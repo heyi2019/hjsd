@@ -1,6 +1,6 @@
 import { Spin, Typography } from "antd";
 import type { Account, AccountExecutionDetail, AccountExecutionEvent, EmployeeOption } from "../shared/api/catalog";
-import { executionActionLabel } from "../shared/lib/format";
+import { executionActionLabel, money } from "../shared/lib/format";
 import {
   STATUS_LABEL,
   BUSINESS_MODE_LABEL,
@@ -21,6 +21,7 @@ import {
   type InventoryEventDraft,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
+import { consignmentPlatform, isConsignmentListing, isActiveConsignmentListing } from "./consignment-logic";
 
 function dateTimeMinute(value: string | null | undefined): string {
   if (!value) return "-";
@@ -41,17 +42,14 @@ function eventPlatform(detail: AccountExecutionDetail | undefined, eventType: st
 function consignmentSummary(detail: AccountExecutionDetail | undefined, accountStatus?: string): string {
   if (accountStatus === "VOID") return "-";
   const records = detail?.orders
-    .filter((order) => order.order_type === "DG" && order.status !== "CANCELLED")
+    .filter((order) => isConsignmentListing(order) && order.status !== "CANCELLED")
     .map((order) => {
-      const configuredPlatform = order.extra_values?.consignment_platform;
-      const platform = configuredPlatform
-        ? String(configuredPlatform)
-        : (order.counterparties ?? [])
-          .filter((counterparty) => counterparty.role === "PLATFORM")
-          .map((counterparty) => counterparty.display_name)
-          .join("、") || "-";
+      const platform = consignmentPlatform(order) ?? "-";
       const listedAt = dateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? ""));
-      return `${platform} / ${listedAt}`;
+      // 寄售价格随该次上架记录保存；未填时不占位，避免出现「¥-」。
+      const price = order.extra_values?.consignment_price as string | number | null | undefined;
+      const priceText = price == null || price === "" ? "" : ` / ¥${money(price)}`;
+      return `${platform} / ${listedAt}${priceText}`;
     }) ?? [];
   return records.length ? records.join("\n") : "-";
 }
@@ -68,9 +66,7 @@ function orderPlatformValues(order: AccountExecutionDetail["orders"][number]): s
 /** 下架分两类：平台下架（PLATFORM）只取消指定平台的上架记录；系统下架（SYSTEM）按 ERP 出库、账号退出库存。
  *  操作明细「平台」列据此取值：平台下架显示具体平台，系统下架显示「本系统」。 */
 function consignmentPlatformOf(order: AccountExecutionDetail["orders"][number]): string {
-  const configured = order.extra_values?.consignment_platform;
-  if (configured) return String(configured);
-  return orderPlatformValues(order).join("、") || "-";
+  return consignmentPlatform(order) ?? "-";
 }
 
 function eventPlatformLabel(
@@ -196,6 +192,8 @@ export function OrderDetail({
   onSave,
   onCancel,
   saving,
+  timeShiftDays,
+  onTimeShift,
 }: {
   row: Account;
   detail?: AccountExecutionDetail;
@@ -212,6 +210,9 @@ export function OrderDetail({
   onSave?: () => void;
   onCancel?: () => void;
   saving?: boolean;
+  /** 编辑态时间联动：平移天数与 setter。 */
+  timeShiftDays?: number;
+  onTimeShift?: (days: number) => void;
 }) {
   if (loading && !detail) return <Spin size="small" />;
 
@@ -224,8 +225,10 @@ export function OrderDetail({
   )) ?? [];
   const expenseFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "OUT");
   const incomeFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "IN");
-  const totalExpense = expenseFlows.reduce((sum, { cashflow }) => sum + Number(cashflow.amount), 0).toFixed(2);
-  const totalIncome = incomeFlows.reduce((sum, { cashflow }) => sum + Number(cashflow.amount), 0).toFixed(2);
+  // 合计一律取后端 finance_summary（与上面明细同源），前端只数条数、不再累加金额。
+  const summary = detail?.finance_summary;
+  const totalExpense = summary?.total_expense ?? "0.00";
+  const totalIncome = summary?.total_income ?? "0.00";
 
   const financeRows: InventoryFinanceRow[] = [
     ...financialFlows.map(({ event, cashflow }) => ({
@@ -266,14 +269,11 @@ export function OrderDetail({
     }))
   )) ?? [];
 
-  const consignmentOrders = (detail?.orders ?? []).filter((order) => order.order_type === "DG" && order.status !== "CANCELLED");
-  const hasActiveConsignment = consignmentOrders.some((order) => {
-    const unlisted = order.extra_values?.platform_unlisted_at || order.extra_values?.platform_unlist_scope;
-    return !unlisted;
-  });
+  const consignmentOrders = (detail?.orders ?? []).filter(isConsignmentListing);
+  const hasActiveConsignment = consignmentOrders.some(isActiveConsignmentListing);
   const hasUnlistedConsignment = consignmentOrders.some((order) => {
     const unlisted = order.extra_values?.platform_unlisted_at || order.extra_values?.platform_unlist_scope;
-    return Boolean(unlisted);
+    return order.status !== "CANCELLED" && Boolean(unlisted);
   });
   const operationStatusLabel = resolveOperationStatus(row.status, hasActiveConsignment, hasUnlistedConsignment);
 
@@ -283,6 +283,7 @@ export function OrderDetail({
     statusLabel: STATUS_LABEL[row.status] ?? row.status,
     gameType: row.game_type ?? null,
     gameAccount: row.game_account ?? null,
+    campAccount: row.camp_account ?? null,
     platform: row.platform ?? null,
     cost: row.cost_amount ?? null,
     businessMode: row.business_mode ? (BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode) : null,
@@ -302,8 +303,11 @@ export function OrderDetail({
     channelRegion: [row.platform, row.channel_region].filter(Boolean).join(" / ") || "-",
     boundPhone: row.bound_phone || "-",
     secondary: row.has_secondary == null ? "-" : row.has_secondary ? "有" : "无",
+    walletRealname: row.wallet_realname || "-",
+    walletRealnameImages: row.wallet_realname_images ?? [],
     accountDescription: row.account_description || "-",
     accountImages: row.account_images ?? [],
+    secondaryImages: row.secondary_images ?? [],
     note: row.note || "-",
     orderNotes: orderNotes(detail),
     orderParties: renderOrderParties(orderParties(detail), onPartyClick),
@@ -325,7 +329,7 @@ export function OrderDetail({
       executionRows={executionRows}
       financeRows={financeRows}
       expenseCount={expenseFlows.length}
-      incomeCount={incomeFlows.length}
+      incomeCount={incomeFlows.length + rebateItems.length}
       totalExpense={totalExpense}
       totalIncome={totalIncome}
       flowCount={financialFlows.length + rebateItems.length}
@@ -333,6 +337,8 @@ export function OrderDetail({
       onSave={onSave}
       onCancel={onCancel}
       saving={saving}
+      timeShiftDays={timeShiftDays}
+      onTimeShift={onTimeShift}
     />
   );
 }

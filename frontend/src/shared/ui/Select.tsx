@@ -20,11 +20,15 @@ import "./Select.css";
 type SelectRef = React.ElementRef<typeof AntdSelect>;
 
 export const Select = forwardRef<SelectRef, SelectProps>((props, ref) => {
-  const { popupClassName, classNames, ...restProps } = props;
+  const { popupClassName, classNames, virtual, ...restProps } = props;
   const mergedPopup = ["ui-select-pop", popupClassName].filter(Boolean).join(" ").trim();
   return (
     <AntdSelect
       {...restProps}
+      // 关闭虚拟列表：antd 默认 virtual 只渲染可视区选项，导致无障碍辅助树只暴露前两项，
+      // 屏幕阅读器/键盘无法触达其余选项（L270）。业务选项集规模小，全量渲染无性能负担；
+      // 调用方仍可用 virtual 显式覆盖。
+      virtual={virtual ?? false}
       ref={ref}
       classNames={{
         ...classNames,

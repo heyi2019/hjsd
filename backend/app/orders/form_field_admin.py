@@ -22,6 +22,10 @@ from .form_field_rules import (
     _normalize_field_options,
 )
 
+# 系统统一术语字段：显示名由业务口径固定（如 payment_pool_id 全站统一「资金账户」），
+# 配置中心只读展示；此集合是最终裁决，防止绕过界面直接调接口改名。
+FIXED_LABEL_FIELD_KEYS = frozenset({"payment_pool_id"})
+
 def create_order_form_field(
     session: Session,
     *,
@@ -147,6 +151,16 @@ def update_order_form_field(
         next_label = label.strip()
     else:
         next_label = definition.label
+    # 系统统一术语字段禁止改名：同值回传（前端整表提交）放行，任何实际改名一律 422。
+    if definition.field_key in FIXED_LABEL_FIELD_KEYS and next_label != definition.label:
+        raise Validation(
+            "该字段为系统统一术语，字段名称不可修改",
+            details={
+                "field": "label",
+                "field_key": definition.field_key,
+                "current": definition.label,
+            },
+        )
     # 类型创建后固定：值结构（单值/多值、标量类型）由类型决定，改类型会让
     # 历史 form_extra 值（字符串 vs 数组、类型语义）渲染异常，故禁止变更。
     # 前端编辑弹窗的类型选择器本就 disabled（仅新增时可定类型），此处为最终裁决。

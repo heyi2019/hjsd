@@ -1,4 +1,4 @@
-import { Modal, Popconfirm, Space } from "antd";
+import { Modal, Space } from "antd";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navigation } from "./navigation";
@@ -10,26 +10,8 @@ import { LoginPage } from "../auth/LoginPage";
 import { ChangePasswordPage } from "../auth/ChangePasswordPage";
 import type { ComponentType } from "react";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
+import { ConfirmButton } from "../shared/ui";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
-
-/** 业务中心子页记忆：切走再切回时恢复到上次停留的子页，而非强制「库存中心」。 */
-const BIZ_TAB_KEY = "erp:businessTab";
-type StoredTab = BusinessCenterEntryTab | null;
-function getStoredBizTab(): StoredTab {
-  try {
-    const v = sessionStorage.getItem(BIZ_TAB_KEY);
-    return (v as StoredTab) ?? null;
-  } catch {
-    return null;
-  }
-}
-function setStoredBizTab(tab: BusinessCenterEntryTab): void {
-  try {
-    sessionStorage.setItem(BIZ_TAB_KEY, tab);
-  } catch {
-    /* sessionStorage 不可用时静默降级，不影响导航 */
-  }
-}
 
 const OrdersPage = lazy(() => import("../orders/OrdersPage").then(({ OrdersPage }) => ({ default: OrdersPage })));
 const CustomersPage = lazy(() => import("../customers/CustomersPage").then(({ CustomersPage }) => ({ default: CustomersPage })));
@@ -80,17 +62,17 @@ export function AppShell() {
   const businessMine = active === "business" && new URLSearchParams(location.search).get("mine") === "true";
   const reportTab = active === "operations" ? new URLSearchParams(location.search).get("tab") : null;
   const initialReportTab = reportTab === "commission" || reportTab === "my-earnings" ? reportTab : undefined;
-  // 业务中心子页：URL 显式带子页则用它（并记忆）；否则恢复上次记忆，首次默认库存中心。
-  const businessTab = active === "business" ? (rawBizTab ?? getStoredBizTab() ?? "inventory") : undefined;
+  // 业务中心只保留作业页；未指定子页时默认进入库存中心。
+  const businessTab = active === "business" ? (rawBizTab ?? "inventory") : undefined;
   const [userCenterOpen, setUserCenterOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const { user, authenticated, mustChangePassword, logout } = useSession();
+  const { role, authenticated, mustChangePassword, logout, can } = useSession();
   const { mode, setMode } = useTheme();
   const item = navigation.find((entry) => entry.key === active);
   const navigateTo = (key: string, tab?: BusinessCenterEntryTab) => {
-    // 回到业务中心但不指定子页时，恢复上次停留的子页（避免被强制回库存中心）。
+    // 回到业务中心但不指定子页时，进入库存中心。
     if (key === "business" && !tab) {
-      navigate(`/business/${getStoredBizTab() ?? "inventory"}`);
+      navigate("/business/inventory");
       return;
     }
     navigate(`/${key}${tab ? `/${tab}` : ""}`);
@@ -113,10 +95,6 @@ export function AppShell() {
   useEffect(() => {
     setVisited((prev) => (prev.has(active) ? prev : new Set(prev).add(active)));
   }, [active]);
-  // 业务中心子页落点记忆：URL 显式带子页时持久化，供「切走再切回」恢复。
-  useEffect(() => {
-    if (active === "business" && rawBizTab) setStoredBizTab(rawBizTab);
-  }, [active, rawBizTab]);
   // 转场重放：不再靠 key 重挂载（那会丢状态），改用 reflow 技巧重放 .page-enter 弹簧入场。
   const pageRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -176,7 +154,9 @@ export function AppShell() {
           宜游轩 <span>ERP</span>
         </div>
         <nav className="nav-list" aria-label="主导航" ref={navRef}>
-          {navigation.map((n) => (
+          {navigation
+            .filter((n) => !n.requiredPermission || can(n.requiredPermission))
+            .map((n) => (
             <button
               key={n.key}
               type="button"
@@ -241,24 +221,26 @@ export function AppShell() {
                 以 Modal 弹出挂载 UserCenterPage，不占用侧栏 nav 计数与一级路由。
                 用 .topbar-action 紧凑幽灵按钮（36px，与分段控件/选择器同高），
                 不再复用 .nav-item（44px 会把顶栏整行撑高）。 */}
-            <button type="button" className="topbar-action" onClick={() => setUserCenterOpen(true)}>
+            <button type="button" className="topbar-action" data-user-center-open={userCenterOpen} onClick={() => setUserCenterOpen(true)}>
               用户中心
             </button>
             {/* 当前角色只读展示：角色由管理员配置（生产态=登录账号角色，DEV 态=X-Dev-User 头），
                 不是运行时可选参数——故不放下拉选择器，避免误以为可自行切换权限。 */}
             <span className="topbar-role">
               <span className="muted">当前角色{import.meta.env.DEV ? "（开发态）" : ""}</span>
-              <span className="topbar-role-name">{DEV_ROLES.find((r) => r.value === user)?.label ?? user}</span>
+              <span className="topbar-role-name">{DEV_ROLES.find((r) => r.value === role)?.label ?? role}</span>
             </span>
-            <Popconfirm
+            <ConfirmButton
+              className="topbar-action topbar-action--logout"
+              type="text"
               title="退出登录"
               description="退出后需要重新登录才能继续操作。"
               okText="退出"
               cancelText="取消"
-              onConfirm={() => void logout()}
+              onConfirm={async () => { void logout(); }}
             >
-              <button type="button" className="topbar-action topbar-action--logout">退出登录</button>
-            </Popconfirm>
+              退出登录
+            </ConfirmButton>
           </Space>
         </header>
         <main className="page-content">
@@ -272,12 +254,16 @@ export function AppShell() {
               const PageComponent = key === "dashboard" ? DashboardPage : PAGES[key];
               if (!PageComponent) return null;
               return (
-                <ErrorBoundary key={key} name={key}>
-                  <div
-                    ref={isActive ? pageRef : undefined}
-                    className={`page-slot${isActive ? " page-enter" : " page-slot--hidden"}`}
-                    aria-hidden={!isActive}
-                  >
+                <div
+                  key={key}
+                  ref={isActive ? pageRef : undefined}
+                  className={`page-slot${isActive ? " page-enter" : " page-slot--hidden"}`}
+                  aria-hidden={!isActive}
+                >
+                  {/* 边界必须挂在 .page-slot 内部：挂在外面时降级卡会顶掉整个 slot，
+                      page-slot--hidden 随之消失，keep-alive 下隐藏页的错误卡就会叠到
+                      当前页底部（2026-11-03 实测库存/订单/分期/资金/报表/设置六处全现）。 */}
+                  <ErrorBoundary name={key}>
                     {key === "dashboard" ? (
                       <DashboardPage onNavigate={navigateTo} onPersonalNavigate={navigateToPersonalView} />
                     ) : (
@@ -291,8 +277,8 @@ export function AppShell() {
                         focusCounterpartyId={key === "customers" ? focusCounterpartyId : undefined}
                       />
                     )}
-                  </div>
-                </ErrorBoundary>
+                  </ErrorBoundary>
+                </div>
               );
             })}
           </Suspense>
@@ -301,7 +287,11 @@ export function AppShell() {
       <Modal
         open={userCenterOpen}
         title="用户中心"
-        footer={null}
+        footer={
+          <button type="button" className="ant-btn" onClick={() => setUserCenterOpen(false)}>
+            关闭
+          </button>
+        }
         destroyOnHidden
         onCancel={() => setUserCenterOpen(false)}
         className="user-center-modal"

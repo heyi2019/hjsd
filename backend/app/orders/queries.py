@@ -6,13 +6,14 @@ from __future__ import annotations
 from datetime import date
 from app.core.security import CurrentUser
 from app.core.security import owner_scope_filter
-from app.domain.enums import EventType
 from sqlalchemy import (
+    cast,
     exists,
     func,
     or_,
     select,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 from app.domain.trade import (
     Account,
@@ -39,7 +40,9 @@ def list_orders(
     )
     return list(
         session.scalars(
-            stmt.order_by(Order.id).limit(limit).offset(offset)
+            # 列表按「最近优先」：先交易日倒序，同日再按 id 倒序。
+            # 原来是 Order.id 升序，等于把最老的 20 条排在第一页，手机端和台账都反直觉。
+            stmt.order_by(Order.trade_date.desc(), Order.id.desc()).limit(limit).offset(offset)
         ).unique().all()
     )
 
@@ -89,13 +92,22 @@ def _order_list_stmt(
         stmt = stmt.where(
             or_(
                 Order.order_no.ilike(pattern),
-                # 2026-10-28 去冗余：平铺列已删，订单侧账号搜索走快照 JSON
-                func.json_extract(Order.account_snapshot, "$.game_account").ilike(pattern),
+                # 2026-10-28 去冗余：平铺列已删，订单侧账号搜索走快照 JSON。
+                # 必须用 ORM 的 JSON 取值表达式而非 func.json_extract：后者是 SQLite
+                # 的 JSON1 扩展函数，PostgreSQL 无此函数，生产（PG）下订单关键字搜索
+                # 会直接 500。as_string() 由方言各自渲染——PG 出 `->>`，SQLite 出
+                # `json_extract`，两边语义一致。
+                Order.account_snapshot["game_account"].as_string().ilike(pattern),
                 Account.game_account.ilike(pattern),
                 Order.note.ilike(pattern),
             )
         )
     if mine and user is not None:
+        # 「我的订单」= 我负责的 + 我参与的。
+        # 每一笔订单事件的执行人都算参与，不限 SELL：买号、售出、运营消耗、
+        # 收付款、交付、取消、退款各自都有负责人，只认 SELL 会让买号/运营的人
+        # 在自己工作台看不到他做过单。`operator_user_ids` 是事件上的多操作人，
+        # 列类型是 json（不是 jsonb），PG 下必须先 cast 再用数组包含判断。
         stmt = stmt.where(
             or_(
                 Order.owner_id == user.id,
@@ -103,8 +115,10 @@ def _order_list_stmt(
                 exists(
                     select(OrderEvent.id).where(
                         OrderEvent.order_id == Order.id,
-                        OrderEvent.event_type == EventType.SELL.value,
-                        OrderEvent.created_by == user.username,
+                        or_(
+                            OrderEvent.created_by == user.username,
+                            cast(OrderEvent.operator_user_ids, JSONB).contains([user.id]),
+                        ),
                     )
                 ),
             )

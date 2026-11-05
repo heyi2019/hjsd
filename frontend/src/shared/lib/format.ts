@@ -70,7 +70,7 @@ export function installmentDisplayStatus(status: string): string {
 }
 
 export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
-  WAITING: "待售",
+  WAITING: "在库",
   SOLD: "已售",
   VOID: "失效",
 };
@@ -81,7 +81,7 @@ export const EVENT_TYPE_LABEL: Record<string, string> = {
   SELL: "售出",
   PAYMENT: "回款（分期）",
   DELIVER: "交付",
-  CANCEL: "冲销",
+  CANCEL: "取消",
   REFUND: "退款",
 };
 
@@ -115,6 +115,7 @@ export function statusColor(status: string): string {
     case "PAID":
     case "SETTLED":
     case "IN_STOCK":
+    case "WAITING":
       return "green";
     case "DRAFT":
     case "PENDING":
@@ -126,11 +127,14 @@ export function statusColor(status: string): string {
     case "DEFAULTED":
     case "LOST":
     case "DISABLED":
+    case "VOID":
       return "red";
     case "COMPLETED":
     case "DELIVERED":
     case "RETURNED":
       return "cyan";
+    case "SOLD":
+      return "red";
     default:
       return "default";
   }

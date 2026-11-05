@@ -1,6 +1,13 @@
 import axios from "axios";
+import { cloudAdapter } from "./cloud/adapter";
+import { isCloudMode } from "./cloud/config";
 
-/** 后端基址：本地联调 8123（8000 被 Docker 占用），与 docs/ERP_本地开发与联调指南_v1.0.md 一致。 */
+/** 云端预览模式下，所有 /api/v1 请求改由云适配器承接；其它环境完全走原 FastAPI。 */
+export const CLOUD_MODE = isCloudMode();
+const CLOUD_TRANSPORT_ADAPTER = CLOUD_MODE ? cloudAdapter : undefined;
+if (CLOUD_MODE) document.title = `${document.title} · 云端预览（只读）`;
+
+/** 后端基址：本地联调 8123（8000 被 Docker 占用）；后端绑 0.0.0.0，局域网可直连。 */
 export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8123/api/v1";
 
 /** dev 直通用户：后端以 `X-Dev-User` 识别；切换角色即可验证权限显隐。 */
@@ -15,7 +22,7 @@ export function setDevUser(user: string): void {
   localStorage.setItem(DEV_USER_KEY, user);
 }
 
-export const api = axios.create({ baseURL: API_BASE, timeout: 15_000 });
+export const api = axios.create({ baseURL: API_BASE, timeout: 15_000, adapter: CLOUD_TRANSPORT_ADAPTER });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -50,7 +57,7 @@ const pending = new Map<string, Promise<CacheEntry>>();
 
 // 纯传输层：复用相同 baseURL 与默认 xhr adapter，但不挂载本项目拦截器，
 // 供缓存层直接发起真实网络请求（避免与缓存拦截器相互递归）。
-const transport = axios.create({ baseURL: API_BASE, timeout: 15_000 });
+const transport = axios.create({ baseURL: API_BASE, timeout: 15_000, adapter: CLOUD_TRANSPORT_ADAPTER });
 
 function buildCacheKey(config: { method?: string; url?: string; params?: unknown; headers?: Record<string, unknown> }): string {
   const headers = (config.headers as Record<string, unknown>) || {};
@@ -79,7 +86,9 @@ async function realSend(config: any): Promise<CacheEntry> {
   const cfg = {
     ...config,
     headers,
-    adapter: undefined,
+    // 云模式下必须显式带上云适配器：此处 config 已被缓存层改写成 fake adapter，
+    // 若留 undefined 会回落到 transport 默认的 xhr，重新打到 /api/v1。
+    adapter: CLOUD_TRANSPORT_ADAPTER,
     transformRequest: config.transformRequest,
     transformResponse: config.transformResponse,
   };
@@ -147,7 +156,7 @@ export function clearApiCache(): void {
   pending.clear();
 }
 
-export type SessionUser = { id: number; username: string; role: string; display_name: string; must_change_password?: boolean };
+export type SessionUser = { id: number; username: string; role: string; display_name: string; must_change_password?: boolean; auth_method?: string };
 
 export async function login(username: string, password: string) {
   const response = await api.post<{ access_token: string; user: SessionUser }>("/auth/login", { username, password });
@@ -164,13 +173,102 @@ export async function checkBackendHealth(): Promise<void> {
   await api.get("/health", { timeout: 3_000 });
 }
 
-export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
-  await api.post("/auth/change-password", { old_password: oldPassword, new_password: newPassword });
+export async function changePassword(oldPassword: string | null, newPassword: string): Promise<void> {
+  // 免密登录（手机号验证码 / 微信）的会话从未输入过密码，首次设置密码时不带
+  // old_password；是否允许省略由后端按 token 的 amr 与 must_change_password 判定，
+  // 前端不做准入决定。
+  const body: { old_password?: string; new_password: string } = { new_password: newPassword };
+  if (oldPassword) body.old_password = oldPassword;
+  // 会话安全操作不能沿用普通请求的 15 秒等待；失败或旧密码错误时应尽快回到可重试状态。
+  await api.post("/auth/change-password", body, { timeout: 5_000 });
 }
 
 export async function logout(): Promise<void> {
   try { await api.post("/auth/logout"); } finally { localStorage.removeItem(ACCESS_TOKEN_KEY); }
 }
+
+// ---- 免密登录：手机号验证码 / 微信 -------------------------------------------------
+// 统一约定：登录页只调这些函数，token 落盘动作集中在 persistAccessToken 一处，
+// 避免「某个入口忘了写 localStorage」导致登录成功却仍停在登录页。
+
+export type PasswordlessStatus = "logged_in" | "bind_required";
+
+export type LoginMethods = {
+  password: { enabled: boolean };
+  phone_code: { enabled: boolean; dev_code_visible: boolean };
+  wechat: {
+    enabled: boolean;
+    configured: boolean;
+    provider: string;
+    verify_mode: "sms" | "password";
+    reason: string | null;
+  };
+};
+
+export type CodeChallenge = {
+  sent: boolean;
+  expires_in: number;
+  phone: string;
+  code_ticket: string;
+  dev_code?: string | null;
+};
+
+export type PasswordlessLoginResult = {
+  status: PasswordlessStatus;
+  access_token?: string | null;
+  user?: SessionUser | null;
+  bind_ticket?: string | null;
+  verify_mode?: "sms" | "password" | null;
+  message?: string | null;
+};
+
+/** 登录页启动时拉一次：哪些入口真的可用（未就绪的入口不点亮按钮）。 */
+export async function fetchLoginMethods(): Promise<LoginMethods> {
+  return (await api.get<LoginMethods>("/auth/login-methods", { timeout: 5_000 })).data;
+}
+
+export async function requestWechatAuthorize(redirectUri: string): Promise<{ authorize_url: string; state: string }> {
+  return (
+    await api.get<{ authorize_url: string; state: string }>("/auth/wechat/authorize", {
+      params: { redirect_uri: redirectUri },
+      timeout: 8_000,
+    })
+  ).data;
+}
+
+export async function wechatLogin(code: string, state: string): Promise<PasswordlessLoginResult> {
+  return (await api.post<PasswordlessLoginResult>("/auth/wechat/login", { code, state })).data;
+}
+
+export async function sendWechatBindCode(bindTicket: string, phone: string): Promise<CodeChallenge> {
+  return (
+    await api.post<CodeChallenge>("/auth/wechat/bind/code", { bind_ticket: bindTicket, phone })
+  ).data;
+}
+
+export async function confirmWechatBind(payload: {
+  bind_ticket: string;
+  phone: string;
+  code_ticket?: string;
+  code?: string;
+  password?: string;
+}): Promise<PasswordlessLoginResult> {
+  return (await api.post<PasswordlessLoginResult>("/auth/wechat/bind/confirm", payload)).data;
+}
+
+export async function sendPhoneLoginCode(phone: string): Promise<CodeChallenge> {
+  return (await api.post<CodeChallenge>("/auth/phone/code", { phone })).data;
+}
+
+export async function phoneLogin(phone: string, code: string, codeTicket: string): Promise<PasswordlessLoginResult> {
+  return (await api.post<PasswordlessLoginResult>("/auth/phone/login", { phone, code, code_ticket: codeTicket })).data;
+}
+
+/** 把服务端下发的 token 落盘。免密登录的所有分支都必须经由此函数。 */
+export function persistAccessToken(token: string): void {
+  localStorage.setItem(ACCESS_TOKEN_KEY, token);
+}
+
 
 /** 后端不可达标记：页面据此显示「连接失败」横幅，而不是静默渲染空态。
  *  典型场景：后端未启动 / 端口错 / CORS 预检被拒 —— 三者都表现为 response 为空。 */

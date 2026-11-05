@@ -1,10 +1,10 @@
 import { appMessage } from "../../shared/ui/appFeedback";
-import { Card, Form, Input, Popconfirm, Space, Typography } from "antd";
+import { Card, Form, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { optionSetsApi, type OptionItem } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
-import { BusinessForm, DataTable, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
+import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
 
 export function OptionDictionarySection({ code, title, description }: { code: string; title: string; description: string }) {
   const [rows, setRows] = useState<OptionItem[]>([]);
@@ -27,17 +27,31 @@ export function OptionDictionarySection({ code, title, description }: { code: st
       <PermissionButton permission="option-set.manage" size="small" onClick={() => { setEditingValue(row.value); form.setFieldsValue({ option: row.label }); }}>编辑</PermissionButton>
       <PermissionButton permission="option-set.manage" size="small" onClick={() => void move(row.value, -1)}>上移</PermissionButton>
       <PermissionButton permission="option-set.manage" size="small" onClick={() => void move(row.value, 1)}>下移</PermissionButton>
-      <Popconfirm title={`删除${title}「${row.label}」？`} onConfirm={async () => { try { await optionSetsApi.update(code, { options: rows.filter((item) => item.value !== row.value) }); await load(); } catch (err) { setError(normalizeError(err)); } }}><PermissionButton permission="option-set.manage" size="small" danger>删除</PermissionButton></Popconfirm>
+      <ConfirmButton
+        permission="option-set.manage"
+        size="small"
+        danger
+        title={`删除${title}「${row.label}」？`}
+        description="删除后不可恢复。"
+        okText="删除"
+        onConfirm={async () => {
+          await optionSetsApi.update(code, { options: rows.filter((item) => item.value !== row.value) });
+          appMessage.success(`${title}已删除`);
+          await load();
+        }}
+      >
+        删除
+      </ConfirmButton>
     </Space></PermissionGate> },
   ];
   return <Card size="small" title={title}>
     <ErrorBanner error={error} onRetry={() => void load()} /><Typography.Paragraph type="secondary">{description}</Typography.Paragraph>
     <DataTable<OptionItem> columns={columns} rows={rows} page={1} pageSize={Math.max(rows.length, 10)} total={rows.length} emptyText={`暂无${title}`} onPageChange={() => undefined} pagination={false} rowKey="value" />
-    <PermissionGate permission="option-set.manage"><BusinessForm form={form} layout="inline" onFinish={save}>
+    <PermissionGate permission="option-set.manage"><BusinessRegistrationForm form={form} layout="inline" onFinish={save}>
       <Form.Item name="option" label={title} rules={[{ required: true, message: `请输入${title}` }]}><Input placeholder={`请输入${title}`} /></Form.Item>
       <Form.Item><PermissionButton permission="option-set.manage" type="primary" htmlType="submit">{editingValue ? `保存${title}` : `新增${title}`}</PermissionButton></Form.Item>
       {editingValue ? <Form.Item><PermissionButton permission="option-set.manage" onClick={() => { setEditingValue(null); form.resetFields(); }}>取消编辑</PermissionButton></Form.Item> : null}
-    </BusinessForm></PermissionGate>
+    </BusinessRegistrationForm></PermissionGate>
   </Card>;
 }
 

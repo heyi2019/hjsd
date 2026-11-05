@@ -1,0 +1,161 @@
+"""TESTING-06 磁盘测试文件集合、区域归属与分层归属必须与 tests/manifest.json 一致。
+
+背景：本仓库搬过三次测试目录，每次都有一批东西「不报错地消失」——
+``test_catalog.all_backend_test_files()`` 指向已死的 ``backend/tests/v1`` 让
+``run_regression.py B`` 打印「无匹配文件」然后 exit 0；``gen_test_case_library.py``
+只用 ``os.listdir`` 扫一层，文件一下沉就从用例库里整批消失；``record_frontend_results``
+用 ``relative_to(frontend)`` 失败时 ``return None``，记录被静默丢弃。
+
+共同点是**扫描范围写死在旧路径，而失败表现是「结果为空」而不是「报错」**。
+空集合上的「磁盘 ⊆ 清单」类断言恒真，守卫看起来全绿。
+
+本守卫的做法：manifest 只存「应该收到多少」，文件集合永远扫磁盘，
+两边对不上就红。目录存在时才校验目录归属，故搬迁前后的结构都能跑。
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+# 向上找 pytest.ini 定位仓库根：本文件会被搬进 tests/backend/{unit,integration}/<区域>/，
+# 届时 parents[N] 的层数会变，写死层数必错。
+def _repo_root() -> Path:
+    here = Path(__file__).resolve()
+    for candidate in (here, *here.parents):
+        if (candidate / "pytest.ini").exists():
+            return candidate
+    raise RuntimeError("找不到仓库根（没有 pytest.ini）")
+
+
+REPO = _repo_root()
+BE_TESTS = REPO / "tests" / "backend"
+MANIFEST_PATH = REPO / "tests" / "manifest.json"
+BACKEND = REPO / "backend"
+KINDS = ("unit", "integration")
+GUARD_AREA = {
+    "test_manifest_parity.py": "SYS12",
+    "test_promise_declaration.py": "SYS12",
+    "test_group_coverage.py": "SYS11",
+    "test_db_channel.py": "SYS10",
+}
+
+
+def _manifest() -> dict:
+    assert MANIFEST_PATH.exists(), f"manifest 不存在：{MANIFEST_PATH}"
+    return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+
+def _test_files() -> list[Path]:
+    """递归扫盘。用 rglob 而非 glob 是本守卫存在的意义之一。"""
+    return sorted(BE_TESTS.rglob("test_*.py"))
+
+
+sys.path.insert(0, str(BACKEND / "scripts"))
+import test_catalog as tc  # noqa: E402 — 必须先调整 sys.path
+
+
+def _area_of(fname: str) -> str:
+    """功能编号首字母 → 区域目录名。
+
+    目录与 manifest 用区域全名（business/customer/…），功能编号仍是字母前缀
+    （B03、SYS12），映射表在 manifest.regionByCode，避免两套命名各写一份。
+    """
+    func = tc.BACKEND_FILE_TO_FUNC.get(fname) or GUARD_AREA.get(fname)
+    assert func, f"{fname} 既不在 BACKEND_FILE_TO_FUNC 也无守卫区域登记"
+    code = func[0] if func[0] in "ABCDEF" else "SYS"
+    return _manifest()["regionByCode"][code]
+
+
+def test_manifest_has_all_three_layers() -> None:
+    """manifest 自带结构完整性：三端齐全、区域与目录声明不空。"""
+    m = _manifest()
+    assert m["version"] >= 1
+    for layer in ("backend", "frontend", "e2e"):
+        assert layer in m["layers"], f"manifest 缺 {layer} 层"
+        assert m["layers"][layer]["root"].startswith("tests/"), f"{layer}.root 必须指向 tests/"
+    for key in ("shared", "system"):
+        assert key in m["regions"], f"regions 缺 {key}"
+
+
+def test_backend_file_count_matches_manifest() -> None:
+    """文件总数与 manifest 一致。搬丢一个就红。"""
+    expected = _manifest()["layers"]["backend"]["expected"]["files"]
+    files = _test_files()
+    assert files, "rglob 扫不到任何后端测试文件——扫描根写错了（这正是要防的静默归零）"
+    assert len(files) == expected, (
+        f"后端测试文件 {len(files)} 个，manifest 记 {expected} 个；"
+        f"差异集合：{[p.name for p in files][:10]}"
+    )
+
+
+def test_backend_area_distribution_matches_manifest() -> None:
+    """区域归属分布与 manifest 一致：防止有人新增文件却不登记功能编号（落 SYS 兜底会改分布）。"""
+    m = _manifest()
+    expected: dict[str, int] = {}
+    for kind_data in m["layers"]["backend"]["expected"]["kinds"].values():
+        for area, count in kind_data["byArea"].items():
+            expected[area] = expected.get(area, 0) + count
+
+    actual: dict[str, int] = {}
+    for path in _test_files():
+        area = _area_of(path.name)
+        actual[area] = actual.get(area, 0) + 1
+
+    assert actual == expected, f"区域分布不一致：磁盘 {actual} vs manifest {expected}"
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_kind_directories_match_manifest_when_present(kind: str) -> None:
+    """目录存在时，每个区域的 unit/integration 文件数必须与 manifest 一致。
+
+    旧结构（文件平铺在 tests/backend/ 下）没有这两个目录，跳过；
+    搬迁后自动生效，搬错一半（例如只搬了 unit/）会被 test_no_stray_backend_files 抓到。
+    """
+    kind_dir = BE_TESTS / kind
+    if not kind_dir.is_dir():
+        pytest.skip(f"{kind}/ 尚未建立（搬迁前的扁平结构）")
+
+    expected = _manifest()["layers"]["backend"]["expected"]["kinds"][kind]["byArea"]
+    actual: dict[str, int] = {}
+    for area_dir in sorted(kind_dir.iterdir()):
+        if not area_dir.is_dir():
+            continue
+        n = len(list(area_dir.glob("test_*.py")))
+        if n:
+            actual[area_dir.name] = n
+
+    assert actual == expected, f"{kind}/ 区域分布 {actual} 与 manifest {expected} 不一致"
+
+
+def test_no_stray_backend_files_when_partitioned() -> None:
+    """一旦开始分区，tests/backend 根目录就不许再留 test_*.py（防「搬了一半」）。"""
+    if not any((BE_TESTS / k).is_dir() for k in KINDS):
+        pytest.skip("尚未分区（扁平结构）")
+
+    stray = sorted(p.name for p in BE_TESTS.glob("test_*.py"))
+    assert not stray, f"分区后根目录仍残留测试文件：{stray}"
+
+
+def test_case_total_matches_manifest(request: pytest.FixtureRequest) -> None:
+    """用例总数与 manifest 一致。
+
+    只在全量收集时校验：单跑本文件时 total 很小，硬比会误报。
+    （这是上一轮踩过的坑：基线断言必须先判断收集规模。）
+    """
+    total = len(request.session.items)
+    if total < 1000:
+        pytest.skip(f"当前只收集到 {total} 条用例，非全量运行，跳过总数校验")
+    expected = _manifest()["layers"]["backend"]["expected"]["cases"]
+    assert total == expected, f"用例总数 {total}，manifest 记 {expected}"
+
+
+def test_guards_declare_area() -> None:
+    """三个守卫自身必须有区域归属，否则会落 SYS 兜底并悄悄改变区域分布。"""
+    on_disk = {p.name for p in BE_TESTS.rglob("test_*.py")}
+    for fname in GUARD_AREA:
+        assert fname in on_disk, f"守卫文件丢失：{fname}"
+        _area_of(fname)  # 无区域登记会 AssertionError

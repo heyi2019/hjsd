@@ -1,33 +1,4 @@
 .th-fee-primary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-  row-gap: var(--space-4);
-  width: 100%;
-  padding: var(--space-3);
-  box-sizing: border-box;
-}
-
-.th-fee-primary .ant-form-item { margin: 0; }
-.th-fee-primary .ant-form-item-control,
-.th-fee-primary .ant-form-item-control-input,
-.th-fee-primary .ant-form-item-control-input-content {
-  min-width: 0;
-  max-width: 100%;
-}
-.th-fee-primary .ant-form-item-control-input-content > * { width: 160px; max-width: 100%; }
-.th-fee-primary__field {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-.th-fee-primary__field .recovery-fee-card__label { white-space: nowrap; }
-.th-fee-primary__field .ant-form-item { flex: 1 1 auto; min-width: 0; }
-@media (max-width: 720px) {
-  .th-fee-primary { grid-template-columns: minmax(0, 1fr); }
-
-  .th-fee-primary .ant-form-item-control-input-content > * { width: 100%; }
-  .th-fee-primary__field { width: 100%; }
+  border-color: color-mix(in srgb, var(--color-primary) 32%, var(--glass-border));
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--glass));
 }

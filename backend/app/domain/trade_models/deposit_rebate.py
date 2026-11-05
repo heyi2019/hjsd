@@ -133,49 +133,6 @@ class RebateRecord(Base, AuditMixin):
     # REBATE/REBATEVOID 作用域自定义字段值。
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
-
-class RebateSettlement(Base, AuditMixin):
-    """返点分次结算：净额 = 毛额 − 手续费，冲销通过反向子记录留痕。"""
-
-    __tablename__ = "rebate_settlements"
-    __table_args__ = (
-        Index("ix_rebate_settlements_rebate_record_id", "rebate_record_id"),
-        Index("ix_rebate_settlements_fee_cashflow_id", "fee_cashflow_id"),
-        UniqueConstraint("settlement_no", name="uq_rebate_settlements_no"),
-        UniqueConstraint("cashflow_id", name="uq_rebate_settlements_flow"),
-        Index(
-            "uq_rebate_settlements_reversal",
-            "reversal_of_id",
-            unique=True,
-        ),
-        CheckConstraint(
-            "gross_amount >= 0 AND platform_fee >= 0 AND net_amount >= 0",
-            name="amount_nonneg",
-        ),
-        CheckConstraint(
-            "net_amount = gross_amount - platform_fee",
-            name="net_amount_matches_breakdown",
-        ),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    settlement_no: Mapped[str] = mapped_column(String(48), nullable=False)
-    rebate_record_id: Mapped[int] = mapped_column(
-        ForeignKey("rebate_records.id", ondelete="RESTRICT"), nullable=False
-    )
-    settled_on: Mapped[date] = mapped_column(Date, nullable=False)
-    gross_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
-    platform_fee: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
-    net_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
-    cashflow_id: Mapped[int | None] = mapped_column(
-        ForeignKey("cashflow.id", ondelete="SET NULL"), nullable=True
-    )
-    fee_cashflow_id: Mapped[int | None] = mapped_column(
-        ForeignKey("cashflow.id", ondelete="SET NULL"), nullable=True
-    )
-    reversal_of_id: Mapped[int | None] = mapped_column(
-        ForeignKey("rebate_settlements.id", ondelete="RESTRICT"), nullable=True
-    )
-    # REBSETTLE/REBREVERSE 作用域自定义字段值。
-    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+# 返点分次结算模型 `RebateSettlement`（rebate_settlements 表）已于 2026-11-05 下线：
+# 返点登记即完成收入确认，金额唯一取 rebate_records.base_amount，不再有分次到账、
+# 手续费与冲销子记录。已有库（含生产）中的历史表保留、不 drop，避免破坏历史数据。

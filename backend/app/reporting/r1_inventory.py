@@ -1,6 +1,6 @@
 """reporting.r1_inventory：R1 库存健康度。
 
-回收与代挂账号纳入库存；提号只保留订单账号文本，不纳入库存。
+所有已经进入独立库存且仍在库的账号都纳入统计，包括提号账号。
 """
 
 from __future__ import annotations
@@ -78,8 +78,6 @@ def r1_inventory_health(
         entity_ids=[account.id for account in accounts],
     )
     for account in accounts:
-        if account.inventory_type == "PICKUP":
-            continue
         if account.inventory_status != InventoryStatus.IN_STOCK.value:
             continue
         orders = order_by_account.get(account.id, [])

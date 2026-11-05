@@ -74,6 +74,7 @@ export type OrderDetailMeta = {
   statusLabel?: string;
   gameType?: string | null;
   gameAccount?: string | null;
+  campAccount?: string | null;
   platform?: string | null;
   cost?: string | null;
   businessMode?: string | null;
@@ -95,8 +96,13 @@ export type OrderDetailMeta = {
   channelRegion: string;
   boundPhone: string;
   secondary: string;
+  walletRealname: string;
+  /** 钱包实名注销佐证图（data URL）。 */
+  walletRealnameImages: string[];
   accountDescription: string;
   accountImages: string[];
+  /** 二次验证佐证图（data URL）。 */
+  secondaryImages: string[];
   note: string;
   // 订单补充
   orderNotes: string;

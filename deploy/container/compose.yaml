@@ -1,0 +1,63 @@
+# 黑金时代 ERP（宜游轩ERP）本机数据库容器。
+#
+# 存在理由：此前三个库（dev / test / release，合计 35 MB）寄生在另一个项目的共享容器
+# `container-db-1` 里——那个容器跑着对方 841 MB 的业务库，`docker compose down -v`
+# 连卷带库删掉会顺手删掉我们的上线母本；我们的归档配置也只能写进对方卷里的
+# postgresql.auto.conf。库小、耦合重，所以自建。
+#
+# 用法（不要直接 docker compose up，密码等变量在仓库根 .env 里）：
+#   bash deploy/scripts/pg_container.sh up|down|status|logs
+#
+# 与共享容器相比的三点不同：
+# 1) 端口只绑 127.0.0.1，不向局域网暴露（共享容器是 0.0.0.0:5432）。
+# 2) WAL 归档目录挂宿主机 bind mount，归档不落在数据卷上——数据盘坏了归档还在。
+# 3) archive_mode / archive_command 写在自己的启动参数里，不写 auto.conf，谁都不会
+#    在别处悄悄改掉它。
+
+name: heijin
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ${ERP_PG_CONTAINER:-heijin-db-1}
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${ERP_PG_USER:?需要在 .env 配置 ERP_PG_USER}
+      POSTGRES_PASSWORD: ${ERP_PG_PASSWORD:?需要在 .env 配置 ERP_PG_PASSWORD}
+    # 只绑本机回环：三个库都只给本机后端与 pytest 用，没有跨机访问需求。
+    ports:
+      - "127.0.0.1:${ERP_PG_PORT:-5433}:5432"
+    volumes:
+      - heijin_pg_data:/var/lib/postgresql/data
+      # 归档段直接写宿主机，路径由 .env 的 ERP_PG_ARCHIVE_HOST 指定。
+      # 挂到 /wal_archive 而不是 PGDATA 内的子目录：后者会在 initdb 之前先建出目录，
+      # 让 initdb 直接报「directory exists but is not empty」起不来；分开挂还顺带做到
+      # 「PGDATA 被清空也不影响已归档的 WAL」。
+      - ${ERP_PG_ARCHIVE_HOST:?需要在 .env 配置 ERP_PG_ARCHIVE_HOST}:/wal_archive
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      # 不加 test && 判断：归档段不可变，重复归档同名文件应当直接覆盖，
+      # 否则一次写一半的残文件会让该段永远归档失败、WAL 一直堆积。
+      - -c
+      - archive_command=cp %p /wal_archive/%f
+      # 库基本空闲，靠超时强制切片。原设 5min 是为把 RPO 压到 5 分钟，但在「每天只写
+      # 几单」的实际负载下它的代价是：空闲期也每 5 分钟切一个 16MB 段 = 4.5 GB/天，
+      # 14 天保留期峰值 63 GB，其中几乎全是空段。30min 使产出降到 0.75 GB/天（峰值
+      # 10.5 GB），代价是 RPO 放宽到 30 分钟——这对本库可接受：每日 04:10 有 pg_dump
+      # 逻辑备份兜底（backup_local.sh），且日常写入量以「单」计，30 分钟最多丢几单。
+      # 注意别把这个值再调大：它同时决定了空闲期 WAL 的产出量。
+      - -c
+      - archive_timeout=30min
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  heijin_pg_data:

@@ -11,6 +11,7 @@ import { useListViewColumns } from "../shared/lib/listColumns";
 
 /** 词典未加载时的回落值，与改造前硬编码一致。 */
 const ENTITY_TYPE_FALLBACK = Object.entries(ENTITY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
+const ACTION_FALLBACK = Object.entries(AUDIT_ACTION_LABEL).map(([value, label]) => ({ value, label }));
 import { DataTable, ErrorBanner, Select } from "../shared/ui";
 
 export function AuditPanel() {
@@ -22,7 +23,7 @@ export function AuditPanel() {
   const [actor, setActor] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [actionOptions, setActionOptions] = useState<string[]>([]);
+  const [actionOptions, setActionOptions] = useState<string[]>(Object.keys(AUDIT_ACTION_LABEL));
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const load = useCallback(async () => {
     try {
@@ -43,7 +44,7 @@ export function AuditPanel() {
   }, [entityType, entityId, action, actor, fromDate, toDate]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
-    auditApi.actions().then(setActionOptions).catch(() => setActionOptions([]));
+    auditApi.actions().then(setActionOptions).catch(() => undefined);
   }, []);
   const { arrange: arrangeColumns } = useListViewColumns("AUDIT_LOG");
   const columns: ColumnsType<AuditLogRow> = [
@@ -74,7 +75,9 @@ export function AuditPanel() {
             placeholder="动作"
             value={action || undefined}
             onChange={(value) => setAction(value ?? "")}
-            options={actionOptions.map((value) => ({ value, label: configurableLabel("AUDIT_ACTION", value, AUDIT_ACTION_LABEL) }))}
+            options={actionOptions.length > 0
+              ? actionOptions.map((value) => ({ value, label: configurableLabel("AUDIT_ACTION", value, AUDIT_ACTION_LABEL) }))
+              : ACTION_FALLBACK}
           />
           <Input placeholder="操作人" value={actor} onChange={(event) => setActor(event.target.value)} onPressEnter={() => void load()} />
           <Input aria-label="审计开始日期" placeholder="开始日期" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />

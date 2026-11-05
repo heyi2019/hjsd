@@ -36,6 +36,8 @@ export function PolicySettingsPanel() {
   const [definitions, setDefinitions] = useState<PolicyDefinition[]>([]);
   const [definitionId, setDefinitionId] = useState<number | null>(null);
   const [versions, setVersions] = useState<PolicyVersion[]>([]);
+  const [definitionsReady, setDefinitionsReady] = useState(false);
+  const [versionsReady, setVersionsReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -48,11 +50,13 @@ export function PolicySettingsPanel() {
   const current = definitions.find((d) => d.id === definitionId) ?? null;
 
   const loadDefinitions = useCallback(async () => {
+    setDefinitionsReady(false);
     try {
       const data = await policyApi.list();
       setDefinitions(data.items);
       setDefinitionId((prev) => prev ?? data.items[0]?.id ?? null);
       setError(null);
+      setDefinitionsReady(true);
     } catch (err) {
       setError(normalizeError(err));
     }
@@ -65,13 +69,16 @@ export function PolicySettingsPanel() {
   const loadVersions = useCallback(async () => {
     if (definitionId === null) {
       setVersions([]);
+      setVersionsReady(true);
       return;
     }
     setLoading(true);
+    setVersionsReady(false);
     try {
       const data = await policyApi.versions(definitionId);
       setVersions(data.items);
       setError(null);
+      setVersionsReady(true);
     } catch (err) {
       setError(normalizeError(err));
     } finally {
@@ -112,7 +119,7 @@ export function PolicySettingsPanel() {
     setEditorOpen(false);
   };
 
-  /** 作废草稿版本：草稿只是未发布的规划，作废不影响任何历史订单口径。 */
+  /** 取消草稿版本：草稿只是未发布的规划，取消不影响任何历史订单口径。 */
   const submitSupersede = async (values: Record<string, unknown>) => {
     const target = supersedeTarget;
     if (!target) return;
@@ -121,7 +128,7 @@ export function PolicySettingsPanel() {
     });
     if (succeeded) {
       setSupersedeTarget(null);
-      appMessage.success(`草稿 v${target.version} 已作废`);
+      appMessage.success(`草稿 v${target.version} 已取消`);
     }
   };
 
@@ -159,6 +166,8 @@ export function PolicySettingsPanel() {
     setResolveOpen(true);
   };
 
+  const policyDataReady = definitionsReady && versionsReady;
+
   return (
     <section className="ui-stack">
       <PageHeader
@@ -174,10 +183,10 @@ export function PolicySettingsPanel() {
 
       <StatRow
         items={[
-          { label: "规则总数", kind: "count", amount: String(definitions.length) },
-          { label: "已发布", kind: "count", amount: String(versions.filter((v) => v.status === "ACTIVE").length) },
-          { label: "草稿版本", kind: "count", amount: String(versions.filter((v) => v.status === "DRAFT").length) },
-          { label: "当前规则", kind: "count", amount: current ? current.name : "-" },
+          { label: "规则总数", kind: "count", amount: policyDataReady ? String(definitions.length) : error ? "不可用" : "—" },
+          { label: "已发布", kind: "count", amount: policyDataReady ? String(versions.filter((v) => v.status === "ACTIVE").length) : error ? "不可用" : "—" },
+          { label: "草稿版本", kind: "count", amount: policyDataReady ? String(versions.filter((v) => v.status === "DRAFT").length) : error ? "不可用" : "—" },
+          { label: "当前规则", kind: "count", amount: policyDataReady && current ? current.name : error ? "不可用" : "—" },
         ]}
       />
 
@@ -197,7 +206,7 @@ export function PolicySettingsPanel() {
               versions={versions}
               loading={loading}
               scopeOptions={scopeOptions}
-              canManage={canManage}
+              canManage={canManage && policyDataReady && !error}
               onOpenEditor={() => setEditorOpen(true)}
               onOpenResolve={openResolve}
               onSupersede={setSupersedeTarget}
@@ -235,16 +244,16 @@ export function PolicySettingsPanel() {
 
       <FormDrawer
         open={supersedeTarget !== null}
-        title={`作废草稿 · v${supersedeTarget?.version ?? ""}`}
-        fields={[{ name: "reason", label: "作废理由", required: true, kind: "textarea" as const }]}
-        submitText="确认作废"
+        title={`取消草稿 · v${supersedeTarget?.version ?? ""}`}
+        fields={[{ name: "reason", label: "取消理由", required: true, kind: "textarea" as const }]}
+        submitText="确认取消"
         submitting={acting}
         error={error}
         onClose={() => setSupersedeTarget(null)}
         onSubmit={(values) => void submitSupersede(values)}
         extra={
           <p className="ui-drawer-hint">
-            只有草稿版本可作废。已发布版本是历史日期的解析口径，作废会挖掉历史规则的落点；
+            只有草稿版本可取消。已发布版本是历史日期的解析口径，取消会挖掉历史规则的落点；
             要下线生效中的版本，请「设置配置」新建版本并把生效期接上。
           </p>
         }

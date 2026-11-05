@@ -13,17 +13,25 @@ import { customersApi,
   type Pool, } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
-import { AdaptiveFormGrid, BusinessActionModal, BusinessForm, ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
-import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
+import { AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
+import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { AdditionalFeeFields } from "../orders/AdditionalFeeFields";
 import { InstallmentScheduleFields, resizeInstallmentSchedule } from "../orders/InstallmentScheduleFields";
 import { RecoveryCustomerSection } from "../orders/recovery/RecoveryCustomerSection";
 import { DeliveryInfoSection } from "../orders/DeliveryInfoSection";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
 import { collectFullPayment, collectInstallmentPayment } from "./ReceiverSection";
+import { lastPeriodAmount, perPeriodServiceFee, saleInstallmentMismatch, saleInstallmentPlan } from "./sale-plan";
 import "./InventorySaleModal.css";
 
 type SaleInventoryType = "RECOVERY" | "PICKUP" | "CONSIGNMENT" | (string & {});
+
+/** 三类售出各自独立的表单作用域：改一份的字段/必填/板块标题不影响另外两份。 */
+const SALE_SCOPE_BY_INVENTORY_TYPE: Record<string, string> = {
+  RECOVERY: "SALEREC",
+  PICKUP: "SALETH",
+  CONSIGNMENT: "SALEDG",
+};
 
 /** 买家角色：代挂（CONSIGNMENT）为委托方 CONSIGNOR，其余（回收/提号）为买家 BUYER。 */
 function buyerRoleOf(inventoryType: string | null | undefined): "BUYER" | "CONSIGNOR" {
@@ -59,7 +67,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
-  const { config } = useOrderFormConfig(open ? "SALE" : undefined);
+  const saleScope = SALE_SCOPE_BY_INVENTORY_TYPE[resolvedType ?? ""];
   const paymentMethod = Form.useWatch("payment_method", form) ?? "FULL";
   const saleAmount = Form.useWatch("amount", form);
   const amount2 = Form.useWatch("amount2", form);
@@ -72,10 +80,8 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const lastAutoPeriodAmount = useRef<number | undefined>();
 
   useEffect(() => {
-    const total = Number(serviceFee);
-    const count = Number(periods);
-    if (!Number.isFinite(total) || !Number.isFinite(count) || count <= 0) return;
-    const nextValue = Number((total / count).toFixed(2));
+    const nextValue = perPeriodServiceFee(serviceFee, periods);
+    if (nextValue === null) return;
     const isAutoValue = periodServiceFee === undefined || periodServiceFee === lastAutoPeriodFee.current;
     if (isAutoValue) {
       form.setFieldValue("per_period_service_fee", nextValue);
@@ -83,29 +89,21 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
     }
   }, [form, periodServiceFee, periods, serviceFee]);
 
-  const defaultPeriodAmount = useMemo(() => {
-    const principal = Number(saleAmount ?? 0);
-    const firstPayment = Number(downPayment ?? 0);
-    const count = Number(periods ?? 0);
-    if (!Number.isFinite(principal) || !Number.isFinite(firstPayment) || !Number.isFinite(count) || count <= 0) {
-      return undefined;
-    }
-    return ((principal - firstPayment + Number(serviceFee ?? 0)) / count).toFixed(2);
-  }, [downPayment, periods, saleAmount, serviceFee]);
+  // 分期金额规划的唯一算法来源（见 sale-plan.ts）：自动填值、末期提示、校验共用一套「分」。
+  const plan = useMemo(
+    () => saleInstallmentPlan({ saleAmount, downPayment, serviceFee, periods }),
+    [downPayment, periods, saleAmount, serviceFee],
+  );
 
   useEffect(() => {
-    const principal = Number(saleAmount);
-    const firstPayment = Number(downPayment);
-    const fee = Number(serviceFee);
-    const count = Number(periods);
-    if (![principal, firstPayment, fee, count].every(Number.isFinite) || count <= 0) return;
-    const nextValue = Math.ceil((Math.round(principal * 100) - Math.round(firstPayment * 100) + Math.round(fee * 100)) / count) / 100;
+    if (!plan) return;
+    const nextValue = plan.perPeriodCents / 100;
     const isAutoValue = perPeriod === undefined || perPeriod === lastAutoPeriodAmount.current;
     if (isAutoValue) {
       form.setFieldValue("per_period", nextValue);
       lastAutoPeriodAmount.current = nextValue;
     }
-  }, [downPayment, form, periods, perPeriod, saleAmount, serviceFee]);
+  }, [form, perPeriod, plan]);
 
   useEffect(() => {
     if (paymentMethod !== "INSTALLMENT") return;
@@ -171,6 +169,14 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
         source: values.customer_source as string | undefined,
         note: values.note as string | undefined,
       })).customer;
+      if (customer.status === "DISABLED" || customer.status === "MERGED") {
+        setError({
+          message: customer.status === "MERGED"
+            ? "客户已合并，不能作为售出买家"
+            : "客户已拉黑，不能作为售出买家",
+        });
+        return;
+      }
       await ordersApi.addCustomerRole(sourceOrderId, {
         customer_id: customer.id,
         role: buyerRoleOf(resolvedType),
@@ -209,8 +215,9 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   return (
     <BusinessActionModal
       title={title}
+      fieldCount={21}
       open={open}
-      className="inventory-sale-modal recovery-order-modal"
+      className="inventory-sale-modal"
       destroyOnHidden
       onCancel={props.onClose}
       footer={
@@ -221,11 +228,15 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
     >
       <ErrorBanner error={error} />
       <InventoryAccountSummary account={props.account} />
-      <FieldConfigContext.Provider value={config}>
-        <BusinessForm scope="SALE" form={form} onFinish={submit}>
+      <FieldConfigScope scope={saleScope ?? ""} active={open && Boolean(saleScope)}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope={saleScope ?? ""} form={form} onFinish={submit}>
           <RecoveryCustomerSection title={buyerInfoTitle} />
           <DeliveryInfoSection showIntermediary employees={employees} />
-          <section className="inventory-sale-cashflow" aria-labelledby="inventory-sale-cashflow-title">
+          <section className="inventory-sale-cashflow inventory-sale-cashflow--full-width" aria-labelledby="inventory-sale-cashflow-title">
             <div id="inventory-sale-cashflow-title" className="inventory-sale-cashflow__title">资金流水</div>
             <AdaptiveFormGrid>
               {isConsignment && (
@@ -271,7 +282,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
                   <Input placeholder="可选填" />
                 </CfgItem>
               </> : (
-                <div className="inventory-sale-installment-fields">
+                <div className="inventory-sale-installment-fields inventory-sale-installment-fields--grid">
                   <p className="muted">出售时选择分期，系统会建立对应的售出分期合同，并将账号标记为“分期中”。</p>
                   <CfgItem name="down_payment" label="首付金额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0 || Number(v) > Number(saleAmount)) throw new Error("首付不能为负数或超过售出金额"); } }]}><MoneyInput placeholder="没有首付填 0" /></CfgItem>
                   <CfgItem
@@ -284,7 +295,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
                   <CfgItem name="service_fee" label="分期服务费总额" initialValue="0" rules={[{ validator: async (_, v) => { if (!Number.isFinite(Number(v)) || Number(v) < 0) throw new Error("服务费不能为负数"); } }]}><MoneyInput placeholder="可选填" /></CfgItem>
                   <CfgItem name="periods" label="分期期数" initialValue={1} rules={[{ validator: async (_, v) => { if (!Number.isInteger(Number(v)) || Number(v) <= 0) throw new Error("期数必须为正整数"); } }]}><Input inputMode="numeric" placeholder="请输入期数" /></CfgItem>
                   <CfgItem name="per_period_service_fee" label="每期服务费" rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("每期服务费必须为非负金额"); } }]}><MoneyInput placeholder="按服务费总额/期数计算" /></CfgItem>
-                  <CfgItem name="per_period" label="每期金额" rules={[{ required: true, message: "请输入每期金额" }, { validator: async (_, value) => { const count = Number(periods), total = Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0), amount = Number(value); if (!Number.isFinite(amount) || amount < 0 || (count > 0 && (amount * count + 0.001 < Number(saleAmount) - Number(downPayment || 0) || amount * (count - 1) > total + 0.001))) throw new Error("每期金额与分期总额不匹配"); } }]} extra={defaultPeriodAmount && perPeriod != null && Number(periods) > 0 ? `最后一期：${((Math.round((Number(saleAmount) - Number(downPayment || 0) + Number(serviceFee || 0)) * 100) - Math.round(Number(perPeriod) * 100) * (Number(periods) - 1)) / 100).toFixed(2)} 元` : undefined}><MoneyInput placeholder="请输入每期应收" /></CfgItem>
+                  <CfgItem name="per_period" label="每期金额" rules={[{ required: true, message: "请输入每期金额" }, { validator: async (_, value) => { if (saleInstallmentMismatch(plan, value)) throw new Error("每期金额与分期总额不匹配"); } }]} extra={plan && perPeriod != null ? `最后一期：${lastPeriodAmount(plan, perPeriod) ?? plan.lastPeriod} 元` : undefined}><MoneyInput placeholder="请输入每期应收" /></CfgItem>
                   <div className="inventory-sale-plan">
                     <div className="inventory-sale-plan__title">分期计划</div>
                     <InstallmentScheduleFields name="installment_schedule" />
@@ -295,8 +306,8 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
             <AdditionalFeeFields pools={pools} />
           </section>
           <CustomFieldSection testIdSuffix="inventory-sale" />
-        </BusinessForm>
-      </FieldConfigContext.Provider>
+        </BusinessRegistrationForm>
+      </FieldConfigScope>
     </BusinessActionModal>
   );
 }

@@ -21,7 +21,7 @@ from app.orders import service as orders_service
 from app.orders.amounts import order_amounts
 from app.parties import service as parties_service
 from app.policy import service as policy_service
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from app.core.errors import (
     Conflict,
@@ -199,10 +199,12 @@ def _service_fee_from_snapshot(
 
 
 #: 合约类型 → 允许的订单类型；未登记的类型不做该约束由调用方另行校验。
+#: 分期出售的业务名称只有一个，回收/提号售出可用，代挂售出仅全款不建分期合约；
+#: PICKUP_SALE / CONSIGNMENT_SALE 是迁移 0056 之前的遗留类型，只为读取历史数据保留。
 _CONTRACT_ALLOWED_ORDER_TYPES = {
-    InstallmentContractType.STOCK_SALE.value: frozenset({"HS", "TH", "DG"}),
+    InstallmentContractType.STOCK_SALE.value: frozenset({"HS", "TH"}),
     InstallmentContractType.PICKUP_SALE.value: frozenset({"TH"}),
-    InstallmentContractType.CONSIGNMENT_SALE.value: frozenset({"DG"}),
+    InstallmentContractType.CONSIGNMENT_SALE.value: frozenset(),
 }
 
 
@@ -260,6 +262,13 @@ def create_installment(
     # 表驱动比复制四遍 if/elif 更难漏改、也更好审计（新增类型必须在此登记或显式例外）。
     allowed_order_types = _CONTRACT_ALLOWED_ORDER_TYPES.get(contract_type)
     if allowed_order_types is not None and order.order_type not in allowed_order_types:
+        if not allowed_order_types:
+            # 空集 = 该合约类型已不再对任何订单开放（代挂售出仅全款）。
+            raise Validation(
+                "代挂售出仅全款，不提供分期出售",
+                code=ErrorCode.INSTALLMENT_TYPE_INVALID,
+                details={"order_no": order.order_no, "contract_type": contract_type},
+            )
         allowed_order_label = "、".join(sorted(allowed_order_types))
         raise Validation(
             f"{contract_type} 只能用于 {allowed_order_label} 订单",
@@ -460,20 +469,97 @@ def create_installment(
     )
     return installment
 
+def _apply_installment_filters(
+    stmt,
+    *,
+    session: Session,
+    status: str | None = None,
+    order_id: int | None = None,
+    trade_date_from: date | None = None,
+    trade_date_to: date | None = None,
+    user: CurrentUser | None = None,
+):
+    """分期合约的公共筛选条件（列表与合计必须同一份，避免口径漂移）。
+
+    调用方需已 `join(Order)`：日期区间按**订单成交日期**筛，与前端原先的本地筛选同义。
+    """
+    if status:
+        stmt = stmt.where(Installment.status == status)
+    if order_id:
+        stmt = stmt.where(Installment.order_id == order_id)
+    if trade_date_from is not None:
+        stmt = stmt.where(Order.trade_date >= trade_date_from)
+    if trade_date_to is not None:
+        stmt = stmt.where(Order.trade_date <= trade_date_to)
+    if user is not None:
+        scope = owner_scope_filter(Order.owner_id, user, session)
+        if scope is not None:
+            stmt = stmt.where(scope)
+    return stmt
+
+
 def list_installments(
     session: Session,
     *,
     status: str | None = None,
     order_id: int | None = None,
+    trade_date_from: date | None = None,
+    trade_date_to: date | None = None,
     user: CurrentUser | None = None,
 ) -> list[Installment]:
-    stmt = select(Installment).join(Order, Order.id == Installment.order_id)
-    if status:
-        stmt = stmt.where(Installment.status == status)
-    if order_id:
-        stmt = stmt.where(Installment.order_id == order_id)
-    if user is not None:
-        scope = owner_scope_filter(Order.owner_id, user, session)
-        if scope is not None:
-            stmt = stmt.where(scope)
+    stmt = _apply_installment_filters(
+        select(Installment).join(Order, Order.id == Installment.order_id),
+        session=session,
+        status=status,
+        order_id=order_id,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        user=user,
+    )
     return list(session.scalars(stmt.order_by(Installment.id)).all())
+
+
+def installment_totals(
+    session: Session,
+    *,
+    status: str | None = None,
+    order_id: int | None = None,
+    trade_date_from: date | None = None,
+    trade_date_to: date | None = None,
+    user: CurrentUser | None = None,
+) -> dict[str, Decimal]:
+    """按与列表**完全相同**的条件聚合总应收 / 已收 / 剩余（Decimal，服务端唯一口径）。
+
+    剩余用 GREATEST(..., 0) 夹住：先收款后减免时公式会得负数，页面不能显示负的「剩余」。
+    """
+    receivable = (
+        Installment.down_payment
+        + Installment.per_period * Installment.periods
+        + func.coalesce(Installment.final_period_adjustment, 0)
+        - Installment.waived_amount
+    )
+    remaining = func.greatest(
+        receivable
+        - Installment.paid_amount
+        - func.coalesce(Installment.bad_debt_amount, 0),
+        0,
+    )
+    stmt = _apply_installment_filters(
+        select(
+            func.coalesce(func.sum(receivable), 0),
+            func.coalesce(func.sum(Installment.paid_amount), 0),
+            func.coalesce(func.sum(remaining), 0),
+        ).join(Order, Order.id == Installment.order_id),
+        session=session,
+        status=status,
+        order_id=order_id,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        user=user,
+    )
+    total_receivable, total_paid, total_remaining = session.execute(stmt).one()
+    return {
+        "total_receivable": to_money(total_receivable or 0),
+        "total_paid": to_money(total_paid or 0),
+        "total_remaining": to_money(total_remaining or 0),
+    }

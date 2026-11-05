@@ -6,7 +6,7 @@ import { poolsApi, type Pool } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { POOL_OWNERSHIP_LABEL, POOL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
-import { BusinessActionModal, BusinessForm, Select } from "../../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, Select } from "../../shared/ui";
 
 /** 词典未加载/未打桩时的回落值，与改造前硬编码完全一致，保证零行为变化。 */
 const POOL_TYPE_FALLBACK = [
@@ -19,7 +19,7 @@ const POOL_OWNERSHIP_FALLBACK = [
   { value: "CUSTODY", label: "代管" },
   { value: "THIRD_PART", label: "第三方" },
 ];
-import { ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { ConfirmButton, DataTable, ErrorBanner, InlineError, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
 export function PoolsPanel() {
   const poolTypeOptions = useOptionSet("POOL_TYPE") ?? POOL_TYPE_FALLBACK;
@@ -128,14 +128,14 @@ export function PoolsPanel() {
         page={1}
         pageSize={Math.max(rows.length, 10)}
         total={rows.length}
-        emptyText="暂无资金池"
+        emptyText={error ? "资金池数据不可用，请点击重新加载" : "暂无资金池"}
         onPageChange={() => undefined}
      />
       <PermissionGate
         permission="pool.manage"
         fallback={<Typography.Paragraph type="secondary">当前角色无主数据维护权限。</Typography.Paragraph>}
       >
-        <BusinessForm form={form} layout="inline" onFinish={submit}>
+        <BusinessRegistrationForm form={form} layout="inline" onFinish={submit}>
           <Form.Item name="code" rules={[{ required: true }]}>
             <Input placeholder="池代码，如 HJ_CUSTODY" />
           </Form.Item>
@@ -143,20 +143,25 @@ export function PoolsPanel() {
             <Input placeholder="显示名" />
           </Form.Item>
           <Form.Item>
-            <PermissionButton permission="pool.manage" type="primary" htmlType="submit">
+            <PermissionButton permission="pool.manage" type="primary" htmlType="submit" disabled={Boolean(error)}>
               新增资金池
             </PermissionButton>
           </Form.Item>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </PermissionGate>
-      <BusinessActionModal title={editing ? `编辑资金池 · ${editing.code}` : "编辑资金池"} open={Boolean(editing)} onCancel={() => { setEditing(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} okText="保存">
-        <BusinessForm form={editForm} onFinish={update}>
+      <BusinessActionModal title={editing ? `编辑资金池 · ${editing.code}` : "编辑资金池"} fieldCount={5} open={Boolean(editing)} onCancel={() => { setEditing(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} okText="保存">
+        <InlineError error={editing ? error : null} />
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={editForm} onFinish={update}>
           <Form.Item label="代码"><Input value={editing?.code} disabled /></Form.Item>
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="pool_type" label="用途类型" rules={[{ required: true }]}><Select options={poolTypeOptions} /></Form.Item>
           <Form.Item name="ownership" label="资金归属" rules={[{ required: true }]}><Select options={ownershipOptions} /></Form.Item>
           <Form.Item name="note" label="备注"><Input.TextArea rows={3} /></Form.Item>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
     </Card>
   );

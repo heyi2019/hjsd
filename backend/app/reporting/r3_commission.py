@@ -13,18 +13,16 @@ from sqlalchemy.orm import Session
 from app.domain.enums import OrderStatus
 from app.domain.trade import (
     Order,
-    OrderEvent,
     OrderProfitAllocation,
 )
 
 from ._shared import (
     ZERO,
     _apply_order_scope,
-    _bad_debt_by_order,
-    _event_totals,
     _money,
     _sum_report_field,
     _validate_date_range,
+    cashflow_totals_by_order,
 )
 
 def r3_commission_reconciliation(
@@ -57,24 +55,16 @@ def r3_commission_reconciliation(
     if user_id is not None:
         rows = [row for row in rows if row[0].user_id == user_id]
 
+    # 利润 = 该订单所有收入 − 所有支出（2026-11-05 用户裁决）。
+    # 走报表唯一取数口，与分润弹窗同源：收入含返点记录、支出含分期坏账；
+    # 不再由 SELL/BUY/COST 事件推导，也不按「是否生成流水」排除有资金走向的事实。
     per_order_profit: dict[int, Decimal] = defaultdict(lambda: ZERO)
-    events = session.scalars(
-        _apply_order_scope(
-            select(OrderEvent)
-            .join(Order, Order.id == OrderEvent.order_id)
-            .where(OrderEvent.is_posted.is_(True)),
-            order_scope,
-            session,
-        )
-    ).all()
-    events_by_order: dict[int, list[OrderEvent]] = defaultdict(list)
-    for event in events:
-        events_by_order[event.order_id].append(event)
-    for order_id, order_events in events_by_order.items():
-        income, buy_amount, direct_cost = _event_totals(order_events)
-        per_order_profit[order_id] = income - buy_amount - direct_cost
-    for order_id, amount in _bad_debt_by_order(session, user=order_scope).items():
-        per_order_profit[order_id] -= amount
+    scoped_order_ids = {order.id for _, order in rows}
+    if scoped_order_ids:
+        for order_id, (income, expense, _buy) in cashflow_totals_by_order(
+            session, order_ids=scoped_order_ids
+        ).items():
+            per_order_profit[order_id] = _money(income - expense)
 
     grouped: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for allocation, order in rows:
@@ -87,9 +77,11 @@ def r3_commission_reconciliation(
         amount = _money(allocation.allocation_amount)
         # 分润支持「按比例」与「按金额」两种录入口径：填了金额就直接作为应付基数，
         # 否则按 利润 × 比例 计算。二者由录入校验保证不会同时出现。
+        # 判据必须是 `!= 0` 而非 `> 0`：亏损单的金额本身就是负数（填 -300 表示分担 300 亏损），
+        # 用 `> 0` 会把负数误判成「没填金额」而回退到比例，亏损分润就算错。
         base = (
             amount
-            if amount > 0
+            if amount != 0
             else (profit * rate / Decimal("100")).quantize(Decimal("0.01"))
         )
         grouped[allocation.user_id].append(

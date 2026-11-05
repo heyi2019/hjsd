@@ -8,6 +8,10 @@
   background: color-mix(in srgb, var(--glass) 66%, transparent);
   container-type: inline-size;
 }
+/* 资金流水是售出表单的完整分区，不能被多列表单当成单个字段挤到一列。 */
+.inventory-sale-cashflow--full-width {
+  grid-column: 1 / -1;
+}
 .inventory-sale-cashflow__title {
   padding-bottom: var(--space-2);
   margin-bottom: var(--space-3);
@@ -16,8 +20,26 @@
   font: var(--font-section);
 }
 .inventory-sale-cashflow .ant-form-item { margin-bottom: 0; min-width: 0; }
-.inventory-sale-installment-fields { grid-column: 1 / -1; }
+.inventory-sale-installment-fields {
+  grid-column: 1 / -1;
+}
+.inventory-sale-installment-fields--grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-5);
+  min-width: 0;
+}
+.inventory-sale-installment-fields--grid > .muted,
+.inventory-sale-installment-fields--grid > .inventory-sale-plan {
+  grid-column: 1 / -1;
+}
 .inventory-sale-installment-fields .installment-schedule-list { grid-column: 1 / -1; }
+
+@container (max-width: 760px) {
+  .inventory-sale-installment-fields--grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 
 /* 分期计划卡片：把逐期到期日容器做成带标题的独立区块，与资金流水卡片视觉一致。 */
 .inventory-sale-plan {

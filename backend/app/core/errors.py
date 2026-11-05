@@ -1,6 +1,6 @@
 """core.errors：统一异常与错误码。
 
-错误码与 HTTP 映射严格执行《ERP_接口错误码与状态机_v1.0.md》，
+错误码与 HTTP 状态映射由本模块的 `AppError` 层级唯一决定，
 业务代码只允许抛 `AppError` 子类，禁止在路由里手工拼 HTTPException 状态码。
 """
 from __future__ import annotations
@@ -48,6 +48,9 @@ class ErrorCode:
     MERGE_TARGET_INVALID = "MERGE_TARGET_INVALID"
     SEQUENCE_EXHAUSTED = "SEQUENCE_EXHAUSTED"
     DUPLICATE_CODE = "DUPLICATE_CODE"
+    # 建单判重：同一游戏账号+游戏类型已有库存。未售出直接拒绝，已售出需显式确认复购。
+    INVENTORY_ACCOUNT_IN_STOCK = "INVENTORY_ACCOUNT_IN_STOCK"
+    REPURCHASE_CONFIRM_REQUIRED = "REPURCHASE_CONFIRM_REQUIRED"
     AMOUNT_INVALID = "AMOUNT_INVALID"
 
 

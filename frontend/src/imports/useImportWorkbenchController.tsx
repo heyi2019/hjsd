@@ -10,7 +10,7 @@ import { importsApi,
 import { normalizeError } from "../shared/api/client";
 import { ConfirmButton, PermissionButton, Select, StatusTag } from "../shared/ui";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { type ImportWorkbenchProps } from "./ImportWorkbench.fragments";
+import { IMPORT_SOURCE_KIND_OPTIONS, type ImportWorkbenchProps } from "./ImportWorkbench.fragments";
 
 /** 导入工作台的全部 state / 派生 / 处理器（含行表格列与批次动作条 JSX）。 */
 export function useImportWorkbenchController({
@@ -18,7 +18,11 @@ export function useImportWorkbenchController({
   onBatchIdChange,
 }: ImportWorkbenchProps) {
   const [batches, setBatches] = useState<ImportBatch[]>([]);
-  const sourceKindOptions = useOptionSet("IMPORT_SOURCE_KIND") ?? [];
+  const [batchesReady, setBatchesReady] = useState(false);
+  const sourceKindOptionsRaw = useOptionSet("IMPORT_SOURCE_KIND");
+  // 业务字典为空/未就绪时回落到只读集合，避免「数据类型」下拉空白却残留游离默认值（L278）。
+  const sourceKindOptions =
+    sourceKindOptionsRaw && sourceKindOptionsRaw.length > 0 ? sourceKindOptionsRaw : IMPORT_SOURCE_KIND_OPTIONS;
   const batchStatusOptions = useOptionSet("IMPORT_BATCH_STATUS") ?? [];
   const isBatchControlled = batchIdProp !== undefined;
   const [internalBatchId, setInternalBatchId] = useState<number | null>(null);
@@ -51,11 +55,13 @@ export function useImportWorkbenchController({
   const current = batches.find((b) => b.id === batchId) ?? null;
 
   const loadBatches = useCallback(async () => {
+    setBatchesReady(false);
     try {
       const data = await importsApi.batches();
       setBatches(data.items);
       if (batchId === null) setBatchId(data.items[0]?.id ?? null);
       setError(null);
+      setBatchesReady(true);
     } catch (err) {
       setError(normalizeError(err));
     }
@@ -185,12 +191,14 @@ export function useImportWorkbenchController({
       <PermissionButton
         permission="import.manage"
         type="primary"
+        disabled={!batchesReady}
         onClick={() => setImportOpen(true)}
       >
         新建导入
       </PermissionButton>
       <Select
         className="ui-control-width-import"
+        aria-label="导入批次"
         value={batchId ?? undefined}
         placeholder="选择导入批次"
         options={batches.map((b) => ({
@@ -243,6 +251,7 @@ export function useImportWorkbenchController({
 
   return {
     batches,
+    batchesReady,
     setBatches,
     sourceKindOptions,
     batchStatusOptions,

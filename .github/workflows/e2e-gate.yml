@@ -1,0 +1,97 @@
+name: e2e-gate
+
+# E2E 门禁：真实 Chromium + 真实后端 + 独立 PG 库 heijin_erp_e2e。
+# 数据策略：每轮不清数据。本地常驻复用 e2e 库，CI 的 postgres service 则是全新空库——
+# 两者都走 e2e_db.py 默认 keep 分支（create_all 补表 + 幂等播种），夹具按
+# (business_mode, inventory_type) 补足 IN_STOCK 账号，用例消耗后下一轮自动补齐；
+# 自动化不再注入 E2E_RESET=1。绝不触碰 dev/test/release。
+# main / test 推送、PR、手动触发均阻塞。
+
+on:
+  push:
+    branches: [main, master, test]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-gate-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # 普通 runner 上 services.postgres 只暴露映射端口，主机名 postgres 无法解析；
+  # webServer 里的 e2e_db.py 直接用本变量建维护库，必须指向 127.0.0.1。
+  E2E_DATABASE_URL: "postgresql+psycopg://erp_app:erp_app@127.0.0.1:5432/heijin_erp_e2e"
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    # 给 retries 留余量：串行整跑 + 经营中心/设置走查各 195s 预算，偶发重试
+    # （单次失败用例最多 ×3 预算）需额外时间，30min 偏紧，提到 45min。
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: erp_app
+          POSTGRES_PASSWORD: erp_app
+          POSTGRES_DB: heijin_erp_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U erp_app"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install backend dependencies (venv)
+        working-directory: backend
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Install frontend dependencies (仓库根 npm workspaces)
+        working-directory: .
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E (真实浏览器 + 真实后端 + 独立 E2E 库)
+        working-directory: frontend
+        run: npm run test:e2e
+
+      # E2E 结果翻译进《测试结果库/results.jsonl》，否则报告 E2E 行恒为 0。
+      # 用 always()：E2E 失败时更要把 FAIL 记进去，那正是报告要暴露的东西。
+      - name: Record E2E results → 测试结果库
+        if: always()
+        working-directory: backend
+        run: .venv/bin/python scripts/record_e2e_results.py --json test-results/playwright-report.json
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 14

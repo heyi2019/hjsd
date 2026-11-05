@@ -20,15 +20,15 @@ cd backend && .venv/bin/python scripts/v1_init_db.py && cd ..
 # 2.1) 初始化正式管理员（首次部署必须执行；密码不会写入脚本）
 cd backend && ADMIN_PASSWORD='请替换为强密码' .venv/bin/python scripts/create_admin.py && cd ..
 
-# 3) 起后端（:8123）
-cd backend && .venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8123
+# 3) 起后端（0.0.0.0:8123，局域网可访问）
+cd backend && .venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8123
 
 # 4) 起前端（:5173，新终端）
 cd frontend && npm run dev
 ```
 
-前端代理端口由 `frontend/.env.local` 的 `VITE_BACKEND_PORT` 管理，默认是 `8123`；
-如果后端使用临时端口，前后端必须使用同一个端口，例如：
+前端代理端口读取顺序为 `process.env.VITE_BACKEND_PORT` → `process.env.ERP_E2E_BACKEND_PORT`
+→ `frontend/.env.local` 的 `VITE_BACKEND_PORT`（仓库内默认 `8123`）。改端口必须前后端一致，例如：
 
 ```bash
 # 后端终端
@@ -89,18 +89,19 @@ cd frontend && npm run build
 |---|---|
 | `backend/app/core` | settings / database / money / errors / security / audit / numbering |
 | `backend/app/domain` | 当前 ORM 模型与领域对象 |
-| `backend/app/foundation` `finance` `orders` `installments` `policy` `reporting` | 领域服务与路由，每个含 `service.py` + `router.py` |
-| `backend/alembic/versions` | 单一当前结构基线迁移（`0001_current_schema_baseline`） |
-| `backend/tests/v1` | v1 测试 |
-| `frontend/src` | `shared/`（UI 与 API）、各领域页面目录 |
+| `backend/app` 领域包 | 20 个已挂载 router：`foundation` `parties` `search` `orders` + `orders.form_fields` `value_added_services`（分期域，路由名仍为 installments）`finance` `stocks` `reporting` `policy` `quality` `notifications` `imports` `audit` `auth` + `auth.admin`（人员）+ `auth.teams` `attachments` `options` `lists`；`core`/`domain` 为基础设施与 ORM |
+| `backend/alembic/squashed_versions` | **活动迁移链**：只有 `0001_current_schema_baseline`，head = `0001`（`alembic.ini` 的 `version_locations` 只指向此目录；改 ORM 即改基线，不再加增量迁移） |
+| `backend/alembic/versions` | 74 个历史增量迁移，**不被 alembic 加载**，仅作追溯（`run_regression.py lint` 仍扫描） |
+| `tests/backend` | 后端测试（pytest，111 个文件） |
+| `frontend/src` | 按业务域拆分（`orders/` `stocks/` `customers/` `installments/` `pools/` `rebates/` `reporting/` 等 20 个目录），无 `pages/`；`shared/` 为 UI 与 API 基础层 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |
-| `docs` | PRD、功能规格、架构、数据字典、DDL、API、任务清单（**业务唯一依据**） |
+| `docs` | 当前有效文档：顶层事实源 / 工程 / 前端测试资产 + `testing/` 测试体系 + `ux-audit/`、`h5_audit_*/` 证据目录；**全仓文档地图见 `docs/README.md`**；时点性报告已归档至 `docs/archive/` |
 | `rawdata/原始数据` | 金山文档导出的 5 份只读 JSON |
-| `data` `logs` `runtime` `outputs` `monitor` `business_output` | 运行态与生成物，默认不提交 |
+| `data` `logs` `outputs` | 运行态与生成物，默认不提交 |
 
 ## 关键业务约束
 
-写代码前必看 `docs/ERP_功能规格说明书_v1.0.md`，几条最容易踩的：
+写代码前必看 `docs/ERP_PRD_v1.3_当前实现版.md` 与 `docs/ERP_数据字典_v2.0.md`（旧功能规格 F01 已冻结，仅保留编号体系），几条最容易踩的：
 
 - **规则快照**（BAS-06-04）：订单 / 返点 / 分期创建时固化当时生效的规则版本与参数
   （`policy_version_id` + `policy_snapshot`）。改未来费率**不会**改写已发生业务的利润。

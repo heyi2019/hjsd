@@ -33,8 +33,9 @@ from .create import (
 )
 from .events import _apply_account_effect, _opposite_direction, post_event
 from .links import create_order_link, delete_order_link, list_order_links
-from .mutations import cancel_order, update_order
-from .pools import pool_balance, pool_balances
+from .cancellation_model import cancel_order
+from .mutations import update_order
+from .pools import pool_balance, pool_balance_summary, pool_balances
 from .queries import _order_list_stmt, count_orders, list_orders
 
 __all__ = [
@@ -59,6 +60,7 @@ __all__ = [
     "list_order_links",
     "list_orders",
     "pool_balance",
+    "pool_balance_summary",
     "pool_balances",
     "post_event",
     "update_order",

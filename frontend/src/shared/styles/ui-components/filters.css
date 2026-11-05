@@ -1,0 +1,314 @@
+/* ── 页面纵向栈与筛选条 ───────────────────────────────────── */
+.ui-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* 建单补充字段统一使用独立网格，避免长标签挤压默认 labelCol。 */
+.business-registration-modal .custom-field-section {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+  min-width: 0;
+  width: 100%;
+}
+.business-registration-modal .custom-field-section > .ant-typography {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.business-registration-modal .custom-field-section > .ant-form-item {
+  min-width: 0;
+  margin: 0;
+}
+.business-registration-modal .custom-field-section > .ant-form-item .ant-form-item-row {
+  display: grid;
+  grid-template-columns: minmax(140px, max-content) minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-2);
+}
+.business-registration-modal .custom-field-section > .ant-form-item .ant-form-item-label {
+  width: auto !important;
+  padding: 0 !important;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.business-registration-modal .custom-field-section > .ant-form-item .ant-form-item-label > label {
+  line-height: 1.25;
+}
+.business-registration-modal .custom-field-section > .ant-form-item .ant-form-item-control,
+.business-registration-modal .custom-field-section > .ant-form-item .ant-form-item-control-input-content > * {
+  min-width: 0;
+  width: 100%;
+}
+
+/* 返点核心字段：四组标签与输入框紧凑横排，避免操作人掉到下一行。 */
+.business-registration-modal .rebate-core-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+  width: 100%;
+}
+.business-registration-modal .rebate-core-fields > .ant-form-item {
+  min-width: 0;
+  margin: 0;
+}
+.business-registration-modal .rebate-core-fields > .ant-form-item .ant-form-item-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-2);
+}
+.business-registration-modal .rebate-core-fields > .ant-form-item .ant-form-item-label {
+  width: auto !important;
+  min-width: max-content;
+  padding: 0 !important;
+}
+.business-registration-modal .rebate-core-fields > .ant-form-item .ant-form-item-control {
+  min-width: 0;
+  width: auto !important;
+}
+.business-registration-modal .rebate-core-fields > .ant-form-item .ant-form-item-control-input-content > * {
+  width: 100%;
+  min-width: 0;
+}
+.business-registration-modal .rebate-core-fields .ant-form-item-explain,
+.business-registration-modal .rebate-core-fields .ant-form-item-extra {
+  grid-column: 2;
+}
+
+@media (max-width: 720px) {
+  .business-registration-modal .custom-field-section { grid-template-columns: 1fr; }
+  .business-registration-modal .custom-field-section > .ant-typography,
+  .business-registration-modal .custom-field-section > .ant-form-item { grid-column: 1; }
+  .business-registration-modal .rebate-core-fields { grid-template-columns: 1fr; }
+  .business-registration-modal .rebate-core-fields > .ant-form-item .ant-form-item-row {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+}
+
+.settings-tabs.ant-tabs-left > .ant-tabs-nav {
+  min-width: 9rem;
+}
+.settings-tabs.ant-tabs-left > .ant-tabs-content-holder {
+  min-width: 0;
+  max-height: calc(100vh - 9rem);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.settings-tabs.ant-tabs-left .ant-tabs-tab {
+  justify-content: flex-start;
+  min-height: var(--ui-control-height);
+  padding-inline: var(--space-3);
+}
+
+@media (--bp-md) {
+  .settings-tabs > .ant-tabs-content-holder { max-height: none; overflow: visible; }
+  .dashboard-page .ui-entry-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (--bp-sm) {
+  .dashboard-page .ui-entry-row { grid-template-columns: 1fr; }
+  .dashboard-note { padding: var(--space-4); }
+}
+.ui-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.studio-expense-filters {
+  gap: var(--space-3);
+}
+
+/* 工作室支出：让统计卡片与筛选栏分段，并保持筛选项的横向顺序。 */
+.studio-expense-card .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.studio-expense-card .studio-expense-filters {
+  margin: 0;
+}
+.studio-expense-page-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.studio-expense-card .studio-expense-filters {
+  align-items: center;
+}
+.studio-expense-filters--single-row {
+  flex-wrap: nowrap;
+}
+.ui-control-width-studio-pool {
+  width: var(--col-w-280);
+  max-width: 100%;
+}
+
+@media (--bp-sm) {
+  .studio-expense-filters--single-row {
+    flex-wrap: wrap;
+  }
+
+  .studio-expense-card .studio-expense-filters {
+    align-items: stretch;
+  }
+}
+
+/* 筛选栏内的枚举下拉：按语义宽度收敛，避免被 flex 拉满或缩成选项宽度。 */
+.ui-filter-select { width: var(--col-w-160); }
+
+/* 资金流水筛选项较多：桌面端按语义宽度收敛，避免每个字段被 flex 拉满；窄屏再自然堆叠。 */
+.funds-cashflow-filters {
+  display: flex;
+  align-items: center;
+  margin-block-end: var(--space-4);
+}
+.funds-cashflow-filters > * { min-width: 0; width: 100%; }
+.funds-cashflow-filters > :first-child {
+  flex: 1 1 var(--col-w-240);
+  max-width: var(--col-w-280);
+}
+.funds-cashflow-filters > :not(:first-child) {
+  flex: 0 1 var(--col-w-140);
+  max-width: var(--col-w-140);
+}
+.funds-cashflow-filters .ant-select { width: 100%; }
+
+@media (--bp-md) {
+  .funds-cashflow-filters > * {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}
+@media (--bp-sm) {
+  .funds-cashflow-filters > * { flex-basis: 100%; }
+}
+
+.ui-admin-table .ant-table-wrapper { margin-block: 0; }
+
+/* Shared form geometry: page files choose semantic widths, never inline pixels. */
+.ui-form-spaced { margin-block-start: var(--space-4); }
+
+.orders-event-table {
+  margin-top: var(--space-2);
+  min-width: 34rem;
+  border: var(--border-w) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.orders-event-row {
+  display: grid;
+  grid-template-columns: 7.5rem 8rem 8rem minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  padding-block: var(--space-1);
+  padding-inline: var(--space-3);
+  line-height: 1.4;
+  white-space: nowrap;
+  border-bottom: var(--border-w) solid var(--color-border);
+}
+.orders-event-row:last-child {
+  border-bottom: 0;
+}
+.orders-event-row--header {
+  color: var(--color-text-secondary);
+  background: var(--soft);
+  font-weight: 650;
+}
+.orders-event-list { max-width: 100%; overflow-x: auto; }
+.ui-filter-bar--spaced { margin-block-end: var(--space-3); }
+.ui-control-full { width: 100%; }
+.ui-control-width-policy { width: var(--control-filter-select-width); }
+.ui-control-width-inventory { width: var(--col-w-180); }
+.ui-control-width-import { width: var(--col-w-280); }
+.ui-ledger-search { width: var(--col-w-280); }
+
+/* 分润明细是一个完整的数据行，桌面端保持字段与操作同排，避免金额/删除按钮掉到下一行。 */
+.orders-allocation-row {
+  grid-template-columns: minmax(180px, 1.35fr) minmax(150px, 1fr) 120px 140px auto;
+  align-items: start;
+}
+.orders-allocation-row .ant-form-item { margin-bottom: 0; min-width: 0; }
+.orders-allocation-row .ant-form-item-control,
+.orders-allocation-row .ant-select,
+.orders-allocation-row .ant-input-affix-wrapper,
+.orders-allocation-row .ant-input { width: 100%; }
+.orders-allocation-row > .ant-btn { align-self: center; margin: 0; white-space: nowrap; }
+/* 按操作分润：固定四项，每行只有「分配项 + 姓名 + 比例」三列。 */
+.orders-allocation-row.is-action {
+  grid-template-columns: minmax(0, 1.35fr) minmax(100px, 0.75fr) minmax(110px, 0.85fr);
+}
+.orders-allocation-kind {
+  align-self: center;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+.ui-control-width-date { width: var(--control-date-width); }
+.ui-control-width-90 { width: var(--col-w-90); }
+.ui-control-width-100 { width: var(--col-w-100); }
+.ui-control-width-110 { width: var(--col-w-110); }
+.ui-control-width-120 { width: var(--col-w-120); }
+.ui-control-width-140 { width: var(--col-w-140); }
+.ui-control-width-180 { width: var(--col-w-180); }
+.ui-control-width-200 { width: var(--col-w-200); }
+.ui-control-width-260 { width: var(--col-w-260); }
+.ui-control-min-180 { min-width: var(--col-w-180); }
+.ui-title-spaced { margin-block-start: var(--space-4); }
+.ui-toolbar-spaced { margin-block-end: var(--space-4); }
+.ui-text-flush { margin-block-end: 0; }
+.ui-drawer-actions { justify-content: flex-end; width: 100%; }
+.policy-version-date-row { width: 100%; }
+.policy-version-date-row__item { flex: 1; }
+
+/* 经营规则主从双表：左栏规则清单选中态（antd List，非内联样式）。 */
+.policy-master .ant-list-item { cursor: pointer; transition: background-color 0.15s; }
+.policy-master .ant-list-item:hover { background: rgba(0, 0, 0, 0.03); }
+.policy-master .ant-list-item.is-active { background: #e6f4ff; }
+.policy-split { align-items: flex-start; }
+
+/* 容器内错误提示（Modal / Drawer 内部）下边距：原用内联 style 控制，迁移到此处（ui_guards 规则 11）。 */
+.inline-error { margin-block-end: var(--space-3); }
+.order-cancel-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.order-cancel-meta .ant-form-item,
+.order-cancel-meta .ant-form-item-control,
+.order-cancel-meta .ant-form-item-control-input,
+.order-cancel-meta .ant-form-item-control-input-content {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.order-cancel-meta .ant-form-item {
+  margin-bottom: 0;
+}
+
+.order-cancel-meta .responsible-employee-select .ant-form-item-control {
+  flex: 1 1 auto !important;
+  overflow: hidden;
+}
+
+.order-cancel-meta .responsible-employee-select .ant-select,
+.order-cancel-meta .responsible-employee-select .ant-select-selector {
+  width: 100% !important;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.order-cancel-meta .responsible-employee-select .ant-select-selection-overflow {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}

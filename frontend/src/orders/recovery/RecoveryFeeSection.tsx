@@ -1,37 +1,31 @@
 import { CfgItem, useFieldConfig, fieldLabel, sectionLabel } from "../ConfigurableField";
 import type { ReactNode } from "react";
 import type { Pool } from "../../shared/api/catalog";
-import { MoneyInput, Select } from "../../shared/ui";
+import { BusinessRegistrationGroup, BusinessRegistrationSection, MoneyInput, Select } from "../../shared/ui";
 import { AdditionalFeeFields } from "../AdditionalFeeFields";
 import "./RecoveryFeeSection.css";
 
 export function RecoveryFeeSection(props: {
-  totalRecoveryCost: number;
+  /** 上游按「分」汇总后的 2 位小数字符串，此处只负责展示。 */
+  totalRecoveryCost: string;
   pools: Pool[];
   financeExtras?: ReactNode;
 }) {
   const cfg = useFieldConfig();
   const financeTitle = sectionLabel("FINANCE", "资金明细");
   return (
-    <section className="recovery-fee-section recovery-fees" aria-labelledby="recovery-fees-title">
-      <div className="recovery-fees__heading">
-        <div>
-          <div id="recovery-fees-title" className="recovery-fees__title">{financeTitle}</div>
-          <div className="recovery-fees__hint">填写账号价格与实际发生的附加费用</div>
-        </div>
-      </div>
-      <div className="primary-amount-section recovery-fee-card recovery-fee-card--primary">
-        <div className="recovery-fee-card__label"><span className="form-field__required-mark" aria-hidden="true">*</span>{fieldLabel(cfg, "recovery_price", "账号号价")}</div>
-        <CfgItem className="primary-amount-section__price" name="recovery_price" hideLabel rules={[{ required: true, message: "回收价必填" }]}>
+    <BusinessRegistrationSection className="finance-section" title={financeTitle} description="填写回收金额与实际发生的附加费用">
+      <BusinessRegistrationGroup className="primary-amount-fields">
+        <CfgItem name="recovery_price" label={fieldLabel(cfg, "recovery_price", "回收金额")} rules={[{ required: true, message: "回收金额必填" }]}>
           <MoneyInput placeholder="请输入金额" />
         </CfgItem>
-        <CfgItem className="primary-amount-section__pool" name="payment_pool_id" fixedLabel="支出账户" rules={[{ required: true, message: "请选择支出账户" }]}>
-          <Select placeholder="请选择支出账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} />
+        <CfgItem name="payment_pool_id" fixedLabel="资金账户" rules={[{ required: true, message: "请选择资金账户" }]}>
+          <Select placeholder="请选择资金账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} />
         </CfgItem>
-      </div>
+      </BusinessRegistrationGroup>
       <AdditionalFeeFields pools={props.pools} />
       {props.financeExtras}
-      <div className="recovery-fees__total"><span>付款金额（含全部附加费用）</span><strong>¥ {props.totalRecoveryCost.toFixed(2)}</strong></div>
-    </section>
+      <div className="finance-total"><span>付款金额（含全部附加费用）</span><strong>¥ {props.totalRecoveryCost}</strong></div>
+    </BusinessRegistrationSection>
   );
 }

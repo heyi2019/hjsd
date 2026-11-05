@@ -17,6 +17,26 @@ export const orderTypesApi = {
     api.post<OrderTypeRoute>(`/order-types/${code}/routes`, payload).then((r) => r.data),
 };
 
+/** 订单编辑入参（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
+export interface OrderPatchPayload {
+  trade_date?: string;
+  form_extra?: Record<string, unknown>;
+  note?: string | null;
+  account_snapshot?: {
+    game_account: string;
+    game_type?: string | null;
+    game_password?: string | null;
+    camp_account?: string | null;
+    channel_region?: string | null;
+    bound_phone?: string | null;
+    has_secondary?: boolean | null;
+    wallet_realname?: string | null;
+    platform?: string | null;
+    purchase_price?: string | null;
+    note?: string | null;
+  } | null;
+}
+
 export const ordersApi = {
   // 自动翻页取全量：后端 GET /orders 默认 limit=100、max=500，调用方不传 limit 时
   // 只会取到前 100 单，导致订单列表/聚合缺失数据（dev 库 627 单只取 100 的数据完整性缺口）。
@@ -47,6 +67,11 @@ export const ordersApi = {
     api
       .get<Blob>("/orders/export.csv", { params: { _t: Date.now() }, responseType: "blob" })
       .then((r) => r.data),
+  /** 订单台账 Excel：两个 sheet —— 主订单信息（列表可见列）+ 详情信息（订单详情全字段）。 */
+  exportXlsx: () =>
+    api
+      .get<Blob>("/orders/export.xlsx", { params: { _t: Date.now() }, responseType: "blob" })
+      .then((r) => r.data),
   get: (orderId: number) =>
     api.get<Order>(`/orders/${orderId}`).then((r) => r.data),
   links: (orderId: number) =>
@@ -73,15 +98,21 @@ export const ordersApi = {
       game_account: string;
       game_type?: string;
       game_password?: string;
+      camp_account?: string;
       channel_region?: string;
       bound_phone?: string;
       bound_phone_owner?: string;
       has_secondary?: boolean;
+      secondary_images?: string[];
+      wallet_realname?: string;
+      wallet_realname_images?: string[];
       purchase_price?: string;
       note?: string;
       extra_values?: Record<string, unknown>;
     };
     account_id?: number;
+    /** 后端判重：同账号已有「已售出」记录时，用户确认复购回流后置 true 放行。 */
+    confirm_repurchase?: boolean;
     owner_id?: number;
     capital_type?: string;
     note?: string;
@@ -151,25 +182,8 @@ export const ordersApi = {
     payload: { customer_id: number; role: string },
   ) => api.post<Order>(`/orders/${orderId}/customer-roles`, payload).then((r) => r.data),
   /** 订单编辑（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
-  patch: (
-    orderId: number,
-    payload: {
-      trade_date?: string;
-      form_extra?: Record<string, unknown>;
-      note?: string | null;
-      account_snapshot?: {
-        game_account: string;
-        game_type?: string | null;
-        game_password?: string | null;
-        channel_region?: string | null;
-        bound_phone?: string | null;
-        has_secondary?: boolean | null;
-        platform?: string | null;
-        purchase_price?: string | null;
-        note?: string | null;
-      } | null;
-    },
-  ) => api.patch<Order>(`/orders/${orderId}`, payload).then((r) => r.data),
+  patch: (orderId: number, payload: OrderPatchPayload) =>
+    api.patch<Order>(`/orders/${orderId}`, payload).then((r) => r.data),
 };
 
 export const orderFormFieldsApi = {

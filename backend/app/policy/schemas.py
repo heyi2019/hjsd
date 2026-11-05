@@ -45,8 +45,10 @@ class ProfitAllocationItem(RequestModel):
     role: str = Field(default="OWNER", min_length=1, max_length=32)
     allocation_type: str | None = Field(default=None, max_length=16)
     # 比例与金额都是选填：填比例按利润占比分，填金额按固定额分，同一条不可同时填。
+    # allocation_amount 允许负数：亏损单按金额分润时填负数，表示该人分担的亏损额
+    # （利润 -1000、填 -300 即承担 300 亏损）。正负方向由订单利润符号决定，见 allocations.py。
     allocation_rate: Decimal = Field(default=Decimal("0"), ge=0)
-    allocation_amount: Decimal = Field(default=Decimal("0"), ge=0)
+    allocation_amount: Decimal = Field(default=Decimal("0"))
 
 
 class ProfitAllocationSet(RequestModel):

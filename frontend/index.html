@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0b1220" />
     <title>宜游轩 ERP</title>
+    <script>
+      // 云端只读预览：发布域免密直达主界面（本机 / ECS 不匹配域名，行为不变）。
+      (function () {
+        try {
+          if (/\.app\.workbuddy\.host$|\.workbuddy\.link$/.test(window.location.hostname)) {
+            if (!localStorage.getItem("hj.access-token")) {
+              localStorage.setItem("hj.access-token", "cloud-preview-token");
+            }
+          }
+        } catch (_) { /* 隐私模式下 localStorage 不可用，回落正常登录页 */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

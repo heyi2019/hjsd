@@ -37,10 +37,14 @@ class OrderAccountSnapshot(BaseModel):
     game_account: str = Field(min_length=1, max_length=128)
     game_type: str | None = Field(default=None, max_length=64)
     game_password: str | None = Field(default=None, max_length=256)
+    camp_account: str | None = Field(default=None, max_length=128)
     channel_region: str | None = Field(default=None, max_length=128)
     bound_phone: str | None = Field(default=None, max_length=64)
     bound_phone_owner: str | None = Field(default=None, max_length=128)
     has_secondary: bool | None = None
+    secondary_images: list[str] | None = Field(default=None, max_length=3)
+    wallet_realname: str | None = Field(default=None, max_length=16)
+    wallet_realname_images: list[str] | None = Field(default=None, max_length=3)
     platform: str | None = Field(default=None, max_length=64)
     purchase_price: str | None = Field(default=None, max_length=32, description="账号号价（全款基础价格）")
     note: str | None = None
@@ -95,6 +99,12 @@ class OrderCreate(BaseModel):
     trade_date: date
     account_snapshot: OrderAccountSnapshot | None = None
     account_id: int | None = None
+    # 建单判重：同一游戏账号+游戏类型已有「已售出」记录时，后端返回
+    # REPURCHASE_CONFIRM_REQUIRED；用户确认复购回流后带此标记重提即放行。
+    # 已有「未售出」记录则无条件拒绝（INVENTORY_ACCOUNT_IN_STOCK），该标记不生效。
+    confirm_repurchase: bool = Field(
+        default=False, description="确认复购回流：仅对已售出的历史同账号生效"
+    )
     owner_id: int | None = None
     capital_type: str | None = Field(default=None, description="默认取业务定义")
     note: str | None = None
@@ -148,7 +158,7 @@ class OrderCancelIn(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
     # 表单字段配置体系（ORDERCANC 作用域）：合并进订单 form_extra。
     form_extra: dict[str, object] | None = None
-    # 作用域可显式指定（如从库存发起的作废），缺省按取消单 ORDERCANC 校验。
+    # 作用域可显式指定（如从库存发起的取消），缺省按取消单 ORDERCANC 校验。
     form_extra_scope: str | None = Field(default=None, min_length=2, max_length=16)
 
 
@@ -193,7 +203,10 @@ class OrderListOut(OrderOut):
     inventory_operator: str | None = None
     sale_at: datetime | None = None
     sale_operator: str | None = None
+    in_hand_time: str | None = None
     event_total: Decimal | None = None
+    cost_amount: Decimal | None = None
+    profit_base: Decimal | None = None
     last_event_type: str | None = None
     last_event_amount: Decimal | None = None
     last_event_on: date | None = None
@@ -251,6 +264,9 @@ class EventOut(BaseModel):
     form_extra: dict[str, object] | None = None
     created_at: datetime
     operator: str
+    # 该事件还能被冲销多少：amount − Σ已冲销 CANCEL，夹底 0；CANCEL 自身恒 0。
+    # 由后端下发，避免前端（订单页/库存页）各自再算一遍而口径漂移。
+    cancellable_amount: Decimal = Decimal("0.00")
 
 
 class OrderDetailOut(OrderOut):
@@ -379,6 +395,23 @@ class PoolBalanceOut(BaseModel):
     cash_balance: Decimal
     deposit_held: Decimal
     available: Decimal
+
+
+class PoolBalanceTotalsOut(BaseModel):
+    """资金池余额汇总：服务端按 Decimal 聚合，前端只展示不再自己累加。"""
+
+    cash_balance: Decimal
+    available: Decimal
+    deposit_held: Decimal
+    # 自有权益口径：仅 ownership=OWNED 的池、按现金头寸计（不扣押金占用）。
+    owned_cash_balance: Decimal
+
+
+class PoolBalanceListOut(BaseModel):
+    """批量余额：一次返回全部可见池的卡片与汇总，替代前端逐池 N+1。"""
+
+    items: list[PoolBalanceOut]
+    totals: PoolBalanceTotalsOut
 
 
 __all__ = [

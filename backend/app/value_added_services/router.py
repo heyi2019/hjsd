@@ -63,10 +63,19 @@ def _installment_output(db: Session, item) -> schemas.InstallmentOut:
 def list_installments(
     status: str | None = Query(default=None),
     order_id: int | None = Query(default=None),
+    trade_date_from: date | None = Query(default=None),
+    trade_date_to: date | None = Query(default=None),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> list[schemas.InstallmentOut]:
-    items = service.list_installments(db, status=status, order_id=order_id, user=_user)
+    items = service.list_installments(
+        db,
+        status=status,
+        order_id=order_id,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        user=_user,
+    )
     extras = parties_service.get_extra_values_bulk(
         db, entity_type="installment", entity_ids=[item.id for item in items]
     )
@@ -74,6 +83,28 @@ def list_installments(
         schemas.InstallmentOut.model_validate({**item.__dict__, "extra_values": extras.get(item.id, {})})
         for item in items
     ]
+
+
+@router.get("/installments/totals", response_model=schemas.InstallmentTotalsOut)
+def installment_totals(
+    status: str | None = Query(default=None),
+    order_id: int | None = Query(default=None),
+    trade_date_from: date | None = Query(default=None),
+    trade_date_to: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> schemas.InstallmentTotalsOut:
+    """分期台合计：与 `/installments` 同一套筛选条件，Decimal 聚合，前端不再 reduce。"""
+    return schemas.InstallmentTotalsOut.model_validate(
+        service.installment_totals(
+            db,
+            status=status,
+            order_id=order_id,
+            trade_date_from=trade_date_from,
+            trade_date_to=trade_date_to,
+            user=_user,
+        )
+    )
 
 
 @router.get("/installments/export.csv")
@@ -84,10 +115,21 @@ def export_installments_csv(
     _user: CurrentUser = read_access,
 ) -> Response:
     """分期与回款按可见列导出 CSV：同 /installments 口径，天然全量。"""
-    outputs = list_installments(status=status, order_id=order_id, db=db, _user=_user)
+    # 直接调路由函数时 Query(default=None) 的默认值不会生效，必须把区间显式传 None。
+    outputs = list_installments(
+        status=status,
+        order_id=order_id,
+        trade_date_from=None,
+        trade_date_to=None,
+        db=db,
+        _user=_user,
+    )
     rows = [output.model_dump(mode="json") for output in outputs]
     value_labels = list_columns_service.get_value_labels(db, "INSTALLMENT")
     for row, output in zip(rows, outputs, strict=True):
+        # 列表列注册表里「剩余」的列 key 是 remaining，而字段名是 remaining_receivable；
+        # 不补这一行别名，导出那列会整列空掉（页面上却是后端算好的值）。
+        row["remaining"] = row.get("remaining_receivable")
         schedules = db.scalars(
             select(InstallmentSchedule)
             .where(InstallmentSchedule.installment_id == output.id)

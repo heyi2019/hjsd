@@ -1,0 +1,8 @@
+{
+  "name": "yiyouxuan-erp",
+  "private": true,
+  "description": "宜游轩 ERP 单仓根。唯一作用是让仓库根成为 npm 包根：tests/ 下的前端与 E2E 测试需要能解析前端依赖。",
+  "workspaces": [
+    "frontend"
+  ]
+}

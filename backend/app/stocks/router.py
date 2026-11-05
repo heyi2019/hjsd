@@ -3,7 +3,7 @@
 账号状态与成本由订单事件驱动，本模块**不提供**改状态/改成本入口（ACC-01-03/04）。
 """
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -11,6 +11,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.money import to_money
 from app.core.security import (
     PERM_AUDIT_READ,
     PERM_FINANCE_READ,
@@ -21,7 +22,7 @@ from app.core.security import (
     owner_scope_filter,
     require_permissions,
 )
-from app.domain.enums import AuditAction
+from app.domain.enums import AuditAction, EventType
 from app.lists.export import build_list_csv, csv_file_response
 from app.stocks import service
 from app.parties import service as parties_service
@@ -39,15 +40,21 @@ from app.domain.trade import (
     Reconciliation,
 )
 from app.core.audit import record_audit
-from app.core.errors import Conflict, NotFound, Validation
+from app.core.errors import Conflict, NotFound, PermissionDenied, Validation
 from app.orders import service as orders_service
+from app.orders.amounts import order_profit_flow_by_order
+# 复用订单台账「成交日期」的账期平移口径（事件/流水 occurred_on + 规则快照重取）。
+from app.orders.mutations import _shift_accounting_dates
 
 from .schemas import (
     AccountOut,
     AccountListOut,
     AccountProfileUpdate,
+    AccountDeleteRequest,
     ExecutionEditRequest,
     InventoryResponseOut,
+    InventoryStatsOut,
+    InventoryStatsQuery,
     ExecutionCashflowOut,
     ExecutionEventOut,
     ExecutionCounterpartyOut,
@@ -56,6 +63,7 @@ from .schemas import (
     AccountExecutionOrderOut,
     AccountAuditOut,
     AccountExecutionDetailOut,
+    ExecutionFinanceSummaryOut,
 )
 
 router = APIRouter(tags=["ACC-01 账号台账"])
@@ -63,6 +71,49 @@ router = APIRouter(tags=["ACC-01 账号台账"])
 read_access = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 manage = require_permissions(PERM_ORDER_CREATE)
 edit_execution = require_permissions(PERM_ORDER_UPDATE, PERM_FINANCE_ORDER_EVENT_POST)
+
+
+def _apply_time_shift(db: Session, account_id: int, delta_days: int, actor: str) -> None:
+    """账号台账时间联动：把该账号关联订单的整条时间轴平移 N 天。
+
+    账期（trade_date / 事件与流水 occurred_on / 规则快照）走订单台账同源函数；
+    台账界面展示的「登记时间」「售出时间」「流水时间」取的是 created_at / posted_at
+    时间戳，必须一并平移，否则改完日期界面仍显示旧值。
+    分期还款计划（first_due_on / 期次 due_on）按既定口径不动。
+    """
+    if delta_days == 0:
+        return
+    db.flush()  # 让同一请求内先前的执行记录改动对下面的查询可见
+    shift = timedelta(days=delta_days)
+    orders = list(db.scalars(select(Order).where(Order.account_id == account_id)).all())
+    if not orders:
+        raise NotFound("账号关联订单不存在")
+    order_ids = [order.id for order in orders]
+    events = list(db.scalars(select(OrderEvent).where(OrderEvent.order_id.in_(order_ids))).all())
+    flows = list(db.scalars(select(Cashflow).where(Cashflow.order_id.in_(order_ids))).all())
+    for order in orders:
+        new_trade_date = order.trade_date + shift
+        _shift_accounting_dates(db, order, actor=actor, new_trade_date=new_trade_date)
+        order.trade_date = new_trade_date
+        if order.created_at is not None:
+            order.created_at = order.created_at + shift
+        order.updated_by = actor
+    for event in events:
+        if event.posted_at is not None:
+            event.posted_at = event.posted_at + shift
+        if event.created_at is not None:
+            event.created_at = event.created_at + shift
+        event.updated_by = actor
+    for flow in flows:
+        if flow.created_at is not None:
+            flow.created_at = flow.created_at + shift
+        flow.updated_by = actor
+    record_audit(
+        db, action="ORDER_UPDATE", entity_type="inventory_time_shift",
+        entity_id=account_id, actor=actor,
+        before={"delta_days": 0},
+        after={"delta_days": delta_days, "orders": len(orders), "events": len(events), "cashflows": len(flows)},
+    )
 
 
 @router.patch("/stocks/{account_id}/execution-edit")
@@ -137,6 +188,8 @@ def update_execution_detail(
     account.cost_amount = Decimal(str(account.cost_amount)) + cost_delta
     if changes:
         account.updated_by = user.username
+    if payload.time_shift is not None:
+        _apply_time_shift(db, account_id, payload.time_shift.delta_days, user.username)
     db.flush()
     return {"ok": True}
 
@@ -289,9 +342,19 @@ def export_accounts_csv(
         _user,
         include_credentials=_user.has(PERM_ORDER_CREATE),
     )
-    csv_text, meta = build_list_csv(
-        db, "INVENTORY", [output.model_dump() for output in outputs]
-    )
+    # 「未售时长」列的注册键是 inventory_age，而响应字段叫 inventory_age_days，
+    # 不补别名整列会导出成空（列在、值没有）。格式与前端本地导出保持一致：`N天`。
+    # 「状态」列（注册键 status）在界面上展示的是**库存状态**（在库/出库），
+    # 不是库存周期状态（WAITING/SOLD/VOID）；不覆盖就会导出另一套值域的裸码。
+    rows = [
+        {
+            **output.model_dump(),
+            "status": output.inventory_status,
+            "inventory_age": "" if output.inventory_age_days is None else f"{output.inventory_age_days}天",
+        }
+        for output in outputs
+    ]
+    csv_text, meta = build_list_csv(db, "INVENTORY", rows)
     record_audit(
         db,
         action=AuditAction.LIST_EXPORT,
@@ -322,6 +385,29 @@ def update_account_profile(
     return _account_output(item, include_credentials=True, extra_values=extras)
 
 
+def _require_admin(user: CurrentUser) -> None:
+    """账号删除不可逆：权限收紧到系统管理员，operator/finance 即使有建单权也不可删。"""
+    if not user.is_admin:
+        raise PermissionDenied("仅系统管理员可删除账号")
+
+
+@router.delete("/stocks/{account_id}", status_code=204, response_model=None)
+def delete_account(
+    account_id: int,
+    payload: AccountDeleteRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage,
+) -> Response:
+    """删除库存账号（仅管理员）。
+
+    请求体必带删除原因（空白一律 422）；账号行物理删除，订单/事件/流水/返点
+    全部保留并解绑，账号快照与原因写入审计日志，操作不可恢复。
+    """
+    _require_admin(user)
+    service.delete_account(db, account_id, actor=_actor(user), reason=payload.reason, user=user)
+    return Response(status_code=204)
+
+
 @router.get("/stocks/inventory", response_model=InventoryResponseOut)
 def inventory(
     db: Session = Depends(get_db),
@@ -331,6 +417,21 @@ def inventory(
     rows = service.inventory(db, user=_user)
     total = sum((row["cost_amount"] for row in rows), Decimal("0"))
     return InventoryResponseOut(items=rows, count=len(rows), total_cost=total)
+
+
+@router.post("/stocks/inventory/stats", response_model=InventoryStatsOut)
+def inventory_stats(
+    payload: InventoryStatsQuery,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> InventoryStatsOut:
+    """汇总当前可见账号的占用成本与库龄档位。
+
+    入参是界面此刻展示的账号集合，因此筛选口径只有一份（前端视图），
+    金额累加与库龄天数只在后端算，前端不再做 float 求和。
+    """
+    stats = service.inventory_stats(db, account_ids=payload.account_ids, user=_user)
+    return InventoryStatsOut(**stats)
 
 
 @router.get("/stocks/{account_id}/execution-detail", response_model=AccountExecutionDetailOut)
@@ -460,14 +561,27 @@ def execution_detail(
             )
     operator_ids = {uid for event in events for uid in (event.operator_user_ids or [])}
     operator_names = {user.id: user.display_name for user in db.scalars(select(User).where(User.id.in_(operator_ids))).all()} if operator_ids else {}
+    # 可冲销余额：口径与 post_event 的校验同源（CANCEL 金额累加后从被冲销事件里扣），
+    # 一次遍历算完，避免前端为了「还能冲多少」自己相减。
+    cancelled_by_offset: dict[int, Decimal] = {}
+    for item in events:
+        if item.event_type == EventType.CANCEL.value and item.offset_event_id is not None:
+            cancelled_by_offset[item.offset_event_id] = (
+                cancelled_by_offset.get(item.offset_event_id, Decimal("0.00")) + to_money(item.amount)
+            )
     events_by_order: dict[int, list[ExecutionEventOut]] = {}
     for event in events:
+        cancellable = Decimal("0.00")
+        if event.event_type != EventType.CANCEL.value:
+            remaining = to_money(event.amount) - cancelled_by_offset.get(event.id, Decimal("0.00"))
+            cancellable = remaining if remaining > 0 else Decimal("0.00")
         events_by_order.setdefault(event.order_id, []).append(
             ExecutionEventOut(
                 id=event.id,
                 event_no=event.event_no,
                 event_type=event.event_type,
                 amount=event.amount,
+                cancellable_amount=cancellable,
                 occurred_on=event.occurred_on,
                 occurred_at=event.posted_at or event.created_at,
                 created_at=event.created_at,
@@ -506,6 +620,47 @@ def execution_detail(
             )
             for row in db.scalars(select(AuditLog).where(or_(*audit_filters)).order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())).all()
         ]
+    # 财务汇总与上面组装出的明细同源：事件流水 + 订单独立流水 + 返点收入。
+    # 资金走向只有收入 / 支出两种：返点登记即收入确认、分期坏账是回收时确认
+    # 的损失（支出），两者都不生成资金流水，但都必须计入总收入 / 总支出与净额。
+    zero = Decimal("0.00")
+    cashflow_income = zero
+    total_expense = zero
+    for flow in flow_by_event.values():
+        if flow.direction == "IN":
+            cashflow_income += flow.amount
+        else:
+            total_expense += flow.amount
+    for order_flows in cashflows_by_order.values():
+        for flow in order_flows:
+            if flow.direction == "IN":
+                cashflow_income += flow.amount
+            else:
+                total_expense += flow.amount
+    rebate_income = zero
+    for order_rebates in rebates_by_order.values():
+        for rebate in order_rebates:
+            rebate_income += rebate.base_amount
+    # 坏账是支出，与订单利润同源；它不占「资金明细」流水行，但必须扣减净额。
+    bad_debt_expense = zero
+    if order_ids:
+        bad_debt_expense = sum(
+            (
+                expense
+                for _rebate_income, expense in order_profit_flow_by_order(
+                    db, order_ids=order_ids
+                ).values()
+            ),
+            zero,
+        )
+    total_expense += bad_debt_expense
+    finance_summary = ExecutionFinanceSummaryOut(
+        cashflow_income=cashflow_income,
+        rebate_income=rebate_income,
+        total_income=cashflow_income + rebate_income,
+        total_expense=total_expense,
+        net_amount=cashflow_income + rebate_income - total_expense,
+    )
     return AccountExecutionDetailOut(
         account=_account_outputs(
             db,
@@ -513,6 +668,7 @@ def execution_detail(
             _user,
             include_credentials=_user.has(PERM_ORDER_CREATE),
         )[0],
+        finance_summary=finance_summary,
         orders=[
             AccountExecutionOrderOut(
                 order_id=order.id,

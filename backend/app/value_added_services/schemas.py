@@ -17,6 +17,14 @@ class ScheduleCreate(RequestModel):
     service_fee_rate: Decimal = Decimal("0")
 
 
+class InstallmentTotalsOut(BaseModel):
+    """分期台合计：与列表同条件、服务端 Decimal 聚合，前端不再对当页求和。"""
+
+    total_receivable: Decimal
+    total_paid: Decimal
+    total_remaining: Decimal
+
+
 class InstallmentCreate(RequestModel):
     order_id: int
     contract_type: str = Field(
@@ -77,6 +85,21 @@ class InstallmentOut(BaseModel):
             + to_money(self.final_period_adjustment or 0)
             - to_money(self.waived_amount)
         )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def remaining_receivable(self) -> Decimal:
+        """剩余应收 = 总应收 − 已收 − 坏账，且**不小于 0**。
+
+        口径唯一来源在后端：前端原先自己相减，先收后减免时会出现负的「剩余」。
+        已收 + 坏账超过总应收（减免把应收降到已收之下）时按 0 计，不显示负数。
+        """
+        remaining = (
+            self.total_receivable
+            - to_money(self.paid_amount)
+            - to_money(self.bad_debt_amount or 0)
+        )
+        return remaining if remaining > 0 else Decimal("0.00")
 
 
 class ScheduleOut(BaseModel):

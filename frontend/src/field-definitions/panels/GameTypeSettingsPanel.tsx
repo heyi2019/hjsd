@@ -1,10 +1,10 @@
 import { appMessage } from "../../shared/ui/appFeedback";
-import { Card, Checkbox, Form, Input, InputNumber, Popconfirm, Space, Table, Typography } from "antd";
+import { Checkbox, Form, Input, InputNumber, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { gameTypesApi, type GameTypeOption } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
-import { BusinessForm, ConfirmButton, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
+import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 import "./GameTypeSettingsPanel.css";
 
 export function GameTypeSettingsPanel() {
@@ -111,13 +111,20 @@ export function GameTypeSettingsPanel() {
             >
               {row.is_active ? "停用" : "启用"}
             </ConfirmButton>
-            <Popconfirm
+            <ConfirmButton
+              permission="order-type.manage"
+              size="small"
+              danger
               title={`删除游戏类型「${row.name}」？`}
               description="删除后不可恢复；默认游戏类型需先取消默认。"
-              onConfirm={() => run(() => gameTypesApi.remove(row.id))}
+              okText="删除"
+              onConfirm={async () => {
+                await gameTypesApi.remove(row.id);
+                await load();
+              }}
             >
-              <PermissionButton permission="order-type.manage" size="small" danger>删除</PermissionButton>
-            </Popconfirm>
+              删除
+            </ConfirmButton>
           </Space>
         </PermissionGate>
       ),
@@ -125,25 +132,30 @@ export function GameTypeSettingsPanel() {
   ];
 
   return (
-    <Card className="glass" title="游戏与渠道配置">
+    <section className="game-type-settings-panel">
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Typography.Paragraph type="secondary">
         新建订单和账号时使用这里的标准选项，支持模糊搜索；每个游戏类型可配置对应的渠道／区服。勾选默认后，新建表单会自动带出该类型。默认项不能停用。
       </Typography.Paragraph>
       <div className="game-type-settings__container">
         <Typography.Title level={5}>已配置游戏类型</Typography.Title>
-        <Table<GameTypeOption>
+        <DataTable<GameTypeOption>
+          size="small"
           rowKey="id"
           columns={columns}
-          dataSource={rows}
+          rows={rows}
+          page={1}
+          pageSize={10}
+          total={rows.length}
+          onPageChange={() => undefined}
           pagination={false}
-          locale={{ emptyText: "暂无游戏类型" }}
+          emptyText="暂无游戏类型"
         />
       </div>
       <PermissionGate permission="order-type.manage">
         <div className="game-type-settings__container">
           <Typography.Title level={5}>{editingId === null ? "新增游戏类型" : "编辑游戏类型"}</Typography.Title>
-          <BusinessForm form={form} layout="inline" onFinish={submit} initialValues={{ sort_order: 0 }}>
+          <BusinessRegistrationForm form={form} layout="inline" onFinish={submit} initialValues={{ sort_order: 0 }}>
             <Form.Item name="game_type_name" label="游戏类型" rules={[{ required: true, message: "请输入游戏类型" }]}> 
               <Input name="game_type_name" autoComplete="off" placeholder="如：王者荣耀" />
             </Form.Item>
@@ -175,9 +187,9 @@ export function GameTypeSettingsPanel() {
                 <PermissionButton permission="order-type.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
               </Form.Item>
             )}
-          </BusinessForm>
+          </BusinessRegistrationForm>
         </div>
       </PermissionGate>
-    </Card>
+    </section>
   );
 }

@@ -4,9 +4,11 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.core.schemas import PageOut, RequestModel
+
+from ._common import INVENTORY_STATUSES, inventory_age_days as age_days, inventory_age_level as age_level
 
 class AccountOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -16,6 +18,7 @@ class AccountOut(BaseModel):
     source_order_id: int | None = None
     source_order_no: str | None = None
     game_account: str | None = None
+    camp_account: str | None = None
     game_type: str | None = None
     business_mode: str | None = None
     inventory_type: str | None = None
@@ -24,6 +27,9 @@ class AccountOut(BaseModel):
     channel_region: str | None = None
     bound_phone: str | None = None
     has_secondary: bool | None = None
+    secondary_images: list[str] | None = None
+    wallet_realname: str | None = None
+    wallet_realname_images: list[str] | None = None
     platform: str | None = None
     note: str | None = None
     account_description: str | None = None
@@ -38,6 +44,20 @@ class AccountOut(BaseModel):
     inventory_operator: str | None = None
     created_at: datetime
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def inventory_age_days(self) -> int | None:
+        """在库天数（自然日）：非在库为 None；与卡片指标同一口径，前端只展示。"""
+        if self.inventory_status not in INVENTORY_STATUSES:
+            return None
+        return age_days(self.inventory_entry_at or self.buy_date or self.created_at)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def inventory_age_level(self) -> str | None:
+        """库龄档位（NORMAL/WARNING/OVERDUE）：阈值由后端定义，前端只映射颜色。"""
+        return age_level(self.inventory_age_days)
+
 
 class AccountListOut(PageOut[AccountOut]):
     pass
@@ -47,11 +67,15 @@ class AccountProfileUpdate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     game_account: str | None = Field(default=None, max_length=128)
+    camp_account: str | None = Field(default=None, max_length=128)
     game_type: str | None = Field(default=None, max_length=64)
     game_password: str | None = Field(default=None, max_length=256)
     channel_region: str | None = Field(default=None, max_length=128)
     bound_phone: str | None = Field(default=None, max_length=64)
     has_secondary: bool | None = None
+    secondary_images: list[str] | None = Field(default=None, max_length=3)
+    wallet_realname: str | None = Field(default=None, max_length=16)
+    wallet_realname_images: list[str] | None = Field(default=None, max_length=3)
     platform: str | None = Field(default=None, max_length=64)
     account_description: str | None = Field(default=None, max_length=2000)
     account_images: list[str] | None = Field(default=None, max_length=9)
@@ -59,6 +83,21 @@ class AccountProfileUpdate(RequestModel):
     extra_values: dict[str, object] | None = None
     # 表单字段配置体系（INVEDIT 作用域）：合并进账号 form_extra。
     form_extra: dict[str, object] | None = None
+
+
+class AccountDeleteRequest(RequestModel):
+    """删除账号的二次确认载荷：原因必填，只进审计日志，不落业务表。"""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    reason: str = Field(min_length=1, max_length=200)
+
+    @field_validator("reason")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        # str_strip_whitespace 已去首尾空格；这里再兜一次，防止纯空白绕过 min_length。
+        if not value.strip():
+            raise ValueError("删除原因不能为空")
+        return value.strip()
 
 
 class ExecutionEditItem(RequestModel):
@@ -69,9 +108,21 @@ class ExecutionEditItem(RequestModel):
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
+class ExecutionTimeShift(RequestModel):
+    """账号台账时间联动：任一时间锚点改 N 天，整单时间轴平移 N 天（保留相对关系）。
+
+    与订单台账「成交日期」同源口径：trade_date、事件/流水 occurred_on 同步平移，
+    另外把台账展示用的 created_at / posted_at 时间戳一并平移，避免界面值不动。
+    分期 first_due_on / 期次 due_on 属客户还款计划，不随之平移。
+    """
+
+    delta_days: int = Field(ge=-3650, le=3650)
+
+
 class ExecutionEditRequest(RequestModel):
     events: list[ExecutionEditItem] = Field(max_length=100)
     profile: AccountProfileUpdate | None = None
+    time_shift: ExecutionTimeShift | None = None
 
 
 class AccountInventoryOut(BaseModel):
@@ -103,6 +154,20 @@ class InventoryResponseOut(BaseModel):
     total_cost: Decimal
 
 
+class InventoryStatsQuery(RequestModel):
+    # 界面当前可见的账号集合；筛选留在前端做视图即时反馈，聚合与库龄口径归后端。
+    account_ids: list[int] = Field(default_factory=list, max_length=5000)
+
+
+class InventoryStatsOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    account_count: int
+    occupied_cost: Decimal
+    over_7d_count: int
+    over_30d_count: int
+
+
 class ExecutionCashflowOut(BaseModel):
     flow_no: str
     pool_name: str | None = None
@@ -121,6 +186,9 @@ class ExecutionEventOut(BaseModel):
     event_no: str
     event_type: str
     amount: Decimal
+    # 该事件仍可被冲销的余额 = amount − 已冲销合计（夹底 0）；CANCEL 自身恒为 0。
+    # 口径与下单/冲销校验（`orders.events.post_event`）同源，前端不再自行相减。
+    cancellable_amount: Decimal = Decimal("0")
     occurred_on: date
     occurred_at: datetime
     created_at: datetime
@@ -191,15 +259,31 @@ class AccountAuditOut(BaseModel):
     occurred_at: datetime
 
 
+class ExecutionFinanceSummaryOut(BaseModel):
+    """账号维度的财务汇总：明细在前端拼装，合计一律由后端给。
+
+    口径与本接口的 orders 完全一致（事件流水 + 订单独立流水 + 返点收入），
+    另含分期坏账支出（损失计提，不占资金明细流水行）；前端不再对详情数据做第二遍累加。
+    """
+
+    cashflow_income: Decimal
+    rebate_income: Decimal
+    total_income: Decimal
+    total_expense: Decimal
+    net_amount: Decimal
+
+
 class AccountExecutionDetailOut(BaseModel):
     account: AccountOut
     orders: list[AccountExecutionOrderOut]
+    finance_summary: ExecutionFinanceSummaryOut
     audit: list[AccountAuditOut] = Field(default_factory=list)
 
 __all__ = [
     "AccountOut",
     "AccountListOut",
     "AccountProfileUpdate",
+    "AccountDeleteRequest",
     "ExecutionEditItem",
     "ExecutionEditRequest",
     "AccountInventoryOut",
@@ -212,4 +296,5 @@ __all__ = [
     "AccountExecutionOrderOut",
     "AccountAuditOut",
     "AccountExecutionDetailOut",
+    "ExecutionFinanceSummaryOut",
 ]

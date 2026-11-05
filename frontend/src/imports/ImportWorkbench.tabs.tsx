@@ -19,7 +19,7 @@ export function RowsTab({ columns, rows, loading }: {
                   rows={rows}
                   loading={loading}
                   page={1}
-                  pageSize={Math.max(rows.length, 10)}
+                  pageSize={20}
                   total={rows.length}
                   emptyText="该批次暂无行"
                   onPageChange={() => undefined}

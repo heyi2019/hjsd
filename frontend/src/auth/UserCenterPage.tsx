@@ -5,18 +5,18 @@ import { appMessage } from "../shared/ui/appFeedback";
  *  onClose 由 Modal 容器注入：退出登录需先关弹窗再 logout。 */
 import { Button, Card, Form, Input } from "antd";
 import { useState } from "react";
-import { ErrorBanner } from "../shared/ui";
+import { ConfirmButton, ErrorBanner } from "../shared/ui";
 import { normalizeError } from "../shared/api/client";
 import { DEV_ROLES, ROLE_PERMISSIONS, useSession } from "../shared/state/session";
 import { PERMISSION_LABEL } from "../shared/lib/labels";
 
 export function UserCenterPage({ onClose }: { onClose?: () => void }) {
-  const { user, changePassword, logout } = useSession();
+  const { role, changePassword, logout } = useSession();
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
-  const roleLabel = DEV_ROLES.find((r) => r.value === user)?.label ?? "未设置角色";
-  const permissions = ROLE_PERMISSIONS[user] ?? [];
+  const roleLabel = DEV_ROLES.find((r) => r.value === role)?.label ?? "未设置角色";
+  const permissions = ROLE_PERMISSIONS[role] ?? [];
 
   const submit = async (values: { old_password: string; new_password: string; confirm_password: string }) => {
     if (values.new_password !== values.confirm_password) {
@@ -74,14 +74,18 @@ export function UserCenterPage({ onClose }: { onClose?: () => void }) {
             <Input.Password autoComplete="new-password" />
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={submitting}>修改密码</Button>
-          <Button
+          <ConfirmButton
             type="primary"
             danger
             className="user-center__logout"
-            onClick={() => { onClose?.(); void logout(); }}
+            title="确认退出登录？"
+            description="退出后需重新登录，未保存的修改会丢失。"
+            okText="确认退出"
+            cancelText="取消"
+            onConfirm={async () => { onClose?.(); void logout(); }}
           >
             退出登录
-          </Button>
+          </ConfirmButton>
         </Form>
       </Card>
     </div>

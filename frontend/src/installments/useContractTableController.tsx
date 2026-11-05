@@ -1,14 +1,14 @@
 import { Form, Space } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { installmentsApi, ordersApi, type Installment, type InstallmentDisposition, type Order, type Schedule } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { INSTALLMENT_STATUS_LABEL, installmentDisplayStatus, money, today } from "../shared/lib/format";
 import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";
-import { MoneyText, PermissionButton, StatusTag, useCompactLayout } from "../shared/ui";
+import { MoneyText, PermissionButton, StatusTag } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { useSession } from "../shared/state/session";
@@ -17,7 +17,12 @@ import type { Permission } from "../shared/state/session";
 
 export function useContractTableController(params: { contractType: string; reloadKey: number; dateRange?: [string, string] | null }) {
   const { contractType, reloadKey, dateRange } = params;
+  // 上层每次渲染都会新建 [from, to] 数组，直接当 useCallback 依赖会每次变化 →
+  // load 变 → useEffect 触发 → 无限重拉。这里只依赖两个原始字符串。
+  const dateFrom = dateRange?.[0] ?? "";
+  const dateTo = dateRange?.[1] ?? "";
   const [rows, setRows] = useState<Installment[]>([]);
+  const [totals, setTotals] = useState<{ total_receivable: string; total_paid: string; total_remaining: string } | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const { can } = useSession();
@@ -36,9 +41,25 @@ export function useContractTableController(params: { contractType: string; reloa
   const [extendTarget, setExtendTarget] = useState<Schedule | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const compact = useCompactLayout();
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
+
+  // P2-274：各业务弹窗共享同一份 write.error，上一操作的失败提示会残留到其它弹窗。
+  // 只要「某个业务弹窗由关到开」（含从 A 弹窗切到 B 弹窗）就清空错误态，保证每个弹窗起始干净。
+  // 注意：不能把 write 放进依赖——useAsyncAction 每次渲染返回新对象，一旦放入，失败提示被
+  // setError 写出后，同一次重渲染就会再次触发 effect 把 error 清掉，反而吞掉失败提示
+  // （回归测试 收款提交失败 / P2-274 会因此失败）。write.clearError 本身是稳定引用，可安全调用。
+  const prevTargetsRef = useRef<Record<string, unknown>>({});
+  useEffect(() => {
+    const targets: Record<string, unknown> = {
+      payTarget, deliverTarget, recoverTarget, resaleTarget,
+      cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
+    };
+    const openedNew = Object.keys(targets).some((k) => targets[k] && !prevTargetsRef.current[k]);
+    if (openedNew) write.clearError();
+    prevTargetsRef.current = targets;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget]);
   const [payForm] = Form.useForm();
   const [deliverForm] = Form.useForm();
   const [recoverForm] = Form.useForm();
@@ -52,10 +73,20 @@ export function useContractTableController(params: { contractType: string; reloa
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [list, orderList] = await Promise.all([installmentsApi.list(), ordersApi.list()]);
+      // 日期区间与合计都走服务端：列表与合计同条件，前端不再本地筛/本地求和。
+      const rangeParams = {
+        trade_date_from: dateFrom || undefined,
+        trade_date_to: dateTo || undefined,
+      };
+      const [list, orderList, summary] = await Promise.all([
+        installmentsApi.list(rangeParams),
+        ordersApi.list(),
+        installmentsApi.totals(rangeParams),
+      ]);
       const filtered = list.filter((item) => item.contract_type === contractType);
       setRows(filtered);
       setOrders(orderList);
+      setTotals(summary);
       const entries = await Promise.all(
         filtered.map(async (item) => {
           const [scheduleRows, dispositionRows] = await Promise.all([
@@ -73,7 +104,7 @@ export function useContractTableController(params: { contractType: string; reloa
     } finally {
       setLoading(false);
     }
-  }, [contractType]);
+  }, [contractType, dateFrom, dateTo]);
 
   useEffect(() => {
     void load();
@@ -246,16 +277,11 @@ export function useContractTableController(params: { contractType: string; reloa
     });
   };
 
-  // 总应收只采用后端下发值，前端不再自行推导第二套口径。
-  const receivable = (row: Installment) => Number(row.total_receivable);
+  // 总应收 / 剩余应收都只采用后端下发值（含「不小于 0」的 clamp），前端不再自行推导。
 
-  const visibleRows = rows.filter((row) => {
-    if (!dateRange) return true;
-    const tradeDate = orders.find((order) => order.id === row.order_id)?.trade_date;
-    return Boolean(tradeDate) && tradeDate! >= dateRange[0] && tradeDate! <= dateRange[1];
-  });
-  const totalReceivable = visibleRows.reduce((sum, row) => sum + receivable(row), 0).toFixed(2);
-  const totalPaid = visibleRows.reduce((sum, row) => sum + Number(row.paid_amount), 0).toFixed(2);
+  // 合计直接取服务端（Decimal）；日期区间已在后端筛，列表不再二次过滤。
+  const totalReceivable = totals?.total_receivable ?? "0.00";
+  const totalPaid = totals?.total_paid ?? "0.00";
 
   const { arrange: arrangeColumns } = useListViewColumns("INSTALLMENT");
   const columns: ColumnsType<Installment> = [
@@ -295,7 +321,8 @@ export function useContractTableController(params: { contractType: string; reloa
       title: "总应收",
       key: "receivable",
       align: "right",
-      render: (_v, row) => <MoneyText value={receivable(row).toFixed(2)} />,
+      dataIndex: "total_receivable",
+      render: (value: string) => <MoneyText value={value} />,
     },
     {
       title: "服务费",
@@ -326,13 +353,8 @@ export function useContractTableController(params: { contractType: string; reloa
       title: "剩余",
       key: "remaining",
       align: "right",
-      render: (_v, row) => (
-        <MoneyText
-          value={(
-            receivable(row) - Number(row.paid_amount) - Number(row.bad_debt_amount ?? 0)
-          ).toFixed(2)}
-        />
-      ),
+      dataIndex: "remaining_receivable",
+      render: (value: string) => <MoneyText value={value ?? "0.00"} />,
     },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={installmentDisplayStatus(v)} label={configurableLabel("INSTALLMENT_STATUS", installmentDisplayStatus(v), INSTALLMENT_STATUS_LABEL)} /> },
     {
@@ -343,7 +365,7 @@ export function useContractTableController(params: { contractType: string; reloa
           <PermissionButton
             permission="order.event.post"
             size="small"
-            disabled={["DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
+            disabled={["SETTLED", "DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
             onClick={() => { payForm.resetFields(); setPayTarget(row); payForm.setFieldsValue({ paid_on: today() }); }}
           >
             登记收款
@@ -372,7 +394,7 @@ export function useContractTableController(params: { contractType: string; reloa
             permission="order.event.post"
             size="small"
             danger
-            disabled={!(["PENDING", "ACTIVE", "OVERDUE", "SETTLED"].includes(row.status))}
+            disabled={!(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status))}
             onClick={() => { cancelForm.resetFields(); setCancelTarget(row); cancelForm.setFieldsValue({ cancelled_on: today() }); }}
           >
             终止分期并退款
@@ -472,7 +494,7 @@ export function useContractTableController(params: { contractType: string; reloa
 
 
   return {
-    rows: visibleRows,
+    rows,
     setRows,
     sortDesc,
     setSortDesc,
@@ -506,7 +528,6 @@ export function useContractTableController(params: { contractType: string; reloa
     setError,
     loading,
     setLoading,
-    compact,
     write,
     payForm,
     deliverForm,
@@ -531,7 +552,6 @@ export function useContractTableController(params: { contractType: string; reloa
     submitDefault,
     submitWaive,
     submitExtend,
-    receivable,
     totalReceivable,
     totalPaid,
     arrangeColumns,

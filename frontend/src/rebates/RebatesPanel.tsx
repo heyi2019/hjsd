@@ -17,16 +17,19 @@ import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
 import {
   DataTable,
+  DateField,
   ErrorBanner,
   InlineError,
   MoneyInput,
   MoneyText,
   ConfirmButton,
   BusinessActionModal,
-  BusinessForm,
+  BusinessRegistrationForm,
   PermissionButton,
   Select,
   StatRow,
+  dateValueFromEvent,
+  dateValueProps,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { percentRules, requiredMoneyRules } from "../shared/lib/validators";
@@ -42,6 +45,7 @@ export function RebatesPanel() {
   const [editTarget, setEditTarget] = useState<Rebate | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dataReady, setDataReady] = useState(false);
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
   const [form] = Form.useForm();
@@ -61,6 +65,7 @@ export function RebatesPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setDataReady(false);
     try {
       const [list, orderList, employeeList] = await Promise.all([
         rebatesApi.list(),
@@ -71,6 +76,7 @@ export function RebatesPanel() {
       setOrders(orderList);
       setEmployees(employeeList);
       setError(null);
+      setDataReady(true);
     } catch (err) {
       setError(normalizeError(err));
     } finally {
@@ -210,7 +216,7 @@ export function RebatesPanel() {
 
       <StatRow
         items={[
-          { label: "返点记录数", kind: "count", amount: String(rows.length) },
+          { label: "返点记录数", kind: "count", amount: error ? "不可用" : dataReady ? String(rows.length) : "—" },
         ]}
       />
 
@@ -223,6 +229,7 @@ export function RebatesPanel() {
             <PermissionButton
               permission="order.event.post"
               type="primary"
+              disabled={!dataReady || loading || Boolean(error) || orders.length === 0}
               onClick={() => {
                 form.resetFields();
                 setCreateOpen(true);
@@ -240,30 +247,38 @@ export function RebatesPanel() {
           page={1}
           pageSize={Math.max(rows.length, 10)}
           total={rows.length}
-          emptyText="暂无返点记录"
+          emptyText={error ? "返点数据不可用，请点击重新加载" : "暂无返点记录"}
           onPageChange={() => undefined}
         />
       </Card>
 
-      <BusinessActionModal title={editTarget ? `编辑返点 · ${editTarget.rebate_no}` : "编辑返点"} open={Boolean(editTarget)} onCancel={() => setEditTarget(null)} footer={null}>
+      <BusinessActionModal title={editTarget ? `编辑返点 · ${editTarget.rebate_no}` : "编辑返点"} fieldCount={5} open={Boolean(editTarget)} onCancel={() => setEditTarget(null)} footer={null}>
         <InlineError error={write.error} />
-        <BusinessForm scope="INVREBATE" form={editForm} onFinish={submitEdit}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INVREBATE" form={editForm} onFinish={submitEdit}>
           <div className="rebate-core-fields">
             <CfgItem name="base_amount" label="返点金额" rules={requiredMoneyRules("返点金额")}><MoneyInput /></CfgItem>
             <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}><Input suffix="%" /></CfgItem>
-            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]}><Input /></CfgItem>
+            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
             <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           </div>
           <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
           <CustomFieldSection testIdSuffix="rebate-edit" />
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>保存</PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
 
-      <BusinessActionModal title="新增返点记录" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
+      <BusinessActionModal title="新增返点记录" fieldCount={6} open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
         <InlineError error={write.error} />
         <FieldConfigScope scope="REBATE" active={createOpen}>
-        <BusinessForm scope="INVREBATE" form={form}
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INVREBATE" form={form}
           onFinish={submitCreate}
           initialValues={{ collected_on: today(), rebate_type: "BUY" }}
         >
@@ -284,8 +299,8 @@ export function RebatesPanel() {
             <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}>
               <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
             </CfgItem>
-            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]}>
-              <Input placeholder="YYYY-MM-DD" />
+            <CfgItem name="collected_on" label="返点日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+              <DateField />
             </CfgItem>
             <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           </div>
@@ -296,7 +311,7 @@ export function RebatesPanel() {
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             创建
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </BusinessActionModal>
     </section>

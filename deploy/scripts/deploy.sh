@@ -98,41 +98,99 @@ echo "==> 构建镜像"
 docker compose build
 fi
 
-if [[ "${DATABASE_URL:-}" == postgresql* ]]; then
-  echo "==> 迁移前备份 PostgreSQL 正式库（不打包/不备份开发 SQLite）"
-  pg_backup_dir="${ERP_PG_BACKUP_DIR:-../backups}"
-  mkdir -p "$pg_backup_dir"
-  pg_backup_file="$pg_backup_dir/heijin_erp_pg_$(date +%Y%m%d_%H%M%S).dump"
-  docker compose exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > "$pg_backup_file"
-  sha256sum "$pg_backup_file" > "$pg_backup_file.sha256"
-  find "$pg_backup_dir" -maxdepth 1 -type f -name 'heijin_erp_pg_*.dump' -mtime +30 -delete
-  echo "BACKUP_OK path=$pg_backup_file sha256=$(awk '{print $1}' "$pg_backup_file.sha256")"
-elif docker compose run --rm backend test -f /app/data/heijin_erp_v1.db; then
-  echo "==> 迁移前备份本地 SQLite 开发库"
-  docker compose run --rm backend \
-    python /app/scripts/backup_db.py \
-    --db /app/data/heijin_erp_v1.db \
-    --out-dir /app/data/backups \
-    --keep 30
-else
-  echo "==> SQLite 开发库不存在，跳过本地备份"
+# 迁移前必须有一份可信的库快照：迁移改的是结构，出错往往不可逆。
+# 备份逻辑只有一处真相（backup_daily.sh，pg_dump -Fc + sha256 + 完整性闸门），
+# 这里只负责「先把 db 拉起来 → 备份 → 备份失败就中止发布」。
+echo "==> 确保 db 服务就绪（迁移前备份依赖它）"
+docker compose up -d db
+
+db_ready=0
+for _ in $(seq 1 20); do
+  if docker compose exec -T db sh -c 'pg_isready -U "$POSTGRES_USER" -q' </dev/null >/dev/null 2>&1; then
+    db_ready=1; break
+  fi
+  sleep 2
+done
+if [ "$db_ready" -ne 1 ]; then
+  echo "✗ db 在 40s 内未就绪，已中止发布（不在没有备份的情况下改结构）" >&2
+  exit 1
 fi
 
+echo "==> 预检：数据库版本戳能否被活动迁移链解析"
+# 活动链已压平为单一 0001，历史增量迁移（0065~0071 等）不再加载。
+# 生产库若停在旧链（如 0064_expand_buy_rebate_scope），alembic 会在执行任何 DDL 之前
+# 报 Can't locate revision 并中止。这里提前拦一次，把「不要 stamp 绕过」的指引打到日志里，
+# 避免运维现场把结构落后的库 stamp 成已升级（那样之后 upgrade head 是空操作）。
+migration_probe="$(docker compose run --rm --no-deps backend alembic current </dev/null 2>&1 || true)"
+if printf '%s\n' "$migration_probe" | grep -q "Can't locate revision"; then
+  printf '%s\n' "$migration_probe" | sed 's/^/    /' >&2
+  cat >&2 <<'MIGRATION_CHAIN_MSG'
+
+✗ 数据库版本戳不在活动迁移链内，升级必然失败，已中止（未做任何改动）。
+  活动链已压平为单一 0001，0065~0071 等历史增量已不存在。
+  ⚠ 不要用 alembic stamp 绕过：对结构落后的库 stamp 之后 upgrade head 是空操作，
+    等于把未完成的库伪装成已升级。
+  正确路径：备份数据 → 空库 alembic upgrade head 建全量结构 → 清洗后导入 → 校验。
+  详见 docs/ERP_数据库架构检查与治理方案_V1.1_20261103.md 第五节。
+MIGRATION_CHAIN_MSG
+  exit 1
+fi
+printf '%s\n' "$migration_probe" | sed 's/^/    /'
+
+echo "==> 迁移前备份 PostgreSQL 正式库"
+if ! bash scripts/backup_daily.sh; then
+  echo "✗ 迁移前备份失败，已中止发布（不在没有备份的情况下改结构）" >&2
+  exit 1
+fi
+
+# 发布不变量基线：只采集，不写库。用升级前后逐项比对自动证明发布通道没有偷改库结构
+# 或业务数据（历史上 stamp_db_version / seed_policy_definitions 会破坏这一口径）。
+# 用户与库名与 compose 的 db 服务同源；宿主未 export 时按 compose 默认值回落。
+db_snapshot() {
+  docker compose exec -T db psql \
+    -U "${POSTGRES_USER:-erp_app}" -d "${POSTGRES_DB:-heijin_erp}" -tAc \
+    "select
+       (select count(*) from information_schema.tables where table_schema=current_schema()),
+       coalesce((select to_regclass('public.db_version')::text), 'NONE'),
+       (select count(*) from policy_definitions),
+       (select count(*) from option_sets),
+       (select count(*) from order_form_fields where order_type_code='SALE'),
+       (select count(*) from order_form_fields),
+       (select version_num from alembic_version)"
+}
+
+# psql 返回异常（连接失败 / 列数不符 / 空值）时立即中止，不能让下面的算术比较
+# 退化成 "[: : integer expression expected" 这种无法定位的报错。
+validate_state() {
+  local label="$1" state="$2" tables _dbver policies options sale fields _alembic
+  IFS='|' read -r tables _dbver policies options sale fields _alembic <<< "$state"
+  if ! [[ "$tables" =~ ^[0-9]+$ && "$policies" =~ ^[0-9]+$ && "$options" =~ ^[0-9]+$ \
+          && "$sale" =~ ^[0-9]+$ && "$fields" =~ ^[0-9]+$ ]]; then
+    printf '✗ %s库状态采集格式异常，已中止发布：%q\n' "$label" "$state" >&2
+    exit 1
+  fi
+}
+
+echo "==> 采集发布前库状态基线（只读）"
+pre_state="$(db_snapshot)"
+validate_state "发布前" "$pre_state"
+IFS='|' read -r pre_tables pre_dbversion pre_policies pre_optionsets pre_sale_rows pre_fields pre_alembic <<< "$pre_state"
+echo "  ${pre_state}"
+
 echo "==> 执行数据库迁移"
-# 保留完整的 0001→0071 迁移链，兼容 ECS 现有 PostgreSQL 的 0064 版本戳；
-# 不得在迁移失败时用 stamp_baseline.py 掩盖错误，否则会把结构未完成的库伪装成已升级。
+# 活动链已压平为单一 0001（alembic.ini 的 version_locations 只指 squashed_versions），
+# ECS 现存的 0064 版本戳无法解析，会在此处硬停——这是预期行为，不是 bug。
+# 首次上线必须先按 Release→Prod 流程重建库；不得用 stamp 把结构未完成的库伪装成已升级。
 docker compose run --rm backend alembic upgrade head
 
-# 数据库版本「随推送版本来」：迁移完成后把当前发布版本戳记进 db_version 审计表，
-# 可追溯「哪个发布版本动了库、落到哪个 schema 态」。版本优先级：脚本 --version >
-# 容器环境 APP_VERSION > app/version.py 的 __version__（已随发版 bump）。
-docker compose run --rm -e APP_VERSION backend python scripts/stamp_db_version.py
-
-# 经营规则定义是系统闭集（REBATE / COMMISSION / INSTALLMENT / WRITE_DOWN / REFUND / DG_MIXED），
-# 迁移只建表不预置，缺定义时 make_snapshot 返回空快照且不报错（静默失效）。
-# 脚本幂等：定义按 (policy_code, GLOBAL) 判重、已有版本的跳过，可反复执行。
-echo "==> 预置经营规则定义与默认版本（幂等）"
-docker compose run --rm backend python scripts/seed_policy_definitions.py --apply
+# 发布纪律（V1.0.4 起）：部署脚本不得改库结构、不得写业务数据。
+# 下面两个历史调用已移除，禁止再加回：
+#   - scripts/stamp_db_version.py        → create_all 自建 db_version 表（41 → 42 表）
+#   - scripts/seed_policy_definitions.py → 写入 policy_definitions 定义与默认版本（0 → 6）
+# 活动迁移链已压平为 0001，结构升级只由 Alembic / 上线执行单负责；经营规则由业务侧按
+# 裁决预置，部署时静默写入会让「升级前后库状态一致」的验收口径失效。
+# 脚本文件保留在镜像内，确需执行时由运维显式手工调用，不进自动发布通道。
+echo "==> 跳过历史版本戳与规则预置（发布通道不写库结构与业务数据）"
 
 echo "==> 启动服务"
 if ! docker compose up -d; then
@@ -172,6 +230,74 @@ done
 if [ "$health_ok" -ne 1 ]; then
   echo "  ✗ 健康检查在 60 秒内未通过，请查 docker compose logs backend frontend" >&2
   docker compose logs --tail=80 backend frontend >&2 || true
+  exit 1
+fi
+
+# 已有库升级必须补齐表单作用域：0001 在生产已 stamp，create_all + seed_catalog 不会重播
+# 种子，漏跑会让回收/提号/代挂三张售出表单回落硬编码默认值、丢失管理员既有配置。
+# 脚本随 backend 镜像落在 /app/scripts/，旧镜像（回滚场景）没有该文件则跳过，不阻断回滚。
+echo "==> 补齐售出表单三作用域（幂等；旧镜像无脚本则跳过）"
+b4_applied=0
+if docker compose exec -T backend sh -c 'test -f scripts/split_sale_form_scopes.py'; then
+  docker compose exec -T backend python3 scripts/split_sale_form_scopes.py
+  b4_applied=1
+else
+  echo "  ⚠ 本版镜像未内置补齐脚本，跳过（回滚到旧版本时属正常）"
+fi
+
+echo "==> 发布后不变量校验（只读）"
+post_state="$(db_snapshot)"
+validate_state "发布后" "$post_state"
+IFS='|' read -r post_tables post_dbversion post_policies post_optionsets post_sale_rows post_fields post_alembic <<< "$post_state"
+echo "  ${post_state}"
+
+invariant_fail=0
+assert_unchanged() {
+  local label="$1" before="$2" after="$3"
+  if [ "$before" = "$after" ]; then
+    printf '  ✓ %s: %s\n' "$label" "$after"
+  else
+    printf '  ✗ %s 发生变化：%s → %s\n' "$label" "$before" "$after" >&2
+    invariant_fail=1
+  fi
+}
+
+assert_unchanged "表数" "$pre_tables" "$post_tables"
+assert_unchanged "db_version 表" "$pre_dbversion" "$post_dbversion"
+assert_unchanged "policy_definitions 行数" "$pre_policies" "$post_policies"
+assert_unchanged "option_sets 行数" "$pre_optionsets" "$post_optionsets"
+assert_unchanged "历史 SALE 行数" "$pre_sale_rows" "$post_sale_rows"
+assert_unchanged "alembic 版本戳" "$pre_alembic" "$post_alembic"
+
+if [ "$post_fields" -lt "$pre_fields" ]; then
+  echo "  ✗ 字段总数倒退：${pre_fields} → ${post_fields}" >&2
+  invariant_fail=1
+else
+  echo "  ✓ 字段总数：${pre_fields} → ${post_fields}（只增不减）"
+fi
+
+if [ "$b4_applied" = "1" ]; then
+  scope_state="$(docker compose exec -T db psql \
+    -U "${POSTGRES_USER:-erp_app}" -d "${POSTGRES_DB:-heijin_erp}" -tAc \
+    "select
+       (select count(*) from order_form_fields where order_type_code='SALEREC'),
+       (select count(*) from order_form_fields where order_type_code='SALETH'),
+       (select count(*) from order_form_fields where order_type_code='SALEDG')")"
+  IFS='|' read -r rec_fields th_fields dg_fields <<< "$scope_state"
+  if ! [[ "$rec_fields" =~ ^[0-9]+$ && "$th_fields" =~ ^[0-9]+$ && "$dg_fields" =~ ^[0-9]+$ ]]; then
+    printf '  ✗ 售出三作用域计数格式异常：%q\n' "$scope_state" >&2
+    exit 1
+  fi
+  if [ "$rec_fields" -gt 0 ] && [ "$th_fields" -gt 0 ] && [ "$dg_fields" -gt 0 ]; then
+    echo "  ✓ 售出三作用域：SALEREC=${rec_fields} SALETH=${th_fields} SALEDG=${dg_fields}"
+  else
+    echo "  ✗ 售出三作用域存在空字段集：SALEREC=${rec_fields} SALETH=${th_fields} SALEDG=${dg_fields}" >&2
+    invariant_fail=1
+  fi
+fi
+
+if [ "$invariant_fail" -ne 0 ]; then
+  echo "✗ 发布后不变量校验失败，请按上线执行单回滚段处置" >&2
   exit 1
 fi
 

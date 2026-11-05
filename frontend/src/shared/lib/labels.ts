@@ -24,10 +24,14 @@ export const BUSINESS_TYPE_LABEL: Record<string, string> = {
   CONSIGNMENT: "代挂",
 };
 
+/**
+ * 增值服务只有「分期出售」一种业务名称，不按货源类型拆成「回收分期/提号分期/代挂分期」。
+ * 能否分期由货源类型决定（回收、提号可选分期出售；代挂只做全款），而不是业务类别。
+ */
 export const VALUE_ADDED_SERVICE_LABEL: Record<string, string> = {
-  STOCK_SALE: "分期",
-  PICKUP_SALE: "提号分期",
-  CONSIGNMENT_SALE: "代挂分期",
+  STOCK_SALE: "分期出售",
+  PICKUP_SALE: "分期出售",
+  CONSIGNMENT_SALE: "分期出售",
 };
 
 export const POOL_TYPE_LABEL: Record<string, string> = {
@@ -145,7 +149,8 @@ export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
   TH_DIRECT_COST: "提号/代挂直接成本",
   TH_REVENUE: "提号/代挂收入",
   SERVICE_REVENUE: "增值服务收入",
-  REBATE_INCOME: "返点收入",
+  ADDITIONAL_INCOME: "附加收入",
+  ADDITIONAL_EXPENSE: "附加支出",
   OPERATING_EXPENSE: "运营费用",
   DEPOSIT: "押金/保证金",
   EXTERNAL_FUNDING: "外部资金",
@@ -193,7 +198,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   ACCOUNT_UPDATE: "编辑账号",
   ORDER_CREATE: "新建订单",
   ORDER_UPDATE: "编辑订单",
-  ORDER_CANCEL: "取消订单",
+  ORDER_CANCEL: "取消",
   ORDER_LINK_CREATE: "新建订单关联",
   EVENT_CREATE: "登记订单事件",
   EVENT_POST: "过账订单事件",
@@ -215,7 +220,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   REBATE_CREATE: "登记返点",
   REBATE_SETTLE: "返点结算",
   REBATE_REVERSE: "冲销返点",
-  REBATE_VOID: "作废返点",
+  REBATE_VOID: "取消返点",
   RECONCILIATION_CREATE: "登记对账",
   RECONCILIATION_RESOLVE: "处置对账差异",
   QUALITY_ISSUE_CREATE: "新建质量工单",

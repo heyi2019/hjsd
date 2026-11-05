@@ -1,25 +1,26 @@
 """库存中心查询与库存成本汇总。"""
 from __future__ import annotations
 
+from collections.abc import Sequence
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
 from app.core.security import CurrentUser
-from app.domain.enums import InventoryType
 from app.domain.trade import Account
 from app.parties import service as parties_service
-from ._common import INVENTORY_STATUSES, scope_filter
+from ._common import INVENTORY_STATUSES, inventory_age_days as age_days, scope_filter
 
 
 def list_accounts(
     session: Session, *, status: str | None = None, user: CurrentUser | None = None,
     limit: int | None = None, offset: int = 0,
 ) -> list[Account]:
-    # 账号台账包含 TH 的 PICKUP 库存实体；自营资产健康与成本统计单独排除提号库存。
+    # 账号台账包含所有业务类型的库存实体；库存健康与成本统计使用同一口径。
     stmt = select(Account)
     if status:
         stmt = stmt.where(Account.status == status)
@@ -46,7 +47,7 @@ def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict
     """库存健康表：只统计独立库存状态为在库的真实占用。"""
     rows = [
         row for row in list_accounts(session, user=user)
-        if row.inventory_status in INVENTORY_STATUSES and row.inventory_type != InventoryType.PICKUP.value
+        if row.inventory_status in INVENTORY_STATUSES
     ]
     extra_values = parties_service.get_extra_values_bulk(
         session, entity_type="account", entity_ids=[row.id for row in rows]
@@ -54,6 +55,7 @@ def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict
     return [
         {
             "account_id": row.id,
+            "stock_no": row.stock_no,
             "game_account": row.game_account,
             "business_mode": row.business_mode,
             "inventory_type": row.inventory_type,
@@ -74,10 +76,61 @@ def total_inventory_cost(session: Session, *, user: CurrentUser | None = None) -
     return to_money(sum((to_money(row.cost_amount) for row in _inventory_rows(session, user=user)), Decimal("0")))
 
 
+def inventory_stats(
+    session: Session,
+    *,
+    account_ids: Sequence[int],
+    today: date | None = None,
+    user: CurrentUser | None = None,
+) -> dict[str, Any]:
+    """按给定账号集合汇总库存卡片指标。
+
+    集合由调用方（界面上当前可见的行）给出，避免筛选口径在前后端各写一份；
+    金额与库龄全部在此按后端口径算好，前端只负责展示。
+    """
+    ids = [int(item) for item in dict.fromkeys(account_ids)]
+    if not ids:
+        return {
+            "account_count": 0,
+            "occupied_cost": to_money(Decimal("0")),
+            "over_7d_count": 0,
+            "over_30d_count": 0,
+        }
+    stmt = select(Account).where(Account.id.in_(ids))
+    scope = scope_filter(session, user)
+    if scope is not None:
+        stmt = stmt.where(scope)
+    rows = list(session.scalars(stmt).all())
+    reference = today or date.today()
+    over_7d = 0
+    over_30d = 0
+    for row in rows:
+        age = inventory_age_days(row, today=reference)
+        if age is None:
+            continue
+        if age > 7:
+            over_7d += 1
+        if age > 30:
+            over_30d += 1
+    return {
+        "account_count": len(rows),
+        "occupied_cost": to_money(sum((to_money(row.cost_amount) for row in rows), Decimal("0"))),
+        "over_7d_count": over_7d,
+        "over_30d_count": over_30d,
+    }
+
+
+def inventory_age_days(row: Account, *, today: date | None = None) -> int | None:
+    """库龄（自然日）：入库存时间优先，旧数据回退买入日/建档时间。
+
+    计算口径在 `_common`（与响应字段共用），此处只负责挑出「用哪个时间」。
+    """
+    return age_days(row.inventory_entry_at or row.buy_date or row.created_at, today=today)
+
+
 def _inventory_rows(session: Session, *, user: CurrentUser | None = None) -> list[Account]:
     stmt = select(Account).where(
         Account.inventory_status.in_(INVENTORY_STATUSES),
-        or_(Account.inventory_type.is_(None), Account.inventory_type != InventoryType.PICKUP.value),
     )
     scope = scope_filter(session, user)
     if scope is not None:
@@ -85,4 +138,11 @@ def _inventory_rows(session: Session, *, user: CurrentUser | None = None) -> lis
     return list(session.scalars(stmt).all())
 
 
-__all__ = ["count_accounts", "inventory", "list_accounts", "total_inventory_cost"]
+__all__ = [
+    "count_accounts",
+    "inventory",
+    "inventory_age_days",
+    "inventory_stats",
+    "list_accounts",
+    "total_inventory_cost",
+]

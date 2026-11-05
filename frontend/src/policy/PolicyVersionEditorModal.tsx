@@ -1,5 +1,5 @@
 import { Alert, Form, Input, InputNumber, Space, Typography } from "antd";
-import { BusinessActionModal, BusinessForm, Select } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, Select } from "../shared/ui";
 import { useEffect, useState } from "react";
 import {
   configToFields,
@@ -10,6 +10,7 @@ import {
   type PolicyFieldDef,
 } from "./policyConfigSchema";
 import { today } from "./policyConstants";
+import "./PolicyVersionEditorModal.css";
 
 export interface PolicyVersionSubmit {
   effective_from: string;
@@ -51,7 +52,7 @@ function renderControl(field: PolicyFieldDef) {
         max={field.max ?? 100}
         addonAfter="%"
         placeholder={field.placeholder}
-        className="ui-control-width-160"
+        className="ui-control-width-160 percent-input"
       />
     );
   }
@@ -125,6 +126,7 @@ export function PolicyVersionEditorModal({
   return (
     <BusinessActionModal
       open={open}
+      fieldCount={fields.length + 3}
       title="设置配置"
       okText="保存"
       cancelText="取消"
@@ -133,7 +135,11 @@ export function PolicyVersionEditorModal({
       onCancel={onCancel}
       onOk={() => void form.submit()}
     >
-      <BusinessForm form={form} onFinish={onFinish}>
+      <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={form} onFinish={onFinish}>
         <Space direction="horizontal" size="middle" className="policy-version-date-row">
           <Form.Item
             name="effective_from"
@@ -190,7 +196,7 @@ export function PolicyVersionEditorModal({
           （仅在登记返点时未手填费率的情况下生效）；<strong>提成分配比例</strong>按动作留存口径，
           订单「分润」仍按单录入；分期、跌价、退款的参数仅作口径留痕，接入计算前不改变金额。
         </Typography.Paragraph>
-      </BusinessForm>
+      </BusinessRegistrationForm>
     </BusinessActionModal>
   );
 }

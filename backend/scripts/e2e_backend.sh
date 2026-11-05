@@ -1,43 +1,48 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# E2E 后端启动器：把后端指向**独立的 E2E 库** heijin_erp_e2e，绝不写入 dev/test/release。
+#
+# 流程：
+#   1) 解析 E2E 库地址（E2E_DATABASE_URL 优先；否则从 .env 的 DATABASE_URL 仅替换库名 → heijin_erp_e2e，
+#      保留 host/port/凭据）。库名含 `e2e` 的强制校验在 e2e_db.py 内完成，误指业务库即拒绝。
+#   2) export DATABASE_URL / E2E_DATABASE_URL 指向 E2E 库（env var 覆盖 .env，已验证）。
+#   3) 跑 e2e_db.py：建库（若不存在）→ 默认只补缺失表 + 幂等播种，**不删数据**；
+#      E2E_RESET=1 时才 drop_all + create_all + TRUNCATE 重建。库本身常驻不删。
+#   4) 起 uvicorn，独占 ERP_E2E_BACKEND_PORT（默认 8124，绕开 8123 的常驻 dev 后端）。
+#
+# 被 frontend/playwright.config.ts 的 webServer 调起；CI 通过 E2E_DATABASE_URL 注入服务库地址。
+set -eo pipefail
 cd "$(dirname "$0")/.."   # -> backend/
-PY="${ERP_E2E_PYTHON:-python3}"
-# 独立 E2E env 文件注入 DATABASE_URL，绕过仓库根 .env 指向的生产库 heijin_erp_v1.db。
-# 根因：pydantic-settings 在 Settings 类定义时调用 locate_env_file() 读取 env_file；
-# 根目录 .env 里的 DATABASE_URL 会覆盖 export 的环境变量，使 uvicorn 误连生产库。
-# 故用 ERP_ENV_FILE 指向仅含 E2E 库地址的临时文件，并以「命令前缀」方式注入
-# （sandbox 下后台进程不继承 export 的环境变量，前缀语法直接绑定到子进程最稳）。
-ENV_FILE="/tmp/heijin_e2e_env"
-printf 'DATABASE_URL=sqlite:///./data/heijin_erp_e2e.db\n' > "$ENV_FILE"
-# 默认 8124：8123 被用户常驻的「黑金时代生产 dev 后端」占用（连 heijin_erp_v1.db），
-# E2E 必须独占一个端口以彻底隔离，绝不触碰生产库。可用 ERP_E2E_BACKEND_PORT 覆盖。
+
+PY="${ERP_E2E_PYTHON:-$PWD/.venv/bin/python}"
+if [[ ! -x "$PY" ]]; then
+  PY="python3"
+fi
 PORT="${ERP_E2E_BACKEND_PORT:-8124}"
-echo "[e2e-backend] 重建 E2E 库（ERP_ENV_FILE=${ENV_FILE}）"
-rm -f "data/heijin_erp_e2e.db"
-echo "[e2e-backend] alembic upgrade head（建表 + foundation 种子）"
-ERP_ENV_FILE="$ENV_FILE" "$PY" -m alembic upgrade head
-echo "[e2e-backend] 创建/更新联调管理员 admin"
-ERP_ENV_FILE="$ENV_FILE" ADMIN_PASSWORD="${ERP_E2E_ADMIN_PASSWORD:-12345678}" "$PY" scripts/create_admin.py
-# 补齐 DEV 态 X-Dev-User 映射所需的 operator/finance/auditor/viewer 真实用户行（id 2..5），
-# 与 app/core/security.py 的 DEV 用户映射一致，避免 PATCH /users/2 等接口 422。
-echo "[e2e-backend] 补齐 DEV 映射用户（operator/finance/auditor/viewer）"
-ERP_ENV_FILE="$ENV_FILE" "$PY" scripts/seed_e2e_users.py
-# 批量验收订单夹具：创建 RECOVERY/PICKUP/CONSIGNMENT 等账户、订单与分期合同，
-# 供 business-write 等真实写入联调用例使用。幂等（已有 [批量验收] 标记则跳过）。
-# 该脚本自身未把 backend/ 加入 sys.path，故用 PYTHONPATH="$PWD" 注入（PWD 已 cd 到 backend/）。
-echo "[e2e-backend] 批量验收订单夹具（账户/订单/合同）"
-ERP_ENV_FILE="$ENV_FILE" PYTHONPATH="$PWD" "$PY" scripts/seed_batch_acceptance_orders.py
-# 干净 IN_STOCK 账户夹具：验收种子会把 RECOVERY/PICKUP/CONSIGNMENT 账户通过事件消耗掉，
-# 而部分 business-write 用例要求 IN_STOCK 且未消耗的账户，故单独补一组 pristine 账户（互不干扰）。
-echo "[e2e-backend] 干净 IN_STOCK 账户夹具（RECOVERY/PICKUP/CONSIGNMENT 各一）"
-ERP_ENV_FILE="$ENV_FILE" "$PY" scripts/seed_e2e_accounts.py
-# 客户夹具：库存「售出」弹窗的「买家」下拉取自 /customers，空库会导致下拉无选项。
-echo "[e2e-backend] 客户夹具（售出流程买家）"
-ERP_ENV_FILE="$ENV_FILE" "$PY" scripts/seed_e2e_customers.py
-# 诊断：把本实例将连接的库路径写到已知文件，供 E2E 跑后核验隔离是否生效（仅前台，不依赖后台 env）。
-ERP_ENV_FILE="$ENV_FILE" "$PY" -c "from app.core.settings import get_settings; open('/tmp/e2e_db_path.txt','w').write(str(get_settings().sqlite_file))"
-echo "[e2e-backend] 启动 uvicorn @ ${PORT}"
-# 注意：本环境 bash 的 `exec VAR=val cmd` 赋值前缀是坏的（exec 会把 VAR=val 当成
-# 要执行的文件路径）。故先 export 再 exec——脚本内同一进程 export，exec 子进程必继承。
-export ERP_ENV_FILE="$ENV_FILE"
-exec "$PY" -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT"
+
+E2E_URL="${E2E_DATABASE_URL:-}"
+if [[ -z "$E2E_URL" && -f .env ]]; then
+  # 从 .env 取业务库地址，仅替换库名为 heijin_erp_e2e（绝不手动拼凭据）。
+  BASE_URL="$(grep -E '^DATABASE_URL=' .env | head -1 | cut -d= -f2-)"
+  E2E_URL="${BASE_URL%/*}/heijin_erp_e2e"
+fi
+if [[ -z "$E2E_URL" ]]; then
+  echo "[e2e-backend] 无法解析 E2E 库地址（E2E_DATABASE_URL 未设且 .env 无 DATABASE_URL）" >&2
+  exit 1
+fi
+
+export DATABASE_URL="$E2E_URL"
+export E2E_DATABASE_URL="$E2E_URL"
+
+# 默认**不清数据**（e2e 库同时当第五个可查看环境，不能每次启动就清空）；
+# 自动化（playwright webServer）与人工启动都走默认 keep 分支，靠 e2e_db.py 的夹具
+# 按类型补足 IN_STOCK 账号来重复跑测。仅人工需要彻底清空时才设 E2E_RESET=1。
+if [[ "${E2E_RESET:-0}" == "1" ]]; then
+  echo "[e2e-backend] 重置并播种 E2E 库（E2E_RESET=1）：$E2E_URL"
+  "$PY" scripts/e2e_db.py --reset
+else
+  echo "[e2e-backend] 保留现有数据并补齐种子（幂等）：$E2E_URL"
+  "$PY" scripts/e2e_db.py
+fi
+
+echo "[e2e-backend] 启动 uvicorn @ ${PORT}（DATABASE_URL=$E2E_URL）"
+exec "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$PORT"

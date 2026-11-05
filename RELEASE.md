@@ -10,13 +10,19 @@
 scripts/ops/bump_version.sh patch         # 先 --dry-run 看将要改什么
 scripts/ops/bump_version.sh --check       # 确认三处一致
 
-# 2 写本文件的发布说明（新版本章节，脚本不代写）
+# 2 生成本文件的发布章节（脚本出骨架，业务口径仍需人工补）
+scripts/ops/changelog.sh --from v1.0.1        # 先看草稿，不落盘
+scripts/ops/changelog.sh --from v1.0.1 --write # 插入到顶部（已有该版本章节会拒绝）
 
 # 3 提交并打 tag（tag 必须指向含本次版本改动的提交）
-git add backend/app/version.py frontend/package.json frontend/package-lock.json RELEASE.md
+git add backend/app/version.py frontend/package.json package-lock.json RELEASE.md
 git commit -m "release: v1.1.1 ..."
 scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 ```
+
+> **漏写会被测试挡住**：`tests/backend/unit/system/test_settings.py::test_release_notes_has_section_for_current_version`
+> 断言本文件存在当前版本的 `## Vx.y.z` 章节，且章节内含「发布时间」「本次内容」。
+> 版本号涨了、章节没跟上 → `run_regression.py ci` 直接红，不再依赖人记得。
 
 一次改动三处，缺一处即失效：
 
@@ -24,10 +30,81 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 | --- | --- | --- |
 | `backend/app/version.py` | 唯一事实源；`deploy.sh` 据此生成镜像 tag | `/health` 与镜像 tag 报旧版本 |
 | `frontend/package.json` | 前端包版本 | 前端无法反查 |
-| `frontend/package-lock.json` | 根包版本（顶层 + `packages[""]` 两处） | `npm ci` 结果与 package.json 不符 |
+| `package-lock.json`（仓库根） | workspaces 子包 `packages["frontend"].version` | `npm ci` 结果与 package.json 不符 |
 
 部署侧**无需任何配置**：`deploy.sh` 用 `sed` 从 `version.py` 解析并 `export APP_VERSION`，
 镜像 tag（`heijin-backend:<版本>`）与容器内 `/api/v1/health` 的 `app_version` 自动跟随。
+
+---
+
+## V1.0.4
+
+**发布时间：** 2026-11-05 CST（Asia/Shanghai）
+
+| 项目 | 版本 / 标识 |
+| --- | --- |
+| 系统发布版本 | `V1.0.4` |
+| 前端构建版本 | `1.0.4` |
+| 后端 API 版本 | `1.0.4`（唯一事实源 `backend/app/version.py`） |
+| 数据库迁移基线 | 活动链仅 `0001` = head；**本版零 DDL**，历史表 `rebate_settlements` 保留不 drop |
+
+### 本次内容
+
+相对 `v1.0.3` 共 36 个非合并提交（139 文件，+4698 / −1176）。**按终态交付口径**：
+
+- **售出表单三分**：回收 / 提号 / 代挂由共用 `SALE` 拆为 `SALEREC` / `SALETH` / `SALEDG`，字段与板块标题各自配置、互不影响；差异化后 28 / 28 / 21 项，代挂金额称「利润」且不含分期与分笔字段。**已有库升级必须跑 `backend/scripts/split_sale_form_scopes.py`**，字段总数 220 → 297。
+- **利润与报表同源**：分润基数 = 单订单所有收入 − 所有支出（可正可负可 0）；返点记录计入收入、分期坏账计入支出；结算展示列与 `rebate_settlements` 模型层下线，返点金额唯一取 `rebate_records.base_amount`。
+- **订单与账号台账**：成交日期可编辑并平移事件/流水账期、重取规则快照；台账编辑态三个时间联动；账号删除仅管理员、原因必填、关联单据保留并显式解绑；亏损单允许按金额负数分润；一个动作多人按人数均分；「我的订单」覆盖全部事件执行人。
+- **前端单入口**：H5 两套入口与微信 H5 通道已下线，手机访问靠 `responsive.css` 三断点；移动端隐藏列按列 key 打标，禁用 nth-child。
+- **登录**：桌面端密码 / 手机号验证码 / 微信三入口保留，不开放注册；生产 `.env` 两条免密链路仍显式关闭。
+- **质量口径**：三端全量回归全绿（后端 1728、前端落库 1081 全 PASS、E2E 62），官方报告 FAIL / ERROR / SKIP / 未执行 / 弱标准均归零；版本三处一致由 `bump_version.sh --check` 守卫。
+- **发布通道合规**：`deploy.sh` 移除 `db_version` 自建表与 `policy_definitions` 预置两处副作用，内置售出表单 B4 补齐与升级前后库状态不变量自检（失败即中止发布）；`deploy-production.yml` 持久化 ECS `.env` 的 `APP_VERSION`，避免后续单独 `compose up` 静默回落旧镜像。
+
+> 提交历史中曾出现 `feat(h5)` 系列，最终已整体下线，**不属于本版交付内容**。发布记录按终态口径书写，勿按提交列表逐条对外引用。
+
+### 升级与回滚
+
+按 `docs/ERP_生产上线执行单_v1.4_20261105.md` **自动 CI/CD 原地增量升级**：`git push origin dev:refs/heads/test` → 3 gate → `auto-merge` → `deploy-production` → ECS。零 DDL、B4 已内置进 `deploy.sh`、生产数据不出 ECS。回滚：先把 `.env` 的 `APP_VERSION` 写回 `1.0.3` 再 `docker compose up -d`（只给单条命令加变量前缀会被持久化值覆盖），B4 插入行对旧镜像不可见，无需清理数据。
+
+### 已知遗留
+
+首次设密死锁修复未包含在本版；生产两条免密链路保持关闭，开放前需单独发版。高负载下两条 E2E flake 仍待裁决；`test` 分支自动部署链路已修合规并作为唯一发布通道，**误触等同生产上线**。
+
+---
+
+## V1.0.3
+
+**发布时间：** 2026-11-05 CST（Asia/Shanghai）
+
+| 项目 | 版本 / 标识 |
+| --- | --- |
+| 系统发布版本 | `V1.0.3` |
+| 前端构建版本 | `1.0.3` |
+| 后端 API 版本 | `1.0.3`（唯一事实源 `backend/app/version.py`） |
+| 数据库迁移基线 | 活动链仅 `0001` = head（`create_all` + `seed_catalog`），不再加增量迁移 |
+
+### 本次内容
+
+- **售出表单三分**：回收 / 提号 / 代挂售出由共用 `SALE` 拆为 `SALEREC` / `SALETH` / `SALEDG` 独立作用域，三份字段与板块标题各自配置、互不影响；按界面差异化补齐后可配字段 28 / 28 / 21 项，代挂金额称「利润」且不含分期与分笔字段。**已有库升级必须执行 `backend/scripts/split_sale_form_scopes.py`**，否则回落默认值并丢失管理员配置。
+- **利润口径统一**：分润基数 = 该订单所有收入 − 所有支出，可正可负可 0；返点记录计入收入、分期坏账计入支出（二者不生成 cashflow）；报表与订单详情同源。结算展示层与 `rebate_settlements` 模型层下线，已有库历史表保留不 drop。
+- **分润与订单**：亏损单允许按金额负数分润；一个动作多人时按人数均分，台账增删执行人联动分润人数；「我的订单」覆盖全部事件执行人而非仅 SELL。
+- **时间与删除**：成交日期可编辑并按天数平移该单事件/流水账期、重取规则快照；账号台账编辑态三个时间联动平移（含系统时间戳）；账号删除仅管理员、原因必填、关联单据保留并显式解绑、审计留全快照。
+- **登录**：桌面端免密登录（密码 / 手机号验证码 / 微信）保留，准入为已配置手机号且在职、不开放注册；**H5 两套入口与微信 H5 通道已下线**，前端回到单入口。生产 `.env` 显式关闭两条免密链路。
+- **上线口径**：迁移链压平为活基线 `0001`，上线改为原地增量（dump → drill → `schema_diff.py` 只补缺失 → `APP_VERSION` 换镜像），主键须单独核 `pg_constraint`。
+
+### 发布前检查
+
+- `scripts/ops/bump_version.sh --check` 三处版本一致；`run_regression.py ci` / `fe` 与 Playwright E2E 结果已定性。
+- 已有库按 `docs/ERP_生产上线执行单_v1.3_20261105.md` B4 跑拆分脚本，并检查 C1 字段数增量为预期。
+- 结构比对除列与索引外，必须核对 `pg_constraint.contype='p'`（业务表缺失主键数为 0）。
+
+### 回滚
+
+镜像按 `APP_VERSION` 回退到上一版；数据库侧拆分脚本只插不删、旧 `SALE` 行完整保留，`rebate_settlements` 历史表亦未 drop，回退旧镜像无需清理数据。
+
+### 已知遗留
+
+**1.0.3 不含首次设密死锁修复**：启用免密登录前必须先发 1.0.4；当前生产两条链路显式关闭，请勿在 1.0.3 上开启。
 
 ---
 
@@ -40,7 +117,7 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 | 系统发布版本 | `V1.0.1` |
 | 前端构建版本 | `1.0.1` |
 | 后端 API 版本 | `1.0.1`（唯一事实源 `backend/app/version.py`） |
-| 数据库迁移基线 | Alembic `0071`（生产 PostgreSQL 当前从 `0064` 继续升级） |
+| 数据库迁移基线 | Alembic 活动链 `0001` → `0003`（head `0003`）。**2026-11-01 更正**：10-31 已将 `0002..0071` 压平，生产 PostgreSQL 已 stamp 至 `0003`（= head），不再从 `0064` 走增量升级 |
 
 ### 本次内容
 

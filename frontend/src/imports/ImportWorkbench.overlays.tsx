@@ -1,11 +1,12 @@
 import { appMessage } from "../shared/ui/appFeedback";
+import { useEffect } from "react";
 import { Form, Input, Typography, Upload } from "antd";
 
 import { importsApi } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { BusinessActionModal, BusinessForm, FormDrawer, InlineError, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, FormDrawer, InlineError, PermissionButton, Select } from "../shared/ui";
 
-import { parseImportText, downloadImportTemplate } from "./ImportWorkbench.fragments";
+import { isSupportedImportFile, parseImportText, downloadImportTemplate } from "./ImportWorkbench.fragments";
 import type { ImportWorkbenchController } from "./useImportWorkbenchController";
 
 /** 导入工作台的 7 个浮层：人工指派 / 新建导入 / 标单边划转 / 跳过 / 回滚 / 驳回 / 更正。 */
@@ -38,6 +39,11 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
     sourceKindOptions,
     unlinkedTarget,
   } = controller;
+
+  // 打开新建导入弹窗时清空残留错误，避免工作台历史异常与本次本地校验提示并列（L282）。
+  useEffect(() => {
+    if (importOpen) setError(null);
+  }, [importOpen, setError]);
 
   return (
     <>
@@ -73,6 +79,7 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
         okText="开始导入"
         cancelText="取消"
         confirmLoading={importing}
+        okButtonProps={{ disabled: Boolean(error) }}
         destroyOnHidden
         onCancel={() => {
           setImportOpen(false);
@@ -110,7 +117,11 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
         }}
       >
         <InlineError error={error} />
-        <BusinessForm form={importForm}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={importForm}>
           <Form.Item name="source_name" label="数据名称" rules={[{ required: true, message: "请输入数据名称" }]}>
             <Input placeholder="例如：2026年10月订单导入" />
           </Form.Item>
@@ -121,7 +132,12 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
             permission="import.manage"
             type="link"
             className="ui-drawer-hint"
-            onClick={() => downloadImportTemplate(String(importForm.getFieldValue("source_kind") ?? "STANDARD_ORDER"))}
+            onClick={() => {
+              const kind = String(importForm.getFieldValue("source_kind") ?? "STANDARD_ORDER");
+              downloadImportTemplate(kind);
+              const label = sourceKindOptions.find((option) => option.value === kind)?.label ?? kind;
+              appMessage.success(`已开始下载「${label}」导入模板`);
+            }}
           >
             下载当前类型导入模板
           </PermissionButton>
@@ -129,7 +145,13 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
             <Upload
               accept=".json,.csv"
               maxCount={1}
-              beforeUpload={() => false}
+              beforeUpload={(file) => {
+                if (!isSupportedImportFile(file)) {
+                  appMessage.error("只支持 JSON 或 CSV 文件");
+                  return Upload.LIST_IGNORE;
+                }
+                return false;
+              }}
               fileList={importFile ? [importFile] : []}
               onChange={({ fileList }) => setImportFile(fileList[0] ?? null)}
               onRemove={() => { setImportFile(null); return true; }}
@@ -143,7 +165,7 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
           <Form.Item name="note" label="导入说明">
             <Input.TextArea rows={3} placeholder="可填写来源、日期范围或对账依据" />
           </Form.Item>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
 
       <FormDrawer

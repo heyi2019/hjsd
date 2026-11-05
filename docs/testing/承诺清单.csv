@@ -1,0 +1,54 @@
+﻿承诺编号,层级,负责端,承诺内容,失效后果,验证证据,覆盖状态,历史别名,备注
+MONEY-01,L0,双端,"金额全程 Decimal(18,2)；任何合计不得经 float 中转",分丢失、账对不上，且不可逆,test_money.py;test_money_float_guard.py,已覆盖,,
+MONEY-02,L0,后端,成交总额 total 为 gross，不等于本金+利润之和,利润口径虚高，经营数据失真,test_orders_contract.py,待核,,需确认断言直接校验 gross 语义
+POOL-01,L0,后端,资金池余额 = 池内已审核流水的有符号和；批量端点与单池端点同口径,余额错→超额支付或拒付,test_pool_balances_batch.py,已覆盖,FIN-01,
+CASHFLOW-01,L0,双端,流水合计由服务端计算，不受分页上限影响,报表静默少算,test_cashflow_totals.py;test_studio_cashflow_summary.py,已覆盖,FIN-04,
+REVERSAL-01,L0,后端,冲销必须成对（reversal_of_id）；原流水不可物理删除,账目无法重建，审计断链,test_finance_reversal_service.py,已覆盖,,
+TRANSFER-01,L0,后端,划转两腿成对且共用 transfer_id，禁止单边落库,资金凭空增减,test_finance_transfers_service.py,已覆盖,,
+RECON-01,L0,后端,对账判重键 = pool_id + reconciled_on + account_label，重复对账必须拒绝,同一笔对两次，账面虚增,test_finance_reconciliation_service.py,已覆盖,,
+DEPOSIT-01,L0,后端,押金剩余 = 实收−已退−已损失，不得为负,退超，直接资金损失,test_deposit_remaining.py,已覆盖,DEP-01,
+REBATE-01,L0,后端,返点按规则快照计算；结算不改原规则定义,返点争议，历史单无法复算,test_finance_rebates_service.py;test_rebate_current_contract.py,待核,,需确认快照而非实时规则
+INSTALLMENT-01,L0,后端,减免累加 waived_amount，不改原应收金额,应收被篡改，客户对账争议,test_installment_remaining.py,已覆盖,,
+INSTALLMENT-02,L0,后端,末期 final_period_adjustment 吸收尾差，分期合计必须闭合,分期不平，尾差长期挂账,test_installments_service.py,待核,,需确认末期尾差断言
+IDEMPOTENCY-01,L0,后端,重复提交不得产生第二笔流水,重复扣款/重复入账,,缺失（已知缺陷：test_finance_idempotency_service.py 记录缺陷存在，非守卫）,,该文件断言 duplicate_buy 会产生重复流水，即承诺未实现
+NUMBER-01,L1,后端,单号唯一且分配后不可修改（HS/TH/DG+4、KU_+5、ZC/SR+5）,重号，对外凭证失效,test_numbering.py,已覆盖,,
+INVENTORY-01,L1,后端,同 game_account + game_type 未售不得重复入库（422）,幽灵库存，资产虚增,test_stock_intake_contract.py;test_order_duplicate_account.py,已覆盖,,
+INVENTORY-02,L1,后端,仅当无已过账资金事件时，取消订单才回收库存,库存与资金脱钩,test_cancel_inventory_release.py,已覆盖,,
+STATE-01,L1,后端,非法状态流转必须拒绝，不得静默落库,脏状态，后续流程全乱,test_state_machine.py;test_order_status_contract.py,已覆盖,,
+EVENT-01,L1,后端,订单事件只追加，不可改不可删,业务事实被篡改,test_orders_events_service.py,待核,,需确认无 update/delete 路径
+ORDER-01,L1,后端,删单按 source 显式级联，不依赖数据库级联猜测,孤儿数据，统计口径污染,test_orders.py,待核,,需逐 source 造数验证
+AUTH-01,L2,双端,越权访问必须 403，不依赖前端隐藏按钮,跨客户数据越界,test_auth_contract.py,已覆盖,,
+MASK-01,L2,双端,客户联系方式按角色脱敏下发,隐私泄露,test_parties_masking.py,已覆盖,,
+AUDIT-01,L2,后端,关键写路径必须留审计记录（record_audit）,无法追责,test_audit_contract.py,待核,,需按写路径清单逐条核对
+TESTING-01,L2,双端,每个测试文件必须归属一条已登记承诺；清单证据文件必须真实存在,测试资产腐烂：不知在守什么，也无法判断哪条承诺无人守,test_promise_declaration.py,已覆盖,,
+TESTING-02,L2,后端,每个测试文件必须登记在 run_regression.GROUPS 至少一个组内；GROUPS 不得指向不存在的文件,测试写完却没有入口执行，缺陷静默通过 CI（已发生：13 个文件 68 个用例从未执行）,test_group_coverage.py,已覆盖,,
+API-01,L2,双端,对外 API 契约（字段名、类型、错误码、分页结构）不得静默变更,契约漂移→前端静默错乱，调用方无从察觉,test_accounts_contract.py;test_attachments_contract.py;test_installments_contract.py;test_notifications_contract.py;test_orders_contract.py;test_search_contract.py,已覆盖,,
+CALC-01,L2,双端,聚合与派生指标（未售天数、合计、剩余、汇总）必须由服务端下发，前端不得自行计算,前后端各算一遍，同一数据两处显示不同,test_account_inventory_age.py;test_inventory_stats.py;test_execution_cancellable_amount.py;test_execution_finance_summary.py;test_order_event_cancellable_amount.py,已覆盖,,承接原 ACC-01 / ORD-01 中的派生口径部分
+MASTER-01,L1,后端,主数据写操作仅管理员；被引用对象不得停用或删除（422）,引用断裂，历史单无法解析,test_foundation_contract.py;test_order_types_api.py;test_pools_api.py,已覆盖,,
+POLICY-01,L1,后端,经营规则版本化并快照固化，历史单只读当时快照，禁止读实时规则,历史单金额随规则变更而变，无法复算,test_m5_policy.py;test_policy_contract.py,已覆盖,,
+IMPORT-01,L1,后端,导入只落原文，脱敏后方可展示；映射幂等，重复导入不产生第二份数据,原始敏感数据泄露 / 重复入账,test_import_landing.py;test_import_mapping.py;test_imports_contract.py,已覆盖,,
+PARTY-01,L1,后端,客户角色按单判定，档案不设固定类型；合作方不写客户角色,角色固化后跨单业务无法表达,test_parties.py;test_parties_contract.py;test_leads_contract.py,已覆盖,,对应 11-02 客户角色裁决
+FORM-01,L1,后端,参与核算的字段禁入活字段（须升格固定列）；扩展字段按声明类型校验,核算字段漂移，口径不可复算,test_parties_fields_service.py,已覆盖,,
+REPORT-01,L1,后端,报表合计与筛选在服务端完成，不受分页影响,报表静默少算,test_reporting_contract.py;test_m4.py,已覆盖,,与 CASHFLOW-01 分工：后者管流水合计，本条目管报表域
+QUALITY-01,L2,后端,数据质量扫描发现的异常必须落工单；指标口径固定,异常无处置，数据持续腐化,test_quality_contract.py;test_quality_issue_contract.py;test_quality_metrics_contract.py,已覆盖,,
+MIGRATE-01,L1,后端,迁移基线可重复执行、不覆盖旧库、Up/Down 闭环,升级破坏数据且无法回滚,test_migration.py,已覆盖,,
+CONFIG-01,L1,后端,配置只来自根目录 .env，不得指向旧库,连错库，对错误的数据执行操作,test_settings.py,已覆盖,,
+FLOW-01,L2,双端,跨模块业务流程端到端闭合（建单→库存→资金→报表）,单点都正确但串联断裂，业务实际走不通,test_flow_recycle.py;test_flow_sale.py;test_flow_distribution.py;test_flow_installment.py;test_flow_config_driven.py,已覆盖,,
+PROFIT-01,L1,后端,分润四项（BUY/SELL/OPERATION/COMPANY）合计恒为 100%,分润金额不平，账目无法闭合,test_profit_allocation_modes.py,已覆盖,,
+CASHFLOW-02,L1,后端,流水三轴属性（nature / fund_nature / accounting_attribute）取值受枚举约束,非法属性落库，账面分类失真,test_finance_attributes.py,已覆盖,,
+LIST-01,L3,双端,列表列注册表与界面逐列同名同序,列显示错位，导出与界面不一致,test_list_columns.py;test_list_custom_columns.py;test_list_scope_ui_parity.py,已覆盖,,
+EXPORT-01,L3,后端,导出口径 = 可见列 + 中文表头 + 值翻译，与列配置一致,对外交付的表格与系统不符,test_list_export_csv.py;test_report_export_columns.py,已覆盖,,
+SECURITY-01,L2,后端,公开发布的安全边界（越权、注入、敏感信息暴露）不得回退,对外暴露内部数据,test_public_release_security.py,已覆盖,,
+RATELIMIT-01,L2,后端,登录与写端点必须限流,暴力破解、接口被刷,test_ratelimit.py,已覆盖,,
+BOOT-01,L1,后端,唯一入口必须可导入且已挂载 v1 路由,服务起不来或路由缺失,test_main_contract.py,已覆盖,,
+BACKUP-01,L1,后端,备份必须每日产出且可恢复,灾难发生时无可用备份,test_backup_scripts.py,已覆盖,,
+DEPLOY-01,L1,后端,发布脚本退出码契约（首次部署与健康检查）,发布失败却报成功,test_deploy_script_contract.py,已覆盖,,
+CORE-01,L1,后端,core 基础设施（money / numbering / errors / settings / database）契约稳定,基础层缺陷扩散至全系统,test_core_contract.py;test_core_infra_gaps.py,已覆盖,,
+TESTING-03,L2,后端,覆盖率门禁只降不升,覆盖率静默下滑无人察觉,test_coverage_gate.py,已覆盖,,
+ROBUST-01,L2,后端,非法输入必须被明确拒绝，不得 500 或静默吞错,攻击面暴露、故障不可诊断,test_bughunt.py,已覆盖,,
+TESTING-04,L2,双端,测试内 vi.mock 的模块标识必须是 @/ 别名或包名，禁止相对路径；相对路径存量冻结只减不增,测试文件搬家后相对 mock 静默不命中，测试改用真实现仍通过，保护消失且不报警,tests/frontend/unit/system/mock-specifier.test.ts,已覆盖,,基线 tests/config/mock-specifier-baseline.json，2026-11-04 存量清零，新增即红
+TESTING-05,L2,后端,"快速通道（pytest -m ""not db""）内不得出现任何连库用例；db 标记由 v1_engine 夹具依赖派生，自建连接的文件必须显式声明",快通道静默连库：慢、依赖外部服务，极端情况下连错库或污染数据,test_db_channel.py,已覆盖,,"判据来自死端口实验：DATABASE_URL 指向不可达端口后跑 -m ""not db""，曾暴露 test_migration 12 错误 + test_numbering 1 失败"
+TESTING-06,L2,双端,磁盘上的测试文件集合、区域归属与分层归属必须与 tests/manifest.json 一致；任一端少收、多收或归错层即失败,测试文件搬走后扫描仍只认旧目录，用例整批从用例库与报告消失却不报错（已在 workspace 扫描、GROUPS 反查、record 落键三处各发生过一次）,test_manifest_parity.py;tests/frontend/unit/system/manifest-parity.test.ts,已覆盖,,manifest 只存「应该收到多少」，不存文件名清单；文件集合永远扫磁盘，避免第二份清单腐烂
+INVENTORY-03,L1,后端,账号删除仅管理员可执行且原因必填：物理删账号行，订单/事件/流水/返点全部保留并显式解绑，账号快照与原因写入审计；有分期处置记录（RESTRICT）必须 409 拒绝,关联单据被连带删除或留下悬空 account_id，历史核算与对账不可逆失真,test_account_delete.py,已覆盖,,2026-11-05 裁决
+AUTH-02,L2,双端,免密登录准入=users.phone 已配置且在职，不开放注册；验证码票据绑定手机号与用途不可跨号复用；微信未绑定只发 bind_ticket 不发 access_token；token 带 amr 且伪造一律 401,绕过密码拿到他人会话，属账号接管级漏洞,test_passwordless_login.py,已覆盖,,2026-11-05 裁决；生产 1.0.3 显式关闭两条链路
+PROFIT-02,L0,后端,分润基数=该订单所有收入−所有支出，可正可负可 0；收入含返点记录金额、支出含分期坏账金额，二者不生成 cashflow 也不得排除；不得按 SELL−BUY−COST 推导,利润虚高/虚低，分润与报表同源代码不同数，经营数据失真,test_profit_cashflow_basis.py,已覆盖,,2026-11-05 用户裁决；唯一权威 orders/amounts.py::order_cashflow_profit

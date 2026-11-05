@@ -1,5 +1,5 @@
 import { appMessage } from "../../shared/ui/appFeedback";
-import { Card, Form, Input, Space, Typography, InputNumber } from "antd";
+import { Form, Input, Space, Typography, InputNumber } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { orderTypesApi, type OrderType, type OrderTypeRoute } from "../../shared/api/catalog";
@@ -8,7 +8,7 @@ import { normalizeError } from "../../shared/api/client";
 import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { filterRetiredOrderTypes } from "../../shared/lib/retiredProducts";
-import { BusinessActionModal, CompactActions, BusinessForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
+import { BusinessActionModal, CompactActions, BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 
 const FUND_NATURE_LABEL: Record<string, string> = {
   BUSINESS: "本方经营",
@@ -165,26 +165,20 @@ export function OrderTypesPanel() {
   ];
 
   return (
-    <Card
-      className="glass"
-      title="业务类型主数据"
-      extra={
-        <PermissionButton permission="order-type.manage" type="primary" onClick={() => { createForm.resetFields(); setCreateOpen(true); }}>
+    <section className="order-types-panel">
+      <div className="order-types-panel__actions">
+        <PermissionButton permission="order-type.manage" type="primary" disabled={Boolean(error)} onClick={() => { createForm.resetFields(); setCreateOpen(true); }}>
           新建类型
         </PermissionButton>
-      }
-    >
+      </div>
       <ErrorBanner error={error} onRetry={() => void load()} />
-      <Typography.Paragraph type="secondary">
-        新增业务无需改代码：配置编号前缀与资金路由后即可开单（BAS-02）。
-      </Typography.Paragraph>
       <DataTable<OrderType>
         columns={columns}
         rows={rows}
         page={1}
         pageSize={Math.max(rows.length, 10)}
         total={rows.length}
-        emptyText="暂无业务类型"
+        emptyText={error ? "业务类型数据不可用，请点击重新加载" : "暂无业务类型"}
         onPageChange={() => undefined}
      />
       <PermissionGate
@@ -197,12 +191,17 @@ export function OrderTypesPanel() {
       </PermissionGate>
       <BusinessActionModal
         title="新建业务类型"
+        fieldCount={6}
         open={createOpen}
         onCancel={() => setCreateOpen(false)}
         okText="创建"
         onOk={() => void createForm.submit()}
       >
-        <BusinessForm form={createForm} onFinish={create} initialValues={{ capital_type: "STOCK", sort_order: 0 }}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={createForm} onFinish={create} initialValues={{ capital_type: "STOCK", sort_order: 0 }}>
           <Form.Item name="code" label="代码" rules={[
             { required: true, message: "请输入类型代码" },
             { pattern: /^[A-Z0-9]{2,10}$/, message: "2-10 位大写字母或数字，创建后不可修改" },
@@ -224,26 +223,34 @@ export function OrderTypesPanel() {
           <Form.Item name="description" label="说明">
             <Input.TextArea rows={3} placeholder="选填" />
           </Form.Item>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
       <BusinessActionModal size="compact" title={previewTarget ? `${previewTarget.code} 路由影响预览` : "路由影响预览"} open={Boolean(previewTarget)} onCancel={() => setPreviewTarget(null)} footer={null}>
-        <BusinessForm form={previewForm} onFinish={runPreview}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={previewForm} onFinish={runPreview}>
           <Form.Item name="portion" label="资金份额" rules={[{ required: true }]}><Select options={portionOptions} /></Form.Item>
           <Form.Item name="pool_code" label="目标资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.code, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
           <CompactActions>
             <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">生成预览</PermissionButton>
           </CompactActions>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         {preview ? <Typography.Paragraph><strong>影响结果：</strong>{preview.changed ? "将发生变化" : "无变化"}<br />历史影响：{JSON.stringify(preview.historical_impact)}<br />未来影响：{preview.future_effect}</Typography.Paragraph> : null}
       </BusinessActionModal>
-      <BusinessActionModal title={editTarget ? `编辑业务类型 · ${editTarget.code}` : "编辑业务类型"} open={Boolean(editTarget)} onCancel={() => { setEditTarget(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} okText="保存">
-        <BusinessForm form={editForm} onFinish={update}>
+      <BusinessActionModal title={editTarget ? `编辑业务类型 · ${editTarget.code}` : "编辑业务类型"} fieldCount={5} open={Boolean(editTarget)} onCancel={() => { setEditTarget(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} okText="保存">
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={editForm} onFinish={update}>
           <Form.Item label="代码"><Input value={editTarget?.code} disabled /></Form.Item>
           <Form.Item label="资金性质"><Input value={editTarget?.capital_type} disabled /></Form.Item>
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="sort_order" label="排序"><InputNumber min={0} precision={0} className="ui-control-full" /></Form.Item>
           <Form.Item name="description" label="说明"><Input.TextArea rows={3} /></Form.Item>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
       <BusinessActionModal
         title={routeTarget ? `资金路由 · ${routeTarget.code}` : "资金路由"}
@@ -271,7 +278,11 @@ export function OrderTypesPanel() {
           onPageChange={() => undefined}
        />
         <Typography.Paragraph strong className="ui-form-spaced">新增 / 覆盖路由</Typography.Paragraph>
-        <BusinessForm form={routeForm} onFinish={submitRoute} initialValues={{ portion: "PRINCIPAL", priority: 0 }}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={routeForm} onFinish={submitRoute} initialValues={{ portion: "PRINCIPAL", priority: 0 }}>
           <Form.Item name="portion" label="资金份额" rules={[{ required: true }]}>
             <Select options={portionOptions} />
           </Form.Item>
@@ -285,8 +296,8 @@ export function OrderTypesPanel() {
             <InputNumber min={0} precision={0} className="ui-control-full" />
           </Form.Item>
           <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">保存路由</PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
-    </Card>
+    </section>
   );
 }

@@ -23,6 +23,7 @@ from sqlalchemy import (
     JSON,
     String,
     Text,
+    text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import (
@@ -78,10 +79,18 @@ class Account(Base, AuditMixin):
     # 库存编号：台账唯一编码 KU + 四位流水（系统生成，不可手改）。
     stock_no: Mapped[str | None] = mapped_column(String(32), nullable=True)
     game_account: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # 营地账号：网易营地等官方社区账号，与游戏账号绑定但不参与核算的自描述信息。
+    camp_account: Mapped[str | None] = mapped_column(String(128), nullable=True)
     game_password: Mapped[str | None] = mapped_column(String(256), nullable=True)
     channel_region: Mapped[str | None] = mapped_column(String(128), nullable=True)
     bound_phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     has_secondary: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # 二次验证佐证图（data URL 数组，最多 3 张）；只作交付资料，不参与核算。
+    secondary_images: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # 钱包实名状态（已注销 / 未注销）：账号能否安全交付的前置信息，源表为空时留空。
+    wallet_realname: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # 钱包实名已注销的佐证图（data URL 数组，最多 3 张）；只作交付资料，不参与核算。
+    wallet_realname_images: Mapped[list | None] = mapped_column(JSON, nullable=True)
     platform: Mapped[str | None] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=AccountStatus.WAITING.value
@@ -95,7 +104,10 @@ class Account(Base, AuditMixin):
         DateTime,
         nullable=False,
         default=now_second,
-        server_default="CURRENT_TIMESTAMP",
+        # 必须用 text() 而非裸字符串：裸字符串会渲染成 DEFAULT 'CURRENT_TIMESTAMP'，
+        # SQLite 容忍（当字符串落下），PostgreSQL 会当 timestamp 字面量解析并报
+        # InvalidDatetimeFormat，建表即失败。
+        server_default=text("CURRENT_TIMESTAMP"),
     )
     buy_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cost_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)

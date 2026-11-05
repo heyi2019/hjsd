@@ -10,11 +10,11 @@
     python scripts/cleanup_orphan_orders.py                      # 预览全部类型
     python scripts/cleanup_orphan_orders.py --order-type TH      # 只看提号
     python scripts/cleanup_orphan_orders.py --since 2026-10-01   # 只看某日之后创建的
-    python scripts/cleanup_orphan_orders.py --apply              # 真正作废（走后端 cancel_order）
+    python scripts/cleanup_orphan_orders.py --apply              # 真正取消（走后端 cancel_order）
 
 安全约束：
 - 不 --apply 时绝不写库；
-- 作废走 service.cancel_order，已登记事件的订单会被后端拒绝（"请先冲销"），不会误伤；
+- 取消走 service.cancel_order，已登记事件的订单会被后端拒绝（"请先冲销"），不会误伤；
 - 逐条提交，单条失败不影响其余，失败原因逐条打印。
 """
 from __future__ import annotations
@@ -34,7 +34,7 @@ from app.core.database import get_session_factory  # noqa: E402
 from app.domain.trade import Order, OrderEvent  # noqa: E402
 from app.orders import service as orders_service  # noqa: E402
 
-REASON = "售出登记失败的孤儿订单，批量清理作废"
+REASON = "售出登记失败的孤儿订单，批量清理取消"
 
 
 def find_orphans(session, order_types: list[str], since: str | None):
@@ -57,7 +57,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="清理售出失败残留的无事件孤儿订单")
     parser.add_argument("--order-type", action="append", default=[], help="订单类型，可多次传入，如 TH")
     parser.add_argument("--since", default=None, help="只处理该日期之后创建的订单（YYYY-MM-DD）")
-    parser.add_argument("--apply", action="store_true", help="真正作废；不加则只预览")
+    parser.add_argument("--apply", action="store_true", help="真正取消；不加则只预览")
     args = parser.parse_args()
 
     session = get_session_factory()()
@@ -75,7 +75,7 @@ def main() -> int:
         )
 
     if not args.apply:
-        print("\n[dry-run] 未做任何修改；确认无误后加 --apply 执行作废。")
+        print("\n[dry-run] 未做任何修改；确认无误后加 --apply 执行取消。")
         session.close()
         return 0
 
@@ -85,12 +85,12 @@ def main() -> int:
             orders_service.cancel_order(session, order.id, actor="cleanup", reason=REASON)
             session.commit()
             done += 1
-            print(f"  已作废 #{order.id} {order.order_no}")
+            print(f"  已取消 #{order.id} {order.order_no}")
         except Exception as exc:  # noqa: BLE001 —— 单条失败不影响其余，原因需逐条打印
             session.rollback()
             failed += 1
-            print(f"  作废失败 #{order.id} {order.order_no}: {exc}")
-    print(f"\n完成：作废 {done} 张，失败 {failed} 张。")
+            print(f"  取消失败 #{order.id} {order.order_no}: {exc}")
+    print(f"\n完成：取消 {done} 张，失败 {failed} 张。")
     session.close()
     return 0
 

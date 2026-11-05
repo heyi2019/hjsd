@@ -16,6 +16,7 @@ from .rebates import (
 )
 from .cashflows import (
     cancel_deposit,
+    cashflow_totals,
     create_cashflow,
     create_deposit,
     list_cashflows,
@@ -23,6 +24,7 @@ from .cashflows import (
     lose_deposit,
     return_deposit,
     reverse_cashflow,
+    studio_summary,
 )
 from .reconciliation import (
     create_reconciliation,
@@ -48,6 +50,8 @@ def deposit_held_total(session: Session, pool_id: int | None = None) -> Decimal:
 
 __all__ = [
     "cancel_deposit",
+    "cashflow_totals",
+    "studio_summary",
     "create_cashflow",
     "create_deposit",
     # 以下两项为路由层门面再导出：app/finance/router.py 通过 service.<name> 访问，

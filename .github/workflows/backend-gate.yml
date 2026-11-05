@@ -1,0 +1,95 @@
+name: backend-gate
+
+on:
+  push:
+    branches: [main, master, test]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-gate.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+  workflow_dispatch:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: erp_app
+          POSTGRES_PASSWORD: erp_app
+          POSTGRES_DB: heijin_erp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U erp_app"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # 普通 runner（非 container job）里 services.postgres 只能通过映射端口访问，
+      # 主机名 postgres 无法解析；CI 必须用 127.0.0.1，与 coverage-gate 口径一致。
+      # DATABASE_URL 也必须给：test_numbering.test_concurrent_allocation_is_unique
+      # 读 Settings.alembic_url（= database_url）去 CREATE DATABASE 探针库，
+      # 不注入时会落到无密码的缺省开发地址，报 fe_sendauth: no password supplied。
+      # CI 的 postgres service 是一次性单库，conftest 对「两变量同库」的拒绝已在 CI 下豁免。
+      DATABASE_URL: "postgresql+psycopg://erp_app:erp_app@127.0.0.1:5432/heijin_erp_test"
+      TEST_DATABASE_URL: "postgresql+psycopg://erp_app:erp_app@127.0.0.1:5432/heijin_erp_test"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Determine test scope (分层策略)
+        id: scope
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "groups=ci" >> "$GITHUB_OUTPUT"      # 手动触发：全量回归
+          elif [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "master" ]; then
+            echo "groups=ci" >> "$GITHUB_OUTPUT"      # 发布前：全系统回归 + 高风险跨模块
+          else
+            echo "groups=unit cross B C D" >> "$GITHUB_OUTPUT"  # PR/test：单元 + 核心集成 + 跨模块
+          fi
+
+      # CI 走串行：--parallel 会让每个 xdist worker 各自建库，在 GitHub runner 上
+      # 曾因连接失败触发 worker_errordown / KeyError: WorkerController 使整轮 INTERNALERROR。
+      # 本地仍可用 --parallel 提速；CI 以稳定为准，coverage-gate 已覆盖全量。
+      - name: Run backend regression (分层)
+        working-directory: backend
+        run: |
+          python run_regression.py lint
+          for g in ${{ steps.scope.outputs.groups }}; do
+            echo "=== 执行分组: $g ==="
+            python run_regression.py "$g" --backend-only || exit 1
+          done
+
+      - name: Generate test case library + report
+        working-directory: backend
+        run: |
+          python scripts/gen_test_case_library.py
+          python scripts/make_test_report.py
+
+      - name: Upload case library & report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-report
+          path: |
+            docs/testing/测试用例库.csv
+            docs/testing/测试用例库.md
+            docs/testing/测试报告.md
+            docs/testing/测试报告.json
+            docs/testing/测试结果库/results.jsonl
+          retention-days: 30

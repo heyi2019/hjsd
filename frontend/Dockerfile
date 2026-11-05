@@ -5,15 +5,21 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
-COPY frontend/package.json frontend/package-lock.json ./
+# [2026-11-04] 仓库根改为 npm workspaces（根 package.json + 根 package-lock.json），
+# frontend/ 下不再有锁文件。安装必须在根层做，否则 `npm ci` 找不到锁文件直接失败；
+# 装完 node_modules 在 /app 根，frontend 通过 workspace 链接复用，不必重复安装。
+COPY package.json package-lock.json ./
+COPY frontend/package.json ./frontend/
 # 使用锁文件保证生产构建可重复；ECS 直连 npmjs.org 较慢，使用 npmmirror。
 RUN npm ci --registry=https://registry.npmmirror.com
 
-COPY frontend/ ./
+COPY frontend/ ./frontend/
 
-# ui_guards.mjs 需比对后端枚举定义；构建期挂载后端源码供其只读校验
-COPY backend/app /backend/app
+# ui_guards.mjs 按 cwd(frontend)/../backend/app/domain/enums.py 读取枚举做对齐校验，
+# 故后端源码必须落在 /app/backend/app；放 /backend/app 会 ENOENT 直接中断构建。
+COPY backend/app /app/backend/app
 
+WORKDIR /app/frontend
 # 生产使用同源相对路径，由 nginx 反代 /api/v1 到后端，浏览器零跨域
 ENV VITE_API_BASE=/api/v1
 RUN npm run build
@@ -31,7 +37,8 @@ RUN sed -i 's|https://dl-cdn.alpinelinux.org/alpine|https://mirrors.aliyun.com/a
     && echo "Asia/Shanghai" > /etc/timezone \
     && rm -rf /var/cache/apk/*
 
-COPY --from=build /app/dist /usr/share/nginx/html
+# 构建阶段 WORKDIR 是 /app/frontend（根层安装、包内构建），产物在 frontend/dist。
+COPY --from=build /app/frontend/dist /usr/share/nginx/html
 COPY frontend/nginx.global.conf /etc/nginx/nginx.conf
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 # 安全头片段：被 server 块与三个自带 add_header 的 location 共同 include。

@@ -3,7 +3,8 @@ import { Input, Space, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useState } from "react";
 import { stocksApi, type Account } from "../shared/api/catalog";
-import { BusinessActionModal, Select } from "../shared/ui";
+import { BusinessActionModal, InlineError, Select } from "../shared/ui";
+import "./InventoryProfileModal.css";
 
 export type InventoryProfileTarget = {
   account: Account;
@@ -19,6 +20,16 @@ function readImageData(file: Blob): Promise<string> {
   });
 }
 
+function ProfileContext({ account }: { account: Account }) {
+  return (
+    <div className="inventory-profile-context" aria-label="账号上下文">
+      <div className="inventory-profile-context__item"><span>订单编号</span><strong>{account.source_order_no ?? "-"}</strong></div>
+      <div className="inventory-profile-context__item"><span>游戏类型</span><strong>{account.game_type ?? "-"}</strong></div>
+      <div className="inventory-profile-context__item"><span>游戏账号</span><strong>{account.game_account ?? "-"}</strong></div>
+    </div>
+  );
+}
+
 export function InventoryProfileModal({
   target,
   onClose,
@@ -32,6 +43,7 @@ export function InventoryProfileModal({
 }) {
   const [form, setForm] = useState({
     gameAccount: "",
+    campAccount: "",
     gameType: "",
     gamePassword: "",
     channelRegion: "",
@@ -43,12 +55,14 @@ export function InventoryProfileModal({
   });
   const [images, setImages] = useState<UploadFile[]>([]);
   const [saving, setSaving] = useState(false);
+  const [validationError, setValidationError] = useState<{ message: string } | null>(null);
 
   useEffect(() => {
     if (!target) return;
     const { account } = target;
     setForm({
       gameAccount: account.game_account ?? "",
+      campAccount: account.camp_account ?? "",
       gameType: account.game_type ?? "",
       gamePassword: account.game_password ?? "",
       channelRegion: account.channel_region ?? "",
@@ -64,6 +78,7 @@ export function InventoryProfileModal({
       status: "done",
       url,
     })));
+    setValidationError(null);
   }, [target]);
 
   async function imageValues(): Promise<string[]> {
@@ -75,12 +90,19 @@ export function InventoryProfileModal({
 
   async function save() {
     if (!target) return;
+    setValidationError(null);
     setSaving(true);
     try {
+      const imagePayload = target.mode === "description" ? null : await imageValues();
+      if (target.mode === "images" && !imagePayload?.length) {
+        setValidationError({ message: "请至少添加一张图片" });
+        return;
+      }
       const payload = target.mode === "description"
         ? { account_description: form.description }
-        : target.mode === "images" ? { account_images: await imageValues() } : {
+        : target.mode === "images" ? { account_images: imagePayload ?? [] } : {
             game_account: form.gameAccount,
+            camp_account: form.campAccount,
             game_type: form.gameType,
             game_password: form.gamePassword,
             channel_region: form.channelRegion,
@@ -88,7 +110,7 @@ export function InventoryProfileModal({
             platform: form.platform,
             has_secondary: form.hasSecondary,
             account_description: form.description,
-            account_images: await imageValues(),
+            account_images: imagePayload ?? [],
             note: form.note,
           };
       const updated = await stocksApi.updateProfile(target.account.id, payload);
@@ -112,30 +134,38 @@ export function InventoryProfileModal({
       onCancel={onClose}
       onOk={() => void save()}
     >
+      <InlineError error={validationError} />
       {target?.mode === "images" ? (
-        <Upload
-          listType="picture-card"
-          accept="image/*"
-          maxCount={9}
-          fileList={images}
-          beforeUpload={() => false}
-          onChange={({ fileList }) => setImages(fileList.slice(0, 9))}
-        >
-          <span aria-hidden="true">＋</span>
-          <div>添加图片</div>
-        </Upload>
+        <Space className="inventory-profile-description-editor" direction="vertical" size="middle">
+          <ProfileContext account={target.account} />
+          <Upload
+            listType="picture-card"
+            accept="image/*"
+            maxCount={9}
+            fileList={images}
+            beforeUpload={() => false}
+            onChange={({ fileList }) => setImages(fileList.slice(0, 9))}
+          >
+            <span aria-hidden="true">＋</span>
+            <div>添加图片</div>
+          </Upload>
+        </Space>
       ) : target?.mode === "description" ? (
-        <Input.TextArea
-          rows={6}
-          maxLength={2000}
-          showCount
-          value={form.description}
-          placeholder="补充账号等级、资源、限制等信息"
-          onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-        />
+        <Space className="inventory-profile-description-editor" direction="vertical" size="middle">
+          <ProfileContext account={target.account} />
+          <Input.TextArea
+            rows={8}
+            maxLength={400}
+            showCount
+            value={form.description}
+            placeholder="补充账号等级、资源、限制等信息"
+            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+          />
+        </Space>
       ) : (
         <Space className="inventory-profile-editor" direction="vertical" size="middle">
           <Input aria-label="游戏账号/产品" placeholder="游戏账号/产品" value={form.gameAccount} onChange={(event) => setForm((current) => ({ ...current, gameAccount: event.target.value }))} />
+          <Input aria-label="营地账号" placeholder="营地账号" value={form.campAccount} onChange={(event) => setForm((current) => ({ ...current, campAccount: event.target.value }))} />
           <Input aria-label="游戏/产品类型" placeholder="游戏/产品类型" value={form.gameType} onChange={(event) => setForm((current) => ({ ...current, gameType: event.target.value }))} />
           <Input.Password aria-label="账号密码" placeholder="账号密码" value={form.gamePassword} onChange={(event) => setForm((current) => ({ ...current, gamePassword: event.target.value }))} />
           <Input aria-label="渠道 / 区服" placeholder="渠道 / 区服" value={form.channelRegion} onChange={(event) => setForm((current) => ({ ...current, channelRegion: event.target.value }))} />

@@ -38,9 +38,10 @@ function formatAt(value: string | null | undefined): string {
 export function ConfigAuditPanel() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [rows, setRows] = useState<AuditLogRow[]>([]);
-  const [actions, setActions] = useState<string[]>([]);
+  const [actions, setActions] = useState<string[]>(Object.keys(AUDIT_ACTION_LABEL));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const hasError = Boolean(error);
 
   // 配置项的 entity_type 选项：一个配置项可能对应多个 entity_type（如经营规则有
   // policy_definition / policy_version），这里摊平成「配置项 · 类型」两级，选的是类型值。
@@ -59,7 +60,7 @@ export function ConfigAuditPanel() {
     void auditApi
       .actions()
       .then((list) => setActions(list))
-      .catch(() => setActions([]));
+      .catch(() => undefined);
   }, []);
 
   const load = useCallback(async () => {
@@ -121,7 +122,9 @@ export function ConfigAuditPanel() {
       <Card className="glass" title="配置改动追溯">
         <Typography.Paragraph type="secondary">
           只读流水，记录各配置项的新建 / 编辑 / 停用等动作；写入请回各配置项自己的页面。
-          当前筛选下共 {rows.length} 条（上限 {FETCH_LIMIT} 条）。
+          {hasError
+            ? "记录加载失败，当前记录数不可用，请用上方“重新加载”重试。"
+            : `当前筛选下共 ${rows.length} 条（上限 ${FETCH_LIMIT} 条）。`}
         </Typography.Paragraph>
         <Space className="ui-filter-bar" wrap>
           <Select
@@ -129,6 +132,7 @@ export function ConfigAuditPanel() {
             showSearch
             placeholder="配置项"
             className="ui-control-width-200"
+            disabled={hasError}
             value={filters.entityType || undefined}
             onChange={(value) => patch({ entityType: value ?? "" })}
             options={entityTypeOptions}
@@ -138,6 +142,7 @@ export function ConfigAuditPanel() {
             showSearch
             placeholder="动作"
             className="ui-control-width-200"
+            disabled={hasError}
             value={filters.action || undefined}
             onChange={(value) => patch({ action: value ?? "" })}
             options={actions.map((action) => ({
@@ -149,11 +154,13 @@ export function ConfigAuditPanel() {
             allowClear
             placeholder="操作人"
             className="ui-control-width-140"
+            disabled={hasError}
             value={filters.actor}
             onChange={(event) => patch({ actor: event.target.value })}
           />
           <DatePicker.RangePicker
             placeholder={["起始日期", "截止日期"]}
+            disabled={hasError}
             onChange={(range) => {
               const [from, to] = range ?? [];
               patch({

@@ -66,7 +66,7 @@ def main() -> int:
     args = parser.parse_args()
 
     settings = get_settings()
-    engine = create_engine(settings.sqlalchemy_url)
+    engine = create_engine(settings.alembic_url)
     try:
         gaps = _missing(engine)
         if gaps:

@@ -1,6 +1,6 @@
 """domain.enums：v1 封闭枚举与编号域。
 
-取值以《ERP_数据字典_v1.0.md》为准：
+取值以本模块定义为唯一来源，数据库 CHECK 约束与之同步：
 - `capital_type`、`ownership`、业务 code 等核算枚举保持封闭；
 - `pool_type` 是**注册表**（V31），扩展登记新值即可，不改表。
 """
@@ -77,7 +77,7 @@ class SequenceKey(StrEnum):
     CASHFLOW_IN = "CASHFLOW_IN"
     IMPORT = "IMPORT"
     ATTACHMENT = "ATTACHMENT"
-    # 库存编号：账号台账唯一编码，KU + 四位流水（KU0001…），系统生成不可手改。
+    # 库存编号：账号台账唯一编码，KU_ + 五位流水（KU_00001…），系统生成不可手改。
     STOCK_NO = "STOCK_NO"
 
 
@@ -221,7 +221,8 @@ class AccountingAttribute(StrEnum):
     TH_DIRECT_COST = "TH_DIRECT_COST"
     TH_REVENUE = "TH_REVENUE"
     SERVICE_REVENUE = "SERVICE_REVENUE"
-    REBATE_INCOME = "REBATE_INCOME"
+    ADDITIONAL_INCOME = "ADDITIONAL_INCOME"  # 附加收入：返点(category=REBATE)与其他(TIP/PENALTY)
+    ADDITIONAL_EXPENSE = "ADDITIONAL_EXPENSE"  # 附加支出：同行分成等成交环节的附加费用
     OPERATING_EXPENSE = "OPERATING_EXPENSE"
     DEPOSIT = "DEPOSIT"
     EXTERNAL_FUNDING = "EXTERNAL_FUNDING"
@@ -256,6 +257,24 @@ class InventoryStatus(StrEnum):
 
     IN_STOCK = "IN_STOCK"
     OUT_OF_STOCK = "OUT_OF_STOCK"
+
+
+class InventoryAgeLevel(StrEnum):
+    """库存账号的库龄档位：7 天内正常、8–30 天预警、超过 30 天超期。
+
+    阈值是经营口径而不是展示细节，故与库存状态同处领域枚举，前后端不得各写一份。
+    """
+
+    NORMAL = "NORMAL"
+    WARNING = "WARNING"
+    OVERDUE = "OVERDUE"
+
+
+class WalletRealName(StrEnum):
+    """库存账号的钱包实名状态：交付前需确认实名是否已解绑。"""
+
+    NOT_CANCELLED = "未注销"
+    CANCELLED = "已注销"
 
 
 class BusinessMode(StrEnum):
@@ -442,6 +461,8 @@ class AuditAction(StrEnum):
     LEAD_CLOSE = "LEAD_CLOSE"
     ACCOUNT_CREATE = "ACCOUNT_CREATE"
     ACCOUNT_UPDATE = "ACCOUNT_UPDATE"
+    # 账号删除：物理删账号行但保留订单/流水/返点，审计必须带删除原因与账号快照。
+    ACCOUNT_DELETE = "ACCOUNT_DELETE"
     ORDER_CREATE = "ORDER_CREATE"
     ORDER_UPDATE = "ORDER_UPDATE"
     ORDER_CANCEL = "ORDER_CANCEL"
@@ -472,9 +493,11 @@ class AuditAction(StrEnum):
     REBATE_CREATE = "REBATE_CREATE"
     REBATE_UPDATE = "REBATE_UPDATE"
     REBATE_DELETE = "REBATE_DELETE"
+    # 分次结算模型层已下线（11-05）：以下三个动作不再写入，保留枚举值仅供
+    # 历史 audit_logs 正确显示（前端 labels.ts 有对应中文标签）。
     REBATE_SETTLE = "REBATE_SETTLE"
     REBATE_REVERSE = "REBATE_REVERSE"
-    REBATE_VOID = "REBATE_VOID"  # 零结算返点记录作废（有结算走 REBATE_REVERSE）
+    REBATE_VOID = "REBATE_VOID"
     RECONCILIATION_CREATE = "RECONCILIATION_CREATE"
     RECONCILIATION_RESOLVE = "RECONCILIATION_RESOLVE"
     QUALITY_ISSUE_CREATE = "QUALITY_ISSUE_CREATE"
@@ -490,6 +513,9 @@ class AuditAction(StrEnum):
     USER_HANDOVER = "USER_HANDOVER"
     PASSWORD_CHANGE = "PASSWORD_CHANGE"
     PASSWORD_RESET = "PASSWORD_RESET"
+    # 微信绑定变更：绑定/解绑都属于账号凭证变更，必须留痕（谁、哪个 open_id、哪个手机号）。
+    WECHAT_BIND = "WECHAT_BIND"
+    WECHAT_UNBIND = "WECHAT_UNBIND"
     TEAM_CREATE = "TEAM_CREATE"
     TEAM_UPDATE = "TEAM_UPDATE"
     FIELD_DEFINITION_CHANGE = "FIELD_DEFINITION_CHANGE"
@@ -539,6 +565,7 @@ __all__ = [
     "InstallmentContractType",
     "InstallmentDispositionAction",
     "InstallmentStatus",
+    "InventoryAgeLevel",
     "LinkStatus",
     "LeadStatus",
     "LeadType",

@@ -183,7 +183,7 @@ def update_version_draft(
     return _ver_out(item)
 
 
-# ── 状态收口：SUPERSEDED（草稿替代作废）与 EXPIRED（过期清扫） ──────
+# ── 状态收口：SUPERSEDED（草稿替代取消）与 EXPIRED（过期清扫） ──────
 
 def supersede_draft_version(
     session: Session,
@@ -193,11 +193,11 @@ def supersede_draft_version(
     reason: str,
     replaced_by_version_id: int | None = None,
 ) -> dict[str, Any]:
-    """作废草稿版本（SUPERSEDED）。
+    """取消草稿版本（SUPERSEDED）。
 
-    语义边界：**只有 DRAFT 可作废**。已发布（ACTIVE）版本是历史日期的
+    语义边界：**只有 DRAFT 可取消**。已发布（ACTIVE）版本是历史日期的
     解析口径（resolve_version 按 status=ACTIVE + 生效期取版本），
-    作废会挖掉历史规则的落点；要下线生效版本请新建版本封口生效期。
+    取消会挖掉历史规则的落点；要下线生效版本请新建版本封口生效期。
     replaced_by_version_id 用于记录替代关系（可选，须属同一规则定义）。
     """
     item = session.get(PolicyVersion, version_id)
@@ -205,13 +205,13 @@ def supersede_draft_version(
         raise NotFound(f"规则版本 {version_id} 不存在", details={"version_id": version_id})
     if item.status != PolicyStatus.DRAFT.value:
         raise Validation(
-            "只能作废草稿版本；已发布版本是历史解析口径，请用新建版本封口生效期",
+            "只能取消草稿版本；已发布版本是历史解析口径，请用新建版本封口生效期",
             details={"version_id": version_id, "status": item.status},
         )
-    text = _required_text(reason, field="reason", message="作废必须填写理由")
+    text = _required_text(reason, field="reason", message="取消必须填写理由")
     if replaced_by_version_id is not None:
         if replaced_by_version_id == version_id:
-            raise Validation("替代版本不能是被作废版本本身", details={"version_id": version_id})
+            raise Validation("替代版本不能是被取消版本本身", details={"version_id": version_id})
         replacement = session.get(PolicyVersion, replaced_by_version_id)
         if replacement is None or (
             replacement.policy_definition_id != item.policy_definition_id

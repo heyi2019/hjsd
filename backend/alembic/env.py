@@ -2,7 +2,7 @@
 
 用法（工作目录 backend）：
 ```bash
-DATABASE_URL=sqlite:///./data/heijin_erp_v1.db alembic upgrade head
+DATABASE_URL=postgresql+psycopg://erp_app@127.0.0.1:5432/heijin_erp_dev alembic upgrade head
 ```
 禁止把 `sqlalchemy.url` 写进 alembic.ini：那会产生第二个配置真相，
 导致迁移跑到旧 `heijin.db` 上（PRD V15/V17）。

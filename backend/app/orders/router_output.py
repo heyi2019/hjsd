@@ -6,6 +6,9 @@ from datetime import datetime
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from decimal import Decimal
+
+from app.core.money import to_money
 from app.core.security import (
     CurrentUser,
     PERM_AUDIT_READ,
@@ -31,9 +34,34 @@ from app.domain.trade import (
 )
 from app.domain.users import User
 from app.orders import schemas, service
+from app.orders.amounts import event_totals
 
 def _actor(user: CurrentUser) -> str:
     return user.username
+
+
+def _elapsed_label(start: datetime | None, end: datetime | None) -> str:
+    """入库到售出的在手时长，按「X天X小时X分」展示（与前端 formatElapsedTime 同口径）。
+
+    缺任一端或时间倒挂返回 "-"：未售账号的「已持有多久」属库存中心「未售时长」，
+    台账只表达「实际在手过多久」，不按当前时刻推算。
+    """
+    if start is None or end is None or end < start:
+        return "-"
+    try:
+        total_minutes = int((end - start).total_seconds()) // 60
+    except TypeError:  # 一端带时区一端不带（历史导入数据）时不做臆测
+        return "-"
+    days, rest = divmod(total_minutes, 1_440)
+    hours, minutes = divmod(rest, 60)
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days}天")
+    if hours:
+        parts.append(f"{hours}小时")
+    if minutes or not parts:
+        parts.append(f"{minutes}分")
+    return "".join(parts)
 
 
 def _order_output(db: Session, order, user: CurrentUser) -> schemas.OrderOut:
@@ -57,7 +85,31 @@ def _operator_names(db: Session, events: list[OrderEvent]) -> dict[int, str]:
     return {user.id: user.display_name or user.username for user in users}
 
 
-def _event_output(event: OrderEvent, operator_names: dict[int, str] | None = None) -> schemas.EventOut:
+def cancellable_by_event(events: list[OrderEvent]) -> dict[int, Decimal]:
+    """每个事件的可冲销余额：`amount − Σ已冲销 CANCEL`，夹底 0；CANCEL 自身恒 0。
+
+    与 `post_event` 的冲销校验同源（校验挡住超额，这里给前端展示「还能冲多少」）。
+    一次遍历累加 CANCEL 再逐事件相减，避免每个事件回查一遍。
+    """
+    cancelled: dict[int, Decimal] = {}
+    for item in events:
+        if item.event_type == "CANCEL" and item.offset_event_id is not None:
+            cancelled[item.offset_event_id] = cancelled.get(item.offset_event_id, Decimal("0.00")) + to_money(item.amount)
+    amounts: dict[int, Decimal] = {}
+    for item in events:
+        if item.event_type == "CANCEL":
+            amounts[item.id] = Decimal("0.00")
+            continue
+        remaining = to_money(item.amount) - cancelled.get(item.id, Decimal("0.00"))
+        amounts[item.id] = remaining if remaining > 0 else Decimal("0.00")
+    return amounts
+
+
+def _event_output(
+    event: OrderEvent,
+    operator_names: dict[int, str] | None = None,
+    cancellable: dict[int, Decimal] | None = None,
+) -> schemas.EventOut:
     """把审计字段映射为事件响应字段，避免 ORM 属性名泄漏到 API。"""
     selected_operators = _selected_operator_label(event, operator_names)
     return schemas.EventOut.model_validate(
@@ -82,6 +134,7 @@ def _event_output(event: OrderEvent, operator_names: dict[int, str] | None = Non
             "created_at": event.created_at,
             # created_by 是审计操作者；业务上的操作人以表单勾选员工为准。
             "operator": selected_operators or event.created_by,
+            "cancellable_amount": (cancellable or {}).get(event.id, Decimal("0.00")),
         }
     )
 
@@ -129,7 +182,8 @@ def _order_detail_output(
     ).all()
     operator_names = _operator_names(db, events)
     event_by_id = {event.id: event for event in events}
-    output.events = [_event_output(event, operator_names) for event in events]
+    cancellable = cancellable_by_event(list(events))
+    output.events = [_event_output(event, operator_names, cancellable) for event in events]
     output.links = [
         schemas.OrderLinkOut.model_validate(item)
         for item in service.list_order_links(db, order.id, user)
@@ -316,11 +370,19 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         snapshot = order.account_snapshot or {}
         events = events_by_order.get(order.id, [])
         installment = installments.get(order.id)
+        income, buy_amount, direct_cost = event_totals(events)
+        total_cost = buy_amount + direct_cost
         latest = events[0] if events else None
         sale_event = next((event for event in events if event.event_type == "SELL"), None)
         party = parties.get(order.id)
         installment = installments.get(order.id)
-        sale_at = sale_event.created_at if sale_event else installment.created_at if installment else None
+        # 售卖时间取卖出事件的业务发生日（occurred_on），不用记录创建时刻 created_at；
+        # created_at 是入库写入时间，用它会让历史导入单全部显示成导入当天。
+        sale_at = (
+            datetime.combine(sale_event.occurred_on, datetime.min.time())
+            if sale_event
+            else installment.created_at if installment else None
+        )
         sale_operator = (
             (_selected_operator_label(sale_event, operator_names) or sale_event.created_by)
             if sale_event else installment.created_by if installment else None
@@ -363,7 +425,10 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             ),
             "sale_at": sale_at,
             "sale_operator": sale_operator,
+            "in_hand_time": _elapsed_label(inventory_entry_at, sale_at),
             "event_total": sum((event.amount for event in events), 0),
+            "cost_amount": total_cost,
+            "profit_base": income - total_cost,
             "last_event_type": latest.event_type if latest else None,
             "last_event_amount": latest.amount if latest else None,
             "last_event_on": latest.occurred_on if latest else None,

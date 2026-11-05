@@ -3,9 +3,10 @@
 import { Card, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import { ordersApi, poolsApi, reportsApi, type BusinessPnlReport, type Order, type Pool, type PoolBalance } from "../shared/api/catalog";
+import { ordersApi, poolsApi, reportsApi, type BusinessPnlReport, type Order, type Pool, type PoolBalance, type PoolBalanceTotals } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { useListViewColumns } from "../shared/lib/listColumns";
+import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 import {
   DataTable,
   EntryCard,
@@ -23,10 +24,15 @@ interface PoolRow {
   balance?: PoolBalance;
 }
 
-export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => void }) {
-  const [pools, setPools] = useState<Pool[]>([]);
+export function countOngoingOrders(items: Pick<Order, "status">[]): number {
+  return items.filter((order) => ["ACTIVE", "INSTALLMENT"].includes(order.status)).length;
+}
+
+export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
+  const [pools, setPools] = useState<Pool[] | null>(null);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [balanceTotals, setBalanceTotals] = useState<PoolBalanceTotals | null>(null);
+  const [orders, setOrders] = useState<Order[] | null>(null);
   const [businessPnl, setBusinessPnl] = useState<BusinessPnlReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
@@ -36,10 +42,12 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
     try {
       const list = await poolsApi.list();
       setPools(list);
-      const entries = await Promise.all(
-        list.map(async (pool) => [pool.id, await poolsApi.balance(pool.id)] as const),
+      // 余额与汇总一次批量取回：原先逐池 N+1，再用浮点把卡片相加算合计。
+      const overview = await poolsApi.balances();
+      setBalances(
+        Object.fromEntries(overview.items.map((item) => [item.pool_id, item])),
       );
-      setBalances(Object.fromEntries(entries));
+      setBalanceTotals(overview.totals);
       // 订单计数与资金总览同源加载：订单接口失败时池数据已落 state，仍可渲染，
       // 错误经同一 ErrorBanner 露出，不静默显示 0。
       setOrders(await ordersApi.list());
@@ -58,16 +66,15 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
     void load();
   }, [load]);
 
-  const rows: PoolRow[] = pools.map((pool) => ({ key: pool.code, pool, balance: balances[pool.id] }));
+  const rows: PoolRow[] = (pools ?? []).map((pool) => ({ key: pool.code, pool, balance: balances[pool.id] }));
 
-  const sum = (pick: (b?: PoolBalance) => string | undefined) =>
-    rows.reduce((acc, row) => acc + Number(pick(row.balance) ?? 0), 0).toFixed(2);
-
-  const totalAvailable = sum((b) => b?.available);
-  const totalDeposit = sum((b) => b?.deposit_held);
+  // 合计取服务端（Decimal），前端不再对卡片浮点累加。
+  const totalAvailable = pools === null ? "不可用" : balanceTotals?.available ?? "—";
+  const totalDeposit = pools === null ? "不可用" : balanceTotals?.deposit_held ?? "—";
 
   // 业务计数口径：ACTIVE 表示进行中。
-  const activeCount = orders.filter((o) => o.status === "ACTIVE").length;
+  const activeCount = orders === null ? null : countOngoingOrders(orders);
+  const orderCardsUnavailable = orders === null;
 
   const { arrange: arrangeColumns } = useListViewColumns("POOL_BALANCE");
   const columns: ColumnsType<PoolRow> = [
@@ -125,15 +132,17 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
       <EntryRow>
         <EntryCard
           title="订单总数"
-          value={String(orders.length)}
+          value={orders === null ? "不可用" : String(orders.length)}
           description="点击进入业务中心 · 订单台账"
-          onClick={() => onNavigate?.("business")}
+          disabled={orderCardsUnavailable}
+          onClick={() => onNavigate?.("business", "ledger")}
         />
         <EntryCard
           title="进行中"
-          value={String(activeCount)}
+          value={activeCount === null ? "不可用" : String(activeCount)}
           description="点击进入业务中心 · 订单台账"
-          onClick={() => onNavigate?.("business")}
+          disabled={orderCardsUnavailable}
+          onClick={() => onNavigate?.("business", "ledger")}
         />
       </EntryRow>
 
@@ -141,12 +150,12 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
         items={[
           { label: "可用余额合计", amount: totalAvailable },
           { label: "押金占用", amount: totalDeposit },
-          { label: "利润", amount: businessPnl?.total.full_income ?? "-", tone: "auto" },
+          { label: "利润", amount: businessPnl?.total.main_profit ?? "-", tone: "auto" },
         ]}
       />
       <StatRow
         items={[
-          { label: "资金池数量", kind: "count", amount: String(pools.length) },
+          { label: "资金池数量", kind: "count", amount: pools === null ? "不可用" : String(pools.length) },
         ]}
       />
 
@@ -160,7 +169,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string) => 
             pageSize={Math.max(rows.length, 10)}
             total={rows.length}
             rowKey="key"
-            emptyText="尚未配置资金池"
+            emptyText={pools === null ? "资金池数据不可用，请点击重新加载" : "尚未配置资金池"}
             onPageChange={() => undefined}
          />
         </Card>

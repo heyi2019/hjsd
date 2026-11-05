@@ -12,7 +12,7 @@ export const policyApi = {
     api.post<PolicyVersion>(`/policies/${definitionId}/versions`, payload).then((r) => r.data),
   updateDraft: (versionId: number, config: Record<string, unknown>) =>
     api.patch<PolicyVersion>(`/policy-versions/${versionId}`, { config }).then((r) => r.data),
-  /** 作废草稿版本（SUPERSEDED）：仅 DRAFT 可作废；已发布版本是历史解析口径，服务端拒绝。 */
+  /** 取消草稿版本（SUPERSEDED）：仅 DRAFT 可取消；已发布版本是历史解析口径，服务端拒绝。 */
   supersede: (versionId: number, payload: { reason: string; replaced_by_version_id?: number }) =>
     api.post<PolicyVersion>(`/policy-versions/${versionId}/supersede`, payload).then((r) => r.data),
   /** 过期清扫：把 effective_to < on 的 ACTIVE 版本固化为 EXPIRED（幂等）。 */

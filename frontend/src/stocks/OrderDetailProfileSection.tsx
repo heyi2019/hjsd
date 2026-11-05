@@ -1,4 +1,4 @@
-import { Descriptions, Input, Typography } from "antd";
+import { Descriptions, Input } from "antd";
 import { useMemo } from "react";
 import type { Account, AccountExecutionDetail } from "../shared/api/catalog";
 import {
@@ -22,9 +22,11 @@ import {
 const ACCOUNT_FIELD_MAP: Record<string, { cfgKey: string; fallback: string }> = {
   gameType: { cfgKey: "game_type", fallback: "游戏 / 产品类型" },
   gameAccount: { cfgKey: "game_account", fallback: "游戏账号 / 产品" },
+  campAccount: { cfgKey: "camp_account", fallback: "营地账号" },
   password: { cfgKey: "game_password", fallback: "账号密码" },
   channelRegion: { cfgKey: "channel_region", fallback: "渠道 / 区服" },
   secondary: { cfgKey: "has_secondary", fallback: "有无二次" },
+  walletRealname: { cfgKey: "wallet_realname", fallback: "钱包实名" },
   note: { cfgKey: "game_account_note", fallback: "账号备注" },
 };
 
@@ -54,13 +56,15 @@ export function OrderDetailProfileSection({
   const accountProfileFields: OrderDetailField[] = [
     { key: "gameType", label: ACCOUNT_FIELD_MAP.gameType.fallback, value: meta.gameType || "-" },
     { key: "gameAccount", label: ACCOUNT_FIELD_MAP.gameAccount.fallback, value: meta.gameAccount || "-" },
+    { key: "campAccount", label: ACCOUNT_FIELD_MAP.campAccount.fallback, value: meta.campAccount || "-" },
     {
       key: "password",
       label: ACCOUNT_FIELD_MAP.password.fallback,
-      value: meta.password === "-" ? meta.password : <Typography.Text copyable>{meta.password}</Typography.Text>,
+      value: meta.password === "-" ? meta.password : "已隐藏",
     },
     { key: "channelRegion", label: ACCOUNT_FIELD_MAP.channelRegion.fallback, value: meta.channelRegion },
     { key: "secondary", label: ACCOUNT_FIELD_MAP.secondary.fallback, value: meta.secondary },
+    { key: "walletRealname", label: ACCOUNT_FIELD_MAP.walletRealname.fallback, value: meta.walletRealname },
     { key: "note", label: ACCOUNT_FIELD_MAP.note.fallback, value: meta.note },
   ];
 

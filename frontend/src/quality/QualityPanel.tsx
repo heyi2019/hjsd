@@ -5,7 +5,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { qualityApi, type QualityIssue, type QualityMetricRow, type QualityMetricValue, type QualityMetrics, type QualitySummary } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { BusinessActionModal, CompactActions, BusinessForm, DataTable, ErrorBanner, InlineError, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
+import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, InlineError, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
 
@@ -48,6 +48,7 @@ function renderMetric(value: QualityMetricValue | undefined, formula?: string) {
 export function QualityPanel() {
   const severityOptions = useOptionSet("QUALITY_SEVERITY") ?? [];
   const [summary, setSummary] = useState<QualitySummary | null>(null);
+  const [summaryReady, setSummaryReady] = useState(false);
   const [metrics, setMetrics] = useState<QualityMetrics | null>(null);
   const [metricWindow, setMetricWindow] = useState(6);
   const [metricsLoading, setMetricsLoading] = useState(false);
@@ -66,11 +67,13 @@ export function QualityPanel() {
   const [updating, setUpdating] = useState(false);
 
   const load = useCallback(async () => {
+    setSummaryReady(false);
     try {
       const [nextSummary, nextRows] = await Promise.all([qualityApi.summary(), qualityApi.list()]);
       setSummary(nextSummary);
       setRows(nextRows.items);
       setError(null);
+      setSummaryReady(true);
     } catch (err) {
       setError(normalizeError(err));
     }
@@ -212,7 +215,7 @@ export function QualityPanel() {
   return (
     <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} />
-      <StatRow items={[{ label: "异常总数", kind: "count", amount: String(summary?.total ?? 0) }, { label: "高严重度", kind: "count", amount: String(summary?.by_severity?.HIGH ?? 0), tone: "warn" }]} />
+      <StatRow items={[{ label: "异常总数", kind: "count", amount: summaryReady ? String(summary?.total ?? 0) : "不可用" }, { label: "高严重度", kind: "count", amount: summaryReady ? String(summary?.by_severity?.HIGH ?? 0) : "不可用", tone: "warn" }]} />
       <Card
         className="glass"
         title="月度质量指标"
@@ -239,11 +242,15 @@ export function QualityPanel() {
       </Card>
       <Card className="glass" title="质量异常工单" extra={<Space><PermissionButton permission="order.update" loading={scanning} onClick={() => void scanIssues()}>主动扫描</PermissionButton><PermissionButton permission="order.update" type="primary" onClick={() => setCreateOpen(true)}>新建工单</PermissionButton></Space>}>
         <DataTable<QualityIssue> columns={arrangeColumns(columns)} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无质量异常" onPageChange={() => undefined} />
-        <PermissionButton permission="order.update" onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
+        <PermissionButton permission="order.update" disabled={!summaryReady || rows.every((row) => row.status === "CLOSED")} onClick={() => setBatchCloseOpen(true)}>批量关闭未关闭工单</PermissionButton>
       </Card>
-      <BusinessActionModal title="新建质量工单" open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
+      <BusinessActionModal title="新建质量工单" fieldCount={6} open={createOpen} onCancel={() => setCreateOpen(false)} footer={null}>
         <InlineError error={createOpen ? error : null} />
-        <BusinessForm form={createForm} onFinish={createIssue}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={createForm} onFinish={createIssue}>
           <Form.Item name="code" label="异常编码" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="severity" label="严重程度" rules={[{ required: true }]}><Select options={severityOptions} /></Form.Item>
           <Form.Item name="title" label="标题" rules={[{ required: true }]}><Input /></Form.Item>
@@ -251,27 +258,35 @@ export function QualityPanel() {
           <Form.Item name="entity_id" label="对象编号" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="message" label="问题描述" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
           <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={creating}>创建工单</PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
       <BusinessActionModal size="compact" title="关闭质量工单" open={Boolean(closeTarget)} onCancel={() => setCloseTarget(null)} footer={null}>
         <InlineError error={closeTarget ? error : null} />
-        <BusinessForm form={closeForm} onFinish={closeIssue}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={closeForm} onFinish={closeIssue}>
           <Form.Item name="resolution" label="处理结果" rules={[{ required: true }]}><Input.TextArea rows={3} /></Form.Item>
           <Form.Item name="evidence" label="依据"><Input.TextArea rows={2} /></Form.Item>
           <CompactActions>
             <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={closing}>确认关闭</PermissionButton>
           </CompactActions>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
       <BusinessActionModal size="compact" title="批量关闭质量工单" open={batchCloseOpen} onCancel={() => setBatchCloseOpen(false)} footer={null}>
         <InlineError error={batchCloseOpen ? error : null} />
-        <BusinessForm form={batchCloseForm} onFinish={batchCloseIssues}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} form={batchCloseForm} onFinish={batchCloseIssues}>
           <Form.Item name="resolution" label="批量处理结果" rules={[{ required: true }]}><Input.TextArea rows={3} placeholder="将应用到当前列表中最多 50 条未关闭工单" /></Form.Item>
           <Form.Item name="evidence" label="依据"><Input.TextArea rows={2} /></Form.Item>
           <CompactActions>
             <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={batchClosing}>确认批量关闭</PermissionButton>
           </CompactActions>
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </BusinessActionModal>
     </section>
   );

@@ -8,12 +8,20 @@ import { normalizeError } from "../shared/api/client";
 import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
 import { useOptionSet } from "../shared/lib/optionSets";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
-import { DataTable, BusinessActionModal, BusinessForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatusTag, useCompactLayout } from "../shared/ui";
+import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
-import { MobileCounterpartyList, collectExtras } from "./CustomersPage.fragments";
+import { collectExtras } from "./CustomersPage.fragments";
+
+const COUNTERPARTY_STATUS_OPTIONS = [
+  { value: "ACTIVE", label: "进行中" },
+  { value: "DISABLED", label: "已拉黑" },
+];
+
+// 类型词典不可用时回落的只读集合：保证默认类型 PEER 始终是带名称的 selected option，
+// 避免出现"控件外游离文本 PEER"。来源与 COUNTERPARTY_TYPE_LABEL 一致（含 PEER/SUPPLIER/PLATFORM 等）。
+const COUNTERPARTY_TYPE_FALLBACK = Object.entries(COUNTERPARTY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 
 export function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
-  const compact = useCompactLayout();
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
@@ -153,19 +161,19 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
       className="glass"
       title="合作方"
       extra={
-        <PermissionButton permission="counterparty.manage" type="primary" onClick={() => setOpen(true)}>
+        <PermissionButton permission="counterparty.manage" type="primary" disabled={Boolean(error) || !counterpartyTypeOptions} onClick={() => setOpen(true)}>
           新建合作方
         </PermissionButton>
       }
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Space wrap className="counterparty-filter-bar">
-        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" value={statusFilter} options={counterpartyStatusOptions ?? []} onChange={(value) => setStatusFilter(value)} />
+        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? COUNTERPARTY_STATUS_OPTIONS} onChange={(value) => setStatusFilter(value)} />
       </Space>
       <Typography.Paragraph type="secondary">
         同行、供货方、平台使用 CP 编号，与客户（CUS）严格分离；有历史参与关系仅可拉黑。
       </Typography.Paragraph>
-      {!compact ? <DataTable<Counterparty>
+      <DataTable<Counterparty>
         columns={columns}
         rows={visibleCounterparties}
         page={1}
@@ -173,24 +181,19 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         total={visibleCounterparties.length}
         emptyText="暂无合作方"
         onPageChange={() => undefined}
-     /> : <MobileCounterpartyList
-        rows={rows}
-        onDetail={(row) => void openDetail(row)}
-        onEdit={setEditTarget}
-        onToggle={async (row) => {
-          await counterpartiesApi.setStatus(row.id, row.status !== "ACTIVE");
-          appMessage.success(row.status === "ACTIVE" ? "合作方已拉黑，历史关系保留" : "合作方已解除拉黑");
-          await load();
-        }}
-      />}
-      <BusinessActionModal title="新建合作方" open={open} onCancel={() => setOpen(false)} footer={null}>
+     />
+      <BusinessActionModal title="新建合作方" fieldCount={5} open={open} onCancel={() => setOpen(false)} footer={null}>
         <FieldConfigScope scope="COUNTERPARTY" active={open}>
-        <BusinessForm scope="COUNTERPARTY" form={form} colon={false} className="form-no-colon" onFinish={submit} initialValues={{ type: "PEER" }}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="COUNTERPARTY" form={form} colon={false} className="form-no-colon" onFinish={submit} initialValues={{ type: "PEER" }}>
           <CfgItem name="display_name" label="名称" rules={[{ required: true }]}>
             <Input />
           </CfgItem>
           <CfgItem name="type" label="类型" rules={[{ required: true }]}>
-            <Select options={counterpartyTypeOptions ?? []} />
+            <Select options={counterpartyTypeOptions ?? COUNTERPARTY_TYPE_FALLBACK} />
           </CfgItem>
           <CfgItem name="contact_name" label="联系人">
             <Input />
@@ -202,15 +205,16 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
             <Input />
           </CfgItem>
           <CustomFieldSection testIdSuffix="counterparty-create" />
-          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit">
+          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit" disabled={Boolean(error) || !counterpartyTypeOptions}>
             建档
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </BusinessActionModal>
 
       <BusinessActionModal
         title={editTarget ? `编辑合作方 · ${editTarget.counterparty_no}` : "编辑合作方"}
+        fieldCount={6}
         open={Boolean(editTarget)}
         onCancel={() => {
           setEditTarget(null);
@@ -220,10 +224,13 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         destroyOnHidden
       >
         <FieldConfigScope scope="COUNTERPARTY" active={Boolean(editTarget)}>
-        <BusinessForm
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }}
           scope="COUNTERPARTY"
           form={editForm}
-          layout="vertical"
           colon={false}
           className="form-no-colon"
           onFinish={submitEdit}
@@ -264,7 +271,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
           <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit">
             保存
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </BusinessActionModal>
 

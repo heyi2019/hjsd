@@ -12,9 +12,15 @@ const walk = (dir) =>
     return statSync(full).isDirectory() ? walk(full) : [full];
   });
 
-/** 页面文件：排除组件库本体，否则守卫会自己告自己。 */
+// 全量文件列表只遍历一次（原 pages() 与规则 9/10/11/13/14 各自 walk(SRC) 重复整树扫描）。
+const ALL_FILES = walk(SRC);
+
+/** 页面文件：排除组件库本体，否则守卫会自己告自己。
+ * 同时排除 *.test.tsx：测试夹具常用裸 <Button> / <Table> / <Tag> 模拟外部提交入口与
+ * 表格渲染，它们不产出产品 UI，不应被「页面不得绕过组件库」系列规则管辖。
+ * 规则 11 / 13 / 14 早已显式排除测试文件，此处统一口径（2026-11-02）。 */
 const pages = () =>
-  walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("shared", "ui")) && !f.includes(join("auth", "LoginPage")) && !f.includes(join("auth", "ChangePasswordPage")) && !f.includes(join("auth", "UserCenterPage")));
+  ALL_FILES.filter((f) => f.endsWith(".tsx") && !/\.test\.tsx$/.test(f) && !f.includes(join("shared", "ui")) && !f.includes(join("auth", "LoginPage")) && !f.includes(join("auth", "ChangePasswordPage")) && !f.includes(join("auth", "UserCenterPage")));
 
 /** 计数语义的 label：必须显式 kind: "count"，否则被 MoneyText 渲染成 "1.00"。 */
 const COUNT_LABELS = [
@@ -33,7 +39,7 @@ for (const file of pages()) {
     const pattern = new RegExp(`label: "${label}",[\\s\\S]{0,160}?amount:`, "g");
     for (const hit of text.matchAll(pattern)) {
       const segment = text.slice(hit.index, hit.index + hit[0].length);
-      if (!segment.includes('kind: "count"')) {
+      if (!/kind:\s*("count"|'count'|\{"count"\})/.test(segment)) {
         fail("count-kind", `${relative(process.cwd(), file)} → label: "${label}" 缺 kind: "count"`);
       }
     }
@@ -45,7 +51,10 @@ const BANNED = [
   ["no-antd-statistic", (t) => t.includes("<Statistic"), "须用 StatCard / StatRow"],
   ["no-antd-tag", (t) => /<Tag[ >]/.test(t), "须用 StatusTag"],
   ["no-raw-button", (t) => /<Button[ >]/.test(t), "写操作须用 PermissionButton 权限门控"],
-  ["no-raw-table", (t) => /<Table(?:<[^>]+>)?[ >]/.test(t), "须用 DataTable 统一列表壳"],
+  // 禁止裸 <Table>：注意「标签后紧跟空格/尖括号」的写法会被 JSX 多行排版绕过
+  // （`<Table` 换行接属性时其后是换行符，旧正则 `[ >]` 不匹配）——2026-11 实测
+  // 三处裸表因此从未被本规则拦到。改用「标签名后不得紧跟标识符字符」判定。
+  ["no-raw-table", (t) => /<Table(?![\w.])/.test(t), "须用 DataTable 统一列表壳"],
 ];
 for (const [rule, probe, hint] of BANNED) {
   for (const file of pages()) {
@@ -159,7 +168,7 @@ if (!existsSync(uiComponentsCss)) {
 // var() 引用不存在的自定义属性时，**整条声明作废且零报错**，静默回落浏览器默认
 // （实测 font 简写整体失效、字号退回 13px，恰与父级继承值撞车而看不出异常）。
 // 这类缺陷 tsc / vite / 现有 8 条规则全都抓不到，只能靠交叉比对声明与引用。
-const cssFiles = walk(SRC).filter((f) => f.endsWith(".css"));
+const cssFiles = ALL_FILES.filter((f) => f.endsWith(".css"));
 /**
  * 剥注释必须能跨行：块注释 /* ... *\/ 常整段跨多行（如 tokens.css 里
  * 「响应式断点媒体查询」那段就整块提到 @media (--bp-md) 的用法），
@@ -229,17 +238,46 @@ if (definedKf.size === 0) {
 // 规则 11：页面与共享 UI 不得使用 JSX 内联 style。
 // 统一样式必须进入令牌 / 共享 CSS，避免同一控件在不同页面出现不可追踪的局部变体。
 // 测试 motion stub 是 React style 转发夹具，属于测试基础设施，明确排除。
-for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")))) {
-  const text = readFileSync(file, "utf8");
-  if (/<[A-Za-z][^>]*\bstyle\s*=/.test(text)) {
-    fail("no-inline-style", `${relative(process.cwd(), file)} → 样式必须迁移到共享 CSS / 设计令牌`);
+// 排除条件必须同时覆盖两种写法：src/test/ 目录下的公共夹具，以及任意 *.test.tsx
+// 内的用例内联夹具（撑高 2000px 测滚动、透传 style 的 mock 组件）。此前只排了目录，
+// 与规则 13/14 的排除口径不一致，导致测试文件被产品规则拦下（2026-11-02 修正）。
+//
+// 显式豁免（2026-11-02 用户裁决「让守卫放过它」）：按「文件 → {上限, 理由}」登记。
+// **上限是硬约束**——豁免不是放开：命中数一旦超过声明上限即报错，防止一个口子
+// 演变成整页内联样式。登记的理由只允许是「静态 CSS 类无法表达的字段级动态值」；
+// 「写起来快」「懒得提类名」不构成理由。视觉定稿后应回收到 CSS 并删除条目。
+const INLINE_STYLE_ALLOWLIST = new Map([
+  [
+    "src/pools/StudioExpensePanel.tsx",
+    {
+      max: 2,
+      reason:
+        "工作室收支登记弹窗视觉稿落地（2026-11-02 用户指定）：金额控件宽度与标签列宽需按字段实时取值，"
+        + "静态类名无法表达；其余样式一律落 StudioExpensePanel.css，本豁免不含页面复选/筛选区。",
+    },
+  ],
+]);
+for (const [rel, entry] of INLINE_STYLE_ALLOWLIST) {
+  // 自检：路径写错或文件改名会让豁免静默失效（守卫报绿但实际没放行）。
+  if (!existsSync(join(process.cwd(), rel))) {
+    fail("no-inline-style", `豁免清单指向的文件不存在：${rel}（${entry.reason}）`);
   }
+}
+for (const file of ALL_FILES.filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
+  const text = stripComments(readFileSync(file, "utf8"));
+  const rel = relative(process.cwd(), file).replaceAll("\\", "/");
+  const hits = [...text.matchAll(/<[A-Za-z][^>]*\bstyle\s*=/g)].length;
+  if (hits === 0) continue;
+  const allowance = INLINE_STYLE_ALLOWLIST.get(rel);
+  if (allowance && hits <= allowance.max) continue;
+  const quota = allowance ? `（豁免上限 ${allowance.max} 处，实有 ${hits} 处）` : "";
+  fail("no-inline-style", `${rel} → 样式必须迁移到共享 CSS / 设计令牌${quota}`);
 }
 
 // 规则 12：前端样式只能使用当前品牌语义，禁止保留旧视觉别名或开发兜底入口。
 // 旧的 violet 命名曾作为兼容别名长期存在，实际颜色已经是品牌蓝；继续保留会让
 // 令牌语义与业务设计不一致，也会让下一轮重构误把旧别名当成可用 API。
-const styleSource = cssFiles.map((file) => readFileSync(file, "utf8")).join("\n");
+const styleSource = cssFiles.map((file) => stripComments(readFileSync(file, "utf8"))).join("\n");
 if (/\bviolet\b/i.test(styleSource)) {
   fail("style-alias", "样式仍保留 violet 旧视觉别名，应统一为品牌语义令牌");
 }
@@ -266,6 +304,7 @@ const FORM_SCOPE_WHITELIST = new Map([
   ["src/auth/UserCenterPage.tsx", "用户中心，非业务数据录入"],
   ["src/field-definitions/panels/GameTypeSettingsPanel.tsx", "配置管理界面本身"],
   ["src/field-definitions/panels/IntermediaryPlatformSettingsPanel.tsx", "配置管理界面本身"],
+  ["src/field-definitions/panels/BusinessReminderSettingsPanel.tsx", "工作台规则配置界面本身，编辑的是系统提醒参数而非业务单据"],
   ["src/field-definitions/panels/OrderFormFieldsPanel.tsx", "表单字段配置界面本身（即守卫所保护的设置页）"],
   ["src/field-definitions/panels/useOrderFormFieldsPanelController.tsx", "同上：字段配置界面的编辑表单 JSX 拆分到 controller 后仍是同一界面，非业务录入"],
   ["src/field-definitions/panels/OrderTypeRoutesPanel.tsx", "配置管理界面本身"],
@@ -276,14 +315,15 @@ const FORM_SCOPE_WHITELIST = new Map([
   ["src/search/SearchPanel.tsx", "查询表单，非数据录入"],
   ["src/users/TeamsPanel.tsx", "团队管理，系统表单"],
   ["src/users/UsersPanel.tsx", "用户管理，系统表单"],
+  ["src/stocks/InventoryPanel/InventoryDeleteDialog.tsx", "账号删除二次确认：删除原因只写审计日志、不落业务字段，属系统级确认输入，不开放表单字段配置"],
 ]);
 let wiredCount = 0;
-for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
+for (const file of ALL_FILES.filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
   const rel = relative(process.cwd(), file).replaceAll("\\", "/");
   const text = readFileSync(file, "utf8");
-  // 业务表单统一使用共享 BusinessForm；保留对原生 antd Form 的识别以覆盖
+  // 业务表单统一使用共享 BusinessRegistrationForm；保留对原生 antd Form 的识别以覆盖
   // 登录、查询等非业务表单和 Form.List/Form.Item 的宿主文件。
-  if (!(/<(?:Form|BusinessForm)[\s>]/.test(text) && /onFinish=/.test(text))) continue;
+  if (!(/<(?:Form|BusinessRegistrationForm)[\s>]/.test(text) && /onFinish=/.test(text))) continue;
   if (WIRED_RE.test(text) && CONFIG_MODULE_RE.test(text)) {
     wiredCount++;
     continue;
@@ -303,7 +343,7 @@ if (wiredCount === 0) {
 // 共享组件本体是唯一允许接触底层 antd Select 的位置；测试夹具可按测试自身需要使用原生组件。
 const sharedSelectFile = join(SRC, "shared", "ui", "Select.tsx");
 const rawAntdSelectRe = /import\s*\{[\s\S]*?\bSelect(?:\s+as\s+\w+)?\s*[,}][\s\S]*?\}\s*from\s+"antd"/;
-for (const file of walk(SRC).filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
+for (const file of ALL_FILES.filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {
   if (file === sharedSelectFile) continue;
   const text = readFileSync(file, "utf8");
   if (rawAntdSelectRe.test(text)) {

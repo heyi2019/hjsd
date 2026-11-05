@@ -1,9 +1,9 @@
-/** 资金中心各 Tab 视图层：overview / cashflows / deposits / reconciliations / controls。
+/** 资金中心各 Tab 视图层：overview / cashflows / reconciliations / controls。
  *  每个 Tab 通过 controller 消费 useFundsPageController 暴露的状态与处理器，自身只负责列定义与渲染。 */
 import { Card, Input, Space, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { DataTable, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
-import { columnKey, useListViewColumns } from "../shared/lib/listColumns";
+import { useListViewColumns } from "../shared/lib/listColumns";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
 import {
@@ -13,12 +13,11 @@ import {
   POOL_OWNERSHIP_LABEL,
   RECONCILIATION_STATUS_LABEL,
 } from "../shared/lib/labels";
-import { MobileCashflowList, MobileDepositList, MobilePoolList } from "./FundsPage.fragments";
 import type { FundsPageController } from "./useFundsPageController";
 import type { Cashflow, Deposit, Pool, Reconciliation } from "../shared/api/catalog";
 
 export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
-  const { pools, balances, totalCash, totalAvailable, totalDeposit, totalOwned, compact, transferForm, setTransferOpen, loading } = ctrl;
+  const { pools, balances, totalCash, totalAvailable, totalDeposit, totalOwned, transferForm, setTransferOpen, loading, fundsReady, error } = ctrl;
   const { arrange: arrangeFundPoolColumns } = useListViewColumns("FUND_POOLS");
   const poolColumns: ColumnsType<Pool> = [
     {
@@ -36,13 +35,12 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "押金", key: "deposit_held", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.deposit_held} /> },
     { title: "可用余额", key: "available", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.available} strong /> },
   ];
-  const mobileFieldOrder = arrangeFundPoolColumns(poolColumns).map(columnKey);
   return (
     <Card
       className="glass"
       title="资金池卡片"
       extra={
-        <PermissionButton permission="finance.transfer" type="primary" onClick={() => { transferForm.setFieldsValue({ occurred_on: today() }); setTransferOpen(true); }}>
+        <PermissionButton permission="finance.transfer" type="primary" disabled={!fundsReady || loading || Boolean(error)} onClick={() => { transferForm.setFieldsValue({ occurred_on: today() }); setTransferOpen(true); }}>
           资金池划转
         </PermissionButton>
       }
@@ -58,20 +56,16 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
       <Typography.Paragraph type="secondary" className="ui-card-hint">
         口径：现金头寸含全部资金池；自有权益仅计归属为「{POOL_OWNERSHIP_LABEL.OWNED}」的池，「{POOL_OWNERSHIP_LABEL.CUSTODY}/{POOL_OWNERSHIP_LABEL.THIRD_PART}」只计头寸、不计权益；押金占用仍为自有资金，故权益不扣减占用。
       </Typography.Paragraph>
-      {compact ? (
-        <MobilePoolList rows={pools} balances={balances} fieldOrder={mobileFieldOrder} />
-      ) : (
-        <DataTable<Pool>
-          columns={arrangeFundPoolColumns(poolColumns)}
-          rows={pools}
-          page={1}
-          pageSize={10}
-          total={pools.length}
-          emptyText="尚未配置资金池"
-          loading={loading}
-          onPageChange={() => undefined}
-        />
-      )}
+      <DataTable<Pool>
+        columns={arrangeFundPoolColumns(poolColumns)}
+        rows={pools}
+        page={1}
+        pageSize={10}
+        total={pools.length}
+        emptyText={error ? "资金数据不可用，请点击重新加载" : "尚未配置资金池"}
+        loading={loading}
+        onPageChange={() => undefined}
+      />
     </Card>
   );
 }
@@ -82,9 +76,10 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
     cashflowDirection, setCashflowDirection, cashflowStatus, setCashflowStatus, cashflowFundNature, setCashflowFundNature,
     cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, cashflowFrom, setCashflowFrom,
     cashflowTo, setCashflowTo, flowDirectionOptions, flowStatusOptions, flowFundNatureOptions, flowAttributeOptions,
-    fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, totalFlowIncome, totalFlowExpense, compact,
-    cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, natureOptionSet, loading,
+    fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, totalFlowIncome, totalFlowExpense,
+    cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, natureOptionSet, loading, cashflowsReady, error,
   } = ctrl;
+  const cashflowUnavailable = !cashflowsReady || Boolean(error);
   const { arrange: arrangeCashflowColumns } = useListViewColumns("CASHFLOW");
   const cashflowColumns: ColumnsType<Cashflow> = [
     { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
@@ -123,7 +118,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       width: 170,
       render: (_v, row) => (
         <Space size={2}>
-          {row.status === "APPROVED" && !row.order_id && !row.deposit_id && !row.transfer_id && !row.order_event_id && (
+          {row.status === "APPROVED" && !row.reversal_of_id && !cashflows.some((flow) => flow.reversal_of_id === row.id) && !row.order_id && !row.deposit_id && !row.transfer_id && !row.order_event_id && (
             <PermissionButton
               permission="deposit.post"
               size="small"
@@ -136,16 +131,15 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       ),
     },
   ];
-  const mobileFieldOrder = arrangeCashflowColumns(cashflowColumns).map(columnKey);
   return (
-    <Card className="glass" title="资金明细" extra={<PermissionButton permission="deposit.post" type="primary" onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>
+    <Card className="glass" title="资金明细" extra={<PermissionButton permission="deposit.post" type="primary" disabled={cashflowUnavailable || loading || !flowDirectionOptions} onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>
       <div className="ui-filter-bar funds-cashflow-filters">
         <Input aria-label="流水搜索" allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注" onChange={(event) => setCashflowKeyword(event.target.value)} />
-        <Select aria-label="流水资金池" allowClear value={cashflowPoolId} placeholder="全部资金池" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
-        <Select aria-label="流水方向" allowClear value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
-        <Select aria-label="流水状态" allowClear value={cashflowStatus} placeholder="全部状态" options={flowStatusOptions ?? []} onChange={setCashflowStatus} />
-        <Select aria-label="流水资金性质" allowClear value={cashflowFundNature || undefined} placeholder="全部资金性质" options={flowFundNatureOptions ?? []} onChange={(value) => setCashflowFundNature(value ?? "")} />
-        <Select aria-label="流水核算属性" allowClear value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
+        <Select aria-label="流水资金池" allowClear disabled={cashflowUnavailable} value={cashflowPoolId} placeholder="全部资金池" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
+        <Select aria-label="流水方向" allowClear disabled={cashflowUnavailable} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
+        <Select aria-label="流水状态" allowClear disabled={cashflowUnavailable} value={cashflowStatus} placeholder="全部状态" options={flowStatusOptions ?? []} onChange={setCashflowStatus} />
+        <Select aria-label="流水资金性质" allowClear disabled={cashflowUnavailable} value={cashflowFundNature || undefined} placeholder="全部资金性质" options={flowFundNatureOptions ?? []} onChange={(value) => setCashflowFundNature(value ?? "")} />
+        <Select aria-label="流水核算属性" allowClear disabled={cashflowUnavailable} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
         <Input aria-label="流水中类别筛选" allowClear value={cashflowCategory} placeholder="类别，如 REVERSAL" onChange={(event) => setCashflowCategory(event.target.value)} />
         <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
         <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
@@ -157,7 +151,9 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       <Typography.Paragraph type="secondary" className="ui-drawer-hint">
         状态口径：所有流水（含本页手工登记的独立流水）过账即「已入账」，直接计入系统余额。
       </Typography.Paragraph>
-      {cashflowTotal > cashflows.length ? (
+      {cashflowUnavailable ? (
+        <Typography.Text type="warning">资金流水数据不可用，请点击“查询”或页面顶部的“重新加载”。</Typography.Text>
+      ) : cashflowTotal > cashflows.length ? (
         <Typography.Text type="warning">
           共匹配 {cashflowTotal} 笔，已加载 {cashflows.length} 笔（单次上限 2000 条，请用日期区间缩小范围）。
         </Typography.Text>
@@ -166,35 +162,27 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       )}
       <StatRow
         items={[
-          { label: "总收入", amount: totalFlowIncome },
-          { label: "总支出", amount: totalFlowExpense },
-          { label: "当前结果", kind: "count", amount: visibleCashflows.length },
+          { label: "总收入", amount: cashflowUnavailable ? "不可用" : totalFlowIncome },
+          { label: "总支出", amount: cashflowUnavailable ? "不可用" : totalFlowExpense },
+          { label: "当前结果", kind: "count", amount: cashflowUnavailable ? "不可用" : visibleCashflows.length },
         ]}
       />
-      {compact ? (
-        <MobileCashflowList
-          rows={visibleCashflows}
-          fieldOrder={mobileFieldOrder}
-          onReverse={(row) => { reverseForm.setFieldsValue({ reversed_on: today() }); setReverseTarget(row); }}
-        />
-      ) : (
-        <DataTable<Cashflow>
-          columns={arrangeCashflowColumns(cashflowColumns)}
-          rows={visibleCashflows}
-          page={1}
-          pageSize={10}
-          total={visibleCashflows.length}
-          emptyText="暂无资金流水"
-          loading={loading}
-          onPageChange={() => undefined}
-        />
-      )}
+      <DataTable<Cashflow>
+        columns={arrangeCashflowColumns(cashflowColumns)}
+        rows={visibleCashflows}
+        page={1}
+        pageSize={10}
+        total={visibleCashflows.length}
+        emptyText={cashflowUnavailable ? "资金流水数据不可用，请点击重新加载" : "暂无资金流水"}
+        loading={loading}
+        onPageChange={() => undefined}
+      />
     </Card>
   );
 }
 
-export function DepositTab({ ctrl }: { ctrl: FundsPageController }) {
-  const { deposits, compact, setDepositOpen, returnForm, setReturnTarget, lossForm, setLossTarget, cancelForm, setCancelTarget, loading } = ctrl;
+export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
+  const { deposits, setDepositOpen, returnForm, setReturnTarget, lossForm, setLossTarget, cancelForm, setCancelTarget, loading } = ctrl;
   const { arrange: arrangeDepositColumns } = useListViewColumns("DEPOSITS");
   const depositColumns: ColumnsType<Deposit> = [
     { title: "占用金额", dataIndex: "paid_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
@@ -203,7 +191,7 @@ export function DepositTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "预计释放", dataIndex: "expected_release_on", render: (v: string | null | undefined) => v || "—" },
     { title: "已释放", dataIndex: "returned_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "已损失", dataIndex: "lost_amount", align: "right", render: (v: string | null | undefined) => <MoneyText value={v ?? "0.00"} /> },
-    { title: "剩余", key: "remaining", align: "right", render: (_v, row) => (<MoneyText value={(Number(row.paid_amount) - Number(row.returned_amount) - Number(row.lost_amount ?? 0)).toFixed(2)} />) },
+    { title: "剩余", key: "remaining", align: "right", render: (_v, row) => (<MoneyText value={row.remaining_amount} />) },
     { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="DEPOSIT_STATUS" /> },
     {
       title: "操作",
@@ -240,7 +228,6 @@ export function DepositTab({ ctrl }: { ctrl: FundsPageController }) {
       ),
     },
   ];
-  const mobileFieldOrder = arrangeDepositColumns(depositColumns).map(columnKey);
   return (
     <Card
       className="glass"
@@ -251,33 +238,23 @@ export function DepositTab({ ctrl }: { ctrl: FundsPageController }) {
         </PermissionButton>
       }
     >
-      {compact ? (
-        <MobileDepositList
-          rows={deposits}
-          pools={ctrl.pools}
-          fieldOrder={mobileFieldOrder}
-          onRelease={(row) => { setReturnTarget(row); returnForm.setFieldsValue({ released_on: today() }); }}
-          onLoss={(row) => { setLossTarget(row); lossForm.setFieldsValue({ lost_on: today() }); }}
-          onCancel={(row) => { setCancelTarget(row); cancelForm.setFieldsValue({ cancelled_on: today() }); }}
-        />
-      ) : (
       <DataTable<Deposit>
-          columns={arrangeDepositColumns(depositColumns)}
-          rows={deposits}
-          page={1}
-          pageSize={10}
-          total={deposits.length}
-          emptyText="暂无押金占用"
-          loading={loading}
-          onPageChange={() => undefined}
-        />
-      )}
+        columns={arrangeDepositColumns(depositColumns)}
+        rows={deposits}
+        page={1}
+        pageSize={10}
+        total={deposits.length}
+        emptyText="暂无押金占用"
+        loading={loading}
+        onPageChange={() => undefined}
+      />
     </Card>
   );
 }
 
 export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
-  const { reconciliations, pools, reconciliationForm, setReconciliationOpen, loading } = ctrl;
+  const { reconciliations, pools, reconciliationForm, setReconciliationOpen, loading, reconciliationsReady, error } = ctrl;
+  const reconciliationUnavailable = !reconciliationsReady || Boolean(error);
   const { arrange: arrangeReconciliationColumns } = useListViewColumns("RECONCILIATIONS");
   const reconciliationColumns: ColumnsType<Reconciliation> = [
     { title: "资金池", key: "pool", render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? row.pool_id },
@@ -303,7 +280,7 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
     },
   ];
   return (
-    <Card className="glass" title="资金对账" extra={<PermissionButton permission="deposit.post" type="primary" onClick={() => { reconciliationForm.setFieldsValue({ reconciled_on: today() }); setReconciliationOpen(true); }}>新增对账</PermissionButton>}>
+    <Card className="glass" title="资金对账" extra={<PermissionButton permission="deposit.post" type="primary" disabled={reconciliationUnavailable || loading} onClick={() => { reconciliationForm.setFieldsValue({ reconciled_on: today() }); setReconciliationOpen(true); }}>新增对账</PermissionButton>}>
       <Typography.Paragraph type="secondary" className="ui-card-hint">
         系统余额口径：截至对账日期「已入账」流水的累计；按池内账户对账时另含该账户期初余额。差异 = 账面余额 − 系统余额。
       </Typography.Paragraph>
@@ -313,8 +290,9 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
         page={1}
         pageSize={10}
         total={reconciliations.length}
-        emptyText="暂无对账记录"
+        emptyText={reconciliationUnavailable ? "资金对账数据不可用，请点击重新加载" : "暂无对账记录"}
         loading={loading}
+        pagination={error ? false : undefined}
         onPageChange={() => undefined}
       />
     </Card>

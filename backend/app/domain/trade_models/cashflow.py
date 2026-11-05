@@ -210,8 +210,10 @@ class OrderProfitAllocation(Base, TimestampMixin):
     role: Mapped[str] = mapped_column(String(32), nullable=False)
     allocation_rate: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     # 按金额分润：与 allocation_rate 互斥（二者都为选填，填哪个用哪个）。
-    # 报表取数口径：allocation_amount > 0 时直接作为该人的应付基数，
-    # 否则回退 利润 × allocation_rate / 100。
+    # 可为负：亏损单按金额分润时存负数，表示该人分担的亏损额（利润 -1000、填 -300）。
+    # 报表取数口径：allocation_amount != 0 时直接作为该人的应付基数，
+    # 否则回退 利润 × allocation_rate / 100。判据用 != 而非 > 0，否则负金额会被
+    # 误判成「未填」而回退比例，亏损分润就算错。
     allocation_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     policy_version_id: Mapped[int | None] = mapped_column(
         ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True

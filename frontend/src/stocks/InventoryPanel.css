@@ -1,6 +1,5 @@
 .inventory-filters {
   align-items: center;
-  padding-top: var(--space-2);
 }
 
 /* 取消交易的金额和收款账户始终保持同一行，避免紧凑弹窗误触发窄屏规则。 */

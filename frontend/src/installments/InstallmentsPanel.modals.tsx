@@ -1,6 +1,6 @@
 import { Input, Typography } from "antd";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
-import { BusinessActionModal, BusinessForm, InlineError, MoneyInput, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, DateField, InlineError, MoneyInput, PermissionButton, Select, dateValueFromEvent, dateValueProps } from "../shared/ui";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import type { ContractTableController } from "./useContractTableController";
 
@@ -24,7 +24,11 @@ export function PayModal({ controller }: { controller: ContractTableController }
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTPAY" active={Boolean(payTarget)}>
-          <BusinessForm scope="INSTPAY" form={payForm} onFinish={submitPay}>
+          <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INSTPAY" form={payForm} onFinish={submitPay}>
           <CfgItem name="period_no" label="期次（0=首付，留空按到期顺序）">
             <Select
               allowClear
@@ -37,14 +41,14 @@ export function PayModal({ controller }: { controller: ContractTableController }
           <CfgItem name="amount" label="本次实收" rules={requiredMoneyRules("本次实收")}>
             <MoneyInput />
           </CfgItem>
-          <CfgItem name="paid_on" label="收款日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="paid_on" label="收款日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CustomFieldSection testIdSuffix="installment-pay" />
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             确认收款
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </Modal>
   );
@@ -67,9 +71,13 @@ export function RecoverModal({ controller }: { controller: ContractTableControll
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTRECOVER" active={Boolean(recoverTarget)}>
-          <BusinessForm scope="INSTRECOVER" form={recoverForm} onFinish={submitRecover}>
-          <CfgItem name="occurred_on" label="回收日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INSTRECOVER" form={recoverForm} onFinish={submitRecover}>
+          <CfgItem name="occurred_on" label="回收日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CfgItem name="note" label="回收说明" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
@@ -78,7 +86,7 @@ export function RecoverModal({ controller }: { controller: ContractTableControll
           <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={write.pending}>
             确认回收
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </Modal>
   );
@@ -102,7 +110,11 @@ export function ResaleModal({ controller }: { controller: ContractTableControlle
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTRESALE" active={Boolean(resaleTarget)}>
-          <BusinessForm scope="INSTRESALE" form={resaleForm} onFinish={submitResale}>
+          <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INSTRESALE" form={resaleForm} onFinish={submitResale}>
           <Typography.Paragraph type="secondary">
             回收账号转售登记：请先在库存中心售出该账号生成售出订单，再在此关联。
             出售订单必须已登记 SELL 事件且关联同一账号，每个合约只能登记一次。
@@ -120,8 +132,8 @@ export function ResaleModal({ controller }: { controller: ContractTableControlle
                 }))}
             />
           </CfgItem>
-          <CfgItem name="occurred_on" label="出售日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="occurred_on" label="出售日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CfgItem name="note" label="出售说明" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
@@ -130,7 +142,7 @@ export function ResaleModal({ controller }: { controller: ContractTableControlle
           <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={write.pending}>
             确认登记
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </Modal>
   );
@@ -153,7 +165,11 @@ export function DeliverModal({ controller }: { controller: ContractTableControll
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTDELIVER" active={Boolean(deliverTarget)}>
-          <BusinessForm scope="INSTDELIVER" form={deliverForm} onFinish={submitDeliver}>
+          <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INSTDELIVER" form={deliverForm} onFinish={submitDeliver}>
           <CfgItem name="delivery_mode" label="交付方式" rules={[{ required: true }]}>
             <Select />
           </CfgItem>
@@ -163,8 +179,8 @@ export function DeliverModal({ controller }: { controller: ContractTableControll
           <CfgItem name="bound_phone_owner" label="手机号绑定人">
             <Input placeholder="可选填，默认带出建单信息" />
           </CfgItem>
-          <CfgItem name="delivered_on" label="换绑日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="delivered_on" label="换绑日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CfgItem name="note" label="换绑凭证" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
@@ -177,7 +193,7 @@ export function DeliverModal({ controller }: { controller: ContractTableControll
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>
             确认交付
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </Modal>
   );
@@ -200,14 +216,18 @@ export function CancelModal({ controller }: { controller: ContractTableControlle
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTCANCEL" active={Boolean(cancelTarget)}>
-          <BusinessForm scope="INSTCANCEL" form={cancelForm} onFinish={submitCancel}>
+          <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INSTCANCEL" form={cancelForm} onFinish={submitCancel}>
           <Typography.Paragraph type="secondary">
             {cancelTarget?.contract_type === "PICKUP_SALE"
               ? "按已收款原资金池退款，提号取消后账号直接结束。"
               : "按已收款原资金池退款，取消后账号回到库存。"}
           </Typography.Paragraph>
-          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="cancelled_on" label="取消日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CfgItem name="reason" label="取消原因" rules={[{ required: true }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
@@ -216,7 +236,7 @@ export function CancelModal({ controller }: { controller: ContractTableControlle
           <PermissionButton permission="order.event.post" type="primary" danger htmlType="submit" loading={write.pending}>
             确认退款并终止分期
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </Modal>
   );
@@ -240,12 +260,16 @@ export function SettleModal({ controller }: { controller: ContractTableControlle
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTSETTLE" active={Boolean(settleTarget)}>
-          <BusinessForm scope="INSTSETTLE" form={settleForm} onFinish={submitSettleEarly}>
+          <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INSTSETTLE" form={settleForm} onFinish={submitSettleEarly}>
           <Typography.Paragraph type="secondary">
             一次性收清全部剩余应收，逐期生成收款并关闭未来期次；不指定资金池时按原收款资金池入账。
           </Typography.Paragraph>
-          <CfgItem name="paid_on" label="结清日期" rules={[{ required: true, message: "请选择结清日期" }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="paid_on" label="结清日期" rules={[{ required: true, message: "请选择结清日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} placeholder="可选" />
@@ -254,7 +278,7 @@ export function SettleModal({ controller }: { controller: ContractTableControlle
           <PermissionButton permission={settlePermission} type="primary" htmlType="submit" loading={write.pending}>
             确认提前结清
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </Modal>
   );
@@ -277,7 +301,11 @@ export function DefaultModal({ controller }: { controller: ContractTableControll
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTDEFAULT" active={Boolean(defaultTarget)}>
-          <BusinessForm scope="INSTDEFAULT" form={defaultForm} onFinish={submitDefault}>
+          <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INSTDEFAULT" form={defaultForm} onFinish={submitDefault}>
           <Typography.Paragraph type="secondary">
             登记后合约进入 DEFAULTED，仅可继续收款或关闭，不可再交付。
           </Typography.Paragraph>
@@ -288,7 +316,7 @@ export function DefaultModal({ controller }: { controller: ContractTableControll
           <PermissionButton permission="order.update" type="primary" danger htmlType="submit" loading={write.pending}>
             确认登记违约
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </Modal>
   );
@@ -311,15 +339,19 @@ export function WaiveModal({ controller }: { controller: ContractTableController
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTWAIVE" active={Boolean(waiveTarget)}>
-          <BusinessForm scope="INSTWAIVE" form={waiveForm} onFinish={submitWaive}>
+          <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INSTWAIVE" form={waiveForm} onFinish={submitWaive}>
           <Typography.Paragraph type="secondary">
             已收款部分不可减免，减免额不得超过该期未收金额；减免后该期不再计入催收。
           </Typography.Paragraph>
           <CfgItem name="amount" label="减免金额" rules={requiredMoneyRules("减免金额")}>
             <MoneyInput />
           </CfgItem>
-          <CfgItem name="waived_on" label="减免日期" rules={[{ required: true, message: "请选择减免日期" }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="waived_on" label="减免日期" rules={[{ required: true, message: "请选择减免日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CfgItem name="reason" label="减免原因" rules={[{ required: true, message: "请填写减免原因" }]}>
             <Input.TextArea rows={2} />
@@ -328,7 +360,7 @@ export function WaiveModal({ controller }: { controller: ContractTableController
           <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={write.pending}>
             确认减免
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </Modal>
   );
@@ -351,12 +383,16 @@ export function ExtendModal({ controller }: { controller: ContractTableControlle
       >
         <InlineError error={write.error} />
         <FieldConfigScope scope="INSTEXTEND" active={Boolean(extendTarget)}>
-          <BusinessForm scope="INSTEXTEND" form={extendForm} onFinish={submitExtend}>
+          <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INSTEXTEND" form={extendForm} onFinish={submitExtend}>
           <Typography.Paragraph type="secondary">
             新到期日必须晚于原到期日；逾期期次展期后回到 PENDING。
           </Typography.Paragraph>
-          <CfgItem name="new_due_on" label="新到期日" rules={[{ required: true, message: "请选择新到期日" }]}>
-            <Input placeholder="YYYY-MM-DD" />
+          <CfgItem name="new_due_on" label="新到期日" rules={[{ required: true, message: "请选择新到期日" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
           </CfgItem>
           <CfgItem name="reason" label="展期原因" rules={[{ required: true, message: "请填写展期原因" }]}>
             <Input.TextArea rows={2} />
@@ -365,7 +401,7 @@ export function ExtendModal({ controller }: { controller: ContractTableControlle
           <PermissionButton permission="order.update" type="primary" htmlType="submit" loading={write.pending}>
             确认展期
           </PermissionButton>
-        </BusinessForm>
+        </BusinessRegistrationForm>
         </FieldConfigScope>
       </Modal>
   );

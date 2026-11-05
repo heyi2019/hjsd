@@ -14,6 +14,9 @@
 .inventory-row-actions .ant-btn-link:hover { background: var(--soft); border-radius: var(--radius-compact); }
 .inventory-detail {
   width: min(100%, 1200px);
+  max-height: 36rem;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   box-sizing: border-box;
   margin: 0;
   padding: var(--space-4) 0;
@@ -42,7 +45,8 @@
 .inventory-detail .ant-table-wrapper {
   width: 100%;
   max-width: none;
-  overflow-x: clip;
+  /* 窄窗下允许横向滚动而非裁切右侧列（L202） */
+  overflow-x: auto;
   overflow-y: clip;
 }
 .inventory-detail__section > .ui-table-wrap {
@@ -53,8 +57,7 @@
   box-sizing: border-box;
   transform: none;
 }
-.inventory-detail__section > .ui-table-wrap.inventory-execution-table,
-.inventory-detail__section > .ui-table-wrap.inventory-finance-table {
+.inventory-detail__section > .ui-table-wrap.ui-datatable--inline {
   margin-inline: 0 !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -104,17 +107,17 @@
   box-sizing: border-box;
   border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
   border-radius: var(--radius-sm);
-  overflow-x: clip;
-  overflow-y: clip;
+  /* 窄窗下允许横向滚动而非裁切右侧列（L202） */
+  overflow-x: auto;
+  overflow-y: auto;
 }
 .inventory-execution-table .ant-table,
 .inventory-finance-table .ant-table {
   width: 100% !important;
-  min-width: 0 !important;
   table-layout: fixed;
 }
 .inventory-execution-table .ant-table-content,
-.inventory-finance-table .ant-table-content { overflow-x: clip !important; }
+.inventory-finance-table .ant-table-content { overflow-x: auto !important; }
 .inventory-execution-table th,
 .inventory-execution-table td,
 .inventory-finance-table th,
@@ -128,6 +131,14 @@
 .inventory-execution-table .ant-table-tbody > tr > td.ant-table-cell-fix-left { background: color-mix(in srgb, var(--glass) 84%, transparent); }
 .inventory-execution-table .ant-table-thead > tr > th.ant-table-cell-fix-left { background: color-mix(in srgb, var(--soft) 68%, transparent); }
 .inventory-execution-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
+/* 内联表视觉统一收进 .ui-datatable--inline（shared/styles/ui-components/tables.css）。
+   此处只保留详情页独有的布局补偿：抵消卡片内边距，让表格贴到卡片左右边缘。
+   注：详情页的金额表/执行表因 L202（窄窗横向滚动）仍使用 .inventory-finance-table /
+   .inventory-execution-table 自有规则，不套用 .ui-datatable--inline 的 clip 布局。 */
+.inventory-detail__section .ui-datatable--inline .ant-table-container {
+  margin-inline-start: calc(var(--space-5) * -2);
+  width: calc(100% + var(--space-5) * 2);
+}
 .inventory-finance-list { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
 .inventory-finance-list > .inventory-detail__meta { padding: var(--space-3); display: grid; gap: var(--space-3); }
 .inventory-execution-list > .inventory-detail__meta { padding: var(--space-3); }
@@ -142,8 +153,9 @@
   box-sizing: border-box;
   border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
   border-radius: var(--radius-sm);
-  overflow-x: clip;
-  overflow-y: clip;
+  /* 窄窗下允许横向滚动而非裁切右侧列（L202） */
+  overflow-x: auto;
+  overflow-y: auto;
 }
 .inventory-finance-table .ant-table-container { border: 0; border-radius: 0; overflow: hidden; }
 .inventory-finance-table .ant-table-thead > tr > th { background: color-mix(in srgb, var(--soft) 68%, transparent); color: var(--color-text-secondary); font-weight: 650; white-space: nowrap; }
@@ -152,15 +164,21 @@
 .inventory-finance-table .ant-table-tbody > tr > td.ant-table-cell-fix-left { background: color-mix(in srgb, var(--glass) 84%, transparent); }
 .inventory-finance-table .ant-table-thead > tr > th.ant-table-cell-fix-left { background: color-mix(in srgb, var(--soft) 68%, transparent); }
 .inventory-finance-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
-.inventory-finance-table__amount { display: grid; justify-items: end; gap: 2px; min-width: 100px; font-variant-numeric: tabular-nums; }
-.inventory-finance-table__amount .ui-money { font-weight: 700; }
+/* 金额单元格：右对齐 + 等宽数字，与上方汇总卡数值列对齐。 */
+.inventory-detail__cell-amount { display: grid; justify-items: end; gap: 2px; min-width: 100px; font-variant-numeric: tabular-nums; }
+.inventory-detail__cell-amount .ui-money { font-weight: 700; }
 /* 流水表字号对齐运营信息「作图」标签（--font-caption-2，12px）。 */
 .inventory-finance-table .ant-table-thead > tr > th,
 .inventory-finance-table .ant-table-tbody > tr > td { font-size: var(--fs-caption-2); }
 @media (--bp-sm) { .inventory-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (--bp-sm) {
   .inventory-table .ant-table-tbody > tr.ant-table-expanded-row > td { padding: var(--space-2) var(--space-3) !important; }
-  .inventory-detail { padding: var(--space-3) 0; }
+  .inventory-detail { max-height: 28rem; padding: var(--space-3) 0; }
   .inventory-detail__edit-grid, .inventory-edit-more__fields { grid-template-columns: 1fr; }
   .inventory-edit-more__note { grid-column: auto; }
 }
+/* 编辑态「时间联动」：订单创建 / 售出 / 流水三个锚点并排，窄屏单列。 */
+.inventory-time-shift__fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2) var(--space-3); }
+.inventory-time-shift__field { display: grid; gap: var(--space-1); min-width: 0; }
+.inventory-time-shift__field > span { font-size: var(--fs-caption-2); color: var(--color-text-secondary); }
+@media (--bp-sm) { .inventory-time-shift__fields { grid-template-columns: 1fr; } }

@@ -12,6 +12,8 @@ export const MANAGED_OPTION_FIELD_KEYS = [
   "supplier_source",
   "dg_customer_source",
 ];
+// 系统统一术语字段：显示名由业务口径固定，配置中心不允许改名（后端有同名校验兜底）。
+export const FIXED_LABEL_FIELD_KEYS = ["payment_pool_id"];
 export const CONDITION_OP_OPTIONS = [
   { value: "eq", label: "等于" },
   { value: "ne", label: "不等于" },

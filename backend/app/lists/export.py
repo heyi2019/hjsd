@@ -50,6 +50,31 @@ def detail_json(value: Any, value_labels: dict[str, dict[str, str]] | None = Non
     return json.dumps(translate(value), ensure_ascii=False, separators=(",", ":"), default=str)
 
 
+def inject_custom_columns(
+    rows: list[dict[str, Any]], config: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """把自定义列（`extra:{key}`）的值从行扩展字段平铺进明细行。
+
+    CSV 与 xlsx 导出共用同一份注入逻辑，避免两种格式的取值口径漂移。
+    """
+    custom_sources = {
+        column["key"]: column["source_key"]
+        for column in config["columns"]
+        if column.get("custom") and column.get("source_key")
+    }
+    if not custom_sources:
+        return list(rows)
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        extras = item.get("extra_values") or item.get("form_extra") or {}
+        if isinstance(extras, dict):
+            for key, source_key in custom_sources.items():
+                item[key] = extras.get(source_key)
+        items.append(item)
+    return items
+
+
 def build_list_csv(
     db: Session,
     scope_code: str,
@@ -59,6 +84,9 @@ def build_list_csv(
     extra_columns: list[tuple[str, str, bool]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """按 scope 的列配置把行 dict 列表拼成 CSV 文本。
+
+    CSV 一律**单行表头**：导入解析以首个非空行为表头，多行表头会让回流导入错位。
+    需要板块分组/合并表头时走 `lists.xlsx`（导出 Excel）。
 
     返回 `(csv_text, meta)`，meta 带 `column_count`（可见列数）与
     `translated_columns`（做了值翻译的列键），供审计记录使用。
@@ -71,19 +99,7 @@ def build_list_csv(
     ]
     if extra_columns:
         columns.extend(extra_columns)
-    custom_sources = {
-        column["key"]: column["source_key"]
-        for column in config["columns"]
-        if column.get("custom") and column.get("source_key")
-    }
-    items: list[dict[str, Any]] = []
-    for row in rows:
-        item = dict(row)
-        extras = item.get("extra_values") or item.get("form_extra") or {}
-        if isinstance(extras, dict):
-            for key, source_key in custom_sources.items():
-                item[key] = extras.get(source_key)
-        items.append(item)
+    items = inject_custom_columns(rows, config)
     report: dict[str, Any] = {"items": items}
     if total is not None:
         report["total"] = total

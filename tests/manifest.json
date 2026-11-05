@@ -1,0 +1,179 @@
+{
+  "version": 1,
+  "_doc": "测试体系唯一事实源。只存「应该收到多少」，不存文件名清单——第二份清单必然腐烂。文件集合永远扫磁盘。",
+  "regions": {
+    "system": "系统级（跨区域兜底）",
+    "workbench": "工作台",
+    "business": "业务中心",
+    "customer": "客户中心",
+    "finance": "资金中心",
+    "operations": "经营中心",
+    "settings": "设置",
+    "shared": "测试基建与跨区域守卫"
+  },
+  "layers": {
+    "backend": {
+      "root": "tests/backend",
+      "runner": "pytest",
+      "conftest": "tests/backend/conftest.py",
+      "report": "tests/backend/_report",
+      "kinds": [
+        "unit",
+        "integration"
+      ],
+      "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
+      "expected": {
+        "files": 117,
+        "cases": 1728,
+        "kinds": {
+          "unit": {
+            "files": 32,
+            "cases": 297,
+            "byArea": {
+              "business": 5,
+              "customer": 1,
+              "finance": 3,
+              "operations": 2,
+              "settings": 2,
+              "system": 19
+            }
+          },
+          "integration": {
+            "files": 85,
+            "cases": 1431,
+            "byArea": {
+              "business": 30,
+              "customer": 6,
+              "finance": 14,
+              "operations": 7,
+              "settings": 13,
+              "system": 15
+            }
+          }
+        },
+        "_baseline_note": "1676 是搬迁前基线（113 文件）；1684 = 1676 + test_manifest_parity.py 8 条。2026-11-05 补齐 3 个并发会话新增文件（共 32 例）入 GROUPS 后，磁盘 117 文件 / ci 全量收集 1728 例 = 1696 + 32，按实测对齐"
+      },
+      "budgets": {
+        "fast": 60,
+        "unit": 120,
+        "all": 600
+      }
+    },
+    "frontend": {
+      "root": "tests/frontend",
+      "runner": "vitest",
+      "config": "frontend/vitest.config.ts",
+      "expected": {
+        "files": 96,
+        "layers": {
+          "fast": 14,
+          "quick": 8,
+          "react": 58,
+          "deep": 16
+        },
+        "cases": {
+          "fast": 96,
+          "quick": 88,
+          "react": 761,
+          "deep": 124
+        },
+        "byArea": {
+          "unit": {
+            "workbench": 1,
+            "business": 8,
+            "settings": 2,
+            "shared": 9,
+            "system": 4
+          },
+          "module": {
+            "workbench": 6,
+            "business": 19,
+            "customer": 3,
+            "finance": 5,
+            "operations": 7,
+            "settings": 15,
+            "shared": 7,
+            "system": 10
+          }
+        },
+        "_baseline_note": "93 是搬迁前基线；94 = 93 + 新增 manifest-parity.test.ts（6 条用例）。2026-11-04 前端测试整体迁入 tests/frontend/{unit,module}/<区域>/。本次改动前 HEAD 已有 95 个测试文件但 expected 仍记 94（守卫本来就是红的，非本次引入）；本次新增 InventoryPanel.delete.test.tsx 后按实际扫描对齐为 96 / react 58 / module.business 19。StocksApiRoutes.test.ts 与新增文件共 +5 例，cases.react 只按本轮增量记 761，HEAD 遗留那 1 个文件的用例数待下次全量基线刷新；baseline 两块是 2026-11-04 时点实测，保持原值不动。",
+        "root_layout": "tests/frontend/<unit|module>/<区域>/",
+        "baseline": {
+          "_doc": "2026-11-04 搬迁后实测（同机同代码）。cpu = user+sys，跨会话可比；wall 受并发会话干扰。",
+          "fast": {
+            "files": 14,
+            "cases": 96,
+            "wall": 7.3
+          },
+          "quick": {
+            "files": 8,
+            "cases": 88,
+            "wall": 27.2
+          },
+          "react": {
+            "files": 56,
+            "cases": 756,
+            "wall": 119.7,
+            "cpu": 462.0
+          },
+          "deep": {
+            "files": 16,
+            "cases": 124,
+            "wall": 45.8
+          },
+          "full_default_wall": 154.23
+        }
+      },
+      "budgets": {
+        "fast": 60,
+        "quick": 150,
+        "react": 600,
+        "deep": 600
+      },
+      "baseline": {
+        "_doc": "2026-11-04 搬迁前实测。react 的 cpu 字段 = user+sys，是跨会话可比口径；wall 受并发会话干扰可达 20%。",
+        "react": {
+          "files": 56,
+          "cases": 756,
+          "wall": 133.92,
+          "cpu": 468.1
+        },
+        "fast_quick": {
+          "files": 21,
+          "cases": 176,
+          "wall": 25.74
+        }
+      }
+    },
+    "e2e": {
+      "root": "tests/e2e",
+      "runner": "playwright",
+      "config": "frontend/playwright.config.ts",
+      "expected": {
+        "files": 15,
+        "cases": 62,
+        "byArea": {
+          "system": 7,
+          "business": 1,
+          "finance": 1,
+          "cross": 6
+        }
+      },
+      "budgets": {
+        "full": 300
+      }
+    }
+  },
+  "fixtures": "tests/fixtures",
+  "regionByCode": {
+    "A": "workbench",
+    "B": "business",
+    "C": "customer",
+    "D": "finance",
+    "E": "operations",
+    "F": "settings",
+    "SYS": "system",
+    "shared": "shared"
+  },
+  "_regionDoc": "目录名用区域全名（tests/backend/<kind>/<区域>/）；功能编号仍用字母前缀（A..F/SYS），映射见 regionByCode。"
+}

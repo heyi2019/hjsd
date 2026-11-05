@@ -1,5 +1,5 @@
 import { appMessage } from "../../shared/ui/appFeedback";
-import { Form, Input, InputNumber, Popconfirm, Space, Switch, Tooltip, Typography } from "antd";
+import { Form, Input, InputNumber, Space, Switch, Tooltip, Typography } from "antd";
 import type { InputRef } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,12 +8,13 @@ import { normalizeError } from "../../shared/api/client";
 import { FIELD_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { buildGroupedScopeOptions, useFormScopes } from "../formScopes";
-import { BusinessForm, ConfirmButton, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
+import { BusinessRegistrationForm, ConfirmButton, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 import "./OrderFormFieldsPanel.css";
 import {
   CONDITION_OP_OPTIONS,
   DEFAULT_SECTION_ORDER,
   FIELD_SECTION_OPTIONS,
+  FIXED_LABEL_FIELD_KEYS,
   FLOW_DIRECTION_OPTIONS,
   MANAGED_OPTION_FIELD_KEYS,
   OPTION_FIELD_TYPES,
@@ -63,6 +64,8 @@ export function useOrderFormFieldsPanelController({
   const editorSection = Form.useWatch("section", form);
   const needsOptions = OPTION_FIELD_TYPES.includes(fieldType as string);
   const managedOptionField = MANAGED_OPTION_FIELD_KEYS.includes(editingField?.field_key ?? "");
+  // 系统统一术语字段（如资金账户）：名称必须全站一致，配置中心只读展示、不可改名。
+  const fixedLabelField = FIXED_LABEL_FIELD_KEYS.includes(editingField?.field_key ?? "");
   const orderedSectionOptions = useMemo(() => {
     const ordered = [...sectionOrder];
     return ordered.map((value) => {
@@ -378,28 +381,26 @@ export function useOrderFormFieldsPanelController({
             >
               {row.is_active ? "停用" : "启用"}
             </ConfirmButton>
-            <Tooltip title={!row.is_custom ? "预置字段不可删除（仅自定义字段可删）" : undefined}>
-              <span>
-                <Popconfirm
-                  title={`删除字段「${row.label}」`}
-                  description="删除后不可恢复；自定义字段的历史值仍保留在订单 form_extra 中。"
-                  onConfirm={async () => {
-                    try {
+              <Tooltip title={!row.is_custom ? "预置字段不可删除（仅自定义字段可删）" : undefined}>
+                <span>
+                  <ConfirmButton
+                    permission="field-definition.manage"
+                    size="small"
+                    danger
+                    disabled={!row.is_custom}
+                    title={`删除字段「${row.label}」`}
+                    description="删除后不可恢复；自定义字段的历史值仍保留在订单 form_extra 中。"
+                    okText="确认删除"
+                    onConfirm={async () => {
                       await orderFormFieldsApi.remove(row.id);
                       appMessage.success("字段已删除");
                       await load(activeType);
-                    } catch (err) {
-                      // 顶部 ErrorBanner 语义是「加载失败」，操作失败需即时可见
-                      appMessage.error(normalizeError(err).message);
-                    }
-                  }}
-                >
-                  <PermissionButton permission="field-definition.manage" size="small" danger disabled={!row.is_custom}>
+                    }}
+                  >
                     删除
-                  </PermissionButton>
-                </Popconfirm>
-              </span>
-            </Tooltip>
+                  </ConfirmButton>
+                </span>
+              </Tooltip>
           </Space>
         </PermissionGate>
       ),
@@ -408,7 +409,7 @@ export function useOrderFormFieldsPanelController({
 
   const editorForm = (
     <PermissionGate permission="field-definition.manage">
-      <BusinessForm
+      <BusinessRegistrationForm
         form={form}
         id={editorFormId}
         layout="inline"
@@ -416,11 +417,17 @@ export function useOrderFormFieldsPanelController({
         className="ui-form-spaced"
         initialValues={{ field_type: "TEXT", sort_order: 0, section: "EXTRA" }}
       >
-        <Form.Item name="field_key" label="字段键" rules={[{ required: true }]}>
+        <Form.Item name="field_key" label="字段键" rules={[{ required: true }, { pattern: /^[a-z][a-z0-9_]*$/, message: "仅支持小写字母与下划线，且以小写字母开头" }]}>
           <Input placeholder="小写下划线，如 vip_tag" disabled={editingId !== null} />
         </Form.Item>
-        <Form.Item name="label" label="标签" rules={[{ required: true }]}>
-          <Input placeholder="页面显示名" />
+        <Form.Item
+          name="label"
+          label="标签"
+          rules={[{ required: true }]}
+          tooltip={fixedLabelField ? "系统统一术语，字段名称不可修改" : undefined}
+          extra={fixedLabelField ? "系统统一术语，全站统一显示，不可改名" : undefined}
+        >
+          <Input placeholder="页面显示名" disabled={fixedLabelField} />
         </Form.Item>
         <Form.Item name="field_type" label="类型">
           <Select options={editorFieldTypeOptions} className="ui-control-width-180" disabled={editingId !== null} />
@@ -544,7 +551,7 @@ export function useOrderFormFieldsPanelController({
             <PermissionButton permission="field-definition.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
           </Form.Item>
         )}
-      </BusinessForm>
+      </BusinessRegistrationForm>
     </PermissionGate>
   );
 

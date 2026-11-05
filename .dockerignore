@@ -1,5 +1,6 @@
 # 前端构建上下文为项目根（docker-compose.yml -> frontend build context: ..）
 # 此处排除的内容不会被打入构建上下文，既缩小上传体积，也避免误拷宿主机依赖。
+node_modules
 frontend/node_modules
 frontend/dist
 frontend/test-results

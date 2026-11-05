@@ -159,7 +159,7 @@ def _rebate_base_from_snapshot(
     口径复用 app/orders/amounts.py（与报表同源）：
     - GROSS：卖出收入合计（成交额）
     - PRINCIPAL：买入成本合计（本金）
-    - PROFIT：收入 - 买入成本 - 直接费用
+    - PROFIT：该订单所有收入 - 所有支出，收入含返点、支出含坏账（见 orders/amounts.py）
 
     规则未声明 base 时返回 None，由调用方按「base_amount 必填」报错，不静默兜底。
     """

@@ -6,30 +6,88 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 from app.core.audit import record_audit
 from app.core.security import CurrentUser
+from app.foundation import service as foundation_service
 from app.orders.form_fields import validate_form_extra
 from app.parties import service as parties_service
+from app.policy import service as policy_service
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import Validation
 from app.domain.trade import (
+    Cashflow,
     Order,
     OrderEvent,
 )
 from app.domain.enums import (
     AuditAction,
+    PolicyType,
 )
 
-from .cancellation_model import cancel_order  # re-exported through orders.service
 from ._shared import (
     _audit_value,
     get_order,
 )
 
 _UNSET = object()
+
+
+def _shift_accounting_dates(
+    session: Session,
+    order: Order,
+    *,
+    actor: str,
+    new_trade_date: date,
+) -> dict[str, int]:
+    """成交日期变更时按天数差平移账期，并按新成交日重取规则快照。
+
+    用「天数差」而不是把每个 occurred_on 统一改成新日期：保留事件之间的相对
+    时间关系（成交日后第 3 天的收款，改日期后仍是第 3 天）。
+    分期合约的 first_due_on / 期次 due_on 属客户还款计划，不随单据日期平移。
+    """
+    delta = (new_trade_date - order.trade_date).days
+    shift = timedelta(days=delta)
+    events = session.scalars(
+        select(OrderEvent).where(OrderEvent.order_id == order.id)
+    ).all()
+    flows = session.scalars(
+        select(Cashflow).where(Cashflow.order_id == order.id)
+    ).all()
+    for event in events:
+        event.occurred_on = event.occurred_on + shift
+        event.updated_by = actor
+    for flow in flows:
+        flow.occurred_on = flow.occurred_on + shift
+        flow.updated_by = actor
+
+    definition = foundation_service.get_order_type_by_code(session, order.order_type)
+    if definition is not None:
+        snapshot: dict[str, Any] = {}
+        primary_version_id: int | None = None
+        for code in (PolicyType.REBATE.value, PolicyType.COMMISSION.value):
+            version_id, snap = policy_service.make_snapshot(
+                session,
+                policy_code=code,
+                on=new_trade_date,
+                scope_type="ORDER_TYPE",
+                scope_id=definition.id,
+            )
+            if snap is None:
+                continue
+            snapshot[code] = snap
+            if primary_version_id is None:
+                primary_version_id = version_id
+        order.policy_version_id = primary_version_id
+        order.policy_snapshot = snapshot or None
+    return {
+        "shifted_days": delta,
+        "shifted_events": len(events),
+        "shifted_cashflows": len(flows),
+    }
+
 
 def update_order(
     session: Session,
@@ -45,16 +103,15 @@ def update_order(
 ) -> Order:
     """受控编辑订单主字段。
 
-    订单一旦存在已登记事件，核算字段只能通过事件冲销/更正处理；备注仍可补充。
-    订单编号、业务类型、库存账号关联和状态属于不可编辑的身份字段。
+    成交日期随时可改：改日期时按天数差平移本单全部事件与资金流水的 occurred_on，
+    并按新成交日重取返点/提成规则快照，保证账期与规则口径一致。
+    账号快照、订单编号、业务类型、库存账号关联和状态仍属不可编辑字段。
     """
     order = get_order(session, order_id, user)
     if trade_date is not _UNSET and trade_date is None:
         raise Validation("订单日期不能清空", details={"field": "trade_date"})
-    accounting_changes = (
-        trade_date,
-        account_snapshot,
-    )
+    # trade_date 已放开：不再受「已有登记事件」限制，改日期在下方联动平移账期。
+    accounting_changes = (account_snapshot,)
     if any(value is not _UNSET for value in accounting_changes):
         posted = session.scalar(
             select(OrderEvent.id).where(
@@ -63,7 +120,7 @@ def update_order(
             )
         )
         if posted is not None:
-            raise Validation("已有登记事件的订单只能修改备注，核算字段必须通过冲销/更正")
+            raise Validation("已有登记事件的订单不能修改账号快照，核算数据须通过冲销/更正")
 
     if account_snapshot is not _UNSET and account_snapshot is not None:
         raise Validation("订单账号快照当前不支持")
@@ -72,7 +129,13 @@ def update_order(
         "trade_date": order.trade_date,
         "account_snapshot": order.account_snapshot,
         "note": order.note,
+        "policy_version_id": order.policy_version_id,
     }
+    shift_info: dict[str, int] = {}
+    if trade_date is not _UNSET and trade_date != order.trade_date:
+        shift_info = _shift_accounting_dates(
+            session, order, actor=actor, new_trade_date=trade_date  # type: ignore[arg-type]
+        )
     if trade_date is not _UNSET:
         order.trade_date = trade_date
     if account_snapshot is not _UNSET:
@@ -103,6 +166,8 @@ def update_order(
             "trade_date": order.trade_date,
             "account_snapshot": order.account_snapshot,
             "note": order.note,
+            "policy_version_id": order.policy_version_id,
+            **shift_info,
         }),
     )
     return order

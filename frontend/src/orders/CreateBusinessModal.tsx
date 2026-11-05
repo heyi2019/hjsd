@@ -1,4 +1,4 @@
-import { appMessage, appModal } from "../shared/ui/appFeedback";
+import { appMessage } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form } from "antd";
 import dayjs from "dayjs";
@@ -19,7 +19,7 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
-import { BusinessActionModal, BusinessForm, ErrorBanner, PermissionButton } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, ConfirmDialog, ErrorBanner, PermissionButton } from "../shared/ui";
 import { RecoveryAccountSection } from "./recovery/RecoveryAccountSection";
 import { RecoveryCustomerSection } from "./recovery/RecoveryCustomerSection";
 import { RecoveryFeeSection } from "./recovery/RecoveryFeeSection";
@@ -65,6 +65,10 @@ export function CreateBusinessModal(props: {
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
+  const repurchaseConfirmedFor = useRef<string | null>(null);
+  const [repurchasePrompt, setRepurchasePrompt] = useState<{ values: Record<string, unknown>; gameAccount: string } | null>(null);
+  const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
+  const initialValuesRef = useRef<Record<string, unknown>>({});
   const { totalRecoveryCost } = useRecoveryFormState(form);
   const formId = "business-order-form";
   // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
@@ -74,7 +78,10 @@ export function CreateBusinessModal(props: {
   // 关闭弹窗即清空表单：antd Form 默认 preserve=true，destroyOnHidden 只销毁 DOM 不丢表单实例值，
   // 仅成功路径显式 resetFields；取消/点遮罩关闭会残留上次输入，故在 open 变 false 时统一 reset。
   useEffect(() => {
-    if (!props.open) form.resetFields();
+    if (!props.open) {
+      form.resetFields();
+      repurchaseConfirmedFor.current = null;
+    }
   }, [props.open, form]);
 
   // 基础数据随页面挂载即预热并常驻内存：后续每次打开弹窗直接读 state，不再发网络请求。
@@ -113,18 +120,23 @@ export function CreateBusinessModal(props: {
       defaults.customer_role = "SELLER";
       defaults.counterparty_role = "PEER";
     }
-    if (isTh) defaults.supplier_source = "氪金联盟";
     const defaultGameType = gameTypes.find((item) => item.is_default)?.name;
     const gameTypeField = "game_type";
     if (defaultGameType && form.getFieldValue(gameTypeField) == null) {
       defaults[gameTypeField] = defaultGameType;
     }
     form.setFieldsValue(defaults);
+    // 以「打开瞬间」的表单值为脏判定基线：仅打开下拉再收起不算脏（P2-198）。
+    initialValuesRef.current = form.getFieldsValue(true);
   }, [form, gameTypes, isRecovery, isTh, orderType, props.open]);
 
   const submit = async (values: Record<string, unknown>) => {
     setSubmitting(true);
     try {
+      const gameAccount = String(values.game_account ?? "").trim();
+      // 判重已后移到后端（POST /orders）：未售出重复由后端返回 INVENTORY_ACCOUNT_IN_STOCK
+      // 并在 game_account 字段上提示；已售出重复返回 REPURCHASE_CONFIRM_REQUIRED，
+      // 由确认弹窗决定是否按复购回流继续。前端不再拉库存台账自行比对。
       const formExtra = (values.form_extra as Record<string, unknown> | undefined) ?? {};
       const accountExtraKeys = new Set(
         Object.values(config)
@@ -142,6 +154,13 @@ export function CreateBusinessModal(props: {
           ? values[key].filter((id): id is number => typeof id === "number")
           : [];
         if (responsibleIds.length > 0) orderFormExtra[key] = responsibleIds;
+      }
+      // 交付信息随订单持久化：交易平台 / 中介类型 / 包赔类型 / 手机号绑定人。
+      // 与 delivery_responsible_ids 同口径写入 form_extra，供订单详情回显
+      // （账号实体与 account_snapshot 均未回传 bound_phone_owner，详情改读 extra_values）。
+      for (const key of ["intermediary_platform", "intermediary_type", "compensation_type", "bound_phone_owner"]) {
+        const v = values[key];
+        if (v !== undefined && v !== null && v !== "") orderFormExtra[key] = v;
       }
       const customerPrefix = isDg ? "dg_" : "";
       const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
@@ -233,10 +252,22 @@ export function CreateBusinessModal(props: {
           bound_phone: values.bound_phone as string | undefined,
           bound_phone_owner: values.bound_phone_owner as string | undefined,
           has_secondary: values.has_secondary === "有" ? true : values.has_secondary === "无" ? false : undefined,
+          // 二次图片只在「有二次」时随号入库；无二次时表单残留不提交。
+          secondary_images: values.has_secondary === "有"
+            ? ((values.secondary_images as string[] | undefined)?.length ? values.secondary_images as string[] : undefined)
+            : undefined,
+          wallet_realname: values.wallet_realname as string | undefined,
+          // 钱包实名注销佐证图：仅「已注销」时随号入库。
+          wallet_realname_images: values.wallet_realname === "已注销"
+            ? ((values.wallet_realname_images as string[] | undefined)?.length ? values.wallet_realname_images as string[] : undefined)
+            : undefined,
+          camp_account: values.camp_account as string | undefined,
           note: values.game_account_note as string | undefined,
           extra_values: Object.keys(accountExtraValues).length ? accountExtraValues : undefined,
         },
         account_id: undefined,
+        // 后端判重：仅当用户已确认复购回流时，同一「已售出」账号才放行。
+        confirm_repurchase: repurchaseConfirmedFor.current === gameAccount,
         note,
         customer_roles: customerRoles,
         counterparty_roles: counterpartyId
@@ -260,27 +291,35 @@ export function CreateBusinessModal(props: {
       form.resetFields();
       void Promise.resolve(props.onCreated()).catch(() => undefined);
     } catch (error) {
-      setLoadError(normalizeError(error));
+      const normalized = normalizeError(error);
+      if (normalized.code === "INVENTORY_ACCOUNT_IN_STOCK") {
+        // 未售出重复属硬阻止：字段标红 + 页面级提示，不提供复购确认入口。
+        form.setFields([{ name: "game_account", errors: [normalized.message] }]);
+        setLoadError(normalized);
+        return;
+      }
+      if (normalized.code === "REPURCHASE_CONFIRM_REQUIRED") {
+        form.setFields([{ name: "game_account", errors: [normalized.message] }]);
+        setRepurchasePrompt({ values, gameAccount: String(values.game_account ?? "").trim() });
+        return;
+      }
+      setLoadError(normalized);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
+    <>
     <BusinessActionModal
       title={<span className="resizable-modal__drag-handle">{modalTitle}</span>}
+      fieldCount={21}
       open={props.open}
       onCancel={() => {
-        if (form.isFieldsTouched()) {
-          appModal.confirm({
-            title: "放弃未保存的建单内容？",
-            content: "表单已填写但未提交，关闭后将丢失本次输入。",
-            className: "heijin-fast-confirm",
-            okText: "放弃",
-            cancelText: "继续编辑",
-            okButtonProps: { danger: true },
-            onOk: () => props.onClose(),
-          });
+        const currentValues = form.getFieldsValue(true);
+        const isDirty = JSON.stringify(currentValues) !== JSON.stringify(initialValuesRef.current);
+        if (isDirty) {
+          setAbandonConfirmOpen(true);
         } else {
           props.onClose();
         }
@@ -293,14 +332,15 @@ export function CreateBusinessModal(props: {
       width={1200}
     >
       <ErrorBanner error={loadError} />
-      <BusinessForm
+      <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }}
         scope={orderType}
         form={form}
         id={formId}
-        layout="horizontal"
         scrollToFirstError
-        labelCol={{ flex: "0 0 96px" }}
-        wrapperCol={{ flex: "1 1 auto" }}
         onFinish={submit}
         onValuesChange={(changed) => {
           const clear: Record<string, undefined> = {};
@@ -316,9 +356,7 @@ export function CreateBusinessModal(props: {
           order_type: props.initialOrderType,
           ...(isRecovery
             ? { customer_role: "SELLER", counterparty_role: "PEER" }
-            : isTh
-              ? { supplier_source: "氪金联盟" }
-              : {}),
+            : {}),
         }}
       >
         <FieldConfigContext.Provider value={config}>
@@ -330,7 +368,39 @@ export function CreateBusinessModal(props: {
             <CustomFieldSection section="EXTRA" testIdSuffix="extra" />
           </SectionLabelsContext.Provider>
         </FieldConfigContext.Provider>
-      </BusinessForm>
+      </BusinessRegistrationForm>
     </BusinessActionModal>
+    {/* 确认框必须渲染在业务弹窗「外侧」（与它同级），不能作为其 children。
+        嵌在 children 里时，主弹窗一旦 open=false，嵌套 Modal 的关闭渲染会被跳过：
+        DOM 卡在可见状态，而 state 已是 false —— 之后点 X / 取消 都是幂等 setState，
+        React 直接 bail out 不重渲染，表现为「弹窗看得见但怎么都关不掉」。 */}
+    <ConfirmDialog
+      open={Boolean(repurchasePrompt)}
+      title="检测到重复游戏账号"
+      description={`历史账号「${repurchasePrompt?.gameAccount ?? ""}」已售出，可作为复购回流重新入库。请确认是否继续建单。`}
+      okText="是，继续建单"
+      cancelText="否，返回修改"
+      onConfirm={async () => {
+        const prompt = repurchasePrompt;
+        if (!prompt) return;
+        repurchaseConfirmedFor.current = prompt.gameAccount;
+        form.setFields([{ name: "game_account", errors: [] }]);
+        setLoadError(null);
+        setRepurchasePrompt(null);
+        await submit(prompt.values);
+      }}
+      onCancel={() => setRepurchasePrompt(null)}
+    />
+    <ConfirmDialog
+      open={abandonConfirmOpen}
+      title="放弃未保存的建单内容？"
+      description="表单已填写但未提交，关闭后将丢失本次输入。"
+      okText="放弃"
+      cancelText="继续编辑"
+      danger
+      onConfirm={async () => { setAbandonConfirmOpen(false); props.onClose(); }}
+      onCancel={() => setAbandonConfirmOpen(false)}
+    />
+    </>
   );
 }

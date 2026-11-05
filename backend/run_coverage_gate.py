@@ -11,7 +11,7 @@ fail_under 是全局单阈值，无法表达按业务域保存基线、只拦截
 故解析 `coverage json` 按包聚合后逐包与版本化基线比较。
 
 用法：
-    python3 run_coverage_gate.py            # 跑全量 tests/v1 + 校验闸门（CI/收口用）
+    python3 run_coverage_gate.py            # 跑全量 tests/backend + 校验闸门（CI/收口用）
     python3 run_coverage_gate.py --report   # 只打印当前覆盖率，不失败（本地巡检用）
 
 与既有纪律一致：
@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -29,15 +30,18 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parent
 PY = sys.executable  # 与当前解释器同环境（应在 .venv 内）
 
-# 四域闸门阈值：包前缀 -> 允许的最大缺失行数
-GATES = {
-    "app/foundation": 0,
-    "app/core": 0,
-    "app/reporting": 0,
-    "app/finance": 7,
-}
+# 受闸门保护的四个业务域。阈值**不在这里**——一律读 coverage_baseline.json 的
+# max_missing。此前这里曾写成 {域: 允许缺失数} 的字面量，取值 0/0/0/7 与基线
+# (1/0/22/41) 长期不一致，被 load_gates() 整个覆盖掉却仍被读码者当成真实上限
+# （审计报告反复记成「finance 容 7 行」）。改成纯域名元组，杜绝这种误读。
+DOMAINS = (
+    "app/foundation",
+    "app/core",
+    "app/reporting",
+    "app/finance",
+)
 
-FULL_SUITE = ["tests/v1"]
+FULL_SUITE = ["../tests/backend"]
 COV_JSON = BACKEND / "coverage.json"
 BASELINE_JSON = BACKEND / "coverage_baseline.json"
 
@@ -51,7 +55,7 @@ def load_gates() -> dict[str, int]:
     if not isinstance(packages, dict):
         raise RuntimeError("覆盖率基线格式错误：缺少 packages 对象")
     gates: dict[str, int] = {}
-    for package in GATES:
+    for package in DOMAINS:
         item = packages.get(package)
         if not isinstance(item, dict) or not isinstance(item.get("max_missing"), int):
             raise RuntimeError(f"覆盖率基线格式错误：缺少 {package}.max_missing")
@@ -61,7 +65,10 @@ def load_gates() -> dict[str, int]:
 
 def _run(cmd: list[str]) -> None:
     print("+ " + " ".join(cmd), flush=True)
-    subprocess.run(cmd, cwd=BACKEND, check=True)
+    # 不注入 DATABASE_URL：测试夹具强制要求 PostgreSQL 且库名必须含 test
+    # （见 tests/backend/conftest.py::_test_database_url），注入 SQLite 会让整套测试
+    # 在 collect 期直接 exit。库地址由 .env（本地）或 CI 环境变量指定。
+    subprocess.run(cmd, cwd=BACKEND, env=os.environ.copy(), check=True)
 
 
 def collect_coverage() -> Path:
@@ -78,13 +85,13 @@ def aggregate(cov_json: Path) -> dict[str, dict[str, int]]:
     """按包前缀聚合语句数与缺失行数。"""
     data = json.loads(cov_json.read_text(encoding="utf-8"))
     agg: dict[str, dict[str, int]] = {
-        pkg: {"statements": 0, "missing": 0} for pkg in GATES
+        pkg: {"statements": 0, "missing": 0} for pkg in DOMAINS
     }
     for path, info in data.get("files", {}).items():
         summary = info.get("summary", {})
         num = summary.get("num_statements", 0)
         miss = summary.get("missing_lines", 0)
-        for pkg in GATES:
+        for pkg in DOMAINS:
             if path == pkg or path.startswith(pkg + "/"):
                 agg[pkg]["statements"] += num
                 agg[pkg]["missing"] += miss

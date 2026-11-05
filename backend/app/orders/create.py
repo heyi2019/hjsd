@@ -29,6 +29,7 @@ from app.domain.trade import (
     OrderFormField,
 )
 from app.domain.enums import (
+    AccountStatus,
     AuditAction,
     CapitalType,
     CommissionMode,
@@ -46,6 +47,60 @@ from ._shared import (
     get_order,
 )
 
+
+def _assert_no_duplicate_inventory_account(
+    session: Session,
+    *,
+    game_account: str,
+    game_type: str | None,
+    confirm_repurchase: bool,
+) -> None:
+    """建单判重：同一游戏账号 + 游戏类型不得重复进入库存。
+
+    口径（原前端建单弹窗的逻辑，现由后端统一判定）：
+
+    - 已有**未售出**账号（除 ``SOLD`` / ``VOID`` 外的任何状态）→ 直接拒绝；
+    - 仅**已售出**记录 → 视为复购回流，需 ``confirm_repurchase`` 显式确认；
+    - ``VOID``（已取消/作废）不参与判重，取消后可用同一账号重新建单。
+
+    缺 ``game_type`` 时无法精确匹配，跳过判重（与前端原口径一致）。
+    """
+    if not game_type:
+        return
+    rows = list(
+        session.scalars(
+            select(Account).where(
+                Account.game_account == game_account,
+                Account.game_type == game_type,
+                Account.status != AccountStatus.VOID.value,
+            )
+        ).all()
+    )
+    if not rows:
+        return
+    unsold = [row for row in rows if row.status != AccountStatus.SOLD.value]
+    reported = unsold or rows
+    details = {
+        "field": "game_account",
+        "game_account": game_account,
+        "game_type": game_type,
+        "account_ids": [row.id for row in reported],
+        "stock_nos": [row.stock_no for row in reported],
+    }
+    if unsold:
+        raise Validation(
+            f"已有未售出库存账号「{game_account}」，请先售出后再建单",
+            code=ErrorCode.INVENTORY_ACCOUNT_IN_STOCK,
+            details=details,
+        )
+    if not confirm_repurchase:
+        raise Validation(
+            f"历史库存账号「{game_account}」已售出，请确认是否为复购回流订单",
+            code=ErrorCode.REPURCHASE_CONFIRM_REQUIRED,
+            details=details,
+        )
+
+
 def create_order(
     session: Session,
     *,
@@ -54,6 +109,7 @@ def create_order(
     account_snapshot: dict[str, Any] | None = None,
     actor: str,
     account_id: int | None = None,
+    confirm_repurchase: bool = False,
     owner_id: int | None = None,
     capital_type: str | None = None,
     note: str | None = None,
@@ -219,17 +275,33 @@ def create_order(
 
     # 快照是建单和内联建库的单一事实源；订单行只落快照，不再写平铺列。
     game_account = game_type = game_password = channel_region = None
-    bound_phone = account_note = None
+    camp_account = None
+    secondary_images = None
+    wallet_realname_images = None
+    bound_phone = account_note = wallet_realname = None
     has_secondary = None
     if account_snapshot is not None and definition.code in {"HS", "TH", "DG"}:
         snap = account_snapshot
         game_account = snap["game_account"]
         game_type = snap.get("game_type")
         game_password = snap.get("game_password")
+        camp_account = snap.get("camp_account")
         channel_region = snap.get("channel_region")
         bound_phone = snap.get("bound_phone")
         has_secondary = snap.get("has_secondary")
+        secondary_images = snap.get("secondary_images")
+        wallet_realname = snap.get("wallet_realname")
+        wallet_realname_images = snap.get("wallet_realname_images")
         account_note = snap.get("note")
+
+    # 建单判重：只在新建库存账号时判，引用已有账号（如库存寄售上架）不判。
+    if account_id is None and game_account:
+        _assert_no_duplicate_inventory_account(
+            session,
+            game_account=game_account,
+            game_type=game_type,
+            confirm_repurchase=confirm_repurchase,
+        )
 
     # 内联建库存账号（2026-10-28 口径）：建单成功即生成库存编号，不再等 BUY 事件。
     # HS/TH/DG 内联建库必须有账号快照；已有 account_id 的订单直接引用库存账号。
@@ -238,6 +310,9 @@ def create_order(
             session, order_type=definition.code, game_account=game_account, actor=actor,
             game_type=game_type, game_password=game_password, channel_region=channel_region,
             bound_phone=bound_phone, has_secondary=has_secondary, account_note=account_note,
+            wallet_realname=wallet_realname, camp_account=camp_account,
+            secondary_images=secondary_images,
+            wallet_realname_images=wallet_realname_images,
             extra_values=(account_snapshot or {}).get("extra_values"),
         ).id
 
@@ -246,15 +321,28 @@ def create_order(
             session, order_type=definition.code, game_account=game_account, actor=actor,
             game_type=game_type, game_password=game_password, channel_region=channel_region,
             bound_phone=bound_phone, has_secondary=has_secondary, account_note=account_note,
+            wallet_realname=wallet_realname, camp_account=camp_account,
+            secondary_images=secondary_images,
+            wallet_realname_images=wallet_realname_images,
             extra_values=(account_snapshot or {}).get("extra_values"),
         ).id
 
+    # 二次图片是账号私有资料（data URL 体积大），只入库存账号，不复制进订单快照。
+    order_account_snapshot = account_snapshot
+    if account_snapshot is not None and (
+        "secondary_images" in account_snapshot or "wallet_realname_images" in account_snapshot
+    ):
+        order_account_snapshot = {
+            key: value
+            for key, value in account_snapshot.items()
+            if key not in {"secondary_images", "wallet_realname_images"}
+        }
     order = Order(
         order_no=foundation_service.next_order_no(session, definition),
         order_type=definition.code,
         capital_type=selected_capital_type,
         trade_date=trade_date,
-        account_snapshot=account_snapshot,
+        account_snapshot=order_account_snapshot,
         account_id=account_id,
         status=OrderStatus.ACTIVE.value,
         policy_version_id=primary_version_id,

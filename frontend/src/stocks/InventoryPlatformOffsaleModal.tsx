@@ -1,11 +1,12 @@
-import { DatePicker, Form, Input, Table } from "antd";
+import { DatePicker, Form, Input } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { ordersApi, type Account, type AccountExecutionOrder } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { appMessage } from "../shared/ui/appFeedback";
-import { BusinessActionModal, CompactActions, BusinessForm, ErrorBanner, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
+import { consignmentPlatform, isActiveConsignmentListing } from "./consignment-logic";
 
 export type ActiveConsignment = {
   orderId: number;
@@ -24,11 +25,11 @@ function minute(value: string | null | undefined) {
 
 export function consignmentRecords(orders: AccountExecutionOrder[]): ActiveConsignment[] {
   return orders
-    .filter((order) => order.order_type === "DG" && order.status !== "CANCELLED")
+    .filter(isActiveConsignmentListing)
     .map((order) => ({
       orderId: order.order_id,
       orderNo: order.order_no,
-      platform: String(order.extra_values?.consignment_platform ?? order.account_platform ?? order.counterparties?.filter((party) => party.role === "PLATFORM").map((party) => party.display_name).join("、") ?? "-"),
+      platform: consignmentPlatform(order) ?? "-",
       listedAt: minute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date)),
     }));
 }
@@ -118,7 +119,11 @@ export function InventoryPlatformOffsaleModal(props: {
       <ErrorBanner error={error} />
       <p className="muted">选择寄售平台时只取消对应平台的上架记录；选择本系统时按 ERP 出库处理，账号退出库存中心。</p>
       <FieldConfigContext.Provider value={config}>
-        <BusinessForm scope="INVOID" form={form} layout="horizontal" labelAlign="left" labelCol={{ flex: "108px" }} wrapperCol={{ flex: "auto" }} onFinish={submit}>
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="INVOID" form={form} onFinish={submit}>
           <CfgItem name="order_id" label="下架平台" rules={[{ required: true, message: "请选择下架平台" }]}>
             <Select
               aria-label="下架平台"
@@ -134,15 +139,19 @@ export function InventoryPlatformOffsaleModal(props: {
             <Input aria-label="下架原因" placeholder="请输入平台下架原因" />
           </CfgItem>
           <CustomFieldSection testIdSuffix="inv-platform-offsale" />
-        </BusinessForm>
+        </BusinessRegistrationForm>
       </FieldConfigContext.Provider>
-      <Table
+      <DataTable
         size="small"
         pagination={false}
         rowKey="orderId"
-        dataSource={displayRecords}
+        rows={displayRecords}
+        page={1}
+        pageSize={10}
+        total={displayRecords.length}
+        onPageChange={() => undefined}
+        emptyText="暂无可下架的平台"
         columns={[{ title: "上架平台", dataIndex: "platform" }, { title: "上架时间", dataIndex: "listedAt" }]}
-        locale={{ emptyText: "暂无可下架的平台" }}
       />
     </BusinessActionModal>
   );

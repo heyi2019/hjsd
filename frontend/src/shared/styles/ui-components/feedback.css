@@ -1,0 +1,70 @@
+/* ── MoneyText ────────────────────────────────────────────── */
+.ui-money {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+}
+.ui-money--strong { font-weight: 600; }
+/* 中国区惯例：收入/正数为红，支出/负数为绿；颜色只是辅助，符号与文案同步承载语义。 */
+.ui-money--income { color: var(--color-error); }
+.ui-money--expense { color: var(--color-success); }
+.ui-money--plain { color: var(--color-text-primary); }
+
+/* ── DataTable ────────────────────────────────────────────── */
+.ui-table-loading {
+  display: grid;
+  place-items: center;
+  min-height: 8rem;
+}
+.ui-table-wrap .ant-table-tbody > tr > td { font-variant-numeric: tabular-nums; }
+
+/* ── FormDrawer / ErrorBanner 辅助 ────────────────────────── */
+.ui-drawer-hint {
+  margin: var(--space-3) 0 0;
+  font: var(--font-caption-2);
+  color: var(--color-text-secondary);
+}
+/* 卡片内口径说明：位于统计卡组 / 表格上方，与上下文留出上下间距。 */
+.ui-card-hint {
+  margin: var(--space-3) 0;
+  font: var(--font-caption-2);
+  color: var(--color-text-secondary);
+}
+.ui-error-banner { margin-block-end: var(--space-3); }
+
+/* 减少动效偏好：玻璃模糊属于装饰，直接关闭。 */
+@media (prefers-reduced-motion: reduce) {
+  .ui-stat { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .ui-error-banner,
+  .form-drawer .ant-drawer-footer {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--color-surface);
+  }
+}
+
+/* 增强对比度时，优先保留边界和文字层级，避免玻璃材质把内容冲淡。 */
+@media (prefers-contrast: more), (forced-colors: active) {
+  .glass,
+  .ui-stat,
+  .ui-entry-card,
+  .ui-table-empty {
+    border-color: var(--color-text-secondary);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .ui-entry-card:hover { border-color: var(--color-text-primary); }
+  .ui-datatable .ant-table-thead > tr > th { border-bottom-color: var(--color-text-secondary); }
+}
+
+/* 触控设备上的表格保留清晰的横向滚动容器，避免内容被裁成不可读的窄列。 */
+.ui-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}

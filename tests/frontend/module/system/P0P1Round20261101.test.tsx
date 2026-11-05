@@ -274,7 +274,16 @@ it("P1/FE-219：编号序列数据失败时不伪装成真实空列表", async (
 });
 
 it("P1/FE-218：导入批次失败时锁定新建导入入口", async () => {
-  vi.mocked(catalog.importsApi.batches).mockRejectedValueOnce({ isAxiosError: true, message: "batches down" });
+  // 错误必须带 response：client.ts 的 lastNetworkFailure 是模块级全局态，CI 上同进程
+  // 其它用例的真实请求（后端不可达 ECONNREFUSED）会置位它；无 response 的 axios 错误
+  // 会被 normalizeError 改写成「后端不可达」兜底文案，使消息断言随用例顺序漂移
+  // （2026-11-05 首次 CI 实测：仅本例红，本地单跑恒绿）。带 v1 响应体后走
+  // data.message 分支，与全局连接态解耦。
+  vi.mocked(catalog.importsApi.batches).mockRejectedValueOnce({
+    isAxiosError: true,
+    message: "batches down",
+    response: { status: 400, data: { message: "batches down" } },
+  });
   renderLight(<ImportWorkbench />, { user: "admin" });
 
   expect(await screen.findByText("batches down")).toBeInTheDocument();

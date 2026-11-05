@@ -18,12 +18,15 @@ from app.core.settings import (
 SECURE_TEST_SECRET = "test-production-secret-0123456789-abcdef"
 
 
-def test_default_application_version_is_semver_without_release_prefix():
+def test_default_application_version_is_semver_without_release_prefix(monkeypatch):
     """API 对外使用 SemVer；V 前缀只属于系统发布标签。
 
     版本号的唯一事实源是 `app/version.py`：这里断言"配置默认值 == 事实源"，
     再校验格式。发版只改 version.py，本测试无需跟着改，但能挡住手滑写坏。
     """
+    # CI 可能注入 APP_VERSION（部署脚本的发布版本），会覆盖配置默认值；
+    # 本用例测的是「缺省值 == 事实源」，必须屏蔽外部环境变量。
+    monkeypatch.delenv("APP_VERSION", raising=False)
     from app.version import __version__ as release_version
 
     assert Settings().app_version == release_version
@@ -142,12 +145,16 @@ def test_settings_loads_from_root_env():
     assert settings.access_token_expire_minutes >= 1
 
 
-def test_default_database_is_postgres():
+def test_default_database_is_postgres(monkeypatch):
     """SQLite 已彻底下线：缺 .env 时的兜底地址也必须是 PG。
 
     以前兜底是某个本地文件库地址——连不上库时会静默新建一个本地文件，
     数据写进没人知道的地方。现在宁可连不上明确报错。
     """
+    # CI 会显式注入 DATABASE_URL / TEST_DATABASE_URL 指向测试库；
+    # 本用例测的是「配置缺省值」，先屏蔽环境变量才能取到真正的兜底地址。
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("TEST_DATABASE_URL", raising=False)
     settings = Settings(_env_file=None)
     assert settings.database_url.startswith("postgresql")
     assert settings.database_url.endswith("/heijin_erp_dev")
@@ -268,9 +275,12 @@ class TestLoginRateLimitKnob:
 class TestTestDatabaseSeparation:
     """测试库必须与开发库分开配置：曾因回落 DATABASE_URL 把开发库 118 单清空。"""
 
-    def test_test_database_url_defaults_to_empty(self):
+    def test_test_database_url_defaults_to_empty(self, monkeypatch):
         """缺省为空表示「未单独配置」，夹具据此拒绝运行，不猜一个库去清空。"""
-        # 必须显式屏蔽 .env：本机 .env 已配了 TEST_DATABASE_URL，否则测的是环境而非缺省值
+        # 必须显式屏蔽 .env 与 CI 注入的环境变量：本机 .env 已配了 TEST_DATABASE_URL，
+        # CI 也会注入 DATABASE_URL / TEST_DATABASE_URL，否则测的是环境而非缺省值。
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.delenv("TEST_DATABASE_URL", raising=False)
         assert Settings(_env_file=None).test_database_url == ""
 
     def test_test_database_url_is_independent_of_database_url(self):
@@ -290,6 +300,8 @@ class TestTestDatabaseSeparation:
             encoding="utf-8",
         )
         monkeypatch.delenv("TEST_DATABASE_URL", raising=False)
+        # CI 注入的 DATABASE_URL 优先级高于 env_file，不屏蔽就测不到「.env 被读进来」。
+        monkeypatch.delenv("DATABASE_URL", raising=False)
         settings = Settings(_env_file=env_file)
         assert settings.test_database_url.endswith("/heijin_erp_test")
         assert settings.database_url.endswith("/heijin_erp_dev")

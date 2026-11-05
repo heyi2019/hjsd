@@ -30,7 +30,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      TEST_DATABASE_URL: "postgresql+psycopg://erp_app:erp_app@postgres:5432/heijin_erp_test"
+      # 普通 runner（非 container job）里 services.postgres 只能通过映射端口访问，
+      # 主机名 postgres 无法解析；CI 必须用 127.0.0.1，与 coverage-gate 口径一致。
+      TEST_DATABASE_URL: "postgresql+psycopg://erp_app:erp_app@127.0.0.1:5432/heijin_erp_test"
     steps:
       - uses: actions/checkout@v4
 
@@ -56,16 +58,16 @@ jobs:
             echo "groups=unit cross B C D" >> "$GITHUB_OUTPUT"  # PR/test：单元 + 核心集成 + 跨模块
           fi
 
-      # 回归默认走 pytest-xdist 并行（--parallel）：每个 worker 由 conftest 自动建
-      # 独立库、退出时回收，默认串行行为不变。本地实测 ci 全量 1684 passed
-      # ~99s → 51s（约 -48%）。lint 不是 pytest，不加该开关。
+      # CI 走串行：--parallel 会让每个 xdist worker 各自建库，在 GitHub runner 上
+      # 曾因连接失败触发 worker_errordown / KeyError: WorkerController 使整轮 INTERNALERROR。
+      # 本地仍可用 --parallel 提速；CI 以稳定为准，coverage-gate 已覆盖全量。
       - name: Run backend regression (分层)
         working-directory: backend
         run: |
           python run_regression.py lint
           for g in ${{ steps.scope.outputs.groups }}; do
             echo "=== 执行分组: $g ==="
-            python run_regression.py "$g" --backend-only --parallel || exit 1
+            python run_regression.py "$g" --backend-only || exit 1
           done
 
       - name: Generate test case library + report

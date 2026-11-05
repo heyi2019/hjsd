@@ -112,7 +112,10 @@ jobs:
         run: npm ci
 
       - name: Run coverage (fast+quick+react)
-        run: ./node_modules/.bin/vitest run --coverage --project=fast --project=quick --project=react --reporter=dot
+        # npm ci 在仓库根执行（workspaces hoisted），vitest 二进制落在根 node_modules/.bin，
+        # 不是 frontend/node_modules/.bin。CI 实测 ./node_modules/.bin/vitest 直接
+        # "No such file or directory"，故显式走根路径。
+        run: ../node_modules/.bin/vitest run --coverage --project=fast --project=quick --project=react --reporter=dot
 
   test-react-deep:
     # 仅在 main/master 的 push、定时与手动触发时运行，PR 与 test 分支跳过。
@@ -175,6 +178,12 @@ jobs:
     name: Frontend checks and tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # 本 job 不 checkout，也没有 frontend/ 目录；顶层 defaults 的 working-directory: frontend
+    # 会让纯 shell 断言步骤在启动 bash 前就报 "No such file or directory"（CI 实测）。
+    # 汇总 job 只需在仓库根跑 echo / exit，故就地覆盖工作目录。
+    defaults:
+      run:
+        working-directory: .
     needs: [static-checks, test-layers, test-react-deep, frontend-coverage]
     if: always()
     steps:

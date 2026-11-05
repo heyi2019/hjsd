@@ -21,7 +21,9 @@ permissions:
   contents: read
 
 env:
-  E2E_DATABASE_URL: "postgresql+psycopg://erp_app:erp_app@postgres:5432/heijin_erp_e2e"
+  # 普通 runner 上 services.postgres 只暴露映射端口，主机名 postgres 无法解析；
+  # webServer 里的 e2e_db.py 直接用本变量建维护库，必须指向 127.0.0.1。
+  E2E_DATABASE_URL: "postgresql+psycopg://erp_app:erp_app@127.0.0.1:5432/heijin_erp_e2e"
 
 jobs:
   e2e:

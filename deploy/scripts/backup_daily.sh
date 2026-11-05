@@ -32,7 +32,10 @@ die() { echo "✗ $*" >&2; exit 1; }
 [ -f .env ] || die "缺少 deploy/.env（本脚本需与 docker compose 使用同一份部署配置）"
 
 # db 服务必须已就绪：容器不在时 pg_dump 无从谈起，明确报错而不是产出空备份。
-if ! docker compose ps --status running --services 2>/dev/null | grep -qx "$SERVICE"; then
+# 先把输出收进变量再判断：直接管道给 grep -qx 会在匹配首行后提前退出，上游
+# docker compose 可能收到 SIGPIPE，在 set -o pipefail 下被误判成「db 未运行」。
+running_services="$(docker compose ps --status running --services 2>/dev/null || true)"
+if ! grep -qx "$SERVICE" <<< "$running_services"; then
   die "db 容器未运行，无法备份（先 docker compose up -d db，确认库已就绪）"
 fi
 

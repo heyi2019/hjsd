@@ -47,6 +47,7 @@ from test_catalog import (  # noqa: E402
     frontend_func_for,
     frontend_file_modules,
     frontend_test_files,
+    is_e2e_test,
     is_frontend_test,
     load_registry,
 )
@@ -662,7 +663,12 @@ def _unit_files() -> set:
 
 def _stage(ttype, func, rel, tname, doc, body, fname, primary, related, flow) -> dict:
     is_fe = is_frontend_test(rel)
-    expected, criteria = extract_criteria(doc, body, frontend=is_fe)
+    # 合格标准按「源码语言」分流，不按目录：E2E 同样是 TS/JS，断言写的是 expect(...)。
+    # 旧口径只认 tests/frontend/，tests/e2e/ 被当后端去搜 Python assert / pytest.raises，
+    # 于是 53 条明明带 5~16 处 expect 的 Playwright 用例全被标成「无显式断言」（2026-11-05）。
+    # 只改合格标准推导；meta_body / 测试方法 / 前置条件 / 输入数据仍按 is_fe 原口径，别一起动。
+    is_js = is_fe or is_e2e_test(rel)
+    expected, criteria = extract_criteria(doc, body, frontend=is_js)
     # 测试方法/前置条件/输入数据沿用原口径（前端历来只扫标题、不扫回调体）。
     # 本次只为补「合格标准」，不顺带改写前端这 3 个字段的既有取值。
     meta_body = "" if is_fe else body

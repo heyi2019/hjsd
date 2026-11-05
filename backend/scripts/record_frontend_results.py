@@ -76,7 +76,12 @@ def _rel_key(abs_path: str, title: str) -> str | None:
 # it.each 的占位符：用例库记的是模板（`按字段数量 %s 使用标准宽度 %s`），
 # 运行时展开成具体值（`按字段数量 2 使用标准宽度 520px`）。与后端 parametrize
 # 一个函数一条用例同构 —— 变体必须归并回模板那一条，否则会凭空多出 N 条未收录用例。
-_PLACEHOLDER = re.compile(r"%[sdifjoO]")
+#
+# JS 模板字面量同理（2026-11-05）：用例库按源码收的是
+# `测试文件总数等于 manifest 的 ${expected.files}`，vitest 报出的却是插值后的
+# `... manifest 的 96`。此前只认 %s，这条用例一直落不了库，在官方报告里显示「未执行」。
+# 两类占位符统一在此归并；**不要改测试标题**（标题是用例编号的键，改了会漂移）。
+_PLACEHOLDER = re.compile(r"%[sdifjoO]|\$\{[^{}]*\}")
 
 
 def _template_regex(title: str) -> "re.Pattern[str]":

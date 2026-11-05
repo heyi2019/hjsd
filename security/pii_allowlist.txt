@@ -23,20 +23,41 @@ rawdata/原始数据/sheet17_installments.json :: phone
 # 已逐一核对：全部为 138****0000/0001/0002、138****1111、138****8888、
 # 138****9999、138****1234、139****0000、139****2222 一类占位值，非真实用户号码。
 # 注意：本文件自身也在扫描范围内，注释中不得出现完整号码（上面已刻意脱敏）。
-backend/scripts/seed_e2e_customers.py :: phone
-backend/tests/v1/test_auth_contract.py :: phone
-backend/tests/v1/test_bughunt.py :: phone
-backend/tests/v1/test_orders_contract.py :: phone
-backend/tests/v1/test_parties.py :: phone
-backend/tests/v1/test_parties_contract.py :: phone
 # 合成测试号码：仅用于分期交付/订单事件契约，非真实用户数据。
-backend/tests/v1/test_installments_contract.py :: phone
-backend/tests/v1/test_list_export_csv.py :: phone
-backend/tests/v1/test_orders.py :: phone
 # 接口规范文档的号码为占位示例值（138 号段全 0 尾号，一眼可辨非真实）；文档已归档，路径随归档目录同步。
 # 原 v1.0 条目已删除：该文件已不存在（死条目只提示不阻断，但会误导后来者）。
 docs/archive/ERP_API接口规范_v1.1_已作废.md :: phone
-frontend/e2e/business-write.spec.ts :: phone
-frontend/src/customers/CustomersPage.test.tsx :: phone
-frontend/src/stocks/InventoryProfileModal.deep.test.tsx :: phone
 tests/fixtures/v1_acceptance_seed.json :: phone
+
+# ── 三、测试目录迁移后的合成占位号码（2026-11-05 登记） ─────────────────
+# 11-04 后测试树由 backend/tests/v1、frontend/e2e、frontend/src 迁到
+# tests/backend、tests/e2e、tests/frontend；文档与用例库新增同类占位值。
+# 均为 138****0000 一类合成号码（非真实客户数据）；email 一条为测试占位邮箱。
+# 两份治理方案文档里的真实号码已改为 198****3890 脱敏写法，未登记进本清单。
+backend/scripts/e2e_db.py :: phone
+docs/ERP_API接口规范_v1.2.md :: phone
+docs/archive/ERP_生产上线执行单_v1.0_20261103_已作废.md :: phone
+docs/archive/ERP_生产上线执行单_v1.1_20261103_已作废.md :: phone
+docs/archive/ERP_生产上线执行单_v1.2_20261104_已作废.md :: phone
+docs/testing/测试用例库.csv :: phone
+docs/testing/测试用例库.md :: phone
+docs/前端建单与页面交互测试报告_20261101.md :: phone
+docs/前端建单与页面交互测试报告_20261101_P1修复版.md :: phone
+tests/backend/integration/business/test_bughunt.py :: phone
+tests/backend/integration/business/test_installments_contract.py :: phone
+tests/backend/integration/business/test_orders.py :: phone
+tests/backend/integration/business/test_orders_contract.py :: phone
+tests/backend/integration/customer/test_parties.py :: phone
+tests/backend/integration/customer/test_parties_contract.py :: phone
+tests/backend/integration/operations/test_list_export_csv.py :: phone
+tests/backend/integration/system/test_auth_contract.py :: phone
+tests/backend/integration/system/test_passwordless_login.py :: phone
+tests/backend/unit/customer/test_parties_masking.py :: phone
+tests/backend/unit/system/test_settings.py :: email
+tests/e2e/cross/business-write.spec.ts :: phone
+tests/frontend/module/business/InventoryPanel.write.test.tsx :: phone
+tests/frontend/module/business/InventoryProfileModal.deep.test.tsx :: phone
+tests/frontend/module/business/OrdersPage.actions.test.tsx :: phone
+tests/frontend/module/customer/CustomersPage.test.tsx :: phone
+tests/frontend/module/settings/UsersPanel.test.tsx :: phone
+tests/frontend/module/system/P0P1Round20261101.test.tsx :: phone

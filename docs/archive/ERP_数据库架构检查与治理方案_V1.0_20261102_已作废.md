@@ -38,7 +38,7 @@
 | **当前版本戳** | **`0003`** —— 原文档与 `README` 都写 `0064_expand_buy_rebate_scope`，**错** | `select version_num from alembic_version` |
 | **表数** | **41** —— 比基线的 40 张多一张遗留表 `db_version`（4 行，最后一条 `alembic_revision=0003` / 2026-10-31 22:33） | `pg_stat_user_tables` |
 | **业务数据** | **全空**：`orders` 0 / `stocks` 0 / `cashflow` 0 / `order_events` 0 / `customers` 0 / `installments` 0 / `rebate_records` 0 | 逐表 `n_live_tup` |
-| **仅存数据** | `users` 2（`admin` / `19873133890`，均 ADMIN）、`audit_logs` 29、`document_sequences` 14、`policy_definitions` 6、`policy_versions` 4、`pools` 2、种子 `order_form_fields` 212 / `option_sets` 62 | 同上 |
+| **仅存数据** | `users` 2（`admin` / `198****3890`，均 ADMIN）、`audit_logs` 29、`document_sequences` 14、`policy_definitions` 6、`policy_versions` 4、`pools` 2、种子 `order_form_fields` 212 / `option_sets` 62 | 同上 |
 | 归档 | 未开启（`archive_mode=off`）→ 无 PITR | 既有结论 |
 
 **两处被推翻的原判断**
@@ -50,11 +50,11 @@
 
 | 库 | 账号 | 状态 |
 |---|---|---|
-| 生产 `heijin_erp` | `admin`（系统管理员）、`19873133890`（何一） | 原始状态 |
+| 生产 `heijin_erp` | `admin`（系统管理员）、`198****3890`（何一） | 原始状态 |
 | 上线包（替换前） | `三三`（ADMIN）、`xuanxuan`（VIEWER） | 已废弃 |
-| 上线包（替换后） | `admin`（系统管理员）、`19873133890`（何一） | ✅ 与生产一致，含原口令哈希 |
+| 上线包（替换后） | `admin`（系统管理员）、`198****3890`（何一） | ✅ 与生产一致，含原口令哈希 |
 
-上线包的 `users` 已按生产对齐，覆盖式重建后**账号与口令均不变**。待决残留：`19873133890` 的 `must_change_password = true`（生产原值，非本次引入），首次登录会被要求改口令。
+上线包的 `users` 已按生产对齐，覆盖式重建后**账号与口令均不变**。待决残留：`198****3890` 的 `must_change_password = true`（生产原值，非本次引入），首次登录会被要求改口令。
 
 
 ### 1.3 E2E 数据库：**不存在**
@@ -576,7 +576,7 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 | `customers` | 12 | **0** | 全部命中 `TEST_CUSTOMERS` 名单，引用 0 |
 | `counterparties` | 4 | **0** | 全部测试 |
 | `teams` | 2 | **0** | 全部测试 |
-| `users` | 3 | **2** | 删 `user_test_20261101`；当时保留 `三三`(ADMIN) 与 `xuanxuan`(VIEWER)，**11.9 已整体替换为生产的 `admin` / `19873133890`** |
+| `users` | 3 | **2** | 删 `user_test_20261101`；当时保留 `三三`(ADMIN) 与 `xuanxuan`(VIEWER)，**11.9 已整体替换为生产的 `admin` / `198****3890`** |
 
 订单 / 库存 / 流水 / 事件零影响（119 / 90 / 370 / 200 不变），`orders.owner_id` 无空值，涉及的外键表（deposits、order_counterparty_roles、customer_leads、order_customer_roles、notifications）全为 0 行。
 
@@ -719,11 +719,11 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 **④ 上线后用什么账号登录（→ 已按 A 执行，见 11.10）**
 
-覆盖式重建会把生产 2 个账号（`admin`、`19873133890`）替换成上线包的 `三三`、`xuanxuan`，口令哈希一并替换。
+覆盖式重建会把生产 2 个账号（`admin`、`198****3890`）替换成上线包的 `三三`、`xuanxuan`，口令哈希一并替换。
 
 | 方案 | 做法 | 代价 |
 |---|---|---|
-| **A（✅ 已采用）** | 上线包内先把 `users` 对齐生产：从生产 dump 取 `admin` + `19873133890` 两行（含 `password_hash`）写入 release | 账号口令完全不变；需改 release 库一次（幂等、可重做） |
+| **A（✅ 已采用）** | 上线包内先把 `users` 对齐生产：从生产 dump 取 `admin` + `198****3890` 两行（含 `password_hash`）写入 release | 账号口令完全不变；需改 release 库一次（幂等、可重做） |
 | B | 保留 `三三`/`xuanxuan`，上线后重新建号 | 上线当天必须知道 dev 口令，或走重置流程；易卡住 |
 | C | 恢复后立刻用 SQL 把生产两行插回去 | 等效 A，但把风险推到上线窗口现场 |
 
@@ -772,7 +772,7 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 | 方案 | 真实后果 |
 |---|---|
-| **A** | 保住生产的 `19873133890`（何一）账号且口令不变；`admin`（id=1）口令会被 `ADMIN_PASSWORD` 覆盖成新值；119 单归属人显示名变成「系统管理员」 |
+| **A** | 保住生产的 `198****3890`（何一）账号且口令不变；`admin`（id=1）口令会被 `ADMIN_PASSWORD` 覆盖成新值；119 单归属人显示名变成「系统管理员」 |
 | **B** | 何一账号丢失，变成 `三三`/`xuanxuan` + 新建的 `admin`；历史数据不受影响（`created_by` 全是 `wps-import`） |
 | **C** | 等价 A，但拖到上线窗口现场做 |
 
@@ -820,7 +820,7 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 ### 11.10 上线包账号对齐生产（方案 A 已执行，2026-11-02 23:56，全本地）
 
-**目标**：覆盖式重建后，生产原账号 `admin` / `19873133890`（何一）能照旧登录，口令不变。
+**目标**：覆盖式重建后，生产原账号 `admin` / `198****3890`（何一）能照旧登录，口令不变。
 
 **取数**：生产 dump 已在本机（`prod_final_20261102_234555.dump`），**无需再连生产**。恢复进一次性临时库 `berp_prod_stage` 读出两行，用完即 `DROP`。
 
@@ -841,7 +841,7 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 | id | username | display_name | role | must_change_password |
 |---|---|---|---|---|
 | 1 | `admin` | 系统管理员 | ADMIN | f |
-| 2 | `19873133890` | 何一 | ADMIN | **t** |
+| 2 | `198****3890` | 何一 | ADMIN | **t** |
 
 - 何一 `pool_ids = [1,2]`（两池权限随行迁移，未丢）；
 - 五处外键**悬空 0 行**（`orders.owner_id` 119 条全部仍指向有效的 id=1）；
@@ -865,7 +865,7 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 **副作用与残留**
 
 1. 119 单的 `owner_id` 仍 = 1，现在指向「系统管理员」——归属人显示名会从「李三」变「系统管理员」。语义修正（改成 id=2 何一）属动业务数据，**未做**。
-2. `19873133890` 的 `must_change_password = true` 是**生产原值**，不是本次引入：上线后首次登录会被要求改口令。若要免除，改的是生产语义而非上线包，**未动**。
+2. `198****3890` 的 `must_change_password = true` 是**生产原值**，不是本次引入：上线后首次登录会被要求改口令。若要免除，改的是生产语义而非上线包，**未动**。
 3. `create_admin.py` 是「建或改」，部署时 `export ADMIN_PASSWORD` 会**覆盖 admin(id=1) 的口令**——这是刻意保留的兜底，不影响何一账号。
 
 ---
@@ -923,7 +923,7 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 |---|---|---|
 | 表数 | 40 | ✅ 40（无 `db_version`，符合“上线后由 `stamp_db_version.py` 建”） |
 | 版本戳 | `0001` | ✅ `0001` |
-| 用户 | 2 行 | ✅ `1:admin:ADMIN`、`2:19873133890:ADMIN` |
+| 用户 | 2 行 | ✅ `1:admin:ADMIN`、`2:198****3890:ADMIN` |
 | 业务量 | 119/90/370/200 | ✅ 完全一致 |
 | 配置 | 63 选项集 / 259 字段 | ✅ 完全一致 |
 
@@ -953,7 +953,7 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 
 ### 11.14 预置员工账号与上线包第四次重出（2026-11-03 01:15）
 
-**背景**：`release` 库此前只有 2 个账号（`admin` / `19873133890` 何一），且两者都是 ADMIN——意味着上线后全公司只有两个人能登录，且都是全权限。同时发现一处归属错位：dev 的 119 单 `owner_id=1` 是「三三（李三）」，而 release 里 `id=1` 被生产的 `admin` 占用，**同一批单上线后显示为「系统管理员」建的单**。
+**背景**：`release` 库此前只有 2 个账号（`admin` / `198****3890` 何一），且两者都是 ADMIN——意味着上线后全公司只有两个人能登录，且都是全权限。同时发现一处归属错位：dev 的 119 单 `owner_id=1` 是「三三（李三）」，而 release 里 `id=1` 被生产的 `admin` 占用，**同一批单上线后显示为「系统管理员」建的单**。
 
 **账号归属口径（用户裁决 11-03 01:12）**：119 单历史归属**保持 `owner_id=1`（admin）不动**，不改为三三。故本次只建人、不动历史数据。
 
@@ -976,7 +976,7 @@ rebate_records 0         quality_issues 0   import_batches 0 / import_rows 0
 - `GET /users`：`sansan`(ADMIN) → **200**，`kaiwen`(OPERATOR) → **403**，权限边界成立；
 - `GET /stocks/inventory`（OPERATOR）→ 200，业务读路径可用。
 
-**上线包第四次重出**：`release_20261103_011557.dump`，219,946 B，sha256 `fc8b89fd…564fc7`，TOC 仍 430 条 / 40 个 TABLE DATA（只多 4 行 users，对象数不变）。恢复校验：临时库恢复后 **6 用户**（`admin,19873133890,sansan,xiaoxuan,jixiang,kaiwen`）+ 119/90/370/200 全部一致，验完即 `DROP ... WITH (FORCE)`。
+**上线包第四次重出**：`release_20261103_011557.dump`，219,946 B，sha256 `fc8b89fd…564fc7`，TOC 仍 430 条 / 40 个 TABLE DATA（只多 4 行 users，对象数不变）。恢复校验：临时库恢复后 **6 用户**（`admin,198****3890,sansan,xiaoxuan,jixiang,kaiwen`）+ 119/90/370/200 全部一致，验完即 `DROP ... WITH (FORCE)`。
 
 执行单常量（包名、大小、sha256、检查点前缀、`scp` / `docker cp` 命令、期望终态「2 用户」→「6 用户」）已同步，并新增「预置员工账号 4 名」勾选项。**11.13 那条复检记录保留原样**——它是对旧包的既成事实，新包的验证是静态恢复校验，未重跑 C4 全链路。
 

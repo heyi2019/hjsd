@@ -43,7 +43,7 @@
 | 版本戳 | **`0003`**（不在只剩 `0001` 的活动链里） |
 | 表数 | **41**（多一张遗留 `db_version`） |
 | 业务数据 | **全空**：orders / stocks / cashflow / order_events / customers / installments / rebate 全 0 |
-| 仅存 | `users` 2（`admin`、`19873133890` 何一，均 ADMIN）、`audit_logs` 29、种子 212 / 62 |
+| 仅存 | `users` 2（`admin`、`198****3890` 何一，均 ADMIN）、`audit_logs` 29、种子 212 / 62 |
 | 归档 | `archive_mode=off` → 无 PITR |
 
 **它是「旧结构 + 空数据」的空壳。**上线时整库删除、由上线包覆盖重建，无业务数据损失。
@@ -62,7 +62,7 @@
 | id | 账号 | 姓名 | 角色 | 数据范围 | 资金账户 | 强制改密 |
 |---:|---|---|---|---|---|---|
 | 1 | `admin` | 系统管理员 | ADMIN | ALL | `[]` | 否 |
-| 2 | `19873133890` | 何一 | ADMIN | ALL | `[1,2]` | 是（生产原值） |
+| 2 | `198****3890` | 何一 | ADMIN | ALL | `[1,2]` | 是（生产原值） |
 | 4 | `sansan` | 三三 | ADMIN | ALL | `[1,2]` | 是 |
 | 5 | `xiaoxuan` | 小轩 | OPERATOR | ALL | `[1,2]` | 是 |
 | 6 | `jixiang` | 吉祥 | OPERATOR | ALL | `[1,2]` | 是 |

@@ -1,4 +1,4 @@
-import { Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from "antd";
+import { Card, Descriptions, Drawer, Form, Input, Space, Spin } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
@@ -170,9 +170,6 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
       <Space wrap className="counterparty-filter-bar">
         <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? COUNTERPARTY_STATUS_OPTIONS} onChange={(value) => setStatusFilter(value)} />
       </Space>
-      <Typography.Paragraph type="secondary">
-        同行、供货方、平台使用 CP 编号，与客户（CUS）严格分离；有历史参与关系仅可拉黑。
-      </Typography.Paragraph>
       <DataTable<Counterparty>
         columns={columns}
         rows={visibleCounterparties}

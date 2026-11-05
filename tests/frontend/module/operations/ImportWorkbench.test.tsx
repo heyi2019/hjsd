@@ -485,7 +485,6 @@ describe("ImportWorkbench：动作流与写路径", () => {
       renderLight(<ImportWorkbench embedded />, { user: "admin" });
       await waitFor(() => expect(screen.getByRole("button", { name: /新建导入/ })).toBeInTheDocument());
       expect(screen.queryByText("导入工作台")).toBeNull();
-      expect(screen.getByText(/导入数据只保留原文与人工映射/)).toBeInTheDocument();
     });
   });
 });

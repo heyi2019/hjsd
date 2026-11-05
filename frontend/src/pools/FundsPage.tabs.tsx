@@ -53,9 +53,6 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
           { label: "自有权益合计", amount: totalOwned },
         ]}
       />
-      <Typography.Paragraph type="secondary" className="ui-card-hint">
-        口径：现金头寸含全部资金池；自有权益仅计归属为「{POOL_OWNERSHIP_LABEL.OWNED}」的池，「{POOL_OWNERSHIP_LABEL.CUSTODY}/{POOL_OWNERSHIP_LABEL.THIRD_PART}」只计头寸、不计权益；押金占用仍为自有资金，故权益不扣减占用。
-      </Typography.Paragraph>
       <DataTable<Pool>
         columns={arrangeFundPoolColumns(poolColumns)}
         rows={pools}
@@ -148,9 +145,6 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
           导出 CSV
         </PermissionButton>
       </div>
-      <Typography.Paragraph type="secondary" className="ui-drawer-hint">
-        状态口径：所有流水（含本页手工登记的独立流水）过账即「已入账」，直接计入系统余额。
-      </Typography.Paragraph>
       {cashflowUnavailable ? (
         <Typography.Text type="warning">资金流水数据不可用，请点击“查询”或页面顶部的“重新加载”。</Typography.Text>
       ) : cashflowTotal > cashflows.length ? (
@@ -281,9 +275,6 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
   ];
   return (
     <Card className="glass" title="资金对账" extra={<PermissionButton permission="deposit.post" type="primary" disabled={reconciliationUnavailable || loading} onClick={() => { reconciliationForm.setFieldsValue({ reconciled_on: today() }); setReconciliationOpen(true); }}>新增对账</PermissionButton>}>
-      <Typography.Paragraph type="secondary" className="ui-card-hint">
-        系统余额口径：截至对账日期「已入账」流水的累计；按池内账户对账时另含该账户期初余额。差异 = 账面余额 − 系统余额。
-      </Typography.Paragraph>
       <DataTable<Reconciliation>
         columns={arrangeReconciliationColumns(reconciliationColumns)}
         rows={reconciliations}

@@ -1,6 +1,6 @@
 /** 数据中心：今日资金与业务总览（原工作台数据内容，2026-10-13 迁入「经营中心」Tab）。
  *  现金头寸、可用余额和押金分列展示，禁止混用（FIN-01-03）。 */
-import { Card, Space, Typography } from "antd";
+import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { ordersApi, poolsApi, reportsApi, type BusinessPnlReport, type Order, type Pool, type PoolBalance, type PoolBalanceTotals } from "../shared/api/catalog";
@@ -124,10 +124,6 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
   return (
     <section className="ui-stack">
       <ErrorBanner error={loadError} onRetry={() => void load()} retrying={loading} />
-
-      <Typography.Paragraph type="secondary" className="muted">
-        现金头寸、可用余额与押金分列展示，禁止混用（FIN-01-03）。
-      </Typography.Paragraph>
 
       <EntryRow>
         <EntryCard

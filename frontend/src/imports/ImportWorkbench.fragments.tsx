@@ -1,7 +1,4 @@
 /** ImportWorkbench 的共享常量与纯函数（拆分自导入工作台主组件）。 */
-/** 嵌入模式：作为「设置」页内的 Tab 渲染时，不再重复输出 PageHeader 大标题，
- *  红线说明降级为次要文本，批次选择与确认/回滚动作保留为筛选条。 */
-export const RED_LINE_DESC = "导入数据只保留原文与人工映射：不覆盖新单、不自动匹配、不补造单边划转。";
 
 /** 业务字典暂不可用时的只读回落，保证默认值仍属于可选项集合。 */
 export const IMPORT_SOURCE_KIND_OPTIONS = [

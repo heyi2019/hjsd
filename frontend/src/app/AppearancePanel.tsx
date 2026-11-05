@@ -18,10 +18,6 @@ export function AppearancePanel() {
     <div className="ui-stack">
       <Card className="glass" title="玻璃材质透明度">
         <div className="ui-stack">
-          <Typography.Text type="secondary">
-            调节全站玻璃材质的通透程度：向左更清透（crystal-clear，背景内容透出更多），
-            向右更厚实（fully tinted，文字对比更强）。调节结果即时生效并记住。
-          </Typography.Text>
           <Slider
             min={GLASS_MIN}
             max={GLASS_MAX}

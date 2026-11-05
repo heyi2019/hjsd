@@ -172,7 +172,6 @@ export function PolicySettingsPanel() {
     <section className="ui-stack">
       <PageHeader
         title="经营规则"
-        description="规则由系统预置并直接生效；点「设置配置」即生成新版本并发布，历史版本保留可查。"
       />
 
       <ErrorBanner

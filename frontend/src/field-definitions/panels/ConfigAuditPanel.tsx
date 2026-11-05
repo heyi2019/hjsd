@@ -120,12 +120,11 @@ export function ConfigAuditPanel() {
     <div className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Card className="glass" title="配置改动追溯">
-        <Typography.Paragraph type="secondary">
-          只读流水，记录各配置项的新建 / 编辑 / 停用等动作；写入请回各配置项自己的页面。
-          {hasError
-            ? "记录加载失败，当前记录数不可用，请用上方“重新加载”重试。"
-            : `当前筛选下共 ${rows.length} 条（上限 ${FETCH_LIMIT} 条）。`}
-        </Typography.Paragraph>
+        {hasError ? (
+          <Typography.Paragraph type="secondary">
+            记录加载失败，当前记录数不可用，请用上方“重新加载”重试。
+          </Typography.Paragraph>
+        ) : null}
         <Space className="ui-filter-bar" wrap>
           <Select
             allowClear

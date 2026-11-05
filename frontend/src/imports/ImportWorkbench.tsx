@@ -5,9 +5,9 @@
  * - 系统**不做自动匹配**，映射必须人工指派且留依据
  * - **不补造单边划转**，未裁决的只打 UNLINKED_TRANSFER 标记
  */
-import { Tabs, Typography } from "antd";
+import { Tabs } from "antd";
 import { ErrorBanner, PageHeader, StatRow } from "../shared/ui";
-import { RED_LINE_DESC, type ImportWorkbenchProps } from "./ImportWorkbench.fragments";
+import { type ImportWorkbenchProps } from "./ImportWorkbench.fragments";
 import { useImportWorkbenchController } from "./useImportWorkbenchController";
 import { PreviewTab, ReconTab, RowsTab } from "./ImportWorkbench.tabs";
 import { ImportWorkbenchOverlays } from "./ImportWorkbench.overlays";
@@ -32,12 +32,9 @@ export function ImportWorkbench({
   return (
     <section className="ui-stack">
       {embedded ? (
-        <>
-          <Typography.Paragraph type="secondary">{RED_LINE_DESC}</Typography.Paragraph>
-          {headerActions}
-        </>
+        headerActions
       ) : (
-        <PageHeader title="导入工作台" description={RED_LINE_DESC} actions={headerActions} />
+        <PageHeader title="导入工作台" actions={headerActions} />
       )}
 
       <ErrorBanner error={error} />

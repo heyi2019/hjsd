@@ -1,7 +1,7 @@
 // vitest 入口会同时注册 matchers 并扩展 expect 的类型（jest-dom v7 提供 vitest.d.ts）
 import "@testing-library/jest-dom/vitest";
 import { afterEach, vi } from "vitest";
-import { cleanup } from "@testing-library/react";
+import { act, cleanup } from "@testing-library/react";
 import { resetTestBrowserState } from "@fixtures/browser-state";
 
 afterEach(async () => {
@@ -32,6 +32,17 @@ afterEach(async () => {
   // antd Table/rc-overflow schedules a MessageChannel update after unmount.
   // Let that task drain while jsdom is still alive; otherwise the callback can
   // run after the test environment is torn down and raise `window is not defined`.
+  //
+  // 单次 setTimeout(0) 只让出「一个」宏任务，挡不住 React 18+ 的并发渲染：
+  // 用例里未 await 的异步 setState 会走 scheduler 的 MessageChannel，在负载高时
+  // 排到本次 tick 之后；jsdom 一拆除，commit 阶段就抛 `window is not defined` /
+  // `document global ... is not defined anymore`。Vitest 把它记为 unhandled error，
+  // 于是「80 文件 / 970 用例全过」的覆盖率 job 仍以 exit 1 判红（2026-11-05 CI 实测）。
+  // act() 不是靠等时机，而是强制排空 React 自己的调度队列；再留一轮宏任务给
+  // mock promise 链落地，确保组件卸载后的残余提交都在 jsdom 存活期内完成。
+  await act(async () => {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  });
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
 });
 

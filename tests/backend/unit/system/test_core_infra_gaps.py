@@ -120,3 +120,6 @@ def test_user_from_payload_rejects_invalid_owner_scope():
     # security.py:353  owner_scope 不在 OWNER_SCOPES
     with pytest.raises(AuthError):
         user_from_payload({"sub": 1, "username": "x", "owner_scope": "INVALID"})
+    # amr 不在认证方式白名单时同样拒绝：否则伪造 token 可抬高免密会话的信任级。
+    with pytest.raises(AuthError):
+        user_from_payload({"sub": 1, "username": "x", "amr": "FORGED"})

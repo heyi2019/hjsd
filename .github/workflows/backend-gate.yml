@@ -32,6 +32,11 @@ jobs:
     env:
       # 普通 runner（非 container job）里 services.postgres 只能通过映射端口访问，
       # 主机名 postgres 无法解析；CI 必须用 127.0.0.1，与 coverage-gate 口径一致。
+      # DATABASE_URL 也必须给：test_numbering.test_concurrent_allocation_is_unique
+      # 读 Settings.alembic_url（= database_url）去 CREATE DATABASE 探针库，
+      # 不注入时会落到无密码的缺省开发地址，报 fe_sendauth: no password supplied。
+      # CI 的 postgres service 是一次性单库，conftest 对「两变量同库」的拒绝已在 CI 下豁免。
+      DATABASE_URL: "postgresql+psycopg://erp_app:erp_app@127.0.0.1:5432/heijin_erp_test"
       TEST_DATABASE_URL: "postgresql+psycopg://erp_app:erp_app@127.0.0.1:5432/heijin_erp_test"
     steps:
       - uses: actions/checkout@v4

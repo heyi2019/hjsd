@@ -36,8 +36,14 @@ export default defineConfig({
   // tests/frontend/ 同构：区域目录 + 支撑文件）。快照目录跟着 spec 走，
   // `visual.spec.ts-snapshots/` 已随 visual.spec.ts 一起迁到 tests/e2e/system/。
   testDir: "../tests/e2e",
-  timeout: 30000,
-  expect: { timeout: 10000 },
+  // 一致性修复 E2E 系统性 flake（2026-11-06）：CI 负载下后端/浏览器响应变慢、
+  // click 动作可达性竞态，失败用例每轮都在变（视觉基线→弹窗缩放→走查超时），
+  // 属负载型而非逻辑型。根因修复＝统一重试 + 给足超时余量：真 bug 重试后仍失败
+  // （被 loud 暴露），负载型 flake 重试即过。本地（无 CI env）retries=0 不掩盖问题。
+  timeout: 60000,
+  expect: { timeout: 15000 },
+  // CI 环境自动重试 2 次（Playwright 官方 CI 推荐值）；本地跑不重试。
+  retries: process.env.CI ? 2 : 0,
   // E2E 整轮串行（workers:1）的原因（2026-11-04 实测验证，勿擅自改并行）：
   //   ① 写库用例共享 heijin_erp_e2e 的 document_sequences 计数器，并发会撞唯一约束 → flaky。
   //   ② 纯 UI / 只读用例虽不写库，但有两个结构性脆弱点：

@@ -90,14 +90,17 @@ async function clickTab(page: Page, label: string) {
     const overflowed = !!box && box.x + box.width > viewportWidth - 80;
 
     if (overflowed) {
-      await page.locator(".ant-tabs-nav-more").first().click();
+      // 短超时：CI 负载下 click 偶发卡在 actionability 自动等待上，若不限定会
+      // 把用例自带 195s 预算悄悄吃光（表现为「超时失败」）。限定 5s 让卡点快速
+      // 失败，配合 config 的 retries 廉价重试，整轮不会被一个卡点拖沉。
+      await page.locator(".ant-tabs-nav-more").first().click({ timeout: 5000 });
       await page
         .locator(".ant-tabs-dropdown-menu-item", { hasText: label })
         .first()
-        .click();
+        .click({ timeout: 5000 });
     } else {
-      await tab.scrollIntoViewIfNeeded();
-      await tab.click();
+      await tab.scrollIntoViewIfNeeded({ timeout: 5000 });
+      await tab.click({ timeout: 5000 });
     }
 
     if ((await tab.getAttribute("aria-selected").catch(() => null)) === "true") {

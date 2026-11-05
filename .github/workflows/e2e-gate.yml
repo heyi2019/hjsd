@@ -28,7 +28,9 @@ env:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 给 retries 留余量：串行整跑 + 经营中心/设置走查各 195s 预算，偶发重试
+    # （单次失败用例最多 ×3 预算）需额外时间，30min 偏紧，提到 45min。
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16

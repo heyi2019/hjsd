@@ -10,6 +10,7 @@ import {
 } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
+import { type TimeFieldKey, type TimeSet } from "../OrderDetail.shared";
 
 export type EventDraft = {
   id: number;
@@ -25,8 +26,8 @@ export interface AccountExecutionEditor {
   inlineEditId: number | null;
   eventDrafts: Record<number, EventDraft>;
   updateEventDraft: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
-  timeShiftMinutes: number;
-  setTimeShiftDays: Dispatch<SetStateAction<number>>;
+  timeSet: TimeSet;
+  setTimeField: (field: TimeFieldKey, value: string | null) => void;
   employees: EmployeeOption[];
   invEditExtraForm: ReturnType<typeof Form.useForm>[0];
   savingAccount: boolean;
@@ -51,7 +52,9 @@ export function useAccountExecutionEditor(params: {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [inlineEditId, setInlineEditId] = useState<number | null>(null);
   const [eventDrafts, setEventDrafts] = useState<Record<number, EventDraft>>({});
-  const [timeShiftMinutes, setTimeShiftDays] = useState(0);
+  const [timeSet, setTimeSet] = useState<TimeSet>({});
+  const setTimeField = (field: TimeFieldKey, value: string | null) =>
+    setTimeSet((current) => ({ ...current, [field]: value }));
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [invEditExtraForm] = Form.useForm();
   const [savingAccount, setSavingAccount] = useState(false);
@@ -59,7 +62,7 @@ export function useAccountExecutionEditor(params: {
   async function openEditor(account: Account) {
     setEditingAccount({ ...account });
     setEventDrafts({});
-    setTimeShiftDays(0);
+    setTimeSet({});
     try {
       const list = await employeesApi.list();
       setEmployees(list);
@@ -73,7 +76,7 @@ export function useAccountExecutionEditor(params: {
     setInlineEditId(null);
     setEditingAccount(null);
     setEventDrafts({});
-    setTimeShiftDays(0);
+    setTimeSet({});
     invEditExtraForm.resetFields();
   }
 
@@ -107,11 +110,12 @@ export function useAccountExecutionEditor(params: {
         const original = getExecutionDetail(id)?.orders.flatMap((order) => order.events).find((event) => event.id === draft.id);
         return original && (draft.amount !== original.amount || draft.note !== (original.note ?? null) || draft.operator_user_ids !== undefined);
       });
-      if (events.length || timeShiftMinutes !== 0) {
+      if (events.length || Object.keys(timeSet).length > 0) {
+        const time_set = buildTimeSetPayload(timeSet);
         await stocksApi.updateExecution(id, {
           profile,
           events,
-          time_shift: timeShiftMinutes !== 0 ? { delta_minutes: timeShiftMinutes } : undefined,
+          time_set: time_set ?? undefined,
         });
         setEditingAccount(null);
         setEventDrafts({});
@@ -137,7 +141,7 @@ export function useAccountExecutionEditor(params: {
       }
       setEditingAccount(null);
       setEventDrafts({});
-      setTimeShiftDays(0);
+      setTimeSet({});
       invEditExtraForm.resetFields();
       setInlineEditId(null);
       appMessage.success("修改已保存");
@@ -154,8 +158,8 @@ export function useAccountExecutionEditor(params: {
     inlineEditId,
     eventDrafts,
     updateEventDraft,
-    timeShiftMinutes,
-    setTimeShiftDays,
+    timeSet,
+    setTimeField,
     employees,
     invEditExtraForm,
     savingAccount,
@@ -163,4 +167,21 @@ export function useAccountExecutionEditor(params: {
     cancelInlineEdit,
     saveInline,
   };
+}
+
+const TIME_SET_KEY_MAP: Record<TimeFieldKey, string> = {
+  registeredAt: "registered_at",
+  soldAt: "sold_at",
+  flowAt: "flow_at",
+};
+
+/** 仅把「用户改过的字段」转成后端 time_set 载荷；未改的字段不发送。 */
+function buildTimeSetPayload(set: TimeSet): Record<string, string | null> | null {
+  const entries = Object.entries(set) as [TimeFieldKey, string | null][];
+  if (entries.length === 0) return null;
+  const payload: Record<string, string | null> = {};
+  for (const [key, value] of entries) {
+    payload[TIME_SET_KEY_MAP[key]] = value;
+  }
+  return payload;
 }

@@ -379,8 +379,8 @@ export function useOrdersPageController(params: {
     }
   };
 
-  /** 编辑订单：后端限制——已有登记事件的订单只能改备注；账号快照仅特定业务可维护，
-   *  且密码被后端隐去（无 order.create 权限）时不允许整体回写快照，避免覆盖隐藏密码。 */
+  /** 编辑订单：#15 需求2——所有主字段（含成交日期、账号快照）一律可编辑，无只读保留；
+   *  密码被后端隐去（无 order.create 权限）时仍不整体回写快照，避免覆盖隐藏密码。 */
   const openEditOrder = (order: Order) => {
     setSelectedOrder(order);
     const snapshot = order.account_snapshot;
@@ -417,14 +417,12 @@ export function useOrdersPageController(params: {
 
   const submitEditOrder = async (values: Record<string, unknown>) => {
     if (!selectedOrder) return;
-    // 成交日期现在也可改（后端联动平移账期）；hasPosted 仅用于决定账号快照是否回写。
-    const orderHasPosted = (selectedOrder.events ?? []).some((event) => event.is_posted);
+    // 成交日期现在也可改（后端联动平移账期）；账号快照按 #15 需求2 一律回写（权限可见时）。
     setEditSubmitting(true);
     try {
       const payload = buildOrderPatchPayload({
         values,
         snapshot: selectedOrder.account_snapshot,
-        hasPosted: orderHasPosted,
       });
       await ordersApi.patch(selectedOrder.id, payload);
       // 成交日期放开后，有登记事件的订单也能改主字段，统一提示「订单已更新」。
@@ -618,8 +616,8 @@ export function useOrdersPageController(params: {
     eventDrafts: accountEditor.eventDrafts,
     updateEventDraft: accountEditor.updateEventDraft,
     employees: accountEditor.employees,
-    timeShiftMinutes: accountEditor.timeShiftMinutes,
-    setTimeShiftDays: accountEditor.setTimeShiftDays,
+    timeSet: accountEditor.timeSet,
+    setTimeField: accountEditor.setTimeField,
     invEditExtraForm: accountEditor.invEditExtraForm,
     savingAccount: accountEditor.savingAccount,
     openAccountEditor,

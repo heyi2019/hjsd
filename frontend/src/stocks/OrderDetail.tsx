@@ -20,6 +20,8 @@ import {
   classifyEventCategory,
   type InventoryEventDraft,
   type OrderDetailMeta,
+  type TimeFieldKey,
+  type TimeSet,
 } from "./OrderDetail.shared";
 import { consignmentPlatform, isConsignmentListing, isActiveConsignmentListing } from "./consignment-logic";
 
@@ -192,8 +194,8 @@ export function OrderDetail({
   onSave,
   onCancel,
   saving,
-  timeShiftMinutes,
-  onTimeShift,
+  timeSet,
+  onTimeSet,
 }: {
   row: Account;
   detail?: AccountExecutionDetail;
@@ -210,9 +212,9 @@ export function OrderDetail({
   onSave?: () => void;
   onCancel?: () => void;
   saving?: boolean;
-  /** 编辑态时间联动：平移天数与 setter。 */
-  timeShiftMinutes?: number;
-  onTimeShift?: (days: number) => void;
+  /** 编辑态时间编辑：已改动的字段与 setter。 */
+  timeSet?: TimeSet;
+  onTimeSet?: (field: TimeFieldKey, value: string | null) => void;
 }) {
   if (loading && !detail) return <Spin size="small" />;
 
@@ -337,8 +339,8 @@ export function OrderDetail({
       onSave={onSave}
       onCancel={onCancel}
       saving={saving}
-      timeShiftMinutes={timeShiftMinutes}
-      onTimeShift={onTimeShift}
+      timeSet={timeSet}
+      onTimeSet={onTimeSet}
     />
   );
 }

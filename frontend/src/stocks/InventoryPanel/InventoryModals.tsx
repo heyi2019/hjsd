@@ -52,6 +52,8 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     voidPools,
     voidTarget,
     voiding,
+    timeSet,
+    setTimeField,
   } = controller;
 
   return (
@@ -162,6 +164,8 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           onSave={saveInline}
           onCancel={cancelInlineEdit}
           saving={savingAccount}
+          timeSet={timeSet}
+          onTimeSet={setTimeField}
         /> : null}
       </BusinessActionModal>
       <InventoryProfileModal

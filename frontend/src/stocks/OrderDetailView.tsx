@@ -16,56 +16,57 @@ import type {
   InventoryEventDraft,
   InventoryExecutionRow,
   InventoryFinanceRow,
+  TimeFieldKey,
+  TimeSet,
 } from "./OrderDetail.shared";
 import "./OrderDetail.css";
 
 // 兼容既有引用路径：外部仍从本文件取这三个行类型。
 export type { InventoryExecutionRow, InventoryFinanceRow, InventoryPartyLink } from "./OrderDetail.shared";
+export type { TimeFieldKey, TimeSet } from "./OrderDetail.shared";
 
-/** 编辑态时间联动：三个锚点都能改，任一改动按天数差平移整条时间轴，另两项即时预览。
+/** 编辑态时间编辑（#15 需求2）：三个系统时间戳可独立绝对设值或清空。
  *  台账显示的这三个值分别是 Order.created_at / SELL 事件 posted_at / Cashflow.created_at，
- *  后端按同一个 delta 平移账期与展示时间戳，保证界面与报表归属不脱节。 */
+ *  后端按字段绝对写入（清空=置 NULL），不涉及相对平移。 */
 function TimeShiftFields({
-  registeredAt, soldAt, flowAt, shiftMinutes, onShift,
+  base, timeSet, onTimeSet,
 }: {
-  registeredAt: string;
-  soldAt: string;
-  flowAt: string;
-  shiftMinutes: number;
-  onShift: (minutes: number) => void;
+  base: Record<TimeFieldKey, string>;
+  timeSet: TimeSet;
+  onTimeSet: (field: TimeFieldKey, value: string | null) => void;
 }) {
-  const field = (label: string, original: string) => {
-    const base = original && original !== "-" ? original : "";
-    const shown = base ? dayjs(base).add(shiftMinutes, "minute").format("YYYY-MM-DD HH:mm") : "";
-    return (
-      <label className="inventory-time-shift__field">
-        <span>{label}</span>
-        <DateField
-          showTime={{ format: "HH:mm" }}
-          format="YYYY-MM-DD HH:mm"
-          minuteStep={1}
-          aria-label={`编辑${label}`}
-          disabled={!base}
-          value={shown ? dayjs(shown) : null}
-          onChange={(value) => onShift(value && base ? value.diff(dayjs(base), "minute") : 0)}
-        />
-      </label>
-    );
-  };
+  const items: { key: TimeFieldKey; label: string }[] = [
+    { key: "registeredAt", label: "订单创建时间" },
+    { key: "soldAt", label: "售出时间" },
+    { key: "flowAt", label: "流水时间" },
+  ];
   return (
     <div className="inventory-detail__section inventory-time-shift">
       <div className="inventory-detail__section-heading">
-        <Typography.Text strong>时间联动</Typography.Text>
+        <Typography.Text strong>时间编辑</Typography.Text>
         <Typography.Text type="secondary">
-          {shiftMinutes === 0
-            ? "改任一项，本单订单、事件与资金流水时间同步平移，分期还款计划不变"
-            : `整单时间轴平移 ${shiftMinutes} 分钟，分期还款计划不变`}
+          三个系统时间戳可独立设值或清空（清空即删除该时间），分期还款计划不变
         </Typography.Text>
       </div>
       <div className="inventory-time-shift__fields">
-        {field("订单创建时间", registeredAt)}
-        {field("售出时间", soldAt)}
-        {field("流水时间", flowAt)}
+        {items.map(({ key, label }) => {
+          const raw = timeSet[key] !== undefined ? timeSet[key] : base[key];
+          const value = raw && raw !== "-" ? dayjs(String(raw)) : null;
+          return (
+            <label key={key} className="inventory-time-shift__field">
+              <span>{label}</span>
+              <DateField
+                showTime={{ format: "HH:mm" }}
+                format="YYYY-MM-DD HH:mm"
+                minuteStep={1}
+                allowClear
+                aria-label={`编辑${label}`}
+                value={value}
+                onChange={(v) => onTimeSet(key, v && v.isValid() ? v.format("YYYY-MM-DDTHH:mm:ss") : null)}
+              />
+            </label>
+          );
+        })}
       </div>
     </div>
   );
@@ -92,9 +93,9 @@ type OrderDetailViewProps = {
   onSave?: () => void;
   onCancel?: () => void;
   saving?: boolean;
-  /** 编辑态时间联动：当前平移天数与 setter（由库存台账控制器持有）。 */
-  timeShiftMinutes?: number;
-  onTimeShift?: (minutes: number) => void;
+  /** 编辑态时间编辑：已改动的字段与 setter（由库存台账控制器持有）。 */
+  timeSet?: TimeSet;
+  onTimeSet?: (field: TimeFieldKey, value: string | null) => void;
 };
 
 /** 详情容器：只负责「板块怎么摆」，板块内部各自独立成文件（见 OrderDetail*.tsx）。
@@ -120,8 +121,8 @@ export function OrderDetailView({
   onSave,
   onCancel,
   saving,
-  timeShiftMinutes,
-  onTimeShift,
+  timeSet,
+  onTimeSet,
 }: OrderDetailViewProps) {
   const extraFieldsBySection = (section: string): OrderDetailField[] => meta.orderExtras
     .filter((field) => field.section === section)
@@ -132,11 +133,13 @@ export function OrderDetailView({
       <div className="inventory-detail inventory-detail--editing">
         <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onEdit={onEdit} />
         <TimeShiftFields
-          registeredAt={meta.registeredAt}
-          soldAt={meta.soldAt}
-          flowAt={financeRows.find((row) => row.key.startsWith("flow-"))?.occurredAt ?? financeRows[0]?.occurredAt ?? "-"}
-          shiftMinutes={timeShiftMinutes ?? 0}
-          onShift={onTimeShift ?? (() => undefined)}
+          base={{
+            registeredAt: meta.registeredAt,
+            soldAt: meta.soldAt,
+            flowAt: financeRows.find((row) => row.key.startsWith("flow-"))?.occurredAt ?? financeRows[0]?.occurredAt ?? "-",
+          }}
+          timeSet={timeSet ?? {}}
+          onTimeSet={onTimeSet ?? (() => undefined)}
         />
         <BusinessRegistrationForm
           layout="horizontal"

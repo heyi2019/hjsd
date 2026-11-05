@@ -1,6 +1,6 @@
 """INVENTORY-02 库存执行事件编辑后的库存与资金一致性。"""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -144,7 +144,7 @@ def test_inventory_time_shift_moves_all_three_displayed_times_together(seeded_cl
     event_dates_before = {item["id"]: item["occurred_on"] for item in before["events"]}
     buy_before = next(item for item in before["events"] if item["event_type"] == "BUY")
 
-    response = seeded_client.patch(f"{url}/execution-edit", headers=headers, json={"events": [], "time_shift": {"delta_days": 5}})
+    response = seeded_client.patch(f"{url}/execution-edit", headers=headers, json={"events": [], "time_shift": {"delta_minutes": 7200}})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     shifted = seeded_db.get(Order, order.id)
@@ -165,7 +165,49 @@ def test_inventory_time_shift_moves_all_three_displayed_times_together(seeded_cl
     assert seeded_db.scalar(select(AuditLog).where(AuditLog.entity_type == "inventory_time_shift", AuditLog.entity_id == str(account.id))) is not None
 
     # 零平移是 no-op，不会重复改动时间轴
-    idle = seeded_client.patch(f"{url}/execution-edit", headers=headers, json={"events": [], "time_shift": {"delta_days": 0}})
+    idle = seeded_client.patch(f"{url}/execution-edit", headers=headers, json={"events": [], "time_shift": {"delta_minutes": 0}})
     assert idle.status_code == 200, idle.text
     seeded_db.expire_all()
     assert seeded_db.get(Order, order.id).trade_date == date(2026, 10, 6)
+
+
+def test_inventory_time_set_absolutely_sets_and_clears_three_timestamps(seeded_client, seeded_db, headers):
+    """#15 需求2：台账三个系统时间戳可绝对设值，也可清空（置 NULL）。
+
+    登记时间 → Order.created_at；售出时间 → 来源单 SELL 事件 posted_at；
+    流水时间 → 来源单首条资金流水 Cashflow.created_at。两者均为可空列（DDL 已放开）。
+    """
+    account = accounts.create_account(seeded_db, game_account="time-set", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = orders.create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    orders.post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
+    orders.post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("200"), occurred_on=date(2026, 10, 3), actor="pytest")
+    seeded_db.commit()
+
+    url = f"/api/v1/stocks/{account.id}/execution-edit"
+
+    # 绝对设值：三个时间戳各自独立写入。
+    set_resp = seeded_client.patch(url, headers=headers, json={"events": [], "time_set": {
+        "registered_at": "2026-01-15T08:30:00",
+        "sold_at": "2026-02-20T09:15:00",
+        "flow_at": "2026-03-25T10:45:00",
+    }})
+    assert set_resp.status_code == 200, set_resp.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Order, order.id).created_at == datetime(2026, 1, 15, 8, 30, 0)
+    sell = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL", OrderEvent.is_posted.is_(True)))
+    assert sell is not None and sell.posted_at == datetime(2026, 2, 20, 9, 15, 0)
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == order.id).order_by(Cashflow.occurred_on, Cashflow.id))
+    assert flow is not None and flow.created_at == datetime(2026, 3, 25, 10, 45, 0)
+    assert seeded_db.scalar(select(AuditLog).where(AuditLog.entity_type == "inventory_time_set", AuditLog.entity_id == str(account.id))) is not None
+
+    # 清空（置 NULL）：三个时间戳均可删除。
+    clear_resp = seeded_client.patch(url, headers=headers, json={"events": [], "time_set": {
+        "registered_at": None, "sold_at": None, "flow_at": None,
+    }})
+    assert clear_resp.status_code == 200, clear_resp.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Order, order.id).created_at is None
+    sell2 = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL", OrderEvent.is_posted.is_(True)))
+    assert sell2 is not None and sell2.posted_at is None
+    flow2 = seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == order.id).order_by(Cashflow.occurred_on, Cashflow.id))
+    assert flow2 is not None and flow2.created_at is None

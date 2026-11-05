@@ -134,6 +134,8 @@ class OrderUpdate(BaseModel):
 
     trade_date: date | None = None
     account_snapshot: OrderAccountSnapshot | None = None
+    # #15 需求2：登记时间（系统时间戳）可改可清空；不传=保持原值，显式 null=清空。
+    created_at: datetime | None = None
     note: str | None = None
     extra_values: dict[str, object] | None = None
     # 表单字段配置体系（ORDEREDIT 作用域）：合并进订单 form_extra。
@@ -182,7 +184,8 @@ class OrderOut(BaseModel):
     commission_mode: str | None = None
     commission_payer: str | None = None
     extra_values: dict[str, object] = Field(default_factory=dict)
-    created_at: datetime
+    # #15 需求2：登记时间可清空，故允许为 null。
+    created_at: datetime | None = None
 
 
 class OrderListOut(OrderOut):

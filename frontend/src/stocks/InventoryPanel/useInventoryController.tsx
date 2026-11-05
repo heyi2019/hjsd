@@ -19,6 +19,7 @@ import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 import { useSession } from "../../shared/state/session";
 import type { BusinessCenterEntryTab } from "../../orders/businessCenter";
 import { filterInventoryRows, findCancelableBuy, inventoryCellValue, moreMenuItems } from "./helpers";
+import { type TimeFieldKey, type TimeSet } from "../OrderDetail.shared";
 
 // 关键字逐键输入时合并请求：指标不是主流程，200ms 足够跟手。
 const INVENTORY_STATS_DEBOUNCE_MS = 200;
@@ -62,7 +63,9 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const [invEditExtraForm] = Form.useForm();
   const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
   // 编辑态时间联动：三个锚点共用一个平移天数，保存时整单时间轴按此 delta 平移。
-  const [timeShiftMinutes, setTimeShiftDays] = useState(0);
+  const [timeSet, setTimeSet] = useState<TimeSet>({});
+  const setTimeField = (field: TimeFieldKey, value: string | null) =>
+    setTimeSet((current) => ({ ...current, [field]: value }));
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   // T20：筛选项从「选项词典」配置读取（库存业务 / 类型）。
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
@@ -149,7 +152,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   async function openEditor(account: Account) {
     setEditingAccount({ ...account });
     setEventDrafts({});
-    setTimeShiftDays(0);
+    setTimeSet({});
     await Promise.all([
       employeesApi.list().then(setEmployees).catch((cause) => setError(normalizeError(cause))),
       loadExecution(account),
@@ -163,7 +166,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     setInlineEditId(null);
     setEditingAccount(null);
     setEventDrafts({});
-    setTimeShiftDays(0);
+    setTimeSet({});
     invEditExtraForm.resetFields();
     setDetailTarget(null);
   }
@@ -439,11 +442,12 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
         const original = executionDetails[id]?.orders.flatMap((order) => order.events).find((event) => event.id === draft.id);
         return original && (draft.amount !== original.amount || draft.note !== (original.note ?? null) || draft.operator_user_ids !== undefined);
       });
-      if (events.length || timeShiftMinutes !== 0) {
+      if (events.length || Object.keys(timeSet).length > 0) {
+        const time_set = buildTimeSetPayload(timeSet);
         await stocksApi.updateExecution(id, {
           profile,
           events,
-          time_shift: timeShiftMinutes !== 0 ? { delta_minutes: timeShiftMinutes } : undefined,
+          time_set: time_set ?? undefined,
         });
         setEditingAccount(null);
         setEventDrafts({});
@@ -464,7 +468,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
       }
       setEditingAccount(null);
       setEventDrafts({});
-      setTimeShiftDays(0);
+      setTimeSet({});
       invEditExtraForm.resetFields();
       setInlineEditId(null);
       setDetailTarget(null);
@@ -624,8 +628,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     sortDesc,
     inventoryStats,
     updateEventDraft,
-    timeShiftMinutes,
-    setTimeShiftDays,
+    timeSet,
+    setTimeField,
     voidForm,
     voidPools,
     voidTarget,
@@ -636,6 +640,23 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     submitVoid,
     visibleRows,
   };
+}
+
+const TIME_SET_KEY_MAP: Record<TimeFieldKey, string> = {
+  registeredAt: "registered_at",
+  soldAt: "sold_at",
+  flowAt: "flow_at",
+};
+
+/** 仅把「用户改过的字段」转成后端 time_set 载荷；未改的字段不发送。 */
+function buildTimeSetPayload(set: TimeSet): Record<string, string | null> | null {
+  const entries = Object.entries(set) as [TimeFieldKey, string | null][];
+  if (entries.length === 0) return null;
+  const payload: Record<string, string | null> = {};
+  for (const [key, value] of entries) {
+    payload[TIME_SET_KEY_MAP[key]] = value;
+  }
+  return payload;
 }
 
 export type InventoryController = ReturnType<typeof useInventoryController>;

@@ -59,8 +59,8 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     eventDrafts,
     updateEventDraft,
     employees,
-    timeShiftMinutes,
-    setTimeShiftDays,
+    timeSet,
+    setTimeField,
     invEditExtraForm,
     savingAccount,
     openAccountEditor,
@@ -175,8 +175,8 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
                   onSave={saveInline}
                   onCancel={cancelInlineEdit}
                   saving={savingAccount}
-                  timeShiftMinutes={timeShiftMinutes}
-                  onTimeShift={setTimeShiftDays}
+                  timeSet={timeSet}
+                  onTimeSet={setTimeField}
                 />
               );
             },

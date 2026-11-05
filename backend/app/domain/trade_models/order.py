@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.core.database import Base
 from app.core.money import Amount
+from app.core.time import now_second
 from app.domain.base import (
     AuditMixin,
     TimestampMixin,
@@ -35,6 +36,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import (
     Mapped,
@@ -126,6 +128,13 @@ class Order(Base, AuditMixin):
     # 建单表单「自定义字段」值存放处（与统一表单字段配置解耦，不违反治理约束）。
     # key 为 OrderFormField.field_key，value 为按 field_type 归一化后的值。
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    # #15 需求2：登记时间（系统时间戳，台账展示为「订单创建时间」）可改可清空删除，
+    # 故在此覆盖 TimestampMixin 的 created_at 为可空；插入仍由 server_default 兜底，
+    # 仅「清空」动作可显式置 NULL。updated_at 保持非空（仍来自 TimestampMixin）。
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, default=now_second, server_default=func.now()
+    )
 
 
 class OrderLink(Base, TimestampMixin):

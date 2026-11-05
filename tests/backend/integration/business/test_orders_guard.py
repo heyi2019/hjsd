@@ -338,14 +338,15 @@ def test_update_order_records_date_change(seeded_db):
     assert updated.trade_date == TODAY2
 
 
-def test_update_order_rejects_account_snapshot(seeded_db):
+def test_update_order_accepts_account_snapshot(seeded_db):
+    """#15 需求2：账号快照一律可编辑（推翻 11-05「账号快照拒编辑」裁决）。"""
     order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
-    with pytest.raises(Validation, match="订单账号快照当前不支持"):
-        service.update_order(
-            seeded_db, order.id, actor="pytest",
-            account_snapshot={"game_account": "x"}, user=None,
-        )
+    updated = service.update_order(
+        seeded_db, order.id, actor="pytest",
+        account_snapshot={"game_account": "x", "game_type": "王者荣耀"}, user=None,
+    )
+    assert updated.account_snapshot == {"game_account": "x", "game_type": "王者荣耀"}
 
 
 def test_create_order_rejects_invalid_counterparty_role(seeded_db):

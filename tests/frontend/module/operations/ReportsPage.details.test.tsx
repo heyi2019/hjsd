@@ -176,7 +176,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     expect(screen.getAllByText("160.00").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("订单利润：单独展示账号采购成本并说明净利公式", async () => {
+  it("订单利润：单独展示账号采购成本", async () => {
     resolveMockOnce(vi.mocked(catalog.reportsApi.orderProfit), {
       from: null,
       to: null,
@@ -196,7 +196,6 @@ describe("ReportsPage：各报表渲染与错误态", () => {
 
     expect(await screen.findByText("HS-2026-0011")).toBeInTheDocument();
     expect(screen.getAllByText("账号采购成本").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/净利 = 所有收入 − 所有支出/)).toBeInTheDocument();
     expect(screen.getAllByText("400.00").length).toBeGreaterThanOrEqual(1);
   });
 });

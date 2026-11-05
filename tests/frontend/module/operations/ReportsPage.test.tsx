@@ -1,9 +1,10 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { resolveMock } from "@fixtures/mock-api";
+import { appMessage } from "@/shared/ui/appFeedback";
 
 import * as catalog from "@/shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
@@ -111,59 +112,38 @@ describe("ReportsPage：经营中心报表", () => {
     expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
   });
 
-  it("管理员可从导出工具条按日期范围 + 下拉勾选发起导出", async () => {
+  it("订单利润页内导出按钮按统计周期导出", async () => {
+    vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await ui.type(screen.getByLabelText("导出开始日期"), "2026-01-01");
-    await ui.type(screen.getByLabelText("导出结束日期"), "2026-01-31");
-    const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
-    await ui.click(selector);
-    const listbox = await screen.findByRole("listbox");
-    await ui.click(within(listbox).getByText("订单利润"));
-    await ui.click(screen.getByRole("button", { name: /导出/ }));
+    await gotoTab("订单利润");
+    // 报表统计周期 picker：激活 Tab 面板内的两枚日期输入（父级提升、无独立 label）
+    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
+    const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
+    await ui.type(dateInputs[0], "2026-01-01");
+    await ui.type(dateInputs[1], "2026-01-31");
+    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31" }));
   });
 
-  it("未勾选报表直接点导出 → 提示至少勾选一项", async () => {
+  it("库存报表页内导出按钮无筛选也能导出并给出成功反馈", async () => {
+    const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await ui.click(screen.getByRole("button", { name: /导出/ }));
-    expect(await screen.findByText("请至少勾选一项报表")).toBeInTheDocument();
-    expect(vi.mocked(catalog.reportsApi.exportCsv)).not.toHaveBeenCalled();
+    await screen.findByRole("tab", { name: "库存 R1" });
+    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("inventory-health", { from: undefined, to: undefined }));
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("已导出 inventory-health.csv"));
   });
 
   it("导出日期反向（开始晚于结束）时拦截并给出错误提示，不发起导出", async () => {
+    const errorSpy = vi.spyOn(appMessage, "error").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await ui.type(screen.getByLabelText("导出开始日期"), "2026-12-31");
-    await ui.type(screen.getByLabelText("导出结束日期"), "2026-01-01");
-    // 先勾选一项，确保命中的是反向日期分支而非「未勾选」分支（L1531 验证点）
-    const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
-    await ui.click(selector);
-    const listbox = await screen.findByRole("listbox");
-    await ui.click(within(listbox).getByText("订单利润"));
-    await ui.click(screen.getByRole("button", { name: /导出/ }));
-    expect(await screen.findByText("导出开始日期不能晚于结束日期")).toBeInTheDocument();
+    await gotoTab("订单利润");
+    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
+    const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
+    await ui.type(dateInputs[0], "2026-12-31");
+    await ui.type(dateInputs[1], "2026-01-01");
+    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("导出开始日期不能晚于结束日期"));
     expect(vi.mocked(catalog.reportsApi.exportCsv)).not.toHaveBeenCalled();
-  });
-
-  it("导出成功后展示结果反馈（成功文案 + 触发下载），按钮 loading 阻止重复点击", async () => {
-    renderLight(<ReportsPage />, { user: "admin" });
-    await ui.type(screen.getByLabelText("导出开始日期"), "2026-01-01");
-    await ui.type(screen.getByLabelText("导出结束日期"), "2026-01-31");
-    const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
-    await ui.click(selector);
-    const listbox = await screen.findByRole("listbox");
-    const option = within(listbox).getByText("订单利润");
-    await ui.click(option);
-    // 等待选项真正被选中（aria-selected=true 反映已提交的选中态）。
-    // 注意：该 Select 用 maxTagCount="responsive"，jsdom 无布局时会把已选标签折叠成
-    // "+ N ..." 溢出指示，无法直接断言可见标签文字；故改等选项 aria-selected，
-    // 避免误判「未选中」而命中「请至少勾选一项」分支。
-    await waitFor(() =>
-      expect(within(listbox).getByText("订单利润").closest(".ant-select-item-option")).toHaveAttribute("aria-selected", "true"),
-    );
-    await ui.click(screen.getByRole("button", { name: /导出/ }));
-    // L1727 验证点：成功文案出现 + 确实触发了下载请求
-    // 成功文案在「页内反馈区」与 antd message 弹层各渲染一份，用 findAllByText 兼容双渲染。
-    expect((await screen.findAllByText("已导出 1 份报表")).length).toBeGreaterThan(0);
-    expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31" });
   });
 });

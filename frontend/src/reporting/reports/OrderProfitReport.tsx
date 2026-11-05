@@ -6,7 +6,8 @@ import { reportsApi, type OrderProfitReport, type OrderProfitRow } from "../../s
 import { ORDER_TYPE_LABEL } from "../../shared/lib/labels";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow, StatusTag } from "../../shared/ui";
-import { Note, type ReportRange, useReport } from "./shared";
+import { type ReportRange, useReport } from "./shared";
+import { ReportExportButton } from "./ReportExportButton";
 
 export function OrderProfit({ range }: { range: ReportRange }) {
   const { params, picker } = range;
@@ -35,9 +36,6 @@ export function OrderProfit({ range }: { range: ReportRange }) {
     <Card className="glass" title="订单利润明细">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
-      <Note>
-        净利 = 所有收入 − 所有支出：收入含资金流水与返点记录，支出含资金流水、账号采购成本与分期坏账；返点列是收入中的其中项，不再重复加进净利。
-      </Note>
       <StatRow
         items={[
           { label: "收入合计", amount: data?.total.income ?? "-" },
@@ -57,6 +55,7 @@ export function OrderProfit({ range }: { range: ReportRange }) {
          emptyText="所选区间无订单"
          onPageChange={() => undefined}
       />
+      <ReportExportButton name="order-profit" params={params} />
     </Card>
   );
 }

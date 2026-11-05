@@ -5,7 +5,8 @@ import type { ColumnsType } from "antd/es/table";
 import { reportsApi, type MonthlyPnlReport, type MonthlyPnlRow } from "../../shared/api/catalog";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow } from "../../shared/ui";
-import { Note, type ReportRange, useReport } from "./shared";
+import { type ReportRange, useReport } from "./shared";
+import { ReportExportButton } from "./ReportExportButton";
 
 export function MonthlyPnl({ range }: { range: ReportRange }) {
   const { params, picker } = range;
@@ -31,7 +32,6 @@ export function MonthlyPnl({ range }: { range: ReportRange }) {
     <Card className="glass" title="月度经营损益 R2">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
-      <Note>账号采购成本属直接成本，不计入运营费用，避免双重扣减（RPT-01-02）。</Note>
       <StatRow
         items={[
           { label: "销售收入", amount: data?.total.sales_income ?? "-" },
@@ -48,6 +48,7 @@ export function MonthlyPnl({ range }: { range: ReportRange }) {
          emptyText="所选区间无数据"
          onPageChange={() => undefined}
       />
+      <ReportExportButton name="monthly-pnl" params={params} />
     </Card>
   );
 }

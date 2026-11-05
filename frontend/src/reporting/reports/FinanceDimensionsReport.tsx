@@ -6,7 +6,8 @@ import { reportsApi, type FinanceDimensionReport, type FinanceDimensionRow } fro
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL } from "../../shared/lib/labels";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow } from "../../shared/ui";
-import { Note, type ReportRange, useReport } from "./shared";
+import { type ReportRange, useReport } from "./shared";
+import { ReportExportButton } from "./ReportExportButton";
 
 export function FinanceDimensions({ range }: { range: ReportRange }) {
   const { params, picker } = range;
@@ -28,7 +29,6 @@ export function FinanceDimensions({ range }: { range: ReportRange }) {
     <Card className="glass" title="资金属性分析">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
-      <Note>按已审核流水的资金池、资金性质、核算属性和现金方向聚合；净方向金额按收入为正、支出为负计算。</Note>
       <StatRow
         items={[
           { label: "发生额合计", amount: data?.total_amount ?? "-" },
@@ -45,6 +45,7 @@ export function FinanceDimensions({ range }: { range: ReportRange }) {
          emptyText="所选区间无已审核流水"
          onPageChange={() => undefined}
       />
+      <ReportExportButton name="finance-dimensions" params={params} />
     </Card>
   );
 }

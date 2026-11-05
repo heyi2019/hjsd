@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
+import { appMessage } from "@/shared/ui/appFeedback";
 
 import * as catalog from "@/shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
@@ -167,35 +168,31 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     expect(screen.getAllByText("-").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("FE-053：导出成功后创建下载锚点并显示结果反馈", async () => {
+  it("FE-053：页内导出成功后创建下载锚点并显示结果反馈", async () => {
     const createUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test");
     const revokeUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
-    await ui.click(selector);
-    const listbox = await screen.findByRole("listbox");
-    await ui.click(within(listbox).getByText("库存健康"));
-    await ui.click(screen.getByRole("button", { name: /导出/ }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalled());
+    await screen.findByRole("tab", { name: "库存 R1" });
+    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("inventory-health", { from: undefined, to: undefined }));
     expect(createUrl).toHaveBeenCalled();
     expect(revokeUrl).toHaveBeenCalled();
-    // 成功文案在「页内反馈区」与 antd message 弹层各渲染一份，findByText 单数会报
-    // 「Found multiple elements」，用 findAllByText 兼容双渲染。
-    expect((await screen.findAllByText(/已导出 1 份报表/)).length).toBeGreaterThan(0);
+    expect(successSpy).toHaveBeenCalledWith("已导出 inventory-health.csv");
     createUrl.mockRestore();
     revokeUrl.mockRestore();
   });
 
   it("导出日期反向时阻止请求并提示范围错误", async () => {
+    const errorSpy = vi.spyOn(appMessage, "error").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await ui.type(screen.getByLabelText("导出开始日期"), "2026-10-31");
-    await ui.type(screen.getByLabelText("导出结束日期"), "2026-10-01");
-    const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
-    await ui.click(selector);
-    const listbox = await screen.findByRole("listbox");
-    await ui.click(within(listbox).getByText("订单利润"));
-    await ui.click(screen.getByRole("button", { name: /导出/ }));
-    expect(await screen.findByText("导出开始日期不能晚于结束日期")).toBeInTheDocument();
+    await gotoTab("订单利润");
+    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
+    const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
+    await ui.type(dateInputs[0], "2026-10-31");
+    await ui.type(dateInputs[1], "2026-10-01");
+    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("导出开始日期不能晚于结束日期"));
     expect(vi.mocked(catalog.reportsApi.exportCsv)).not.toHaveBeenCalled();
   });
 

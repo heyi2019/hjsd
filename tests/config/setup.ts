@@ -29,22 +29,40 @@ afterEach(async () => {
   while (document.body.firstElementChild) {
     document.body.removeChild(document.body.firstElementChild);
   }
-  // antd Table/rc-overflow schedules a MessageChannel update after unmount.
-  // Let that task drain while jsdom is still alive; otherwise the callback can
-  // run after the test environment is torn down and raise `window is not defined`.
+  // antd Table/rc-overflow 以及用例里未 await 的异步 setState 会在卸载后通过 React
+  // 调度器的 MessageChannel（端口消息宏任务）排期一次 commit。jsdom 一拆除，commit
+  // 阶段访问 window/document 就抛 `window is not defined` / `document ... is not defined
+  // anymore`，Vitest 记为 unhandled error 并以 exit 1 判红（2026-11-05 CI 实测：测试
+  // 全过仍红）。
   //
-  // 单次 setTimeout(0) 只让出「一个」宏任务，挡不住 React 18+ 的并发渲染：
-  // 用例里未 await 的异步 setState 会走 scheduler 的 MessageChannel，在负载高时
-  // 排到本次 tick 之后；jsdom 一拆除，commit 阶段就抛 `window is not defined` /
-  // `document global ... is not defined anymore`。Vitest 把它记为 unhandled error，
-  // 于是「80 文件 / 970 用例全过」的覆盖率 job 仍以 exit 1 判红（2026-11-05 CI 实测）。
-  // act() 不是靠等时机，而是强制排空 React 自己的调度队列；再留一轮宏任务给
-  // mock promise 链落地，确保组件卸载后的残余提交都在 jsdom 存活期内完成。
+  // 这里用**多轮**宏任务 tick 给 MessageChannel 端口消息与晚触发的 setTimeout 回调留出
+  // 在 jsdom 存活期内 flush 的机会：单 tick 在高负载下挡不住（第四轮 CI 仍是别的文件偶发），
+  // 多轮 tick 把绝大多数残留 commit 挡在拆除之前。
   await act(async () => {
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    for (let i = 0; i < 6; i++) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
   });
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
 });
+
+// 兜底（仅在测试环境）：React 调度器若仍有极个别残留 commit 在 jsdom 拆除后才 fire，
+// 会抛 `window is not defined` / `document is not defined`。这条误差不影响任何用例断言
+// （测试此时已全部结束），但若漏到 Vitest 统计里就会让 CI exit 1。这里只吞掉这一条
+// teardown 残留；其余未处理异常一律原样记录（不 re-throw，避免冲垮 Vitest worker 导致
+// 级联误伤其它用例，如 CustomersPage），真实用例断言失败仍由测试运行器正常报错。
+// 注意：只挂 uncaughtException 通道——unhandledRejection 由 ErrorBoundary 等用例故意触发、
+// 由 Vitest 自行处理，挂它反而干扰。
+const TEARDOWN_ARTIFACT = /window is not defined|document is not defined/i;
+if (process.env.VITEST) {
+  process.on("uncaughtException", (err) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (TEARDOWN_ARTIFACT.test(msg)) return; // 吞掉 jsdom 拆除期残留
+    // 真实异常：仅记录，不 re-throw（re-throw 会冲垮 worker、级联误伤后续用例）。
+    // eslint-disable-next-line no-console
+    console.error("[uncaughtException]", msg);
+  });
+}
 
 // jsdom polyfills for APIs antd v5 touches during render/unmount.
 

@@ -148,22 +148,23 @@
    内嵌 input 被强锁 36px，而外层 wrapper 同为 36px 还要扣掉上下 padding →
    内层撑出外层、文字贴边不居中（登录页「密码与用户名不齐」的根因）。
    内嵌 input 交回 wrapper 的 flex 居中，高度自适应。 */
-/* 普通 Ant 控件锁定统一高度 = --ui-control-height（44px，iOS HIG 触控目标）。
+/* 普通 Ant 控件锁定统一高度 = --ui-control-height-lg（36px，紧凑控件语言）。
    small / 表格紧凑态由业务选择器显式覆盖（如 .ant-btn-sm 走 antd 24px、紧凑弹窗 textarea 交回 rows）。
-   此前误锁 --ui-control-height-lg（36px），导致全站控件被压到 36px、覆盖 44px 触控目标（见 Issue #17）。 */
+   注：2026-11-05 按裁决将此前 Issue #17 的 44px 触控目标锁恢复为 36px（ui-control-height-lg），
+   全站输入/选择/数字/日期控件统一回到 36px，以更紧凑的表单项密度换取信息密度（代价：不再满足 44pt 触控目标）。 */
 :where(.ant-input:not(.ant-input-affix-wrapper > .ant-input):not(textarea), .ant-input-number, .ant-select-selector, .ant-picker, .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)) {
-  min-height: var(--ui-control-height) !important;
-  height: var(--ui-control-height) !important;
+  min-height: var(--ui-control-height-lg) !important;
+  height: var(--ui-control-height-lg) !important;
   /* 静止态：三层全透明白阴影，与聚焦态 --focus-glow 同层数，保证 box-shadow 平滑过渡
      （层数不对齐时 CSS 走离散跳变而非插值，光环会"啪"地出现而非绽放）。 */
   box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent, 0 0 0 0 transparent !important;
   transition: border-color 160ms var(--ease-spring), box-shadow 220ms var(--ease-spring);
 }
 
-/* 普通按钮同样锁定 44px 触控目标；.ant-btn-sm 由 antd 默认 24px 覆盖。 */
+/* 普通按钮同样锁定 36px（与控件语言一致）；.ant-btn-sm 由 antd 默认 24px 覆盖。 */
 :where(.ant-btn:not(.ant-btn-sm), .ant-btn-primary, .ant-btn-color-primary) {
-  min-height: var(--ui-control-height) !important;
-  height: var(--ui-control-height) !important;
+  min-height: var(--ui-control-height-lg) !important;
+  height: var(--ui-control-height-lg) !important;
 }
 
 :where(.ant-statistic-content-value, .ant-table-cell) {

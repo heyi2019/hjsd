@@ -127,6 +127,18 @@ jobs:
           tar -xzf /tmp/heijin-gh-cd/heijin-source.tar.gz -C /opt/heijin
 
           cd /opt/heijin/deploy
+
+          # 持久化发布版本：deploy.sh 只在本次进程内覆盖 APP_VERSION，.env 若仍写旧 tag，
+          # 之后在 ECS 上单独执行 docker compose up -d 会静默回落到旧镜像（回滚事故）。
+          if grep -q '^APP_VERSION=' .env; then
+            sed -i "s/^APP_VERSION=.*/APP_VERSION=${APP_VERSION}/" .env
+          else
+            printf '\nAPP_VERSION=%s\n' "${APP_VERSION}" >> .env
+          fi
+          grep '^APP_VERSION=' .env
+
+          # deploy.sh 内含发布前后库状态不变量校验与售出表单三作用域补齐（B4），
+          # 任一校验失败即非零退出，CI 判红，不会静默上线。
           ERP_SKIP_BUILD=1 APP_VERSION="$APP_VERSION" bash scripts/deploy.sh
           curl -fsS http://127.0.0.1/api/v1/health
           REMOTE
@@ -140,6 +152,8 @@ jobs:
             echo "- Version: \`${APP_VERSION}\`"
             echo "- Target: ECS"
             echo "- Health check: passed"
+            echo "- DB invariants: verified (deploy.sh)"
+            echo "- Sale form scopes: backfilled (B4)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Tag release

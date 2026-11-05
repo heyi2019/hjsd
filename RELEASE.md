@@ -58,16 +58,17 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 - **前端单入口**：H5 两套入口与微信 H5 通道已下线，手机访问靠 `responsive.css` 三断点；移动端隐藏列按列 key 打标，禁用 nth-child。
 - **登录**：桌面端密码 / 手机号验证码 / 微信三入口保留，不开放注册；生产 `.env` 两条免密链路仍显式关闭。
 - **质量口径**：三端全量回归全绿（后端 1728、前端落库 1081 全 PASS、E2E 62），官方报告 FAIL / ERROR / SKIP / 未执行 / 弱标准均归零；版本三处一致由 `bump_version.sh --check` 守卫。
+- **发布通道合规**：`deploy.sh` 移除 `db_version` 自建表与 `policy_definitions` 预置两处副作用，内置售出表单 B4 补齐与升级前后库状态不变量自检（失败即中止发布）；`deploy-production.yml` 持久化 ECS `.env` 的 `APP_VERSION`，避免后续单独 `compose up` 静默回落旧镜像。
 
 > 提交历史中曾出现 `feat(h5)` 系列，最终已整体下线，**不属于本版交付内容**。发布记录按终态口径书写，勿按提交列表逐条对外引用。
 
 ### 升级与回滚
 
-按 `docs/ERP_生产上线执行单_v1.4_20261105.md` 原地增量升级：零 DDL、必跑 B4、生产数据不出 ECS、**禁止 push `test` 触发 CI 自动部署**。回滚只需 `APP_VERSION=1.0.3` 换回镜像，B4 插入行对旧镜像不可见，无需清理数据。
+按 `docs/ERP_生产上线执行单_v1.4_20261105.md` **自动 CI/CD 原地增量升级**：`git push origin dev:refs/heads/test` → 3 gate → `auto-merge` → `deploy-production` → ECS。零 DDL、B4 已内置进 `deploy.sh`、生产数据不出 ECS。回滚：先把 `.env` 的 `APP_VERSION` 写回 `1.0.3` 再 `docker compose up -d`（只给单条命令加变量前缀会被持久化值覆盖），B4 插入行对旧镜像不可见，无需清理数据。
 
 ### 已知遗留
 
-首次设密死锁修复未包含在本版；生产两条免密链路保持关闭，开放前需单独发版。高负载下两条 E2E flake 与 `test` 分支自动部署链路仍待裁决。
+首次设密死锁修复未包含在本版；生产两条免密链路保持关闭，开放前需单独发版。高负载下两条 E2E flake 仍待裁决；`test` 分支自动部署链路已修合规并作为唯一发布通道，**误触等同生产上线**。
 
 ---
 

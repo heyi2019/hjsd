@@ -484,7 +484,21 @@ def module_files(module: str) -> list[str]:
 
 
 def cross_files() -> list[str]:
-    return sorted(CROSS_MODULE_FILES)
+    """返回 cross 文件的**相对 tests/backend 的路径**（如 integration/business/test_flow_sale.py）。
+
+    CROSS_MODULE_FILES 的键仍是裸文件名（供 backend_file_modules 按 basename 匹配）；
+    但 run_regression.py 会把这些返回值拼成 ``tests/backend/<path>``，因此这里必须给出
+    真实相对路径——此前返回裸文件名导致整组 pytest 因 ``tests/backend/test_flow_*.py``
+    不存在而 exit 1（CI backend-gate 的 cross 分组长期静默失效）。"""
+    root = os.path.join(REPO, "tests", "backend")
+    resolved: list[str] = []
+    for base in sorted(CROSS_MODULE_FILES):
+        for dirpath, _dirs, files in os.walk(root):
+            if base in files:
+                resolved.append(
+                    os.path.relpath(os.path.join(dirpath, base), root).replace(os.sep, "/")
+                )
+    return sorted(resolved)
 
 
 def type_files(ttype: str) -> list[str]:

@@ -22,7 +22,7 @@ export function MonthlyPnl({ range }: { range: ReportRange }) {
     { title: "运营费用", dataIndex: "operating_expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "返点收益", dataIndex: "rebate_income", align: "right", render: (v: string) => <MoneyText value={v} />},
     {
-      title: "经营利润",
+      title: "经营利润（报表口径）",
       dataIndex: "operating_profit",
       align: "right",
       render: (v: string) => <MoneyText value={v} tone="auto" strong />,
@@ -35,7 +35,7 @@ export function MonthlyPnl({ range }: { range: ReportRange }) {
       <StatRow
         items={[
           { label: "销售收入", amount: data?.total.sales_income ?? "-" },
-          { label: "经营利润", amount: data?.total.operating_profit ?? "-", tone: "auto" },
+          { label: "经营利润（报表口径）", amount: data?.total.operating_profit ?? "-", tone: "auto" },
         ]}
       />
              <DataTable<MonthlyPnlRow>

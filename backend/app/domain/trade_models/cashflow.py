@@ -14,8 +14,6 @@ from app.domain.enums import (
     AllocationRole,
     CashflowStatus,
     Direction,
-    FundNature,
-    Nature,
     ReconciliationStatus,
 )
 from datetime import (
@@ -46,20 +44,6 @@ class Cashflow(Base, AuditMixin):
     __tablename__ = "cashflow"
     __table_args__ = (
         CheckConstraint(
-            f"nature IN {Nature.values()!r}".replace("[", "(").replace("]", ")"),
-            name="cashflow_nature_valid",
-        ),
-        CheckConstraint(
-            f"fund_nature IN {FundNature.values()!r}".replace("[", "(").replace("]", ")"),
-            name="cashflow_fund_nature_valid",
-        ),
-        CheckConstraint(
-            f"accounting_attribute IN {AccountingAttribute.values()!r}"
-            .replace("[", "(")
-            .replace("]", ")"),
-            name="cashflow_accounting_attribute_valid",
-        ),
-        CheckConstraint(
             f"direction IN {Direction.values()!r}".replace("[", "(").replace("]", ")"),
             name="cashflow_direction_valid",
         ),
@@ -67,26 +51,12 @@ class Cashflow(Base, AuditMixin):
             f"status IN {CashflowStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="cashflow_status_valid",
         ),
-        CheckConstraint(
-            "nature != 'INTERNAL' OR transfer_id IS NOT NULL",
-            name="internal_transfer_link_valid",
-        ),
-        CheckConstraint(
-            "(nature = 'INTERNAL' AND transfer_id IS NOT NULL) OR "
-            "(direction = 'IN' AND nature IN ('EXTERNAL_IN', 'BUSINESS_IN')) OR "
-            "(direction = 'OUT' AND nature = 'BUSINESS_OUT') OR "
-            "(category = 'CANCEL' AND nature = 'BUSINESS_IN' AND direction IN ('IN', 'OUT'))",
-            name="cashflow_direction_nature_valid",
-        ),
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
         # 一笔订单事件可派生多笔资金流水（如售出拆分进不同资金池），
         # 故不再对 order_event_id 设唯一约束；历史唯一约束由迁移 0065 在库中移除。
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
         Index("ix_cashflow_order", "order_id"),
         Index("ix_cashflow_deposit", "deposit_id"),
-        Index("ix_cashflow_nature", "nature"),
-        Index("ix_cashflow_fund_nature", "fund_nature"),
-        Index("ix_cashflow_accounting_attribute", "accounting_attribute"),
         Index("ix_cashflow_transfer", "transfer_id"),
         CheckConstraint("amount >= 0", name="amount_nonneg"),
         Index("ix_cashflow_occurred_on", "occurred_on"),
@@ -100,15 +70,6 @@ class Cashflow(Base, AuditMixin):
         ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
     )
     occurred_on: Mapped[date] = mapped_column(Date, nullable=False)
-    nature: Mapped[str] = mapped_column(String(16), nullable=False)
-    fund_nature: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=FundNature.BUSINESS.value,
-        server_default=FundNature.BUSINESS.value,
-    )
-    accounting_attribute: Mapped[str] = mapped_column(
-        String(32), nullable=False, default=AccountingAttribute.OPERATING_EXPENSE.value,
-        server_default=AccountingAttribute.OPERATING_EXPENSE.value,
-    )
     category: Mapped[str] = mapped_column(String(32), nullable=False, default="OTHER")
     direction: Mapped[str] = mapped_column(String(8), nullable=False)
     amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)

@@ -104,7 +104,7 @@ def _profit_flow_rows(
       `InstallmentDisposition.occurred_on` 归期；一份合约只有一次 RECOVER，
       连接不会放大金额。
 
-    不过滤审核状态 / 资金性质：资金走向只有收入、支出两类，登记即计入。
+    不过滤审核状态：资金走向只有收入、支出两类，登记即计入。
     """
     rows: list[tuple[int, date, Decimal, Decimal]] = []
 
@@ -199,7 +199,7 @@ def order_cashflow_profit(session: Session, order_id: int) -> Decimal:
     """订单利润：所有收入 − 所有支出（可正、可负、可为 0）。
 
     收入 = 资金流水 IN 合计 + 返点记录金额；支出 = 资金流水 OUT 合计 + 分期坏账。
-    不过滤审核状态与资金性质；冲销流水本身是反向流水，自然被计入。
+    不过滤审核状态；冲销流水本身是反向流水，自然被计入。
     """
     rows = session.execute(
         select(Cashflow.direction, func.coalesce(func.sum(Cashflow.amount), 0))

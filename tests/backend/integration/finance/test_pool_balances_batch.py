@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from app.domain.enums import Direction, Nature, PoolOwnership
+from app.domain.enums import Direction, PoolOwnership
 from app.finance import service as finance_service
 from app.foundation import service as foundation_service
 
@@ -27,8 +27,6 @@ def _flow(seeded_db, pool_id: int, *, direction: str, amount: str, note: str):
         pool_id=pool_id,
         occurred_on=TODAY,
         direction=direction,
-        nature=Nature.BUSINESS_IN.value if direction == Direction.IN.value
-        else Nature.BUSINESS_OUT.value,
         category="OPERATING",
         amount=Decimal(amount),
         note=note,

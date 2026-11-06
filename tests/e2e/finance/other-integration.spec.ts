@@ -34,7 +34,7 @@ test("资金中心页面划转后生成一收一支的内部资金流水", async
   expect(result.status()).toBe(201);
   const body = await result.json();
   expect(body.cashflows).toHaveLength(2);
-  expect(body.cashflows.map((f: { direction: string; amount: string; fund_nature: string }) => [f.direction, Number(f.amount), f.fund_nature]).sort()).toEqual([["IN", 1, "INTERNAL"], ["OUT", 1, "INTERNAL"]]);
+  expect(body.cashflows.map((f: { direction: string; amount: string; nature: string }) => [f.direction, Number(f.amount), f.nature]).sort()).toEqual([["IN", 1, "INTERNAL"], ["OUT", 1, "INTERNAL"]]);
   await expect(dialog).toBeHidden();
 });
 

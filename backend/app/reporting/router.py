@@ -87,7 +87,7 @@ def finance_dimensions(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
 ) -> FinanceDimensionOut:
-    """按资金池、资金性质、核算属性和现金方向聚合已审核流水。"""
+    """按资金池和现金方向聚合已审核流水。"""
     return service.finance_dimension_report(db, from_date=from_date, to_date=to_date, user=user)
 
 

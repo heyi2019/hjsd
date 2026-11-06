@@ -44,7 +44,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
   const columns: ColumnsType<CommissionRow> = [
     ...(mine ? [] : [{ title: "人员 ID", dataIndex: "user_id", width: 100 }]),
     { title: "订单号", dataIndex: "order_no", width: 160 },
-    { title: "利润基数", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "订单利润基数", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} />},
     { title: "费率", dataIndex: "rate", align: "right", width: 90},
     { title: "应付", dataIndex: "payable", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "已付", dataIndex: "paid", align: "right", render: (v: string) => <MoneyText value={v} />},

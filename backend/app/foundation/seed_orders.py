@@ -40,7 +40,6 @@ def seed_order_matrix(db, actor: str = "e2e") -> None:
         EventType,
         InstallmentContractType,
         InstallmentStatus,
-        Nature,
         Portion,
         RebateStatus,
         RebateType,
@@ -88,38 +87,38 @@ def seed_order_matrix(db, actor: str = "e2e") -> None:
         customers = db.query(Customer).order_by(Customer.id).all()
     buyer_c, seller_c, consignor_c = customers[0], customers[1], customers[2]
 
-    # (order_type, capital_type, business_mode, inventory_type, status, linked)
+    # (order_type, business_mode, inventory_type, status, linked)
     # 状态：ACTIVE / INSTALLMENT / COMPLETED / CANCELLED
     # DG 无分期（DG 走统一 SELL），故 DG 只含 ACTIVE/COMPLETED/CANCELLED。
     MATRIX = [
-        ("HS", "STOCK", "SELF", "RECOVERY", "ACTIVE", True),
-        ("HS", "STOCK", "SELF", "RECOVERY", "ACTIVE", False),
-        ("HS", "STOCK", "SELF", "RECOVERY", "INSTALLMENT", True),
-        ("HS", "STOCK", "SELF", "RECOVERY", "INSTALLMENT", False),
-        ("HS", "STOCK", "SELF", "RECOVERY", "COMPLETED", True),
-        ("HS", "STOCK", "SELF", "RECOVERY", "COMPLETED", False),
-        ("HS", "STOCK", "SELF", "RECOVERY", "CANCELLED", True),
-        ("HS", "STOCK", "SELF", "RECOVERY", "CANCELLED", False),
-        ("TH", "STOCK", "DISTRIBUTION", "PICKUP", "ACTIVE", True),
-        ("TH", "STOCK", "DISTRIBUTION", "PICKUP", "ACTIVE", False),
-        ("TH", "STOCK", "DISTRIBUTION", "PICKUP", "INSTALLMENT", True),
-        ("TH", "STOCK", "DISTRIBUTION", "PICKUP", "INSTALLMENT", False),
-        ("TH", "STOCK", "DISTRIBUTION", "PICKUP", "COMPLETED", True),
-        ("TH", "STOCK", "DISTRIBUTION", "PICKUP", "COMPLETED", False),
-        ("TH", "STOCK", "DISTRIBUTION", "PICKUP", "CANCELLED", True),
-        ("TH", "STOCK", "DISTRIBUTION", "PICKUP", "CANCELLED", False),
-        ("DG", "ZERO", "DISTRIBUTION", "CONSIGNMENT", "ACTIVE", True),
-        ("DG", "ZERO", "DISTRIBUTION", "CONSIGNMENT", "ACTIVE", False),
-        ("DG", "ZERO", "DISTRIBUTION", "CONSIGNMENT", "COMPLETED", True),
-        ("DG", "ZERO", "DISTRIBUTION", "CONSIGNMENT", "COMPLETED", False),
-        ("DG", "ZERO", "DISTRIBUTION", "CONSIGNMENT", "CANCELLED", True),
-        ("DG", "ZERO", "DISTRIBUTION", "CONSIGNMENT", "CANCELLED", False),
+        ("HS", "SELF", "RECOVERY", "ACTIVE", True),
+        ("HS", "SELF", "RECOVERY", "ACTIVE", False),
+        ("HS", "SELF", "RECOVERY", "INSTALLMENT", True),
+        ("HS", "SELF", "RECOVERY", "INSTALLMENT", False),
+        ("HS", "SELF", "RECOVERY", "COMPLETED", True),
+        ("HS", "SELF", "RECOVERY", "COMPLETED", False),
+        ("HS", "SELF", "RECOVERY", "CANCELLED", True),
+        ("HS", "SELF", "RECOVERY", "CANCELLED", False),
+        ("TH", "DISTRIBUTION", "PICKUP", "ACTIVE", True),
+        ("TH", "DISTRIBUTION", "PICKUP", "ACTIVE", False),
+        ("TH", "DISTRIBUTION", "PICKUP", "INSTALLMENT", True),
+        ("TH", "DISTRIBUTION", "PICKUP", "INSTALLMENT", False),
+        ("TH", "DISTRIBUTION", "PICKUP", "COMPLETED", True),
+        ("TH", "DISTRIBUTION", "PICKUP", "COMPLETED", False),
+        ("TH", "DISTRIBUTION", "PICKUP", "CANCELLED", True),
+        ("TH", "DISTRIBUTION", "PICKUP", "CANCELLED", False),
+        ("DG", "DISTRIBUTION", "CONSIGNMENT", "ACTIVE", True),
+        ("DG", "DISTRIBUTION", "CONSIGNMENT", "ACTIVE", False),
+        ("DG", "DISTRIBUTION", "CONSIGNMENT", "COMPLETED", True),
+        ("DG", "DISTRIBUTION", "CONSIGNMENT", "COMPLETED", False),
+        ("DG", "DISTRIBUTION", "CONSIGNMENT", "CANCELLED", True),
+        ("DG", "DISTRIBUTION", "CONSIGNMENT", "CANCELLED", False),
     ]
 
     base_date = date(2026, 9, 1)
     acct_seq = 90000  # 订单专用账号段，远离 top-up 段，避免撞号
 
-    for idx, (otype, capital, biz_mode, inv_type, status, linked) in enumerate(MATRIX):
+    for idx, (otype, biz_mode, inv_type, status, linked) in enumerate(MATRIX):
         order_no = f"E2E-{otype}-{status}-{'L' if linked else 'U'}-{idx + 1:02d}"
         if db.query(Order).filter(Order.order_no == order_no).first() is not None:
             continue  # 幂等：整单（含子表）已存在则跳过
@@ -161,7 +160,6 @@ def seed_order_matrix(db, actor: str = "e2e") -> None:
         order = Order(
             order_no=order_no,
             order_type=otype,
-            capital_type=capital,
             trade_date=trade_date,
             status=status,
             link_status=link_status,
@@ -221,10 +219,6 @@ def seed_order_matrix(db, actor: str = "e2e") -> None:
                 flow_no=f"CF-{order_no}-B",
                 pool_id=invest_pool.id,
                 occurred_on=trade_date,
-                nature=Nature.BUSINESS_OUT.value,
-                accounting_attribute=(
-                    AccountingAttribute.SELF_DIRECT_COST.value
-                    if otype == "HS" else AccountingAttribute.TH_DIRECT_COST.value),
                 category="PURCHASE",
                 direction=Direction.OUT.value,
                 amount=Decimal("800"),
@@ -235,10 +229,6 @@ def seed_order_matrix(db, actor: str = "e2e") -> None:
 
         # 售出（ACTIVE 视为未售不建卖出；DG 仅 COMPLETED 建卖出，无 INSTALLMENT）
         if status in ("COMPLETED", "INSTALLMENT"):
-            sell_attr = (
-                AccountingAttribute.SERVICE_REVENUE.value if otype == "DG"
-                else AccountingAttribute.SELF_REVENUE.value if otype == "HS"
-                else AccountingAttribute.TH_REVENUE.value)
             sell_cat = "SERVICE" if otype == "DG" else "SALE"
             ev_sell = OrderEvent(
                 event_no=f"EV-{order_no}-SELL",
@@ -258,8 +248,6 @@ def seed_order_matrix(db, actor: str = "e2e") -> None:
                 flow_no=f"CF-{order_no}-S",
                 pool_id=profit_pool.id,
                 occurred_on=sell_date,
-                nature=Nature.BUSINESS_IN.value,
-                accounting_attribute=sell_attr,
                 category=sell_cat,
                 direction=Direction.IN.value,
                 amount=Decimal("2000"),

@@ -84,9 +84,6 @@ class CashflowOut(BaseModel):
     pool_id: int
     occurred_on: date
     occurred_at: datetime
-    nature: str
-    fund_nature: str
-    accounting_attribute: str
     category: str
     direction: str
     amount: Decimal
@@ -137,9 +134,6 @@ class CashflowCreate(RequestModel):
     pool_id: int
     occurred_on: date
     direction: str
-    nature: str
-    fund_nature: str | None = None
-    accounting_attribute: str | None = None
     category: str
     amount: Decimal
     order_id: int | None = None

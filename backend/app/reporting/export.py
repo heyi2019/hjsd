@@ -176,16 +176,18 @@ def finance_dimension_report(
     to_date: date | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
-    """按资金性质、核算属性、方向和账户聚合已审核流水。"""
+    """按收支方向和资金池聚合已审核流水。"""
     _validate_date_range(from_date, to_date)
     stmt = (
         select(
             Pool.id.label("pool_id"),
             Pool.code.label("pool_code"),
             Pool.name.label("pool_name"),
-            Cashflow.fund_nature,
-            Cashflow.accounting_attribute,
             Cashflow.direction,
+            case(
+                (Cashflow.order_id.is_not(None), "BUSINESS"),
+                else_="STUDIO",
+            ).label("scope"),
             func.count(Cashflow.id).label("flow_count"),
             func.sum(Cashflow.amount).label("amount"),
             func.sum(
@@ -199,10 +201,10 @@ def finance_dimension_report(
         .where(Cashflow.status == CashflowStatus.APPROVED.value)
         .group_by(
             Pool.id, Pool.code, Pool.name,
-            Cashflow.fund_nature,
-            Cashflow.accounting_attribute, Cashflow.direction,
+            Cashflow.direction,
+            Cashflow.order_id.is_not(None),
         )
-        .order_by(Pool.code, Cashflow.fund_nature, Cashflow.accounting_attribute, Cashflow.direction)
+        .order_by(Pool.code, Cashflow.direction)
     )
     if from_date is not None:
         stmt = stmt.where(Cashflow.occurred_on >= from_date)
@@ -217,9 +219,8 @@ def finance_dimension_report(
             "pool_id": row["pool_id"],
             "pool_code": row["pool_code"],
             "pool_name": row["pool_name"],
-            "fund_nature": row["fund_nature"],
-            "accounting_attribute": row["accounting_attribute"],
             "direction": row["direction"],
+            "scope": row["scope"],
             "flow_count": int(row["flow_count"] or 0),
             "amount": _money(row["amount"]),
             "signed_amount": _money(row["signed_amount"]),

@@ -42,7 +42,6 @@ const orders = [
     id: 1,
     order_no: "HS-2026-0001",
     order_type: "HS",
-    capital_type: "SELF",
     trade_date: "2026-10-01",
     status: "ACTIVE",
     account_game_type: "原神",
@@ -58,9 +57,9 @@ const orders = [
     sale_operator: "售卖员",
     sale_at: "2026-10-17T16:45:00",
   },
-  { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
+  { id: 2, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-02", status: "COMPLETED" },
 ];
-const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
+const types = [{ id: 1, code: "HS", name: "回收", is_active: true }];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -176,7 +175,7 @@ describe("OrdersPage：四类订单台账", () => {
   it("订单台账顶部展示当前筛选结果的订单统计卡", async () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([
       ...orders,
-      { id: 3, order_no: "DG-2026-0003", order_type: "DG", capital_type: "ZERO", trade_date: "2026-10-03", status: "CANCELLED" },
+      { id: 3, order_no: "DG-2026-0003", order_type: "DG", trade_date: "2026-10-03", status: "CANCELLED" },
     ]);
 
     await openLedger();
@@ -252,7 +251,6 @@ describe("OrdersPage：四类订单台账", () => {
         id: 3,
         order_no: "DG-2026-0003",
         order_type: "DG",
-        capital_type: "ZERO",
         trade_date: "2026-10-03",
         status: "ACTIVE",
         note: "[批量验收] DG 分期出售",
@@ -273,7 +271,6 @@ describe("OrdersPage：四类订单台账", () => {
         id: 3,
         order_no: "DG-2026-0003",
         order_type: "DG",
-        capital_type: "ZERO",
         trade_date: "2026-10-03",
         status: "ACTIVE",
         account_game_type: "王者荣耀",
@@ -444,7 +441,6 @@ describe("OrdersPage：四类订单台账", () => {
         id: 3,
         order_no: "DG-2026-0003",
         order_type: "DG",
-        capital_type: "ZERO",
         trade_date: "2026-10-03",
         status: "ACTIVE",
         account_id: 9,
@@ -466,7 +462,6 @@ describe("OrdersPage：四类订单台账", () => {
       id: 4,
       order_no: "DG-2026-0004",
       order_type: "DG",
-      capital_type: "ZERO",
       trade_date: "2026-10-04",
       status: "COMPLETED",
       account_id: 10,

@@ -132,10 +132,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("occurred_on", "日期"),
             ListColumn("occurred_at", "建立时间"),
             ListColumn("category", "类别"),
-            ListColumn("fund_nature", "资金性质"),
-            ListColumn("accounting_attribute", "核算属性"),
-            ListColumn("direction", "收支"),
-            ListColumn("nature", "流向"),
+            ListColumn("direction", "收支方向"),
             ListColumn("amount", "金额"),
             ListColumn("source", "来源"),
             ListColumn("status", "状态"),
@@ -219,7 +216,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("account_direct_cost", "账号直接成本"),
             ListColumn("operating_expense", "运营费用"),
             ListColumn("rebate_income", "返点收益"),
-            ListColumn("operating_profit", "经营利润"),
+            ListColumn("operating_profit", "经营利润（报表口径）"),
         ),
     ),
     ListScope(
@@ -228,7 +225,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         columns=(
             ListColumn("user_id", "人员 ID"),
             ListColumn("order_no", "订单号"),
-            ListColumn("profit_base", "利润基数"),
+            ListColumn("profit_base", "订单利润基数"),
             ListColumn("rate", "费率"),
             ListColumn("payable", "应付"),
             ListColumn("paid", "已付"),
@@ -240,8 +237,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         label="报表·资金日报",
         columns=(
             ListColumn("pool_name", "资金池"),
-            # 同一行 pool_name 被页面重复渲染成「名称」列，这里用独立 key 以免两列联动
-            ListColumn("pool_label", "名称"),
             ListColumn("opening", "期初"),
             ListColumn("income", "收入"),
             ListColumn("expense", "支出"),
@@ -255,8 +250,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         label="报表·资金属性分析",
         columns=(
             ListColumn("pool_name", "资金池"),
-            ListColumn("fund_nature", "资金性质", value_set="FUND_FLOW_FUND_NATURE"),
-            ListColumn("accounting_attribute", "核算属性", value_set="FUND_FLOW_ACCOUNTING_ATTRIBUTE"),
             ListColumn("direction", "现金方向", value_set="FUND_FLOW_DIRECTION"),
             ListColumn("flow_count", "笔数"),
             ListColumn("amount", "发生额"),
@@ -270,7 +263,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("order_type", "业务", value_set="ORDER_BUSINESS"),
             ListColumn("main_income", "主营收入"),
             ListColumn("main_cost", "主营成本"),
-            ListColumn("main_profit", "主营毛利"),
+            ListColumn("main_profit", "业务利润（汇总）"),
         ),
     ),
     ListScope(
@@ -284,8 +277,8 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("income", "收入"),
             ListColumn("buy_amount", "账号采购成本"),
             ListColumn("direct_cost", "直接成本"),
-            ListColumn("rebate", "返点"),
-            ListColumn("net_profit", "净利"),
+            ListColumn("rebate", "返点（收入子项）"),
+            ListColumn("net_profit", "订单利润（净利）"),
         ),
     ),
     ListScope(

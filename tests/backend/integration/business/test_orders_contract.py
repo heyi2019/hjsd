@@ -23,7 +23,6 @@ from app.core.security import CurrentUser, DEV_USERS, build_access_token
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
-    CapitalType,
     CustomerStatus,
     InstallmentContractType,
     OrderStatus,

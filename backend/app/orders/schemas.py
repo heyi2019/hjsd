@@ -106,7 +106,6 @@ class OrderCreate(BaseModel):
         default=False, description="确认复购回流：仅对已售出的历史同账号生效"
     )
     owner_id: int | None = None
-    capital_type: str | None = Field(default=None, description="默认取业务定义")
     note: str | None = None
     # 佣金口径（BAS：仅 DG 代挂单可用；两者必须同时填写或同时留空）
     commission_mode: str | None = Field(
@@ -170,7 +169,6 @@ class OrderOut(BaseModel):
     id: int
     order_no: str
     order_type: str
-    capital_type: str
     business_mode: str | None = None
     business_type: str | None = None
     value_added_service: str | None = None
@@ -292,7 +290,6 @@ class OrderCashflowOut(BaseModel):
     flow_no: str
     pool_id: int
     occurred_on: date
-    nature: str
     category: str
     direction: str
     amount: Decimal

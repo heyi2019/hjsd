@@ -118,9 +118,8 @@ class FinanceDimensionItemOut(ReportModel):
     pool_id: int
     pool_code: str
     pool_name: str
-    fund_nature: str
-    accounting_attribute: str
     direction: str
+    scope: str
     flow_count: int
     amount: Decimal
     signed_amount: Decimal

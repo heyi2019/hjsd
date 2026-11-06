@@ -86,8 +86,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
       ],
     });
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金日报 R4");
-    expect((await screen.findAllByText("POOL-A")).length).toBeGreaterThanOrEqual(1); // 资金池/名称两列同值
+    await gotoTab("资金报表·日报");
+    expect(await screen.findAllByText("POOL-A")).toHaveLength(1);
+    expect(screen.queryByRole("columnheader", { name: "名称" })).not.toBeInTheDocument();
     expect(screen.getByText(/2026-10-08/)).toBeInTheDocument(); // 标题含日期
     expect(screen.getAllByText("现金余额").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
     expect(screen.getAllByText("可用余额").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
@@ -96,7 +97,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   it("R4 资金日报：切换日期带 on 参数重新拉取（#56）", async () => {
     vi.mocked(catalog.reportsApi.dailyFunds).mockClear();
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金日报 R4");
+    await gotoTab("资金报表·日报");
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.dailyFunds)).toHaveBeenCalled());
     const dateInput = screen.getByLabelText("资金日报日期");
     fireEvent.change(dateInput, { target: { value: "2026-10-08" } });
@@ -106,7 +107,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   it("FE-051：共享日期区间传递到 R2/R3/R5、资金属性和订单利润", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     const setFrom = async (label: RegExp) => {
-      await gotoTab(label.source.includes("R2") ? "月度损益 R2" : label.source.includes("R3") ? "提成对账 R3" : label.source.includes("R5") ? "业务损益 R5" : label.source.includes("资金属性") ? "资金属性分析" : "订单利润");
+      await gotoTab(label.source.includes("R2") ? "月度损益 R2" : label.source.includes("R3") ? "提成对账 R3" : label.source.includes("R5") ? "业务损益 R5" : label.source.includes("资金属性") ? "资金报表·属性分析" : "订单利润");
       const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
       fireEvent.change(pane.querySelector<HTMLInputElement>(".ui-control-width-date")!, { target: { value: "2026-10-01" } });
     };
@@ -127,9 +128,8 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
       items: [
         {
           pool_name: "POOL-A",
-          fund_nature: "BUSINESS",
-          accounting_attribute: "SELF_REVENUE",
           direction: "IN",
+          scope: "STUDIO",
           flow_count: 3,
           amount: "100.00",
           signed_amount: "100.00",
@@ -139,12 +139,11 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
       total_signed_amount: "100.00",
     });
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金属性分析");
+    await gotoTab("资金报表·属性分析");
     await screen.findByText("POOL-A");
     expect(screen.queryByText("资金账户")).toBeNull();
     expect(screen.getByText("收入")).toBeInTheDocument(); // direction === IN
-    expect(screen.getByText("本方经营")).toBeInTheDocument(); // fund_nature 中文映射（#60）
-    expect(screen.getByText("自营收入")).toBeInTheDocument(); // accounting_attribute 中文映射（#60）
+    expect(screen.getByText("工作室收支")).toBeInTheDocument();
     expect(screen.getAllByText("净方向金额").length).toBeGreaterThanOrEqual(1);
   });
 
@@ -241,13 +240,13 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   it("FE-271：资金属性分析历史空区间清空旧汇总", async () => {
     vi.mocked(catalog.reportsApi.financeDimensions).mockImplementation((params) => Promise.resolve(
       params?.from ? { items: [], total_amount: "0", total_signed_amount: "0" } : {
-        items: [{ pool_name: "POOL-FE271", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE", direction: "IN", flow_count: 1, amount: "10", signed_amount: "10" }],
+        items: [{ pool_name: "POOL-FE271", accounting_attribute: "SELF_REVENUE", direction: "IN", flow_count: 1, amount: "10", signed_amount: "10" }],
         total_amount: "10",
         total_signed_amount: "10",
       },
     ) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金属性分析");
+    await gotoTab("资金报表·属性分析");
     await screen.findByText("POOL-FE271");
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
     const dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
@@ -300,7 +299,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
     await waitFor(() => expect(screen.queryByText("HS-FE273")).not.toBeInTheDocument());
 
-    await gotoTab("资金日报 R4");
+    await gotoTab("资金报表·日报");
     await screen.findByLabelText("资金日报日期");
     fireEvent.change(screen.getByLabelText("资金日报日期"), { target: { value: "2026-10-01" } });
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-01" }));

@@ -24,12 +24,12 @@ from app.orders import service as orders_service
 TODAY = date(2026, 10, 17)
 
 
-def _make_flow(session, *, direction, nature, fund_nature="BUSINESS",
+def _make_flow(session, *, direction, nature,
                accounting_attribute="OPERATING_EXPENSE", category="OTHER", amount="10",
                note="memo", order_id=None, pool_id=1):
     return create_cashflow(
         session, pool_id=pool_id, occurred_on=TODAY, direction=direction, nature=nature,
-        fund_nature=fund_nature, accounting_attribute=accounting_attribute,
+        accounting_attribute=accounting_attribute,
         category=category, amount=Decimal(amount), actor="pytest", note=note, order_id=order_id,
     )
 
@@ -41,7 +41,7 @@ def _seed_recon(session):
     for amount in (Decimal("50"), Decimal("20")):
         create_cashflow(
             session, pool_id=pool.id, occurred_on=TODAY, direction="IN",
-            nature="BUSINESS_IN", fund_nature="BUSINESS",
+            nature="BUSINESS_IN",
             accounting_attribute="OPERATING_EXPENSE", category="OTHER",
             amount=amount, actor="pytest",
         )

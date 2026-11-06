@@ -593,7 +593,7 @@ def export_orders_xlsx(
         value_labels={"event_type": option_labels.get("ORDER_EVENT_TYPE", {})},
     )
     # 资金明细：类别与事件类型同值域（BUY/SELL/PAYMENT），复用同一组字典；
-    # 现金性质与方向重复，已从列里移除，不再需要 CASHFLOW_NATURE
+    # 资金性质与方向重复，已从列里移除。
     write_sheet(
         workbook,
         title="资金明细",
@@ -685,7 +685,6 @@ def create_order(
         account_id=payload.account_id,
         confirm_repurchase=payload.confirm_repurchase,
         owner_id=owner_id,
-        capital_type=payload.capital_type,
         note=payload.note,
         commission_mode=payload.commission_mode,
         commission_payer=payload.commission_payer,

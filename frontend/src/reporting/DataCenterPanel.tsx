@@ -146,7 +146,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
         items={[
           { label: "可用余额合计", amount: totalAvailable },
           { label: "押金占用", amount: totalDeposit },
-          { label: "利润", amount: businessPnl?.total.main_profit ?? "-", tone: "auto" },
+          { label: "业务利润（汇总）", amount: businessPnl?.total.main_profit ?? "-", tone: "auto" },
         ]}
       />
       <StatRow

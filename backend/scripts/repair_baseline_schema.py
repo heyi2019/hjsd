@@ -36,7 +36,6 @@ def _has_route_unique_constraint(connection: sqlite3.Connection) -> bool:
         if unique and {row[2] for row in connection.execute(f"PRAGMA index_info({index})")} == {
             "order_type_id",
             "portion",
-            "fund_nature",
         }:
             return True
     return False
@@ -53,20 +52,18 @@ def _rebuild_order_type_pools(connection: sqlite3.Connection) -> None:
                 order_type_id INTEGER NOT NULL,
                 pool_id INTEGER NOT NULL,
                 portion VARCHAR(16) NOT NULL,
-                fund_nature VARCHAR(16),
                 priority INTEGER NOT NULL,
                 is_active BOOLEAN NOT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                CONSTRAINT ck_order_type_pools_fund_nature_valid CHECK (fund_nature IS NULL OR fund_nature IN ('BUSINESS', 'EXTERNAL', 'INTERNAL')),
                 CONSTRAINT ck_order_type_pools_portion_valid CHECK (portion IN ('PRINCIPAL', 'PROFIT', 'GROSS')),
                 CONSTRAINT ck_order_type_pools_route_priority_nonnegative CHECK (priority >= 0),
                 CONSTRAINT fk_order_type_pools_order_type_id FOREIGN KEY(order_type_id) REFERENCES order_type_defs(id) ON DELETE CASCADE,
                 CONSTRAINT fk_order_type_pools_pool_id FOREIGN KEY(pool_id) REFERENCES pools(id) ON DELETE RESTRICT,
-                CONSTRAINT uq_order_type_pools_route UNIQUE (order_type_id, portion, fund_nature)
+                CONSTRAINT uq_order_type_pools_route UNIQUE (order_type_id, portion)
             );
-            INSERT INTO order_type_pools__baseline (id, order_type_id, pool_id, portion, fund_nature, priority, is_active, created_at, updated_at)
-            SELECT id, order_type_id, pool_id, portion, fund_nature, priority, is_active, created_at, updated_at
+            INSERT INTO order_type_pools__baseline (id, order_type_id, pool_id, portion, priority, is_active, created_at, updated_at)
+            SELECT id, order_type_id, pool_id, portion, priority, is_active, created_at, updated_at
             FROM order_type_pools;
             DROP TABLE order_type_pools;
             ALTER TABLE order_type_pools__baseline RENAME TO order_type_pools;
@@ -107,7 +104,6 @@ def repair(path: Path) -> list[str]:
             actions.append("创建表 game_type_options")
 
         additions = (
-            ("order_type_pools", "fund_nature", "VARCHAR(16)"),
             ("order_events", "operator_user_ids", "JSON"),
             ("installments", "final_period_adjustment", "NUMERIC(18, 2) NOT NULL DEFAULT 0"),
         )

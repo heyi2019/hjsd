@@ -19,7 +19,6 @@ export function DailyFunds() {
   const { arrange: arrangeDailyFunds } = useListViewColumns("RPT_DAILY_FUNDS");
   const columns: ColumnsType<DailyFundsRow> = [
     { title: "资金池", dataIndex: "pool_name", width: 150 },
-    { title: "名称", key: "pool_label", dataIndex: "pool_name"},
     { title: "期初", dataIndex: "opening", align: "right", render: (v: string) => <MoneyText value={v} />},
     { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "支出", dataIndex: "expense", align: "right", render: (v: string) => <MoneyText value={v} /> },

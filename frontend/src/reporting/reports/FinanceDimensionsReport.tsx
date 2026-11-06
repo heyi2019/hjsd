@@ -3,7 +3,6 @@
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { reportsApi, type FinanceDimensionReport, type FinanceDimensionRow } from "../../shared/api/catalog";
-import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL } from "../../shared/lib/labels";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow } from "../../shared/ui";
 import { type ReportRange, useReport } from "./shared";
@@ -18,15 +17,14 @@ export function FinanceDimensions({ range }: { range: ReportRange }) {
   const { arrange: arrangeFinanceDim } = useListViewColumns("RPT_FINANCE_DIM");
   const columns: ColumnsType<FinanceDimensionRow> = [
     { title: "资金池", dataIndex: "pool_name", width: 130 },
-    { title: "资金性质", dataIndex: "fund_nature", width: 120, render: (v: string) => FUND_NATURE_LABEL[v] ?? v },
-    { title: "核算属性", dataIndex: "accounting_attribute", width: 160, render: (v: string) => ACCOUNTING_ATTRIBUTE_LABEL[v] ?? v},
     { title: "现金方向", dataIndex: "direction", width: 90, render: (v: string) => v === "IN" ? "收入" : "支出"},
+    { title: "归属", dataIndex: "scope", width: 100, render: (v: string) => v === "BUSINESS" ? "业务收支" : "工作室收支" },
     { title: "笔数", dataIndex: "flow_count", align: "right", width: 80},
     { title: "发生额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "净方向金额", dataIndex: "signed_amount", align: "right", render: (v: string) => <MoneyText value={v} tone="auto" strong /> },
   ];
   return (
-    <Card className="glass" title="资金属性分析">
+    <Card className="glass" title="资金报表·属性分析">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
       <StatRow

@@ -73,7 +73,7 @@ describe("OrderTypesPanel.deep", () => {
 
   it("保存路由成功：提交 setRoute + 刷新路由列表", async () => {
     vi.mocked(catalog.orderTypesApi.routes).mockResolvedValue([
-      { id: 1, order_type_code: "HS", portion: "PRINCIPAL", fund_nature: null, pool_code: "POOL-A", pool_name: "主资金池", priority: 1, is_active: true },
+      { id: 1, order_type_code: "HS", portion: "PRINCIPAL", pool_code: "POOL-A", pool_name: "主资金池", priority: 1, is_active: true },
     ]);
     renderLight(<OrderTypesPanel />, { user: "admin" });
     const row = await rowOf("HS");
@@ -84,7 +84,7 @@ describe("OrderTypesPanel.deep", () => {
     await waitFor(() =>
       expect(vi.mocked(catalog.orderTypesApi.setRoute)).toHaveBeenCalledWith(
         "HS",
-        expect.objectContaining({ portion: "PRINCIPAL", pool_code: "POOL-A", fund_nature: null, priority: 0 }),
+        expect.objectContaining({ portion: "PRINCIPAL", pool_code: "POOL-A", priority: 0 }),
       ),
     );
     expect(message.success).toHaveBeenCalledWith("资金路由已保存");

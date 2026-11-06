@@ -11,7 +11,6 @@ const order = (overrides: Partial<Order> = {}): Order => ({
   id: 1,
   order_no: "HS-2026-0001",
   order_type: "HS",
-  capital_type: "SELF",
   trade_date: "2026-10-01",
   status: "ACTIVE",
   business_mode: "SELF",
@@ -74,6 +73,25 @@ describe("OrdersPage helpers", () => {
         { user_id: null, role: "SALES", allocation_type: "SELL", allocation_rate: "0", allocation_amount: "100" },
         { user_id: null, role: "SERVICE", allocation_type: "OPERATION", allocation_rate: "0", allocation_amount: "100" },
         { user_id: null, role: "OWNER", allocation_type: "COMPANY", allocation_rate: "0", allocation_amount: "500" },
+      ],
+    });
+  });
+
+  it("按操作分润时运营人员和运营份额可以留空", () => {
+    const result = validateAllocations([
+      { allocation_type: "BUY", employee: 1, role: "BUYER", allocation_rate: "25" },
+      { allocation_type: "SELL", employee: 2, role: "SALES", allocation_rate: "25" },
+      { allocation_type: "OPERATION", role: "SERVICE", allocation_rate: "", allocation_amount: "" },
+      { allocation_type: "COMPANY", employee: "COMPANY", role: "OWNER", allocation_rate: "50" },
+    ], "1000.00", "ACTION");
+
+    expect(result).toEqual({
+      ok: true,
+      items: [
+        { user_id: 1, role: "BUYER", allocation_type: "BUY", allocation_rate: "25", allocation_amount: "0" },
+        { user_id: 2, role: "SALES", allocation_type: "SELL", allocation_rate: "25", allocation_amount: "0" },
+        { user_id: null, role: "SERVICE", allocation_type: "OPERATION", allocation_rate: "0", allocation_amount: "0" },
+        { user_id: null, role: "OWNER", allocation_type: "COMPANY", allocation_rate: "50", allocation_amount: "0" },
       ],
     });
   });

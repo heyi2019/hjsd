@@ -438,8 +438,21 @@ class TestPolicyAllocationGuards:
         with pytest.raises(Validation, match="公司收益不绑定人员"):
             policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
-    def test_operation_without_user_rejected(self, seeded_db):
-        # 588: 人员收益必须绑定人员
+    def test_operation_without_user_is_optional_when_zero(self, seeded_db):
+        # 588: 运营不是必填项；未绑定运营人员时只能保留 0 份额。
+        order = _order(seeded_db)
+        items = [
+            {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
+            {"allocation_type": "SELL", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
+            {"allocation_type": "OPERATION", "user_id": None, "role": "OWNER", "allocation_rate": "0"},
+            {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "50"},
+        ]
+        result = policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
+        operation = next(item for item in result if item["allocation_type"] == "OPERATION")
+        assert operation["user_id"] is None
+        assert operation["allocation_rate"] == "0.00"
+
+    def test_operation_without_user_rejected_when_nonzero(self, seeded_db):
         order = _order(seeded_db)
         items = [
             {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},

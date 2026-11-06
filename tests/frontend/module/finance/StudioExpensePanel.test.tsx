@@ -44,12 +44,12 @@ const expenseFlows = [
   {
     id: 51, flow_no: "CF-001", pool_id: 1, occurred_on: "2026-10-20", nature: "BUSINESS_OUT",
     category: "房租", direction: "OUT", amount: "3000.00", source: "OTHER", status: "APPROVED",
-    fund_nature: "BUSINESS", accounting_attribute: "OPERATING_EXPENSE",
+    accounting_attribute: "OPERATING_EXPENSE",
   },
   {
     id: 52, flow_no: "CF-002", pool_id: 2, occurred_on: "2026-10-21", nature: "BUSINESS_OUT",
     category: "日用", direction: "OUT", amount: "100.00", source: "OTHER", status: "PENDING",
-    fund_nature: "BUSINESS", accounting_attribute: "OPERATING_EXPENSE",
+    accounting_attribute: "OPERATING_EXPENSE",
   },
 ];
 
@@ -279,7 +279,6 @@ describe("StudioExpensePanel：工作室支出", () => {
       pool_id: 1,
       direction: "OUT",
       nature: "BUSINESS_OUT",
-      fund_nature: "BUSINESS",
       accounting_attribute: "OPERATING_EXPENSE",
       category: "房租",
       amount: "3000.00",
@@ -313,7 +312,6 @@ describe("StudioExpensePanel：工作室支出", () => {
       pool_id: 1,
       direction: "IN",
       nature: "BUSINESS_IN",
-      fund_nature: "BUSINESS",
       accounting_attribute: "SELF_REVENUE",
       category: "货款",
       amount: "800.00",

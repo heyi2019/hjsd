@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.stocks import service as stocks_service
 from app.core.errors import ErrorCode, NotFound, Validation
-from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
+from app.domain.enums import AccountStatus, Direction, EventType, OrderStatus
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.value_added_services import service as installment_service
@@ -156,12 +156,10 @@ class TestA01HsStock:
         in_flows = _flows(seeded_db, profit.id)
         assert [str(flow.amount) for flow in out_flows] == ["1000.00", "50.00"]
         assert all(flow.direction == Direction.OUT.value for flow in out_flows)
-        assert out_flows[0].fund_nature == "BUSINESS"
         assert out_flows[0].accounting_attribute == "SELF_DIRECT_COST"
         assert out_flows[1].accounting_attribute == "SELF_DIRECT_COST"
         assert [str(flow.amount) for flow in in_flows] == ["1400.00"]
         assert in_flows[0].direction == Direction.IN.value
-        assert in_flows[0].fund_nature == "BUSINESS"
         assert in_flows[0].accounting_attribute == "SELF_REVENUE"
 
         events = seeded_db.scalars(
@@ -342,7 +340,6 @@ class TestA02ThStock:
         )
         seeded_db.commit()
         # 提号按普通库存资金处理，不再要求 BUY/SELL 互相核销。
-        assert seeded_db.get(Order, order.id).capital_type == "STOCK"
 
 class TestA03DgZeroCapital:
     def test_service_income_routes_to_profit_pool(self, seeded_db):
@@ -356,7 +353,6 @@ class TestA03DgZeroCapital:
             customer_roles=[(consignor.id, "CONSIGNOR")],
         )
         seeded_db.commit()
-        assert seeded_db.get(Order, order.id).capital_type == "ZERO"
 
         service.post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("200"),
@@ -367,7 +363,6 @@ class TestA03DgZeroCapital:
         flows = _flows(seeded_db, profit.id)
         assert len(flows) == 1
         assert str(flows[0].amount) == "200.00"
-        assert flows[0].nature == Nature.BUSINESS_IN.value
 
 class TestEventRules:
     @pytest.mark.parametrize(("order_type", "inventory_type"), [("HS", "RECOVERY"), ("TH", "PICKUP")])

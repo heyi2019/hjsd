@@ -225,7 +225,6 @@ def create_order_type(
         db,
         code=payload.code,
         name=payload.name,
-        capital_type=payload.capital_type.value,
         actor=_actor(user),
         sequence_prefix=payload.sequence_prefix,
         sort_order=payload.sort_order,
@@ -276,7 +275,6 @@ def list_routes(
             id=route.id,
             order_type_code=route.order_type.code,
             portion=route.portion,
-            fund_nature=route.fund_nature,
             pool_code=route.pool.code,
             pool_name=route.pool.name,
             priority=route.priority,
@@ -298,7 +296,6 @@ def set_route(
         order_type_code=code,
         portion=payload.portion.value,
         pool_code=payload.pool_code,
-        fund_nature=payload.fund_nature.value if payload.fund_nature else None,
         actor=_actor(user),
         priority=payload.priority,
     )
@@ -306,7 +303,6 @@ def set_route(
         id=route.id,
         order_type_code=route.order_type.code,
         portion=route.portion,
-        fund_nature=route.fund_nature,
         pool_code=route.pool.code,
         pool_name=route.pool.name,
         priority=route.priority,
@@ -321,7 +317,6 @@ def set_route(
 def route_impact_preview(
     code: str,
     portion: schemas.Portion = Query(...),
-    fund_nature: schemas.FundNature | None = Query(default=None),
     pool_code: str = Query(..., min_length=2, max_length=64),
     db: Session = Depends(get_db),
     _user: CurrentUser = manage_order_types,
@@ -332,7 +327,6 @@ def route_impact_preview(
             order_type_code=code,
             portion=portion.value,
             pool_code=pool_code,
-            fund_nature=fund_nature.value if fund_nature else None,
         )
     )
 

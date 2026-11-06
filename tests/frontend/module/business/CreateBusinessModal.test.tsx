@@ -55,7 +55,7 @@ beforeEach(() => {
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
     { id: 2, name: "原神", sort_order: 20, is_active: true, is_default: false },
   ]);
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
   resolveMock(vi.mocked(catalog.ordersApi.postEvent), { event: { id: 1 }, cashflow_no: "FLOW-0001" });
 });
 

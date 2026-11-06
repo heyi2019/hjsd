@@ -17,6 +17,7 @@ from .rebates import (
 from .cashflows import (
     cancel_deposit,
     cashflow_totals,
+    create_business_event_cashflow,
     create_cashflow,
     create_deposit,
     list_cashflows,
@@ -53,6 +54,7 @@ __all__ = [
     "cashflow_totals",
     "studio_summary",
     "create_cashflow",
+    "create_business_event_cashflow",
     "create_deposit",
     # 以下两项为路由层门面再导出：app/finance/router.py 通过 service.<name> 访问，
     # 不可删除（否则 500）；列在 __all__ 中既保留门面，又让静态检查认账。

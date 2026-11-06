@@ -16,7 +16,6 @@ from app.core.security import CurrentUser
 from app.domain.enums import (
     AccountStatus,
     CashflowStatus,
-    Nature,
     QualityIssueStatus,
     ReconciliationStatus,
     OrderStatus,

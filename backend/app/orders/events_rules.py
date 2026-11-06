@@ -15,11 +15,7 @@ from app.core.money import to_money
 from app.domain.foundation import Pool
 from app.foundation import service as foundation_service
 from ._common import _required_text
-from .cancellation_model import (
-    apply_cancellation_account_effect,
-    get_cancellation_offset,
-    opposite_cancellation_direction,
-)
+from .cancellation_model import get_cancellation_offset, opposite_cancellation_direction
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import (
@@ -28,15 +24,10 @@ from app.core.errors import (
     Validation,
 )
 from app.core.time import now_second
-from app.core.state_machine import (
-    ACCOUNT_TRANSITIONS,
-    ORDER_TRANSITIONS,
-    transition,
-)
+from app.core.state_machine import ORDER_TRANSITIONS, transition
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
-    CapitalType,
     EventType,
     PoolStatus,
 )
@@ -46,6 +37,7 @@ from app.domain.trade import (
     Order,
     OrderEvent,
 )
+from app.stocks import service as stocks_service
 
 def _assert_sellable_order(session: Session, order: Order) -> None:
     """库存账号售出必须建立在已采购入库之上。"""
@@ -304,8 +296,11 @@ def _post_deliver(
             if normalized_bound_phone is not None:
                 account.bound_phone = normalized_bound_phone
                 account.updated_by = actor
-            account.status = AccountStatus.SOLD.value
-            account.updated_by = actor
+            stocks_service.mark_delivered(
+                account,
+                actor=actor,
+                bound_phone=normalized_bound_phone,
+            )
     order.status = transition(
         ORDER_TRANSITIONS, order.status, "COMPLETE", entity="订单"
     )
@@ -325,11 +320,9 @@ def _resolve_pool(
     session: Session,
     order: Order,
     portion: str,
-    *,
-    fund_nature: str | None = None,
 ) -> Pool:
     pool = foundation_service.resolve_default_pool(
-        session, order.order_type, portion, fund_nature=fund_nature
+        session, order.order_type, portion
     )
     if pool is None:
         raise Validation(
@@ -338,7 +331,6 @@ def _resolve_pool(
             details={
                 "order_type": order.order_type,
                 "portion": portion,
-                "fund_nature": fund_nature,
             },
         )
     return pool
@@ -374,31 +366,18 @@ def _apply_account_effect(
     account = session.get(Account, order.account_id)
     if account is None:
         return
-    stock_type = order.order_type == "HS" or order.capital_type == CapitalType.STOCK.value
+    stock_type = order.order_type in {"HS", "TH"}
 
-    if event_type == EventType.BUY.value:
-        account.cost_amount = to_money(account.cost_amount) + amount
-        account.buy_date = order.trade_date
-        next_action = "BUY_STOCK" if stock_type else "BUY_CREDIT"
-        # 合约先行（建约已把账号置为分期中）时，BUY 仅补记成本，不重复转换。
-        target = ACCOUNT_TRANSITIONS.get(account.status, {}).get(next_action)
-        if target is not None:
-            account.status = target
-    elif event_type == EventType.COST.value:
-        account.cost_amount = to_money(account.cost_amount) + amount
-    elif event_type == EventType.SELL.value:
-        account.status = transition(ACCOUNT_TRANSITIONS, account.status, "SELL", entity="账号")
-    elif event_type == EventType.CANCEL.value:
-        apply_cancellation_account_effect(
-            account,
-            amount,
-            offset_event=offset_event,
-            cancel_fully_consumed=cancel_fully_consumed,
-            actor=actor,
-        )
-        return
-    if actor is not None:
-        account.updated_by = actor
+    stocks_service.apply_account_event_effect(
+        account,
+        event_type=event_type,
+        amount=amount,
+        stock_type=stock_type,
+        buy_date=order.trade_date,
+        offset_event_type=offset_event.event_type if offset_event is not None else None,
+        cancel_fully_consumed=cancel_fully_consumed,
+        actor=actor,
+    )
 
 
 __all__ = [

@@ -403,6 +403,11 @@ def v1_engine(request):
     lock_connection = _acquire_session_lock(engine, terminal)
     try:
         Base.metadata.create_all(bind=engine)
+        # 测试库可能由旧版本留下已删除的字段；测试基线跟随当前 ORM，先清理历史列。
+        with engine.begin() as connection:
+            connection.execute(text('ALTER TABLE public."order_type_defs" DROP COLUMN IF EXISTS capital_type CASCADE'))
+            connection.execute(text('ALTER TABLE public."orders" DROP COLUMN IF EXISTS capital_type CASCADE'))
+            connection.execute(text('ALTER TABLE public."cashflow" DROP COLUMN IF EXISTS nature CASCADE'))
         _truncate_all(engine)
         yield engine
     finally:

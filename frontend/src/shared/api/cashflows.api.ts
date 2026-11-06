@@ -11,9 +11,6 @@ export const cashflowsApi = {
     occurred_from?: string;
     occurred_to?: string;
     status?: string;
-    nature?: string;
-    fund_nature?: string;
-    accounting_attribute?: string;
     category?: string;
     created_by?: string;
     keyword?: string;
@@ -53,9 +50,6 @@ export const cashflowsApi = {
     occurred_from?: string;
     occurred_to?: string;
     status?: string;
-    nature?: string;
-    fund_nature?: string;
-    accounting_attribute?: string;
     category?: string;
     created_by?: string;
   }) =>

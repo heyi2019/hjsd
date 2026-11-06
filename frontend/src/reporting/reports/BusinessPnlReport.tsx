@@ -26,21 +26,21 @@ export function BusinessPnl({ range }: { range: ReportRange }) {
     { title: "主营收入", dataIndex: "main_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "主营成本", dataIndex: "main_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
     {
-      title: "主营毛利",
+      title: "业务利润（汇总）",
       dataIndex: "main_profit",
       align: "right",
       render: (v: string) => <MoneyText value={v} tone="auto" strong />,
     },
   ];
   return (
-    <Card className="glass" title="业务级损益 R5">
+    <Card className="glass" title="业务利润汇总 R5">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
       <StatRow
         items={[
           { label: "主营收入", amount: data?.total.main_income ?? "-" },
           { label: "主营成本", amount: data?.total.main_cost ?? "-" },
-          { label: "主营毛利", amount: data?.total.main_profit ?? "-", tone: "auto" },
+          { label: "业务利润（汇总）", amount: data?.total.main_profit ?? "-", tone: "auto" },
         ]}
       />
              <DataTable<BusinessPnlRow>

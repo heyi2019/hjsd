@@ -1,0 +1,5 @@
+appId: wbapp_RuvvSocMWWv718cmitkxuo
+name: 宜游轩ERP预览
+localDir: /Users/aries/黑金时代/outputs/yyx
+appType: web
+entryHtml: index.html

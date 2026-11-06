@@ -5,9 +5,8 @@ import { appMessage } from "../../shared/ui/appFeedback";
  * 才能看到去向，无法回答「总额部分现在落到哪个池」这类横向问题。本页把所有类型的路由
  * 摊平到一张表，并提供统一的覆盖入口与影响预览。
  *
- * 口径：路由按（业务类型 + 份额 + 资金性质）唯一，优先级大者优先；资金性质不填表示不限。
- * 份额与资金性质的选项来自选项词典（ROUTE_PORTION / ROUTE_FUND_NATURE），设置页改文案后
- * 本页同步变化。
+ * 口径：路由按（业务类型 + 份额）唯一，优先级大者优先。
+ * 份额选项来自选项词典（ROUTE_PORTION），设置页改文案后本页同步变化。
  */
 import { Card, Form, InputNumber, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -19,7 +18,6 @@ import { orderTypesApi,
   type Pool,
   type RouteImpactPreview, } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
-import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { filterRetiredOrderTypes } from "../../shared/lib/retiredProducts";
 import { useSession } from "../../shared/state/session";
@@ -30,26 +28,15 @@ const PORTION_LABEL: Record<string, string> = {
   PROFIT: "利润",
   GROSS: "总额",
 };
-const FUND_NATURE_LABEL: Record<string, string> = {
-  BUSINESS: "本方经营",
-  EXTERNAL: "外部/受托",
-  INTERNAL: "内部调拨",
-};
 const PORTION_FALLBACK = [
   { value: "PRINCIPAL", label: "本金" },
   { value: "PROFIT", label: "利润" },
   { value: "GROSS", label: "总额" },
 ];
-const FUND_NATURE_FALLBACK = [
-  { value: "BUSINESS", label: FUND_NATURE_LABEL.BUSINESS },
-  { value: "EXTERNAL", label: FUND_NATURE_LABEL.EXTERNAL },
-  { value: "INTERNAL", label: FUND_NATURE_LABEL.INTERNAL },
-];
 
 interface RouteRow extends OrderTypeRoute {
   /** 冗余所属类型的展示信息，避免表格里再回查。 */
   typeName: string;
-  capitalType: string;
 }
 
 export function OrderTypeRoutesPanel() {
@@ -65,7 +52,6 @@ export function OrderTypeRoutesPanel() {
   const [form] = Form.useForm();
 
   const portionOptions = useOptionSet("ROUTE_PORTION") ?? PORTION_FALLBACK;
-  const fundNatureOptions = useOptionSet("ROUTE_FUND_NATURE") ?? FUND_NATURE_FALLBACK;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,7 +70,6 @@ export function OrderTypeRoutesPanel() {
             return rows.map((row) => ({
               ...row,
               typeName: type.name,
-              capitalType: type.capital_type,
             }));
           } catch {
             routeLoadFailed = true;
@@ -124,7 +109,6 @@ export function OrderTypeRoutesPanel() {
       await orderTypesApi.setRoute(values.order_type_code as string, {
         portion: values.portion as string,
         pool_code: values.pool_code as string,
-        fund_nature: values.fund_nature ? (values.fund_nature as string) : null,
         priority: Number(values.priority ?? 0),
       });
       appMessage.success("资金路由已保存");
@@ -148,7 +132,6 @@ export function OrderTypeRoutesPanel() {
           values.order_type_code as string,
           values.portion as string,
           values.pool_code as string,
-          values.fund_nature ? String(values.fund_nature) : undefined,
         ),
       );
       appMessage.success("已生成影响预览");
@@ -165,23 +148,10 @@ export function OrderTypeRoutesPanel() {
       render: (code: string, row) => `${row.typeName}（${code}）`,
     },
     {
-      title: "资金性质",
-      dataIndex: "capitalType",
-      width: 110,
-      render: (v: string) => configurableLabel("CAPITAL_TYPE", v, CAPITAL_TYPE_LABEL),
-    },
-    {
       title: "份额",
       dataIndex: "portion",
       width: 90,
       render: (v: string) => configurableLabel("ROUTE_PORTION", v, PORTION_LABEL),
-    },
-    {
-      title: "资金性质",
-      dataIndex: "fund_nature",
-      width: 120,
-      render: (v: string | null) =>
-        v ? configurableLabel("ROUTE_FUND_NATURE", v, FUND_NATURE_LABEL) : "不限",
     },
     {
       title: "目标资金池",
@@ -201,7 +171,7 @@ export function OrderTypeRoutesPanel() {
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Card className="glass" title="资金路由一览">
         <Typography.Paragraph type="secondary">
-          路由决定各类订单的过账去向：按资金份额（本金/利润/总额）与资金性质匹配目标资金池，优先级大者优先。
+          路由决定各类订单的过账去向：按资金份额（本金/利润/总额）匹配目标资金池，优先级大者优先。
           {error
             ? "业务类型覆盖不可用，请先重新加载。"
             : <>共 {routes.length} 条路由，覆盖 {new Set(routes.map((row) => row.order_type_code)).size} /{" "}
@@ -252,9 +222,6 @@ export function OrderTypeRoutesPanel() {
             </Form.Item>
             <Form.Item name="portion" label="资金份额" rules={[{ required: true }]}>
               <Select options={portionOptions} />
-            </Form.Item>
-            <Form.Item name="fund_nature" label="资金性质" extra="选填；不填表示不限性质">
-              <Select allowClear placeholder="不限" options={fundNatureOptions} />
             </Form.Item>
             <Form.Item name="pool_code" label="目标资金池" rules={[{ required: true, message: "请选择目标资金池" }]}>
               <Select placeholder="请选择资金池" options={poolOptions} />

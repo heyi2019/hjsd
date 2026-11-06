@@ -1,7 +1,7 @@
 """domain.enums：v1 封闭枚举与编号域。
 
 取值以本模块定义为唯一来源，数据库 CHECK 约束与之同步：
-- `capital_type`、`ownership`、业务 code 等核算枚举保持封闭；
+- `ownership` 等核算枚举保持封闭；
 - `pool_type` 是**注册表**（V31），扩展登记新值即可，不改表。
 """
 from __future__ import annotations
@@ -40,13 +40,6 @@ class PoolType(StrEnum):
     INVEST = "INVEST"
     PROFIT = "PROFIT"
     OTHER = "OTHER"
-
-
-class CapitalType(StrEnum):
-    """资金性质：默认取业务定义，允许按单覆盖（V34）。"""
-
-    STOCK = "STOCK"  # 回收：库存型
-    ZERO = "ZERO"  # 代挂：零本金
 
 
 class Portion(StrEnum):
@@ -198,37 +191,11 @@ class EventType(StrEnum):
     REFUND = "REFUND"
 
 
-class Nature(StrEnum):
-    EXTERNAL_IN = "EXTERNAL_IN"
-    BUSINESS_IN = "BUSINESS_IN"
-    BUSINESS_OUT = "BUSINESS_OUT"
-    INTERNAL = "INTERNAL"
-
-
-class FundNature(StrEnum):
-    """资金所有权性质：本方经营、外部/受托或本方内部调拨。"""
-
-    BUSINESS = "BUSINESS"
-    EXTERNAL = "EXTERNAL"
-    INTERNAL = "INTERNAL"
-
-
 class AccountingAttribute(StrEnum):
     """资金在经营核算中的具体归类。"""
 
-    SELF_REVENUE = "SELF_REVENUE"
-    SELF_DIRECT_COST = "SELF_DIRECT_COST"
-    TH_DIRECT_COST = "TH_DIRECT_COST"
-    TH_REVENUE = "TH_REVENUE"
-    SERVICE_REVENUE = "SERVICE_REVENUE"
-    ADDITIONAL_INCOME = "ADDITIONAL_INCOME"  # 附加收入：返点(category=REBATE)与其他(TIP/PENALTY)
-    ADDITIONAL_EXPENSE = "ADDITIONAL_EXPENSE"  # 附加支出：同行分成等成交环节的附加费用
-    OPERATING_EXPENSE = "OPERATING_EXPENSE"
-    DEPOSIT = "DEPOSIT"
-    EXTERNAL_FUNDING = "EXTERNAL_FUNDING"
-    INTERNAL_TRANSFER = "INTERNAL_TRANSFER"
-    REVERSAL = "REVERSAL"
-    REFUND = "REFUND"
+    INCOME = "INCOME"
+    EXPENSE = "EXPENSE"
 
 
 class Direction(StrEnum):
@@ -546,7 +513,6 @@ class AuditAction(StrEnum):
 __all__ = [
     "AccountStatus",
     "AuditAction",
-    "CapitalType",
     "AccountingAttribute",
     "CashflowStatus",
     "CounterpartyRole",
@@ -561,7 +527,6 @@ __all__ = [
     "ImportBatchStatus",
     "ImportRowStatus",
     "EventType",
-    "FundNature",
     "InstallmentContractType",
     "InstallmentDispositionAction",
     "InstallmentStatus",
@@ -569,7 +534,6 @@ __all__ = [
     "LinkStatus",
     "LeadStatus",
     "LeadType",
-    "Nature",
     "OrderLinkType",
     "OrderStatus",
     "PolicyStatus",

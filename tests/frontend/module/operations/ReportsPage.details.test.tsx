@@ -133,6 +133,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     await gotoTab("月度损益 R2");
     expect(await screen.findByText("2026-09")).toBeInTheDocument();
     expect(screen.getAllByText("2,000.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("经营利润（报表口径）").length).toBeGreaterThanOrEqual(1);
   });
 
   it("R5 业务损益：渲染业务与主营收入", async () => {
@@ -151,6 +152,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     await gotoTab("业务损益 R5");
     expect(await screen.findByText(/HS/)).toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("业务利润（汇总）").length).toBeGreaterThanOrEqual(1);
   });
 
   it("订单利润：渲染订单号与净额", async () => {
@@ -174,6 +176,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     await gotoTab("订单利润");
     expect(await screen.findByText("HS-2026-0010")).toBeInTheDocument();
     expect(screen.getAllByText("160.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("订单利润（净利）").length).toBeGreaterThanOrEqual(1);
   });
 
   it("订单利润：单独展示账号采购成本", async () => {

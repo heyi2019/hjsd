@@ -20,7 +20,6 @@ from app.domain.enums import (
     InstallmentContractType,
     InstallmentDispositionAction,
     LinkStatus,
-    Nature,
     RebateStatus,
     RebateType,
 )

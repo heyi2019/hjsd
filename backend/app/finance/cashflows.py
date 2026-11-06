@@ -13,6 +13,7 @@ from app.core.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.time import now_second
 from app.core.money import to_money
+from app.core.business_numbering import cashflow_no as next_cashflow_no
 from app.core.numbering import allocate_flow_no
 from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import (
@@ -20,19 +21,14 @@ from app.domain.enums import (
     AuditAction,
     CashflowStatus,
     Direction,
-    Nature,
 )
 from app.domain.trade import Cashflow, Order
-from app.finance.attributes import (
-    accounting_attributes_for_manual_cashflow,
-    validate_fund_accounting_attribute,
-)
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
 from app.orders.form_fields import validate_form_extra
 from app.parties import service as parties_service
 
-from ._common import _positive, _text
+from ._common import _non_negative, _positive, _text
 
 
 # 兼容层：押金服务迁至 deposits.py，此处保留原路径导出
@@ -67,9 +63,6 @@ def create_cashflow(
     pool_id: int,
     occurred_on: date,
     direction: str,
-    nature: str,
-    fund_nature: str | None = None,
-    accounting_attribute: str | None = None,
     category: str,
     amount: Any,
     actor: str,
@@ -87,21 +80,6 @@ def create_cashflow(
         raise Validation(
             f"direction 必须为 {Direction.values()}", details={"field": "direction"}
         ) from exc
-    try:
-        nature = Nature(nature).value
-    except ValueError as exc:
-        raise Validation(
-            f"nature 必须为 {Nature.values()}", details={"field": "nature"}
-        ) from exc
-    if nature == Nature.INTERNAL.value:
-        raise Validation("独立现金流不能使用 INTERNAL，请使用池间划转")
-    if direction == Direction.IN.value and nature not in {
-        Nature.EXTERNAL_IN.value,
-        Nature.BUSINESS_IN.value,
-    }:
-        raise Validation("收入流水的 nature 不匹配", details={"direction": direction, "nature": nature})
-    if direction == Direction.OUT.value and nature != Nature.BUSINESS_OUT.value:
-        raise Validation("支出流水的 nature 不匹配", details={"direction": direction, "nature": nature})
     label = _text(
         category,
         field="category",
@@ -109,20 +87,7 @@ def create_cashflow(
         uppercase=True,
         type_message="category 必须为文本",
     )
-    default_fund_nature, default_accounting_attribute = (
-        accounting_attributes_for_manual_cashflow(
-            nature=nature, category=label, direction=direction
-        )
-    )
-    fund_nature = fund_nature or default_fund_nature
-    accounting_attribute = accounting_attribute or default_accounting_attribute
-    try:
-        validate_fund_accounting_attribute(fund_nature, accounting_attribute)
-    except ValueError as exc:
-        raise Validation(str(exc), details={"fund_nature": fund_nature, "accounting_attribute": accounting_attribute}) from exc
-    if nature == Nature.EXTERNAL_IN.value and (
-        not isinstance(note, str) or not note.strip()
-    ):
+    if label == "EXTERNAL_FUNDING" and direction == Direction.IN.value and not note:
         raise Validation("独立收款必须填写摘要", details={"field": "note"})
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
@@ -134,9 +99,6 @@ def create_cashflow(
         flow_no=allocate_flow_no(session, direction),
         pool_id=pool.id,
         occurred_on=occurred_on,
-        nature=nature,
-        fund_nature=fund_nature,
-        accounting_attribute=accounting_attribute,
         category=label,
         direction=direction,
         amount=money,
@@ -166,8 +128,79 @@ def create_cashflow(
             "status": flow.status,
             "pool_id": pool.id,
             "direction": direction,
-            "nature": nature,
             "amount": str(money),
+        },
+    )
+    return flow
+
+
+def create_business_event_cashflow(
+    session: Session,
+    *,
+    pool_id: int,
+    occurred_on: date,
+    direction: str,
+    category: str,
+    amount: Any,
+    order_id: int,
+    order_event_id: int,
+    actor: str,
+    note: str | None = None,
+) -> Cashflow:
+    """由资金域登记订单事件派生流水。
+
+    交易履约域可以在同一事务中发起本命令，但不直接构造 ``Cashflow``。
+    该入口保留事件流水的已审核语义、订单事件关联和订单级编号规则；调用方
+    继续持有同一 SQLAlchemy 会话，因此事件、流水和资产状态仍然原子提交。
+    """
+    try:
+        direction = Direction(direction).value
+    except ValueError as exc:
+        raise Validation(
+            f"direction 必须为 {Direction.values()}", details={"field": "direction"}
+        ) from exc
+    category = _text(
+        category,
+        field="category",
+        message="category 不能为空",
+        uppercase=True,
+        type_message="category 必须为文本",
+    )
+    pool = foundation_service.assert_pool_usable(session, pool_id)
+    order = orders_service.get_order(session, order_id)
+    money = _non_negative(amount, field="amount")
+    flow = Cashflow(
+        flow_no=next_cashflow_no(
+            session, order_no=order.order_no, order_id=order.id, category=category
+        ),
+        pool_id=pool.id,
+        occurred_on=occurred_on,
+        category=category,
+        direction=direction,
+        amount=money,
+        status=CashflowStatus.APPROVED.value,
+        order_id=order.id,
+        order_event_id=order_event_id,
+        note=note,
+        created_by=actor,
+        updated_by=actor,
+    )
+    session.add(flow)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.CASHFLOW_CREATE,
+        entity_type="cashflow",
+        entity_id=flow.flow_no,
+        actor=actor,
+        after={
+            "status": flow.status,
+            "pool_id": pool.id,
+            "order_id": order.id,
+            "order_event_id": order_event_id,
+            "direction": direction,
+            "amount": str(money),
+            "category": category,
         },
     )
     return flow
@@ -200,19 +233,13 @@ def reverse_cashflow(
     if session.scalar(select(Cashflow.id).where(Cashflow.reversal_of_id == flow.id)):
         raise Validation("该流水已冲销", details={"cashflow_id": cashflow_id})
 
-    if flow.direction == Direction.OUT.value:
-        reverse_direction = Direction.IN.value
-        reverse_nature = Nature.BUSINESS_IN.value
-    else:
-        reverse_direction = Direction.OUT.value
-        reverse_nature = Nature.BUSINESS_OUT.value
+    reverse_direction = (
+        Direction.IN.value if flow.direction == Direction.OUT.value else Direction.OUT.value
+    )
     reversal = Cashflow(
         flow_no=allocate_flow_no(session, reverse_direction),
         pool_id=flow.pool_id,
         occurred_on=reversed_on,
-        nature=reverse_nature,
-        fund_nature=flow.fund_nature,
-        accounting_attribute=AccountingAttribute.REVERSAL.value,
         category="REVERSAL",
         direction=reverse_direction,
         amount=to_money(flow.amount),
@@ -264,9 +291,6 @@ def _apply_cashflow_filters(
     occurred_from: date | None = None,
     occurred_to: date | None = None,
     status: str | None = None,
-    nature: str | None = None,
-    fund_nature: str | None = None,
-    accounting_attribute: str | None = None,
     category: str | None = None,
     created_by: str | None = None,
     keyword: str | None = None,
@@ -310,12 +334,6 @@ def _apply_cashflow_filters(
                 details={"field": "status", "value": status},
             ) from exc
         stmt = stmt.where(Cashflow.status == status)
-    if nature is not None:
-        stmt = stmt.where(Cashflow.nature == nature)
-    if fund_nature is not None:
-        stmt = stmt.where(Cashflow.fund_nature == fund_nature)
-    if accounting_attribute is not None:
-        stmt = stmt.where(Cashflow.accounting_attribute == accounting_attribute)
     if category is not None:
         stmt = stmt.where(Cashflow.category == category)
     if created_by is not None:
@@ -355,9 +373,6 @@ def _flow_row(flow: Cashflow, order_no: str | None) -> dict[str, Any]:
         "pool_id": flow.pool_id,
         "occurred_on": flow.occurred_on,
         "occurred_at": flow.created_at,
-        "nature": flow.nature,
-        "fund_nature": flow.fund_nature,
-        "accounting_attribute": flow.accounting_attribute,
         "category": flow.category,
         "direction": flow.direction,
         "amount": flow.amount,
@@ -386,9 +401,6 @@ def list_cashflows(
     occurred_from: date | None = None,
     occurred_to: date | None = None,
     status: str | None = None,
-    nature: str | None = None,
-    fund_nature: str | None = None,
-    accounting_attribute: str | None = None,
     category: str | None = None,
     created_by: str | None = None,
     keyword: str | None = None,
@@ -413,9 +425,6 @@ def list_cashflows(
         occurred_from=occurred_from,
         occurred_to=occurred_to,
         status=status,
-        nature=nature,
-        fund_nature=fund_nature,
-        accounting_attribute=accounting_attribute,
         category=category,
         created_by=created_by,
         keyword=keyword,
@@ -448,9 +457,6 @@ def cashflow_totals(
     occurred_from: date | None = None,
     occurred_to: date | None = None,
     status: str | None = None,
-    nature: str | None = None,
-    fund_nature: str | None = None,
-    accounting_attribute: str | None = None,
     category: str | None = None,
     created_by: str | None = None,
     keyword: str | None = None,
@@ -478,9 +484,6 @@ def cashflow_totals(
         occurred_from=occurred_from,
         occurred_to=occurred_to,
         status=status,
-        nature=nature,
-        fund_nature=fund_nature,
-        accounting_attribute=accounting_attribute,
         category=category,
         created_by=created_by,
         keyword=keyword,
@@ -506,12 +509,6 @@ _MANUAL_EXCLUDED_CATEGORIES = (
     "TRANSFER",
 )
 
-# 工作室口径：支出只认「运营消耗」，收入只认「自营收入」——两者是不同的归类，
-# 所以不能用一个属性过滤同时拿到两个方向。
-STUDIO_EXPENSE_ATTRIBUTE = AccountingAttribute.OPERATING_EXPENSE.value
-STUDIO_INCOME_ATTRIBUTE = AccountingAttribute.SELF_REVENUE.value
-
-
 def _studio_scope() -> Any:
     """「手工登记的工作室收支」的 SQL 条件，与列表里的 source=OTHER 等价。"""
     return and_(
@@ -522,11 +519,11 @@ def _studio_scope() -> Any:
         or_(
             and_(
                 Cashflow.direction == Direction.OUT.value,
-                Cashflow.accounting_attribute == STUDIO_EXPENSE_ATTRIBUTE,
+                Cashflow.direction == Direction.OUT.value,
             ),
             and_(
                 Cashflow.direction == Direction.IN.value,
-                Cashflow.accounting_attribute == STUDIO_INCOME_ATTRIBUTE,
+                Cashflow.direction == Direction.IN.value,
             ),
         ),
     )

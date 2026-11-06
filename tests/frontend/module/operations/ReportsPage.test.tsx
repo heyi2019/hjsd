@@ -98,7 +98,7 @@ describe("ReportsPage：经营中心报表", () => {
   it("七个 Tab 齐全（R1-R5 + 订单利润 + 数据中心）", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "库存 R1" });
-    for (const label of ["库存 R1", "月度损益 R2", "提成对账 R3", "资金日报 R4", "业务损益 R5", "订单利润", "数据中心"]) {
+    for (const label of ["库存 R1", "月度损益 R2", "提成对账 R3", "资金报表·日报", "业务损益 R5", "订单利润", "数据中心"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
   });

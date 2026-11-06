@@ -106,7 +106,6 @@ class CustomerBusinessOut(BaseModel):
     order_id: int
     order_no: str
     order_type: str
-    capital_type: str
     status: str
     trade_date: date
     owner_id: int | None = None

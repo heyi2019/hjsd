@@ -1,15 +1,13 @@
 /** 资金中心各 Tab 视图层：overview / cashflows / reconciliations / controls。
  *  每个 Tab 通过 controller 消费 useFundsPageController 暴露的状态与处理器，自身只负责列定义与渲染。 */
-import { Card, Input, Space, Tooltip, Typography } from "antd";
+import { Card, Input, Space, Tabs, Tooltip, Typography } from "antd";
+import { useState } from "react";
 import type { ColumnsType } from "antd/es/table";
 import { DataTable, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
 import {
-  ACCOUNTING_ATTRIBUTE_LABEL,
-  FUND_NATURE_LABEL,
-  NATURE_LABEL,
   POOL_OWNERSHIP_LABEL,
   RECONCILIATION_STATUS_LABEL,
 } from "../shared/lib/labels";
@@ -53,6 +51,7 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
           { label: "自有权益合计", amount: totalOwned },
         ]}
       />
+      <Typography.Text type="secondary">自有权益仅计归属为「自有」的池；托管/第三方池只计现金头寸。</Typography.Text>
       <DataTable<Pool>
         columns={arrangeFundPoolColumns(poolColumns)}
         rows={pools}
@@ -70,12 +69,13 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
 export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
   const {
     visibleCashflows, cashflows, cashflowKeyword, setCashflowKeyword, pools, cashflowPoolId, setCashflowPoolId,
-    cashflowDirection, setCashflowDirection, cashflowStatus, setCashflowStatus, cashflowFundNature, setCashflowFundNature,
-    cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, cashflowFrom, setCashflowFrom,
-    cashflowTo, setCashflowTo, flowDirectionOptions, flowStatusOptions, flowFundNatureOptions, flowAttributeOptions,
+    cashflowStatus, setCashflowStatus,
+    cashflowCategory, setCashflowCategory, cashflowFrom, setCashflowFrom,
+    cashflowTo, setCashflowTo, flowDirectionOptions, flowStatusOptions,
     fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, totalFlowIncome, totalFlowExpense,
-    cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, natureOptionSet, loading, cashflowsReady, error,
+    cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, loading, cashflowsReady, error,
   } = ctrl;
+  const [detailDirection, setDetailDirection] = useState<"IN" | "OUT">("IN");
   const cashflowUnavailable = !cashflowsReady || Boolean(error);
   const { arrange: arrangeCashflowColumns } = useListViewColumns("CASHFLOW");
   const cashflowColumns: ColumnsType<Cashflow> = [
@@ -85,28 +85,16 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "建立时间", dataIndex: "occurred_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     { title: "类别", dataIndex: "category" },
     {
-      title: "资金性质",
-      dataIndex: "fund_nature",
-      render: (v: string | null | undefined, row) => FUND_NATURE_LABEL[v ?? (row.nature?.startsWith("EXTERNAL") ? "EXTERNAL" : "BUSINESS")] ?? v ?? "—",
-    },
-    {
-      title: "核算属性",
-      dataIndex: "accounting_attribute",
-      render: (v: string | null | undefined) => ACCOUNTING_ATTRIBUTE_LABEL[v ?? ""] ?? v ?? "—",
-    },
-    {
-      title: "收支",
+      title: "收支方向",
       dataIndex: "direction",
       render: (v: string) => (v === "IN" ? "收入" : "支出"),
     },
-    {
-      title: "流向",
-      dataIndex: "nature",
-      render: (v: string | null | undefined) =>
-        natureOptionSet?.find((o) => o.value === (v ?? ""))?.label ?? NATURE_LABEL[v ?? ""] ?? v ?? "—",
-    },
     { title: "金额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "来源", dataIndex: "source" },
+    {
+      title: "归属",
+      key: "scope",
+      render: (_value, row) => (row.order_id ? "业务收支" : "工作室收支"),
+    },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("FUND_FLOW_STATUS", v, { APPROVED: "已入账" })} /> },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
     {
@@ -129,14 +117,11 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
     },
   ];
   return (
-    <Card className="glass" title="资金明细" extra={<PermissionButton permission="deposit.post" type="primary" disabled={cashflowUnavailable || loading || !flowDirectionOptions} onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>
+    <Card className="glass" title="全局资金流水" extra={<PermissionButton permission="deposit.post" type="primary" disabled={cashflowUnavailable || loading || !flowDirectionOptions} onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>
       <div className="ui-filter-bar funds-cashflow-filters">
         <Input aria-label="流水搜索" allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注" onChange={(event) => setCashflowKeyword(event.target.value)} />
         <Select aria-label="流水资金池" allowClear disabled={cashflowUnavailable} value={cashflowPoolId} placeholder="全部资金池" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
-        <Select aria-label="流水方向" allowClear disabled={cashflowUnavailable} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
         <Select aria-label="流水状态" allowClear disabled={cashflowUnavailable} value={cashflowStatus} placeholder="全部状态" options={flowStatusOptions ?? []} onChange={setCashflowStatus} />
-        <Select aria-label="流水资金性质" allowClear disabled={cashflowUnavailable} value={cashflowFundNature || undefined} placeholder="全部资金性质" options={flowFundNatureOptions ?? []} onChange={(value) => setCashflowFundNature(value ?? "")} />
-        <Select aria-label="流水核算属性" allowClear disabled={cashflowUnavailable} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
         <Input aria-label="流水中类别筛选" allowClear value={cashflowCategory} placeholder="类别，如 REVERSAL" onChange={(event) => setCashflowCategory(event.target.value)} />
         <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
         <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
@@ -161,15 +146,28 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
           { label: "当前结果", kind: "count", amount: cashflowUnavailable ? "不可用" : visibleCashflows.length },
         ]}
       />
-      <DataTable<Cashflow>
-        columns={arrangeCashflowColumns(cashflowColumns)}
-        rows={visibleCashflows}
-        page={1}
-        pageSize={10}
-        total={visibleCashflows.length}
-        emptyText={cashflowUnavailable ? "资金流水数据不可用，请点击重新加载" : "暂无资金流水"}
-        loading={loading}
-        onPageChange={() => undefined}
+      <Tabs
+        activeKey={detailDirection}
+        onChange={(key) => setDetailDirection(key as "IN" | "OUT")}
+        items={["IN", "OUT"].map((direction) => {
+          const rows = visibleCashflows.filter((row) => row.direction === direction);
+          return {
+            key: direction,
+            label: direction === "IN" ? "收入明细" : "支出明细",
+            children: (
+              <DataTable<Cashflow>
+                columns={arrangeCashflowColumns(cashflowColumns)}
+                rows={rows}
+                page={1}
+                pageSize={10}
+                total={rows.length}
+                emptyText={cashflowUnavailable ? "资金流水数据不可用，请点击重新加载" : `暂无${direction === "IN" ? "收入" : "支出"}明细`}
+                loading={loading}
+                onPageChange={() => undefined}
+              />
+            ),
+          };
+        })}
       />
     </Card>
   );
@@ -275,6 +273,7 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
   ];
   return (
     <Card className="glass" title="资金对账" extra={<PermissionButton permission="deposit.post" type="primary" disabled={reconciliationUnavailable || loading} onClick={() => { reconciliationForm.setFieldsValue({ reconciled_on: today() }); setReconciliationOpen(true); }}>新增对账</PermissionButton>}>
+      <Typography.Text type="secondary">系统余额口径：截至对账日期「已入账」流水的累计。</Typography.Text>
       <DataTable<Reconciliation>
         columns={arrangeReconciliationColumns(reconciliationColumns)}
         rows={reconciliations}

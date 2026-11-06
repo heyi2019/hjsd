@@ -122,7 +122,6 @@ const order1: Order = {
   id: 1,
   order_no: "HS-2026-0001",
   order_type: "HS",
-  capital_type: "SELF",
   trade_date: "2026-10-01",
   status: "ACTIVE",
   business_mode: "SELF",
@@ -140,7 +139,6 @@ const order2: Order = {
   id: 2,
   order_no: "DG-2026-0002",
   order_type: "DG",
-  capital_type: "ZERO",
   trade_date: "2026-10-02",
   status: "COMPLETED",
   business_mode: "DISTRIBUTION",
@@ -149,7 +147,6 @@ const order3: Order = {
   id: 3,
   order_no: "HS-2026-0003",
   order_type: "HS",
-  capital_type: "CREDIT",
   trade_date: "2026-10-03",
   status: "ACTIVE",
   installment_principal: "12000.00",
@@ -170,7 +167,7 @@ const link1: OrderLink = {
   note: "来源单",
   created_at: "2026-10-01T10:00:00",
 };
-const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
+const types = [{ id: 1, code: "HS", name: "回收", is_active: true }];
 
 const installment: Installment = {
   id: 11,

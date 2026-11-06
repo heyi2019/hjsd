@@ -301,8 +301,6 @@
 | `TH_DIRECT_COST` | 为客户需求向同行采购账号形成的分销直接采购成本 | TH 向同行买号 |
 | `TH_REVENUE` | 将按客户需求采购的账号卖给客户形成的分销销售收入 | TH 向客户售号 |
 | `SERVICE_REVENUE` | 已确认的服务费、佣金等收入 | 分期合约已确认服务费；DG 仅在实际结算口径确认后使用 |
-| `ADDITIONAL_INCOME` | 附加收入：返点到账、打赏、违约金等非卖号收入（内部以 `cashflow.category` 区分：`REBATE`/`TIP`/`PENALTY`） | `REBATE` 等资金流水 |
-| `ADDITIONAL_EXPENSE` | 附加支出：随成交发生、既非号价成本也非日常经营的过手性支出（代收代付同行分成等），与附加收入对称核算 | HS0051 成交 888 转付同行 277.60 |
 | `OPERATING_EXPENSE` | 与具体订单无直接对应的日常经营费用 | 平台费、人工、办公等 |
 | `DEPOSIT` | 外部/受托押金的占用、释放或损失 | `DEPOSIT_HOLD`、`DEPOSIT_RELEASE` |
 | `EXTERNAL_FUNDING` | 非经营性的外部资金注入或退出 | 股东注资、借款 |

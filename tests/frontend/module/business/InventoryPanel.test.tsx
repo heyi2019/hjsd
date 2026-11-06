@@ -452,9 +452,9 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(detailPanel).queryByText("流水时间", { exact: true })).toBeNull();
     const financePanel = detailPanel.querySelector(".inventory-finance-list") as HTMLElement;
     const financeSummary = financePanel.querySelector(".inventory-finance-summary") as HTMLElement;
-    expect(within(financeSummary).getByText("支出")).toBeInTheDocument();
+    expect(within(financeSummary).getByText("资金流水支出")).toBeInTheDocument();
     expect(within(financeSummary).getByText("收入")).toBeInTheDocument();
-    expect(within(financeSummary).getByText("总支出")).toBeInTheDocument();
+    expect(within(financeSummary).getByText("总支出（含坏账）")).toBeInTheDocument();
     expect(within(financeSummary).getByText("总收入")).toBeInTheDocument();
     const financeHeaders = within(financePanel).getAllByRole("columnheader");
     for (const name of ["类型", "方向", "金额", "比例", "时间"]) {

@@ -30,7 +30,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 from app.core.time import now_second
 from app.domain.base import AuditMixin, TimestampMixin
-from app.domain.enums import CapitalType, FundNature, PoolOwnership, PoolStatus, PoolType, Portion
+from app.domain.enums import PoolOwnership, PoolStatus, PoolType, Portion
 
 
 class Pool(Base, AuditMixin):
@@ -73,10 +73,6 @@ class OrderTypeDef(Base, AuditMixin):
 
     __tablename__ = "order_type_defs"
     __table_args__ = (
-        CheckConstraint(
-            f"capital_type IN {CapitalType.values()!r}".replace("[", "(").replace("]", ")"),
-            name="capital_type_valid",
-        ),
         CheckConstraint("sort_order >= 0", name="order_type_sort_order_nonnegative"),
         UniqueConstraint("code", name="uq_order_type_defs_code"),
         UniqueConstraint("sequence_prefix", name="uq_order_type_defs_sequence_prefix"),
@@ -85,7 +81,6 @@ class OrderTypeDef(Base, AuditMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(16), nullable=False)  # 不可更新
     name: Mapped[str] = mapped_column(String(64), nullable=False)
-    capital_type: Mapped[str] = mapped_column(String(16), nullable=False)
     sequence_prefix: Mapped[str] = mapped_column(String(16), nullable=False)
     sequence_key: Mapped[str] = mapped_column(String(64), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -114,7 +109,7 @@ class GameTypeOption(Base, AuditMixin):
     channel_regions: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
 class OrderTypePool(Base, TimestampMixin):
-    """业务↔资金池路由；按业务、份额和可选资金性质区分默认池（BAS-03-02）。"""
+    """业务↔资金池路由；按业务和份额区分默认池（BAS-03-02）。"""
 
     __tablename__ = "order_type_pools"
     __table_args__ = (
@@ -123,14 +118,8 @@ class OrderTypePool(Base, TimestampMixin):
             f"portion IN {Portion.values()!r}".replace("[", "(").replace("]", ")"),
             name="portion_valid",
         ),
-        CheckConstraint(
-            f"fund_nature IS NULL OR fund_nature IN {FundNature.values()!r}".replace("[", "(").replace("]", ")"),
-            name="fund_nature_valid",
-        ),
         CheckConstraint("priority >= 0", name="route_priority_nonnegative"),
-        UniqueConstraint(
-            "order_type_id", "portion", "fund_nature", name="uq_order_type_pools_route"
-        ),
+        UniqueConstraint("order_type_id", "portion", name="uq_order_type_pools_route"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -141,7 +130,6 @@ class OrderTypePool(Base, TimestampMixin):
         ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
     )
     portion: Mapped[str] = mapped_column(String(16), nullable=False)
-    fund_nature: Mapped[str | None] = mapped_column(String(16), nullable=True)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 

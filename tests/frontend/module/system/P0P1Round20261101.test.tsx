@@ -61,7 +61,7 @@ import { consignmentRecords } from "@/stocks/InventoryPlatformOffsaleModal";
 
 vi.mock("@/shared/api/catalog");
 
-const types = [{ id: 1, code: "TH", name: "提号", capital_type: "DISTRIBUTION", is_active: true }];
+const types = [{ id: 1, code: "TH", name: "提号", is_active: true }];
 const settledInstallment = {
   id: 1,
   inst_no: "TH0002-FQ",
@@ -113,7 +113,7 @@ beforeEach(() => {
   ]);
   vi.mocked(catalog.installmentsApi.dispositions).mockResolvedValue([]);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([
-    { id: 10, order_no: "TH-2026-0002", order_type: "TH", capital_type: "DISTRIBUTION", trade_date: "2026-10-01", status: "ACTIVE" },
+    { id: 10, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-01", status: "ACTIVE" },
   ]);
   vi.mocked(catalog.reportsApi.inventoryHealth).mockResolvedValue({ generated_on: "2026-10-01", total_cost: "0.00", items: [] });
 });
@@ -344,7 +344,7 @@ it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () =
 });
 
 it("P1/FE-050：流水冲销成功后原流水不再显示重复冲销入口", async () => {
-  const original = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
+  const original = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
   const reversal = { ...original, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", reversal_of_id: 7 };
   let mainListCalls = 0;
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
@@ -399,11 +399,11 @@ it("P1/FE-051：经营报表日期筛选传递到各报表查询", async () => {
   await waitFor(() => expect(catalog.reportsApi.commission).toHaveBeenLastCalledWith({ from: "2026-10-01", all_people: true }));
   await user.click(screen.getByRole("tab", { name: /业务损益 R5/ }));
   await waitFor(() => expect(catalog.reportsApi.businessPnl).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
-  await user.click(screen.getByRole("tab", { name: /资金属性分析/ }));
+  await user.click(screen.getByRole("tab", { name: /资金报表·属性分析/ }));
   await waitFor(() => expect(catalog.reportsApi.financeDimensions).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
   await user.click(screen.getByRole("tab", { name: /订单利润/ }));
   await waitFor(() => expect(catalog.reportsApi.orderProfit).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
-  await user.click(screen.getByRole("tab", { name: /资金日报 R4/ }));
+  await user.click(screen.getByRole("tab", { name: /资金报表·日报/ }));
   const dailyDate = screen.getByLabelText("资金日报日期");
   fireEvent.change(dailyDate, { target: { value: "2026-10-01" } });
   await waitFor(() => expect(catalog.reportsApi.dailyFunds).toHaveBeenLastCalledWith({ on: "2026-10-01" }));
@@ -449,7 +449,7 @@ it("P1/FE-169：订单利润展示采购成本并给出可复算口径", async (
 
   expect(await screen.findByText("HS-2026-0011")).toBeInTheDocument();
   expect(screen.getAllByText("账号采购成本").length).toBeGreaterThanOrEqual(1);
-  expect(screen.getByText(/净利 = 所有收入 − 所有支出/)).toBeInTheDocument();
+  expect(screen.getByText(/订单利润 = 所有收入 − 所有支出/)).toBeInTheDocument();
   expect(screen.getAllByText("400.00").length).toBeGreaterThanOrEqual(1);
 });
 
@@ -656,7 +656,7 @@ it("P1/FE-239：资金池主数据失败时锁定新增入口", async () => {
 
 it("P1/FE-240：过账路由失败时显示不可用并锁定保存", async () => {
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValueOnce([
-    { id: 1, code: "HS", name: "回收", capital_type: "STOCK", is_active: true },
+    { id: 1, code: "HS", name: "回收", is_active: true },
   ] as never);
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
     { id: 1, code: "MAIN", name: "主账户", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
@@ -691,14 +691,14 @@ it("P1/FE-261：完整资金划转不进入单边异常修复列表", async () =
 
 it("P1/FE-262：过账路由覆盖列表包含代挂 DG", async () => {
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValueOnce([
-    { id: 1, code: "HS", name: "回收", capital_type: "STOCK", is_active: true },
-    { id: 2, code: "DG", name: "代挂", capital_type: "ZERO", is_active: true },
+    { id: 1, code: "HS", name: "回收", is_active: true },
+    { id: 2, code: "DG", name: "代挂", is_active: true },
   ] as never);
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
     { id: 1, code: "MAIN", name: "主账户", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
   ] as never);
   vi.mocked(catalog.orderTypesApi.routes).mockImplementation((id: number) => Promise.resolve([
-    { id: id * 10, order_type_code: id === 2 ? "DG" : "HS", portion: "GROSS", fund_nature: null, pool_code: "MAIN", pool_name: "主账户", priority: 0, is_active: true },
+    { id: id * 10, order_type_code: id === 2 ? "DG" : "HS", portion: "GROSS", pool_code: "MAIN", pool_name: "主账户", priority: 0, is_active: true },
   ] as never));
   renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
 
@@ -743,9 +743,9 @@ it("P1/FE-149：数据中心进行中包含分期订单并跳转订单台账", a
     totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
   vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
-    { id: 10, order_no: "HS-2026-0001", order_type: "HS", capital_type: "STOCK", trade_date: "2026-10-01", status: "ACTIVE" },
-    { id: 11, order_no: "TH-2026-0002", order_type: "TH", capital_type: "STOCK", trade_date: "2026-10-02", status: "INSTALLMENT" },
-    { id: 12, order_no: "DG-2026-0003", order_type: "DG", capital_type: "ZERO", trade_date: "2026-10-03", status: "COMPLETED" },
+    { id: 10, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE" },
+    { id: 11, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-02", status: "INSTALLMENT" },
+    { id: 12, order_no: "DG-2026-0003", order_type: "DG", trade_date: "2026-10-03", status: "COMPLETED" },
   ]);
   const onNavigate = vi.fn();
   renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
@@ -893,7 +893,7 @@ it("P1/FE-229：资金流水数据失败时不显示零统计且禁用新增", a
   renderLight(<FundsPage />, { user: "admin" });
 
   fireEvent.click(screen.getByRole("tab", { name: "流水" }));
-  expect(await screen.findByText("资金明细")).toBeInTheDocument();
+  expect(await screen.findByText("全局资金流水")).toBeInTheDocument();
   expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("不可用");
   expect(screen.getByRole("button", { name: /新增流水/ })).toBeDisabled();
 });
@@ -1270,10 +1270,10 @@ it("P1/FE-270/271/272/273：R2/R3/R4/R5 历史空区间分别传递筛选条件"
   await waitFor(() => expect(catalog.reportsApi.commission).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
   await setRange("业务损益 R5");
   await waitFor(() => expect(catalog.reportsApi.businessPnl).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
-  await setRange("资金属性分析");
+  await setRange("资金报表·属性分析");
   await waitFor(() => expect(catalog.reportsApi.financeDimensions).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
 
-  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("tab", { name: "资金日报 R4" }));
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("tab", { name: "资金报表·日报" }));
   const dailyInput = await screen.findByLabelText("资金日报日期");
   fireEvent.change(dailyInput, { target: { value: "2026-10-01" } });
   await waitFor(() => expect(catalog.reportsApi.dailyFunds).toHaveBeenLastCalledWith({ on: "2026-10-01" }));

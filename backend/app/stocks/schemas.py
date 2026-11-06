@@ -196,7 +196,6 @@ class ExecutionCashflowOut(BaseModel):
     # #15 需求2：流水时间（Cashflow.created_at）可清空，故允许为 null。
     occurred_at: datetime | None = None
     direction: str
-    nature: str
     category: str
     amount: Decimal
     note: str | None = None

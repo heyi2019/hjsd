@@ -10,8 +10,8 @@ import type { OrderType, Pool, RouteImpactPreview } from "@/shared/api/catalog";
 vi.mock("@/shared/api/catalog");
 
 const rows: OrderType[] = [
-  { id: 1, code: "HS", name: "回收", capital_type: "STOCK", is_active: true, description: null, sort_order: 1 },
-  { id: 2, code: "DG", name: "代挂", capital_type: "ZERO", is_active: false, sort_order: 2 },
+  { id: 1, code: "HS", name: "回收", is_active: true, description: null, sort_order: 1 },
+  { id: 2, code: "DG", name: "代挂", is_active: false, sort_order: 2 },
 ];
 const pools: Pool[] = [
   { id: 1, code: "POOL-A", name: "主资金池", pool_type: "MAIN", ownership: "SELF", status: "ACTIVE" },

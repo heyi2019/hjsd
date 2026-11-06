@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.schemas import RequestModel
-from app.domain.enums import CapitalType, FundNature, PoolOwnership, PoolStatus, PoolType, Portion
+from app.domain.enums import PoolOwnership, PoolStatus, PoolType, Portion
 
 
 class PoolCreate(RequestModel):
@@ -60,7 +60,6 @@ class OrderTypeCreate(RequestModel):
 
     code: str = Field(min_length=2, max_length=10, description="2-10 位大写字母数字，创建后不可修改")
     name: str = Field(min_length=1, max_length=64)
-    capital_type: CapitalType
     sequence_prefix: str | None = Field(default=None, max_length=16, description="默认等于 code")
     sort_order: int = 0
     description: str | None = None
@@ -80,7 +79,6 @@ class OrderTypeOut(BaseModel):
     id: int
     code: str
     name: str
-    capital_type: str
     business_mode: str | None = None
     business_type: str | None = None
     value_added_service: str | None = None
@@ -133,7 +131,6 @@ class RouteIn(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     portion: Portion = Portion.GROSS
-    fund_nature: FundNature | None = None
     pool_code: str = Field(min_length=2, max_length=64)
     priority: int = 0
 
@@ -142,7 +139,6 @@ class RouteOut(BaseModel):
     id: int
     order_type_code: str
     portion: str
-    fund_nature: str | None = None
     pool_code: str
     pool_name: str
     priority: int

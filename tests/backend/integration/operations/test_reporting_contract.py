@@ -61,7 +61,7 @@ def test_report_viewer_can_read_employee_options_for_operations_filter(
     assert report.status_code == 200, report.text
 
 
-def test_finance_dimension_report_groups_fund_and_accounting_attributes(
+def test_finance_dimension_report_groups_fund_and_income_expense_scope(
     seeded_db, seeded_client, headers
 ):
     from app.finance.cashflows import create_cashflow
@@ -69,18 +69,15 @@ def test_finance_dimension_report_groups_fund_and_accounting_attributes(
     # 资金池账户已下线：直接在种子池上造流水（等价于原 get_pool + create_pool_account）
     pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
     assert pool is not None, "种子池 HJ_INVEST 缺失"
-    for direction, amount, attribute in (
-        ("IN", "100.00", "SELF_REVENUE"),
-        ("OUT", "40.00", "SELF_DIRECT_COST"),
+    for direction, amount in (
+        ("IN", "100.00"),
+        ("OUT", "40.00"),
     ):
         create_cashflow(
             seeded_db,
             pool_id=pool.id,
             occurred_on=date(2026, 10, 17),
             direction=direction,
-            nature="BUSINESS_IN" if direction == "IN" else "BUSINESS_OUT",
-            fund_nature="BUSINESS",
-            accounting_attribute=attribute,
             category="OTHER",
             amount=Decimal(amount),
             actor="pytest",
@@ -94,8 +91,8 @@ def test_finance_dimension_report_groups_fund_and_accounting_attributes(
     assert report["total_amount"] == Decimal("140.00")
     assert report["total_signed_amount"] == Decimal("60.00")
     assert {item["pool_code"] for item in report["items"]} == {"HJ_INVEST"}
-    assert {item["accounting_attribute"] for item in report["items"]} == {
-        "SELF_REVENUE", "SELF_DIRECT_COST"
+    assert {(item["direction"], item["scope"]) for item in report["items"]} == {
+        ("IN", "STUDIO"), ("OUT", "STUDIO")
     }
 
     response = seeded_client.get(
@@ -110,8 +107,10 @@ def test_finance_dimension_report_groups_fund_and_accounting_attributes(
         "/api/v1/reports/finance-dimensions/export.csv", headers=headers
     )
     assert exported.status_code == 200, exported.text
-    # 2026-10-29 起导出表头用「列表字段」里的中文列名，不再是英文键
-    assert "资金性质" in exported.content.decode("utf-8-sig").splitlines()[0]
+    # 导出表头来自当前列表字段配置，已不再包含资金性质维度。
+    header = exported.content.decode("utf-8-sig").splitlines()[0]
+    assert "资金性质" not in header
+    assert "核算属性" in header
 
 D = date(2026, 10, 4)        # 主测试日（与 m4 一致）
 EARLY = date(2026, 9, 15)    # 月初侧样本（用于 from 过滤）

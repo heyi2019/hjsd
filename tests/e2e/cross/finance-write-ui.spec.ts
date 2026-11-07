@@ -186,15 +186,13 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     await pickSelect(page, dialog, "资金池", /投资款荷包/);
     await dialog.getByLabel("发生日期").fill("2026-10-21");
     await pickSelect(page, dialog, "收支方向", "收入");
-    await pickSelect(page, dialog, "资金性质", "本方经营");
-    await pickSelect(page, dialog, "核算属性", "自营收入");
     await dialog.getByLabel("类别").fill("E2E_UI_FLOW");
     await dialog.getByLabel("金额").fill("10.00");
     await dialog.getByLabel("摘要").fill("E2E 独立流水 UI");
     // 口径：资金流水已取消审核/驳回流程，录入即入账（3f7c115）。按钮文案为「提交」。
     await dialog.getByRole("button", { name: "提交" }).click();
 
-    await expect(page.getByText("独立资金流水已提交，已入账")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("资金流水已提交，已入账")).toBeVisible({ timeout: 10000 });
     expect(errors).toEqual([]);
   });
 

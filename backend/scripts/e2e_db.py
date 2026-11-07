@@ -117,6 +117,25 @@ def _truncate_all(engine) -> None:
         conn.execute(text(f"TRUNCATE {names} RESTART IDENTITY CASCADE"))
 
 
+def _drop_retired_columns(engine) -> None:
+    """让常驻 E2E 库追平当前 ORM，清掉历史版本遗留的非空字段。
+
+    `keep` 模式只执行 ``create_all``，不会修改已有表；旧库因此可能仍保留
+    已从当前模型删除、但带 NOT NULL 的 ``capital_type`` / ``nature``，新写入
+    订单和资金流水时会被 PostgreSQL 拒绝。
+    """
+    with engine.begin() as connection:
+        connection.execute(
+            text('ALTER TABLE public."order_type_defs" DROP COLUMN IF EXISTS capital_type CASCADE')
+        )
+        connection.execute(
+            text('ALTER TABLE public."orders" DROP COLUMN IF EXISTS capital_type CASCADE')
+        )
+        connection.execute(
+            text('ALTER TABLE public."cashflow" DROP COLUMN IF EXISTS nature CASCADE')
+        )
+
+
 def _seed_default_users(db) -> None:
     """补齐占位用户（对齐 conftest.seed_default_users）。
 
@@ -231,6 +250,7 @@ def reset(reset_only: bool = False, keep: bool = False) -> str:
         Base.metadata.drop_all(bind=engine)
         Base.metadata.create_all(bind=engine)
         _truncate_all(engine)
+    _drop_retired_columns(engine)
     Session = sessionmaker(bind=engine, autoflush=False, future=True)
     db = Session()
     try:

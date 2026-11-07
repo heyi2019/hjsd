@@ -6,6 +6,7 @@ import { reportsApi, type InventoryHealthReport, type InventoryHealthRow } from 
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow, StatusTag } from "../../shared/ui";
 import { Note, useReport } from "./shared";
+import { ReportExportButton } from "./ReportExportButton";
 
 export function InventoryReport() {
   const { data, loading, error, reload } = useReport<InventoryHealthReport>(
@@ -59,6 +60,7 @@ export function InventoryReport() {
          emptyText={error ? "库存健康数据不可用，请点击重新加载" : "暂无在库账号"}
          onPageChange={() => undefined}
       />
+      <ReportExportButton name="inventory-health" />
     </Card>
   );
 }

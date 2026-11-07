@@ -26,10 +26,10 @@ const POOLS = [
 
 const ROUTES: Record<number, OrderTypeRoute[]> = {
   1: [
-    { id: 11, order_type_code: "HS", portion: "PRINCIPAL", fund_nature: null, pool_code: "HJ_INVEST", pool_name: "投资款荷包", priority: 0, is_active: true },
+    { id: 11, order_type_code: "HS", portion: "PRINCIPAL", pool_code: "HJ_INVEST", pool_name: "投资款荷包", priority: 0, is_active: true },
   ],
   2: [
-    { id: 21, order_type_code: "DG", portion: "GROSS", fund_nature: "BUSINESS", pool_code: "HJ_INVEST", pool_name: "投资款荷包", priority: 5, is_active: true },
+    { id: 21, order_type_code: "DG", portion: "GROSS", pool_code: "HJ_INVEST", pool_name: "投资款荷包", priority: 5, is_active: true },
   ],
 };
 
@@ -62,7 +62,7 @@ describe("OrderTypeRoutesPanel 资金路由页", () => {
     expect(await screen.findByText("代挂（DG）", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
   });
 
-  it("份额与资金性质文案来自选项词典；不限性质显示「不限」", async () => {
+  it("份额文案来自选项词典", async () => {
     renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
 
     await screen.findByText("回收（HS）");
@@ -72,9 +72,6 @@ describe("OrderTypeRoutesPanel 资金路由页", () => {
     // ROUTE_PORTION 词典：PRINCIPAL=本金、GROSS=总额
     expect(within(table).getByText("本金")).toBeInTheDocument();
     expect(within(table).getByText("总额")).toBeInTheDocument();
-    // fund_nature 为空 → 不限；有值 → ROUTE_FUND_NATURE 词典文案
-    expect(within(table).getByText("不限")).toBeInTheDocument();
-    expect(within(table).getByText("本方经营")).toBeInTheDocument();
   });
 
   it("FE-240：路由读取失败进入错误态并锁定覆盖保存", async () => {
@@ -109,7 +106,6 @@ describe("PoolsAndRoutesPanel", () => {
         portion: "PRINCIPAL",
         pool_code: "HJ_CUSTODY",
         pool_name: "托管池",
-        fund_nature: null,
         priority: 0,
         is_active: true,
       },

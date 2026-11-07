@@ -106,7 +106,6 @@ class OrderCreate(BaseModel):
         default=False, description="确认复购回流：仅对已售出的历史同账号生效"
     )
     owner_id: int | None = None
-    capital_type: str | None = Field(default=None, description="默认取业务定义")
     note: str | None = None
     # 佣金口径（BAS：仅 DG 代挂单可用；两者必须同时填写或同时留空）
     commission_mode: str | None = Field(
@@ -134,6 +133,8 @@ class OrderUpdate(BaseModel):
 
     trade_date: date | None = None
     account_snapshot: OrderAccountSnapshot | None = None
+    # #15 需求2：登记时间（系统时间戳）可改可清空；不传=保持原值，显式 null=清空。
+    created_at: datetime | None = None
     note: str | None = None
     extra_values: dict[str, object] | None = None
     # 表单字段配置体系（ORDEREDIT 作用域）：合并进订单 form_extra。
@@ -168,7 +169,6 @@ class OrderOut(BaseModel):
     id: int
     order_no: str
     order_type: str
-    capital_type: str
     business_mode: str | None = None
     business_type: str | None = None
     value_added_service: str | None = None
@@ -182,7 +182,8 @@ class OrderOut(BaseModel):
     commission_mode: str | None = None
     commission_payer: str | None = None
     extra_values: dict[str, object] = Field(default_factory=dict)
-    created_at: datetime
+    # #15 需求2：登记时间可清空，故允许为 null。
+    created_at: datetime | None = None
 
 
 class OrderListOut(OrderOut):
@@ -289,9 +290,10 @@ class OrderCashflowOut(BaseModel):
     flow_no: str
     pool_id: int
     occurred_on: date
-    nature: str
     category: str
     direction: str
+    # Deprecated compatibility field derived from the current cashflow shape.
+    nature: str
     amount: Decimal
     status: str
     order_event_id: int | None = None

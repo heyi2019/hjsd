@@ -13,22 +13,21 @@
 
 目标是在不篡改导入原始数据的前提下，建立可审计的订单事件、资金池、库存、分期、返点和活字段数据库。
 
-当前已有 SQLite 过渡基础库、`models_new`、`services_new` 与数据导入脚本；但分期 PAYMENT、返点分次结算、押金、完整活字段、正式外键/索引和 Alembic 迁移尚未完整落地。
+当前 PostgreSQL 基线已落地，`models_new` / `services_new` 等过渡目录已删除；分期 PAYMENT、押金、活字段、正式外键/索引和 Alembic 活动迁移链均已接入。
 
 ## 2. 数据库策略
 
 | 场景 | 方案 |
 |---|---|
-| 本地开发/MVP | SQLite，开启外键，独立 v1 数据库文件 |
-| 正式环境（当前） | 阿里云 ECS SQLite v1 持久化库，使用 Alembic 管理迁移；每日备份 |
-| 正式环境（目标） | 独立 PostgreSQL 实例/数据库；迁移完成前不得切换连接类型 |
+| 本地开发/测试 | 独立 PostgreSQL 数据库，按会话隔离 |
+| 正式环境（当前） | 独立 PostgreSQL 实例/数据库，使用 Alembic 管理迁移；每日备份 |
 | 金额 | `DECIMAL(18,2)` + Python `Decimal`，禁止 float |
 | 迁移 | 旧库/原始 JSON 只读；迁移只写新库；每次前备份 |
 | 删除 | 有流水的池、历史活字段、核心凭证禁止物理删除，改停用/取消 |
 
 ## 3. 建设顺序（M0）
 
-1. 初始化迁移框架、环境配置、SQLite 外键和基础审计字段。
+1. 初始化迁移框架、环境配置、PostgreSQL 连接和基础审计字段。
 2. 建 `pools`、`order_type_defs`、`order_type_pools`、`customers`、`counterparties` 等主数据；客户与合作方分别按 `CUS`、`CP` 编号。
 3. 建 `stocks`、`orders`、`order_customer_roles`、`order_counterparty_roles`、`order_events`、`cashflow`，实现订单客户/合作方多角色关联与事件→现金流一对一。
 4. 建 `installments` 与 `installment_schedules`：以 `contract_type` 区分 STOCK_SALE(HS) / PICKUP_SALE(TH) / CONSIGNMENT_SALE(DG)；一单一合约，期次计划支持 PAYMENT、逾期、换绑、断分期处置，结清交付以无现金流 DELIVER 记录。

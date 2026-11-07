@@ -118,7 +118,6 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_game_types_contract.py": "F04",
     "test_import_landing.py": "E03",
     "test_import_mapping.py": "E03",
-    "test_imports_contract.py": "E03",
     "test_installment_remaining.py": "B08",
     "test_installment_totals.py": "B08",
     "test_installments_contract.py": "B08",
@@ -150,6 +149,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_orders.py": "B01",
     "test_orders_common.py": "B01",
     "test_orders_contract.py": "B01",
+    "test_order_edit_smoke.py": "B01",
     "test_orders_events_service.py": "B03",
     "test_orders_guard.py": "B02",
     "test_orders_router_guard.py": "B02",
@@ -178,7 +178,6 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_reporting_r_consistency.py": "E01",
     "test_reporting_service_gaps.py": "E01",
     "test_request_schema_contract.py": "SYS07",
-    "test_search_contract.py": "SYS08",
     "test_settings.py": "SYS06",
     "test_state_machine.py": "SYS04",
     "test_stock_intake_contract.py": "B04",
@@ -221,7 +220,7 @@ E2E_FILE_TO_FUNC: dict[str, str] = {
 
 # E2E 的跨模块文件：一个 spec 覆盖多个业务模块时登记，仅影响「关联模块」列。
 E2E_CROSS_MODULE: dict[str, set[str]] = {
-    # 五类业务写入 + 资金闭环 + 质量中心 + 需求池 + 通知/搜索 + 报表导出 + 审计 + 数据范围
+    # 五类业务写入 + 资金闭环 + 质量中心 + 需求池 + 通知 + 报表导出 + 审计 + 数据范围
     "business-write.spec.ts": {"B", "C", "D", "E", "SYS"},
     "finance-write-ui.spec.ts": {"B", "D"},   # 分期收款同时动订单与资金
     "upgrade-integration.spec.ts": {"B", "D"},
@@ -290,14 +289,11 @@ FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "RebatesPanel.deep.test.tsx":          "D04",
     "RebatesPanel.test.tsx":               "D04",
     "StudioExpensePanel.test.tsx":         "D05",
-    "DataCenterPanel.test.tsx":            "E01",
     "ReportsPage.deep.test.tsx":           "E01",
     "ReportsPage.details.test.tsx":        "E01",
     "ReportsPage.test.tsx":                "E01",
     "inventory-export.test.ts":            "E02",
-    "ImportWorkbench.test.tsx":            "E03",
     "ConfigCenterPanel.test.tsx":          "F01",
-    "PolicySettingsPanel.test.tsx":        "F01",
     "SettingsPage.deep.test.tsx":          "F01",
     "SettingsPage.test.tsx":               "F01",
     "panels.config.test.tsx":              "F01",
@@ -337,12 +333,6 @@ FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "client.test.ts":                      "SYS07",
     "ui.atoms.test.tsx":                   "SYS07",
     "ui.containers.test.tsx":              "SYS07",
-    "AttachmentPanel.deep.test.tsx":       "SYS08",
-    "AttachmentPanel.test.tsx":            "SYS08",
-    "NotificationsPanel.test.tsx":         "SYS08",
-    "QualityPanel.deep.test.tsx":          "SYS08",
-    "QualityPanel.test.tsx":               "SYS08",
-    "SearchPanel.test.tsx":                "SYS08",
     "fixtures.test.ts":                    "SYS10",
     "vite.config.test.ts":                 "SYS10",
     "P0P1Round20261101.test.tsx":          "SYS11",

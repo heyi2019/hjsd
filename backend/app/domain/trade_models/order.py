@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from app.core.database import Base
 from app.core.money import Amount
+from app.core.time import now_second
 from app.domain.base import (
     AuditMixin,
     TimestampMixin,
 )
 from app.domain.enums import (
-    CapitalType,
     CommissionMode,
     CommissionPayer,
     DeliveryMode,
@@ -35,6 +35,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import (
     Mapped,
@@ -52,10 +53,6 @@ class Order(Base, AuditMixin):
         CheckConstraint(
             f"status IN {OrderStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="order_status_valid",
-        ),
-        CheckConstraint(
-            f"capital_type IN {CapitalType.values()!r}".replace("[", "(").replace("]", ")"),
-            name="order_capital_type_valid",
         ),
         UniqueConstraint("order_no", name="uq_orders_no"),
         Index("ix_orders_type_date", "order_type", "trade_date"),
@@ -91,7 +88,6 @@ class Order(Base, AuditMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     order_no: Mapped[str] = mapped_column(String(32), nullable=False)
     order_type: Mapped[str] = mapped_column(String(16), nullable=False)
-    capital_type: Mapped[str] = mapped_column(String(16), nullable=False)
     trade_date: Mapped[date] = mapped_column(Date, nullable=False)
     # listing_price / service_fee / expected_settlement_date 已删除（0024）：
     # ORM 有定义但 schema 从未暴露、前端零引用、486 行全 NULL 的死列；
@@ -126,6 +122,13 @@ class Order(Base, AuditMixin):
     # 建单表单「自定义字段」值存放处（与统一表单字段配置解耦，不违反治理约束）。
     # key 为 OrderFormField.field_key，value 为按 field_type 归一化后的值。
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    # #15 需求2：登记时间（系统时间戳，台账展示为「订单创建时间」）可改可清空删除，
+    # 故在此覆盖 TimestampMixin 的 created_at 为可空；插入仍由 server_default 兜底，
+    # 仅「清空」动作可显式置 NULL。updated_at 保持非空（仍来自 TimestampMixin）。
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, default=now_second, server_default=func.now()
+    )
 
 
 class OrderLink(Base, TimestampMixin):

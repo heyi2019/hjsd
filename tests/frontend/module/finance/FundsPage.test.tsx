@@ -57,8 +57,8 @@ const deposits = [
   { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" },
 ];
 const cashflows = [
-  { id: 1, status: "APPROVED", flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
-  { id: 2, status: "APPROVED", flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
+  { id: 1, status: "APPROVED", flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_DIRECT_COST" },
+  { id: 2, status: "APPROVED", flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_REVENUE" },
 ];
 
 beforeEach(() => {
@@ -153,7 +153,8 @@ describe("FundsPage：资金池卡片", () => {
     expect(await screen.findByText("资金流水数据不可用，请点击“查询”或页面顶部的“重新加载”。")).toBeInTheDocument();
     expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("不可用");
     expect(screen.getByRole("button", { name: /新增流水/ })).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "流水方向" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "收入明细" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "支出明细" })).toBeInTheDocument();
   });
 
   it("FE-230：对账失败时显示明确空态并禁用新增", async () => {
@@ -208,19 +209,23 @@ describe("FundsPage：资金流水", () => {
     await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
 
     expect(screen.queryByText("资金池账户")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("资金性质")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("关联订单")).toBeInTheDocument();
   });
 
   it("展示订单号、收支明细及总收入/总支出", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
+    expect(screen.getByRole("tab", { name: "收入明细" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "支出明细" })).toBeInTheDocument();
+    expect(screen.getByText("HS0001-CF-SELL-01")).toBeInTheDocument();
+    await ui.click(screen.getByRole("tab", { name: "支出明细" }));
     expect(screen.getByText("HS0001-CF-BUY-01")).toBeInTheDocument();
-    expect(screen.getAllByText("HS0001").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("总收入")).toBeInTheDocument();
     expect(screen.getByText("总支出")).toBeInTheDocument();
-    expect(screen.getAllByText("本方经营").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("自营直接成本")).toBeInTheDocument();
-    expect(screen.getByText("自营收入")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "收支方向" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "资金性质" })).not.toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("500.00").length).toBeGreaterThanOrEqual(1);
   });

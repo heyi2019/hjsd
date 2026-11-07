@@ -94,7 +94,6 @@ def _initial_markers_for_file(filename: str) -> set[str]:
             "bughunt",
             "_gaps",
             "unreachable_status_paths",
-            "repair_baseline_schema",
             "coverage_gate",
             "deploy_script_contract",
             "account_stock_no",
@@ -244,8 +243,12 @@ from app.api_v1 import create_app  # noqa: E402
 from app.core.database import Base, get_db  # noqa: E402
 from app.core.security import CurrentUser, DEV_USERS, build_access_token  # noqa: E402
 from app.core.settings import get_settings  # noqa: E402
-from app.domain import attachments, foundation, imports, notifications, options, parties, quality, trade, users  # noqa: E402,F401  注册全部 v1 表
+from app.domain import attachments, foundation, notifications, options, parties, quality, trade, users  # noqa: E402,F401  注册全部 v1 表
+from app.legacy_imports import models as _imports  # noqa: E402  注册历史导入表
+
+_ = _imports
 from app.foundation.seeds import seed_foundation  # noqa: E402
+from app.foundation.seed_orders import seed_order_matrix  # noqa: E402
 
 
 def seed_default_users(db: Session) -> None:
@@ -402,6 +405,24 @@ def v1_engine(request):
     lock_connection = _acquire_session_lock(engine, terminal)
     try:
         Base.metadata.create_all(bind=engine)
+        # 测试库可能由旧版本留下已删除的字段；测试基线跟随当前 ORM，先清理历史列。
+        with engine.begin() as connection:
+            connection.execute(text('ALTER TABLE public."order_type_defs" DROP COLUMN IF EXISTS capital_type CASCADE'))
+            connection.execute(text('ALTER TABLE public."orders" DROP COLUMN IF EXISTS capital_type CASCADE'))
+            connection.execute(text('ALTER TABLE public."cashflow" DROP COLUMN IF EXISTS nature CASCADE'))
+            connection.execute(
+                text(
+                    'ALTER TABLE public."cashflow" '
+                    'ADD COLUMN IF NOT EXISTS accounting_attribute '
+                    "VARCHAR(32) NOT NULL DEFAULT 'OPERATING_EXPENSE'"
+                )
+            )
+            connection.execute(
+                text(
+                    'CREATE INDEX IF NOT EXISTS ix_cashflow_accounting_attribute '
+                    'ON public."cashflow" (accounting_attribute)'
+                )
+            )
         _truncate_all(engine)
         yield engine
     finally:
@@ -546,6 +567,34 @@ def _replay_seeds(db: Session) -> None:
 def seeded_db(db: Session, seed_template: str):
     _replay_seeds(db)
     return db
+
+
+@pytest.fixture()
+def seeded_orders_db(seeded_db: Session):
+    """带「全覆盖订单矩阵」的测试库：HS/TH/DG × 状态 × 关联/未关联，附事件/流水/返点/分期/分润。
+
+    与 `seeded_db` 同生命周期（用例结束整体回滚），不污染其他用例。需要丰富订单数据
+    （订单台账/账号台账/报表/资金等回归）的用例显式声明此夹具即可，全局 `seed_template`
+    仍只含基础种子，避免把 22 单灌进所有用例导致 `count() == 1` 类断言误红。
+    """
+    seed_order_matrix(seeded_db)
+    return seeded_db
+
+
+@pytest.fixture()
+def seeded_orders_client(app, seeded_orders_db: Session):
+    """带全覆盖订单矩阵的 TestClient。"""
+
+    def override_get_db():
+        try:
+            yield seeded_orders_db
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
 
 
 # 会话级复用：create_app 单次 ~415ms（162 条路由的 pydantic schema 注册是纯 CPU 无状态），

@@ -20,6 +20,12 @@ export type InventoryFinanceRow = {
   event?: AccountExecutionEvent | null;
 };
 
+/** #15 需求2：账号台账三个系统时间戳的绝对设值 / 清空。 */
+export type TimeFieldKey = "registeredAt" | "soldAt" | "flowAt";
+
+/** 仅记录「用户改过的字段」；值为 string=绝对设值，为 null=清空。未出现的字段不发送。 */
+export type TimeSet = Partial<Record<TimeFieldKey, string | null>>;
+
 export type InventoryExecutionCategory = "BUY_IN" | "OPERATING" | "SELL_OUT";
 
 export const OPERATION_CATEGORY_LABEL: Record<InventoryExecutionCategory, string> = {

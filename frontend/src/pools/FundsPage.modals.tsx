@@ -7,8 +7,6 @@ import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 import { today } from "../shared/lib/format";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { configurableLabel } from "../shared/lib/optionSets";
-import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, NATURE_LABEL } from "../shared/lib/labels";
-import { ALLOWED_ATTRIBUTES_BY_FUND_NATURE } from "./FundsPage.fragments";
 import type { FundsPageController } from "./useFundsPageController";
 import type { Cashflow } from "../shared/api/catalog";
 
@@ -63,34 +61,20 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
 }
 
 export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { cashflowOpen, setCashflowOpen, cashflowForm, submitCashflow, write, pools, cashflowAttributeOptions, flowDirectionOptions } = ctrl;
+  const { cashflowOpen, setCashflowOpen, cashflowForm, submitCashflow, write, pools, flowDirectionOptions } = ctrl;
   return (
-    <Modal title="新增独立资金流水" fieldCount={8} open={cashflowOpen} onCancel={() => setCashflowOpen(false)} footer={null}>
+    <Modal title="新增资金流水" fieldCount={8} open={cashflowOpen} onCancel={() => setCashflowOpen(false)} footer={null}>
       <InlineError error={write.error} />
       <FieldConfigScope scope="FUNDFLOW" active={cashflowOpen}>
         <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
-          wrapperCol={{ flex: "auto" }} scope="FUNDFLOW" form={cashflowForm} onFinish={submitCashflow} initialValues={{ occurred_on: today(), direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" }}>
+          wrapperCol={{ flex: "auto" }} scope="FUNDFLOW" form={cashflowForm} onFinish={submitCashflow} initialValues={{ occurred_on: today(), direction: "IN" }}>
           <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} /></CfgItem>
           <CfgItem name="occurred_on" label="发生日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
           <CfgItem name="direction" label="收支方向" rules={[{ required: true }]}><Select options={flowDirectionOptions ?? FLOW_DIRECTION_FALLBACK} aria-label="收支方向" /></CfgItem>
-          <CfgItem name="fund_nature" label="资金性质" rules={[{ required: true }]}>
-            <Select
-              onChange={(value: string) => {
-                // 资金性质切换后，原核算属性可能不在白名单内，自动改选首个合法项
-                const allowed = ALLOWED_ATTRIBUTES_BY_FUND_NATURE[value] ?? [];
-                const current = cashflowForm.getFieldValue("accounting_attribute") as string | undefined;
-                if (current && !allowed.includes(current)) {
-                  cashflowForm.setFieldsValue({ accounting_attribute: allowed[0] });
-                }
-              }}
-            />
-          </CfgItem>
-          <CfgItem name="accounting_attribute" label="核算属性" rules={[{ required: true }]} help="可选范围由资金性质决定（与后端白名单一致）">
-            <Select options={cashflowAttributeOptions} />
-          </CfgItem>
+          <CfgItem name="order_id" label="关联订单" extra="可选；不填写则归入全局资金"><Input inputMode="numeric" placeholder="可选，填写订单 ID" /></CfgItem>
           <CfgItem name="category" label="类别" rules={[{ required: true }]}><Input /></CfgItem>
           <CfgItem name="amount" label="金额" rules={requiredMoneyRules("金额")}><MoneyInput /></CfgItem>
           <CfgItem name="note" label="摘要" rules={[{ required: true }]}><Input.TextArea rows={2} /></CfgItem>
@@ -181,7 +165,7 @@ export function ReverseModal({ ctrl }: { ctrl: FundsPageController }) {
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="FUNDREVERSE" form={reverseForm} onFinish={reverseCashflow}>
           <Typography.Paragraph type="secondary" className="ui-drawer-hint">
-            冲销会生成一笔方向相反、金额相同的流水：自动继承原流水的资金性质，核算属性固定为「冲销」，
+            冲销会生成一笔方向相反、金额相同的流水，
             状态直接为「已入账」——不经过审核流程，提交即入账。原流水保留并标记为已冲销，不可重复冲销。
           </Typography.Paragraph>
           <CfgItem name="reversed_on" label="冲销日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
@@ -336,16 +320,13 @@ export function RepairModal({ ctrl }: { ctrl: FundsPageController }) {
 }
 
 export function UnmatchedModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { unmatchedTarget, setUnmatchedTarget, cashflows, natureOptionSet, loading } = ctrl;
+  const { unmatchedTarget, setUnmatchedTarget, cashflows, loading } = ctrl;
   const unmatchedColumns: ColumnsType<Cashflow> = [
     { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
     { title: "流水号", dataIndex: "flow_no" },
     { title: "日期", dataIndex: "occurred_on" },
     { title: "类别", dataIndex: "category" },
-    { title: "资金性质", dataIndex: "fund_nature", render: (v: string | null | undefined, row) => FUND_NATURE_LABEL[v ?? (row.nature?.startsWith("EXTERNAL") ? "EXTERNAL" : "BUSINESS")] ?? v ?? "—" },
-    { title: "核算属性", dataIndex: "accounting_attribute", render: (v: string | null | undefined) => ACCOUNTING_ATTRIBUTE_LABEL[v ?? ""] ?? v ?? "—" },
-    { title: "收支", dataIndex: "direction", render: (v: string) => (v === "IN" ? "收入" : "支出") },
-    { title: "流向", dataIndex: "nature", render: (v: string | null | undefined) => natureOptionSet?.find((o) => o.value === (v ?? ""))?.label ?? NATURE_LABEL[v ?? ""] ?? v ?? "—" },
+    { title: "收支方向", dataIndex: "direction", render: (v: string) => (v === "IN" ? "收入" : "支出") },
     { title: "金额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "来源", dataIndex: "source" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("FUND_FLOW_STATUS", v, { APPROVED: "已入账" })} /> },

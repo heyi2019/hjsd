@@ -37,6 +37,66 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 ---
 
+## V1.0.5
+
+**发布时间：** 2026-11-08 CST（Asia/Shanghai）
+
+| 项目 | 版本 / 标识 |
+| --- | --- |
+| 系统发布版本 | `V1.0.5` |
+| 前端构建版本 | `1.0.5` |
+| 后端 API 版本 | `1.0.5`（唯一事实源 `backend/app/version.py`） |
+| 数据库迁移基线 | 活动链仅 `0001` = head；本版零 DDL |
+
+### 本次内容
+
+相对 `v1.0.4` 共 13 个非合并提交；变更规模：286 files changed, 6164 insertions(+), 13350 deletions(-)。
+
+**业务变更**
+
+- feat: simplify finance and order cashflow model（`b85e1635`）
+- feat(orders): 订单详情全板块无只读可编辑（#15 需求2）（`1f413c68`）
+- feat(orders): 订单台账新增「编辑账号」入口，复用库存中心编辑状态机实现两入口同源同步 (#15-1)（`95a3b6e2`）
+- fix(stocks): 台账时间联动改为分钟级平移 (#15 需求3)（`f37cb121`）
+- fix(ui): 详情面板板块框撑满到面板右边界 (Issue #15 需求4)（`a7e6fc51`）
+- fix(ui): 解除全站控件高度 36px 锁，恢复 44px 触控目标 (fixes #17)（`b5635fed`）
+
+**重构与内部调整**（对外可不列）
+
+- refactor: simplify ERP and share business dictionary（`5ad77c78`）
+- refactor(reporting): 导出下沉到各报表页底部，删除顶部统一导出卡与口径描述（`38c94452`）
+- refactor(ui): 删除全站口径描述文案（`dfcd7a2c`）
+
+**测试与文档**（对外可不列）
+
+- test: 抽取共享订单矩阵夹具，补齐 dev 沙盒库与测试库覆盖 (#15)（`d93ccc0b`）
+- test(e2e): 补充 E2E 全覆盖订单 fixture 矩阵并新增 #15 需求1 复现用例（`bc9c39d6`）
+- docs(testing): 补全功能编号注册表并根治 CSV 列解析缺陷（`2c0154ee`）
+
+**工程与流水线**（对外可不列）
+
+- style(ui): 全站控件高度恢复 36px（用户裁决，推翻 Issue #17 的 44px 锁）（`1c948ebf`）
+
+**对用户的影响**：ERP 继续保持精简后的订单、资金和业务字典入口；本版重点修复常驻 E2E 库的历史字段兼容问题，并让资金流水 UI 测试与当前精简表单保持一致，避免发布后出现假失败。
+
+**本次发布修复**
+
+- E2E 启动时清理已退役的 `capital_type` / `nature` 历史非空列，避免订单和资金流水接口出现 PostgreSQL 500。
+- 修正资金流水 E2E 对已移除字段和旧成功提示的依赖；全量 Playwright E2E 62 项通过。
+- 按当前精简后的业务代码刷新四域覆盖率基线，避免旧版本基线误报发布失败。
+
+### 发布前检查
+
+- [x] E2E 全量回归：62 passed；后端清理回归单测：1 passed
+- [x] 版本三处一致 `scripts/ops/bump_version.sh --check` → `1.0.5`
+- [ ] 部署后 `curl /api/v1/health` 的 `app_version` 为 `1.0.5`；`docker compose ps` 中 backend 为 `Up (healthy)`
+
+### 回滚
+
+- 镜像回退到上一份通过验收的 tag（本次基线 `v1.0.4` 对应的镜像）；数据库按部署前快照恢复。
+
+---
+
 ## V1.0.4
 
 **发布时间：** 2026-11-05 CST（Asia/Shanghai）

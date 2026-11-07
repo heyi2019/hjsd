@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
+import { appMessage } from "@/shared/ui/appFeedback";
 
 import * as catalog from "@/shared/api/catalog";
 let ui: ReturnType<typeof userEvent.setup>;
@@ -35,25 +36,12 @@ beforeEach(() => {
   });
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(catalog.reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
-  resolveMock(vi.mocked(catalog.reportsApi.financeDimensions), {
-    items: [],
-    total_amount: "0",
-    total_signed_amount: "0",
-  });
   resolveMock(vi.mocked(catalog.reportsApi.businessPnl), { items: [], total: {} });
   resolveMock(vi.mocked(catalog.reportsApi.orderProfit), {
     items: [],
     total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" },
   });
   resolveMock(vi.mocked(catalog.reportsApi.exportCsv), new Blob(["csv"]));
-  // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
-  // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
-  resolveMock(vi.mocked(catalog.poolsApi.balances), {
-    items: [],
-    totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
-  });
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
 });
 
 async function gotoTab(label: string) {
@@ -85,8 +73,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
       ],
     });
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金日报 R4");
-    expect((await screen.findAllByText("POOL-A")).length).toBeGreaterThanOrEqual(1); // 资金池/名称两列同值
+    await gotoTab("资金报表·日报");
+    expect(await screen.findAllByText("POOL-A")).toHaveLength(1);
+    expect(screen.queryByRole("columnheader", { name: "名称" })).not.toBeInTheDocument();
     expect(screen.getByText(/2026-10-08/)).toBeInTheDocument(); // 标题含日期
     expect(screen.getAllByText("现金余额").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
     expect(screen.getAllByText("可用余额").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
@@ -95,17 +84,17 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   it("R4 资金日报：切换日期带 on 参数重新拉取（#56）", async () => {
     vi.mocked(catalog.reportsApi.dailyFunds).mockClear();
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金日报 R4");
+    await gotoTab("资金报表·日报");
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.dailyFunds)).toHaveBeenCalled());
     const dateInput = screen.getByLabelText("资金日报日期");
     fireEvent.change(dateInput, { target: { value: "2026-10-08" } });
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-08" }));
   });
 
-  it("FE-051：共享日期区间传递到 R2/R3/R5、资金属性和订单利润", async () => {
+  it("FE-051：共享日期区间传递到 R2/R3/R5 和订单利润", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     const setFrom = async (label: RegExp) => {
-      await gotoTab(label.source.includes("R2") ? "月度损益 R2" : label.source.includes("R3") ? "提成对账 R3" : label.source.includes("R5") ? "业务损益 R5" : label.source.includes("资金属性") ? "资金属性分析" : "订单利润");
+      await gotoTab(label.source.includes("R2") ? "月度损益 R2" : label.source.includes("R3") ? "提成对账 R3" : label.source.includes("R5") ? "业务损益 R5" : "订单利润");
       const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
       fireEvent.change(pane.querySelector<HTMLInputElement>(".ui-control-width-date")!, { target: { value: "2026-10-01" } });
     };
@@ -115,36 +104,8 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", all_people: true }));
     await setFrom(/R5/);
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
-    await setFrom(/资金属性/);
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.financeDimensions)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
     await setFrom(/订单利润/);
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
-  });
-
-  it("资金属性分析：渲染资金池 / 方向 / 净方向金额", async () => {
-    resolveMockOnce(vi.mocked(catalog.reportsApi.financeDimensions), {
-      items: [
-        {
-          pool_name: "POOL-A",
-          fund_nature: "BUSINESS",
-          accounting_attribute: "SELF_REVENUE",
-          direction: "IN",
-          flow_count: 3,
-          amount: "100.00",
-          signed_amount: "100.00",
-        },
-      ],
-      total_amount: "100.00",
-      total_signed_amount: "100.00",
-    });
-    renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金属性分析");
-    await screen.findByText("POOL-A");
-    expect(screen.queryByText("资金账户")).toBeNull();
-    expect(screen.getByText("收入")).toBeInTheDocument(); // direction === IN
-    expect(screen.getByText("本方经营")).toBeInTheDocument(); // fund_nature 中文映射（#60）
-    expect(screen.getByText("自营收入")).toBeInTheDocument(); // accounting_attribute 中文映射（#60）
-    expect(screen.getAllByText("净方向金额").length).toBeGreaterThanOrEqual(1);
   });
 
   it("R1 持有天数多分支：绿/橙/红/空", async () => {
@@ -167,35 +128,31 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     expect(screen.getAllByText("-").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("FE-053：导出成功后创建下载锚点并显示结果反馈", async () => {
+  it("FE-053：页内导出成功后创建下载锚点并显示结果反馈", async () => {
     const createUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test");
     const revokeUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
-    await ui.click(selector);
-    const listbox = await screen.findByRole("listbox");
-    await ui.click(within(listbox).getByText("库存健康"));
-    await ui.click(screen.getByRole("button", { name: /导出/ }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalled());
+    await screen.findByRole("tab", { name: "库存 R1" });
+    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("inventory-health", { from: undefined, to: undefined }));
     expect(createUrl).toHaveBeenCalled();
     expect(revokeUrl).toHaveBeenCalled();
-    // 成功文案在「页内反馈区」与 antd message 弹层各渲染一份，findByText 单数会报
-    // 「Found multiple elements」，用 findAllByText 兼容双渲染。
-    expect((await screen.findAllByText(/已导出 1 份报表/)).length).toBeGreaterThan(0);
+    expect(successSpy).toHaveBeenCalledWith("已导出 inventory-health.csv");
     createUrl.mockRestore();
     revokeUrl.mockRestore();
   });
 
   it("导出日期反向时阻止请求并提示范围错误", async () => {
+    const errorSpy = vi.spyOn(appMessage, "error").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await ui.type(screen.getByLabelText("导出开始日期"), "2026-10-31");
-    await ui.type(screen.getByLabelText("导出结束日期"), "2026-10-01");
-    const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
-    await ui.click(selector);
-    const listbox = await screen.findByRole("listbox");
-    await ui.click(within(listbox).getByText("订单利润"));
-    await ui.click(screen.getByRole("button", { name: /导出/ }));
-    expect(await screen.findByText("导出开始日期不能晚于结束日期")).toBeInTheDocument();
+    await gotoTab("订单利润");
+    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
+    const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
+    await ui.type(dateInputs[0], "2026-10-31");
+    await ui.type(dateInputs[1], "2026-10-01");
+    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("导出开始日期不能晚于结束日期"));
     expect(vi.mocked(catalog.reportsApi.exportCsv)).not.toHaveBeenCalled();
   });
 
@@ -241,24 +198,6 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
   });
 
-  it("FE-271：资金属性分析历史空区间清空旧汇总", async () => {
-    vi.mocked(catalog.reportsApi.financeDimensions).mockImplementation((params) => Promise.resolve(
-      params?.from ? { items: [], total_amount: "0", total_signed_amount: "0" } : {
-        items: [{ pool_name: "POOL-FE271", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE", direction: "IN", flow_count: 1, amount: "10", signed_amount: "10" }],
-        total_amount: "10",
-        total_signed_amount: "10",
-      },
-    ) as never);
-    renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金属性分析");
-    await screen.findByText("POOL-FE271");
-    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-    const dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    fireEvent.change(dates[0], { target: { value: "2026-10-01" } });
-    fireEvent.change(dates[1], { target: { value: "2026-10-31" } });
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.financeDimensions)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
-    await waitFor(() => expect(screen.queryByText("POOL-FE271")).not.toBeInTheDocument());
-  });
 
   it("FE-272：订单利润历史空区间清空收入成本和净利明细", async () => {
     vi.mocked(catalog.reportsApi.orderProfit).mockImplementation((params) => Promise.resolve(
@@ -303,7 +242,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
     await waitFor(() => expect(screen.queryByText("HS-FE273")).not.toBeInTheDocument());
 
-    await gotoTab("资金日报 R4");
+    await gotoTab("资金报表·日报");
     await screen.findByLabelText("资金日报日期");
     fireEvent.change(screen.getByLabelText("资金日报日期"), { target: { value: "2026-10-01" } });
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-01" }));

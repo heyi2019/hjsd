@@ -34,7 +34,7 @@ test("资金中心页面划转后生成一收一支的内部资金流水", async
   expect(result.status()).toBe(201);
   const body = await result.json();
   expect(body.cashflows).toHaveLength(2);
-  expect(body.cashflows.map((f: { direction: string; amount: string; fund_nature: string }) => [f.direction, Number(f.amount), f.fund_nature]).sort()).toEqual([["IN", 1, "INTERNAL"], ["OUT", 1, "INTERNAL"]]);
+  expect(body.cashflows.map((f: { direction: string; amount: string; nature: string }) => [f.direction, Number(f.amount), f.nature]).sort()).toEqual([["IN", 1, "INTERNAL"], ["OUT", 1, "INTERNAL"]]);
   await expect(dialog).toBeHidden();
 });
 
@@ -92,7 +92,7 @@ test("资金流水页面新增即入账并在列表显示", async ({ page }) => 
   await navItem(page, "资金中心").click();
   await page.getByRole("tab", { name: "流水" }).click();
   await page.getByRole("button", { name: "新增流水" }).click();
-  const dialog = page.getByRole("dialog", { name: "新增独立资金流水" });
+  const dialog = page.getByRole("dialog", { name: "新增资金流水" });
   await dialog.locator(".ant-select-selector").first().click();
   await page.getByTitle("投资款荷包（HJ_INVEST）").last().click();
   await dialog.getByLabel("类别").fill("UI_TEST");

@@ -60,7 +60,7 @@ beforeEach(() => {
     total_paid: "350.00",
     total_remaining: "150.00",
   });
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }]);
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE" }]);
 });
 
 describe("InstallmentsPanel：分期合约", () => {
@@ -234,7 +234,7 @@ describe("InstallmentsPanel：动作与减免", () => {
       { id: 1, installment_id: 1, period_no: 0, due_on: "2026-10-01", due_amount: "100.00", received_amount: "100.00", status: "PAID" },
     ]);
     vi.mocked(catalog.installmentsApi.dispositions).mockResolvedValue([]);
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }]);
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE" }]);
   });
 
   describe("InstallmentsPanel：登记收款 / 换绑交付", () => {

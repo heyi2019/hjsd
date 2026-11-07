@@ -29,7 +29,6 @@ export const ALL_PERMISSIONS = [
   "option-set.manage",
   "report.read",
   "report.export",
-  "import.manage",
   "user.manage",
 ] as const;
 

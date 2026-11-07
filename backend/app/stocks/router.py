@@ -52,6 +52,7 @@ from .schemas import (
     AccountProfileUpdate,
     AccountDeleteRequest,
     ExecutionEditRequest,
+    ExecutionTimeSet,
     InventoryResponseOut,
     InventoryStatsOut,
     InventoryStatsQuery,
@@ -73,18 +74,18 @@ manage = require_permissions(PERM_ORDER_CREATE)
 edit_execution = require_permissions(PERM_ORDER_UPDATE, PERM_FINANCE_ORDER_EVENT_POST)
 
 
-def _apply_time_shift(db: Session, account_id: int, delta_days: int, actor: str) -> None:
-    """账号台账时间联动：把该账号关联订单的整条时间轴平移 N 天。
+def _apply_time_shift(db: Session, account_id: int, delta_minutes: int, actor: str) -> None:
+    """账号台账时间联动：把该账号关联订单的整条时间轴平移 N 分钟。
 
     账期（trade_date / 事件与流水 occurred_on / 规则快照）走订单台账同源函数；
     台账界面展示的「登记时间」「售出时间」「流水时间」取的是 created_at / posted_at
     时间戳，必须一并平移，否则改完日期界面仍显示旧值。
     分期还款计划（first_due_on / 期次 due_on）按既定口径不动。
     """
-    if delta_days == 0:
+    if delta_minutes == 0:
         return
     db.flush()  # 让同一请求内先前的执行记录改动对下面的查询可见
-    shift = timedelta(days=delta_days)
+    shift = timedelta(minutes=delta_minutes)
     orders = list(db.scalars(select(Order).where(Order.account_id == account_id)).all())
     if not orders:
         raise NotFound("账号关联订单不存在")
@@ -111,8 +112,56 @@ def _apply_time_shift(db: Session, account_id: int, delta_days: int, actor: str)
     record_audit(
         db, action="ORDER_UPDATE", entity_type="inventory_time_shift",
         entity_id=account_id, actor=actor,
-        before={"delta_days": 0},
-        after={"delta_days": delta_days, "orders": len(orders), "events": len(events), "cashflows": len(flows)},
+        before={"delta_minutes": 0},
+        after={"delta_minutes": delta_minutes, "orders": len(orders), "events": len(events), "cashflows": len(flows)},
+    )
+
+
+def _set_times(db: Session, account_id: int, time_set: ExecutionTimeSet, actor: str, user: CurrentUser) -> None:
+    """账号台账三个系统时间戳绝对设值 / 清空（#15 需求2）。
+
+    映射到账号来源单（与台账展示口径一致）：
+    - registered_at → 来源单 Order.created_at
+    - sold_at       → 来源单 SELL 事件 posted_at
+    - flow_at       → 来源单首条资金流水 Cashflow.created_at
+    仅 model_fields_set 中出现的字段生效；值为 None 表示清空（置 NULL）。
+    """
+    source_order = _source_orders(db, [account_id], user).get(account_id)
+    if source_order is None:
+        raise NotFound("账号关联来源订单不存在")
+    changed: dict[str, object] = {}
+    if "registered_at" in time_set.model_fields_set:
+        source_order.created_at = time_set.registered_at
+        source_order.updated_by = actor
+        changed["registered_at"] = time_set.registered_at
+    if "sold_at" in time_set.model_fields_set:
+        sell = db.scalar(
+            select(OrderEvent).where(
+                OrderEvent.order_id == source_order.id,
+                OrderEvent.event_type == "SELL",
+                OrderEvent.is_posted.is_(True),
+            ).order_by(OrderEvent.id)
+        )
+        if sell is None:
+            raise NotFound("来源单没有已登记的售出事件，无法设置售出时间")
+        sell.posted_at = time_set.sold_at
+        sell.updated_by = actor
+        changed["sold_at"] = time_set.sold_at
+    if "flow_at" in time_set.model_fields_set:
+        flow = db.scalar(
+            select(Cashflow).where(Cashflow.order_id == source_order.id)
+            .order_by(Cashflow.occurred_on, Cashflow.id)
+        )
+        if flow is None:
+            raise NotFound("来源单没有资金流水，无法设置流水时间")
+        flow.created_at = time_set.flow_at
+        flow.updated_by = actor
+        changed["flow_at"] = time_set.flow_at
+    record_audit(
+        db, action="ORDER_UPDATE", entity_type="inventory_time_set",
+        entity_id=account_id, actor=actor,
+        before={"mode": "absolute"},
+        after={key: (value.isoformat() if value else None) for key, value in changed.items()},
     )
 
 
@@ -188,8 +237,10 @@ def update_execution_detail(
     account.cost_amount = Decimal(str(account.cost_amount)) + cost_delta
     if changes:
         account.updated_by = user.username
-    if payload.time_shift is not None:
-        _apply_time_shift(db, account_id, payload.time_shift.delta_days, user.username)
+    if payload.time_set is not None:
+        _set_times(db, account_id, payload.time_set, user.username, user)
+    elif payload.time_shift is not None:
+        _apply_time_shift(db, account_id, payload.time_shift.delta_minutes, user.username)
     db.flush()
     return {"ok": True}
 

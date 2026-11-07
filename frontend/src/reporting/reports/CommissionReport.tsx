@@ -8,6 +8,7 @@ import { normalizeError } from "../../shared/api/client";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, Select, StatRow } from "../../shared/ui";
 import { Note, type ReportRange, useReport } from "./shared";
+import { ReportExportButton } from "./ReportExportButton";
 
 export function Commission({ range, mine = false }: { range: ReportRange; mine?: boolean }) {
   const { params, picker } = range;
@@ -43,7 +44,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
   const columns: ColumnsType<CommissionRow> = [
     ...(mine ? [] : [{ title: "人员 ID", dataIndex: "user_id", width: 100 }]),
     { title: "订单号", dataIndex: "order_no", width: 160 },
-    { title: "利润基数", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "订单利润基数", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} />},
     { title: "费率", dataIndex: "rate", align: "right", width: 90},
     { title: "应付", dataIndex: "payable", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "已付", dataIndex: "paid", align: "right", render: (v: string) => <MoneyText value={v} />},
@@ -72,7 +73,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
         {picker}
       </Space>
       <ErrorBanner error={employeeError} />
-      <Note>{mine ? "仅展示当前登录用户在分润配置中获得的收益。" : "默认展示所有人的经营总览；可按人员筛选到每一单。应付与已付差异即为待追补金额（RPT-01-03）。"}</Note>
+      {mine ? <Note>仅展示当前登录用户在分润配置中获得的收益。</Note> : null}
       <StatRow
         items={[
           { label: mine ? "收益订单数" : "订单数", kind: "count", amount: String(data?.total.order_count ?? 0) },
@@ -92,6 +93,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
          emptyText="所选区间无提成记录"
          onPageChange={() => undefined}
       />
+      <ReportExportButton name="commission" params={params} />
     </Card>
   );
 }

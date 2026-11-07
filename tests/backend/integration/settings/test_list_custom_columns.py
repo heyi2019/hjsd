@@ -87,7 +87,6 @@ def test_data_only_keys_become_candidates_and_addable(seeded_client, headers, se
         Order(
             order_no="HS9901",
             order_type="HS",
-            capital_type="STOCK",
             trade_date=date(2026, 1, 1),
             form_extra={"qa500_note": "补齐轮回填"},
             created_by="tester",
@@ -131,7 +130,6 @@ def test_data_only_key_prefers_definition_label(seeded_client, headers, seeded_d
         Order(
             order_no="HS9902",
             order_type="HS",
-            capital_type="STOCK",
             trade_date=date(2026, 1, 2),
             form_extra={"legacy_note": "x"},
             created_by="tester",

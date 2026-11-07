@@ -20,7 +20,6 @@ from app.domain.enums import (
     InstallmentContractType,
     InstallmentDispositionAction,
     LinkStatus,
-    Nature,
     RebateStatus,
     RebateType,
 )
@@ -76,7 +75,6 @@ def _add_flow(seeded_db, order_id: int, direction: str, amount: str) -> None:
             flow_no=f"CF-PROFIT-{uuid4().hex[:10]}",
             pool_id=1,
             occurred_on=D,
-            nature=Nature.BUSINESS_IN.value if direction == "IN" else Nature.BUSINESS_OUT.value,
             direction=direction,
             category="OTHER",
             amount=to_money(amount),

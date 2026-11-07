@@ -119,7 +119,7 @@ def _load(stem: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
 
 
 def _existing_batches(session: Any) -> set[str]:
-    from app.domain.imports import ImportBatch
+    from app.legacy_imports.models import ImportBatch
 
     return {row.source_name for row in session.query(ImportBatch).all()}
 
@@ -165,7 +165,7 @@ def main() -> int:
         return 0
 
     from app.core.database import get_session_factory
-    from app.imports import service as import_service
+    from app.legacy_imports import service as import_service
 
     session = get_session_factory()()
     try:
@@ -189,8 +189,7 @@ def main() -> int:
             created += 1
         session.commit()
         print(f"\n完成：新建 {created} 个批次，跳过 {skipped} 个已存在批次。")
-        print("下一步：在页面按批次逐行指派映射（/imports/batches/{id}/rows），")
-        print("或等口径裁决后提交导入批次，保留标准导入记录。")
+        print("下一步：使用迁移脚本继续人工映射并保留标准导入记录。")
     except Exception:
         session.rollback()
         raise

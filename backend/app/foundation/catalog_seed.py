@@ -180,9 +180,30 @@ C0Dls3Wmf9E/vmiW1/Y3kKfDQRYPhgXdH8gQ1+f96XxuspB+px08+Lw/03kXuDw5Oxya3ZydumVRN4TV
 Qlhbi/rMspSNNTruNLMGshvFaiKM3ShWE6DsRrGaAGI3itUggN0oVqMIdqNYdmDrRrFO/fNv//xfi4j0WA==
 """
 
-
 def seed_catalog(session: Session, *, actor: str = "system") -> None:
     data = json.loads(zlib.decompress(base64.b64decode(_CATALOG_BLOB)))
+    if not any(item["code"] == "BUSINESS_DICTIONARY" for item in data["option_sets"]):
+        data["option_sets"].append(
+            {
+                "code": "BUSINESS_DICTIONARY",
+                "label": "业务字典",
+                "group": "OPS",
+                "editable": True,
+                "options": [],
+                "description": None,
+            }
+        )
+    data["option_sets"] = [
+        item for item in data["option_sets"]
+        if item["code"] != "FUND_FLOW_ACCOUNTING_ATTRIBUTE"
+    ]
+    data["order_form_fields"] = [
+        item for item in data["order_form_fields"]
+        if not (
+            item["order_type_code"] == "FUNDFLOW"
+            and item["field_key"] == "accounting_attribute"
+        )
+    ]
     for values in data["option_sets"]:
         if session.scalar(select(OptionSet).where(OptionSet.code == values["code"])):
             continue

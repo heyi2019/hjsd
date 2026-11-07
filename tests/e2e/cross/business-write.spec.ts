@@ -213,14 +213,6 @@ test("系统通知：查询当前用户的未读通知", async ({ request }) => 
   expect(typeof body.unread_total).toBe("number");
 });
 
-test("全局搜索：按权限返回客户摘要", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
-  const response = await request.get(`${apiBase}/search`, { headers: { "X-Dev-User": "admin" }, params: { q: "E2E 需求客户" } });
-  expect(response.status()).toBe(200);
-  const body = await response.json();
-  expect(body.items.some((item: { type: string; title: string }) => item.type === "CUSTOMER" && item.title === "E2E 需求客户")).toBe(true);
-});
-
 test("治理能力：报表导出与订单附件闭环", async ({ request }) => {
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
   const headers = { "X-Dev-User": "admin" };

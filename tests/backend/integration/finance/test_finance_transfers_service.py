@@ -9,7 +9,7 @@ from sqlalchemy import select, text
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
-from app.domain.enums import AccountingAttribute, Direction, FundNature, Nature
+from app.domain.enums import AccountingAttribute, Direction
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
 from app.finance import transfers
@@ -156,7 +156,6 @@ def test_repair_transfer_rejects_multiple_rows_same_transfer(seeded_db):
         flow_no=f"{tid}-THIRD",
         pool_id=profit.id,
         occurred_on=date(2026, 10, 17),
-        nature=Nature.INTERNAL.value,
         direction=Direction.OUT.value,
         amount=to_money("10"),
         transfer_id=tid,
@@ -190,9 +189,7 @@ def test_repair_transfer_rejects_invalid_direction(seeded_db):
             flow_no=bad_flow_no,
             pool_id=invest.id,
             occurred_on=date(2026, 10, 17),
-            nature=Nature.INTERNAL.value,
-            accounting_attribute=AccountingAttribute.INTERNAL_TRANSFER.value,
-            fund_nature=FundNature.INTERNAL.value,
+            accounting_attribute=AccountingAttribute.EXPENSE.value,
             category="TRANSFER",
             direction="ZZ",
             amount=to_money("10"),

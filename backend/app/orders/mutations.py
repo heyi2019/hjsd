@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 from app.core.audit import record_audit
 from app.core.security import CurrentUser
@@ -96,6 +96,7 @@ def update_order(
     actor: str,
     trade_date: date | None | object = _UNSET,
     account_snapshot: dict[str, Any] | None | object = _UNSET,
+    created_at: datetime | None | object = _UNSET,
     note: str | None | object = _UNSET,
     extra_values: Mapping[str, Any] | None | object = _UNSET,
     form_extra: Mapping[str, Any] | None | object = _UNSET,
@@ -105,29 +106,21 @@ def update_order(
 
     成交日期随时可改：改日期时按天数差平移本单全部事件与资金流水的 occurred_on，
     并按新成交日重取返点/提成规则快照，保证账期与规则口径一致。
-    账号快照、订单编号、业务类型、库存账号关联和状态仍属不可编辑字段。
+    账号快照（#15 需求2：推翻 11-05「账号快照拒编辑」裁决，一律可编辑）、
+    登记时间（created_at，可改可清空）均在此开放；订单编号、业务类型、
+    库存账号关联和状态仍属不可编辑字段。
     """
     order = get_order(session, order_id, user)
     if trade_date is not _UNSET and trade_date is None:
         raise Validation("订单日期不能清空", details={"field": "trade_date"})
     # trade_date 已放开：不再受「已有登记事件」限制，改日期在下方联动平移账期。
-    accounting_changes = (account_snapshot,)
-    if any(value is not _UNSET for value in accounting_changes):
-        posted = session.scalar(
-            select(OrderEvent.id).where(
-                OrderEvent.order_id == order.id,
-                OrderEvent.is_posted.is_(True),
-            )
-        )
-        if posted is not None:
-            raise Validation("已有登记事件的订单不能修改账号快照，核算数据须通过冲销/更正")
-
-    if account_snapshot is not _UNSET and account_snapshot is not None:
-        raise Validation("订单账号快照当前不支持")
+    # account_snapshot 按 #15 需求2 一律可编辑（推翻 11-05「账号快照拒编辑」裁决），
+    # 不再因「已有登记事件」而拒绝；核算口径如需修正走冲销/更正，但快照文本本身可改。
 
     before = {
         "trade_date": order.trade_date,
         "account_snapshot": order.account_snapshot,
+        "created_at": order.created_at,
         "note": order.note,
         "policy_version_id": order.policy_version_id,
     }
@@ -138,6 +131,8 @@ def update_order(
         )
     if trade_date is not _UNSET:
         order.trade_date = trade_date
+    if created_at is not _UNSET:
+        order.created_at = created_at
     if account_snapshot is not _UNSET:
         order.account_snapshot = account_snapshot
     if note is not _UNSET:
@@ -165,6 +160,7 @@ def update_order(
         after=_audit_value({
             "trade_date": order.trade_date,
             "account_snapshot": order.account_snapshot,
+            "created_at": order.created_at,
             "note": order.note,
             "policy_version_id": order.policy_version_id,
             **shift_info,

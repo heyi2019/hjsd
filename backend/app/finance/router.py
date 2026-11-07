@@ -99,9 +99,6 @@ def list_cashflows(
     occurred_from: date | None = Query(default=None),
     occurred_to: date | None = Query(default=None),
     status: str | None = Query(default=None),
-    nature: str | None = Query(default=None),
-    fund_nature: str | None = Query(default=None),
-    accounting_attribute: str | None = Query(default=None),
     category: str | None = Query(default=None),
     created_by: str | None = Query(default=None),
     keyword: str | None = Query(default=None),
@@ -129,11 +126,6 @@ def list_cashflows(
         "occurred_from": occurred_from,
         "occurred_to": occurred_to,
         "status": status,
-        "nature": nature.strip().upper() if nature else None,
-        "fund_nature": fund_nature.strip().upper() if fund_nature else None,
-        "accounting_attribute": (
-            accounting_attribute.strip().upper() if accounting_attribute else None
-        ),
         "category": category.strip().upper() if category else None,
         "created_by": created_by,
         "keyword": keyword,
@@ -158,9 +150,6 @@ def export_cashflows_csv(
     occurred_from: date | None = Query(default=None),
     occurred_to: date | None = Query(default=None),
     status: str | None = Query(default=None),
-    nature: str | None = Query(default=None),
-    fund_nature: str | None = Query(default=None),
-    accounting_attribute: str | None = Query(default=None),
     category: str | None = Query(default=None),
     created_by: str | None = Query(default=None),
     keyword: str | None = Query(default=None),
@@ -176,9 +165,6 @@ def export_cashflows_csv(
         occurred_from=occurred_from,
         occurred_to=occurred_to,
         status=status,
-        nature=nature,
-        fund_nature=fund_nature,
-        accounting_attribute=accounting_attribute,
         category=category,
         created_by=created_by,
         keyword=keyword,
@@ -211,13 +197,7 @@ def create_cashflow(
         pool_id=payload.pool_id,
         occurred_on=payload.occurred_on,
         direction=payload.direction.strip().upper(),
-        nature=payload.nature.strip().upper(),
-        fund_nature=payload.fund_nature.strip().upper() if payload.fund_nature else None,
-        accounting_attribute=(
-            payload.accounting_attribute.strip().upper()
-            if payload.accounting_attribute
-            else None
-        ),
+        nature=payload.nature,
         category=payload.category,
         amount=payload.amount,
         order_id=payload.order_id,

@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 /** 选中主资金账户。附加费用区的中介费账户与主资金账户同名同占位（资金账户），
- *  故排除附加费用区后再定位（回收走 payment-info-section、提号走 th-fee-primary）。 */
+ *  故排除附加费用区后再定位。 */
 async function pickMainPool() {
   const placeholder = screen
     .getAllByText("请选择资金账户", { exact: true })
@@ -55,7 +55,7 @@ beforeEach(() => {
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
     { id: 2, name: "原神", sort_order: 20, is_active: true, is_default: false },
   ]);
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
+  vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
   resolveMock(vi.mocked(catalog.ordersApi.postEvent), { event: { id: 1 }, cashflow_no: "FLOW-0001" });
 });
 

@@ -63,4 +63,6 @@ def test_every_json_api_route_declares_response_model(app):
     # → 179（派生运算下沉后端 +4：GET /pools/balances、GET /installments/totals、
     # GET /cashflows/studio-summary、POST /stocks/inventory/stats）。
     # → 189（2026-11-05 实测：账号删除 + 免密登录/绑定、列表列配置、库存统计等累计 +10）
-    assert public_routes == 189
+    # → 188（全局搜索前端入口已下线，移除后端兼容路由）
+    # → 176（历史导入工作台已下线，保留迁移模型与脚本但移除在线 API）
+    assert public_routes == 176

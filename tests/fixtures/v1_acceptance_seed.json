@@ -22,7 +22,7 @@
     {"id": "A03", "order_type": "DG", "events": [{"type": "SELL", "amount": "200.00"}], "expected": {"inventory_required": false}},
     {"id": "A04", "order_type": "DG", "counterparty_ref": "platform", "installment": {"contract_type": "CONSIGNMENT_SALE", "delivery_mode": "PLATFORM_OPERATOR", "payments": ["300.00", "300.00", "300.00"], "deliver": true}},
     {"id": "A05", "order_type": "HS", "installment": {"contract_type": "STOCK_SALE", "delivery_mode": "CUSTOMER_SELF", "payments": ["500.00", "500.00"], "deliver": true}},
-    {"id": "A06", "rebate": {"source_order_type": "HS", "settlements": [{"gross": "100.00", "fee": "5.00"}, {"gross": "50.00", "fee": "0.00"}]}},
+    {"id": "A06", "rebate": {"source_order_type": "HS", "base_amount": "150.00"}},
     {"id": "A07", "transfer": {"source_pool": "HJ_INVEST", "target_pool": "HJ_PROFIT", "amount": "500.00"}},
     {"id": "A08", "deposit": {"pool": "HJ_INVEST", "paid": "1000.00", "returned": "300.00"}},
     {"id": "A10", "field_definition": {"entity_type": "customer", "field_key": "preferred_platform", "deactivate_after_value": true}},

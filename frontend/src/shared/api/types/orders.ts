@@ -8,7 +8,6 @@ export interface OrderType {
   id: number;
   code: string;
   name: string;
-  capital_type: string;
   is_active: boolean;
   description?: string | null;
   sort_order?: number;
@@ -19,7 +18,6 @@ export interface OrderTypeRoute {
   id: number;
   order_type_code: string;
   portion: string;
-  fund_nature?: string | null;
   pool_code: string;
   pool_name: string;
   priority: number;
@@ -30,7 +28,6 @@ export interface Order {
   id: number;
   order_no: string;
   order_type: string;
-  capital_type: string;
   business_mode?: string | null;
   business_type?: string | null;
   value_added_service?: string | null;
@@ -102,7 +99,6 @@ export interface OrderCashflow {
   pool_id: number;
   occurred_on: string;
   occurred_at?: string | null;
-  nature: string;
   category: string;
   direction: string;
   amount: string;

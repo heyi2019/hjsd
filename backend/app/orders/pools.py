@@ -21,7 +21,6 @@ from app.domain.trade import Cashflow
 from app.domain.enums import (
     CashflowStatus,
     Direction,
-    Nature,
     PoolOwnership,
 )
 
@@ -46,22 +45,22 @@ def pool_balances(
         ):
             raise NotFound(f"资金池 {pool_id} 不存在", details={"pool_id": pool_id})
 
-    # (direction, nature) -> 已审金额合计；同一池多个 nature 会返回多行。
+    # (direction, category) -> 已审金额合计；TRANSFER 单独计入内部划转。
     cells: dict[int, dict[tuple[str, str], Decimal]] = {}
-    for pool_id, direction, nature, amount in session.execute(
+    for pool_id, direction, category, amount in session.execute(
         select(
             Cashflow.pool_id,
             Cashflow.direction,
-            Cashflow.nature,
+            Cashflow.category,
             func.coalesce(func.sum(Cashflow.amount), 0),
         )
         .where(
             Cashflow.pool_id.in_(ids),
             Cashflow.status == CashflowStatus.APPROVED.value,
         )
-        .group_by(Cashflow.pool_id, Cashflow.direction, Cashflow.nature)
+        .group_by(Cashflow.pool_id, Cashflow.direction, Cashflow.category)
     ):
-        cells.setdefault(pool_id, {})[(direction, nature)] = to_money(amount or 0)
+        cells.setdefault(pool_id, {})[(direction, category)] = to_money(amount or 0)
     deposits = {
         pool_id: to_money(amount or 0)
         for pool_id, amount in session.execute(
@@ -85,19 +84,21 @@ def pool_balances(
     for pool_id in ids:
         bucket = cells.get(pool_id, {})
 
-        def total(direction: str, nature: str | None = None) -> Decimal:
-            if nature is not None:
-                return bucket.get((direction, nature), Decimal("0.00"))
+        def total(direction: str, *, transfer: bool | None = None) -> Decimal:
             return sum(
-                (amount for (d, _n), amount in bucket.items() if d == direction),
+                (
+                    amount
+                    for (d, category), amount in bucket.items()
+                    if d == direction and (transfer is None or (category == "TRANSFER") == transfer)
+                ),
                 Decimal("0.00"),
             )
 
-        income = total(Direction.IN.value, Nature.BUSINESS_IN.value)
-        expense = total(Direction.OUT.value, Nature.BUSINESS_OUT.value)
-        transfer_in = total(Direction.IN.value, Nature.INTERNAL.value)
-        transfer_out = total(Direction.OUT.value, Nature.INTERNAL.value)
-        # 现金头寸包含 INTERNAL 划转；经营收入/支出仍只统计 BUSINESS_*，避免把划转算进损益。
+        income = total(Direction.IN.value, transfer=False)
+        expense = total(Direction.OUT.value, transfer=False)
+        transfer_in = total(Direction.IN.value, transfer=True)
+        transfer_out = total(Direction.OUT.value, transfer=True)
+        # 现金头寸包含划转；经营收入/支出仍排除 TRANSFER，避免把划转算进损益。
         cash_balance = total(Direction.IN.value) - total(Direction.OUT.value)
         deposit_held = deposits.get(pool_id, Decimal("0.00"))
         pool = pools[pool_id]

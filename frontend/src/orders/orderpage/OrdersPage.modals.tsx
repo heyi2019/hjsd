@@ -288,7 +288,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
           />
           <Typography.Paragraph type="secondary">
             {isAction
-              ? "按操作分配：买号、售出、运营、公司四项。人员已锁定为账号台账 / 库存中心登记的执行人（买号=业务负责人、售出=交付负责人、运营=运营负责人）。一个动作有多人时，该动作的份额按人数均分（2 人各半、3 人各三分之一），只需在首行填该动作合计。台账之后增删执行人，这里的人数与均分会自动跟着变，合计不变；需要换人请到账号台账或库存中心修改。"
+              ? "按操作分配：买号、售出、运营、公司四项。运营为可选项，留空即不分运营份额。人员已锁定为账号台账 / 库存中心登记的执行人（买号=业务负责人、售出=交付负责人、运营=运营负责人）。一个动作有多人时，该动作的份额按人数均分（2 人各半、3 人各三分之一），只需在首行填该动作合计。台账之后增删执行人，这里的人数与均分会自动跟着变，合计不变；需要换人请到账号台账或库存中心修改。"
               : "每行一位员工：比例和金额任填其一，填写时不会互相改写；两者都填时须自洽。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。亏损单按金额分润请填负数（如 -300 表示分担 300 亏损）。"}
           </Typography.Paragraph>
           <Form.List name="allocations">
@@ -363,7 +363,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                             label={split ? "比例合计" : "比例"}
                             rules={
                               isAction
-                                ? [...percentRules("比例"), { required: true, message: "请填写比例" }]
+                                ? [...percentRules("比例"), ...(kind === "OPERATION" ? [] : [{ required: true, message: "请填写比例" }])]
                                 : percentRules("比例")
                             }
                           >
@@ -470,13 +470,10 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
           }}
         >
           <FieldConfigScope scope="REFUND" active={refundOpen}>
-          <CfgItem name="occurred_on" label="发生日期" initialValue={dayjs(today())} rules={[{ required: true, message: "请选择发生日期" }]}>
-            <DatePicker format="YYYY-MM-DD" className="ui-control-full" />
-          </CfgItem>
           <CfgItem name="direction" label="资金流向" initialValue="OUT" rules={[{ required: true, message: "请选择资金流向" }]}>
             <Select disabled options={[{ value: "OUT", label: "支出" }]} />
           </CfgItem>
-          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={users} />
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="负责人" employees={users} />
           <CfgItem name="amount" label="金额" rules={requiredMoneyRules("金额")}>
             <MoneyInput placeholder="请输入退款金额" />
           </CfgItem>
@@ -502,7 +499,7 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
                 <span role="columnheader">发生日期</span>
                 <span role="columnheader">收支</span>
                 <span role="columnheader">金额</span>
-                <span role="columnheader">操作人</span>
+                <span role="columnheader">负责人</span>
               </div>
               {actionOrder.cashflows.map((flow) => (
                 <div key={flow.flow_no} className="orders-event-row" role="row">

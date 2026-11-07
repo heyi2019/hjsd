@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import NotFound, Validation
-from app.domain.enums import CapitalType, PoolOwnership, PoolStatus, Portion
+from app.domain.enums import PoolOwnership, PoolStatus, Portion
 from app.domain.foundation import OrderTypeDef, OrderTypePool
 from app.foundation import seeds, service
 from app.orders import service as order_service
@@ -113,7 +113,6 @@ class TestOrderTypeGuards:
             seeded_db,
             code="TBOOL",
             name="布尔状态校验",
-            capital_type=CapitalType.STOCK.value,
             actor="pytest",
         )
         with pytest.raises(Validation, match="is_active 必须为布尔值"):
@@ -135,7 +134,6 @@ class TestOrderTypeGuards:
             seeded_db,
             code="TBR",
             name="路由状态校验",
-            capital_type=CapitalType.STOCK.value,
             actor="pytest",
         )
         service.set_route(
@@ -155,7 +153,6 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TBN",
                 name="   ",
-                capital_type=CapitalType.STOCK.value,
                 actor="pytest",
             )
         with pytest.raises(Validation):
@@ -163,7 +160,6 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TBP",
                 name="同行代收",
-                capital_type=CapitalType.STOCK.value,
                 sequence_prefix="TB-",
                 actor="pytest",
             )
@@ -174,7 +170,6 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TB",
                 name="同行代收",
-                capital_type=CapitalType.STOCK.value,
                 sort_order=-1,
                 actor="pytest",
             )
@@ -186,7 +181,6 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TBT",
                 name="类型值校验",
-                capital_type=CapitalType.STOCK.value,
                 sort_order=True,
                 actor="pytest",
             )
@@ -197,7 +191,6 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TB",
                 name="同行代收",
-                capital_type=CapitalType.STOCK.value,
                 sequence_prefix="HS",
                 actor="pytest",
             )
@@ -217,7 +210,6 @@ class TestOrderTypeGuards:
                 OrderTypeDef.__table__.insert().values(
                     code="TB",
                     name="同行代收",
-                    capital_type=CapitalType.STOCK.value,
                     sequence_prefix="TB",
                     sequence_key="ORDER_TB",
                     is_active=False,
@@ -233,7 +225,6 @@ class TestOrderTypeGuards:
                 OrderTypeDef.__table__.insert().values(
                     code="TB",
                     name="同行代收",
-                    capital_type=CapitalType.STOCK.value,
                     sequence_prefix="HS",
                     sequence_key="ORDER_TB",
                     is_active=False,
@@ -269,7 +260,7 @@ class TestOrderTypeGuards:
         assert updated.name == "代挂改名"
         assert updated.description == "客户让我帮忙卖他的号"
         assert updated.sort_order == 99
-        # code / capital_type 不随更新变动（BAS-02-03）
+        # code / 编号前缀不随更新变动（BAS-02-03）
         assert updated.code == "DG"
 
 

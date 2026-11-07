@@ -15,6 +15,7 @@ import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 import type { BusinessOrderType } from "../CreateBusinessModal";
 import { DEFAULT_BUSINESS_CENTER_TAB, type BusinessCenterEntryTab, type BusinessCenterTab } from "../businessCenter";
 import { BusinessFilterKey, BusinessModeFilterKey, CancelFormScope, buildActionAllocationCandidates, buildActionAllocationRows, buildOrderPatchPayload, filterBusinessOrders, formatOrderAmount, pickCancelableEvent, resolveCancelAmount, type ActionAllocationCandidates, type AllocationFormRow, type AllocationMode } from "./helpers";
+import { useAccountExecutionEditor } from "../../stocks/InventoryPanel/useAccountExecutionEditor";
 
 export function useOrdersPageController(params: {
   active?: boolean;
@@ -94,6 +95,11 @@ export function useOrdersPageController(params: {
       setLedgerDetailLoading((current) => ({ ...current, [accountId]: false }));
     }
   };
+  const accountEditor = useAccountExecutionEditor({
+    getExecutionDetail: (id) => ledgerDetails[id],
+    onSaved: (id, detail) => setLedgerDetails((current) => ({ ...current, [id]: detail })),
+  });
+
   const handleLedgerExpand = (expanded: boolean, record: Order) => {
     // 手风琴：一次只展开一行，避免多行展开同时挂载多份详情导致 DOM 与页面长度翻倍。
     setExpandedOrderIds(expanded ? [String(record.id)] : []);
@@ -373,8 +379,8 @@ export function useOrdersPageController(params: {
     }
   };
 
-  /** 编辑订单：后端限制——已有登记事件的订单只能改备注；账号快照仅特定业务可维护，
-   *  且密码被后端隐去（无 order.create 权限）时不允许整体回写快照，避免覆盖隐藏密码。 */
+  /** 编辑订单：#15 需求2——所有主字段（含成交日期、账号快照）一律可编辑，无只读保留；
+   *  密码被后端隐去（无 order.create 权限）时仍不整体回写快照，避免覆盖隐藏密码。 */
   const openEditOrder = (order: Order) => {
     setSelectedOrder(order);
     const snapshot = order.account_snapshot;
@@ -395,16 +401,28 @@ export function useOrdersPageController(params: {
     setEditOpen(true);
   };
 
+  /** 打开账号台账内联编辑：与库存中心「编辑」入口一致——取该订单关联的 stocks 账号详情，
+   *  进入编辑态并展开所在行。两入口面向同一份 stocks 记录，保存后各自 re-fetch 即时反映。 */
+  const openAccountEditor = async (order: Order) => {
+    if (!order.account_id) return;
+    try {
+      const detail = await stocksApi.executionDetail(order.account_id);
+      setLedgerDetails((current) => ({ ...current, [order.account_id as number]: detail }));
+      await accountEditor.openEditor(detail.account);
+      setExpandedOrderIds([String(order.id)]);
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    }
+  };
+
   const submitEditOrder = async (values: Record<string, unknown>) => {
     if (!selectedOrder) return;
-    // 成交日期现在也可改（后端联动平移账期）；hasPosted 仅用于决定账号快照是否回写。
-    const orderHasPosted = (selectedOrder.events ?? []).some((event) => event.is_posted);
+    // 成交日期现在也可改（后端联动平移账期）；账号快照按 #15 需求2 一律回写（权限可见时）。
     setEditSubmitting(true);
     try {
       const payload = buildOrderPatchPayload({
         values,
         snapshot: selectedOrder.account_snapshot,
-        hasPosted: orderHasPosted,
       });
       await ordersApi.patch(selectedOrder.id, payload);
       // 成交日期放开后，有登记事件的订单也能改主字段，统一提示「订单已更新」。
@@ -483,6 +501,17 @@ export function useOrdersPageController(params: {
         return (
           <Space size={2}>
           <PermissionButton permission="order.update" type="link" size="small" onClick={() => openEditOrder(order)}>编辑</PermissionButton>
+          {order.account_id ? (
+            <PermissionButton
+              permission="order.create"
+              type="link"
+              size="small"
+              disabled={accountEditor.editingAccount !== null}
+              onClick={() => void openAccountEditor(order)}
+            >
+              编辑账号
+            </PermissionButton>
+          ) : null}
           <PermissionGate permission="order.event.post">
             <PermissionButton
               permission="order.event.post"
@@ -581,6 +610,19 @@ export function useOrdersPageController(params: {
     ledgerExporting,
     ledgerDetailLoading,
     ledgerDetails,
+    editingAccount: accountEditor.editingAccount,
+    setEditingAccount: accountEditor.setEditingAccount,
+    inlineEditId: accountEditor.inlineEditId,
+    eventDrafts: accountEditor.eventDrafts,
+    updateEventDraft: accountEditor.updateEventDraft,
+    employees: accountEditor.employees,
+    timeSet: accountEditor.timeSet,
+    setTimeField: accountEditor.setTimeField,
+    invEditExtraForm: accountEditor.invEditExtraForm,
+    savingAccount: accountEditor.savingAccount,
+    openAccountEditor,
+    cancelInlineEdit: accountEditor.cancelInlineEdit,
+    saveInline: accountEditor.saveInline,
     ledgerSortDesc,
     load,
     loadError,

@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { AttachmentItem, DocumentSequence, GameTypeOption, NotificationItem } from "./types";
+import type { GameTypeOption, NotificationItem } from "./types";
 
 export const gameTypesApi = {
   list: (params?: { include_inactive?: boolean }) =>
@@ -13,17 +13,6 @@ export const gameTypesApi = {
   setDefault: (id: number, isDefault: boolean) =>
     api.patch<GameTypeOption>(`/game-types/${id}/default?is_default=${isDefault}`).then((r) => r.data),
   remove: (id: number) => api.delete(`/game-types/${id}`),
-};
-
-export const sequencesApi = {
-  list: () => api.get<DocumentSequence[]>("/sequences").then(r => r.data),
-};
-
-export const attachmentsApi = {
-  list: (entity_type: string, entity_id: string) => api.get<{ items: AttachmentItem[] }>("/attachments", { params: { entity_type, entity_id } }).then(r => r.data),
-  create: (data: Record<string, unknown>) => api.post<AttachmentItem>("/attachments", data).then(r => r.data),
-  download: (id: number) => api.get<Blob>(`/attachments/${id}/download`, { responseType: "blob" }).then(r => r.data),
-  remove: (id: number) => api.delete(`/attachments/${id}`).then(r => r.data),
 };
 
 export const notificationsApi = {

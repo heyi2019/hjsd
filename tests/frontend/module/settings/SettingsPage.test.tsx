@@ -1,5 +1,6 @@
 import * as catalog from "@/shared/api/catalog";
 vi.mock("@/shared/api/catalog");
+import userEvent from "@testing-library/user-event";
 import * as client from "@/shared/api/client";
 vi.mock("@/shared/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/api/client")>()),
@@ -19,6 +20,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
 import { renderLight } from "@fixtures/render";
 import { screen } from "@testing-library/react";
 import { SettingsPage } from "@/field-definitions/SettingsPage";
+import { BusinessDictionaryPanel } from "@/field-definitions/panels/BusinessDictionaryPanel";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const orderTypes = [
@@ -47,6 +49,46 @@ it("业务字典按账号流转、资金动作和账务动作三层结构渲染"
   expect(document.querySelectorAll(".business-dictionary__group").length).toBeGreaterThanOrEqual(3);
   // 动作行数量健康，防止整段误删
   expect(document.querySelectorAll(".business-dictionary__action-line").length).toBeGreaterThan(10);
+});
+
+it("设置页不再提供独立的配置改动追溯入口", () => {
+  renderLight(<SettingsPage />, { user: "admin" });
+
+  expect(screen.queryByRole("tab", { name: "改动追溯" })).not.toBeInTheDocument();
+});
+
+it("业务字典可进入编辑态并保存全员共享内容", async () => {
+  vi.mocked(catalog.optionSetsApi.get).mockResolvedValue({
+    id: 1,
+    code: "BUSINESS_DICTIONARY",
+    label: "业务字典",
+    group: "OPS",
+    editable: true,
+    options: [],
+    description: "原始口径",
+  });
+  vi.mocked(catalog.optionSetsApi.update).mockResolvedValue({
+    id: 1,
+    code: "BUSINESS_DICTIONARY",
+    label: "业务字典",
+    group: "OPS",
+    editable: true,
+    options: [],
+    description: "新的共享口径",
+  });
+  const user = userEvent.setup();
+  renderLight(<BusinessDictionaryPanel />, { user: "admin" });
+
+  await user.click(await screen.findByRole("button", { name: "编辑" }));
+  const editor = screen.getByRole("textbox", { name: "业务字典内容" });
+  await user.clear(editor);
+  await user.type(editor, "新的共享口径");
+  await user.click(screen.getByRole("button", { name: "保存" }));
+
+  expect(catalog.optionSetsApi.update).toHaveBeenCalledWith(
+    "BUSINESS_DICTIONARY",
+    expect.objectContaining({ description: "新的共享口径" }),
+  );
 });
 
 it("业务字典在分润规则下方展示取消模型", async () => {

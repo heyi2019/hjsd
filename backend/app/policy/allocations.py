@@ -357,7 +357,11 @@ def _set_action_allocations(
             if allocation_type == "COMPANY" and item.get("user_id") is not None:
                 raise Validation("公司收益不绑定人员", details={"field": "user_id"})
             if allocation_type == "OPERATION" and item.get("user_id") is None:
-                raise Validation("人员收益必须绑定人员", details={"field": "user_id"})
+                # 运营是可选动作：未填写运营人员时允许该项保持 0 份额；
+                # 一旦给运营分配了比例或金额，仍必须绑定具体人员。
+                allocation_amount = to_money(item.get("allocation_amount") or 0)
+                if rate != Decimal("0") or allocation_amount != Decimal("0"):
+                    raise Validation("人员收益必须绑定人员", details={"field": "user_id"})
             if allocation_type in {"BUY", "SELL"} and allocation_type not in action_actor_ids and item.get("user_id") is not None:
                 raise Validation(f"{allocation_type} 收益人必须绑定对应动作执行人", details={"field": "user_id"})
             if allocation_type in {"BUY", "SELL"} and allocation_type in action_actor_ids:

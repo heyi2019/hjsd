@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.errors import AppError, ErrorCode
-from app.domain.enums import CapitalType, PoolStatus, Portion
+from app.domain.enums import PoolStatus, Portion
 from app.domain.options import OptionSet
 from app.domain.trade_models.form_config import OrderFormField
 from app.foundation.catalog_seed import seed_catalog
@@ -18,6 +18,9 @@ class TestOrderTypes:
 
         first_option_count = db.query(OptionSet).count()
         first_field_count = db.query(OrderFormField).count()
+        business_dictionary = db.query(OptionSet).filter_by(code="BUSINESS_DICTIONARY").one()
+        assert business_dictionary.label == "业务字典"
+        assert business_dictionary.editable is True
         cancel_amount = db.query(OrderFormField).filter_by(
             order_type_code="ORDERCANC", field_key="cancel_amount"
         ).one()
@@ -31,7 +34,7 @@ class TestOrderTypes:
 
     def test_new_business_needs_no_code_change(self, db):
         order_type = service.create_order_type(
-            db, code="TB", name="同行代收", capital_type=CapitalType.STOCK.value, actor="pytest"
+            db, code="TB", name="同行代收", actor="pytest"
         )
         db.commit()
         assert order_type.is_active is False
@@ -40,7 +43,7 @@ class TestOrderTypes:
 
     def test_activate_without_route_is_blocked(self, db):
         order_type = service.create_order_type(
-            db, code="TB", name="同行代收", capital_type=CapitalType.STOCK.value, actor="pytest"
+            db, code="TB", name="同行代收", actor="pytest"
         )
         db.commit()
         with pytest.raises(AppError) as exc:
@@ -50,17 +53,13 @@ class TestOrderTypes:
     def test_duplicate_business_code_rejected(self, seeded_db):
         with pytest.raises(AppError) as exc:
             service.create_order_type(
-                seeded_db, code="HS", name="重复回收", capital_type=CapitalType.STOCK.value, actor="pytest"
+                seeded_db, code="HS", name="重复回收", actor="pytest"
             )
         assert exc.value.code == ErrorCode.DUPLICATE_CODE
 
-    def test_invalid_capital_type_rejected(self, db):
-        with pytest.raises(AppError):
-            service.create_order_type(db, code="XX", name="坏业务", capital_type="MAGIC", actor="pytest")
-
-    def test_retired_dfq_capital_type_rejected(self, db):
-        with pytest.raises(AppError):
-            service.create_order_type(db, code="DFQ", name="代分期", capital_type="CREDIT", actor="pytest")
+    def test_business_type_creation_needs_only_identity_and_sequence_fields(self, db):
+        created = service.create_order_type(db, code="XX", name="新业务", actor="pytest")
+        assert created.code == "XX"
 
 
 class TestRoutes:
@@ -89,28 +88,6 @@ class TestRoutes:
         after_total = len(service.list_routes(seeded_db, order_type_id=order_type.id))
         assert before_total == after_total
         assert service.resolve_default_pool(seeded_db, "HS", Portion.PRINCIPAL.value).code == "HJ_PROFIT"
-
-    def test_fund_nature_route_precedes_legacy_portion_route(self, seeded_db):
-        service.set_route(
-            seeded_db,
-            order_type_code="HS",
-            portion=Portion.PRINCIPAL.value,
-            fund_nature="BUSINESS",
-            pool_code="HJ_PROFIT",
-            actor="pytest",
-        )
-        seeded_db.commit()
-
-        assert (
-            service.resolve_default_pool(
-                seeded_db,
-                "HS",
-                Portion.PRINCIPAL.value,
-                fund_nature="BUSINESS",
-            ).code
-            == "HJ_PROFIT"
-        )
-        assert service.resolve_default_pool(seeded_db, "HS", Portion.PRINCIPAL.value).code == "HJ_INVEST"
 
     def test_route_to_disabled_pool_rejected(self, seeded_db):
         service.set_pool_status(
@@ -141,22 +118,9 @@ class TestOrderTypeValidationGuards:
                 db,
                 code="QX",
                 name="非串前缀",
-                capital_type=CapitalType.STOCK.value,
                 sequence_prefix=123,
                 actor="pytest",
             )
-
-    def test_set_route_rejects_invalid_fund_nature(self, seeded_db):
-        with pytest.raises(AppError) as exc:
-            service.set_route(
-                seeded_db,
-                order_type_code="HS",
-                portion=Portion.PRINCIPAL.value,
-                pool_code="HJ_INVEST",
-                fund_nature="BOGUS",
-                actor="pytest",
-            )
-        assert "fund_nature" in str(exc.value)
 
     def test_impact_preview_rejects_invalid_portion(self, seeded_db):
         with pytest.raises(AppError) as exc:
@@ -167,17 +131,6 @@ class TestOrderTypeValidationGuards:
                 pool_code="HJ_INVEST",
             )
         assert "portion" in str(exc.value)
-
-    def test_impact_preview_rejects_invalid_fund_nature(self, seeded_db):
-        with pytest.raises(AppError) as exc:
-            service.route_impact_preview(
-                seeded_db,
-                order_type_code="HS",
-                portion=Portion.PRINCIPAL.value,
-                pool_code="HJ_INVEST",
-                fund_nature="BOGUS",
-            )
-        assert "fund_nature" in str(exc.value)
 
     def test_impact_preview_rejects_disabled_pool(self, seeded_db):
         pool = service.get_pool_by_code(seeded_db, "HJ_INVEST")
@@ -191,10 +144,3 @@ class TestOrderTypeValidationGuards:
                 pool_code="HJ_INVEST",
             )
         assert "已停用" in str(exc.value)
-
-    def test_resolve_default_pool_rejects_invalid_fund_nature(self, seeded_db):
-        with pytest.raises(AppError) as exc:
-            service.resolve_default_pool(
-                seeded_db, "HS", Portion.PRINCIPAL.value, fund_nature="BOGUS"
-            )
-        assert "fund_nature" in str(exc.value)

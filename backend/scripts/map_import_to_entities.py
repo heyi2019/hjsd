@@ -139,7 +139,7 @@ def _pools_in(row: dict[str, Any]) -> set[str]:
 
 
 def _order_rows(session: Any) -> list[Any]:
-    from app.domain.imports import ImportBatch, ImportRow
+    from app.legacy_imports.models import ImportBatch, ImportRow
 
     batch = (
         session.query(ImportBatch).filter_by(source_name="金山文档·订单").one_or_none()

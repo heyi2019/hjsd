@@ -18,12 +18,13 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import Validation
-from app.domain.enums import AccountingAttribute, Direction, FundNature
+from app.domain.enums import AccountingAttribute, Direction
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Order
 from app.domain.trade_models.cashflow import Cashflow
 from app.orders import events
 from app.orders import service as orders_service
+from app.stocks import service as stocks_service
 
 TODAY = date(2026, 10, 6)
 
@@ -52,7 +53,6 @@ def test_flow_c_th_distribution_fund_settlement(seeded_db):
     # 分销核算属性与自营 HS 区分开（TH_DIRECT_COST / TH_REVENUE，而非 SELF_*）。
     assert buy_flow.accounting_attribute == AccountingAttribute.TH_DIRECT_COST.value
     assert sell_flow.accounting_attribute == AccountingAttribute.TH_REVENUE.value
-    assert buy_flow.fund_nature == FundNature.BUSINESS.value
     assert buy_flow.direction == Direction.OUT.value
     assert sell_flow.direction == Direction.IN.value
 
@@ -105,3 +105,47 @@ def test_flow_c_dg_consignment_sell_and_buy_rejected(seeded_db):
     assert account.status == "SOLD"  # WAITING --SELL--> SOLD
     order = seeded_db.get(Order, dg.id)
     assert order.status == "COMPLETED"
+
+
+def test_stocks_domain_applies_account_event_lifecycle(seeded_db):
+    """ACC-DOM-01：账号状态与成本变化由账号资产域命令统一处理。"""
+    account = Account(
+        business_mode="SELF",
+        inventory_type="RECOVERY",
+        status="WAITING",
+        cost_amount=Decimal("0.00"),
+        created_by="pytest",
+        updated_by="pytest",
+    )
+    seeded_db.add(account)
+    seeded_db.flush()
+
+    stocks_service.apply_account_event_effect(
+        account,
+        event_type="BUY",
+        amount=Decimal("100.00"),
+        stock_type=True,
+        actor="pytest",
+    )
+    assert account.status == "WAITING"
+    assert account.cost_amount == Decimal("100.00")
+
+    stocks_service.apply_account_event_effect(
+        account,
+        event_type="SELL",
+        amount=Decimal("0.00"),
+        stock_type=True,
+        actor="pytest",
+    )
+    assert account.status == "SOLD"
+
+    stocks_service.apply_account_event_effect(
+        account,
+        event_type="CANCEL",
+        amount=Decimal("0.00"),
+        stock_type=True,
+        offset_event_type="SELL",
+        cancel_fully_consumed=True,
+        actor="pytest",
+    )
+    assert account.status == "WAITING"

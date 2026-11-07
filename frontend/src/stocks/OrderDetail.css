@@ -13,7 +13,7 @@
 .inventory-row-actions .ant-space-item:first-child .ant-btn-link { font-weight: 650; color: var(--color-primary-text); }
 .inventory-row-actions .ant-btn-link:hover { background: var(--soft); border-radius: var(--radius-compact); }
 .inventory-detail {
-  width: min(100%, 1200px);
+  width: 100%;
   max-height: 36rem;
   overflow-y: auto;
   scrollbar-gutter: stable;
@@ -26,8 +26,8 @@
   box-shadow: none;
 }
 .inventory-table .ant-table-tbody > tr.ant-table-expanded-row .inventory-detail {
-  /* 展开详情与弹窗保持同一紧凑宽度，避免随主表横向铺满。 */
-  width: min(100%, 1200px);
+  /* 展开详情与弹窗跟随父容器铺满，板块框直接对齐到面板最右边界。 */
+  width: 100%;
   margin-inline: 0;
 }
 .inventory-detail__meta {
@@ -72,7 +72,7 @@
 .inventory-detail__meta .ant-descriptions-item-label { width: 96px; }
 .inventory-detail__meta .ant-descriptions-item-content { width: auto; max-width: none; }
 .inventory-detail .ant-descriptions-item-content .ant-typography { overflow-wrap: anywhere; }
-.inventory-detail .ant-descriptions-view > table { width: min(100%, 1200px) !important; margin-inline-end: auto; table-layout: fixed !important; }
+.inventory-detail .ant-descriptions-view > table { width: 100% !important; margin-inline-end: 0; table-layout: fixed !important; }
 .inventory-detail .ant-descriptions-view > table col { width: auto !important; }
 .inventory-detail .ant-descriptions-item-label.inventory-detail__datetime,
 .inventory-detail .ant-descriptions-item-content.inventory-detail__datetime { width: auto; max-width: none; }

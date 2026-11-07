@@ -17,6 +17,7 @@ from app.domain.enums import (
     AuditAction,
     OrderStatus,
     PolicyType,
+    Portion,
     RebateStatus,
     RebateType,
 )
@@ -129,6 +130,24 @@ def create_rebate(
     )
     session.add(record)
     session.flush()
+    # 返点登记即代表实际到账：独立生成收入流水，仍只通过订单号追溯来源。
+    from app.finance.cashflows import create_cashflow
+
+    rebate_pool = foundation_service.require_default_pool(
+        session, order.order_type, Portion.PROFIT.value
+    )
+    create_cashflow(
+        session,
+        pool_id=rebate_pool.id,
+        occurred_on=collected_on,
+        direction="IN",
+        category="REBATE",
+        amount=base,
+        actor=actor,
+        order_id=order.id,
+        note=note or f"返点 {record.rebate_no}",
+        user=user,
+    )
     record_audit(
         session,
         action=AuditAction.REBATE_CREATE,

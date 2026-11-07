@@ -16,7 +16,6 @@ from app.core.audit import record_audit
 from app.core.numbering import ensure_sequence
 from app.domain.enums import (
     AuditAction,
-    CapitalType,
     PoolOwnership,
     PoolType,
     Portion,
@@ -33,11 +32,11 @@ SEED_POOLS: tuple[tuple[str, str, str, str], ...] = (
     ("HJ_PROFIT", "利润荷包", PoolType.PROFIT.value, PoolOwnership.OWNED.value),
 )
 
-# (code, name, capital_type, sort_order, description)
-SEED_ORDER_TYPES: tuple[tuple[str, str, str, int, str], ...] = (
-    ("HS", "回收", CapitalType.STOCK.value, 10, "客户把号卖给我，我择机卖出（库存型）"),
-    ("TH", "提号", CapitalType.STOCK.value, 20, "买家找我买号，我去同行那里提号卖给他（库存型）"),
-    ("DG", "代挂", CapitalType.ZERO.value, 30, "客户让我帮忙卖他的号，我收服务费（零本金型）"),
+# (code, name, sort_order, description)
+SEED_ORDER_TYPES: tuple[tuple[str, str, int, str], ...] = (
+    ("HS", "回收", 10, "客户把号卖给我，我择机卖出（库存型）"),
+    ("TH", "提号", 20, "买家找我买号，我去同行那里提号卖给他（库存型）"),
+    ("DG", "代挂", 30, "客户让我帮忙卖他的号，我收服务费（零本金型）"),
 )
 
 SEED_GAME_TYPES: tuple[tuple[str, int, bool], ...] = (
@@ -102,7 +101,7 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
         )
         stats["pools_created"] += 1
 
-    for code, name, capital_type, sort_order, description in SEED_ORDER_TYPES:
+    for code, name, sort_order, description in SEED_ORDER_TYPES:
         existing = service.get_order_type_by_code(session, code)
         if existing is not None:
             stats["order_types_skipped"] += 1
@@ -112,7 +111,6 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
                 session,
                 code=code,
                 name=name,
-                capital_type=capital_type,
                 actor=actor,
                 sort_order=sort_order,
                 description=description,
@@ -149,7 +147,7 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
         stats["routes_updated" if existed else "routes_created"] += 1
 
     # 路由就绪后启用业务：一次执行即达到可用状态，不依赖“再跑一遍种子”
-    for code, _name, _capital_type, _sort_order, _description in SEED_ORDER_TYPES:
+    for code, _name, _sort_order, _description in SEED_ORDER_TYPES:
         order_type = service.get_order_type_by_code(session, code)
         if order_type is None or order_type.is_active:
             continue

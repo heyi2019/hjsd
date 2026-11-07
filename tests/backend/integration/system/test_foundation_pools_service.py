@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.errors import AppError, ErrorCode
-from app.domain.enums import AuditAction, CapitalType, PoolOwnership, PoolStatus
+from app.domain.enums import AuditAction, PoolOwnership, PoolStatus
 from app.domain.foundation import AuditLog
 from app.foundation import pools as pools_service
 from app.foundation import service
@@ -35,13 +35,13 @@ class TestSeed:
         assert profit.pool_type == "PROFIT"
 
         expected = {
-            "HS": (CapitalType.STOCK.value, 1),
-            "TH": (CapitalType.STOCK.value, 2),
-            "DG": (CapitalType.ZERO.value, 3),
+        "HS": 1,
+        "TH": 2,
+        "DG": 3,
         }
         codes = {item.code: item for item in service.list_order_types(seeded_db)}
-        for code, (capital_type, _) in expected.items():
-            assert codes[code].capital_type == capital_type
+        for code, _ in expected.items():
+            assert codes[code].id > 0
             assert codes[code].is_active is True
 
     def test_seed_writes_audit(self, seeded_db):

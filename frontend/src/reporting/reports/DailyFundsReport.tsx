@@ -7,7 +7,8 @@ import { reportsApi, type DailyFundsReport, type DailyFundsRow } from "../../sha
 import { today } from "../../shared/lib/format";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow } from "../../shared/ui";
-import { Note, useReport } from "./shared";
+import { useReport } from "./shared";
+import { ReportExportButton } from "./ReportExportButton";
 
 export function DailyFunds() {
   const [reportOn, setReportOn] = useState(today());
@@ -18,7 +19,6 @@ export function DailyFunds() {
   const { arrange: arrangeDailyFunds } = useListViewColumns("RPT_DAILY_FUNDS");
   const columns: ColumnsType<DailyFundsRow> = [
     { title: "资金池", dataIndex: "pool_name", width: 150 },
-    { title: "名称", key: "pool_label", dataIndex: "pool_name"},
     { title: "期初", dataIndex: "opening", align: "right", render: (v: string) => <MoneyText value={v} />},
     { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "支出", dataIndex: "expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
@@ -38,7 +38,6 @@ export function DailyFunds() {
       extra={<Input type="date" aria-label="资金日报日期" value={reportOn} onChange={(event) => setReportOn(event.target.value)} className="ui-control-width-date" />}
     >
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      <Note>与 FIN-01 同日口径一致：押金单列，不并入经营收支。</Note>
       <StatRow
         items={[
           { label: "现金余额", amount: data?.total.cash_balance ?? "-" },
@@ -56,6 +55,7 @@ export function DailyFunds() {
          emptyText="当日无资金流水"
          onPageChange={() => undefined}
       />
+      <ReportExportButton name="daily-funds" params={{ from: reportOn, to: reportOn }} />
     </Card>
   );
 }

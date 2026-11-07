@@ -122,7 +122,6 @@ const order1: Order = {
   id: 1,
   order_no: "HS-2026-0001",
   order_type: "HS",
-  capital_type: "SELF",
   trade_date: "2026-10-01",
   status: "ACTIVE",
   business_mode: "SELF",
@@ -140,7 +139,6 @@ const order2: Order = {
   id: 2,
   order_no: "DG-2026-0002",
   order_type: "DG",
-  capital_type: "ZERO",
   trade_date: "2026-10-02",
   status: "COMPLETED",
   business_mode: "DISTRIBUTION",
@@ -149,7 +147,6 @@ const order3: Order = {
   id: 3,
   order_no: "HS-2026-0003",
   order_type: "HS",
-  capital_type: "CREDIT",
   trade_date: "2026-10-03",
   status: "ACTIVE",
   installment_principal: "12000.00",
@@ -170,7 +167,7 @@ const link1: OrderLink = {
   note: "来源单",
   created_at: "2026-10-01T10:00:00",
 };
-const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
+const types = [{ id: 1, code: "HS", name: "回收", is_active: true }];
 
 const installment: Installment = {
   id: 11,
@@ -1155,27 +1152,26 @@ describe("buildOrderPatchPayload 纯函数", () => {
     const payload = buildOrderPatchPayload({
       values: { trade_date: "2026-11-02", note: " 改备注 ", snap_game_type: "星穹铁道" },
       snapshot,
-      hasPosted: false,
     });
     expect(payload.trade_date).toBe("2026-11-02");
     expect(payload.note).toBe("改备注");
     expect(payload.account_snapshot).toMatchObject({ game_account: "acc-1", game_type: "星穹铁道" });
   });
 
-  it("已有登记事件：仍带成交日期（后端联动平移账期），但不带账号快照", () => {
+  it("已有登记事件：仍带成交日期并继续回写账号快照", () => {
     const payload = buildOrderPatchPayload({
       values: { trade_date: "2026-11-02", note: "补充说明" },
       snapshot,
-      hasPosted: true,
     });
-    expect(payload).toEqual({ trade_date: "2026-11-02", note: "补充说明", form_extra: undefined });
+    expect(payload.trade_date).toBe("2026-11-02");
+    expect(payload.note).toBe("补充说明");
+    expect(payload.account_snapshot).toMatchObject({ game_account: "acc-1" });
   });
 
   it("快照密码被隐去（无 order.create）：不带 account_snapshot，避免覆盖成空", () => {
     const payload = buildOrderPatchPayload({
       values: { note: "x", snap_game_account: "acc-9" },
       snapshot: { ...snapshot, game_password: null },
-      hasPosted: false,
     });
     expect(payload.account_snapshot).toBeUndefined();
   });
@@ -1184,7 +1180,6 @@ describe("buildOrderPatchPayload 纯函数", () => {
     const payload = buildOrderPatchPayload({
       values: { note: "x", snap_game_type: "原神", snap_game_password: "pwd-1" },
       snapshot,
-      hasPosted: false,
     });
     expect(payload.account_snapshot).toMatchObject({
       wallet_realname: "何一",
@@ -1193,7 +1188,7 @@ describe("buildOrderPatchPayload 纯函数", () => {
   });
 
   it("备注留空 → note 显式 null（清空），不是空串", () => {
-    const payload = buildOrderPatchPayload({ values: { note: "   " }, snapshot: null, hasPosted: false });
+    const payload = buildOrderPatchPayload({ values: { note: "   " }, snapshot: null });
     expect(payload.note).toBeNull();
   });
 });

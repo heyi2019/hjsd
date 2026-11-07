@@ -12,7 +12,7 @@ from app.core.errors import Conflict, NotFound, Validation
 from app.core.numbering import allocate_number
 from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus, AuditAction, InstallmentContractType, SequenceKey
-from app.domain.imports import ImportRow
+from app.legacy_imports.models import ImportRow
 from app.domain.trade import Account, InstallmentDisposition, Order
 from app.parties import service as parties_service
 from ._common import (

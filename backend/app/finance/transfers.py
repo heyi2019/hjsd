@@ -13,7 +13,7 @@ from app.core.errors import NotFound, Validation
 from app.core.money import to_money
 from app.core.numbering import allocate_flow_no
 from app.core.security import CurrentUser
-from app.domain.enums import AccountingAttribute, AuditAction, Direction, FundNature, Nature
+from app.domain.enums import AccountingAttribute, AuditAction, Direction
 from app.domain.trade import Cashflow
 from app.orders.form_fields import validate_form_extra
 from app.foundation import service as foundation_service
@@ -47,8 +47,6 @@ def create_transfer(
     common = {
         "transfer_id": transfer_id,
         "occurred_on": occurred_on,
-        "nature": Nature.INTERNAL.value,
-        "fund_nature": FundNature.INTERNAL.value,
         "accounting_attribute": AccountingAttribute.INTERNAL_TRANSFER.value,
         "category": "TRANSFER",
         "amount": money,
@@ -122,7 +120,6 @@ def repair_transfer(
             select(Cashflow)
             .where(
                 Cashflow.transfer_id == transfer,
-                Cashflow.nature == Nature.INTERNAL.value,
             )
             .order_by(Cashflow.id)
         ).all()
@@ -151,8 +148,6 @@ def repair_transfer(
         flow_no=allocate_flow_no(session, direction),
         pool_id=target.id,
         occurred_on=source.occurred_on,
-        nature=Nature.INTERNAL.value,
-        fund_nature=FundNature.INTERNAL.value,
         accounting_attribute=AccountingAttribute.INTERNAL_TRANSFER.value,
         category="TRANSFER",
         direction=direction,

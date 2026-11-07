@@ -57,7 +57,7 @@ def create_order_form_field(
     if isinstance(sort_order, bool) or not isinstance(sort_order, int) or sort_order < 0:
         raise Validation("排序值必须为非负整数", details={"field": "sort_order"})
     if flow_direction is not None and flow_direction not in {"BASE", "IN", "OUT"}:
-        raise Validation("资金流向性质不合法", details={"field": "flow_direction"})
+        raise Validation("收支方向不合法", details={"field": "flow_direction"})
     key = (field_key or "").strip()
     if not FIELD_KEY_PATTERN.match(key):
         raise Validation(
@@ -232,7 +232,7 @@ def update_order_form_field(
     definition.note = note
     if flow_direction is not _UNSET:
         if flow_direction is not None and flow_direction not in {"BASE", "IN", "OUT"}:
-            raise Validation("资金流向性质不合法", details={"field": "flow_direction"})
+            raise Validation("收支方向不合法", details={"field": "flow_direction"})
         definition.flow_direction = flow_direction
     definition.updated_by = actor
     session.flush()

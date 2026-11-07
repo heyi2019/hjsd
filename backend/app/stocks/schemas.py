@@ -109,20 +109,41 @@ class ExecutionEditItem(RequestModel):
 
 
 class ExecutionTimeShift(RequestModel):
-    """账号台账时间联动：任一时间锚点改 N 天，整单时间轴平移 N 天（保留相对关系）。
+    """账号台账时间联动：任一时间锚点改 N 分钟，整单时间轴平移 N 分钟（保留相对关系）。
 
     与订单台账「成交日期」同源口径：trade_date、事件/流水 occurred_on 同步平移，
     另外把台账展示用的 created_at / posted_at 时间戳一并平移，避免界面值不动。
     分期 first_due_on / 期次 due_on 属客户还款计划，不随之平移。
     """
 
-    delta_days: int = Field(ge=-3650, le=3650)
+    delta_minutes: int = Field(ge=-5256000, le=5256000)
+
+
+class ExecutionTimeSet(RequestModel):
+    """账号台账三个系统时间戳的绝对设值 / 清空（#15 需求2）。
+
+    字段含义与界面一致：
+    - registered_at：订单创建时间（Order.created_at）
+    - sold_at：售出时间（来源单 SELL 事件 posted_at）
+    - flow_at：流水时间（来源单主资金流水 Cashflow.created_at）
+    每个字段可选；在 model_fields_set 中即视为「用户改过」，值为 None=清空。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    registered_at: datetime | None = None
+    sold_at: datetime | None = None
+    flow_at: datetime | None = None
 
 
 class ExecutionEditRequest(RequestModel):
     events: list[ExecutionEditItem] = Field(max_length=100)
     profile: AccountProfileUpdate | None = None
     time_shift: ExecutionTimeShift | None = None
+    # #15 需求2：三个系统时间戳（登记/售出/流水）绝对设值或清空。
+    # 仅传入的字段生效；字段值为 null 表示清空（置 NULL），非 null 表示绝对设值。
+    # 与 time_shift（相对平移）互斥由前端保证，后端两者都给时以 time_set 优先。
+    time_set: ExecutionTimeSet | None = None
 
 
 class AccountInventoryOut(BaseModel):
@@ -172,8 +193,11 @@ class ExecutionCashflowOut(BaseModel):
     flow_no: str
     pool_name: str | None = None
     occurred_on: date
-    occurred_at: datetime
+    # #15 需求2：流水时间（Cashflow.created_at）可清空，故允许为 null。
+    occurred_at: datetime | None = None
     direction: str
+    # Deprecated compatibility field; the persisted model now derives this
+    # from transfer/category/direction, but execution views still expose it.
     nature: str
     category: str
     amount: Decimal
@@ -235,7 +259,8 @@ class AccountExecutionOrderOut(BaseModel):
     order_no: str
     order_type: str
     trade_date: date
-    created_at: datetime
+    # #15 需求2：登记时间可清空，故允许为 null。
+    created_at: datetime | None = None
     status: str
     account_platform: str | None = None
     note: str | None = None
@@ -286,6 +311,7 @@ __all__ = [
     "AccountDeleteRequest",
     "ExecutionEditItem",
     "ExecutionEditRequest",
+    "ExecutionTimeSet",
     "AccountInventoryOut",
     "InventoryResponseOut",
     "ExecutionCashflowOut",

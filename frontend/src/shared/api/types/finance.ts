@@ -1,4 +1,4 @@
-/** 资金账户、存取、划转、流水、返点、对账与财务维度报表。
+/** 资金账户、存取、划转、流水、返点与对账。
  * 由原 shared/api/types.ts 按领域拆分；对外仍从 `./types` 统一导入。
  * 金额一律以字符串传输，前端不做浮点数计算。 */
 
@@ -66,11 +66,9 @@ export interface Cashflow {
   pool_id: number;
   occurred_on: string;
   occurred_at?: string | null;
-  nature: string;
-  fund_nature?: string;
-  accounting_attribute?: string;
   category: string;
   direction: "IN" | "OUT" | string;
+  accounting_attribute?: string;
   amount: string;
   order_id?: number | null;
   order_no?: string | null;
@@ -103,7 +101,3 @@ export interface Rebate {
 }
 
 export interface Reconciliation { id: number; pool_id: number; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string; reason?: string | null; unmatched_flow_ids?: number[]; note?: string | null }
-
-export interface FinanceDimensionRow { pool_id: number; pool_code: string; pool_name: string; fund_nature: string; accounting_attribute: string; direction: string; flow_count: number; amount: string; signed_amount: string }
-
-export interface FinanceDimensionReport { items: FinanceDimensionRow[]; total_amount: string; total_signed_amount: string }

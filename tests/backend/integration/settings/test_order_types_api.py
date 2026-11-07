@@ -7,7 +7,7 @@ from app.foundation.classification import classification_for_order_type
 ORDER_TYPES = "/api/v1/order-types"
 
 
-def test_fixed_business_classification_is_not_inferred_from_capital_type():
+def test_fixed_business_classification_is_not_inferred_from_removed_capital_type():
     assert classification_for_order_type("HS") == {
         "business_mode": "SELF",
         "business_type": "RECOVERY",
@@ -21,7 +21,7 @@ def test_create_business_then_route_then_activate(client, headers, seeded_db):
     """BAS-02-02：新业务必须“先配路由、再启用”，否则 TB0001 无法生成。"""
     created = client.post(
         ORDER_TYPES,
-        json={"code": "TB", "name": "同行代收", "capital_type": "STOCK"},
+        json={"code": "TB", "name": "同行代收"},
         headers=headers,
     )
     assert created.status_code == 201, created.text
@@ -48,13 +48,13 @@ def test_create_business_then_route_then_activate(client, headers, seeded_db):
 
 def test_new_sequence_created_with_business(client, headers):
     client.post(
-        ORDER_TYPES, json={"code": "TB", "name": "同行代收", "capital_type": "STOCK"}, headers=headers
+        ORDER_TYPES, json={"code": "TB", "name": "同行代收"}, headers=headers
     )
     sequences = client.get("/api/v1/sequences", headers=headers).json()
     assert any(item["sequence_key"] == "ORDER_TB" and item["next_number"] == "TB0001" for item in sequences)
 
 
-def test_pass_thru_capital_type_is_removed(client, headers):
+def test_capital_type_is_rejected_from_order_type_api(client, headers):
     response = client.post(
         ORDER_TYPES,
         json={"code": "TP", "name": "不应存在的资金分类", "capital_type": "PASS_THRU"},
@@ -80,29 +80,6 @@ def test_route_upsert_is_idempotent(client, seeded_db, headers):
     assert len(principal_routes) == 1
 
 
-def test_route_can_be_keyed_by_fund_nature(client, seeded_db, headers):
-    response = client.post(
-        f"{ORDER_TYPES}/HS/routes",
-        json={"portion": "PRINCIPAL", "fund_nature": "BUSINESS", "pool_code": "HJ_PROFIT"},
-        headers=headers,
-    )
-
-    assert response.status_code == 201, response.text
-    body = response.json()
-    assert body["portion"] == "PRINCIPAL"
-    assert body["fund_nature"] == "BUSINESS"
-    assert body["pool_code"] == "HJ_PROFIT"
-
-    routes = client.get(f"{ORDER_TYPES}/1/routes", headers=headers).json()
-    assert len(
-        [
-            item
-            for item in routes
-            if item["portion"] == "PRINCIPAL" and item["fund_nature"] == "BUSINESS"
-        ]
-    ) == 1
-
-
 def test_unknown_business_route_returns_404(client, headers):
     response = client.post(
         f"{ORDER_TYPES}/ZZ/routes", json={"portion": "PROFIT", "pool_code": "HJ_PROFIT"}, headers=headers
@@ -113,7 +90,7 @@ def test_unknown_business_route_returns_404(client, headers):
 
 def test_duplicate_business_code_returns_422(client, seeded_db, headers):
     response = client.post(
-        ORDER_TYPES, json={"code": "HS", "name": "重复回收", "capital_type": "STOCK"}, headers=headers
+        ORDER_TYPES, json={"code": "HS", "name": "重复回收"}, headers=headers
     )
     assert response.status_code == 422
     assert response.json()["code"] == ErrorCode.DUPLICATE_CODE

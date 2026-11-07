@@ -16,7 +16,6 @@ from app.core.security import CurrentUser
 from app.domain.enums import (
     AccountStatus,
     CashflowStatus,
-    Nature,
     QualityIssueStatus,
     ReconciliationStatus,
     OrderStatus,
@@ -68,7 +67,6 @@ def _order(
     *,
     order_no: str,
     order_type: str = "HS",
-    capital_type: str = "STOCK",
     owner_id: int = 1,
     account_id=None,
     account_snapshot=None,
@@ -76,7 +74,6 @@ def _order(
     order = Order(
         order_no=order_no,
         order_type=order_type,
-        capital_type=capital_type,
         trade_date=date.today(),
         status=OrderStatus.ACTIVE.value,
         owner_id=owner_id,
@@ -103,7 +100,6 @@ def _dg_with_overdue_installment(seeded_db, *, order_no: str, owner_id: int):
         seeded_db,
         order_no=order_no,
         order_type="TH",
-        capital_type="ZERO",
         owner_id=owner_id,
         account_id=None,
     )
@@ -256,7 +252,6 @@ def test_scan_cashflow_source_mismatch(seeded_db):
         flow_no="FL-MISMATCH-1",
         pool_id=pool2.id,
         occurred_on=date.today(),
-        nature=Nature.BUSINESS_IN.value,
         direction="IN",
         category="OTHER",
         amount=to_money("50"),
@@ -312,7 +307,6 @@ def test_metrics_scope_filters(seeded_db):
             flow_no="FL-METRIC-1",
             pool_id=1,
             occurred_on=date.today(),
-            nature=Nature.BUSINESS_IN.value,
             direction="IN",
             category="OTHER",
             amount=to_money("100"),

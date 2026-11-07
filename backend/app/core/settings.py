@@ -167,6 +167,14 @@ class Settings(BaseSettings):
             raise ValueError("登录限流次数不得为负数（0 表示每个窗口一律拒绝，请确认意图）")
         return value
 
+    @field_validator("database_url", "test_database_url")
+    @classmethod
+    def _validate_postgresql_urls(cls, value: str) -> str:
+        """数据库连接统一 PostgreSQL，拒绝已下线的 SQLite 连接串。"""
+        if value and not value.startswith("postgresql"):
+            raise ValueError("DATABASE_URL / TEST_DATABASE_URL 必须使用 PostgreSQL")
+        return value
+
     @field_validator("wechat_provider")
     @classmethod
     def _validate_wechat_provider(cls, value: str) -> str:

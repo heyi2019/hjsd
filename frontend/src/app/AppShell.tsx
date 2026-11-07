@@ -21,7 +21,7 @@ const SettingsPage = lazy(() => import("../field-definitions/SettingsPage").then
 const UserCenterPage = lazy(() => import("../auth/UserCenterPage").then(({ UserCenterPage }) => ({ default: UserCenterPage })));
 
 // 注：dashboard 不入此映射——工作台是纯动作入口（无跳转需求），由下方三元单独渲染；
-// 其余页面统一收 onNavigate（ReportsPage 的数据中心入口卡跳业务中心用），无跳转需求的页面忽略该 prop。
+// 其余页面统一收 onNavigate；无跳转需求的页面忽略该 prop。
 type PageProps = {
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
   initialTab?: BusinessCenterEntryTab;

@@ -5,7 +5,7 @@
 - core/database.py:103-105    create_all 测试建库入口
 - core/database.py:110-113    dispose_engine 必须把两个全局单例都置空
 - core/ratelimit.py:30        窗口过期后计数归零（不是永久封禁）
-- core/sql_functions.py:30/31 sqlite 方言的 strftime 渲染
+- core/sql_functions.py:24 PostgreSQL 方言的 to_char 渲染
 
 本文件属 `unit` 组（单文件 <1s、不依赖 seeded_db/TestClient）。
 返点分次结算编号 `rebate_settlement_no` 随模型层下线已删除，相关用例一并移除。
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import column, inspect, select, text
-from sqlalchemy.dialects import postgresql, sqlite
+from sqlalchemy.dialects import postgresql
 
 from app.core import database
 from app.core.ratelimit import RateLimiter
@@ -85,15 +85,13 @@ def test_ratelimit_window_expiry_resets_counter(monkeypatch):
     assert limiter.is_allowed("k", limit=1, window_seconds=60) is True  # 窗口过期重置
 
 
-def test_year_month_compiles_for_both_dialects():
-    """按月聚合键必须两边都能渲染：PG 走 to_char，SQLite 走 strftime（已下线方言仍保兼容）。"""
+def test_year_month_compiles_for_postgresql():
+    """按月聚合键必须渲染为 PostgreSQL 的 to_char。"""
     expression = year_month(column("trade_date"))
 
     pg_sql = str(select(expression).compile(dialect=postgresql.dialect()))
-    sqlite_sql = str(select(expression).compile(dialect=sqlite.dialect()))
 
     assert "to_char(trade_date, 'YYYY-MM')" in pg_sql
-    assert "strftime('%Y-%m', trade_date)" in sqlite_sql
 
 
 def test_user_from_payload_rejects_bool_sub():

@@ -3,6 +3,10 @@
   vertical-align: top !important;
 }
 
+.business-dictionary__saved-content {
+  white-space: pre-wrap;
+}
+
 /* 一级列表标签：文字加粗并上下左右居中（以账号流转标题为样板） */
 .business-dictionary .ant-descriptions-item-label {
   font-weight: 600;

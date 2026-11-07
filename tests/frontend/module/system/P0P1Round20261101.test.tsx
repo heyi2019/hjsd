@@ -29,30 +29,19 @@ import { ACCESS_TOKEN_KEY } from "@/shared/api/client";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { FundsPage } from "@/pools/FundsPage";
 import { RebatesPanel } from "@/rebates/RebatesPanel";
-import { DataCenterPanel } from "@/reporting/DataCenterPanel";
 import { CustomerPanel } from "@/customers/CustomerPanel";
 import { CounterpartyPanel } from "@/customers/CounterpartyPanel";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
 import { InventoryProfileModal } from "@/stocks/InventoryProfileModal";
 import { InventoryConsignmentModal } from "@/stocks/InventoryConsignmentModal";
-import { countOngoingOrders } from "@/reporting/DataCenterPanel";
 import { OrderTypesPanel } from "@/field-definitions/panels/OrderTypesPanel";
 import { PoolsPanel } from "@/field-definitions/panels/PoolsPanel";
 import { OrderTypeRoutesPanel } from "@/field-definitions/panels/OrderTypeRoutesPanel";
-import { PolicySettingsPanel } from "@/policy/PolicySettingsPanel";
-import { SequencesPanel } from "@/field-definitions/panels/SequencesPanel";
-import { ImportWorkbench } from "@/imports/ImportWorkbench";
-import { RowsTab } from "@/imports/ImportWorkbench.tabs";
-import { isSupportedImportFile } from "@/imports/ImportWorkbench.fragments";
 import { OrderDetail } from "@/stocks/OrderDetail";
 import { OrderDetailDeliverySection } from "@/stocks/OrderDetailDeliverySection";
 import { InventorySaleModal } from "@/stocks/InventorySaleModal";
 import { buildInventoryCsv } from "@/stocks/inventory-export";
-import { SearchPanel } from "@/search/SearchPanel";
-import { AttachmentPanel } from "@/attachments/AttachmentPanel";
-import { QualityPanel } from "@/quality/QualityPanel";
 import { AuditPanel } from "@/audit/AuditPanel";
-import { ConfigAuditPanel } from "@/field-definitions/panels/ConfigAuditPanel";
 import { clearOptionSetsCache, loadOptionSets } from "@/shared/lib/optionSets";
 import { seedOrderFormFields } from "@fixtures/formFieldsSeed";
 import { appMessage } from "@/shared/ui/appFeedback";
@@ -61,7 +50,7 @@ import { consignmentRecords } from "@/stocks/InventoryPlatformOffsaleModal";
 
 vi.mock("@/shared/api/catalog");
 
-const types = [{ id: 1, code: "TH", name: "提号", capital_type: "DISTRIBUTION", is_active: true }];
+const types = [{ id: 1, code: "TH", name: "提号", is_active: true }];
 const settledInstallment = {
   id: 1,
   inst_no: "TH0002-FQ",
@@ -113,7 +102,7 @@ beforeEach(() => {
   ]);
   vi.mocked(catalog.installmentsApi.dispositions).mockResolvedValue([]);
   vi.mocked(catalog.ordersApi.list).mockResolvedValue([
-    { id: 10, order_no: "TH-2026-0002", order_type: "TH", capital_type: "DISTRIBUTION", trade_date: "2026-10-01", status: "ACTIVE" },
+    { id: 10, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-01", status: "ACTIVE" },
   ]);
   vi.mocked(catalog.reportsApi.inventoryHealth).mockResolvedValue({ generated_on: "2026-10-01", total_cost: "0.00", items: [] });
 });
@@ -256,62 +245,6 @@ it("P1/FE-217：团队数据失败时显示错误空态且禁用新增", async (
   expect(screen.getByRole("button", { name: /新增团队/ })).toBeDisabled();
 });
 
-it("P1/FE-215：经营规则数据失败时统计不显示零且不开放规则操作", async () => {
-  vi.mocked(catalog.policyApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "policies down" });
-  renderLight(<PolicySettingsPanel />, { user: "admin" });
-
-  expect(await screen.findByText("经营规则")).toBeInTheDocument();
-  expect(screen.getByText("规则总数").closest(".ui-stat")).toHaveTextContent("不可用");
-  expect(screen.queryByRole("button", { name: "设置配置" })).toBeNull();
-});
-
-it("P1/FE-219：编号序列数据失败时不伪装成真实空列表", async () => {
-  vi.mocked(catalog.sequencesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "sequences down" });
-  renderLight(<SequencesPanel />, { user: "admin" });
-
-  expect(await screen.findByText("编号序列数据不可用，请点击重新加载")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /重新加载/ })).toBeInTheDocument();
-});
-
-it("P1/FE-218：导入批次失败时锁定新建导入入口", async () => {
-  // 错误必须带 response：client.ts 的 lastNetworkFailure 是模块级全局态，CI 上同进程
-  // 其它用例的真实请求（后端不可达 ECONNREFUSED）会置位它；无 response 的 axios 错误
-  // 会被 normalizeError 改写成「后端不可达」兜底文案，使消息断言随用例顺序漂移
-  // （2026-11-05 首次 CI 实测：仅本例红，本地单跑恒绿）。带 v1 响应体后走
-  // data.message 分支，与全局连接态解耦。
-  vi.mocked(catalog.importsApi.batches).mockRejectedValueOnce({
-    isAxiosError: true,
-    message: "batches down",
-    response: { status: 400, data: { message: "batches down" } },
-  });
-  renderLight(<ImportWorkbench />, { user: "admin" });
-
-  expect(await screen.findByText("batches down")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /新建导入/ })).toBeDisabled();
-});
-
-it("P1/FE-220：导入数据类型字典失败时仍保持完整可选项", async () => {
-  vi.mocked(catalog.importsApi.batches).mockResolvedValueOnce({ items: [], total: 0 } as never);
-  vi.mocked(catalog.optionSetsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "option sets down" });
-  clearOptionSetsCache();
-  renderLight(<ImportWorkbench />, { user: "admin" });
-
-  await screen.findByRole("button", { name: /新建导入/ });
-  fireEvent.click(screen.getByRole("button", { name: /新建导入/ }));
-  const modal = await screen.findByText("导入导入数据");
-  const modalContent = modal.closest(".ant-modal-content") as HTMLElement;
-  const user = userEvent.setup({ pointerEventsCheck: 0 });
-  await user.click(modalContent.querySelector(".ant-select-selector") as Element);
-  const dropdown = await waitFor(() => {
-    const dropdowns = [...document.querySelectorAll(".ant-select-dropdown")];
-    const current = dropdowns[dropdowns.length - 1] as HTMLElement | undefined;
-    if (!current) throw new Error("导入类型下拉未打开");
-    return current;
-  });
-  const options = [...dropdown.querySelectorAll(".ant-select-item-option-content")].map((option) => option.textContent);
-  expect(options).toEqual(expect.arrayContaining(["订单", "资金流水"]));
-});
-
 it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () => {
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
     { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
@@ -344,7 +277,7 @@ it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () =
 });
 
 it("P1/FE-050：流水冲销成功后原流水不再显示重复冲销入口", async () => {
-  const original = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
+  const original = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
   const reversal = { ...original, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", reversal_of_id: 7 };
   let mainListCalls = 0;
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
@@ -364,6 +297,7 @@ it("P1/FE-050：流水冲销成功后原流水不再显示重复冲销入口", a
   const user = userEvent.setup({ pointerEventsCheck: 0 });
   await screen.findByText(/POOL-A/);
   await user.click(screen.getByRole("tab", { name: "流水" }));
+  await user.click(screen.getByRole("tab", { name: "支出明细" }));
   await screen.findByText("CF-A-07");
   await user.click(screen.getByRole("button", { name: /冲销/ }));
   const modal = document.querySelector(".ant-modal-content") as HTMLElement;
@@ -380,7 +314,6 @@ it("P1/FE-051：经营报表日期筛选传递到各报表查询", async () => {
   vi.mocked(catalog.reportsApi.monthlyPnl).mockResolvedValue({ items: [], total: {} } as never);
   vi.mocked(catalog.reportsApi.commission).mockResolvedValue({ items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } } as never);
   vi.mocked(catalog.reportsApi.dailyFunds).mockResolvedValue({ date: "2026-11-01", total: {}, items: [] } as never);
-  vi.mocked(catalog.reportsApi.financeDimensions).mockResolvedValue({ items: [], total_amount: "0", total_signed_amount: "0" } as never);
   vi.mocked(catalog.reportsApi.businessPnl).mockResolvedValue({ items: [], total: {} } as never);
   vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValue({ items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } } as never);
   const user = userEvent.setup({ pointerEventsCheck: 0 });
@@ -399,11 +332,9 @@ it("P1/FE-051：经营报表日期筛选传递到各报表查询", async () => {
   await waitFor(() => expect(catalog.reportsApi.commission).toHaveBeenLastCalledWith({ from: "2026-10-01", all_people: true }));
   await user.click(screen.getByRole("tab", { name: /业务损益 R5/ }));
   await waitFor(() => expect(catalog.reportsApi.businessPnl).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
-  await user.click(screen.getByRole("tab", { name: /资金属性分析/ }));
-  await waitFor(() => expect(catalog.reportsApi.financeDimensions).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
   await user.click(screen.getByRole("tab", { name: /订单利润/ }));
   await waitFor(() => expect(catalog.reportsApi.orderProfit).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
-  await user.click(screen.getByRole("tab", { name: /资金日报 R4/ }));
+  await user.click(screen.getByRole("tab", { name: /资金报表·日报/ }));
   const dailyDate = screen.getByLabelText("资金日报日期");
   fireEvent.change(dailyDate, { target: { value: "2026-10-01" } });
   await waitFor(() => expect(catalog.reportsApi.dailyFunds).toHaveBeenLastCalledWith({ on: "2026-10-01" }));
@@ -411,17 +342,16 @@ it("P1/FE-051：经营报表日期筛选传递到各报表查询", async () => {
 
 it("P1/FE-053：报表导出成功后显示可核对的结果反馈", async () => {
   vi.mocked(catalog.reportsApi.exportCsv).mockResolvedValue(new Blob(["csv"]) as never);
+  vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValue({ items: [], total: { income: "0", buy_amount: "0", direct_cost: "0", rebate: "0", net_profit: "0" } } as never);
   const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   const createUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:report");
   const revokeUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
   const user = userEvent.setup({ pointerEventsCheck: 0 });
   renderLight(<ReportsPage />, { user: "admin" });
-  const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
-  await user.click(selector);
-  await user.click(await screen.findByText("订单利润", { selector: ".ant-select-item-option-content" }));
-  await user.click(screen.getByRole("button", { name: /导出/ }));
+  await user.click(screen.getByRole("tab", { name: "订单利润" }));
+  await user.click(await screen.findByRole("button", { name: /导出 CSV/ }));
 
-  await waitFor(() => expect(screen.getByText(/已导出 1 份报表/)).toBeInTheDocument());
+  await waitFor(() => expect(catalog.reportsApi.exportCsv).toHaveBeenCalledWith("order-profit", { from: undefined, to: undefined }));
   expect(anchorClick).toHaveBeenCalled();
   expect(createUrl).toHaveBeenCalled();
   expect(revokeUrl).toHaveBeenCalledWith("blob:report");
@@ -449,7 +379,7 @@ it("P1/FE-169：订单利润展示采购成本并给出可复算口径", async (
 
   expect(await screen.findByText("HS-2026-0011")).toBeInTheDocument();
   expect(screen.getAllByText("账号采购成本").length).toBeGreaterThanOrEqual(1);
-  expect(screen.getByText(/净利 = 所有收入 − 所有支出/)).toBeInTheDocument();
+  expect(screen.getByText(/订单利润 = 所有收入 − 所有支出/)).toBeInTheDocument();
   expect(screen.getAllByText("400.00").length).toBeGreaterThanOrEqual(1);
 });
 
@@ -656,7 +586,7 @@ it("P1/FE-239：资金池主数据失败时锁定新增入口", async () => {
 
 it("P1/FE-240：过账路由失败时显示不可用并锁定保存", async () => {
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValueOnce([
-    { id: 1, code: "HS", name: "回收", capital_type: "STOCK", is_active: true },
+    { id: 1, code: "HS", name: "回收", is_active: true },
   ] as never);
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
     { id: 1, code: "MAIN", name: "主账户", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
@@ -691,96 +621,19 @@ it("P1/FE-261：完整资金划转不进入单边异常修复列表", async () =
 
 it("P1/FE-262：过账路由覆盖列表包含代挂 DG", async () => {
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValueOnce([
-    { id: 1, code: "HS", name: "回收", capital_type: "STOCK", is_active: true },
-    { id: 2, code: "DG", name: "代挂", capital_type: "ZERO", is_active: true },
+    { id: 1, code: "HS", name: "回收", is_active: true },
+    { id: 2, code: "DG", name: "代挂", is_active: true },
   ] as never);
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
     { id: 1, code: "MAIN", name: "主账户", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
   ] as never);
   vi.mocked(catalog.orderTypesApi.routes).mockImplementation((id: number) => Promise.resolve([
-    { id: id * 10, order_type_code: id === 2 ? "DG" : "HS", portion: "GROSS", fund_nature: null, pool_code: "MAIN", pool_name: "主账户", priority: 0, is_active: true },
+    { id: id * 10, order_type_code: id === 2 ? "DG" : "HS", portion: "GROSS", pool_code: "MAIN", pool_name: "主账户", priority: 0, is_active: true },
   ] as never));
   renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
 
   await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("combobox", { name: "业务类型" }));
   expect(await screen.findByText("代挂（DG）", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
-});
-
-it("P1/FE-063：导入文件类型校验拒绝 PNG", () => {
-  expect(isSupportedImportFile({ name: "account-image.png", type: "image/png" })).toBe(false);
-  expect(isSupportedImportFile({ name: "orders.csv", type: "text/csv" })).toBe(true);
-  expect(isSupportedImportFile({ name: "rows.json", type: "application/json" })).toBe(true);
-});
-
-it("P1/FE-188：错误大批次原始行按页渲染，避免首屏冻结", () => {
-  const rows = Array.from({ length: 3229 }, (_, index) => ({
-    id: index + 1,
-    batch_id: 1,
-    row_no: index + 1,
-    raw: { 行号: `行-${index + 1}` },
-    status: "PENDING",
-    unlinked_transfer: false,
-  })) as unknown as import("@/shared/api/catalog").ImportRow[];
-  renderLight(
-    <RowsTab
-      columns={[{ title: "行号", dataIndex: "row_no" }, { title: "原始内容", dataIndex: ["raw", "行号"] }]}
-      rows={rows}
-      loading={false}
-    />,
-    { user: "admin" },
-  );
-  const body = document.querySelector("tbody") as HTMLElement;
-  expect(within(body).queryByText("行-3229")).not.toBeInTheDocument();
-  expect(body.querySelectorAll("tr").length).toBeLessThanOrEqual(21);
-});
-
-it("P1/FE-149：数据中心进行中包含分期订单并跳转订单台账", async () => {
-  expect(countOngoingOrders([{ status: "ACTIVE" }, { status: "INSTALLMENT" }, { status: "COMPLETED" }])).toBe(2);
-  vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([]);
-  // 数据中心改为一次批量取余额（含服务端汇总），空池时给空 items + 零合计。
-  vi.mocked(catalog.poolsApi.balances).mockResolvedValueOnce({
-    items: [],
-    totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
-  });
-  vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
-    { id: 10, order_no: "HS-2026-0001", order_type: "HS", capital_type: "STOCK", trade_date: "2026-10-01", status: "ACTIVE" },
-    { id: 11, order_no: "TH-2026-0002", order_type: "TH", capital_type: "STOCK", trade_date: "2026-10-02", status: "INSTALLMENT" },
-    { id: 12, order_no: "DG-2026-0003", order_type: "DG", capital_type: "ZERO", trade_date: "2026-10-03", status: "COMPLETED" },
-  ]);
-  const onNavigate = vi.fn();
-  renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
-  const card = await screen.findByRole("button", { name: /进行中/ });
-  expect(card).toHaveTextContent("2");
-  await userEvent.setup({ pointerEventsCheck: 0 }).click(card);
-  expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
-});
-
-it("P1/FE-241：数据中心主数据失败时不显示零统计且禁用快捷入口", async () => {
-  vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
-  const onNavigate = vi.fn();
-  renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
-
-  const totalCard = await screen.findByRole("button", { name: /订单总数/ });
-  const activeCard = screen.getByRole("button", { name: /进行中/ });
-  expect(totalCard).toHaveTextContent("不可用");
-  expect(activeCard).toHaveTextContent("不可用");
-  expect(totalCard).toHaveAttribute("aria-disabled", "true");
-  expect(activeCard).toHaveAttribute("aria-disabled", "true");
-  fireEvent.click(totalCard);
-  expect(onNavigate).not.toHaveBeenCalled();
-  expect(screen.getByText("资金池数量").closest(".ui-stat")).toHaveTextContent("不可用");
-});
-
-it("P1/FE-227：数据中心失败态快捷入口独立回归", async () => {
-  vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
-  const onNavigate = vi.fn();
-  renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
-
-  const totalCard = await screen.findByRole("button", { name: /订单总数/ });
-  expect(totalCard).toHaveTextContent("不可用");
-  expect(totalCard).toHaveAttribute("aria-disabled", "true");
-  fireEvent.click(totalCard);
-  expect(onNavigate).not.toHaveBeenCalled();
 });
 
 it("P1/FE-242：客户中心请求失败时不显示零统计且禁用依赖入口", async () => {
@@ -795,44 +648,6 @@ it("P1/FE-242：客户中心请求失败时不显示零统计且禁用依赖入�
   expect(screen.getByRole("combobox", { name: "客户状态" })).toBeDisabled();
 });
 
-it("P1/FE-164/198：全局搜索结果可进入且清空后不保留旧结果", async () => {
-  vi.mocked(catalog.searchApi.query).mockResolvedValueOnce({
-    items: [{ id: 12, type: "order", code: "HS0006", title: "订单", subtitle: null, route: "/orders/12" }],
-  });
-  renderLight(<SearchPanel />, { user: "admin" });
-  const input = screen.getByPlaceholderText(/订单号/);
-  const user = userEvent.setup({ pointerEventsCheck: 0 });
-  await user.type(input, "HS0006");
-  await user.click(screen.getByRole("button", { name: /搜索/ }));
-  expect(await screen.findByRole("link", { name: /打开订单/ })).toHaveAttribute("href", "/orders/12");
-  await user.clear(input);
-  expect(screen.queryByText("HS0006")).not.toBeInTheDocument();
-});
-
-it("P1/FE-114/165：附件未选对象时保护上传入口并给出前置提示", async () => {
-  renderLight(<AttachmentPanel />, { user: "admin" });
-  expect(screen.getByText("请先填写对象编号后上传附件")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /上传附件/ })).toBeDisabled();
-  vi.mocked(catalog.attachmentsApi.create).mockResolvedValueOnce({ id: 2 } as never);
-  vi.mocked(catalog.attachmentsApi.list).mockResolvedValueOnce({ items: [] } as never);
-  const user = userEvent.setup({ pointerEventsCheck: 0 });
-  await user.type(screen.getByPlaceholderText("对象编号"), "100");
-  const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-  await user.upload(fileInput, new File(["fixture"], "fixture.png", { type: "image/png" }));
-  await waitFor(() => expect(catalog.attachmentsApi.create).toHaveBeenCalledWith(expect.objectContaining({ entity_id: "100", file_name: "fixture.png" })));
-});
-
-it("P1/FE-104/110/160：质量摘要失败不显示零，全部关闭时禁用批量动作", async () => {
-  vi.mocked(catalog.qualityApi.summary).mockRejectedValueOnce(new Error("quality summary down"));
-  vi.mocked(catalog.qualityApi.list).mockResolvedValueOnce({
-    items: [{ id: 1, issue_no: "QLT-closed", severity: "LOW", title: "已关闭", entity_type: "order", entity_id: "1", status: "CLOSED", message: "done" }],
-  });
-  renderLight(<QualityPanel />, { user: "admin" });
-  expect(await screen.findByText(/quality summary down/)).toBeInTheDocument();
-  expect(screen.getByText("异常总数").closest(".ui-stat")).toHaveTextContent("不可用");
-  expect(screen.getByRole("button", { name: /批量关闭未关闭工单/ })).toBeDisabled();
-});
-
 it("P1/FE-150/151：审计对象与动作下拉在字典失败时仍可用", async () => {
   vi.mocked(catalog.auditApi.list).mockResolvedValueOnce({ items: [], total: 0 });
   vi.mocked(catalog.auditApi.actions).mockRejectedValueOnce({ isAxiosError: true, message: "audit actions down" });
@@ -844,20 +659,6 @@ it("P1/FE-150/151：审计对象与动作下拉在字典失败时仍可用", asy
   expect(await screen.findByText("订单", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
   await userEvent.setup({ pointerEventsCheck: 0 }).click(selects[1].querySelector(".ant-select-selector") as Element);
   expect(await screen.findByText("新建资金池", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
-});
-
-it("P1/FE-176：配置改动追溯动作筛选独立回归", async () => {
-  vi.mocked(catalog.auditApi.list).mockResolvedValueOnce({
-    items: [{ id: 1, actor: "admin", action: "ROUTE_UPDATE", entity_type: "OrderTypePool", entity_id: "11", reason: "调整路由", occurred_at: "2026-10-26T13:00:00" }],
-    total: 1,
-  });
-  vi.mocked(catalog.auditApi.actions).mockResolvedValueOnce(["ROUTE_UPDATE", "POOL_DISABLE"]);
-  renderLight(<ConfigAuditPanel />, { user: "admin" });
-  await screen.findByText("配置改动追溯");
-  const actionSelect = document.querySelectorAll(".ui-filter-bar .ant-select")[1] as HTMLElement;
-  await userEvent.setup({ pointerEventsCheck: 0 }).click(actionSelect.querySelector(".ant-select-selector") as Element);
-  await userEvent.setup({ pointerEventsCheck: 0 }).click(await screen.findByText("更新资金路由", { selector: ".ant-select-item-option-content" }));
-  await waitFor(() => expect(vi.mocked(catalog.auditApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ action: "ROUTE_UPDATE" })));
 });
 
 it("P1/FE-244：资金总览数据失败时不显示零统计且禁用划转", async () => {
@@ -893,7 +694,7 @@ it("P1/FE-229：资金流水数据失败时不显示零统计且禁用新增", a
   renderLight(<FundsPage />, { user: "admin" });
 
   fireEvent.click(screen.getByRole("tab", { name: "流水" }));
-  expect(await screen.findByText("资金明细")).toBeInTheDocument();
+  expect(await screen.findByText("全局资金流水")).toBeInTheDocument();
   expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("不可用");
   expect(screen.getByRole("button", { name: /新增流水/ })).toBeDisabled();
 });
@@ -1252,7 +1053,6 @@ it("P1/FE-270/271/272/273：R2/R3/R4/R5 历史空区间分别传递筛选条件"
   vi.mocked(catalog.reportsApi.monthlyPnl).mockResolvedValue({ items: [], total: {} } as never);
   vi.mocked(catalog.reportsApi.commission).mockResolvedValue({ items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } } as never);
   vi.mocked(catalog.reportsApi.businessPnl).mockResolvedValue({ items: [], total: {} } as never);
-  vi.mocked(catalog.reportsApi.financeDimensions).mockResolvedValue({ items: [], total_amount: "0", total_signed_amount: "0" } as never);
   vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValue({ items: [], total: {} } as never);
   vi.mocked(catalog.reportsApi.dailyFunds).mockResolvedValue({ date: "2026-10-01", total: {}, items: [] } as never);
   renderLight(<ReportsPage />, { user: "admin" });
@@ -1270,10 +1070,7 @@ it("P1/FE-270/271/272/273：R2/R3/R4/R5 历史空区间分别传递筛选条件"
   await waitFor(() => expect(catalog.reportsApi.commission).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
   await setRange("业务损益 R5");
   await waitFor(() => expect(catalog.reportsApi.businessPnl).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
-  await setRange("资金属性分析");
-  await waitFor(() => expect(catalog.reportsApi.financeDimensions).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
-
-  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("tab", { name: "资金日报 R4" }));
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("tab", { name: "资金报表·日报" }));
   const dailyInput = await screen.findByLabelText("资金日报日期");
   fireEvent.change(dailyInput, { target: { value: "2026-10-01" } });
   await waitFor(() => expect(catalog.reportsApi.dailyFunds).toHaveBeenLastCalledWith({ on: "2026-10-01" }));

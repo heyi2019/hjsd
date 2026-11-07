@@ -72,9 +72,7 @@ def money_equal(left: Any, right: Any, *, tolerance: Decimal = Decimal("0.0001")
 class Amount(TypeDecorator):
     """DECIMAL(18,2) 金额列：对外恒为 Decimal。
 
-    SQLite 无原生定点类型，底层以双精度 REAL 存储，因此：
-    - 写入：Decimal -> float 落库；
-    - 读出：立即 `Decimal(str(value))` 并量化到 2 位。
+    读写均统一量化到 2 位，避免业务层出现浮点金额。
     在 18,2 的实际业务量级（远低于 1e13）内往返无损；迁 PostgreSQL 后自动退化为原生 NUMERIC。
     """
 

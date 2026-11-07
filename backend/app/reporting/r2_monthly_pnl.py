@@ -15,6 +15,7 @@ from decimal import Decimal
 from typing import Any
 from app.core.security import CurrentUser
 from sqlalchemy import (
+    and_,
     case,
     func,
     or_,
@@ -22,9 +23,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 from app.domain.enums import (
+    AccountingAttribute,
     CashflowStatus,
     Direction,
-    Nature,
 )
 from app.domain.trade import (
     Cashflow,
@@ -98,11 +99,13 @@ def r2_monthly_pnl(
     op_stmt = select(Cashflow).where(
         Cashflow.status == CashflowStatus.APPROVED.value,
         Cashflow.order_event_id.is_(None),
-        or_(Cashflow.fund_nature == "BUSINESS", Cashflow.category == "OPERATING_COST"),
         or_(
-            Cashflow.accounting_attribute == "OPERATING_EXPENSE",
-            Cashflow.accounting_attribute == "REVERSAL",
+            and_(
+                Cashflow.direction == Direction.OUT.value,
+                Cashflow.accounting_attribute == AccountingAttribute.OPERATING_EXPENSE.value,
+            ),
             Cashflow.category == "OPERATING_COST",
+            Cashflow.reversal_of_id.is_not(None),
         ),
     )
     pool_ids = _visible_pool_ids(user)
@@ -119,14 +122,12 @@ def r2_monthly_pnl(
         amount = _money(flow.amount)
         if (
             flow.direction == Direction.OUT.value
-            and flow.nature == Nature.BUSINESS_OUT.value
         ):
             operating[_month_key(occurred_on)] += amount
         elif flow.reversal_of_id is not None:
             original = session.get(Cashflow, flow.reversal_of_id)
             if original is not None and (
                 original.direction == Direction.OUT.value
-                and original.nature == Nature.BUSINESS_OUT.value
             ):
                 operating[_month_key(occurred_on)] -= amount
 

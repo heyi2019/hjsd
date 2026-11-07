@@ -252,13 +252,18 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
         assert "assignee_id" not in quality_columns
 
         route_columns = _column_names(engine, "order_type_pools")
-        assert "fund_nature" in route_columns
+        assert "fund_nature" not in route_columns
+        assert "fund_nature" not in _column_names(engine, "cashflow")
+        assert "nature" not in _column_names(engine, "cashflow")
+        assert "capital_type" not in _column_names(engine, "order_type_defs")
+        assert "capital_type" not in _column_names(engine, "orders")
 
-        # 资金流水 CHECK：INTERNAL 必须绑定 transfer_id（跨方言只看约束语义）。
+        # 资金流水核算属性保留封闭枚举，覆盖收入/支出及业务细分属性。
         cashflow_clause = _check_clauses(engine, "cashflow")
-        assert "INTERNAL" in cashflow_clause
-        assert "transfer_id" in cashflow_clause
-        assert "IS NOT NULL" in cashflow_clause
+        assert "'INCOME'" in cashflow_clause
+        assert "'EXPENSE'" in cashflow_clause
+        assert "OPERATING_EXPENSE" in cashflow_clause
+        assert "INTERNAL_TRANSFER" in cashflow_clause
 
         pools = {row[0] for row in connection.execute(text("SELECT code FROM pools"))}
         assert pools == {"HJ_INVEST", "HJ_PROFIT"}
@@ -266,14 +271,10 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
         types = {
             row[0]: row[1]
             for row in connection.execute(
-                text("SELECT code, capital_type FROM order_type_defs ORDER BY code")
+                text("SELECT code, name FROM order_type_defs ORDER BY code")
             )
         }
-        assert types == {
-            "HS": "STOCK",
-            "TH": "STOCK",
-            "DG": "ZERO",
-        }
+        assert types == {"HS": "回收", "TH": "提号", "DG": "代挂"}
 
         routes = {
             row[0]: row[1]
@@ -504,12 +505,10 @@ def test_retired_product_checks_are_removed(migration_db):
     orders_clause = _check_clauses(engine, "orders")
     type_defs_clause = _check_clauses(engine, "order_type_defs")
     installments_clause = _check_clauses(engine, "installments")
-    cashflow_clause = _check_clauses(engine, "cashflow")
 
     assert "'CREDIT'" not in orders_clause
     assert "'CREDIT'" not in type_defs_clause
     assert "'ADVANCE_PURCHASE'" not in installments_clause
-    assert "'DFQ_PRINCIPAL'" not in cashflow_clause
 
 
 def test_account_status_rename_migrates_legacy_rows_without_touching_inventory_status(migration_db):

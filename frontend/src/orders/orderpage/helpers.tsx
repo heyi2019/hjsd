@@ -254,6 +254,25 @@ export function validateAllocations(
     const expanded: Expanded[] = [];
     for (const kind of order) {
       const group = groups.get(kind) ?? [];
+      // 运营是可选动作：整组留空时按 0 份额提交，不要求填写人员。
+      // 只要运营组实际填了比例或金额，仍沿用逐行校验，避免出现半填状态。
+      const operationIsBlank = kind === "OPERATION"
+        && group.length > 0
+        && group.every((row) => String(row.allocation_rate ?? "").trim() === "" && String(row.allocation_amount ?? "").trim() === "");
+      if (operationIsBlank) {
+        group.forEach((row) => {
+          expanded.push({
+            kind,
+            employee: row.employee,
+            role: row.role || ALLOCATION_TYPE_ROLE[kind],
+            rate: 0,
+            amount: 0,
+            hasRate: false,
+            hasAmount: false,
+          });
+        });
+        continue;
+      }
       const totalRow = group.find((row) => (row.share_mode ?? "PER_PERSON") === "TOTAL");
       if (totalRow) {
         // 多人均分：本行填的是该动作合计，按该动作人数拆到人。
@@ -422,26 +441,26 @@ export function resolveCancelAmount(params: {
 
 /**
  * 订单编辑 PATCH 入参组装（原本内联在 submitEditOrder 里）。
- * 三条规则都由后端契约决定，抽出来才可免挂载覆盖：
+ * 规则由后端契约决定，抽出来才可免挂载覆盖：
  *  1. 成交日期始终回写：后端按天数差平移本单事件/资金流水日期并重取规则快照；
  *  2. 快照密码被后端隐去（无 order.create 权限）→ 完全不带 account_snapshot，
  *     避免把隐藏密码覆盖成空；
  *  3. 快照是整体替换：表单里没有的控件（钱包实名 / 营地账号）沿用原快照值，
  *     否则编辑一次订单就把钱包实名抹掉。
+ *  #15 需求2：账号快照一律可编辑（含已有登记事件的订单），不再因 hasPosted 而跳过回写。
  */
 export function buildOrderPatchPayload(params: {
   values: Record<string, unknown>;
   snapshot: Order["account_snapshot"];
-  hasPosted: boolean;
 }): OrderPatchPayload {
-  const { values, snapshot, hasPosted } = params;
+  const { values, snapshot } = params;
   const payload: OrderPatchPayload = {};
-  // 成交日期始终回写；hasPosted 只影响账号快照（后端对有登记事件的单也拒收快照）。
+  // 成交日期始终回写；账号快照在可见密码（具备 order.create 权限）时一律回写。
   payload.trade_date = values.trade_date as string;
   const note = (values.note as string | undefined)?.trim();
   payload.note = note ? note : null;
   payload.form_extra = (values.form_extra as Record<string, unknown> | undefined) ?? undefined;
-  if (!hasPosted && snapshot && snapshot.game_password) {
+  if (snapshot && snapshot.game_password) {
     payload.account_snapshot = {
       game_account: (values.snap_game_account as string) ?? snapshot.game_account,
       game_type: (values.snap_game_type as string) || null,

@@ -22,7 +22,6 @@ from app.domain.enums import (
     Direction,
     EventType,
     InstallmentStatus,
-    Nature,
     ReconciliationStatus,
     QualityIssueStatus,
 )
@@ -212,7 +211,7 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
     transfer_rows: dict[str, list[Cashflow]] = defaultdict(list)
     for flow in session.scalars(
         select(Cashflow).where(
-            Cashflow.transfer_id.is_not(None), Cashflow.nature == Nature.INTERNAL.value
+            Cashflow.transfer_id.is_not(None), Cashflow.category == "TRANSFER"
         )
     ).all():
         transfer_rows[flow.transfer_id].append(flow)
@@ -281,7 +280,7 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
 
     for order in orders:
         order_events = [event for event in events_by_order.get(order.id, []) if event.is_posted]
-        if order.order_type == "HS" and order.capital_type == "STOCK" and order.account_id is None:
+        if order.order_type == "HS" and order.account_id is None:
             if any(event.event_type == EventType.BUY.value and event.is_posted for event in order_events):
                 issues.append(
                     _issue(

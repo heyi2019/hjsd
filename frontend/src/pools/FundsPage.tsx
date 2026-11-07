@@ -19,10 +19,6 @@ import {
   TransferModal,
   UnmatchedModal,
 } from "./FundsPage.modals";
-import { deriveCashflowNature } from "./FundsPage.fragments";
-
-export { deriveCashflowNature };
-
 export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const ctrl = useFundsPageController(active);
   return (

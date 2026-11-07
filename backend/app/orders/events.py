@@ -10,7 +10,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
-from app.core.business_numbering import cashflow_no as next_cashflow_no
 from app.core.business_numbering import event_no as next_event_no
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import to_money
@@ -21,13 +20,11 @@ from app.domain.enums import (
     AuditAction,
     Direction,
     EventType,
-    Nature,
     OrderStatus,
     Portion,
 )
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderProfitAllocation
 from app.domain.users import User
-from app.finance.attributes import accounting_attribute_for_order_event
 # 保留 re-export：既有调用方/测试按 `app.orders.events.foundation_service` 打桩，
 # 拆分到 events_rules 后该路径仍需可解析（指向同一模块对象）。
 from app.foundation import service as foundation_service
@@ -39,14 +36,14 @@ from ._common import (
     _required_text,
 )
 
-# 事件 → 现金流方向 / 性质 / 分类
-EVENT_FLOW_MAP: dict[str, tuple[str, str, str]] = {
-    EventType.BUY.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "BUY"),
-    EventType.COST.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "COST"),
-    EventType.SELL.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "SELL"),
-    EventType.PAYMENT.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "PAYMENT"),
-    EventType.CANCEL.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "CANCEL"),
-    EventType.REFUND.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "REFUND"),
+# 事件 → 现金流方向 / 分类
+EVENT_FLOW_MAP: dict[str, tuple[str, str]] = {
+    EventType.BUY.value: (Direction.OUT.value, "BUY"),
+    EventType.COST.value: (Direction.OUT.value, "COST"),
+    EventType.SELL.value: (Direction.IN.value, "SELL"),
+    EventType.PAYMENT.value: (Direction.IN.value, "PAYMENT"),
+    EventType.CANCEL.value: (Direction.IN.value, "CANCEL"),
+    EventType.REFUND.value: (Direction.OUT.value, "REFUND"),
 }
 
 
@@ -237,7 +234,7 @@ def post_event(
     if event_type == EventType.SELL.value:
         _assert_sellable_order(session, order)
 
-    direction, nature, category = EVENT_FLOW_MAP[event_type]
+    direction, category = EVENT_FLOW_MAP[event_type]
     if flow_category is not None:
         if (
             not isinstance(flow_category, str)
@@ -321,13 +318,10 @@ def post_event(
                 },
             )
         cancel_fully_consumed = money >= remaining
-    fund_nature, accounting_attribute = accounting_attribute_for_order_event(
-        order.order_type, event_type
-    )
     resolved_pool_id = (
         pool_id
         or (offset.pool_id if offset is not None else None)
-        or _resolve_pool(session, order, portion, fund_nature=fund_nature).id
+        or _resolve_pool(session, order, portion).id
     )
     if user is not None and not user.can_see_pool(resolved_pool_id):
         raise NotFound("资金池不存在", details={"pool_id": resolved_pool_id})
@@ -412,49 +406,37 @@ def post_event(
     if event_type == EventType.CANCEL.value:
         direction = cancel_direction
 
-    flow = Cashflow(
-        flow_no=next_cashflow_no(
-            session, order_no=order.order_no, order_id=order.id, category=category
-        ),
+    # 订单动作继续自动生成独立资金流水；事件与流水分表保存，并通过
+    # order_id / order_event_id 关联，资金域只负责实际收支记录。
+    from app.finance import service as finance_service
+
+    flow = finance_service.create_business_event_cashflow(
+        session,
         pool_id=event.pool_id,
         occurred_on=occurred_on,
-        nature=nature,
-        fund_nature=fund_nature,
-        accounting_attribute=accounting_attribute,
-        category=category,
         direction=direction,
+        category=category,
         amount=money,
         order_id=order.id,
         order_event_id=event.id,
+        actor=actor,
+        event_type=event_type,
         note=note,
-        created_by=actor,
-        updated_by=actor,
     )
-    session.add(flow)
-    # 先落库主流水，确保拆分流水编号（count+1）能正确递增、不与主流水冲突。
-    session.flush()
-
-    # 售出拆分：将金额2 派生为同一 SELL 事件下的第二笔资金流水，进入资金账户2。
     if resolved_pool_id2 is not None:
-        secondary_flow = Cashflow(
-            flow_no=next_cashflow_no(
-                session, order_no=order.order_no, order_id=order.id, category=category
-            ),
+        finance_service.create_business_event_cashflow(
+            session,
             pool_id=resolved_pool_id2,
             occurred_on=occurred_on,
-            nature=nature,
-            fund_nature=fund_nature,
-            accounting_attribute=accounting_attribute,
-            category=category,
             direction=direction,
+            category=category,
             amount=secondary_money,
             order_id=order.id,
             order_event_id=event.id,
+            actor=actor,
+            event_type=event_type,
             note=note,
-            created_by=actor,
-            updated_by=actor,
         )
-        session.add(secondary_flow)
 
     _apply_account_effect(
         session,

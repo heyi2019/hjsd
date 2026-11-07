@@ -104,7 +104,7 @@ def cashflow_totals_by_order(
     2026-11-05 用户裁决：利润 = 单订单所有收入 − 所有支出，可正可负可 0；
     资金走向只有收入 / 支出两种，不以「是否生成 cashflow 行」为界。
     本函数是报表侧唯一取数口，与分润基数 `order_cashflow_profit` 同源：
-    不看 status / nature / fund_nature，冲销流水本身是反向流水自然计入；
+    不看 status，冲销流水本身是反向流水自然计入；
     返点记录（收入）与分期坏账（支出）由 `order_profit_flow_by_order` 补齐。
     调用方传入的 order_ids 必须已过权限范围。
     """

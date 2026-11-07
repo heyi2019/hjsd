@@ -61,27 +61,6 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
   ],
   FUNDFLOW: [
     { key: "direction", label: "收支方向", type: "SELECT", options: [{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }] },
-    { key: "fund_nature", label: "资金性质", type: "SELECT", options: [{ value: "BUSINESS", label: "本方经营" }, { value: "EXTERNAL", label: "外部/受托" }, { value: "INTERNAL", label: "内部调拨" }] },
-    {
-      key: "accounting_attribute",
-      label: "核算属性",
-      type: "SELECT",
-      options: [
-        { value: "SELF_REVENUE", label: "自营收入" },
-        { value: "SELF_DIRECT_COST", label: "自营直接成本" },
-        { value: "TH_DIRECT_COST", label: "提号/代挂直接成本" },
-        { value: "TH_REVENUE", label: "提号/代挂收入" },
-        { value: "SERVICE_REVENUE", label: "增值服务收入" },
-        { value: "ADDITIONAL_INCOME", label: "附加收入" },
-        { value: "ADDITIONAL_EXPENSE", label: "附加支出" },
-        { value: "OPERATING_EXPENSE", label: "运营费用" },
-        { value: "DEPOSIT", label: "押金/保证金" },
-        { value: "EXTERNAL_FUNDING", label: "外部资金" },
-        { value: "INTERNAL_TRANSFER", label: "内部调拨" },
-        { value: "REVERSAL", label: "冲销" },
-        { value: "REFUND", label: "退款" },
-      ],
-    },
   ],
   REBATE: [
     { key: "rebate_type", label: "返点类型", type: "SELECT", options: [{ value: "BUY", label: "买号返点" }, { value: "SELL", label: "卖号返点" }] },
@@ -156,12 +135,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   ] },
   { code: "FUND_FLOW_STATUS", label: "流水状态", group: "FUND", editable: false, options: [
     { value: "APPROVED", label: "已入账" },
-  ] },
-  { code: "FUND_FLOW_FUND_NATURE", label: "流水资金性质", group: "FUND", editable: false, options: [
-    { value: "BUSINESS", label: "本方经营" }, { value: "EXTERNAL", label: "外部/受托" }, { value: "INTERNAL", label: "内部调拨" },
-  ] },
-  { code: "FUND_FLOW_ACCOUNTING_ATTRIBUTE", label: "流水核算属性", group: "FUND", editable: false, options: [
-    { value: "SELF_REVENUE", label: "自营收入" }, { value: "SELF_DIRECT_COST", label: "自营直接成本" }, { value: "TH_DIRECT_COST", label: "提号/代挂直接成本" }, { value: "TH_REVENUE", label: "提号/代挂收入" }, { value: "SERVICE_REVENUE", label: "增值服务收入" }, { value: "ADDITIONAL_INCOME", label: "附加收入" }, { value: "ADDITIONAL_EXPENSE", label: "附加支出" }, { value: "OPERATING_EXPENSE", label: "运营费用" }, { value: "DEPOSIT", label: "押金/保证金" }, { value: "EXTERNAL_FUNDING", label: "外部资金" }, { value: "INTERNAL_TRANSFER", label: "内部调拨" }, { value: "REVERSAL", label: "冲销" }, { value: "REFUND", label: "退款" },
   ] },
   /* ── 0008 补种：客户 / 订单 / 分期 / 导入 / 规则 / 质量 / 资金 / 系统 ── */
   { code: "CUSTOMER_STATUS", label: "客户状态", group: "CUSTOMER", editable: false, options: [
@@ -249,14 +222,8 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "POOL_OWNERSHIP", label: "资金池归属", group: "FUND", editable: false, options: [
     { value: "OWNED", label: "自有" }, { value: "CUSTODY", label: "代管" }, { value: "THIRD_PART", label: "第三方" },
   ] },
-  { code: "CAPITAL_TYPE", label: "资金性质", group: "ORDER", editable: false, options: [
-    { value: "STOCK", label: "库存型" }, { value: "ZERO", label: "零本金型" },
-  ] },
   { code: "ROUTE_PORTION", label: "资金份额", group: "ORDER", editable: false, options: [
     { value: "PRINCIPAL", label: "本金" }, { value: "PROFIT", label: "利润" }, { value: "GROSS", label: "总额" },
-  ] },
-  { code: "ROUTE_FUND_NATURE", label: "路由资金性质", group: "ORDER", editable: false, options: [
-    { value: "BUSINESS", label: "本方经营" }, { value: "EXTERNAL", label: "外部/受托" }, { value: "INTERNAL", label: "内部调拨" },
   ] },
   { code: "COMMISSION_PAYER", label: "佣金承担方", group: "ORDER", editable: false, options: [
     { value: "BUYER", label: "买方" }, { value: "CONSIGNOR", label: "寄售方" }, { value: "PLATFORM", label: "平台" },
@@ -403,12 +370,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "DELIVER", label: "交付" },
     { value: "CANCEL", label: "取消" },
     { value: "REFUND", label: "退款" },
-  ] },
-  { code: "CASHFLOW_NATURE", label: "资金流向", group: "FUND", editable: false, options: [
-    { value: "EXTERNAL_IN", label: "外部流入" },
-    { value: "BUSINESS_IN", label: "本方流入" },
-    { value: "BUSINESS_OUT", label: "本方流出" },
-    { value: "INTERNAL", label: "内部调拨" },
   ] },
   { code: "DELIVERY_MODE", label: "交付方式", group: "ORDER", editable: false, options: [
     { value: "PLATFORM_OPERATOR", label: "平台/本方操作换绑" },

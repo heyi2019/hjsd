@@ -7,9 +7,8 @@ import { DashboardPage } from "@/app/DashboardPage";
 
 import * as catalog from "@/shared/api/catalog";
 import { seedOrderFormFields } from "@fixtures/formFieldsSeed";
-/** 2026-10-13：工作台数据总览（资金池/统计/入口卡）已迁至「经营中心 · 数据中心」
- *  （用例见 reporting/DataCenterPanel.test.tsx）。本文件只覆盖瘦身后的工作台：
- *  纯动作入口——新建业务卡 + 登记弹窗，以及「数据已迁走」的回归断言。 */
+/** 工作台只保留当前用户的动作入口与个人业务摘要：
+ *  纯动作入口——新建业务卡 + 登记弹窗，以及工作台个人摘要的回归断言。 */
 
 vi.mock("@/shared/api/catalog")
 

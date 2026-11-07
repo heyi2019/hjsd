@@ -1,5 +1,9 @@
-import { Card, Descriptions, Typography } from "antd";
-import type { ReactNode } from "react";
+import { Card, Descriptions, Input, Space, Typography } from "antd";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { optionSetsApi } from "../../shared/api/catalog";
+import { useSession } from "../../shared/state/session";
+import { appMessage } from "../../shared/ui/appFeedback";
+import { PermissionButton } from "../../shared/ui";
 import "./BusinessDictionaryPanel.css";
 
 /** 二级条目行：一级条目占多行，每行「加粗名称 + 说明」，不用卡片。 */
@@ -43,8 +47,61 @@ function EntryGroup({ title, children, stacked = false }: { title: string; child
 }
 
 export function BusinessDictionaryPanel() {
+  const { can } = useSession();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [savedContent, setSavedContent] = useState<string | null>(null);
+  const [remoteExists, setRemoteExists] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    void Promise.resolve(optionSetsApi.get("BUSINESS_DICTIONARY")).then((item) => {
+      if (!mounted || !item) return;
+      setRemoteExists(true);
+      if (item.description?.trim()) setSavedContent(item.description);
+    }).catch(() => undefined);
+    return () => { mounted = false; };
+  }, []);
+
+  const startEditing = () => {
+    setDraft(savedContent ?? contentRef.current?.textContent?.trim() ?? "");
+    setEditing(true);
+  };
+
+  const save = async () => {
+    const description = draft.trim();
+    if (!description) {
+      appMessage.error("业务字典内容不能为空");
+      return;
+    }
+    const payload = { label: "业务字典", group: "OPS", editable: true, options: [], description };
+    try {
+      if (remoteExists) await optionSetsApi.update("BUSINESS_DICTIONARY", payload);
+      else await optionSetsApi.create({ code: "BUSINESS_DICTIONARY", ...payload });
+      setRemoteExists(true);
+      setSavedContent(description);
+      setEditing(false);
+      appMessage.success("业务字典已保存，所有用户可见");
+    } catch (error) {
+      appMessage.error(`业务字典保存失败：${String(error)}`);
+    }
+  };
+
+  const actions = editing ? (
+    <Space>
+      <PermissionButton permission="option-set.manage" onClick={() => setEditing(false)}>返回</PermissionButton>
+      <PermissionButton permission="option-set.manage" type="primary" onClick={() => void save()}>保存</PermissionButton>
+    </Space>
+  ) : can("option-set.manage") ? (
+    <PermissionButton permission="option-set.manage" onClick={startEditing}>编辑</PermissionButton>
+  ) : null;
+
   return (
-    <Card className="glass business-dictionary" title="业务分类口径">
+    <Card className="glass business-dictionary" title="业务分类口径" extra={actions}>
+      {editing ? <Input.TextArea aria-label="业务字典内容" value={draft} onChange={(event) => setDraft(event.target.value)} autoSize={{ minRows: 18 }} /> : null}
+      {!editing && savedContent ? <Typography.Paragraph className="business-dictionary__saved-content">{savedContent}</Typography.Paragraph> : null}
+      {!editing && !savedContent ? <div ref={contentRef}>
       <Descriptions bordered size="small" column={1} labelStyle={{ width: 96 }}>
         <Descriptions.Item label="业务">
           <EntryLine name="自营" desc="本方承担资金、库存和利润。" />
@@ -247,6 +304,7 @@ export function BusinessDictionaryPanel() {
           <EntryLine name="取消记录" desc="已取消账号不参与重复入库校验。" />
         </Descriptions.Item>
       </Descriptions>
+      </div> : null}
     </Card>
   );
 }

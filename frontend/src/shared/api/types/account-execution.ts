@@ -10,7 +10,6 @@ export interface AccountExecutionCashflow {
   occurred_on: string;
   occurred_at?: string | null;
   direction: string;
-  nature: string;
   category: string;
   amount: string;
   note?: string | null;

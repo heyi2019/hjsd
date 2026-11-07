@@ -2,7 +2,7 @@
 
 规则：
 - 导出列 = 该报表对应 `RPT_*` 作用域的可见列，顺序与界面一致；
-- 表头用注册表中文名，不再是英文键（此前导出的表头是 order_no / fund_nature 这类键名）；
+- 表头用注册表中文名，不再是英文键；
 - 「已登记但被隐藏」的列一律不导 —— 隐藏列不能以英文键回填成新列；
 - 唯一例外：**完全未登记**的键（如合计行独有字段）追加末尾，避免合计信息丢失；
 - 枚举列的值按 `option_sets` 字典翻成中文（列注册表用 value_set 声明归属），
@@ -43,7 +43,6 @@ def _finance_rows(seeded_db) -> None:
             occurred_on=date(2026, 10, 17),
             direction=direction,
             nature="BUSINESS_IN" if direction == "IN" else "BUSINESS_OUT",
-            fund_nature="BUSINESS",
             accounting_attribute=attribute,
             category="OTHER",
             amount=Decimal(amount),
@@ -148,18 +147,17 @@ def test_export_endpoint_uses_visible_chinese_columns(seeded_db, seeded_client, 
     assert exported.status_code == 200, exported.text
     header = _header(exported.content.decode("utf-8-sig"))
     assert header[0] == "row_type"
-    assert "资金性质" in header
+    assert "核算属性" in header
     assert "发生额" in header
     assert "fund_nature" not in header
 
     # 隐藏两列后再导出：中文表头消失，且不会以英文键回填
-    _set_visibility(seeded_client, headers, "RPT_FINANCE_DIM", {"fund_nature", "accounting_attribute"})
+    _set_visibility(seeded_client, headers, "RPT_FINANCE_DIM", {"accounting_attribute"})
     again = seeded_client.get(
         "/api/v1/reports/finance-dimensions/export.csv", headers=headers
     )
     assert again.status_code == 200, again.text
     trimmed = _header(again.content.decode("utf-8-sig"))
-    assert "资金性质" not in trimmed
     assert "核算属性" not in trimmed
     assert "fund_nature" not in trimmed
     assert "accounting_attribute" not in trimmed
@@ -206,11 +204,6 @@ def _seed_option_sets(seeded_db) -> None:
     正式库由 0001 基线播种 57 组，导出时现查该表，无需这段代码。
     """
     sets = {
-        "FUND_FLOW_FUND_NATURE": [
-            {"value": "BUSINESS", "label": "本方经营"},
-            {"value": "EXTERNAL", "label": "外部/受托"},
-            {"value": "INTERNAL", "label": "内部调拨"},
-        ],
         "FUND_FLOW_ACCOUNTING_ATTRIBUTE": [
             {"value": "SELF_REVENUE", "label": "自营收入"},
             {"value": "SELF_DIRECT_COST", "label": "自营直接成本"},
@@ -248,28 +241,28 @@ def test_report_csv_translates_enum_values_and_keeps_row_type():
     """值中文：命中的码翻译，row_type / 金额保持原样。"""
     report = {
         "items": [
-            {"fund_nature": "BUSINESS", "direction": "IN", "status": "COMPLETED", "amount": "100.00"},
-            {"fund_nature": "EXTERNAL", "direction": "OUT", "status": "ACTIVE", "amount": "40.00"},
+            {"accounting_attribute": "SELF_REVENUE", "direction": "IN", "status": "COMPLETED", "amount": "100.00"},
+            {"accounting_attribute": "SELF_DIRECT_COST", "direction": "OUT", "status": "ACTIVE", "amount": "40.00"},
         ],
         "total": None,
     }
     lines = report_csv(
         report,
         columns=[
-            ("fund_nature", "资金性质", True),
+            ("accounting_attribute", "核算属性", True),
             ("direction", "现金方向", True),
             ("status", "状态", True),
             ("amount", "发生额", True),
         ],
         value_labels={
-            "fund_nature": {"BUSINESS": "本方经营", "EXTERNAL": "外部/受托"},
+            "accounting_attribute": {"SELF_REVENUE": "自营收入", "SELF_DIRECT_COST": "自营直接成本"},
             "direction": {"IN": "收入", "OUT": "支出"},
             "status": {"COMPLETED": "已完成", "ACTIVE": "进行中"},
         },
     ).lstrip("\ufeff").splitlines()
-    assert lines[0] == "row_type,资金性质,现金方向,状态,发生额"
-    assert lines[1] == "ITEM,本方经营,收入,已完成,100.00"
-    assert lines[2] == "ITEM,外部/受托,支出,进行中,40.00"
+    assert lines[0] == "row_type,核算属性,现金方向,状态,发生额"
+    assert lines[1] == "ITEM,自营收入,收入,已完成,100.00"
+    assert lines[2] == "ITEM,自营直接成本,支出,进行中,40.00"
 
 
 def _seed_custom_field(seeded_db) -> None:
@@ -370,8 +363,7 @@ def test_get_value_labels_reads_option_sets_table(seeded_db):
     """映射来自 option_sets 表；未声明 value_set 的列 / scope 返回空。"""
     _seed_option_sets(seeded_db)
     labels = lists_service.get_value_labels(seeded_db, "RPT_FINANCE_DIM")
-    assert set(labels) == {"fund_nature", "accounting_attribute", "direction"}
-    assert labels["fund_nature"]["BUSINESS"] == "本方经营"
+    assert set(labels) == {"accounting_attribute", "direction"}
     assert labels["direction"]["IN"] == "收入"
     assert "amount" not in labels
     # 未标注枚举列的 scope 与未知 scope 都不报错
@@ -393,11 +385,9 @@ def test_export_endpoint_translates_enum_values(seeded_db, seeded_client, header
     items = [row for row in rows[1:] if row[0] == "ITEM"]
     assert items, "应至少有明细行"
 
-    natures = {row[idx["资金性质"]] for row in items}
     directions = {row[idx["现金方向"]] for row in items}
     attributes = {row[idx["核算属性"]] for row in items}
-    assert "本方经营" in natures
-    assert "BUSINESS" not in natures
+    assert "资金性质" not in idx
     assert directions <= {"收入", "支出"}
     assert "IN" not in directions
     assert "自营收入" in attributes or "自营直接成本" in attributes

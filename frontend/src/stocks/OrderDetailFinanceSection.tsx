@@ -67,11 +67,12 @@ export function OrderDetailFinanceSection({
       <div className="inventory-detail__meta">
         <InventoryExtraFieldsGroup section="FINANCE" fields={extraFields} />
         <div className="inventory-finance-summary">
-          <div className="inventory-finance-summary__item inventory-finance-summary__item--expense"><span>支出</span><strong>{expenseCount} 笔</strong></div>
+          <div className="inventory-finance-summary__item inventory-finance-summary__item--expense"><span>资金流水支出</span><strong>{expenseCount} 笔</strong></div>
           <div className="inventory-finance-summary__item inventory-finance-summary__item--income"><span>收入</span><strong>{incomeCount} 笔</strong></div>
-          <div className="inventory-finance-summary__item inventory-finance-summary__item--amount"><span>总支出</span><MoneyText value={totalExpense} /></div>
+          <div className="inventory-finance-summary__item inventory-finance-summary__item--amount"><span>总支出（含坏账）</span><MoneyText value={totalExpense} /></div>
           <div className="inventory-finance-summary__item inventory-finance-summary__item--amount"><span>总收入</span><MoneyText value={totalIncome} /></div>
         </div>
+        <Typography.Text type="secondary">总支出含分期坏账，坏账不生成资金流水行</Typography.Text>
         {rows.length ? <DataTable className="inventory-finance-table" columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" /> : null}
         {!rows.length ? <Typography.Text type="secondary">暂无资金明细</Typography.Text> : null}
       </div>

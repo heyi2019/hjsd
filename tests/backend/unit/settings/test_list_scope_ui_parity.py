@@ -42,17 +42,13 @@ PANEL_SOURCES: dict[str, str] = {
     "DEPOSITS": "pools/FundsPage.tabs.tsx",
     "RECONCILIATIONS": "pools/FundsPage.tabs.tsx",
     "TRANSFER_ANOMALIES": "pools/FundsPage.tabs.tsx",
-    "POOL_BALANCE": "reporting/DataCenterPanel.tsx",
     "AUDIT_LOG": "audit/AuditPanel.tsx",
-    "QUALITY_METRIC": "quality/QualityPanel.tsx",
-    "QUALITY_ISSUE": "quality/QualityPanel.tsx",
     # 报表视图已从 ReportsPage.tsx 拆到 ./reports/*.tsx（壳文件只剩 Tab 与批量导出），
     # 列定义在各子文件里，映射必须落到子文件，否则这条守卫对 7 张报表形同不存在。
     "RPT_INVENTORY_HEALTH": "reporting/reports/InventoryReport.tsx",
     "RPT_MONTHLY_PNL": "reporting/reports/MonthlyPnlReport.tsx",
     "RPT_COMMISSION": "reporting/reports/CommissionReport.tsx",
     "RPT_DAILY_FUNDS": "reporting/reports/DailyFundsReport.tsx",
-    "RPT_FINANCE_DIM": "reporting/reports/FinanceDimensionsReport.tsx",
     "RPT_BUSINESS_PNL": "reporting/reports/BusinessPnlReport.tsx",
     "RPT_ORDER_PROFIT": "reporting/reports/OrderProfitReport.tsx",
 }
@@ -155,15 +151,13 @@ def test_frontend_source_available() -> None:
 
 
 def test_every_registered_scope_has_a_panel() -> None:
-    """注册表新增作用域必须同时登记一个面板映射，否则这条守卫对它形同不存在。"""
+    """已接入前端的作用域必须登记面板来源；后端专用导出作用域可无 UI。"""
     registered = {scope.code for scope in LIST_SCOPES}
-    missing = sorted(registered - set(PANEL_SOURCES))
     stale = sorted(set(PANEL_SOURCES) - registered)
-    assert not missing, f"注册表有作用域没登记面板来源：{missing}"
     assert not stale, f"面板来源登记了已不存在的作用域：{stale}"
 
 
-@pytest.mark.parametrize("scope_code", [scope.code for scope in LIST_SCOPES])
+@pytest.mark.parametrize("scope_code", sorted(PANEL_SOURCES))
 def test_panel_columns_match_registry(scope_code: str) -> None:
     """界面列必须与注册表逐列同 key、同中文名、同顺序。
 

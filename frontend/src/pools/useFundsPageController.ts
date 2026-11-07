@@ -19,11 +19,9 @@ import {
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { today } from "../shared/lib/format";
-import { ACCOUNTING_ATTRIBUTE_LABEL } from "../shared/lib/labels";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { ALLOWED_ATTRIBUTES_BY_FUND_NATURE, deriveCashflowNature } from "./FundsPage.fragments";
 
 export function useFundsPageController(active = true) {
   const [pools, setPools] = useState<Pool[]>([]);
@@ -55,18 +53,12 @@ export function useFundsPageController(active = true) {
   const [cashflowStatus, setCashflowStatus] = useState<string | undefined>();
   const [cashflowFrom, setCashflowFrom] = useState("");
   const [cashflowTo, setCashflowTo] = useState("");
-  const [cashflowFundNature, setCashflowFundNature] = useState("");
-  const [cashflowAttribute, setCashflowAttribute] = useState("");
   const [cashflowCategory, setCashflowCategory] = useState("");
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [fundsReady, setFundsReady] = useState(false);
-  // T20：资金流水筛选项从「选项词典」配置读取（方向 / 状态 / 资金性质 / 核算属性）。
+  // 资金流水筛选项从「选项词典」配置读取（方向 / 状态）。
   const flowDirectionOptions = useOptionSet("FUND_FLOW_DIRECTION");
   const flowStatusOptions = useOptionSet("FUND_FLOW_STATUS");
-  const flowFundNatureOptions = useOptionSet("FUND_FLOW_FUND_NATURE");
-  const flowAttributeOptions = useOptionSet("FUND_FLOW_ACCOUNTING_ATTRIBUTE");
-  // 资金流向（nature）从 CASHFLOW_NATURE 词典读取，设置页改文案可同步；词典未加载时回落 NATURE_LABEL。
-  const natureOptionSet = useOptionSet("CASHFLOW_NATURE");
   // 弹窗不会同时打开，故全部写操作后共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
   // L1527-①：全部资金弹窗共用同一 write.error。任一弹窗开/关切换时清除该错误，
@@ -92,11 +84,6 @@ export function useFundsPageController(active = true) {
   const [depositForm] = Form.useForm();
   const [returnForm] = Form.useForm();
   const [cashflowForm] = Form.useForm();
-  const cashflowFormNature = Form.useWatch("fund_nature", cashflowForm) as string | undefined;
-  const cashflowAttributeOptions = (
-    ALLOWED_ATTRIBUTES_BY_FUND_NATURE[cashflowFormNature ?? "BUSINESS"]
-    ?? Object.keys(ACCOUNTING_ATTRIBUTE_LABEL)
-  ).map((value) => ({ value, label: ACCOUNTING_ATTRIBUTE_LABEL[value] ?? value }));
   const [transferForm] = Form.useForm();
   const [reconciliationForm] = Form.useForm();
   const [resolveForm] = Form.useForm();
@@ -116,10 +103,6 @@ export function useFundsPageController(active = true) {
   cashflowDirectionRef.current = cashflowDirection;
   const cashflowStatusRef = useRef(cashflowStatus);
   cashflowStatusRef.current = cashflowStatus;
-  const cashflowFundNatureRef = useRef(cashflowFundNature);
-  cashflowFundNatureRef.current = cashflowFundNature;
-  const cashflowAttributeRef = useRef(cashflowAttribute);
-  cashflowAttributeRef.current = cashflowAttribute;
   const cashflowCategoryRef = useRef(cashflowCategory);
   cashflowCategoryRef.current = cashflowCategory;
 
@@ -135,8 +118,6 @@ export function useFundsPageController(active = true) {
       pool_id: cashflowPoolIdRef.current ?? undefined,
       direction: cashflowDirectionRef.current || undefined,
       status: cashflowStatusRef.current || undefined,
-      fund_nature: cashflowFundNatureRef.current || undefined,
-      accounting_attribute: cashflowAttributeRef.current || undefined,
       category: cashflowCategoryRef.current.trim() || undefined,
       keyword: cashflowKeywordRef.current.trim() || undefined,
       limit: 2000,
@@ -163,8 +144,6 @@ export function useFundsPageController(active = true) {
           pool_id: cashflowPoolIdRef.current ?? undefined,
           direction: cashflowDirectionRef.current || undefined,
           status: cashflowStatusRef.current || undefined,
-          fund_nature: cashflowFundNatureRef.current || undefined,
-          accounting_attribute: cashflowAttributeRef.current || undefined,
           category: cashflowCategoryRef.current.trim() || undefined,
         }),
         `资金流水-${today()}.csv`,
@@ -273,20 +252,18 @@ export function useFundsPageController(active = true) {
 
   const submitCashflow = async (values: Record<string, unknown>) => {
     await write.run(async () => {
-      const fundNature = String(values.fund_nature ?? "BUSINESS");
       const direction = String(values.direction ?? "IN");
+      const category = String(values.category ?? "OTHER");
       await cashflowsApi.create({
         pool_id: Number(values.pool_id),
         occurred_on: values.occurred_on as string,
         direction,
-        nature: deriveCashflowNature(fundNature, direction),
-        fund_nature: fundNature,
-        accounting_attribute: String(values.accounting_attribute ?? "OPERATING_EXPENSE"),
-        category: values.category as string,
+        category,
         amount: values.amount as string,
+        order_id: values.order_id ? Number(values.order_id) : undefined,
         note: values.note as string,
       });
-      appMessage.success("独立资金流水已提交，已入账");
+      appMessage.success("资金流水已提交，已入账");
       setCashflowOpen(false);
       cashflowForm.resetFields();
       await load();
@@ -490,18 +467,10 @@ export function useFundsPageController(active = true) {
     setCashflowFrom,
     cashflowTo,
     setCashflowTo,
-    cashflowFundNature,
-    setCashflowFundNature,
-    cashflowAttribute,
-    setCashflowAttribute,
     cashflowCategory,
     setCashflowCategory,
     flowDirectionOptions,
     flowStatusOptions,
-    flowFundNatureOptions,
-    flowAttributeOptions,
-    natureOptionSet,
-    cashflowAttributeOptions,
     depositForm,
     returnForm,
     cashflowForm,

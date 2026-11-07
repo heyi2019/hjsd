@@ -17,7 +17,6 @@ from sqlalchemy.orm import Session
 from app.domain.enums import (
     CashflowStatus,
     Direction,
-    Nature,
 )
 from app.domain.trade import (
     Cashflow,
@@ -45,7 +44,7 @@ def daily_funds_report(
     pools = session.scalars(pool_stmt).all()
     ids = [pool.id for pool in pools]
 
-    # 逐池标量查询改为一次分组聚合：期初按池累计有符号和，当日按 (方向, 性质) 分箱。
+    # 逐池标量查询改为一次分组聚合：期初按池累计有符号和，当日按方向与类别分箱。
     opening_by_pool: dict[int, Decimal] = {}
     day_cells: dict[int, dict[tuple[str, str], Decimal]] = {}
     deposit_paid_by_pool: dict[int, Decimal] = {}
@@ -71,11 +70,11 @@ def daily_funds_report(
             .group_by(Cashflow.pool_id)
         ):
             opening_by_pool[pool_id] = _money(amount)
-        for pool_id, direction, nature, amount in session.execute(
+        for pool_id, direction, category, amount in session.execute(
             select(
                 Cashflow.pool_id,
                 Cashflow.direction,
-                Cashflow.nature,
+                Cashflow.category,
                 func.coalesce(func.sum(Cashflow.amount), 0),
             )
             .where(
@@ -83,9 +82,9 @@ def daily_funds_report(
                 Cashflow.occurred_on == target,
                 Cashflow.status == CashflowStatus.APPROVED.value,
             )
-            .group_by(Cashflow.pool_id, Cashflow.direction, Cashflow.nature)
+            .group_by(Cashflow.pool_id, Cashflow.direction, Cashflow.category)
         ):
-            day_cells.setdefault(pool_id, {})[(direction, nature)] = _money(amount)
+            day_cells.setdefault(pool_id, {})[(direction, category)] = _money(amount)
         for pool_id, amount in session.execute(
             select(Deposit.pool_id, func.coalesce(func.sum(Deposit.paid_amount), 0))
             .where(Deposit.pool_id.in_(ids), Deposit.paid_on == target)
@@ -106,18 +105,10 @@ def daily_funds_report(
                 "pool_code": pool.code,
                 "pool_name": pool.name,
                 "opening": opening_by_pool.get(pool.id, ZERO),
-                "income": bucket.get(
-                    (Direction.IN.value, Nature.BUSINESS_IN.value), ZERO
-                ),
-                "expense": bucket.get(
-                    (Direction.OUT.value, Nature.BUSINESS_OUT.value), ZERO
-                ),
-                "transfer_in": bucket.get(
-                    (Direction.IN.value, Nature.INTERNAL.value), ZERO
-                ),
-                "transfer_out": bucket.get(
-                    (Direction.OUT.value, Nature.INTERNAL.value), ZERO
-                ),
+                "income": sum((amount for (direction, category), amount in bucket.items() if direction == Direction.IN.value and category != "TRANSFER"), ZERO),
+                "expense": sum((amount for (direction, category), amount in bucket.items() if direction == Direction.OUT.value and category != "TRANSFER"), ZERO),
+                "transfer_in": bucket.get((Direction.IN.value, "TRANSFER"), ZERO),
+                "transfer_out": bucket.get((Direction.OUT.value, "TRANSFER"), ZERO),
                 "deposit_paid": deposit_paid_by_pool.get(pool.id, ZERO),
                 "deposit_held": balance["deposit_held"],
                 "cash_balance": balance["cash_balance"],

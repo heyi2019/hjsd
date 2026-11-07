@@ -1,10 +1,10 @@
 import { api } from "./client";
-import type { EventPostResult, FormScope, ListColumnConfig, ListCustomFieldOption, ListScopeConfig, Order, OrderFormField, OrderLink, OrderType, OrderTypeRoute, PageResponse, RouteImpactPreview, SearchResult } from "./types";
+import type { EventPostResult, FormScope, ListColumnConfig, ListCustomFieldOption, ListScopeConfig, Order, OrderFormField, OrderLink, OrderType, OrderTypeRoute, PageResponse, RouteImpactPreview } from "./types";
 
 export const orderTypesApi = {
   update: (id: number, data: Partial<OrderType>) => api.patch<OrderType>(`/order-types/${id}`, data).then(r => r.data),
   setActive: (id: number, is_active: boolean) => api.patch<OrderType>(`/order-types/${id}/active`, {is_active}).then(r => r.data),
-  impactPreview: (code: string, portion: string, pool_code: string, fund_nature?: string) => api.get<RouteImpactPreview>(`/order-types/${code}/routes/impact-preview`, {params: {portion, pool_code, fund_nature}}).then(r => r.data),
+  impactPreview: (code: string, portion: string, pool_code: string) => api.get<RouteImpactPreview>(`/order-types/${code}/routes/impact-preview`, {params: {portion, pool_code}}).then(r => r.data),
   list: () => api.get<OrderType[]>("/order-types").then((r) => r.data),
   create: (payload: Partial<OrderType>) =>
     api.post<OrderType>("/order-types", payload).then((r) => r.data),
@@ -12,11 +12,10 @@ export const orderTypesApi = {
     api.get<OrderTypeRoute[]>(`/order-types/${orderTypeId}/routes`).then((r) => r.data),
   setRoute: (
     code: string,
-    payload: { portion: string; pool_code: string; fund_nature?: string | null; priority?: number },
+    payload: { portion: string; pool_code: string; priority?: number },
   ) =>
     api.post<OrderTypeRoute>(`/order-types/${code}/routes`, payload).then((r) => r.data),
 };
-
 /** 订单编辑入参（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
 export interface OrderPatchPayload {
   trade_date?: string;
@@ -114,7 +113,6 @@ export const ordersApi = {
     /** 后端判重：同账号已有「已售出」记录时，用户确认复购回流后置 true 放行。 */
     confirm_repurchase?: boolean;
     owner_id?: number;
-    capital_type?: string;
     note?: string;
     /** 佣金口径：仅 DG 代挂单可用，两者必须同时填写或同时留空。 */
     commission_mode?: string;
@@ -257,5 +255,3 @@ export const listColumnsApi = {
       )
       .then((r) => r.data),
 };
-
-export const searchApi = { query: (q: string) => api.get<{ items: SearchResult[] }>("/search", { params: { q } }).then(r => r.data) };

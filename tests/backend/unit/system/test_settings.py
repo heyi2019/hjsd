@@ -199,10 +199,9 @@ def test_alembic_url_equals_database_url():
 
 
 def test_sqlite_is_no_longer_supported():
-    """残留的 SQLite 配置不再有专属处理路径：没有 sqlite_file / sqlalchemy_url。"""
-    settings = Settings(database_url="sqlite:///./data/probe.db", _env_file=None)
-    assert not hasattr(settings, "sqlite_file")
-    assert not hasattr(settings, "sqlalchemy_url")
+    """SQLite 连接串在配置层直接拒绝。"""
+    with pytest.raises(ValidationError, match="必须使用 PostgreSQL"):
+        Settings(database_url="sqlite:///./data/probe.db", _env_file=None)
 
 
 def test_describe_does_not_leak_secret():

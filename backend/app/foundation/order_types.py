@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.numbering import ensure_sequence
-from app.domain.enums import AuditAction, CapitalType, FundNature, PoolStatus, Portion
+from app.domain.enums import AuditAction, PoolStatus, Portion
 from app.domain.foundation import OrderTypeDef, OrderTypePool, Pool
 from app.domain.trade import Cashflow, Order, OrderEvent
 from ._common import SEQUENCE_PREFIX_PATTERN, _get_order_type_or_404, _non_negative_int, _normalize_code, _required_bool, _required_name, _snapshot
@@ -29,7 +29,6 @@ def create_order_type(
     *,
     code: str,
     name: str,
-    capital_type: str,
     actor: str,
     sequence_prefix: str | None = None,
     sort_order: int = 0,
@@ -38,11 +37,6 @@ def create_order_type(
     """BAS-02-02：新增业务只需建一行主数据，不改代码、不改表。"""
     normalized = _normalize_code(code, field_name="code")
     normalized_name = _required_name(name, field="name")
-    if capital_type not in CapitalType.values():
-        raise Validation(
-            "capital_type 取值非法",
-            details={"capital_type": capital_type, "allowed": CapitalType.values()},
-        )
     sort_order = _non_negative_int(sort_order, field="sort_order")
     if sort_order < 0:
         raise Validation(
@@ -75,7 +69,6 @@ def create_order_type(
     order_type = OrderTypeDef(
         code=normalized,
         name=normalized_name,
-        capital_type=capital_type,
         sequence_prefix=prefix,
         sequence_key=sequence_key,
         is_active=False,  # BAS-02-02：启用前必须配置资金路由
@@ -93,7 +86,7 @@ def create_order_type(
         entity_type="OrderTypeDef",
         entity_id=order_type.id,
         actor=actor,
-        after=_snapshot(order_type, ("code", "name", "capital_type", "sequence_prefix")),
+        after=_snapshot(order_type, ("code", "name", "sequence_prefix")),
     )
     return order_type
 def update_order_type(
@@ -105,7 +98,7 @@ def update_order_type(
     description: str | None = None,
     sort_order: int | None = None,
 ) -> OrderTypeDef:
-    """BAS-02-03：code / capital_type / 编号前缀一旦使用即不可改。"""
+    """BAS-02-03：code / 编号前缀一旦使用即不可改。"""
     order_type = _get_order_type_or_404(session, order_type_id)
     if sort_order is not None:
         sort_order = _non_negative_int(sort_order, field="sort_order")
@@ -174,7 +167,7 @@ def set_order_type_active(
 # ------------------------------------------------------------------- 资金路由
 def list_routes(session: Session, *, order_type_id: int | None = None) -> list[OrderTypePool]:
     stmt = select(OrderTypePool).order_by(
-        OrderTypePool.order_type_id, OrderTypePool.portion, OrderTypePool.fund_nature
+        OrderTypePool.order_type_id, OrderTypePool.portion
     )
     if order_type_id is not None:
         stmt = stmt.where(OrderTypePool.order_type_id == order_type_id)
@@ -186,20 +179,14 @@ def set_route(
     portion: str,
     pool_code: str,
     actor: str,
-    fund_nature: str | None = None,
     priority: int = 0,
     is_active: bool = True,
 ) -> OrderTypePool:
-    """BAS-03-02：同一业务、份额和资金性质仅保留一条默认路由。"""
+    """BAS-03-02：同一业务和份额仅保留一条默认路由。"""
     is_active = _required_bool(is_active, field="is_active")
     if portion not in Portion.values():
         raise Validation(
             "portion 取值非法", details={"portion": portion, "allowed": Portion.values()}
-        )
-    if fund_nature is not None and fund_nature not in FundNature.values():
-        raise Validation(
-            "fund_nature 取值非法",
-            details={"fund_nature": fund_nature, "allowed": FundNature.values()},
         )
     priority = _non_negative_int(priority, field="priority")
     if priority < 0:
@@ -219,7 +206,6 @@ def set_route(
         select(OrderTypePool).where(
             OrderTypePool.order_type_id == order_type.id,
             OrderTypePool.portion == portion,
-            OrderTypePool.fund_nature == fund_nature,
         )
     )
     before = None
@@ -228,7 +214,6 @@ def set_route(
             order_type_id=order_type.id,
             pool_id=pool.id,
             portion=portion,
-            fund_nature=fund_nature,
             priority=priority,
             is_active=is_active,
         )
@@ -247,7 +232,7 @@ def set_route(
         actor=actor,
         before=before,
         after=_snapshot(route, ("pool_id", "priority", "is_active")),
-        reason=f"{order_type.code}/{portion}/{fund_nature or '*'} -> {pool.code}",
+        reason=f"{order_type.code}/{portion} -> {pool.code}",
     )
     return route
 def route_impact_preview(
@@ -256,17 +241,11 @@ def route_impact_preview(
     order_type_code: str,
     portion: str,
     pool_code: str,
-    fund_nature: str | None = None,
 ) -> dict[str, Any]:
     """预览路由变更影响；只读，不改写历史订单或流水。"""
     if portion not in Portion.values():
         raise Validation(
             "portion 取值非法", details={"portion": portion, "allowed": Portion.values()}
-        )
-    if fund_nature is not None and fund_nature not in FundNature.values():
-        raise Validation(
-            "fund_nature 取值非法",
-            details={"fund_nature": fund_nature, "allowed": FundNature.values()},
         )
     order_type = require_order_type_by_code(session, order_type_code)
     pool = require_pool_by_code(session, pool_code)
@@ -277,7 +256,7 @@ def route_impact_preview(
             details={"pool_code": pool.code},
         )
     current = _find_route(
-        session, order_type.id, portion, fund_nature=fund_nature, active_only=False
+        session, order_type.id, portion, active_only=False
     )
     order_ids = list(
         session.scalars(
@@ -301,7 +280,6 @@ def route_impact_preview(
     return {
         "order_type": order_type.code,
         "portion": portion,
-        "fund_nature": fund_nature,
         "current_route": {
             "pool_code": current.pool.code,
             "pool_name": current.pool.name,
@@ -327,23 +305,17 @@ def resolve_default_pool(
     session: Session,
     order_type_code: str,
     portion: str,
-    fund_nature: str | None = None,
 ) -> Pool | None:
-    """读取默认资金池；资金性质路由优先，未配置时回退兼容旧份额路由。"""
+    """读取默认资金池。"""
     if portion not in Portion.values():
         raise Validation(
             "portion 取值非法", details={"portion": portion, "allowed": Portion.values()}
-        )
-    if fund_nature is not None and fund_nature not in FundNature.values():
-        raise Validation(
-            "fund_nature 取值非法",
-            details={"fund_nature": fund_nature, "allowed": FundNature.values()},
         )
     order_type = get_order_type_by_code(session, order_type_code)
     if order_type is None:
         raise NotFound("业务类型不存在", details={"order_type_code": order_type_code})
     route = _find_route(
-        session, order_type.id, portion, fund_nature=fund_nature, active_only=True
+        session, order_type.id, portion, active_only=True
     )
     if route is None:
         return None
@@ -352,18 +324,16 @@ def require_default_pool(
     session: Session,
     order_type_code: str,
     portion: str,
-    fund_nature: str | None = None,
 ) -> Pool:
     """路由优先级：显式池 > 业务默认路由 > 报错（PRD §1.3）。"""
-    pool = resolve_default_pool(session, order_type_code, portion, fund_nature=fund_nature)
+    pool = resolve_default_pool(session, order_type_code, portion)
     if pool is None:
         raise Validation(
-            f"业务 {order_type_code} 未配置 {portion}/{fund_nature or '*'} 资金池",
+            f"业务 {order_type_code} 未配置 {portion} 资金池",
             code=ErrorCode.POOL_ROUTE_MISSING,
             details={
                 "order_type": order_type_code,
                 "portion": portion,
-                "fund_nature": fund_nature,
             },
         )
     if pool.status != PoolStatus.ACTIVE.value:
@@ -380,28 +350,15 @@ def _find_route(
     order_type_id: int,
     portion: str,
     *,
-    fund_nature: str | None,
     active_only: bool,
 ) -> OrderTypePool | None:
-    """按资金性质优先查找路由，随后回退到旧版仅按份额的路由。"""
+    """按业务和份额查找路由。"""
     base = [
         OrderTypePool.order_type_id == order_type_id,
         OrderTypePool.portion == portion,
     ]
     if active_only:
         base.append(OrderTypePool.is_active.is_(True))
-    if fund_nature is not None:
-        route = session.scalar(
-            select(OrderTypePool).where(
-                *base,
-                OrderTypePool.fund_nature == fund_nature,
-            )
-        )
-        if route is not None:
-            return route
     return session.scalar(
-        select(OrderTypePool).where(
-            *base,
-            OrderTypePool.fund_nature.is_(None),
-        )
+        select(OrderTypePool).where(*base)
     )

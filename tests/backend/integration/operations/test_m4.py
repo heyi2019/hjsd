@@ -1,6 +1,6 @@
-"""REPORT-01 M4：R1-R5 报表 / 审计查询 / P2 导入。
+"""REPORT-01 M4：R1-R5 报表 / 审计查询。
 
-功能编号：RPT-01-01~06、MIG-01-01~08、BAS-05-03
+功能编号：RPT-01-01~06、BAS-05-03
 """
 from __future__ import annotations
 
@@ -8,12 +8,11 @@ from datetime import date
 
 import pytest
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
 
 from app.stocks import service as stocks_service
 from app.domain.enums import ImportRowStatus
-from app.domain.imports import ImportBatch, ImportRow
-from app.imports import service as import_service
+from app.legacy_imports import service as import_service
+from app.legacy_imports.models import ImportBatch, ImportRow
 from app.orders import service as order_service
 from app.reporting import service as reporting_service
 
@@ -103,102 +102,6 @@ class TestReports:
         assert data["total"]["order_count"] == len(data["items"])
 
 
-# --------------------------------------------------------------------- 导入
-class TestImport:
-    def test_import_rows_have_unique_positive_row_numbers_in_database(self, seeded_db):
-        batch = import_service.create_batch(
-            seeded_db, source_name="rows.xlsx", rows=[{"value": 1}], actor="pytest"
-        )
-        seeded_db.add(
-            ImportRow(
-                batch_id=batch["id"],
-                row_no=1,
-                raw={"duplicate": True},
-                status=ImportRowStatus.UNMAPPED.value,
-            )
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
-        batch = import_service.create_batch(
-            seeded_db, source_name="rows-2.xlsx", rows=[{"value": 1}], actor="pytest"
-        )
-        seeded_db.add(
-            ImportRow(
-                batch_id=batch["id"],
-                row_no=0,
-                raw={"invalid": True},
-                status=ImportRowStatus.UNMAPPED.value,
-            )
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
-    def test_no_auto_matching_on_create(self, seeded_db):
-        batch = import_service.create_batch(
-            seeded_db,
-            source_name="source-orders.xlsx",
-            rows=[{"order_no": "OLD-1", "amount": "100"}, {"order_no": "OLD-2"}],
-            actor="pytest",
-        )
-        assert batch["unmapped_count"] == 2
-        rows = import_service.list_rows(seeded_db, batch["id"])
-        assert all(r["mapped_order_id"] is None for r in rows)
-        assert all(r["status"] == ImportRowStatus.UNMAPPED.value for r in rows)
-
-    def test_manual_mapping_then_commit(self, seeded_db):
-        from datetime import date
-
-        order = order_service.create_order(
-            seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest"
-        )
-        batch = import_service.create_batch(
-            seeded_db, source_name="source.xlsx", rows=[{"order_no": "OLD-9"}], actor="pytest"
-        )
-        row = import_service.list_rows(seeded_db, batch["id"])[0]
-        mapped = import_service.assign_mapping(
-            seeded_db, row["id"], order_id=order.id, basis="对账单第 9 行", actor="pytest"
-        )
-        assert mapped["status"] == ImportRowStatus.MAPPED.value
-
-        committed = import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
-        assert committed["imported"] == 1
-        assert committed["unmapped"] == 0
-
-    def test_unmapped_rows_stay_unmapped_not_business_data(self, seeded_db):
-        from sqlalchemy import select
-
-        from app.domain.trade import Cashflow, OrderEvent
-
-        before_flows = len(seeded_db.scalars(select(Cashflow)).all())
-        before_events = len(seeded_db.scalars(select(OrderEvent)).all())
-
-        batch = import_service.create_batch(
-            seeded_db, source_name="source.xlsx", rows=[{"x": 1}, {"y": 2}], actor="pytest"
-        )
-        committed = import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
-        assert committed["unmapped"] == 2
-
-        # 红线：导入不写任何业务数据，不补造划转
-        assert len(seeded_db.scalars(select(Cashflow)).all()) == before_flows
-        assert len(seeded_db.scalars(select(OrderEvent)).all()) == before_events
-
-        # 未映射行保持 UNMAPPED 并在 issue_note 留痕，可见但不阻塞新业务
-        rows = import_service.list_rows(seeded_db, batch["id"])
-        assert all(r["status"] == ImportRowStatus.UNMAPPED.value for r in rows)
-        assert all(r["issue_note"] for r in rows)
-
-    def test_commit_is_not_repeatable(self, seeded_db):
-        batch = import_service.create_batch(
-            seeded_db, source_name="source.xlsx", rows=[{"x": 1}], actor="pytest"
-        )
-        import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
-        with pytest.raises(Exception):
-            import_service.commit_batch(seeded_db, batch["id"], actor="pytest")
-
-
 # --------------------------------------------------------------------- API 层
 class TestM4Api:
     def test_reports_endpoints_require_permission(self, seeded_client, viewer_headers):
@@ -218,28 +121,10 @@ class TestM4Api:
         assert response.status_code == 200
         assert "items" in response.json()
 
-    def test_import_endpoints(self, seeded_client, headers):
-        created = seeded_client.post(
-            "/api/v1/imports/batches",
-            json={"source_name": "api-import.xlsx", "rows": [{"a": 1}]},
-            headers=headers,
-        )
-        assert created.status_code == 200
-        batch_id = created.json()["id"]
-        assert seeded_client.get(f"/api/v1/imports/batches/{batch_id}/rows", headers=headers).status_code == 200
-        assert (
-            seeded_client.post(
-                f"/api/v1/imports/batches/{batch_id}/commit", headers=headers
-            ).status_code
-            == 200
-        )
 
 
 class TestImportClosure:
-    """MIG-01 补齐验收：预览 / 对账 / 回滚 / 更正 / 补录依据 / UNLINKED 标记。
-
-    红线复验：全流程**不得写入任何 cashflow**，导入行只作参考。
-    """
+    """MIG-01 历史导入校验；在线导入 API 已下线。"""
 
     @staticmethod
     def _source_rows() -> list[dict[str, object]]:

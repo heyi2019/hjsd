@@ -43,8 +43,8 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     saveInline,
     cancelInlineEdit,
     openPartyCard,
-    timeShiftDays,
-    setTimeShiftDays,
+    timeSet,
+    setTimeField,
   } = controller;
 
   return (
@@ -130,8 +130,8 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
               onSave={saveInline}
               onCancel={cancelInlineEdit}
               saving={savingAccount}
-              timeShiftDays={timeShiftDays}
-              onTimeShift={setTimeShiftDays}
+              timeSet={timeSet}
+              onTimeSet={setTimeField}
             />
           ),
           expandRowByClick: true,

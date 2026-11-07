@@ -8,11 +8,6 @@ export const ORDER_TYPE_LABEL: Record<string, string> = {
   DG: "代挂",
 };
 
-export const CAPITAL_TYPE_LABEL: Record<string, string> = {
-  STOCK: "库存型",
-  ZERO: "零本金型",
-};
-
 export const BUSINESS_MODE_LABEL: Record<string, string> = {
   SELF: "自营",
   DISTRIBUTION: "分销",
@@ -92,7 +87,6 @@ export const PERMISSION_LABEL: Record<string, string> = {
   "option-set.manage": "管理选项词典",
   "report.read": "查看报表",
   "report.export": "导出报表",
-  "import.manage": "管理导入",
   "user.manage": "管理用户",
 };
 
@@ -127,37 +121,6 @@ export function orderTypeLabel(code: string | null | undefined, names?: Record<s
   return names?.[code] ?? ORDER_TYPE_LABEL[code] ?? code;
 }
 
-/** 资金流向（Nature 四值）：与 backend/app/domain/enums.py Nature 一致。 */
-export const NATURE_LABEL: Record<string, string> = {
-  EXTERNAL_IN: "外部流入",
-  BUSINESS_IN: "本方流入",
-  BUSINESS_OUT: "本方流出",
-  INTERNAL: "内部调拨",
-};
-
-/** 资金所有权性质（FundNature 三值）：与 backend/app/domain/enums.py FundNature 一致。 */
-export const FUND_NATURE_LABEL: Record<string, string> = {
-  BUSINESS: "本方经营",
-  EXTERNAL: "外部/受托",
-  INTERNAL: "内部调拨",
-};
-
-/** 核算属性（AccountingAttribute 13 值）：与 backend/app/domain/enums.py AccountingAttribute 一致。 */
-export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
-  SELF_REVENUE: "自营收入",
-  SELF_DIRECT_COST: "自营直接成本",
-  TH_DIRECT_COST: "提号/代挂直接成本",
-  TH_REVENUE: "提号/代挂收入",
-  SERVICE_REVENUE: "增值服务收入",
-  ADDITIONAL_INCOME: "附加收入",
-  ADDITIONAL_EXPENSE: "附加支出",
-  OPERATING_EXPENSE: "运营费用",
-  DEPOSIT: "押金/保证金",
-  EXTERNAL_FUNDING: "外部资金",
-  INTERNAL_TRANSFER: "内部调拨",
-  REVERSAL: "冲销",
-  REFUND: "退款",
-};
 
 /** 日对账快照状态（ReconciliationStatus）：OPEN=差异待处理（未核销）、RESOLVED=差异已处理（已核销）。
  *  注意 OPEN/RESOLVED 与质量域共用，不能改 StatusTag 全局映射，只能在对账调用点显式传 label。 */

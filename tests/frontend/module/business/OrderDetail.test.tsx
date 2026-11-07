@@ -55,7 +55,7 @@ describe("OrderDetail", () => {
     expect(within(panel).getAllByText("admin").length).toBeGreaterThanOrEqual(2);
     expect(within(panel).getAllByText("100.00").length).toBeGreaterThanOrEqual(2);
     expect(within(panel).getByText("买号本金")).toBeInTheDocument();
-    expect(within(panel).getByText("总支出")).toBeInTheDocument();
+    expect(within(panel).getByText("总支出（含坏账）")).toBeInTheDocument();
   });
 
   it("FE-054：原详情测试入口不展示账号密码明文", () => {
@@ -258,7 +258,34 @@ describe("OrderDetail", () => {
     const panel = document.querySelector(".inventory-detail") as HTMLElement;
     const summary = panel.querySelector(".inventory-finance-summary") as HTMLElement;
     expect(within(summary).getByText("总收入").parentElement).toHaveTextContent("123.45");
-    expect(within(summary).getByText("总支出").parentElement).toHaveTextContent("67.89");
+    expect(within(summary).getByText("总支出（含坏账）").parentElement).toHaveTextContent("67.89");
+  });
+
+  it("区分资金流水支出与含坏账的总支出", () => {
+    const detail = {
+      orders: [{
+        order_id: 272,
+        order_no: "HS-FE272",
+        order_type: "HS",
+        status: "DONE",
+        created_at: "2026-11-02T10:00:00",
+        events: [],
+        rebates: [],
+      }],
+      finance_summary: {
+        cashflow_income: "0.00",
+        rebate_income: "0.00",
+        total_income: "0.00",
+        total_expense: "100.00",
+        net_amount: "-100.00",
+      },
+    } as unknown as AccountExecutionDetail;
+
+    render(<OrderDetail row={account} detail={detail} loading={false} />);
+    const finance = document.querySelector(".inventory-detail__section--finance") as HTMLElement;
+    expect(within(finance).getByText("资金流水支出")).toBeInTheDocument();
+    expect(within(finance).getByText("总支出（含坏账）")).toBeInTheDocument();
+    expect(within(finance).getByText("总支出含分期坏账，坏账不生成资金流水行")).toBeInTheDocument();
   });
 
   it("FE-129：无寄售平台的初始代挂单不应显示为已上架", () => {

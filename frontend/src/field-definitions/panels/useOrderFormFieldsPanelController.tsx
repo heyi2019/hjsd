@@ -291,7 +291,7 @@ export function useOrderFormFieldsPanelController({
     },
     { title: "排序", dataIndex: "sort_order", width: 72 },
     { title: "类型", dataIndex: "field_type", render: (v: string, row) => MANAGED_OPTION_FIELD_KEYS.includes(row.field_key) ? "联动选择" : configurableLabel("FIELD_TYPE", v, FIELD_TYPE_LABEL) },
-    { title: "资金流向性质", dataIndex: "flow_direction", render: (value: OrderFormField["flow_direction"]) => FLOW_DIRECTION_OPTIONS.find((item) => item.value === value)?.label ?? "-" },
+    { title: "收支方向", dataIndex: "flow_direction", render: (value: OrderFormField["flow_direction"]) => FLOW_DIRECTION_OPTIONS.find((item) => item.value === value)?.label ?? "-" },
     {
       title: "必填",
       dataIndex: "required",
@@ -440,8 +440,8 @@ export function useOrderFormFieldsPanelController({
           />
         </Form.Item>
         {editorSection === "FINANCE" ? (
-          <Form.Item name="flow_direction" label="资金流向性质">
-            <Select allowClear placeholder="请选择资金流向性质" options={[...FLOW_DIRECTION_OPTIONS]} className="ui-control-width-160" popupClassName="order-form-field-option-pop" />
+          <Form.Item name="flow_direction" label="收支方向">
+            <Select allowClear placeholder="请选择收支方向" options={[...FLOW_DIRECTION_OPTIONS]} className="ui-control-width-160" popupClassName="order-form-field-option-pop" />
           </Form.Item>
         ) : null}
         {needsOptions && !managedOptionField && (

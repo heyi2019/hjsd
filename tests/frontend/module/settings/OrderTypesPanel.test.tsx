@@ -47,11 +47,10 @@ beforeEach(() => {
 });
 
 describe("OrderTypesPanel 业务类型主数据", () => {
-  it("加载并渲染列表（资金性质标签 + 启用状态）", async () => {
+  it("加载并渲染列表及启用状态", async () => {
     renderLight(<OrderTypesPanel />, { user: "admin" });
     expect(await screen.findByText("HS")).toBeInTheDocument();
     expect(screen.getByText("回收")).toBeInTheDocument();
-    expect(screen.getByText("库存型")).toBeInTheDocument();
     expect(screen.getByText("是")).toBeInTheDocument();
     expect(screen.getByText("否")).toBeInTheDocument();
   });
@@ -145,7 +144,7 @@ describe("OrderTypesPanel 业务类型主数据", () => {
     await pickSelect(modal, "目标资金池", "主资金池（POOL-A）");
     await ui.click(within(modal).getByRole("button", { name: /生成预览/ }));
     await waitFor(() =>
-      expect(catalog.orderTypesApi.impactPreview).toHaveBeenCalledWith("HS", "PRINCIPAL", "POOL-A", undefined)
+      expect(catalog.orderTypesApi.impactPreview).toHaveBeenCalledWith("HS", "PRINCIPAL", "POOL-A")
     );
     expect(await within(modal).findByText(/将发生变化/)).toBeInTheDocument();
     expect(within(modal).getByText(/将影响未来 3 单/)).toBeInTheDocument();

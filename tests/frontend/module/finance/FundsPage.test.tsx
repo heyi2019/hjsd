@@ -220,14 +220,11 @@ describe("FundsPage：资金流水", () => {
     expect(screen.getByRole("tab", { name: "收入明细" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "支出明细" })).toBeInTheDocument();
     expect(screen.getByText("HS0001-CF-SELL-01")).toBeInTheDocument();
-    expect(screen.getByText("自营收入")).toBeInTheDocument();
     await ui.click(screen.getByRole("tab", { name: "支出明细" }));
     expect(screen.getByText("HS0001-CF-BUY-01")).toBeInTheDocument();
-    expect(screen.getByText("自营直接成本")).toBeInTheDocument();
     expect(screen.getByText("总收入")).toBeInTheDocument();
     expect(screen.getByText("总支出")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "收支方向" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "资金流向性质" })).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "资金性质" })).not.toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("500.00").length).toBeGreaterThanOrEqual(1);

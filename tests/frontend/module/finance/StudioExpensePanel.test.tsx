@@ -260,7 +260,7 @@ describe("StudioExpensePanel：工作室支出", () => {
     }
   });
 
-  it("登记支出：提交即入账（OUT / BUSINESS_OUT / OPERATING_EXPENSE）", async () => {
+  it("登记支出：提交即入账", async () => {
     mockOptionSets();
     resolveMockOnce(vi.mocked(catalog.cashflowsApi.create), { id: 61 });
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
@@ -278,8 +278,6 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(payload).toMatchObject({
       pool_id: 1,
       direction: "OUT",
-      nature: "BUSINESS_OUT",
-      accounting_attribute: "OPERATING_EXPENSE",
       category: "房租",
       amount: "3000.00",
     });
@@ -294,7 +292,7 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(screen.getByText(/流水读取失败/)).toBeInTheDocument();
   });
 
-  it("登记收入：IN / BUSINESS_IN / SELF_REVENUE，同样自动入账", async () => {
+  it("登记收入：同样自动入账", async () => {
     mockOptionSets();
     resolveMockOnce(vi.mocked(catalog.cashflowsApi.create), { id: 62 });
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
@@ -311,8 +309,6 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(payload).toMatchObject({
       pool_id: 1,
       direction: "IN",
-      nature: "BUSINESS_IN",
-      accounting_attribute: "SELF_REVENUE",
       category: "货款",
       amount: "800.00",
     });

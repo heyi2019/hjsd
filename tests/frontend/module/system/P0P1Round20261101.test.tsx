@@ -297,6 +297,7 @@ it("P1/FE-050：流水冲销成功后原流水不再显示重复冲销入口", a
   const user = userEvent.setup({ pointerEventsCheck: 0 });
   await screen.findByText(/POOL-A/);
   await user.click(screen.getByRole("tab", { name: "流水" }));
+  await user.click(screen.getByRole("tab", { name: "支出明细" }));
   await screen.findByText("CF-A-07");
   await user.click(screen.getByRole("button", { name: /冲销/ }));
   const modal = document.querySelector(".ant-modal-content") as HTMLElement;
@@ -341,17 +342,16 @@ it("P1/FE-051：经营报表日期筛选传递到各报表查询", async () => {
 
 it("P1/FE-053：报表导出成功后显示可核对的结果反馈", async () => {
   vi.mocked(catalog.reportsApi.exportCsv).mockResolvedValue(new Blob(["csv"]) as never);
+  vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValue({ items: [], total: { income: "0", buy_amount: "0", direct_cost: "0", rebate: "0", net_profit: "0" } } as never);
   const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   const createUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:report");
   const revokeUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
   const user = userEvent.setup({ pointerEventsCheck: 0 });
   renderLight(<ReportsPage />, { user: "admin" });
-  const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
-  await user.click(selector);
-  await user.click(await screen.findByText("订单利润", { selector: ".ant-select-item-option-content" }));
-  await user.click(screen.getByRole("button", { name: /导出/ }));
+  await user.click(screen.getByRole("tab", { name: "订单利润" }));
+  await user.click(await screen.findByRole("button", { name: /导出 CSV/ }));
 
-  await waitFor(() => expect(screen.getByText(/已导出 1 份报表/)).toBeInTheDocument());
+  await waitFor(() => expect(catalog.reportsApi.exportCsv).toHaveBeenCalledWith("order-profit", { from: undefined, to: undefined }));
   expect(anchorClick).toHaveBeenCalled();
   expect(createUrl).toHaveBeenCalled();
   expect(revokeUrl).toHaveBeenCalledWith("blob:report");

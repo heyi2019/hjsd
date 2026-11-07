@@ -485,8 +485,8 @@ describe("OrderDetailDeliverySection", () => {
   });
 });
 
-describe("InventoryPanel：账号台账编辑态时间联动", () => {
-  it("三个时间都可改，改任一项联动预览，保存带整单平移天数", async () => {
+describe("InventoryPanel：账号台账编辑态时间编辑", () => {
+  it("三个时间都可改，保存只提交被修改的绝对时间", async () => {
     const detail = {
       account: accounts[0],
       orders: [{
@@ -531,16 +531,13 @@ describe("InventoryPanel：账号台账编辑态时间联动", () => {
     await user.clear(sold);
     await user.type(sold, "2026-10-20 00:00");
     await user.keyboard("{Enter}");
-    await waitFor(
-      () => expect(screen.getByText(/整单时间轴平移 4320 分钟/)).toBeInTheDocument(),
-      { timeout: 3000 },
-    );
-    expect((screen.getByLabelText("编辑订单创建时间") as HTMLInputElement).value).toBe("2026-10-18 10:19");
-    expect((screen.getByLabelText("编辑流水时间") as HTMLInputElement).value).toBe("2026-10-18 10:20");
+    await waitFor(() => expect((sold as HTMLInputElement).value).toBe("2026-10-20 00:00"));
+    expect((screen.getByLabelText("编辑订单创建时间") as HTMLInputElement).value).toBe("2026-10-15 10:19");
+    expect((screen.getByLabelText("编辑流水时间") as HTMLInputElement).value).toBe("2026-10-15 10:20");
 
     fireEvent.click(screen.getByRole("button", { name: /保存/ }));
     await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateExecution)).toHaveBeenCalledWith(1, expect.objectContaining({
-      time_shift: { delta_minutes: 4320 },
+      time_set: { sold_at: "2026-10-20T00:00:00" },
     })));
   });
 });

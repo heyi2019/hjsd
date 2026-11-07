@@ -35,6 +35,7 @@ tests/fixtures/v1_acceptance_seed.json :: phone
 # 均为 138****0000 一类合成号码（非真实客户数据）；email 一条为测试占位邮箱。
 # 两份治理方案文档里的真实号码已改为 198****3890 脱敏写法，未登记进本清单。
 backend/scripts/e2e_db.py :: phone
+backend/app/foundation/seed_orders.py :: phone
 docs/ERP_API接口规范_v1.2.md :: phone
 docs/archive/ERP_生产上线执行单_v1.0_20261103_已作废.md :: phone
 docs/archive/ERP_生产上线执行单_v1.1_20261103_已作废.md :: phone

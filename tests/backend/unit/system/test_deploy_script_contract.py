@@ -7,6 +7,7 @@ import stat
 import subprocess
 from pathlib import Path
 import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
+from scripts import e2e_db
 
 
 PROJECT_ROOT = _repo.REPO_ROOT
@@ -141,3 +142,34 @@ def test_backend_runtime_receives_explicit_release_version():
     """运行中的 API 健康信息必须与导入镜像的发布版本一致。"""
     compose = COMPOSE_FILE.read_text(encoding="utf-8")
     assert "APP_VERSION: ${APP_VERSION:-latest}" in compose
+
+    engine = _FakeEngine()
+    e2e_db._drop_retired_columns(engine)
+    assert engine.connection.statements == [
+        'ALTER TABLE public."order_type_defs" DROP COLUMN IF EXISTS capital_type CASCADE',
+        'ALTER TABLE public."orders" DROP COLUMN IF EXISTS capital_type CASCADE',
+        'ALTER TABLE public."cashflow" DROP COLUMN IF EXISTS nature CASCADE',
+    ]
+
+
+class _FakeConnection:
+    def __init__(self) -> None:
+        self.statements: list[str] = []
+
+    def execute(self, statement) -> None:
+        self.statements.append(str(statement))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args) -> None:
+        return None
+
+
+class _FakeEngine:
+    def __init__(self) -> None:
+        self.connection = _FakeConnection()
+
+    def begin(self):
+        return self.connection
+

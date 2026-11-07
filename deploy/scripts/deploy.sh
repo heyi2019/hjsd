@@ -154,6 +154,7 @@ db_snapshot() {
        coalesce((select to_regclass('public.db_version')::text), 'NONE'),
        (select count(*) from policy_definitions),
        (select count(*) from option_sets),
+       (select count(*) from option_sets where code='BUSINESS_DICTIONARY'),
        (select count(*) from order_form_fields where order_type_code='SALE'),
        (select count(*) from order_form_fields),
        (select version_num from alembic_version)"
@@ -162,10 +163,10 @@ db_snapshot() {
 # psql 返回异常（连接失败 / 列数不符 / 空值）时立即中止，不能让下面的算术比较
 # 退化成 "[: : integer expression expected" 这种无法定位的报错。
 validate_state() {
-  local label="$1" state="$2" tables _dbver policies options sale fields _alembic
-  IFS='|' read -r tables _dbver policies options sale fields _alembic <<< "$state"
+  local label="$1" state="$2" tables _dbver policies options business_dictionary sale fields _alembic
+  IFS='|' read -r tables _dbver policies options business_dictionary sale fields _alembic <<< "$state"
   if ! [[ "$tables" =~ ^[0-9]+$ && "$policies" =~ ^[0-9]+$ && "$options" =~ ^[0-9]+$ \
-          && "$sale" =~ ^[0-9]+$ && "$fields" =~ ^[0-9]+$ ]]; then
+          && "$business_dictionary" =~ ^[0-9]+$ && "$sale" =~ ^[0-9]+$ && "$fields" =~ ^[0-9]+$ ]]; then
     printf '✗ %s库状态采集格式异常，已中止发布：%q\n' "$label" "$state" >&2
     exit 1
   fi
@@ -174,7 +175,7 @@ validate_state() {
 echo "==> 采集发布前库状态基线（只读）"
 pre_state="$(db_snapshot)"
 validate_state "发布前" "$pre_state"
-IFS='|' read -r pre_tables pre_dbversion pre_policies pre_optionsets pre_sale_rows pre_fields pre_alembic <<< "$pre_state"
+IFS='|' read -r pre_tables pre_dbversion pre_policies pre_optionsets pre_business_dictionary pre_sale_rows pre_fields pre_alembic <<< "$pre_state"
 echo "  ${pre_state}"
 
 echo "==> 执行数据库迁移"
@@ -248,7 +249,7 @@ fi
 echo "==> 发布后不变量校验（只读）"
 post_state="$(db_snapshot)"
 validate_state "发布后" "$post_state"
-IFS='|' read -r post_tables post_dbversion post_policies post_optionsets post_sale_rows post_fields post_alembic <<< "$post_state"
+IFS='|' read -r post_tables post_dbversion post_policies post_optionsets post_business_dictionary post_sale_rows post_fields post_alembic <<< "$post_state"
 echo "  ${post_state}"
 
 invariant_fail=0
@@ -265,7 +266,16 @@ assert_unchanged() {
 assert_unchanged "表数" "$pre_tables" "$post_tables"
 assert_unchanged "db_version 表" "$pre_dbversion" "$post_dbversion"
 assert_unchanged "policy_definitions 行数" "$pre_policies" "$post_policies"
-assert_unchanged "option_sets 行数" "$pre_optionsets" "$post_optionsets"
+if [ "$pre_optionsets" = "$post_optionsets" ]; then
+  printf '  ✓ option_sets 行数: %s\n' "$post_optionsets"
+elif [ "$post_optionsets" -eq $((pre_optionsets + 1)) ] \
+  && [ "$pre_business_dictionary" -eq 0 ] \
+  && [ "$post_business_dictionary" -eq 1 ]; then
+  echo "  ✓ option_sets 行数：${pre_optionsets} → ${post_optionsets}（补齐 BUSINESS_DICTIONARY 系统字典）"
+else
+  echo "  ✗ option_sets 行数 发生非预期变化：${pre_optionsets} → ${post_optionsets}" >&2
+  invariant_fail=1
+fi
 assert_unchanged "历史 SALE 行数" "$pre_sale_rows" "$post_sale_rows"
 assert_unchanged "alembic 版本戳" "$pre_alembic" "$post_alembic"
 

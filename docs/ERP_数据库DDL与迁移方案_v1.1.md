@@ -7,7 +7,7 @@
 | v1.1 | 2026-11-01 | accounts→stocks；修正 game_account UNIQUE 错误约束（实际不唯一）；合约类型改三类；索引与种子表述校正；旧版 ERP_数据库DDL与迁移方案_v1.0_已作废.md 归档于 `docs/archive/` |
 
 
-> **依据**：PRD v1.3 → 数据字典 v2.0；功能编号体系沿用 `ERP_PRD_F01`（已冻结，仅编号有效）。MVP 使用 SQLite，生产迁 PostgreSQL 时由 Alembic 承接同结构；数据导入仅为 P2 参考能力。
+> **依据**：PRD v1.3 → 数据字典 v2.0；功能编号体系沿用 `ERP_PRD_F01`（已冻结，仅编号有效）。当前开发、测试与生产统一使用 PostgreSQL；结构变更由 Alembic 活动迁移链承接；历史导入仅保留离线追溯能力。
 
 ## 1. 建表顺序
 
@@ -49,7 +49,7 @@
 
 ## 4. 历史参考迁移流程（P2）
 
-1. 备份旧 `heijin.db` 和原始 JSON；数据导入只写新 ERP 的参考记录区，不覆盖新业务数据。
+1. 备份历史数据库导出物和原始 JSON；离线迁移只写临时 PostgreSQL 库，不覆盖新业务数据。
 2. 写种子池 `HJ_INVEST`、`HJ_PROFIT`，写 HS/TH/DG 和默认路由。
 3. 迁移账户、主业务订单、返点、分期、需求、现金流；每阶段输出行数与异常数。
 4. 订单/返点/分期无可靠关联时分别标 UNLINKED/ORPHAN；不得自动匹配。
@@ -58,6 +58,6 @@
 
 ## 5. 数据升级规则
 
-- SQLite 仅允许追加列、表、索引；结构重构通过新 schema revision 迁移，禁止直接破坏旧表。
+- PostgreSQL 结构变更必须通过 Alembic schema revision，禁止直接修改线上表结构。
 - 每个 schema 变更有 Alembic revision、回滚说明和迁移前备份。
 - `pool.code`、业务 code、业务编号、正式关联不可更新；名称、备注、活字段可更新。

@@ -20,7 +20,6 @@ from app.core.database import Base
 from app.domain import (  # noqa: F401
     attachments,
     foundation,
-    imports,
     lists,
     notifications,
     options,
@@ -29,6 +28,7 @@ from app.domain import (  # noqa: F401
     trade,
     users,
 )
+from app.legacy_imports import models as imports  # noqa: F401
 from app.foundation.seeds import seed_foundation
 from app.foundation.catalog_seed import seed_catalog
 

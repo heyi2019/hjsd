@@ -1,12 +1,10 @@
 /** 设置页入口：仅保留「配置中心」与少数非业务配置类页签。
- * 原业务配置类独立页签（业务类型 / 表单字段 / 列表字段 / 编号序列 / 资金池 /
+ * 原业务配置类独立页签（业务类型 / 表单字段 / 列表字段 / 资金池 /
  * 游戏与渠道 / 中介业务配置 / 参与方来源）已聚合进「配置中心」（用户裁决 2026-10-31）。
  *
  * 第一性原理：标签 / 权限 / 只读一律取自 configCatalog.ts 单一事实源，组件挂载复用
  * panels/panelRegistry.tsx，消除与注册表重复的硬编码。仅两处必要的显式逻辑：
  *   1. 「配置中心」为容器页签（渲染 ConfigCenterPanel），非注册表项，置于业务字典之后；
- *   2. 「导入」页签需要父级 batchId 状态以跨 Tab 保留批次选择，单独特判（其余通用项走 PANEL_REGISTRY）。
-
  * 注：账期锁定（period-locks）已由 dev 彻底移除（面板与注册表项均删除），
  * 故 SETTINGS_TAB_ORDER 不含该项。 */
 import { Tabs } from "antd";
@@ -15,7 +13,6 @@ import { useSession } from "../shared/state/session";
 import { SETTINGS_ITEMS } from "./configCatalog";
 import { PANEL_REGISTRY } from "./panels/panelRegistry";
 import { ConfigCenterPanel } from "./panels/ConfigCenterPanel";
-import { ImportWorkbench } from "../imports/ImportWorkbench";
 
 interface TabItem {
   key: string;
@@ -26,11 +23,8 @@ interface TabItem {
 /** 设置页左侧页签顺序（不含容器类「配置中心」）；标签 / 权限 / 只读取自 configCatalog。 */
 const SETTINGS_TAB_ORDER = [
   "business-dictionary",
-  "policies",
-  "imports",
   "users",
   "teams",
-  "config-audit",
   "appearance",
 ] as const;
 
@@ -38,8 +32,6 @@ export function SettingsPage() {
   const { can } = useSession();
   const [compact, setCompact] = useState(false);
   const [activeTab, setActiveTab] = useState("business-dictionary");
-  // 导入的批次选择提升到父级：SettingsPage 的 Tab 非挂载，切换后回到导入页仍能保留上次所选批次。
-  const [importBatchId, setImportBatchId] = useState<number | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia?.("(max-width: 960px)");
@@ -51,10 +43,6 @@ export function SettingsPage() {
   }, []);
 
   const renderTab = (key: string): React.ReactElement => {
-    // 导入页签需父级 batchId 状态以跨 Tab 保留批次选择；其余通用项统一走注册表。
-    if (key === "imports") {
-      return <ImportWorkbench embedded batchId={importBatchId} onBatchIdChange={setImportBatchId} />;
-    }
     return PANEL_REGISTRY[key]?.(() => {}) ?? null;
   };
 

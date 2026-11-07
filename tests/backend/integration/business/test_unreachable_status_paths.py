@@ -5,7 +5,7 @@ QA500B 补齐轮确认这 5 个枚举值无写入路径，本文件按补齐端�
 2. PolicyVersion.EXPIRED     — POST /policies/versions/expire-sweep（effective_to < on）
 3. RebateRecord.VOID         — POST /rebates/{id}/void（仅零结算 OPEN）
 4. Deposit.CANCELLED         — POST /deposits/{id}/cancel（仅 PAID 无退还/损失，全额冲正）
-5. ImportBatch.REJECTED      — POST /imports/batches/{id}/reject（仅 DRAFT/MAPPED）
+5. ImportBatch.REJECTED      — 历史迁移服务直接驳回（仅 DRAFT/MAPPED）
 附带：CounterpartyStatus.DISABLED 走既有 PATCH /counterparties/{id}/status。
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ from app.domain.enums import (
 )
 from app.domain.trade import Cashflow, Deposit
 from app.finance import service as finance_service
-from app.imports import service as imports_service
+from app.legacy_imports import service as imports_service
 from app.policy import service as policy_service
 
 

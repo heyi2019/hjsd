@@ -87,7 +87,6 @@ export const PERMISSION_LABEL: Record<string, string> = {
   "option-set.manage": "管理选项词典",
   "report.read": "查看报表",
   "report.export": "导出报表",
-  "import.manage": "管理导入",
   "user.manage": "管理用户",
 };
 

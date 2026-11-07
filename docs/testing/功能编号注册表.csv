@@ -21,7 +21,7 @@ D04,D,返点明细与登记,app/finance(rebates),返点落 finance，来源订�
 D05,D,资金报表/汇总,app/reporting/funds,资金日报统计,中,
 E01,E,经营报表 R1-R5,app/reporting/*,库存健康/月度损益/提成对账/资金日报/业务损益 口径一致,中,BIZ-RPT-R1..R5-001
 E02,E,报表导出与列一致性,"app/reporting/export,app/lists",导出与页面一致,中,
-E03,E,数据导入/迁移,"app/imports,alembic",导入映射 / 迁移基线,高,
+E03,E,数据导入/迁移,"app/legacy_imports,backend/scripts,alembic",历史导入模型 / 迁移基线,高,
 E04,E,自动化工作区,前端 AutomationWorkspace,自动化规则配置与执行,低,待建设
 F01,F,经营规则配置(policy 快照),app/policy,规则改版不回写历史订单；成交日固化快照,中,BIZ-SET-RULE-001
 F02,F,表单字段配置,app/orders/form_fields,活字段/固定列/required 驱动,中,

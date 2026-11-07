@@ -47,6 +47,7 @@ def create_transfer(
     common = {
         "transfer_id": transfer_id,
         "occurred_on": occurred_on,
+        "accounting_attribute": AccountingAttribute.INTERNAL_TRANSFER.value,
         "category": "TRANSFER",
         "amount": money,
         "created_by": actor,
@@ -147,6 +148,7 @@ def repair_transfer(
         flow_no=allocate_flow_no(session, direction),
         pool_id=target.id,
         occurred_on=source.occurred_on,
+        accounting_attribute=AccountingAttribute.INTERNAL_TRANSFER.value,
         category="TRANSFER",
         direction=direction,
         amount=to_money(source.amount),

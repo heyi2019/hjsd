@@ -234,6 +234,7 @@ GROUPS = {
         "tests/backend/integration/business/test_order_duplicate_account.py",
         "tests/backend/integration/business/test_order_event_cancellable_amount.py",
         "tests/backend/integration/business/test_profit_cashflow_basis.py",
+        "tests/backend/integration/business/test_order_edit_smoke.py",
     ],
     "installments": [
         "tests/backend/integration/business/test_installments_contract.py",
@@ -290,7 +291,6 @@ GROUPS = {
         "tests/backend/unit/system/test_quality_issues_service.py",
         "tests/backend/integration/system/test_quality_metrics_contract.py",
         "tests/backend/unit/system/test_notifications_contract.py",
-        "tests/backend/integration/system/test_search_contract.py",
         "tests/backend/integration/system/test_attachments_contract.py",
         "tests/backend/integration/system/test_audit_contract.py",
         "tests/backend/integration/system/test_attachments_service.py",
@@ -300,7 +300,6 @@ GROUPS = {
     "imports": [
         "tests/backend/unit/operations/test_import_landing.py",
         "tests/backend/integration/operations/test_import_mapping.py",
-        "tests/backend/integration/operations/test_imports_contract.py",
         "tests/backend/integration/system/test_migration.py",
     ],
     # 跨域基建板块：列表列/导出、部署脚本、覆盖率与迁移基线——改动常横跨多域。

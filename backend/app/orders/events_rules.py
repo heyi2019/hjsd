@@ -11,7 +11,6 @@ from decimal import Decimal
 from typing import Any
 from app.core.audit import record_audit
 from app.core.business_numbering import event_no as next_event_no
-from app.core.money import to_money
 from app.domain.foundation import Pool
 from app.foundation import service as foundation_service
 from ._common import _required_text

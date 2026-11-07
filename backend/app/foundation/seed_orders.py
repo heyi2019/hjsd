@@ -33,7 +33,6 @@ def seed_order_matrix(db, actor: str = "e2e") -> None:
     from app.domain.trade_models.installment import Installment, InstallmentSchedule
     from app.domain.trade_models.order import Order, OrderEvent
     from app.domain.enums import (
-        AccountingAttribute,
         CashflowStatus,
         CustomerRole,
         Direction,

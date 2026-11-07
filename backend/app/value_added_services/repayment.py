@@ -206,8 +206,7 @@ def cancel_installment(
         .order_by(OrderEvent.id)
     ).all()
     # 一次性取回全部已登记冲销，本地按被冲销事件归集，避免逐笔查询（N+1）。
-    # 不在 SQL 里 SUM：金额列是 DECIMAL TypeDecorator，SQLite 聚合存在浮点精度风险；
-    # 金额一律 Python 侧 Decimal 累加，与「逐笔求和」的原实现完全等价。
+    # 不在 SQL 里 SUM：金额一律 Python 侧 Decimal 累加，与「逐笔求和」等价。
     original_ids = [original.id for original in original_events]
     refunded_by_event: dict[int, Decimal] = {}
     if original_ids:

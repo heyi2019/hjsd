@@ -105,8 +105,8 @@ class Account(Base, AuditMixin):
         nullable=False,
         default=now_second,
         # 必须用 text() 而非裸字符串：裸字符串会渲染成 DEFAULT 'CURRENT_TIMESTAMP'，
-        # SQLite 容忍（当字符串落下），PostgreSQL 会当 timestamp 字面量解析并报
-        # InvalidDatetimeFormat，建表即失败。
+        # PostgreSQL 会把裸字符串当 timestamp 字面量解析并报 InvalidDatetimeFormat，
+        # 建表即失败。
         server_default=text("CURRENT_TIMESTAMP"),
     )
     buy_date: Mapped[date | None] = mapped_column(Date, nullable=True)

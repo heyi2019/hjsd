@@ -33,7 +33,7 @@
 
 | 模块 | 方法与路径 | 用途 |
 |---|---|---|
-| 健康 | GET `/`、GET `/health` | 引擎信息、数据库连通性与 SQLite 运行参数 |
+| 健康 | GET `/`、GET `/health` | 引擎信息与 PostgreSQL 数据库连通性 |
 | 认证 | POST `/auth/login`、GET `/auth/me`、POST `/auth/change-password`、POST `/auth/logout` | 登录、当前用户、改密、会话注销 |
 | 主数据 | `GET/POST /pools`；`PATCH/DELETE /pools/{pool_id}`；`PATCH /pools/{pool_id}/status`；`GET /pools/{pool_id}/balance`；`GET/POST /order-types`；`PATCH /order-types/{order_type_id}`、`/active`；`GET/POST /game-types`；`PATCH /game-types/{game_type_id}`、`/active`、`/default`；`DELETE /game-types/{game_type_id}`；`GET/POST /option-sets`；`GET/PUT/DELETE /option-sets/{code}`；`GET /sequences` | 资金池、业务类型、游戏类型、选项集及状态维护 |
 | 路由 | `GET /order-types/{order_type_id}/routes`；`POST /order-types/{code}/routes`；`GET /order-types/{code}/routes/impact-preview` | 业务类型到资金池的过账路由与影响预览；当前无路由 PATCH |
@@ -44,16 +44,16 @@
 | 库存账号 | `GET /stocks`；`PATCH /stocks/{account_id}`；`GET /stocks/inventory`、`/stocks/{account_id}/execution-detail`；`PATCH /stocks/{account_id}/execution-edit` | 账号台账、库存健康、执行明细与受控编辑；账号列表为分页列表 |
 | 分期 | `GET/POST /installments`；`POST /installments/mark-overdue`；`GET /installments/{installment_id}/schedules`、`/dispositions`；`POST /installments/{installment_id}/payments`、`/recover`、`/resale`、`/settle-early`、`/default`、`/deliver`、`/cancel`；`POST /installments/{installment_id}/schedules/{period_no}/waive`、`/extend` | 分期合约、期次、收款与处置 |
 | 人员/团队 | `GET/POST /users`；`PATCH /users/{user_id}`；`POST /users/{user_id}/reset-password`；`GET/POST /teams`；`PATCH /teams/{team_id}` | 人员、角色、数据范围与团队 |
-| 资金 | `GET/POST /cashflows`；`POST /cashflows/{cashflow_id}/approve`、`/reject`、`/reverse`；`GET/POST /deposits`；`POST /deposits/{deposit_id}/returns`、`/cancel`、`/losses`；`GET/POST /rebates`；`GET /rebates/overdue`、`/rebates/{rebate_id}`；`GET/POST /rebates/{rebate_id}/settlements`；`POST /rebates/{rebate_id}/settlements/{settlement_id}/reverse`、`/rebates/{rebate_id}/void`；`GET/POST /reconciliations`；`POST /reconciliations/{reconciliation_id}/resolve` | 资金流水、押金、返点与对账；资金列表是否分页以各自响应模型为准 |
+| 资金 | `GET/POST /cashflows`；`POST /cashflows/{cashflow_id}/approve`、`/reject`、`/reverse`；`GET/POST /deposits`；`POST /deposits/{deposit_id}/returns`、`/cancel`、`/losses`；`GET/POST /rebates`；`GET /rebates/overdue`、`/rebates/{rebate_id}`、`PATCH /rebates/{rebate_id}`、`DELETE /rebates/{rebate_id}`；`GET/POST /reconciliations`；`POST /reconciliations/{reconciliation_id}/resolve` | 资金流水、押金、返点与对账；返点分次结算接口已下线；资金列表是否分页以各自响应模型为准 |
 | 划转 | POST `/transfers`、`/transfers/{transfer_id}/repair` | 原子资金划转与单边划转修复。**账期锁定能力已整体移除**：原 `GET/POST /period-locks` 端点、`period_locks` 表、`finance.period.lock` 权限与「锁定账期」入口均不存在，调用将返回 404 |
 | 报表 | GET `/reports/inventory-health`、`/monthly-pnl`、`/commission`、`/business-pnl`、`/finance-dimensions`、`/daily-funds`、`/order-profit`；GET `/reports/{report_name}/export.csv` | 库存健康、损益、佣金、资金、订单利润与导出 |
 | 质量 | `GET /quality/exceptions`、`/metrics`、`/issues`、`/issues/{issue_id}`；`POST /quality/scan`、`/issues`、`/issues/{issue_id}/close`、`/issues/batch-close`；`PATCH /quality/issues/{issue_id}` | 数据质量异常与指标 |
-| 搜索/通知 | `GET /search`、`/notifications`；`POST /notifications/{notification_id}/read`、`/notifications/sync-overdue-rebates` | 全局搜索与站内通知 |
+| 通知 | `GET /notifications`；`POST /notifications/{notification_id}/read`、`/notifications/sync-overdue-rebates` | 站内通知；全局搜索入口已下线 |
 | 附件 | `GET/POST /attachments`；`GET /attachments/{attachment_id}/download`；`DELETE /attachments/{attachment_id}` | 订单、事件、资金、分期、质量异常附件 |
 | 列表列配置 | `GET /list-columns`；`GET /list-columns/custom-fields`；`PUT/DELETE /list-columns/{scope}`；`POST /list-columns/{scope}/custom`；`DELETE /list-columns/{scope}/custom/{column_key}` | 各列表作用域的列显示配置与自定义列定义；自定义列键为 `extra:{field_key}`，显示状态复用 `list_column_configs`（不另建状态表）；「恢复默认」只清显示配置、不删列定义 |
 | 表单扩展字段 | `GET/POST /order-form-fields`；`GET /order-form-fields/scopes`；`GET/PATCH/DELETE /order-form-fields/{field_id}`；`PATCH /order-form-fields/{field_id}/active` | 统一的订单/库存/客户等表单字段定义、启停、排序与作用域；值落在实体 `form_extra` |
 | 经营规则 | `GET/POST /policies`；`GET/POST /policies/{definition_id}/versions`；`GET /policies/{definition_id}`；`PATCH /policy-versions/{version_id}`；`POST /policy-versions/{version_id}/approve`、`/supersede`、`/policies/versions/expire-sweep`；`GET /policy-versions/resolve` | 规则版本、审批、快照与解析 |
-| 导入 | `GET/POST /imports/batches`；`GET /imports/batches/{batch_id}/rows`、`/preview`、`/reconciliation`；`POST /imports/rows/{row_id}/map`、`/skip`、`/unlinked-transfer`；`POST /imports/batches/{batch_id}/commit`、`/rollback`、`/corrections`、`/reject` | P2 标准导入与复核 |
+| 导入 | 在线 `/imports` API 已下线；历史批次、原始行和映射仅由离线迁移脚本读取 | 不参与新业务流程 |
 | 审计 | GET `/audit-logs`、`/audit-logs/actions`、`/audit-logs/stats` | 按对象、人员、日期查询受控操作记录 |
 
 ### 2.1 分页列表

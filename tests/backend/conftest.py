@@ -94,7 +94,6 @@ def _initial_markers_for_file(filename: str) -> set[str]:
             "bughunt",
             "_gaps",
             "unreachable_status_paths",
-            "repair_baseline_schema",
             "coverage_gate",
             "deploy_script_contract",
             "account_stock_no",
@@ -244,7 +243,10 @@ from app.api_v1 import create_app  # noqa: E402
 from app.core.database import Base, get_db  # noqa: E402
 from app.core.security import CurrentUser, DEV_USERS, build_access_token  # noqa: E402
 from app.core.settings import get_settings  # noqa: E402
-from app.domain import attachments, foundation, imports, notifications, options, parties, quality, trade, users  # noqa: E402,F401  注册全部 v1 表
+from app.domain import attachments, foundation, notifications, options, parties, quality, trade, users  # noqa: E402,F401  注册全部 v1 表
+from app.legacy_imports import models as _imports  # noqa: E402  注册历史导入表
+
+_ = _imports
 from app.foundation.seeds import seed_foundation  # noqa: E402
 from app.foundation.seed_orders import seed_order_matrix  # noqa: E402
 
@@ -408,6 +410,19 @@ def v1_engine(request):
             connection.execute(text('ALTER TABLE public."order_type_defs" DROP COLUMN IF EXISTS capital_type CASCADE'))
             connection.execute(text('ALTER TABLE public."orders" DROP COLUMN IF EXISTS capital_type CASCADE'))
             connection.execute(text('ALTER TABLE public."cashflow" DROP COLUMN IF EXISTS nature CASCADE'))
+            connection.execute(
+                text(
+                    'ALTER TABLE public."cashflow" '
+                    'ADD COLUMN IF NOT EXISTS accounting_attribute '
+                    "VARCHAR(32) NOT NULL DEFAULT 'OPERATING_EXPENSE'"
+                )
+            )
+            connection.execute(
+                text(
+                    'CREATE INDEX IF NOT EXISTS ix_cashflow_accounting_attribute '
+                    'ON public."cashflow" (accounting_attribute)'
+                )
+            )
         _truncate_all(engine)
         yield engine
     finally:

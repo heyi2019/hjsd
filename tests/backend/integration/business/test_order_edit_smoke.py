@@ -1,12 +1,8 @@
-"""#15 需求2 后端：订单主字段可编辑——登记时间(created_at)可改可清空、账号快照(account_snapshot)一律可编辑。
+"""ORDER-01 订单主字段可编辑——登记时间(created_at)可改可清空、账号快照(account_snapshot)一律可编辑。
 
 - created_at：可绝对设值，也可清空（置 NULL，列已放可为空）。
 - account_snapshot：推翻 11-05「账号快照拒编辑」裁决，所有订单（含已有登记事件者）均可编辑。
 """
-from datetime import datetime
-
-from app.orders import service as orders
-
 H = {"X-Dev-User": "admin"}
 
 

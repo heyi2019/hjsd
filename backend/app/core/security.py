@@ -67,7 +67,6 @@ PERM_POOL_MANAGE = "pool.manage"
 PERM_ORDER_TYPE_MANAGE = "order-type.manage"
 PERM_REPORT_READ = "report.read"
 PERM_REPORT_EXPORT = "report.export"
-PERM_IMPORT_MANAGE = "import.manage"
 PERM_USER_MANAGE = "user.manage"
 PERM_OPTION_SET_MANAGE = "option-set.manage"
 
@@ -95,7 +94,6 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(
         PERM_ORDER_TYPE_MANAGE,
         PERM_REPORT_READ,
         PERM_REPORT_EXPORT,
-        PERM_IMPORT_MANAGE,
         PERM_USER_MANAGE,
         PERM_OPTION_SET_MANAGE,
     }
@@ -216,8 +214,7 @@ def owner_scope_ids(session: Any, user: CurrentUser) -> set[int] | None:
     """Resolve the owner ids visible to a user, including TEAM membership.
 
     Team membership is intentionally resolved in Python for now: the membership
-    list is stored as JSON during this incremental rollout and remains portable
-    across SQLite and PostgreSQL.
+    list is stored as JSON during this incremental rollout.
     """
     if user.is_admin or user.owner_scope == "ALL":
         return None

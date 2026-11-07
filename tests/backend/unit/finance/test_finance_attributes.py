@@ -1,3 +1,5 @@
+"""CASHFLOW-02 资金核算属性与金额边界校验。"""
+
 def test_text_required_empty_raises_validation() -> None:
     from app.core.errors import Validation
     from app.finance._common import _text

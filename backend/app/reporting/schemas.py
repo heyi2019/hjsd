@@ -118,6 +118,7 @@ class FinanceDimensionItemOut(ReportModel):
     pool_id: int
     pool_code: str
     pool_name: str
+    accounting_attribute: str
     direction: str
     scope: str
     flow_count: int

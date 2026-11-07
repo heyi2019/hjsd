@@ -61,11 +61,15 @@ def test_update_options_on_editable_set(client, headers):
     )
     updated = client.put(
         f"{OPTION_SETS}/GAME_TAG",
-        json={"options": [{"value": "HOT", "label": "热门"}, {"value": "CLASSIC", "label": "经典"}]},
+        json={
+            "options": [{"value": "HOT", "label": "热门"}, {"value": "CLASSIC", "label": "经典"}],
+            "description": "全员共享的业务字典口径",
+        },
         headers=headers,
     )
     assert updated.status_code == 200, updated.text
     assert [o["value"] for o in updated.json()["options"]] == ["HOT", "CLASSIC"]
+    assert updated.json()["description"] == "全员共享的业务字典口径"
 
 
 

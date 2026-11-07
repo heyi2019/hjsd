@@ -1,17 +1,11 @@
-/** 经营中心：库存 R1 / 月度损益 R2 / 提成对账 R3 / 资金报表·日报 R4 / 业务损益 R5 / 数据中心（RPT-01）。
+/** 经营中心：库存 R1 / 月度损益 R2 / 提成对账 R3 / 资金报表·日报 R4 / 业务损益 R5。
  * 各报表视图拆到 ./reports/*.tsx（导出按钮在各自页内），本文件只留 Tab 壳。 */
 import { Input, Space, Tabs } from "antd";
 import { useEffect, useState } from "react";
-import { AttachmentPanel } from "../attachments/AttachmentPanel";
 import { AuditPanel } from "../audit/AuditPanel";
-import { NotificationsPanel } from "../notifications/NotificationsPanel";
-import { QualityPanel } from "../quality/QualityPanel";
-import { SearchPanel } from "../search/SearchPanel";
-import { DataCenterPanel } from "./DataCenterPanel";
 import { BusinessPnl } from "./reports/BusinessPnlReport";
 import { Commission } from "./reports/CommissionReport";
 import { DailyFunds } from "./reports/DailyFundsReport";
-import { FinanceDimensions } from "./reports/FinanceDimensionsReport";
 import { InventoryReport } from "./reports/InventoryReport";
 import { MonthlyPnl } from "./reports/MonthlyPnlReport";
 import { OrderProfit } from "./reports/OrderProfitReport";
@@ -46,14 +40,8 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
     { key: "r3", label: "提成对账 R3", render: () => <Commission range={reportRange} mine={myEarnings} /> },
     { key: "r4", label: "资金报表·日报", render: () => <DailyFunds /> },
     { key: "r5", label: "业务损益 R5", render: () => <BusinessPnl range={reportRange} /> },
-    { key: "finance-dimensions", label: "资金报表·属性分析", render: () => <FinanceDimensions range={reportRange} /> },
     { key: "profit", label: "订单利润", render: () => <OrderProfit range={reportRange} /> },
-    { key: "data-center", label: "数据中心", render: () => <DataCenterPanel onNavigate={onNavigate} /> },
-    { key: "quality", label: "质量中心", render: () => <QualityPanel /> },
-    { key: "notifications", label: "系统提醒", render: () => <NotificationsPanel /> },
-    { key: "search", label: "全局搜索", render: () => <SearchPanel /> },
     { key: "audit", label: "审计记录", render: () => <AuditPanel /> },
-    { key: "attachments", label: "附件中心", render: () => <AttachmentPanel /> },
   ];
 
   return (
@@ -64,7 +52,7 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
         onChange={setActiveTab}
         items={tabItems.map(({ render, ...item }) => ({
           ...item,
-          // 隐藏 Tab 不挂载：避免首屏同时发起 13 组请求，也避免切换无关页面时产生状态更新。
+          // 隐藏 Tab 不挂载：避免首屏同时发起多组请求，也避免切换无关页面时产生状态更新。
           children: activeTab === item.key ? render() : null,
         }))}
       />

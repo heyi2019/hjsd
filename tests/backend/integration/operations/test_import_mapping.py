@@ -35,7 +35,7 @@ def mapper():
 
 def _seed_order_rows(session, rows):
     """把订单原始行灌进 import_rows（复用真实落地链路）。"""
-    from app.imports import service as import_service
+    from app.legacy_imports import service as import_service
 
     batch = import_service.create_batch(
         session,
@@ -44,7 +44,7 @@ def _seed_order_rows(session, rows):
         source_kind="STANDARD_ORDER",
         actor="pytest",
     )
-    from app.domain.imports import ImportRow
+    from app.legacy_imports.models import ImportRow
 
     # 测试会话是 autoflush=False（见 conftest「savepoint 挡不住 commit」的说明），
     # 所以必须显式 flush，否则被测代码的查询看不到刚落库的 ImportRow。
@@ -218,7 +218,7 @@ class TestIdempotency:
         mapper.map_orders(seeded_db, dry_run=False)
         seeded_db.commit()
         # 手工把 status 拨回 UNMAPPED，模拟「幂等判断被绕过」
-        from app.domain.imports import ImportRow
+        from app.legacy_imports.models import ImportRow
 
         seeded_db.query(ImportRow).update({"status": ImportRowStatus.UNMAPPED.value})
         seeded_db.commit()

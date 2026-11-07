@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound, Validation
 from app.domain.enums import ImportBatchStatus, ImportRowStatus
-from app.domain.imports import ImportBatch, ImportRow
+from app.legacy_imports.models import ImportBatch, ImportRow
 
 _AMOUNT_KEYS = ("交易金额", "本金", "利润", "amount", "principal", "profit")
 

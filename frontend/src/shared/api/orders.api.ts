@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { EventPostResult, FormScope, ListColumnConfig, ListCustomFieldOption, ListScopeConfig, Order, OrderFormField, OrderLink, OrderType, OrderTypeRoute, PageResponse, RouteImpactPreview, SearchResult } from "./types";
+import type { EventPostResult, FormScope, ListColumnConfig, ListCustomFieldOption, ListScopeConfig, Order, OrderFormField, OrderLink, OrderType, OrderTypeRoute, PageResponse, RouteImpactPreview } from "./types";
 
 export const orderTypesApi = {
   update: (id: number, data: Partial<OrderType>) => api.patch<OrderType>(`/order-types/${id}`, data).then(r => r.data),
@@ -16,7 +16,6 @@ export const orderTypesApi = {
   ) =>
     api.post<OrderTypeRoute>(`/order-types/${code}/routes`, payload).then((r) => r.data),
 };
-
 /** 订单编辑入参（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
 export interface OrderPatchPayload {
   trade_date?: string;
@@ -256,5 +255,3 @@ export const listColumnsApi = {
       )
       .then((r) => r.data),
 };
-
-export const searchApi = { query: (q: string) => api.get<{ items: SearchResult[] }>("/search", { params: { q } }).then(r => r.data) };

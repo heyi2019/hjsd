@@ -33,7 +33,6 @@ beforeEach(() => {
   resolveMock(vi.mocked(catalog.reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(catalog.reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
-  resolveMock(vi.mocked(catalog.reportsApi.financeDimensions), { items: [], total_amount: "0", total_signed_amount: "0" });
   resolveMock(vi.mocked(catalog.reportsApi.businessPnl), { items: [], total: {} });
   resolveMock(vi.mocked(catalog.reportsApi.orderProfit), { items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
   resolveMock(vi.mocked(catalog.reportsApi.exportCsv), new Blob(["csv"]));

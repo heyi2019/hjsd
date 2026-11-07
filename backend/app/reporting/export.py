@@ -183,6 +183,7 @@ def finance_dimension_report(
             Pool.id.label("pool_id"),
             Pool.code.label("pool_code"),
             Pool.name.label("pool_name"),
+            Cashflow.accounting_attribute,
             Cashflow.direction,
             case(
                 (Cashflow.order_id.is_not(None), "BUSINESS"),
@@ -201,6 +202,7 @@ def finance_dimension_report(
         .where(Cashflow.status == CashflowStatus.APPROVED.value)
         .group_by(
             Pool.id, Pool.code, Pool.name,
+            Cashflow.accounting_attribute,
             Cashflow.direction,
             Cashflow.order_id.is_not(None),
         )
@@ -219,6 +221,7 @@ def finance_dimension_report(
             "pool_id": row["pool_id"],
             "pool_code": row["pool_code"],
             "pool_name": row["pool_name"],
+            "accounting_attribute": row["accounting_attribute"],
             "direction": row["direction"],
             "scope": row["scope"],
             "flow_count": int(row["flow_count"] or 0),

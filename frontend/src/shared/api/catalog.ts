@@ -14,5 +14,4 @@ export * from "./org.api";
 export * from "./options.api";
 export * from "./reports.api";
 export * from "./policy.api";
-export * from "./quality.api";
 export * from "./misc.api";

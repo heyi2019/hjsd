@@ -36,8 +36,6 @@ const TABLE_BY_ROOT: Record<string, string> = {
   installments: "installments",
   deposits: "deposits",
   "game-types": "game_type_options",
-  sequences: "document_sequences",
-  attachments: "attachments",
   notifications: "notifications",
   "option-sets": "option_sets",
   "order-types": "order_type_defs",
@@ -51,8 +49,6 @@ const TABLE_BY_ROOT: Record<string, string> = {
   reconciliations: "reconciliations",
   rebates: "rebate_records",
   "audit-logs": "audit_logs",
-  imports: "import_batches",
-  quality: "quality_issues",
   transfers: "cashflow",
 };
 
@@ -63,10 +59,7 @@ const TABLE_BY_SUBPATH: Record<string, string> = {
   "order-types/routes": "order_type_pools",
   "installments/schedules": "installment_schedules",
   "installments/dispositions": "installment_dispositions",
-  "imports/batches": "import_batches",
-  "imports/rows": "import_rows",
   "list-columns/custom-fields": "list_custom_columns",
-  "quality/issues": "quality_issues",
 };
 
 const IGNORED_PARAMS = new Set([
@@ -76,7 +69,6 @@ const IGNORED_PARAMS = new Set([
 
 /** 语义上是查询、但用 POST 发出的端点（预览环境允许，返回空结果）。 */
 const QUERY_POST_PATHS = new Set([
-  "/quality/scan",
   "/installments/mark-overdue",
 ]);
 
@@ -215,8 +207,6 @@ function resolveTable(path: string, segments: string[]): string | undefined {
     const one = `${root}/${segments[1]}`;
     if (TABLE_BY_SUBPATH[one]) return TABLE_BY_SUBPATH[one];
   }
-  if (path === "/imports/batches") return "import_batches";
-  if (path === "/quality/issues") return "quality_issues";
   return TABLE_BY_ROOT[root];
 }
 
@@ -305,38 +295,6 @@ export const cloudAdapter: AxiosAdapter = async (config) => {
   }
 
   // ---- 特殊只读形状 ----
-  if (path === "/sequences") {
-    try {
-      const rows = await fetchRows("document_sequences", params);
-      const mapped = rows.map((row) => {
-        const prefix = String(row.prefix ?? "");
-        const padding = Number(row.padding ?? 0);
-        const current = Number(row.current_value ?? 0);
-        return {
-          ...row,
-          next_number: `${prefix}${String(current + 1).padStart(padding, "0")}`,
-        };
-      });
-      return ok(config, collection(mapped, params));
-    } catch (err) {
-      return cloudFailure(config, err);
-    }
-  }
-
-  if (path === "/search") {
-    try {
-      const [orders, stocks] = await Promise.all([fetchRows("orders", {}), fetchRows("stocks", {})]);
-      const needle = (params.q ?? params.keyword ?? "").toLowerCase();
-      const mapped: Row[] = [
-        ...orders.map((o) => ({ id: o.id, type: "order", code: o.order_no, title: String(o.order_no ?? ""), subtitle: String(o.note ?? ""), route: `/business/orders/${o.id}` })),
-        ...stocks.map((s) => ({ id: s.id, type: "stock", code: s.stock_no, title: String(s.stock_no ?? ""), subtitle: String(s.game_type ?? ""), route: `/business/inventory/${s.id}` })),
-      ].filter((row) => !needle || JSON.stringify(row).toLowerCase().includes(needle));
-      return ok(config, collection(mapped, params));
-    } catch (err) {
-      return cloudFailure(config, err);
-    }
-  }
-
   if (path === "/stocks/inventory") {
     try {
       const rows = await fetchRows("stocks", {});
@@ -352,7 +310,7 @@ export const cloudAdapter: AxiosAdapter = async (config) => {
     }
   }
 
-  if (segments[0] === "reports" || path.startsWith("/quality/") ||
+  if (segments[0] === "reports" ||
       path === "/pools/balances" || path === "/cashflows/studio-summary" || path.endsWith("/balance")) {
     // 聚合类端点依赖后端业务规则，预览环境返回结构完整的空结果，不伪装数值。
     return ok(config, collection([], params));

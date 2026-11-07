@@ -36,25 +36,12 @@ beforeEach(() => {
   });
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(catalog.reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
-  resolveMock(vi.mocked(catalog.reportsApi.financeDimensions), {
-    items: [],
-    total_amount: "0",
-    total_signed_amount: "0",
-  });
   resolveMock(vi.mocked(catalog.reportsApi.businessPnl), { items: [], total: {} });
   resolveMock(vi.mocked(catalog.reportsApi.orderProfit), {
     items: [],
     total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" },
   });
   resolveMock(vi.mocked(catalog.reportsApi.exportCsv), new Blob(["csv"]));
-  // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
-  // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
-  resolveMock(vi.mocked(catalog.poolsApi.balances), {
-    items: [],
-    totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
-  });
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
 });
 
 async function gotoTab(label: string) {
@@ -104,10 +91,10 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-08" }));
   });
 
-  it("FE-051：共享日期区间传递到 R2/R3/R5、资金属性和订单利润", async () => {
+  it("FE-051：共享日期区间传递到 R2/R3/R5 和订单利润", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     const setFrom = async (label: RegExp) => {
-      await gotoTab(label.source.includes("R2") ? "月度损益 R2" : label.source.includes("R3") ? "提成对账 R3" : label.source.includes("R5") ? "业务损益 R5" : label.source.includes("资金属性") ? "资金报表·属性分析" : "订单利润");
+      await gotoTab(label.source.includes("R2") ? "月度损益 R2" : label.source.includes("R3") ? "提成对账 R3" : label.source.includes("R5") ? "业务损益 R5" : "订单利润");
       const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
       fireEvent.change(pane.querySelector<HTMLInputElement>(".ui-control-width-date")!, { target: { value: "2026-10-01" } });
     };
@@ -117,34 +104,8 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", all_people: true }));
     await setFrom(/R5/);
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
-    await setFrom(/资金属性/);
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.financeDimensions)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
     await setFrom(/订单利润/);
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
-  });
-
-  it("资金属性分析：渲染资金池 / 方向 / 净方向金额", async () => {
-    resolveMockOnce(vi.mocked(catalog.reportsApi.financeDimensions), {
-      items: [
-        {
-          pool_name: "POOL-A",
-          direction: "IN",
-          scope: "STUDIO",
-          flow_count: 3,
-          amount: "100.00",
-          signed_amount: "100.00",
-        },
-      ],
-      total_amount: "100.00",
-      total_signed_amount: "100.00",
-    });
-    renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金报表·属性分析");
-    await screen.findByText("POOL-A");
-    expect(screen.queryByText("资金账户")).toBeNull();
-    expect(screen.getByText("收入")).toBeInTheDocument(); // direction === IN
-    expect(screen.getByText("工作室收支")).toBeInTheDocument();
-    expect(screen.getAllByText("净方向金额").length).toBeGreaterThanOrEqual(1);
   });
 
   it("R1 持有天数多分支：绿/橙/红/空", async () => {
@@ -237,24 +198,6 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
   });
 
-  it("FE-271：资金属性分析历史空区间清空旧汇总", async () => {
-    vi.mocked(catalog.reportsApi.financeDimensions).mockImplementation((params) => Promise.resolve(
-      params?.from ? { items: [], total_amount: "0", total_signed_amount: "0" } : {
-        items: [{ pool_name: "POOL-FE271", accounting_attribute: "SELF_REVENUE", direction: "IN", flow_count: 1, amount: "10", signed_amount: "10" }],
-        total_amount: "10",
-        total_signed_amount: "10",
-      },
-    ) as never);
-    renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金报表·属性分析");
-    await screen.findByText("POOL-FE271");
-    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-    const dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    fireEvent.change(dates[0], { target: { value: "2026-10-01" } });
-    fireEvent.change(dates[1], { target: { value: "2026-10-31" } });
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.financeDimensions)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
-    await waitFor(() => expect(screen.queryByText("POOL-FE271")).not.toBeInTheDocument());
-  });
 
   it("FE-272：订单利润历史空区间清空收入成本和净利明细", async () => {
     vi.mocked(catalog.reportsApi.orderProfit).mockImplementation((params) => Promise.resolve(

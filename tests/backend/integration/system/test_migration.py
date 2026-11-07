@@ -258,11 +258,12 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
         assert "capital_type" not in _column_names(engine, "order_type_defs")
         assert "capital_type" not in _column_names(engine, "orders")
 
-        # 资金流水只按收入/支出归类；调拨等动作保留在类别与关联记录中。
+        # 资金流水核算属性保留封闭枚举，覆盖收入/支出及业务细分属性。
         cashflow_clause = _check_clauses(engine, "cashflow")
         assert "'INCOME'" in cashflow_clause
         assert "'EXPENSE'" in cashflow_clause
-        assert "INTERNAL_TRANSFER" not in cashflow_clause
+        assert "OPERATING_EXPENSE" in cashflow_clause
+        assert "INTERNAL_TRANSFER" in cashflow_clause
 
         pools = {row[0] for row in connection.execute(text("SELECT code FROM pools"))}
         assert pools == {"HJ_INVEST", "HJ_PROFIT"}
@@ -504,14 +505,10 @@ def test_retired_product_checks_are_removed(migration_db):
     orders_clause = _check_clauses(engine, "orders")
     type_defs_clause = _check_clauses(engine, "order_type_defs")
     installments_clause = _check_clauses(engine, "installments")
-    cashflow_clause = _check_clauses(engine, "cashflow")
 
     assert "'CREDIT'" not in orders_clause
     assert "'CREDIT'" not in type_defs_clause
     assert "'ADVANCE_PURCHASE'" not in installments_clause
-    assert "'DFQ_PRINCIPAL'" not in cashflow_clause
-    for retired in ("SELF_REVENUE", "OPERATING_EXPENSE", "INTERNAL_TRANSFER", "REVERSAL", "REFUND"):
-        assert retired not in cashflow_clause
 
 
 def test_account_status_rename_migrates_legacy_rows_without_touching_inventory_status(migration_db):

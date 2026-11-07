@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from app.domain.enums import Direction, PoolOwnership
+from app.domain.enums import PoolOwnership
 from app.finance import service as finance_service
 from app.foundation import service as foundation_service
 

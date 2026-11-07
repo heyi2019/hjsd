@@ -17,7 +17,7 @@ from app.domain.enums import (
     ImportSourceKind,
     SequenceKey,
 )
-from app.domain.imports import ImportBatch, ImportRow
+from app.legacy_imports.models import ImportBatch, ImportRow
 
 from ._shared import (
     _required_text,

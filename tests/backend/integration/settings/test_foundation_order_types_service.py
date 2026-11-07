@@ -18,17 +18,13 @@ class TestOrderTypes:
 
         first_option_count = db.query(OptionSet).count()
         first_field_count = db.query(OrderFormField).count()
+        business_dictionary = db.query(OptionSet).filter_by(code="BUSINESS_DICTIONARY").one()
+        assert business_dictionary.label == "业务字典"
+        assert business_dictionary.editable is True
         cancel_amount = db.query(OrderFormField).filter_by(
             order_type_code="ORDERCANC", field_key="cancel_amount"
         ).one()
         assert cancel_amount.flow_direction == "IN"
-        cashflow_options = db.query(OptionSet).filter_by(
-            code="FUND_FLOW_ACCOUNTING_ATTRIBUTE"
-        ).one()
-        assert cashflow_options.options == [
-            {"value": "INCOME", "label": "收入"},
-            {"value": "EXPENSE", "label": "支出"},
-        ]
 
         seed_catalog(db, actor="second")
         db.commit()

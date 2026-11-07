@@ -42,18 +42,9 @@ beforeEach(() => {
     { id: 8, username: "finance", display_name: "财务同事", is_active: true },
   ]);
   resolveMock(vi.mocked(catalog.reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
-  resolveMock(vi.mocked(catalog.reportsApi.financeDimensions), { items: [], total_amount: "0", total_signed_amount: "0" });
   resolveMock(vi.mocked(catalog.reportsApi.businessPnl), { items: [], total: {} });
   resolveMock(vi.mocked(catalog.reportsApi.orderProfit), { items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
   resolveMock(vi.mocked(catalog.reportsApi.exportCsv), new Blob(["csv"]));
-  // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
-  // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
-  resolveMock(vi.mocked(catalog.poolsApi.balances), {
-    items: [],
-    totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
-  });
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
 });
 
 async function gotoTab(label: string) {
@@ -61,6 +52,37 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：经营中心报表", () => {
+  it("不再提供全局搜索和附件中心入口", async () => {
+    renderLight(<ReportsPage />, { user: "admin" });
+    await screen.findByRole("tab", { name: "库存 R1" });
+    expect(screen.queryByRole("tab", { name: "全局搜索" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "附件中心" })).toBeNull();
+  });
+
+  it("不再提供系统提醒入口（工作台保留提醒计数）", async () => {
+    renderLight(<ReportsPage />, { user: "admin" });
+    await screen.findByRole("tab", { name: "库存 R1" });
+    expect(screen.queryByRole("tab", { name: "系统提醒" })).toBeNull();
+  });
+
+  it("不再提供资金报表属性分析入口", async () => {
+    renderLight(<ReportsPage />, { user: "admin" });
+    await screen.findByRole("tab", { name: "库存 R1" });
+    expect(screen.queryByRole("tab", { name: "资金报表·属性分析" })).toBeNull();
+  });
+
+  it("不再提供数据中心入口", async () => {
+    renderLight(<ReportsPage />, { user: "admin" });
+    await screen.findByRole("tab", { name: "库存 R1" });
+    expect(screen.queryByRole("tab", { name: "数据中心" })).toBeNull();
+  });
+
+  it("不再提供质量中心入口", async () => {
+    renderLight(<ReportsPage />, { user: "admin" });
+    await screen.findByRole("tab", { name: "库存 R1" });
+    expect(screen.queryByRole("tab", { name: "质量中心" })).not.toBeInTheDocument();
+  });
+
   it("初始只加载当前激活的库存报表，不提前加载隐藏 Tab", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "库存 R1" });
@@ -95,21 +117,12 @@ describe("ReportsPage：经营中心报表", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
   });
 
-  it("七个 Tab 齐全（R1-R5 + 订单利润 + 数据中心）", async () => {
+  it("六个核心 Tab 齐全（R1-R5 + 订单利润）", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "库存 R1" });
-    for (const label of ["库存 R1", "月度损益 R2", "提成对账 R3", "资金报表·日报", "业务损益 R5", "订单利润", "数据中心"]) {
+    for (const label of ["库存 R1", "月度损益 R2", "提成对账 R3", "资金报表·日报", "业务损益 R5", "订单利润"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
-  });
-
-  it("数据中心 Tab：渲染资金统计与订单入口卡，点击入口卡跳业务中心", async () => {
-    const onNavigate = vi.fn();
-    renderLight(<ReportsPage onNavigate={onNavigate} />, { user: "admin" });
-    await gotoTab("数据中心");
-    expect(await screen.findByText("可用余额合计")).toBeInTheDocument();
-    await ui.click(screen.getByRole("button", { name: /订单总数/ }));
-    expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
   });
 
   it("订单利润页内导出按钮按统计周期导出", async () => {

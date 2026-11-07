@@ -202,6 +202,7 @@ def _order_detail_output(
                     "occurred_on": item.occurred_on,
                     "category": item.category,
                     "direction": item.direction,
+                    "nature": item.nature,
                     "amount": item.amount,
                     "status": item.status,
                     "order_event_id": item.order_event_id,

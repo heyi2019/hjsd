@@ -31,8 +31,10 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
     func,
 )
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -50,6 +52,12 @@ class Cashflow(Base, AuditMixin):
         CheckConstraint(
             f"status IN {CashflowStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="cashflow_status_valid",
+        ),
+        CheckConstraint(
+            f"accounting_attribute IN {AccountingAttribute.values()!r}"
+            .replace("[", "(")
+            .replace("]", ")"),
+            name="cashflow_accounting_attribute_valid",
         ),
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
         # 一笔订单事件可派生多笔资金流水（如售出拆分进不同资金池），
@@ -70,6 +78,13 @@ class Cashflow(Base, AuditMixin):
         ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
     )
     occurred_on: Mapped[date] = mapped_column(Date, nullable=False)
+    # 经营核算属性：资金流水列表与报表需要回显该字段；数据库基线已有此列。
+    accounting_attribute: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default=AccountingAttribute.EXPENSE.value,
+        server_default=AccountingAttribute.EXPENSE.value,
+    )
     category: Mapped[str] = mapped_column(String(32), nullable=False, default="OTHER")
     direction: Mapped[str] = mapped_column(String(8), nullable=False)
     amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
@@ -103,6 +118,42 @@ class Cashflow(Base, AuditMixin):
         DateTime, nullable=True, default=now_second, server_default=func.now()
     )
 
+    def __init__(self, **kwargs):
+        # ``nature`` disappeared from the persisted schema in 0077.  Accept
+        # the legacy constructor keyword so old fixtures/integrations can be
+        # migrated independently; the value is intentionally transient.
+        self._legacy_nature = kwargs.pop("nature", None)
+        super().__init__(**kwargs)
+
+    @property
+    def nature(self) -> str:
+        legacy_nature = getattr(self, "_legacy_nature", None)
+        if legacy_nature:
+            return legacy_nature
+        if self.transfer_id or self.category == "TRANSFER":
+            return "INTERNAL"
+        if self.direction == Direction.IN.value:
+            return "EXTERNAL_IN" if self.category == "EXTERNAL_FUNDING" else "BUSINESS_IN"
+        return "BUSINESS_OUT"
+
+
+@event.listens_for(Cashflow, "before_insert")
+def _validate_legacy_cashflow_nature(mapper, connection, target: Cashflow) -> None:
+    """Keep old constructor callers subject to the removed direction checks."""
+    nature = getattr(target, "_legacy_nature", None)
+    if nature is None:
+        return
+    if nature == "INTERNAL" and not target.transfer_id:
+        raise IntegrityError("cashflow INTERNAL requires transfer_id", {}, None)
+    if nature == "INTERNAL":
+        return
+    allowed = {
+        Direction.IN.value: {"EXTERNAL_IN", "BUSINESS_IN"},
+        Direction.OUT.value: {"BUSINESS_OUT"},
+    }
+    if nature not in allowed.get(target.direction, set()):
+        raise IntegrityError("cashflow direction/nature mismatch", {}, None)
+
 
 class Reconciliation(Base, AuditMixin):
     """按资金池、账单日和账户固化的日对账快照。"""
@@ -124,9 +175,8 @@ class Reconciliation(Base, AuditMixin):
         ),
         CheckConstraint("statement_balance >= 0", name="reconciliation_statement_nonneg"),
         CheckConstraint(
-            # 容差 0.005（半分）：SQLite 无 DECIMAL，Amount 落库即 REAL，严格等式
-            # 对角分不为零的余额组合必然浮点残差 IntegrityError（0.30-0.10≠0.20）。
-            # 真实口径偏差只可能是 0 或 >=0.01，半分窗口不会误放行。
+            # 容差 0.005（半分）避免金额计算出现边界残差；真实口径偏差只可能是
+            # 0 或 >=0.01，半分窗口不会误放行。
             "abs(difference - (statement_balance - system_balance)) <= 0.005",
             name="difference_matches_balances",
         ),

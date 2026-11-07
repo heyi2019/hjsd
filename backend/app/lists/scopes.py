@@ -134,7 +134,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("category", "类别"),
             ListColumn("direction", "收支方向"),
             ListColumn("amount", "金额"),
-            ListColumn("source", "来源"),
+            ListColumn("scope", "归属"),
             ListColumn("status", "状态"),
             ListColumn("note", "备注"),
             ListColumn("actions", "操作"),
@@ -250,6 +250,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         label="报表·资金属性分析",
         columns=(
             ListColumn("pool_name", "资金池"),
+            ListColumn("accounting_attribute", "核算属性", value_set="FUND_FLOW_ACCOUNTING_ATTRIBUTE"),
             ListColumn("direction", "现金方向", value_set="FUND_FLOW_DIRECTION"),
             ListColumn("flow_count", "笔数"),
             ListColumn("amount", "发生额"),

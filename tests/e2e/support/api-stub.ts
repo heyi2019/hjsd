@@ -5,9 +5,9 @@ import { type Page, type Locator } from "@playwright/test";
  *
  * 设计要点（来自组件测试的踩坑经验）：
  *  - 列表类接口（orders / pools / customers / accounts / funds / installments /
- *    rebates / imports/batches / imports/rows）返回 `{ items: [], total: 0 }`，
+ *    rebates）返回 `{ items: [], total: 0 }`，
  *    让页面走正常空态渲染，而不是因缺字段崩溃。
- *  - 对象类接口（reports / imports/reconciliation / policy /
+ *  - 对象类接口（reports / policy /
  *    audit）返回 `{ items: [], total: 0, result: {}, data: {} }` 兜底，
  *    避免读深层字段（如 reconciliation.funds.note）时抛 undefined。
  *
@@ -15,7 +15,6 @@ import { type Page, type Locator } from "@playwright/test";
  */
 const OBJECT_PATHS = [
   "/reports/",
-  "/imports/batches/1/reconciliation",
   "/policy",
   "/audit",
 ];

@@ -21,6 +21,18 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         return getattr(flow, key)
     category = value("category")
     direction = value("direction")
+    legacy_nature = (
+        value("nature")
+        if isinstance(flow, dict) and "nature" in flow
+        else getattr(flow, "nature", None)
+    )
+    if legacy_nature is None:
+        if category == "TRANSFER" or getattr(flow, "transfer_id", None):
+            legacy_nature = "INTERNAL"
+        elif direction == "IN":
+            legacy_nature = "EXTERNAL_IN" if category == "EXTERNAL_FUNDING" else "BUSINESS_IN"
+        else:
+            legacy_nature = "BUSINESS_OUT"
     order_id = value("order_id")
     order_event_id = value("order_event_id")
     transfer_id = value("transfer_id")
@@ -54,6 +66,8 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         occurred_at=value("occurred_at"),
         category=category,
         direction=direction,
+        nature=legacy_nature,
+        accounting_attribute=value("accounting_attribute"),
         amount=value("amount"),
         status=value("status"),
         reviewed_by=value("reviewed_by"),

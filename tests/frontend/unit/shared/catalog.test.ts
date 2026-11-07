@@ -5,7 +5,7 @@ vi.mock("@/shared/api/client", () => ({
 }));
 
 import { api } from "@/shared/api/client";
-import { auditApi, installmentsApi, reportsApi, teamsApi, usersApi } from "@/shared/api/catalog";
+import { auditApi, installmentsApi, teamsApi, usersApi } from "@/shared/api/catalog";
 
 describe("auditApi：与后端审计查询契约一致", () => {
   beforeEach(() => {
@@ -21,10 +21,8 @@ describe("auditApi：与后端审计查询契约一致", () => {
 });
 
 describe("页面接口契约", () => {
-  it("分期处置和资金分析读取后端接口", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: { items: [], total_amount: "0", total_signed_amount: "0" } });
-    await reportsApi.financeDimensions({ from: "2026-10-01" });
-    expect(api.get).toHaveBeenCalledWith("/reports/finance-dimensions", { params: { from: "2026-10-01" } });
+  it("分期处置读取后端接口", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [] });
     vi.mocked(api.get).mockResolvedValueOnce({ data: [] });
     expect(await installmentsApi.dispositions(7)).toEqual([]);
     expect(api.get).toHaveBeenCalledWith("/installments/7/dispositions");

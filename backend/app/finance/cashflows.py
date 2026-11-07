@@ -31,6 +31,38 @@ from app.parties import service as parties_service
 from ._common import _non_negative, _positive, _text
 
 
+def validate_accounting_attribute(value: str) -> str:
+    """校验并标准化资金流水核算属性。"""
+    try:
+        return AccountingAttribute(value).value
+    except ValueError as exc:
+        raise ValueError(
+            f"核算属性取值非法，必须为 {AccountingAttribute.values()}"
+        ) from exc
+
+
+def accounting_attribute_for_event(order_type: str, event_type: str) -> str:
+    """返回订单事件的经营核算属性。"""
+    mapping = {
+        ("HS", "BUY"): AccountingAttribute.SELF_DIRECT_COST.value,
+        ("HS", "COST"): AccountingAttribute.SELF_DIRECT_COST.value,
+        ("HS", "SELL"): AccountingAttribute.SELF_REVENUE.value,
+        ("HS", "PAYMENT"): AccountingAttribute.SELF_REVENUE.value,
+        ("TH", "BUY"): AccountingAttribute.TH_DIRECT_COST.value,
+        ("TH", "COST"): AccountingAttribute.TH_DIRECT_COST.value,
+        ("TH", "SELL"): AccountingAttribute.TH_REVENUE.value,
+        ("TH", "PAYMENT"): AccountingAttribute.TH_REVENUE.value,
+        ("DG", "SELL"): AccountingAttribute.SERVICE_REVENUE.value,
+        ("DG", "PAYMENT"): AccountingAttribute.SERVICE_REVENUE.value,
+        ("REFUND", "REFUND"): AccountingAttribute.REFUND.value,
+    }
+    if event_type == "REFUND":
+        return AccountingAttribute.REFUND.value
+    if event_type == "CANCEL":
+        return AccountingAttribute.REVERSAL.value
+    return mapping.get((order_type.upper(), event_type.upper()), AccountingAttribute.EXPENSE.value)
+
+
 # 兼容层：押金服务迁至 deposits.py，此处保留原路径导出
 from .deposits import (
     cancel_deposit,
@@ -63,6 +95,11 @@ def create_cashflow(
     pool_id: int,
     occurred_on: date,
     direction: str,
+    # ``nature`` was removed from the persisted cashflow model in migration
+    # 0077.  Keep accepting the old service-level keyword for callers that
+    # have not migrated yet; direction is now the source of truth.
+    nature: str | None = None,
+    accounting_attribute: str | None = None,
     category: str,
     amount: Any,
     actor: str,
@@ -80,6 +117,17 @@ def create_cashflow(
         raise Validation(
             f"direction 必须为 {Direction.values()}", details={"field": "direction"}
         ) from exc
+    if nature is not None:
+        normalized_nature = str(nature).strip().upper()
+        allowed_by_direction = {
+            Direction.IN.value: {"EXTERNAL_IN", "BUSINESS_IN"},
+            Direction.OUT.value: {"BUSINESS_OUT"},
+        }
+        if normalized_nature not in allowed_by_direction.get(direction, set()):
+            raise Validation(
+                "nature 与 direction 不匹配",
+                details={"direction": direction, "nature": normalized_nature},
+            )
     label = _text(
         category,
         field="category",
@@ -87,6 +135,12 @@ def create_cashflow(
         uppercase=True,
         type_message="category 必须为文本",
     )
+    try:
+        accounting_attribute = validate_accounting_attribute(
+            accounting_attribute or AccountingAttribute.OPERATING_EXPENSE.value
+        )
+    except ValueError as exc:
+        raise Validation(str(exc), details={"field": "accounting_attribute"}) from exc
     if label == "EXTERNAL_FUNDING" and direction == Direction.IN.value and not note:
         raise Validation("独立收款必须填写摘要", details={"field": "note"})
     if user is not None and not user.can_see_pool(pool_id):
@@ -99,6 +153,7 @@ def create_cashflow(
         flow_no=allocate_flow_no(session, direction),
         pool_id=pool.id,
         occurred_on=occurred_on,
+        accounting_attribute=accounting_attribute,
         category=label,
         direction=direction,
         amount=money,
@@ -140,11 +195,13 @@ def create_business_event_cashflow(
     pool_id: int,
     occurred_on: date,
     direction: str,
+    accounting_attribute: str | None = None,
     category: str,
     amount: Any,
     order_id: int,
     order_event_id: int,
     actor: str,
+    event_type: str | None = None,
     note: str | None = None,
 ) -> Cashflow:
     """由资金域登记订单事件派生流水。
@@ -169,12 +226,20 @@ def create_business_event_cashflow(
     pool = foundation_service.assert_pool_usable(session, pool_id)
     order = orders_service.get_order(session, order_id)
     money = _non_negative(amount, field="amount")
+    try:
+        accounting_attribute = validate_accounting_attribute(
+            accounting_attribute
+            or accounting_attribute_for_event(order.order_type, event_type or category)
+        )
+    except ValueError as exc:
+        raise Validation(str(exc), details={"field": "accounting_attribute"}) from exc
     flow = Cashflow(
         flow_no=next_cashflow_no(
             session, order_no=order.order_no, order_id=order.id, category=category
         ),
         pool_id=pool.id,
         occurred_on=occurred_on,
+        accounting_attribute=accounting_attribute,
         category=category,
         direction=direction,
         amount=money,
@@ -240,6 +305,7 @@ def reverse_cashflow(
         flow_no=allocate_flow_no(session, reverse_direction),
         pool_id=flow.pool_id,
         occurred_on=reversed_on,
+        accounting_attribute=AccountingAttribute.REVERSAL.value,
         category="REVERSAL",
         direction=reverse_direction,
         amount=to_money(flow.amount),
@@ -291,6 +357,7 @@ def _apply_cashflow_filters(
     occurred_from: date | None = None,
     occurred_to: date | None = None,
     status: str | None = None,
+    accounting_attribute: str | None = None,
     category: str | None = None,
     created_by: str | None = None,
     keyword: str | None = None,
@@ -334,6 +401,12 @@ def _apply_cashflow_filters(
                 details={"field": "status", "value": status},
             ) from exc
         stmt = stmt.where(Cashflow.status == status)
+    if accounting_attribute is not None:
+        try:
+            validate_accounting_attribute(accounting_attribute)
+        except ValueError as exc:
+            raise Validation(str(exc), details={"field": "accounting_attribute"}) from exc
+        stmt = stmt.where(Cashflow.accounting_attribute == accounting_attribute)
     if category is not None:
         stmt = stmt.where(Cashflow.category == category)
     if created_by is not None:
@@ -374,6 +447,12 @@ def _flow_row(flow: Cashflow, order_no: str | None) -> dict[str, Any]:
         "occurred_on": flow.occurred_on,
         "occurred_at": flow.created_at,
         "category": flow.category,
+        "nature": (
+            "INTERNAL"
+            if flow.transfer_id or flow.category == "TRANSFER"
+            else ("EXTERNAL_IN" if flow.direction == Direction.IN.value and flow.category == "EXTERNAL_FUNDING" else ("BUSINESS_IN" if flow.direction == Direction.IN.value else "BUSINESS_OUT"))
+        ),
+        "accounting_attribute": flow.accounting_attribute,
         "direction": flow.direction,
         "amount": flow.amount,
         "status": flow.status,
@@ -401,6 +480,7 @@ def list_cashflows(
     occurred_from: date | None = None,
     occurred_to: date | None = None,
     status: str | None = None,
+    accounting_attribute: str | None = None,
     category: str | None = None,
     created_by: str | None = None,
     keyword: str | None = None,
@@ -425,6 +505,7 @@ def list_cashflows(
         occurred_from=occurred_from,
         occurred_to=occurred_to,
         status=status,
+        accounting_attribute=accounting_attribute,
         category=category,
         created_by=created_by,
         keyword=keyword,
@@ -457,6 +538,7 @@ def cashflow_totals(
     occurred_from: date | None = None,
     occurred_to: date | None = None,
     status: str | None = None,
+    accounting_attribute: str | None = None,
     category: str | None = None,
     created_by: str | None = None,
     keyword: str | None = None,
@@ -484,6 +566,7 @@ def cashflow_totals(
         occurred_from=occurred_from,
         occurred_to=occurred_to,
         status=status,
+        accounting_attribute=accounting_attribute,
         category=category,
         created_by=created_by,
         keyword=keyword,
@@ -519,11 +602,11 @@ def _studio_scope() -> Any:
         or_(
             and_(
                 Cashflow.direction == Direction.OUT.value,
-                Cashflow.direction == Direction.OUT.value,
+                Cashflow.accounting_attribute == AccountingAttribute.OPERATING_EXPENSE.value,
             ),
             and_(
                 Cashflow.direction == Direction.IN.value,
-                Cashflow.direction == Direction.IN.value,
+                Cashflow.accounting_attribute == AccountingAttribute.SELF_REVENUE.value,
             ),
         ),
     )
@@ -612,8 +695,6 @@ def studio_summary(
 
 
 __all__ = [
-    "STUDIO_EXPENSE_ATTRIBUTE",
-    "STUDIO_INCOME_ATTRIBUTE",
     "cancel_deposit",
     "cashflow_totals",
     "create_cashflow",

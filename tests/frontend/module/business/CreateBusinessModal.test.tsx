@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 /** 选中主资金账户。附加费用区的中介费账户与主资金账户同名同占位（资金账户），
- *  故排除附加费用区后再定位（回收走 payment-info-section、提号走 th-fee-primary）。 */
+ *  故排除附加费用区后再定位。 */
 async function pickMainPool() {
   const placeholder = screen
     .getAllByText("请选择资金账户", { exact: true })

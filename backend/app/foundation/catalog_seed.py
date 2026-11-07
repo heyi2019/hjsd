@@ -182,6 +182,17 @@ Qlhbi/rMspSNNTruNLMGshvFaiKM3ShWE6DsRrGaAGI3itUggN0oVqMIdqNYdmDrRrFO/fNv//xfi4j0
 
 def seed_catalog(session: Session, *, actor: str = "system") -> None:
     data = json.loads(zlib.decompress(base64.b64decode(_CATALOG_BLOB)))
+    if not any(item["code"] == "BUSINESS_DICTIONARY" for item in data["option_sets"]):
+        data["option_sets"].append(
+            {
+                "code": "BUSINESS_DICTIONARY",
+                "label": "业务字典",
+                "group": "OPS",
+                "editable": True,
+                "options": [],
+                "description": None,
+            }
+        )
     data["option_sets"] = [
         item for item in data["option_sets"]
         if item["code"] != "FUND_FLOW_ACCOUNTING_ATTRIBUTE"

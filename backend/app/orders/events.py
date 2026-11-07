@@ -410,7 +410,7 @@ def post_event(
     # order_id / order_event_id 关联，资金域只负责实际收支记录。
     from app.finance import service as finance_service
 
-    finance_service.create_business_event_cashflow(
+    flow = finance_service.create_business_event_cashflow(
         session,
         pool_id=event.pool_id,
         occurred_on=occurred_on,
@@ -420,6 +420,7 @@ def post_event(
         order_id=order.id,
         order_event_id=event.id,
         actor=actor,
+        event_type=event_type,
         note=note,
     )
     if resolved_pool_id2 is not None:
@@ -433,6 +434,7 @@ def post_event(
             order_id=order.id,
             order_event_id=event.id,
             actor=actor,
+            event_type=event_type,
             note=note,
         )
 

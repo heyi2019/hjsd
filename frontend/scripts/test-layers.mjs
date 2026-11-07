@@ -42,7 +42,6 @@ export const quickTests = [
   "tests/frontend/module/system/UserCenterPage.test.tsx",
   "tests/frontend/module/settings/SettingsPage.test.tsx",
   "tests/frontend/module/business/CreateBusinessModal.test.tsx",
-  "tests/frontend/module/settings/PolicySettingsPanel.test.tsx",
   "tests/frontend/module/operations/ReportsPage.test.tsx",
   "tests/frontend/module/shared/session.test.tsx",
 ];

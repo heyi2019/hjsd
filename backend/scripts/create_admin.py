@@ -16,8 +16,11 @@ from sqlalchemy import select  # noqa: E402
 
 from app.core.database import Base, get_engine, get_session_factory  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
-from app.domain import foundation, imports, parties, trade, users  # noqa: E402,F401
+from app.domain import foundation, parties, trade, users  # noqa: E402,F401
+from app.legacy_imports import models as _imports  # noqa: E402  注册历史导入模型
 from app.domain.users import User  # noqa: E402
+
+_ = _imports
 
 
 def main() -> None:

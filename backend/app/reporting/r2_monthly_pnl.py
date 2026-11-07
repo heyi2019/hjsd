@@ -15,6 +15,7 @@ from decimal import Decimal
 from typing import Any
 from app.core.security import CurrentUser
 from sqlalchemy import (
+    and_,
     case,
     func,
     or_,
@@ -22,6 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 from app.domain.enums import (
+    AccountingAttribute,
     CashflowStatus,
     Direction,
 )
@@ -98,8 +100,12 @@ def r2_monthly_pnl(
         Cashflow.status == CashflowStatus.APPROVED.value,
         Cashflow.order_event_id.is_(None),
         or_(
-            Cashflow.direction == Direction.OUT.value,
+            and_(
+                Cashflow.direction == Direction.OUT.value,
+                Cashflow.accounting_attribute == AccountingAttribute.OPERATING_EXPENSE.value,
+            ),
             Cashflow.category == "OPERATING_COST",
+            Cashflow.reversal_of_id.is_not(None),
         ),
     )
     pool_ids = _visible_pool_ids(user)

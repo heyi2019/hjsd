@@ -29,7 +29,6 @@ from app.core.settings import get_settings  # noqa: E402
 from app.domain import (  # noqa: E402,F401
     attachments,
     foundation,
-    imports,
     lists,
     notifications,
     options,
@@ -38,6 +37,7 @@ from app.domain import (  # noqa: E402,F401
     trade,
     users,
 )
+from app.legacy_imports import models as imports  # noqa: E402,F401
 from app.foundation.seeds import seed_foundation  # noqa: E402
 from app.foundation.catalog_seed import seed_catalog  # noqa: E402
 from app.foundation.seed_orders import seed_order_matrix  # noqa: E402

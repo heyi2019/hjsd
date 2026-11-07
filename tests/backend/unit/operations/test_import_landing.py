@@ -12,7 +12,7 @@ import json
 import pytest
 
 from app.domain.enums import AuditAction, ImportBatchStatus, ImportRowStatus
-from app.imports import service as import_service
+from app.legacy_imports import service as import_service
 import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
 
@@ -124,7 +124,7 @@ class TestNoInference:
         assert batch["unmapped_count"] == 1
         assert batch["status"] == ImportBatchStatus.DRAFT.value
 
-        from app.domain.imports import ImportRow
+        from app.legacy_imports.models import ImportRow
 
         row = seeded_db.query(ImportRow).filter_by(batch_id=batch["id"]).one()
         assert row.status == ImportRowStatus.UNMAPPED.value
@@ -158,7 +158,7 @@ class TestIdempotency:
         src.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
         monkeypatch.setattr(lander, "SOURCE_DIR", tmp_path)
 
-        from app.domain.imports import ImportBatch
+        from app.legacy_imports.models import ImportBatch
 
         import_service.create_batch(
             seeded_db,

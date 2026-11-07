@@ -292,6 +292,8 @@ class OrderCashflowOut(BaseModel):
     occurred_on: date
     category: str
     direction: str
+    # Deprecated compatibility field derived from the current cashflow shape.
+    nature: str
     amount: Decimal
     status: str
     order_event_id: int | None = None

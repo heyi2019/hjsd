@@ -11,7 +11,7 @@ from app.core.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.time import now_second
 from app.domain.enums import AuditAction, ImportBatchStatus, ImportRowStatus
-from app.domain.imports import ImportBatch, ImportRow
+from app.legacy_imports.models import ImportBatch, ImportRow
 from app.domain.trade import Account, Order
 
 from ._shared import (

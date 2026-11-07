@@ -23,12 +23,12 @@
       ],
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
-        "files": 117,
-        "cases": 1728,
+        "files": 116,
+        "cases": 1643,
         "kinds": {
           "unit": {
             "files": 32,
-            "cases": 297,
+            "cases": 271,
             "byArea": {
               "business": 5,
               "customer": 1,
@@ -39,19 +39,19 @@
             }
           },
           "integration": {
-            "files": 85,
-            "cases": 1431,
+            "files": 84,
+            "cases": 1372,
             "byArea": {
-              "business": 30,
+              "business": 31,
               "customer": 6,
               "finance": 14,
-              "operations": 7,
+              "operations": 6,
               "settings": 13,
-              "system": 15
+              "system": 14
             }
           }
         },
-        "_baseline_note": "1676 是搬迁前基线（113 文件）；1684 = 1676 + test_manifest_parity.py 8 条。2026-11-05 补齐 3 个并发会话新增文件（共 32 例）入 GROUPS 后，磁盘 117 文件 / ci 全量收集 1728 例 = 1696 + 32，按实测对齐"
+        "_baseline_note": "2026-11-07 清理已下线功能对应的历史测试资产后，磁盘 116 文件 / 后端全量收集 1643 例；数量以实际递归扫描与 pytest 收集为准。"
       },
       "budgets": {
         "fast": 60,
@@ -64,39 +64,39 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 96,
+        "files": 87,
         "layers": {
           "fast": 14,
-          "quick": 8,
-          "react": 58,
-          "deep": 16
+          "quick": 7,
+          "react": 52,
+          "deep": 14
         },
         "cases": {
-          "fast": 96,
-          "quick": 88,
-          "react": 761,
-          "deep": 124
+          "fast": 98,
+          "quick": 79,
+          "react": 694,
+          "deep": 103
         },
         "byArea": {
           "unit": {
             "workbench": 1,
             "business": 8,
-            "settings": 2,
+            "settings": 1,
             "shared": 9,
             "system": 4
           },
           "module": {
-            "workbench": 6,
-            "business": 19,
+            "business": 20,
             "customer": 3,
             "finance": 5,
-            "operations": 7,
-            "settings": 15,
+            "operations": 3,
+            "settings": 14,
             "shared": 7,
-            "system": 10
+            "system": 6,
+            "workbench": 6
           }
         },
-        "_baseline_note": "93 是搬迁前基线；94 = 93 + 新增 manifest-parity.test.ts（6 条用例）。2026-11-04 前端测试整体迁入 tests/frontend/{unit,module}/<区域>/。本次改动前 HEAD 已有 95 个测试文件但 expected 仍记 94（守卫本来就是红的，非本次引入）；本次新增 InventoryPanel.delete.test.tsx 后按实际扫描对齐为 96 / react 58 / module.business 19。StocksApiRoutes.test.ts 与新增文件共 +5 例，cases.react 只按本轮增量记 761，HEAD 遗留那 1 个文件的用例数待下次全量基线刷新；baseline 两块是 2026-11-04 时点实测，保持原值不动。",
+        "_baseline_note": "2026-11-07 清理已下线模块的残留测试后，按磁盘实际 87 个文件与四层回归 JSON 结果刷新期望计数。",
         "root_layout": "tests/frontend/<unit|module>/<区域>/",
         "baseline": {
           "_doc": "2026-11-04 搬迁后实测（同机同代码）。cpu = user+sys，跨会话可比；wall 受并发会话干扰。",

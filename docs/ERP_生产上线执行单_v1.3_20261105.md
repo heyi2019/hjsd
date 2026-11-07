@@ -86,7 +86,7 @@ v1.2 的前提是「生产库业务数据为空，用 Release 包整体覆盖」
 ### B0.0 三条硬约束（违反任一条，验收必挂）
 
 1. **不许 `DROP DATABASE` / `pg_restore` 覆盖**——生产已有真实数据，这是本版与 v1.2 最大的差别。
-2. **不许走 `deploy.sh`**（含 CI 的 `deploy-production.yml`）：`stamp_db_version.py` 会自建 `db_version` 表（→ 42 表，破坏验收），`seed_policy_definitions.py` 会写入规则定义（破坏「`policy_definitions` 0 条」）。
+2. **不许走旧版 `deploy.sh`**（含 CI 的 `deploy-production.yml`）：旧流程曾调用已移除的版本戳记与策略预置脚本，会自建 `db_version` 表或写入规则定义，破坏验收口径。
 3. **起容器必须显式传 `APP_VERSION=<新版本>`**：`docker-compose.yml` 是 `image: heijin-backend:${APP_VERSION:-latest}`，`.env` 里的值必须同步改，否则任何不带参的 `up -d` 都会把线上打到 `.env` 里那个旧版本。
 
 ### B0.1 升版本（唯一事实源，单文件提交）

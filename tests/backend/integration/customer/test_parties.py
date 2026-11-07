@@ -100,7 +100,7 @@ class TestMerge:
         seeded_db.commit()
         # 迁移 0008 后 order_customer_roles.order_id 指向 orders，占位订单 1 必须先存在
         seeded_db.add(Order(
-            id=1, order_no="ORD0001", order_type="HS", capital_type="STOCK",
+                id=1, order_no="ORD0001", order_type="HS",
             trade_date=date.today(), status="ACTIVE", link_status="UNLINKED",
             created_by="pytest", updated_by="pytest", created_at=datetime.now(), updated_at=datetime.now(),
         ))

@@ -83,6 +83,7 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 - E2E 启动时清理已退役的 `capital_type` / `nature` 历史非空列，避免订单和资金流水接口出现 PostgreSQL 500。
 - 修正资金流水 E2E 对已移除字段和旧成功提示的依赖；全量 Playwright E2E 62 项通过。
+- 按当前精简后的业务代码刷新四域覆盖率基线，避免旧版本基线误报发布失败。
 
 ### 发布前检查
 

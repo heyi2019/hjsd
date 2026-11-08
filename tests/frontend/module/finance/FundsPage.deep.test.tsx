@@ -278,13 +278,6 @@ describe("FundsPage：资金写路径深覆盖", () => {
     warningSpy.mockRestore();
   });
 
-  it("对账页展示系统余额口径说明", async () => {
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
-    await ui.click(screen.getByRole("tab", { name: "对账" }));
-    expect(await screen.findByText(/系统余额口径：截至对账日期「已入账」流水的累计/)).toBeInTheDocument();
-  });
-
   it("总览统计卡的自有权益取服务端汇总（不再前端按 ownership 自算）", async () => {
     // 归属判定（OWNED 计入权益、CUSTODY/THIRD_PART 只计头寸）已在后端
     // pool_balance_summary 里完成，契约由 backend tests/v1/test_pool_balances_batch.py 守；

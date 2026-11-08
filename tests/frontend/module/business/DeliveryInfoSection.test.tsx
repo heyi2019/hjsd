@@ -1,4 +1,4 @@
-/** L254 回归：交易平台选「其他」时出现「其他平台」自定义输入框（与客户来源联动一致），
+/** 交易平台选「其他」时出现「其他平台」自定义输入框（与客户来源联动一致），
  *  且留空校验提示「请输入交易平台名称」；切换到非「其他」时自定义输入消失。 */
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -30,7 +30,7 @@ function Harness() {
   );
 }
 
-describe("DeliveryInfoSection：交易平台「其他」自定义输入（L254）", () => {
+describe("DeliveryInfoSection：交易平台「其他」自定义输入", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

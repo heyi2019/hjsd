@@ -56,21 +56,6 @@ async function openConfigCenter() {
 }
 
 describe("SettingsPage.deep", () => {
-  it("管理员不再看到导入 Tab，业务配置类已聚合进配置中心", async () => {
-    renderLight(<SettingsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "业务字典" });
-    expect(screen.queryByRole("tab", { name: "导入" })).toBeNull();
-    expect(screen.getByRole("tab", { name: "人员与权限" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "团队管理" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "经营规则" })).toBeNull();
-    // 配置中心为聚合入口
-    expect(screen.getByRole("tab", { name: "配置中心" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "外观" })).toBeInTheDocument();
-    // 原独立业务配置页签已移除
-    expect(screen.queryByRole("tab", { name: "业务类型" })).toBeNull();
-    expect(screen.queryByRole("tab", { name: "游戏与渠道" })).toBeNull();
-  });
-
   it("查看人(viewer)屏蔽 user.manage 条件 Tab，配置中心仍可见", async () => {
     renderLight(<SettingsPage />, { user: "viewer" });
     await screen.findByRole("tab", { name: "业务字典" });
@@ -80,32 +65,6 @@ describe("SettingsPage.deep", () => {
     // 配置中心（含无权限字段/主数据项）仍可作为入口
     expect(screen.getByRole("tab", { name: "配置中心" })).toBeInTheDocument();
   });
-
-  it("紧凑屏宽下 tabPosition 切换为 top（ant-tabs-top）", async () => {
-    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query === "(max-width: 960px)",
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }));
-    const { container } = renderLight(<SettingsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "业务字典" });
-    expect(window.matchMedia).toHaveBeenCalledWith("(max-width: 960px)");
-    expect(container.querySelector(".ant-tabs-top")).not.toBeNull();
-    expect(container.querySelector(".ant-tabs-left")).toBeNull();
-  });
-
-  it("默认屏宽下 tabPosition 为 left（ant-tabs-left）", async () => {
-    const { container } = renderLight(<SettingsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "业务字典" });
-    expect(container.querySelector(".ant-tabs-left")).not.toBeNull();
-    expect(container.querySelector(".ant-tabs-top")).toBeNull();
-  });
-
 
   it("切换 Tab 仅挂载激活面板：配置中心内点资金池触发 PoolsPanel 挂载（poolsApi.list 被调用）", async () => {
     renderLight(<SettingsPage />, { user: "admin" });

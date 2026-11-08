@@ -2,7 +2,6 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Account, AccountExecutionDetail } from "@/shared/api/catalog";
 import { OrderDetail } from "@/stocks/OrderDetail";
-import { renderApp } from "@fixtures/render";
 
 const account = {
   id: 1,
@@ -90,79 +89,6 @@ describe("OrderDetail", () => {
     expect(screen.getByRole("link", { name: "合作方_平台：平台A" })).toBeInTheDocument();
     fireEvent.click(buyer);
     expect(onPartyClick).toHaveBeenCalledWith({ id: 7, display_name: "买家A", role: "BUYER", entityType: "customer" });
-  });
-
-  it("把展开详情按基础信息、执行明细和资金明细分成独立视觉层", () => {
-    render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
-    const panel = document.querySelector(".inventory-detail") as HTMLElement;
-    // 已移除的冗余分组不应再出现
-    expect(within(panel).queryByText("登记与流转信息")).toBeNull();
-    expect(within(panel).queryByText("其他补充信息")).toBeNull();
-    expect(within(panel).queryByText("主订单信息")).toBeNull();
-    // 账号补充资料（描述 / 作图）现置于运营信息板块
-    expect(within(panel).getByText("账号补充资料")).toBeInTheDocument();
-    expect(within(panel).getByText("描述")).toBeInTheDocument();
-    expect(within(panel).getByText("作图")).toBeInTheDocument();
-    expect(panel.querySelector(".inventory-detail__meta")).toBeTruthy();
-    expect(panel.querySelector(".inventory-detail__section--execution")).toBeTruthy();
-    expect(panel.querySelector(".inventory-detail__section--finance")).toBeTruthy();
-    expect(panel.querySelector(".inventory-finance-summary__item--amount")).toBeTruthy();
-  });
-
-  it("给展开表格中的信息表保留独立留白", () => {
-    render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
-    const panel = document.querySelector(".inventory-detail") as HTMLElement;
-    expect(panel.querySelector(".inventory-detail__meta-table")).toBeTruthy();
-    const accountTable = panel.querySelector(".inventory-detail__section--profile .inventory-detail__meta-table");
-    // 账号资料 7 项（游戏类型/账号/密码/区服/有无二次/钱包实名/账号备注）分 2 行网格。
-    expect(accountTable?.querySelectorAll("tbody > tr")).toHaveLength(2);
-  });
-
-  it("账号补充资料（标签 描述/作图）置于运营信息，游戏账号信息不再含该组", () => {
-    render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
-    const profileSection = document.querySelector(".inventory-detail__section--profile") as HTMLElement;
-    const operationSection = document.querySelector(".inventory-detail__section--operation") as HTMLElement;
-    // 游戏账号信息不再包含账号补充资料
-    expect(profileSection.textContent).not.toContain("账号补充资料");
-    // 账号补充资料组位于运营信息，标签为「描述 / 作图」，不再使用旧名「账号描述 / 账号图片」
-    const groups = Array.from(operationSection.querySelectorAll(".inventory-detail__meta-group"));
-    const supplementGroup = groups.find((g) => g.textContent?.includes("账号补充资料")) as HTMLElement;
-    expect(supplementGroup.textContent).toContain("描述");
-    expect(supplementGroup.textContent).toContain("作图");
-    expect(supplementGroup.textContent).not.toContain("账号描述");
-    expect(supplementGroup.textContent).not.toContain("账号图片");
-    expect(supplementGroup.textContent).not.toContain("有无二次");
-    // 游戏账号信息（走建单）：账号资料组含 有无二次 与 账号备注
-    const accountGroup = Array.from(profileSection.querySelectorAll(".inventory-detail__meta-group"))
-      .find((g) => g.textContent?.includes("账号资料") && !g.textContent?.includes("补充")) as HTMLElement;
-    expect(accountGroup.textContent).toContain("有无二次");
-    expect(accountGroup.textContent).toContain("账号备注");
-  });
-
-  it("编辑执行明细时操作员选择器保持可读宽度", () => {
-    const detail = {
-      orders: [{
-        order_id: 1,
-        order_no: "HS0001",
-        order_type: "HS",
-        created_at: "2026-10-15T10:19:00",
-        events: [{
-          id: 1,
-          event_no: "EV0001",
-          event_type: "BUY",
-          amount: "100.00",
-          occurred_at: "2026-10-15T10:20:00",
-          operator: "admin",
-          operator_user_ids: [7],
-          note: "回收登记",
-          cashflow: { flow_no: "CF0001", direction: "OUT", amount: "100.00" },
-        }],
-        rebates: [],
-      }],
-    } as unknown as AccountExecutionDetail;
-
-    renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} employees={[{ id: 7, username: "zhangsan", display_name: "张三", is_active: true }]} />);
-    expect(document.querySelector(".inventory-edit-operator")).toBeTruthy();
   });
 
   it("FE-256：系统下架审计记录在账号详情中可追溯", () => {

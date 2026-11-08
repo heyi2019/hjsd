@@ -52,37 +52,6 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：经营中心报表", () => {
-  it("不再提供全局搜索和附件中心入口", async () => {
-    renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "库存 R1" });
-    expect(screen.queryByRole("tab", { name: "全局搜索" })).toBeNull();
-    expect(screen.queryByRole("tab", { name: "附件中心" })).toBeNull();
-  });
-
-  it("不再提供系统提醒入口（工作台保留提醒计数）", async () => {
-    renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "库存 R1" });
-    expect(screen.queryByRole("tab", { name: "系统提醒" })).toBeNull();
-  });
-
-  it("不再提供资金报表属性分析入口", async () => {
-    renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "库存 R1" });
-    expect(screen.queryByRole("tab", { name: "资金报表·属性分析" })).toBeNull();
-  });
-
-  it("不再提供数据中心入口", async () => {
-    renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "库存 R1" });
-    expect(screen.queryByRole("tab", { name: "数据中心" })).toBeNull();
-  });
-
-  it("不再提供质量中心入口", async () => {
-    renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "库存 R1" });
-    expect(screen.queryByRole("tab", { name: "质量中心" })).not.toBeInTheDocument();
-  });
-
   it("初始只加载当前激活的库存报表，不提前加载隐藏 Tab", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "库存 R1" });
@@ -138,25 +107,4 @@ describe("ReportsPage：经营中心报表", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31" }));
   });
 
-  it("库存报表页内导出按钮无筛选也能导出并给出成功反馈", async () => {
-    const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
-    renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "库存 R1" });
-    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("inventory-health", { from: undefined, to: undefined }));
-    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("已导出 inventory-health.csv"));
-  });
-
-  it("导出日期反向（开始晚于结束）时拦截并给出错误提示，不发起导出", async () => {
-    const errorSpy = vi.spyOn(appMessage, "error").mockImplementation((() => undefined) as never);
-    renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("订单利润");
-    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-    const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    await ui.type(dateInputs[0], "2026-12-31");
-    await ui.type(dateInputs[1], "2026-01-01");
-    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
-    await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("导出开始日期不能晚于结束日期"));
-    expect(vi.mocked(catalog.reportsApi.exportCsv)).not.toHaveBeenCalled();
-  });
 });

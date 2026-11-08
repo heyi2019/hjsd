@@ -61,4 +61,3 @@ tests/frontend/module/business/InventoryProfileModal.deep.test.tsx :: phone
 tests/frontend/module/business/OrdersPage.actions.test.tsx :: phone
 tests/frontend/module/customer/CustomersPage.test.tsx :: phone
 tests/frontend/module/settings/UsersPanel.test.tsx :: phone
-tests/frontend/module/system/P0P1Round20261101.test.tsx :: phone

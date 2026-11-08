@@ -254,8 +254,7 @@ describe("InventoryPanel：写入与长路径", () => {
   });
 });
 
-// 原 InventoryConsignmentModal.test.tsx：只读 executionDetail，「已上架记录」的平台名来源（L234）
-describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () => {
+describe("InventoryConsignmentModal 已上架记录平台展示", () => {
   const consignAccount = {
     id: 1,
     source_order_no: "DG-2026-0003",
@@ -339,8 +338,6 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
   });
 });
 
-// —— 原 OrderDetailDeliverySection.test.tsx ——
-// 订单详情「交付明细」区块：只读 props + 字段定义，无页面级挂载。
 describe("OrderDetailDeliverySection", () => {
   beforeEach(() => {
     vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([]);

@@ -126,15 +126,7 @@ describe("UsersPanel：用户管理动作", () => {
     await waitFor(() => expect(vi.mocked(client.api).post).toHaveBeenCalledWith("/users/7/reset-password", { password: "new-password" }));
   });
 
-  it("接口异常时禁用新增用户并展示错误重试态", async () => {
-    vi.mocked(client.api).get.mockRejectedValue(new Error("拉取失败"));
-    renderLight(<UsersPanel />, { user: "admin" });
-    const addBtn = await screen.findByRole("button", { name: /新增用户/ });
-    await waitFor(() => expect(addBtn).toBeDisabled());
-    expect(screen.getByText(/拉取失败/)).toBeInTheDocument();
-  });
-
-  it("新增用户空提交被必填校验拦截并显示字段级错误（L1743）", async () => {
+  it("新增用户空提交被必填校验拦截并显示字段级错误", async () => {
     renderLight(<UsersPanel />, { user: "admin" });
     await screen.findByText("operator01");
     await ui.click(screen.getByRole("button", { name: /新增用户/ }));

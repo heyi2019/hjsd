@@ -6,11 +6,7 @@
  * 照常通过。这类失效是静默的，只有在改代码的人同步改了断言的地方才会暴露。
  * 把「相对路径」本身定为违规，才能把静默失效变成提交时的显式失败。
  *
- * 2026-11-04 大搬迁时存量已**全部清零**（494 处 import、74 处 vi.mock 相对路径改为别名），
- * 故基线文件保留但条目为空：这里不再有「冻结豁免」，新增一条相对路径即红。
- * 搬迁中还借此抓到两处真缺陷：OrdersPage.actions.test.tsx 里
- * `vi.mock("../../stocks/InventoryPanel")` 从 src/orders/ 解析到不存在的 frontend/stocks/，
- * mock 从未命中，测试一直在渲染真组件。
+ * 当前仓库不保留相对路径豁免；新增一条相对路径即红。
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";

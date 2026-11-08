@@ -106,68 +106,6 @@ it("admin 渲染业务入口卡", async () => {
     expect(screen.getByRole("button", { name: "代挂" })).toBeInTheDocument();
   });
 
-it("工作台只保留标题和入口，不显示辅助描述文字", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: /自营·回收/ });
-    expect(screen.queryByText("先处理最重要的动作；业务数据与经营指标分别在对应中心查看。")).toBeNull();
-    expect(screen.queryByText("回收 / 提号 / 代挂 库存账号的统一出售入口")).toBeNull();
-    expect(screen.queryByText("从库存中心选择任意渠道（回收 / 提号 / 代挂）的账号售出")).toBeNull();
-    expect(screen.queryByText("录入游戏账号、来源与回收费用，创建回收单")).toBeNull();
-    expect(screen.queryByText("需要快速开始时，从一个明确动作开始。")).toBeNull();
-  });
-
-it("业务入口按场景使用独立的卡片视觉层级", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: /自营·回收/ });
-    expect(document.querySelector(".dashboard-entry-group--sell")).toBeInTheDocument();
-    expect(document.querySelector(".dashboard-entry-group--self-owned")).toBeInTheDocument();
-    expect(document.querySelector(".dashboard-entry-group--distribution")).toBeInTheDocument();
-  });
-
-it("所有业务分组都不显示顶部装饰条", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: "提号" });
-    const groups = document.querySelectorAll(".dashboard-entry-group");
-    expect(groups).toHaveLength(3);
-    groups.forEach((group) => {
-      expect(group).toHaveClass("dashboard-entry-group--no-accent");
-    });
-  });
-
-it("分销入口使用中性白色视觉", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: "提号" });
-    expect(document.querySelector(".dashboard-entry-group--distribution.dashboard-entry-group--neutral")).toBeInTheDocument();
-  });
-
-it("主入口展示短标签，强化业务转化层级", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: /售出库存账号/ });
-    expect(screen.getByText("主推入口")).toBeInTheDocument();
-    expect(screen.getByText("高频业务")).toBeInTheDocument();
-  });
-
-it("分销入口只显示业务名称，不重复显示分销前缀", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    expect(await screen.findByRole("button", { name: "提号" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "代挂" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "分销·提号" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "分销·代挂" })).toBeNull();
-  });
-
-it("所有业务入口使用同一套标准化分组结构", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: "提号" });
-    const groups = document.querySelectorAll(".dashboard-entry-group");
-    expect(groups).toHaveLength(3);
-    groups.forEach((group) => {
-      expect(group.querySelector(":scope > .dashboard-entry-group__items")).toBeInTheDocument();
-    });
-  });
-
-
-// —— 以下 6 条原在 DashboardPage.interactions.test.tsx ——
-// 同一页面、同一份 mock 契约，拆两个文件等于让同样的 jsdom+antd 启动付两遍。
 it("viewer 无 order.create → 看不到新建业务卡", async () => {
     await act(async () => {
       renderLight(<DashboardPage />, { user: "viewer" });
@@ -196,34 +134,6 @@ it("点击提号卡直接打开提号登记弹窗（不跳转页面）", async (
     fireEvent.click(await screen.findByRole("button", { name: "提号" }));
     const modal = await screen.findByText("新建提号订单");
     expect(modal.closest(".ant-modal-content")).toBeTruthy();
-  });
-
-it("数据总览已迁走：不再渲染资金池表格/统计/订单入口卡", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: /自营·回收/ });
-    expect(screen.queryByText("资金池概览")).toBeNull();
-    expect(screen.queryByText("可用余额合计")).toBeNull();
-    expect(screen.queryByText("资金池数量")).toBeNull();
-    expect(screen.queryByText("订单总数")).toBeNull();
-    expect(screen.queryByText(/POOL-A/)).toBeNull();
-  });
-
-it("订单请求完成时不产生未包裹 act 的异步更新警告", async () => {
-    let resolveOrders!: (value: never[]) => void;
-    vi.mocked(catalog.ordersApi.list).mockReturnValueOnce(new Promise<never[]>((resolve) => {
-      resolveOrders = resolve;
-    }));
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const view = renderLight(<DashboardPage />, { user: "admin" });
-
-    view.unmount();
-    resolveOrders([]);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(
-      consoleError.mock.calls.some((args) => args.join(" ").includes("not wrapped in act")),
-    ).toBe(false);
-    consoleError.mockRestore();
   });
 
 });

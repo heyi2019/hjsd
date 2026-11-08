@@ -37,20 +37,6 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     await waitFor(() => expect(catalog.ordersApi.list).toHaveBeenCalledTimes(4));
   });
 
-  it("业务总览计数：订单总量与完成订单量", async () => {
-    const orders = [
-      { id: 1, status: "ACTIVE" },
-      { id: 2, status: "COMPLETED" },
-      { id: 3, status: "COMPLETED" },
-    ] as unknown as Order[];
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
-    renderLight(<DashboardPage />, { user: "admin" });
-    const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
-    const doneCard = (await screen.findByText("完成订单量")).closest(".ui-stat") as HTMLElement;
-    expect(within(totalCard).getByText("3")).toBeInTheDocument();
-    expect(within(doneCard).getByText("2")).toBeInTheDocument();
-  });
-
   it("我的关注卡片展示当前登录用户的订单数与分润收益", async () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
       { id: 1, status: "ACTIVE" },

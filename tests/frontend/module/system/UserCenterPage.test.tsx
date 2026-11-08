@@ -85,7 +85,7 @@ describe("UserCenterPage：账号信息与修改密码", () => {
     expect(screen.queryByText("登录工作台")).not.toBeInTheDocument();
   });
 
-  it("退出登录需二次确认，确认后才登出（L1611）", async () => {
+  it("退出登录需二次确认，确认后才登出", async () => {
     const ui = userEvent.setup();
     renderLight(<UserCenterPage />, { user: "admin" });
     await ui.click(screen.getByRole("button", { name: /退出登录/ }));

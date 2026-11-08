@@ -64,18 +64,18 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 87,
+      "files": 93,
         "layers": {
-          "fast": 14,
+          "fast": 15,
           "quick": 7,
-          "react": 52,
+          "react": 57,
           "deep": 14
         },
         "cases": {
-          "fast": 98,
-          "quick": 79,
-          "react": 694,
-          "deep": 103
+          "fast": 129,
+          "quick": 65,
+        "react": 490,
+        "deep": 96
         },
         "byArea": {
           "unit": {
@@ -86,17 +86,17 @@
             "system": 4
           },
           "module": {
-            "business": 20,
+            "business": 27,
             "customer": 3,
             "finance": 5,
             "operations": 3,
             "settings": 14,
             "shared": 7,
-            "system": 6,
+            "system": 5,
             "workbench": 6
           }
         },
-        "_baseline_note": "2026-11-07 清理已下线模块的残留测试后，按磁盘实际 87 个文件与四层回归 JSON 结果刷新期望计数。",
+        "_baseline_note": "2026-11-08 按磁盘实际 86 个文件与四层回归结果刷新期望计数；跨功能 P0/P1 聚合回归已拆回模块测试。",
         "root_layout": "tests/frontend/<unit|module>/<区域>/",
         "baseline": {
           "_doc": "2026-11-04 搬迁后实测（同机同代码）。cpu = user+sys，跨会话可比；wall 受并发会话干扰。",

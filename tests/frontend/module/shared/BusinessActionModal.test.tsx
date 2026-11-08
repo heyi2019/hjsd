@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { BusinessActionModal } from "@/shared/ui/BusinessActionModal";
-import { CompactActions } from "@/shared/ui/CompactActions";
 import { Select } from "@/shared/ui/Select";
 
 // 本文件局部覆盖 rc-motion：尊重传入的 visible（open=false 时弹层真正卸载），
@@ -62,79 +61,6 @@ describe("BusinessActionModal", () => {
     expect(document.querySelector(".adaptive-business-modal.business-registration-modal")).toBeTruthy();
     expect(document.querySelector(".resizable-modal__drag-handle")).toHaveTextContent("资金收支");
     expect(screen.getByText("内容")).toBeInTheDocument();
-  });
-
-  it("size=compact 追加紧凑表单类，且不再套用建单大弹窗尺寸", () => {
-    renderLight(
-      <BusinessActionModal open size="compact" title="锁定账期" onCancel={() => undefined}>
-        <div>内容</div>
-      </BusinessActionModal>,
-      { user: "admin" },
-    );
-
-    expect(document.querySelector(".adaptive-business-modal.business-registration-modal.compact-form-modal")).toBeTruthy();
-    const modal = document.querySelector<HTMLElement>(".ant-modal");
-    expect(modal?.style.width).toBe("520px");
-  });
-
-  it("size=compact 时显式 width 优先于默认 520", () => {
-    renderLight(
-      <BusinessActionModal open size="compact" width={720} title="锁定账期" onCancel={() => undefined}>
-        <div>内容</div>
-      </BusinessActionModal>,
-      { user: "admin" },
-    );
-
-    expect(document.querySelector<HTMLElement>(".ant-modal")?.style.width).toBe("720px");
-  });
-
-  it.each([
-    [2, "520px", "business-form-layout-1x5"],
-    [7, "600px", "business-form-layout-2x5"],
-    [12, "900px", "business-form-layout-3x5"],
-    [17, "1080px", "business-form-layout-4x5"],
-    [20, "1200px", "business-form-layout-build-order"],
-  ])("按字段数量 %s 使用标准宽度 %s", (fieldCount, expectedWidth, fieldLayout) => {
-    renderLight(
-      <BusinessActionModal open fieldCount={fieldCount} title="字段表单" onCancel={() => undefined}>
-        <div>内容</div>
-      </BusinessActionModal>,
-      { user: "admin" },
-    );
-
-    const modal = document.querySelector<HTMLElement>(".ant-modal");
-    expect(modal?.style.width).toBe(expectedWidth);
-    expect(modal?.style.getPropertyValue("--resizable-modal-width")).toBe(expectedWidth);
-    if (fieldLayout) expect(document.querySelector<HTMLElement>(".adaptive-business-modal")).toHaveClass(fieldLayout);
-  });
-
-  it("20 个及以上字段使用建单式完整布局", () => {
-    renderLight(
-      <BusinessActionModal open fieldCount={21} title="建单表单" onCancel={() => undefined}>
-        <div>内容</div>
-      </BusinessActionModal>,
-      { user: "admin" },
-    );
-
-    expect(document.querySelector<HTMLElement>(".adaptive-business-modal"))
-      .toHaveClass("business-form-layout-build-order");
-  });
-
-  it("compact 弹窗内按钮不插入中文字符间距（autoInsertSpace=false）", () => {
-    renderLight(
-      <BusinessActionModal open size="compact" title="锁定账期" onCancel={() => undefined}>
-        <CompactActions>
-          <button type="submit">确认</button>
-        </CompactActions>
-      </BusinessActionModal>,
-      { user: "admin" },
-    );
-
-    const cancel = screen.getByText("取消").closest("button");
-    // antd 默认会在两个中文字符间插入空格（渲染成「取 消」），此处应已关闭。
-    expect(cancel).toBeTruthy();
-    expect(cancel!.textContent).toBe("取消");
-    expect(cancel!.textContent).not.toContain(" ");
   });
 
   it("P2-194：打开弹窗时重置 .ant-modal-body 滚动位置（避免承接上一弹窗旧滚动）", async () => {

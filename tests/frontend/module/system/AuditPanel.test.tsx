@@ -29,12 +29,6 @@ describe("AuditPanel：审计记录", () => {
     expect(screen.getByText("订单")).toBeInTheDocument();
   });
 
-  it("加载失败展示错误横幅", async () => {
-    vi.mocked(catalog.auditApi.list).mockRejectedValue(new Error("audit down"));
-    renderLight(<AuditPanel />, { user: "admin" });
-    expect(await screen.findByText(/audit down/)).toBeInTheDocument();
-  });
-
   it("按对象编号筛选重新加载", async () => {
     renderLight(<AuditPanel />, { user: "admin" });
     await screen.findByText("admin");

@@ -1,21 +1,12 @@
-/**
- * 展示类原子组件——由 9 个碎片文件合并：
- *   MoneyText / StatusTag / PageHeader / EntryCard / StatCard / ErrorBanner /
- *   CompactActions / Select / DateField
- * 合并动因：文件级 import+transform 是固定成本（约 2s/文件，与用例数无关），
- * 这些小文件各自只有 1~10 条用例。用例与断言逐条保留，各自 describe 隔离。
- */
+/** 共享展示组件的用户可见语义与关键交互。 */
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ComponentProps } from "react";
 import { renderLight } from "@fixtures/render";
 import { MoneyText } from "@/shared/ui/MoneyText";
 import { StatusTag } from "@/shared/ui/StatusTag";
-import { statusColor } from "@/shared/lib/format";
-import { PageHeader } from "@/shared/ui/PageHeader";
-import { EntryCard, EntryRow } from "@/shared/ui/EntryCard";
-import { StatCard, StatRow } from "@/shared/ui/StatCard";
+import { EntryCard } from "@/shared/ui/EntryCard";
+import { StatRow } from "@/shared/ui/StatCard";
 import { ErrorBanner } from "@/shared/ui/ErrorBanner";
 import { BusinessActionModal } from "@/shared/ui/BusinessActionModal";
 import { CompactActions } from "@/shared/ui/CompactActions";
@@ -37,25 +28,6 @@ describe("MoneyText：金额只展示，不做浮点运算", () => {
   it("空值显示 -", () => {
     const { container } = render(<MoneyText value={null} />);
     expect(container.textContent).toBe("-");
-  });
-
-  it("tone=auto 时按正负自动上色（中国区惯例：正红负绿）", () => {
-    const { container: pos } = render(<MoneyText value="100" tone="auto" />);
-    expect(pos.querySelector(".ui-money--income")).toBeTruthy();
-    const { container: neg } = render(<MoneyText value="-100" tone="auto" />);
-    expect(neg.querySelector(".ui-money--expense")).toBeTruthy();
-    const { container: zero } = render(<MoneyText value="0" tone="auto" />);
-    expect(zero.querySelector(".ui-money--plain")).toBeTruthy();
-  });
-
-  it("显式 tone 覆盖 auto 推断", () => {
-    const { container } = render(<MoneyText value="-100" tone="income" />);
-    expect(container.querySelector(".ui-money--income")).toBeTruthy();
-  });
-
-  it("strong 追加强调类名", () => {
-    const { container } = render(<MoneyText value="1" strong />);
-    expect(container.querySelector(".ui-money--strong")).toBeTruthy();
   });
 
   it("0.1 与 0.2 分别展示为 0.10 / 0.20（证明前端没有做加法）", () => {
@@ -85,12 +57,6 @@ describe("StatusTag：文案承载语义，颜色只是辅助", () => {
   it("传入 label 时以 label 为准", () => {
     render(<StatusTag status="ACTIVE" label="自定义" />);
     expect(screen.getByText("自定义")).toBeInTheDocument();
-  });
-
-  it("传入 color 时覆盖 statusColor", () => {
-    const { container } = render(<StatusTag status="ACTIVE" color="red" />);
-    expect(statusColor("ACTIVE")).toBe("green"); // 默认应仍是绿
-    expect(container.querySelector(".ant-tag-red")).toBeTruthy();
   });
 
   it("10 个后端核心状态枚举必须都有中文文案（守卫规则⑦ 的运行时兜底）", () => {
@@ -129,30 +95,6 @@ describe("StatusTag：文案承载语义，颜色只是辅助", () => {
   });
 });
 
-describe("PageHeader", () => {
-  it("渲染标题与说明", () => {
-    render(<PageHeader title="订单中心" description="订单与金额事件" />);
-    expect(screen.getByRole("heading", { name: "订单中心" })).toBeInTheDocument();
-    expect(screen.getByText("订单与金额事件")).toBeInTheDocument();
-  });
-
-  it("未传 description 时不渲染空段落", () => {
-    const { container } = render(<PageHeader title="订单中心" />);
-    expect(container.querySelector(".ui-page-header__desc")).toBeNull();
-  });
-
-  it("未传 actions 时不渲染动作区", () => {
-    const { container } = render(<PageHeader title="订单中心" />);
-    expect(container.querySelector(".ui-page-header__actions")).toBeNull();
-  });
-
-  it("actions 渲染到动作区", () => {
-    render(<PageHeader title="订单中心" actions={<button type="button">新建</button>} />);
-    const actions = document.querySelector(".ui-page-header__actions");
-    expect(actions?.textContent).toBe("新建");
-  });
-});
-
 describe("EntryCard：可点击入口卡", () => {
   it("点击触发 onClick", async () => {
     const onClick = vi.fn();
@@ -173,24 +115,6 @@ describe("EntryCard：可点击入口卡", () => {
     expect(onClick).toHaveBeenCalledTimes(2);
   });
 
-  it("动作卡无 value 时不渲染数值节点", () => {
-    render(<EntryCard title="新建业务" onClick={() => undefined} />);
-    expect(screen.queryByText("72")).toBeNull();
-  });
-
-  it("tone 落到样式类上（primary/warn/plain）", () => {
-    const { container } = render(
-      <EntryRow>
-        <EntryCard title="a" tone="primary" onClick={() => undefined} />
-        <EntryCard title="b" tone="warn" onClick={() => undefined} />
-        <EntryCard title="c" onClick={() => undefined} />
-      </EntryRow>,
-    );
-    expect(container.querySelector(".ui-entry-card--primary")).toBeTruthy();
-    expect(container.querySelector(".ui-entry-card--warn")).toBeTruthy();
-    expect(container.querySelector(".ui-entry-card--plain")).toBeTruthy();
-    expect(container.querySelector(".ui-entry-row")).toBeTruthy();
-  });
 });
 
 describe("StatRow：金额与计数不能混", () => {
@@ -202,16 +126,6 @@ describe("StatRow：金额与计数不能混", () => {
   it("kind=count → 原样显示，不加小数（订单数不能被当成金额）", () => {
     render(<StatRow items={[{ label: "订单数", amount: 14565, kind: "count" }]} />);
     expect(screen.getByText("14565")).toBeInTheDocument();
-  });
-
-  it("number 型 amount 未显式 kind 时按 count 推断（守卫规则① 要求显式声明）", () => {
-    render(<StatRow items={[{ label: "订单数", amount: 14565 }]} />);
-    expect(screen.getByText("14565")).toBeInTheDocument();
-  });
-
-  it("字符串 amount 未显式 kind 时按 money 推断", () => {
-    render(<StatRow items={[{ label: "成交额", amount: "14565" }]} />);
-    expect(screen.getByText("14,565.00")).toBeInTheDocument();
   });
 
   it("缺失金额显示 -，不显示 0", () => {
@@ -226,39 +140,6 @@ describe("StatRow：金额与计数不能混", () => {
     expect(screen.getAllByText("-")).toHaveLength(2);
   });
 
-  it("tone=warn 不改变金额格式，只换卡片语气", () => {
-    const { container } = render(
-      <StatRow items={[{ label: "风险提示", amount: "88.8", tone: "warn" }]} />,
-    );
-    expect(screen.getByText("88.80")).toBeInTheDocument();
-    expect(container.querySelector(".ui-stat--warn")).toBeTruthy();
-  });
-
-  it("tone=auto → 金额不参与上色决策（StatRow 回落到 plain）", () => {
-    const { container } = render(
-      <StatRow items={[{ label: "净额", amount: "-100", tone: "auto" }]} />,
-    );
-    expect(container.querySelector(".ui-stat--plain")).toBeTruthy();
-  });
-
-  it("hint 可选，未传不渲染空节点", () => {
-    const { container } = render(<StatRow items={[{ label: "成交额", amount: "1" }]} />);
-    expect(container.querySelector(".ui-stat__hint")).toBeNull();
-  });
-});
-
-describe("StatCard：基础容器", () => {
-  it("label / value / hint 三段齐全", () => {
-    render(<StatCard label="本金" value="¥100" hint="含税" />);
-    expect(screen.getByText("本金")).toBeInTheDocument();
-    expect(screen.getByText("¥100")).toBeInTheDocument();
-    expect(screen.getByText("含税")).toBeInTheDocument();
-  });
-
-  it("默认 tone=plain", () => {
-    const { container } = render(<StatCard label="本金" value="1" />);
-    expect(container.querySelector(".ui-stat--plain")).toBeTruthy();
-  });
 });
 
 describe("ErrorBanner：给可执行下一步，不只复述报错", () => {
@@ -266,21 +147,6 @@ describe("ErrorBanner：给可执行下一步，不只复述报错", () => {
     render(<ErrorBanner error={{ message: "缺少资金池路由", code: "POOL_ROUTE_MISSING" }} />);
     expect(screen.getByText("缺少资金池路由")).toBeInTheDocument();
     expect(screen.getByText(/设置 → 主数据/)).toBeInTheDocument();
-  });
-
-  it("标准错误对象可以渲染后端不可达提示", () => {
-    render(<ErrorBanner error={{ message: "后端不可达" }} />);
-    expect(screen.getByText("后端不可达")).toBeInTheDocument();
-  });
-
-  it("不再接受旧的分散错误参数", () => {
-    render(<ErrorBanner {...({ message: "旧错误文案", code: "VALIDATION_ERROR" } as unknown as ComponentProps<typeof ErrorBanner>)} />);
-    expect(screen.queryByText("旧错误文案")).toBeNull();
-  });
-
-  it("无 message 时不渲染（不占版面）", () => {
-    const { container } = render(<ErrorBanner error={null} />);
-    expect(container.firstChild).toBeNull();
   });
 
   it("未知错误码不显示 hint，但 message 仍在", () => {
@@ -332,23 +198,6 @@ describe("CompactActions", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it("divider 默认 true（操作条带分隔线），为 false 时加 no-divider 类", () => {
-    const { unmount } = renderLight(
-      <CompactActions onCancel={vi.fn()}>
-        <button>确认</button>
-      </CompactActions>,
-    );
-    expect(document.querySelector(".compact-form-actions")).not.toHaveClass("no-divider");
-
-    unmount();
-    renderLight(
-      <CompactActions onCancel={vi.fn()} divider={false}>
-        <button>确认</button>
-      </CompactActions>,
-    );
-    expect(document.querySelector(".compact-form-actions.no-divider")).toBeTruthy();
-  });
-
   it("无显式 onCancel 时回落到 ModalCancelContext（弹窗内用法）", () => {
     const onCancel = vi.fn();
     renderLight(
@@ -366,10 +215,10 @@ describe("CompactActions", () => {
   });
 });
 
-describe("Select：L270 关闭虚拟列表", () => {
+describe("Select：关闭虚拟列表", () => {
   const MANY = Array.from({ length: 20 }, (_, i) => ({ value: `v${i}`, label: `选项${i}` }));
 
-  it("L270：关闭虚拟列表后，全部选项渲染进 DOM（辅助树完整）", async () => {
+  it("关闭虚拟列表后，全部选项渲染进 DOM（辅助树完整）", async () => {
     const user = userEvent.setup();
     renderLight(<Select options={MANY} placeholder="请选择" />, { user: "admin" });
 

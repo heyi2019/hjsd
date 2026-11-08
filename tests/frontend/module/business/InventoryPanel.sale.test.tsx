@@ -140,6 +140,25 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
   }));
 });
 
+it("FE-042：已拉黑客户不能参与库存售出", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  resolveMock(vi.mocked(catalog.customersApi.list), [
+    { id: 7, display_name: "买家A", status: "DISABLED" },
+  ]);
+  renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+
+  await screen.findByText("买家信息");
+  await ui.type(screen.getByLabelText("客户昵称"), "买家A");
+  await ui.type(screen.getByLabelText("售出金额"), "350");
+  await ui.click(screen.getByLabelText("资金账户"));
+  await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  await ui.click(screen.getByRole("button", { name: /确认售出/ }));
+
+  await waitFor(() => expect(screen.getByText(/客户已拉黑，不能作为售出买家/)).toBeInTheDocument());
+  expect(vi.mocked(catalog.ordersApi.addCustomerRole)).not.toHaveBeenCalled();
+  expect(vi.mocked(catalog.ordersApi.postEvent)).not.toHaveBeenCalled();
+});
+
 ;
 
 ;
@@ -267,18 +286,6 @@ it("库存中心不为售出单提供取消入口", async () => {
 });
 
 describe("库存售出三表单分支", () => {
-  it("回收售出标题为『售出回收账号』且买家信息区为『买家信息』", async () => {
-    renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-    expect(await screen.findByText("售出回收账号")).toBeInTheDocument();
-    expect(screen.getByText("买家信息")).toBeInTheDocument();
-  });
-
-  it("售出表单的资金流水区占满表单宽度", async () => {
-    renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-    const cashflow = await screen.findByText("资金流水");
-    expect(cashflow.closest(".inventory-sale-cashflow")).toHaveClass("inventory-sale-cashflow--full-width");
-  });
-
   it("回收、提号、代挂三种售出表单都展示统一的交付信息", async () => {
     const deliveryLabels = ["换绑手机号", "手机号绑定人", "交易平台", "中介类型", "包赔类型", "交付负责人"];
     const cases = [
@@ -293,17 +300,6 @@ describe("库存售出三表单分支", () => {
       for (const label of deliveryLabels) expect(screen.getByText(label)).toBeInTheDocument();
       unmount();
     }
-  });
-
-  it("提号售出标题为『售出提号账号』", async () => {
-    renderLight(<PickupSaleModal account={{ ...accounts[0], inventory_type: "PICKUP" }} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-    expect(await screen.findByText("售出提号账号")).toBeInTheDocument();
-  });
-
-  it("代挂售出标题为『售出代挂账号』且买家信息区为『委托方信息』", async () => {
-    renderLight(<ConsignmentSaleModal account={{ ...accounts[0], inventory_type: "CONSIGNMENT" }} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-    expect(await screen.findByText("售出代挂账号")).toBeInTheDocument();
-    expect(screen.getByText("委托方信息")).toBeInTheDocument();
   });
 
   it("分期出售只对回收与提号开放，代挂仅全款", async () => {

@@ -3,11 +3,14 @@
   "private": true,
   "version": "1.0.5",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "vite --host",
-    "build": "node scripts/ui_guards.mjs && tsc -p tsconfig.app.json && vite build",
+    "build": "node scripts/ui_guards.mjs && tsc -p tsconfig.app.json && vite build && node scripts/bundle_guard.mjs",
     "check": "node scripts/ui_guards.mjs && tsc",
-    "test": "vitest run --project=quick",
+    "test": "node scripts/test-full-sharded.mjs --light-only",
     "test:unit": "vitest run --project=fast",
     "test:panel": "node scripts/test-panel.mjs",
     "audit:ux": "node scripts/ux-audit.mjs",

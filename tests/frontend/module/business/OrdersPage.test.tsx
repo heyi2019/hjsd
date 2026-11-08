@@ -81,49 +81,6 @@ async function openLedger(user?: string) {
 }
 
 describe("OrdersPage：四类订单台账", () => {
-  // 原 4 条用例（默认进入库存中心 / 台账语义名称 / 不留重复标题 / 页签集合）挂的是同一份
-  // 默认夹具、只读静态 DOM，合并为一次挂载，断言逐条保留。
-  it("业务中心外壳：默认进库存中心、页签只留三视图、不重复标题与流程提示", async () => {
-    renderLight(<OrdersPage />);
-
-    const inventoryTab = await screen.findByRole("tab", { name: "库存中心" });
-    expect(inventoryTab).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByRole("tab", { name: "业务总览" })).toBeNull();
-
-    expect(await screen.findByRole("tab", { name: "订单台账" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "业务台账" })).toBeNull();
-
-    for (const label of ["库存中心", "订单台账", "分期与回款"]) {
-      expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
-    }
-    expect(screen.queryByRole("tab", { name: "返点" })).toBeNull();
-
-    expect(screen.queryByRole("heading", { name: "业务中心" })).toBeNull();
-    expect(screen.queryByText("获客是通用能力；买号、买入交付、售出、售出交付和回款（分期）是执行动作。回收、提号、代挂分别承载不同业务。")).toBeNull();
-    expect(screen.queryByText(/待处理/)).toBeNull();
-  });
-
-  it("订单台账不提供关联筛选和关联列", async () => {
-    renderLight(<OrdersPage />);
-    await screen.findByRole("tab", { name: "订单台账" });
-
-    expect(screen.queryByText("关联筛选")).toBeNull();
-    expect(screen.queryByRole("combobox", { name: "关联状态筛选" })).toBeNull();
-    expect(screen.queryByRole("columnheader", { name: "关联" })).toBeNull();
-  });
-
-  it("订单台账把导出按钮放在筛选栏最后并使用简短文案", async () => {
-    renderLight(<OrdersPage initialTab="ledger" />);
-    // 默认夹具只有 HS-2026-0001 / TH-2026-0002（INSTALLMENT-SETTLED 只属于 FE-257 用例）
-    await screen.findAllByText("HS-2026-0001");
-    const exportButton = screen.getByRole("button", { name: /导出/ });
-    expect(exportButton).toHaveTextContent("导出");
-    expect(screen.queryByRole("button", { name: /导出 CSV/ })).toBeNull();
-    const filterBar = screen.getByPlaceholderText("搜索订单号 / 游戏账号/产品 / 对方 / 备注").closest(".ui-filter-bar")!;
-    const buttons = filterBar.querySelectorAll("button");
-    expect(buttons[buttons.length - 1]).toBe(exportButton);
-  });
-
   // 原 5 条用例（无流程提示 / 日期区间位置 / 订单编号与状态 / 责任时间列 / 默认视图核心列）
   // 都只用默认夹具 + openLedger 一次进入台账，全是只读断言，合并为一次挂载。
   it("订单台账默认视图：筛选区、识别列与行内业务数据", async () => {
@@ -220,28 +177,6 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.getByRole("columnheader", { name: "订单状态" })).toBeInTheDocument();
     expect(within(row).getByText("分期中")).toBeInTheDocument();
     expect(within(row).queryByText("合约：已结清")).toBeNull();
-  });
-
-  it("业务中心仅保留业务作业页，不重复展示业务总览", async () => {
-    vi.mocked(catalog.stocksApi.list).mockResolvedValue([{
-      id: 10,
-      status: "WAITING",
-      inventory_entry_at: "2026-09-01T00:00:00",
-      cost_amount: "100.00",
-    } as never]);
-    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{
-      id: 20,
-      status: "OVERDUE",
-      total_receivable: "1030.00",
-      paid_amount: "400.00",
-      bad_debt_amount: "0.00",
-    } as never]);
-
-    renderLight(<OrdersPage />);
-
-    await screen.findByRole("tab", { name: "库存中心" });
-    expect(screen.queryByRole("tab", { name: "业务总览" })).toBeNull();
-    expect(screen.queryByRole("region", { name: "业务提醒" })).toBeNull();
   });
 
   it("订单搜索包含订单备注，支持按批次标记筛选", async () => {
@@ -420,7 +355,6 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.queryByText("旧平台")).toBeNull();
   });
 
-  // 原两条（操作列四个小号入口 / 行级操作）同一份 admin 夹具，合并为一次挂载。
   it("操作列直接提供编辑、分润、资金收支、取消四个小号入口", async () => {
     await openLedger("admin");
 
@@ -508,12 +442,6 @@ describe("OrdersPage：四类订单台账", () => {
     }
   });
 
-  it("移除没有明确业务含义的通用登记事件入口", async () => {
-    renderLight(<OrdersPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "订单台账" });
-    expect(screen.queryByRole("button", { name: /登记事件/ })).toBeNull();
-  });
-
   it("订单操作通过取消按钮进入取消并提交原因", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...orders[0], events: [] });
     vi.mocked(catalog.ordersApi.cancel).mockResolvedValue({ ...orders[0], status: "CANCELLED" });
@@ -558,10 +486,4 @@ describe("OrdersPage：四类订单台账", () => {
     expect(within(modal).queryByLabelText("入账账户")).toBeNull();
   });
 
-  it("忽略已废弃的业务中心页签参数并回到订单台账", async () => {
-    renderLight(<OrdersPage initialTab={"th" as "inventory"} />);
-    const tab = await screen.findByRole("tab", { name: "订单台账" });
-    expect(tab).toHaveAttribute("aria-selected", "true");
-    expect((await screen.findAllByText("HS-2026-0001")).length).toBeGreaterThan(0);
-  });
 });

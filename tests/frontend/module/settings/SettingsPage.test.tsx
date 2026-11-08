@@ -51,12 +51,6 @@ it("业务字典按账号流转、资金动作和账务动作三层结构渲染"
   expect(document.querySelectorAll(".business-dictionary__action-line").length).toBeGreaterThan(10);
 });
 
-it("设置页不再提供独立的配置改动追溯入口", () => {
-  renderLight(<SettingsPage />, { user: "admin" });
-
-  expect(screen.queryByRole("tab", { name: "改动追溯" })).not.toBeInTheDocument();
-});
-
 it("业务字典可进入编辑态并保存全员共享内容", async () => {
   vi.mocked(catalog.optionSetsApi.get).mockResolvedValue({
     id: 1,

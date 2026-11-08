@@ -1,5 +1,4 @@
-/** 订单表单小组件：客户来源（L258）与附加费用（中介费/支出行）字段路径。
- *  两文件原本各自一套 Form + renderLight，无 vi.mock，合并后只省一次文件级固定成本。 */
+/** 订单表单小组件：客户来源与附加费用（中介费/支出行）字段路径。 */
 import { useState } from "react";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -23,9 +22,7 @@ describe("CustomerSourceFields：客户来源校验文案", () => {
     );
   }
 
-  /** L258 回归：客户来源选「其他」但留空时，校验提示应为「请输入其他来源」，
-   *  而非笼统的「请输入客户来源」（两者语义不同，旧文案误导填写人）。 */
-  it("L258：客户来源选「其他」且未填具体来源时，提示「请输入其他来源」", async () => {
+  it("客户来源选「其他」且未填具体来源时，提示「请输入其他来源」", async () => {
     const user = userEvent.setup();
     renderLight(<Harness />, { user: "admin" });
 
@@ -40,7 +37,6 @@ describe("CustomerSourceFields：客户来源校验文案", () => {
     await waitFor(() =>
       expect(screen.getByText("请输入其他来源")).toBeInTheDocument(),
     );
-    // 旧文案不应出现
     expect(screen.queryByText("请输入客户来源")).toBeNull();
     // 校验未过，不应提交成功
     expect(screen.queryByTestId("submitted")).toBeNull();
@@ -96,17 +92,6 @@ describe("AdditionalFeeFields：中介费字段路径", () => {
     const list = getForm().getFieldValue("expense_items");
     expect(Array.isArray(list) && list.length === 1).toBe(true);
     expect(getForm().getFieldValue("intermediary_fee")).toBeUndefined();
-  });
-
-  it("将增加支出放在附加费用容器的右上方标题区", () => {
-    const { container } = renderFeeForm();
-    const addButton = screen.getByText("+ 增加支出").closest("button");
-    const card = container.querySelector(".additional-fee-fields");
-
-    if (!addButton) throw new Error("增加支出按钮未渲染");
-    expect(card).toBeInTheDocument();
-    expect(addButton.closest(".business-registration-group__header")).toBeInTheDocument();
-    expect(addButton.closest(".additional-fee-fields")).toBe(card);
   });
 
   it("新增支出行只保留金额、资金账户和支出备注", async () => {

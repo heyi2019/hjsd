@@ -12,7 +12,7 @@ describe("BusinessReminderSettingsPanel", () => {
     vi.clearAllMocks();
   });
 
-  it("业务提醒读取失败时锁定保存按钮并提供重试入口（L1659）", async () => {
+  it("业务提醒读取失败时锁定保存按钮并提供重试入口", async () => {
     vi.mocked(catalog.optionSetsApi).get.mockRejectedValue(new Error("提醒配置读取失败"));
     renderLight(<BusinessReminderSettingsPanel />, { user: "admin" });
 
@@ -24,7 +24,7 @@ describe("BusinessReminderSettingsPanel", () => {
     expect(screen.getByRole("button", { name: /重新加载/ })).toBeInTheDocument();
   });
 
-  it("业务提醒正常加载后保存按钮可用（L1659 反向保障）", async () => {
+  it("业务提醒正常加载后保存按钮可用", async () => {
     vi.mocked(catalog.optionSetsApi).get.mockResolvedValue({
       options: [{ value: "inventory_aging_days", label: "库存订单超过多少天提醒", value2: "7" }],
     } as never);

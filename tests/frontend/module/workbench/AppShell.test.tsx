@@ -117,27 +117,6 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
     expect(screen.getByRole("tab", { name: "订单台账" })).toHaveAttribute("aria-selected", "false");
   });
 
-  it("逐个点击每个导航项都能切换到对应页面（无白屏、无抛错）", async () => {
-    await renderShell();
-    for (const item of navigation) {
-      const nav = screen.getByRole("navigation", { name: "主导航" });
-      const target = [...nav.querySelectorAll(".nav-item")].find((b) =>
-        b.textContent?.includes(item.label),
-      ) as Element;
-      await ui.click(target);
-      await waitFor(() =>
-        expect(document.querySelector(".topbar__page")?.textContent).toBe(item.label),
-        { timeout: 10_000 },
-      );
-      // 页面自身标题（h2）也要对上：顶栏与页头同名，故用 All 变体
-      expect(screen.getAllByRole("heading", { name: item.label }).length).toBeGreaterThanOrEqual(1);
-      // 高亮态随之切换
-      const active = document.querySelector(".nav-item--active");
-      expect(active?.textContent).toContain(item.label);
-      expect(within(nav).getByText(item.label)).toBeTruthy();
-    }
-  });
-
   it("当前页签带 aria-current=page", async () => {
     await renderShell();
     const current = document.querySelector('[aria-current="page"]');

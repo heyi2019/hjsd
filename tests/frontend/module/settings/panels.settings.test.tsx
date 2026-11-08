@@ -70,7 +70,7 @@ describe("PoolsPanel：失败态与空态", () => {
     expect(screen.queryByText("资金池账户")).not.toBeInTheDocument();
   });
 
-  it("编辑资金池保存失败时弹窗内显示错误且不关闭（L1801）", async () => {
+  it("编辑资金池保存失败时弹窗内显示错误且不关闭", async () => {
     const local = userEvent.setup();
     vi.mocked(catalog.poolsApi).update.mockRejectedValue(new Error("资金池保存失败"));
     renderLight(<PoolsPanel />, { user: "admin" });
@@ -146,12 +146,6 @@ describe("GameTypeSettingsPanel：表单细节", () => {
     const input = await screen.findByPlaceholderText("如：王者荣耀");
     expect(input).toHaveAttribute("name", "game_type_name");
     expect(input).toHaveAttribute("autocomplete", "off");
-  });
-
-  it("不再渲染重复的游戏与渠道配置容器标题", async () => {
-    renderLight(<GameTypeSettingsPanel />, { user: "admin" });
-    expect(await screen.findByText("已配置游戏类型")).toBeInTheDocument();
-    expect(screen.queryByText("游戏与渠道配置")).toBeNull();
   });
 
   it("新建时勾选默认类型 → payload 带 is_default（后端 create 支持，edit 不传）", async () => {

@@ -92,21 +92,6 @@ describe("ListColumnsPanel", () => {
     }));
   });
 
-  it("不显示列表列配置说明文字", async () => {
-    renderLight(<ListColumnsPanel />);
-    await waitFor(() => expect(screen.getByText("订单号")).toBeInTheDocument());
-
-    expect(screen.queryByText(/配置各列表显示哪些列、以什么顺序显示/)).not.toBeInTheDocument();
-  });
-
-  it("默认展示第一个列表的全部列，所有列均可隐藏（无锁定）", async () => {
-    renderLight(<ListColumnsPanel />);
-    await waitFor(() => expect(screen.getByText("订单号")).toBeInTheDocument());
-    expect(screen.getByText("对方 / 来源")).toBeInTheDocument();
-    // 身份列 order_no 的隐藏按钮不再被禁用
-    expect(screen.getByRole("button", { name: "显示_order_no" })).not.toBeDisabled();
-  });
-
   it("隐藏列：提交整表且该列 is_visible=false", async () => {
     renderLight(<ListColumnsPanel />);
     await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());

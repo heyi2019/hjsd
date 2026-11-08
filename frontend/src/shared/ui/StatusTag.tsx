@@ -29,6 +29,7 @@ const LABELS: Record<string, string> = {
   DISABLED: "已停用",
   LINKED: "已关联",
   UNLINKED: "未关联",
+  UNMAPPED: "未映射",
   ORPHAN: "孤儿",
   UNLINKED_TRANSFER: "单边划转未关联",
   BLOCKER: "阻断",

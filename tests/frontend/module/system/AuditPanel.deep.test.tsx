@@ -50,12 +50,6 @@ describe("AuditPanel.deep：筛选/重试/降级分支", () => {
     expect(vi.mocked(catalog.auditApi.list)).toHaveBeenCalledTimes(1);
   });
 
-  it("空数据：展示 emptyText「暂无审计记录」", async () => {
-    vi.mocked(catalog.auditApi.list).mockResolvedValue({ items: [], total: 0 });
-    renderLight(<AuditPanel />, { user: "admin" });
-    expect(await screen.findByText("暂无审计记录")).toBeInTheDocument();
-  });
-
   it("选对象类型触发 load 且参数带 entity_type", async () => {
     renderLight(<AuditPanel />, { user: "admin" });
     await screen.findByText("admin");

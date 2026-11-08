@@ -433,25 +433,22 @@ describe("OrdersPage：分润", () => {
     expect(within(modal).getByText("5,000.00")).toBeInTheDocument();
   });
 
-  it("分润：比例与金额不再互算，填写一项不改写另一项", async () => {
-    // 比例与金额各自独立录入，前端不得自行换算。
-    // 旧实现用 syncAllocationPair 在 onValuesChange 里双向回填，改金额会静默改写比例，
-    // 用户无法手动精调；此处锁死「只写自己这一格」的行为。
+  it("分润：比例与金额双向联动，按最后编辑的一项换算", async () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     const rate = within(modal).getByLabelText("比例");
     const amount = within(modal).getByLabelText("金额");
 
-    // 填比例：金额保持空白，不按利润折算回填
+    // 5000 × 30% = 1500，填比例立即回填金额
     fireEvent.change(rate, { target: { value: "30" } });
     expect(rate).toHaveValue("30");
-    expect(amount).toHaveValue("");
+    expect(amount).toHaveValue("1500.00");
 
-    // 填金额：比例保持原值，不按金额反算
-    fireEvent.change(amount, { target: { value: "1500" } });
-    expect(amount).toHaveValue("1500");
-    expect(rate).toHaveValue("30");
+    // 再改金额：1500 ÷ 5000 = 30%，金额反向回填比例
+    fireEvent.change(amount, { target: { value: "2500" } });
+    expect(amount).toHaveValue("2500");
+    expect(rate).toHaveValue("50.00");
   });
 
   it("分润：无存量时按操作四项展开，买号/售出自动绑定动作执行人", async () => {
@@ -558,8 +555,7 @@ describe("OrdersPage：分润", () => {
     expect(within(modal).getAllByLabelText("比例")).toHaveLength(2);
   });
 
-  it("分润：按操作四项时比例与金额同样不互算", async () => {
-    // 按操作四项也必须独立录入。
+  it("分润：按操作四项时比例与金额同样双向联动", async () => {
     // 只测按姓名口径会漏掉「买号/售出/运营/公司」四行的情况。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: [],
@@ -584,17 +580,17 @@ describe("OrdersPage：分润", () => {
     const amounts = within(modal).getAllByLabelText("金额");
     expect(rates).toHaveLength(4);
 
-    // 填买号行比例：本行金额保持空白，另外三行也不得被牵连改写
+    // 填买号行比例：本行按订单利润换算金额，另外三行不被牵连改写
     fireEvent.change(rates[0], { target: { value: "30" } });
     expect(rates[0]).toHaveValue("30");
-    expect(amounts[0]).toHaveValue("");
+    expect(amounts[0]).toHaveValue("1500.00");
     expect(amounts[1]).toHaveValue("");
     expect(amounts[2]).toHaveValue("");
 
-    // 再填本行金额：比例保持原值，不按金额反算
+    // 再填本行金额：按订单利润反算比例
     fireEvent.change(amounts[0], { target: { value: "1000" } });
     expect(amounts[0]).toHaveValue("1000");
-    expect(rates[0]).toHaveValue("30");
+    expect(rates[0]).toHaveValue("20.00");
   });
 
   it("分润：一个动作多人时按人数均分，买号 2 人各得一半", async () => {

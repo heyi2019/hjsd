@@ -225,6 +225,24 @@ export function splitEven(total: number, people: number, scale = 100): number[] 
   return parts.map((unit) => unit / scale);
 }
 
+/** 分润输入联动：按订单利润把比例换算成金额，金额固定保留两位小数。 */
+export function allocationAmountFromRate(orderProfit: string, rate: string): string {
+  if (String(rate).trim() === "") return "";
+  const profit = Number(orderProfit);
+  const percentage = Number(rate);
+  if (!Number.isFinite(profit) || !Number.isFinite(percentage)) return "";
+  return (profit * percentage / 100).toFixed(2);
+}
+
+/** 分润输入联动：按订单利润把金额反算成比例；利润为 0 时没有可推导的比例。 */
+export function allocationRateFromAmount(orderProfit: string, amount: string): string {
+  if (String(amount).trim() === "") return "";
+  const profit = Number(orderProfit);
+  const value = Number(amount);
+  if (!Number.isFinite(profit) || !Number.isFinite(value) || profit === 0) return "";
+  return (value / profit * 100).toFixed(2);
+}
+
 export function validateAllocations(
   rows: AllocationFormRow[],
   orderProfit: string,

@@ -242,6 +242,18 @@ def test_sale_scopes_have_independent_field_sets(seeded_db):
     assert count("SALE") == 0
     assert amount_of("SALEREC").label == "售出金额"
     assert amount_of("SALEDG").label == "利润"
+    for code in ("SALEREC", "SALETH"):
+        payment_method = seeded_db.scalar(
+            select(OrderFormField).where(
+                OrderFormField.order_type_code == code,
+                OrderFormField.field_key == "payment_method",
+            )
+        )
+        assert payment_method is not None
+        assert payment_method.options == [
+            {"value": "FULL", "label": "全款"},
+            {"value": "INSTALLMENT", "label": "分期付款"},
+        ]
     assert "sale_amount" in {
         row.field_key
         for row in seeded_db.scalars(

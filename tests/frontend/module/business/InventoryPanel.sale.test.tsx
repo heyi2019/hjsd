@@ -318,6 +318,21 @@ describe("库存售出三表单分支", () => {
     }
   });
 
+  it("回收与提号售出显示全款/分期付款选项", async () => {
+    const cases = [
+      [RecoverySaleModal, accounts[0]],
+      [PickupSaleModal, { ...accounts[0], inventory_type: "PICKUP" }],
+    ] as const;
+
+    for (const [Modal, account] of cases) {
+      const { unmount } = renderLight(<Modal account={account} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+      await screen.findByText("付款方式");
+      expect(screen.getByText("全款")).toBeInTheDocument();
+      expect(screen.getByText("分期付款")).toBeInTheDocument();
+      unmount();
+    }
+  });
+
   it("三类售出各取独立作用域配置，互不共用", async () => {
     const cases = [
       [RecoverySaleModal, accounts[0], "SALEREC"],

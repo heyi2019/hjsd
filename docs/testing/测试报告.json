@@ -1,27 +1,27 @@
 {
-  "generated_at": "2026-11-05 00:03 UTC",
-  "last_run_id": "20261105-080048-6776795d-76913",
-  "run_batches": 136,
-  "cases_total": 2740,
+  "generated_at": "2026-11-08 18:25 UTC",
+  "last_run_id": "20261109-022527-0ec122bb-fe",
+  "run_batches": 459,
+  "cases_total": 2140,
   "module_def": {
-    "A": 22,
-    "B": 843,
-    "C": 186,
-    "D": 274,
-    "E": 240,
-    "F": 423,
-    "SYS": 752
+    "A": 12,
+    "B": 693,
+    "C": 179,
+    "D": 226,
+    "E": 80,
+    "F": 366,
+    "SYS": 584
   },
   "layer_def": {
-    "IT": 2475,
+    "IT": 1912,
     "E2E": 53,
-    "UT": 212
+    "UT": 175
   },
-  "cross_flow_cases": 8,
+  "cross_flow_cases": 9,
   "no_execution": 0,
   "fail_error": 0,
   "skip": 0,
-  "retired_cases": 197,
+  "retired_cases": 903,
   "pending_criteria": 0,
-  "weak_criteria": 0
+  "weak_criteria": 1
 }

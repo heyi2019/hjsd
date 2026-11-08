@@ -311,4 +311,3 @@
 
 /* 页面槽保持挂载；非激活页隐藏但不卸载。 */
 .page-slot { display: block; }
-.page-slot--hidden { display: none; }

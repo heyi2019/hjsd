@@ -7,6 +7,7 @@ import { countBusinessOrders } from "./helpers";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 import type { OrdersPageController } from "./useOrdersPageController";
 import { markMobileHiddenColumns } from "../../shared/lib/listColumns";
+import { useMemo } from "react";
 
 /** ≤640px 隐藏列：原规则写 nth-child(4)，但表格有展开列占位，实测命中的是
  *  「游戏账号/产品」而非入库负责人。本次保持默认隐藏目标不变，只把序号换成稳定 key，
@@ -68,14 +69,21 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
   } = controller;
 
   const statValue = (value: number) => (loading ? "—" : loadError ? "不可用" : String(value));
+  const stats = useMemo(() => filteredOrders.reduce((summary, order) => {
+    summary.total += 1;
+    if (["ACTIVE", "INSTALLMENT"].includes(order.status)) summary.active += 1;
+    else if (order.status === "COMPLETED") summary.completed += 1;
+    else if (order.status === "CANCELLED") summary.cancelled += 1;
+    return summary;
+  }, { total: 0, active: 0, completed: 0, cancelled: 0 }), [filteredOrders]);
 
   return (
     <section className="ui-stack">
       <StatRow items={[
-        { label: "订单总量", kind: "count", amount: statValue(filteredOrders.length) },
-        { label: "进行中订单", kind: "count", amount: statValue(filteredOrders.filter((order) => ["ACTIVE", "INSTALLMENT"].includes(order.status)).length) },
-        { label: "完成订单量", kind: "count", amount: statValue(filteredOrders.filter((order) => order.status === "COMPLETED").length) },
-        { label: "已取消订单", kind: "count", amount: statValue(filteredOrders.filter((order) => order.status === "CANCELLED").length) },
+        { label: "订单总量", kind: "count", amount: statValue(stats.total) },
+        { label: "进行中订单", kind: "count", amount: statValue(stats.active) },
+        { label: "完成订单量", kind: "count", amount: statValue(stats.completed) },
+        { label: "已取消订单", kind: "count", amount: statValue(stats.cancelled) },
       ]} />
       <Card className="glass">
         <Space wrap className="ui-filter-bar ui-filter-bar--spaced">

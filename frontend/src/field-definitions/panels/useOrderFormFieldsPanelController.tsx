@@ -53,7 +53,9 @@ export function useOrderFormFieldsPanelController({
   const [sectionLabels, setSectionLabels] = useState<Record<string, string>>({});
   const [editingSectionValue, setEditingSectionValue] = useState<string | null>(null);
   const [addingSection, setAddingSection] = useState(false);
-  const editingField = rows.find((row) => row.id === editingId) ?? null;
+  const rowsById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
+  const rowsByFieldKey = useMemo(() => new Map(rows.map((row) => [row.field_key, row])), [rows]);
+  const editingField = rowsById.get(editingId ?? -1) ?? null;
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [form] = Form.useForm();
@@ -83,7 +85,7 @@ export function useOrderFormFieldsPanelController({
     .filter((row) => row.is_active && row.field_key !== editingField?.field_key)
     .map((row) => ({ value: row.field_key, label: `${row.label}（${row.field_key}）` }));
   // 触发值候选取自依赖字段自身的选项；无选项时允许手输（tags 模式）。
-  const dependencyRow = rows.find((row) => row.field_key === condFieldKey);
+  const dependencyRow = rowsByFieldKey.get(condFieldKey ?? "");
   const triggerOptions = normalizeOptionItems(dependencyRow?.options).map((item) => ({
     value: item.value,
     label: item.label,
@@ -92,9 +94,14 @@ export function useOrderFormFieldsPanelController({
     (sectionFilter === "ALL" || (row.section ?? "EXTRA") === sectionFilter) &&
     (activeFilter === "ALL" || (activeFilter === "ACTIVE" ? row.is_active : !row.is_active))
   ));
+  const sectionCounts = useMemo(() => rows.reduce((counts, row) => {
+    const section = row.section ?? "EXTRA";
+    counts.set(section, (counts.get(section) ?? 0) + 1);
+    return counts;
+  }, new Map<string, number>()), [rows]);
   const sectionManagementRows = orderedSectionOptions.map((section, index) => ({
     ...section,
-    count: rows.filter((row) => (row.section ?? "EXTRA") === section.value).length,
+    count: sectionCounts.get(section.value) ?? 0,
     index,
   }));
 
@@ -322,7 +329,7 @@ export function useOrderFormFieldsPanelController({
           {row.required_when ? (
             <Typography.Text type="secondary" aria-label={`条件_${row.field_key}`}>
               条件必填：{describeCondition(
-                rows.find((item) => item.field_key === row.required_when?.field)?.label ?? row.required_when.field,
+                rowsByFieldKey.get(row.required_when.field)?.label ?? row.required_when.field,
                 row.required_when,
               )}
             </Typography.Text>

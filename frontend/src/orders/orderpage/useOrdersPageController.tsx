@@ -435,25 +435,27 @@ export function useOrdersPageController(params: {
     }
   };
 
-  // keep-alive：切走再切回不会重挂载。重新激活（active 翻回 true）时重拉列表，
-  // 保证在其他入口新建的订单（工作台快捷建单、库存中心售出/寄售/返点）的订单号及时出现在台账。
+  // 页面重新激活时重拉列表，保证在其他入口新建的订单（工作台快捷建单、库存中心售出/寄售/返点）
+  // 的订单号及时出现在台账。
   useReloadOnActive(active, load);
   useEffect(() => {
     if (active) setMineOrders(initialMine);
   }, [active, initialMine]);
 
-  const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
-  // 先按业务筛选，再按日期，最后一次排序；避免渲染层重复计算同一批订单。
-  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter)
-    .filter((order) => {
-      if (!dateRange) return true;
-      const tradeDate = new Date(`${order.trade_date}T00:00:00`);
-      return !Number.isNaN(tradeDate.getTime())
-        && tradeDate >= dateRange[0].startOf("day").toDate()
-        && tradeDate <= dateRange[1].endOf("day").toDate();
-    })
-    .slice()
-    .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
+  const typeNames = useMemo(() => Object.fromEntries(types.map((type) => [type.code, type.name])), [types]);
+  const filteredOrders = useMemo(() => {
+    // 先按业务筛选，再按日期，最后一次排序；避免无关状态变化时重复扫描订单。
+    const startTime = dateRange?.[0].startOf("day").valueOf();
+    const endTime = dateRange?.[1].endOf("day").valueOf();
+    return filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter)
+      .filter((order) => {
+        if (startTime === undefined || endTime === undefined) return true;
+        const tradeTime = new Date(`${order.trade_date}T00:00:00`).getTime();
+        return !Number.isNaN(tradeTime) && tradeTime >= startTime && tradeTime <= endTime;
+      })
+      .slice()
+      .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
+  }, [businessModeFilter, dateRange, gameTypeFilter, inventoryStatusFilter, keyword, ledgerSortDesc, orderTypeFilter, orders]);
   // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
   const orderHasPostedEvents = (selectedOrder?.events ?? []).some((event) => event.is_posted);
   const normalizedInitialTab: BusinessCenterTab = initialTab && ["inventory", "ledger", "collections"].includes(initialTab)

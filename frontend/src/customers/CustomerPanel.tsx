@@ -87,8 +87,8 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
     }
   }, [keyword, statusFilter]);
 
-  // keep-alive：建单流程会自动建档客户，重新激活时重拉避免列表过期。
-  // 首次挂载由筛选 effect 负责；keep-alive 重新激活时仍由统一入口刷新。
+  // 建单流程会自动建档客户，重新激活时重拉避免列表过期。
+  // 首次挂载由筛选 effect 负责；重新激活时仍由统一入口刷新。
   useReloadOnActive(active, load, { skipFirstMount: true });
   const wasActiveRef = useRef(active);
   useEffect(() => {

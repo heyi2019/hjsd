@@ -11,6 +11,7 @@ import { useState, type ReactElement } from "react";
 import {
   CONFIG_GROUP_LABEL,
   SETTINGS_ITEMS,
+  SETTINGS_ITEM_BY_KEY,
   type ConfigGroupCode,
 } from "../configCatalog";
 import { useSession } from "../../shared/state/session";
@@ -61,7 +62,7 @@ export function ConfigCenterPanel() {
         ))}
       </nav>
       <section className="config-center__content" data-testid="center-content">
-        <Card className="glass" title={SETTINGS_ITEMS.find((i) => i.key === selected)?.label ?? "配置"}>
+        <Card className="glass" title={SETTINGS_ITEM_BY_KEY.get(selected)?.label ?? "配置"}>
           {renderPanel(selected)}
         </Card>
       </section>

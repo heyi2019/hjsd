@@ -1,7 +1,5 @@
-// AppShell 对访问过的页面做 keep-alive（仅 display:none 隐藏，不卸载），
-// 因此「仅在 mount 时加载」的页面不会自动感知其他页面/入口写入的数据变更
-// 确保切回页面时能看到最新数据。
-// 统一收敛为 useReloadOnActive：页面把 loader 交给它，即可在「首次挂载 + 每次重新激活」时重拉，
+// 页面切换会卸载旧页面，因此页面把 loader 交给 useReloadOnActive，统一在
+// 「首次挂载 + 每次重新激活」时重拉，
 // 避免每个页面各自记得写 useEffect 而漏接。
 //
 // 用法：

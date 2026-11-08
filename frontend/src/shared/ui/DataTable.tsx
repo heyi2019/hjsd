@@ -36,6 +36,8 @@ export function DataTable<T>(props: {
   className?: string;
   size?: TableProps<T>["size"];
 }) {
+  const fallbackKeysRef = useRef(new WeakMap<object, string>());
+  const nextFallbackKeyRef = useRef(0);
   const defaultRowKey = (row: T) => {
     const candidate = row as T & {
       id?: string | number;
@@ -43,7 +45,17 @@ export function DataTable<T>(props: {
       code?: string | number;
       no?: string | number;
     };
-    return String(candidate.id ?? candidate.key ?? candidate.code ?? candidate.no ?? JSON.stringify(row));
+    const stableValue = candidate.id ?? candidate.key ?? candidate.code ?? candidate.no;
+    if (stableValue != null && stableValue !== "") return String(stableValue);
+    if (typeof row === "object" && row !== null) {
+      const objectRow = row as object;
+      const existing = fallbackKeysRef.current.get(objectRow);
+      if (existing) return existing;
+      const generated = `row-${++nextFallbackKeyRef.current}`;
+      fallbackKeysRef.current.set(objectRow, generated);
+      return generated;
+    }
+    return `row-${String(row)}`;
   };
   // 前端分页自管状态：默认开启；显式 controlledPaging 时交回调用方做服务端分页。
   const [innerPage, setInnerPage] = useState(1);

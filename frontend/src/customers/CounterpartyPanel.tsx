@@ -45,7 +45,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
     }
   }, []);
 
-  // keep-alive：提号建单会自动建档供货方，重新激活时重拉避免列表过期。
+  // 提号建单会自动建档供货方，重新激活时重拉避免列表过期。
   useReloadOnActive(active, load);
 
   useEffect(() => {

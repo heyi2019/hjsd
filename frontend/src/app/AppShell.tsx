@@ -1,5 +1,5 @@
 import { Space } from "antd";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navigation } from "./navigation";
 import { DEV_ROLES, useSession } from "../shared/state/session";
@@ -29,7 +29,7 @@ type PageProps = {
   initialTab?: BusinessCenterEntryTab;
   initialMine?: boolean;
   initialReportTab?: "commission" | "my-earnings";
-  /** keep-alive 下当前页是否处于激活态：非激活仅隐藏不卸载，页面可据此在重新激活时重拉数据。 */
+  /** 当前页是否处于激活态；页面切换时由路由重新挂载。 */
   active?: boolean;
   /** Customer Center deep-link focus, passed from the shell so standalone page tests need no Router context. */
   focusCustomerId?: number;
@@ -71,33 +71,28 @@ export function AppShell() {
   const { role, authenticated, mustChangePassword, logout, can } = useSession();
   const { mode, setMode } = useTheme();
   const item = navigation.find((entry) => entry.key === active);
-  const navigateTo = (key: string, tab?: BusinessCenterEntryTab) => {
+  const navigateTo = useCallback((key: string, tab?: BusinessCenterEntryTab) => {
     // 回到业务中心但不指定子页时，进入库存中心。
     if (key === "business" && !tab) {
       navigate("/business/inventory");
       return;
     }
     navigate(`/${key}${tab ? `/${tab}` : ""}`);
-  };
-  const navigateToPersonalView = (view: "orders" | "earnings") => {
+  }, [navigate]);
+  const navigateToPersonalView = useCallback((view: "orders" | "earnings") => {
     if (view === "orders") {
       navigate("/business/ledger?mine=true");
       return;
     }
     navigate("/operations?tab=my-earnings");
-  };
+  }, [navigate]);
   // 空路径 / 或 "" 统一重定向到工作台，保证默认落点稳定。
   useEffect(() => {
     if (location.pathname === "/" || location.pathname === "") {
       navigate("/dashboard", { replace: true });
     }
   }, [location.pathname, navigate]);
-  // keep-alive：访问过的页面持续挂载，仅非激活态隐藏（display:none），避免切导航重挂载丢状态。
-  const [visited, setVisited] = useState<Set<string>>(() => new Set(["dashboard"]));
-  useEffect(() => {
-    setVisited((prev) => (prev.has(active) ? prev : new Set(prev).add(active)));
-  }, [active]);
-  // 转场重放：不再靠 key 重挂载（那会丢状态），改用 reflow 技巧重放 .page-enter 弹簧入场。
+  // 当前页切换时重放 .page-enter 弹簧入场。
   const pageRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = pageRef.current;
@@ -287,43 +282,31 @@ export function AppShell() {
         </header>
         <PullToRefreshProvider>
         <main className="page-content">
-          {/* 路由化 + keep-alive：
-              1) 落点由 URL 决定（深链/刷新/前进后退可用），见 navigateTo。
-              2) 访问过的页面持续挂载，仅非激活态 display:none，避免切导航重挂载丢状态（原 key={active} 的副作用）。
-              3) 转场弹簧入场改由 pageRef + reflow 重放（见上方 useEffect），不再靠重挂载。 */}
+          {/* 路由落点由 URL 决定；当前页单独挂载，避免保留整棵隐藏页面树。 */}
           <Suspense fallback={<div className="page-loading" role="status">正在打开…</div>}>
-            {[...visited, active].filter((k, i, a) => a.indexOf(k) === i).map((key) => {
-              const isActive = key === active;
-              const PageComponent = key === "dashboard" ? DashboardPage : PAGES[key];
+            {(() => {
+              const PageComponent = active === "dashboard" ? DashboardPage : PAGES[active];
               if (!PageComponent) return null;
               return (
-                <div
-                  key={key}
-                  ref={isActive ? pageRef : undefined}
-                  className={`page-slot${isActive ? " page-enter" : " page-slot--hidden"}`}
-                  aria-hidden={!isActive}
-                >
-                  {/* 边界必须挂在 .page-slot 内部：挂在外面时降级卡会顶掉整个 slot，
-                      page-slot--hidden 随之消失，keep-alive 下隐藏页的错误卡就会叠到
-                      当前页底部（2026-11-03 实测库存/订单/分期/资金/报表/设置六处全现）。 */}
-                  <ErrorBoundary name={key}>
-                    {key === "dashboard" ? (
-                      <DashboardPage onNavigate={navigateTo} onPersonalNavigate={navigateToPersonalView} />
+                <div key={active} ref={pageRef} className="page-slot page-enter">
+                  <ErrorBoundary name={active}>
+                    {active === "dashboard" ? (
+                      <DashboardPage active onNavigate={navigateTo} onPersonalNavigate={navigateToPersonalView} />
                     ) : (
                       <PageComponent
                         onNavigate={navigateTo}
-                        initialTab={key === "business" ? businessTab : undefined}
-                        initialMine={key === "business" && active === "business" ? businessMine : undefined}
-                        initialReportTab={key === "operations" && active === "operations" ? initialReportTab : undefined}
-                        active={isActive}
-                        focusCustomerId={key === "customers" ? focusCustomerId : undefined}
-                        focusCounterpartyId={key === "customers" ? focusCounterpartyId : undefined}
+                        initialTab={active === "business" ? businessTab : undefined}
+                        initialMine={active === "business" ? businessMine : undefined}
+                        initialReportTab={active === "operations" ? initialReportTab : undefined}
+                        active
+                        focusCustomerId={active === "customers" ? focusCustomerId : undefined}
+                        focusCounterpartyId={active === "customers" ? focusCounterpartyId : undefined}
                       />
                     )}
                   </ErrorBoundary>
                 </div>
               );
-            })}
+            })()}
           </Suspense>
         </main>
         </PullToRefreshProvider>

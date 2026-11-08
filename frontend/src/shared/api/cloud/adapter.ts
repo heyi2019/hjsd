@@ -172,16 +172,16 @@ async function fetchRows(table: string, params: Record<string, string>): Promise
   const { data, error } = await db.from(table).select("*").order("id", { ascending: true });
   if (error) return Promise.reject(error);
   let rows: Row[] = Array.isArray(data) ? (data as Row[]) : [];
-  for (const [key, value] of Object.entries(params)) {
-    if (IGNORED_PARAMS.has(key) || !rows.length || !(key in rows[0])) continue;
+  const filters = Object.entries(params).filter(([key]) => !IGNORED_PARAMS.has(key));
+  if (!filters.length) return rows;
+  return rows.filter((row) => filters.every(([key, value]) => {
+    if (!(key in row)) return true;
     if (key === "keyword") {
       const needle = value.toLowerCase();
-      rows = rows.filter((row) => Object.values(row).some((v) => typeof v === "string" && v.toLowerCase().includes(needle)));
-    } else {
-      rows = rows.filter((row) => String(row[key] ?? "") === value);
+      return Object.values(row).some((item) => typeof item === "string" && item.toLowerCase().includes(needle));
     }
-  }
-  return rows;
+    return String(row[key] ?? "") === value;
+  }));
 }
 
 function csvBlob(rows: Row[]): Blob {
@@ -252,17 +252,20 @@ export const cloudAdapter: AxiosAdapter = async (config) => {
       const rows = await fetchRows("stocks", {});
       const target = ids.size ? rows.filter((row) => ids.has(Number(row.id))) : rows;
       const now = Date.now();
-      const ageDays = (row: Row) => {
+      const stats = target.reduce<{ occupied: number; over7: number; over30: number }>((summary, row) => {
         const raw = row.inventory_entry_at ?? row.buy_date;
         const ts = raw ? new Date(String(raw)).getTime() : NaN;
-        return Number.isFinite(ts) ? (now - ts) / 86_400_000 : 0;
-      };
-      const occupied = target.reduce((sum, row) => sum + (Number(row.cost_amount) || 0), 0);
+        const ageDays = Number.isFinite(ts) ? (now - ts) / 86_400_000 : 0;
+        summary.occupied += Number(row.cost_amount) || 0;
+        if (ageDays > 7) summary.over7 += 1;
+        if (ageDays > 30) summary.over30 += 1;
+        return summary;
+      }, { occupied: 0, over7: 0, over30: 0 });
       return ok(config, {
         account_count: target.length,
-        occupied_cost: occupied.toFixed(2),
-        over_7d_count: target.filter((row) => ageDays(row) > 7).length,
-        over_30d_count: target.filter((row) => ageDays(row) > 30).length,
+        occupied_cost: stats.occupied.toFixed(2),
+        over_7d_count: stats.over7,
+        over_30d_count: stats.over30,
       });
     } catch (err) {
       return cloudFailure(config, err);

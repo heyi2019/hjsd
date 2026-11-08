@@ -10,6 +10,7 @@ type OptionSetMap = Record<string, OptionItem[]>;
 
 let cache: OptionSetMap | null = null;
 let inflight: Promise<OptionSetMap> | null = null;
+let labelCache = new Map<string, Map<string, string>>();
 
 /** 加载全部选项词典并缓存；并发请求复用同一 Promise。 */
 export function loadOptionSets(): Promise<OptionSetMap> {
@@ -23,6 +24,10 @@ export function loadOptionSets(): Promise<OptionSetMap> {
         map[set.code] = set.options ?? [];
       }
       cache = map;
+      labelCache = new Map(Object.entries(map).map(([code, options]) => [
+        code,
+        new Map(options.map((item) => [item.value, item.label])),
+      ]));
       inflight = null;
       return map;
     })
@@ -37,6 +42,7 @@ export function loadOptionSets(): Promise<OptionSetMap> {
 export function clearOptionSetsCache(): void {
   cache = null;
   inflight = null;
+  labelCache = new Map();
 }
 
 /** 组件用：返回全量 code→options 映射（加载中为 null）。 */
@@ -70,8 +76,7 @@ export function useOptionSet(code: string): OptionItem[] | null {
  */
 function optionLabelSync(code: string, value: string | null | undefined): string | null {
   if (!value || !cache) return null;
-  const found = (cache[code] ?? []).find((item) => item.value === value);
-  return found?.label ?? null;
+  return labelCache.get(code)?.get(value) ?? null;
 }
 
 /**

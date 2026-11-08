@@ -33,13 +33,13 @@ function DeliverySubSection({
   orderType,
   order,
   account,
-  employees,
+  employeeNames,
 }: {
   title: string;
   orderType?: string | null | undefined;
   order?: AccountExecutionOrder;
   account?: Account | null;
-  employees?: EmployeeOption[];
+  employeeNames?: Map<number, string>;
 }) {
   const { config } = useOrderFormConfig(orderType ?? undefined);
   if (!order) {
@@ -59,8 +59,8 @@ function DeliverySubSection({
       const raw = extraValues[key];
       if (raw == null || raw === "") {
         value = "-";
-      } else if (key === "delivery_responsible_ids" && Array.isArray(raw) && employees?.length) {
-        value = raw.map((id) => employees.find((emp) => emp.id === id)?.display_name ?? "未知负责人").join("、") || "-";
+      } else if (key === "delivery_responsible_ids" && Array.isArray(raw) && employeeNames?.size) {
+        value = raw.map((id) => employeeNames.get(id as number) ?? "未知负责人").join("、") || "-";
       } else if (key === "delivery_responsible_ids" && Array.isArray(raw)) {
         value = raw.length ? "负责人信息加载中" : "-";
       } else {
@@ -111,6 +111,10 @@ export function OrderDetailDeliverySection({
 }) {
   const creationOrder = useMemo(() => findCreationOrder(detail, meta.sourceOrderNo), [detail, meta.sourceOrderNo]);
   const sellOrder = useMemo(() => findSellOrder(detail, creationOrder), [detail, creationOrder]);
+  const employeeNames = useMemo(
+    () => new Map((employees ?? []).map((employee) => [employee.id, employee.display_name] as const)),
+    [employees],
+  );
 
   if (editing) {
     return (
@@ -125,8 +129,8 @@ export function OrderDetailDeliverySection({
     <div className="inventory-detail__section inventory-detail__section--delivery">
       <InventorySectionHeading title="交付信息" />
       <div className="inventory-detail__meta">
-        <DeliverySubSection title="买号交付" orderType={creationOrder?.order_type} order={creationOrder} account={account} employees={employees} />
-        <DeliverySubSection title="卖号交付" orderType={sellOrder?.order_type} order={sellOrder} employees={employees} />
+        <DeliverySubSection title="买号交付" orderType={creationOrder?.order_type} order={creationOrder} account={account} employeeNames={employeeNames} />
+        <DeliverySubSection title="卖号交付" orderType={sellOrder?.order_type} order={sellOrder} employeeNames={employeeNames} />
       </div>
     </div>
   );

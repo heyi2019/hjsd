@@ -26,6 +26,7 @@ function ContractTable({
   const {
     arrangeColumns,
     columns,
+    dispositionLoading,
     dispositions,
     error,
     exportCsv,
@@ -34,6 +35,7 @@ function ContractTable({
     loading,
     rows,
     scheduleColumns,
+    scheduleLoading,
     schedules,
     setSortDesc,
     sortDesc,
@@ -103,17 +105,25 @@ function ContractTable({
           emptyText="暂无分期合约"
           onPageChange={() => undefined}
           expandable={{
+            onExpand: (expanded, row) => {
+              if (expanded) {
+                void controller.loadSchedules(row.id);
+                void controller.loadDispositions(row.id);
+              }
+            },
             expandedRowRender: (row) => (
               <Space direction="vertical" size="middle" className="installment-detail-stack">
-                <DataTable<Schedule>
-                rows={schedules[row.id] ?? []}
-                page={1}
-                pageSize={20}
-                total={(schedules[row.id] ?? []).length}
-                onPageChange={() => undefined}
-                emptyText="暂无期次"
-                columns={scheduleColumns}
-              />
+                {scheduleLoading[row.id] || dispositionLoading[row.id] ? <Typography.Text type="secondary">正在加载明细…</Typography.Text> : (
+                  <DataTable<Schedule>
+                    rows={schedules[row.id] ?? []}
+                    page={1}
+                    pageSize={20}
+                    total={(schedules[row.id] ?? []).length}
+                    onPageChange={() => undefined}
+                    emptyText="暂无期次"
+                    columns={scheduleColumns}
+                  />
+                )}
               {(dispositions[row.id] ?? []).length > 0 && (
                 <Typography.Paragraph>
                   处置记录：{(dispositions[row.id] ?? []).map((item) =>

@@ -9,7 +9,7 @@ import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 /** 报表视图共用的统计周期筛选：提升到父级，使各带区间筛选的报表在 Tab 切换（非挂载）后仍保留筛选条件。 */
 export type ReportRange = { params: { from?: string; to?: string }; picker: ReactNode };
 
-/** 经营中心是否处于激活态：透传给 useReport，使 keep-alive 隐藏期间写入的数据在切回时自动重拉。 */
+/** 经营中心是否处于激活态：透传给 useReport，使切回页面时自动重拉。 */
 export const ReportsActiveContext = createContext(true);
 
 /** 所有报表共用的取数/错误态壳：避免每个报表各写一遍 try/catch。 */

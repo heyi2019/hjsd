@@ -19,26 +19,36 @@ import { InventoryAccountSummary } from "./InventoryAccountSummary";
 import "./InventoryRebateModal.css";
 
 type RebateKind = "BUY" | "SELL";
+type ExecutionOrder = AccountExecutionDetail["orders"][number];
+type SourceOrderIndex = {
+  buy?: ExecutionOrder;
+  sell?: ExecutionOrder;
+};
 
 const REBATE_KIND_LABEL: Record<RebateKind, string> = {
   BUY: "买号返点（对应回收/提号）",
   SELL: "卖号返点（对应售出）",
 };
 
-function sourceOrder(detail: AccountExecutionDetail | null, kind: RebateKind) {
-  if (kind === "BUY") {
-    return detail?.orders.find((order) =>
-      ["HS", "TH"].includes(order.order_type),
-    );
+function buildSourceOrderIndex(detail: AccountExecutionDetail | null): SourceOrderIndex {
+  if (!detail) return {};
+  let buy: ExecutionOrder | undefined;
+  let sell: ExecutionOrder | undefined;
+  let sellFallback: ExecutionOrder | undefined;
+  for (const order of detail.orders) {
+    if (!buy && ["HS", "TH"].includes(order.order_type)) buy = order;
+    if (!sell && order.events.some((event) => event.event_type === "SELL")) sell = order;
+    if (!sellFallback && ["HS", "TH", "DG"].includes(order.order_type)) sellFallback = order;
   }
-  const sellOrder = detail?.orders.find((order) => order.events.some((event) =>
-    event.event_type === "SELL",
-  ));
-  return sellOrder ?? detail?.orders.find((order) => ["HS", "TH", "DG"].includes(order.order_type));
+  return { buy, sell: sell ?? sellFallback };
 }
 
-function defaultBaseAmount(detail: AccountExecutionDetail | null, kind: RebateKind): string {
-  const order = sourceOrder(detail, kind);
+function sourceOrder(detail: AccountExecutionDetail | null, kind: RebateKind, index = buildSourceOrderIndex(detail)) {
+  return kind === "BUY" ? index.buy : index.sell;
+}
+
+function defaultBaseAmount(detail: AccountExecutionDetail | null, kind: RebateKind, index?: SourceOrderIndex): string {
+  const order = sourceOrder(detail, kind, index);
   const eventType = kind === "BUY" ? "BUY" : "SELL";
   return order?.events.find((event) => event.event_type === eventType)?.amount ?? "0";
 }
@@ -59,6 +69,7 @@ export function InventoryRebateModal(props: {
   const [editForm] = Form.useForm();
   const open = Boolean(props.account);
   const { config } = useOrderFormConfig(open ? "INVREBATE" : undefined);
+  const sourceOrders = useMemo(() => buildSourceOrderIndex(detail), [detail]);
 
   useEffect(() => {
     if (!open || !props.account) return;
@@ -74,10 +85,11 @@ export function InventoryRebateModal(props: {
         const uniqueRebates = new Map<number, Rebate>();
         for (const rebate of rebateLists.flat()) uniqueRebates.set(rebate.id, rebate);
         setRebates([...uniqueRebates.values()]);
-        const firstKind: RebateKind | undefined = sourceOrder(value, "BUY") ? "BUY" : sourceOrder(value, "SELL") ? "SELL" : undefined;
+        const valueOrders = buildSourceOrderIndex(value);
+        const firstKind: RebateKind | undefined = valueOrders.buy ? "BUY" : valueOrders.sell ? "SELL" : undefined;
         form.setFieldsValue({
           rebate_type: firstKind,
-          base_amount: firstKind ? defaultBaseAmount(value, firstKind) : "0",
+          base_amount: firstKind ? defaultBaseAmount(value, firstKind, valueOrders) : "0",
           collected_on: today(),
         });
       })
@@ -100,14 +112,18 @@ export function InventoryRebateModal(props: {
   }, [open]);
 
   const availableKinds = useMemo(
-    () => (["BUY", "SELL"] as RebateKind[]).filter((kind) => sourceOrder(detail, kind)),
-    [detail],
+    () => (["BUY", "SELL"] as RebateKind[]).filter((kind) => sourceOrder(detail, kind, sourceOrders)),
+    [detail, sourceOrders],
+  );
+  const employeeNames = useMemo(
+    () => new Map(employees.map((employee) => [employee.id, employee.display_name] as const)),
+    [employees],
   );
 
   const submit = async (values: { rebate_type?: RebateKind; base_amount?: string; rate?: string; collected_on?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     if (!props.account) return;
     const kind = values.rebate_type;
-    const order = kind ? sourceOrder(detail, kind) : undefined;
+    const order = kind ? sourceOrder(detail, kind, sourceOrders) : undefined;
     if (!kind || !order) return;
     setSubmitting(true);
     try {
@@ -236,7 +252,7 @@ export function InventoryRebateModal(props: {
                   <span role="cell"><MoneyText value={row.base_amount} /></span>
                   <span role="cell">{row.rate}%</span>
                   <span role="cell">{row.collected_on}</span>
-                  <span role="cell">{row.operator_user_ids?.map((id) => employees.find((employee) => employee.id === id)?.display_name).filter(Boolean).join("、") || row.operator || "-"}</span>
+                  <span role="cell">{row.operator_user_ids?.map((id) => employeeNames.get(id)).filter(Boolean).join("、") || row.operator || "-"}</span>
                   <span role="cell">
                     <Space size={2}>
                       <PermissionButton

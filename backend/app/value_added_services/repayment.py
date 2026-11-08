@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Any
 from app.core.audit import record_audit
 from app.core.security import CurrentUser
+from app.core.security import owner_scope_filter
 from app.orders import service as orders_service
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -45,6 +46,32 @@ from ._shared import (
     get_installment,
     total_receivable,
 )
+
+
+def list_schedules_bulk(
+    session: Session,
+    installment_ids: list[int] | set[int],
+    user: CurrentUser | None = None,
+) -> dict[int, list[InstallmentSchedule]]:
+    """一次读取多个合约的期次，并沿用合约列表的所有者可见范围。"""
+    ids = {int(item) for item in installment_ids if int(item) > 0}
+    if not ids:
+        return {}
+    stmt = (
+        select(InstallmentSchedule)
+        .join(Installment, Installment.id == InstallmentSchedule.installment_id)
+        .join(Order, Order.id == Installment.order_id)
+        .where(Installment.id.in_(ids))
+        .order_by(InstallmentSchedule.installment_id, InstallmentSchedule.period_no)
+    )
+    if user is not None:
+        scope = owner_scope_filter(Order.owner_id, user, session)
+        if scope is not None:
+            stmt = stmt.where(scope)
+    result: dict[int, list[InstallmentSchedule]] = {}
+    for row in session.scalars(stmt).all():
+        result.setdefault(row.installment_id, []).append(row)
+    return result
 
 def pay(
     session: Session,

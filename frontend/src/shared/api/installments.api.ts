@@ -3,6 +3,7 @@ import type { Cashflow, Deposit, Installment, InstallmentCancelResult, Installme
 
 export const installmentsApi = {
   dispositions: (id: number) => api.get<InstallmentDisposition[]>(`/installments/${id}/dispositions`).then(r => r.data),
+  dispositionsBulk: (ids: number[]) => api.get<Record<number, InstallmentDisposition[]>>("/installments/dispositions", { params: { ids: ids.join(",") } }).then(r => r.data),
   recover: (id: number, data: {occurred_on: string; note: string; form_extra?: Record<string, unknown>}) => api.post<InstallmentDisposition>(`/installments/${id}/recover`, data).then(r => r.data),
   /** 回收转售登记：把已回收账号的新售出订单关联回分期合约（后端只认 resale_order_id）。 */
   resale: (id: number, data: {resale_order_id: number; occurred_on: string; note: string; form_extra?: Record<string, unknown>}) => api.post<InstallmentDisposition>(`/installments/${id}/resale`, data).then(r => r.data),
@@ -24,6 +25,8 @@ export const installmentsApi = {
     api.post<Installment>("/installments", payload).then((r) => r.data),
   schedules: (id: number) =>
     api.get<Schedule[]>(`/installments/${id}/schedules`).then((r) => r.data),
+  schedulesBulk: (ids: number[]) =>
+    api.get<Record<number, Schedule[]>>("/installments/schedules", { params: { ids: ids.join(",") } }).then((r) => r.data),
   pay: (
     id: number,
     payload: { amount: string; paid_on: string; period_no?: number; pool_id?: number; note?: string; form_extra?: Record<string, unknown> },

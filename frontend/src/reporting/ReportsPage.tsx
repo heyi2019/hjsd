@@ -18,7 +18,7 @@ export function ReportsPage({ active = true, initialReportTab }: { active?: bool
   const [reportFrom, setReportFrom] = useState("");
   const [reportTo, setReportTo] = useState("");
   useEffect(() => {
-    // keep-alive 下离开经营中心时保留个人视图，避免隐藏页在切换期间改请求口径；
+    // 离开经营中心时保留个人视图，避免切换期间改请求口径；
     // 重新激活后再按 URL 入口决定是「我的收益」还是完整提成对账。
     if (!active) return;
     setMyEarnings(initialReportTab === "my-earnings");

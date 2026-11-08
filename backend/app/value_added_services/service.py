@@ -29,6 +29,7 @@ from .create import (
 from .recovery import (
     deliver,
     list_dispositions,
+    list_dispositions_bulk,
     mark_overdue,
     record_sale,
     recover_account,
@@ -38,6 +39,7 @@ from .repayment import (
     cancel_installment,
     extend_schedule,
     pay,
+    list_schedules_bulk,
     waive_schedule,
 )
 from .settlement import mark_default, settle_early
@@ -58,8 +60,10 @@ __all__ = [
     "get_installment",
     "link_recovered_sale",
     "list_dispositions",
+    "list_dispositions_bulk",
     "installment_totals",
     "list_installments",
+    "list_schedules_bulk",
     "mark_default",
     "mark_overdue",
     "pay",

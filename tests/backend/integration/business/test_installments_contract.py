@@ -1597,6 +1597,18 @@ def test_list_dispositions_endpoint_returns_records(seeded_client, seeded_db, he
     assert response.status_code == 200, response.text
     assert any(item["action"] == "RECOVER" for item in response.json())
 
+    batch_dispositions = seeded_client.get(
+        f"/api/v1/installments/dispositions?ids={contract.id}", headers=headers
+    )
+    assert batch_dispositions.status_code == 200, batch_dispositions.text
+    assert batch_dispositions.json()[str(contract.id)][0]["action"] == "RECOVER"
+
+    batch_schedules = seeded_client.get(
+        f"/api/v1/installments/schedules?ids={contract.id}", headers=headers
+    )
+    assert batch_schedules.status_code == 200, batch_schedules.text
+    assert len(batch_schedules.json()[str(contract.id)]) == 2
+
 def test_resale_endpoint_records_sale(seeded_client, seeded_db, headers):
     account = _account(seeded_db, "resale-endpoint-account")
     order = _order(seeded_db, order_type="HS", account_id=account.id)

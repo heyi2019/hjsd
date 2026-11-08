@@ -1,6 +1,6 @@
 import { appMessage } from "../shared/ui/appFeedback";
 import { Card, Form, Input, Space, Typography } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { errorMessage, normalizeError, type NormalizedError } from "../shared/api/client";
 import { poolsApi, teamsApi, usersApi, type ManagedUser, type Pool, type Team } from "../shared/api/catalog";
 import { BusinessActionModal, BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";
@@ -60,6 +60,8 @@ export function UsersPanel() {
     }
   };
   useEffect(() => { void load(); }, []);
+  const teamById = useMemo(() => new Map(teams.map((team) => [team.id, team.name])), [teams]);
+  const poolById = useMemo(() => new Map(pools.map((pool) => [pool.id, pool.name])), [pools]);
   const submit = async (values: Record<string, string>) => { try { await usersApi.create(values); appMessage.success("用户已创建"); form.resetFields(); await load(); } catch (err) { appMessage.error(errorMessage(err)); } };
   const updateUser = async (values: Record<string, string>) => {
     if (!editing) return;
@@ -96,8 +98,8 @@ export function UsersPanel() {
         { title: "手机号", dataIndex: "phone", render: (v?: string) => v || "-" },
         { title: "角色", dataIndex: "role", render: (v: string) => USER_ROLE_LABEL[v] ?? v },
         { title: "数据范围", dataIndex: "owner_scope", render: (v: string) => OWNER_SCOPE_LABEL[v] ?? v },
-        { title: "团队", render: (_: unknown, user: User) => (user.team_ids ?? []).map((id) => teams.find((team) => team.id === id)?.name ?? id).join("、") || "-" },
-        { title: "资金池", render: (_: unknown, user: User) => (user.pool_ids ?? []).map((id) => pools.find((pool) => pool.id === id)?.name ?? id).join("、") || (user.owner_scope === "ALL" ? "全部" : "-") },
+        { title: "团队", render: (_: unknown, user: User) => (user.team_ids ?? []).map((id) => teamById.get(id) ?? id).join("、") || "-" },
+        { title: "资金池", render: (_: unknown, user: User) => (user.pool_ids ?? []).map((id) => poolById.get(id) ?? id).join("、") || (user.owner_scope === "ALL" ? "全部" : "-") },
         { title: "状态", dataIndex: "is_active", render: (v: boolean) => v ? "启用" : "停用" },
         { title: "操作", key: "actions", render: (_: unknown, user: User) => <Space size={2}><PermissionButton permission="user.manage" size="small" onClick={() => { setEditing(user); editForm.setFieldsValue({ display_name: user.display_name, phone: user.phone ?? "", role: user.role, owner_scope: user.owner_scope, pool_ids: user.pool_ids ?? [], team_ids: user.team_ids ?? [] }); }}>编辑</PermissionButton><ConfirmButton
               permission="user.manage"

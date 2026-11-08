@@ -39,10 +39,14 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
     const now = new Date();
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const [personalOrdersResult, ordersResult, earningsResult] = await Promise.allSettled([
+    const [personalOrdersResult, ordersResult, earningsResult, stockResult, installmentResult, reminderConfigResult, notificationResult] = await Promise.allSettled([
       ordersApi.list({ mine: true }),
       ordersApi.list(),
       reportsApi.commission({ mine: true, from: monthStart, to: monthEnd }),
+      stocksApi.list({ status: "WAITING" }),
+      installmentsApi.list(),
+      optionSetsApi.get(BUSINESS_REMINDER_CONFIG_CODE),
+      notificationsApi.list({ limit: 50, unread_only: true }),
     ]);
     if (!mountedRef.current) return;
     if (personalOrdersResult.status === "fulfilled") {
@@ -64,24 +68,21 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
     } else {
       setEarningsError(normalizeError(earningsResult.reason));
     }
-    const [stockResult, installmentResult, reminderConfigResult] = await Promise.allSettled([
-      stocksApi.list({ status: "WAITING" }),
-      installmentsApi.list(),
-      optionSetsApi.get(BUSINESS_REMINDER_CONFIG_CODE),
-    ]);
-    const notificationResult = await Promise.allSettled([
-      notificationsApi.list({ limit: 50, unread_only: true }),
-    ]);
     if (!mountedRef.current) return;
     const reminderConfig = reminderConfigResult.status === "fulfilled"
       ? parseBusinessReminderConfig(reminderConfigResult.value?.options)
       : DEFAULT_BUSINESS_REMINDER_CONFIG;
     setBusinessReminderConfig(reminderConfig);
     if (stockResult.status === "fulfilled") {
+      const inventoryStats = stockResult.value.reduce((summary, item) => {
+        if ((item.inventory_age_days ?? 0) > reminderConfig.inventoryAgingDays) summary.aging += 1;
+        if (item.inventory_age_level === "OVERDUE") summary.overdue += 1;
+        return summary;
+      }, { aging: 0, overdue: 0 });
       setInventoryCount(stockResult.value.length);
       // 天数与档位都来自后端（AccountOut）；阈值可配的是「提醒天数」，只做比较不做日期差。
-      setInventoryAgingCount(stockResult.value.filter((item) => (item.inventory_age_days ?? 0) > reminderConfig.inventoryAgingDays).length);
-      setInventoryOverdueCount(stockResult.value.filter((item) => item.inventory_age_level === "OVERDUE").length);
+      setInventoryAgingCount(inventoryStats.aging);
+      setInventoryOverdueCount(inventoryStats.overdue);
     } else {
       setInventoryCount(null);
       setInventoryAgingCount(null);
@@ -94,8 +95,8 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
       setInstallmentCount(null);
       setOverdueInstallmentCount(null);
     }
-    if (notificationResult[0].status === "fulfilled") {
-      setNewProfitNotificationCount(notificationResult[0].value.items.filter((item) =>
+    if (notificationResult.status === "fulfilled") {
+      setNewProfitNotificationCount(notificationResult.value.items.filter((item) =>
         [item.notification_type ?? "", item.title, item.message].some((value) => /分润|利润|提成/.test(value)),
       ).length);
     } else {
@@ -106,7 +107,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
   useEffect(() => () => {
     mountedRef.current = false;
   }, []);
-  // keep-alive：工作台常驻挂载，重新激活时重拉汇总，避免其他页面完成的业务不反映在计数里。
+  // 页面重新激活时重拉汇总，避免其他页面完成的业务不反映在计数里。
   useReloadOnActive(active, loadSummary);
   const openCreate = (orderType: BusinessOrderType) => {
     setCreateType(orderType);

@@ -140,8 +140,10 @@ export function buildActionAllocationRows(
         ? []
         : [...new Set(existed.map((item) => item.user_id).filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0))];
       const candidateIds = kind === "COMPANY" ? [] : candidates[kind];
-      const added = candidateIds.filter((id) => !existedIds.includes(id));
-      const removed = existedIds.filter((id) => !candidateIds.includes(id));
+      const existedIdSet = new Set(existedIds);
+      const candidateIdSet = new Set(candidateIds);
+      const added = candidateIds.filter((id) => !existedIdSet.has(id));
+      const removed = existedIds.filter((id) => !candidateIdSet.has(id));
       // 有执行人无法匹配用户时不做联动，原样回显，避免静默丢行。
       const aligned = kind !== "COMPANY"
         && candidateIds.length > 0

@@ -410,6 +410,13 @@ class TestAccountsApi:
         )
         assert hidden_detail.status_code == 404
 
+        batch_detail = seeded_client.get(
+            f"/api/v1/stocks/execution-details?ids={mine.id},{other.id}", headers=headers
+        )
+        assert batch_detail.status_code == 200, batch_detail.text
+        assert str(mine.id) in batch_detail.json()
+        assert str(other.id) not in batch_detail.json()
+
         hidden_update = seeded_client.patch(
             f"/api/v1/stocks/{other.id}",
             json={"note": "不应修改"},

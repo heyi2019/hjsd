@@ -74,6 +74,13 @@ manage = require_permissions(PERM_ORDER_CREATE)
 edit_execution = require_permissions(PERM_ORDER_UPDATE, PERM_FINANCE_ORDER_EVENT_POST)
 
 
+def _parse_batch_ids(raw: str) -> list[int]:
+    values = [part.strip() for part in raw.split(",") if part.strip()]
+    if not values or len(values) > 500 or any(not part.isdigit() or int(part) <= 0 for part in values):
+        raise Validation("ids 必须是 1-500 个正整数，逗号分隔")
+    return list(dict.fromkeys(int(part) for part in values))
+
+
 def _apply_time_shift(db: Session, account_id: int, delta_minutes: int, actor: str) -> None:
     """账号台账时间联动：把该账号关联订单的整条时间轴平移 N 分钟。
 
@@ -483,6 +490,23 @@ def inventory_stats(
     """
     stats = service.inventory_stats(db, account_ids=payload.account_ids, user=_user)
     return InventoryStatsOut(**stats)
+
+
+@router.get("/stocks/execution-details", response_model=dict[int, AccountExecutionDetailOut])
+def execution_details(
+    ids: str = Query(..., description="库存账号 ID，逗号分隔"),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> dict[int, AccountExecutionDetailOut]:
+    """批量读取库存账号详情，复用单账号的权限与组装口径。"""
+    result: dict[int, AccountExecutionDetailOut] = {}
+    for account_id in _parse_batch_ids(ids):
+        try:
+            result[account_id] = execution_detail(account_id, db, _user)
+        except NotFound:
+            # 不把不存在或不可见账号从批量响应中区分出来，避免泄露 ID 是否存在。
+            continue
+    return result
 
 
 @router.get("/stocks/{account_id}/execution-detail", response_model=AccountExecutionDetailOut)

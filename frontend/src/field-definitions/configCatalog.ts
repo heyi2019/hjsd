@@ -77,3 +77,5 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     group: "OPS",
   },
 ];
+
+export const SETTINGS_ITEM_BY_KEY = new Map(SETTINGS_ITEMS.map((item) => [item.key, item]));

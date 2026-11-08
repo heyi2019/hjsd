@@ -182,7 +182,7 @@ export function useFundsPageController(active = true) {
     }
   }, [fetchCashflows]);
 
-  // keep-alive：建单（initial_buy/initial_costs）与退款都会生成资金流水，重新激活时重拉避免资金中心过期。
+  // 建单（initial_buy/initial_costs）与退款都会生成资金流水，重新激活时重拉避免资金中心过期。
   useReloadOnActive(active, load);
 
   const submitDeposit = async (values: Record<string, unknown>) => {

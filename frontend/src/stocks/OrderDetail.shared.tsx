@@ -155,11 +155,12 @@ export function findCreationOrder(
   sourceOrderNo?: string | null,
 ): AccountExecutionOrder | undefined {
   if (!detail?.orders?.length) return undefined;
-  return (
-    detail.orders.find((order) => order.order_no === sourceOrderNo)
-    ?? detail.orders.find((order) => order.order_type !== "DG")
-    ?? detail.orders[0]
-  );
+  let firstNonDg: AccountExecutionOrder | undefined;
+  for (const order of detail.orders) {
+    if (order.order_no === sourceOrderNo) return order;
+    if (!firstNonDg && order.order_type !== "DG") firstNonDg = order;
+  }
+  return firstNonDg ?? detail.orders[0];
 }
 
 /** 卖号交付单：优先取含 SELL 事件的单，否则取首个非创建单的 DG（代挂售出）单。无售出则为 undefined。 */
@@ -168,9 +169,10 @@ export function findSellOrder(
   creationOrder?: AccountExecutionOrder,
 ): AccountExecutionOrder | undefined {
   if (!detail?.orders?.length) return undefined;
-  return (
-    detail.orders.find((order) => order.events.some((event) => event.event_type === "SELL"))
-    ?? detail.orders.find((order) => order !== creationOrder && order.order_type === "DG")
-    ?? undefined
-  );
+  let firstDg: AccountExecutionOrder | undefined;
+  for (const order of detail.orders) {
+    if (order.events.some((event) => event.event_type === "SELL")) return order;
+    if (!firstDg && order !== creationOrder && order.order_type === "DG") firstDg = order;
+  }
+  return firstDg;
 }

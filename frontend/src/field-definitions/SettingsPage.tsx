@@ -10,7 +10,7 @@
 import { Tabs } from "antd";
 import { useEffect, useState } from "react";
 import { useSession } from "../shared/state/session";
-import { SETTINGS_ITEMS } from "./configCatalog";
+import { SETTINGS_ITEM_BY_KEY } from "./configCatalog";
 import { PANEL_REGISTRY } from "./panels/panelRegistry";
 import { ConfigCenterPanel } from "./panels/ConfigCenterPanel";
 
@@ -47,7 +47,7 @@ export function SettingsPage() {
   };
 
   const standaloneTabs: TabItem[] = SETTINGS_TAB_ORDER
-    .map((key) => SETTINGS_ITEMS.find((i) => i.key === key))
+    .map((key) => SETTINGS_ITEM_BY_KEY.get(key))
     .filter(
       (item): item is NonNullable<typeof item> =>
         !!item && (!item.permission || can(item.permission)),

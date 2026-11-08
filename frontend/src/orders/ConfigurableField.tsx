@@ -158,8 +158,9 @@ export function isConditionActive(
     return raw !== undefined && raw !== null && String(raw).trim() !== "";
   }
   const triggers = cond.values ?? [];
+  const triggerSet = new Set(triggers);
   const current = (Array.isArray(raw) ? raw : [raw]).map((item) => String(item ?? ""));
-  const hit = current.some((item) => triggers.includes(item));
+  const hit = current.some((item) => triggerSet.has(item));
   return cond.op === "ne" ? !hit : hit;
 }
 

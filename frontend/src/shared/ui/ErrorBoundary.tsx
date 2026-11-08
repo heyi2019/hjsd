@@ -27,7 +27,7 @@ export function isModuleLoadError(error: Error | null | undefined): boolean {
 /**
  * 页面级错误边界：单个页面渲染抛错时只在此边界内显示降级 UI，
  * 不向上冒泡到 AppShell 导致整个应用外壳（侧栏/顶栏）白屏。
- * 与 AppShell 的 keep-alive 配合：崩溃的页面 slot 被本边界接住，
+ * 与 AppShell 的页面级错误边界配合：崩溃的页面 slot 被本边界接住，
  * 其它已挂载页面不受影响，用户可切走再切回或点「重试」恢复。
  */
 export class ErrorBoundary extends Component<Props, State> {

@@ -88,7 +88,7 @@ describe("OrderDetail", () => {
       finance_summary: { total_income: "0.00", total_expense: "100.00", net_amount: "-100.00" },
     } as unknown as AccountExecutionDetail;
 
-    renderLight(<OrderDetail row={{ ...account, bound_phone: "13800000000" } as unknown as Account} detail={detail} loading={false} editing={{ ...account, bound_phone: "13800000000" } as unknown as Account} />, { user: "admin" });
+    renderLight(<OrderDetail row={{ ...account, bound_phone: "138****0000" } as unknown as Account} detail={detail} loading={false} editing={{ ...account, bound_phone: "138****0000" } as unknown as Account} />, { user: "admin" });
 
     const editPanel = screen.getByTestId("order-edit-feature-panel");
     expect(editPanel).toHaveAttribute("aria-label", "订单编辑功能板块");

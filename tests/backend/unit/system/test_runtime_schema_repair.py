@@ -1,6 +1,8 @@
 """DEPLOY-01：运行时 schema 兼容修复，存量库不能因已下线的非空列阻断写入。"""
 from __future__ import annotations
 
+from pathlib import Path
+
 from scripts import repair_runtime_schema
 
 
@@ -40,3 +42,10 @@ def test_repair_runtime_schema_removes_retired_columns_from_all_write_tables():
         'ALTER TABLE public."cashflow" ADD COLUMN IF NOT EXISTS accounting_attribute '
         "VARCHAR(32) NOT NULL DEFAULT 'EXPENSE'",
     ]
+
+
+def test_backend_container_starts_schema_repair_as_module():
+    dockerfile = Path(__file__).resolve().parents[4] / "backend" / "Dockerfile"
+
+    assert "python3 -m scripts.repair_runtime_schema" in dockerfile.read_text(encoding="utf-8")
+    assert "python3 scripts/repair_runtime_schema.py" not in dockerfile.read_text(encoding="utf-8")

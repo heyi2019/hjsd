@@ -20,7 +20,7 @@ def test_load_gates_reads_all_business_domains():
         "app/foundation": 2,
         "app/core": 0,
         "app/reporting": 22,
-        "app/finance": 50,
+        "app/finance": 54,
     }
 
 

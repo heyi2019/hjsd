@@ -18,9 +18,9 @@
       "max_missing": 22
     },
     "app/finance": {
-      "statements": 1041,
-      "missing": 50,
-      "max_missing": 50
+      "statements": 1027,
+      "missing": 54,
+      "max_missing": 54
     }
   }
 }

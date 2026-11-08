@@ -15,7 +15,7 @@
   color: var(--color-text-primary);
 }
 
-/* Keep the desktop React shell independent from legacy generic section/header rules. */
+/* Keep the desktop React shell independent from generic section/header rules. */
 .app-shell > .workspace {
   display: flex;
   flex-direction: column;
@@ -103,10 +103,8 @@
 /* body 字号已统一收口到 typography.css（--fs-footnote 13px，2026-09-03 用户裁定：
    右侧正文比左侧导航小一点）。此处旧 !important 覆盖已删除，避免双头声明。 */
 
-/* Desktop dark theme: these legacy business surfaces previously kept light literals. */
-/* 修正 2026-09-11：原 `:root[data-theme="dark"] html` 是死代码——html 即 :root 本身，
-   不可能成为 :root 的后代，该选择器永不匹配，导致深色下 html 层仍是亮色。
-   data-theme 打在 documentElement 上，直接写 :root[data-theme="dark"] 即可。 */
+/* Desktop dark theme surfaces. */
+/* data-theme 挂在 documentElement 上，直接设置根节点背景。 */
 :root[data-theme="dark"] {
   background: var(--paper);
 }
@@ -125,8 +123,7 @@
   border-color: var(--color-border);
 }
 
-/* .login-card 已移出本组：登录卡是恒定品牌面（渐变蓝，见 page-layouts.css），
-   不随主题切换——2026-10-13 用户裁决「登录页背景白、登录框渐变蓝」。 */
+/* 登录卡保持品牌渐变面，不随主题切换。 */
 :root[data-theme="dark"] .small-metric-card,
 :root[data-theme="dark"] .ord-date-controls input,
 :root[data-theme="dark"] .finance-tabs button.secondary {
@@ -167,7 +164,7 @@
   border-color: var(--glass-border);
 }
 
-/* .login-card 排除：登录卡保持品牌渐变蓝，不吃暗色玻璃底（同上，2026-10-13 用户裁决）。 */
+/* 登录卡保持品牌渐变蓝，不使用暗色玻璃底。 */
 :root[data-theme="dark"] .ant-card:not(.login-card),
 :root[data-theme="dark"] .ant-modal-content,
 :root[data-theme="dark"] .ant-drawer-content,

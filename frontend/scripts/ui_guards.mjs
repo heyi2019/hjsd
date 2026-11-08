@@ -82,7 +82,6 @@ const labelKeys = labelBlockM
 // 这些枚举的值会直接进 StatusTag，必须全部有中文标签
 const STATUS_ENUMS = [
   "OrderStatus", "InstallmentStatus", "AccountStatus", "RebateStatus",
-  "ImportBatchStatus", "ImportRowStatus",
   "PoolStatus", "DepositStatus", "PolicyStatus",
 ];
 /** 取枚举块。注意：传给 new RegExp 的模式里反斜杠必须双写（`\\(`），
@@ -247,6 +246,13 @@ if (definedKf.size === 0) {
 // 演变成整页内联样式。登记的理由只允许是「静态 CSS 类无法表达的字段级动态值」；
 // 「写起来快」「懒得提类名」不构成理由。视觉定稿后应回收到 CSS 并删除条目。
 const INLINE_STYLE_ALLOWLIST = new Map([
+  [
+    "src/shared/ui/pullToRefresh/PullToRefreshProvider.tsx",
+    {
+      max: 2,
+      reason: "下拉刷新指示器的透明度、位移和旋转角度由实时触摸状态驱动，静态 CSS 无法表达。",
+    },
+  ],
   [
     "src/pools/StudioExpensePanel.tsx",
     {

@@ -3,7 +3,7 @@
  *
  * 设计边界：
  * - 只在发布域（或 VITE_DATA_SOURCE=cloud）启用，本地 5188 / ECS 仍走原 FastAPI；
- * - 复用 axios adapter 接口，因此 src/shared/api/*.api.ts 的 146 处调用点无需改动；
+ * - 复用 axios adapter 接口，业务 API 无需感知数据源；
  * - 云端是 heijin_erp_release 的只读快照，写操作一律返回明确的业务错误，不静默造假成功。
  */
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from "axios";
@@ -128,11 +128,7 @@ function cloudFailure(config: InternalAxiosRequestConfig, cause: unknown): never
   return fail(config, 400, "CLOUD_REQUEST_FAILED", `云服务请求失败：${detail}`);
 }
 
-/**
- * 集合响应同时兼容两种消费方：数组本身可 .map()，也带 .items/.total 等属性。
- * 后端各端点返回形状不一（PageResponse / {items,total} / 裸数组），
- * 这里用一个数组 + 附加属性统一兜住，避免逐端点散改。
- */
+/** 统一集合响应的数组访问、分页元数据与汇总字段。 */
 function collection(rows: Row[], params: Record<string, string>): Row[] & Record<string, unknown> {
   const limit = params.limit ? Number(params.limit) : undefined;
   const offset = params.offset ? Number(params.offset) : 0;
@@ -176,16 +172,16 @@ async function fetchRows(table: string, params: Record<string, string>): Promise
   const { data, error } = await db.from(table).select("*").order("id", { ascending: true });
   if (error) return Promise.reject(error);
   let rows: Row[] = Array.isArray(data) ? (data as Row[]) : [];
-  for (const [key, value] of Object.entries(params)) {
-    if (IGNORED_PARAMS.has(key) || !rows.length || !(key in rows[0])) continue;
+  const filters = Object.entries(params).filter(([key]) => !IGNORED_PARAMS.has(key));
+  if (!filters.length) return rows;
+  return rows.filter((row) => filters.every(([key, value]) => {
+    if (!(key in row)) return true;
     if (key === "keyword") {
       const needle = value.toLowerCase();
-      rows = rows.filter((row) => Object.values(row).some((v) => typeof v === "string" && v.toLowerCase().includes(needle)));
-    } else {
-      rows = rows.filter((row) => String(row[key] ?? "") === value);
+      return Object.values(row).some((item) => typeof item === "string" && item.toLowerCase().includes(needle));
     }
-  }
-  return rows;
+    return String(row[key] ?? "") === value;
+  }));
 }
 
 function csvBlob(rows: Row[]): Blob {
@@ -199,7 +195,7 @@ function csvBlob(rows: Row[]): Blob {
   return new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
 }
 
-function resolveTable(path: string, segments: string[]): string | undefined {
+function resolveTable(segments: string[]): string | undefined {
   const root = segments[0];
   if (segments.length >= 3) {
     const two = `${root}/${segments[2]}`;
@@ -211,7 +207,7 @@ function resolveTable(path: string, segments: string[]): string | undefined {
 }
 
 /** 子集合按路径里的父 id 过滤，列名取行里真实存在的那一个。 */
-function parentFilter(table: string, segments: string[], rows: Row[]): Row[] {
+function parentFilter(segments: string[], rows: Row[]): Row[] {
   if (segments.length < 3 || !rows.length) return rows;
   const parentId = segments[1];
   if (!/^\d+$/.test(parentId)) return rows;
@@ -256,17 +252,20 @@ export const cloudAdapter: AxiosAdapter = async (config) => {
       const rows = await fetchRows("stocks", {});
       const target = ids.size ? rows.filter((row) => ids.has(Number(row.id))) : rows;
       const now = Date.now();
-      const ageDays = (row: Row) => {
+      const stats = target.reduce<{ occupied: number; over7: number; over30: number }>((summary, row) => {
         const raw = row.inventory_entry_at ?? row.buy_date;
         const ts = raw ? new Date(String(raw)).getTime() : NaN;
-        return Number.isFinite(ts) ? (now - ts) / 86_400_000 : 0;
-      };
-      const occupied = target.reduce((sum, row) => sum + (Number(row.cost_amount) || 0), 0);
+        const ageDays = Number.isFinite(ts) ? (now - ts) / 86_400_000 : 0;
+        summary.occupied += Number(row.cost_amount) || 0;
+        if (ageDays > 7) summary.over7 += 1;
+        if (ageDays > 30) summary.over30 += 1;
+        return summary;
+      }, { occupied: 0, over7: 0, over30: 0 });
       return ok(config, {
         account_count: target.length,
-        occupied_cost: occupied.toFixed(2),
-        over_7d_count: target.filter((row) => ageDays(row) > 7).length,
-        over_30d_count: target.filter((row) => ageDays(row) > 30).length,
+        occupied_cost: stats.occupied.toFixed(2),
+        over_7d_count: stats.over7,
+        over_30d_count: stats.over30,
       });
     } catch (err) {
       return cloudFailure(config, err);
@@ -327,12 +326,12 @@ export const cloudAdapter: AxiosAdapter = async (config) => {
   }
 
   // ---- 通用表查询 ----
-  const table = resolveTable(path, segments);
+  const table = resolveTable(segments);
   if (!table) return ok(config, collection([], params));
 
   try {
     let rows = await fetchRows(table, params);
-    rows = parentFilter(table, segments, rows);
+    rows = parentFilter(segments, rows);
 
     // 单条：/resource/:id（或 /option-sets/:code）
     if (segments.length === 2 && !IGNORED_PARAMS.has(segments[1])) {

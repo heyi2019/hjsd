@@ -54,7 +54,7 @@ beforeEach(() => {
   ]);
   vi.mocked(catalog.installmentsApi.dispositions).mockResolvedValue([]);
   // 合计由服务端下发（Decimal 聚合）；「300+200」这类算术的契约在
-  // backend tests/v1/test_installment_totals.py，前端只验展示。
+  // tests/backend/integration/business/test_installment_totals.py，前端只验展示。
   vi.mocked(catalog.installmentsApi.totals).mockResolvedValue({
     total_receivable: "500.00",
     total_paid: "350.00",
@@ -64,17 +64,6 @@ beforeEach(() => {
 });
 
 describe("InstallmentsPanel：分期合约", () => {
-  it("只展示分期出售，不展示代分期/提号分期/代挂分期", async () => {
-    renderLight(<InstallmentsPanel />, { user: "admin" });
-    expect(await screen.findByText("HS0001-INS01")).toBeInTheDocument();
-    // 代分期（DFQ）下线后本面板专营库存分期出售（contractType=STOCK_SALE），
-    // 不再有分期类型切换页签，故断言「无任何 tab」而非「选中分期出售 tab」。
-    expect(screen.queryAllByRole("tab")).toHaveLength(0);
-    for (const name of ["代分期", "提号分期", "代挂分期"]) {
-      expect(screen.queryByText(name)).toBeNull();
-    }
-  });
-
   it("渲染合约号并把 order_id 映射成订单号", async () => {
     renderLight(<InstallmentsPanel />, { user: "admin" });
     expect(await screen.findByText("HS0001-INS01")).toBeInTheDocument();
@@ -184,9 +173,6 @@ describe("InstallmentsPanel：分期合约", () => {
   });
 });
 
-// —— 原 InstallmentsPanel.actions.test.tsx ——
-// 原 .actions 文件；fixture 与主文件同名，整体收进独立 describe 隔离作用域。
-// 三个文件都是同一页 + 同一份 catalog automock，拆开只让 jsdom+antd 启动重复付费。
 describe("InstallmentsPanel：动作与减免", () => {
   let ui: ReturnType<typeof userEvent.setup>;
 
@@ -330,9 +316,6 @@ describe("InstallmentsPanel：动作与减免", () => {
   });
 });
 
-// —— 原 InstallmentsPanel.flows.test.tsx ——
-// 原 .flows 文件；同上。
-// 三个文件都是同一页 + 同一份 catalog automock，拆开只让 jsdom+antd 启动重复付费。
 describe("InstallmentsPanel：剩余动作流加深", () => {
   const baseInstallment = {
     id: 1,

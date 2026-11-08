@@ -334,7 +334,14 @@
   .dashboard-page .ui-entry-row > .dashboard-entry-group--sell { order: 0; }
   .dashboard-page .ui-entry-row > .dashboard-entry-group--distribution { order: 1; }
   .dashboard-page .ui-entry-row > .dashboard-entry-group--self-owned { order: 2; }
-  .dashboard-entry-group--distribution { grid-template-rows: var(--sz-42) auto; }
+  /* 移动端首屏自包含：三组入口（售出/分销/自营）在首屏内完整呈现，不被底部固定 Tab 栏裁切。
+     原固定行高 42+106 使三组长约 570px，首屏底部（约 771px 起被 Tab 栏覆盖）会压住「自营」组；
+     收窄卡片高度与组间距（卡片 106→92、组头 42→40、间距收紧），使入口区整体压到 Tab 栏之上，
+     空出底部安全区。桌面端保持原有大气行高。 */
+  .dashboard-entry-group { grid-template-rows: 40px auto; padding: var(--space-2); gap: var(--space-1-half); }
+  .dashboard-entry-group .ui-entry-card { min-height: 92px; height: 92px; }
+  .dashboard-entry-group__items { gap: var(--space-1-half); }
+  .dashboard-entry-group--distribution { grid-template-rows: 40px auto; }
   .dashboard-entry-group--distribution .dashboard-entry-group__items {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

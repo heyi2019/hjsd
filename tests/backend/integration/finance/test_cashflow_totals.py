@@ -1,7 +1,6 @@
 """CASHFLOW-01 资金流水列表合计（total_in / total_out）契约（FIN-04）。
 
-背景：合计原先由前端对当页（`limit` 上限 2000）求和，流水超过上限就静默少算，
-且用浮点累加金额。现改为服务端按**同一套筛选条件**聚合，本文件锁住四件事：
+服务端按**同一套筛选条件**聚合，本文件锁住四件事：
 
 1. 合计不受 `limit` / `offset` 影响；
 2. 合计随筛选参数变化（方向）；
@@ -22,7 +21,6 @@ def _create(client, headers, *, direction: str, amount: str, note: str) -> dict:
         "pool_id": 1,
         "occurred_on": TODAY.isoformat(),
         "direction": direction,
-        "nature": "BUSINESS_IN" if direction == "IN" else "BUSINESS_OUT",
         "category": "OPERATING",
         "amount": amount,
         "note": note,

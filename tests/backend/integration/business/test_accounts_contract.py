@@ -1,4 +1,4 @@
-"""API-01 accounts 账号台账契约测试（ACC-01）。
+"""API-01 accounts 账号台账契约测试。
 
 与 test_m2.py 的分工：既有文件已覆盖建账号与账号状态随订单事件流转；
 本文件补空标识/重复建档校验、查询 404 与状态过滤、库存成本汇总
@@ -293,7 +293,7 @@ class TestCreateAccountGuards:
             )
 
     def test_duplicate_identifier_allowed_as_repeat_purchase(self, seeded_db):
-        """2026-10-28 口径：game_account 不唯一——复购同号各建独立实体。"""
+        """game_account 不唯一，复购同号各建独立实体。"""
         first = _account(seeded_db, "dup-acc")
         second = service.create_account(seeded_db, game_account="dup-acc", actor="pytest")
         assert second.id != first.id
@@ -364,12 +364,6 @@ class TestAccountQueries:
         assert service.total_inventory_cost(seeded_db) == Decimal("300.00")
 
 class TestAccountsApi:
-    def test_inventory_endpoint_publishes_typed_response_contract(self, app):
-        schema = app.openapi()["paths"]["/api/v1/stocks/inventory"]["get"]["responses"]["200"]
-        response_schema = schema["content"]["application/json"]["schema"]
-
-        assert response_schema["$ref"].endswith("/InventoryResponseOut")
-
     def test_account_endpoints_follow_order_owner_scope(
         self, seeded_client, seeded_db
     ):
@@ -415,6 +409,13 @@ class TestAccountsApi:
             f"/api/v1/stocks/{other.id}/execution-detail", headers=headers
         )
         assert hidden_detail.status_code == 404
+
+        batch_detail = seeded_client.get(
+            f"/api/v1/stocks/execution-details?ids={mine.id},{other.id}", headers=headers
+        )
+        assert batch_detail.status_code == 200, batch_detail.text
+        assert str(mine.id) in batch_detail.json()
+        assert str(other.id) not in batch_detail.json()
 
         hidden_update = seeded_client.patch(
             f"/api/v1/stocks/{other.id}",
@@ -488,48 +489,6 @@ class TestAccountsApi:
         )
         assert detail.status_code == 200, detail.text
         assert detail.json()["account"]["game_password"] is None
-
-    def test_standalone_account_creation_endpoint_removed(self, seeded_client, headers):
-        response = seeded_client.post(
-            "/api/v1/stocks",
-            json={
-                "game_account": "standalone-account",
-                "business_mode": "SELF",
-                "inventory_type": "RECOVERY",
-            },
-            headers=headers,
-        )
-        assert response.status_code == 405, response.text
-
-    def test_order_creation_rejects_legacy_account_payload(self, seeded_client, headers):
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "HS",
-                "trade_date": TODAY.isoformat(),
-                "account": {"game_account": "standard-context", "platform": "王者"},
-            },
-            headers=headers,
-        )
-        assert response.status_code == 422, response.text
-        assert response.json()["details"]["errors"][0]["field"] == "account"
-
-    def test_order_creation_rejects_legacy_account_media_payload(self, seeded_client, headers):
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "HS",
-                "trade_date": TODAY.isoformat(),
-                "account": {
-                    "game_account": "legacy-account-with-media",
-                    "platform": "王者",
-                    "account_description": "不再兼容的旧建单资料",
-                    "account_images": ["data:image/png;base64,image-0"],
-                },
-            },
-            headers=headers,
-        )
-        assert response.status_code == 422, response.text
 
     def test_list_accounts_endpoint_with_status(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "api-acc")
@@ -629,18 +588,6 @@ class TestAccountsApi:
         item = next(row for row in response.json()["items"] if row["game_account"] == account.game_account)
         assert item["source_order_no"] == order.order_no
 
-    def test_order_creation_rejects_legacy_consignment_account_payload(self, seeded_client, headers):
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "DG",
-                "trade_date": TODAY.isoformat(),
-                "account": {"game_account": "consignment-source", "platform": "寄售平台"},
-            },
-            headers=headers,
-        )
-        assert response.status_code == 422, response.text
-
     def test_execution_detail_includes_source_order(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-acc")
         order = _buy(seeded_db, account, amount="300")
@@ -663,7 +610,6 @@ class TestAccountsApi:
             pool_id=pool.id,
             occurred_on=TODAY,
             direction="OUT",
-            nature="BUSINESS_OUT",
             category="OTHER",
             amount=Decimal("12"),
             order_id=order.id,
@@ -686,7 +632,6 @@ class TestAccountsApi:
                 "occurred_on": TODAY.isoformat(),
                 "occurred_at": order_payload["cashflows"][0]["occurred_at"],
                 "direction": "OUT",
-                "nature": "BUSINESS_OUT",
                 "category": "OTHER",
                 "amount": "12.00",
                 "note": "订单关联的独立支出",

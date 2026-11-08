@@ -34,9 +34,6 @@ from app.domain import (  # noqa: E402,F401  注册全部 v1 模型
     trade,
     users,
 )
-from app.legacy_imports import models as _imports  # noqa: E402  注册历史导入模型
-
-_ = _imports
 
 BASELINE_REVISION = "0001"
 

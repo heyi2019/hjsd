@@ -37,6 +37,38 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 ---
 
+## V1.0.6
+
+**发布时间：** 2026-11-09 CST（Asia/Shanghai）
+
+| 项目 | 版本 / 标识 |
+| --- | --- |
+| 系统发布版本 | `V1.0.6` |
+| 前端构建版本 | `1.0.6` |
+| 后端 API 版本 | `1.0.6`（唯一事实源 `backend/app/version.py`） |
+| 数据库兼容 | 后端启动时幂等清理已退役字段，修复存量库建单 500 |
+
+### 本次内容
+
+- 修复存量 PostgreSQL 保留旧版非空字段导致的订单建单 500。
+- 后端启动前清理 `capital_type`、`fund_nature`、`nature`，并补齐 `cashflow.accounting_attribute`。
+- 新增运行时 schema 修复回归测试，E2E 库复用同一修复逻辑。
+- 发布前执行后端、前端、E2E 全链路测试并构建 V1.0.6 镜像。
+
+### 发布前检查
+
+- [x] 后端测试报告通过：1477 passed
+- [x] 前端测试报告通过：782 tests passed
+- [x] E2E 测试报告通过：62 passed
+- [ ] 后端与前端镜像构建并完成自检（后端镜像已构建，前端镜像交由 CI 构建）
+- [ ] 部署后 `/api/v1/health` 返回 `app_version=1.0.6`
+
+### 回滚
+
+- 镜像回退到上一份通过验收的 tag；数据库按部署前快照恢复。
+
+---
+
 ## V1.0.5
 
 **发布时间：** 2026-11-08 CST（Asia/Shanghai）
@@ -46,7 +78,7 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 | 系统发布版本 | `V1.0.5` |
 | 前端构建版本 | `1.0.5` |
 | 后端 API 版本 | `1.0.5`（唯一事实源 `backend/app/version.py`） |
-| 数据库迁移基线 | 活动链仅 `0001` = head；本版零 DDL |
+| 数据库迁移基线 | 活动链仅 `0001` = head；启动阶段执行幂等的已知结构漂移修复 |
 
 ### 本次内容
 
@@ -81,7 +113,7 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 **本次发布修复**
 
-- E2E 启动时清理已退役的 `capital_type` / `nature` 历史非空列，避免订单和资金流水接口出现 PostgreSQL 500。
+- 后端启动时清理已退役的 `capital_type` / `fund_nature` / `nature` 历史非空列，并补齐 `cashflow.accounting_attribute`，避免存量库订单和资金流水接口出现 PostgreSQL 500。
 - 修正资金流水 E2E 对已移除字段和旧成功提示的依赖；全量 Playwright E2E 62 项通过。
 - 按当前精简后的业务代码刷新四域覆盖率基线，避免旧版本基线误报发布失败。
 

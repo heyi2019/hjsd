@@ -132,11 +132,13 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
 
   const from = dateRange?.[0]?.format("YYYY-MM-DD") ?? "";
   const to = dateRange?.[1]?.format("YYYY-MM-DD") ?? "";
+  const selectedPoolCodes = useMemo(() => new Set(poolCodes), [poolCodes]);
 
   const selectedPools = useMemo(
-    () => pools.filter((pool) => poolCodes.includes(pool.code)),
-    [pools, poolCodes],
+    () => pools.filter((pool) => selectedPoolCodes.has(pool.code)),
+    [pools, selectedPoolCodes],
   );
+  const poolById = useMemo(() => new Map(pools.map((pool) => [pool.id, pool.name])), [pools]);
 
   useEffect(() => {
     setPoolCodes((current) => {
@@ -151,7 +153,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
     try {
       const savedItems = await readOptionSet(ITEM_SET_CODE);
       if (savedItems && savedItems.length > 0) setExpenseItems(savedItems);
-      const allowedIds = pools.filter((pool) => poolCodes.includes(pool.code)).map((pool) => pool.id);
+      const allowedIds = pools.filter((pool) => selectedPoolCodes.has(pool.code)).map((pool) => pool.id);
       if (allowedIds.length === 0) {
         setFlows([]);
         setSummary(null);
@@ -175,7 +177,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
     } finally {
       setLoading(false);
     }
-  }, [category, from, to, pools, poolCodes]);
+  }, [category, from, to, pools, selectedPoolCodes]);
 
   useEffect(() => {
     void load();
@@ -228,7 +230,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
     { title: "日期", dataIndex: "occurred_on" },
     {
       title: "资金池",
-      render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? row.pool_id,
+      render: (_v, row) => poolById.get(row.pool_id) ?? row.pool_id,
     },
     {
       title: "收支",

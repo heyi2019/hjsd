@@ -42,7 +42,7 @@ export interface AccountExecutionEditor {
  * 同一个后端接口（stocksApi.updateExecution / updateProfile），编辑后各自 re-fetch 即时反映。
  *
  * 详情缓存由各调用方注入（getExecutionDetail / onSaved），hook 自身不持有列表缓存，
- * 以便库存中心与订单中心各自用各自的缓存结构接入，未来库存中心可平滑迁移到本 hook。
+ * 由库存中心与订单中心分别注入缓存结构。
  */
 export function useAccountExecutionEditor(params: {
   getExecutionDetail: (accountId: number) => AccountExecutionDetail | undefined;

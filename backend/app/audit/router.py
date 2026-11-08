@@ -80,30 +80,38 @@ def stats_audit_logs(
 
     为什么单开一个端点：`AuditLogListOut.total` 的语义是「当前页行数」（= len(items)），
     limit=1 时它恒等于 1，把它当累计数会得到错误数字。这里直接 COUNT(*)。
-    不改既有 /audit-logs 的 total —— 经营中心审计页的分页依赖现有行为，改它需另行裁决。
+    保持 /audit-logs 的 total 行为，供经营中心审计页分页使用。
 
     entity_types 走逗号分隔而非 FastAPI 重复参数：前端 axios 默认把数组序列化成
-    `key[]=v`，与重复参数约定不兼容，逗号串更简单稳定。
+    支持逗号分隔的重复筛选值。
     """
     del user
     wanted = [item.strip() for item in entity_types.split(",") if item.strip()]
-    items: list[schemas.AuditEntityStatOut] = []
-    for entity_type in wanted:
-        count = db.scalar(
-            select(func.count())
-            .select_from(AuditLog)
-            .where(AuditLog.entity_type == entity_type)
+    if not wanted:
+        return schemas.AuditEntityStatsOut(items=[])
+    unique_types = list(dict.fromkeys(wanted))
+    aggregate_rows = db.execute(
+        select(
+            AuditLog.entity_type,
+            func.count(AuditLog.id),
+            func.max(AuditLog.id),
         )
-        last = db.scalars(
-            select(AuditLog)
-            .where(AuditLog.entity_type == entity_type)
-            .order_by(AuditLog.id.desc())
-            .limit(1)
-        ).first()
+        .where(AuditLog.entity_type.in_(unique_types))
+        .group_by(AuditLog.entity_type)
+    ).all()
+    counts = {entity_type: int(count) for entity_type, count, _last_id in aggregate_rows}
+    last_ids = {last_id for _entity_type, _count, last_id in aggregate_rows if last_id is not None}
+    last_by_type = {
+        row.entity_type: row
+        for row in db.scalars(select(AuditLog).where(AuditLog.id.in_(last_ids))).all()
+    } if last_ids else {}
+    items = []
+    for entity_type in wanted:
+        last = last_by_type.get(entity_type)
         items.append(
             schemas.AuditEntityStatOut(
                 entity_type=entity_type,
-                count=int(count or 0),
+                count=counts.get(entity_type, 0),
                 last_at=last.occurred_at if last else None,
                 last_actor=last.actor if last else None,
             )

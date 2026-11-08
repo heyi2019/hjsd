@@ -100,7 +100,6 @@ const EXECUTION_ACTION_LABEL: Record<string, string> = {
 
 export function executionActionLabel(
   eventType: string | null | undefined,
-  orderType?: string | null,
 ): string {
   if (!eventType) return "-";
   if (eventType === "DELIVER") return "买入交付";

@@ -11,14 +11,14 @@ import { MonthlyPnl } from "./reports/MonthlyPnlReport";
 import { OrderProfit } from "./reports/OrderProfitReport";
 import { type ReportRange, ReportsActiveContext } from "./reports/shared";
 
-export function ReportsPage({ onNavigate, active = true, initialReportTab }: { onNavigate?: (key: string) => void; active?: boolean; initialReportTab?: "commission" | "my-earnings" }) {
+export function ReportsPage({ active = true, initialReportTab }: { active?: boolean; initialReportTab?: "commission" | "my-earnings" }) {
   const [myEarnings, setMyEarnings] = useState(initialReportTab === "my-earnings");
   const [activeTab, setActiveTab] = useState(initialReportTab === "commission" || myEarnings ? "r3" : "r1");
   // 报表视图统计周期：提升到父级，避免切换 Tab（非挂载）后筛选条件丢失。
   const [reportFrom, setReportFrom] = useState("");
   const [reportTo, setReportTo] = useState("");
   useEffect(() => {
-    // keep-alive 下离开经营中心时保留个人视图，避免隐藏页在切换期间改请求口径；
+    // 离开经营中心时保留个人视图，避免切换期间改请求口径；
     // 重新激活后再按 URL 入口决定是「我的收益」还是完整提成对账。
     if (!active) return;
     setMyEarnings(initialReportTab === "my-earnings");

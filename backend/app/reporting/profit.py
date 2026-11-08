@@ -1,6 +1,6 @@
 """reporting.profit：订单利润明细（RPT-01）。
 
-利润口径（2026-11-05 用户裁决）：**该订单所有收入 − 所有支出**，
+利润口径：**该订单所有收入 − 所有支出**，
 可正可负可 0；与分润基数同源，取数统一走 `cashflow_totals_by_order`。
 资金走向只有收入 / 支出两种，不以「是否生成资金流水」为界：
 收入 = 资金流水 IN + 返点记录金额；支出 = 资金流水 OUT + 分期坏账金额。
@@ -52,6 +52,10 @@ def order_profit_detail(
         user,
         session,
     )
+    if from_date is not None:
+        orders_stmt = orders_stmt.where(Order.trade_date >= from_date)
+    if to_date is not None:
+        orders_stmt = orders_stmt.where(Order.trade_date <= to_date)
     orders = session.execute(orders_stmt).all()
     order_ids = [row.id for row in orders]
     extra_values = parties_service.get_extra_values_bulk(
@@ -74,10 +78,6 @@ def order_profit_detail(
     no_totals = (ZERO, ZERO, ZERO)
     items = []
     for order in orders:
-        if from_date and order.trade_date < from_date:
-            continue
-        if to_date and order.trade_date > to_date:
-            continue
         income, expense, buy_amount = cashflow_by_order.get(order.id, no_totals)
         rebate = rebate_by_order.get(order.id, ZERO)
         items.append(

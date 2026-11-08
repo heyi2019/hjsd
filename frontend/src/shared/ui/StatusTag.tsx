@@ -29,6 +29,7 @@ const LABELS: Record<string, string> = {
   DISABLED: "已停用",
   LINKED: "已关联",
   UNLINKED: "未关联",
+  UNMAPPED: "未映射",
   ORPHAN: "孤儿",
   UNLINKED_TRANSFER: "单边划转未关联",
   BLOCKER: "阻断",
@@ -39,15 +40,6 @@ const LABELS: Record<string, string> = {
   RESOLVED: "已处置",
   CLOSED: "已关闭",
   IGNORED: "已忽略",
-  // 导入批次 / 行状态（MIG-01）：与后端 ImportBatchStatus / ImportRowStatus 对齐
-  UNMAPPED: "未映射",
-  ROLLED_BACK: "已回滚",
-  CORRECTED: "已更正",
-  COMMITTED: "已确认",
-  MAPPED: "已映射",
-  REJECTED: "已拒绝",
-  IMPORTED: "已导入",
-  SKIPPED: "已跳过",
   // 经营规则版本状态（PolicyStatus）
   EXPIRED: "已失效",
   SUPERSEDED: "已被取代",

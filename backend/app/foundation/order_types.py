@@ -242,7 +242,7 @@ def route_impact_preview(
     portion: str,
     pool_code: str,
 ) -> dict[str, Any]:
-    """预览路由变更影响；只读，不改写历史订单或流水。"""
+    """预览路由变更影响；只读，不改写既有订单或流水。"""
     if portion not in Portion.values():
         raise Validation(
             "portion 取值非法", details={"portion": portion, "allowed": Portion.values()}
@@ -299,7 +299,7 @@ def route_impact_preview(
             "cashflow_count": int(cashflow_count or 0),
             "unchanged": True,
         },
-        "future_effect": "仅影响变更提交后按该业务和份额新解析的默认资金池，历史记录保留实际 pool_id",
+        "future_effect": "仅影响变更提交后按该业务和份额新解析的默认资金池，既有记录保留实际 pool_id",
     }
 def resolve_default_pool(
     session: Session,

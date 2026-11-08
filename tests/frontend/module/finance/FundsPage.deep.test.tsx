@@ -57,9 +57,9 @@ const deposits = [
   { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" },
 ];
 const cashflows = [
-  { id: 1, flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_DIRECT_COST" },
-  { id: 2, flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_REVENUE" },
-  { id: 3, flow_no: "HS0001-CF-CXL-01", pool_id: 1, occurred_on: "2026-10-18", nature: "BUSINESS_OUT", category: "CXL", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", status: "APPROVED", reviewed_by: "admin", reviewed_at: "2026-10-18T09:30:00", reversal_of_id: 1, accounting_attribute: "REVERSAL" },
+  { id: 1, flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_DIRECT_COST" },
+  { id: 2, flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_REVENUE" },
+  { id: 3, flow_no: "HS0001-CF-CXL-01", pool_id: 1, occurred_on: "2026-10-18", category: "CXL", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", status: "APPROVED", reviewed_by: "admin", reviewed_at: "2026-10-18T09:30:00", reversal_of_id: 1, accounting_attribute: "REVERSAL" },
 ];
 
 beforeEach(() => {
@@ -118,7 +118,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
 
   it("已入账且无关联流水 → 冲销调用 cashflowsApi.reverse", async () => {
-    const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
+    const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
     resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: approved, total: approved.length, total_in: "0.00", total_out: "300.00" });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
@@ -136,7 +136,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   });
 
   it("冲销成功后原流水不再提供重复冲销入口，并展示反向流水", async () => {
-    const approved = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
+    const approved = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
     const reversal = { ...approved, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", reversal_of_id: 7 };
     let mainListCalls = 0;
     vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => {
@@ -164,7 +164,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   });
 
   it("冲销失败时保留弹窗和表单，并显示可重试错误", async () => {
-    const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
+    const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
     vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => params?.direction
       ? { items: [], total: 0, total_in: "0.00", total_out: "0.00" }
       : { items: approved, total: 1, total_in: "0.00", total_out: "300.00" });
@@ -278,16 +278,9 @@ describe("FundsPage：资金写路径深覆盖", () => {
     warningSpy.mockRestore();
   });
 
-  it("对账页展示系统余额口径说明", async () => {
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
-    await ui.click(screen.getByRole("tab", { name: "对账" }));
-    expect(await screen.findByText(/系统余额口径：截至对账日期「已入账」流水的累计/)).toBeInTheDocument();
-  });
-
   it("总览统计卡的自有权益取服务端汇总（不再前端按 ownership 自算）", async () => {
     // 归属判定（OWNED 计入权益、CUSTODY/THIRD_PART 只计头寸）已在后端
-    // pool_balance_summary 里完成，契约由 backend tests/v1/test_pool_balances_batch.py 守；
+    // pool_balance_summary 里完成，契约由 tests/backend/integration/finance/test_pool_balances_batch.py 守；
     // 这里只验前端确实展示服务端给的数，而不是自己挑池相加。
     vi.mocked(catalog.poolsApi.list).mockResolvedValue([
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "OWNED", status: "ACTIVE" },

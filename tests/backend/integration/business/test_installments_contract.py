@@ -1,17 +1,15 @@
 """API-01 installments 分期合约契约测试（ACC-01 / HS-01-06）。
 
-与 test_m2.py / test_bughunt.py 的分工：既有文件已覆盖 HS/TH/DG 分期主路径、
+与 test_m2.py 的分工：本文件覆盖 HS/TH/DG 分期主路径、
 HS 分期出售不新增 BUY、超收校验、未结清不可交付、逾期标记主路径；
 本文件补建单校验分支（类型/账号/重复/期数/交付方式）、查询与过滤、
 收款守卫（DELIVERED 冲突/期次不存在/自动选期/收满防御）、交付守卫
-（非法交付方式/空凭证）、逾期升级 ACTIVE→OVERDUE，以及 3 个未测路由端点。
+（非法交付方式/空凭证）、逾期升级 ACTIVE→OVERDUE，以及相关路由边界。
 """
 from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import get_type_hints
-
 import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -26,26 +24,18 @@ from app.domain.enums import (
     EventType,
     InstallmentContractType,
     InstallmentStatus,
+    OrderStatus,
     ScheduleStatus,
 )
 from app.domain.foundation import AuditLog
 from app.domain.trade import Account, Cashflow, Installment, InstallmentDisposition, InstallmentSchedule, Order, OrderEvent
 from app.domain.users import User
 from app.value_added_services import service as installment_service
-from app.value_added_services import router as installments_router
-from app.value_added_services import schemas
 from app.orders import service as orders_service
 from app.reporting import service as reporting_service
 
 TODAY = date(2026, 10, 12)
 PAST = date(2026, 9, 1)
-
-def test_installment_action_routes_use_declared_response_types():
-    assert get_type_hints(installments_router.pay_installment)["return"] == schemas.PaymentResult
-    assert get_type_hints(installments_router.cancel_installment)["return"] == schemas.InstallmentCancelResult
-    assert get_type_hints(installments_router.mark_overdue)["return"] == schemas.MarkOverdueOut
-    assert get_type_hints(installments_router.recover_installment_account)["return"] == schemas.DispositionOut
-    assert get_type_hints(installments_router.resale_installment_account)["return"] == schemas.DispositionOut
 
 def _account(seeded_db, game_account: str):
     from app.stocks import service as stocks_service
@@ -593,6 +583,12 @@ def test_installment_payment_cannot_be_cancelled_through_generic_event_endpoint(
             offset_event_id=payment.id,
             reason="绕过服务层",
         )
+    assert seeded_db.scalar(
+        select(OrderEvent.id).where(
+            OrderEvent.order_id == order.id,
+            OrderEvent.event_type == EventType.CANCEL.value,
+        )
+    ) is None
 
 def test_installment_scope_follows_order_owner(seeded_db):
     scoped_user = CurrentUser.build(
@@ -754,13 +750,12 @@ class TestPayGuards:
         assert second.period_no == 1
         assert second.status == ScheduleStatus.PARTIAL.value
 
-    def test_pick_schedule_all_paid_is_defensive(self, seeded_db):
-        # 收满后 remaining_total=0，pay() 在 _pick_schedule 之前即被"超收"拦下；
-        # 直调私有函数覆盖"所有期次已收满"防御分支
+    def test_pay_rejects_overpayment_after_all_periods_paid(self, seeded_db):
         _, contract = self._settled_dg(seeded_db, "allpaid")
-        with pytest.raises(Validation) as exc:
-            installment_service._pick_schedule(seeded_db, contract, None, TODAY)
-        assert "所有期次已收满" in str(exc.value)
+        with pytest.raises(Validation, match="收款金额超过剩余应收"):
+            installment_service.pay(
+                seeded_db, contract.id, amount=Decimal("1"), paid_on=TODAY, actor="pytest"
+            )
 
 # ------------------------------------------------------------------ 交付守卫
 class TestDeliverGuards:
@@ -1434,7 +1429,7 @@ class TestInstallmentsApi:
         assert resale.related_order_id == sale_order.id
 
         profit = reporting_service.order_profit_detail(seeded_db)
-        # 资金走向只有收入 / 支出（11-05 裁决）：分期坏账=支出，虽不生成
+        # 资金走向只有收入 / 支出：分期坏账=支出，虽不生成
         # 资金流水也必须计入。收入 1200 − 买号 800 − 坏账 1000 = -600。
         assert profit["total"]["direct_cost"] == Decimal("1000.00")
         assert profit["total"]["net_profit"] == Decimal("-600.00")
@@ -1572,6 +1567,10 @@ def test_cancel_endpoint_cancels_installment(seeded_client, seeded_db, headers):
         headers=headers,
     )
     assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["installment"]["status"] == InstallmentStatus.CANCELLED.value
+    assert payload["order_status"] == OrderStatus.CANCELLED.value
+    assert payload["cancel_event_ids"] == []
 
 def test_list_dispositions_endpoint_returns_records(seeded_client, seeded_db, headers):
     account = _account(seeded_db, "list-dispo-account")
@@ -1597,6 +1596,18 @@ def test_list_dispositions_endpoint_returns_records(seeded_client, seeded_db, he
     )
     assert response.status_code == 200, response.text
     assert any(item["action"] == "RECOVER" for item in response.json())
+
+    batch_dispositions = seeded_client.get(
+        f"/api/v1/installments/dispositions?ids={contract.id}", headers=headers
+    )
+    assert batch_dispositions.status_code == 200, batch_dispositions.text
+    assert batch_dispositions.json()[str(contract.id)][0]["action"] == "RECOVER"
+
+    batch_schedules = seeded_client.get(
+        f"/api/v1/installments/schedules?ids={contract.id}", headers=headers
+    )
+    assert batch_schedules.status_code == 200, batch_schedules.text
+    assert len(batch_schedules.json()[str(contract.id)]) == 2
 
 def test_resale_endpoint_records_sale(seeded_client, seeded_db, headers):
     account = _account(seeded_db, "resale-endpoint-account")

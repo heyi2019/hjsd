@@ -79,13 +79,9 @@ def test_allocate_unknown_sequence_is_rejected(db):
 
 
 def test_concurrent_allocation_is_unique():
-    """并发取号回归（2026-10-28 压测修复）：多会话全周期（取号→提交）编号绝不重复。
+    """多会话全周期（取号→提交）编号绝不重复。
 
-    旧实现「SELECT 读值 → Python +1 → UPDATE 绝对值写」在并发下会发出重复号，
-    撞 orders.order_no 唯一约束产生 500（实测 10 并发建单 37/50 失败）。
-
-    SQLite 已整体下线，本用例改为在独立的 PostgreSQL 临时探针库上验证：多连接并发
-    取号，编号唯一且不重复。零触碰 dev/test/release/生产任何既有库。
+    在独立 PostgreSQL 探针库中用多连接并发取号，验证编号唯一且不重复。
     """
     import os
     import random

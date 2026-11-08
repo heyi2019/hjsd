@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.database import get_db
+from app.core.errors import Validation
 from app.core.security import (
     PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
@@ -126,16 +127,15 @@ def export_installments_csv(
     )
     rows = [output.model_dump(mode="json") for output in outputs]
     value_labels = list_columns_service.get_value_labels(db, "INSTALLMENT")
+    installment_ids = [output.id for output in outputs]
+    schedules_by_installment = service.list_schedules_bulk(db, installment_ids, _user)
+    dispositions_by_installment = service.list_dispositions_bulk(db, installment_ids, _user)
     for row, output in zip(rows, outputs, strict=True):
         # 列表列注册表里「剩余」的列 key 是 remaining，而字段名是 remaining_receivable；
         # 不补这一行别名，导出那列会整列空掉（页面上却是后端算好的值）。
         row["remaining"] = row.get("remaining_receivable")
-        schedules = db.scalars(
-            select(InstallmentSchedule)
-            .where(InstallmentSchedule.installment_id == output.id)
-            .order_by(InstallmentSchedule.period_no)
-        ).all()
-        dispositions = service.list_dispositions(db, output.id, _user)
+        schedules = schedules_by_installment.get(output.id, [])
+        dispositions = dispositions_by_installment.get(output.id, [])
         row["installment_note"] = row.get("note")
         row["installment_delivery_mode"] = row.get("delivery_mode")
         row["installment_delivered_on"] = row.get("delivered_on")
@@ -193,6 +193,39 @@ def create_installment(
         extra_values=payload.extra_values,
     )
     return _installment_output(db, item)
+
+
+def _parse_batch_ids(raw: str) -> list[int]:
+    values = [part.strip() for part in raw.split(",") if part.strip()]
+    if not values or len(values) > 500 or any(not part.isdigit() or int(part) <= 0 for part in values):
+        raise Validation("ids 必须是 1-500 个正整数，逗号分隔")
+    return list(dict.fromkeys(int(part) for part in values))
+
+
+@router.get("/installments/schedules", response_model=dict[int, list[schemas.ScheduleOut]])
+def list_schedules_bulk(
+    ids: str = Query(..., description="分期合约 ID，逗号分隔"),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> dict[int, list[schemas.ScheduleOut]]:
+    rows = service.list_schedules_bulk(db, _parse_batch_ids(ids), _user)
+    return {
+        installment_id: [schemas.ScheduleOut.model_validate(row) for row in values]
+        for installment_id, values in rows.items()
+    }
+
+
+@router.get("/installments/dispositions", response_model=dict[int, list[schemas.DispositionOut]])
+def list_dispositions_bulk(
+    ids: str = Query(..., description="分期合约 ID，逗号分隔"),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> dict[int, list[schemas.DispositionOut]]:
+    rows = service.list_dispositions_bulk(db, _parse_batch_ids(ids), _user)
+    return {
+        installment_id: [schemas.DispositionOut.model_validate(row) for row in values]
+        for installment_id, values in rows.items()
+    }
 
 
 @router.get("/installments/{installment_id}/schedules", response_model=list[schemas.ScheduleOut])

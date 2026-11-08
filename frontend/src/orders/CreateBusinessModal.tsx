@@ -1,8 +1,7 @@
 import { appMessage } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form } from "antd";
-import dayjs from "dayjs";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection } from "./ConfigurableField";
 import {
   counterpartiesApi,
@@ -25,7 +24,6 @@ import { RecoveryCustomerSection } from "./recovery/RecoveryCustomerSection";
 import { RecoveryFeeSection } from "./recovery/RecoveryFeeSection";
 import { useRecoveryFormState } from "./recovery/useRecoveryFormState";
 import { ThOrderSection } from "./th/ThOrderSection";
-import { resizeInstallmentSchedule, serializeInstallmentSchedule } from "./InstallmentScheduleFields";
 import { DgOrderSection } from "./dg/DgOrderSection";
 
 export type BusinessOrderType = "HS" | "TH" | "DG";
@@ -36,20 +34,12 @@ const MODAL_TITLES: Record<string, string> = {
   DG: "新建代挂订单",
 };
 
-function toDateString(value: unknown) {
-  if (typeof value === "string" && value) return value;
-  if (value && typeof value === "object" && "format" in value && typeof value.format === "function") {
-    return value.format("YYYY-MM-DD");
-  }
-  return today();
-}
-
 export function CreateBusinessModal(props: {
   open: boolean;
   onClose: () => void;
   /** 建单成功后的刷新回调（页面重新拉列表）。 */
   onCreated: () => void | Promise<void>;
-  /** 必须从明确业务入口打开，订单类型不再通过通用兼容表单选择。 */
+  /** 由明确业务入口传入订单类型。 */
   initialOrderType: BusinessOrderType;
 }) {
   const orderType = props.initialOrderType;
@@ -70,6 +60,19 @@ export function CreateBusinessModal(props: {
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
   const initialValuesRef = useRef<Record<string, unknown>>({});
   const { totalRecoveryCost } = useRecoveryFormState(form);
+  const customersByName = useMemo(() => {
+    const index = new Map<string, Customer[]>();
+    for (const customer of customers) {
+      const list = index.get(customer.display_name) ?? [];
+      list.push(customer);
+      index.set(customer.display_name, list);
+    }
+    return index;
+  }, [customers]);
+  const counterpartiesByNameAndType = useMemo(
+    () => new Map(counterparties.map((item) => [`${item.display_name}\u0000${item.type}`, item] as const)),
+    [counterparties],
+  );
   const formId = "business-order-form";
   // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
   // 不同业务类型通过 orderType 变化自动切换配置（get/post 走已落地的 GET 缓存层）。
@@ -171,7 +174,7 @@ export function CreateBusinessModal(props: {
         : selectedCustomerSource;
       const customerNickname = values[`${customerPrefix}customer_nickname`];
       if ((isRecovery || isDg) && customerNickname) {
-        const existingCustomer = customers.find((customer) =>
+        const existingCustomer = (customersByName.get(String(customerNickname)) ?? []).find((customer) =>
           customer.display_name === customerNickname
           && ((values[`${customerPrefix}customer_phone`] && customer.phone === values[`${customerPrefix}customer_phone`])
             || (values[`${customerPrefix}customer_wechat`] && customer.wechat === values[`${customerPrefix}customer_wechat`])
@@ -203,9 +206,7 @@ export function CreateBusinessModal(props: {
         // TH 的业务角色是同行（PEER）；页面仍以“供货方”展示业务称呼。
         // 后端按订单参与方契约校验 TH 只能使用 PEER。
         const role = "PEER";
-        const existingCounterparty = counterparties.find((item) =>
-          item.display_name === values.supplier_nickname && item.type === role,
-        );
+        const existingCounterparty = counterpartiesByNameAndType.get(`${String(values.supplier_nickname)}\u0000${role}`);
         const counterparty = existingCounterparty ?? await counterpartiesApi.create({
           display_name: values.supplier_nickname as string,
           type: role,

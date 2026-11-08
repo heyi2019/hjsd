@@ -16,7 +16,7 @@ vi.mock("@/shared/api/catalog", async (importOriginal) => {
     "list", "get", "create", "update", "patch", "post", "postEvent", "remove", "cancel", "skip", "markUnlinked",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "inventoryStats", "updateProfile", "updateExecution", "merge", "search",
+    "balance", "executionDetail", "executionDetailsBulk", "inventoryStats", "updateProfile", "updateExecution", "merge", "search",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -267,17 +267,22 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
   it("导出：读取明细并提示失败条数", async () => {
     const secondInStockRow = { ...inStockRow, id: 4, game_account: "acc-4" } as unknown as Account;
     await openPanel([inStockRow, secondInStockRow]);
-    vi.mocked(catalog.stocksApi.executionDetail)
-      .mockResolvedValueOnce(sellDetail)
-      .mockRejectedValueOnce(new Error("detail down"));
+    vi.mocked(catalog.stocksApi.executionDetailsBulk).mockResolvedValueOnce({
+      [inStockRow.id]: sellDetail,
+    });
     await ui.click(screen.getByRole("button", { name: /导出/ }));
-    await waitFor(() => expect(catalog.stocksApi.executionDetail).toHaveBeenCalled());
+    await waitFor(() => expect(catalog.stocksApi.executionDetailsBulk).toHaveBeenCalledWith(
+      [inStockRow.id, secondInStockRow.id],
+      expect.any(AbortSignal),
+    ));
     await waitFor(() => expect(message.warning).toHaveBeenCalledWith("1 条明细读取失败，已导出其余可用字段"));
   });
 
   it("导出成功后给出完成反馈", async () => {
     await openPanel([inStockRow]);
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce(sellDetail);
+    vi.mocked(catalog.stocksApi.executionDetailsBulk).mockResolvedValueOnce({
+      [inStockRow.id]: sellDetail,
+    });
     await ui.click(screen.getByRole("button", { name: /导出/ }));
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("库存 CSV 已导出"));
   });

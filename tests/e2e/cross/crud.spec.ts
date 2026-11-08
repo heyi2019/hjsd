@@ -23,7 +23,7 @@ test.describe("real-backend CRUD round-trip", () => {
   }) => {
     const auth = AUTH_HEADERS;
 
-    // 0) 清理残留：把此前运行的 联测_CRUD_ 测试客户置 DISABLED
+    // 0) 清理残留：把已有的 联测_CRUD_ 测试客户置 DISABLED
     // GET /customers 返回分页信封 { items, total }（PageOut），不再返回裸数组。
     const pre = (await (
       await request.get(`${API_BASE}/customers`, { headers: auth })

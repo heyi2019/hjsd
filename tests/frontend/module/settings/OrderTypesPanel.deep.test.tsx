@@ -51,7 +51,12 @@ describe("OrderTypesPanel.deep", () => {
     await ui.click(within(modal).getByRole("button", { name: /创建/ }));
     await waitFor(() =>
       expect(vi.mocked(catalog.orderTypesApi.create)).toHaveBeenCalledWith(
-        expect.objectContaining({ code: "XY", name: "新业务", capital_type: "STOCK", sort_order: 0 }),
+        expect.objectContaining({
+          code: "XY",
+          name: "新业务",
+          description: null,
+          sort_order: 0,
+        }),
       ),
     );
     expect(message.success).toHaveBeenCalledWith("业务类型已创建");

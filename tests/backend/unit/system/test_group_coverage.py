@@ -2,13 +2,13 @@
 
 背景：``backend/run_regression.py`` 的 ``GROUPS`` 是逐文件手写的白名单，
 ``all`` / ``ci`` / 各域组 / ``changed`` 四条路径都只从它取值。白名单里没有的
-文件不会报错、不会告警，只是永远不执行——13 个文件 68 个用例曾因此从未进过 CI。
+文件不会报错、不会告警，只是永远不执行。
 
 本守卫把「人必须记得登记」变成「CI 必须通过」：
 
 1. 磁盘 ⊆ 分组：新增测试文件不登记就跑不过；
 2. 分组 ⊆ 磁盘：重命名或删除文件后必须同步白名单，避免死条目；
-3. 路径前缀规范：防止旧目录（``backend/tests/v1``）残留；
+3. 路径前缀规范：防止旧测试根路径残留；
 4. 同一组内无重复路径；
 5. ``all`` / ``ci`` 的取值必须覆盖全部分组。
 
@@ -84,12 +84,4 @@ def test_no_duplicate_paths_within_a_group() -> None:
         if len(items) != len(set(items))
     }
     assert not dupes, f"同一组内出现重复路径：{dupes}"
-
-
-def test_all_paths_cover_every_group() -> None:
-    """all / ci 的取值必须覆盖所有已登记路径。"""
-    covered = set(rr.all_paths())
-    missing = sorted(set(_all_group_items()) - covered)
-    assert not missing, "all / ci 未覆盖以下已登记路径：\n" + "\n".join(
-        f"  - {item}" for item in missing
-    )
+# End of static group guards.

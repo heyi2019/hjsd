@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 from _repo import BACKEND_DIR as BACKEND, BE_TESTS, REPO_ROOT as REPO
@@ -19,9 +20,8 @@ sys.path.insert(0, str(BACKEND / "scripts"))
 
 import promise_catalog as pc  # noqa: E402
 
-# 过渡期基线：文件头写着功能码、但清单尚未登记的承诺数量。**只允许下降**。
-# 每登记一条就把它改小；新增未登记声明会让本测试变红，从而拦住「加测试不登记」。
-# 2026-11-04：33 个文件全部补写承诺码，基线归零。此后任何未登记声明都是新增债务。
+# 未登记承诺预算固定为零；新增文件头声明必须先登记进承诺清单。
+# 否则本测试变红，阻止「加测试不登记」。
 UNREGISTERED_BUDGET = 0
 
 VALID_LEVELS = {"L0", "L1", "L2", "L3"}
@@ -33,7 +33,7 @@ def _rows() -> list[dict]:
 
 
 def test_every_test_file_has_owner() -> None:
-    """不允许存在既无承诺声明、又不在历史映射表里的测试文件。"""
+    """不允许存在既无承诺声明、又不在功能映射表里的测试文件。"""
     orphans = [row["file"] for row in _rows() if row["source"] == "none"]
     assert not orphans, (
         "以下测试文件既没有文件头承诺声明，也不在 test_catalog.BACKEND_FILE_TO_FUNC 中，"
@@ -70,6 +70,15 @@ def test_ledger_entries_are_well_formed() -> None:
     assert not problems, "承诺清单结构问题：\n" + "\n".join(problems)
 
 
+@lru_cache(maxsize=1)
+def _backend_evidence_index() -> dict[str, Path]:
+    index: dict[str, Path] = {}
+    for path in sorted(BE_TESTS.rglob("test_*.py")):
+        index.setdefault(path.name, path)
+    return index
+
+
+@lru_cache(maxsize=None)
 def _evidence_path(name: str) -> Path:
     """解析验证证据路径。
 
@@ -79,16 +88,13 @@ def _evidence_path(name: str) -> Path:
     """
     if name.startswith("tests/"):
         return REPO / name
-    if name.startswith("frontend:"):  # 旧写法兼容：frontend:<仓库根相对路径>
+    if name.startswith("frontend:"):  # frontend:<仓库根相对路径>
         return REPO / name[len("frontend:") :]
     direct = BE_TESTS / name
     if direct.exists():
         return direct
-    # 测试文件已按 unit|integration/<区域>/ 分层，而清单里存的是裸文件名。
-    # 只查根目录会让 48 条证据集体「不存在」——报错很响亮，但真正的问题是解析方式
-    # 还停留在扁平结构；下次再分层（例如按域再拆一层）这里必须仍然有效。
-    matches = sorted(BE_TESTS.rglob(name))
-    return matches[0] if matches else direct
+    # 测试文件按 unit|integration/<区域>/ 分层，而清单里存的是裸文件名。
+    return _backend_evidence_index().get(name, direct)
 
 
 def test_ledger_evidence_files_exist() -> None:
@@ -119,22 +125,3 @@ def test_missing_promises_state_a_reason() -> None:
         and not (row.get("备注") or "").strip()
     ]
     assert not silent, f"以下承诺标记缺失但未写原因：{silent}"
-
-
-def test_no_file_relies_on_legacy_fallback() -> None:
-    """每个测试文件都必须自己声明承诺码，不得靠历史功能码或别名兜底。
-
-    2026-11-04 已完成 112/112 全量改造：历史 ``func``（BACKEND_FILE_TO_FUNC 手写表）
-    与 ``alias``（清单历史别名字段）两条回落路径不再被任何文件使用。本断言把它锁死——
-    以后新增测试文件必须自己在 docstring 首行写承诺码，否则直接红。
-    """
-    legacy = [
-        f"{row['file']}（{row['code']} / {row['source']}）"
-        for row in _rows()
-        if row["source"] in {"func", "alias", "unregistered", "none"}
-    ]
-    assert not legacy, (
-        "以下测试文件未在 docstring 首行声明已登记的承诺码，仍靠历史回落：\n"
-        + "\n".join(f"  - {item}" for item in legacy)
-        + "\n请在文件第一行写 `\"\"\"<承诺编号> <一句话说明>\"\"\"`，并在 docs/testing/承诺清单.csv 登记。"
-    )

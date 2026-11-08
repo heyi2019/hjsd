@@ -117,7 +117,7 @@ function sumRowValue(
  * 合计 ÷ N，提交时按人数均分（两人各半、三人各三分之一）。
  *
  * 存量分润与台账执行人一致时，按存量逐人回显（PER_PERSON），不折叠成合计，
- * 避免静默改动历史数据；台账之后**增删**了该动作的执行人时，把已存份额合成合计
+ * 避免静默改动已存份额；台账之后**增删**了该动作的执行人时，把已存份额合成合计
  * 并按台账现有执行人均分（首行 TOTAL、其余只读 SHARED）——台账是执行人的唯一来源。
  * 该动作在台账没有任何执行人（候选为空）时不做联动，原样回显。
  */
@@ -140,9 +140,11 @@ export function buildActionAllocationRows(
         ? []
         : [...new Set(existed.map((item) => item.user_id).filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0))];
       const candidateIds = kind === "COMPANY" ? [] : candidates[kind];
-      const added = candidateIds.filter((id) => !existedIds.includes(id));
-      const removed = existedIds.filter((id) => !candidateIds.includes(id));
-      // 有执行人落不到具体用户（历史空值）时不做联动，宁可原样回显也不静默丢行。
+      const existedIdSet = new Set(existedIds);
+      const candidateIdSet = new Set(candidateIds);
+      const added = candidateIds.filter((id) => !existedIdSet.has(id));
+      const removed = existedIds.filter((id) => !candidateIdSet.has(id));
+      // 有执行人无法匹配用户时不做联动，原样回显，避免静默丢行。
       const aligned = kind !== "COMPANY"
         && candidateIds.length > 0
         && (added.length > 0 || removed.length > 0)

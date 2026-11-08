@@ -219,6 +219,32 @@ def list_dispositions(
     )
 
 
+def list_dispositions_bulk(
+    session: Session,
+    installment_ids: list[int] | set[int],
+    user: CurrentUser | None = None,
+) -> dict[int, list[InstallmentDisposition]]:
+    """一次读取多个合约的处置历史，并沿用合约列表的所有者可见范围。"""
+    ids = {int(item) for item in installment_ids if int(item) > 0}
+    if not ids:
+        return {}
+    stmt = (
+        select(InstallmentDisposition)
+        .join(Installment, Installment.id == InstallmentDisposition.installment_id)
+        .join(Order, Order.id == Installment.order_id)
+        .where(Installment.id.in_(ids))
+        .order_by(InstallmentDisposition.installment_id, InstallmentDisposition.occurred_on, InstallmentDisposition.id)
+    )
+    if user is not None:
+        scope = owner_scope_filter(Order.owner_id, user, session)
+        if scope is not None:
+            stmt = stmt.where(scope)
+    result: dict[int, list[InstallmentDisposition]] = {}
+    for row in session.scalars(stmt).all():
+        result.setdefault(row.installment_id, []).append(row)
+    return result
+
+
 def deliver(
     session: Session,
     installment_id: int,

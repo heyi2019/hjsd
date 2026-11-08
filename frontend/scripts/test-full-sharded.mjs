@@ -11,6 +11,7 @@
  *
  *  模式：
  *    默认          ：fast + quick + 常规 react（不含 deep）  —— 日常 CI / 里程碑前
+ *    --light-only  ：仅 fast + quick                         —— 日常提交门禁
  *    --deep-only   ：仅 react-deep（.deep 重型文件）         —— 夜间定时 / 手动深测
  *    --all         ：fast + quick + 常规 react + react-deep   —— 发版前完整回归
  *  react / react-deep 的项目归属与 deep 剥离口径在 vitest.config.ts（react.exclude + react-deep
@@ -24,9 +25,15 @@ import { fastTests, quickTests, matchesAny } from "./test-layers.mjs";
 
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const rawArgs = process.argv.slice(2);
-const mode = rawArgs.includes("--deep-only") ? "deep-only" : rawArgs.includes("--all") ? "all" : "default";
+const mode = rawArgs.includes("--light-only")
+  ? "light-only"
+  : rawArgs.includes("--deep-only")
+    ? "deep-only"
+    : rawArgs.includes("--all")
+      ? "all"
+      : "default";
 // 模式标志不传给 vitest，其余参数（如 --reporter）原样透传。
-const extraArgs = rawArgs.filter((arg) => arg !== "--deep-only" && arg !== "--all");
+const extraArgs = rawArgs.filter((arg) => !["--light-only", "--deep-only", "--all"].includes(arg));
 
 // react / react-deep 层内已是多 worker，层间并行会超订 CPU：本文件的重层一律串行。
 const CONCURRENCY = 1;
@@ -131,18 +138,20 @@ const TIMEOUT = { fast: 60_000, quick: 150_000, react: 600_000, deep: 600_000 };
 // react/deep 用 --project 触发（vitest.config.ts 单一事实源），单进程共享 transform 缓存。
 const jobs = [];
 if (mode !== "deep-only") {
-  jobs.push(["fast", ["run", "test:fast", "--", "--reporter=dot", ...extraArgs], TIMEOUT.fast]);
-  jobs.push(["quick", ["run", "test:quick", "--", "--reporter=dot", ...extraArgs], TIMEOUT.quick]);
+  jobs.push(["fast", ["run", "test:fast", "--", "--reporter=dot", "--silent=passed-only", ...extraArgs], TIMEOUT.fast]);
+  jobs.push(["quick", ["run", "test:quick", "--", "--reporter=dot", "--silent=passed-only", ...extraArgs], TIMEOUT.quick]);
+}
+if (mode !== "deep-only" && mode !== "light-only") {
   jobs.push([
     "react（非 deep，单进程）",
-    ["run", "test:react", "--", "--retry=0", "--reporter=dot", ...extraArgs],
+    ["run", "test:react", "--", "--retry=0", "--reporter=dot", "--silent=passed-only", ...extraArgs],
     TIMEOUT.react,
   ]);
 }
-if (mode !== "default") {
+if (mode !== "default" && mode !== "light-only") {
   jobs.push([
     "react-deep（.deep 重型，单进程）",
-    ["run", "test:react-deep", "--", "--retry=0", "--reporter=dot", ...extraArgs],
+    ["run", "test:react-deep", "--", "--retry=0", "--reporter=dot", "--silent=passed-only", ...extraArgs],
     TIMEOUT.deep,
   ]);
 }
@@ -150,7 +159,9 @@ if (mode !== "default") {
 const startedAt = performance.now();
 const layerDesc = mode === "deep-only"
   ? `deep-only：react-deep ${deepFiles.length} 个 .deep 重型文件`
-  : mode === "all"
+  : mode === "light-only"
+    ? `日常门禁：fast ${fastFiles.length} / quick ${quickFiles.length}（react/deep 仅发布前运行）`
+    : mode === "all"
     ? `全量（含 deep）：fast ${fastFiles.length} / quick ${quickFiles.length} / react ${reactFiles.length} / react-deep ${deepFiles.length}`
     : `日常（不含 deep）：fast ${fastFiles.length} / quick ${quickFiles.length} / react ${reactFiles.length}（react-deep ${deepFiles.length} 移出，由 test:full:deep 承担）`;
 console.log(

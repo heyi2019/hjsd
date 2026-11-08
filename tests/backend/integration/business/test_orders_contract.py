@@ -1,9 +1,9 @@
 """API-01 orders 订单/事件契约测试（ORD-01/02、FIN-01/03）。
 
-与 test_orders.py / test_bughunt.py / test_m2.py 的分工：既有文件已覆盖四类业务建单、
+与 test_orders.py / test_m2.py 的分工：本文件覆盖四类业务建单、
 BUY/COST/SELL/PAYMENT/DELIVER/CANCEL(无 offset) 登记、状态机、路由缺失等主路径；
 本文件补NotFound/越权/过滤/非法入参分支、`_opposite_direction` 三分支、
-`_apply_account_effect` 防御与 CANCEL 分支、以及 3 个未测路由端点。
+`_apply_account_effect` 防御与 CANCEL 分支，以及相关路由边界。
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def test_order_create_uses_account_snapshot_as_the_only_account_input():
         schemas.OrderCreate(
             order_type="HS",
             trade_date=D,
-            game_account="legacy-flat-account",
+            game_account="flat-account-input",
         )
 
 def test_order_create_validates_active_custom_field_values(seeded_db):
@@ -247,7 +247,7 @@ def test_database_allows_inventory_links_for_th_orders(seeded_db):
     assert order.account_snapshot is None
 
 def test_database_accepts_th_order_snapshot_and_rejects_custom_type(seeded_db):
-    """2026-10-28 口径：快照 CHECK 放宽为四类业务通用，自定义类型仍被库层拒绝。"""
+    """快照 CHECK 对四类业务通用，自定义类型仍被库层拒绝。"""
     order = _order(seeded_db, order_type="TH")
     order.account_snapshot = {"game_account": "th-text-only"}
     seeded_db.flush()
@@ -367,6 +367,19 @@ class TestCreateOrderValidation:
                 actor="pytest",
             )
 
+    def test_scoped_user_cannot_read_linked_foreign_order(self, seeded_db):
+        visible = _order(seeded_db, owner_id=9)
+        foreign = _order(seeded_db, owner_id=1)
+        order_service.create_order_link(
+            seeded_db,
+            visible.id,
+            related_order_id=foreign.id,
+            relation_type="FOLLOW_UP",
+            actor="pytest",
+        )
+
+        assert order_service.list_order_links(seeded_db, visible.id, _scoped_user()) == []
+
     def test_order_link_delete_removes_link_and_writes_audit(self, seeded_db):
         source = _order(seeded_db, order_type="HS")
         follow_up = _order(seeded_db, order_type="HS")
@@ -432,6 +445,24 @@ class TestCreateOrderValidation:
         # 重复删除 → 404
         with pytest.raises(NotFound, match="不存在"):
             order_service.delete_order_link(seeded_db, follow_up.id, link.id, actor="pytest")
+
+    def test_scoped_user_cannot_delete_linked_foreign_order(self, seeded_db):
+        visible = _order(seeded_db, owner_id=9)
+        foreign = _order(seeded_db, owner_id=1)
+        link = order_service.create_order_link(
+            seeded_db,
+            visible.id,
+            related_order_id=foreign.id,
+            relation_type="FOLLOW_UP",
+            actor="pytest",
+        )
+
+        with pytest.raises(NotFound, match="不存在"):
+            order_service.delete_order_link(
+                seeded_db, visible.id, link.id, actor="pytest", user=_scoped_user()
+            )
+
+        assert seeded_db.scalar(select(OrderLink).where(OrderLink.id == link.id)) is not None
 
     def test_installment_gate_flags_must_be_boolean_in_service(self, seeded_db):
         order = _order(seeded_db, order_type="HS")
@@ -890,7 +921,7 @@ class TestCreateOrderValidation:
         assert order.account_snapshot is None
 
     def test_th_accepts_order_account_snapshot_and_creates_inline_account(self, seeded_db):
-        """2026-10-28 口径：account_snapshot 四类业务通用，TH 快照建单即建号。"""
+        """account_snapshot 对四类业务通用，TH 快照建单即建号。"""
         order = order_service.create_order(
             seeded_db,
             order_type="TH",
@@ -905,19 +936,6 @@ class TestCreateOrderValidation:
         assert account.game_account == "th-snapshot-account"
         assert account.stock_no is not None
         assert order.account_snapshot == {"game_account": "th-snapshot-account"}
-
-    def test_account_snapshot_rejects_removed_legacy_account_fields(self, seeded_db):
-        with pytest.raises(Validation, match="订单账号快照字段校验失败"):
-            order_service.create_order(
-                seeded_db,
-                order_type="HS",
-                trade_date=D,
-                actor="pytest",
-                account_snapshot={
-                    "game_account": "hs-legacy-region",
-                    "region": "旧字段",
-                },
-            )
 
     def test_account_snapshot_does_not_accept_inventory_media_fields(self, seeded_db):
         with pytest.raises(Validation, match="订单账号快照字段校验失败"):
@@ -1129,7 +1147,7 @@ class TestGetAndListOrders:
     def test_list_orders_mine_covers_every_event_operator_not_only_sell(self, seeded_db):
         """每一笔事件都有负责人：非 SELL 事件的执行人、被指派操作人也算「我参与的」。
 
-        旧口径只认 SELL 执行人，买号 / 运营消耗的人在自己工作台看不到他做过的单。
+        工作台按所有事件执行人和被指派操作人汇总参与过的订单。
         """
         users = list(
             seeded_db.scalars(
@@ -1168,7 +1186,7 @@ class TestGetAndListOrders:
         self, seeded_client, seeded_db, headers
     ):
         mine = _order(seeded_db, owner_id=9, trade_date=date(2026, 10, 3))
-        # 2026-10-28 去冗余：订单侧账号关键词走 account_snapshot JSON 检索
+        # 订单侧账号关键词走 account_snapshot JSON 检索。
         mine.account_snapshot = {"game_account": "workbench-keyword-account"}
         _order(seeded_db, order_type="TH", owner_id=1, trade_date=date(2026, 10, 4))
         seeded_db.flush()
@@ -1251,16 +1269,6 @@ class TestPostEventValidation:
             )
         assert "事件类型" in str(exc.value)
 
-    def test_transfer_removed_from_event_types(self, seeded_db):
-        """划转已从 EventType 移除：不再是「可枚举但不可登记」，而是非法事件类型。"""
-        order = _order(seeded_db)
-        with pytest.raises(Validation) as exc:
-            order_service.post_event(
-                seeded_db, order.id, event_type="TRANSFER", amount="1.00",
-                occurred_on=D, actor="pytest",
-            )
-        assert "事件类型" in str(exc.value)
-
     def test_deliver_requires_note(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation) as exc:
@@ -1329,6 +1337,9 @@ class TestCancelOffsetDirection:
         from app.domain.enums import Direction
         from app.domain.trade import Cashflow
 
+        # 分支零：没有冲销目标时默认按入账处理。
+        assert order_service._opposite_direction(None, seeded_db) == Direction.IN.value
+
         # 分支一：offset 指向 BUY → 方向取反为 IN（每分支独立建单）
         order_a = _order(seeded_db)
         buy_a, _ = order_service.post_event(
@@ -1357,11 +1368,6 @@ class TestCancelOffsetDirection:
             occurred_on=D, actor="pytest", offset_event_id=sell_event.id,
             reason="买家部分退款",
         )
-
-        # 分支三：offset 指向不存在的事件 → NotFound。FK 全局强制使经 post_event
-        # 不可达（INSERT order_events 即失败，校验在 flush 之后），直调私有函数覆盖
-        with pytest.raises(NotFound):
-            order_service._opposite_direction(999999, seeded_db)
 
         flows = {
             row.id: row
@@ -1703,21 +1709,6 @@ class TestAccountEffect:
 
         assert "分期" in str(exc.value)
 
-    def test_account_none_branch_is_defensive(self, seeded_db):
-        # FK 全局强制使 ORM 路径不可达（账号删除是 SET NULL）；直调私有函数覆盖防御分支
-        ghost = Order(
-            order_no="HS-GHOST",
-            order_type="HS",
-            trade_date=D,
-            status=OrderStatus.ACTIVE.value,
-            account_id=999999,
-            created_by="pytest",
-            updated_by="pytest",
-        )
-        assert order_service._apply_account_effect(
-            seeded_db, ghost, "BUY", Decimal("100")
-        ) is None
-
 # ------------------------------------------------------------------ 池余额
 class TestPoolBalance:
     def test_pool_balance_service_enforces_pool_visibility(self, seeded_db):
@@ -1770,7 +1761,7 @@ class TestOrdersApi:
     def test_th_account_snapshot_creates_inline_account_via_api(
         self, seeded_client, headers
     ):
-        """2026-10-28 口径：TH 快照建单即建号（API 契约层）。"""
+        """TH 快照建单即创建库存账号。"""
         created = seeded_client.post(
             "/api/v1/orders",
             json={
@@ -1849,8 +1840,7 @@ class TestOrdersApi:
         assert response.json()["owner_id"] == user.id
 
     def test_admin_created_order_defaults_owner_to_operator(self, seeded_client, headers):
-        """未指定负责人时兜底为操作人本人：owner_id 落 NULL 会让单据在按归属过滤后
-        对 SELF 用户永久不可见（历史 153 单曾因此全为 NULL）。"""
+        """未指定负责人时使用操作人本人，确保按归属过滤仍可看到新建单据。"""
         response = seeded_client.post(
             "/api/v1/orders",
             json={"order_type": "HS", "trade_date": D.isoformat()},
@@ -1884,25 +1874,6 @@ class TestOrdersApi:
         )
 
         assert response.status_code == 422, response.text
-
-    def test_dg_creation_rejects_legacy_settlement_terms(
-        self, seeded_client, seeded_db, headers
-    ):
-        # 佣金口径已在建单接口打通，这里只保留「旧结算字段被拒」的断言。
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "DG",
-                "trade_date": D.isoformat(),
-                "listing_price": "1200.00",
-                "service_fee": "120.00",
-                "expected_settlement_date": "2026-10-20",
-            },
-            headers=headers,
-        )
-
-        assert response.status_code == 422, response.text
-        assert "Extra inputs are not permitted" in response.text
 
     def test_dg_creation_persists_commission_terms(
         self, seeded_client, seeded_db, headers

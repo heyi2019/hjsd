@@ -1,4 +1,4 @@
-"""REBATE-01 返点规则快照契约测试。"""
+"""REBATE-01 返点按规则快照计算，结算过程不修改规则定义。"""
 from __future__ import annotations
 
 from datetime import date
@@ -69,14 +69,3 @@ def test_rebate_uses_active_rule_rate_when_rate_is_omitted(seeded_db):
     assert record.rate == Decimal("7.50")
     assert record.policy_snapshot["config"]["rates"]["BUY"] == "7.50"
     assert record.status == "SETTLED"
-
-
-def test_rebate_expected_arrival_route_removed(app):
-    assert "/api/v1/rebates/overdue" not in app.openapi()["paths"]
-
-
-def test_rebate_legacy_action_routes_removed(app):
-    paths = app.openapi()["paths"]
-    assert "/api/v1/rebates/{rebate_id}/void" not in paths
-    assert "/api/v1/rebates/{rebate_id}/settlements" not in paths
-    assert "/api/v1/rebates/{rebate_id}/settlements/{settlement_id}/reverse" not in paths

@@ -182,12 +182,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "DEPOSIT_STATUS", label: "押金状态", group: "INSTALLMENT", editable: false, options: [
     { value: "PAID", label: "已付" }, { value: "PARTIALLY_RETURNED", label: "部分退还" }, { value: "RETURNED", label: "已退" }, { value: "LOST", label: "已损失" }, { value: "CANCELLED", label: "已取消" },
   ] },
-  { code: "IMPORT_BATCH_STATUS", label: "导入批次状态", group: "IMPORT", editable: false, options: [
-    { value: "DRAFT", label: "草稿" }, { value: "MAPPED", label: "已映射" }, { value: "COMMITTED", label: "已确认" }, { value: "REJECTED", label: "已拒绝" }, { value: "ROLLED_BACK", label: "已回滚" }, { value: "CORRECTED", label: "已更正" },
-  ] },
-  { code: "IMPORT_SOURCE_KIND", label: "导入数据类型", group: "IMPORT", editable: false, options: [
-    { value: "STANDARD_ORDER", label: "订单" }, { value: "STANDARD_ACCOUNT", label: "账号" }, { value: "STANDARD_CASHFLOW", label: "资金流水" }, { value: "STANDARD_INSTALLMENT", label: "分期" }, { value: "STANDARD_LEAD", label: "需求" },
-  ] },
   { code: "POLICY_STATUS", label: "规则版本状态", group: "POLICY", editable: false, options: [
     { value: "DRAFT", label: "草稿" }, { value: "ACTIVE", label: "已发布" }, { value: "EXPIRED", label: "已失效" }, { value: "SUPERSEDED", label: "已被取代" },
   ] },
@@ -239,9 +233,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   ] },
   { code: "INSTALLMENT_DISPOSITION", label: "违约处置方式", group: "INSTALLMENT", editable: false, options: [
     { value: "RECOVER", label: "回收" }, { value: "RESELL", label: "出售" },
-  ] },
-  { code: "IMPORT_ROW_STATUS", label: "导入行状态", group: "IMPORT", editable: false, options: [
-    { value: "PENDING", label: "待映射" }, { value: "MAPPED", label: "已映射" }, { value: "UNMAPPED", label: "未映射" }, { value: "IMPORTED", label: "已导入" }, { value: "SKIPPED", label: "已跳过" }, { value: "ROLLED_BACK", label: "已回滚" },
   ] },
   { code: "ENTITY_TYPE", label: "实体类型", group: "SYSTEM", editable: false, options: [
     { value: "order", label: "订单" },
@@ -322,9 +313,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "INSTALLMENT_RESELL", label: "回收转售" },
     { value: "DELIVER_CREATE", label: "登记交付" },
     { value: "REBATE_CREATE", label: "登记返点" },
-    { value: "REBATE_SETTLE", label: "返点结算" },
-    { value: "REBATE_REVERSE", label: "冲销返点" },
-    { value: "REBATE_VOID", label: "取消返点" },
     { value: "RECONCILIATION_CREATE", label: "登记对账" },
     { value: "RECONCILIATION_RESOLVE", label: "处置对账差异" },
     { value: "QUALITY_ISSUE_CREATE", label: "新建质量工单" },
@@ -350,17 +338,9 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "REPORT_EXPORT", label: "导出报表" },
     { value: "ATTACHMENT_UPLOAD", label: "上传附件" },
     { value: "ATTACHMENT_DELETE", label: "删除附件" },
-    { value: "IMPORT_LAND", label: "导入落库" },
-    { value: "IMPORT_COMMIT", label: "确认导入批次" },
-    { value: "IMPORT_REJECT", label: "驳回导入批次" },
-    { value: "IMPORT_MAP", label: "映射导入行" },
-    { value: "IMPORT_SKIP", label: "跳过导入行" },
-    { value: "IMPORT_MARK_UNLINKED", label: "标记单边划转" },
-    { value: "IMPORT_ROLLBACK", label: "回滚导入批次" },
     { value: "OPTION_SET_CREATE", label: "新建选项词典" },
     { value: "OPTION_SET_UPDATE", label: "编辑选项词典" },
     { value: "OPTION_SET_DELETE", label: "删除选项词典" },
-    { value: "IMPORT_CORRECTION", label: "更正导入批次" },
   ] },
   { code: "ORDER_EVENT_TYPE", label: "订单事件类型", group: "ORDER", editable: false, options: [
     { value: "BUY", label: "买号" },

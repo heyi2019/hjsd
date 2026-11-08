@@ -30,6 +30,11 @@ describe("stocksApi 路由", () => {
     expect(apiMock.patch).toHaveBeenNthCalledWith(2, "/stocks/7/execution-edit", { profile: {}, events: [] });
   });
 
+  it("库存详情支持按 ID 批量读取", async () => {
+    await stocksApi.executionDetailsBulk([7, 8]);
+    expect(apiMock.get).toHaveBeenCalledWith("/stocks/execution-details", { params: { ids: "7,8" } });
+  });
+
   it("删除账号走 DELETE /stocks/{id} 且请求体带删除原因", async () => {
     await stocksApi.remove(7, "重复录入");
 

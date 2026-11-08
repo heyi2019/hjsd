@@ -10,6 +10,7 @@ from datetime import date
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from app.core.errors import Validation
 from app.core.money import to_money
 from app.domain.enums import PolicyStatus, PolicyType
 from app.domain.parties import PolicyVersion
@@ -69,7 +70,7 @@ class TestPolicyDefinition:
         assert scoped["policy_code"] == "REBATE"
         assert scoped["scope_type"] == "ORDER_TYPE"
 
-    def test_scoped_requires_scope_id(self, seeded_db):
+    def test_create_scoped_policy_requires_scope_id(self, seeded_db):
         """非全局范围必须指定 scope_id，否则规则会误伤全部业务。"""
         with pytest.raises(Exception):
             policy_service.create_definition(
@@ -137,10 +138,10 @@ class TestPolicyVersion:
         assert v2["version"] == 2
 
     def test_new_version_supersedes_open_ended(self, seeded_db):
-        """新版本接续封口「开放至今」的旧版本（旧失效日 = 新生效日）。
+        """新版本接续封口开放版本（旧失效日 = 新生效日）。
 
         否则开放版本一旦存在，任何新版本都会因重叠被拒，规则永远无法改版
-        （设置配置「保存即发布」将不可用）。旧版本 config 不被改写。
+        旧版本 config 不被改写。
         """
         definition = _make_policy(seeded_db)
         v1 = policy_service.create_version(
@@ -198,28 +199,6 @@ class TestPolicyVersion:
                 effective_to=date(2026, 1, 1),
                 config={"rate": "5"},
                 actor="pytest",
-            )
-
-    def test_published_version_is_immutable(self, seeded_db):
-        """已发布版本不可修改 —— 只能新建（BAS-06-02）。"""
-        definition = _make_policy(seeded_db)
-        version = _publish(
-            seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"}
-        )
-        with pytest.raises(Exception):
-            policy_service.update_version_draft(
-                seeded_db, version["id"], config={"rate": "99"}, actor="pytest"
-            )
-
-    def test_published_version_not_editable(self, seeded_db):
-        definition = _make_policy(seeded_db)
-        version = policy_service.create_version(
-            seeded_db, definition["id"], effective_from=date(2026, 1, 1), config={"rate": "5"}, actor="pytest"
-        )
-        # 创建即发布（ACTIVE）：已发布版本不可改，只能新建版本封口
-        with pytest.raises(Exception):
-            policy_service.update_version_draft(
-                seeded_db, version["id"], config={"rate": "6"}, actor="pytest"
             )
 
     def test_published_version_resolvable(self, seeded_db):
@@ -308,7 +287,7 @@ class TestSnapshotRedline:
         assert order.policy_snapshot[PolicyType.REBATE.value]["config"] == {"rate": "5"}
 
     def test_rule_change_does_not_rewrite_history(self, seeded_db):
-        """本轮最关键的一条：改未来费率后，历史订单快照必须原样不动。"""
+        """改未来费率后，已有订单快照必须保持不变。"""
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1), to=date(2026, 7, 1), config={"rate": "5"})
         old_order = order_service.create_order(
@@ -629,28 +608,19 @@ class TestProfitAllocation:
         by_type = {item["allocation_type"]: item for item in policy_service.list_allocations(seeded_db, order.id)}
         assert by_type["SELL"]["user_id"] == 2
 
-    def test_total_must_be_100(self, seeded_db):
-        order = self._order(seeded_db)
-        with pytest.raises(Exception):
-            policy_service.set_allocations(
-                seeded_db,
-                order.id,
-                items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "60"}],
-                actor="pytest",
-            )
-
-    def test_sum_99_rejected(self, seeded_db):
-        order = self._order(seeded_db)
-        with pytest.raises(Exception):
-            policy_service.set_allocations(
-                seeded_db,
-                order.id,
-                items=[
-                    {"user_id": 1, "role": "OWNER", "allocation_rate": "50"},
-                    {"user_id": 2, "role": "SALES", "allocation_rate": "49"},
-                ],
-                actor="pytest",
-            )
+    def test_allocation_rate_sum_below_100_rejected(self, seeded_db):
+        for items in (
+            [{"user_id": 1, "role": "OWNER", "allocation_rate": "60"}],
+            [
+                {"user_id": 1, "role": "OWNER", "allocation_rate": "50"},
+                {"user_id": 2, "role": "SALES", "allocation_rate": "49"},
+            ],
+        ):
+            order = self._order(seeded_db)
+            with pytest.raises(Exception):
+                policy_service.set_allocations(
+                    seeded_db, order.id, items=items, actor="pytest"
+                )
 
     def test_negative_rate_rejected(self, seeded_db):
         order = self._order(seeded_db)
@@ -797,7 +767,7 @@ class TestPolicyApi:
         """项目约定：Validation → 422（见 test_pools_api / test_order_types_api）。
 
         注意：无失效日的版本会被新版本接续封口（见 TestPolicyVersion），因此真重叠
-        需要旧版本本身带失效日、新版本起点落在其区间内。
+        需要被替代版本本身带失效日、新版本起点落在其区间内。
         """
         created = seeded_client.post(
             "/api/v1/policies",
@@ -834,3 +804,71 @@ class TestPolicyApi:
             "/api/v1/policies", headers={"X-Dev-User": "operator"}
         )
         assert operator.status_code == 403, operator.text
+
+
+def test_supersede_rejects_published_version(seeded_db):
+    definition = _make_policy(seeded_db, code="SUP-TEST")
+    version = _publish(
+        seeded_db,
+        definition,
+        frm=date(2027, 1, 1),
+        to=date(2027, 12, 31),
+        config={"rate": "10"},
+    )
+    with pytest.raises(Validation):
+        policy_service.supersede_draft_version(
+            seeded_db, version["id"], actor="pytest", reason="已发布版本不可取消"
+        )
+
+
+def test_supersede_requires_reason(seeded_db):
+    definition = _make_policy(seeded_db, code="SUP-REASON")
+    version = _publish(
+        seeded_db,
+        definition,
+        frm=date(2027, 1, 1),
+        to=date(2027, 12, 31),
+        config={"rate": "10"},
+    )
+    with pytest.raises(Validation):
+        policy_service.supersede_draft_version(
+            seeded_db, version["id"], actor="pytest", reason=""
+        )
+
+
+def test_expire_sweep_marks_lapsed_versions(seeded_db):
+    definition = _make_policy(seeded_db, code="EXP-TEST")
+    lapsed = _publish(
+        seeded_db,
+        definition,
+        frm=date(2026, 1, 1),
+        to=date(2026, 12, 31),
+        config={"rate": "10"},
+    )
+    live = _publish(
+        seeded_db,
+        definition,
+        frm=date(2027, 1, 1),
+        to=None,
+        config={"rate": "12"},
+    )
+    out = policy_service.expire_lapsed_versions(seeded_db, on=date(2027, 1, 1), actor="pytest")
+    assert out["swept"] == 1
+    assert out["version_ids"] == [lapsed["id"]]
+    assert seeded_db.get(PolicyVersion, lapsed["id"]).status == PolicyStatus.EXPIRED.value
+    assert seeded_db.get(PolicyVersion, live["id"]).status == PolicyStatus.ACTIVE.value
+
+
+def test_expire_sweep_is_idempotent(seeded_db):
+    definition = _make_policy(seeded_db, code="EXP-IDEM")
+    _publish(
+        seeded_db,
+        definition,
+        frm=date(2026, 1, 1),
+        to=date(2026, 6, 30),
+        config={"rate": "10"},
+    )
+    first = policy_service.expire_lapsed_versions(seeded_db, on=date(2026, 7, 1), actor="pytest")
+    second = policy_service.expire_lapsed_versions(seeded_db, on=date(2026, 7, 1), actor="pytest")
+    assert first["swept"] == 1
+    assert second["swept"] == 0

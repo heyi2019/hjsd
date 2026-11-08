@@ -1,12 +1,10 @@
-"""parties.service：客户、线索、合作方与表单扩展字段的统一 Service 入口。
+"""客户、线索、合作方与扩展字段统一入口。
 
-本模块是兼容层（facade），只做符号再导出，不含业务逻辑：
+本模块只做符号再导出，不含业务逻辑：
 - 客户相关 → `app.parties.customers`
 - 需求/线索 → `app.parties.leads`
 - 合作方 → `app.parties.counterparties`
 - 扩展字段 → `app.parties.fields`
-
-外部既有 `from app.parties import service as parties_service` 的调用方式保持不变。
 
 规则来源：CUS-01、BAS-02-05、BAS-04。
 """

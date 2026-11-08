@@ -173,7 +173,7 @@ def test_update_dynamic_select_field_rename_with_empty_options(seeded_db):
 def test_fixed_term_field_label_cannot_be_renamed(seeded_db):
     """系统统一术语字段（payment_pool_id=资金账户）禁止改名；同值回传放行。
 
-    口径：资金账户这一术语全站统一，配置中心只读展示，接口层做最终裁决。
+    口径：资金账户这一术语全站统一，配置中心只读展示，接口层强制校验。
     """
     core = OrderFormField(
         order_type_code="HS",
@@ -446,7 +446,7 @@ def test_router_dynamic_field_rename_with_empty_options(seeded_client, seeded_db
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["label"] == "路由动态字段改名"
-    assert body["options"] in (None, [])
+    assert body["options"] is None
 
 
 def test_router_dynamic_multiselect_rename_with_empty_options(seeded_client, seeded_db, headers):
@@ -524,13 +524,7 @@ def test_router_permission_denied_for_viewer(seeded_client, viewer_headers):
 
 
 def test_router_form_config_readable_by_operator(seeded_client, headers, operator_headers):
-    """读端点只要求登录：非管理员角色必须拿到完整表单配置（2026-11-05 修正）。
-
-    回归背景：三个 GET 原挂在 field-definition.manage（仅 ADMIN）下，OPERATOR /
-    FINANCE / AUDITOR 一律 403；前端 useOrderFormConfig / useOrderFormSectionLabels
-    在 catch 里降级为空配置，于是「管理员配好的自定义字段与板块标题」对非管理员
-    彻底失效，界面上只留下两行 403 控制台报错。本用例锁住「读放开、写仍拦」。
-    """
+    """表单配置读权限对经办人开放，写权限仍只给管理员。"""
     # 管理员先配一个自定义字段 + 一个板块标题改名
     created = seeded_client.post(
         "/api/v1/order-form-fields", headers=headers,
@@ -580,13 +574,9 @@ def test_router_form_config_readable_by_operator(seeded_client, headers, operato
     assert denied_labels.status_code == 403
 
 
-def test_rename_persists_to_db_and_backfills_via_list_endpoint(seeded_client, headers):
-    """闭环实证：设置页改名 → 落库 → 前端数据源(GET /order-form-fields)实时返回新名、旧名消失。
-
-    前端 OrderFormFieldsPanel 保存后调 load() 重新 list；业务表单 useOrderFormConfig
-    挂载时亦调 list。本用例验证 list 端点从 DB 实时读（无缓存），改名后取到的是新名。
-    """
-    # 1) 建一个字段（走与前端相同的创建端点）
+def test_rename_persists_to_db_and_list_endpoint_reads_current_value(seeded_client, headers):
+    """字段改名落库后，列表接口返回新值而不是缓存值。"""
+    # 创建一个字段。
     created = seeded_client.post(
         "/api/v1/order-form-fields",
         headers=headers,
@@ -598,7 +588,7 @@ def test_rename_persists_to_db_and_backfills_via_list_endpoint(seeded_client, he
     assert created.status_code == 201, created.text
     fid = created.json()["id"]
 
-    # 2) GET 列表：前端此刻拿到的就是"原名"（数据源读取验证）
+    # 首次读取得到原名。
     first = seeded_client.get(
         "/api/v1/order-form-fields", headers=headers,
         params={"order_type_code": "HS", "include_inactive": True},
@@ -607,7 +597,7 @@ def test_rename_persists_to_db_and_backfills_via_list_endpoint(seeded_client, he
     first_labels = [f["label"] for f in first.json()]
     assert "回填探针原名" in first_labels
 
-    # 3) 改名（走与设置页 submit 相同的 PATCH 端点）
+    # 更新名称。
     patched = seeded_client.patch(
         f"/api/v1/order-form-fields/{fid}", headers=headers,
         json={"label": "回填探针新名"},
@@ -615,7 +605,7 @@ def test_rename_persists_to_db_and_backfills_via_list_endpoint(seeded_client, he
     assert patched.status_code == 200, patched.text
     assert patched.json()["label"] == "回填探针新名"
 
-    # 4) 再次 GET 列表（前端重新拉取时）：新名在、旧名不在 —— 证明无陈旧缓存
+    # 再次读取必须只返回新名。
     second = seeded_client.get(
         "/api/v1/order-form-fields", headers=headers,
         params={"order_type_code": "HS", "include_inactive": True},
@@ -632,7 +622,7 @@ def test_router_requires_auth(seeded_client):
             order_type_code="HS", field_key="noauth", label="N", field_type="TEXT"
         ).model_dump(mode="json"),
     )
-    assert resp.status_code in (401, 403)
+    assert resp.status_code == 401
 
 
 # --------------------------------------------------------------------------- #
@@ -1128,7 +1118,7 @@ def test_router_section_labels_requires_auth(seeded_client):
         "/api/v1/order-form-fields/section-labels",
         json=SectionLabelsSaveIn(order_type_code="TH", labels={"FINANCE": "x"}).model_dump(mode="json"),
     )
-    assert resp.status_code in (401, 403)
+    assert resp.status_code == 401
 
 
 def test_router_section_labels_rejects_bad_section_key(seeded_client, headers):

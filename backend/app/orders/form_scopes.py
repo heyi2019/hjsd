@@ -2,7 +2,7 @@
 
 设置页「表单字段」的作用域清单由此定义，经 GET /order-form-fields/scopes 下发；
 前端只消费接口返回的作用域，不再维护第二份清单。
-每个作用域对应一个可配置字段的业务表单（弹窗/面板），种子字段见各迁移。
+每个作用域对应一个可配置字段的业务表单（弹窗/面板）。
 """
 from __future__ import annotations
 
@@ -28,17 +28,17 @@ GROUP_FUND = "FUND"
 GROUP_STUDIO = "STUDIO"
 
 FORM_SCOPES: list[FormScope] = [
-    # ---- 建单表单（迁移 0002）----
+    # ---- 建单表单 ----
     FormScope("HS", "回收建单", GROUP_ORDER),
     FormScope("TH", "提号建单", GROUP_ORDER),
     FormScope("DG", "代挂建单", GROUP_ORDER),
-    # ---- 订单操作（迁移 0019）----
+    # ---- 订单操作 ----
     FormScope("ORDERCANC", "取消", GROUP_ORDER_OP),
     FormScope("ORDEREDIT", "编辑订单", GROUP_ORDER_OP),
     FormScope("ORDERLINK", "订单关联", GROUP_ORDER_OP),
     FormScope("ALLOCATION", "订单分润", GROUP_ORDER_OP),
     FormScope("REFUND", "资金收支", GROUP_ORDER_OP),
-    # ---- 库存中心（迁移 0003；按库存中心页面操作顺序）----
+    # ---- 库存中心 ----
     # 售出按货源类型拆成三份独立表单配置；改一份不影响另外两份。
     FormScope("SALEREC", "回收售出", GROUP_INVENTORY),
     FormScope("SALETH", "提号售出", GROUP_INVENTORY),
@@ -48,14 +48,14 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("INVREFUND", "取消", GROUP_INVENTORY),
     FormScope("INVEDIT", "编辑", GROUP_INVENTORY),
     FormScope("INVOID", "下架", GROUP_INVENTORY),
-    # ---- 客户（迁移 0003 / 0004）----
+    # ---- 客户 ----
     FormScope("LEAD", "客户需求池", GROUP_CUSTOMER),
     FormScope("LEADCLOSE", "关闭需求", GROUP_CUSTOMER),
     FormScope("LEADCONVERT", "需求转单", GROUP_CUSTOMER),
-    # ---- 客户与合作方（迁移 0012）----
+    # ---- 客户与合作方 ----
     FormScope("CUSTOMER", "客户建档", GROUP_PARTY),
     FormScope("COUNTERPARTY", "合作方建档", GROUP_PARTY),
-    # ---- 分期（迁移 0003）----
+    # ---- 分期 ----
     FormScope("INSTPAY", "分期收款", GROUP_INSTALLMENT),
     FormScope("INSTRECOVER", "分期回收", GROUP_INSTALLMENT),
     FormScope("INSTRESALE", "分期出售登记", GROUP_INSTALLMENT),
@@ -66,7 +66,7 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("INSTDEFAULT", "违约登记", GROUP_INSTALLMENT),
     FormScope("INSTWAIVE", "减免", GROUP_INSTALLMENT),
     FormScope("INSTEXTEND", "展期", GROUP_INSTALLMENT),
-    # ---- 资金（迁移 0003）----
+    # ---- 资金 ----
     FormScope("FUNDDEPOSIT", "押金占用", GROUP_FUND),
     FormScope("FUNDFLOW", "录入流水", GROUP_FUND),
     FormScope("FUNDTRANSFER", "资金划转", GROUP_FUND),
@@ -78,7 +78,7 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("FUNDLOSS", "损失", GROUP_FUND),
     FormScope("FUNDREPAIR", "划转修复", GROUP_FUND),
     FormScope("FUNDCANCEL", "取消押金", GROUP_FUND),
-    # ---- 工作室（迁移 0019）----
+    # ---- 工作室 ----
     FormScope("STUDIOEXP", "工作室收支登记", GROUP_STUDIO),
     FormScope("STUDIOREJ", "工作室拒绝", GROUP_STUDIO),
     FormScope("STUDIOREV", "工作室冲销", GROUP_STUDIO),

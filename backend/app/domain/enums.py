@@ -68,7 +68,6 @@ class SequenceKey(StrEnum):
     # 资金流水按方向独立递增（用户口径 2026-10-28）：支出 ZC+五位流水、收入 SR+五位流水。
     CASHFLOW_OUT = "CASHFLOW_OUT"
     CASHFLOW_IN = "CASHFLOW_IN"
-    IMPORT = "IMPORT"
     ATTACHMENT = "ATTACHMENT"
     # 库存编号：账号台账唯一编码，KU_ + 五位流水（KU_00001…），系统生成不可手改。
     STOCK_NO = "STOCK_NO"
@@ -364,36 +363,6 @@ class AllocationRole(StrEnum):
     SERVICE = "SERVICE"  # 服务
 
 
-class ImportBatchStatus(StrEnum):
-    """标准导入批次：导入只落「原始行 + 映射」，绝不自动匹配（MIG-01）。"""
-
-    DRAFT = "DRAFT"
-    MAPPED = "MAPPED"
-    COMMITTED = "COMMITTED"
-    REJECTED = "REJECTED"
-    ROLLED_BACK = "ROLLED_BACK"  # 整批逻辑回滚（MIG-01-07），原始文件与日志保留
-    CORRECTED = "CORRECTED"  # 已确认批次的冲销/更正（MIG-01-08），不删原始记录
-
-
-class ImportSourceKind(StrEnum):
-    """标准导入来源类型；不再接受 LEGACY_* 或任意自定义值。"""
-
-    ORDER = "STANDARD_ORDER"
-    ACCOUNT = "STANDARD_ACCOUNT"
-    CASHFLOW = "STANDARD_CASHFLOW"
-    INSTALLMENT = "STANDARD_INSTALLMENT"
-    LEAD = "STANDARD_LEAD"
-
-
-class ImportRowStatus(StrEnum):
-    PENDING = "PENDING"
-    MAPPED = "MAPPED"
-    UNMAPPED = "UNMAPPED"
-    IMPORTED = "IMPORTED"
-    SKIPPED = "SKIPPED"
-    ROLLED_BACK = "ROLLED_BACK"  # 随批次回滚（MIG-01-07）
-
-
 class RebateStatus(StrEnum):
     OPEN = "OPEN"
     PARTIALLY_SETTLED = "PARTIALLY_SETTLED"
@@ -473,11 +442,6 @@ class AuditAction(StrEnum):
     REBATE_CREATE = "REBATE_CREATE"
     REBATE_UPDATE = "REBATE_UPDATE"
     REBATE_DELETE = "REBATE_DELETE"
-    # 分次结算模型层已下线（11-05）：以下三个动作不再写入，保留枚举值仅供
-    # 历史 audit_logs 正确显示（前端 labels.ts 有对应中文标签）。
-    REBATE_SETTLE = "REBATE_SETTLE"
-    REBATE_REVERSE = "REBATE_REVERSE"
-    REBATE_VOID = "REBATE_VOID"
     RECONCILIATION_CREATE = "RECONCILIATION_CREATE"
     RECONCILIATION_RESOLVE = "RECONCILIATION_RESOLVE"
     QUALITY_ISSUE_CREATE = "QUALITY_ISSUE_CREATE"
@@ -508,19 +472,9 @@ class AuditAction(StrEnum):
     REPORT_EXPORT = "REPORT_EXPORT"
     ATTACHMENT_UPLOAD = "ATTACHMENT_UPLOAD"
     ATTACHMENT_DELETE = "ATTACHMENT_DELETE"
-    # 标准导入（MIG-01）：与 EXCEPTION_APPROVE 分开，避免「导入」被误读为「异常审批」。
-    # audit_logs.action 无 CHECK 约束，新增枚举值不需要迁移。
-    IMPORT_LAND = "IMPORT_LAND"  # 原始行落地（只存原文，不做字段推断）
-    IMPORT_COMMIT = "IMPORT_COMMIT"  # 映射确认后生成业务实体
-    IMPORT_REJECT = "IMPORT_REJECT"  # 未确认批次整批驳回（终态，不可再提交）
-    IMPORT_MAP = "IMPORT_MAP"  # 人工指派某行的订单/账号映射
-    IMPORT_SKIP = "IMPORT_SKIP"  # 人工跳过导入行并留存理由
-    IMPORT_MARK_UNLINKED = "IMPORT_MARK_UNLINKED"  # 标记为未关联划转
-    IMPORT_ROLLBACK = "IMPORT_ROLLBACK"  # 整批逻辑回滚（原始行与日志保留）
     OPTION_SET_CREATE = "OPTION_SET_CREATE"  # 新建选项词典
     OPTION_SET_UPDATE = "OPTION_SET_UPDATE"  # 编辑选项词典
     OPTION_SET_DELETE = "OPTION_SET_DELETE"  # 删除选项词典
-    IMPORT_CORRECTION = "IMPORT_CORRECTION"  # 建冲销/更正批次
 
 
 __all__ = [
@@ -537,8 +491,6 @@ __all__ = [
     "DepositStatus",
     "Direction",
     "EntityType",
-    "ImportBatchStatus",
-    "ImportRowStatus",
     "EventType",
     "InstallmentContractType",
     "InstallmentDispositionAction",

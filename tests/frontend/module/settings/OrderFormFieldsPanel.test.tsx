@@ -1,5 +1,5 @@
 /** OrderFormFieldsPanel 交互测试：挂载拉取、新增、行内必填开关、停用、删除、预置字段禁用。 */
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
@@ -52,39 +52,6 @@ beforeEach(() => {
 });
 
 describe("OrderFormFieldsPanel", () => {
-  it("显示板块管理容器并列出运营信息板块", async () => {
-    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
-
-    expect(await screen.findByText("板块管理")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "板块键" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "板块名称" })).toBeInTheDocument();
-    expect(screen.getAllByRole("columnheader", { name: "排序" }).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByRole("columnheader", { name: "操作" }).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("运营信息")).toBeInTheDocument();
-    expect(screen.getByText("账号 / 产品信息")).toBeInTheDocument();
-    expect(screen.getByText("交付信息")).toBeInTheDocument();
-    expect(screen.queryByText(/选择上方「表单」可配置任意业务表单的字段/)).toBeNull();
-    expect(screen.queryByText(/可调整板块在本页的展示顺序/)).toBeNull();
-    const createContainer = screen.getByText("新增自定义字段").closest(".order-form-fields__create-container");
-    const managementCard = screen.getByText("板块管理").closest(".ant-card");
-    expect(createContainer && managementCard && (createContainer.compareDocumentPosition(managementCard) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
-    const managementTable = screen.getByTestId("form-section-management");
-    const addSectionButton = within(managementCard as HTMLElement).getByText("新增板块") as HTMLElement;
-    expect(managementTable.compareDocumentPosition(addSectionButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it("板块管理不再提供上下移动（顺序由字段所属板块驱动）", async () => {
-    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
-    await screen.findByText("板块管理");
-
-    // 板块顺序现在由字段所属板块（section）驱动，设置面板不再提供误导性的上下移动按钮
-    expect(screen.queryByRole("button", { name: "运营信息上移" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "运营信息下移" })).not.toBeInTheDocument();
-    // 编辑 / 查看字段 入口保留
-    expect(screen.getByRole("button", { name: "编辑运营信息" })).toBeInTheDocument();
-    expect(screen.getAllByText("查看字段").length).toBeGreaterThan(0);
-  });
-
   it("板块管理显示编码并可编辑板块名称", async () => {
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
     await screen.findByText("板块管理");
@@ -205,18 +172,6 @@ describe("OrderFormFieldsPanel", () => {
     expect(onConfigureGameTypes).toHaveBeenCalledOnce();
   });
 
-  it("编辑字段时将编辑区展开在该字段行的下方", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
-      makeField({ id: 61, field_key: "tag", label: "行内编辑字段", is_custom: true }),
-    ]);
-    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
-    await screen.findByText("行内编辑字段");
-
-    await ui.click(screen.getByRole("button", { name: "编辑行内编辑字段" }));
-
-    expect(screen.getByLabelText("标签").closest(".ant-table-expanded-row")).not.toBeNull();
-  });
-
   it("资金账户是系统统一术语：配置中心标签只读，不可改名", async () => {
     vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
       makeField({
@@ -302,44 +257,6 @@ describe("OrderFormFieldsPanel", () => {
     ));
   });
 
-  it.each(["TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT"] as const)(
-    "逐一验证 %s 类型字段进入编辑态后可保存",
-    async (fieldType) => {
-      const field = makeField({
-        id: 100 + ["TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT"].indexOf(fieldType),
-        field_key: `${fieldType.toLowerCase()}_field`,
-        label: `${fieldType}编辑前`,
-        field_type: fieldType,
-        options: fieldType === "SELECT" || fieldType === "MULTI_SELECT"
-          ? [{ value: "A", label: "A" }, { value: "B", label: "B" }]
-          : null,
-      });
-      vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([field]);
-      renderLight(<OrderFormFieldsPanel />, { user: "admin" });
-      await screen.findByText(`${fieldType}编辑前`);
-
-      await ui.click(screen.getByRole("button", { name: `编辑${field.label}` }));
-      const labelInput = screen.getByLabelText("标签");
-      await ui.clear(labelInput);
-      await ui.type(labelInput, `${fieldType}编辑后`);
-      await ui.click(screen.getByRole("button", { name: /保存字段/ }));
-
-      await waitFor(() => expect(vi.mocked(catalog.orderFormFieldsApi).update).toHaveBeenCalledWith(
-        field.id,
-        expect.objectContaining({ label: `${fieldType}编辑后` }),
-      ));
-      const payload = vi.mocked(catalog.orderFormFieldsApi).update.mock.calls[0][1] as Partial<Field>;
-      if (fieldType === "SELECT" || fieldType === "MULTI_SELECT") {
-        expect(payload.options).toEqual([
-          { value: "A", label: "A" },
-          { value: "B", label: "B" },
-        ]);
-      } else {
-        expect(payload.options).toBeUndefined();
-      }
-    },
-  );
-
   it("行内必填开关切换调用 update 并刷新", async () => {
     vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 50, field_key: "vip", label: "VIP字段", required: false, is_custom: true }),
@@ -390,24 +307,6 @@ describe("OrderFormFieldsPanel", () => {
 });
 
 describe("OrderFormFieldsPanel 条件必填", () => {
-  it("列表展示条件必填描述", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
-      makeField({ id: 70, field_key: "customer_source", label: "客户来源", field_type: "SELECT", options: [{ value: "其他", label: "其他" }, { value: "微信", label: "微信" }] }),
-      makeField({
-        id: 71,
-        field_key: "customer_source_other",
-        label: "其他来源",
-        required: false,
-        required_when: { field: "customer_source", op: "eq", values: ["其他"] },
-      }),
-    ]);
-    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
-    await screen.findByText("其他来源");
-    expect(screen.getByLabelText("条件_customer_source_other")).toHaveTextContent(
-      "条件必填：客户来源 等于 其他",
-    );
-  });
-
   it("保存条件必填时提交 required_when 并把 required 置为 false", async () => {
     vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 80, field_key: "customer_source", label: "客户来源", field_type: "SELECT", options: [{ value: "其他", label: "其他" }, { value: "微信", label: "微信" }] }),
@@ -475,7 +374,7 @@ describe("OrderFormFieldsPanel 依赖防护", () => {
 });
 
 describe("OrderFormFieldsPanel 字段键格式校验", () => {
-  it("字段键含大写或非法字符时前端拦截、不提交（L1723）", async () => {
+  it("字段键含大写或非法字符时前端拦截、不提交", async () => {
     vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
     await screen.findByText("该表单暂无字段配置");

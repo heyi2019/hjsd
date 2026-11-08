@@ -1,14 +1,11 @@
 """CALC-01 订单事件的「仍可冲销余额」契约（ORD-01 订单详情 / 事件提交）。
 
-订单页 `useOrdersPageController.reversibleEvents` 原先自己遍历同订单的 CANCEL 事件
-做 `amount − Σcancel`，与库存页、以及 `post_event` 的冲销校验是三套实现：
-「是否只算 is_posted」、分次冲销是否累加、夹底与否都可能各自漂移。
-改由后端在 `EventOut.cancellable_amount` 下发后，这里守住：
+后端在 `EventOut.cancellable_amount` 下发统一口径，这里守住：
 
 1. 首发布事件的可冲销余额 = 事件金额；
 2. 分次冲销累加扣减，夹底 0；
 3. CANCEL 事件自身恒为 0.00（不能被二次冲销）；
-4. 提交事件的响应也带同一口径的值（前端拿到就能直接回填默认冲销金额）。
+4. 提交事件的响应也带同一口径的值。
 """
 from __future__ import annotations
 
@@ -105,7 +102,9 @@ def test_fully_cancelled_event_reports_zero(seeded_client, seeded_db, headers):
     assert Decimal(row["cancellable_amount"]) == Decimal("0.00")
 
 
-def test_cancel_event_itself_is_not_cancellable(seeded_client, seeded_db, headers):
+def test_order_detail_cancel_event_is_not_cancellable(
+    seeded_client, seeded_db, headers
+):
     order, buy = _order_with_buy(seeded_db, amount="500")
     cancel = _cancel(seeded_db, order, offset_event_id=buy.id, amount="120")
 
@@ -115,7 +114,9 @@ def test_cancel_event_itself_is_not_cancellable(seeded_client, seeded_db, header
     assert Decimal(row["cancellable_amount"]) == Decimal("0.00")
 
 
-def test_every_event_row_carries_the_field(seeded_client, seeded_db, headers):
+def test_order_detail_rows_carry_cancellable_amount(
+    seeded_client, seeded_db, headers
+):
     """字段恒下发（缺省 0.00）：前端按数值判断，null/缺字段会变 NaN 而静默失效。"""
     order, buy = _order_with_buy(seeded_db, amount="100")
     _cancel(seeded_db, order, offset_event_id=buy.id, amount="40")
@@ -144,7 +145,7 @@ def test_posted_event_response_carries_the_same_value(seeded_client, seeded_db, 
         },
     )
 
-    assert response.status_code in (200, 201), response.text
+    assert response.status_code == 201, response.text
     assert Decimal(response.json()["event"]["cancellable_amount"]) == Decimal("0.00"), (
         "CANCEL 自身不可再冲销"
     )

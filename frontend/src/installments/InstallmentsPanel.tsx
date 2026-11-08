@@ -3,12 +3,9 @@
 import { Button, Card, DatePicker, Segmented, Space, Typography } from "antd";
 import { useState } from "react";
 import type { Dayjs } from "dayjs";
-import { installmentsApi, type Installment, type Schedule } from "../shared/api/catalog";
-import { today } from "../shared/lib/format";
+import type { Installment, Schedule } from "../shared/api/catalog";
 import { configurableLabel } from "../shared/lib/optionSets";
-import { DataTable, ErrorBanner, PermissionButton, StatRow } from "../shared/ui";
-
-
+import { DataTable, ErrorBanner, StatRow } from "../shared/ui";
 import { DISPOSITION_LABEL } from "./InstallmentsPanel.fragments";
 import { useContractTableController } from "./useContractTableController";
 import { ContractModals } from "./InstallmentsPanel.modals";
@@ -28,32 +25,19 @@ function ContractTable({
   });
   const {
     arrangeColumns,
-    cancelForm,
     columns,
-    defaultForm,
+    dispositionLoading,
     dispositions,
     error,
     exportCsv,
     exporting,
     load,
     loading,
-    openDeliver,
-    orders,
-    payForm,
-    recoverForm,
-    resaleForm,
     rows,
     scheduleColumns,
+    scheduleLoading,
     schedules,
-    setCancelTarget,
-    setDefaultTarget,
-    setPayTarget,
-    setRecoverTarget,
-    setResaleTarget,
-    setSettleTarget,
     setSortDesc,
-    settleForm,
-    settlePermission,
     sortDesc,
     totalPaid,
     totalReceivable,
@@ -121,17 +105,25 @@ function ContractTable({
           emptyText="暂无分期合约"
           onPageChange={() => undefined}
           expandable={{
+            onExpand: (expanded, row) => {
+              if (expanded) {
+                void controller.loadSchedules(row.id);
+                void controller.loadDispositions(row.id);
+              }
+            },
             expandedRowRender: (row) => (
               <Space direction="vertical" size="middle" className="installment-detail-stack">
-                <DataTable<Schedule>
-                rows={schedules[row.id] ?? []}
-                page={1}
-                pageSize={20}
-                total={(schedules[row.id] ?? []).length}
-                onPageChange={() => undefined}
-                emptyText="暂无期次"
-                columns={scheduleColumns}
-              />
+                {scheduleLoading[row.id] || dispositionLoading[row.id] ? <Typography.Text type="secondary">正在加载明细…</Typography.Text> : (
+                  <DataTable<Schedule>
+                    rows={schedules[row.id] ?? []}
+                    page={1}
+                    pageSize={20}
+                    total={(schedules[row.id] ?? []).length}
+                    onPageChange={() => undefined}
+                    emptyText="暂无期次"
+                    columns={scheduleColumns}
+                  />
+                )}
               {(dispositions[row.id] ?? []).length > 0 && (
                 <Typography.Paragraph>
                   处置记录：{(dispositions[row.id] ?? []).map((item) =>

@@ -7,11 +7,12 @@ import { appMessage } from "./appFeedback";
  */
 import { Button, Popconfirm } from "antd";
 import type { ButtonProps } from "antd";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { normalizeError } from "../api/client";
 import { PermissionGate } from "./PermissionButton";
 import type { Permission } from "../state/session";
+import { haptic, visualPulse } from "../lib/haptics";
 
 export function ConfirmButton(
   props: {
@@ -30,6 +31,7 @@ export function ConfirmButton(
 ) {
   const { permission, title, description, okText, cancelText, danger, onConfirm, children, ...rest } = props;
   const [pending, setPending] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
   // 受控开关：确认完成后显式关闭。交给 Popconfirm 自行关闭时，
   // 若 onConfirm 的 promise 迟迟不 settle，弹层会一直挂着挡住后续操作。
   const [open, setOpen] = useState(false);
@@ -37,6 +39,11 @@ export function ConfirmButton(
   // 否则用户看到的是「点了没反应」。
   const handleConfirm = async () => {
     if (pending) return;
+    // R2 触觉反馈：确认瞬间轻触（破坏性操作用更重的「错误/重击」档）。
+    // iOS Safari 不支持 vibrate → haptic 返回 false，改用视觉脉冲替代（平台边界，非缺陷）。
+    if (!haptic(danger ? "error" : "medium")) {
+      visualPulse(btnRef.current);
+    }
     setPending(true);
     try {
       await onConfirm();
@@ -62,7 +69,7 @@ export function ConfirmButton(
       disabled={Boolean(rest.disabled) || pending}
       onConfirm={() => void handleConfirm()}
     >
-      <Button {...rest} loading={pending}>
+      <Button {...rest} loading={pending} ref={btnRef}>
         {children}
       </Button>
     </Popconfirm>

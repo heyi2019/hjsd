@@ -4,10 +4,10 @@ import type { ColumnsType } from "antd/es/table";
 import type { Dayjs } from "dayjs";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Key } from "react";
 import { stocksApi, employeesApi, ordersApi, poolsApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption, type InventoryStats, type Pool } from "../../shared/api/catalog";
-import { normalizeError } from "../../shared/api/client";
-import { formatDateTimeMinute, money, today } from "../../shared/lib/format";
-import { MoneyText, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
-import { InventoryPlatformOffsaleModal, consignmentRecords, type ActiveConsignment } from "../InventoryPlatformOffsaleModal";
+import { isRequestAborted, normalizeError } from "../../shared/api/client";
+import { formatDateTimeMinute, today } from "../../shared/lib/format";
+import { MoneyText, PermissionButton, StatusTag } from "../../shared/ui";
+import { consignmentRecords, type ActiveConsignment } from "../InventoryPlatformOffsaleModal";
 import type { InventoryPartyLink } from "../OrderDetailView";
 import type { InventoryProfileTarget } from "../InventoryProfileModal";
 import type { InventoryCancellationValues } from "../InventoryCancellationDialog";
@@ -23,6 +23,7 @@ import { type TimeFieldKey, type TimeSet } from "../OrderDetail.shared";
 
 // 关键字逐键输入时合并请求：指标不是主流程，200ms 足够跟手。
 const INVENTORY_STATS_DEBOUNCE_MS = 200;
+const EXPORT_DETAIL_BATCH_SIZE = 500;
 
 export function useInventoryController({ refreshKey = 0, active = true, onOrdersChanged, onNavigate }: { refreshKey?: number; active?: boolean; onOrdersChanged?: () => void; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
   // 账号删除不可逆：按钮按系统角色显隐，后端仍做管理员二次鉴权。
@@ -46,6 +47,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const [executionLoading, setExecutionLoading] = useState<Record<number, boolean>>({});
   const [expandedAccountIds, setExpandedAccountIds] = useState<Key[]>([]);
   const [exporting, setExporting] = useState(false);
+  const exportAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => exportAbortRef.current?.abort(), []);
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   // 内联编辑：标记当前正在编辑（且已展开）的行；与 editingAccount（草稿副本）配合，决定展开区是否进入编辑态。
@@ -70,11 +73,11 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   // T20：筛选项从「选项词典」配置读取（库存业务 / 类型）。
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
   const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
-  const gameTypeOptions = Array.from(new Set((rows ?? [])
+  const gameTypeOptions = useMemo(() => Array.from(new Set((rows ?? [])
     .map((row) => row.game_type)
     .filter((value): value is string => Boolean(value))))
     .sort((a, b) => a.localeCompare(b, "zh-CN"))
-    .map((value) => ({ value, label: value }));
+    .map((value) => ({ value, label: value })), [rows]);
   const load = useCallback(async () => {
     try {
       const list = await stocksApi.list({ status: "WAITING" });
@@ -115,17 +118,31 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     if (body && scrollLeftRef.current) body.scrollLeft = scrollLeftRef.current;
   }, [expandedAccountIds]);
 
-  const inventoryRows = filterInventoryRows(rows ?? [], { businessMode, gameType: gameTypeFilter });
-  const countInventoryRows = (type?: string) => inventoryRows.filter((row) => !type || row.inventory_type === type).length;
-  const visibleRows = useMemo(() => filterInventoryRows(rows ?? [], {
-    businessMode,
+  const inventoryRows = useMemo(
+    () => filterInventoryRows(rows ?? [], { businessMode, gameType: gameTypeFilter }),
+    [rows, businessMode, gameTypeFilter],
+  );
+  const inventoryTypeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of inventoryRows) {
+      if (row.inventory_type) counts.set(row.inventory_type, (counts.get(row.inventory_type) ?? 0) + 1);
+    }
+    return counts;
+  }, [inventoryRows]);
+  const countInventoryRows = useCallback(
+    (type?: string) => type ? (inventoryTypeCounts.get(type) ?? 0) : inventoryRows.length,
+    [inventoryRows.length, inventoryTypeCounts],
+  );
+  const visibleRows = useMemo(() => filterInventoryRows(inventoryRows, {
     inventoryType,
-    gameType: gameTypeFilter,
     keyword,
     dateRange,
-  }), [rows, businessMode, inventoryType, gameTypeFilter, keyword, dateRange]);
+  }), [inventoryRows, inventoryType, keyword, dateRange]);
   // 展示排序：默认最新在前，可切换最旧在前（统计口径不受影响）。
-  const orderedRows = [...visibleRows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id));
+  const orderedRows = useMemo(
+    () => [...visibleRows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id)),
+    [visibleRows, sortDesc],
+  );
   // 卡片上的金额与库龄档位由后端按「当前可见集合」汇总：筛选只在前端做一份，
   // 算术只在后端做一份，避免 Number() 累加的浮点残渣与两套日期口径漂移。
   useEffect(() => {
@@ -337,6 +354,9 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
       title: "操作",
       key: "actions",
       width: 292,
+      className: "inventory-actions-col",
+      onHeaderCell: () => ({ className: "inventory-actions-col" }),
+      onCell: () => ({ className: "inventory-actions-col" }),
       render: (_value, row) => (
         <Space className="inventory-row-actions" size={4}>
           <PermissionButton
@@ -438,8 +458,12 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     try {
       const { id, game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, note } = editingAccount;
       const profile = { game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, note, form_extra: invEditExtraForm.getFieldsValue()?.form_extra };
+      const detail = executionDetails[id];
+      const eventById = new Map(
+        (detail?.orders.flatMap((order) => order.events) ?? []).map((event) => [event.id, event]),
+      );
       const events = Object.values(eventDrafts).filter((draft) => {
-        const original = executionDetails[id]?.orders.flatMap((order) => order.events).find((event) => event.id === draft.id);
+        const original = eventById.get(draft.id);
         return original && (draft.amount !== original.amount || draft.note !== (original.note ?? null) || draft.operator_user_ids !== undefined);
       });
       if (events.length || Object.keys(timeSet).length > 0) {
@@ -530,24 +554,35 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   }
 
   async function handleExport() {
+    exportAbortRef.current?.abort();
+    const abortController = new AbortController();
+    exportAbortRef.current = abortController;
     setExporting(true);
     try {
-      const detailResults = await Promise.all(visibleRows.map(async (row) => {
-        try {
-          return [row.id, await stocksApi.executionDetail(row.id)] as const;
-        } catch {
-          return [row.id, undefined] as const;
-        }
-      }));
-      const details = Object.fromEntries(detailResults) as Partial<Record<number, AccountExecutionDetail>>;
-      const failedCount = detailResults.filter(([, detail]) => !detail).length;
+      const cached = visibleRows.filter((row) => executionDetails[row.id]);
+      const missingIds = visibleRows.filter((row) => !executionDetails[row.id]).map((row) => row.id);
+      const fetchedDetails: Record<number, AccountExecutionDetail> = {};
+      for (let start = 0; start < missingIds.length; start += EXPORT_DETAIL_BATCH_SIZE) {
+        const batch = missingIds.slice(start, start + EXPORT_DETAIL_BATCH_SIZE);
+        Object.assign(fetchedDetails, await stocksApi.executionDetailsBulk(batch, abortController.signal));
+      }
+      if (abortController.signal.aborted) return;
+      setExecutionDetails((current) => ({ ...current, ...fetchedDetails }));
+      const details = Object.fromEntries([
+        ...cached.map((row) => [row.id, executionDetails[row.id]] as const),
+        ...Object.entries(fetchedDetails),
+      ]) as Partial<Record<number, AccountExecutionDetail>>;
+      const failedCount = visibleRows.length - Object.keys(details).length;
       downloadInventoryCsv(visibleRows, details);
       if (failedCount) {
         appMessage.warning(`${failedCount} 条明细读取失败，已导出其余可用字段`);
       } else {
         appMessage.success("库存 CSV 已导出");
       }
+    } catch (err) {
+      if (!abortController.signal.aborted && !isRequestAborted(err)) throw err;
     } finally {
+      if (exportAbortRef.current === abortController) exportAbortRef.current = null;
       setExporting(false);
     }
   }

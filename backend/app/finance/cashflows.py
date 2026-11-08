@@ -63,7 +63,6 @@ def accounting_attribute_for_event(order_type: str, event_type: str) -> str:
     return mapping.get((order_type.upper(), event_type.upper()), AccountingAttribute.EXPENSE.value)
 
 
-# 兼容层：押金服务迁至 deposits.py，此处保留原路径导出
 from .deposits import (
     cancel_deposit,
     create_deposit,
@@ -95,10 +94,6 @@ def create_cashflow(
     pool_id: int,
     occurred_on: date,
     direction: str,
-    # ``nature`` was removed from the persisted cashflow model in migration
-    # 0077.  Keep accepting the old service-level keyword for callers that
-    # have not migrated yet; direction is now the source of truth.
-    nature: str | None = None,
     accounting_attribute: str | None = None,
     category: str,
     amount: Any,
@@ -117,17 +112,6 @@ def create_cashflow(
         raise Validation(
             f"direction 必须为 {Direction.values()}", details={"field": "direction"}
         ) from exc
-    if nature is not None:
-        normalized_nature = str(nature).strip().upper()
-        allowed_by_direction = {
-            Direction.IN.value: {"EXTERNAL_IN", "BUSINESS_IN"},
-            Direction.OUT.value: {"BUSINESS_OUT"},
-        }
-        if normalized_nature not in allowed_by_direction.get(direction, set()):
-            raise Validation(
-                "nature 与 direction 不匹配",
-                details={"direction": direction, "nature": normalized_nature},
-            )
     label = _text(
         category,
         field="category",
@@ -447,11 +431,6 @@ def _flow_row(flow: Cashflow, order_no: str | None) -> dict[str, Any]:
         "occurred_on": flow.occurred_on,
         "occurred_at": flow.created_at,
         "category": flow.category,
-        "nature": (
-            "INTERNAL"
-            if flow.transfer_id or flow.category == "TRANSFER"
-            else ("EXTERNAL_IN" if flow.direction == Direction.IN.value and flow.category == "EXTERNAL_FUNDING" else ("BUSINESS_IN" if flow.direction == Direction.IN.value else "BUSINESS_OUT"))
-        ),
         "accounting_attribute": flow.accounting_attribute,
         "direction": flow.direction,
         "amount": flow.amount,

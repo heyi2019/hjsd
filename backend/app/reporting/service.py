@@ -1,4 +1,4 @@
-"""reporting.service：报表 Service 统一入口（兼容层）。
+"""报表 Service 统一入口。
 
 本模块只做符号再导出，不含业务逻辑：
 - 共用工具 → `app.reporting._shared`

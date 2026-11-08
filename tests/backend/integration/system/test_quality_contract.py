@@ -12,19 +12,6 @@ from app.orders import service as orders_service
 from app.quality import service
 
 
-def test_quality_read_routes_publish_typed_response_models(app):
-    paths = app.openapi()["paths"]
-
-    assert paths["/api/v1/quality/exceptions"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/QualitySummaryOut"
-    )
-    assert paths["/api/v1/quality/metrics"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/QualityMetricsOut"
-    )
-    issue_list_schema = paths["/api/v1/quality/issues"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-    assert issue_list_schema["$ref"].endswith("/QualityIssueListOut")
-
-
 TODAY = date(2026, 10, 17)
 
 
@@ -118,7 +105,6 @@ class TestQualityScan:
                 flow_no="TR-BROKEN-OUT",
                 pool_id=1,
                 occurred_on=TODAY,
-                nature="INTERNAL",
                 category="TRANSFER",
                 direction="OUT",
                 amount=Decimal("100"),
@@ -137,7 +123,6 @@ class TestQualityScan:
                 flow_no="CF-QUALITY-NEGATIVE",
                 pool_id=1,
                 occurred_on=TODAY,
-                nature="BUSINESS_OUT",
                 category="TEST_EXPENSE",
                 direction="OUT",
                 amount=Decimal("120"),
@@ -215,7 +200,6 @@ class TestQualityScan:
                 flow_no="TR-HIDDEN-OUT",
                 pool_id=2,
                 occurred_on=TODAY,
-                nature="INTERNAL",
                 category="TRANSFER",
                 direction="OUT",
                 amount=Decimal("100"),

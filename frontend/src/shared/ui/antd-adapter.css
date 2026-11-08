@@ -74,7 +74,7 @@
   opacity: 0.56;
 }
 
-/* 表头不折行（2026-09-20 用户裁决 A）。
+/* 表头不折行。
    背景：antd 表头默认可折行（实测 computed 为 normal，且全仓无任何规则声明 th 的
    white-space），窄列（如「状态」「操作」）会被压成两行；而项目既有的
    `.ui-table-wrap th` 与下方 @media (--bp-sm) 的窄屏规则都是 nowrap ——
@@ -150,7 +150,7 @@
    内嵌 input 交回 wrapper 的 flex 居中，高度自适应。 */
 /* 普通 Ant 控件锁定统一高度 = --ui-control-height-lg（36px，紧凑控件语言）。
    small / 表格紧凑态由业务选择器显式覆盖（如 .ant-btn-sm 走 antd 24px、紧凑弹窗 textarea 交回 rows）。
-   注：2026-11-05 按裁决将此前 Issue #17 的 44px 触控目标锁恢复为 36px（ui-control-height-lg），
+   使用统一的 36px 控件高度（ui-control-height-lg），
    全站输入/选择/数字/日期控件统一回到 36px，以更紧凑的表单项密度换取信息密度（代价：不再满足 44pt 触控目标）。 */
 :where(.ant-input:not(.ant-input-affix-wrapper > .ant-input):not(textarea), .ant-input-number, .ant-select-selector, .ant-picker, .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)) {
   min-height: var(--ui-control-height-lg) !important;
@@ -300,7 +300,7 @@
   border: var(--border-w) solid var(--glass-border) !important;
   border-radius: var(--radius-glass) !important;
   /* 弹层改不透明实色（antd 容器色），去掉半透明玻璃 --glass，
-     避免底层页面透出导致选项发虚、对比度不足（2026-10-13 用户裁决）。 */
+     避免底层页面透出导致选项发虚、对比度不足。 */
   background: var(--color-antd-bg-container) !important;
   box-shadow: var(--e2) !important;
 }
@@ -536,7 +536,7 @@
   .ant-table-tbody > tr.ant-table-row:nth-child(12) { animation-delay: 264ms; }
 }
 
-/* ── 建单弹窗 / 二次确认框：入场动画压至 50ms（用户 2026-10-28 裁决）──
+/* ── 建单弹窗 / 二次确认框：入场动画压至 50ms ──
  * 背景：弹窗内容盒默认走 `ui-spring-in var(--dur-spring)`（--dur-spring: 0.5s），
  *   弹簧回弹 500ms 在「打开/关闭」时造成明显拖沓感，用户明确要压到 50ms。
  * 做法：仅覆盖 animation-duration + timing-function，保留 ui-spring-in keyframes

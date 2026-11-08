@@ -1,23 +1,16 @@
-"""STATE-01 orders 域覆盖收口（批2 安全子集）：events.py + service.py 的异常/校验分支守门用例。
-
-仅覆盖 WIP 未触碰的稳定文件（events.py / service.py）；orders/router.py 因 WIP 在改，留待 WIP 落定。
-部分内部守卫（_assert_sellable_order / _assert_event_allowed / _get_offset_event / _resolve_pool /
-_audit_value / _opposite_direction）直接调用，与 test_orders_common.py 对 _common 的手法一致。
-"""
+"""STATE-01 orders 域的事件校验、权限边界和状态守卫。"""
 from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from unittest.mock import patch
 
 import pytest
 from sqlalchemy import select
 
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
-from app.domain.enums import Direction
 from app.domain.foundation import Pool
-from app.domain.trade import Account, Installment, Order, OrderEvent
+from app.domain.trade import Account, Installment, OrderEvent
 from app.value_added_services import service as installment_service
 from app.orders import events, service
 from app.parties import service as parties_service
@@ -255,18 +248,6 @@ def test_deliver_requires_settled_installment(seeded_db):
         )
 
 
-def test_assert_sellable_rejects_missing_account(seeded_db):
-    order = Order(order_type="HS", account_id=999999)
-    with pytest.raises(NotFound, match="不存在"):
-        events._assert_sellable_order(seeded_db, order)
-
-
-def test_assert_event_allowed_rejects_missing_account_for_cost(seeded_db):
-    order = Order(order_type="HS", account_id=999999)
-    with pytest.raises(NotFound, match="不存在"):
-        events._assert_event_allowed(seeded_db, order, "COST")
-
-
 def test_assert_event_allowed_rejects_payment_offset_without_installment(seeded_db):
     order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
@@ -282,10 +263,6 @@ def test_assert_event_allowed_rejects_payment_offset_without_installment(seeded_
             seeded_db, order, "CANCEL", offset_event_id=payment_event.id,
             reason="x", allow_installment_cancel=True,
         )
-
-
-def test_opposite_direction_returns_in_for_none(seeded_db):
-    assert events._opposite_direction(None, seeded_db) == Direction.IN.value
 
 
 def test_get_offset_event_rejects_unposted(seeded_db):
@@ -316,14 +293,6 @@ def test_get_offset_event_rejects_non_money_event(seeded_db):
         events._get_offset_event(seeded_db, deliver_ev.id, order_id=order.id)
 
 
-def test_resolve_pool_rejects_unrouted_type(seeded_db):
-    unknown_order = Order(order_type="ZZ")
-    # resolve_default_pool 对未知类型会先抛 NotFound，这里强制返回 None 直达 696 行
-    with patch("app.orders.events.foundation_service.resolve_default_pool", return_value=None):
-        with pytest.raises(Validation, match="未配置"):
-            events._resolve_pool(seeded_db, unknown_order, "PRINCIPAL")
-
-
 # --------------------------------------------------------------------- service.py
 def test_audit_value_serializes_list(seeded_db):
     assert service._audit_value([Decimal("1.00"), TODAY]) == ["1.00", TODAY.isoformat()]
@@ -339,7 +308,7 @@ def test_update_order_records_date_change(seeded_db):
 
 
 def test_update_order_accepts_account_snapshot(seeded_db):
-    """#15 需求2：账号快照一律可编辑（推翻 11-05「账号快照拒编辑」裁决）。"""
+    """账号快照一律可编辑。"""
     order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
     updated = service.update_order(

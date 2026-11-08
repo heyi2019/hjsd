@@ -48,6 +48,7 @@ from sqlalchemy.orm import sessionmaker  # noqa: E402
 from app.core.database import Base, get_engine  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.core.settings import get_settings  # noqa: E402
+from scripts.repair_runtime_schema import repair_runtime_schema  # noqa: E402
 # 这些模块只为「导入即注册 ORM 表」：Base.metadata.create_all 只会建已 import 的
 # 模型，少导一个就会静默漏表（曾经表现为建单用例全部 500，报「表不存在」）。
 # pyflakes 不认 `# noqa`（那是 flake8 的能力），故用 `__all__` 收口，避免被
@@ -63,13 +64,12 @@ from app.domain import (  # noqa: E402
     trade,
     users,
 )
-from app.legacy_imports import models as imports  # noqa: E402
 from app.foundation.seeds import seed_foundation  # noqa: E402
 from app.foundation.catalog_seed import seed_catalog  # noqa: E402
 from app.foundation.seed_orders import seed_order_matrix  # noqa: E402
 
 __all__ = [
-    "attachments", "foundation", "imports", "lists", "notifications",
+    "attachments", "foundation", "lists", "notifications",
     "options", "parties", "quality", "trade", "users",
 ]
 
@@ -118,22 +118,8 @@ def _truncate_all(engine) -> None:
 
 
 def _drop_retired_columns(engine) -> None:
-    """让常驻 E2E 库追平当前 ORM，清掉历史版本遗留的非空字段。
-
-    `keep` 模式只执行 ``create_all``，不会修改已有表；旧库因此可能仍保留
-    已从当前模型删除、但带 NOT NULL 的 ``capital_type`` / ``nature``，新写入
-    订单和资金流水时会被 PostgreSQL 拒绝。
-    """
-    with engine.begin() as connection:
-        connection.execute(
-            text('ALTER TABLE public."order_type_defs" DROP COLUMN IF EXISTS capital_type CASCADE')
-        )
-        connection.execute(
-            text('ALTER TABLE public."orders" DROP COLUMN IF EXISTS capital_type CASCADE')
-        )
-        connection.execute(
-            text('ALTER TABLE public."cashflow" DROP COLUMN IF EXISTS nature CASCADE')
-        )
+    """让常驻 E2E 库追平当前 ORM 的已知结构变更。"""
+    repair_runtime_schema(engine)
 
 
 def _seed_default_users(db) -> None:

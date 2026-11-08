@@ -2,6 +2,7 @@
  *  全部通过 controller 消费 useFundsPageController 暴露的表单、目标状态与写处理器。 */
 import { Input, Modal as AntdModal, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { useMemo } from "react";
 import { BusinessActionModal, BusinessRegistrationForm, DataTable, DateField, InlineError, MoneyInput, MoneyText, PermissionButton, Select, StatusTag, dateValueFromEvent, dateValueProps } from "../shared/ui";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 import { today } from "../shared/lib/format";
@@ -321,6 +322,11 @@ export function RepairModal({ ctrl }: { ctrl: FundsPageController }) {
 
 export function UnmatchedModal({ ctrl }: { ctrl: FundsPageController }) {
   const { unmatchedTarget, setUnmatchedTarget, cashflows, loading } = ctrl;
+  const unmatchedRows = useMemo(() => {
+    if (!unmatchedTarget) return [];
+    const ids = new Set(unmatchedTarget.unmatched_flow_ids ?? []);
+    return cashflows.filter((row) => ids.has(row.id));
+  }, [cashflows, unmatchedTarget]);
   const unmatchedColumns: ColumnsType<Cashflow> = [
     { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
     { title: "流水号", dataIndex: "flow_no" },
@@ -339,10 +345,10 @@ export function UnmatchedModal({ ctrl }: { ctrl: FundsPageController }) {
       </Typography.Paragraph>
       <DataTable<Cashflow>
         columns={unmatchedColumns}
-        rows={unmatchedTarget ? cashflows.filter((row) => unmatchedTarget.unmatched_flow_ids?.includes(row.id)) : []}
+        rows={unmatchedRows}
         page={1}
         pageSize={10}
-        total={unmatchedTarget ? cashflows.filter((row) => unmatchedTarget.unmatched_flow_ids?.includes(row.id)).length : 0}
+        total={unmatchedRows.length}
         emptyText="当前列表未加载到对应流水"
         onPageChange={() => undefined}
         loading={loading}

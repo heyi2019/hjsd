@@ -42,7 +42,10 @@ def r1_inventory_health(
         _apply_order_scope(
             select(OrderEvent)
             .join(Order, Order.id == OrderEvent.order_id)
-            .where(OrderEvent.is_posted.is_(True)),
+            .where(
+                OrderEvent.is_posted.is_(True),
+                Order.status == OrderStatus.ACTIVE.value,
+            ),
             user,
             session,
         )
@@ -64,7 +67,9 @@ def r1_inventory_health(
             order_by_account[order.account_id].append(order)
 
     items = []
-    account_stmt = select(Account)
+    account_stmt = select(Account).where(
+        Account.inventory_status == InventoryStatus.IN_STOCK.value
+    )
     if user is not None and not user.is_admin and user.owner_scope != "ALL":
         visible_order_ids = select(Order.account_id).where(Order.account_id.is_not(None))
         visible_order_ids = _apply_order_scope(visible_order_ids, user, session)
@@ -78,8 +83,6 @@ def r1_inventory_health(
         entity_ids=[account.id for account in accounts],
     )
     for account in accounts:
-        if account.inventory_status != InventoryStatus.IN_STOCK.value:
-            continue
         orders = order_by_account.get(account.id, [])
         holding_days = (
             (today - account.inventory_entry_at.date()).days

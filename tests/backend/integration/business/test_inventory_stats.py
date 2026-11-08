@@ -1,9 +1,6 @@
-"""CALC-01 库存卡片指标的聚合口径（ACC-01 库存中心）。
+"""CALC-01 库存卡片指标的聚合口径。
 
-前端原本在页面里做 `reduce((sum, row) => sum + Number(row.cost_amount))`
-与两遍日期差过滤，一是不符合「派生值由后端算」，二是 `Number()` 累加在
-分位上会出现 0.30000000000000004 这类残渣。改为前端只交出「此刻可见的
-账号集合」，后端按集合汇总：
+后端按当前可见账号集合汇总：
 
 1. 占用成本按 Decimal 精确相加（三笔 0.10/0.20/0.00 必须等于 0.30）；
 2. 集合外的账号不参与汇总（筛选语义仍只有一份：前端视图）；
@@ -15,7 +12,6 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from app.domain.trade import Account
 from app.stocks import service
 
 
@@ -75,27 +71,6 @@ def test_age_buckets_are_strictly_greater_than_7_and_30_days(seeded_db):
     # 第 7 天不算「超 7 天」；第 8 天算超 7 不算超 30；第 31 天两档都算。
     assert stats["over_7d_count"] == 2
     assert stats["over_30d_count"] == 1
-
-
-def test_age_falls_back_to_buy_date_when_entry_missing():
-    """stocks.inventory_entry_at 是 NOT NULL，回退分支只在模型层守：
-
-    历史客户端/导入数据可能只带 buy_date，库龄不能因此变成空值。
-    """
-    legacy = Account(
-        game_account="stats-age-legacy",
-        business_mode="SELF",
-        inventory_type="RECOVERY",
-        status="WAITING",
-        inventory_status="IN_STOCK",
-        cost_amount=Decimal("50.00"),
-        buy_date=date.today() - timedelta(days=10),
-        created_by="pytest",
-        updated_by="pytest",
-    )
-
-    assert service.inventory_age_days(legacy) == 10
-    assert service.inventory_age_days(legacy, today=date.today() + timedelta(days=21)) == 31
 
 
 def test_unknown_ids_are_ignored_instead_of_failing(seeded_db):

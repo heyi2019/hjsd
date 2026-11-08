@@ -5,7 +5,7 @@
 - 客户 `CUS0001` 编号域独立，创建后不可改、不可复用；
 - 联系方式非唯一：重复只产生候选，**不拦截**；
 - 停用 / 已合并对象不可作为新订单参与方（`CUSTOMER_DISABLED`）；
-- 合并仅管理员：来源置 `MERGED`，迁移参与关系，保留原编号与审计。"""
+- 合并仅管理员：来源置 `MERGED`，转移参与关系，保留原编号与审计。"""
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

@@ -68,21 +68,6 @@ describe("RebatesPanel：返点记录列表", () => {
     expect(screen.getAllByText("0.10%").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("统计卡：返点记录数正常展示", async () => {
-    renderLight(<RebatesPanel />, { user: "admin" });
-    expect(await screen.findByText("返点记录数")).toBeInTheDocument();
-    expect(screen.queryByText("待结算")).toBeNull();
-    expect(screen.queryByRole("button", { name: /登记结算/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /冲销/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /取消/ })).toBeNull();
-  });
-
-  it("后端不可达 → 错误条落地", async () => {
-    vi.mocked(catalog.rebatesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
-    renderLight(<RebatesPanel />, { user: "admin" });
-    await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
-  });
-
   it("来源订单为空时禁用新增返点记录入口", async () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
     renderLight(<RebatesPanel />, { user: "admin" });

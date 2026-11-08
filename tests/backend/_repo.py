@@ -1,6 +1,6 @@
 """测试目录搬迁后的仓库根解析。
 
-背景：10 个测试文件用 ``Path(__file__).resolve().parents[2]`` 当仓库根。测试文件
+背景：测试文件用 ``Path(__file__).resolve().parents[2]`` 当仓库根。测试文件
 下沉到 ``tests/backend/{unit,integration}/<区域>/`` 后层数变成 4，``parents[2]``
 指向 ``tests/backend``，于是「读 deploy/scripts/harden_host.sh」「定位 frontend/src」
 「import run_regression」全部错位。

@@ -99,7 +99,6 @@ describe("库存导出", () => {
             occurred_on: "2026-11-02",
             occurred_at: "2026-11-02T10:00:00",
             direction: "IN",
-            nature: "BUSINESS_IN",
             category: "OTHER",
             amount: "500.00",
             operator: "admin",

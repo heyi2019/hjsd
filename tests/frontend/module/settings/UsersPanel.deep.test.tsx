@@ -115,13 +115,6 @@ describe("UsersPanel.deep：写路径与失败分支", () => {
     await waitFor(() => expect(message.error).toHaveBeenCalled());
   });
 
-  it("加载失败：api.get reject 后 message.error", async () => {
-    vi.mocked(client.api).get.mockRejectedValue(new Error("load fail"));
-    userEvent.setup({ pointerEventsCheck: 0 });
-    renderLight(<UsersPanel />, { user: "admin" });
-    await waitFor(() => expect(message.error).toHaveBeenCalled());
-  });
-
   it("FE-255：人员主数据失败时显示错误态并锁定新增用户", async () => {
     vi.mocked(client.api).get.mockRejectedValue(new Error("users unavailable"));
     renderLight(<UsersPanel />, { user: "admin" });

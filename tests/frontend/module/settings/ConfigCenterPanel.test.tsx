@@ -54,11 +54,6 @@ describe("ConfigCenterPanel", () => {
     expect(screen.queryByTestId("center-nav-sequences")).toBeNull();
   });
 
-  it("不再提供编号序列页面", async () => {
-    renderLight(<ConfigCenterPanel />, { user: "admin" });
-    expect(screen.queryByTestId("center-nav-sequences")).toBeNull();
-  });
-
   it("点击业务提醒后展示库存阈值和提醒开关", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<ConfigCenterPanel />, { user: "admin" });

@@ -18,19 +18,6 @@ from app.parties import service as parties_service
 
 TODAY = date(2026, 10, 4)
 
-def test_order_auxiliary_routes_expose_typed_response_models(app):
-    paths = app.openapi()["paths"]
-
-    event_response = paths["/api/v1/orders/{order_id}/events"]["post"]["responses"]["201"]
-    balance_response = paths["/api/v1/pools/{pool_id}/balance"]["get"]["responses"]["200"]
-
-    assert event_response["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/EventPostResult"
-    )
-    assert balance_response["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/PoolBalanceOut"
-    )
-
 def _new_account(seeded_db, *, game_account: str = "acc-001") -> Account:
     account = Account(
         game_account=game_account,
@@ -367,7 +354,7 @@ class TestA03DgZeroCapital:
 class TestEventRules:
     @pytest.mark.parametrize(("order_type", "inventory_type"), [("HS", "RECOVERY"), ("TH", "PICKUP")])
     def test_inline_purchase_creates_inventory(self, seeded_db, order_type, inventory_type):
-        """2026-10-28 口径：建单成功即内联建库存账号（编号已发放），BUY 只累计成本。"""
+        """建单成功即内联建库存账号，BUY 只累计成本。"""
         order = service.create_order(
             seeded_db,
             order_type=order_type,

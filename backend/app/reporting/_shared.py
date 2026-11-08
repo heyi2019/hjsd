@@ -80,7 +80,7 @@ def _event_contribution(
     """单个事件的 (income, buy_amount, direct_cost)。
 
     实现已下沉到 app/orders/amounts.py：报表与规则派生（返点基数 / 分期服务费基数）
-    必须共用同一口径，避免复制后漂移。保留本名以兼容既有测试与内部调用。
+    必须共用同一口径，避免复制后漂移。
     """
     return order_event_contribution(event, event_types)
 
@@ -101,7 +101,7 @@ def cashflow_totals_by_order(
 ) -> dict[int, tuple[Decimal, Decimal, Decimal]]:
     """按订单汇总资金明细 (所有收入, 所有支出, 其中买号支出)。
 
-    2026-11-05 用户裁决：利润 = 单订单所有收入 − 所有支出，可正可负可 0；
+    利润 = 单订单所有收入 − 所有支出，可正可负可 0；
     资金走向只有收入 / 支出两种，不以「是否生成 cashflow 行」为界。
     本函数是报表侧唯一取数口，与分润基数 `order_cashflow_profit` 同源：
     不看 status，冲销流水本身是反向流水自然计入；

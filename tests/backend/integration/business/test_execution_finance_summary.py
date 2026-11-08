@@ -1,8 +1,6 @@
 """CALC-01 库存账号执行详情的财务汇总契约（ACC-01 execution-detail）。
 
-前端 `stocks/OrderDetail.tsx` 与 `stocks/inventory-export.ts` 原先各自对
-`orders[].events[].cashflow` + `orders[].cashflows` + `orders[].rebates` 做一遍
-浮点累加，同一套算法写了两遍。汇总改由后端下发后，这里守住三条：
+后端下发执行详情财务汇总，这里守住三条：
 
 1. 合计等于明细逐条相加（口径同源，不另算一套）；
 2. 收入含返点、支出只算流水，净额 = 收入 − 支出；
@@ -110,7 +108,6 @@ def test_summary_splits_cashflow_and_rebate_income(seeded_client, seeded_db, hea
         pool_id=pool.id,
         occurred_on=TODAY,
         direction="IN",
-        nature="BUSINESS_IN",
         category="OTHER",
         amount=Decimal("100"),
         order_id=order.id,
@@ -125,7 +122,7 @@ def test_summary_splits_cashflow_and_rebate_income(seeded_client, seeded_db, hea
     assert Decimal(summary["rebate_income"]) == Decimal("50.00")
     assert Decimal(summary["total_income"]) == Decimal("150.00")
     assert Decimal(summary["total_expense"]) == Decimal("300.00")
-    # 净额 = 所有收入 − 所有支出；返点登记即收入，必须并入净额（11-05 裁决）。
+    # 净额 = 所有收入 − 所有支出；返点登记即收入，必须并入净额。
     assert Decimal(summary["net_amount"]) == Decimal("-150.00")
 
 
@@ -139,7 +136,6 @@ def test_summary_equals_manual_sum_over_detail_rows(seeded_client, seeded_db, he
         pool_id=pool.id,
         occurred_on=TODAY,
         direction="OUT",
-        nature="BUSINESS_OUT",
         category="OTHER",
         amount=Decimal("12.34"),
         order_id=order.id,
@@ -150,7 +146,6 @@ def test_summary_equals_manual_sum_over_detail_rows(seeded_client, seeded_db, he
         pool_id=pool.id,
         occurred_on=TODAY,
         direction="IN",
-        nature="BUSINESS_IN",
         category="OTHER",
         amount=Decimal("88.66"),
         order_id=order.id,

@@ -347,6 +347,13 @@ export function normalizeError(error: unknown): NormalizedError {
   return { message: String(error) };
 }
 
+/** 统一判断请求是否由 AbortSignal 主动取消；取消不应冒泡成业务错误提示。 */
+export function isRequestAborted(error: unknown): boolean {
+  return axios.isCancel(error)
+    || (error instanceof DOMException && error.name === "AbortError")
+    || (typeof error === "object" && error !== null && (error as { code?: unknown }).code === "ERR_CANCELED");
+}
+
 /** 统一错误文案：后端只返回 v1 统一结构 { code, message, details }。
  *  展示层只透出中文 message；code 是英文缩写，对终端用户无操作价值，
  *  仅打 console 便于排查，不上屏（曾以 `AUTH_REQUIRED: 用户名或密码错误` 直出登录页）。 */

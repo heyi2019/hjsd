@@ -1,4 +1,4 @@
-"""tests/v1 共享夹具：PostgreSQL 测试库（绝不用生产库）。
+"""后端测试共享夹具：PostgreSQL 测试库（绝不用生产库）。
 
 - 测试库只认 `TEST_DATABASE_URL`（**刻意不回落 `DATABASE_URL`**），库名必须含 `test`
   且不得命中 release/prod 等黑名单、不得与 `DATABASE_URL` 同库——夹具会 `TRUNCATE`
@@ -31,8 +31,8 @@ BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"  # tests/backend -
 def _initial_markers_for_file(filename: str) -> set[str]:
     """按现有文件命名给存量测试补初始分类，不改变测试行为。
 
-    这是过渡性的文件级分类：后续遇到跨域或命名不准确的文件，可在测试模块内
-    用 pytestmark 补充或覆盖。未能可靠判断的文件保持未分类，避免把业务语义猜错。
+    这是文件级分类：跨域或命名不准确的文件可在测试模块内用 pytestmark
+    补充或覆盖；无法可靠判断的文件保持未分类，避免把业务语义猜错。
     """
     markers: set[str] = set()
 
@@ -42,7 +42,6 @@ def _initial_markers_for_file(filename: str) -> set[str]:
         "test_numbering.py",
         "test_state_machine.py",
         "test_game_types.py",
-        "test_product_alias_compat.py",
     }:
         markers.add("unit")
 
@@ -77,7 +76,6 @@ def _initial_markers_for_file(filename: str) -> set[str]:
             "inventory_execution",
             "accounts_",
             "auth_",
-            "backup_restore",
             "migration",
             "notifications_",
             "attachments_",
@@ -91,9 +89,7 @@ def _initial_markers_for_file(filename: str) -> set[str]:
     if any(
         token in filename
         for token in (
-            "bughunt",
             "_gaps",
-            "unreachable_status_paths",
             "coverage_gate",
             "deploy_script_contract",
             "account_stock_no",
@@ -139,15 +135,8 @@ DB_STATS_ATTR = "_hei_db_channel_stats"
 # ---------------------------------------------------------------------------
 # pytest-xdist 并行支持（默认串行时完全不触发，行为零变化）
 #
-# 原 conftest 已对 xdist 做了「跳过会话独占锁」的兼容（PYTEST_XDIST_WORKER 时
-# _acquire_session_lock 直接返回 None），但注释写明「并行需要每个 worker 各自一个库，
-# 不在本夹具保证范围内」——共享同一个测试库时，多个 worker 的 seed_template schema
-# 会并发 DROP/CREATE、public 表会被并发 TRUNCATE，互相拆台。
-#
-# 这里补全这一环：xdist 模式下，每个 worker 跑前自动建「基础库名_${worker}」独立库
-# （如 heijin_erp_test_gw0），并把 TEST_DATABASE_URL 指向它；跑完在 pytest_unconfigure
-# 里 DROP 回收。默认串行（无 PYTEST_XDIST_WORKER）时全部跳过，v1_engine / seed_template
-# / 结果记录器逻辑一字未改。
+# xdist 模式下每个 worker 使用独立测试库，避免 seed_template 的建表和清理互相干扰。
+# 默认串行时不创建额外数据库；v1_engine、seed_template 与结果记录器逻辑保持一致。
 # ---------------------------------------------------------------------------
 # 并行模式下每个 worker 的独立库 URL。用模块级全局而非 os.environ 承载：
 # conftest 的 _test_database_url 优先读它，但测试里 `Settings(_env_file=None)` 只读
@@ -244,9 +233,6 @@ from app.core.database import Base, get_db  # noqa: E402
 from app.core.security import CurrentUser, DEV_USERS, build_access_token  # noqa: E402
 from app.core.settings import get_settings  # noqa: E402
 from app.domain import attachments, foundation, notifications, options, parties, quality, trade, users  # noqa: E402,F401  注册全部 v1 表
-from app.legacy_imports import models as _imports  # noqa: E402  注册历史导入表
-
-_ = _imports
 from app.foundation.seeds import seed_foundation  # noqa: E402
 from app.foundation.seed_orders import seed_order_matrix  # noqa: E402
 
@@ -254,7 +240,7 @@ from app.foundation.seed_orders import seed_order_matrix  # noqa: E402
 def seed_default_users(db: Session) -> None:
     """补齐测试常用的占位用户（id 1..9）。
 
-    迁移 0008 给 orders.owner_id / customers.owner_id / order_profit_allocations.user_id
+    为 orders.owner_id / customers.owner_id / order_profit_allocations.user_id
     补了指向 users 的外键，故测试里直接写死的 user_id/owner_id（如 1/2/3/7/9）必须对应真实用户，
     否则触发 FOREIGN KEY 约束失败。这里集中造一批占位用户，避免每个用例各自造。
     """
@@ -320,7 +306,7 @@ def _test_database_url() -> str:
             returncode=1,
         )
     # 本地必须物理分离。CI 的 postgres service 只建一个一次性的临时库，
-    # 两个变量同库无害，故 CI 环境跳过（`CI` 由 GitHub Actions 自动注入）。
+    # 两个变量同库无害，因此 CI 不做这项比较（`CI` 由 GitHub Actions 注入）。
     if not os.environ.get("CI"):
         base_url = os.environ.get("DATABASE_URL") or settings.database_url
         base_database = make_url(base_url).database if base_url else ""
@@ -405,11 +391,10 @@ def v1_engine(request):
     lock_connection = _acquire_session_lock(engine, terminal)
     try:
         Base.metadata.create_all(bind=engine)
-        # 测试库可能由旧版本留下已删除的字段；测试基线跟随当前 ORM，先清理历史列。
+        # 测试库可能残留已删除字段；测试基线跟随当前 ORM，先清理这些列。
         with engine.begin() as connection:
             connection.execute(text('ALTER TABLE public."order_type_defs" DROP COLUMN IF EXISTS capital_type CASCADE'))
             connection.execute(text('ALTER TABLE public."orders" DROP COLUMN IF EXISTS capital_type CASCADE'))
-            connection.execute(text('ALTER TABLE public."cashflow" DROP COLUMN IF EXISTS nature CASCADE'))
             connection.execute(
                 text(
                     'ALTER TABLE public."cashflow" '
@@ -688,11 +673,8 @@ _RUN_STATE: dict = {"run_id": None, "case_index": {}, "rows": {}}
 def _load_case_index() -> dict:
     """nodeid -> 测试编号。
 
-    case_index.json 按设计不入库，且 backend-gate 是「测试在前、生成器在后」：
-    全新 checkout / CI 跑 pytest 时这份索引尚未生成，旧实现直接返回空映射，
-    当次执行记录的 case_no 会整批缺省。故缺失时从**入库的**《测试用例库.csv》
-    自举同一份映射（生成器写 index 的口径即 f"{文件}::{函数标识}"）。
-    两份都读不到仍返回空 dict——记录器是 best-effort 旁路，绝不阻断测试。
+    case_index.json 不入库；缺失时从入库的《测试用例库.csv》恢复同一份映射。
+    两份都读不到时返回空 dict，记录器作为旁路不阻断测试。
     """
     try:
         if _CASE_INDEX.exists():

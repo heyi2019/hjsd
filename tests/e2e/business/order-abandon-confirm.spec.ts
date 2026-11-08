@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 /**
  * 回归：建单弹窗的「放弃未保存的建单内容？」确认框必须能被关掉。
  *
- * 历史缺陷（用户实测报障：X 点不动、弹窗关不掉）：
+ * 回归覆盖：取消按钮与确认弹窗必须可用：
  *  确认框曾被渲染成 `BusinessActionModal` 的 children。主弹窗一旦 `open=false`，
  *  嵌套 Modal 的关闭渲染被跳过 —— DOM 卡在可见状态，而 React state 已经是 false。
  *  此后点 X / 点「继续编辑」都是把 false 再设成 false 的幂等 setState，React 直接

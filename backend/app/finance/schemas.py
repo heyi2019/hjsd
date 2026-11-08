@@ -86,9 +86,6 @@ class CashflowOut(BaseModel):
     occurred_at: datetime
     category: str
     direction: str
-    # Deprecated compatibility field.  ``cashflow.nature`` is no longer
-    # persisted; responses derive it from direction/source instead.
-    nature: str | None = None
     accounting_attribute: str
     amount: Decimal
     status: str
@@ -138,8 +135,6 @@ class CashflowCreate(RequestModel):
     pool_id: int
     occurred_on: date
     direction: str
-    # Accepted for clients on the pre-0077 contract; storage is direction-only.
-    nature: str | None = None
     category: str
     amount: Decimal
     order_id: int | None = None

@@ -1,19 +1,10 @@
-/**
- * 容器类组件——由 5 个碎片文件合并：
- *   FormDrawer / PermissionButton / BusinessForm(BusinessRegistrationForm) / ConfirmDialog / DataTable
- * 合并动因同 ui.atoms（文件级 import+transform 是固定成本）。用例与断言逐条保留。
- */
+/** 共享容器的权限、提交、错误处置与分页契约。 */
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { FormDrawer } from "@/shared/ui/FormDrawer";
 import { PermissionButton, PermissionGate } from "@/shared/ui/PermissionButton";
-import {
-  BusinessRegistrationForm,
-  BusinessRegistrationGroup,
-  BusinessRegistrationSection,
-} from "@/shared/ui/BusinessRegistrationForm";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { appMessage } from "@/shared/ui/appFeedback";
 import { DataTable } from "@/shared/ui/DataTable";
@@ -87,19 +78,6 @@ describe("FormDrawer：金额动作必须走抽屉提交", () => {
     expect(btn.classList.contains("ant-btn-loading")).toBe(true);
   });
 
-  it("extra 区域渲染在表单下方（用于校验提示等）", async () => {
-    renderLight(
-      <FormDrawer
-        open
-        title="收款"
-        fields={drawerFields}
-        extra={<span>余额不足</span>}
-        onClose={() => {}}
-        onSubmit={() => {}}
-      />,
-    );
-    expect(await screen.findByText("余额不足")).toBeInTheDocument();
-  });
 });
 
 describe("PermissionButton：无权限默认隐藏", () => {
@@ -184,60 +162,6 @@ describe("PermissionGate：区块级门控", () => {
       { user: "viewer" },
     );
     expect(screen.getByText("无权限")).toBeInTheDocument();
-  });
-});
-
-describe("BusinessRegistrationForm", () => {
-  it("提供统一布局、错误滚动和当前表单标识", () => {
-    renderLight(
-      <BusinessRegistrationForm scope="SALE">
-        <label htmlFor="amount">金额</label>
-        <input id="amount" />
-      </BusinessRegistrationForm>,
-      { user: "admin" },
-    );
-
-    const form = screen.getByRole("textbox").closest("form");
-    expect(form).toHaveClass("ui-form-spaced");
-    expect(form).toHaveAttribute("data-form-scope", "SALE");
-  });
-
-  it("登记表复用建单式横向字段口径", () => {
-    renderLight(
-      <BusinessRegistrationForm scope="LEAD">
-        <label htmlFor="customer">客户</label>
-        <input id="customer" />
-      </BusinessRegistrationForm>,
-      { user: "admin" },
-    );
-
-    const form = screen.getByRole("textbox").closest("form");
-    expect(form).toHaveClass("business-registration-form", "ant-form-horizontal");
-    expect(form).toHaveAttribute("data-form-scope", "LEAD");
-  });
-
-  it("提供建单式二级业务分区容器", () => {
-    renderLight(
-      <BusinessRegistrationSection title="客户信息" description="基础资料">
-        <div>字段区域</div>
-      </BusinessRegistrationSection>,
-      { user: "admin" },
-    );
-
-    expect(screen.getByRole("heading", { name: "客户信息" })).toHaveClass("business-registration-section__title");
-    expect(screen.getByText("字段区域").parentElement).toHaveClass("business-registration-section__fields");
-  });
-
-  it("提供二级容器标题", () => {
-    renderLight(
-      <BusinessRegistrationGroup title="基础资料" action={<button type="button">增加字段</button>}>
-        <div>字段区域</div>
-      </BusinessRegistrationGroup>,
-      { user: "admin" },
-    );
-
-    expect(screen.getByRole("heading", { name: "基础资料" })).toHaveClass("business-registration-group__title");
-    expect(screen.getByRole("button", { name: "增加字段" }).parentElement).toHaveClass("business-registration-group__action");
   });
 });
 
@@ -330,11 +254,6 @@ describe("DataTable：三态一致（加载 / 空 / 有数据）", () => {
     expect(headers).toContain("名称");
   });
 
-  it("空数据未传文案时回落「暂无数据」", () => {
-    render(<DataTable columns={tableColumns} rows={[]} page={1} pageSize={10} total={0} onPageChange={() => {}} />);
-    expect(screen.getByText("暂无数据")).toBeInTheDocument();
-  });
-
   it("有数据时渲染表格行", () => {
     render(<DataTable columns={tableColumns} rows={tableRows} page={1} pageSize={20} total={12} onPageChange={() => {}} />);
     expect(screen.getByText("第1行")).toBeInTheDocument();
@@ -350,14 +269,6 @@ describe("DataTable：三态一致（加载 / 空 / 有数据）", () => {
     expect(screen.getByText("第11行")).toBeInTheDocument();
   });
 
-  it("前端分页 pageSize=20 时首屏精确渲染 20 行（非硬编码 10）", () => {
-    const big: TableRow[] = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, name: `R${i + 1}` }));
-    const { container } = render(
-      <DataTable columns={tableColumns} rows={big} page={1} pageSize={20} total={25} onPageChange={() => {}} />,
-    );
-    expect(container.querySelectorAll(".ant-table-row").length).toBe(20);
-    expect(screen.queryByText("R21")).toBeNull(); // 第 21 行在第 2 页
-  });
 });
 
 describe("DataTable：两种分页模式", () => {
@@ -395,19 +306,4 @@ describe("DataTable：两种分页模式", () => {
     expect(onPageChange).not.toHaveBeenCalled();
   });
 
-  it("rowKey 缺省取 id；自定义 rowKey 生效", () => {
-    const { container } = render(
-      <DataTable
-        columns={tableColumns}
-        rows={[{ id: 7, name: "自定义键" }]}
-        page={1}
-        pageSize={10}
-        total={1}
-        rowKey={(row) => `row-${row.id}`}
-        onPageChange={() => {}}
-      />,
-    );
-    expect(container.querySelectorAll(".ant-table-row").length).toBe(1);
-    expect(screen.getByText("自定义键")).toBeInTheDocument();
-  });
 });

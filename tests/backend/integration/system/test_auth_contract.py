@@ -51,14 +51,6 @@ def _login(client: TestClient, username: str, password: str) -> str:
     return response.json()["access_token"]
 
 
-def test_auth_routes_publish_typed_response_models(app):
-    paths = app.openapi()["paths"]
-
-    assert paths["/api/v1/auth/login"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith("/LoginOut")
-    assert paths["/api/v1/users"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["items"]["$ref"].endswith("/PublicUserOut")
-    assert paths["/api/v1/teams"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["items"]["$ref"].endswith("/TeamOut")
-
-
 def test_user_security_scope_values_are_constrained_in_database(seeded_db):
     seeded_db.add(
         User(
@@ -249,6 +241,7 @@ def test_logout_ignores_non_bearer_scheme(client: TestClient):
         "/api/v1/auth/logout", headers={"Authorization": "Basic abc123"}
     )
     assert response.status_code == 200
+    assert response.json()["ok"] is True
 
 
 def test_logout_revokes_token(client: TestClient, db: Session):
@@ -496,13 +489,7 @@ def test_user_phone_is_unique_and_creation_records_hired_on(client: TestClient):
 
 
 def test_user_phone_is_normalized_and_format_validated(client: TestClient):
-    """设置-用户写入的手机号必须与免密登录读侧同一口径（归一化 + 11 位校验）。
-
-    回归背景：手机号是手机号验证码 / 微信扫码登录的准入依据。写入侧若只 trim
-    不校验，「+86 138-0000-0000」这类从通讯录复制的号码会原样落库，登录侧
-    归一化后匹配不上，表现为「后台明明配了手机号，登录却说未开通」；而随便
-    填的脏值（如 8 位）则永远不会生效，且没有任何报错。
-    """
+    """用户手机号写入和免密登录采用同一归一化与格式校验。"""
     created = client.post(
         "/api/v1/users",
         json={

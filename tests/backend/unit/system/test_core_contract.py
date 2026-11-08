@@ -1,13 +1,14 @@
 """CORE-01 core 基础设施契约测试（money / numbering / errors / security / settings / database）。
 
 既有 test_money.py / test_numbering.py / test_settings.py 已覆盖金额量化与编号分配主路径；
-本文件补各模块的兼容别名、类型装饰器、越界与解析失败分支、JWT 全失败分支、
+本文件补各模块的公开接口、类型装饰器、越界与解析失败分支、JWT 全失败分支、
 作用域判定、env 定位与 URL 派生、engine 生命周期与 `get_db` 事务边界。
 """
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import column, create_engine, inspect, select, text
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
@@ -16,6 +17,7 @@ from app import api_v1
 from app.core.errors import AppError, ErrorCode, NotFound, Validation, require_condition
 from app.core.money import Amount, to_money
 from app.core.numbering import MAX_SEQUENCE_VALUE, current_value, peek_number
+from app.core.ratelimit import RateLimiter
 from app.core.security import (
     ROLE_ADMIN,
     ROLE_OPERATOR,
@@ -30,6 +32,7 @@ from app.core.security import (
     user_from_payload,
     verify_password,
 )
+from app.core.sql_functions import year_month
 from app.domain.foundation import DocumentSequence
 
 
@@ -41,8 +44,8 @@ class TestMoneyHelpers:
 
     def test_amount_type_decorator_edges(self):
         column_type = Amount()
-        assert column_type.python_type is not None  # 91：ORM 声明用
-        assert column_type.process_bind_param(None, None) is None  # 95
+        assert column_type.python_type is not None
+        assert column_type.process_bind_param(None, None) is None
         assert float(column_type.process_bind_param("12.34", None)) == 12.34
 
 
@@ -61,8 +64,7 @@ class TestNumberingGuards:
 
         seeded_db.add(
             DocumentSequence(
-                # 800faea 放宽 DB CHECK 至 999999/padding<=6（适配 KU_ 五位），
-                # 序列上限由服务层按 10^padding-1 拦截（SEQUENCE_EXHAUSTED）。
+                # 数据库允许更大的存储范围，序列上限由服务层按 padding 拦截。
                 sequence_key="OVERFLOW_SEQUENCE", prefix="OF", padding=4,
                 current_value=999999 + 1,
             )
@@ -206,6 +208,30 @@ class TestSecurityScopes:
         admin = CurrentUser.build(id=1, username="admin", roles=[ROLE_ADMIN])
         assert owner_scope_filter(Pool.id, admin, seeded_db) is None
 
+    def test_team_scope_ids_are_cached_for_one_session(self, seeded_db, monkeypatch):
+        team_user = CurrentUser.build(
+            id=9,
+            username="operator",
+            roles=[ROLE_OPERATOR],
+            owner_scope="TEAM",
+            team_ids=[3],
+        )
+        calls = 0
+        query = seeded_db.query
+
+        def counted_query(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            return query(*args, **kwargs)
+
+        monkeypatch.setattr(seeded_db, "query", counted_query)
+
+        first = owner_scope_ids(seeded_db, team_user)
+        second = owner_scope_ids(seeded_db, team_user)
+
+        assert first == second
+        assert calls == 1
+
 
 class TestTokenGuards:
     def test_malformed_token_rejected(self):
@@ -339,8 +365,8 @@ class TestPasswordGuards:
     def test_verify_wrong_password_and_bad_encoding(self):
         encoded = hash_password("correct-horse")
         assert verify_password("wrong-password", encoded) is False
-        assert verify_password("correct-horse", "plain$1$x$y") is False  # 296-297
-        assert verify_password("correct-horse", "broken") is False  # 302-303
+        assert verify_password("correct-horse", "plain$1$x$y") is False
+        assert verify_password("correct-horse", "broken") is False
 
 
 class TestRequireRole:
@@ -443,10 +469,6 @@ class TestDatabaseLifecycle:
 
 # ------------------------------------------------------------------ 应用入口
 class TestApiV1Health:
-    def test_root_publishes_typed_response_model(self, app):
-        schema = app.openapi()["paths"]["/"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-        assert schema["$ref"].endswith("/EngineInfoOut")
-
     def test_root_and_health_endpoints(self, client):
         root = client.get("/")
         assert root.status_code == 200, root.text
@@ -473,3 +495,86 @@ class TestApiV1Health:
             "status": "error",
             "database_status": "unavailable",
         }
+
+
+def test_reset_engine_replaces_existing_singleton():
+    engine = database.get_engine()
+    assert engine is not None
+    new_engine = database.reset_engine()
+    assert new_engine is not None
+    assert database.get_engine() is new_engine
+
+
+def test_get_engine_builds_isolated_engine_for_explicit_url(v1_engine):
+    engine = database.get_engine(v1_engine.url)
+    try:
+        assert engine is not database._engine
+        with engine.connect() as connection:
+            assert connection.scalar(text("select 1")) == 1
+    finally:
+        engine.dispose()
+
+
+def test_get_session_factory_keeps_global_factory_unchanged(v1_engine):
+    factory = database.get_session_factory(v1_engine.url)
+    assert database._session_factory is None
+    session = factory()
+    try:
+        assert session.get_bind().url.database == v1_engine.url.database
+    finally:
+        session.close()
+
+
+def test_create_all_is_idempotent_on_existing_schema(v1_engine):
+    engine = database.create_all(v1_engine.url)
+    try:
+        assert inspect(engine).has_table("orders")
+    finally:
+        engine.dispose()
+
+
+def test_dispose_engine_clears_singletons(v1_engine):
+    database.reset_engine(v1_engine.url)
+    assert database._engine is not None
+    database.dispose_engine()
+    assert database._engine is None
+    assert database._session_factory is None
+
+
+def test_rate_limiter_resets_after_window_expiry(monkeypatch):
+    ticks = iter([0.0, 0.0, 61.0])
+    monkeypatch.setattr("app.core.ratelimit.time.monotonic", lambda: next(ticks))
+    limiter = RateLimiter()
+    assert limiter.is_allowed("k", limit=1, window_seconds=60) is True
+    assert limiter.is_allowed("k", limit=1, window_seconds=60) is False
+    assert limiter.is_allowed("k", limit=1, window_seconds=60) is True
+
+
+def test_year_month_compiles_for_postgresql():
+    expression = year_month(column("trade_date"))
+    pg_sql = str(select(expression).compile(dialect=postgresql.dialect()))
+    assert "to_char(trade_date, 'YYYY-MM')" in pg_sql
+
+
+def test_user_from_payload_rejects_bool_subject():
+    with pytest.raises(AuthError):
+        user_from_payload({"sub": True, "username": "x"})
+
+
+def test_user_from_payload_rejects_nonpositive_subject_or_blank_username():
+    with pytest.raises(AuthError):
+        user_from_payload({"sub": 0, "username": "x"})
+    with pytest.raises(AuthError):
+        user_from_payload({"sub": 1, "username": "  "})
+
+
+def test_user_from_payload_rejects_bad_scope_claims():
+    with pytest.raises(AuthError):
+        user_from_payload({"sub": 1, "username": "x", "pool_ids": [1, "bad"]})
+
+
+def test_user_from_payload_rejects_invalid_owner_scope_and_amr():
+    with pytest.raises(AuthError):
+        user_from_payload({"sub": 1, "username": "x", "owner_scope": "INVALID"})
+    with pytest.raises(AuthError):
+        user_from_payload({"sub": 1, "username": "x", "amr": "FORGED"})

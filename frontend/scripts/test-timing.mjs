@@ -26,7 +26,8 @@
 import { spawn, spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir, cpus, loadavg } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
 
 const argv = process.argv.slice(2);
@@ -42,7 +43,18 @@ const fromFile = argOf("--from", null);
 const since = argOf("--since", null);
 // "--" 之后的参数原样透传给 vitest（如 --maxWorkers=6 / --no-isolate / <file>）
 const passthrough = argv.includes("--") ? argv.slice(argv.indexOf("--") + 1) : [];
-const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+const FRONTEND = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO = resolve(FRONTEND, "..");
+const BIN_NAME = process.platform === "win32" ? "vitest.cmd" : "vitest";
+const vitest = [
+  resolve(REPO, "node_modules", ".bin", BIN_NAME),
+  resolve(FRONTEND, "node_modules", ".bin", BIN_NAME),
+].find((candidate) => existsSync(candidate));
+
+if (!vitest) {
+  console.error("找不到 vitest 可执行文件：先在仓库根执行 npm ci");
+  process.exit(2);
+}
 
 const reportPath = fromFile ?? join(tmpdir(), `vitest-timing-${project}-${Date.now()}.json`);
 
@@ -58,7 +70,7 @@ let cpuSeconds = null;
 let phaseLine = "";
 if (!fromFile) {
   const vitestArgs = [
-    "vitest", "run", `--project=${project}`,
+    "run", `--project=${project}`,
     "--reporter=default", "--reporter=json", `--outputFile.json=${reportPath}`,
   ];
   const changed = since ? changedFiles(since) : null;
@@ -66,11 +78,11 @@ if (!fromFile) {
   vitestArgs.push(...passthrough);
   process.stderr.write(`[timing] 运行 ${project} 层${changed ? `（${changed.length} 个改动文件）` : ""}…\n`);
   if (process.env.TIMING_DEBUG) process.stderr.write(`[timing] vitest ${vitestArgs.join(" ")}\n`);
-  const cmd = canMeasureCpu ? TIME_BIN : npx;
-  const cmdArgs = canMeasureCpu ? [timeFlag, npx, ...vitestArgs] : vitestArgs;
+  const cmd = canMeasureCpu ? TIME_BIN : vitest;
+  const cmdArgs = canMeasureCpu ? [timeFlag, vitest, ...vitestArgs] : vitestArgs;
   const started = performance.now();
   // stderr 不直出：/usr/bin/time -l 会打上百行 rusage，只在失败时摘尾部。
-  const child = spawn(cmd, cmdArgs, { stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(cmd, cmdArgs, { cwd: FRONTEND, stdio: ["ignore", "pipe", "pipe"] });
   let out = "";
   let err = "";
   child.stdout.on("data", (chunk) => { out += chunk.toString("utf8"); });

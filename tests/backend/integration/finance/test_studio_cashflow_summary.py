@@ -1,10 +1,6 @@
 """CASHFLOW-01 工作室收支面板汇总契约（FIN-04 /cashflows/studio-summary）。
 
-前端 `pools/StudioExpensePanel.tsx` 原先发两次 `/cashflows`（收入一次、支出一次），
-自己按 `source === "OTHER"` 过滤、再用 `reduce + toFixed` 算出已入账收入/支出/净额。
-这套口径散在组件里有三个问题：`limit` 截断会少算、浮点累加、属性配对规则改一次就漂。
-
-汇总搬后端后，这里守住：
+服务端汇总工作室收支，这里守住：
 1. 只算 APPROVED（待审核不进经营口径）；
 2. 只算手工登记（返点/押金/划转/订单事件流水都不算工作室收支）；
 3. 支出认 OPERATING_EXPENSE、收入认 SELF_REVENUE，不能互相串；
@@ -38,13 +34,12 @@ def _flow(
     category: str = "房租",
     note: str = "memo",
 ):
-    """手工登记一笔工作室收支：nature 与方向对齐，属性由调用方指定。"""
+    """手工登记一笔工作室收支，属性由调用方指定。"""
     return service.create_cashflow(
         seeded_db,
         pool_id=_pool(seeded_db).id,
         occurred_on=TODAY,
         direction=direction,
-        nature="BUSINESS_OUT" if direction == "OUT" else "BUSINESS_IN",
         accounting_attribute=attribute,
         category=category,
         amount=Decimal(amount),
@@ -160,7 +155,6 @@ def test_pool_ids_filter(seeded_client, seeded_db, headers):
         pool_id=other.id,
         occurred_on=TODAY,
         direction="OUT",
-        nature="BUSINESS_OUT",
         accounting_attribute="OPERATING_EXPENSE",
         category="房租",
         amount=Decimal("900"),

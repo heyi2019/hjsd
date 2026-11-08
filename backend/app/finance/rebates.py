@@ -85,7 +85,7 @@ def create_rebate(
     # 不能阻止在订单创建后先登记预计返点。
 
     rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
-    # BAS-06-04：按返点日期固化规则版本，改版不影响历史记录
+    # 按返点日期固化规则版本，改版不影响已登记记录。
     order_type_definition = foundation_service.get_order_type_by_code(
         session, order.order_type
     )

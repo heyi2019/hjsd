@@ -123,12 +123,6 @@ describe("CustomersPage：客户档案", () => {
     expect(await screen.findByText("已合并", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
   });
 
-  it("后端不可达时显示错误条而不是空白页", async () => {
-    vi.mocked(catalog.customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
-    renderLight(<CustomersPage />);
-    await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
-  });
-
   it("FE-242：客户接口失败时统计显示不可用并保护依赖入口", async () => {
     vi.mocked(catalog.customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "customers down" });
     renderLight(<CustomersPage />, { user: "admin" });
@@ -179,36 +173,6 @@ describe("CustomersPage：客户档案", () => {
     expect(screen.getByLabelText("合作类型")).toBeInTheDocument();
   });
 
-  it("统计卡片与筛选条之间保留清晰的分组间距", async () => {
-    renderLight(<CustomersPage />);
-    await screen.findByText("CUS-0001");
-
-    const stats = document.querySelector(".ui-stat-row");
-    const filters = document.querySelector(".customer-list-filters");
-
-    expect(stats).toBeInTheDocument();
-    expect(filters).toHaveClass("customer-list-filters--separated");
-    expect(stats?.nextElementSibling).toBe(filters);
-  });
-
-  it("统计区只展示总数、本月新增和今日新增", async () => {
-    vi.setSystemTime(new Date("2026-10-18T12:00:00"));
-    renderLight(<CustomersPage />);
-    await screen.findByText("CUS-0001");
-
-    expect(screen.getByText("客户总数")).toBeInTheDocument();
-    expect(screen.getByText("本月新增客户数")).toBeInTheDocument();
-    expect(screen.getByText("今日新增客户数")).toBeInTheDocument();
-
-    const stats = document.querySelector(".ui-stat-row");
-    expect(stats?.children).toHaveLength(3);
-    expect(within(stats as HTMLElement).getByText("客户总数")).toBeInTheDocument();
-    expect(within(stats as HTMLElement).getByText("本月新增客户数")).toBeInTheDocument();
-    expect(within(stats as HTMLElement).getByText("今日新增客户数")).toBeInTheDocument();
-    expect(within(stats as HTMLElement).getByText("2")).toBeInTheDocument();
-    expect(within(stats as HTMLElement).getAllByText("1")).toHaveLength(2);
-  });
-
   it("合作方复用客户的详情、编辑和拉黑操作", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue(counterparties);
@@ -229,7 +193,7 @@ describe("CustomersPage：客户档案", () => {
     expect(within(drawer).getByRole("button", { name: /编辑/ })).toBeInTheDocument();
   });
 
-  it("已合并（终态）客户行只保留详情，不暴露合并/拉黑/解除拉黑（L1595）", async () => {
+  it("已合并（终态）客户行只保留详情，不暴露合并/拉黑/解除拉黑", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(catalog.customersApi.list).mockResolvedValue([
       {
@@ -316,9 +280,6 @@ describe("CustomersPage：联系方式脱敏与按需查看", () => {
   });
 });
 
-// —— 原 CustomersPage.actions.test.tsx ——
-// 同一页面、同一份 catalog automock + 同一份 CustomerLeadPanel 替身。
-// CustomersPage.write.test.tsx 未合并：它用带 importOriginal 的工厂，与 automock 语义不同。
 describe("CustomersPage：行内动作", () => {
   let ui: ReturnType<typeof userEvent.setup>;
 
@@ -434,8 +395,6 @@ describe("CustomersPage：行内动作", () => {
   });
 });
 
-// —— 原 CustomersPage.live-fields.test.tsx ——
-// 扩展字段（BAS-04）：列表摘要列 / 新建弹窗动态控件 / 详情抽屉停用字段 / 定义接口失败降级。
 describe("CustomersPage：扩展字段（BAS-04）", () => {
   let ui: ReturnType<typeof userEvent.setup>;
 

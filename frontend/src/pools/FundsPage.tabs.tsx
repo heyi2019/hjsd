@@ -1,7 +1,7 @@
 /** 资金中心各 Tab 视图层：overview / cashflows / reconciliations / controls。
  *  每个 Tab 通过 controller 消费 useFundsPageController 暴露的状态与处理器，自身只负责列定义与渲染。 */
 import { Card, Input, Space, Tabs, Tooltip, Typography } from "antd";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ColumnsType } from "antd/es/table";
 import { DataTable, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { useListViewColumns } from "../shared/lib/listColumns";
@@ -247,9 +247,10 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
 export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
   const { reconciliations, pools, reconciliationForm, setReconciliationOpen, loading, reconciliationsReady, error } = ctrl;
   const reconciliationUnavailable = !reconciliationsReady || Boolean(error);
+  const poolById = useMemo(() => new Map(pools.map((pool) => [pool.id, pool.name])), [pools]);
   const { arrange: arrangeReconciliationColumns } = useListViewColumns("RECONCILIATIONS");
   const reconciliationColumns: ColumnsType<Reconciliation> = [
-    { title: "资金池", key: "pool", render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? row.pool_id },
+    { title: "资金池", key: "pool", render: (_v, row) => poolById.get(row.pool_id) ?? row.pool_id },
     { title: "对账日期", dataIndex: "reconciled_on" },
     { title: "账户", dataIndex: "account_label" },
     { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已入账流水">系统余额</Tooltip>, key: "system_balance", align: "right", render: (_v, row) => <MoneyText value={row.system_balance} /> },
@@ -291,11 +292,12 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
 
 export function ControlsTab({ ctrl }: { ctrl: FundsPageController }) {
   const { transferAnomalies, pools, repairForm, setRepairTarget, loading } = ctrl;
+  const poolById = useMemo(() => new Map(pools.map((pool) => [pool.id, pool.name])), [pools]);
   const { arrange: arrangeTransferAnomalyColumns } = useListViewColumns("TRANSFER_ANOMALIES");
   const transferAnomalyColumns: ColumnsType<{ transfer_id: string; flow: Cashflow }> = [
     { title: "划转号", dataIndex: "transfer_id" },
     { title: "现有流水", key: "flow_no", render: (_v, row) => row.flow.flow_no },
-    { title: "资金池", key: "pool", render: (_v, row) => pools.find((pool) => pool.id === row.flow.pool_id)?.name ?? row.flow.pool_id },
+    { title: "资金池", key: "pool", render: (_v, row) => poolById.get(row.flow.pool_id) ?? row.flow.pool_id },
     { title: "方向", key: "direction", render: (_v, row) => row.flow.direction === "IN" ? "转入" : "转出" },
     { title: "金额", key: "amount", align: "right", render: (_v, row) => <MoneyText value={row.flow.amount} /> },
     {

@@ -118,7 +118,7 @@ describe("AppShell：⌘/Ctrl+K 快捷键", () => {
     const inventoryTab = await screen.findByRole("tab", { name: "库存中心" }, { timeout: 10_000 });
     expect(inventoryTab).toHaveAttribute("aria-selected", "true");
 
-    // 再回到工作台，验证 Ctrl+K 同样生效（keep-alive 下「工作台」文本多处，用顶栏页名断言）
+    // 再回到工作台，验证 Ctrl+K 同样生效。
     await ui.click(screen.getByRole("button", { name: /工作台/ }));
     await waitFor(() =>
       expect(document.querySelector(".topbar__page")?.textContent).toBe("工作台"),
@@ -171,7 +171,7 @@ describe("AppShell：业务中心首页落点", () => {
     const ordersTab = await screen.findByRole("tab", { name: "订单台账" });
     expect(ordersTab).toHaveAttribute("aria-selected", "true");
 
-    // 切到工作台（keep-alive 下「工作台」文本多处，用顶栏页名断言）
+    // 切到工作台并确认当前页标题更新。
     await ui.click(screen.getByRole("button", { name: /工作台/ }));
     await waitFor(() =>
       expect(document.querySelector(".topbar__page")?.textContent).toBe("工作台"),

@@ -1,7 +1,7 @@
 import { Form, Space } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { installmentsApi, ordersApi, type Installment, type InstallmentDisposition, type Order, type Schedule } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
@@ -30,6 +30,14 @@ export function useContractTableController(params: { contractType: string; reloa
   const settlePermission: Permission = can("order.event.post") ? "order.event.post" : "finance.order.event.post";
   const [schedules, setSchedules] = useState<Record<number, Schedule[]>>({});
   const [dispositions, setDispositions] = useState<Record<number, InstallmentDisposition[]>>({});
+  const [scheduleLoading, setScheduleLoading] = useState<Record<number, boolean>>({});
+  const [dispositionLoading, setDispositionLoading] = useState<Record<number, boolean>>({});
+  const loadedScheduleIdsRef = useRef(new Set<number>());
+  const loadingScheduleIdsRef = useRef(new Set<number>());
+  const schedulePromisesRef = useRef(new Map<number, Promise<void>>());
+  const loadedDispositionIdsRef = useRef(new Set<number>());
+  const loadingDispositionIdsRef = useRef(new Set<number>());
+  const dispositionPromisesRef = useRef(new Map<number, Promise<void>>());
   const [payTarget, setPayTarget] = useState<Installment | null>(null);
   const [deliverTarget, setDeliverTarget] = useState<Installment | null>(null);
   const [recoverTarget, setRecoverTarget] = useState<Installment | null>(null);
@@ -70,6 +78,52 @@ export function useContractTableController(params: { contractType: string; reloa
   const [waiveForm] = Form.useForm();
   const [extendForm] = Form.useForm();
 
+  const loadSchedules = useCallback(async (installmentId: number) => {
+    if (loadedScheduleIdsRef.current.has(installmentId)) return;
+    const pending = schedulePromisesRef.current.get(installmentId);
+    if (pending) return pending;
+    const request = (async () => {
+      loadingScheduleIdsRef.current.add(installmentId);
+      setScheduleLoading((current) => ({ ...current, [installmentId]: true }));
+      try {
+        const scheduleRows = await installmentsApi.schedules(installmentId);
+        setSchedules((current) => ({ ...current, [installmentId]: scheduleRows }));
+        loadedScheduleIdsRef.current.add(installmentId);
+      } catch (err) {
+        setError(normalizeError(err));
+      } finally {
+        loadingScheduleIdsRef.current.delete(installmentId);
+        setScheduleLoading((current) => ({ ...current, [installmentId]: false }));
+      }
+    })();
+    schedulePromisesRef.current.set(installmentId, request);
+    await request;
+    schedulePromisesRef.current.delete(installmentId);
+  }, []);
+
+  const loadDispositions = useCallback(async (installmentId: number) => {
+    if (loadedDispositionIdsRef.current.has(installmentId)) return;
+    const pending = dispositionPromisesRef.current.get(installmentId);
+    if (pending) return pending;
+    const request = (async () => {
+      loadingDispositionIdsRef.current.add(installmentId);
+      setDispositionLoading((current) => ({ ...current, [installmentId]: true }));
+      try {
+        const dispositionRows = await installmentsApi.dispositions(installmentId);
+        setDispositions((current) => ({ ...current, [installmentId]: dispositionRows }));
+        loadedDispositionIdsRef.current.add(installmentId);
+      } catch (err) {
+        setError(normalizeError(err));
+      } finally {
+        loadingDispositionIdsRef.current.delete(installmentId);
+        setDispositionLoading((current) => ({ ...current, [installmentId]: false }));
+      }
+    })();
+    dispositionPromisesRef.current.set(installmentId, request);
+    await request;
+    dispositionPromisesRef.current.delete(installmentId);
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -87,17 +141,21 @@ export function useContractTableController(params: { contractType: string; reloa
       setRows(filtered);
       setOrders(orderList);
       setTotals(summary);
-      const entries = await Promise.all(
-        filtered.map(async (item) => {
-          const [scheduleRows, dispositionRows] = await Promise.all([
-            installmentsApi.schedules(item.id),
-            installmentsApi.dispositions(item.id),
-          ]);
-          return [item.id, scheduleRows, dispositionRows] as const;
-        }),
-      );
-      setSchedules(Object.fromEntries(entries.map(([id, scheduleRows]) => [id, scheduleRows])));
-      setDispositions(Object.fromEntries(entries.map(([id, _scheduleRows, dispositionRows]) => [id, dispositionRows])));
+      loadedDispositionIdsRef.current.clear();
+      const dispositionIds = filtered
+        .filter((item) => ["CLOSED", "OVERDUE", "DEFAULTED"].includes(item.status))
+        .map((item) => item.id);
+      const bulkDispositionMap = dispositionIds.length
+        ? await installmentsApi.dispositionsBulk(dispositionIds)
+        : {};
+      const entries = bulkDispositionMap
+        ? Object.entries(bulkDispositionMap).map(([id, rows]) => [Number(id), rows] as const)
+        : await Promise.all(dispositionIds.map(async (id) => [id, await installmentsApi.dispositions(id)] as const));
+      loadedScheduleIdsRef.current.clear();
+      setSchedules({});
+      setDispositionLoading({});
+      setDispositions(Object.fromEntries(entries));
+      for (const [installmentId] of entries) loadedDispositionIdsRef.current.add(installmentId);
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -121,6 +179,14 @@ export function useContractTableController(params: { contractType: string; reloa
     } finally {
       setExporting(false);
     }
+  };
+
+  const openPay = async (row: Installment) => {
+    payForm.resetFields();
+    await loadSchedules(row.id);
+    if (!loadedScheduleIdsRef.current.has(row.id)) return;
+    setPayTarget(row);
+    payForm.setFieldsValue({ paid_on: today() });
   };
 
   const submitPay = async (values: Record<string, unknown>) => {
@@ -158,7 +224,7 @@ export function useContractTableController(params: { contractType: string; reloa
   };
 
   const openDeliver = (row: Installment) => {
-    const order = orders.find((item) => item.id === row.order_id);
+    const order = orderById.get(row.order_id);
     deliverForm.resetFields();
     setDeliverTarget(row);
     deliverForm.setFieldsValue({
@@ -282,6 +348,7 @@ export function useContractTableController(params: { contractType: string; reloa
   // 合计直接取服务端（Decimal）；日期区间已在后端筛，列表不再二次过滤。
   const totalReceivable = totals?.total_receivable ?? "0.00";
   const totalPaid = totals?.total_paid ?? "0.00";
+  const orderById = useMemo(() => new Map(orders.map((order) => [order.id, order])), [orders]);
 
   const { arrange: arrangeColumns } = useListViewColumns("INSTALLMENT");
   const columns: ColumnsType<Installment> = [
@@ -289,18 +356,18 @@ export function useContractTableController(params: { contractType: string; reloa
     {
       title: "订单",
       key: "order",
-      render: (_v, row) => orders.find((order) => order.id === row.order_id)?.order_no ?? row.order_id,
+      render: (_v, row) => orderById.get(row.order_id)?.order_no ?? row.order_id,
     },
     {
       title: "业务",
       key: "business",
-      render: (_v, row) => BUSINESS_MODE_LABEL[orders.find((order) => order.id === row.order_id)?.account_business_mode ?? ""] || "-",
+      render: (_v, row) => BUSINESS_MODE_LABEL[orderById.get(row.order_id)?.account_business_mode ?? ""] || "-",
     },
     {
       title: "类型",
       key: "order_type",
       render: (_v, row) => {
-        const order = orders.find((item) => item.id === row.order_id);
+        const order = orderById.get(row.order_id);
         return order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-";
       },
     },
@@ -308,14 +375,14 @@ export function useContractTableController(params: { contractType: string; reloa
       title: "产品",
       key: "product",
       render: (_v, row) => {
-        const order = orders.find((item) => item.id === row.order_id);
+        const order = orderById.get(row.order_id);
         return order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-";
       },
     },
     {
       title: "对方",
       key: "party",
-      render: (_v, row) => orders.find((order) => order.id === row.order_id)?.party_name || "-",
+      render: (_v, row) => orderById.get(row.order_id)?.party_name || "-",
     },
     {
       title: "总应收",
@@ -366,7 +433,7 @@ export function useContractTableController(params: { contractType: string; reloa
             permission="order.event.post"
             size="small"
             disabled={["SETTLED", "DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
-            onClick={() => { payForm.resetFields(); setPayTarget(row); payForm.setFieldsValue({ paid_on: today() }); }}
+            onClick={() => void openPay(row)}
           >
             登记收款
           </PermissionButton>
@@ -557,6 +624,10 @@ export function useContractTableController(params: { contractType: string; reloa
     arrangeColumns,
     columns,
     scheduleColumns,
+    loadSchedules,
+    loadDispositions,
+    scheduleLoading,
+    dispositionLoading,
   };
 }
 

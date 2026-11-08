@@ -1,17 +1,16 @@
-import { Modal, Space } from "antd";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Space } from "antd";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navigation } from "./navigation";
 import { DEV_ROLES, useSession } from "../shared/state/session";
 import { useTheme } from "../shared/state/theme";
 import { loadOptionSets } from "../shared/lib/optionSets";
-import { DashboardPage } from "./DashboardPage";
-import { LoginPage } from "../auth/LoginPage";
-import { ChangePasswordPage } from "../auth/ChangePasswordPage";
 import type { ComponentType } from "react";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 import { ConfirmButton } from "../shared/ui";
+import { SheetModal } from "../shared/ui/SheetModal";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
+import { PullToRefreshProvider } from "../shared/ui/pullToRefresh/PullToRefreshProvider";
 
 const OrdersPage = lazy(() => import("../orders/OrdersPage").then(({ OrdersPage }) => ({ default: OrdersPage })));
 const CustomersPage = lazy(() => import("../customers/CustomersPage").then(({ CustomersPage }) => ({ default: CustomersPage })));
@@ -19,6 +18,9 @@ const FundsPage = lazy(() => import("../pools/FundsPage").then(({ FundsPage }) =
 const ReportsPage = lazy(() => import("../reporting/ReportsPage").then(({ ReportsPage }) => ({ default: ReportsPage })));
 const SettingsPage = lazy(() => import("../field-definitions/SettingsPage").then(({ SettingsPage }) => ({ default: SettingsPage })));
 const UserCenterPage = lazy(() => import("../auth/UserCenterPage").then(({ UserCenterPage }) => ({ default: UserCenterPage })));
+const DashboardPage = lazy(() => import("./DashboardPage").then(({ DashboardPage }) => ({ default: DashboardPage })));
+const LoginPage = lazy(() => import("../auth/LoginPage").then(({ LoginPage }) => ({ default: LoginPage })));
+const ChangePasswordPage = lazy(() => import("../auth/ChangePasswordPage").then(({ ChangePasswordPage }) => ({ default: ChangePasswordPage })));
 
 // 注：dashboard 不入此映射——工作台是纯动作入口（无跳转需求），由下方三元单独渲染；
 // 其余页面统一收 onNavigate；无跳转需求的页面忽略该 prop。
@@ -27,7 +29,7 @@ type PageProps = {
   initialTab?: BusinessCenterEntryTab;
   initialMine?: boolean;
   initialReportTab?: "commission" | "my-earnings";
-  /** keep-alive 下当前页是否处于激活态：非激活仅隐藏不卸载，页面可据此在重新激活时重拉数据。 */
+  /** 当前页是否处于激活态；页面切换时由路由重新挂载。 */
   active?: boolean;
   /** Customer Center deep-link focus, passed from the shell so standalone page tests need no Router context. */
   focusCustomerId?: number;
@@ -69,33 +71,28 @@ export function AppShell() {
   const { role, authenticated, mustChangePassword, logout, can } = useSession();
   const { mode, setMode } = useTheme();
   const item = navigation.find((entry) => entry.key === active);
-  const navigateTo = (key: string, tab?: BusinessCenterEntryTab) => {
+  const navigateTo = useCallback((key: string, tab?: BusinessCenterEntryTab) => {
     // 回到业务中心但不指定子页时，进入库存中心。
     if (key === "business" && !tab) {
       navigate("/business/inventory");
       return;
     }
     navigate(`/${key}${tab ? `/${tab}` : ""}`);
-  };
-  const navigateToPersonalView = (view: "orders" | "earnings") => {
+  }, [navigate]);
+  const navigateToPersonalView = useCallback((view: "orders" | "earnings") => {
     if (view === "orders") {
       navigate("/business/ledger?mine=true");
       return;
     }
     navigate("/operations?tab=my-earnings");
-  };
+  }, [navigate]);
   // 空路径 / 或 "" 统一重定向到工作台，保证默认落点稳定。
   useEffect(() => {
     if (location.pathname === "/" || location.pathname === "") {
       navigate("/dashboard", { replace: true });
     }
   }, [location.pathname, navigate]);
-  // keep-alive：访问过的页面持续挂载，仅非激活态隐藏（display:none），避免切导航重挂载丢状态。
-  const [visited, setVisited] = useState<Set<string>>(() => new Set(["dashboard"]));
-  useEffect(() => {
-    setVisited((prev) => (prev.has(active) ? prev : new Set(prev).add(active)));
-  }, [active]);
-  // 转场重放：不再靠 key 重挂载（那会丢状态），改用 reflow 技巧重放 .page-enter 弹簧入场。
+  // 当前页切换时重放 .page-enter 弹簧入场。
   const pageRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = pageRef.current;
@@ -119,6 +116,9 @@ export function AppShell() {
   // iOS 26 Scroll Edge Effect：按滚动位置写入上下渐隐距离，内容触边时才渐隐。
   // 未溢出时两值均为 0，mask 退化为全不透明（见 navigation.css 的 .nav-list）。
   const navRef = useRef<HTMLElement>(null);
+  // 顶栏滚动边缘效果（R4）：顶栏是 sticky 玻璃栏，正文从其下方滚过；
+  // 文档滚动超过阈值时让顶栏浮现一条细分隔阴影（iOS 导航栏惯例），归零时隐去。
+  const mainRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const nav = navRef.current;
     if (!nav) return undefined;
@@ -142,10 +142,47 @@ export function AppShell() {
       if (frame) cancelAnimationFrame(frame);
     };
   }, []);
+  // 顶栏滚动边缘：文档为主滚动容器，按滚动位置写入 --main-scrolled（0/1），
+  // 由 responsive.css ≤640px 的 .topbar box-shadow 消费（滚动时浮现分隔阴影）。
+  // 滚动事件挂载点必须同时覆盖两种场景：
+  //   1) 标准/真实移动端浏览器：scrollingElement=documentElement，事件在 html 上派发；
+  //   2) Playwright isMobile 仿真：真实滚动发生在 <body>（body.scrollTop 变化、
+  //      window.scrollY/documentElement.scrollTop 恒 0），且 scroll 事件只派发到 body、
+  //      不冒泡到 window。故 scrollingElement 与 body 都必须挂监听才能稳定捕获。
+  useEffect(() => {
+    const scroller = document.scrollingElement || document.documentElement;
+    const apply = () => {
+      const topbar = mainRef.current?.querySelector<HTMLElement>(".topbar");
+      if (!topbar) return;
+      // 真·视口滚动位置：标准模式下取 documentElement，部分移动端/quirks 模式下
+      // 实际滚动容器是 <body>（实测 body.scrollTop 变化而 window.scrollY 恒 0）。
+      // 三者取最大，跨模式都命中；阈值 >4px 与 CSS 消费的 --main-scrolled 口径一致。
+      const top = Math.max(
+        window.scrollY || 0,
+        document.documentElement.scrollTop || 0,
+        document.body.scrollTop || 0,
+      );
+      const scrolled = top > 4;
+      topbar.style.setProperty("--main-scrolled", scrolled ? "1" : "0");
+    };
+    apply();
+    scroller.addEventListener("scroll", apply, { passive: true });
+    document.body.addEventListener("scroll", apply, { passive: true });
+    window.addEventListener("resize", apply);
+    return () => {
+      scroller.removeEventListener("scroll", apply);
+      document.body.removeEventListener("scroll", apply);
+      window.removeEventListener("resize", apply);
+    };
+  }, []);
   // DEV 与生产同一套退出语义：DEV 初始即已登录（session 内默认 true，X-Dev-User 直通），
   // 点「退出登录」后落登录页，刷新即恢复直通；生产态无 token 同样落登录页。
-  if (!authenticated) return <LoginPage />;
-  if (mustChangePassword) return <ChangePasswordPage />;
+  if (!authenticated) {
+    return <Suspense fallback={<div className="page-loading" role="status">正在打开…</div>}><LoginPage /></Suspense>;
+  }
+  if (mustChangePassword) {
+    return <Suspense fallback={<div className="page-loading" role="status">正在打开…</div>}><ChangePasswordPage /></Suspense>;
+  }
   return (
     <div className="app-shell">
       <aside className="sidebar glass">
@@ -183,7 +220,7 @@ export function AppShell() {
         </nav>
         <div className="sidebar-foot">宜游轩 · 经营工作台</div>
       </aside>
-      <div className="main">
+      <div className="main" ref={mainRef}>
         <header className="topbar view-head">
           <div className="topbar__title">
             <h1 className="topbar__page">{item?.label ?? "用户中心"}</h1>
@@ -243,48 +280,38 @@ export function AppShell() {
             </ConfirmButton>
           </Space>
         </header>
+        <PullToRefreshProvider>
         <main className="page-content">
-          {/* 路由化 + keep-alive：
-              1) 落点由 URL 决定（深链/刷新/前进后退可用），见 navigateTo。
-              2) 访问过的页面持续挂载，仅非激活态 display:none，避免切导航重挂载丢状态（原 key={active} 的副作用）。
-              3) 转场弹簧入场改由 pageRef + reflow 重放（见上方 useEffect），不再靠重挂载。 */}
+          {/* 路由落点由 URL 决定；当前页单独挂载，避免保留整棵隐藏页面树。 */}
           <Suspense fallback={<div className="page-loading" role="status">正在打开…</div>}>
-            {[...visited, active].filter((k, i, a) => a.indexOf(k) === i).map((key) => {
-              const isActive = key === active;
-              const PageComponent = key === "dashboard" ? DashboardPage : PAGES[key];
+            {(() => {
+              const PageComponent = active === "dashboard" ? DashboardPage : PAGES[active];
               if (!PageComponent) return null;
               return (
-                <div
-                  key={key}
-                  ref={isActive ? pageRef : undefined}
-                  className={`page-slot${isActive ? " page-enter" : " page-slot--hidden"}`}
-                  aria-hidden={!isActive}
-                >
-                  {/* 边界必须挂在 .page-slot 内部：挂在外面时降级卡会顶掉整个 slot，
-                      page-slot--hidden 随之消失，keep-alive 下隐藏页的错误卡就会叠到
-                      当前页底部（2026-11-03 实测库存/订单/分期/资金/报表/设置六处全现）。 */}
-                  <ErrorBoundary name={key}>
-                    {key === "dashboard" ? (
-                      <DashboardPage onNavigate={navigateTo} onPersonalNavigate={navigateToPersonalView} />
+                <div key={active} ref={pageRef} className="page-slot page-enter">
+                  <ErrorBoundary name={active}>
+                    {active === "dashboard" ? (
+                      <DashboardPage active onNavigate={navigateTo} onPersonalNavigate={navigateToPersonalView} />
                     ) : (
                       <PageComponent
                         onNavigate={navigateTo}
-                        initialTab={key === "business" ? businessTab : undefined}
-                        initialMine={key === "business" && active === "business" ? businessMine : undefined}
-                        initialReportTab={key === "operations" && active === "operations" ? initialReportTab : undefined}
-                        active={isActive}
-                        focusCustomerId={key === "customers" ? focusCustomerId : undefined}
-                        focusCounterpartyId={key === "customers" ? focusCounterpartyId : undefined}
+                        initialTab={active === "business" ? businessTab : undefined}
+                        initialMine={active === "business" ? businessMine : undefined}
+                        initialReportTab={active === "operations" ? initialReportTab : undefined}
+                        active
+                        focusCustomerId={active === "customers" ? focusCustomerId : undefined}
+                        focusCounterpartyId={active === "customers" ? focusCounterpartyId : undefined}
                       />
                     )}
                   </ErrorBoundary>
                 </div>
               );
-            })}
+            })()}
           </Suspense>
         </main>
+        </PullToRefreshProvider>
       </div>
-      <Modal
+      <SheetModal
         open={userCenterOpen}
         title="用户中心"
         footer={
@@ -297,11 +324,12 @@ export function AppShell() {
         className="user-center-modal"
       >
         <UserCenterPage onClose={() => setUserCenterOpen(false)} />
-      </Modal>
-      <Modal
+      </SheetModal>
+      <SheetModal
         open={moreOpen}
         title="更多"
         footer={null}
+        destroyOnHidden
         onCancel={() => setMoreOpen(false)}
         className="mobile-more-modal"
       >
@@ -328,7 +356,7 @@ export function AppShell() {
             <span>用户中心</span>
           </button>
         </div>
-      </Modal>
+      </SheetModal>
     </div>
   );
 }

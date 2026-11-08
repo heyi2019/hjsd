@@ -1,4 +1,4 @@
-"""API-01 请求模型字段契约：未知字段必须显式拒绝，不再静默兼容旧结构。"""
+"""API-01 请求模型字段契约：未知字段必须显式拒绝。"""
 from __future__ import annotations
 
 from datetime import date
@@ -102,7 +102,7 @@ from app.parties.schemas import (
         ),
         (
             CashflowCreate,
-            {"pool_id": 1, "occurred_on": date(2026, 10, 1), "direction": "IN", "nature": "BUSINESS_IN", "category": "OTHER", "amount": "1.00"},
+            {"pool_id": 1, "occurred_on": date(2026, 10, 1), "direction": "IN", "category": "OTHER", "amount": "1.00"},
         ),
         (CashflowReverse, {"reversed_on": date(2026, 10, 1), "reason": "重复"}),
         (

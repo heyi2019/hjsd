@@ -106,7 +106,7 @@ def merge_customers(
             details={"source_customer_no": source.customer_no},
         )
 
-    # 迁移参与关系：目标已有同订单同角色则跳过（UNIQUE(order, customer, role)）
+    # 转移参与关系：目标已有同订单同角色则跳过（UNIQUE(order, customer, role)）
     roles = session.scalars(
         select(OrderCustomerRole).where(OrderCustomerRole.customer_id == source.id)
     ).all()

@@ -1,6 +1,6 @@
 /** 设置页入口：仅保留「配置中心」与少数非业务配置类页签。
  * 原业务配置类独立页签（业务类型 / 表单字段 / 列表字段 / 资金池 /
- * 游戏与渠道 / 中介业务配置 / 参与方来源）已聚合进「配置中心」（用户裁决 2026-10-31）。
+ * 游戏与渠道 / 中介业务配置 / 参与方来源）已聚合进「配置中心」。
  *
  * 第一性原理：标签 / 权限 / 只读一律取自 configCatalog.ts 单一事实源，组件挂载复用
  * panels/panelRegistry.tsx，消除与注册表重复的硬编码。仅两处必要的显式逻辑：
@@ -10,7 +10,7 @@
 import { Tabs } from "antd";
 import { useEffect, useState } from "react";
 import { useSession } from "../shared/state/session";
-import { SETTINGS_ITEMS } from "./configCatalog";
+import { SETTINGS_ITEM_BY_KEY } from "./configCatalog";
 import { PANEL_REGISTRY } from "./panels/panelRegistry";
 import { ConfigCenterPanel } from "./panels/ConfigCenterPanel";
 
@@ -47,7 +47,7 @@ export function SettingsPage() {
   };
 
   const standaloneTabs: TabItem[] = SETTINGS_TAB_ORDER
-    .map((key) => SETTINGS_ITEMS.find((i) => i.key === key))
+    .map((key) => SETTINGS_ITEM_BY_KEY.get(key))
     .filter(
       (item): item is NonNullable<typeof item> =>
         !!item && (!item.permission || can(item.permission)),

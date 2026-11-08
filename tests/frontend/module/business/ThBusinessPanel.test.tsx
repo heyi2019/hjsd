@@ -30,12 +30,6 @@ describe("ThBusinessPanel：分销·提号", () => {
     expect(screen.queryByText("HS-001")).not.toBeInTheDocument();
   });
 
-  it("加载失败展示错误横幅", async () => {
-    vi.mocked(catalog.ordersApi.list).mockRejectedValue(new Error("orders down"));
-    renderLight(<ThBusinessPanel />, { user: "admin" });
-    expect(await screen.findByText(/orders down/)).toBeInTheDocument();
-  });
-
   it("点击新建提号打开创建弹窗", async () => {
     renderLight(<ThBusinessPanel />, { user: "admin" });
     await screen.findByText("TH-001");
@@ -45,8 +39,6 @@ describe("ThBusinessPanel：分销·提号", () => {
   });
 });
 
-// —— 原 ThFeeSection.test.tsx ——
-// 费用卡片标题的配置化与回退：ThFeeSection 只吃 props + FieldConfigContext，无网络依赖。
 describe("ThFeeSection：费用卡片标题", () => {
   const pools: Pool[] = [];
 
@@ -91,7 +83,7 @@ describe("ThFeeSection：费用卡片标题", () => {
     expect(screen.getByText("预计收买家")).toBeInTheDocument();
   });
 
-  it("TH 费用卡片：资金账户标题使用系统统一术语，不受配置旧文案影响", () => {
+  it("TH 费用卡片：资金账户标题固定使用系统统一术语", () => {
     renderTh({
       payment_pool_id: makeField({ field_key: "payment_pool_id", label: "资金出处", required: true }),
     });

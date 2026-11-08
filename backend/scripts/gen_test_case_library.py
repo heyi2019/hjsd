@@ -12,7 +12,7 @@
 类型判定：后端落在 run_regression.py 的 unit 组 -> UT，其余 -> IT；前端 vitest -> IT。
 幂等：重复运行只追加新用例序号，已分配编号冻结。该 map 不入库，全新 checkout /
 CI 缺失时由 _load_number_map() 从入库的《测试用例库.csv》自举恢复，否则按排序
-重排编号会与入库快照错位（实测 2666 条里 1640 条漂移）。
+重排编号会与入库快照错位。
 
 文件 -> 功能 -> 模块(A/B/C/D/E/F/SYS) 的映射统一取自 scripts/test_catalog.py（单一事实源）。
 """
@@ -186,7 +186,7 @@ def _skip_balanced(src: str, i: int) -> int:
 def scan_ts(path: str, exclude_methods: frozenset = frozenset()):
     """返回 [(标题, None, 回调体)]。
 
-    支持 `it("t")` / `test("t")` / `it.skip("t")` / `it.each([...])("t")`。
+    支持 `it("t")` / `test("t")` / `it.each([...])("t")`。
     `it.each` 保留原始模板（`%s` 等占位符）作为**一条**用例 —— 与后端
     `parametrize` 一个函数一条用例同构；运行时展开的多个变体由执行记录器
     按通配归并回这一条。
@@ -469,15 +469,8 @@ def extract_precond(relpath: str, body: str) -> str:
 def _load_number_map() -> dict[str, int]:
     """恢复「层级|功能编号|文件名|函数标识 → 序号」，保证编号不漂移。
 
-    case_number_map.json 按设计不入库（.gitignore：每次整份重写约 584KB）。
-    全新 checkout / CI 上它不存在，旧实现从空 map 起按排序重新分配序号：
-    因历史编号带空洞（删过的用例留号），重排后实测 2666 条里 **1640 条**
-    与入库快照不一致，报告的 nodeid↔编号关联整体错位。
-
-    故优先读生成器产物；缺失时从**入库的**《测试用例库.csv》自举同一份映射
-    （csv 的「测试层级 / 功能编号 / 自动化测试文件及函数 / 测试函数标识 /
-    测试编号」五列足以还原 key 与序号）。两份都无才是真正的首次生成，
-    返回空 dict 走原有分配逻辑。
+    case_number_map.json 不入库；缺失时从入库的《测试用例库.csv》恢复已有编号。
+    两份都无时才是首次生成，返回空 dict 进入编号分配流程。
     """
     if os.path.exists(CASE_MAP):
         return json.load(open(CASE_MAP, encoding="utf-8"))
@@ -563,6 +556,12 @@ def main() -> None:
             cases.append(_stage("E2E", func, rel, tname, doc, body, fn, primary, related, ""))
 
     # ---- 稳定分配序号 ----
+    # 本地缓存不入库，删除/改名后的测试键也不能继续占用编号空间。
+    active_map_keys = {
+        f"{c['测试层级']}|{c['功能编号']}|{os.path.basename(c['自动化测试文件及函数'])}|{c['测试函数标识']}"
+        for c in cases
+    }
+    number_map = {key: value for key, value in number_map.items() if key in active_map_keys}
     cases.sort(key=lambda c: (c["功能编号"], c["测试层级"], c["自动化测试文件及函数"], c["测试函数标识"]))
 
     counters: dict[tuple[str, str], int] = {}
@@ -582,18 +581,11 @@ def main() -> None:
         if map_key in number_map:
             n = number_map[map_key]
         else:
-            # 兼容迁移：早期版本只记裸函数名（丢类名），历史 map 里存的是
-            # `...|test_x`。首次以 `...|TestX::test_x` 出现时继承旧号，
-            # 避免把 29% 的类内方法整体重编号、留下大量空洞与孤儿键。
-            # 同名跨类冲突时按排序先后，先声明者继承，其余照常新编。
-            inherited = f"{c['测试层级']}|{c['功能编号']}|{base}|{func_id.rsplit('::', 1)[-1]}"
-            inherited_no = number_map.pop(inherited, None) if inherited != map_key else None
-            if inherited_no is not None:
-                n = inherited_no
-            else:
-                counters[(c["测试层级"], c["功能编号"])] = counters.get(
-                    (c["测试层级"], c["功能编号"]), 0) + 1
-                n = counters[(c["测试层级"], c["功能编号"])]
+            # 当前编号只按完整的文件与函数标识分配。
+            counters[(c["测试层级"], c["功能编号"])] = counters.get(
+                (c["测试层级"], c["功能编号"]), 0
+            ) + 1
+            n = counters[(c["测试层级"], c["功能编号"])]
             number_map[map_key] = n
         case_no = f"{c['测试层级']}-{c['功能编号']}-{n:03d}"
         c["测试编号"] = case_no
@@ -616,7 +608,7 @@ def main() -> None:
               "前置条件", "输入数据", "预期结果", "合格标准", "自动化测试文件及函数",
               "测试函数标识", "优先级", "测试名称", "功能名称", "关联旧编号(BIZ)", "流程编号", "备注"]
     with open(OUT_CSV, "w", encoding="utf-8-sig", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
+        w = csv.DictWriter(f, fieldnames=fields, lineterminator="\n")
         w.writeheader()
         for c in cases:
             row = {k: c.get(k, "") for k in fields}
@@ -654,11 +646,6 @@ def _assert_unique(label: str, values: list) -> None:
         f"[gen] {label} 重复，共 {len(dups)} 个（前 5）：{detail}\n"
         "  常见原因：同名测试函数未被类名限定、或计数器种子没接上既有编号。"
     )
-
-
-def _unit_files() -> set:
-    from test_catalog import UNIT_FILES
-    return UNIT_FILES
 
 
 def _stage(ttype, func, rel, tname, doc, body, fname, primary, related, flow) -> dict:

@@ -1,14 +1,13 @@
+/** OrdersPage 业务动作测试套件的共享夹具与注册函数。 */
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage, validateAllocations } from "@/orders/OrdersPage";
-import { buildOrderPatchPayload, buildRefundEventPayload, pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
 
 import * as catalog from "@/shared/api/catalog";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
-import dayjs from "dayjs";
 import { today } from "@/shared/lib/format";
 import * as client from "@/shared/api/client";
 import type { Installment, InstallmentCancelResult, Order, OrderLink, ProfitAllocation } from "@/shared/api/catalog";
@@ -277,13 +276,8 @@ async function clickModalOk(modal: HTMLElement) {
   fireEvent.click(ok!);
 }
 
-describe("OrdersPage：操作与筛选分支", () => {
-  it("分期订单金额展示为 已付/本金 · 期数", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([order3]);
-    await openLedger();
-    expect(screen.getAllByText("¥3000.00/12000.00 · 6期").length).toBeGreaterThan(0);
-  });
-
+export function registerOrdersPageFilterTests() {
+describe("OrdersPage：筛选与分期", () => {
   it("类型筛选：切换 Segmented 后仅保留该类型订单", async () => {
     await openLedger();
     fireEvent.click(screen.getByRole("radio", { name: /回收/ }));
@@ -306,8 +300,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(screen.getByRole("tab", { name: "库存中心" })).toHaveAttribute("aria-selected", "true"));
   });
 
-  // 逾期标记是全局动作（后端按 as_of 扫描全部合约），入口从分期面板收敛到
-  // 订单页「分期与回款」Tab 的右上角，这两个用例随功能入口一起从 InstallmentsPanel.flows 迁入。
+  // 逾期标记是全局动作，后端按 as_of 扫描全部合约。
   it("切走再切回「分期与回款」会重拉分期列表（切入即刷新）", async () => {
     vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
     await openLedger();
@@ -348,7 +341,11 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.click(screen.getByRole("button", { name: /标记逾期/ }));
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("当前无新增逾期合约"));
   });
+});
+}
 
+export function registerOrdersPageLifecycleTests() {
+describe("OrdersPage：编辑与新建", () => {
   it("编辑订单：行操作列打开编辑弹窗并提交 PATCH（成交日期+备注）", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
     vi.mocked(catalog.ordersApi.patch).mockResolvedValue({ ...order1 });
@@ -391,6 +388,34 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(screen.queryByText(/编辑订单 · HS-2026-0001/)).toBeNull());
   });
 
+  it("新建订单：菜单收起、弹窗开关与成功后刷新列表", async () => {
+    await openLedger();
+    const before = vi.mocked(catalog.ordersApi.list).mock.calls.length;
+    const trigger = screen.getByRole("button", { name: /新建订单/ });
+
+    await ui.click(trigger);
+    expect(await screen.findByText("新建提号订单")).toBeInTheDocument();
+    fireEvent.click(await screen.findByText("新建回收订单"));
+    expect(await screen.findByTestId("create-stub")).toBeInTheDocument();
+    // P2-190：受控下拉，选中后弹层真正卸载，不会浮在弹窗上方
+    await waitFor(() => expect(screen.queryByText("新建提号订单")).toBeNull());
+    await waitFor(() => expect(trigger).not.toHaveAttribute("aria-expanded", "true"));
+
+    await ui.click(screen.getByRole("button", { name: /关闭新建弹窗/ }));
+    await waitFor(() => expect(screen.queryByTestId("create-stub")).toBeNull());
+
+    await ui.click(trigger);
+    fireEvent.click(await screen.findByText("新建回收订单"));
+    await screen.findByTestId("create-stub");
+    await ui.click(screen.getByRole("button", { name: /模拟新建成功/ }));
+    await waitFor(() => expect(screen.queryByTestId("create-stub")).toBeNull());
+    expect(vi.mocked(catalog.ordersApi.list).mock.calls.length).toBeGreaterThan(before);
+  });
+});
+}
+
+export function registerOrdersPageAllocationTests() {
+describe("OrdersPage：分润", () => {
   // 原两条（按姓名预填 / 展示订单总利润）同一份夹具、同一入口、纯只读，合并为一次挂载。
   it("分润：弹窗按姓名预填已有比例，并展示订单总利润", async () => {
     await openLedger();
@@ -409,7 +434,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：比例与金额不再互算，填写一项不改写另一项", async () => {
-    // 用户裁决（2026-11-05）：比例与金额各自独立录入，前端不得自行换算。
+    // 比例与金额各自独立录入，前端不得自行换算。
     // 旧实现用 syncAllocationPair 在 onValuesChange 里双向回填，改金额会静默改写比例，
     // 用户无法手动精调；此处锁死「只写自己这一格」的行为。
     await openLedger();
@@ -462,7 +487,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：按操作四项无候选执行人时人员留空且锁定（不猜当前登录人）", async () => {
-    // 2026-11-05 裁决：人员只认账号台账 / 库存中心登记的执行人，分润弹窗不就地猜人。
+    // 人员只认账号台账 / 库存中心登记的执行人，分润弹窗不就地猜人。
     // 本单无任何动作负责人，四行人员全部锁定且留空，等待台账补登记。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: [],
@@ -534,7 +559,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：按操作四项时比例与金额同样不互算", async () => {
-    // 同一裁决的另一半：原 syncAllocationPair 由两种口径共用，故按操作四项也必须独立录入。
+    // 按操作四项也必须独立录入。
     // 只测按姓名口径会漏掉「买号/售出/运营/公司」四行的情况。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: [],
@@ -685,7 +710,6 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(catalog.policyApi.setAllocations).not.toHaveBeenCalled();
   });
 
-  // 原两条（合计 100% 提交成功 / L266 保存后刷新详情）是一次提交路径的两组断言，合并为一次挂载。
   it("分润：比例合计 100% 提交成功并绑定员工，随后刷新订单详情", async () => {
     vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({ account: {}, orders: [] } as never);
     await openLedger();
@@ -706,7 +730,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       allocation_amount: "0",
     });
     expect(message.success).toHaveBeenCalledWith("分润已保存");
-    // L266：分润保存后应按 account_id 强制刷新订单详情（ledgerDetails 缓存），使明细回显
+    // 分润保存后按 account_id 强制刷新订单详情，使明细回显。
     await waitFor(() => expect(catalog.stocksApi.executionDetail).toHaveBeenCalledWith(order1.account_id));
   });
 
@@ -728,7 +752,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：亏损单提示改为「金额填负数」而非「不可用」", async () => {
-    // 2026-11-05 裁决后亏损单允许按金额分润，提示语必须说明填负数（-300 = 分担 300 亏损）。
+    // 亏损单允许按金额分润，提示语必须说明填负数（-300 = 分担 300 亏损）。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: allocationRows,
       total: allocationRows.length,
@@ -762,7 +786,11 @@ describe("OrdersPage：操作与筛选分支", () => {
     await clickModalOk(modal);
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("alloc fail")));
   });
+});
+}
 
+export function registerOrdersPageCashflowTests() {
+describe("OrdersPage：资金收支", () => {
   it("资金收支：填写金额与备注后调用 postEvent(REFUND)", async () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "资金收支");
@@ -787,7 +815,11 @@ describe("OrdersPage：操作与筛选分支", () => {
     await clickModalOk(modal);
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("refund fail")));
   });
+});
+}
 
+export function registerOrdersPageCancellationTests() {
+describe("OrdersPage：取消", () => {
   it("取消：存在可冲销已登记动作时发起 CANCEL 冲销", async () => {
     vi.mocked(catalog.ordersApi.get).mockResolvedValue({
       ...order1,
@@ -919,309 +951,5 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openRowMenu("HS-2026-0001", "取消");
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("detail fail")));
   });
-
-  // 原三条（弹窗开关 / P2-190 菜单收起 / 成功后刷新列表）同一入口同一夹具，合并为一次挂载。
-  it("新建订单：菜单收起、弹窗开关与成功后刷新列表", async () => {
-    await openLedger();
-    const before = vi.mocked(catalog.ordersApi.list).mock.calls.length;
-    const trigger = screen.getByRole("button", { name: /新建订单/ });
-
-    await ui.click(trigger);
-    expect(await screen.findByText("新建提号订单")).toBeInTheDocument();
-    fireEvent.click(await screen.findByText("新建回收订单"));
-    expect(await screen.findByTestId("create-stub")).toBeInTheDocument();
-    // P2-190：受控下拉，选中后弹层真正卸载，不会浮在弹窗上方
-    await waitFor(() => expect(screen.queryByText("新建提号订单")).toBeNull());
-    await waitFor(() => expect(trigger).not.toHaveAttribute("aria-expanded", "true"));
-
-    // 关闭回调清空
-    await ui.click(screen.getByRole("button", { name: /关闭新建弹窗/ }));
-    await waitFor(() => expect(screen.queryByTestId("create-stub")).toBeNull());
-
-    // 再走一次并模拟新建成功 → 列表刷新
-    await ui.click(trigger);
-    fireEvent.click(await screen.findByText("新建回收订单"));
-    await screen.findByTestId("create-stub");
-    await ui.click(screen.getByRole("button", { name: /模拟新建成功/ }));
-    await waitFor(() => expect(screen.queryByTestId("create-stub")).toBeNull());
-    expect(vi.mocked(catalog.ordersApi.list).mock.calls.length).toBeGreaterThan(before);
-  });
-
 });
-
-describe("validateAllocations 纯函数矩阵（免挂载，毫秒级）", () => {
-  it("纯比例合计 100% → ok，归一化 item", () => {
-    const r = validateAllocations(
-      [{ employee: 9, allocation_rate: "100", allocation_amount: "0" }],
-      "5000.00",
-    );
-    expect(r).toEqual({
-      ok: true,
-      items: [{ user_id: 9, role: "OWNER", allocation_rate: "100", allocation_amount: "0" }],
-    });
-  });
-
-  it("按金额分润 → ok，金额归一化、比例置 0", () => {
-    const r = validateAllocations(
-      [{ employee: 9, allocation_rate: "0", allocation_amount: "200" }],
-      "5000.00",
-    );
-    expect(r).toEqual({
-      ok: true,
-      items: [{ user_id: 9, role: "OWNER", allocation_rate: "0", allocation_amount: "200" }],
-    });
-  });
-
-  it("COMPANY 行 → user_id 为 null", () => {
-    const r = validateAllocations(
-      [{ employee: "COMPANY", allocation_rate: "100" }],
-      "5000.00",
-    );
-    expect(r.ok && r.items[0].user_id).toBeNull();
-  });
-
-  it("role 透传（非兜底 OWNER）", () => {
-    const r = validateAllocations(
-      [{ employee: 9, role: "OPERATION", allocation_rate: "100" }],
-      "5000.00",
-    );
-    expect(r.ok && r.items[0].role).toBe("OPERATION");
-  });
-
-  it("纯比例合计非 100% → 拒绝", () => {
-    const r = validateAllocations(
-      [{ employee: 9, allocation_rate: "50", allocation_amount: "0" }],
-      "5000.00",
-    );
-    expect(r).toEqual({ ok: false, error: "按比例分润时合计必须为 100%（也可改用金额）" });
-  });
-
-  it("同一行比例与金额换算不一致 → 拒绝", () => {
-    const r = validateAllocations(
-      [{ employee: 9, allocation_rate: "50", allocation_amount: "200" }],
-      "5000.00",
-    );
-    expect(r).toEqual({ ok: false, error: "比例和金额换算不一致" });
-  });
-
-  it("同一行比例与金额换算一致 → 通过（按金额提交）", () => {
-    const r = validateAllocations(
-      [{ employee: 9, allocation_rate: "50", allocation_amount: "2500" }],
-      "5000.00",
-    );
-    expect(r.ok).toBe(true);
-    // 单行比例合计未满 100%，故按金额模式提交：rate 归零、保留金额。
-    if (r.ok) expect(r.items[0]).toMatchObject({ allocation_rate: "0", allocation_amount: "2500" });
-  });
-
-  // 亏损单分润（2026-11-05 裁决「亏损的时候分亏损」）：金额填负数，方向须与盈亏一致。
-  it("亏损单填正数金额 → 拒绝（方向必须与盈亏一致）", () => {
-    const r = validateAllocations(
-      [{ employee: 9, allocation_rate: "0", allocation_amount: "200" }],
-      "-800.00",
-    );
-    expect(r).toEqual({ ok: false, error: "该单为亏损单，分润金额必须填负数（亏损分担额）" });
-  });
-
-  it("亏损单填负数金额 → 通过，按金额提交并保留负号", () => {
-    const r = validateAllocations(
-      [{ employee: 9, allocation_rate: "0", allocation_amount: "-200" }],
-      "-800.00",
-    );
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.items[0]).toMatchObject({ allocation_rate: "0", allocation_amount: "-200" });
-  });
-
-  it("亏损单超额分担（-900 超过 -800）→ 拒绝", () => {
-    const r = validateAllocations(
-      [{ employee: 9, allocation_rate: "0", allocation_amount: "-900" }],
-      "-800.00",
-    );
-    expect(r.ok).toBe(false);
-    expect((r as { error: string }).error).toContain("分润金额合计不能超过订单总利润");
-  });
-
-  it("盈利单填负数金额 → 拒绝", () => {
-    const r = validateAllocations(
-      [{ employee: 9, allocation_rate: "0", allocation_amount: "-200" }],
-      "500.00",
-    );
-    expect(r).toEqual({ ok: false, error: "该单为盈利单，分润金额不能为负数" });
-  });
-
-  it("利润为 0 时按比例分润 → 通过", () => {
-    const r = validateAllocations(
-      [{ employee: 9, allocation_rate: "100", allocation_amount: "0" }],
-      "0.00",
-    );
-    expect(r.ok).toBe(true);
-  });
-
-  it("金额合计超过订单总利润 → 拒绝", () => {
-    const r = validateAllocations(
-      [{ employee: 9, allocation_rate: "0", allocation_amount: "800" }],
-      "500.00",
-    );
-    expect(r.ok).toBe(false);
-    expect((r as { error: string }).error).toContain("分润金额合计不能超过订单总利润");
-  });
-
-  it("某行比例与金额均为空 → 拒绝", () => {
-    const r = validateAllocations(
-      [{ employee: 9, allocation_rate: "0", allocation_amount: "0" }],
-      "5000.00",
-    );
-    expect(r).toEqual({ ok: false, error: "每行至少填比例或金额之一" });
-  });
-});
-
-// —— 冲销金额判定：原内联在 submitCancelTransaction 内，前后端均零覆盖，
-// 抽成 resolveCancelAmount / pickCancelableEvent 后可免挂载覆盖（资金安全分支）。
-describe("resolveCancelAmount / pickCancelableEvent 纯函数", () => {
-  const remaining = "500.00";
-
-  it("留空 → 全额冲销，取后端剩余可冲金额", () => {
-    expect(resolveCancelAmount({ scope: "ORDERCANC", values: {}, remaining })).toEqual({ ok: true, amount: "500.00" });
-    expect(resolveCancelAmount({ scope: "INVREFUND", values: { refund_amount: "" }, remaining })).toEqual({ ok: true, amount: "500.00" });
-  });
-
-  it("部分冲销：填小于剩余的金额按填的值提交", () => {
-    expect(resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: "300" }, remaining }))
-      .toEqual({ ok: true, amount: "300" });
-  });
-
-  it("超过剩余可冲金额 → 拒绝，提示带上剩余金额", () => {
-    const r = resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: "500.01" }, remaining });
-    expect(r).toEqual({ ok: false, error: "冲销金额不能超过该动作剩余可冲金额 ¥500.00" });
-  });
-
-  it("恰好等于剩余金额 → 放行（边界不因浮点误差误拒）", () => {
-    expect(resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: "500.00" }, remaining }))
-      .toEqual({ ok: true, amount: "500.00" });
-  });
-
-  it("非数字 / 0 / 负数 → 拒绝为无效金额", () => {
-    for (const bad of ["abc", "0", "-1", " "]) {
-      const r = resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: bad }, remaining });
-      // 纯空格会被 trim 成空串 → 按全额处理，属"留空"语义
-      if (bad === " ") expect(r).toEqual({ ok: true, amount: "500.00" });
-      else expect(r).toEqual({ ok: false, error: "请输入有效的冲销金额" });
-    }
-  });
-
-  it("两种 scope 读各自的金额字段，互不串用", () => {
-    // 冲销入库（INVREFUND）读 refund_amount；订单退款（ORDERCANC）读 cancel_amount
-    expect(resolveCancelAmount({ scope: "INVREFUND", values: { refund_amount: "120", cancel_amount: "999" }, remaining }))
-      .toEqual({ ok: true, amount: "120" });
-    expect(resolveCancelAmount({ scope: "ORDERCANC", values: { refund_amount: "999", cancel_amount: "120" }, remaining }))
-      .toEqual({ ok: true, amount: "120" });
-  });
-
-  it("pickCancelableEvent：显式选择优先，未选时取第一条", () => {
-    const list = [
-      { event: { id: 102 }, remaining: "500.00" },
-      { event: { id: 101 }, remaining: "1000.00" },
-    ];
-    expect(pickCancelableEvent(list, 101)?.event.id).toBe(101);
-    expect(pickCancelableEvent(list, undefined)?.event.id).toBe(102);
-    // 表单值可能是字符串
-    expect(pickCancelableEvent(list, "101")?.event.id).toBe(101);
-    // 不存在的 id → 回落到第一条，而不是抛错
-    expect(pickCancelableEvent(list, 999)?.event.id).toBe(102);
-    expect(pickCancelableEvent([], 101)).toBeUndefined();
-  });
-});
-
-// —— 编辑订单 PATCH 组装：三条规则原本内联在 submitEditOrder 内，UI 用例只覆盖
-// 「有事件改备注」一条；快照整体替换的两条兜底（钱包实名 / 营地账号）此前零覆盖。
-describe("buildOrderPatchPayload 纯函数", () => {
-  const snapshot = {
-    game_account: "acc-1",
-    game_type: "原神",
-    game_password: "pwd-1",
-    channel_region: "天空岛",
-    bound_phone: "13800000000",
-    wallet_realname: "何一",
-    camp_account: "camp-1",
-    platform: "安卓",
-    purchase_price: "800.00",
-    note: "建单备注",
-  };
-
-  it("无登记事件：带上成交日期与整体快照", () => {
-    const payload = buildOrderPatchPayload({
-      values: { trade_date: "2026-11-02", note: " 改备注 ", snap_game_type: "星穹铁道" },
-      snapshot,
-    });
-    expect(payload.trade_date).toBe("2026-11-02");
-    expect(payload.note).toBe("改备注");
-    expect(payload.account_snapshot).toMatchObject({ game_account: "acc-1", game_type: "星穹铁道" });
-  });
-
-  it("已有登记事件：仍带成交日期并继续回写账号快照", () => {
-    const payload = buildOrderPatchPayload({
-      values: { trade_date: "2026-11-02", note: "补充说明" },
-      snapshot,
-    });
-    expect(payload.trade_date).toBe("2026-11-02");
-    expect(payload.note).toBe("补充说明");
-    expect(payload.account_snapshot).toMatchObject({ game_account: "acc-1" });
-  });
-
-  it("快照密码被隐去（无 order.create）：不带 account_snapshot，避免覆盖成空", () => {
-    const payload = buildOrderPatchPayload({
-      values: { note: "x", snap_game_account: "acc-9" },
-      snapshot: { ...snapshot, game_password: null },
-    });
-    expect(payload.account_snapshot).toBeUndefined();
-  });
-
-  it("表单缺钱包实名/营地账号控件时沿用快照原值（不抹掉）", () => {
-    const payload = buildOrderPatchPayload({
-      values: { note: "x", snap_game_type: "原神", snap_game_password: "pwd-1" },
-      snapshot,
-    });
-    expect(payload.account_snapshot).toMatchObject({
-      wallet_realname: "何一",
-      camp_account: "camp-1",
-    });
-  });
-
-  it("备注留空 → note 显式 null（清空），不是空串", () => {
-    const payload = buildOrderPatchPayload({ values: { note: "   " }, snapshot: null });
-    expect(payload.note).toBeNull();
-  });
-});
-
-// —— 资金收支（REFUND）入参：日期兜底与「资金账户未选就保持 undefined」此前仅靠挂载覆盖。
-describe("buildRefundEventPayload 纯函数", () => {
-  const fallbackDate = "2026-11-03";
-
-  it("发生日期留空 → 取当天", () => {
-    const payload = buildRefundEventPayload({
-      values: { amount: "88.00", occurred_on: null, pool_id: 3, reason: "退款" },
-      fallbackDate,
-    });
-    expect(payload.occurred_on).toBe(fallbackDate);
-  });
-
-  it("发生日期已选 → 按 YYYY-MM-DD 提交", () => {
-    const payload = buildRefundEventPayload({
-      values: { amount: "88.00", occurred_on: dayjs("2026-10-20"), pool_id: 3, reason: "退款" },
-      fallbackDate,
-    });
-    expect(payload).toMatchObject({ event_type: "REFUND", amount: "88.00", occurred_on: "2026-10-20", pool_id: 3 });
-  });
-
-  it("资金账户未选 → pool_id 保持 undefined（交给后端按订单类型路由），不填 0/空串", () => {
-    const payload = buildRefundEventPayload({ values: { amount: "1", reason: "x" }, fallbackDate });
-    expect(payload.pool_id).toBeUndefined();
-    expect(buildRefundEventPayload({ values: { amount: "1", reason: "x", pool_id: "" as never }, fallbackDate }).pool_id)
-      .toBeUndefined();
-  });
-
-  it("资金账户显式选择 → 数字化提交", () => {
-    const payload = buildRefundEventPayload({ values: { amount: "1", reason: "x", pool_id: "7" }, fallbackDate });
-    expect(payload.pool_id).toBe(7);
-  });
-});
+}

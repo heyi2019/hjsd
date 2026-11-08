@@ -21,6 +21,7 @@ export const fastTests = [
   // 构建/测试配置守卫（别名、define、project 结构）
   "tests/frontend/unit/system/vite.config.test.ts",
   // 业务纯逻辑
+  "tests/frontend/unit/business/helpers.test.ts",
   "tests/frontend/unit/business/inventory-export.test.ts",
   "tests/frontend/unit/business/inventory-logic.test.ts",
   // 共享层 API 客户端与工具函数

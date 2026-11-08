@@ -12,15 +12,18 @@ export type InventoryFilterOptions = {
 /** 库存筛选的单一事实源：先排除非在库，再套用维度条件，避免渲染层重复遍历。 */
 export function filterInventoryRows(rows: Account[], options: InventoryFilterOptions = {}) {
   const keyword = options.keyword?.trim().toLowerCase() ?? "";
+  const dateStart = options.dateRange?.[0].startOf("day").valueOf();
+  const dateEnd = options.dateRange?.[1].endOf("day").valueOf();
   return rows.filter((row) => {
     if (row.status !== "WAITING") return false;
     if (options.businessMode && row.business_mode !== options.businessMode) return false;
     if (options.inventoryType && row.inventory_type !== options.inventoryType) return false;
     if (options.gameType && row.game_type !== options.gameType) return false;
     const rowDate = row.inventory_entry_at ?? row.buy_date ?? row.created_at;
-    if (options.dateRange) {
+    if (dateStart !== undefined && dateEnd !== undefined) {
       const date = rowDate ? new Date(rowDate) : null;
-      if (!date || Number.isNaN(date.getTime()) || date < options.dateRange[0].startOf("day").toDate() || date > options.dateRange[1].endOf("day").toDate()) return false;
+      const timestamp = date?.getTime() ?? Number.NaN;
+      if (Number.isNaN(timestamp) || timestamp < dateStart || timestamp > dateEnd) return false;
     }
     if (!keyword) return true;
     return [row.game_account, row.game_type, row.channel_region, row.platform]

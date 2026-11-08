@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any
 from app.core.audit import record_audit
-from app.core.security import CurrentUser
+from app.core.security import CurrentUser, owner_scope_filter
 from ._common import _positive_money
 from sqlalchemy import (
     or_,
@@ -121,6 +121,18 @@ def delete_order_link(
         or (link.source_order_id != order.id and link.target_order_id != order.id)
     ):
         raise NotFound(f"订单关联 {link_id} 不存在", details={"link_id": link_id})
+    other_order_id = (
+        link.target_order_id
+        if link.source_order_id == order.id
+        else link.source_order_id
+    )
+    # 删除关联会暴露对端订单是否存在；对端也必须通过同一所有者范围校验。
+    try:
+        get_order(session, other_order_id, user)
+    except NotFound as exc:
+        raise NotFound(
+            f"订单关联 {link_id} 不存在", details={"link_id": link_id}
+        ) from exc
     before = {
         "source_order_id": link.source_order_id,
         "target_order_id": link.target_order_id,
@@ -145,15 +157,21 @@ def list_order_links(
 ) -> list[dict[str, Any]]:
     """按当前订单视角返回来源单与后续单。"""
     order = get_order(session, order_id, user)
-    rows = session.scalars(
-        select(OrderLink)
-        .where(
-            or_(
-                OrderLink.source_order_id == order.id,
-                OrderLink.target_order_id == order.id,
-            )
+    conditions = [
+        or_(
+            OrderLink.source_order_id == order.id,
+            OrderLink.target_order_id == order.id,
         )
-        .order_by(OrderLink.id)
+    ]
+    visible_order_scope = owner_scope_filter(Order.owner_id, user, session) if user is not None else None
+    if visible_order_scope is not None:
+        visible_order_ids = select(Order.id).where(visible_order_scope)
+        conditions.extend([
+            OrderLink.source_order_id.in_(visible_order_ids),
+            OrderLink.target_order_id.in_(visible_order_ids),
+        ])
+    rows = session.scalars(
+        select(OrderLink).where(*conditions).order_by(OrderLink.id)
     ).all()
     order_ids = {
         item_id

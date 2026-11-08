@@ -197,7 +197,6 @@ def create_cashflow(
         pool_id=payload.pool_id,
         occurred_on=payload.occurred_on,
         direction=payload.direction.strip().upper(),
-        nature=payload.nature,
         category=payload.category,
         amount=payload.amount,
         order_id=payload.order_id,

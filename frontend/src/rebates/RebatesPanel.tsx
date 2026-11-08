@@ -2,7 +2,7 @@
 import { Card, Form, Input, Space, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ordersApi,
   rebatesApi,
@@ -125,23 +125,24 @@ export function RebatesPanel() {
   };
 
   const { arrange: arrangeColumns } = useListViewColumns("REBATE");
+  const orderById = useMemo(() => new Map(orders.map((order) => [order.id, order])), [orders]);
   const columns: ColumnsType<Rebate> = [
     { title: "返点单号", dataIndex: "rebate_no" },
     {
       title: "来源订单",
       key: "source_order",
-      render: (_v, row) => orders.find((order) => order.id === row.source_order_id)?.order_no ?? "-",
+      render: (_v, row) => orderById.get(row.source_order_id ?? 0)?.order_no ?? "-",
     },
     {
       title: "业务",
       key: "business",
-      render: (_v, row) => BUSINESS_MODE_LABEL[orders.find((order) => order.id === row.source_order_id)?.account_business_mode ?? ""] || "-",
+      render: (_v, row) => BUSINESS_MODE_LABEL[orderById.get(row.source_order_id ?? 0)?.account_business_mode ?? ""] || "-",
     },
     {
       title: "类型",
       key: "order_type",
       render: (_v, row) => {
-        const order = orders.find((item) => item.id === row.source_order_id);
+        const order = orderById.get(row.source_order_id ?? 0);
         return order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-";
       },
     },
@@ -149,7 +150,7 @@ export function RebatesPanel() {
       title: "游戏/产品类型",
       key: "game",
       render: (_v, row) => {
-        const order = orders.find((item) => item.id === row.source_order_id);
+        const order = orderById.get(row.source_order_id ?? 0);
         return order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-";
       },
     },
@@ -158,7 +159,7 @@ export function RebatesPanel() {
       key: "party",
       className: "ui-col-wrap",
       onCell: () => ({ className: "ui-col-wrap" }),
-      render: (_v, row) => orders.find((order) => order.id === row.source_order_id)?.party_name || "-",
+      render: (_v, row) => orderById.get(row.source_order_id ?? 0)?.party_name || "-",
     },
     {
       title: "基数",

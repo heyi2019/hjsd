@@ -27,6 +27,16 @@ describe("页面接口契约", () => {
     expect(await installmentsApi.dispositions(7)).toEqual([]);
     expect(api.get).toHaveBeenCalledWith("/installments/7/dispositions");
   });
+
+  it("分期处置与期次支持按 ID 批量读取", async () => {
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: { 7: [] } })
+      .mockResolvedValueOnce({ data: { 7: [] } });
+    await installmentsApi.dispositionsBulk([7]);
+    await installmentsApi.schedulesBulk([7]);
+    expect(api.get).toHaveBeenNthCalledWith(1, "/installments/dispositions", { params: { ids: "7" } });
+    expect(api.get).toHaveBeenNthCalledWith(2, "/installments/schedules", { params: { ids: "7" } });
+  });
 });
 
 describe("组织 API：统一通过领域客户端访问", () => {

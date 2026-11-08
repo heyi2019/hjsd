@@ -1,17 +1,10 @@
 /**
  * TESTING-06 前端测试文件集合、分层归属与区域归属必须与 tests/manifest.json 一致。
  *
- * 背景：这个仓库搬过三次测试目录，每次都有东西「不报错地消失」——
- *   - `test-full-sharded.mjs` 原来只扫 `src/`，迁出的文件「既不在 fast 也不在 react」，
- *     分层统计依然自洽，但它们再也不会被 test:full 跑到；
- *   - `record_frontend_results._rel_key` 用 `relative_to(frontend)`，搬出包外直接
- *     `return None`，记录被静默丢弃；
- *   - `test-changed.mjs` 只认 `frontend/` 前缀，`tests/` 变更被过滤后打印「未发现前端变更」。
- *
- * 共同点：失败表现是「结果为空」，而空集合上的断言恒真。
+ * 所有测试文件必须被执行层、结果记录与变更检测共同识别，避免空集合让断言失去意义。
  *
  * 本守卫把所有测试文件实际扫一遍，与 manifest 的期望数量、四层归属、区域分布逐一核对。
- * 路径一律折成「相对仓库根」的 posix 串再匹配（2026-11-04 起测试家在仓库根 tests/）。
+ * 路径一律折成「相对仓库根」的 posix 串再匹配。
  */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";

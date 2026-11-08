@@ -1,3 +1,4 @@
+/** InventoryPanel 业务能力测试套件的共享夹具与注册函数。 */
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,43 +25,8 @@ vi.mock("@/shared/api/catalog");
 
 setupInventoryPanelMocks();
 
+export function registerInventoryLedgerTests() {
 describe("InventoryPanel：账号台账", () => {
-  it("筛选控件放在台账内容区内并与上边缘保持间距", async () => {
-    renderLight(<InventoryPanel />, { user: "admin" });
-
-    const search = await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
-    const filters = search.closest(".inventory-filters");
-    expect(filters).toBeInTheDocument();
-    expect(filters).toHaveClass("ui-filter-bar");
-    expect(filters).toHaveClass("ui-filter-bar--spaced");
-    expect(search.closest(".ant-input-affix-wrapper")).toHaveClass("ui-ledger-search");
-    expect(screen.queryByText("账号台账")).not.toBeInTheDocument();
-  });
-
-  it("筛选栏沿用订单台账的分组布局", async () => {
-    renderLight(<InventoryPanel />, { user: "admin" });
-
-    await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
-    expect(screen.getByText("类型筛选")).toBeInTheDocument();
-    expect(screen.getByText("业务筛选")).toBeInTheDocument();
-    expect(screen.queryByText("增值服务筛选")).not.toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "增值服务筛选" })).not.toBeInTheDocument();
-    expect(screen.getByText("排序")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /导出/ })).toHaveTextContent("导出");
-    expect(screen.queryByRole("button", { name: /导出 CSV/ })).toBeNull();
-    const filterBar = screen.getByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台").closest(".ui-filter-bar")!;
-    const buttons = filterBar.querySelectorAll("button");
-    expect(buttons[buttons.length - 1]).toHaveTextContent("导出");
-  });
-
-  it("搜索框右侧提供库存日期区间筛选", async () => {
-    renderLight(<InventoryPanel />, { user: "admin" });
-
-    const search = await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
-    const startDate = screen.getByPlaceholderText("开始日期");
-    expect(search.compareDocumentPosition(startDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
   it("提供游戏类型下拉筛选库存账号", async () => {
     vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
       { ...accounts[0], game_type: "原神" },
@@ -76,16 +42,6 @@ describe("InventoryPanel：账号台账", () => {
 
     await waitFor(() => expect(screen.queryByText("acc-1")).toBeNull());
     expect(screen.getByText("acc-3")).toBeInTheDocument();
-  });
-
-  it("库存中心不展示已移除的增值服务和平台字段", async () => {
-    renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByRole("columnheader", { name: "库存编号" });
-
-    expect(screen.queryByRole("columnheader", { name: "增值服务" })).toBeNull();
-    expect(screen.queryByRole("columnheader", { name: "平台" })).toBeNull();
-    expect(screen.queryByText("增值服务")).toBeNull();
-    expect(screen.queryByText("平台")).toBeNull();
   });
 
   it("库存中心展示入库时间和入库负责人", async () => {
@@ -113,15 +69,6 @@ describe("InventoryPanel：账号台账", () => {
     const rows = screen.getAllByRole("row");
     expect(within(rows[1]).getByText("new-account")).toBeInTheDocument();
   });
-  it("账号台账启用横向滚动以访问右侧操作列", async () => {
-    renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByRole("columnheader", { name: "订单号" });
-
-    expect(document.querySelector(".ui-datatable .ant-table-content")).toHaveStyle({
-      overflowX: "auto",
-    });
-  });
-
   it("提供库存导出入口，并按当前库存字段生成 CSV", async () => {
     expect(buildInventoryCsv(accounts)).toContain(
       "订单号,业务,类型,游戏/产品类型,营地账号,库存编号,平台,成本,库存状态",
@@ -156,17 +103,6 @@ describe("InventoryPanel：账号台账", () => {
     for (const label of ["描述", "作图"]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
     }
-  });
-
-  it("将取消放进更多菜单，不在行内单独展示", async () => {
-    renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByText("acc-1");
-
-    const stockRow = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
-    expect(within(stockRow).queryByRole("button", { name: "取消" })).toBeNull();
-
-    await ui.click(within(stockRow).getByRole("button", { name: "更多" }));
-    expect(screen.getByRole("menuitem", { name: "取消" })).toBeInTheDocument();
   });
 
   it("系统下架只对代挂账号开放，平台下架对在库账号开放", async () => {
@@ -209,7 +145,6 @@ describe("InventoryPanel：账号台账", () => {
             occurred_on: "2026-10-15",
             occurred_at: "2026-10-15T10:20:00",
             direction: "OUT",
-            nature: "BUSINESS_OUT",
             category: "BUY",
             amount: "100.00",
             operator: "admin",
@@ -401,12 +336,6 @@ describe("InventoryPanel：账号台账", () => {
     expect(await screen.findByText("登记返点")).toBeInTheDocument();
   });
 
-  it("无数据时显示「暂无账号」", async () => {
-    vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([]);
-    renderLight(<InventoryPanel />, { user: "admin" });
-    expect(await screen.findByText("暂无账号")).toBeInTheDocument();
-  });
-
   it("展开库存订单可以查询完整执行明细与资金流水", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
@@ -426,7 +355,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(accountSummary).getAllByText(/寄售平台A/).length).toBeGreaterThan(0);
     expect(within(detailPanel).queryByText("发生日期", { exact: true })).toBeNull();
     expect(within(detailPanel).getAllByText("动作时间").length).toBeGreaterThan(0);
-    // 详情页执行/资金表为窄窗横向滚动（L202）定制，使用 .inventory-execution-table /
+    // 详情页执行/资金表使用窄窗横向滚动，使用 .inventory-execution-table /
     // .inventory-finance-table 自有规则，不套用 .ui-datatable--inline 的 overflow-x: clip。
     const executionTable = detailPanel.querySelector(".inventory-execution-list .inventory-execution-table") as HTMLElement;
     const executionHeaders = within(executionTable).getAllByRole("columnheader");
@@ -466,7 +395,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(executionTable).queryByText("EV0001", { exact: true })).toBeNull();
     expect(within(financeSummary).getByText("100.00")).toBeInTheDocument();
     // 总收入 = IN 流水（售出回款 350）+ 返点登记额（夹具 base_amount 1000）。
-    // 返点当前按 base_amount 计入收入（登记即收入）；口径争议见返点基数/费率待裁决，
+    // 返点当前按 base_amount 计入收入（登记即收入），
     // 若口径改为「基数×费率」，此处应同步改成 400.00。
     expect(within(financeSummary).getByText("1,350.00")).toBeInTheDocument();
     const financeTable = financePanel.querySelector(".inventory-finance-table") as HTMLElement;
@@ -536,9 +465,9 @@ describe("InventoryPanel：账号台账", () => {
     expect(headers[0]).toBe("状态");
   });
 });
+}
 
-// —— 原 InventoryPanel.expand.test.tsx ——
-// 夹具与主文件同源（InventoryPanel.test.fixtures），mock 契约一致（catalog automock）。
+export function registerInventoryExpansionTests() {
 describe("InventoryPanel：展开行与写路径联动", () => {
   setupInventoryPanelMocks();
 
@@ -612,9 +541,9 @@ describe("InventoryPanel：展开行与写路径联动", () => {
     });
   });
 });
+}
 
-// —— 原 InventoryPanel.stockNo.test.tsx ——
-// 同上。
+export function registerInventoryNumberExportTests() {
 describe("InventoryPanel：编号列与导出", () => {
   setupInventoryPanelMocks();
 
@@ -663,20 +592,11 @@ describe("InventoryPanel：编号列与导出", () => {
     });
   });
 });
+}
 
-// —— 原 InventoryPanel.filters.test.tsx ——
-// 同上。
+export function registerInventoryFilterStatsTests() {
 describe("InventoryPanel：筛选与统计联动", () => {
   setupInventoryPanelMocks();
-
-  describe("InventoryPanel：职责边界", () => {
-    it("库存中心不提供新增账号入口", async () => {
-      renderLight(<InventoryPanel />, { user: "viewer" });
-      await screen.findByText("acc-1");
-      expect(screen.queryByText("新增账号")).toBeNull();
-      expect(screen.queryByRole("button", { name: /建\s*档/ })).toBeNull();
-    });
-  });
 
   describe("InventoryPanel：状态边界", () => {
     it("固定只向库存接口请求在库账号，不提供跨状态筛选", async () => {
@@ -708,4 +628,5 @@ describe("InventoryPanel：筛选与统计联动", () => {
     });
   });
 });
+}
 

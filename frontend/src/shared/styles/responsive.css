@@ -116,6 +116,24 @@
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     border-bottom: var(--border-w) solid var(--glass-border);
+    /* R4 滚动边缘：--main-scrolled（0/1）由 AppShell 的 window scroll 监听写入，
+       驱动下方 ::before 渐隐遮罩在滚动时浮现（iOS 导航栏惯例），归零隐去。 */
+    --main-scrolled: 0;
+  }
+  /* R4：顶栏底部渐隐遮罩（::after 已被 .view-head 装饰光晕占用，故用 ::before）。
+     文档滚动时内容从其下方透出，遮罩浮现一条自上而下的淡阴影，强化「内容在玻璃下滚动」的分隔感。 */
+  .topbar::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 10px;
+    background: linear-gradient(to bottom, rgba(28, 28, 30, 0.12), rgba(28, 28, 30, 0));
+    opacity: var(--main-scrolled);
+    transition: opacity var(--dur-fast) var(--ease);
+    pointer-events: none;
+    z-index: 1;
   }
   .topbar__title { flex: 0 0 100%; }
   .topbar-actions { width: 100%; justify-content: flex-start; overflow-x: auto; }
@@ -202,9 +220,17 @@
   /* <col> 上的 inline 固定宽度（如审核追溯 190 / 操作 170）会把表格撑出屏外，
      移动端统一放开按内容自适应（inline style 只能被 !important 覆盖）。 */
   .ant-table col[style] { width: auto !important; }
-  /* 操作列一排按钮会把列撑到 600px+；移动端允许换行，换取横向大幅收窄（纵向排布可接受）。 */
-  .ant-table-tbody .ant-space { flex-wrap: wrap; }
-  /* 全站表格默认 white-space: nowrap（legacy 基础样式），长文本列会按 max-content 把表撑宽
+  /* 操作列（及表体内所有横向 Space）统一横向排列。
+     表体列宽为内容自适应（上方 col[style] auto），nowrap 时单元格按按钮实际宽度撑开、一行排得下；
+     显式带 wrap 的 Space（详情区/筛选栏，不在 tbody 内或自带 inline flex-wrap）不受影响。 */
+  .ant-table-tbody .ant-space { flex-wrap: nowrap; }
+  /* 库存中心「操作」列横向排列。
+     只作用在该列单元格（td/th，className），不命中上方 .ant-table col[style] 的 !important 覆盖，
+     也不波及其他表格的流式自适应。min-width 保证 6 个紧凑按钮（售出/寄售/返点/编辑/更多/删除）
+     一行排得下且不折行；列宽 260px 远小于旧评估的 600px+，横向滚动范围可控。 */
+  .inventory-actions-col { width: 268px !important; min-width: 268px !important; max-width: 268px !important; }
+  .inventory-actions-col .inventory-row-actions { flex-wrap: nowrap !important; white-space: nowrap !important; gap: 8px; }
+  /* 全站表格默认 white-space: nowrap，长文本列会按 max-content 把表撑宽
      （实测「投资款荷包（HJ_INVEST）」单列即占 328px）。
      只在明确打了 ui-col-wrap 的列放开换行，不做全局放开——全局会连带把订单台账移动卡片
      的「对方/来源」这类标签折成两行。 */
@@ -237,5 +263,42 @@
   }
   .user-center-modal .ant-modal-header,
   .mobile-more-modal .ant-modal-header { margin-bottom: var(--space-3); }
+
+  /* R1 稳健底贴：antd v5 用 .ant-modal-wrap（display:flex; align-items:center）居中，
+     仅改 .ant-modal 的 top/margin 不足以落到屏幕底部（实测仍贴顶）。用 :has() 命中含
+     .mobile-sheet 的遮罩层并改为 flex-end，真正底贴；仅影响底部 Sheet，其他模态不受影响。 */
+  /* antd .ant-modal-wrap 默认 display:block，仅 align-items 无效；改为 flex 纵向底贴，
+     并保留水平居中（justify-content:center 替代原 margin:0 auto）。 */
+  .ant-modal-wrap:has(.mobile-sheet) { display: flex; align-items: flex-end; justify-content: center; }
+  .mobile-sheet.ant-modal { margin-bottom: 0; top: auto; }
+
+  /* R1 底部 Sheet 拖拽关闭：抓手浮于内容顶部（绝对定位，不占布局、不顶标题）。
+     拖拽逻辑由 SheetModal 内 matchMedia(max-width:640px) 守护；桌面端居中模态
+     不挂载手势，隐藏抓手以免干扰外观。 */
+  .mobile-sheet .ant-modal-content { position: relative; }
+  .sheet-grabber {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 5px;
+    margin: 0;
+    border-radius: var(--radius-pill);
+    background: var(--color-text-tertiary);
+    opacity: 0.5;
+    cursor: grab;
+    touch-action: none; /* 抓手上拖拽不触发页面滚动 */
+    transition: opacity var(--dur-fast) var(--ease);
+    z-index: 2;
+    pointer-events: auto; /* 必须可点：这是拖拽发起的命中目标（closest('.sheet-grabber') 才能取到） */
+  }
+  .sheet-grabber:active { opacity: 0.85; cursor: grabbing; }
+  @media (min-width: 641px) { .sheet-grabber { display: none; } }
+
+  /* R3 动量滚动兜底：iOS 文档滚动默认带动量；此属性仅对 overflow:auto/scroll 的
+     嵌套滚动容器生效，显式声明确保移动端横向滚动（page-content / 表格）也保持惯性手感。 */
+  .page-content,
+  .ant-table-content { -webkit-overflow-scrolling: touch; }
 }
 

@@ -14,6 +14,7 @@ from app.core.security import (
     PERM_AUDIT_READ,
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
+    owner_scope_filter,
 )
 from app.domain.attachments import Attachment
 from app.domain.foundation import AuditLog
@@ -50,7 +51,7 @@ def _elapsed_label(start: datetime | None, end: datetime | None) -> str:
         return "-"
     try:
         total_minutes = int((end - start).total_seconds()) // 60
-    except TypeError:  # 一端带时区一端不带（历史导入数据）时不做臆测
+    except TypeError:  # 两端时区信息不一致时保持原值
         return "-"
     days, rest = divmod(total_minutes, 1_440)
     hours, minutes = divmod(rest, 60)
@@ -67,7 +68,7 @@ def _elapsed_label(start: datetime | None, end: datetime | None) -> str:
 def _order_output(db: Session, order, user: CurrentUser) -> schemas.OrderOut:
     """按订单权限输出详情，避免财务/查看权限读取游戏密码。"""
     output = schemas.OrderOut.model_validate(order)
-    # 表单字段自定义值落订单 form_extra 列，读取直接回显（BAS-04-03 历史值可查）。
+    # 表单字段自定义值落订单 form_extra 列，读取时直接回显。
     output.extra_values = dict(order.form_extra or {})
     if not user.has(PERM_ORDER_CREATE) and output.account_snapshot:
         snapshot = dict(output.account_snapshot)
@@ -168,7 +169,7 @@ def _order_detail_output(
 ) -> schemas.OrderDetailOut:
     """订单详情统一返回主字段和执行事件，避免前端再拼接隐式查询。"""
     output = schemas.OrderDetailOut.model_validate(order)
-    # 表单字段自定义值落订单 form_extra 列，读取直接回显（BAS-04-03 历史值可查）。
+    # 表单字段自定义值落订单 form_extra 列，读取时直接回显。
     output.extra_values = dict(order.form_extra or {})
     if not user.has(PERM_ORDER_CREATE) and output.account_snapshot:
         snapshot = dict(output.account_snapshot)
@@ -202,7 +203,6 @@ def _order_detail_output(
                     "occurred_on": item.occurred_on,
                     "category": item.category,
                     "direction": item.direction,
-                    "nature": item.nature,
                     "amount": item.amount,
                     "status": item.status,
                     "order_event_id": item.order_event_id,
@@ -299,7 +299,9 @@ def _order_detail_output(
     return output
 
 
-def _order_list_payload(db: Session, orders: list) -> list[dict]:
+def _order_list_payload(
+    db: Session, orders: list, user: CurrentUser | None = None
+) -> list[dict]:
     """组装工作台摘要，避免列表页为每一行再请求详情。"""
     # 表单字段自定义值落订单 form_extra 列，列表直接从行数据回显。
     extra_values = {
@@ -313,11 +315,16 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
     )
     source_orders_by_account: dict[int, Order] = {}
     if account_ids:
-        for source_order in db.scalars(
+        source_stmt = (
             select(Order)
             .where(Order.account_id.in_(account_ids), Order.order_type.in_(("HS", "TH", "DG")))
             .order_by(Order.id)
-        ).all():
+        )
+        if user is not None:
+            visible_scope = owner_scope_filter(Order.owner_id, user, db)
+            if visible_scope is not None:
+                source_stmt = source_stmt.where(visible_scope)
+        for source_order in db.scalars(source_stmt).all():
             source_orders_by_account.setdefault(source_order.account_id, source_order)
     inventory_responsible_ids = {
         item
@@ -346,6 +353,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             parties.setdefault(role.order_id, (counterparty.display_name, role.role, counterparty.source, counterparty.created_by, counterparty.created_at))
 
     events_by_order: dict[int, list[OrderEvent]] = {}
+    sale_event_by_order: dict[int, OrderEvent] = {}
     if order_ids:
         for event in db.scalars(
             select(OrderEvent)
@@ -353,6 +361,8 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             .order_by(OrderEvent.occurred_on.desc(), OrderEvent.id.desc())
         ).all():
             events_by_order.setdefault(event.order_id, []).append(event)
+            if event.event_type == "SELL":
+                sale_event_by_order.setdefault(event.order_id, event)
 
     operator_names = _operator_names(
         db,
@@ -373,11 +383,10 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         income, buy_amount, direct_cost = event_totals(events)
         total_cost = buy_amount + direct_cost
         latest = events[0] if events else None
-        sale_event = next((event for event in events if event.event_type == "SELL"), None)
+        sale_event = sale_event_by_order.get(order.id)
         party = parties.get(order.id)
-        installment = installments.get(order.id)
         # 售卖时间取卖出事件的业务发生日（occurred_on），不用记录创建时刻 created_at；
-        # created_at 是入库写入时间，用它会让历史导入单全部显示成导入当天。
+        # created_at 是入库时间，不能作为业务发生日。
         sale_at = (
             datetime.combine(sale_event.occurred_on, datetime.min.time())
             if sale_event

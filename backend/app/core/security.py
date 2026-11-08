@@ -168,7 +168,7 @@ class CurrentUser:
     pool_ids: frozenset[int] = frozenset()  # 空集表示“无池授权”，明细接口应返回空
     team_ids: frozenset[int] = frozenset()
     owner_scope: str = "SELF"  # SELF / TEAM / ALL
-    # 本次会话是怎么认证进来的。老 token 不带 amr，缺省按 password 处理（历史上只有这一条路径）。
+    # 本次会话的认证方式；缺少 amr 时按 password 处理。
     auth_method: str = AUTH_METHOD_PASSWORD
 
     @classmethod
@@ -214,7 +214,9 @@ def owner_scope_ids(session: Any, user: CurrentUser) -> set[int] | None:
     """Resolve the owner ids visible to a user, including TEAM membership.
 
     Team membership is intentionally resolved in Python for now: the membership
-    list is stored as JSON during this incremental rollout.
+    list is stored as JSON during this incremental rollout. Cache the result on
+    the request session because one endpoint commonly builds several scoped
+    queries for the same user.
     """
     if user.is_admin or user.owner_scope == "ALL":
         return None
@@ -222,10 +224,16 @@ def owner_scope_ids(session: Any, user: CurrentUser) -> set[int] | None:
         return {user.id}
     from app.domain.users import User
 
+    scope_cache = getattr(session, "info", {}).setdefault("_owner_scope_ids", {})
+    cache_key = (user.id, user.owner_scope, tuple(sorted(user.team_ids)))
+    cached = scope_cache.get(cache_key)
+    if cached is not None:
+        return set(cached)
     visible = {user.id}
     for owner_id, team_ids in session.query(User.id, User.team_ids).all():
         if set(team_ids or []).intersection(user.team_ids):
             visible.add(owner_id)
+    scope_cache[cache_key] = frozenset(visible)
     return visible
 
 

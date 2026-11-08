@@ -31,10 +31,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    event,
     func,
 )
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -60,10 +58,10 @@ class Cashflow(Base, AuditMixin):
             name="cashflow_accounting_attribute_valid",
         ),
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
-        # 一笔订单事件可派生多笔资金流水（如售出拆分进不同资金池），
-        # 故不再对 order_event_id 设唯一约束；历史唯一约束由迁移 0065 在库中移除。
+        # 一笔订单事件可派生多笔资金流水，支持拆分进入不同资金池。
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
         Index("ix_cashflow_order", "order_id"),
+        Index("ix_cashflow_order_event", "order_event_id"),
         Index("ix_cashflow_deposit", "deposit_id"),
         Index("ix_cashflow_transfer", "transfer_id"),
         CheckConstraint("amount >= 0", name="amount_nonneg"),
@@ -111,49 +109,10 @@ class Cashflow(Base, AuditMixin):
     # 表单字段配置体系：工作室（STUDIOEXP/STUDIOREJ/STUDIOREV）等自定义字段值。
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
-    # #15 需求2：流水时间（系统时间戳，台账展示为「流水时间」）可改可清空删除，
-    # 故在此覆盖 TimestampMixin 的 created_at 为可空；插入仍由 server_default 兜底，
-    # 仅「清空」动作可显式置 NULL。updated_at 保持非空（仍来自 TimestampMixin）。
+    # 流水时间可改可清空，插入时由 server_default 兜底。
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True, default=now_second, server_default=func.now()
     )
-
-    def __init__(self, **kwargs):
-        # ``nature`` disappeared from the persisted schema in 0077.  Accept
-        # the legacy constructor keyword so old fixtures/integrations can be
-        # migrated independently; the value is intentionally transient.
-        self._legacy_nature = kwargs.pop("nature", None)
-        super().__init__(**kwargs)
-
-    @property
-    def nature(self) -> str:
-        legacy_nature = getattr(self, "_legacy_nature", None)
-        if legacy_nature:
-            return legacy_nature
-        if self.transfer_id or self.category == "TRANSFER":
-            return "INTERNAL"
-        if self.direction == Direction.IN.value:
-            return "EXTERNAL_IN" if self.category == "EXTERNAL_FUNDING" else "BUSINESS_IN"
-        return "BUSINESS_OUT"
-
-
-@event.listens_for(Cashflow, "before_insert")
-def _validate_legacy_cashflow_nature(mapper, connection, target: Cashflow) -> None:
-    """Keep old constructor callers subject to the removed direction checks."""
-    nature = getattr(target, "_legacy_nature", None)
-    if nature is None:
-        return
-    if nature == "INTERNAL" and not target.transfer_id:
-        raise IntegrityError("cashflow INTERNAL requires transfer_id", {}, None)
-    if nature == "INTERNAL":
-        return
-    allowed = {
-        Direction.IN.value: {"EXTERNAL_IN", "BUSINESS_IN"},
-        Direction.OUT.value: {"BUSINESS_OUT"},
-    }
-    if nature not in allowed.get(target.direction, set()):
-        raise IntegrityError("cashflow direction/nature mismatch", {}, None)
-
 
 class Reconciliation(Base, AuditMixin):
     """按资金池、账单日和账户固化的日对账快照。"""

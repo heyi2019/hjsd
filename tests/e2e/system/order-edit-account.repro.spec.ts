@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * 复现 #15 需求1：订单台账行的「编辑账号」入口是否进入与库存中心一致的编辑态。
@@ -18,22 +18,11 @@ test.describe("订单台账 编辑账号 入口复现 (#15 需求1)", () => {
     await page.getByRole("tab", { name: "订单台账" }).click();
     await page.waitForTimeout(2500);
 
-    const editBtns = page.getByRole("button", { name: "编辑账号" });
-    const count = await editBtns.count();
-    console.log("REPRO EDIT_BTN_COUNT", count);
-
-    if (count > 0) {
-      await editBtns.first().click();
-      await page.waitForTimeout(1800);
-      const save = await page.getByText("保存修改").count();
-      const gameAcct = await page.getByLabel("编辑游戏账号/产品").count();
-      console.log("REPRO AFTER_CLICK save=", save, "gameAcct=", gameAcct);
-      await page.screenshot({ path: "test-results/order-edit-account.png", fullPage: false });
-    } else {
-      await page.screenshot({ path: "test-results/order-edit-account-no-btn.png", fullPage: false });
-    }
-
-    console.log("REPRO ERRORS_COUNT", errors.length);
-    console.log("REPRO ERRORS_JSON " + JSON.stringify(errors.slice(0, 30)));
+    const editButton = page.getByRole("button", { name: "编辑账号" }).first();
+    await expect(editButton).toBeVisible();
+    await editButton.click();
+    await expect(page.getByText("保存修改")).toBeVisible();
+    await expect(page.getByLabel("编辑游戏账号/产品")).toBeVisible();
+    expect(errors, errors.join("\n")).toEqual([]);
   });
 });

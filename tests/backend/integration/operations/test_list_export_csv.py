@@ -18,6 +18,7 @@ from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.domain.trade import Order, OrderFormField
 from app.orders.router import _event_platform
+from app.value_added_services import router as installments_router
 
 
 def _seed_select_field(db, *, field_key: str = "trade_role") -> OrderFormField:
@@ -112,6 +113,30 @@ def test_installments_export_appends_full_detail_in_the_same_csv_table(seeded_cl
     assert "详情" not in header
     assert "期次明细" in header
     assert "处置记录" in header
+
+
+def test_installments_export_loads_detail_with_bulk_queries(
+    seeded_client, headers, monkeypatch
+):
+    calls = []
+
+    def list_schedules_bulk(*args, **kwargs):
+        calls.append("schedules")
+        return {}
+
+    def list_dispositions_bulk(*args, **kwargs):
+        calls.append("dispositions")
+        return {}
+
+    monkeypatch.setattr(installments_router.service, "list_schedules_bulk", list_schedules_bulk)
+    monkeypatch.setattr(
+        installments_router.service, "list_dispositions_bulk", list_dispositions_bulk
+    )
+
+    response = seeded_client.get("/api/v1/installments/export.csv", headers=headers)
+
+    assert response.status_code == 200, response.text
+    assert calls == ["schedules", "dispositions"]
 
 
 def test_orders_export_respects_hidden_column(seeded_client, headers, seeded_db):
@@ -269,7 +294,7 @@ def test_orders_export_xlsx_splits_detail_json_into_columns(seeded_client, heade
         assert sheet.freeze_panes == "B2"
 
     # 系统内部字段不得混进业务明细表：它们在界面上看不到，导出里也没有对应用户语义
-    system_only = {"事件号", "流水号", "是否过账", "现金性质", "比例", "金额归属", "portion", "nature"}
+    system_only = {"事件号", "流水号", "是否过账", "现金性质", "比例", "金额归属", "portion"}
     for title in ("操作明细", "资金明细"):
         header = {
             workbook[title].cell(row=1, column=index).value

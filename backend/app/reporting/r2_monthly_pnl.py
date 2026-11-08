@@ -1,6 +1,6 @@
 """reporting.r2_monthly_pnl：R2 月度经营损益。
 
-订单贡献口径（2026-11-05 用户裁决）：销售收入 / 直接成本按各订单
+订单贡献口径：销售收入 / 直接成本按各订单
 「所有收入 − 所有支出」取数，与订单利润明细、R5、分润基数同源。
 资金走向只有收入 / 支出两种：返点记录是收入、分期坏账是支出，即使不生成
 资金流水也按各自发生日归月计入。返点收益列是「其中返点」的展示项，
@@ -111,24 +111,28 @@ def r2_monthly_pnl(
     pool_ids = _visible_pool_ids(user)
     if pool_ids is not None:
         op_stmt = op_stmt.where(Cashflow.pool_id.in_(pool_ids))
+    if from_date is not None:
+        op_stmt = op_stmt.where(Cashflow.occurred_on >= from_date)
+    if to_date is not None:
+        op_stmt = op_stmt.where(Cashflow.occurred_on <= to_date)
     op_rows = session.scalars(op_stmt).all()
+    reversal_ids = {flow.reversal_of_id for flow in op_rows if flow.reversal_of_id is not None}
+    original_directions = {
+        flow_id: direction
+        for flow_id, direction in session.execute(
+            select(Cashflow.id, Cashflow.direction).where(Cashflow.id.in_(reversal_ids))
+        ).all()
+    } if reversal_ids else {}
     operating: dict[str, Decimal] = defaultdict(lambda: ZERO)
     for flow in op_rows:
         occurred_on = flow.occurred_on
-        if from_date and occurred_on < from_date:
-            continue
-        if to_date and occurred_on > to_date:
-            continue
         amount = _money(flow.amount)
         if (
             flow.direction == Direction.OUT.value
         ):
             operating[_month_key(occurred_on)] += amount
         elif flow.reversal_of_id is not None:
-            original = session.get(Cashflow, flow.reversal_of_id)
-            if original is not None and (
-                original.direction == Direction.OUT.value
-            ):
+            if original_directions.get(flow.reversal_of_id) == Direction.OUT.value:
                 operating[_month_key(occurred_on)] -= amount
 
     for bucket in (revenue, direct_cost, operating, rebate_income):

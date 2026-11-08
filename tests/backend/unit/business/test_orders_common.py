@@ -1,4 +1,4 @@
-"""ORDER-01 orders 领域共用校验覆盖（补充 _common 未覆盖分支）。"""
+"""ORDER-01 订单金额边界规则。"""
 from __future__ import annotations
 
 from decimal import Decimal

@@ -48,7 +48,7 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
     consignmentAt: platformListingDate(detail),
     consignmentPlatforms: consignmentPlatforms(detail),
     execution: orders.flatMap((order) => order.events.map((event) => [
-      `${event.event_no} · ${executionActionLabel(event.event_type, order.order_type)}`,
+      `${event.event_no} · ${executionActionLabel(event.event_type)}`,
       dateTimeMinute(event.occurred_at ?? event.occurred_on),
       event.amount,
       event.note || "-",

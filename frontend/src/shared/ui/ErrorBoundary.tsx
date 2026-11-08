@@ -12,7 +12,7 @@ interface State {
 /**
  * 模块加载类失败：动态 import 的 chunk 请求失败 / 被中断。
  * `React.lazy` 会把首次失败缓存为终态（status=rejected），进程内不会自行重试，
- * 所以这类错误**无法靠重置 state 恢复**；生产环境发版后旧标签页请求已下线的
+ * 所以这类错误**无法靠重置 state 恢复**；接口变更后的
  * chunk 也会落到同一分支。判定只认模块相关字样，避免把普通 `Failed to fetch`
  *（接口 500/断网）误当成模块失败而整页重载。
  */
@@ -27,7 +27,7 @@ export function isModuleLoadError(error: Error | null | undefined): boolean {
 /**
  * 页面级错误边界：单个页面渲染抛错时只在此边界内显示降级 UI，
  * 不向上冒泡到 AppShell 导致整个应用外壳（侧栏/顶栏）白屏。
- * 与 AppShell 的 keep-alive 配合：崩溃的页面 slot 被本边界接住，
+ * 与 AppShell 的页面级错误边界配合：崩溃的页面 slot 被本边界接住，
  * 其它已挂载页面不受影响，用户可切走再切回或点「重试」恢复。
  */
 export class ErrorBoundary extends Component<Props, State> {

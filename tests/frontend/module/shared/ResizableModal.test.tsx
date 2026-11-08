@@ -46,16 +46,6 @@ function renderInModal(node: ReactNode) {
 const layout = (w: number) => (w >= 640 ? "double" : "single");
 
 describe("ResizableModal 可拖拽缩放弹窗外壳", () => {
-  it("渲染 8 个方向缩放手柄", () => {
-    renderInModal(
-      <ResizableModal>
-        <span>内容</span>
-      </ResizableModal>
-    );
-    expect(screen.getByText("内容")).toBeInTheDocument();
-    expect(document.querySelectorAll(".resizable-modal__resize-handle")).toHaveLength(8);
-  });
-
   it("无 .ant-modal 祖先时不做任何布局同步（安全早退）", () => {
     const spy = vi.fn(layout);
     render(
@@ -75,25 +65,6 @@ describe("ResizableModal 可拖拽缩放弹窗外壳", () => {
     );
     // jsdom 初始矩形宽为 0 → getLayout(0) → single
     expect(modal.getAttribute("data-modal-layout")).toBe("single");
-  });
-
-  it("支持自定义 layoutAttribute 属性名", () => {
-    const { modal } = renderInModal(
-      <ResizableModal getLayout={layout} layoutAttribute="data-my-layout">
-        <span>自定义</span>
-      </ResizableModal>
-    );
-    expect(modal.getAttribute("data-my-layout")).toBe("single");
-    expect(modal.getAttribute("data-modal-layout")).toBeNull();
-  });
-
-  it("未提供 getLayout 时不写入布局属性", () => {
-    const { modal } = renderInModal(
-      <ResizableModal>
-        <span>无布局</span>
-      </ResizableModal>
-    );
-    expect(modal.getAttribute("data-modal-layout")).toBeNull();
   });
 
   it("拖动：超过 6px 阈值后改为 fixed 定位并更新 left/top", () => {

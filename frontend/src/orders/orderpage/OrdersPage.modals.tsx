@@ -1,7 +1,7 @@
-import dayjs, { type Dayjs } from "dayjs";
+import type { Dayjs } from "dayjs";
 import type { AllocationFormRow } from "./helpers";
-import { Alert, DatePicker, Form, Input, Typography } from "antd";
-import { ALLOCATION_TYPE_LABEL, buildActionAllocationRows, buildRefundEventPayload, splitEven, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
+import { Alert, Form, Input, Typography } from "antd";
+import { ALLOCATION_TYPE_LABEL, buildRefundEventPayload, splitEven, validateAllocations, type AllocationType } from "./helpers";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import { CreateBusinessModal } from "../CreateBusinessModal";
 import { DateField, MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
@@ -99,7 +99,7 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
                   placeholder={cancelScope === "INVREFUND" ? "请选择入库流水" : "请选择被冲销动作"}
                   options={cancelableEventsForScope(cancelOrderTarget, cancelScope).map(({ event, remaining }) => ({
                     value: event.id,
-                    label: `${executionActionLabel(event.event_type, cancelOrderTarget.order_type)} · ${event.event_no} · ¥${money(event.amount)}（剩余可冲 ¥${money(remaining)}）`,
+                    label: `${executionActionLabel(event.event_type)} · ${event.event_no} · ¥${money(event.amount)}（剩余可冲 ¥${money(remaining)}）`,
                   }))}
                   onChange={(value: number) => {
                     const target = cancelableEventsForScope(cancelOrderTarget, cancelScope).find((item) => item.event.id === value);

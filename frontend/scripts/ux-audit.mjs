@@ -99,12 +99,17 @@ const A11Y_FN = `
 (() => {
   const res = { tinyTargets: [], missingName: [], imgNoAlt: 0, headingCount: 0, h1: 0, tiny: [] };
   const isInteractive = (el) => ['BUTTON','A','INPUT','SELECT','TEXTAREA'].includes(el.tagName) || el.getAttribute('role') === 'button' || (el.className||'').toString().includes('ant-btn') || (el.className||'').toString().includes('ui-button');
+  const isInternalControl = (el) => {
+    if (el.tagName === 'INPUT' && el.closest('.ant-input-affix-wrapper, .ant-picker-input')) return true;
+    if (['BUTTON', 'A'].includes(el.tagName) || el.getAttribute('role') === 'button') return false;
+    return Boolean(el.parentElement?.closest('button, a, [role="button"], .ant-btn, .ui-button'));
+  };
   for (const el of Array.from(document.querySelectorAll('body *'))) {
     const cs = getComputedStyle(el);
     if (cs.visibility === 'hidden' || cs.display === 'none') continue;
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;
-    if (isInteractive(el)) {
+    if (isInteractive(el) && !isInternalControl(el)) {
       const cls = (el.className || '').toString();
       // antd 内部标准小控件（清除按钮/分页箭头/列设置/选择器内搜索框）由 antd 统一定义、
       // 自带内边距间距，适用 WCAG 2.5.8「间距豁免」，且本身嵌在 ≥24px 的控件内，

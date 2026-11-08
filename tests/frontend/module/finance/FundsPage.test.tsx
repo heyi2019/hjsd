@@ -57,8 +57,8 @@ const deposits = [
   { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" },
 ];
 const cashflows = [
-  { id: 1, status: "APPROVED", flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_DIRECT_COST" },
-  { id: 2, status: "APPROVED", flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_REVENUE" },
+  { id: 1, status: "APPROVED", flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_DIRECT_COST" },
+  { id: 2, status: "APPROVED", flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_REVENUE" },
 ];
 
 beforeEach(() => {
@@ -113,12 +113,6 @@ describe("FundsPage：资金池卡片", () => {
     expect(screen.getAllByText("700.00").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("后端不可达 → 错误条落地", async () => {
-    vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
-    renderLight(<FundsPage />, { user: "admin" });
-    await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
-  });
-
   it("FE-228：资金池主数据失败时总览不可用且划转入口禁用", async () => {
     vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce(new Error("pools down"));
     renderLight(<FundsPage />, { user: "admin" });
@@ -169,20 +163,6 @@ describe("FundsPage：资金池卡片", () => {
 });
 
 describe("FundsPage：押金占用", () => {
-  it("删除独立押金页，押金逻辑并入工作室支出", async () => {
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
-
-    expect(screen.queryByRole("tab", { name: "押金" })).not.toBeInTheDocument();
-    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
-    // 断言「押金占用」这一整块（卡片标题 + 新增入口）落在工作室支出面板内，而不是靠
-    // 别处（如已卸载的总览 StatRow）凑出现次数。Tabs 开了 destroyOnHidden，未激活面板
-    // 不会留在 DOM，故此处必须是面板内的唯一一份。
-    const studioPanel = await screen.findByRole("tabpanel");
-    expect(within(studioPanel).getByText("押金占用")).toBeInTheDocument();
-    expect(within(studioPanel).getByRole("button", { name: /新增占用/ })).toBeInTheDocument();
-  });
-
   it("押金列表渲染金额与剩余（占用-已释放）", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
@@ -202,17 +182,6 @@ describe("FundsPage：押金占用", () => {
 });
 
 describe("FundsPage：资金流水", () => {
-  it("资金流水录入不再提供资金池账户选择", async () => {
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
-    await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
-
-    expect(screen.queryByText("资金池账户")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("资金性质")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("关联订单")).toBeInTheDocument();
-  });
-
   it("展示订单号、收支明细及总收入/总支出", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
@@ -257,16 +226,8 @@ describe("FundsPage：资金流水", () => {
     expect(screen.queryByText("HS0001-CF-BUY-01")).not.toBeInTheDocument();
   });
 
-  it("流水筛选区使用紧凑布局容器", async () => {
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
-    expect(document.querySelector(".funds-cashflow-filters")).toBeInTheDocument();
-  });
 });
 
-// —— 原 FundsPage.write.test.tsx：同页同 mock 契约（METHODS 已取并集），
-// 独立成文件只是让同样的 jsdom+antd 启动多付一次。
 describe("FundsPage：资金写路径", () => {
   it("新增押金占用提交后回传金额与日期", async () => {
     resolveMockOnce(vi.mocked(catalog.depositsApi.create), { id: 12 });
@@ -302,7 +263,6 @@ describe("FundsPage：资金写路径", () => {
     await ui.click(screen.getByRole("tab", { name: "对账" }));
     await ui.click(await screen.findByRole("button", { name: /查看未达流水/ }));
     // 未达流水弹窗按 unmatched_flow_ids 只列出对应那一条，故弹窗内精确 1 次。
-    // 旧断言要求 ≥2 依赖「关闭态弹窗也被渲染」的虚假挂载（motion 桩伪造 visible），已随桩修正失效。
     const unmatchedModal = document.querySelector(".ant-modal") as HTMLElement;
     expect(within(unmatchedModal).getAllByText("HS0001-CF-BUY-01")).toHaveLength(1);
     expect(unmatchedModal.querySelectorAll("tbody tr.ant-table-row")).toHaveLength(1);

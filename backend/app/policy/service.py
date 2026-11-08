@@ -1,6 +1,6 @@
-"""policy.service：经营规则定义 / 版本 / 审批 / 生效期解析 / 利润分配统一入口。
+"""经营规则定义、版本、生效期解析与利润分配统一入口。
 
-本模块是兼容层（facade），只做符号再导出，不含业务逻辑：
+本模块只做符号再导出，不含业务逻辑：
 - 共用工具 → `app.policy._shared`
 - 规则定义 → `app.policy.definitions`
 - 版本与生效期 → `app.policy.versions`
@@ -11,7 +11,7 @@
 2. **同范围的新版本不得与已有版本有效期重叠**；
 3. **已发生的业务不因规则改版而变化** —— 靠 `resolve_version` 返回
    「当时生效的版本」+ 业务对象上的 `policy_snapshot` 固化实现；
-4. 发布只影响 `effective_from` 之后**新建**的业务，不重算历史。
+4. 发布只影响 `effective_from` 之后新建的业务，不重算已发生业务。
 
 有效期模型：`[effective_from, effective_to)` 左闭右开，NULL 表示至今。
 """

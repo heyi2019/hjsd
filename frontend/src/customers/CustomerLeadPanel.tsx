@@ -2,7 +2,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 /** 客户需求池：记录需求事实，支持转单或关闭，不自动生成订单（CUS-02）。 */
 import { Card, Form, Input, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { customersApi, leadsApi, type Customer, type Lead } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { BusinessActionModal, BusinessRegistrationForm, CompactActions, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
@@ -34,6 +34,7 @@ export function CustomerLeadPanel() {
     } catch (err) { setError(normalizeError(err)); }
   }, []);
   useEffect(() => { void load(); }, [load]);
+  const customerById = useMemo(() => new Map(customers.map((customer) => [customer.id, customer])), [customers]);
 
   const createLead = async (values: Record<string, unknown>) => {
     try {
@@ -67,7 +68,7 @@ export function CustomerLeadPanel() {
 
   const columns: ColumnsType<Lead> = [
     { title: "需求编号", dataIndex: "lead_no" },
-    { title: "客户", render: (_v, row) => customers.find((customer) => customer.id === row.customer_id)?.display_name ?? row.customer_id },
+    { title: "客户", render: (_v, row) => customerById.get(row.customer_id)?.display_name ?? row.customer_id },
     { title: "需求类型", dataIndex: "request_type", render: (v: string) => configurableLabel("LEAD_TYPE", v, REQUEST_TYPE_LABEL) },
     { title: "预算", dataIndex: "budget", align: "right", render: (v: string | null) => v ? <MoneyText value={v} /> : "-" },
     { title: "目标", dataIndex: "target" },

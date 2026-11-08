@@ -85,7 +85,7 @@ class Settings(BaseSettings):
     login_rate_limit_enabled: bool = True
     login_rate_limit_per_minute: int = 10
 
-    # database：统一 PostgreSQL（SQLite 已下线）。缺 .env 时用下面的本机兜底地址。
+    # 缺 .env 时使用本机 PostgreSQL 兜底地址。
     database_url: str = DEFAULT_DEV_DATABASE_URL
 
     # 测试库：**必须与 database_url 分开**。pytest 夹具每个 session 会 TRUNCATE 全表 +
@@ -170,7 +170,7 @@ class Settings(BaseSettings):
     @field_validator("database_url", "test_database_url")
     @classmethod
     def _validate_postgresql_urls(cls, value: str) -> str:
-        """数据库连接统一 PostgreSQL，拒绝已下线的 SQLite 连接串。"""
+        """数据库连接必须使用 PostgreSQL。"""
         if value and not value.startswith("postgresql"):
             raise ValueError("DATABASE_URL / TEST_DATABASE_URL 必须使用 PostgreSQL")
         return value

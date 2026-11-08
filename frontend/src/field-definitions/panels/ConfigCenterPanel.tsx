@@ -1,6 +1,6 @@
 /** 配置中心（设置页首个页签）：顶部页签菜单 + 下方渲染对应「现有配置页面」。
  *
- * 设计意图（用户裁决 2026-10-31）：配置中心聚合字段与业务主数据配置项到一页，
+ * 配置中心聚合字段与业务主数据配置项到一页，
  * 顶部按类别列出这些配置项，点击即在下方切换显示对应的现有面板，不再各自独立成 Tab。
  *
  * 复用单一事实源 configCatalog.ts 的 SETTINGS_ITEMS 注册表（分组 / 标签 / 权限 / 只读），
@@ -11,6 +11,7 @@ import { useState, type ReactElement } from "react";
 import {
   CONFIG_GROUP_LABEL,
   SETTINGS_ITEMS,
+  SETTINGS_ITEM_BY_KEY,
   type ConfigGroupCode,
 } from "../configCatalog";
 import { useSession } from "../../shared/state/session";
@@ -61,7 +62,7 @@ export function ConfigCenterPanel() {
         ))}
       </nav>
       <section className="config-center__content" data-testid="center-content">
-        <Card className="glass" title={SETTINGS_ITEMS.find((i) => i.key === selected)?.label ?? "配置"}>
+        <Card className="glass" title={SETTINGS_ITEM_BY_KEY.get(selected)?.label ?? "配置"}>
           {renderPanel(selected)}
         </Card>
       </section>

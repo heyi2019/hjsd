@@ -86,7 +86,7 @@ beforeEach(() => {
         portion: "PRINCIPAL",
         is_posted: true,
         operator: "admin",
-        cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", nature: "BUSINESS_OUT", category: "BUY", amount: "100.00" },
+        cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", category: "BUY", amount: "100.00" },
       }, {
         id: 33,
         event_no: "EV0003",
@@ -135,7 +135,7 @@ beforeEach(() => {
         portion: "PROFIT",
         is_posted: true,
         operator: "admin",
-        cashflow: { flow_no: "CF0002", pool_name: "利润池", occurred_on: "2026-10-16", direction: "IN", nature: "BUSINESS_IN", category: "SELL", amount: "350.00" },
+        cashflow: { flow_no: "CF0002", pool_name: "利润池", occurred_on: "2026-10-16", direction: "IN", category: "SELL", amount: "350.00" },
       }],
     }],
   });
@@ -254,8 +254,7 @@ describe("InventoryPanel：写入与长路径", () => {
   });
 });
 
-// 原 InventoryConsignmentModal.test.tsx：只读 executionDetail，「已上架记录」的平台名来源（L234）
-describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () => {
+describe("InventoryConsignmentModal 已上架记录平台展示", () => {
   const consignAccount = {
     id: 1,
     source_order_no: "DG-2026-0003",
@@ -339,8 +338,6 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
   });
 });
 
-// —— 原 OrderDetailDeliverySection.test.tsx ——
-// 订单详情「交付明细」区块：只读 props + 字段定义，无页面级挂载。
 describe("OrderDetailDeliverySection", () => {
   beforeEach(() => {
     vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([]);
@@ -500,7 +497,7 @@ describe("InventoryPanel：账号台账编辑态时间编辑", () => {
           id: 31, event_no: "EV0001", event_type: "BUY", amount: "100.00",
           occurred_on: "2026-10-15", occurred_at: "2026-10-15T10:20:00",
           portion: "PRINCIPAL", is_posted: true, operator: "admin",
-          cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", occurred_at: "2026-10-15T10:20:00", direction: "OUT", nature: "BUSINESS_OUT", category: "BUY", amount: "100.00" },
+          cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", occurred_at: "2026-10-15T10:20:00", direction: "OUT", category: "BUY", amount: "100.00" },
         }, {
           id: 32, event_no: "EV0002", event_type: "SELL", amount: "200.00",
           occurred_on: "2026-10-17", occurred_at: "2026-10-17",

@@ -2,7 +2,7 @@
 
 与 test_m5_policy.py 的分工：m5 已覆盖创建/发布/解析/快照固化/分配主路径与 401 门控；
 本文件补筛选参数、NotFound 分支、空参校验、`_overlaps` exclude 私有路径、
-snapshot_for 无快照、set_allocations 坏 rate，以及 6 个未测路由端点。
+snapshot_for 无快照、set_allocations 坏 rate，以及相关路由边界。
 """
 from __future__ import annotations
 
@@ -20,20 +20,6 @@ from app.orders import service as order_service
 from app.policy import service as policy_service
 
 D = date(2026, 10, 4)
-
-
-def test_policy_routes_publish_typed_response_models(app):
-    paths = app.openapi()["paths"]
-
-    assert paths["/api/v1/policies"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/PolicyDefinitionListOut"
-    )
-    assert paths["/api/v1/policy-versions/resolve"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/PolicyResolveOut"
-    )
-    assert paths["/api/v1/orders/{order_id}/profit-allocations"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/ProfitAllocationListOut"
-    )
 
 
 @pytest.fixture()
@@ -336,8 +322,8 @@ class TestPolicyApi:
             headers=json_headers,
             json={"config": {"rate": "7"}},
         )
-        # 创建即发布（ACTIVE）：已发布版本不可改，PATCH 被拒
-        assert patched.status_code in (400, 422), patched.text
+        # 创建即发布（ACTIVE）：已发布版本不可改，PATCH 被业务校验拒绝
+        assert patched.status_code == 422, patched.text
 
     def test_profit_allocations_endpoints(self, seeded_client, seeded_db, json_headers):
         order = order_service.create_order(

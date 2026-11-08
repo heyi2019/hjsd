@@ -43,7 +43,8 @@ def test_flow_e_form_field_config_drives_validation(seeded_db):
 
     # 选填态：不填该字段也能建单成功。
     o1 = _hs_order(seeded_db, game_account="flow-e-1")
-    assert o1.id is not None
+    assert o1.status == "ACTIVE"
+    assert o1.form_extra is None
 
     # 翻转配置为「必填」。
     update_order_form_field(seeded_db, field.id, required=True, actor="pytest")
@@ -54,4 +55,5 @@ def test_flow_e_form_field_config_drives_validation(seeded_db):
 
     # 必填态：补齐该字段则通过。
     o2 = _hs_order(seeded_db, game_account="flow-e-3", with_field="hello")
-    assert o2.id is not None
+    assert o2.status == "ACTIVE"
+    assert o2.form_extra["extra_flow_e_memo"] == "hello"

@@ -88,7 +88,7 @@ class TestLoginRateLimit:
         monkeypatch.setattr(settings, "login_rate_limit_per_minute", 2)
         for _ in range(2):
             r = _login(client, "rluser", "wrong")
-            assert r.status_code in (401, 429), r.text
+            assert r.status_code == 401, r.text
         assert _login(client, "rluser", "wrong").status_code == 429
 
     def test_development_bypasses(self, client, rate_user, monkeypatch):

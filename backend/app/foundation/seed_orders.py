@@ -59,8 +59,7 @@ def seed_order_matrix(db, actor: str = "e2e") -> None:
         )
         db.add(admin)
     if employee is None:
-        # 用 OPERATOR 而非 EMPLOYEE：dev/test 等经 alembic 迁移的库，role 约束可能未含 EMPLOYEE，
-        # 而 OPERATOR 在 create_all（E2E）与 alembic（dev/test）两端均合法。
+        # 使用当前基线可接受的 OPERATOR 角色。
         employee = users.User(
             username="employee", display_name="员工", password_hash="seed-not-real",
             role="OPERATOR", owner_scope="SELF", pool_ids=[], team_ids=[], is_active=True,

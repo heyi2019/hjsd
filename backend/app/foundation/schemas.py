@@ -121,7 +121,7 @@ class GameTypeOut(BaseModel):
     @field_validator("channel_regions", mode="before")
     @classmethod
     def normalize_channel_regions(cls, value: object) -> list[str]:
-        """兼容迁移前或旧数据里的 NULL，前端统一收到空数组。"""
+        """空值统一返回空数组。"""
         return value if isinstance(value, list) else []
     created_at: datetime
     updated_at: datetime

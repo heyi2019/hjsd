@@ -48,6 +48,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const [expandedAccountIds, setExpandedAccountIds] = useState<Key[]>([]);
   const [exporting, setExporting] = useState(false);
   const exportAbortRef = useRef<AbortController | null>(null);
+  const locallyRemovedIdsRef = useRef(new Set<number>());
   useEffect(() => () => exportAbortRef.current?.abort(), []);
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
   const [detailTarget, setDetailTarget] = useState<Account | null>(null);
@@ -70,7 +71,11 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const load = useCallback(async () => {
     try {
       const list = await stocksApi.list({ status: "WAITING" });
-      setRows(list ?? []);
+      const freshIds = new Set((list ?? []).map((row) => row.id));
+      locallyRemovedIdsRef.current.forEach((id) => {
+        if (!freshIds.has(id)) locallyRemovedIdsRef.current.delete(id);
+      });
+      setRows((list ?? []).filter((row) => !locallyRemovedIdsRef.current.has(row.id)));
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -470,6 +475,13 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     });
   }
 
+  /** 售出成功后先从当前视图移除，避免库存列表在异步重拉期间继续展示已售账号。 */
+  function removeFromInventory(accountId: number) {
+    locallyRemovedIdsRef.current.add(accountId);
+    setRows((current) => current.filter((row) => row.id !== accountId));
+    setExpandedAccountIds((current) => current.filter((id) => String(id) !== String(accountId)));
+  }
+
   /** 写操作后让详情缓存失效并立即重拉，避免展开区停在写之前的快照。
    *  必须 force：此时 useState 尚未提交，闭包里的 executionDetails 仍是旧值，不加 force 会被命中缓存直接 return。 */
   function refreshExecution(row: Account) {
@@ -553,6 +565,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     mobileFieldOrder,
     onNavigate,
     onOrdersChanged,
+    removeFromInventory,
     openDetail,
     openEditor,
     openPartyCard,

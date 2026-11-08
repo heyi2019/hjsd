@@ -592,8 +592,6 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     sortDesc,
     inventoryStats,
     updateEventDraft: accountEditor.updateEventDraft,
-    timeSet: accountEditor.timeSet,
-    setTimeField: accountEditor.setTimeField,
     voidForm,
     voidPools,
     voidTarget,

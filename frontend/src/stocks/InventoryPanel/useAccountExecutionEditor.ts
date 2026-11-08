@@ -10,7 +10,6 @@ import {
 } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { type TimeFieldKey, type TimeSet } from "../OrderDetail.shared";
 
 export type EventDraft = {
   id: number;
@@ -26,8 +25,6 @@ export interface AccountExecutionEditor {
   inlineEditId: number | null;
   eventDrafts: Record<number, EventDraft>;
   updateEventDraft: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
-  timeSet: TimeSet;
-  setTimeField: (field: TimeFieldKey, value: string | null) => void;
   employees: EmployeeOption[];
   invEditExtraForm: ReturnType<typeof Form.useForm>[0];
   savingAccount: boolean;
@@ -35,7 +32,6 @@ export interface AccountExecutionEditor {
   cancelInlineEdit: () => void;
   saveInline: () => Promise<void>;
 }
-
 /**
  * 账号执行详情编辑器状态机：把库存中心与订单中心共用的「账号台账内联编辑」逻辑抽出，
  * 保证两个入口（库存中心列表 / 订单中心台账）表现一致，且都面向同一份 stocks 记录、
@@ -52,9 +48,6 @@ export function useAccountExecutionEditor(params: {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [inlineEditId, setInlineEditId] = useState<number | null>(null);
   const [eventDrafts, setEventDrafts] = useState<Record<number, EventDraft>>({});
-  const [timeSet, setTimeSet] = useState<TimeSet>({});
-  const setTimeField = (field: TimeFieldKey, value: string | null) =>
-    setTimeSet((current) => ({ ...current, [field]: value }));
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [invEditExtraForm] = Form.useForm();
   const [savingAccount, setSavingAccount] = useState(false);
@@ -62,7 +55,6 @@ export function useAccountExecutionEditor(params: {
   async function openEditor(account: Account) {
     setEditingAccount({ ...account });
     setEventDrafts({});
-    setTimeSet({});
     try {
       const list = await employeesApi.list();
       setEmployees(list);
@@ -76,7 +68,6 @@ export function useAccountExecutionEditor(params: {
     setInlineEditId(null);
     setEditingAccount(null);
     setEventDrafts({});
-    setTimeSet({});
     invEditExtraForm.resetFields();
   }
 
@@ -132,12 +123,10 @@ export function useAccountExecutionEditor(params: {
         const original = getExecutionDetail(id)?.orders.flatMap((order) => order.events).find((event) => event.id === draft.id);
         return original && (draft.amount !== original.amount || draft.note !== (original.note ?? null) || draft.operator_user_ids !== undefined);
       });
-      if (events.length || Object.keys(timeSet).length > 0) {
-        const time_set = buildTimeSetPayload(timeSet);
+      if (events.length) {
         await stocksApi.updateExecution(id, {
           profile,
           events,
-          time_set: time_set ?? undefined,
         });
         setEditingAccount(null);
         setEventDrafts({});
@@ -163,7 +152,6 @@ export function useAccountExecutionEditor(params: {
       }
       setEditingAccount(null);
       setEventDrafts({});
-      setTimeSet({});
       invEditExtraForm.resetFields();
       setInlineEditId(null);
       appMessage.success("修改已保存");
@@ -180,8 +168,6 @@ export function useAccountExecutionEditor(params: {
     inlineEditId,
     eventDrafts,
     updateEventDraft,
-    timeSet,
-    setTimeField,
     employees,
     invEditExtraForm,
     savingAccount,
@@ -189,21 +175,4 @@ export function useAccountExecutionEditor(params: {
     cancelInlineEdit,
     saveInline,
   };
-}
-
-const TIME_SET_KEY_MAP: Record<TimeFieldKey, string> = {
-  registeredAt: "registered_at",
-  soldAt: "sold_at",
-  flowAt: "flow_at",
-};
-
-/** 仅把「用户改过的字段」转成后端 time_set 载荷；未改的字段不发送。 */
-function buildTimeSetPayload(set: TimeSet): Record<string, string | null> | null {
-  const entries = Object.entries(set) as [TimeFieldKey, string | null][];
-  if (entries.length === 0) return null;
-  const payload: Record<string, string | null> = {};
-  for (const [key, value] of entries) {
-    payload[TIME_SET_KEY_MAP[key]] = value;
-  }
-  return payload;
 }

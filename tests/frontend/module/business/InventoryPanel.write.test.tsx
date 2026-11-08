@@ -36,7 +36,6 @@ vi.mock("@/shared/api/catalog", async (importOriginal) => {
   }
   return out as unknown as typeof actual;
 });
-
 const accounts = [
   { id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
   { id: 2, source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
@@ -263,7 +262,6 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(await screen.findByLabelText("买号返点（对应回收/提号）")).toBeChecked();
   });
 });
-
 describe("InventoryConsignmentModal 已上架记录平台展示", () => {
   const consignAccount = {
     id: 1,
@@ -489,62 +487,5 @@ describe("OrderDetailDeliverySection", () => {
       expect(screen.getByText("13800000001")).toBeInTheDocument();
       expect(screen.getByText("13800000002")).toBeInTheDocument();
     });
-  });
-});
-
-describe("InventoryPanel：账号台账编辑态时间编辑", () => {
-  it("三个时间都可改，保存只提交被修改的绝对时间", async () => {
-    const detail = {
-      account: accounts[0],
-      orders: [{
-        order_id: 21,
-        order_no: "HS0001",
-        order_type: "HS",
-        trade_date: "2026-10-15",
-        created_at: "2026-10-15T10:19:00",
-        status: "ACTIVE",
-        events: [{
-          id: 31, event_no: "EV0001", event_type: "BUY", amount: "100.00",
-          occurred_on: "2026-10-15", occurred_at: "2026-10-15T10:20:00",
-          portion: "PRINCIPAL", is_posted: true, operator: "admin",
-          cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", occurred_at: "2026-10-15T10:20:00", direction: "OUT", category: "BUY", amount: "100.00" },
-        }, {
-          id: 32, event_no: "EV0002", event_type: "SELL", amount: "200.00",
-          occurred_on: "2026-10-17", occurred_at: "2026-10-17",
-          portion: "GROSS", is_posted: true, operator: "admin",
-        }],
-        cashflows: [], customers: [], counterparties: [], rebates: [], extra_values: {},
-      }],
-      finance_summary: { cashflow_income: "0", rebate_income: "0", total_income: "0", total_expense: "100.00", net_amount: "-100.00" },
-    };
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(detail as never);
-    resolveMock(vi.mocked(catalog.stocksApi.updateExecution), { ok: true });
-
-    renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByText("acc-1");
-    fireEvent.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
-
-    const created = await screen.findByLabelText("编辑订单创建时间");
-    const sold = screen.getByLabelText("编辑售出时间");
-    const flow = screen.getByLabelText("编辑流水时间");
-    // 时间字段现已按分钟级展示（format YYYY-MM-DD HH:mm），基准含真实分钟。
-    expect((created as HTMLInputElement).value).toBe("2026-10-15 10:19");
-    expect((sold as HTMLInputElement).value).toBe("2026-10-17 00:00");
-    expect((flow as HTMLInputElement).value).toBe("2026-10-15 10:20");
-
-    // antd DatePicker 把输入文本同步进内部 state 是异步的：change 后立刻同步 keyDown
-    // 会读到旧 inputValue，导致 onChange 偶发不触发（曾随机红 4/6）。改用真实异步交互。
-    const user = userEvent.setup();
-    await user.clear(sold);
-    await user.type(sold, "2026-10-20 00:00");
-    await user.keyboard("{Enter}");
-    await waitFor(() => expect((sold as HTMLInputElement).value).toBe("2026-10-20 00:00"));
-    expect((screen.getByLabelText("编辑订单创建时间") as HTMLInputElement).value).toBe("2026-10-15 10:19");
-    expect((screen.getByLabelText("编辑流水时间") as HTMLInputElement).value).toBe("2026-10-15 10:20");
-
-    fireEvent.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateExecution)).toHaveBeenCalledWith(1, expect.objectContaining({
-      time_set: { sold_at: "2026-10-20T00:00:00" },
-    })));
   });
 });

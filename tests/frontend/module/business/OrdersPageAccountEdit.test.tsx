@@ -90,24 +90,27 @@ beforeEach(() => {
 });
 
 describe("订单台账编辑与库存中心同步（#15 需求1）", () => {
-  it("列表行「编辑账号」按钮进入与库存中心一致的账号台账编辑态", async () => {
+  it("列表行「编辑」按钮进入完整订单台账编辑态而不是订单级小窗", async () => {
     renderLight(<OrdersPage />, { user: "admin" });
     await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
     await waitFor(() =>
       expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThanOrEqual(1),
     );
 
-    // 关联了库存账号的订单才显示「编辑账号」入口（与库存中心列表行「编辑」同口径）。
-    const editBtn = await screen.findByRole("button", { name: "编辑账号" });
+    // 订单台账的「编辑」直接复用完整详情编辑态，覆盖账号、时间、执行信息等板块。
+    const editBtn = await screen.findByRole("button", { name: /^编辑$/ });
     await ui.click(editBtn);
 
-    // 编辑态标志：底部「保存修改」按钮 + 账号资料可编辑输入框（来自 OrderDetailView 编辑态）。
+    // 编辑态标志：底部「保存修改」按钮 + 完整详情编辑字段；不再出现订单级小窗。
     await waitFor(() => expect(screen.getByText("保存修改")).toBeInTheDocument());
     expect(screen.getByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑账号描述")).toBeInTheDocument();
+    expect(screen.queryByLabelText("编辑订单创建时间")).not.toBeInTheDocument();
+    expect(screen.queryByText(/编辑订单 ·/)).not.toBeInTheDocument();
   });
 
-  it("未关联库存账号的订单不显示「编辑账号」入口", async () => {
-    // 本用例刻意去掉所有订单的 account_id，验证无关联账号时不出现「编辑账号」入口。
+  it("未关联库存账号的订单不显示完整台账编辑入口", async () => {
+    // 本用例刻意去掉所有订单的 account_id，验证没有可编辑的账号台账详情时不出现入口。
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([
       { id: 1, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE", account_game_type: "原神", account_game_account: "seller-001", account_platform: "安卓", account_status: "WAITING" },
       { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
@@ -117,6 +120,6 @@ describe("订单台账编辑与库存中心同步（#15 需求1）", () => {
     await waitFor(() =>
       expect(screen.getAllByText("TH-2026-0002").length).toBeGreaterThanOrEqual(1),
     );
-    expect(screen.queryAllByRole("button", { name: "编辑账号" }).length).toBe(0);
+    expect(screen.queryAllByRole("button", { name: /^编辑$/ }).length).toBe(0);
   });
 });

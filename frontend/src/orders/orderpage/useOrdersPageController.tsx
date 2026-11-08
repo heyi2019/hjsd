@@ -14,7 +14,7 @@ import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 import type { BusinessOrderType } from "../CreateBusinessModal";
 import { DEFAULT_BUSINESS_CENTER_TAB, type BusinessCenterEntryTab, type BusinessCenterTab } from "../businessCenter";
-import { BusinessFilterKey, BusinessModeFilterKey, CancelFormScope, buildActionAllocationCandidates, buildActionAllocationRows, buildOrderPatchPayload, filterBusinessOrders, formatOrderAmount, pickCancelableEvent, resolveCancelAmount, type ActionAllocationCandidates, type AllocationFormRow, type AllocationMode } from "./helpers";
+import { BusinessFilterKey, BusinessModeFilterKey, CancelFormScope, buildActionAllocationCandidates, buildActionAllocationRows, filterBusinessOrders, formatOrderAmount, pickCancelableEvent, resolveCancelAmount, type ActionAllocationCandidates, type AllocationFormRow, type AllocationMode } from "./helpers";
 import { useAccountExecutionEditor } from "../../stocks/InventoryPanel/useAccountExecutionEditor";
 
 export function useOrdersPageController(params: {
@@ -136,10 +136,6 @@ export function useOrdersPageController(params: {
   ];
   /** 亏损单（总利润 < 0）：顶部提示改口径，金额分润后端也会拒绝。 */
   const allocationIsLoss = Number(allocationProfit) < 0;
-  const [editOpen, setEditOpen] = useState(false);
-  const [editSubmitting, setEditSubmitting] = useState(false);
-  const [editForm] = Form.useForm();
-
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -377,30 +373,7 @@ export function useOrdersPageController(params: {
     }
   };
 
-  /** 编辑订单：#15 需求2——所有主字段（含成交日期、账号快照）一律可编辑，无只读保留；
-   *  密码被后端隐去（无 order.create 权限）时仍不整体回写快照，避免覆盖隐藏密码。 */
-  const openEditOrder = (order: Order) => {
-    setSelectedOrder(order);
-    const snapshot = order.account_snapshot;
-    editForm.setFieldsValue({
-      trade_date: order.trade_date,
-      note: order.note ?? undefined,
-      snap_game_account: snapshot?.game_account,
-      snap_game_type: snapshot?.game_type ?? undefined,
-      snap_game_password: snapshot?.game_password ?? undefined,
-      snap_channel_region: snapshot?.channel_region ?? undefined,
-      snap_bound_phone: snapshot?.bound_phone ?? undefined,
-      snap_wallet_realname: snapshot?.wallet_realname ?? undefined,
-      snap_camp_account: snapshot?.camp_account ?? undefined,
-      snap_platform: snapshot?.platform ?? undefined,
-      snap_purchase_price: snapshot?.purchase_price ?? undefined,
-      snap_note: snapshot?.note ?? undefined,
-    });
-    setEditOpen(true);
-  };
-
-  /** 打开账号台账内联编辑：与库存中心「编辑」入口一致——取该订单关联的 stocks 账号详情，
-   *  进入编辑态并展开所在行。两入口面向同一份 stocks 记录，保存后各自 re-fetch 即时反映。 */
+  /** 订单台账编辑：与库存中心使用同一份完整详情编辑态，删除订单级小窗，避免一行出现两套编辑模型。 */
   const openAccountEditor = async (order: Order) => {
     if (!order.account_id) return;
     try {
@@ -410,28 +383,6 @@ export function useOrdersPageController(params: {
       setExpandedOrderIds([String(order.id)]);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
-    }
-  };
-
-  const submitEditOrder = async (values: Record<string, unknown>) => {
-    if (!selectedOrder) return;
-    // 成交日期现在也可改（后端联动平移账期）；账号快照按 #15 需求2 一律回写（权限可见时）。
-    setEditSubmitting(true);
-    try {
-      const payload = buildOrderPatchPayload({
-        values,
-        snapshot: selectedOrder.account_snapshot,
-      });
-      await ordersApi.patch(selectedOrder.id, payload);
-      // 成交日期放开后，有登记事件的订单也能改主字段，统一提示「订单已更新」。
-      appMessage.success("订单已更新");
-      setEditOpen(false);
-      setSelectedOrder(await ordersApi.get(selectedOrder.id));
-      await load();
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    } finally {
-      setEditSubmitting(false);
     }
   };
 
@@ -456,8 +407,6 @@ export function useOrdersPageController(params: {
       .slice()
       .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
   }, [businessModeFilter, dateRange, gameTypeFilter, inventoryStatusFilter, keyword, ledgerSortDesc, orderTypeFilter, orders]);
-  // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
-  const orderHasPostedEvents = (selectedOrder?.events ?? []).some((event) => event.is_posted);
   const normalizedInitialTab: BusinessCenterTab = initialTab && ["inventory", "ledger", "collections"].includes(initialTab)
     ? initialTab
     : initialTab
@@ -497,7 +446,6 @@ export function useOrdersPageController(params: {
         const canOffsaleConsignment = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
         return (
           <Space size={2}>
-          <PermissionButton permission="order.update" type="link" size="small" onClick={() => openEditOrder(order)}>编辑</PermissionButton>
           {order.account_id ? (
             <PermissionButton
               permission="order.create"
@@ -506,7 +454,7 @@ export function useOrdersPageController(params: {
               disabled={accountEditor.editingAccount !== null}
               onClick={() => void openAccountEditor(order)}
             >
-              编辑账号
+              编辑
             </PermissionButton>
           ) : null}
           <PermissionGate permission="order.event.post">
@@ -585,9 +533,6 @@ export function useOrdersPageController(params: {
     createType,
     currentEmployeeId,
     currentOperator,
-    editForm,
-    editOpen,
-    editSubmitting,
     employeeOptions,
     expandedOrderIds,
     exportLedger,
@@ -613,8 +558,6 @@ export function useOrdersPageController(params: {
     eventDrafts: accountEditor.eventDrafts,
     updateEventDraft: accountEditor.updateEventDraft,
     employees: accountEditor.employees,
-    timeSet: accountEditor.timeSet,
-    setTimeField: accountEditor.setTimeField,
     invEditExtraForm: accountEditor.invEditExtraForm,
     savingAccount: accountEditor.savingAccount,
     openAccountEditor,
@@ -627,10 +570,8 @@ export function useOrdersPageController(params: {
     loading,
     openAllocations,
     openCancelTransaction,
-    openEditOrder,
     openRefund,
     openSystemOffsale,
-    orderHasPostedEvents,
     orderTypeFilter,
     orders,
     page,
@@ -654,8 +595,6 @@ export function useOrdersPageController(params: {
     setCancelScope,
     setCancelSubmitting,
     setCreateType,
-    setEditOpen,
-    setEditSubmitting,
     setExpandedOrderIds,
     setInstallmentRefreshKey,
     setInventoryRefreshKey,
@@ -677,7 +616,6 @@ export function useOrdersPageController(params: {
     setUsers,
     sharedCancellationEvent,
     submitCancelTransaction,
-    submitEditOrder,
     typeNames,
     types,
     users,

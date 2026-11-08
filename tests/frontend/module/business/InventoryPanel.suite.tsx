@@ -241,7 +241,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getByText("暂无账号")).toBeInTheDocument();
   });
 
-  it("编辑账号时可编辑完整账号资料与时间入口", async () => {
+  it("编辑账号时可编辑完整账号资料", async () => {
     vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
@@ -260,9 +260,6 @@ describe("InventoryPanel：账号台账", () => {
       "编辑钱包实名",
       "编辑账号描述",
       "编辑备注",
-      "编辑订单创建时间",
-      "编辑售出时间",
-      "编辑流水时间",
     ]) {
       expect((await screen.findAllByLabelText(label)).length).toBeGreaterThan(0);
     }

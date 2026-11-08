@@ -60,8 +60,6 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     eventDrafts,
     updateEventDraft,
     employees,
-    timeSet,
-    setTimeField,
     invEditExtraForm,
     savingAccount,
     cancelInlineEdit,
@@ -182,8 +180,6 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
                   onSave={saveInline}
                   onCancel={cancelInlineEdit}
                   saving={savingAccount}
-                  timeSet={timeSet}
-                  onTimeSet={setTimeField}
                 />
               );
             },

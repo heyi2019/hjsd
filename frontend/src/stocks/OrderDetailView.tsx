@@ -1,7 +1,6 @@
 import { Space, Typography } from "antd";
-import dayjs from "dayjs";
 import type { Account, AccountExecutionDetail, AccountExecutionEvent } from "../shared/api/catalog";
-import { BusinessRegistrationForm, DateField, PermissionButton } from "../shared/ui";
+import { BusinessRegistrationForm, PermissionButton } from "../shared/ui";
 import { FieldConfigScope } from "../orders/ConfigurableField";
 import { OrderDetailDeliverySection } from "./OrderDetailDeliverySection";
 import { OrderDetailExecutionSection } from "./OrderDetailExecutionSection";
@@ -16,62 +15,11 @@ import type {
   InventoryEventDraft,
   InventoryExecutionRow,
   InventoryFinanceRow,
-  TimeFieldKey,
-  TimeSet,
 } from "./OrderDetail.shared";
 import "./OrderDetail.css";
 
 // 详情视图的共享行类型出口。
 export type { InventoryExecutionRow, InventoryFinanceRow, InventoryPartyLink } from "./OrderDetail.shared";
-export type { TimeFieldKey, TimeSet } from "./OrderDetail.shared";
-
-/** 编辑态时间编辑（#15 需求2）：三个系统时间戳可独立绝对设值或清空。
- *  台账显示的这三个值分别是 Order.created_at / SELL 事件 posted_at / Cashflow.created_at，
- *  后端按字段绝对写入（清空=置 NULL），不涉及相对平移。 */
-function TimeShiftFields({
-  base, timeSet, onTimeSet,
-}: {
-  base: Record<TimeFieldKey, string>;
-  timeSet: TimeSet;
-  onTimeSet: (field: TimeFieldKey, value: string | null) => void;
-}) {
-  const items: { key: TimeFieldKey; label: string }[] = [
-    { key: "registeredAt", label: "订单创建时间" },
-    { key: "soldAt", label: "售出时间" },
-    { key: "flowAt", label: "流水时间" },
-  ];
-  return (
-    <div className="inventory-detail__section inventory-time-shift">
-      <div className="inventory-detail__section-heading">
-        <Typography.Text strong>时间编辑</Typography.Text>
-        <Typography.Text type="secondary">
-          三个系统时间戳可独立设值或清空（清空即删除该时间），分期还款计划不变
-        </Typography.Text>
-      </div>
-      <div className="inventory-time-shift__fields">
-        {items.map(({ key, label }) => {
-          const raw = timeSet[key] !== undefined ? timeSet[key] : base[key];
-          const value = raw && raw !== "-" ? dayjs(String(raw)) : null;
-          return (
-            <label key={key} className="inventory-time-shift__field">
-              <span>{label}</span>
-              <DateField
-                showTime={{ format: "HH:mm" }}
-                format="YYYY-MM-DD HH:mm"
-                minuteStep={1}
-                allowClear
-                aria-label={`编辑${label}`}
-                value={value}
-                onChange={(v) => onTimeSet(key, v && v.isValid() ? v.format("YYYY-MM-DDTHH:mm:ss") : null)}
-              />
-            </label>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 type OrderDetailViewProps = {
   meta: OrderDetailMeta;
   detail?: AccountExecutionDetail | null;
@@ -93,9 +41,6 @@ type OrderDetailViewProps = {
   onSave?: () => void;
   onCancel?: () => void;
   saving?: boolean;
-  /** 编辑态时间编辑：已改动的字段与 setter（由库存台账控制器持有）。 */
-  timeSet?: TimeSet;
-  onTimeSet?: (field: TimeFieldKey, value: string | null) => void;
 };
 
 /** 详情容器：只负责「板块怎么摆」，板块内部各自独立成文件（见 OrderDetail*.tsx）。
@@ -121,8 +66,6 @@ export function OrderDetailView({
   onSave,
   onCancel,
   saving,
-  timeSet,
-  onTimeSet,
 }: OrderDetailViewProps) {
   const extraFieldsBySection = (section: string): OrderDetailField[] => meta.orderExtras
     .filter((field) => field.section === section)
@@ -132,15 +75,6 @@ export function OrderDetailView({
     return (
       <div className="inventory-detail inventory-detail--editing">
         <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onEdit={onEdit} />
-        <TimeShiftFields
-          base={{
-            registeredAt: meta.registeredAt,
-            soldAt: meta.soldAt,
-            flowAt: financeRows.find((row) => row.key.startsWith("flow-"))?.occurredAt ?? financeRows[0]?.occurredAt ?? "-",
-          }}
-          timeSet={timeSet ?? {}}
-          onTimeSet={onTimeSet ?? (() => undefined)}
-        />
         <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"

@@ -184,7 +184,7 @@ echo "==> 执行数据库迁移"
 # 首次上线必须先按 Release→Prod 流程重建库；不得用 stamp 把结构未完成的库伪装成已升级。
 docker compose run --rm backend alembic upgrade head
 
-# 发布纪律（V1.0.4 起）：部署脚本不得改库结构、不得写业务数据。
+# 发布纪律：部署脚本不写业务数据；后端启动阶段仅执行一组明确、幂等的存量结构兼容清理。
 # 下面两个历史调用已移除，禁止再加回：
 #   - scripts/stamp_db_version.py        → create_all 自建 db_version 表（41 → 42 表）
 #   - scripts/seed_policy_definitions.py → 写入 policy_definitions 定义与默认版本（0 → 6）

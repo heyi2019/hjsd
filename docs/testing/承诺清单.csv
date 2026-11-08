@@ -42,7 +42,7 @@ SECURITY-01,L2,后端,公开发布的安全边界（越权、注入、敏感信�
 RATELIMIT-01,L2,后端,登录与写端点必须限流,暴力破解、接口被刷,test_ratelimit.py,已覆盖,,
 BOOT-01,L1,后端,唯一入口必须可导入且已挂载 v1 路由,服务起不来或路由缺失,test_main_contract.py,已覆盖,,
 BACKUP-01,L1,后端,备份必须每日产出且可恢复,灾难发生时无可用备份,test_backup_scripts.py,已覆盖,,
-DEPLOY-01,L1,后端,发布脚本退出码契约（首次部署与健康检查）,发布失败却报成功,test_deploy_script_contract.py,已覆盖,,
+DEPLOY-01,L1,后端,发布脚本退出码契约（首次部署与健康检查）,发布失败却报成功,test_deploy_script_contract.py;test_runtime_schema_repair.py,已覆盖,,
 CORE-01,L1,后端,core 基础设施（money / numbering / errors / settings / database）契约稳定,基础层缺陷扩散至全系统,test_core_contract.py,已覆盖,,
 TESTING-03,L2,后端,覆盖率门禁只降不升,覆盖率静默下滑无人察觉,test_coverage_gate.py,已覆盖,,
 ROBUST-01,L2,后端,非法输入必须被明确拒绝，不得 500 或静默吞错,攻击面暴露、故障不可诊断,test_orders_guard.py;test_finance_contract.py;test_installments_contract.py,已覆盖,,

@@ -46,7 +46,7 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 | 系统发布版本 | `V1.0.5` |
 | 前端构建版本 | `1.0.5` |
 | 后端 API 版本 | `1.0.5`（唯一事实源 `backend/app/version.py`） |
-| 数据库迁移基线 | 活动链仅 `0001` = head；本版零 DDL |
+| 数据库迁移基线 | 活动链仅 `0001` = head；启动阶段执行幂等的已知结构漂移修复 |
 
 ### 本次内容
 
@@ -81,7 +81,7 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 **本次发布修复**
 
-- E2E 启动时清理已退役的 `capital_type` / `nature` 历史非空列，避免订单和资金流水接口出现 PostgreSQL 500。
+- 后端启动时清理已退役的 `capital_type` / `fund_nature` / `nature` 历史非空列，并补齐 `cashflow.accounting_attribute`，避免存量库订单和资金流水接口出现 PostgreSQL 500。
 - 修正资金流水 E2E 对已移除字段和旧成功提示的依赖；全量 Playwright E2E 62 项通过。
 - 按当前精简后的业务代码刷新四域覆盖率基线，避免旧版本基线误报发布失败。
 

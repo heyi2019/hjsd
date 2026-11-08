@@ -148,6 +148,11 @@ def test_backend_runtime_receives_explicit_release_version():
     assert engine.connection.statements == [
         'ALTER TABLE public."order_type_defs" DROP COLUMN IF EXISTS capital_type CASCADE',
         'ALTER TABLE public."orders" DROP COLUMN IF EXISTS capital_type CASCADE',
+        'ALTER TABLE public."order_type_pools" DROP COLUMN IF EXISTS fund_nature CASCADE',
+        'ALTER TABLE public."cashflow" DROP COLUMN IF EXISTS fund_nature CASCADE',
+        'ALTER TABLE public."cashflow" DROP COLUMN IF EXISTS nature CASCADE',
+        'ALTER TABLE public."cashflow" ADD COLUMN IF NOT EXISTS accounting_attribute '
+        "VARCHAR(32) NOT NULL DEFAULT 'EXPENSE'",
     ]
 
 

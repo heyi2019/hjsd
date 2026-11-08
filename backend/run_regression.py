@@ -166,6 +166,7 @@ GROUPS = {
         # 它确保扫描范围始终覆盖当前测试目录——缺失文件必须报错，不能静默变成空结果，
         # 用例会整批从用例库与报告里消失。纯静态，< 0.1s。
         "tests/backend/unit/system/test_manifest_parity.py",
+        "tests/backend/unit/system/test_runtime_schema_repair.py",
     ],
     "foundation": [
         "tests/backend/integration/settings/test_foundation_contract.py",

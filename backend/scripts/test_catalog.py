@@ -169,6 +169,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_reporting_r_consistency.py": "E01",
     "test_reporting_service_gaps.py": "E01",
     "test_request_schema_contract.py": "SYS07",
+    "test_runtime_schema_repair.py": "SYS09",
     "test_settings.py": "SYS06",
     "test_state_machine.py": "SYS04",
     "test_stock_intake_contract.py": "B04",

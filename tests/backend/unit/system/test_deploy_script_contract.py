@@ -126,7 +126,7 @@ def test_deploy_uses_admin_password_from_deploy_env_file(tmp_path):
 
 
 def test_explicit_app_version_overrides_deploy_env_file(tmp_path):
-    """CI 传入的发布版本必须优先于 ECS .env 中遗留的旧版本。"""
+    """CI 传入的发布版本必须优先于 ECS .env 中的版本。"""
     script, fake_bin = _release_tree(tmp_path)
     script.parent.parent.joinpath(".env").write_text(
         "APP_ENV=production\nAPP_VERSION=1.0.0\n", encoding="utf-8"
@@ -148,7 +148,6 @@ def test_backend_runtime_receives_explicit_release_version():
     assert engine.connection.statements == [
         'ALTER TABLE public."order_type_defs" DROP COLUMN IF EXISTS capital_type CASCADE',
         'ALTER TABLE public."orders" DROP COLUMN IF EXISTS capital_type CASCADE',
-        'ALTER TABLE public."cashflow" DROP COLUMN IF EXISTS nature CASCADE',
     ]
 
 

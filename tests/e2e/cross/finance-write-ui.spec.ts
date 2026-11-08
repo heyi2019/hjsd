@@ -217,7 +217,6 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
         pool_id: invest!.id,
         occurred_on: "2026-10-21",
         direction: "IN",
-        nature: "EXTERNAL_IN",
         category: "E2E_TRANSFER_FUNDING",
         amount: "100000.00",
         note: "E2E 划转用例前置充值",
@@ -248,7 +247,7 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
 
     // 业务规则：买号返点（BUY）只能关联回收（HS）订单。故新建 HS 订单作为来源。
     // HS 订单需绑定 IN_STOCK 的 RECOVERY 账号（与 business-write 夹具一致）。
-    // 库存台账路由已随表改名 accounts → stocks（迁移 0009），返回分页信封 { items, total }。
+    // 库存台账路由为 stocks，返回分页信封 { items, total }。
     const accounts = (await request
       .get(`${API_BASE}/stocks`, { headers: ADMIN })
       .then((r) => r.json())) as {
@@ -339,7 +338,7 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     await page.goto("/");
     await navItem(page, "业务中心").click();
     await page.getByRole("tab", { name: "分期与回款", exact: true }).click();
-    // 分期面板只剩「分期出售」Tab（代分期已下线），STOCK_SALE 合约直接在默认 Tab 内渲染。
+    // 分期面板的「分期出售」Tab 直接渲染 STOCK_SALE 合约。
 
     const row = page.locator(".ant-table-row", { hasText: instNo }).first();
     await expect(row).toBeVisible({ timeout: 10000 });

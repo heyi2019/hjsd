@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { installmentsApi, notificationsApi, optionSetsApi, ordersApi, reportsApi, stocksApi, type Order } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
+import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate } from "../shared/ui";
 import { CreateBusinessModal, type BusinessOrderType } from "../orders/CreateBusinessModal";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";

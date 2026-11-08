@@ -1,12 +1,12 @@
 """PROFIT-01 分润两种录入口径的契约测试。
 
-口径（2026-10-26 用户裁决「不止可以填比例，也可以填金额，两个都选填」）：
+口径：比例与金额均可独立填写，也可以都不填。
 
 - **按人模式**（items 不带 allocation_type）：每行一个姓名（user_id，空=公司归属），
   比例与金额都选填、同一行只能填一个。
   - 纯比例：合计必须 100%（沿用 BAS-06-03）。
   - 出现金额：金额合计不得超过订单利润，比例合计不得超过 100%。
-- **按动作模式**（items 都带 allocation_type）：原四项结构不变，用于兼容旧数据/旧前端。
+- **按动作模式**（items 都带 allocation_type）：保留四项结构，支持按动作录入。
 """
 
 from __future__ import annotations
@@ -249,7 +249,7 @@ def test_commission_report_uses_amount_as_payable_base(seeded_db):
     assert [row["profit_base"] for row in rows] == [Decimal("120.00")]
 
 
-# ---- 亏损单分润（2026-11-05 用户裁决「亏损的时候分亏损」）----
+# ---- 亏损单分润 ----
 # 亏损单按金额分润填负数，表示该人分担的亏损额。方向必须与订单盈亏一致，
 # 且报表 base 取负值（`amount != 0` 判据；旧实现用 `> 0` 会把负数当未填而回退比例）。
 

@@ -1,7 +1,6 @@
 import { appMessage } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form } from "antd";
-import dayjs from "dayjs";
 import { useEffect, useRef, useState } from "react";
 import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection } from "./ConfigurableField";
 import {
@@ -25,7 +24,6 @@ import { RecoveryCustomerSection } from "./recovery/RecoveryCustomerSection";
 import { RecoveryFeeSection } from "./recovery/RecoveryFeeSection";
 import { useRecoveryFormState } from "./recovery/useRecoveryFormState";
 import { ThOrderSection } from "./th/ThOrderSection";
-import { resizeInstallmentSchedule, serializeInstallmentSchedule } from "./InstallmentScheduleFields";
 import { DgOrderSection } from "./dg/DgOrderSection";
 
 export type BusinessOrderType = "HS" | "TH" | "DG";
@@ -36,20 +34,12 @@ const MODAL_TITLES: Record<string, string> = {
   DG: "新建代挂订单",
 };
 
-function toDateString(value: unknown) {
-  if (typeof value === "string" && value) return value;
-  if (value && typeof value === "object" && "format" in value && typeof value.format === "function") {
-    return value.format("YYYY-MM-DD");
-  }
-  return today();
-}
-
 export function CreateBusinessModal(props: {
   open: boolean;
   onClose: () => void;
   /** 建单成功后的刷新回调（页面重新拉列表）。 */
   onCreated: () => void | Promise<void>;
-  /** 必须从明确业务入口打开，订单类型不再通过通用兼容表单选择。 */
+  /** 由明确业务入口传入订单类型。 */
   initialOrderType: BusinessOrderType;
 }) {
   const orderType = props.initialOrderType;

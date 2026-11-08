@@ -103,9 +103,7 @@ def create_version(
             and conflict.effective_from < effective_from
             and (effective_to is None or conflict.effective_from < effective_to)
         ):
-            # 「开放至今」的旧版本由新版本接续封口（旧失效日 = 新生效日）：
-            # 否则开放版本一旦存在，任何新版本都建不出来，规则永远无法改版。
-            # 只调整生效窗口，不改旧版本 config（口径仍不可变）。
+            # 当前开放版本由新版本接续封口；配置内容保持不变。
             conflict.effective_to = effective_from
             session.add(conflict)
             session.flush()
@@ -195,9 +193,8 @@ def supersede_draft_version(
 ) -> dict[str, Any]:
     """取消草稿版本（SUPERSEDED）。
 
-    语义边界：**只有 DRAFT 可取消**。已发布（ACTIVE）版本是历史日期的
-    解析口径（resolve_version 按 status=ACTIVE + 生效期取版本），
-    取消会挖掉历史规则的落点；要下线生效版本请新建版本封口生效期。
+    语义边界：**只有 DRAFT 可取消**。已发布（ACTIVE）版本参与按日期解析，
+    要停止使用请新建版本封口生效期。
     replaced_by_version_id 用于记录替代关系（可选，须属同一规则定义）。
     """
     item = session.get(PolicyVersion, version_id)
@@ -205,7 +202,7 @@ def supersede_draft_version(
         raise NotFound(f"规则版本 {version_id} 不存在", details={"version_id": version_id})
     if item.status != PolicyStatus.DRAFT.value:
         raise Validation(
-            "只能取消草稿版本；已发布版本是历史解析口径，请用新建版本封口生效期",
+            "只能取消草稿版本；已发布版本请用新建版本封口生效期",
             details={"version_id": version_id, "status": item.status},
         )
     text = _required_text(reason, field="reason", message="取消必须填写理由")

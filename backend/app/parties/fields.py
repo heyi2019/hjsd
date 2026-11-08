@@ -59,7 +59,7 @@ def _extra_definitions(
 
 
 def _option_values(definition: OrderFormField) -> list[str]:
-    """归一化字段选项：兼容纯字符串数组与 {value,label} 对象数组。"""
+    """归一化字段选项，支持字符串数组与 {value,label} 对象数组。"""
     values: list[str] = []
     for item in definition.options or []:
         if isinstance(item, str):

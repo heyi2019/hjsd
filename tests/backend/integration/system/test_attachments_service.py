@@ -129,7 +129,7 @@ def test_load_target_cashflow_not_found(seeded_db):
 def test_load_target_cashflow_success(seeded_db):
     flow = Cashflow(
         flow_no="CF-TEST-1", pool_id=1, occurred_on=D,
-        nature="BUSINESS_IN", direction="IN", amount=to_money("10"),
+        direction="IN", amount=to_money("10"),
         accounting_attribute="SELF_REVENUE",
         category="REBATE",
     )

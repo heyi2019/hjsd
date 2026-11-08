@@ -1,6 +1,6 @@
-"""value_added_services.service：分期合约建档 / 还款 / 结清 / 回收的统一入口。
+"""分期合约建档、还款、结清与回收统一入口。
 
-本模块是兼容层（facade），只做符号再导出，不含业务逻辑：
+本模块只做符号再导出，不含业务逻辑：
 - 共用工具 → `app.value_added_services._shared`
 - 建档与列表 → `app.value_added_services.create`
 - 还款/减免/展期 → `app.value_added_services.repayment`

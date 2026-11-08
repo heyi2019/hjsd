@@ -25,7 +25,7 @@ def test_rebate_has_only_register_edit_delete_lifecycle():
 
 
 def test_rebate_settlement_model_layer_is_removed():
-    """2026-11-05 裁决：返点分次结算表 / ORM / 编号器整体下线。
+    """返点分次结算表、ORM 与编号器不属于当前模型。
 
     已有库（含生产）保留历史表、不 drop，避免破坏历史数据；全新库由活动基线
     `create_all` 按 ORM 建表，所以 metadata 里不能再出现这张表，否则新装环境

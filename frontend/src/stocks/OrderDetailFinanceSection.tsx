@@ -16,7 +16,6 @@ export function OrderDetailFinanceSection({
   totalExpense,
   totalIncome,
   flowCount,
-  editing,
 }: {
   rows: InventoryFinanceRow[];
   extraFields: OrderDetailField[];
@@ -25,7 +24,6 @@ export function OrderDetailFinanceSection({
   totalExpense: string;
   totalIncome: string;
   flowCount: number;
-  editing?: boolean;
 }) {
   const columns: ColumnsType<InventoryFinanceRow> = [
     { title: "类型", dataIndex: "type", key: "type" },

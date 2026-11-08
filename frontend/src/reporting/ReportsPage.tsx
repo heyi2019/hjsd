@@ -11,7 +11,7 @@ import { MonthlyPnl } from "./reports/MonthlyPnlReport";
 import { OrderProfit } from "./reports/OrderProfitReport";
 import { type ReportRange, ReportsActiveContext } from "./reports/shared";
 
-export function ReportsPage({ onNavigate, active = true, initialReportTab }: { onNavigate?: (key: string) => void; active?: boolean; initialReportTab?: "commission" | "my-earnings" }) {
+export function ReportsPage({ active = true, initialReportTab }: { active?: boolean; initialReportTab?: "commission" | "my-earnings" }) {
   const [myEarnings, setMyEarnings] = useState(initialReportTab === "my-earnings");
   const [activeTab, setActiveTab] = useState(initialReportTab === "commission" || myEarnings ? "r3" : "r1");
   // 报表视图统计周期：提升到父级，避免切换 Tab（非挂载）后筛选条件丢失。

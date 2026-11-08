@@ -12,7 +12,6 @@ from app.core.errors import Conflict, NotFound, Validation
 from app.core.numbering import allocate_number
 from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus, AuditAction, InstallmentContractType, SequenceKey
-from app.legacy_imports.models import ImportRow
 from app.domain.trade import Account, InstallmentDisposition, Order
 from app.parties import service as parties_service
 from ._common import (
@@ -271,7 +270,7 @@ def delete_account(
 ) -> None:
     """物理删除库存账号（仅管理员），业务单据全部保留。
 
-    口径（2026-11-05 裁决）：账号行删除，**订单 / 事件 / 资金流水 / 返点一律保留**，
+    账号行删除时，**订单 / 事件 / 资金流水 / 返点一律保留**，
     订单里的 ``account_snapshot`` 仍保存账号文本，报表按订单取数不受影响。
     关联解绑由本服务显式完成（而不是只靠数据库 ON DELETE SET NULL）：
     生产库是增量升级而来，外键行为以这份代码为准，避免老库 FK 定义不一致时
@@ -297,9 +296,6 @@ def delete_account(
             select(Order.id, Order.order_no).where(Order.account_id == account_id)
         ).all()
     ]
-    import_row_count = session.query(ImportRow).filter(
-        ImportRow.mapped_account_id == account_id
-    ).count()
     before = {
         "id": account.id,
         "stock_no": account.stock_no,
@@ -321,9 +317,6 @@ def delete_account(
     session.query(Order).filter(Order.account_id == account_id).update(
         {Order.account_id: None}, synchronize_session=False
     )
-    session.query(ImportRow).filter(ImportRow.mapped_account_id == account_id).update(
-        {ImportRow.mapped_account_id: None}, synchronize_session=False
-    )
     session.delete(account)
     session.flush()
     record_audit(
@@ -336,7 +329,6 @@ def delete_account(
         after={
             "deleted": True,
             "unlinked_orders": linked_orders,
-            "unlinked_import_rows": import_row_count,
         },
         reason=cleaned_reason,
     )

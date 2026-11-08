@@ -128,7 +128,7 @@ test("分润弹窗默认按操作模型保存四项比例", async ({ page, reque
 test.describe.serial("重写入用例（串行隔离）", () => {
   test.slow();
   test("页面售出绑定操作人，返点登记后在返点明细可见", async ({ page, request }) => {
-    // 库存台账路由已随表改名 accounts → stocks（迁移 0009），返回分页信封 { items, total }。
+    // 库存台账路由为 stocks，返回分页信封 { items, total }。
     const accountPaged = (await (
       await request.get(`${base}/stocks`, { headers })
     ).json()) as {

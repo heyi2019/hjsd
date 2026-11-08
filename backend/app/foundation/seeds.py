@@ -64,7 +64,6 @@ SEED_SEQUENCES: tuple[tuple[str, str, int], ...] = (
     # 资金流水按方向独立递增（2026-10-28 口径）：支出 ZC+五位、收入 SR+五位。
     (SequenceKey.CASHFLOW_OUT.value, "ZC", 5),
     (SequenceKey.CASHFLOW_IN.value, "SR", 5),
-    (SequenceKey.IMPORT.value, "IMP", 4),
     (SequenceKey.ATTACHMENT.value, "ATT", 4),
     # 库存编号（KU_ 序列，2026-10-28 口径）：KU_ + 五位流水（KU_00001…），
     # 独立于业务订单，账号创建时自动发放。
@@ -73,7 +72,7 @@ SEED_SEQUENCES: tuple[tuple[str, str, int], ...] = (
 
 
 def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, int]:
-    """写入 M0 种子；返回各对象的“新建数 / 跳过数”，便于迁移与测试断言。"""
+    """写入 M0 种子；返回各对象的“新建数 / 跳过数”，便于测试断言。"""
     stats: dict[str, int] = {
         "pools_created": 0,
         "pools_skipped": 0,
@@ -197,7 +196,7 @@ def _ensure_sequence_once(
 
 
 def seed_is_applied(session: Session) -> bool:
-    """判断 M0 种子是否已落地（迁移前置检查）。"""
+    """判断 M0 种子是否已落地。"""
     return (
         service.get_pool_by_code(session, "HJ_INVEST") is not None
         and service.get_pool_by_code(session, "HJ_PROFIT") is not None

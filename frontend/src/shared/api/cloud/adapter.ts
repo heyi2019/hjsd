@@ -3,7 +3,7 @@
  *
  * 设计边界：
  * - 只在发布域（或 VITE_DATA_SOURCE=cloud）启用，本地 5188 / ECS 仍走原 FastAPI；
- * - 复用 axios adapter 接口，因此 src/shared/api/*.api.ts 的 146 处调用点无需改动；
+ * - 复用 axios adapter 接口，业务 API 无需感知数据源；
  * - 云端是 heijin_erp_release 的只读快照，写操作一律返回明确的业务错误，不静默造假成功。
  */
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from "axios";
@@ -128,11 +128,7 @@ function cloudFailure(config: InternalAxiosRequestConfig, cause: unknown): never
   return fail(config, 400, "CLOUD_REQUEST_FAILED", `云服务请求失败：${detail}`);
 }
 
-/**
- * 集合响应同时兼容两种消费方：数组本身可 .map()，也带 .items/.total 等属性。
- * 后端各端点返回形状不一（PageResponse / {items,total} / 裸数组），
- * 这里用一个数组 + 附加属性统一兜住，避免逐端点散改。
- */
+/** 统一集合响应的数组访问、分页元数据与汇总字段。 */
 function collection(rows: Row[], params: Record<string, string>): Row[] & Record<string, unknown> {
   const limit = params.limit ? Number(params.limit) : undefined;
   const offset = params.offset ? Number(params.offset) : 0;
@@ -199,7 +195,7 @@ function csvBlob(rows: Row[]): Blob {
   return new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
 }
 
-function resolveTable(path: string, segments: string[]): string | undefined {
+function resolveTable(segments: string[]): string | undefined {
   const root = segments[0];
   if (segments.length >= 3) {
     const two = `${root}/${segments[2]}`;
@@ -211,7 +207,7 @@ function resolveTable(path: string, segments: string[]): string | undefined {
 }
 
 /** 子集合按路径里的父 id 过滤，列名取行里真实存在的那一个。 */
-function parentFilter(table: string, segments: string[], rows: Row[]): Row[] {
+function parentFilter(segments: string[], rows: Row[]): Row[] {
   if (segments.length < 3 || !rows.length) return rows;
   const parentId = segments[1];
   if (!/^\d+$/.test(parentId)) return rows;
@@ -327,12 +323,12 @@ export const cloudAdapter: AxiosAdapter = async (config) => {
   }
 
   // ---- 通用表查询 ----
-  const table = resolveTable(path, segments);
+  const table = resolveTable(segments);
   if (!table) return ok(config, collection([], params));
 
   try {
     let rows = await fetchRows(table, params);
-    rows = parentFilter(table, segments, rows);
+    rows = parentFilter(segments, rows);
 
     // 单条：/resource/:id（或 /option-sets/:code）
     if (segments.length === 2 && !IGNORED_PARAMS.has(segments[1])) {

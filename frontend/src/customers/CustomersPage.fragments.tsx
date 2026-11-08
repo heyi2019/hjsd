@@ -48,7 +48,7 @@ export function collectExtras(
  *  必须透传 Form.Item 注入的 id / value / onChange：包装组件若吞掉这些 props，
  *  标签的 htmlFor 会指向不存在的 id（a11y 断链），且表单值收集为空。 */
 export function ExtraFieldControl({ def, ...controlProps }: { def: OrderFormField; [key: string]: unknown }) {
-  // 选项兼容纯字符串数组与 {value,label} 对象数组
+  // 选项支持字符串数组与 {value,label} 对象数组。
   const options = (def.options ?? []).map((option) =>
     typeof option === "string"
       ? { value: option, label: option }

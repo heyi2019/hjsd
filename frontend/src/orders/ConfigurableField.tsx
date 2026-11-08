@@ -226,7 +226,7 @@ export function CfgItem(props: {
   rules?: Rule[];
   valuePropName?: string;
   tooltip?: ReactNode;
-  /** 固定展示名称：字段键与配置仍保留，避免历史配置的旧文案影响统一业务术语。 */
+  /** 固定展示名称，统一业务术语。 */
   fixedLabel?: string;
   /** 字段下方的补充说明文案（antd Form.Item.extra）。 */
   extra?: ReactNode;
@@ -291,7 +291,7 @@ export function CfgNestedItem(props: {
   name: string;
   /** 无配置时的兜底名称；统一术语字段应改用 fixedLabel。 */
   label?: string;
-  /** 固定展示名称：字段键与配置仍保留，避免历史配置的旧文案影响统一业务术语。 */
+  /** 固定展示名称，统一业务术语。 */
   fixedLabel?: string;
   rules?: Rule[];
   initialValue?: unknown;
@@ -361,7 +361,7 @@ export type FormExtraDisplayItem = {
  *  - 有定义：label 取配置名，status 按 is_active 区分 active / inactive；
  *  - 无定义（字段已删除）：label 回退裸 key，status = deleted。
  * 空值（null / "" / 空数组）过滤。客户列表、客户详情、订单详情共用本函数，
- * 确保删除/停用字段的历史值始终可见且口径一致（修复「列表看到、详情消失」的矛盾）。 */
+ * 确保删除/停用字段的值始终可见且口径一致。 */
 export function buildFormExtraDisplay(
   extra: Record<string, unknown> | null | undefined,
   fieldDefs?: Array<Pick<OrderFormField, "field_key" | "label" | "is_active">>,
@@ -389,7 +389,7 @@ export function buildFormExtraDisplay(
   return items;
 }
 
-/** 历史扩展字段值的通用格式化（与展示兜底共用，避免各页面重复实现）。 */
+/** 扩展字段值的通用格式化。 */
 export function formatExtraDisplayValue(value: unknown): string {
   if (value === null || value === undefined || value === "") return "";
   if (Array.isArray(value)) return value.map((item) => String(item)).join("、");

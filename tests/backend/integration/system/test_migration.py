@@ -227,18 +227,6 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
         ).scalar_one()
         assert legacy_rebate_action_fields == 0
 
-        # source_kind 通过 CHECK 约束限定为 5 种标准导入类型，LEGACY_ORDER 已下线。
-        source_kind_clause = _check_clauses(engine, "import_batches")
-        for source_kind in (
-            "STANDARD_ORDER",
-            "STANDARD_ACCOUNT",
-            "STANDARD_CASHFLOW",
-            "STANDARD_INSTALLMENT",
-            "STANDARD_LEAD",
-        ):
-            assert source_kind in source_kind_clause
-        assert "LEGACY_ORDER" not in source_kind_clause
-
         # 库存唯一索引必须是业务键（KU_+5），旧 uq_stocks_inventory_no 已退役。
         assert "uq_stocks_inventory_no" not in _unique_index_names(engine, "stocks")
 
@@ -297,7 +285,7 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
         assert {"ORDER_HS", "ORDER_TH", "ORDER_DG", "CUSTOMER", "COUNTERPARTY"} <= sequences
         # EVENT/REBATE 仍禁止。
         assert {"EVENT", "REBATE"}.isdisjoint(sequences)
-        # 2026-10-28 裁决：资金流水按方向独立编号（支出 ZC+五位 / 收入 SR+五位），CF 共用域退役。
+        # 资金流水按方向独立编号（支出 ZC+五位 / 收入 SR+五位），CF 共用域停用。
         assert connection.execute(
             text(
                 "SELECT sequence_key || '=' || prefix || '=' || padding FROM document_sequences "
@@ -429,7 +417,7 @@ def test_current_migration_head_is_exposed():
     assert result.returncode == 0, result.stdout + result.stderr
     stdout = result.stdout.strip()
     # alembic heads 形如 "0025 (head)"；head 必须真实存在且被 alembic 识别。
-    # 不再硬编码 revision —— 迁移链推进后硬编码值会腐化（此前 0010 已落后于实际 head）。
+    # 不硬编码 revision，迁移链推进后始终从当前文件解析 head。
     assert "(head)" in stdout, f"alembic heads 未报告 head：\n{stdout}"
     head_rev = stdout.split()[0]
     version_files = [

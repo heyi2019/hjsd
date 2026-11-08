@@ -87,46 +87,6 @@ class TestDepositQueries:
             seeded_db.flush()
         seeded_db.rollback()
 
-    def test_internal_cashflow_requires_transfer_id(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        seeded_db.add(
-            Cashflow(
-                flow_no="CF-INTERNAL-WITHOUT-TRANSFER",
-                pool_id=invest.id,
-                occurred_on=TODAY,
-                nature="INTERNAL",
-                category="TRANSFER",
-                direction="IN",
-                amount=Decimal("1.00"),
-                status="APPROVED",
-                created_by="pytest",
-                updated_by="pytest",
-            )
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
-    def test_cashflow_direction_and_nature_must_match(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        seeded_db.add(
-            Cashflow(
-                flow_no="CF-INVALID-DIRECTION-NATURE",
-                pool_id=invest.id,
-                occurred_on=TODAY,
-                nature="EXTERNAL_IN",
-                category="INVALID",
-                direction="OUT",
-                amount=Decimal("1.00"),
-                status="APPROVED",
-                created_by="pytest",
-                updated_by="pytest",
-            )
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
     def test_reconciliation_difference_matches_two_balances_in_database(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         seeded_db.add(
@@ -167,7 +127,6 @@ class TestDepositQueries:
             pool_id=invest.id,
             occurred_on=TODAY,
             direction="IN",
-            nature="EXTERNAL_IN",
             category="CUSTOMER_RECEIPT",
             amount=Decimal("100"),
             note="第一笔",
@@ -178,7 +137,6 @@ class TestDepositQueries:
             pool_id=invest.id,
             occurred_on=TODAY,
             direction="OUT",
-            nature="BUSINESS_OUT",
             category="OPERATING_COST",
             amount=Decimal("20"),
             note="第二笔",
@@ -188,7 +146,7 @@ class TestDepositQueries:
 
         response = seeded_client.get(
             "/api/v1/cashflows",
-            params={"nature": "EXTERNAL_IN", "category": "CUSTOMER_RECEIPT"},
+            params={"category": "CUSTOMER_RECEIPT"},
             headers=headers,
         )
 
@@ -215,7 +173,6 @@ class TestDepositQueries:
                 pool_id=invest.id,
                 occurred_on=TODAY,
                 direction="IN",
-                nature="BUSINESS_IN",
                 category=123,
                 amount=Decimal("1"),
                 actor="finance",
@@ -494,7 +451,6 @@ class TestCashflowLifecycle:
             pool_id=invest.id,
             occurred_on=TODAY,
             direction="OUT",
-            nature="BUSINESS_OUT",
             category="OPERATING",
             amount=Decimal("120.00"),
             actor="pytest",
@@ -512,7 +468,6 @@ class TestCashflowLifecycle:
             pool_id=invest.id,
             occurred_on=TODAY,
             direction="OUT",
-            nature="BUSINESS_OUT",
             category="OPERATING",
             amount=Decimal("60.00"),
             actor="pytest",
@@ -569,7 +524,6 @@ class TestReconciliation:
             flow_no="CF-RECON-1",
             pool_id=invest.id,
             occurred_on=TODAY,
-            nature="BUSINESS_IN",
             category="OTHER",
             direction="IN",
             amount=Decimal("100.00"),
@@ -629,7 +583,6 @@ class TestFinanceApi:
             flow_no="CF-RECON-API-1",
             pool_id=invest.id,
             occurred_on=TODAY,
-            nature="BUSINESS_IN",
             category="OTHER",
             direction="IN",
             amount=Decimal("100.00"),
@@ -685,7 +638,6 @@ class TestFinanceApi:
                 "pool_id": 1,
                 "occurred_on": TODAY.isoformat(),
                 "direction": "OUT",
-                "nature": "BUSINESS_OUT",
                 "category": "OPERATING",
                 "amount": "25.00",
                 "note": "接口测试费用",
@@ -855,17 +807,17 @@ class TestFinanceApi:
             [
                 Cashflow(
                     flow_no="CF-PAGE-1", pool_id=1, occurred_on=date(2026, 10, 1),
-                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("1"),
+                    category="OTHER", direction="IN", amount=Decimal("1"),
                     created_by="pytest", updated_by="pytest",
                 ),
                 Cashflow(
                     flow_no="CF-PAGE-2", pool_id=2, occurred_on=date(2026, 10, 2),
-                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("2"),
+                    category="OTHER", direction="IN", amount=Decimal("2"),
                     created_by="pytest", updated_by="pytest",
                 ),
                 Cashflow(
                     flow_no="CF-PAGE-3", pool_id=1, occurred_on=date(2026, 10, 3),
-                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("3"),
+                    category="OTHER", direction="IN", amount=Decimal("3"),
                     created_by="pytest", updated_by="pytest",
                 ),
             ]
@@ -896,17 +848,17 @@ class TestFinanceApi:
             [
                 Cashflow(
                     flow_no="CF-TOTAL-1", pool_id=1, occurred_on=date(2026, 10, 1),
-                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("1"),
+                    category="OTHER", direction="IN", amount=Decimal("1"),
                     created_by="pytest", updated_by="pytest",
                 ),
                 Cashflow(
                     flow_no="CF-TOTAL-2", pool_id=2, occurred_on=date(2026, 10, 2),
-                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("2"),
+                    category="OTHER", direction="IN", amount=Decimal("2"),
                     created_by="pytest", updated_by="pytest",
                 ),
                 Cashflow(
                     flow_no="CF-TOTAL-3", pool_id=1, occurred_on=date(2026, 10, 3),
-                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("3"),
+                    category="OTHER", direction="IN", amount=Decimal("3"),
                     created_by="pytest", updated_by="pytest",
                 ),
             ]
@@ -968,7 +920,6 @@ class TestFinanceApi:
                     flow_no="CF-SCOPE-OWN",
                     pool_id=1,
                     occurred_on=TODAY,
-                    nature="BUSINESS_IN",
                     category="OTHER",
                     direction="IN",
                     amount=Decimal("10"),
@@ -980,7 +931,6 @@ class TestFinanceApi:
                     flow_no="CF-SCOPE-OTHER",
                     pool_id=1,
                     occurred_on=TODAY,
-                    nature="BUSINESS_IN",
                     category="OTHER",
                     direction="IN",
                     amount=Decimal("20"),
@@ -1107,7 +1057,6 @@ class TestFinanceApi:
         assert payload["operator"] == "admin"
         assert payload["created_at"]
         assert len(payload["cashflows"]) == 2
-        assert {row["nature"] for row in payload["cashflows"]} == {"INTERNAL"}
         assert {row["direction"] for row in payload["cashflows"]} == {"IN", "OUT"}
         assert len({row["transfer_id"] for row in payload["cashflows"]}) == 1
         source_balance = orders_service.pool_balance(seeded_db, invest.id)
@@ -1158,7 +1107,6 @@ class TestFinanceApi:
                 flow_no="TR-REPAIR-OUT",
                 pool_id=invest.id,
                 occurred_on=TODAY,
-                nature="INTERNAL",
                 category="TRANSFER",
                 direction="OUT",
                 amount=Decimal("80"),
@@ -1202,7 +1150,6 @@ class TestFinanceApi:
                 flow_no="TR-REPAIR-API-OUT",
                 pool_id=invest.id,
                 occurred_on=TODAY,
-                nature="INTERNAL",
                 category="TRANSFER",
                 direction="OUT",
                 amount=Decimal("45"),

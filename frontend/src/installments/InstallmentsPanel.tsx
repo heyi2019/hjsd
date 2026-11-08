@@ -3,12 +3,9 @@
 import { Button, Card, DatePicker, Segmented, Space, Typography } from "antd";
 import { useState } from "react";
 import type { Dayjs } from "dayjs";
-import { installmentsApi, type Installment, type Schedule } from "../shared/api/catalog";
-import { today } from "../shared/lib/format";
+import type { Installment, Schedule } from "../shared/api/catalog";
 import { configurableLabel } from "../shared/lib/optionSets";
-import { DataTable, ErrorBanner, PermissionButton, StatRow } from "../shared/ui";
-
-
+import { DataTable, ErrorBanner, StatRow } from "../shared/ui";
 import { DISPOSITION_LABEL } from "./InstallmentsPanel.fragments";
 import { useContractTableController } from "./useContractTableController";
 import { ContractModals } from "./InstallmentsPanel.modals";
@@ -28,32 +25,17 @@ function ContractTable({
   });
   const {
     arrangeColumns,
-    cancelForm,
     columns,
-    defaultForm,
     dispositions,
     error,
     exportCsv,
     exporting,
     load,
     loading,
-    openDeliver,
-    orders,
-    payForm,
-    recoverForm,
-    resaleForm,
     rows,
     scheduleColumns,
     schedules,
-    setCancelTarget,
-    setDefaultTarget,
-    setPayTarget,
-    setRecoverTarget,
-    setResaleTarget,
-    setSettleTarget,
     setSortDesc,
-    settleForm,
-    settlePermission,
     sortDesc,
     totalPaid,
     totalReceivable,

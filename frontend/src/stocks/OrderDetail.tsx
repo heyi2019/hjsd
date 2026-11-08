@@ -261,7 +261,7 @@ export function OrderDetail({
     order.events.map((event) => ({
       key: `${order.order_id}-${event.id}`,
       category: classifyEventCategory(event.event_type),
-      action: executionActionLabel(event.event_type, order.order_type),
+      action: executionActionLabel(event.event_type),
       occurredAt: dateTimeMinute(event.occurred_at ?? event.occurred_on),
       amount: event.amount,
       operator: event.operator_names?.length ? event.operator_names.join("、") : event.operator || "-",

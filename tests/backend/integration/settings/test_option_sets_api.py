@@ -10,7 +10,7 @@ def test_list_empty_initially(client, headers):
 
 
 def test_read_requires_login(client):
-    """2026-10-27 鉴权缺口回归守卫：读端点此前误用裸函数默认值，匿名可读（200）。"""
+    """读端点必须经过鉴权，匿名请求不得返回 200。"""
     assert client.get(OPTION_SETS).status_code == 401
     assert client.get(f"{OPTION_SETS}/QUALITY_SEVERITY").status_code == 401
 
@@ -89,7 +89,7 @@ def test_dead_enum_rejects_option_change(client, headers):
 
 
 def test_dead_enum_allows_label_only_change(client, headers):
-    """2026-10-26 裁决：死枚举的值集合锁死，但展示文案可在设置页维护。
+    """死枚举的值集合锁定，但展示文案可在设置页维护。
 
     不放开的话 47 项词典里只有 2 项纯字典能改文案，「改文案 → 全站表格同步」形同虚设。
     """

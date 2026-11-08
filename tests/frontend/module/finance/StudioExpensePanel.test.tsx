@@ -42,12 +42,12 @@ const pools = [
 
 const expenseFlows = [
   {
-    id: 51, flow_no: "CF-001", pool_id: 1, occurred_on: "2026-10-20", nature: "BUSINESS_OUT",
+    id: 51, flow_no: "CF-001", pool_id: 1, occurred_on: "2026-10-20",
     category: "房租", direction: "OUT", amount: "3000.00", source: "OTHER", status: "APPROVED",
     accounting_attribute: "OPERATING_EXPENSE",
   },
   {
-    id: 52, flow_no: "CF-002", pool_id: 2, occurred_on: "2026-10-21", nature: "BUSINESS_OUT",
+    id: 52, flow_no: "CF-002", pool_id: 2, occurred_on: "2026-10-21",
     category: "日用", direction: "OUT", amount: "100.00", source: "OTHER", status: "PENDING",
     accounting_attribute: "OPERATING_EXPENSE",
   },

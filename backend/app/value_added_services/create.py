@@ -200,7 +200,7 @@ def _service_fee_from_snapshot(
 
 #: 合约类型 → 允许的订单类型；未登记的类型不做该约束由调用方另行校验。
 #: 分期出售的业务名称只有一个，回收/提号售出可用，代挂售出仅全款不建分期合约；
-#: PICKUP_SALE / CONSIGNMENT_SALE 是迁移 0056 之前的遗留类型，只为读取历史数据保留。
+#: PICKUP_SALE / CONSIGNMENT_SALE 仍作为已存在分期合同的输入类型。
 _CONTRACT_ALLOWED_ORDER_TYPES = {
     InstallmentContractType.STOCK_SALE.value: frozenset({"HS", "TH"}),
     InstallmentContractType.PICKUP_SALE.value: frozenset({"TH"}),

@@ -31,7 +31,7 @@ class TimestampMixin:
 class AuditMixin(TimestampMixin):
     """带操作人痕迹的通用混入。
 
-    匿名用户（迁移/种子）写 `system`，保证责任人永不为空。
+    自动任务写 `system`，保证责任人永不为空。
     """
 
     created_by: Mapped[str] = mapped_column(String(64), nullable=False, default="system")

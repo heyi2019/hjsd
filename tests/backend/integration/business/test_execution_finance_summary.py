@@ -110,7 +110,6 @@ def test_summary_splits_cashflow_and_rebate_income(seeded_client, seeded_db, hea
         pool_id=pool.id,
         occurred_on=TODAY,
         direction="IN",
-        nature="BUSINESS_IN",
         category="OTHER",
         amount=Decimal("100"),
         order_id=order.id,
@@ -125,7 +124,7 @@ def test_summary_splits_cashflow_and_rebate_income(seeded_client, seeded_db, hea
     assert Decimal(summary["rebate_income"]) == Decimal("50.00")
     assert Decimal(summary["total_income"]) == Decimal("150.00")
     assert Decimal(summary["total_expense"]) == Decimal("300.00")
-    # 净额 = 所有收入 − 所有支出；返点登记即收入，必须并入净额（11-05 裁决）。
+    # 净额 = 所有收入 − 所有支出；返点登记即收入，必须并入净额。
     assert Decimal(summary["net_amount"]) == Decimal("-150.00")
 
 
@@ -139,7 +138,6 @@ def test_summary_equals_manual_sum_over_detail_rows(seeded_client, seeded_db, he
         pool_id=pool.id,
         occurred_on=TODAY,
         direction="OUT",
-        nature="BUSINESS_OUT",
         category="OTHER",
         amount=Decimal("12.34"),
         order_id=order.id,
@@ -150,7 +148,6 @@ def test_summary_equals_manual_sum_over_detail_rows(seeded_client, seeded_db, he
         pool_id=pool.id,
         occurred_on=TODAY,
         direction="IN",
-        nature="BUSINESS_IN",
         category="OTHER",
         amount=Decimal("88.66"),
         order_id=order.id,

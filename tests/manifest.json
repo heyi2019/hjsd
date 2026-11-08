@@ -23,35 +23,35 @@
       ],
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
-        "files": 116,
-        "cases": 1643,
+        "files": 114,
+        "cases": 1587,
         "kinds": {
           "unit": {
-            "files": 32,
-            "cases": 271,
+            "files": 31,
+            "cases": 258,
             "byArea": {
               "business": 5,
               "customer": 1,
               "finance": 3,
-              "operations": 2,
+              "operations": 1,
               "settings": 2,
               "system": 19
             }
           },
           "integration": {
-            "files": 84,
-            "cases": 1372,
+            "files": 83,
+            "cases": 1329,
             "byArea": {
               "business": 31,
               "customer": 6,
               "finance": 14,
-              "operations": 6,
+              "operations": 5,
               "settings": 13,
               "system": 14
             }
           }
         },
-        "_baseline_note": "2026-11-07 清理已下线功能对应的历史测试资产后，磁盘 116 文件 / 后端全量收集 1643 例；数量以实际递归扫描与 pytest 收集为准。"
+        "_baseline_note": "清理已下线功能对应的测试资产后，数量以实际递归扫描与 pytest 收集为准。"
       },
       "budgets": {
         "fast": 60,

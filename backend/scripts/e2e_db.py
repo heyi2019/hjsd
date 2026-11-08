@@ -63,13 +63,12 @@ from app.domain import (  # noqa: E402
     trade,
     users,
 )
-from app.legacy_imports import models as imports  # noqa: E402
 from app.foundation.seeds import seed_foundation  # noqa: E402
 from app.foundation.catalog_seed import seed_catalog  # noqa: E402
 from app.foundation.seed_orders import seed_order_matrix  # noqa: E402
 
 __all__ = [
-    "attachments", "foundation", "imports", "lists", "notifications",
+    "attachments", "foundation", "lists", "notifications",
     "options", "parties", "quality", "trade", "users",
 ]
 
@@ -118,11 +117,10 @@ def _truncate_all(engine) -> None:
 
 
 def _drop_retired_columns(engine) -> None:
-    """让常驻 E2E 库追平当前 ORM，清掉历史版本遗留的非空字段。
+    """让常驻 E2E 库追平当前 ORM，清掉已删除的非空字段。
 
-    `keep` 模式只执行 ``create_all``，不会修改已有表；旧库因此可能仍保留
-    已从当前模型删除、但带 NOT NULL 的 ``capital_type`` / ``nature``，新写入
-    订单和资金流水时会被 PostgreSQL 拒绝。
+    `keep` 模式只执行 ``create_all``，不会修改已有表；已有表可能仍保留
+    已从当前模型删除、但带 NOT NULL 的 ``capital_type``，新写入订单时会被拒绝。
     """
     with engine.begin() as connection:
         connection.execute(
@@ -130,9 +128,6 @@ def _drop_retired_columns(engine) -> None:
         )
         connection.execute(
             text('ALTER TABLE public."orders" DROP COLUMN IF EXISTS capital_type CASCADE')
-        )
-        connection.execute(
-            text('ALTER TABLE public."cashflow" DROP COLUMN IF EXISTS nature CASCADE')
         )
 
 

@@ -126,7 +126,7 @@ def update_option_set(
         # 死枚举（editable=False）：值集合受 DB CHECK / domain/enums.py 约束，
         # 增删或改顺序会让业务语义漂移，故值序列必须逐项全等；
         # 但**展示文案允许维护**——这正是全站表格展示同步（T25）的意义所在，
-        # 否则 47 项词典里只有 2 项纯字典能改文案，机制形同虚设（2026-10-26 裁决）。
+        # 纯字典允许修改展示文案，死枚举保持固定。
         current = [{"value": opt["value"], "label": opt["label"]} for opt in (row.options or [])]
         if [opt["value"] for opt in incoming] != [opt["value"] for opt in current]:
             raise AppError(

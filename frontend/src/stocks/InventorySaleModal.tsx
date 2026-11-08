@@ -12,7 +12,6 @@ import { customersApi,
   type EmployeeOption,
   type Pool, } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
-import { today } from "../shared/lib/format";
 import { AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { AdditionalFeeFields } from "../orders/AdditionalFeeFields";
@@ -42,8 +41,8 @@ export interface InventorySaleModalProps {
   account: Account | null;
   onClose: () => void;
   onCreated: () => void | Promise<void>;
-  /** 固定货源类型（RECOVERY/PICKUP/CONSIGNMENT），用于锁定标题与买家角色；缺省时从 account.inventory_type 推断（兼容旧调用）。 */
-  inventoryType?: SaleInventoryType;
+  /** 固定货源类型（RECOVERY/PICKUP/CONSIGNMENT），用于锁定标题与买家角色。 */
+  inventoryType: SaleInventoryType;
   /** 弹窗标题，按货源类型差异化。 */
   title?: string;
   /** 买家信息区标题，按货源类型差异化（代挂为委托方信息）。 */
@@ -57,8 +56,8 @@ type SaleWrapperProps = Pick<InventorySaleModalProps, "account" | "onClose" | "o
  * 仅通过 inventoryType 注入的标题、买家信息标题与买家角色产生差异。
  */
 export function InventorySaleModalBase(props: InventorySaleModalProps) {
-  const { account, inventoryType, title = "售出账号", buyerInfoTitle = "买家信息" } = props;
-  const resolvedType = inventoryType ?? account?.inventory_type;
+  const { inventoryType, title = "售出账号", buyerInfoTitle = "买家信息" } = props;
+  const resolvedType = inventoryType;
   const isConsignment = resolvedType === "CONSIGNMENT";
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
@@ -67,7 +66,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
-  const saleScope = SALE_SCOPE_BY_INVENTORY_TYPE[resolvedType ?? ""];
+  const saleScope = SALE_SCOPE_BY_INVENTORY_TYPE[resolvedType];
   const paymentMethod = Form.useWatch("payment_method", form) ?? "FULL";
   const saleAmount = Form.useWatch("amount", form);
   const amount2 = Form.useWatch("amount2", form);
@@ -325,9 +324,4 @@ export function PickupSaleModal(props: SaleWrapperProps) {
 /** 代挂账号售出（CONSIGNMENT），买家为委托方。 */
 export function ConsignmentSaleModal(props: SaleWrapperProps) {
   return <InventorySaleModalBase {...props} inventoryType="CONSIGNMENT" title="售出代挂账号" buyerInfoTitle="委托方信息" />;
-}
-
-/** 兼容默认导出：行为等同原统一售出表单（标题/角色从 account.inventory_type 推断）。 */
-export function InventorySaleModal(props: InventorySaleModalProps) {
-  return <InventorySaleModalBase {...props} />;
 }

@@ -22,7 +22,6 @@ def _create(client, headers, *, direction: str, amount: str, note: str) -> dict:
         "pool_id": 1,
         "occurred_on": TODAY.isoformat(),
         "direction": direction,
-        "nature": "BUSINESS_IN" if direction == "IN" else "BUSINESS_OUT",
         "category": "OPERATING",
         "amount": amount,
         "note": note,

@@ -64,7 +64,7 @@ export const resetInventoryPanelMocks = () => {
         portion: "PRINCIPAL",
         is_posted: true,
         operator: "admin",
-        cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", nature: "BUSINESS_OUT", category: "BUY", amount: "100.00" },
+        cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", category: "BUY", amount: "100.00" },
       }, {
         id: 33,
         event_no: "EV0003",
@@ -115,7 +115,7 @@ export const resetInventoryPanelMocks = () => {
         portion: "PROFIT",
         is_posted: true,
         operator: "admin",
-        cashflow: { flow_no: "CF0002", pool_name: "利润池", occurred_on: "2026-10-16", direction: "IN", nature: "BUSINESS_IN", category: "SELL", amount: "350.00" },
+        cashflow: { flow_no: "CF0002", pool_name: "利润池", occurred_on: "2026-10-16", direction: "IN", category: "SELL", amount: "350.00" },
       }],
     }],
   });

@@ -106,7 +106,7 @@ def update_order(
 
     成交日期随时可改：改日期时按天数差平移本单全部事件与资金流水的 occurred_on，
     并按新成交日重取返点/提成规则快照，保证账期与规则口径一致。
-    账号快照（#15 需求2：推翻 11-05「账号快照拒编辑」裁决，一律可编辑）、
+    账号快照（可编辑）、
     登记时间（created_at，可改可清空）均在此开放；订单编号、业务类型、
     库存账号关联和状态仍属不可编辑字段。
     """
@@ -114,7 +114,7 @@ def update_order(
     if trade_date is not _UNSET and trade_date is None:
         raise Validation("订单日期不能清空", details={"field": "trade_date"})
     # trade_date 已放开：不再受「已有登记事件」限制，改日期在下方联动平移账期。
-    # account_snapshot 按 #15 需求2 一律可编辑（推翻 11-05「账号快照拒编辑」裁决），
+    # account_snapshot 可编辑，保留订单自身快照。
     # 不再因「已有登记事件」而拒绝；核算口径如需修正走冲销/更正，但快照文本本身可改。
 
     before = {

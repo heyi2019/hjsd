@@ -270,7 +270,7 @@
 .policy-master .ant-list-item.is-active { background: #e6f4ff; }
 .policy-split { align-items: flex-start; }
 
-/* 容器内错误提示（Modal / Drawer 内部）下边距：原用内联 style 控制，迁移到此处（ui_guards 规则 11）。 */
+/* 容器内错误提示（Modal / Drawer 内部）下边距。 */
 .inline-error { margin-block-end: var(--space-3); }
 .order-cancel-meta {
   display: flex;

@@ -1,7 +1,6 @@
 import { Descriptions, Typography } from "antd";
 import type { ReactNode } from "react";
 import type {
-  Account,
   AccountExecutionDetail,
   AccountExecutionEvent,
   AccountExecutionOrder,

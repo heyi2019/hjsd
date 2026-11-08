@@ -116,8 +116,6 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_foundation_pools_service.py": "SYS06",
     "test_game_types.py": "F04",
     "test_game_types_contract.py": "F04",
-    "test_import_landing.py": "E03",
-    "test_import_mapping.py": "E03",
     "test_installment_remaining.py": "B08",
     "test_installment_totals.py": "B08",
     "test_installments_contract.py": "B08",

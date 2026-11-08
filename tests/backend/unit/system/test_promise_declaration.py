@@ -79,7 +79,7 @@ def _evidence_path(name: str) -> Path:
     """
     if name.startswith("tests/"):
         return REPO / name
-    if name.startswith("frontend:"):  # 旧写法兼容：frontend:<仓库根相对路径>
+    if name.startswith("frontend:"):  # frontend:<仓库根相对路径>
         return REPO / name[len("frontend:") :]
     direct = BE_TESTS / name
     if direct.exists():

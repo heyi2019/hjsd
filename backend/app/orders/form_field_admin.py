@@ -23,7 +23,7 @@ from .form_field_rules import (
 )
 
 # 系统统一术语字段：显示名由业务口径固定（如 payment_pool_id 全站统一「资金账户」），
-# 配置中心只读展示；此集合是最终裁决，防止绕过界面直接调接口改名。
+# 配置中心只读展示，防止绕过界面直接调接口改名。
 FIXED_LABEL_FIELD_KEYS = frozenset({"payment_pool_id"})
 
 def create_order_form_field(
@@ -163,7 +163,7 @@ def update_order_form_field(
         )
     # 类型创建后固定：值结构（单值/多值、标量类型）由类型决定，改类型会让
     # 历史 form_extra 值（字符串 vs 数组、类型语义）渲染异常，故禁止变更。
-    # 前端编辑弹窗的类型选择器本就 disabled（仅新增时可定类型），此处为最终裁决。
+    # 类型只允许在新增时确定，编辑时保持不变。
     next_type = definition.field_type
     if field_type is not None:
         if not isinstance(field_type, str) or field_type not in FIELD_TYPES:
@@ -172,7 +172,7 @@ def update_order_form_field(
             )
         if field_type != definition.field_type:
             raise Validation(
-                "字段类型创建后不可变更（如需变更请新增字段并迁移历史值）",
+                "字段类型创建后不可变更，如需变更请新增字段",
                 details={"field": "field_type", "value": field_type, "current": definition.field_type},
             )
     next_options = list(definition.options or [])

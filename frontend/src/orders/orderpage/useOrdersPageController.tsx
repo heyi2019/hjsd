@@ -64,9 +64,7 @@ export function useOrdersPageController(params: {
   // 业务类型、业务模式、责任方和关联关系均来自后端选项词典。
   type Opt = { value: string; label: string };
   const orderBusinessOptions: Opt[] = filterRetiredOrderTypeOptions(useOptionSet("ORDER_BUSINESS") ?? []);
-  const refundResponsibilityOptions: Opt[] = useOptionSet("REFUND_RESPONSIBILITY") ?? [];
   const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];
-  const relationTypeOptions: Opt[] = useOptionSet("ORDER_RELATION_TYPE") ?? [];
   const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? [];
   const inventoryStatusOptions: Opt[] = [
     { value: "all", label: "全部库存状态" },
@@ -458,14 +456,11 @@ export function useOrdersPageController(params: {
     .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
   // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
   const orderHasPostedEvents = (selectedOrder?.events ?? []).some((event) => event.is_posted);
-  const legacyInitialTab = initialTab as string | undefined;
   const normalizedInitialTab: BusinessCenterTab = initialTab && ["inventory", "ledger", "collections"].includes(initialTab)
     ? initialTab
-    : legacyInitialTab === "overview"
-      ? "inventory"
-      : initialTab
-        ? "ledger"
-        : DEFAULT_BUSINESS_CENTER_TAB;
+    : initialTab
+      ? "ledger"
+      : DEFAULT_BUSINESS_CENTER_TAB;
   const [activeTab, setActiveTab] = useState<BusinessCenterTab>(
     normalizedInitialTab,
   );

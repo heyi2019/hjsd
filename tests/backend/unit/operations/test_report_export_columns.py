@@ -42,7 +42,6 @@ def _finance_rows(seeded_db) -> None:
             pool_id=pool.id,
             occurred_on=date(2026, 10, 17),
             direction=direction,
-            nature="BUSINESS_IN" if direction == "IN" else "BUSINESS_OUT",
             accounting_attribute=attribute,
             category="OTHER",
             amount=Decimal(amount),

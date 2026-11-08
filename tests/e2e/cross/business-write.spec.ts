@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-/** 严格业务契约的真实写入联调：不使用旧 account 兼容字段。 */
+/** 严格业务契约的真实写入联调：使用当前账号字段。 */
 test("五类业务写入并按业务规则作废测试订单", async ({ request }) => {
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
   const headers = { "X-Dev-User": "admin" };
@@ -111,7 +111,6 @@ test("资金闭环：独立流水审核冲销、资金池划转与日对账", as
       pool_id: source,
       occurred_on: "2026-10-17",
       direction: "IN",
-      nature: "EXTERNAL_IN",
       category: "E2E_TEST",
       amount: "10.00",
       note: "E2E 独立收款摘要",

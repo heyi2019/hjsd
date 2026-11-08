@@ -4,22 +4,19 @@
 合约类型与计划校验、waive/extend/settle_early 的守卫、recover_account 的
 处置守卫、以及 record_sale 整段（L1128-1190）从未被直接调用。本文件补齐。
 
-末尾一组用例专门覆盖「外键 / 精度保证不可达」的 6 行防御分支：
+末尾一组用例覆盖外键与精度保证下的防御分支：
 - L315 / L676 / L739 / L1061 / L1068：依赖外键（orders.account_id → accounts.id
   SET NULL、installments.order_id → orders.id RESTRICT）。正常 ORM 路径删父行只
   会置 NULL，不留悬空引用，故常规测试到不了。
 - L975（settle_early 循环内 `outstanding <= 0: continue`）：rows 已按
   `received + waived < due` 过滤，正常数据下 outstanding 恒 > 0，该分支不可达。
-  原用例需构造 received=0.996 的超精度脏行，PG 存不进去，曾以 skip 挂起；
-  [2026-11-03] 改为把「不可达」本身写成可执行断言（三层保证各一条用例）：
+  超精度脏行无法写入 PG，因此用可执行断言覆盖三层保证：
   `test_amount_columns_lock_two_decimal_precision`（列 scale=2 且 0.996→1.00、
   该行被查询排除）、`test_overpaid_schedule_rejected_by_check_constraint`
   （ck_installment_schedules_settled_amount_within_due 拒绝超额付）、
   `test_settle_early_filters_settled_rows_but_keeps_one_cent`（付清行被过滤、
   只差 1 分仍结清）。任一层松动即报警，提示守卫重新变为可达。
-  **裁决（11-03）：不删**——它防的不是今天的过滤，而是「循环内陈旧读」：若 pay()
-  将来支持跨期顺延，前一期收款会把后一期补满，此时跳过是该期正确语义，删掉反而
-  让提前结清抛 Validation 直接失败。已在 settlement.py 就近写明，改源码别只删 if。
+  该分支保留用于跨期顺延场景：前一期收款可能补满后一期，此时跳过是正确语义。
 
 覆盖手段：**用独立连接 + `session_replication_role=replica` 绕过外键造脏数据**。
 PostgreSQL 没有 SQLite 的 `PRAGMA foreign_keys=OFF`；superuser 把会话级的

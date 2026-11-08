@@ -38,13 +38,12 @@ def _flow(
     category: str = "房租",
     note: str = "memo",
 ):
-    """手工登记一笔工作室收支：nature 与方向对齐，属性由调用方指定。"""
+    """手工登记一笔工作室收支，属性由调用方指定。"""
     return service.create_cashflow(
         seeded_db,
         pool_id=_pool(seeded_db).id,
         occurred_on=TODAY,
         direction=direction,
-        nature="BUSINESS_OUT" if direction == "OUT" else "BUSINESS_IN",
         accounting_attribute=attribute,
         category=category,
         amount=Decimal(amount),
@@ -160,7 +159,6 @@ def test_pool_ids_filter(seeded_client, seeded_db, headers):
         pool_id=other.id,
         occurred_on=TODAY,
         direction="OUT",
-        nature="BUSINESS_OUT",
         accounting_attribute="OPERATING_EXPENSE",
         category="房租",
         amount=Decimal("900"),

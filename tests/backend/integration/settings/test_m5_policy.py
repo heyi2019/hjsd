@@ -137,10 +137,10 @@ class TestPolicyVersion:
         assert v2["version"] == 2
 
     def test_new_version_supersedes_open_ended(self, seeded_db):
-        """新版本接续封口「开放至今」的旧版本（旧失效日 = 新生效日）。
+        """新版本接续封口开放版本（旧失效日 = 新生效日）。
 
         否则开放版本一旦存在，任何新版本都会因重叠被拒，规则永远无法改版
-        （设置配置「保存即发布」将不可用）。旧版本 config 不被改写。
+        旧版本 config 不被改写。
         """
         definition = _make_policy(seeded_db)
         v1 = policy_service.create_version(
@@ -797,7 +797,7 @@ class TestPolicyApi:
         """项目约定：Validation → 422（见 test_pools_api / test_order_types_api）。
 
         注意：无失效日的版本会被新版本接续封口（见 TestPolicyVersion），因此真重叠
-        需要旧版本本身带失效日、新版本起点落在其区间内。
+        需要被替代版本本身带失效日、新版本起点落在其区间内。
         """
         created = seeded_client.post(
             "/api/v1/policies",

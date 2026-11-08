@@ -1,4 +1,4 @@
-"""FORM-01 表单作用域注册表 + 操作类表单 form_extra 落库（迁移 f7a8b9c0d1e2）。
+"""FORM-01 表单作用域注册表 + 操作类表单 form_extra 落库。
 
 覆盖：
 - GET /order-form-fields/scopes 返回注册表 FORM_SCOPES 的全部作用域（当前 49 个，
@@ -206,7 +206,6 @@ def test_cashflow_create_and_reverse_form_extra(seeded_client, seeded_db, header
             "pool_id": pool_id,
             "occurred_on": D,
             "direction": "OUT",
-            "nature": "BUSINESS_OUT",
             "category": "房租",
             "amount": "500",
             "note": "工作室月租",

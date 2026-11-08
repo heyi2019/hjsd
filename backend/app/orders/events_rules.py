@@ -193,7 +193,7 @@ def _assert_event_allowed(
 
 
 
-# 兼容既有 events/service 内部调用路径；实际取消规则统一由 cancellation_model 管理。
+# 取消规则统一由 cancellation_model 管理。
 _get_offset_event = get_cancellation_offset
 _opposite_direction = opposite_cancellation_direction
 

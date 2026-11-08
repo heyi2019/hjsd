@@ -51,7 +51,7 @@ def allocate_number(session: Session, key: str | SequenceKey) -> str:
     同一个 current_value，各自发同一个号，后提交者撞 `orders.order_no` 唯一约束直接 500。
     改为相对递增（`current_value + 1`）后由数据库自己串行化：PG 在行锁上排队，
     后到者的 UPDATE 等前者提交后才执行，读到的是 +1 之后的值。
-    上限校验放进 WHERE：超限时语句零命中、不消耗任何号，语义与旧版一致。
+    上限校验放进 WHERE：超限时语句零命中、不消耗任何号。
     """
     key_value = key.value if isinstance(key, SequenceKey) else key
     config = session.execute(
@@ -78,7 +78,7 @@ def allocate_number(session: Session, key: str | SequenceKey) -> str:
     ).scalar()
     if allocated is None:
         raise Validation(
-            f"编号已超出 {max_value} 上限，禁止静默进位，请联系管理员裁决",
+            f"编号已超出 {max_value} 上限，禁止静默进位，请联系管理员处理",
             code=ErrorCode.SEQUENCE_EXHAUSTED,
             details={"sequence_key": key_value, "max": max_value},
         )

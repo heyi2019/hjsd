@@ -1,7 +1,7 @@
 """CORE-01 core 基础设施契约测试（money / numbering / errors / security / settings / database）。
 
 既有 test_money.py / test_numbering.py / test_settings.py 已覆盖金额量化与编号分配主路径；
-本文件补各模块的兼容别名、类型装饰器、越界与解析失败分支、JWT 全失败分支、
+本文件补各模块的公开接口、类型装饰器、越界与解析失败分支、JWT 全失败分支、
 作用域判定、env 定位与 URL 派生、engine 生命周期与 `get_db` 事务边界。
 """
 from __future__ import annotations

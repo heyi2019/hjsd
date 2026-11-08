@@ -6,7 +6,7 @@
  */
 
 /* iOS 27 透明度滑桿的驱动变量：注册为 <number> 使其可被过渡/继承，且非法值回落 initial-value。
-   未注册时 var(--glass-alpha) 只是字符串替换，calc 里出错会整条声明失效（玻璃变透明）。 */
+     未注册时 var(--glass-alpha) 只是字符串替换，calc 里出错会整条声明失效。 */
 @property --glass-alpha {
   syntax: "<number>";
   inherits: true;
@@ -15,7 +15,7 @@
 
 :root {
   color-scheme: light;
-  /* iOS 基准：106.25% × 16px = 17px ≈ iOS body 17pt。
+  /* 基准字号：106.25% × 16px = 17px。
      用 % 而非 px，尊重浏览器默认字号设置（等效 Dynamic Type）。
      注意：此值是 rem 的唯一锚点，勿在别处用 px/!important 重置 html 字号。 */
   font-size: 106.25%;
@@ -37,7 +37,7 @@
   --row-selected: rgba(10, 99, 216, 0.16);
 
   /* 液态玻璃（guidelines §2：四件套）
-     iOS 27 透明度滑桿：--glass-alpha 是全站玻璃材质系数，1 = 设计基准值（等价旧版固定 alpha）。
+     透明度滑杆：--glass-alpha 是全站玻璃材质系数，1 为设计基准值。
      crystal-clear 端系数 <1（更透），fully tinted 端 >1（更实；alpha 超过 1 由 rgb() 自动 clamp）。
      亮/暗基色 alpha 本就不同（0.62 / 0.72），故用乘法系数而非绝对 alpha，保证两端观感一致。
      降级块（prefers-reduced-transparency / prefers-contrast）整条覆盖 --glass 为实底，
@@ -51,9 +51,9 @@
   --glass-border: rgb(var(--glass-border-rgb) / calc(var(--glass-border-a) * var(--glass-alpha)));
   --glass-blur: blur(24px) saturate(150%);
   --scrim-blur: blur(2px); /* 遮罩层弱模糊（抽屉/弹层背景），与玻璃材质分档，勿混用 --glass-blur */
-  --glass-blur-md: blur(16px); /* 次级玻璃（article 卡片等），弱于 --glass-blur；历史值，勿擅自合并两档 */
+  --glass-blur-md: blur(16px); /* 次级玻璃（article 卡片等），弱于 --glass-blur */
   --glass-hi: rgba(255, 255, 255, 0.72);
-  --cal-dropdown-bg: rgba(255, 255, 255, 0.40); /* 日历弹层底色（亮）：等效原 55%×0.72≈0.40；与 --glass-hi 解耦，暗色单独提（2026-09-24） */
+  --cal-dropdown-bg: rgba(255, 255, 255, 0.40); /* 日历弹层底色（亮），与 --glass-hi 解耦 */
   /* 玻璃稀释面（sidebar.glass / view-head / antd 输入框等用 color-mix 再稀释的玻璃）：
      抽成令牌，使 RT/CT 降级块能把它整体翻成不透明实底，而非被 color-mix(...transparent) 稀释回半透明。
      正常值统一 88%（原各处以 74/82/86/92 散落，此处收敛为一致值）。 */

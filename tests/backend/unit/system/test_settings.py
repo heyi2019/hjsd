@@ -97,7 +97,7 @@ def _release_sections(text: str) -> dict[str, str]:
 
 
 def test_release_notes_has_section_for_current_version():
-    """升了版本却没写 RELEASE.md = 更新日志断档，且此前无人会发现。
+    """升了版本却没写 RELEASE.md 时，更新日志应被视为断档。
 
     实测缺口：`bump_version.sh` 明写「不写 RELEASE.md」，CI 只打 tag 不生成
     release notes，全仓库无任何断言检查章节是否存在。于是发版脚本可以一路

@@ -2,9 +2,9 @@
 
 口径：
 - 列清单与中文名以注册表为准，库只存 is_visible / sort_order / width / fixed；
-- 缺行的列（新增列）默认可见，按注册表位置插入，不需要数据迁移；
+- 缺行的列（新增列）默认可见，按注册表位置插入；
 - 锁定列（身份列/操作列）不允许隐藏，后端二次校验，不能只靠前端置灰；
-- width / fixed 只存「覆盖值」，None 表示沿用列定义默认（代码改默认不会被历史配置锁死）；
+- width / fixed 只存「覆盖值」，None 表示沿用列定义默认；
 - 保存整表覆盖该 scope，并写审计（前后值都记，便于追溯谁把哪列关了）。
 
 自定义列（ListCustomColumn）：
@@ -66,7 +66,7 @@ def _all_custom_rows(session: Session) -> dict[str, dict[str, ListCustomColumn]]
 
 
 def _option_items(options: Any) -> list[dict[str, str]]:
-    """归一化字段选项：兼容纯字符串数组与 {value,label} 对象数组。"""
+    """归一化字段选项，支持字符串数组与 {value,label} 对象数组。"""
     items: list[dict[str, str]] = []
     for item in options or []:
         if isinstance(item, str):

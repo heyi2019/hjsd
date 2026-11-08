@@ -409,7 +409,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：比例与金额不再互算，填写一项不改写另一项", async () => {
-    // 用户裁决（2026-11-05）：比例与金额各自独立录入，前端不得自行换算。
+    // 比例与金额各自独立录入，前端不得自行换算。
     // 旧实现用 syncAllocationPair 在 onValuesChange 里双向回填，改金额会静默改写比例，
     // 用户无法手动精调；此处锁死「只写自己这一格」的行为。
     await openLedger();
@@ -462,7 +462,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：按操作四项无候选执行人时人员留空且锁定（不猜当前登录人）", async () => {
-    // 2026-11-05 裁决：人员只认账号台账 / 库存中心登记的执行人，分润弹窗不就地猜人。
+    // 人员只认账号台账 / 库存中心登记的执行人，分润弹窗不就地猜人。
     // 本单无任何动作负责人，四行人员全部锁定且留空，等待台账补登记。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: [],
@@ -534,7 +534,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：按操作四项时比例与金额同样不互算", async () => {
-    // 同一裁决的另一半：原 syncAllocationPair 由两种口径共用，故按操作四项也必须独立录入。
+    // 按操作四项也必须独立录入。
     // 只测按姓名口径会漏掉「买号/售出/运营/公司」四行的情况。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: [],
@@ -728,7 +728,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：亏损单提示改为「金额填负数」而非「不可用」", async () => {
-    // 2026-11-05 裁决后亏损单允许按金额分润，提示语必须说明填负数（-300 = 分担 300 亏损）。
+    // 亏损单允许按金额分润，提示语必须说明填负数（-300 = 分担 300 亏损）。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: allocationRows,
       total: allocationRows.length,
@@ -1014,7 +1014,7 @@ describe("validateAllocations 纯函数矩阵（免挂载，毫秒级）", () =>
     if (r.ok) expect(r.items[0]).toMatchObject({ allocation_rate: "0", allocation_amount: "2500" });
   });
 
-  // 亏损单分润（2026-11-05 裁决「亏损的时候分亏损」）：金额填负数，方向须与盈亏一致。
+  // 亏损单分润：金额填负数，方向须与盈亏一致。
   it("亏损单填正数金额 → 拒绝（方向必须与盈亏一致）", () => {
     const r = validateAllocations(
       [{ employee: 9, allocation_rate: "0", allocation_amount: "200" }],
@@ -1133,7 +1133,7 @@ describe("resolveCancelAmount / pickCancelableEvent 纯函数", () => {
 });
 
 // —— 编辑订单 PATCH 组装：三条规则原本内联在 submitEditOrder 内，UI 用例只覆盖
-// 「有事件改备注」一条；快照整体替换的两条兜底（钱包实名 / 营地账号）此前零覆盖。
+// 覆盖「有事件改备注」与快照整体替换的兜底场景。
 describe("buildOrderPatchPayload 纯函数", () => {
   const snapshot = {
     game_account: "acc-1",
@@ -1193,7 +1193,7 @@ describe("buildOrderPatchPayload 纯函数", () => {
   });
 });
 
-// —— 资金收支（REFUND）入参：日期兜底与「资金账户未选就保持 undefined」此前仅靠挂载覆盖。
+// —— 资金收支（REFUND）入参：覆盖日期兜底与资金账户未选场景。
 describe("buildRefundEventPayload 纯函数", () => {
   const fallbackDate = "2026-11-03";
 

@@ -339,7 +339,7 @@ def test_update_order_records_date_change(seeded_db):
 
 
 def test_update_order_accepts_account_snapshot(seeded_db):
-    """#15 需求2：账号快照一律可编辑（推翻 11-05「账号快照拒编辑」裁决）。"""
+    """账号快照一律可编辑。"""
     order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
     updated = service.update_order(

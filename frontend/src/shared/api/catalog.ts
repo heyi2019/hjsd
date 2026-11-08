@@ -1,7 +1,4 @@
-/**
- * 接口聚合桶：catalog.ts 已按业务域拆分为 types.ts + *.api.ts。
- * 本文件仅做再导出兼容层；历史 `import { xApi } from "../shared/api/catalog"` 与 `import * as catalog` 仍可用。
- */
+/** 各业务域 API 的统一出口。 */
 export * from "./types";
 export * from "./pools.api";
 export * from "./orders.api";

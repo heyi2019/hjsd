@@ -274,8 +274,7 @@
   flex-wrap: wrap;
 }
 .topbar__title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-/* 顶栏页名 = 视图 H1（Title 1 · 28），页内 PageHeader 为小节标题（20px），
-   保持 h1 > h2 的正常层级（2026-10-13 用户裁决：17px 倒挂试验作废）。 */
+/* 顶栏页名使用 H1，页内 PageHeader 使用小节标题层级。 */
 .topbar__page { margin: 0; font: var(--font-h1); color: var(--color-text-primary); letter-spacing: var(--ls-tight); }
 
 /* 顶栏右侧工具区：行内只放紧凑控件，统一 36px 行高（与 antd 选择器同高），
@@ -310,7 +309,6 @@
 }
 .topbar-role-name { color: var(--color-text-primary); }
 
-/* keep-alive 页面槽：激活态正常渲染（弹簧入场），非激活态隐藏但保持挂载（避免切导航重挂载丢状态）。
-   原 display 用内联 style 控制，违反 ui_guards 规则 11（禁止内联样式），迁移到此处。 */
+/* 页面槽保持挂载；非激活页隐藏但不卸载。 */
 .page-slot { display: block; }
 .page-slot--hidden { display: none; }

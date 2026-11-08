@@ -7,7 +7,6 @@ import {
   type OrderDetailField,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
-import { OrderDetailEditFields } from "./OrderDetailEditFields";
 import {
   buildFormExtraDisplay,
   fieldLabel,

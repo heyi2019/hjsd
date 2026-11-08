@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
-import { InventorySaleModal, RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/stocks/InventorySaleModal";
+import { RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/stocks/InventorySaleModal";
 
 import * as catalog from "@/shared/api/catalog";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
@@ -49,7 +49,7 @@ beforeEach(() => {
         portion: "PRINCIPAL",
         is_posted: true,
         operator: "admin",
-        cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", nature: "BUSINESS_OUT", category: "BUY", amount: "100.00" },
+        cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", category: "BUY", amount: "100.00" },
       }, {
         id: 33,
         event_no: "EV0003",
@@ -98,7 +98,7 @@ beforeEach(() => {
         portion: "PROFIT",
         is_posted: true,
         operator: "admin",
-        cashflow: { flow_no: "CF0002", pool_name: "利润池", occurred_on: "2026-10-16", direction: "IN", nature: "BUSINESS_IN", category: "SELL", amount: "350.00" },
+        cashflow: { flow_no: "CF0002", pool_name: "利润池", occurred_on: "2026-10-16", direction: "IN", category: "SELL", amount: "350.00" },
       }],
     }],
   });
@@ -114,7 +114,7 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
     customer: { id: 8, customer_no: "C0008", display_name: "新买家", status: "ACTIVE" },
     duplicate_candidates: [],
   });
-  renderLight(<InventorySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+  renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
 
   expect(await screen.findByText("买家信息")).toBeInTheDocument();
   expect(screen.getByText("资金流水")).toBeInTheDocument();

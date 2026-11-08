@@ -168,7 +168,7 @@ class CurrentUser:
     pool_ids: frozenset[int] = frozenset()  # 空集表示“无池授权”，明细接口应返回空
     team_ids: frozenset[int] = frozenset()
     owner_scope: str = "SELF"  # SELF / TEAM / ALL
-    # 本次会话是怎么认证进来的。老 token 不带 amr，缺省按 password 处理（历史上只有这一条路径）。
+    # 本次会话的认证方式；缺少 amr 时按 password 处理。
     auth_method: str = AUTH_METHOD_PASSWORD
 
     @classmethod

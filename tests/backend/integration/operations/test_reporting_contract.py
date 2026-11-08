@@ -66,7 +66,7 @@ def test_finance_dimension_report_groups_fund_and_income_expense_scope(
 ):
     from app.finance.cashflows import create_cashflow
 
-    # 资金池账户已下线：直接在种子池上造流水（等价于原 get_pool + create_pool_account）
+        # 直接在种子池上造流水。
     pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
     assert pool is not None, "种子池 HJ_INVEST 缺失"
     for direction, amount in (
@@ -317,7 +317,7 @@ class TestR2MonthlyPnl:
 
         monthly = reporting_service.r2_monthly_pnl(seeded_db)
         oct_item = _month_item(monthly, "2026-10")
-        # 资金明细口径（11-05 裁决）：撤销售出产生一笔反向资金流水，
+        # 资金明细口径：撤销售出产生一笔反向资金流水，
         # 收入列仍是已入账的 800，冲销的 800 计入支出；净利仍为 -500。
         assert oct_item["sales_income"] == 800
         assert oct_item["account_direct_cost"] == 1300

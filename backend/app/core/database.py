@@ -1,12 +1,6 @@
-"""core.database：v1 独立库 engine / session / Base。
+"""数据库 engine、session 与 ORM Base。
 
-约束：
-- v1 库地址只来自 `core.settings`；
-- 统一约束命名，保证 Alembic 在 PostgreSQL 上正确迁移。
-
-SQLite 通道已下线（2026-11-02）：生产与测试统一 PostgreSQL。原先挂在
-`Engine.connect` 上的连接级 PRAGMA、连接归还时的 `PRAGMA optimize`、以及
-`check_same_thread` 连接参数一并移除——它们对 PostgreSQL 无任何意义。
+数据库地址由 `core.settings` 提供，约束命名保持统一。
 """
 from __future__ import annotations
 
@@ -59,7 +53,7 @@ def get_engine(url: str | None = None) -> Engine:
 
 
 def reset_engine(url: str | None = None) -> Engine:
-    """重建 engine 并丢弃旧连接池（测试/迁移后使用）。"""
+    """重建 engine 并丢弃旧连接池。"""
     global _engine, _session_factory
     if _engine is not None:
         _engine.dispose()

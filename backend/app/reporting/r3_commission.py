@@ -55,7 +55,7 @@ def r3_commission_reconciliation(
     if user_id is not None:
         rows = [row for row in rows if row[0].user_id == user_id]
 
-    # 利润 = 该订单所有收入 − 所有支出（2026-11-05 用户裁决）。
+    # 利润 = 该订单所有收入 − 所有支出。
     # 走报表唯一取数口，与分润弹窗同源：收入含返点记录、支出含分期坏账；
     # 不再由 SELL/BUY/COST 事件推导，也不按「是否生成流水」排除有资金走向的事实。
     per_order_profit: dict[int, Decimal] = defaultdict(lambda: ZERO)

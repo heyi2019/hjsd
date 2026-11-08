@@ -12,9 +12,11 @@ import {
   statusColor,
   today,
 } from "@/shared/lib/format";
+import { haptic } from "@/shared/lib/haptics";
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("money：金额展示（前端不做浮点运算，只格式化）", () => {
@@ -58,6 +60,16 @@ describe("today：本地日期字符串", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 0, 5, 12, 0, 0)); // 本地时间 2026-01-05
     expect(today()).toBe("2026-01-05");
+  });
+});
+
+describe("haptic：平台不接受振动时返回失败", () => {
+  it("保留 navigator.vibrate 的 false 结果，让调用方触发视觉替代", () => {
+    const vibrate = vi.fn(() => false);
+    vi.stubGlobal("navigator", { vibrate });
+
+    expect(haptic("medium")).toBe(false);
+    expect(vibrate).toHaveBeenCalledWith([14]);
   });
 });
 
@@ -111,10 +123,9 @@ describe("状态枚举标签：与后端枚举一一对应", () => {
   });
 
   it("交付动作文案：DELIVER 统一为买入交付，不再按订单类型区分", () => {
-    expect(executionActionLabel("DELIVER", "HS")).toBe("买入交付");
-    expect(executionActionLabel("DELIVER", "DG")).toBe("买入交付");
-    expect(executionActionLabel("BUY", "HS")).toBe("买号");
-    expect(executionActionLabel("PAYMENT", "HS")).toBe("回款（分期）");
+    expect(executionActionLabel("DELIVER")).toBe("买入交付");
+    expect(executionActionLabel("BUY")).toBe("买号");
+    expect(executionActionLabel("PAYMENT")).toBe("回款（分期）");
   });
 });
 

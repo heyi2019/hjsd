@@ -21,7 +21,7 @@ import type {
 } from "./OrderDetail.shared";
 import "./OrderDetail.css";
 
-// 兼容既有引用路径：外部仍从本文件取这三个行类型。
+// 详情视图的共享行类型出口。
 export type { InventoryExecutionRow, InventoryFinanceRow, InventoryPartyLink } from "./OrderDetail.shared";
 export type { TimeFieldKey, TimeSet } from "./OrderDetail.shared";
 
@@ -167,7 +167,6 @@ export function OrderDetailView({
           totalExpense={totalExpense}
           totalIncome={totalIncome}
           flowCount={flowCount}
-          editing
         />
         <OrderDetailPartySection meta={meta} />
         <div className="inventory-detail__footer">

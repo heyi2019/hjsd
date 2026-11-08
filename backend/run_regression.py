@@ -298,8 +298,6 @@ GROUPS = {
         "tests/backend/integration/system/test_quality_guard.py",
     ],
     "imports": [
-        "tests/backend/unit/operations/test_import_landing.py",
-        "tests/backend/integration/operations/test_import_mapping.py",
         "tests/backend/integration/system/test_migration.py",
     ],
     # 跨域基建板块：列表列/导出、部署脚本、覆盖率与迁移基线——改动常横跨多域。

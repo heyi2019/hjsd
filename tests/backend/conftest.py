@@ -244,9 +244,6 @@ from app.core.database import Base, get_db  # noqa: E402
 from app.core.security import CurrentUser, DEV_USERS, build_access_token  # noqa: E402
 from app.core.settings import get_settings  # noqa: E402
 from app.domain import attachments, foundation, notifications, options, parties, quality, trade, users  # noqa: E402,F401  注册全部 v1 表
-from app.legacy_imports import models as _imports  # noqa: E402  注册历史导入表
-
-_ = _imports
 from app.foundation.seeds import seed_foundation  # noqa: E402
 from app.foundation.seed_orders import seed_order_matrix  # noqa: E402
 
@@ -254,7 +251,7 @@ from app.foundation.seed_orders import seed_order_matrix  # noqa: E402
 def seed_default_users(db: Session) -> None:
     """补齐测试常用的占位用户（id 1..9）。
 
-    迁移 0008 给 orders.owner_id / customers.owner_id / order_profit_allocations.user_id
+    为 orders.owner_id / customers.owner_id / order_profit_allocations.user_id
     补了指向 users 的外键，故测试里直接写死的 user_id/owner_id（如 1/2/3/7/9）必须对应真实用户，
     否则触发 FOREIGN KEY 约束失败。这里集中造一批占位用户，避免每个用例各自造。
     """
@@ -405,11 +402,10 @@ def v1_engine(request):
     lock_connection = _acquire_session_lock(engine, terminal)
     try:
         Base.metadata.create_all(bind=engine)
-        # 测试库可能由旧版本留下已删除的字段；测试基线跟随当前 ORM，先清理历史列。
+        # 测试库可能残留已删除字段；测试基线跟随当前 ORM，先清理这些列。
         with engine.begin() as connection:
             connection.execute(text('ALTER TABLE public."order_type_defs" DROP COLUMN IF EXISTS capital_type CASCADE'))
             connection.execute(text('ALTER TABLE public."orders" DROP COLUMN IF EXISTS capital_type CASCADE'))
-            connection.execute(text('ALTER TABLE public."cashflow" DROP COLUMN IF EXISTS nature CASCADE'))
             connection.execute(
                 text(
                     'ALTER TABLE public."cashflow" '

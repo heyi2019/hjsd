@@ -57,8 +57,8 @@ const deposits = [
   { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" },
 ];
 const cashflows = [
-  { id: 1, status: "APPROVED", flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_DIRECT_COST" },
-  { id: 2, status: "APPROVED", flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_REVENUE" },
+  { id: 1, status: "APPROVED", flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_DIRECT_COST" },
+  { id: 2, status: "APPROVED", flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", accounting_attribute: "SELF_REVENUE" },
 ];
 
 beforeEach(() => {

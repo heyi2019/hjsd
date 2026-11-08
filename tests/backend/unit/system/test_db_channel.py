@@ -21,10 +21,8 @@ import re
 # 测试文件下沉后 parents[N] 的层数变了，写死层数只能撑到下一次搬家。
 from _repo import BE_TESTS
 
-# db 用例数基线：只允许上升。派生机制被删除、v1_engine 被改名时，数字会塌下来。
-# 要下调这条基线，必须同时证明「确实有用例不再需要数据库」，不能图省事直接改数。
-# 2026-11-07 historical cleanup removed stale database-marked test assets.
-DB_BASELINE = 1346
+# db 用例数基线：只允许上升。已删除的下线功能测试不计入基线。
+DB_BASELINE = 1304
 
 # 允许在模块级手工声明 db 的文件。派生机制覆盖不到的只能是「自建引擎并连接」这类，
 # 每新增一个都必须在这里登记——否则「手工标记」就成了绕过守卫的后门。

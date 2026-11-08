@@ -173,7 +173,7 @@ def test_update_dynamic_select_field_rename_with_empty_options(seeded_db):
 def test_fixed_term_field_label_cannot_be_renamed(seeded_db):
     """系统统一术语字段（payment_pool_id=资金账户）禁止改名；同值回传放行。
 
-    口径：资金账户这一术语全站统一，配置中心只读展示，接口层做最终裁决。
+    口径：资金账户这一术语全站统一，配置中心只读展示，接口层强制校验。
     """
     core = OrderFormField(
         order_type_code="HS",

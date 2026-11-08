@@ -1,16 +1,12 @@
 /** 业务统一下拉：收口弹层外观与动效，替代对裸 .ant-select-dropdown 的全局 !important 覆盖。
  *
  * 为什么要封装：
- *  - antd 弹层关闭依赖 rc-motion 在「离场动画」结束（animationend）后加 hidden 类。
- *    此前在根容器上用 `animation: ui-spring-in ... both !important` 钉死所有状态，
- *    关闭时动画名不变、浏览器不重播、rc-motion 收不到 animationend → 弹层永远不 hidden
- *    → 下拉关不掉（点开第二个时第一个仍残留展开，2026-10-13 复现）。
+ *  - antd 弹层关闭依赖 rc-motion 的离场动画完成后添加 hidden 类，不能覆盖其状态机。
  *  - 本组件给弹层注入 classNames.popup.root="ui-select-pop"；Select.css 统一处理选项间距、选中态
  *    与极短淡入（无位移缩放，解决「下拉出现太久」），
- *    离场交还 antd 原生，关闭流程恢复正常。弹簧入场此前曾钉死根容器导致关不掉，
- *    故 Select 下拉不走弹簧、改极短淡入（2026-10-13 用户裁决 B）。
+ *    离场交还 antd 原生，关闭流程保持正常；入场使用极短淡入。
  *
- * 调用方零成本迁移：透传 antd Select 全部 props（含 options / allowClear / onChange 等），
+ * 透传 antd Select 全部 props（含 options / allowClear / onChange 等），
  * 仅 React 18 下需把 ref 类型一并透传。 */
 import { Select as AntdSelect } from "antd";
 import type { SelectProps } from "antd";

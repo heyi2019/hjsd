@@ -101,13 +101,12 @@ class Order(Base, AuditMixin):
     )
     # 2026-10-28 去冗余：HS/TH/DG 账号资料统一存 account_snapshot（单一事实源），
     # 原平铺列（game_type/game_account/game_password/channel_region/bound_phone/
-    # has_secondary/account_note）已由迁移 0008 删除；展示与筛选统一从快照取。
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=OrderStatus.ACTIVE.value
     )
     # BAS-06-04 规则快照：创建时固化当时生效的规则版本与参数。
     # 「改未来费率不会改写已发生订单的利润」这条红线靠它兜底 ——
-    # 规则版本改了也不回写快照，历史利润永远按当时口径。
+    # 规则版本改动不回写快照，利润按订单生成时的口径计算。
     policy_version_id: Mapped[int | None] = mapped_column(
         ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True
     )

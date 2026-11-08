@@ -62,7 +62,6 @@ _ID_SOURCES = {
     "issue_id": "select id from quality_issues order by id desc limit 1",
     "pool_id": "select id from pools order by id limit 1",
     "lead_id": "select id from customer_leads order by id desc limit 1",
-    "batch_id": "select id from import_batches order by id desc limit 1",
     "order_type_id": "select id from order_types order by id limit 1",
     "definition_id": "select id from policy_definitions order by id limit 1",
     "attachment_id": "select id from attachments order by id desc limit 1",

@@ -5,7 +5,6 @@ QA500B 补齐轮确认这 5 个枚举值无写入路径，本文件按补齐端�
 2. PolicyVersion.EXPIRED     — POST /policies/versions/expire-sweep（effective_to < on）
 3. RebateRecord.VOID         — POST /rebates/{id}/void（仅零结算 OPEN）
 4. Deposit.CANCELLED         — POST /deposits/{id}/cancel（仅 PAID 无退还/损失，全额冲正）
-5. ImportBatch.REJECTED      — 历史迁移服务直接驳回（仅 DRAFT/MAPPED）
 附带：CounterpartyStatus.DISABLED 走既有 PATCH /counterparties/{id}/status。
 """
 from __future__ import annotations
@@ -14,12 +13,10 @@ from datetime import date
 
 from app.domain.enums import (
     DepositStatus,
-    ImportBatchStatus,
     PolicyStatus,
 )
 from app.domain.trade import Cashflow, Deposit
 from app.finance import service as finance_service
-from app.legacy_imports import service as imports_service
 from app.policy import service as policy_service
 
 
@@ -58,8 +55,6 @@ def test_supersede_rejects_published_version(seeded_db):
             actor="pytest",
             reason="已发布版本不可取消",
         )
-
-
 def test_supersede_rejects_active_version(seeded_db):
     definition = _make_def(seeded_db, "SUP-ACT")
     version = policy_service.create_version(
@@ -217,45 +212,3 @@ def test_cancel_returned_deposit_rejected(seeded_db):
             reason="已发生退还不可取消",
             actor="pytest",
         )
-
-
-# ── 5. ImportBatch REJECTED：未确认批次驳回 ──────────────────────
-
-
-def _make_batch(seeded_db, *, code: str) -> dict:
-    return imports_service.create_batch(
-        seeded_db,
-        source_name=f"驳回测试 {code}",
-        rows=[{"order_no": "X1", "amount": "10"}],
-        actor="pytest",
-    )
-
-
-def test_reject_uncommitted_batch(seeded_db):
-    batch = _make_batch(seeded_db, code="r1")
-    out = imports_service.reject_batch(
-        seeded_db, batch["id"], reason="源文件口径错误", actor="pytest"
-    )
-    assert out["status"] == ImportBatchStatus.REJECTED.value
-
-
-def test_reject_committed_batch_rejected(seeded_db):
-    batch = _make_batch(seeded_db, code="r2")
-    imports_service.commit_batch(seeded_db, batch["id"], actor="pytest")
-    import pytest
-    from app.core.errors import Validation
-
-    with pytest.raises(Validation):
-        imports_service.reject_batch(
-            seeded_db, batch["id"], reason="已确认不可驳回", actor="pytest"
-        )
-
-
-def test_reject_twice_rejected(seeded_db):
-    batch = _make_batch(seeded_db, code="r3")
-    imports_service.reject_batch(seeded_db, batch["id"], reason="首次驳回", actor="pytest")
-    import pytest
-    from app.core.errors import Validation
-
-    with pytest.raises(Validation):
-        imports_service.reject_batch(seeded_db, batch["id"], reason="重复驳回", actor="pytest")

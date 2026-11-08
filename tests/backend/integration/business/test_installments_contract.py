@@ -1434,7 +1434,7 @@ class TestInstallmentsApi:
         assert resale.related_order_id == sale_order.id
 
         profit = reporting_service.order_profit_detail(seeded_db)
-        # 资金走向只有收入 / 支出（11-05 裁决）：分期坏账=支出，虽不生成
+        # 资金走向只有收入 / 支出：分期坏账=支出，虽不生成
         # 资金流水也必须计入。收入 1200 − 买号 800 − 坏账 1000 = -600。
         assert profit["total"]["direct_cost"] == Decimal("1000.00")
         assert profit["total"]["net_profit"] == Decimal("-600.00")

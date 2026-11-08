@@ -39,7 +39,7 @@ import { PoolsPanel } from "@/field-definitions/panels/PoolsPanel";
 import { OrderTypeRoutesPanel } from "@/field-definitions/panels/OrderTypeRoutesPanel";
 import { OrderDetail } from "@/stocks/OrderDetail";
 import { OrderDetailDeliverySection } from "@/stocks/OrderDetailDeliverySection";
-import { InventorySaleModal } from "@/stocks/InventorySaleModal";
+import { RecoverySaleModal } from "@/stocks/InventorySaleModal";
 import { buildInventoryCsv } from "@/stocks/inventory-export";
 import { AuditPanel } from "@/audit/AuditPanel";
 import { clearOptionSetsCache, loadOptionSets } from "@/shared/lib/optionSets";
@@ -199,7 +199,7 @@ it("P1/FE-042：已拉黑客户不能参与库存售出", async () => {
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ] as never);
   renderLight(
-    <InventorySaleModal
+    <RecoverySaleModal
       account={{ id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", game_account: "acc-1", status: "WAITING", inventory_type: "RECOVERY" } as never}
       onClose={() => undefined}
       onCreated={() => undefined}
@@ -277,7 +277,7 @@ it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () =
 });
 
 it("P1/FE-050：流水冲销成功后原流水不再显示重复冲销入口", async () => {
-  const original = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
+  const original = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
   const reversal = { ...original, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", reversal_of_id: 7 };
   let mainListCalls = 0;
   vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([

@@ -5,9 +5,6 @@ import { navigation } from "./navigation";
 import { DEV_ROLES, useSession } from "../shared/state/session";
 import { useTheme } from "../shared/state/theme";
 import { loadOptionSets } from "../shared/lib/optionSets";
-import { DashboardPage } from "./DashboardPage";
-import { LoginPage } from "../auth/LoginPage";
-import { ChangePasswordPage } from "../auth/ChangePasswordPage";
 import type { ComponentType } from "react";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 import { ConfirmButton } from "../shared/ui";
@@ -21,6 +18,9 @@ const FundsPage = lazy(() => import("../pools/FundsPage").then(({ FundsPage }) =
 const ReportsPage = lazy(() => import("../reporting/ReportsPage").then(({ ReportsPage }) => ({ default: ReportsPage })));
 const SettingsPage = lazy(() => import("../field-definitions/SettingsPage").then(({ SettingsPage }) => ({ default: SettingsPage })));
 const UserCenterPage = lazy(() => import("../auth/UserCenterPage").then(({ UserCenterPage }) => ({ default: UserCenterPage })));
+const DashboardPage = lazy(() => import("./DashboardPage").then(({ DashboardPage }) => ({ default: DashboardPage })));
+const LoginPage = lazy(() => import("../auth/LoginPage").then(({ LoginPage }) => ({ default: LoginPage })));
+const ChangePasswordPage = lazy(() => import("../auth/ChangePasswordPage").then(({ ChangePasswordPage }) => ({ default: ChangePasswordPage })));
 
 // 注：dashboard 不入此映射——工作台是纯动作入口（无跳转需求），由下方三元单独渲染；
 // 其余页面统一收 onNavigate；无跳转需求的页面忽略该 prop。
@@ -182,8 +182,12 @@ export function AppShell() {
   }, []);
   // DEV 与生产同一套退出语义：DEV 初始即已登录（session 内默认 true，X-Dev-User 直通），
   // 点「退出登录」后落登录页，刷新即恢复直通；生产态无 token 同样落登录页。
-  if (!authenticated) return <LoginPage />;
-  if (mustChangePassword) return <ChangePasswordPage />;
+  if (!authenticated) {
+    return <Suspense fallback={<div className="page-loading" role="status">正在打开…</div>}><LoginPage /></Suspense>;
+  }
+  if (mustChangePassword) {
+    return <Suspense fallback={<div className="page-loading" role="status">正在打开…</div>}><ChangePasswordPage /></Suspense>;
+  }
   return (
     <div className="app-shell">
       <aside className="sidebar glass">

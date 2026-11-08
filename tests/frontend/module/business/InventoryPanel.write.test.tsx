@@ -151,9 +151,19 @@ describe("InventoryPanel：写入与长路径", () => {
     // 内联编辑：点「编辑」就地展开该行进入编辑态（无弹窗），核心字段可直接改。
     const input = await screen.findByLabelText("编辑游戏账号/产品");
     fireEvent.change(input, { target: { value: "updated-account" } });
+    fireEvent.change(screen.getByLabelText("编辑营地账号"), { target: { value: "updated-camp" } });
+    fireEvent.change(screen.getByLabelText("编辑账号密码"), { target: { value: "updated-password" } });
+    fireEvent.change(screen.getByLabelText("编辑绑定手机号"), { target: { value: "13800000000" } });
+    fireEvent.change(screen.getByLabelText("编辑账号描述"), { target: { value: "updated-description" } });
+    fireEvent.change(screen.getByLabelText("编辑备注"), { target: { value: "updated-note" } });
     fireEvent.click(screen.getByRole("button", { name: /保存/ }));
     await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateProfile)).toHaveBeenCalledWith(1, expect.objectContaining({
       game_account: "updated-account",
+      camp_account: "updated-camp",
+      game_password: "updated-password",
+      bound_phone: "13800000000",
+      account_description: "updated-description",
+      note: "updated-note",
     })));
   });
 

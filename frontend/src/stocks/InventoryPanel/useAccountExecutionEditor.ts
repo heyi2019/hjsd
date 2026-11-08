@@ -94,15 +94,37 @@ export function useAccountExecutionEditor(params: {
     if (!editingAccount) return;
     setSavingAccount(true);
     try {
-      const { id, game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, note } = editingAccount;
-      const profile = {
+      const {
+        id,
         game_account,
+        camp_account,
         game_type,
         game_password,
         channel_region,
         bound_phone,
         has_secondary,
+        secondary_images,
+        wallet_realname,
+        wallet_realname_images,
         platform,
+        account_description,
+        account_images,
+        note,
+      } = editingAccount;
+      const profile = {
+        game_account,
+        camp_account,
+        game_type,
+        game_password,
+        channel_region,
+        bound_phone,
+        has_secondary,
+        secondary_images,
+        wallet_realname,
+        wallet_realname_images,
+        platform,
+        account_description,
+        account_images,
         note,
         form_extra: invEditExtraForm.getFieldsValue()?.form_extra,
       };

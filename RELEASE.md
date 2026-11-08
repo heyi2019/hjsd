@@ -93,9 +93,10 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 ### 发布前检查
 
-- [x] 后端全量回归：`python backend/run_regression.py ci` → 1479 passed；前端四层全量回归：fast 131、quick 64、react 500、react-deep 96 全部通过
+- [x] 后端全量回归：`python backend/run_regression.py ci` → 1482 passed；前端四层全量回归：fast 131、quick 64、react 500、react-deep 96 全部通过
 - [x] 版本三处一致 `scripts/ops/bump_version.sh --check` → `1.0.7`
-- [ ] 部署后 `curl /api/v1/health` 的 `app_version` 为 `1.0.7`；`docker compose ps` 中 backend 为 `Up (healthy)`
+- [x] 部署后 `curl /api/v1/health` 的 `app_version` 为 `1.0.7`，`database_status=ok`；生产部署工作流成功
+- [ ] CI E2E gate：运行 `42528530881` 未通过，需单独定位失败步骤后补跑
 
 ### 回滚
 

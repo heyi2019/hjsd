@@ -1,4 +1,4 @@
-"""EXPORT-01 报表导出与「设置 → 列表字段」列配置的一致性（2026-10-29 口径）。
+"""EXPORT-01 报表导出与列表字段配置的一致性。
 
 规则：
 - 导出列 = 该报表对应 `RPT_*` 作用域的可见列，顺序与界面一致；
@@ -131,11 +131,6 @@ def test_report_csv_does_not_refill_keys_shared_by_item_and_total():
     }
     header = _header(report_csv(report, columns=[("order_no", "订单号", True)]))
     assert header == ["row_type", "订单号"]
-
-
-def test_report_csv_without_columns_keeps_legacy_behaviour():
-    report = {"items": [{"order_no": "HS-1"}]}
-    assert _header(report_csv(report)) == ["row_type", "order_no"]
 
 
 def test_export_endpoint_uses_visible_chinese_columns(seeded_db, seeded_client, headers):

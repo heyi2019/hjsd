@@ -1,12 +1,11 @@
 """INSTALLMENT-01 分期合约「剩余应收」口径（INST）。
 
-背景：前端原先自己算 `total_receivable - paid_amount - bad_debt_amount`，先收款后减免
-时会出现负的「剩余」。现由后端下发 `remaining_receivable`，本文件锁住：
+本文件锁定 `remaining_receivable` 的统一口径：
 
 1. 未收款时剩余等于总应收；
 2. 部分收款 + 坏账时按差额算；
 3. 已收 + 坏账超过总应收（减免把应收降到已收之下）时取 0，不返回负数；
-4. 列表接口确实下发该字段，前端不再自行相减。
+4. 列表接口下发该字段。
 """
 from __future__ import annotations
 

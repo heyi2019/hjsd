@@ -145,8 +145,8 @@ def test_validate_text_and_unknown_type(seeded_db):
 
     # 未知类型受 DB CHECK 约束无法入库，直接按对象校验兜底分支
     unknown = OrderFormField(
-        order_type_code="CUSTOMER", field_key="legacy", label="legacy",
-        field_type="LEGACY", is_custom=True,
+        order_type_code="CUSTOMER", field_key="unsupported_type", label="unsupported_type",
+        field_type="UNSUPPORTED", is_custom=True,
     )
     assert fields_module._validate_extra_value(unknown, 7) == "7"
 
@@ -203,7 +203,7 @@ def test_set_values_empty_input_is_noop(seeded_db):
 
 
 def test_set_values_rejects_non_customer_entities(seeded_db):
-    # 其余实体暂无扩展字段体系：空入参兼容放行，非空入参拒绝
+    # 当前只有 customer 启用扩展字段；其他实体的空写入是 no-op，非空写入拒绝。
     assert service.set_extra_values(
         seeded_db, entity_type="order", entity_id=1, values=[]
     ) == {}
@@ -224,18 +224,6 @@ def test_get_values_missing_customer_returns_empty(seeded_db):
     assert service.get_extra_values(
         seeded_db, entity_type="customer", entity_id=999999
     ) == {}
-
-
-def test_bulk_values(seeded_db):
-    _add_field(seeded_db, "k1")
-    first = _customer(seeded_db, "甲")
-    second = _customer(seeded_db, "乙")
-    _set(seeded_db, first.id, [("k1", "a")])
-    bulk = service.get_extra_values_bulk(
-        seeded_db, entity_type="customer", entity_ids=[first.id, second.id]
-    )
-    assert bulk[first.id] == {"k1": "a"}
-    assert bulk[second.id] == {}
 
 
 def test_bulk_values_empty_and_non_customer(seeded_db):

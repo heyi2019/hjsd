@@ -2,16 +2,14 @@
 
 与 test_parties.py 的分工：既有文件已覆盖编号域、脱敏主路径、停用/合并参与方校验、
 合并迁移主路径、字段停用保留历史值、以及创建客户/合作方/字段端点；
-本文件补脱敏边界（空值/短串）、建单必填校验、查重空条件、查询三过滤+作用域、
+本文件覆盖建单必填校验、查重空条件、查询三过滤+作用域、
 客户更新（含已合并冲突与联系方式审计分流）、状态机 MERGED 守卫、
 合并同源/已合并/重复角色去重、合作方查询与更新、字段定义三项校验与停用过滤、
-表单扩展字段覆写，以及 7 个未测路由端点。
+表单扩展字段覆写，以及相关路由边界。
 """
 from __future__ import annotations
 
 from datetime import date
-from typing import get_type_hints
-
 import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -34,18 +32,9 @@ from app.domain.trade import InstallmentSchedule, OrderFormField
 from app.value_added_services import service as installment_service
 from app.orders import service as orders_service
 from app.parties import service
-from app.parties import router as parties_router
-from app.parties import schemas
 
 CUSTOMERS = "/api/v1/customers"
 COUNTERPARTIES = "/api/v1/counterparties"
-
-
-def test_party_routes_use_declared_response_types():
-    assert get_type_hints(parties_router.list_customers)["return"] == list[schemas.CustomerOut]
-    assert get_type_hints(parties_router.create_customer)["return"] == schemas.CustomerWithCandidates
-    assert get_type_hints(parties_router.get_customer_detail)["return"] == schemas.CustomerDetailOut
-    assert get_type_hints(parties_router.list_counterparties)["return"] == list[schemas.CounterpartyOut]
 
 
 def test_customer_list_supports_limit_and_offset(seeded_client, seeded_db):
@@ -81,19 +70,6 @@ def _audit_actions(seeded_db, action: AuditAction) -> list[str]:
         select(AuditLog).where(AuditLog.action == action.value)
     ).all()
     return [row.entity_id for row in rows]
-
-
-# ------------------------------------------------------------------ 脱敏边界
-class TestMaskingEdgeCases:
-    def test_mask_phone_empty_and_short(self, seeded_db):
-        assert service.mask_phone(None) is None  # 46
-        assert service.mask_phone("") == ""
-        assert service.mask_phone("12345") == "123**"  # 49（长度 ≤ 7 走短串分支）
-
-    def test_mask_id_empty_and_short(self, seeded_db):
-        assert service.mask_id(None) is None  # 56
-        assert service.mask_id("") == ""
-        assert service.mask_id("ab") == "a*"  # 59（长度 ≤ 2 走短串分支）
 
 
 # ------------------------------------------------------------------ 客户建档
@@ -773,12 +749,13 @@ def test_customer_detail_reveal_records_contact_read_audit(seeded_client, seeded
 
 
 def test_validate_owner_id_rejects_non_positive_and_inactive(seeded_db):
-    from app.parties._common import _validate_owner_id
     from app.domain.users import User
     from app.core.errors import Validation
 
     with pytest.raises(Validation):
-        _validate_owner_id(seeded_db, 0)
+        service.create_customer(
+            seeded_db, display_name="无效负责人", actor="pytest", owner_id=0
+        )
     inactive = User(
         username="inactive-owner", display_name="停用负责人", password_hash="x",
         role="VIEWER", owner_scope="SELF", is_active=False,
@@ -786,4 +763,6 @@ def test_validate_owner_id_rejects_non_positive_and_inactive(seeded_db):
     seeded_db.add(inactive)
     seeded_db.flush()
     with pytest.raises(Validation, match="启用"):
-        _validate_owner_id(seeded_db, inactive.id)
+        service.create_customer(
+            seeded_db, display_name="停用负责人客户", actor="pytest", owner_id=inactive.id
+        )

@@ -85,7 +85,7 @@ def test_dead_enum_rejects_option_change(client, headers):
         headers=headers,
     )
     assert bad.status_code == 422, bad.text
-    assert bad.json()["code"] in ("VALIDATION_ERROR",)
+    assert bad.json()["code"] == "VALIDATION_ERROR"
 
 
 def test_dead_enum_allows_label_only_change(client, headers):

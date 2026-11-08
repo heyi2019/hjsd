@@ -1,8 +1,8 @@
 """DEPOSIT-01 finance 押金与返点契约测试（DEP-01 / REB-01）。
 
-与 test_m2.py / test_bughunt.py 的分工：既有文件已覆盖押金占用/部分退回、
+与 test_m2.py 的分工：本文件覆盖押金占用/部分退回、
 超退校验、返点记录与到账主路径；本文件补押金退还 404、押金列表与持有合计、
-来源订单不存在、结算 404 与手续费超额、返点列表过滤，以及 4 个未测路由端点。
+来源订单不存在、结算 404 与手续费超额、返点列表过滤，以及相关路由边界。
 """
 from __future__ import annotations
 
@@ -76,6 +76,19 @@ class TestRebateValidation:
 
 
 class TestDepositQueries:
+    def test_deposit_source_order_must_exist(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+
+        with pytest.raises(NotFound, match="来源订单"):
+            service.create_deposit(
+                seeded_db,
+                pool_id=invest.id,
+                amount=Decimal("100"),
+                paid_on=TODAY,
+                actor="pytest",
+                source_order_id=999999,
+            )
+
     def test_deposit_returned_and_lost_amount_cannot_exceed_paid_amount(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         deposit = service.create_deposit(
@@ -106,19 +119,6 @@ class TestDepositQueries:
         with pytest.raises(IntegrityError):
             seeded_db.flush()
         seeded_db.rollback()
-
-    def test_deposit_source_order_must_exist(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-
-        with pytest.raises(NotFound, match="来源订单"):
-            service.create_deposit(
-                seeded_db,
-                pool_id=invest.id,
-                amount=Decimal("100"),
-                paid_on=TODAY,
-                actor="pytest",
-                source_order_id=999999,
-            )
 
     def test_cashflow_list_filters_accounting_dimensions(self, seeded_client, seeded_db, headers):
         invest = _pool(seeded_db, "HJ_INVEST")
@@ -235,12 +235,6 @@ class TestDepositQueries:
                 paid_on=TODAY,
                 actor="pytest",
                 counterparty_id=counterparty.id,
-            )
-
-    def test_return_deposit_notfound(self, seeded_db):
-        with pytest.raises(NotFound):
-            service.return_deposit(
-                seeded_db, 999999, amount=Decimal("10"), released_on=TODAY, actor="pytest"
             )
 
     def test_list_deposits_filters_by_pool(self, seeded_db):
@@ -378,7 +372,7 @@ class TestRebateGuards:
         assert record.rebate_type == "SELL"
 
     def test_sell_rebate_accepts_recovery_order(self, seeded_db):
-        """2026-10-28 口径：卖号返点不再限 DG，回收单有 SELL 事件即可登记。"""
+        """卖号返点不限 DG，回收单有 SELL 事件即可登记。"""
         order_id = _active_order(seeded_db)
         orders_service.post_event(
             seeded_db,

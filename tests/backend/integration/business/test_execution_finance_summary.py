@@ -1,8 +1,6 @@
 """CALC-01 库存账号执行详情的财务汇总契约（ACC-01 execution-detail）。
 
-前端 `stocks/OrderDetail.tsx` 与 `stocks/inventory-export.ts` 原先各自对
-`orders[].events[].cashflow` + `orders[].cashflows` + `orders[].rebates` 做一遍
-浮点累加，同一套算法写了两遍。汇总改由后端下发后，这里守住三条：
+后端下发执行详情财务汇总，这里守住三条：
 
 1. 合计等于明细逐条相加（口径同源，不另算一套）；
 2. 收入含返点、支出只算流水，净额 = 收入 − 支出；

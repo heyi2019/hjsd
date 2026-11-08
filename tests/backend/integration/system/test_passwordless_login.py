@@ -105,6 +105,9 @@ def test_phone_code_normalizes_common_formats(client: TestClient) -> None:
         json={"phone": "138 0000 0002", "code": sent["dev_code"], "code_ticket": sent["code_ticket"]},
     )
     assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "logged_in"
+    assert payload["user"]["username"] == "phoneuser2"
 
 
 def test_phone_code_rejects_unconfigured_phone(client: TestClient) -> None:
@@ -388,24 +391,26 @@ def test_token_records_authentication_method(client: TestClient) -> None:
     assert decode_token(password_token)["amr"] == "password"
 
 
-def test_legacy_token_without_amr_cannot_skip_old_password(client: TestClient) -> None:
-    """老 token（1.0.3 之前签发，无 amr）按密码会话处理，不得借免密口子绕过旧密码。"""
+def test_token_without_amr_cannot_change_password_without_current_password(
+    client: TestClient,
+) -> None:
+    """缺少认证方式声明的 token 不得绕过已设置密码的校验。"""
     from app.core.security import encode_token
 
-    created = _create_user(client, username="legacy1", phone="13800000035")
+    created = _create_user(client, username="amr_missing", phone="13800000035")
     assert created["must_change_password"] is True
 
-    legacy = encode_token(
+    unsigned_token = encode_token(
         {
             "sub": str(created["id"]),
-            "username": "legacy1",
+            "username": "amr_missing",
             "roles": ["OPERATOR"],
             "pool_ids": [],
             "team_ids": [],
             "owner_scope": "SELF",
         }
     )
-    response = _change_password(client, legacy, {"new_password": "Legacy@2026"})
+    response = _change_password(client, unsigned_token, {"new_password": "NoAmr@2026"})
     assert response.status_code == 401, response.text
 
 

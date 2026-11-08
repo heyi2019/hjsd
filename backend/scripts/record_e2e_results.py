@@ -143,13 +143,8 @@ def _walk_suites(suites, out: list) -> None:
 def _load_case_index() -> dict:
     """nodeid -> 测试编号。
 
-    case_index.json 由 gen_test_case_library.py 生成、按设计不入库
-    （docs/README.md：CI 重建、本地各自生成）。但 e2e-gate 并不跑该生成器，
-    所以 CI 上这份文件根本不存在——旧实现直接 read_text() 会抛
-    FileNotFoundError，令「记录 E2E 结果」整步失败、门禁红。
-
-    故优先读生成器产物；缺失时退回到**入库的**《测试用例库.csv》自举同一份
-    映射——生成器写 csv 的 nodeid 口径正是 f"{文件}::{函数标识}"。
+    case_index.json 由 gen_test_case_library.py 生成且不入库；缺失时从入库的
+    《测试用例库.csv》重建同一份 nodeid 映射，保证结果记录不依赖生成顺序。
     """
     if CASE_INDEX.exists():
         return json.loads(CASE_INDEX.read_text(encoding="utf-8"))

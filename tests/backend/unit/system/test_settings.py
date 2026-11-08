@@ -46,8 +46,7 @@ def test_frontend_version_matches_backend_release_version():
     from app.version import __version__ as release_version
 
     pkg_path = PROJECT_ROOT / "frontend" / "package.json"
-    # npm workspaces 的真实锁文件在仓库根，版本只落在 packages["frontend"]；
-    # 旧断言指向 frontend/package-lock.json（不存在）被 `if is_file()` 静默跳过，等于没守。
+    # npm workspaces 的真实锁文件在仓库根，版本只落在 packages["frontend"]。
     lock_path = PROJECT_ROOT / "package-lock.json"
     assert pkg_path.is_file(), f"缺少前端 package.json：{pkg_path}"
     assert lock_path.is_file(), f"缺少根锁文件：{lock_path}"
@@ -304,7 +303,7 @@ class TestLoginRateLimitKnob:
 
 
 class TestTestDatabaseSeparation:
-    """测试库必须与开发库分开配置：曾因回落 DATABASE_URL 把开发库 118 单清空。"""
+    """测试库必须显式配置，并与开发库隔离。"""
 
     def test_test_database_url_defaults_to_empty(self, monkeypatch):
         """缺省为空表示「未单独配置」，夹具据此拒绝运行，不猜一个库去清空。"""

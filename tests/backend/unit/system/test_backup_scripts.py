@@ -148,11 +148,7 @@ def test_backup_daily_writes_dump_and_sha256(tmp_path: Path) -> None:
 
 
 def test_backup_daily_allows_empty_database(tmp_path: Path) -> None:
-    """空库是合法状态（首次部署 / 刚建的空目标库），不能因此拒绝备份。
-
-    回归背景：闸门最初写成「归档里必须有 schema 对象」，结果空库备份被判为坏备份，
-    连带把「恢复前先备份当前库」这条退路也堵死了——首次部署与空库恢复都会卡在这里。
-    """
+    """空库是合法状态，备份不能因缺少业务表而拒绝。"""
     _, scripts_dir, bin_dir = _deploy_tree(tmp_path, psql_tables=0)
 
     result = _run(scripts_dir / "backup_daily.sh", bin_dir)

@@ -1,9 +1,4 @@
-"""PARTY-01 parties / policy service 守门用例（批3 覆盖收口）。
-
-直接驱动业务校验/守卫分支，把 parties.service 与 policy.service 推到 100%。
-源码级死代码（policy.set_allocations 的 rate 解析/负数、重复人员、不完整分配项）
-已在前置提交中移除；本文件只覆盖可达分支。
-"""
+"""PARTY-01 parties / policy service 的业务校验与权限边界。"""
 
 from datetime import date, datetime
 from decimal import Decimal
@@ -86,11 +81,11 @@ def _add_buy_event(session, order, *, created_by="seeduser1"):
 
 class TestPartiesActivitySummary:
     def test_empty_ids_returns_empty(self, seeded_db):
-        # 249: not ids -> 直接返回空 summary
+        # 没有客户编号时直接返回空摘要。
         assert parties_service.get_customer_activity_summary(seeded_db, []) == {}
 
     def test_event_last_interaction(self, seeded_db):
-        # 285/289: 事件时间线回写 last_interaction_at
+        # 订单和事件时间线应回写客户最近互动时间。
         cust = _customer(seeded_db)
         seeded_db.add(
             Order(
@@ -111,12 +106,15 @@ class TestPartiesActivitySummary:
         )
         seeded_db.flush()
         result = parties_service.get_customer_activity_summary(seeded_db, [cust.id])
-        assert result[cust.id]["last_interaction_at"] is not None
+        summary = result[cust.id]
+        assert summary["order_roles"] == ["BUYER"]
+        assert summary["active_order_count"] == 1
+        assert summary["last_interaction_at"] is not None
 
 
 class TestPartiesMerge:
     def test_merge_reassigns_leads(self, seeded_db):
-        # 632/633: 来源客户的客户需求迁移到目标
+        # 合并客户时，来源客户的需求迁移到目标客户。
         source = _customer(seeded_db)
         target = _customer(seeded_db)
         seeded_db.commit()
@@ -135,7 +133,7 @@ class TestPartiesMerge:
         assert len(migrated) == 1
 
     def test_merge_skips_existing_extra(self, seeded_db):
-        # 654: 目标已存在同字段扩展值时跳过（保留目标值）
+        # 目标已有同字段扩展值时保留目标值。
         source = _customer(seeded_db)
         target = _customer(seeded_db)
         seeded_db.commit()
@@ -152,12 +150,12 @@ class TestPartiesMerge:
 
 class TestPartiesLeadGuards:
     def test_get_lead_missing(self, seeded_db):
-        # 697: 需求不存在 -> NotFound
+        # 不存在的需求返回 NotFound。
         with pytest.raises(NotFound):
             parties_service.get_lead(seeded_db, 99999)
 
     def test_get_lead_scope_excludes(self, seeded_db):
-        # 703: 非管理员且 owner 不在可见范围 -> NotFound
+        # 非管理员不能读取范围外的需求。
         user = _non_admin_user(seeded_db)
         lead = parties_service.create_lead(
             seeded_db, customer_id=_customer(seeded_db).id, request_type="FIND_ACCOUNT",
@@ -169,7 +167,7 @@ class TestPartiesLeadGuards:
             parties_service.get_lead(seeded_db, lead.id, user=scoped)
 
     def test_create_lead_invalid_type(self, seeded_db):
-        # 729/730: 非法 request_type -> Validation
+        # 非法需求类型返回 Validation。
         cust = _customer(seeded_db)
         with pytest.raises(Validation):
             parties_service.create_lead(
@@ -178,7 +176,7 @@ class TestPartiesLeadGuards:
             )
 
     def test_create_lead_negative_budget(self, seeded_db):
-        # 736: 预算为负 -> Validation
+        # 负预算返回 Validation。
         cust = _customer(seeded_db)
         with pytest.raises(Validation):
             parties_service.create_lead(
@@ -187,12 +185,12 @@ class TestPartiesLeadGuards:
             )
 
     def test_list_leads_invalid_status(self, seeded_db):
-        # 784/785: 非法 status -> Validation
+        # 非法状态返回 Validation。
         with pytest.raises(Validation):
             parties_service.list_leads(seeded_db, status="BADSTATUS")
 
     def test_list_leads_keyword(self, seeded_db):
-        # 791/792: 关键字过滤分支
+        # 关键字应过滤需求目标。
         parties_service.create_lead(
             seeded_db, customer_id=_customer(seeded_db).id, request_type="FIND_ACCOUNT",
             target="守门专用目标", actor="pytest",
@@ -202,14 +200,30 @@ class TestPartiesLeadGuards:
         assert any("守门专用" in r.target for r in rows)
 
     def test_list_leads_scope(self, seeded_db):
-        # 801: 非管理员用户触发范围过滤
+        # 非管理员只能看到自己负责的需求
         user = _non_admin_user(seeded_db)
         scoped = _scoped_user(user)
+        own = parties_service.create_lead(
+            seeded_db,
+            customer_id=_customer(seeded_db).id,
+            request_type="FIND_ACCOUNT",
+            target="可见需求",
+            owner_id=user.id,
+            actor="pytest",
+        )
+        parties_service.create_lead(
+            seeded_db,
+            customer_id=_customer(seeded_db).id,
+            request_type="FIND_ACCOUNT",
+            target="他人需求",
+            owner_id=1,
+            actor="pytest",
+        )
         rows = parties_service.list_leads(seeded_db, user=scoped)
-        assert isinstance(rows, list)
+        assert [row.id for row in rows] == [own.id]
 
     def test_update_lead_not_open(self, seeded_db):
-        # 816: 非 OPEN 需求不可编辑 -> Conflict
+        # 非 OPEN 需求不可编辑。
         cust = _customer(seeded_db)
         lead = parties_service.create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
@@ -222,7 +236,7 @@ class TestPartiesLeadGuards:
             parties_service.update_lead(seeded_db, lead.id, actor="pytest", note="改")
 
     def test_update_lead_unknown_field(self, seeded_db):
-        # 820: 不支持的更新字段 -> Validation
+        # 不支持的更新字段返回 Validation。
         cust = _customer(seeded_db)
         lead = parties_service.create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
@@ -233,7 +247,7 @@ class TestPartiesLeadGuards:
             parties_service.update_lead(seeded_db, lead.id, actor="pytest", bogus="y")
 
     def test_update_lead_negative_budget(self, seeded_db):
-        # 836: 更新预算为负 -> Validation
+        # 更新为负预算返回 Validation。
         cust = _customer(seeded_db)
         lead = parties_service.create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
@@ -246,7 +260,7 @@ class TestPartiesLeadGuards:
             )
 
     def test_update_lead_invalid_owner(self, seeded_db):
-        # 838: owner_id 非法 -> _validate_owner_id -> Validation
+        # 非法负责人返回 Validation。
         cust = _customer(seeded_db)
         lead = parties_service.create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
@@ -257,7 +271,7 @@ class TestPartiesLeadGuards:
             parties_service.update_lead(seeded_db, lead.id, actor="pytest", owner_id=-1)
 
     def test_convert_lead_not_open(self, seeded_db):
-        # 883: 非 OPEN 需求不可转单 -> Conflict
+        # 非 OPEN 需求不可转单。
         cust = _customer(seeded_db)
         lead = parties_service.create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
@@ -272,7 +286,7 @@ class TestPartiesLeadGuards:
             )
 
     def test_convert_lead_order_missing(self, seeded_db):
-        # 886: 订单不存在 -> NotFound
+        # 目标订单不存在返回 NotFound。
         cust = _customer(seeded_db)
         lead = parties_service.create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
@@ -285,7 +299,7 @@ class TestPartiesLeadGuards:
             )
 
     def test_convert_lead_order_scope_excludes(self, seeded_db):
-        # 891: 订单不在用户可见范围 -> NotFound
+        # 目标订单超出用户范围时返回 NotFound。
         user = _non_admin_user(seeded_db)
         scoped = _scoped_user(user)
         cust = _customer(seeded_db)
@@ -301,7 +315,7 @@ class TestPartiesLeadGuards:
             )
 
     def test_close_lead_not_open(self, seeded_db):
-        # 917: 非 OPEN 需求不可关闭 -> Conflict
+        # 非 OPEN 需求不可关闭。
         cust = _customer(seeded_db)
         lead = parties_service.create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
@@ -318,7 +332,7 @@ class TestPartiesLeadGuards:
 
 class TestPolicyDefinitionGuards:
     def test_create_definition_global_with_scope_id(self, seeded_db):
-        # 146: GLOBAL 范围不能指定 scope_id
+        # GLOBAL 范围不能指定 scope_id。
         with pytest.raises(Validation):
             policy_service.create_definition(
                 seeded_db, policy_code="X1", name="X1", scope_type="GLOBAL",
@@ -326,7 +340,7 @@ class TestPolicyDefinitionGuards:
             )
 
     def test_create_definition_target_missing(self, seeded_db):
-        # 163: 关联对象不存在
+        # 关联对象不存在时返回 Validation。
         with pytest.raises(Validation):
             policy_service.create_definition(
                 seeded_db, policy_code="X2", name="X2", scope_type="ORDER_TYPE",
@@ -336,22 +350,22 @@ class TestPolicyDefinitionGuards:
 
 class TestPolicyResolveVersionGuards:
     def test_invalid_scope_type(self, seeded_db):
-        # 397: scope_type 非法
+        # 非法 scope_type 返回 Validation。
         with pytest.raises(Validation):
             policy_service.resolve_version(
                 seeded_db, policy_code="X", on=date.today(), scope_type="BAD"
             )
 
     def test_global_with_scope_id(self, seeded_db):
-        # 403: GLOBAL 范围不能指定 scope_id
+        # GLOBAL 范围不能指定 scope_id。
         with pytest.raises(Validation):
             policy_service.resolve_version(
                 seeded_db, policy_code="X", on=date.today(),
                 scope_type="GLOBAL", scope_id=1,
             )
 
-    def test_scoped_requires_scope_id(self, seeded_db):
-        # 407: 非 GLOBAL 必须指定 scope_id
+    def test_resolve_scoped_policy_requires_scope_id(self, seeded_db):
+        # 非 GLOBAL 必须指定 scope_id
         with pytest.raises(Validation):
             policy_service.resolve_version(
                 seeded_db, policy_code="X", on=date.today(), scope_type="ORDER_TYPE"
@@ -360,7 +374,7 @@ class TestPolicyResolveVersionGuards:
 
 class TestPolicyAllocationGuards:
     def test_buy_actor_not_found(self, seeded_db):
-        # 543: BUY 动作执行人不是用户 -> 无法绑定收益人
+        # BUY 动作执行人不是用户时不能绑定收益人。
         order = _order(seeded_db)
         _add_buy_event(seeded_db, order, created_by="ghostuser")
         seeded_db.commit()
@@ -374,7 +388,7 @@ class TestPolicyAllocationGuards:
             policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_sell_actor_not_found(self, seeded_db):
-        # 553: 售出动作执行人不是用户 -> 无法绑定收益人
+        # SELL 动作执行人不是用户时不能绑定收益人。
         from app.domain.trade import Installment
 
         order = _order(seeded_db)
@@ -400,7 +414,7 @@ class TestPolicyAllocationGuards:
             policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_invalid_allocation_type(self, seeded_db):
-        # 581: 分配项类型非法
+        # 非法分配项类型返回 Validation。
         order = _order(seeded_db)
         items = [
             {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
@@ -412,7 +426,7 @@ class TestPolicyAllocationGuards:
             policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_duplicate_allocation_type(self, seeded_db):
-        # 583 → 2026-11-05 新口径：一个动作多人时按人数各录一行、份额均分，
+        # 一个动作多人时按人数各录一行、份额均分，
         # 「项类型」允许重复；判重改为 (allocation_type, user_id)，同一动作同一人员不可重复。
         # 构造四类齐全 + BUY 两行，但两行的 user_id 都为空 → 应命中按人判重。
         order = _order(seeded_db)
@@ -427,7 +441,7 @@ class TestPolicyAllocationGuards:
             policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_company_with_user_rejected(self, seeded_db):
-        # 586: 公司收益不绑定人员
+        # 公司收益不能绑定人员。
         order = _order(seeded_db)
         items = [
             {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
@@ -439,7 +453,7 @@ class TestPolicyAllocationGuards:
             policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_operation_without_user_is_optional_when_zero(self, seeded_db):
-        # 588: 运营不是必填项；未绑定运营人员时只能保留 0 份额。
+        # 未绑定运营人员时只能保留 0 份额。
         order = _order(seeded_db)
         items = [
             {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
@@ -464,7 +478,7 @@ class TestPolicyAllocationGuards:
             policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_buy_recipient_mismatch(self, seeded_db):
-        # 594: 买号收益人必须绑定对应动作执行人
+        # BUY 收益人必须绑定对应动作执行人。
         order = _order(seeded_db)
         _add_buy_event(seeded_db, order, created_by="seeduser1")  # 执行人 = 用户 1
         seeded_db.commit()
@@ -477,8 +491,8 @@ class TestPolicyAllocationGuards:
         with pytest.raises(Validation, match="收益人必须绑定对应动作执行人"):
             policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
-    def test_total_must_be_100(self, seeded_db):
-        # 624: 有效分配比例合计必须为 100%
+    def test_allocation_rate_sum_over_100_rejected(self, seeded_db):
+        # 有效分配比例合计必须为 100%
         order = _order(seeded_db)
         items = [
             {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "30"},

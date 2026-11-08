@@ -1,9 +1,4 @@
-"""MASTER-01 游戏类型标准主数据：Service 与 HTTP 契约测试。
-
-补齐 `app/foundation/game_types.py`（64%→100%）与 `app/foundation/router.py` 中
-game-types 一整段未被 HTTP 层覆盖的端点。既有 `test_game_types.py` 只调 service，
-本文件补两端点契约 + service 的更新/停用/默认值/404 分支。
-"""
+"""MASTER-01 游戏类型主数据的 Service 与 HTTP 契约。"""
 from __future__ import annotations
 
 import pytest

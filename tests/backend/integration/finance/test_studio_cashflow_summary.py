@@ -1,10 +1,6 @@
 """CASHFLOW-01 工作室收支面板汇总契约（FIN-04 /cashflows/studio-summary）。
 
-前端 `pools/StudioExpensePanel.tsx` 原先发两次 `/cashflows`（收入一次、支出一次），
-自己按 `source === "OTHER"` 过滤、再用 `reduce + toFixed` 算出已入账收入/支出/净额。
-这套口径散在组件里有三个问题：`limit` 截断会少算、浮点累加、属性配对规则改一次就漂。
-
-汇总搬后端后，这里守住：
+服务端汇总工作室收支，这里守住：
 1. 只算 APPROVED（待审核不进经营口径）；
 2. 只算手工登记（返点/押金/划转/订单事件流水都不算工作室收支）；
 3. 支出认 OPERATING_EXPENSE、收入认 SELF_REVENUE，不能互相串；

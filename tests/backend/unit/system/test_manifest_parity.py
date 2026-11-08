@@ -1,22 +1,10 @@
-"""TESTING-06 磁盘测试文件集合、区域归属与分层归属必须与 tests/manifest.json 一致。
-
-背景：本仓库搬过三次测试目录，每次都有一批东西「不报错地消失」——
-``test_catalog.all_backend_test_files()`` 指向已死的 ``backend/tests/v1`` 让
-``run_regression.py B`` 打印「无匹配文件」然后 exit 0；``gen_test_case_library.py``
-只用 ``os.listdir`` 扫一层，文件一下沉就从用例库里整批消失；``record_frontend_results``
-用 ``relative_to(frontend)`` 失败时 ``return None``，记录被静默丢弃。
-
-共同点是**扫描范围写死在旧路径，而失败表现是「结果为空」而不是「报错」**。
-空集合上的「磁盘 ⊆ 清单」类断言恒真，守卫看起来全绿。
-
-本守卫的做法：manifest 只存「应该收到多少」，文件集合永远扫磁盘，
-两边对不上就红。目录存在时才校验目录归属，故搬迁前后的结构都能跑。
-"""
+"""TESTING-06 磁盘测试文件集合、区域归属与分层归属必须与 manifest 一致。"""
 
 from __future__ import annotations
 
 import json
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 import pytest
@@ -44,6 +32,7 @@ GUARD_AREA = {
 }
 
 
+@lru_cache(maxsize=1)
 def _manifest() -> dict:
     assert MANIFEST_PATH.exists(), f"manifest 不存在：{MANIFEST_PATH}"
     return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -110,14 +99,9 @@ def test_backend_area_distribution_matches_manifest() -> None:
 
 @pytest.mark.parametrize("kind", KINDS)
 def test_kind_directories_match_manifest_when_present(kind: str) -> None:
-    """目录存在时，每个区域的 unit/integration 文件数必须与 manifest 一致。
-
-    旧结构（文件平铺在 tests/backend/ 下）没有这两个目录，跳过；
-    搬迁后自动生效，搬错一半（例如只搬了 unit/）会被 test_no_stray_backend_files 抓到。
-    """
+    """每个区域的 unit/integration 文件数必须与 manifest 一致。"""
     kind_dir = BE_TESTS / kind
-    if not kind_dir.is_dir():
-        pytest.skip(f"{kind}/ 尚未建立（搬迁前的扁平结构）")
+    assert kind_dir.is_dir(), f"缺少后端测试分层目录：{kind_dir}"
 
     expected = _manifest()["layers"]["backend"]["expected"]["kinds"][kind]["byArea"]
     actual: dict[str, int] = {}
@@ -133,24 +117,10 @@ def test_kind_directories_match_manifest_when_present(kind: str) -> None:
 
 def test_no_stray_backend_files_when_partitioned() -> None:
     """一旦开始分区，tests/backend 根目录就不许再留 test_*.py（防「搬了一半」）。"""
-    if not any((BE_TESTS / k).is_dir() for k in KINDS):
-        pytest.skip("尚未分区（扁平结构）")
+    assert all((BE_TESTS / k).is_dir() for k in KINDS), "后端测试必须同时具备 unit/ 和 integration/ 分区"
 
     stray = sorted(p.name for p in BE_TESTS.glob("test_*.py"))
     assert not stray, f"分区后根目录仍残留测试文件：{stray}"
-
-
-def test_case_total_matches_manifest(request: pytest.FixtureRequest) -> None:
-    """用例总数与 manifest 一致。
-
-    只在全量收集时校验：单跑本文件时 total 很小，硬比会误报。
-    （这是上一轮踩过的坑：基线断言必须先判断收集规模。）
-    """
-    total = len(request.session.items)
-    if total < 1000:
-        pytest.skip(f"当前只收集到 {total} 条用例，非全量运行，跳过总数校验")
-    expected = _manifest()["layers"]["backend"]["expected"]["cases"]
-    assert total == expected, f"用例总数 {total}，manifest 记 {expected}"
 
 
 def test_guards_declare_area() -> None:

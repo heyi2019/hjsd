@@ -60,7 +60,7 @@ cd frontend && npm run dev
 ### 配置约定
 
 - `.env` 查找顺序：`ERP_ENV_FILE` 覆盖 → 仓库根 `.env` → `backend/.env`。
-  **根目录优先**，测试对此有断言（`tests/v1/test_settings.py`）。
+  **根目录优先**，测试对此有断言（`tests/backend/unit/system/test_settings.py`）。
 - `DATABASE_URL` 必须是 v1 库。`core.settings` 硬拒绝 `heijin.db` / `heijin_v2.db`
   两个 v0 遗留库，防止误建。
 - `*.db` 不入版本库，本地库由 `scripts/v1_init_db.py` 重建。

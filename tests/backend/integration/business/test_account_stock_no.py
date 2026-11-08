@@ -1,6 +1,6 @@
 """NUMBER-01 库存编号（stock_no）生成规则 fixture 测试。
 
-覆盖 KU 编码改造的核心逻辑（2026-10-28 口径：KU_ + 五位流水）：
+覆盖库存编号的核心规则（KU_ + 五位流水）：
 - 新建账号自动获得 stock_no，格式 KU_ + 5 位数字；
 - 连续创建按序递增（KU_00001 → KU_00002 → KU_00003）；
 - stock_no 唯一、可经账号列表 API 回读；
@@ -98,7 +98,7 @@ class TestStockNoGeneration:
 
 
 class TestStockNoAtOrderCreation:
-    """2026-10-28 口径：建单成功即生成库存编号（不等 BUY 事件）。"""
+    """建单成功即生成库存编号，不等待 BUY 事件。"""
 
     def test_hs_order_creation_allocates_stock_no_immediately(self, seeded_db):
         order = service_create_order(

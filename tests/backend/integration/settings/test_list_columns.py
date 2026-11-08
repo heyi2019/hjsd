@@ -83,7 +83,7 @@ def test_save_hides_column_and_reorders(seeded_client, headers, seeded_db):
 
 
 def test_actions_column_can_be_hidden(seeded_client, headers):
-    """操作列现在也可隐藏（无锁定约束），保存返回 200。"""
+    """操作列可以隐藏，保存后的列状态立即反映该设置。"""
     ledger = _scope(seeded_client, headers, "LEDGER")
     items = [
         {
@@ -95,6 +95,8 @@ def test_actions_column_can_be_hidden(seeded_client, headers):
     ]
     response = _save(seeded_client, headers, "LEDGER", items)
     assert response.status_code == 200, response.text
+    saved = {column["key"]: column for column in response.json()["columns"]}
+    assert saved["actions"]["is_visible"] is False
 
 
 def test_unknown_column_rejected(seeded_client, headers):

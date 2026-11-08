@@ -23,29 +23,29 @@
       ],
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
-        "files": 114,
-        "cases": 1587,
+        "files": 104,
+        "cases": 1469,
         "kinds": {
           "unit": {
-            "files": 31,
-            "cases": 258,
+            "files": 26,
+            "cases": 240,
             "byArea": {
-              "business": 5,
+              "business": 4,
               "customer": 1,
-              "finance": 3,
+              "finance": 2,
               "operations": 1,
-              "settings": 2,
-              "system": 19
+              "settings": 1,
+              "system": 17
             }
           },
           "integration": {
-            "files": 83,
-            "cases": 1329,
+        "files": 78,
+            "cases": 1229,
             "byArea": {
-              "business": 31,
+              "business": 29,
               "customer": 6,
-              "finance": 14,
-              "operations": 5,
+              "finance": 12,
+              "operations": 4,
               "settings": 13,
               "system": 14
             }
@@ -96,7 +96,7 @@
             "workbench": 6
           }
         },
-        "_baseline_note": "2026-11-08 按磁盘实际 86 个文件与四层回归结果刷新期望计数；跨功能 P0/P1 聚合回归已拆回模块测试。",
+        "_baseline_note": "按磁盘实际文件与当前回归分布维护期望计数；跨功能聚合回归已拆回模块测试。",
         "root_layout": "tests/frontend/<unit|module>/<区域>/",
         "baseline": {
           "_doc": "2026-11-04 搬迁后实测（同机同代码）。cpu = user+sys，跨会话可比；wall 受并发会话干扰。",

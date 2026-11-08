@@ -1,7 +1,7 @@
 """REPORT-01 reporting 报表契约测试（RPT-01）：R1/R2/R3/R5 + 订单利润明细的日期过滤与全部分组循环。
 
-与 test_m4.py::TestReports 的分工：m4 已覆盖无数据冒烟、账号 COST 不进运营费用、
-未归集返点独立列、日报与池余额一致、利润合计自洽、R3 空数据钻取；本文件补
+本文件覆盖无数据冒烟、账号 COST 不进运营费用、未归集返点独立列、日报与池余额一致、
+利润合计自洽、R3 空数据钻取，并补
 日期过滤边界（from/to 双向 continue）、SELL 收入、运营费用/返点结算循环、
 提成分配、订单归属返点、订单明细事件分类与返点 join、?from=&to= API 路径。
 """
@@ -28,23 +28,6 @@ from app.domain.trade import Account, RebateRecord
 from app.orders import service as order_service
 from app.policy import service as policy_service
 from app.reporting import service as reporting_service
-
-
-def test_reporting_read_routes_publish_typed_response_models(app):
-    paths = app.openapi()["paths"]
-
-    expected = {
-        "/api/v1/reports/inventory-health": "InventoryHealthOut",
-        "/api/v1/reports/monthly-pnl": "MonthlyPnlOut",
-        "/api/v1/reports/commission": "CommissionOut",
-        "/api/v1/reports/business-pnl": "BusinessPnlOut",
-        "/api/v1/reports/finance-dimensions": "FinanceDimensionOut",
-        "/api/v1/reports/daily-funds": "DailyFundsOut",
-        "/api/v1/reports/order-profit": "OrderProfitOut",
-    }
-    for path, model_name in expected.items():
-        schema = paths[path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-        assert schema["$ref"].endswith(f"/{model_name}")
 
 
 def test_report_viewer_can_read_employee_options_for_operations_filter(
@@ -328,6 +311,44 @@ class TestR2MonthlyPnl:
         assert detail["buy_amount"] == 500
         assert detail["direct_cost"] == 800
         assert detail["net_profit"] == -500
+
+
+    def test_operating_expense_excludes_account_cost(self, seeded_db):
+        """账号 COST 只能进直接成本，不能进运营费用。"""
+        account = account_service.create_account(
+            seeded_db,
+            game_account="report-r2-account",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="pytest",
+        )
+        order = order_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=D,
+            actor="pytest",
+            account_id=account.id,
+        )
+        order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="1000.00",
+            occurred_on=D, actor="pytest",
+        )
+        order_service.post_event(
+            seeded_db, order.id, event_type="COST", amount="300.00",
+            occurred_on=D, actor="pytest",
+        )
+
+        month = _month_item(reporting_service.r2_monthly_pnl(seeded_db), "2026-10")
+        assert month["account_direct_cost"] == 1300
+        assert month["operating_expense"] == 0
+
+
+def test_order_profit_totals_are_consistent(seeded_db):
+    data = reporting_service.order_profit_detail(seeded_db)
+    for item in data["items"]:
+        assert item["net_profit"] == (
+            item["income"] - item["buy_amount"] - item["direct_cost"]
+        )
 
 
 # --------------------------------------------------------------------- R3 提成

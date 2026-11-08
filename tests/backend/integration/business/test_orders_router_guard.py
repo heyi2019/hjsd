@@ -1,7 +1,7 @@
-"""AUTH-01 tests/backend/test_orders_router_guard：orders.router 守卫/权限分支覆盖收口。
+"""AUTH-01 orders.router 的业务校验与权限边界。
 
 直接调用 router 函数（绕过 FastAPI DI 的依赖工厂），触发业务校验与权限拦截分支，
-不依赖完整 HTTP 链路，保持与批2-4 守门用例一致的轻量风格。
+避免把测试结果混入完整 HTTP 链路。
 """
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ def _new_account(
 # ---- create_order 业务校验分支（在 service 调用前即拦截，无需有效账号） ----
 
 def test_create_order_th_with_installment_rejected(seeded_db):
-    # 355: TH/DG 带分期合约须走出售动作，建单阶段禁止
+    # TH/DG 带分期合约须走出售动作，建单阶段禁止
     payload = schemas.OrderCreate(
         order_type="TH",
         trade_date=TODAY,
@@ -69,7 +69,7 @@ def test_create_order_th_with_installment_rejected(seeded_db):
         router.create_order(payload, db=seeded_db, user=_admin())
 
 def test_create_order_initial_cost_requires_buy_on_hs_th(seeded_db):
-    # 373: 初始费用仅适用于同时提交初始买入的回收/提号订单
+    # 初始费用仅适用于同时提交初始买入的回收/提号订单
     payload = schemas.OrderCreate(
         order_type="HS",
         trade_date=TODAY,
@@ -81,7 +81,7 @@ def test_create_order_initial_cost_requires_buy_on_hs_th(seeded_db):
 # ---- create_order 权限拦截分支 ----
 
 def test_create_order_hs_initial_buy_requires_event_perm(seeded_db):
-    # 376: HS 初始买入需 order.event.post 或 finance.order.event.post
+    # HS 初始买入需 order.event.post 或 finance.order.event.post
     payload = schemas.OrderCreate(
         order_type="HS",
         trade_date=TODAY,
@@ -91,7 +91,7 @@ def test_create_order_hs_initial_buy_requires_event_perm(seeded_db):
         router.create_order(payload, db=seeded_db, user=_auditor())
 
 def test_create_order_hs_initial_cost_requires_event_perm(seeded_db):
-    # 378: HS 初始费用需 order.event.post（财务仅可登记买卖事件）
+    # HS 初始费用需 order.event.post（财务仅可登记买卖事件）
     payload = schemas.OrderCreate(
         order_type="HS",
         trade_date=TODAY,

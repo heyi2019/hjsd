@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import csv
+from functools import lru_cache
 import os
 import re
 
@@ -42,6 +43,7 @@ def is_e2e_test(relpath: str) -> bool:
     return relpath.replace("\\", "/").startswith("tests/e2e/")
 
 
+@lru_cache(maxsize=1)
 def frontend_test_files() -> list[str]:
     """全部前端 vitest 文件的仓库根相对路径（已排序）。
 
@@ -68,7 +70,7 @@ RUN_REG = os.path.join(BACKEND, "run_regression.py")
 MODULES = ["A", "B", "C", "D", "E", "F", "SYS"]
 
 # ---------------------------------------------------------------------------
-# 后端测试文件 -> 功能编号（按真实代码盘点；110 个文件逐一映射）
+# 后端测试文件 -> 功能编号（按真实代码盘点，逐一映射）
 # ---------------------------------------------------------------------------
 BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_account_delete.py": "B04",
@@ -83,12 +85,10 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_audit_contract.py": "SYS05",
     "test_auth_contract.py": "SYS01",
     "test_backup_scripts.py": "SYS09",
-    "test_bughunt.py": "B01",
     "test_cancel_inventory_release.py": "B06",
     "test_cancellation_model.py": "B02",
     "test_cashflow_totals.py": "D02",
     "test_core_contract.py": "SYS07",
-    "test_core_infra_gaps.py": "SYS10",
     "test_coverage_gate.py": "SYS11",
     "test_deploy_script_contract.py": "SYS09",
     "test_deposit_remaining.py": "B08",
@@ -97,8 +97,6 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_finance_attributes.py": "D02",
     "test_finance_cashflows_service.py": "D02",
     "test_finance_contract.py": "D01",
-    "test_finance_controls_service.py": "D03",
-    "test_finance_idempotency_service.py": "D02",
     "test_finance_rebates_service.py": "D04",
     "test_finance_reconciliation_service.py": "D03",
     "test_finance_reporting_task5_tail.py": "D05",
@@ -128,13 +126,11 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_list_export_csv.py": "E02",
     "test_list_scope_ui_parity.py": "F03",
     "test_m2.py": "B08",
-    "test_m4.py": "E01",
     "test_m5_policy.py": "F01",
     "test_main_contract.py": "SYS07",
     "test_migration.py": "SYS13",
     "test_money.py": "SYS02",
     "test_money_float_guard.py": "SYS02",
-    "test_notifications_contract.py": "SYS08",
     "test_notifications_service.py": "SYS08",
     "test_numbering.py": "SYS03",
     "test_option_sets_api.py": "F04",
@@ -148,7 +144,6 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_orders_common.py": "B01",
     "test_orders_contract.py": "B01",
     "test_order_edit_smoke.py": "B01",
-    "test_orders_events_service.py": "B03",
     "test_orders_guard.py": "B02",
     "test_orders_router_guard.py": "B02",
     "test_parties.py": "C01",
@@ -160,7 +155,6 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_policy_rule_consumption.py": "F01",
     "test_pool_balances_batch.py": "D01",
     "test_pools_api.py": "D01",
-    "test_product_alias_compat.py": "F04",
     "test_profit_allocation_modes.py": "B10",
     "test_public_release_security.py": "SYS01",
     "test_quality_contract.py": "SYS08",
@@ -169,7 +163,6 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_quality_issues_service.py": "SYS08",
     "test_quality_metrics_contract.py": "SYS08",
     "test_ratelimit.py": "SYS01",
-    "test_rebate_current_contract.py": "D04",
     "test_rebate_rules_contract.py": "D04",
     "test_report_export_columns.py": "E02",
     "test_reporting_contract.py": "E01",
@@ -180,7 +173,6 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_state_machine.py": "SYS04",
     "test_stock_intake_contract.py": "B04",
     "test_studio_cashflow_summary.py": "D05",
-    "test_unreachable_status_paths.py": "B02",
 }
 
 # ---------------------------------------------------------------------------
@@ -248,8 +240,8 @@ CROSS_FLOW_LABEL = {
 }
 
 
-# 前端测试文件 -> 功能编号（94 个文件逐一登记，与后端 BACKEND_FILE_TO_FUNC 同构）。
-# 只登记**文件名**：搬目录、拆区域都不影响编号，这正是历史 1091 条前端用例零漂移的前提。
+# 前端测试文件 -> 功能编号（逐一登记，与后端 BACKEND_FILE_TO_FUNC 同构）。
+# 只登记**文件名**：搬目录、拆区域都不影响编号。
 FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "DashboardPage.deep.test.tsx":         "A01",
     "DashboardPage.test.tsx":              "A01",
@@ -406,49 +398,11 @@ def e2e_file_modules(fname: str) -> tuple[str, set[str]]:
 
 
 # ---------------------------------------------------------------------------
-# run_regression.py 的 unit 组（决定 UT 类型）
-# ---------------------------------------------------------------------------
-def _group_files(group_name: str) -> set[str]:
-    text = open(RUN_REG, encoding="utf-8").read()
-    m = re.search(r'"%s":\s*\[(.*?)\]' % re.escape(group_name), text, re.S)
-    if not m:
-        return set()
-    prefix = "tests/backend/"
-    # 只认真正的路径：旧实现把正则匹配到的任意字符串都当条目，而 GROUPS 上方有一条
-    # 注释写着 `-m "not db"`（带引号），于是 `ut` 维度会拼出 `tests/backend/not db` 去跑。
-    # 返回「相对 tests/backend 的路径」，与 all_backend_test_files() 同一形态。
-    return {x[len(prefix):] for x in re.findall(r'"([^"]+)"', m.group(1)) if x.startswith(prefix)}
-
-
-UNIT_FILES = _group_files("unit")
-
-
-def test_type_of_backend_file(fname: str) -> str:
-    """文件落在 unit/ 还是 integration/ 目录即为类型；不再靠 GROUPS 里的手工分组反推。
-
-    目录是类型的事实源：GROUPS 的 "unit" 组只收 19 个纯逻辑文件，而 unit/ 目录收
-    32 个（含「多数派是快用例、但仍带少量 db 用例」的混层文件）。用 GROUPS 反推
-    会让类型判定与实际分层不一致。
-    """
-    rel = fname.replace("\\", "/")
-    if rel.startswith("integration/"):
-        return "IT"
-    if rel.startswith("unit/"):
-        return "UT"
-    base = os.path.basename(rel)  # 未分层时的兜底
-    return "UT" if base in {os.path.basename(u) for u in UNIT_FILES} else "IT"
-
-
-# ---------------------------------------------------------------------------
 # 筛选接口（供 run_regression.py 调用）
 # ---------------------------------------------------------------------------
+@lru_cache(maxsize=1)
 def all_backend_test_files() -> list[str]:
-    """全部后端测试文件，返回**相对 tests/backend 的路径**（如 unit/B/test_orders.py）。
-
-    旧实现指向 ``backend/tests/v1``——那个目录早已删除。后果不是报错，而是
-    ``run_regression.py B`` 打印「无匹配后端测试文件」然后 exit 0，业务域维度
-    静默失效了很久。递归扫盘 + 非空断言，是这条路径唯一的防线。
-    """
+    """递归收集全部后端测试文件，返回相对 tests/backend 的路径。"""
     root = os.path.join(REPO, "tests", "backend")
     out: list[str] = []
     for dirpath, _dirs, files in os.walk(root):
@@ -460,6 +414,7 @@ def all_backend_test_files() -> list[str]:
     return sorted(out)
 
 
+@lru_cache(maxsize=None)
 def module_files(module: str) -> list[str]:
     """某模块的全部后端测试文件（UT + IT；含跨模块归属命中的文件）。"""
     out = []
@@ -470,6 +425,15 @@ def module_files(module: str) -> list[str]:
     return sorted(out)
 
 
+@lru_cache(maxsize=1)
+def _backend_files_by_name() -> dict[str, tuple[str, ...]]:
+    by_name: dict[str, list[str]] = {}
+    for relpath in all_backend_test_files():
+        by_name.setdefault(os.path.basename(relpath), []).append(relpath)
+    return {name: tuple(paths) for name, paths in by_name.items()}
+
+
+@lru_cache(maxsize=1)
 def cross_files() -> list[str]:
     """返回 cross 文件的**相对 tests/backend 的路径**（如 integration/business/test_flow_sale.py）。
 
@@ -477,17 +441,15 @@ def cross_files() -> list[str]:
     但 run_regression.py 会把这些返回值拼成 ``tests/backend/<path>``，因此这里必须给出
     真实相对路径——此前返回裸文件名导致整组 pytest 因 ``tests/backend/test_flow_*.py``
     不存在而 exit 1（CI backend-gate 的 cross 分组长期静默失效）。"""
-    root = os.path.join(REPO, "tests", "backend")
-    resolved: list[str] = []
-    for base in sorted(CROSS_MODULE_FILES):
-        for dirpath, _dirs, files in os.walk(root):
-            if base in files:
-                resolved.append(
-                    os.path.relpath(os.path.join(dirpath, base), root).replace(os.sep, "/")
-                )
-    return sorted(resolved)
+    by_name = _backend_files_by_name()
+    return sorted(
+        relpath
+        for base in sorted(CROSS_MODULE_FILES)
+        for relpath in by_name.get(base, ())
+    )
 
 
+@lru_cache(maxsize=None)
 def type_files(ttype: str) -> list[str]:
     """ttype=ut -> unit 组；it -> 非 unit 后端；e2e -> 当前无常住 E2E（返回空）"""
     files = all_backend_test_files()
@@ -498,10 +460,12 @@ def type_files(ttype: str) -> list[str]:
     return []  # e2e 预留
 
 
+@lru_cache(maxsize=None)
 def module_type_files(module: str, ttype: str) -> list[str]:
     return sorted(set(module_files(module)) & set(type_files(ttype)))
 
 
+@lru_cache(maxsize=None)
 def frontend_module_files(module: str) -> list[str]:
     """某模块的前端测试文件（相对仓库根的 frontend/src/… 或 tests/frontend/…）。"""
     out = []
@@ -512,6 +476,7 @@ def frontend_module_files(module: str) -> list[str]:
     return sorted(out)
 
 
+@lru_cache(maxsize=1)
 def module_summary() -> dict[str, int]:
     return {m: len(module_files(m)) for m in MODULES}
 

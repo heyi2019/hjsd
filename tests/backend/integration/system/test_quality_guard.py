@@ -1,7 +1,4 @@
-"""QUALITY-01 QLT 守卫用例：quality.issues / quality.service 覆盖收口至 100%。
-
-直接驱动业务校验与扫描守卫分支；scan 内部不可达的 ORPHAN_CASHFLOW 分支已在源码移除。
-"""
+"""QUALITY-01 质量异常与指标的业务规则。"""
 from __future__ import annotations
 
 from datetime import date
@@ -229,7 +226,7 @@ def test_scan_skips_unposted_event(seeded_db):
     seeded_db.add(ev)
     seeded_db.commit()
     result = quality_service.scan(seeded_db, user=None)
-    assert isinstance(result, list)
+    assert not any(item["entity_id"] == "EV-UNPOSTED-1" for item in result)
 
 def test_scan_cashflow_source_mismatch(seeded_db):
     pool2 = _pool(seeded_db)
@@ -332,7 +329,17 @@ def test_metrics_scope_filters(seeded_db):
     )
     seeded_db.commit()
     result = quality_service.metrics(seeded_db, user=_scoped_user([1]))
-    assert "items" in result
+    item = next(
+        item for item in result["items"]
+        if item["month"] == date.today().strftime("%Y-%m")
+    )
+    assert item["reconciliation_completion_rate"] == {
+        "rate": 100.0,
+        "numerator": 1,
+        "denominator": 1,
+    }
+    assert item["missing_attachment_rate"]["numerator"] == 1
+    assert item["missing_attachment_rate"]["denominator"] == 1
 
 # ------------------------------------------------------- N+1 回归护栏（scan）
 def _count_selects(session, fn) -> int:
@@ -355,13 +362,7 @@ def _count_selects(session, fn) -> int:
     return len(seen)
 
 def test_scan_sql_count_does_not_grow_with_rows(seeded_db):
-    """scan() 的 SQL 条数必须与行数无关。
-
-    2026-10-28 优化前，真实库单次请求 919 条 SQL：逐事件 COUNT 现金流、
-    逐单 EXISTS 分期、逐行 session.get 合约、逐池 pool_balance 都是循环内查询。
-    这里不钉精确条数（新增检查项应当允许增长），只钉"不随行数线性增长"这一性质：
-    再加 4 个订单 + 4 个已过账事件后条数必须不变，一旦有人改回循环内查询就会红。
-    """
+    """scan() 的查询规模不能随订单行数线性增长。"""
     pool = _pool(seeded_db)
 
     def _add_order_with_event(seq: int) -> None:

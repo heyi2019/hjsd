@@ -280,7 +280,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
   it("总览统计卡的自有权益取服务端汇总（不再前端按 ownership 自算）", async () => {
     // 归属判定（OWNED 计入权益、CUSTODY/THIRD_PART 只计头寸）已在后端
-    // pool_balance_summary 里完成，契约由 backend tests/v1/test_pool_balances_batch.py 守；
+    // pool_balance_summary 里完成，契约由 tests/backend/integration/finance/test_pool_balances_batch.py 守；
     // 这里只验前端确实展示服务端给的数，而不是自己挑池相加。
     vi.mocked(catalog.poolsApi.list).mockResolvedValue([
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "OWNED", status: "ACTIVE" },

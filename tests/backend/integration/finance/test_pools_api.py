@@ -93,10 +93,11 @@ def test_validation_error_marks_field(client, headers):
     assert payload["details"]["errors"]
 
 
-def test_jwt_bearer_flow_works(client, admin_token_headers, seeded_db):
+def test_jwt_bearer_flow_works(client, admin_token_headers):
     """JWT 签发/校验链路可用；查看者 token 写操作仍被拒。"""
     response = client.get(POOLS, headers=admin_token_headers)
     assert response.status_code == 200
+    assert isinstance(response.json(), list)
 
 
 def test_expired_token_returns_token_expired(client):

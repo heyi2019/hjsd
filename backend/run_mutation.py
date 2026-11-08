@@ -6,12 +6,12 @@
     python3 run_mutation.py M3 M7           # 只跑指定编号
 
 为什么不用 sed 拼接命令：
-1. **锚点必须匹配完整逻辑单元**。曾因只替换隐式字符串拼接的第一行
+1. **锚点必须匹配完整逻辑单元**。替换范围必须覆盖完整逻辑，
    （`"exact_match": A` 换掉而 `and B` 留在下一行），变异看似生效、
    实则逻辑未变 → 得出「测试是假绿灯」的错误结论。
 2. **还原时序**：`cp backup target` 若与验证命令写在同一条 shell 里，
    可能先于验证执行。用 Python 单进程 try/finally 杜绝竞态。
-3. **锚点未命中必须显式失败**，不能静默跳过（静默跳过会被误读成「守住了」）。
+3. **锚点未命中必须显式失败**，不能静默视为通过。
 """
 import os
 import shutil
@@ -130,7 +130,7 @@ def main():
         return 1
     print("-" * 72)
 
-    survived, killed, skipped = [], [], []
+    survived, killed, failed = [], [], []
     for mid, desc, rel, anchor, repl, kfilter in muts:
         path = os.path.join(BACKEND, rel)
         backup = tempfile.mktemp(suffix=".bak")
@@ -138,8 +138,8 @@ def main():
         try:
             ok, out = apply_mutation(rel, anchor, repl)
             if not ok:
-                skipped.append((mid, desc, out))
-                print(f"  [跳过] {mid:<3} {desc}  ({out})")
+                failed.append((mid, desc, out))
+                print(f"  [失败] {mid:<3} {desc}  ({out})")
                 continue
             code, summary = run_tests()
             green = code == 0
@@ -153,12 +153,12 @@ def main():
     print("-" * 72)
     code, summary = run_tests()
     print(f"还原后复测: {summary}")
-    print(f"统计: 捕获 {len(killed)} / 存活 {len(survived)} / 跳过 {len(skipped)}")
+    print(f"统计: 捕获 {len(killed)} / 存活 {len(survived)} / 失败 {len(failed)}")
     if survived:
         print(f"!! 存活变异（守门测试无效）: {', '.join(survived)}")
-    if skipped:
-        print(f"跳过（锚点需更新）: {', '.join(m[0] for m in skipped)}")
-    return 1 if (survived or skipped or code != 0) else 0
+    if failed:
+        print(f"失败（锚点需更新）: {', '.join(m[0] for m in failed)}")
+    return 1 if (survived or failed or code != 0) else 0
 
 
 if __name__ == "__main__":

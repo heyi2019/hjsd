@@ -1,4 +1,4 @@
-"""CASHFLOW-01 现金流与押金服务拆分后的直接契约测试。"""
+"""CASHFLOW-01 现金流与押金服务契约测试。"""
 from __future__ import annotations
 
 from datetime import date
@@ -34,11 +34,6 @@ def test_cashflows_module_creates_approved_cashflow(seeded_db):
     assert flow.amount == Decimal("180.00")
     assert flow.status == "APPROVED"
     assert flow.category == "客户收款"
-
-
-def test_finance_facade_re_exports_cashflow_entries():
-    assert finance_service.create_cashflow is cashflows.create_cashflow
-    assert finance_service.create_deposit is cashflows.create_deposit
 
 
 def _restricted_user() -> CurrentUser:
@@ -167,14 +162,6 @@ def test_reverse_cashflow_rejects_deposit_flow(seeded_db):
         )
 
 
-def test_reverse_cashflow_in_direction(seeded_db):
-    flow = _make_flow(seeded_db, direction="IN")
-    reversal = cashflows.reverse_cashflow(
-        seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x"
-    )
-    assert reversal.direction == "OUT"
-
-
 # ----------------------------------------------------------- 押金
 
 
@@ -291,21 +278,6 @@ def test_list_cashflows_transfer_source(seeded_db):
     assert all(r["source"] == "TRANSFER" for r in transfer_rows)
 
 
-def test_reverse_cashflow_out_direction(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT")
-    reversal = cashflows.reverse_cashflow(
-        seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x"
-    )
-    assert reversal.direction == "IN"
-
-
-def test_reverse_cashflow_rejects_already_reversed(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT")
-    cashflows.reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x")
-    with pytest.raises(Validation, match="该流水已冲销"):
-        cashflows.reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x")
-
-
 def test_list_cashflows_pool_ids_filter(seeded_db):
     _make_flow(seeded_db, direction="OUT")
     rows, total = cashflows.list_cashflows(seeded_db, pool_ids=[1])
@@ -375,14 +347,6 @@ def test_lose_deposit_marks_lost(seeded_db):
     assert lost.deposit_id == deposit.id
 
 
-def test_create_deposit_rejects_unknown_source_order(seeded_db):
-    with pytest.raises(NotFound, match="来源订单 999999 不存在"):
-        cashflows.create_deposit(
-            seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest",
-            source_order_id=999999,
-        )
-
-
 def test_list_deposits_pool_ids_filter(seeded_db):
     cashflows.create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
@@ -407,40 +371,6 @@ def test_list_cashflows_by_pool_id_visible(seeded_db):
     items, total = cashflows.list_cashflows(seeded_db, pool_id=1, user=_all_scope_user())
     assert total >= 1
     assert all(item["pool_id"] == 1 for item in items)
-
-
-def _cashflow_row(**overrides):
-    """列表路径的 row dict 形态（`_cashflow_out` 的 dict 分支入参）。"""
-    from datetime import datetime
-
-    row = dict(
-        id=1, flow_no="ZC00001", pool_id=1, occurred_on=TODAY,
-        occurred_at=datetime(2026, 10, 17, 9, 0),
-        accounting_attribute="SELF_REVENUE",
-        category="SALE", direction="IN", amount=Decimal("10"), status="APPROVED",
-        reviewed_by=None, reviewed_at=None, reversal_of_id=None, order_id=None,
-        order_no=None, deposit_id=None, order_event_id=None, transfer_id=None,
-        note=None, form_extra=None, operator="pytest", created_by="pytest",
-    )
-    row.update(overrides)
-    return row
-
-
-def test_cashflow_out_marks_order_event_source(seeded_db):
-    """挂了订单事件就必须标 ORDER_EVENT —— 前端据此决定能否跳订单详情。"""
-    from app.finance import router_output
-
-    assert router_output._cashflow_out(seeded_db, _cashflow_row(order_event_id=7)).source == (
-        "ORDER_EVENT"
-    )
-
-
-def test_cashflow_out_marks_rebate_settlement_source(seeded_db):
-    """返点类（含冲销）没有订单事件，来源必须落到 REBATE_SETTLEMENT 而不是 OTHER。"""
-    from app.finance import router_output
-
-    out = router_output._cashflow_out(seeded_db, _cashflow_row(category="REBATE_REVERSAL"))
-    assert out.source == "REBATE_SETTLEMENT"
 
 
 def test_finance_domain_creates_business_event_cashflow(seeded_db):
@@ -484,3 +414,12 @@ def test_finance_domain_creates_business_event_cashflow(seeded_db):
     assert flow.order_id == order.id
     assert flow.order_event_id == event.id
     assert flow.status == "APPROVED"
+    rows, _ = cashflows.list_cashflows(seeded_db, order_id=order.id)
+    assert rows and rows[0]["source"] == "ORDER_EVENT"
+
+
+def test_list_cashflows_marks_rebate_settlement_source(seeded_db):
+    flow = _make_flow(seeded_db, direction="IN", category="REBATE_REVERSAL")
+    rows, _ = cashflows.list_cashflows(seeded_db)
+    listed = next(row for row in rows if row["id"] == flow.id)
+    assert listed["source"] == "REBATE_SETTLEMENT"

@@ -250,8 +250,7 @@ def test_commission_report_uses_amount_as_payable_base(seeded_db):
 
 
 # ---- 亏损单分润 ----
-# 亏损单按金额分润填负数，表示该人分担的亏损额。方向必须与订单盈亏一致，
-# 且报表 base 取负值（`amount != 0` 判据；旧实现用 `> 0` 会把负数当未填而回退比例）。
+# 亏损单按金额分润填负数，表示该人分担的亏损额；报表 base 也必须保留负值。
 
 
 def test_person_mode_allows_negative_amount_on_loss_order(seeded_db):

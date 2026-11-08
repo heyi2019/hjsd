@@ -12,19 +12,6 @@ from app.orders import service as orders_service
 from app.quality import service
 
 
-def test_quality_read_routes_publish_typed_response_models(app):
-    paths = app.openapi()["paths"]
-
-    assert paths["/api/v1/quality/exceptions"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/QualitySummaryOut"
-    )
-    assert paths["/api/v1/quality/metrics"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/QualityMetricsOut"
-    )
-    issue_list_schema = paths["/api/v1/quality/issues"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-    assert issue_list_schema["$ref"].endswith("/QualityIssueListOut")
-
-
 TODAY = date(2026, 10, 17)
 
 

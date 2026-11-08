@@ -72,7 +72,7 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
   // 明细与三项汇总一次取回；「什么算工作室收支」的口径在 backend
-  // tests/v1/test_studio_cashflow_summary.py，这里只验展示。
+  // tests/backend/integration/finance/test_studio_cashflow_summary.py，这里只验展示。
   vi.mocked(catalog.cashflowsApi.studioSummary).mockResolvedValue({
     items: expenseFlows as never,
     approved_income: "0.00",

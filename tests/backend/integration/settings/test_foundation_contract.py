@@ -5,7 +5,7 @@
 路由 upsert 与停用池拒绝等主路径；本文件补池/业务类型的 404 与取值校验、
 列表的启用过滤、更新池全字段、业务类型更新、路由 portion 校验、
 停用池不可作为默认路由、编号域两个便捷函数、种子「业务类型缺失跳过路由」
-与 `seed_is_applied`，以及 2 个未测路由端点。
+与 `seed_is_applied`，以及相关路由边界。
 """
 from __future__ import annotations
 

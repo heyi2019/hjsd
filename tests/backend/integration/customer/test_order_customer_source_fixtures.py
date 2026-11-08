@@ -1,9 +1,7 @@
-"""PARTY-01 R9 fixture：客户来源「可输入选填」+ 四类建单「落库级断言」。
+"""PARTY-01 客户来源字段与四类建单的落库契约。
 
-背景（2026-10-28）：客户来源字段由「严格 SELECT + 独立 _other 文本分支」改为
-「可自由输入的 SELECT（combobox）+ 选填」。后端 create_order 对 form_extra 原样落库
-（service.py:432）、不校验选项/必填，所以「可输入」与「选填」都是 API 既有的契约行为；
-本文件用针对性 fixture 把它们锁死，避免日后回归。
+后端按声明保存 form_extra；本文件验证订单与库存账号都真实落库，
+并保留客户来源字段的输入语义。
 
 落库级断言：三类建单（HS/TH/DG）经 API 创建后，直接查库确认 Order 行与
 （DG/HS/TH 各自触发的）库存 Account 行确实落地，而非只看响应回显。
@@ -64,21 +62,31 @@ def test_customer_source_accepts_free_typed_value(seeded_client, seeded_db, head
     assert order.form_extra.get(key) == free_value
 
 @pytest.mark.parametrize("order_type", ["HS", "TH", "DG"])
-def test_customer_source_optional_when_omitted(seeded_client, headers, order_type):
+def test_customer_source_optional_when_omitted(
+    seeded_client, seeded_db, headers, order_type
+):
     """选填：不传客户来源字段也能成功建单（字段为选填，不因 required=1 在后端拦）。"""
     resp = seeded_client.post(
         "/api/v1/orders", json=_base_payload(order_type), headers=headers
     )
     assert resp.status_code == 201, resp.text
+    order = seeded_db.get(Order, resp.json()["id"])
+    assert order is not None
+    assert not order.form_extra or not order.form_extra.get(CUSTOMER_SOURCE_KEY[order_type])
 
 @pytest.mark.parametrize("order_type", ["HS", "TH", "DG"])
-def test_customer_source_explicit_empty_string_accepted(seeded_client, headers, order_type):
+def test_customer_source_explicit_empty_string_accepted(
+    seeded_client, seeded_db, headers, order_type
+):
     """选填边界：显式传空字符串也算「未填」，不应被拒。"""
     key = CUSTOMER_SOURCE_KEY[order_type]
     payload = _base_payload(order_type)
     payload["form_extra"] = {key: ""}
     resp = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
     assert resp.status_code == 201, resp.text
+    order = seeded_db.get(Order, resp.json()["id"])
+    assert order is not None
+    assert not order.form_extra or not order.form_extra.get(key)
 
 # ------------------------------------------------------------------ 三类建单：落库级断言
 @pytest.mark.parametrize(

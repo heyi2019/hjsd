@@ -54,7 +54,7 @@ beforeEach(() => {
   ]);
   vi.mocked(catalog.installmentsApi.dispositions).mockResolvedValue([]);
   // 合计由服务端下发（Decimal 聚合）；「300+200」这类算术的契约在
-  // backend tests/v1/test_installment_totals.py，前端只验展示。
+  // tests/backend/integration/business/test_installment_totals.py，前端只验展示。
   vi.mocked(catalog.installmentsApi.totals).mockResolvedValue({
     total_receivable: "500.00",
     total_paid: "350.00",

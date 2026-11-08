@@ -309,9 +309,12 @@ describe("InventoryPanel：账号台账", () => {
     await waitFor(() => expect(cost?.textContent).toContain("8,888.88"));
     expect(screen.getByText("超7天库存账号").closest(".ui-stat")?.textContent).toContain("2");
     expect(screen.getByText("超30天库存账号").closest(".ui-stat")?.textContent).toContain("1");
-    // 汇总只按「当前可见集合」发起：accounts 里只有 acc-1 在库。
+    // 汇总只按「当前可见集合」发起：默认在库视图里只有 acc-1。
     expect(vi.mocked(catalog.stocksApi.inventoryStats)).toHaveBeenLastCalledWith([1]);
-    expect(screen.queryByText("已售")).toBeNull();
+    const visibleRow = screen.getAllByRole("row").find((row) => within(row).queryByText("acc-1") !== null);
+    expect(visibleRow).toBeDefined();
+    expect(within(visibleRow!).getByText("在库")).toBeInTheDocument();
+    expect(screen.queryByText("acc-2")).toBeNull();
   });
 
   it("后端不可达 → 错误条落地", async () => {

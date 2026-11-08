@@ -28,7 +28,6 @@ import { DgOrderSection } from "./dg/DgOrderSection";
 import {
   buildCounterpartyRoles,
   buildCustomerRoles,
-  participantLookupKey,
   TH_COUNTERPARTY_ROLE,
   type BusinessOrderType,
 } from "./participantRoles";
@@ -76,10 +75,6 @@ export function CreateBusinessModal(props: {
     }
     return index;
   }, [customers]);
-  const counterpartiesByNameAndType = useMemo(
-    () => new Map(counterparties.map((item) => [participantLookupKey(item.display_name, item.type), item] as const)),
-    [counterparties],
-  );
   const formId = "business-order-form";
   // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
   // 不同业务类型通过 orderType 变化自动切换配置（get/post 走已落地的 GET 缓存层）。
@@ -102,7 +97,7 @@ export function CreateBusinessModal(props: {
     void (async () => {
       try {
         const [cpList, poolList, gameTypeList, employeeList] = await Promise.all([
-          counterpartiesApi.list(),
+          counterpartiesApi.list({ type: TH_COUNTERPARTY_ROLE, status: "ACTIVE" }),
           poolsApi.list(),
           gameTypesApi.list({ include_inactive: false }),
           employeesApi.list(),
@@ -218,31 +213,13 @@ export function CreateBusinessModal(props: {
         : isTh
           ? [
               values.th_account_note as string,
-              values.supplier_source ? `供货方来源：${String(values.supplier_source === "其他" ? values.supplier_source_other : values.supplier_source)}` : "",
               values.supplier_note as string,
               values.th_receive_amount ? `预期收买家：${String(values.th_receive_amount)}` : "",
             ].filter(Boolean).join("｜") || undefined
           : values.note as string;
-      let counterpartyId = values.counterparty_id as number | undefined;
-      if (isTh && values.supplier_nickname) {
-        // TH 的供货源只进入合作伙伴主数据，不进入客户主数据。
-        const existingCounterparty = counterpartiesByNameAndType.get(
-          participantLookupKey(String(values.supplier_nickname), TH_COUNTERPARTY_ROLE),
-        );
-        const counterparty = existingCounterparty ?? await counterpartiesApi.create({
-          display_name: values.supplier_nickname as string,
-          type: TH_COUNTERPARTY_ROLE,
-          contact_name: values.supplier_contact_name as string,
-          phone: values.supplier_phone as string,
-          wechat: values.supplier_wechat as string,
-          qq: values.supplier_qq as string,
-          source: (values.supplier_source === "其他" ? values.supplier_source_other : values.supplier_source) as string,
-          note: [
-            values.supplier_note as string,
-          ].filter(Boolean).join("｜") || undefined,
-        });
-        counterpartyId = counterparty.id;
-      }
+      const counterpartyId = isTh
+        ? values.supplier_counterparty_id as number | undefined
+        : values.counterparty_id as number | undefined;
       const customerRoles = buildCustomerRoles(orderType, values.customer_id as number | undefined);
       const counterpartyRoles = buildCounterpartyRoles(
         orderType,
@@ -361,9 +338,6 @@ export function CreateBusinessModal(props: {
         onFinish={submit}
         onValuesChange={(changed) => {
           const clear: Record<string, undefined> = {};
-          for (const [source, other] of [["supplier_source", "supplier_source_other"]]) {
-            if (source in changed && changed[source] !== "其他") clear[other] = undefined;
-          }
           if ("intermediary_type" in changed && changed.intermediary_type !== "包赔") {
             clear.compensation_type = undefined;
           }
@@ -380,7 +354,7 @@ export function CreateBusinessModal(props: {
           <SectionLabelsContext.Provider value={labels}>
             {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes} employees={employees} businessResponsibleLabel="回收负责人" showIntermediaryDelivery accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
               <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} financeExtras={<CustomFieldSection section="FINANCE" testIdSuffix="finance" />} />
-            </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} employees={employees} /> : <DgOrderSection gameTypes={gameTypes} employees={employees} />}
+            </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} counterparties={counterparties} gameTypes={gameTypes} employees={employees} /> : <DgOrderSection gameTypes={gameTypes} employees={employees} />}
             {isRecovery ? <RecoveryCustomerSection customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
             <CustomFieldSection section="EXTRA" testIdSuffix="extra" />
           </SectionLabelsContext.Provider>

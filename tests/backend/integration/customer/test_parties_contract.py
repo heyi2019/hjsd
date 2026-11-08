@@ -218,8 +218,10 @@ class TestListAndGetCustomers:
             seeded_db,
             order_type="TH",
             trade_date=date(2026, 10, 11),
-            customer_roles=[(customer.id, "BUYER")],
             actor="pytest",
+        )
+        orders_service.add_customer_role(
+            seeded_db, th.id, customer.id, "BUYER", actor="pytest"
         )
         installment = installment_service.create_installment(
             seeded_db,
@@ -273,8 +275,10 @@ class TestListAndGetCustomers:
             order_type="TH",
             trade_date=date(2026, 10, 11),
             owner_id=1,
-            customer_roles=[(customer.id, "BUYER")],
             actor="pytest",
+        )
+        orders_service.add_customer_role(
+            seeded_db, foreign.id, customer.id, "BUYER", actor="pytest"
         )
 
         detail = service.get_customer_detail(seeded_db, customer.id, _scoped_user())
@@ -652,8 +656,10 @@ class TestPartiesApi:
             seeded_db,
             order_type="TH",
             trade_date=date(2026, 10, 12),
-            customer_roles=[(customer.id, "BUYER")],
             actor="pytest",
+        )
+        orders_service.add_customer_role(
+            seeded_db, order.id, customer.id, "BUYER", actor="pytest"
         )
         installment_service.create_installment(
             seeded_db,

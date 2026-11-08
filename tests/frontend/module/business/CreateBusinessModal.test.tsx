@@ -37,7 +37,7 @@ beforeEach(() => {
   seedOrderFormFields(catalog);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
-  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", status: "ACTIVE" }]);
+  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "SUPPLIER", status: "ACTIVE" }]);
   resolveMock(vi.mocked(catalog.stocksApi.list), [
     { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "0.00" },
     { id: 10, game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "WAITING", cost_amount: "0.00" },
@@ -149,6 +149,13 @@ it("打开回收入口后只加载订单所需的业务数据", async () => {
     expect(vi.mocked(catalog.stocksApi.list)).not.toHaveBeenCalled();
     expect(vi.mocked(catalog.ordersApi.list)).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("关联账号（必填）");
+  });
+
+it("提号建单不渲染客户板块，也不加载客户主数据", async () => {
+    await openTypedModal("TH");
+    expect(await screen.findByLabelText("供货方昵称")).toBeInTheDocument();
+    expect(screen.queryByLabelText("客户昵称")).toBeNull();
+    expect(vi.mocked(catalog.customersApi.list)).not.toHaveBeenCalled();
   });
 
 it("回收订单渲染已启用的其他补充字段", async () => {
@@ -307,6 +314,10 @@ it("订单已创建后不等待列表刷新，提交按钮立即结束 loading",
     await pickMainPool();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
+      customer_roles: [],
+      counterparty_roles: [{ counterparty_id: 2, role: "SUPPLIER" }],
+    }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const button = screen.getByRole("button", { name: /创建订单/ });
     expect(button.className).not.toContain("ant-btn-loading");

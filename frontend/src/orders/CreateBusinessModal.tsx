@@ -25,8 +25,15 @@ import { RecoveryFeeSection } from "./recovery/RecoveryFeeSection";
 import { useRecoveryFormState } from "./recovery/useRecoveryFormState";
 import { ThOrderSection } from "./th/ThOrderSection";
 import { DgOrderSection } from "./dg/DgOrderSection";
+import {
+  buildCounterpartyRoles,
+  buildCustomerRoles,
+  participantLookupKey,
+  TH_COUNTERPARTY_ROLE,
+  type BusinessOrderType,
+} from "./participantRoles";
 
-export type BusinessOrderType = "HS" | "TH" | "DG";
+export type { BusinessOrderType } from "./participantRoles";
 
 const MODAL_TITLES: Record<string, string> = {
   HS: "新建回收订单",
@@ -70,7 +77,7 @@ export function CreateBusinessModal(props: {
     return index;
   }, [customers]);
   const counterpartiesByNameAndType = useMemo(
-    () => new Map(counterparties.map((item) => [`${item.display_name}\u0000${item.type}`, item] as const)),
+    () => new Map(counterparties.map((item) => [participantLookupKey(item.display_name, item.type), item] as const)),
     [counterparties],
   );
   const formId = "business-order-form";
@@ -89,30 +96,42 @@ export function CreateBusinessModal(props: {
 
   // 基础数据随页面挂载即预热并常驻内存：后续每次打开弹窗直接读 state，不再发网络请求。
   // 仅成功初始化一次；失败不置位，下次打开可重试。
-  const didInitLookup = useRef(false);
+  const didInitCommonLookup = useRef(false);
   useEffect(() => {
-    if (didInitLookup.current) return;
+    if (didInitCommonLookup.current) return;
     void (async () => {
       try {
-        const [customerList, cpList, poolList, gameTypeList, employeeList] = await Promise.all([
-          customersApi.list(),
+        const [cpList, poolList, gameTypeList, employeeList] = await Promise.all([
           counterpartiesApi.list(),
           poolsApi.list(),
           gameTypesApi.list({ include_inactive: false }),
           employeesApi.list(),
         ]);
-        setCustomers(Array.isArray(customerList) ? customerList : []);
         setCounterparties(Array.isArray(cpList) ? cpList : []);
         setPools((Array.isArray(poolList) ? poolList : []).filter((pool) => pool.status === "ACTIVE"));
         setGameTypes(Array.isArray(gameTypeList) ? gameTypeList : []);
         setEmployees((Array.isArray(employeeList) ? employeeList : []).filter((employee) => employee.is_active));
         setLoadError(null);
-        didInitLookup.current = true;
+        didInitCommonLookup.current = true;
       } catch (error) {
         setLoadError(normalizeError(error));
       }
     })();
   }, []);
+
+  const didInitCustomerLookup = useRef(false);
+  useEffect(() => {
+    if (isTh || didInitCustomerLookup.current) return;
+    void Promise.resolve(customersApi.list())
+      .then((customerList) => {
+        setCustomers(Array.isArray(customerList) ? customerList : []);
+        setLoadError(null);
+        didInitCustomerLookup.current = true;
+      })
+      .catch((error) => {
+        setLoadError(normalizeError(error));
+      });
+  }, [isTh]);
 
   useEffect(() => {
     if (!props.open || !orderType) return;
@@ -131,7 +150,7 @@ export function CreateBusinessModal(props: {
     form.setFieldsValue(defaults);
     // 以「打开瞬间」的表单值为脏判定基线：仅打开下拉再收起不算脏（P2-198）。
     initialValuesRef.current = form.getFieldsValue(true);
-  }, [form, gameTypes, isRecovery, isTh, orderType, props.open]);
+  }, [form, gameTypes, isRecovery, orderType, props.open]);
 
   const submit = async (values: Record<string, unknown>) => {
     setSubmitting(true);
@@ -165,31 +184,34 @@ export function CreateBusinessModal(props: {
         const v = values[key];
         if (v !== undefined && v !== null && v !== "") orderFormExtra[key] = v;
       }
-      const customerPrefix = isDg ? "dg_" : "";
-      const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
-      const selectedCustomerSource = values[customerSourceField] as string | undefined;
-      const customerSourceOtherField = isDg ? "dg_customer_source_other" : "customer_source_other";
-      const resolvedCustomerSource = selectedCustomerSource === "其他"
-        ? values[customerSourceOtherField] as string
-        : selectedCustomerSource;
-      const customerNickname = values[`${customerPrefix}customer_nickname`];
-      if ((isRecovery || isDg) && customerNickname) {
-        const existingCustomer = (customersByName.get(String(customerNickname)) ?? []).find((customer) =>
-          customer.display_name === customerNickname
-          && ((values[`${customerPrefix}customer_phone`] && customer.phone === values[`${customerPrefix}customer_phone`])
-            || (values[`${customerPrefix}customer_wechat`] && customer.wechat === values[`${customerPrefix}customer_wechat`])
-            || (!values[`${customerPrefix}customer_phone`] && !values[`${customerPrefix}customer_wechat`])),
-        );
-        const customer = existingCustomer ?? (await customersApi.create({
-          display_name: customerNickname as string,
-          contact_name: values[isDg ? "dg_customer_contact" : "customer_contact_name"] as string,
-          phone: values[`${customerPrefix}customer_phone`] as string,
-          wechat: values[`${customerPrefix}customer_wechat`] as string,
-          qq: values[`${customerPrefix}customer_qq`] as string,
-          source: resolvedCustomerSource as string,
-          note: (isDg ? values.dg_note : values.note) as string,
-        })).customer;
-        values.customer_id = customer.id;
+      let resolvedCustomerSource: string | undefined;
+      if (isRecovery || isDg) {
+        const customerPrefix = isDg ? "dg_" : "";
+        const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
+        const selectedCustomerSource = values[customerSourceField] as string | undefined;
+        const customerSourceOtherField = isDg ? "dg_customer_source_other" : "customer_source_other";
+        resolvedCustomerSource = selectedCustomerSource === "其他"
+          ? values[customerSourceOtherField] as string
+          : selectedCustomerSource;
+        const customerNickname = values[`${customerPrefix}customer_nickname`];
+        if (customerNickname) {
+          const existingCustomer = (customersByName.get(String(customerNickname)) ?? []).find((customer) =>
+            customer.display_name === customerNickname
+            && ((values[`${customerPrefix}customer_phone`] && customer.phone === values[`${customerPrefix}customer_phone`])
+              || (values[`${customerPrefix}customer_wechat`] && customer.wechat === values[`${customerPrefix}customer_wechat`])
+              || (!values[`${customerPrefix}customer_phone`] && !values[`${customerPrefix}customer_wechat`])),
+          );
+          const customer = existingCustomer ?? (await customersApi.create({
+            display_name: customerNickname as string,
+            contact_name: values[isDg ? "dg_customer_contact" : "customer_contact_name"] as string,
+            phone: values[`${customerPrefix}customer_phone`] as string,
+            wechat: values[`${customerPrefix}customer_wechat`] as string,
+            qq: values[`${customerPrefix}customer_qq`] as string,
+            source: resolvedCustomerSource,
+            note: (isDg ? values.dg_note : values.note) as string,
+          })).customer;
+          values.customer_id = customer.id;
+        }
       }
       const note = (isRecovery || isDg) && resolvedCustomerSource
         ? `客户来源：${String(resolvedCustomerSource)}${values[isDg ? "dg_note" : "note"] ? `｜${String(values[isDg ? "dg_note" : "note"])}` : ""}`
@@ -203,13 +225,13 @@ export function CreateBusinessModal(props: {
           : values.note as string;
       let counterpartyId = values.counterparty_id as number | undefined;
       if (isTh && values.supplier_nickname) {
-        // TH 的业务角色是同行（PEER）；页面仍以“供货方”展示业务称呼。
-        // 后端按订单参与方契约校验 TH 只能使用 PEER。
-        const role = "PEER";
-        const existingCounterparty = counterpartiesByNameAndType.get(`${String(values.supplier_nickname)}\u0000${role}`);
+        // TH 的供货源只进入合作伙伴主数据，不进入客户主数据。
+        const existingCounterparty = counterpartiesByNameAndType.get(
+          participantLookupKey(String(values.supplier_nickname), TH_COUNTERPARTY_ROLE),
+        );
         const counterparty = existingCounterparty ?? await counterpartiesApi.create({
           display_name: values.supplier_nickname as string,
-          type: role,
+          type: TH_COUNTERPARTY_ROLE,
           contact_name: values.supplier_contact_name as string,
           phone: values.supplier_phone as string,
           wechat: values.supplier_wechat as string,
@@ -221,11 +243,12 @@ export function CreateBusinessModal(props: {
         });
         counterpartyId = counterparty.id;
       }
-      const customerRole = isRecovery ? "SELLER" : isDg ? "CONSIGNOR" : String(values.customer_role ?? "BUYER");
-      const counterpartyRole = isTh ? "PEER" : String(values.counterparty_role ?? "PEER");
-      const customerRoles = values.customer_id
-        ? [{ customer_id: values.customer_id as number, role: customerRole }]
-        : [];
+      const customerRoles = buildCustomerRoles(orderType, values.customer_id as number | undefined);
+      const counterpartyRoles = buildCounterpartyRoles(
+        orderType,
+        counterpartyId,
+        values.counterparty_role as string | undefined,
+      );
       const initialCosts = (isRecovery || isTh) ? [
         ...(Number(values.intermediary_fee) > 0 ? [{
           amount: String(values.intermediary_fee), occurred_on: today(), portion: "PRINCIPAL",
@@ -271,14 +294,7 @@ export function CreateBusinessModal(props: {
         confirm_repurchase: repurchaseConfirmedFor.current === gameAccount,
         note,
         customer_roles: customerRoles,
-        counterparty_roles: counterpartyId
-          ? [
-              {
-                counterparty_id: counterpartyId,
-                role: counterpartyRole,
-              },
-            ]
-          : [],
+        counterparty_roles: counterpartyRoles,
         initial_buy: (isRecovery || isTh) ? {
           amount: String((isRecovery ? values.recovery_price : values.th_purchase_amount) ?? 0),
           occurred_on: today(), portion: "PRINCIPAL", pool_id: values.payment_pool_id as number,

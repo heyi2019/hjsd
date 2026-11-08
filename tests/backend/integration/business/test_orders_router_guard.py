@@ -144,7 +144,7 @@ def test_order_list_payload_includes_counterparty_role(seeded_db):
         inventory_type="PICKUP",
     )
     cp = parties_service.create_counterparty(
-        seeded_db, display_name="同行乙", type="PEER", actor="pytest"
+        seeded_db, display_name="供货方乙", type="SUPPLIER", actor="pytest"
     )
     order = service.create_order(
         seeded_db,
@@ -152,13 +152,13 @@ def test_order_list_payload_includes_counterparty_role(seeded_db):
         trade_date=TODAY,
         actor="pytest",
         account_id=account.id,
-        counterparty_roles=[(cp.id, "PEER")],
+        counterparty_roles=[(cp.id, "SUPPLIER")],
         user=_admin(),
     )
     seeded_db.commit()
     payloads = router._order_list_payload(seeded_db, [order])
-    assert payloads[0]["party_name"] == "同行乙"
-    assert payloads[0]["party_role"] == "PEER"
+    assert payloads[0]["party_name"] == "供货方乙"
+    assert payloads[0]["party_role"] == "SUPPLIER"
 
 
 def test_order_list_payload_does_not_use_foreign_source_order(seeded_db):

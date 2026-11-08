@@ -17,10 +17,10 @@ from app.domain.trade import Account, Order
 
 D = date(2026, 10, 4)
 
-# 各业务类型对应的客户来源字段键（与 order_form_fields 种子一致）。
-CUSTOMER_SOURCE_KEY = {
+# 各业务类型对应的参与方来源字段键（与 order_form_fields 种子一致）。
+PARTY_SOURCE_KEY = {
     "HS": "customer_source",
-    "TH": "customer_source",
+    "TH": "supplier_source",
     "DG": "dg_customer_source",
 }
 
@@ -44,11 +44,11 @@ def _base_payload(order_type: str) -> dict:
     if order_type == "DG":
         return {**base, "account_snapshot": {"game_account": "r9-dg-account"}}
 
-# ------------------------------------------------------------------ 客户来源：可输入选填
+# ------------------------------------------------------------------ 参与方来源：可输入选填
 @pytest.mark.parametrize("order_type", ["HS", "TH", "DG"])
 def test_customer_source_accepts_free_typed_value(seeded_client, seeded_db, headers, order_type):
     """可输入：不在预设选项里的自由文本也应被接受并落库。"""
-    key = CUSTOMER_SOURCE_KEY[order_type]
+    key = PARTY_SOURCE_KEY[order_type]
     free_value = "抖音直播间引流"  # 非预设 option，专门测「可输入」
     payload = _base_payload(order_type)
     payload["form_extra"] = {key: free_value}
@@ -72,14 +72,14 @@ def test_customer_source_optional_when_omitted(
     assert resp.status_code == 201, resp.text
     order = seeded_db.get(Order, resp.json()["id"])
     assert order is not None
-    assert not order.form_extra or not order.form_extra.get(CUSTOMER_SOURCE_KEY[order_type])
+    assert not order.form_extra or not order.form_extra.get(PARTY_SOURCE_KEY[order_type])
 
 @pytest.mark.parametrize("order_type", ["HS", "TH", "DG"])
 def test_customer_source_explicit_empty_string_accepted(
     seeded_client, seeded_db, headers, order_type
 ):
     """选填边界：显式传空字符串也算「未填」，不应被拒。"""
-    key = CUSTOMER_SOURCE_KEY[order_type]
+    key = PARTY_SOURCE_KEY[order_type]
     payload = _base_payload(order_type)
     payload["form_extra"] = {key: ""}
     resp = seeded_client.post("/api/v1/orders", json=payload, headers=headers)

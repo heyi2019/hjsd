@@ -301,18 +301,16 @@ class TestA02ThStock:
         assert seeded_db.get(Order, order.id).account_snapshot is None
 
     def test_advance_then_settle(self, seeded_db):
-        peer = parties_service.create_counterparty(
-            seeded_db, display_name="同行A", type="PEER", actor="pytest"
+        supplier = parties_service.create_counterparty(
+            seeded_db, display_name="供货方A", type="SUPPLIER", actor="pytest"
         )
-        buyer = _customer(seeded_db)
         seeded_db.commit()
         order = service.create_order(
             seeded_db,
             order_type="TH",
             trade_date=TODAY,
             actor="pytest",
-            customer_roles=[(buyer.id, "BUYER")],
-            counterparty_roles=[(peer.id, "PEER")],
+            counterparty_roles=[(supplier.id, "SUPPLIER")],
         )
         seeded_db.commit()
 

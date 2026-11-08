@@ -89,7 +89,7 @@
 {"order_type":"HS","trade_date":"2026-10-04","account_id":12,"customer_roles":[{"customer_id":10,"role":"SELLER"},{"customer_id":11,"role":"BUYER"}],"counterparty_roles":[]}
 ```
 
-返回包含 `order_no`。HS 必须使用 `account_id` 关联回收库存；DG 使用 `account_id` 关联寄售库存；TH 使用 `account_id` 关联提号库存（PICKUP）。订单角色必须符合业务类型，且停用客户/合作方不可引用。TH 同行写 `counterparty_roles:PEER`，DG 寄售方写 `CONSIGNOR`；不得把同行或供货方写入客户。创建分期合约时，`contract_type=STOCK_SALE` 仅接受已买入在库的 HS 订单，`PICKUP_SALE` 仅接受 TH 订单，`CONSIGNMENT_SALE` 仅接受 DG 订单。
+返回包含 `order_no`。HS 必须使用 `account_id` 关联回收库存；DG 使用 `account_id` 关联寄售库存；TH 使用 `account_id` 关联提号库存（PICKUP）。订单角色必须符合业务类型，且停用客户/合作方不可引用。TH 供货源写 `counterparty_roles:SUPPLIER`，只关联合作伙伴主数据，不写入客户；DG 寄售方写 `CONSIGNOR`。创建分期合约时，`contract_type=STOCK_SALE` 仅接受已买入在库的 HS 订单，`PICKUP_SALE` 仅接受 TH 订单，`CONSIGNMENT_SALE` 仅接受 DG 订单。
 
 ### 客户与合作方
 

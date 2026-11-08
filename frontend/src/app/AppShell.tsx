@@ -1,4 +1,4 @@
-import { Modal, Space } from "antd";
+import { Space } from "antd";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { navigation } from "./navigation";
@@ -11,7 +11,9 @@ import { ChangePasswordPage } from "../auth/ChangePasswordPage";
 import type { ComponentType } from "react";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 import { ConfirmButton } from "../shared/ui";
+import { SheetModal } from "../shared/ui/SheetModal";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
+import { PullToRefreshProvider } from "../shared/ui/pullToRefresh/PullToRefreshProvider";
 
 const OrdersPage = lazy(() => import("../orders/OrdersPage").then(({ OrdersPage }) => ({ default: OrdersPage })));
 const CustomersPage = lazy(() => import("../customers/CustomersPage").then(({ CustomersPage }) => ({ default: CustomersPage })));
@@ -119,6 +121,9 @@ export function AppShell() {
   // iOS 26 Scroll Edge Effect：按滚动位置写入上下渐隐距离，内容触边时才渐隐。
   // 未溢出时两值均为 0，mask 退化为全不透明（见 navigation.css 的 .nav-list）。
   const navRef = useRef<HTMLElement>(null);
+  // 顶栏滚动边缘效果（R4）：顶栏是 sticky 玻璃栏，正文从其下方滚过；
+  // 文档滚动超过阈值时让顶栏浮现一条细分隔阴影（iOS 导航栏惯例），归零时隐去。
+  const mainRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const nav = navRef.current;
     if (!nav) return undefined;
@@ -140,6 +145,39 @@ export function AppShell() {
       nav.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
       if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+  // 顶栏滚动边缘：文档为主滚动容器，按滚动位置写入 --main-scrolled（0/1），
+  // 由 responsive.css ≤640px 的 .topbar box-shadow 消费（滚动时浮现分隔阴影）。
+  // 滚动事件挂载点必须同时覆盖两种场景：
+  //   1) 标准/真实移动端浏览器：scrollingElement=documentElement，事件在 html 上派发；
+  //   2) Playwright isMobile 仿真：真实滚动发生在 <body>（body.scrollTop 变化、
+  //      window.scrollY/documentElement.scrollTop 恒 0），且 scroll 事件只派发到 body、
+  //      不冒泡到 window。故 scrollingElement 与 body 都必须挂监听才能稳定捕获。
+  useEffect(() => {
+    const scroller = document.scrollingElement || document.documentElement;
+    const apply = () => {
+      const topbar = mainRef.current?.querySelector<HTMLElement>(".topbar");
+      if (!topbar) return;
+      // 真·视口滚动位置：标准模式下取 documentElement，部分移动端/quirks 模式下
+      // 实际滚动容器是 <body>（实测 body.scrollTop 变化而 window.scrollY 恒 0）。
+      // 三者取最大，跨模式都命中；阈值 >4px 与 CSS 消费的 --main-scrolled 口径一致。
+      const top = Math.max(
+        window.scrollY || 0,
+        document.documentElement.scrollTop || 0,
+        document.body.scrollTop || 0,
+      );
+      const scrolled = top > 4;
+      topbar.style.setProperty("--main-scrolled", scrolled ? "1" : "0");
+    };
+    apply();
+    scroller.addEventListener("scroll", apply, { passive: true });
+    document.body.addEventListener("scroll", apply, { passive: true });
+    window.addEventListener("resize", apply);
+    return () => {
+      scroller.removeEventListener("scroll", apply);
+      document.body.removeEventListener("scroll", apply);
+      window.removeEventListener("resize", apply);
     };
   }, []);
   // DEV 与生产同一套退出语义：DEV 初始即已登录（session 内默认 true，X-Dev-User 直通），
@@ -183,7 +221,7 @@ export function AppShell() {
         </nav>
         <div className="sidebar-foot">宜游轩 · 经营工作台</div>
       </aside>
-      <div className="main">
+      <div className="main" ref={mainRef}>
         <header className="topbar view-head">
           <div className="topbar__title">
             <h1 className="topbar__page">{item?.label ?? "用户中心"}</h1>
@@ -243,6 +281,7 @@ export function AppShell() {
             </ConfirmButton>
           </Space>
         </header>
+        <PullToRefreshProvider>
         <main className="page-content">
           {/* 路由化 + keep-alive：
               1) 落点由 URL 决定（深链/刷新/前进后退可用），见 navigateTo。
@@ -283,8 +322,9 @@ export function AppShell() {
             })}
           </Suspense>
         </main>
+        </PullToRefreshProvider>
       </div>
-      <Modal
+      <SheetModal
         open={userCenterOpen}
         title="用户中心"
         footer={
@@ -297,11 +337,12 @@ export function AppShell() {
         className="user-center-modal"
       >
         <UserCenterPage onClose={() => setUserCenterOpen(false)} />
-      </Modal>
-      <Modal
+      </SheetModal>
+      <SheetModal
         open={moreOpen}
         title="更多"
         footer={null}
+        destroyOnHidden
         onCancel={() => setMoreOpen(false)}
         className="mobile-more-modal"
       >
@@ -328,7 +369,7 @@ export function AppShell() {
             <span>用户中心</span>
           </button>
         </div>
-      </Modal>
+      </SheetModal>
     </div>
   );
 }

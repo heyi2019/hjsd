@@ -135,3 +135,56 @@
 :where(.ant-btn-link:not(:disabled)):hover {
   color: var(--color-primary-text) !important;
 }
+
+/* ── 触觉视觉替代脉冲（R2）────────────────────────────────
+   iOS Safari 不支持 navigator.vibrate，haptics.visualPulse 给按钮加此 class
+   做一次性「光环扩散」，替代触觉。仅动 box-shadow，不与 :active 的 transform 冲突。
+   放在减弱动效媒体查询之外：纯光环透明度反馈对 reduced-motion 用户仍安全。 */
+@keyframes ui-haptic-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 45%, transparent); }
+  100% { box-shadow: 0 0 0 10px transparent; }
+}
+.haptic-pulse {
+  animation: ui-haptic-pulse 220ms var(--ease) !important;
+}
+
+/* ── 下拉刷新指示器（R5）────────────────────────────────
+   固定定位于视口顶部，从顶栏下方透出（仿 iOS）。仅在触摸设备可见：
+   桌面无触摸手势，指示器恒 opacity:0（由组件内联样式控制），此处只负责外观。
+   拖拽中（pulling/ready）不启用过渡，跟随手指实时位移；释放/刷新（idle/refreshing）
+   启用过渡做回弹/归位。 */
+.ptr-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font: var(--font-nav-secondary);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--color-surface) 80%, transparent), color-mix(in srgb, var(--color-surface) 0%, transparent));
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.ptr-pulling,
+.ptr-ready { transition: none; }
+.ptr-idle,
+.ptr-refreshing { transition: transform var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease); }
+.ptr-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--color-text-tertiary) 40%, transparent);
+  border-top-color: var(--color-primary);
+  flex: 0 0 auto;
+}
+.ptr-spinner.spinning { animation: ptr-rotate 0.7s linear infinite; }
+@keyframes ptr-rotate { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .ptr-indicator { transition: none; }
+  .ptr-spinner.spinning { animation-duration: 1.4s; }
+}

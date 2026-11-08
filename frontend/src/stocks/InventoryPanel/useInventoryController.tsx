@@ -5,9 +5,9 @@ import type { Dayjs } from "dayjs";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Key } from "react";
 import { stocksApi, employeesApi, ordersApi, poolsApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption, type InventoryStats, type Pool } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
-import { formatDateTimeMinute, money, today } from "../../shared/lib/format";
-import { MoneyText, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
-import { InventoryPlatformOffsaleModal, consignmentRecords, type ActiveConsignment } from "../InventoryPlatformOffsaleModal";
+import { formatDateTimeMinute, today } from "../../shared/lib/format";
+import { MoneyText, PermissionButton, StatusTag } from "../../shared/ui";
+import { consignmentRecords, type ActiveConsignment } from "../InventoryPlatformOffsaleModal";
 import type { InventoryPartyLink } from "../OrderDetailView";
 import type { InventoryProfileTarget } from "../InventoryProfileModal";
 import type { InventoryCancellationValues } from "../InventoryCancellationDialog";
@@ -337,6 +337,9 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
       title: "操作",
       key: "actions",
       width: 292,
+      className: "inventory-actions-col",
+      onHeaderCell: () => ({ className: "inventory-actions-col" }),
+      onCell: () => ({ className: "inventory-actions-col" }),
       render: (_value, row) => (
         <Space className="inventory-row-actions" size={4}>
           <PermissionButton

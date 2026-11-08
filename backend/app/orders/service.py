@@ -30,6 +30,7 @@ from .create import (
     _customer_role,
     add_customer_role,
     create_order,
+    replace_order_participants,
 )
 from .events import _apply_account_effect, _opposite_direction, post_event
 from .links import create_order_link, delete_order_link, list_order_links
@@ -51,6 +52,7 @@ __all__ = [
     "_validate_existing_account_context",
     "_validate_participant_roles",
     "add_customer_role",
+    "replace_order_participants",
     "cancel_order",
     "count_orders",
     "create_order",

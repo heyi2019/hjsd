@@ -38,6 +38,6 @@ export const stocksApi = {
     ).then((r) => r.data),
   executionDetailsBulk: (ids: number[], signal?: AbortSignal) =>
     api.get<Record<number, AccountExecutionDetail>>("/stocks/execution-details", { params: { ids: ids.join(",") }, signal }).then((r) => r.data),
-  updateExecution: (id: number, payload: { profile: Partial<Account>; events: { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }[]; time_shift?: { delta_minutes: number }; time_set?: { registered_at?: string | null; sold_at?: string | null; flow_at?: string | null } }) =>
+  updateExecution: (id: number, payload: { profile: Partial<Account>; events: { id: number; expected_amount: string; amount: string; note: string | null; occurred_at?: string | null; flow_occurred_at?: string | null; operator_user_ids?: number[] }[]; time_shift?: { delta_minutes: number }; time_set?: { registered_at?: string | null; sold_at?: string | null; flow_at?: string | null } }) =>
     api.patch<{ ok: boolean }>(`/stocks/${id}/execution-edit`, payload).then((r) => r.data),
 };

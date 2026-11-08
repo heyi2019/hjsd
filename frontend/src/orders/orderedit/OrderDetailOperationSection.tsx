@@ -1,6 +1,6 @@
 import { Descriptions, Image, Space, Typography } from "antd";
-import { StatusTag } from "../shared/ui";
-import { CustomFieldSection } from "../orders/ConfigurableField";
+import { StatusTag } from "../../shared/ui";
+import { CustomFieldSection } from "../ConfigurableField";
 import {
   InventoryExtraFieldsGroup,
   InventorySectionHeading,
@@ -8,7 +8,7 @@ import {
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
 
-/** 板块3：运营信息 = 业务方案 / 运营自定义字段（只读）或编辑表单（编辑态）+ 当前运营状态（寄售中 / 已下架）。 */
+/** 板块3：运营信息 = 业务方案 / 运营自定义字段编辑表单 + 当前运营状态（寄售中 / 已下架）。 */
 export function OrderDetailOperationSection({
   meta,
   editing,
@@ -22,6 +22,9 @@ export function OrderDetailOperationSection({
         <InventorySectionHeading title="运营信息" />
         <CustomFieldSection section="OPERATION" testIdSuffix="inv-edit-operation" />
         <CustomFieldSection section="BUSINESS" testIdSuffix="inv-edit-business" />
+        <CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="inv-edit-account-product" />
+        <CustomFieldSection section="FINANCE" testIdSuffix="inv-edit-finance" />
+        <CustomFieldSection section="PARTICIPANT" testIdSuffix="inv-edit-participant" />
         <CustomFieldSection testIdSuffix="inv-edit" />
       </div>
     );

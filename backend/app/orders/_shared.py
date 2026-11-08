@@ -99,12 +99,13 @@ def _normalize_account_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
 
 _CUSTOMER_ROLES_BY_ORDER_TYPE: dict[str, frozenset[str]] = {
     "HS": frozenset({"SELLER", "BUYER", "INSTALLMENT_CUSTOMER"}),
-    "TH": frozenset({"BUYER"}),
+    # 提号建单只登记合作伙伴供货源；客户在库存售出时再追加到原订单。
+    "TH": frozenset(),
     "DG": frozenset({"CONSIGNOR"}),
 }
 _COUNTERPARTY_ROLES_BY_ORDER_TYPE: dict[str, frozenset[str]] = {
     "HS": frozenset(),
-    "TH": frozenset({"PEER"}),
+    "TH": frozenset({"SUPPLIER"}),
     "DG": frozenset({"PLATFORM"}),
 }
 

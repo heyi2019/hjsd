@@ -1,6 +1,6 @@
 import { Spin, Typography } from "antd";
-import type { Account, AccountExecutionDetail, AccountExecutionEvent, EmployeeOption } from "../shared/api/catalog";
-import { executionActionLabel, money } from "../shared/lib/format";
+import type { Account, AccountExecutionDetail, AccountExecutionEvent, EmployeeOption } from "../../shared/api/catalog";
+import { executionActionLabel, money } from "../../shared/lib/format";
 import {
   STATUS_LABEL,
   BUSINESS_MODE_LABEL,
@@ -9,7 +9,7 @@ import {
   accountFinancialFlows,
   financeTypeLabel,
   rebateTypeLabel,
-} from "./inventory-logic";
+} from "../../stocks/inventory-logic";
 import {
   OrderDetailView,
   type InventoryPartyLink,
@@ -20,10 +20,10 @@ import {
   classifyEventCategory,
   type InventoryEventDraft,
   type OrderDetailMeta,
-  type TimeFieldKey,
-  type TimeSet,
+  type InventoryOrderDraft,
+  type InventoryPartyDraft,
 } from "./OrderDetail.shared";
-import { consignmentPlatform, isConsignmentListing, isActiveConsignmentListing } from "./consignment-logic";
+import { consignmentPlatform, isConsignmentListing, isActiveConsignmentListing } from "../../stocks/consignment-logic";
 
 function dateTimeMinute(value: string | null | undefined): string {
   if (!value) return "-";
@@ -188,14 +188,18 @@ export function OrderDetail({
   onEdit,
   eventDrafts,
   onEventEdit,
+  timeDrafts,
+  onTimeEdit,
+  orderDrafts,
+  onOrderEdit,
+  partyDrafts,
+  onPartyEdit,
   onPartyClick,
   employees = [],
   extraForm,
   onSave,
   onCancel,
   saving,
-  timeSet,
-  onTimeSet,
 }: {
   row: Account;
   detail?: AccountExecutionDetail;
@@ -205,16 +209,19 @@ export function OrderDetail({
   editing?: Account | null;
   onEdit?: (account: Account) => void;
   eventDrafts?: Record<number, InventoryEventDraft>;
-  onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
+  onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string | null; flow_occurred_at?: string | null; operator_user_ids?: number[] }) => void;
+  timeDrafts?: { registered_at?: string | null; sold_at?: string | null };
+  onTimeEdit?: (key: "registered_at" | "sold_at", value: string | null) => void;
+  orderDrafts?: Record<number, InventoryOrderDraft>;
+  onOrderEdit?: (orderId: number, changes: InventoryOrderDraft) => void;
+  partyDrafts?: Record<number, InventoryPartyDraft>;
+  onPartyEdit?: (orderId: number, draft: InventoryPartyDraft) => void;
   employees?: EmployeeOption[];
   onPartyClick?: (party: InventoryPartyLink) => void;
   extraForm?: unknown;
   onSave?: () => void;
   onCancel?: () => void;
   saving?: boolean;
-  /** 编辑态时间编辑：已改动的字段与 setter。 */
-  timeSet?: TimeSet;
-  onTimeSet?: (field: TimeFieldKey, value: string | null) => void;
 }) {
   if (loading && !detail) return <Spin size="small" />;
 
@@ -267,6 +274,8 @@ export function OrderDetail({
       operator: event.operator_names?.length ? event.operator_names.join("、") : event.operator || "-",
       note: event.note || "-",
       platform: eventPlatformLabel(detail, order, event.event_type),
+      orderId: order.order_id,
+      orderNo: order.order_no,
       event,
     }))
   )) ?? [];
@@ -339,8 +348,12 @@ export function OrderDetail({
       onSave={onSave}
       onCancel={onCancel}
       saving={saving}
-      timeSet={timeSet}
-      onTimeSet={onTimeSet}
+      timeDrafts={timeDrafts}
+      onTimeEdit={onTimeEdit}
+      orderDrafts={orderDrafts}
+      onOrderEdit={onOrderEdit}
+      partyDrafts={partyDrafts}
+      onPartyEdit={onPartyEdit}
     />
   );
 }

@@ -2,6 +2,19 @@
   align-items: center;
 }
 
+/* 库存主表只保留 antd 内容层这一处横向滚动，外层壳不再与它叠加滚动。
+ * 这样展开行与表头使用同一条横向坐标，避免左侧字段被旧 scrollLeft 裁掉。 */
+.ui-table-wrap.inventory-table--single-scroll {
+  overflow-x: clip;
+  overscroll-behavior-x: contain;
+}
+
+.inventory-table--single-scroll > .ant-table-wrapper > .ant-table > .ant-table-container > .ant-table-content {
+  overflow-x: auto !important;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
 /* 取消交易的金额和收款账户始终保持同一行，避免紧凑弹窗误触发窄屏规则。 */
 .adaptive-form-grid.inventory-void-fields {
   grid-template-columns: repeat(2, minmax(0, 1fr));

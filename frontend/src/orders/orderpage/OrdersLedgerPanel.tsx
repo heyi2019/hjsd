@@ -1,8 +1,7 @@
 import { Card, DatePicker, Dropdown, Input, Segmented, Space, Spin, Typography } from "antd";
 import type { BusinessCenterEntryTab } from "../businessCenter";
 import { DataTable, PermissionButton, Select, StatRow } from "../../shared/ui";
-import { OrderDetail } from "../../stocks/OrderDetail";
-import type { InventoryPartyLink } from "../../stocks/OrderDetailView";
+import { OrderDetail, type InventoryPartyLink } from "../orderedit";
 import { countBusinessOrders } from "./helpers";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 import type { OrdersPageController } from "./useOrdersPageController";
@@ -59,10 +58,14 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     inlineEditId,
     eventDrafts,
     updateEventDraft,
+    timeDrafts,
+    updateTimeDraft,
+    orderDrafts,
+    updateOrderDraft,
+    partyDrafts,
+    updatePartyDraft,
     employees,
-    timeSet,
-    setTimeField,
-    invEditExtraForm,
+    orderEditExtraForm,
     savingAccount,
     cancelInlineEdit,
     saveInline,
@@ -177,13 +180,17 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
                   onEdit={setEditingAccount}
                   eventDrafts={eventDrafts}
                   onEventEdit={updateEventDraft}
+                  timeDrafts={timeDrafts}
+                  onTimeEdit={updateTimeDraft}
+                  orderDrafts={orderDrafts}
+                  onOrderEdit={updateOrderDraft}
+                  partyDrafts={partyDrafts}
+                  onPartyEdit={updatePartyDraft}
                   employees={employees}
-                  extraForm={invEditExtraForm}
+                  extraForm={orderEditExtraForm}
                   onSave={saveInline}
                   onCancel={cancelInlineEdit}
                   saving={savingAccount}
-                  timeSet={timeSet}
-                  onTimeSet={setTimeField}
                 />
               );
             },

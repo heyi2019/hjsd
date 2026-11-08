@@ -10,7 +10,7 @@ import { InventoryPlatformOffsaleModal } from "../InventoryPlatformOffsaleModal"
 import { InventoryProfileModal } from "../InventoryProfileModal";
 import { InventoryRebateModal } from "../InventoryRebateModal";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../InventorySaleModal";
-import { OrderDetail } from "../OrderDetail";
+import { OrderDetail } from "../../orders/orderedit";
 import type { InventoryController } from "./useInventoryController";
 
 export function InventoryModals({ controller }: { controller: InventoryController }) {
@@ -26,12 +26,13 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     executionDetails,
     executionLoading,
     inlineEditId,
-    invEditExtraForm,
+    orderEditExtraForm,
     load,
     onOrdersChanged,
     platformOffsaleTarget,
     profileTarget,
     rebateTarget,
+    removeFromInventory,
     refreshExecution,
     saleTarget,
     saveInline,
@@ -50,8 +51,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     voidPools,
     voidTarget,
     voiding,
-    timeSet,
-    setTimeField,
   } = controller;
 
   return (
@@ -60,6 +59,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         const onCreated = async () => {
           const account = saleTarget;
           setSaleTarget(null);
+          if (account) removeFromInventory(account.id);
           await load();
           if (account) controller.dropExecutionCache(account.id);
           onOrdersChanged?.();
@@ -158,12 +158,10 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           eventDrafts={eventDrafts}
           onEventEdit={updateEventDraft}
           employees={employees}
-          extraForm={invEditExtraForm}
+          extraForm={orderEditExtraForm}
           onSave={saveInline}
           onCancel={cancelInlineEdit}
           saving={savingAccount}
-          timeSet={timeSet}
-          onTimeSet={setTimeField}
         /> : null}
       </BusinessActionModal>
       <InventoryProfileModal

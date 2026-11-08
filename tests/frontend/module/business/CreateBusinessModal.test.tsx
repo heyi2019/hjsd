@@ -24,6 +24,12 @@ async function pickMainPool() {
   await ui.click(placeholder.closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
   await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
 }
+
+async function pickSupplier() {
+  const field = screen.getByLabelText("供货合作伙伴");
+  await ui.click(field.closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+  await ui.click(await screen.findByText(/同行甲（CP-0001）/, { selector: ".ant-select-item-option-content" }));
+}
 // 自动 mock：所有导出（含嵌套 ordersApi / orderTypesApi / ...）均为 vi.fn()，
 // 跨文件在 isolate:false 下复用同一份 mock 实例，配合 setup.ts 的 resetAllMocks
 // 与各文件 beforeEach 重新设定返回值，避免闭包捕获的 vi.fn() 在共享模块图下串扰。
@@ -37,7 +43,7 @@ beforeEach(() => {
   seedOrderFormFields(catalog);
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
-  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", status: "ACTIVE" }]);
+  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "SUPPLIER", status: "ACTIVE" }]);
   resolveMock(vi.mocked(catalog.stocksApi.list), [
     { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "0.00" },
     { id: 10, game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "WAITING", cost_amount: "0.00" },
@@ -151,6 +157,23 @@ it("打开回收入口后只加载订单所需的业务数据", async () => {
     expect(container.textContent).not.toContain("关联账号（必填）");
   });
 
+it("提号建单不渲染客户板块，也不加载客户主数据", async () => {
+    await openTypedModal("TH");
+    expect(await screen.findByLabelText("供货合作伙伴")).toBeInTheDocument();
+    expect(screen.queryByLabelText("客户昵称")).toBeNull();
+    expect(vi.mocked(catalog.customersApi.list)).not.toHaveBeenCalled();
+  });
+
+it("提号建单从合作方主数据选择供货方，不展示来源分类", async () => {
+    await openTypedModal("TH");
+    const field = await screen.findByLabelText("供货合作伙伴");
+    expect(field).toBeInTheDocument();
+    await ui.click(field.closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    expect(await screen.findByText(/同行甲（CP-0001）/, { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(screen.queryByText("氪金联盟", { selector: ".ant-select-item-option-content" })).toBeNull();
+    expect(screen.queryByLabelText("供货方来源")).toBeNull();
+  });
+
 it("回收订单渲染已启用的其他补充字段", async () => {
   vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([
     ...allFormFields(),
@@ -190,13 +213,11 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
       message: "Request failed",
     });
     const { container } = await openTypedModal("TH");
-    await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
+    await pickSupplier();
     await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
     await ui.type(screen.getByLabelText("游戏账号"), "pickup-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
     await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
-    await ui.click(screen.getByLabelText("供货方来源").closest(".ant-form-item")?.querySelector(".ant-select-selector") as Element);
-    await ui.click(await screen.findByText("氪金联盟", { selector: ".ant-select-item-option-content" }));
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
     await ui.type(amounts[1], "1200");
@@ -218,7 +239,7 @@ it("FE-023：未售出的相同游戏账号由后端拒绝并保留表单", asyn
       message: "Request failed",
     });
     await openTypedModal("TH");
-    await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
+    await pickSupplier();
     await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
     await ui.type(screen.getByLabelText("游戏账号"), "pickup-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
@@ -252,7 +273,7 @@ it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单"
       })
       .mockResolvedValueOnce({ id: 1 } as never);
     await openTypedModal("TH");
-    await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
+    await pickSupplier();
     await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
     await ui.type(screen.getByLabelText("游戏账号"), "pickup-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
@@ -273,15 +294,12 @@ it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单"
     );
   });
 
-it("FE-123：原建单测试入口的提号来源默认值跟随主数据", async () => {
-    clearOptionSetsCache();
-    vi.mocked(catalog.optionSetsApi.list).mockResolvedValueOnce({
-      items: [{ code: "SUPPLIER_SOURCE", options: [{ value: "自营", label: "自营" }, { value: "其他", label: "其他" }] }],
-    } as never);
-    await loadOptionSets();
-    renderLight(<CreateBusinessModal open onClose={() => undefined} onCreated={() => undefined} initialOrderType="TH" />, { user: "admin" });
-    const field = await screen.findByLabelText("供货方来源");
-    await waitFor(() => expect(field.closest(".ant-select")?.querySelector(".ant-select-selection-item")).toHaveTextContent("自营"));
+it("FE-123：提号供货方下拉只读取 SUPPLIER 合作方主数据", async () => {
+    await openTypedModal("TH");
+    const field = await screen.findByLabelText("供货合作伙伴");
+    await ui.click(field.closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    expect(await screen.findByText(/同行甲（CP-0001）/, { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(vi.mocked(catalog.counterpartiesApi.list)).toHaveBeenCalledWith({ type: "SUPPLIER", status: "ACTIVE" });
   });
 
 it("订单已创建后不等待列表刷新，提交按钮立即结束 loading", async () => {
@@ -293,20 +311,22 @@ it("订单已创建后不等待列表刷新，提交按钮立即结束 loading",
       <CreateBusinessModal open onClose={onClose} onCreated={() => refresh} initialOrderType="TH" />,
       { user: "admin" },
     );
-    await screen.findByLabelText("供货方昵称");
+    await screen.findByLabelText("供货合作伙伴");
     await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
     await ui.type(screen.getByLabelText("游戏账号"), "pickup-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
     await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
-    await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
-    await ui.click(screen.getByLabelText("供货方来源").closest(".ant-form-item")?.querySelector(".ant-select-selector") as Element);
-    await ui.click(await screen.findByText("氪金联盟", { selector: ".ant-select-item-option-content" }));
+    await pickSupplier();
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
     await ui.type(amounts[1], "1200");
     await pickMainPool();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
+      customer_roles: [],
+      counterparty_roles: [{ counterparty_id: 2, role: "SUPPLIER" }],
+    }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const button = screen.getByRole("button", { name: /创建订单/ });
     expect(button.className).not.toContain("ant-btn-loading");

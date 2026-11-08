@@ -141,7 +141,7 @@ ORM 模型共 **39 张表**，另有 Alembic 自建的 `alembic_version` 与迁�
 | `customer_leads` | lead_no, customer_id, request_type, budget, target, status, owner_id, converted_order_id, closed_reason, note | 不占用资金、不自动建单；转单后保留来源关系 |
 | `counterparties` | counterparty_no, display_name, type, contact_name, phone, wechat, qq, source, status, note | 不与客户混用 |
 | `order_customer_roles` | order_id, customer_id, role | `UNIQUE(order_id, customer_id, role)` |
-| `order_counterparty_roles` | order_id, counterparty_id, role | `UNIQUE(order_id, counterparty_id, role)`；TH 同行、平台方从此关联 |
+| `order_counterparty_roles` | order_id, counterparty_id, role | `UNIQUE(order_id, counterparty_id, role)`；TH 供货方、DG 平台方从此关联 |
 
 ### 4.3 经营规则
 

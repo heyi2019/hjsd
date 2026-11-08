@@ -1,10 +1,12 @@
-import { Typography } from "antd";
+import { Input, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { DataTable, MoneyText } from "../shared/ui";
+import { DataTable, MoneyText } from "../../shared/ui";
+import type { AccountExecutionEvent } from "../../shared/api/catalog";
 import {
   InventoryExtraFieldsGroup,
   type OrderDetailField,
   type InventoryFinanceRow,
+  type InventoryEventDraft,
 } from "./OrderDetail.shared";
 
 /** 「资金明细」板块：自定义字段分组 + 收支汇总条 + 流水表。 */
@@ -16,6 +18,9 @@ export function OrderDetailFinanceSection({
   totalExpense,
   totalIncome,
   flowCount,
+  editing,
+  eventDrafts,
+  onEventEdit,
 }: {
   rows: InventoryFinanceRow[];
   extraFields: OrderDetailField[];
@@ -24,6 +29,9 @@ export function OrderDetailFinanceSection({
   totalExpense: string;
   totalIncome: string;
   flowCount: number;
+  editing?: boolean;
+  eventDrafts?: Record<number, InventoryEventDraft>;
+  onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; flow_occurred_at?: string | null }) => void;
 }) {
   const columns: ColumnsType<InventoryFinanceRow> = [
     { title: "类型", dataIndex: "type", key: "type" },
@@ -40,14 +48,26 @@ export function OrderDetailFinanceSection({
       dataIndex: "amount",
       key: "amount",
       align: "right",
-      render: (value: string) => (
+      render: (value: string, row) => (
         <div className="inventory-detail__cell-amount">
-          <MoneyText value={value} />
+          {editing && row.event ? <Input aria-label={`编辑资金金额 ${row.key.replace(/^flow-/, "")}`} value={eventDrafts?.[row.event.id]?.amount ?? value} onChange={(event) => onEventEdit?.(row.event as AccountExecutionEvent, { amount: event.target.value })} /> : <MoneyText value={value} />}
         </div>
       ),
     },
     { title: "比例", dataIndex: "rate", key: "rate", align: "right" },
-    { title: "时间", dataIndex: "occurredAt", key: "occurredAt" },
+    {
+      title: "时间",
+      dataIndex: "occurredAt",
+      key: "occurredAt",
+      render: (value: string, row) => row.event && editing ? (
+        <Input
+          type="datetime-local"
+          aria-label={`编辑流水时间 ${row.key.replace(/^flow-/, "")}`}
+          value={(row.event.cashflow?.occurred_at ?? `${row.event.cashflow?.occurred_on ?? value}:00`).replace(" ", "T").slice(0, 16)}
+          onChange={(event) => onEventEdit?.(row.event as AccountExecutionEvent, { flow_occurred_at: event.target.value || null })}
+        />
+      ) : value,
+    },
     { title: "操作人", dataIndex: "operator", key: "operator" },
     {
       title: "资金池",

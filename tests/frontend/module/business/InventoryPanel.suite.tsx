@@ -241,18 +241,28 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getByText("暂无账号")).toBeInTheDocument();
   });
 
-  it("编辑账号时可编辑核心资料（游戏账号/产品、游戏/产品类型）", async () => {
+  it("编辑账号时可编辑完整账号资料", async () => {
     vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
 
     // 内联编辑：点「编辑」直接就地展开该行进入编辑态，不再弹窗。
     await ui.click(screen.getAllByRole("button", { name: "编辑" })[0]);
-    expect(await screen.findByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
-    expect(screen.getByLabelText("编辑游戏/产品类型")).toBeInTheDocument();
-    // 账号密码 / 绑定手机号在编辑态以只读描述呈现，不再提供可编辑输入。
-    expect(screen.queryByLabelText("编辑账号密码")).toBeNull();
-    expect(screen.queryByLabelText("编辑绑定手机号")).toBeNull();
+    for (const label of [
+      "编辑游戏账号/产品",
+      "编辑营地账号",
+      "编辑游戏/产品类型",
+      "编辑账号密码",
+      "编辑渠道 / 区服",
+      "编辑绑定手机号",
+      "编辑平台",
+      "编辑有无二次",
+      "编辑钱包实名",
+      "编辑账号描述",
+      "编辑备注",
+    ]) {
+      expect((await screen.findAllByLabelText(label)).length).toBeGreaterThan(0);
+    }
   });
 
   it("库存编辑展示运营信息自定义字段", async () => {
@@ -299,9 +309,12 @@ describe("InventoryPanel：账号台账", () => {
     await waitFor(() => expect(cost?.textContent).toContain("8,888.88"));
     expect(screen.getByText("超7天库存账号").closest(".ui-stat")?.textContent).toContain("2");
     expect(screen.getByText("超30天库存账号").closest(".ui-stat")?.textContent).toContain("1");
-    // 汇总只按「当前可见集合」发起：accounts 里只有 acc-1 在库。
+    // 汇总只按「当前可见集合」发起：默认在库视图里只有 acc-1。
     expect(vi.mocked(catalog.stocksApi.inventoryStats)).toHaveBeenLastCalledWith([1]);
-    expect(screen.queryByText("已售")).toBeNull();
+    const visibleRow = screen.getAllByRole("row").find((row) => within(row).queryByText("acc-1") !== null);
+    expect(visibleRow).toBeDefined();
+    expect(within(visibleRow!).getByText("在库")).toBeInTheDocument();
+    expect(screen.queryByText("acc-2")).toBeNull();
   });
 
   it("后端不可达 → 错误条落地", async () => {
@@ -410,6 +423,19 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(financeTable).getByText("2026-10-17 12:30")).toBeInTheDocument();
     expect(vi.mocked(catalog.stocksApi.executionDetail)).toHaveBeenCalledWith(1);
     fireEvent.click(document.querySelector(".ant-table-row-expand-icon") as Element);
+  });
+
+  it("展开详情与主表保持同一宽度基准，并只保留主表横向滚动区域", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    fireEvent.click(screen.getByText("acc-1").closest("tr")!.querySelector(".ant-table-row-expand-icon") as Element);
+
+    const inventoryTable = document.querySelector(".inventory-table") as HTMLElement;
+    const detailPanel = (await screen.findByText("当前运营状态")).closest(".inventory-detail") as HTMLElement;
+
+    expect(inventoryTable).toHaveClass("inventory-table--single-scroll");
+    expect(inventoryTable.querySelector(".ant-table-content")).toBeInTheDocument();
+    expect(detailPanel).toHaveClass("inventory-detail--aligned");
   });
 
   it("未售时长列受列表字段配置控制：配置隐藏后列头消失、其余列不受影响", async () => {

@@ -37,6 +37,72 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 ---
 
+## V1.0.7
+
+**发布时间：** 2026-11-09 CST（Asia/Shanghai）
+
+| 项目 | 版本 / 标识 |
+| --- | --- |
+| 系统发布版本 | `V1.0.7` |
+| 前端构建版本 | `1.0.7` |
+| 后端 API 版本 | `1.0.7`（唯一事实源 `backend/app/version.py`） |
+| 数据库迁移基线 | `0001`（活动链 head；存量库由启动修复脚本补齐结构） |
+
+### 本次内容
+
+相对 `f7df3f18` 共 16 个非合并提交；变更规模：75 files changed, 1660 insertions(+), 1075 deletions(-)。
+
+**业务变更**
+
+- feat: unify order edit feature panel（`5219b462`）
+- fix: align inventory detail layout（`4b7804e8`）
+- fix: 提号供货方改用合作伙伴主数据（`2582d9b1`）
+- fix: correct installment sale contract mapping（`4bfff616`）
+- fix(frontend): refresh inventory after sale（`ece3b14d`）
+- fix(frontend): simplify order ledger editing（`85bdd89d`）
+- fix(frontend): tighten account edit field layout（`53f28c56`）
+- fix(frontend): unify account ledger editing fields（`4188e95f`）
+- fix: backfill sale payment method options（`64499840`）
+- fix: start schema repair as python module（`59f7305d`）
+- fix: clear release gate findings（`9aec95a4`）
+
+**重构与内部调整**（对外可不列）
+
+- refactor: 梳理提号建单参与方规则（`8f754b5c`）
+
+**测试与文档**（对外可不列）
+
+- test: refresh linux visual baselines（`f938ffd8`）
+
+**工程与流水线**（对外可不列）
+
+- ci: collect deployment diagnostics（`d6c34b44`）
+- ci: refresh finance coverage baseline（`2c7359e0`）
+
+**其他变更**
+
+- 修复分润公式联动（`6e4066ca`）
+
+**对用户的影响：**
+
+- 库存中心与订单台账共用同一套订单编辑板块，账号资料、订单资料、参与方、操作明细和资金明细的编辑口径统一。
+- 订单编辑支持登记时间、售出时间、操作时间、资金流水时间和订单日期；保存后库存中心与订单台账同步刷新。
+- 提号订单的供货方统一从合作伙伴主数据选择，分期出售合约映射和售出后的库存刷新修复。
+- 分润比例与金额支持双向换算，按本单利润联动，最后编辑的一项为准。
+- 本版本继续保持上一版确认的精简范围，不恢复已下线的导入、全局搜索和旧兼容模块。
+
+### 发布前检查
+
+- [x] 后端全量回归：`python backend/run_regression.py ci` → 1479 passed；前端四层全量回归：fast 131、quick 64、react 500、react-deep 96 全部通过
+- [x] 版本三处一致 `scripts/ops/bump_version.sh --check` → `1.0.7`
+- [ ] 部署后 `curl /api/v1/health` 的 `app_version` 为 `1.0.7`；`docker compose ps` 中 backend 为 `Up (healthy)`
+
+### 回滚
+
+- 镜像回退到上一份通过验收的 `V1.0.6` 镜像；数据库按部署前快照恢复。
+
+---
+
 ## V1.0.6
 
 **发布时间：** 2026-11-09 CST（Asia/Shanghai）

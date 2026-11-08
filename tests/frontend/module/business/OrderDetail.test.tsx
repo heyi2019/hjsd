@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { renderLight } from "@fixtures/render";
 import type { Account, AccountExecutionDetail } from "@/shared/api/catalog";
-import { OrderDetail } from "@/stocks/OrderDetail";
+import { OrderDetail } from "@/orders/orderedit/OrderDetail";
 
 const account = {
   id: 1,
@@ -63,6 +64,46 @@ describe("OrderDetail", () => {
     const panel = document.querySelector(".inventory-detail") as HTMLElement;
     expect(within(panel).queryByText("secret-password")).not.toBeInTheDocument();
     expect(within(panel).getByText("已隐藏")).toBeInTheDocument();
+  });
+
+  it("全量编辑：详情各板块不保留只读字段", () => {
+    const detail = {
+      orders: [{
+        order_id: 1,
+        order_no: "HS0001",
+        order_type: "HS",
+        created_at: "2026-10-15T10:19:00",
+        events: [{
+          id: 1,
+          event_no: "EV0001",
+          event_type: "BUY",
+          amount: "100.00",
+          occurred_at: "2026-10-15T10:20:00",
+          operator: "admin",
+          note: "回收登记",
+          cashflow: { flow_no: "CF0001", direction: "OUT", amount: "100.00", occurred_at: "2026-10-15T10:21:00", operator: "admin" },
+        }],
+        customers: [{ id: 7, display_name: "买家A", role: "BUYER" }],
+      }],
+      finance_summary: { total_income: "0.00", total_expense: "100.00", net_amount: "-100.00" },
+    } as unknown as AccountExecutionDetail;
+
+    renderLight(<OrderDetail row={{ ...account, bound_phone: "138****0000" } as unknown as Account} detail={detail} loading={false} editing={{ ...account, bound_phone: "138****0000" } as unknown as Account} />, { user: "admin" });
+
+    const editPanel = screen.getByTestId("order-edit-feature-panel");
+    expect(editPanel).toHaveAttribute("aria-label", "订单编辑功能板块");
+    expect(editPanel).toHaveClass("inventory-detail");
+    expect(editPanel).not.toHaveClass("inventory-detail--editing");
+    expect(editPanel.querySelector(".inventory-detail__edit-grid")).not.toBeInTheDocument();
+    expect(editPanel.querySelectorAll(".inventory-detail__meta").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("编辑登记时间")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑售出时间")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑流水时间 CF0001")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑换绑手机号")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑交易平台")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑执行时间 买号")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑资金金额 CF0001")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑参与方 买家A")).toBeInTheDocument();
   });
 
   it("参与方按角色与名称展示，并可打开客户中心卡片", () => {

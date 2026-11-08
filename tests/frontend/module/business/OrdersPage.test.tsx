@@ -40,6 +40,7 @@ vi.mock("@/shared/api/catalog", async (importOriginal) => {
 const orders = [
   {
     id: 1,
+    account_id: 1,
     order_no: "HS-2026-0001",
     order_type: "HS",
     trade_date: "2026-10-01",
@@ -360,9 +361,11 @@ describe("OrdersPage：四类订单台账", () => {
 
     // 不再有「更多」收纳入口
     expect(screen.queryAllByRole("button", { name: "更多" })).toHaveLength(0);
-    for (const label of ["编辑", "分润", "资金收支", "取消"]) {
+    const expectedCounts = { 编辑: 1, 分润: 2, "资金收支": 2, 取消: 2 };
+    for (const label of ["编辑", "分润", "资金收支", "取消"] as const) {
       const buttons = screen.getAllByRole("button", { name: label });
-      expect(buttons).toHaveLength(2);
+      // 只有关联库存账号的订单才有完整编辑入口；第二条测试订单没有 account_id。
+      expect(buttons).toHaveLength(expectedCounts[label]);
       expect(buttons.every((button) => button.classList.contains("ant-btn-sm"))).toBe(true);
       expect(buttons[0]).toBeInTheDocument();
     }

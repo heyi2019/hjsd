@@ -11,6 +11,12 @@ import {
   resolveCancelAmount,
   validateAllocations,
 } from "@/orders/orderpage/helpers";
+import {
+  buildCounterpartyRoles,
+  buildCustomerRoles,
+  participantLookupKey,
+  TH_COUNTERPARTY_ROLE,
+} from "@/orders/participantRoles";
 
 const order = (overrides: Partial<Order> = {}): Order => ({
   id: 1,
@@ -24,6 +30,14 @@ const order = (overrides: Partial<Order> = {}): Order => ({
 });
 
 describe("OrdersPage helpers", () => {
+  it("提号建单只生成 SUPPLIER 合作伙伴角色，不生成客户角色", () => {
+    expect(buildCustomerRoles("TH", 7)).toEqual([]);
+    expect(buildCounterpartyRoles("TH", 9, "PEER")).toEqual([
+      { counterparty_id: 9, role: TH_COUNTERPARTY_ROLE },
+    ]);
+    expect(participantLookupKey("供货方", TH_COUNTERPARTY_ROLE)).toBe("供货方\u0000SUPPLIER");
+  });
+
   it("按业务类型、模式、游戏和库存状态筛选订单", () => {
     expect(filterBusinessOrders([
       order({ account_game_type: "原神", account_status: "WAITING" }),

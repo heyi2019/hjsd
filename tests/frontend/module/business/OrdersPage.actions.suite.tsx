@@ -346,46 +346,48 @@ describe("OrdersPage：筛选与分期", () => {
 
 export function registerOrdersPageLifecycleTests() {
 describe("OrdersPage：编辑与新建", () => {
-  it("编辑订单：行操作列打开编辑弹窗并提交 PATCH（成交日期+备注）", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
+  it("编辑订单：行操作列打开完整编辑板块并提交订单日期与备注", async () => {
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+      account: { id: 5, game_account: "seller-001", inventory_type: "RECOVERY", status: "WAITING" },
+      orders: [{ order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", created_at: "2026-10-01T09:30:00", status: "ACTIVE", events: [] }],
+      finance_summary: { total_income: "0.00", total_expense: "0.00", net_amount: "0.00" },
+    } as never);
     vi.mocked(catalog.ordersApi.patch).mockResolvedValue({ ...order1 });
     await openLedger();
     await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
-    const modal = await modalOf(/编辑订单 · HS-2026-0001/);
-    await ui.clear(within(modal).getByLabelText("成交日期"));
-    await ui.type(within(modal).getByLabelText("成交日期"), "2026-10-05");
-    await ui.type(within(modal).getByLabelText("备注"), "补登记");
-    await ui.click(within(modal).getByRole("button", { name: /保存修改/ }));
+    const panel = await screen.findByTestId("order-edit-feature-panel");
+    await ui.clear(within(panel).getByLabelText("编辑订单日期"));
+    await ui.type(within(panel).getByLabelText("编辑订单日期"), "2026-10-05");
+    await ui.type(within(panel).getByLabelText("编辑订单备注"), "补登记");
+    await ui.click(within(panel).getByRole("button", { name: /保存修改/ }));
     await waitFor(() => expect(catalog.ordersApi.patch).toHaveBeenCalledWith(1, expect.objectContaining({
       trade_date: "2026-10-05",
       note: "补登记",
     })));
   });
 
-  it("编辑有登记事件订单：成交日期可改、PATCH 带日期、提示「订单已更新」并关闭弹窗", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
-      {
-        ...order1,
-        events: [{ id: 1, event_no: "EV-1", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "1000.00" }],
-      },
-    ]);
+  it("编辑有登记事件订单：统一编辑板块仍可修改订单日期并退出编辑态", async () => {
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+      account: { id: 5, game_account: "seller-001", inventory_type: "RECOVERY", status: "WAITING" },
+      orders: [{ order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", created_at: "2026-10-01T09:30:00", status: "ACTIVE", events: [{ id: 1, event_no: "EV-1", order_id: 1, order_type: "HS", event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", occurred_at: "2026-10-01T10:00:00", is_posted: true, cancellable_amount: "1000.00" }] }],
+      finance_summary: { total_income: "0.00", total_expense: "1000.00", net_amount: "-1000.00" },
+    } as never);
     vi.mocked(catalog.ordersApi.patch).mockResolvedValue({ ...order1 });
     await openLedger();
     await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
-    const modal = await modalOf(/编辑订单 · HS-2026-0001/);
-    // 回归：有登记事件时日期不再被禁用（后端会联动平移账期）
-    expect(within(modal).getByLabelText("成交日期")).not.toBeDisabled();
-    await ui.clear(within(modal).getByLabelText("成交日期"));
-    await ui.type(within(modal).getByLabelText("成交日期"), "2026-10-05");
-    await ui.type(within(modal).getByLabelText("备注"), "仅更新备注");
-    await ui.click(within(modal).getByRole("button", { name: /保存修改/ }));
+    const panel = await screen.findByTestId("order-edit-feature-panel");
+    expect(within(panel).getByLabelText("编辑订单日期")).not.toBeDisabled();
+    await ui.clear(within(panel).getByLabelText("编辑订单日期"));
+    await ui.type(within(panel).getByLabelText("编辑订单日期"), "2026-10-05");
+    await ui.type(within(panel).getByLabelText("编辑订单备注"), "仅更新备注");
+    await ui.click(within(panel).getByRole("button", { name: /保存修改/ }));
     await waitFor(() => expect(catalog.ordersApi.patch).toHaveBeenCalledWith(1, expect.objectContaining({
       trade_date: "2026-10-05",
       note: "仅更新备注",
     })));
-    await waitFor(() => expect(message.success).toHaveBeenCalledWith("订单已更新"));
-    // 保存后弹窗应关闭
-    await waitFor(() => expect(screen.queryByText(/编辑订单 · HS-2026-0001/)).toBeNull());
+    await waitFor(() => expect(message.success).toHaveBeenCalledWith("修改已保存"));
+    // 保存后退出编辑态，展开详情回到只读展示。
+    await waitFor(() => expect(screen.queryByText("保存修改")).toBeNull());
   });
 
   it("新建订单：菜单收起、弹窗开关与成功后刷新列表", async () => {
@@ -433,25 +435,22 @@ describe("OrdersPage：分润", () => {
     expect(within(modal).getByText("5,000.00")).toBeInTheDocument();
   });
 
-  it("分润：比例与金额不再互算，填写一项不改写另一项", async () => {
-    // 比例与金额各自独立录入，前端不得自行换算。
-    // 旧实现用 syncAllocationPair 在 onValuesChange 里双向回填，改金额会静默改写比例，
-    // 用户无法手动精调；此处锁死「只写自己这一格」的行为。
+  it("分润：比例与金额双向联动，按最后编辑的一项换算", async () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     const rate = within(modal).getByLabelText("比例");
     const amount = within(modal).getByLabelText("金额");
 
-    // 填比例：金额保持空白，不按利润折算回填
+    // 5000 × 30% = 1500，填比例立即回填金额
     fireEvent.change(rate, { target: { value: "30" } });
     expect(rate).toHaveValue("30");
-    expect(amount).toHaveValue("");
+    expect(amount).toHaveValue("1500.00");
 
-    // 填金额：比例保持原值，不按金额反算
-    fireEvent.change(amount, { target: { value: "1500" } });
-    expect(amount).toHaveValue("1500");
-    expect(rate).toHaveValue("30");
+    // 再改金额：1500 ÷ 5000 = 30%，金额反向回填比例
+    fireEvent.change(amount, { target: { value: "2500" } });
+    expect(amount).toHaveValue("2500");
+    expect(rate).toHaveValue("50.00");
   });
 
   it("分润：无存量时按操作四项展开，买号/售出自动绑定动作执行人", async () => {
@@ -558,8 +557,7 @@ describe("OrdersPage：分润", () => {
     expect(within(modal).getAllByLabelText("比例")).toHaveLength(2);
   });
 
-  it("分润：按操作四项时比例与金额同样不互算", async () => {
-    // 按操作四项也必须独立录入。
+  it("分润：按操作四项时比例与金额同样双向联动", async () => {
     // 只测按姓名口径会漏掉「买号/售出/运营/公司」四行的情况。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: [],
@@ -584,17 +582,17 @@ describe("OrdersPage：分润", () => {
     const amounts = within(modal).getAllByLabelText("金额");
     expect(rates).toHaveLength(4);
 
-    // 填买号行比例：本行金额保持空白，另外三行也不得被牵连改写
+    // 填买号行比例：本行按订单利润换算金额，另外三行不被牵连改写
     fireEvent.change(rates[0], { target: { value: "30" } });
     expect(rates[0]).toHaveValue("30");
-    expect(amounts[0]).toHaveValue("");
+    expect(amounts[0]).toHaveValue("1500.00");
     expect(amounts[1]).toHaveValue("");
     expect(amounts[2]).toHaveValue("");
 
-    // 再填本行金额：比例保持原值，不按金额反算
+    // 再填本行金额：按订单利润反算比例
     fireEvent.change(amounts[0], { target: { value: "1000" } });
     expect(amounts[0]).toHaveValue("1000");
-    expect(rates[0]).toHaveValue("30");
+    expect(rates[0]).toHaveValue("20.00");
   });
 
   it("分润：一个动作多人时按人数均分，买号 2 人各得一半", async () => {

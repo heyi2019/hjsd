@@ -48,10 +48,9 @@ class TestA04DistributionInstallmentSale:
     """
 
     def test_downpayment_two_periods_deliver(self, seeded_db):
-        platform = parties_service.create_counterparty(
-            seeded_db, display_name="寄售平台B", type="PEER", actor="pytest"
+        supplier = parties_service.create_counterparty(
+            seeded_db, display_name="供货方B", type="SUPPLIER", actor="pytest"
         )
-        customer = parties_service.create_customer(seeded_db, display_name="分期客户", actor="pytest")
         seeded_db.commit()
 
         order = orders_service.create_order(
@@ -59,8 +58,7 @@ class TestA04DistributionInstallmentSale:
             order_type="TH",
             trade_date=TODAY,
             actor="pytest",
-            customer_roles=[(customer.id, "BUYER")],
-            counterparty_roles=[(platform.id, "PEER")],
+            counterparty_roles=[(supplier.id, "SUPPLIER")],
         )
         seeded_db.commit()
 

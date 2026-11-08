@@ -699,13 +699,40 @@ class TestCreateOrderValidation:
                 ],
             )
 
-    def test_participant_roles_must_match_order_type(self, seeded_db):
-        customer = parties_service.create_customer(
-            seeded_db, display_name="业务角色客户", actor="pytest"
-        )
+    def test_th_uses_supplier_counterparty_only(self, seeded_db):
         supplier = parties_service.create_counterparty(
             seeded_db, display_name="供货方", type="SUPPLIER", actor="pytest"
         )
+        customer = parties_service.create_customer(
+            seeded_db, display_name="售出客户", actor="pytest"
+        )
+
+        order = order_service.create_order(
+            seeded_db,
+            order_type="TH",
+            trade_date=D,
+            actor="pytest",
+            counterparty_roles=[(supplier.id, "SUPPLIER")],
+        )
+        assert order.order_type == "TH"
+
+        with pytest.raises(Validation, match="TH 不允许客户角色 BUYER"):
+            order_service.create_order(
+                seeded_db,
+                order_type="TH",
+                trade_date=D,
+                actor="pytest",
+                customer_roles=[(customer.id, "BUYER")],
+            )
+
+        with pytest.raises(Validation, match="TH 不允许合作方角色 PEER"):
+            order_service.create_order(
+                seeded_db,
+                order_type="TH",
+                trade_date=D,
+                actor="pytest",
+                counterparty_roles=[(supplier.id, "PEER")],
+            )
 
         with pytest.raises(Validation, match="TH 不允许客户角色 SELLER"):
             order_service.create_order(
@@ -714,15 +741,6 @@ class TestCreateOrderValidation:
                 trade_date=D,
                 actor="pytest",
                 customer_roles=[(customer.id, "SELLER")],
-            )
-
-        with pytest.raises(Validation, match="TH 不允许合作方角色 SUPPLIER"):
-            order_service.create_order(
-                seeded_db,
-                order_type="TH",
-                trade_date=D,
-                actor="pytest",
-                counterparty_roles=[(supplier.id, "SUPPLIER")],
             )
 
     def test_participant_id_shape_is_rejected_before_database_flush(self, seeded_db):

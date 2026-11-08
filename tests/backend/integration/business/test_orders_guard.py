@@ -186,14 +186,13 @@ def test_hs_cost_requires_account(seeded_db):
 
 
 def test_th_sell_blocked_when_installment_exists(seeded_db):
-    peer = parties_service.create_counterparty(
-        seeded_db, display_name="peer", type="PEER", actor="pytest"
+    supplier = parties_service.create_counterparty(
+        seeded_db, display_name="供货方", type="SUPPLIER", actor="pytest"
     )
-    buyer = _customer(seeded_db)
     seeded_db.commit()
     order = service.create_order(
         seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
-        customer_roles=[(buyer.id, "BUYER")], counterparty_roles=[(peer.id, "PEER")],
+        counterparty_roles=[(supplier.id, "SUPPLIER")],
     )
     seeded_db.commit()
     service.post_event(
@@ -334,19 +333,19 @@ def test_create_order_rejects_non_positive_counterparty_id(seeded_db):
     with pytest.raises(Validation):
         service.create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
-            counterparty_roles=[(-1, "PEER")],
+            counterparty_roles=[(-1, "SUPPLIER")],
         )
 
 
 def test_create_order_rejects_duplicate_counterparty(seeded_db):
-    peer = parties_service.create_counterparty(
-        seeded_db, display_name="p", type="PEER", actor="pytest"
+    supplier = parties_service.create_counterparty(
+        seeded_db, display_name="p", type="SUPPLIER", actor="pytest"
     )
     seeded_db.commit()
     with pytest.raises(Validation):
         service.create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
-            counterparty_roles=[(peer.id, "PEER"), (peer.id, "PEER")],
+            counterparty_roles=[(supplier.id, "SUPPLIER"), (supplier.id, "SUPPLIER")],
         )
 
 

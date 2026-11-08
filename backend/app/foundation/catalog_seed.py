@@ -11,6 +11,11 @@ from sqlalchemy.orm import Session
 from app.domain.options import OptionSet
 from app.domain.trade_models.form_config import OrderFormField
 
+SALE_PAYMENT_METHOD_OPTIONS = [
+    {"value": "FULL", "label": "全款"},
+    {"value": "INSTALLMENT", "label": "分期付款"},
+]
+
 _CATALOG_BLOB = """
 eJztfWtTU1m6/1ehrDqv/jPtdJ+ec2am6v8ikqCZDoROgt2eU1O7Imw1NSGhk9C2Z2qq8IKAEIKKiIIiNIrtJZEWNRAuH2ay905e
 +RXOuuwk67ZDdq6LPqnqVtmstS+/9aznvp7nH6eiY4lQNKLE1UT81F/++x+nhqMj6qm/nHJ4PN5eR8DtHVACFwZdp353Khy8qIbB
@@ -215,6 +220,12 @@ def seed_catalog(session: Session, *, actor: str = "system") -> None:
             and values["field_key"] == "cancel_amount"
         ):
             values = {**values, "flow_direction": "IN"}
+        if (
+            values["order_type_code"] in {"SALEREC", "SALETH"}
+            and values["field_key"] == "payment_method"
+            and not values.get("options")
+        ):
+            values = {**values, "options": SALE_PAYMENT_METHOD_OPTIONS}
         exists = session.scalar(
             select(OrderFormField).where(
                 OrderFormField.order_type_code == values["order_type_code"],
@@ -222,6 +233,13 @@ def seed_catalog(session: Session, *, actor: str = "system") -> None:
             )
         )
         if exists:
+            # 旧版分离作用域种子曾漏掉付款方式选项；仅修复空值，不覆盖管理员自定义配置。
+            if (
+                exists.order_type_code in {"SALEREC", "SALETH"}
+                and exists.field_key == "payment_method"
+                and not exists.options
+            ):
+                exists.options = SALE_PAYMENT_METHOD_OPTIONS
             continue
         values = {**values, "created_by": actor, "updated_by": actor}
         session.add(OrderFormField(**values))

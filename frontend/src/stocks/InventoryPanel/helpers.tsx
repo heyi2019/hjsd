@@ -7,6 +7,7 @@ export type InventoryFilterOptions = {
   gameType?: string;
   keyword?: string;
   dateRange?: [Dayjs, Dayjs] | null;
+  status?: "WAITING" | "SOLD";
 };
 
 /** 库存筛选的单一事实源：先排除非在库，再套用维度条件，避免渲染层重复遍历。 */
@@ -14,8 +15,9 @@ export function filterInventoryRows(rows: Account[], options: InventoryFilterOpt
   const keyword = options.keyword?.trim().toLowerCase() ?? "";
   const dateStart = options.dateRange?.[0].startOf("day").valueOf();
   const dateEnd = options.dateRange?.[1].endOf("day").valueOf();
+  const status = options.status ?? "WAITING";
   return rows.filter((row) => {
-    if (row.status !== "WAITING") return false;
+    if (row.status !== status) return false;
     if (options.businessMode && row.business_mode !== options.businessMode) return false;
     if (options.inventoryType && row.inventory_type !== options.inventoryType) return false;
     if (options.gameType && row.game_type !== options.gameType) return false;

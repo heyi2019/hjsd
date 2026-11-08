@@ -29,6 +29,13 @@ class CounterpartyRoleInput(BaseModel):
     role: str = Field(min_length=1, max_length=64)
 
 
+class OrderParticipantsUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_roles: list[CustomerRoleInput] = Field(default_factory=list)
+    counterparty_roles: list[CounterpartyRoleInput] = Field(default_factory=list)
+
+
 class OrderAccountSnapshot(BaseModel):
     """订单中的产品快照：游戏账号是单一交易实体，游戏类型是产品类型。"""
 
@@ -419,6 +426,7 @@ __all__ = [
     "EventOut",
     "EventPostResult",
     "CounterpartyRoleInput",
+    "OrderParticipantsUpdate",
     "CustomerRoleInput",
     "InitialBuyCreate",
     "OrderAccountSnapshot",

@@ -5,7 +5,7 @@ import type {
   AccountExecutionEvent,
   AccountExecutionOrder,
   EmployeeOption,
-} from "../shared/api/catalog";
+} from "../../shared/api/catalog";
 
 export type InventoryFinanceRow = {
   key: string;
@@ -18,12 +18,6 @@ export type InventoryFinanceRow = {
   operator: string;
   event?: AccountExecutionEvent | null;
 };
-
-/** #15 需求2：账号台账三个系统时间戳的绝对设值 / 清空。 */
-export type TimeFieldKey = "registeredAt" | "soldAt" | "flowAt";
-
-/** 仅记录「用户改过的字段」；值为 string=绝对设值，为 null=清空。未出现的字段不发送。 */
-export type TimeSet = Partial<Record<TimeFieldKey, string | null>>;
 
 export type InventoryExecutionCategory = "BUY_IN" | "OPERATING" | "SELL_OUT";
 
@@ -42,6 +36,8 @@ export function classifyEventCategory(eventType: string | null | undefined): Inv
 
 export type InventoryExecutionRow = {
   key: string;
+  orderId: number;
+  orderNo: string;
   category: InventoryExecutionCategory;
   action: string;
   occurredAt: string;
@@ -120,8 +116,25 @@ export type OrderDetailMeta = {
   operationOperators?: string;
 };
 
-/** 编辑态下单个事件的草稿值，由上层 InventoryPanel 持有。 */
-export type InventoryEventDraft = { amount: string; note: string | null; operator_user_ids?: number[] };
+/** 订单编辑功能板块中的单个事件草稿值，由订单编辑状态机持有。 */
+export type InventoryEventDraft = {
+  amount: string;
+  note: string | null;
+  occurred_at?: string | null;
+  flow_occurred_at?: string | null;
+  operator_user_ids?: number[];
+};
+export type InventoryOrderDraft = {
+  trade_date?: string;
+  created_at?: string | null;
+  note?: string | null;
+  extra_values?: Record<string, unknown>;
+  form_extra?: Record<string, unknown>;
+};
+export type InventoryPartyDraft = {
+  customer_roles: { customer_id: number; role: string }[];
+  counterparty_roles: { counterparty_id: number; role: string }[];
+};
 export type InventoryEmployeeOption = EmployeeOption;
 
 const EDITABLE_CASHFLOW_EVENTS = new Set(["BUY", "SELL", "COST"]);

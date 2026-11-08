@@ -1,7 +1,7 @@
 import type { Dayjs } from "dayjs";
 import type { AllocationFormRow } from "./helpers";
 import { Alert, Form, Input, Typography } from "antd";
-import { ALLOCATION_TYPE_LABEL, buildRefundEventPayload, splitEven, validateAllocations, type AllocationType } from "./helpers";
+import { ALLOCATION_TYPE_LABEL, allocationAmountFromRate, allocationRateFromAmount, buildRefundEventPayload, splitEven, validateAllocations, type AllocationType } from "./helpers";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import { CreateBusinessModal } from "../CreateBusinessModal";
 import { DateField, MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
@@ -132,56 +132,6 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
   );
 }
 
-export function EditOrderModal({ controller }: { controller: OrdersPageController }) {
-  const {
-    editForm,
-    editOpen,
-    editSubmitting,
-    orderHasPostedEvents,
-    selectedOrder,
-    setEditOpen,
-    submitEditOrder,
-  } = controller;
-  return (
-      <BusinessActionModal
-        title={selectedOrder ? `编辑订单 · ${selectedOrder.order_no}` : "编辑订单"}
-        fieldCount={7}
-        open={editOpen}
-        confirmLoading={editSubmitting}
-        onCancel={() => { if (!editSubmitting) setEditOpen(false); }}
-        okText="保存修改"
-        onOk={() => void editForm.submit()}
-      >
-        <BusinessRegistrationForm
-          layout="horizontal"
-          labelAlign="left"
-          labelCol={{ flex: "108px" }}
-          wrapperCol={{ flex: "auto" }} scope="ORDEREDIT" form={editForm} onFinish={submitEditOrder}>
-          <FieldConfigScope scope="ORDEREDIT" active={editOpen}>
-          <Typography.Paragraph type="secondary">
-            订单编号、业务类型、账号关联与状态不可编辑；修改成交日期会同步平移本单事件与资金流水日期，并重取返点/提成规则快照。
-          </Typography.Paragraph>
-          <CfgItem
-            name="trade_date"
-            label="成交日期"
-            rules={[{ required: true, message: "请输入成交日期" }]}
-            extra={orderHasPostedEvents ? "该单已有登记事件，改日期将同步平移事件与资金流水日期" : undefined}
-            getValueFromEvent={dateValueFromEvent}
-            getValueProps={dateValueProps}
-          >
-            <DateField />
-          </CfgItem>
-          <CfgItem name="note" label="备注">
-            <Input.TextArea rows={2} placeholder="订单备注（选填）" />
-          </CfgItem>
-
-          <CustomFieldSection testIdSuffix="order-edit" />
-          </FieldConfigScope>
-        </BusinessRegistrationForm>
-      </BusinessActionModal>
-  );
-}
-
 export function AllocationModal({ controller }: { controller: OrdersPageController }) {
   const {
     actionOrder,
@@ -289,7 +239,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
           <Typography.Paragraph type="secondary">
             {isAction
               ? "按操作分配：买号、售出、运营、公司四项。运营为可选项，留空即不分运营份额。人员已锁定为账号台账 / 库存中心登记的执行人（买号=业务负责人、售出=交付负责人、运营=运营负责人）。一个动作有多人时，该动作的份额按人数均分（2 人各半、3 人各三分之一），只需在首行填该动作合计。台账之后增删执行人，这里的人数与均分会自动跟着变，合计不变；需要换人请到账号台账或库存中心修改。"
-              : "每行一位员工：比例和金额任填其一，填写时不会互相改写；两者都填时须自洽。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。亏损单按金额分润请填负数（如 -300 表示分担 300 亏损）。"}
+              : "每行一位员工：比例和金额任填其一，填写任一项会按本单利润双向换算，最后编辑的一项为准。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。亏损单按金额分润请填负数（如 -300 表示分担 300 亏损）。"}
           </Typography.Paragraph>
           <Form.List name="allocations">
             {(fields, { add, remove }) => (
@@ -371,6 +321,12 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                               suffix="%"
                               inputMode="decimal"
                               className="ui-control-width-120"
+                              onChange={(event) => {
+                                allocationForm.setFieldValue(
+                                  ["allocations", field.name, "allocation_amount"],
+                                  allocationAmountFromRate(allocationProfit, event.target.value),
+                                );
+                              }}
                             />
                           </Form.Item>
                           <Form.Item
@@ -382,6 +338,12 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                               prefix="¥"
                               inputMode="decimal"
                               className="ui-control-width-140"
+                              onChange={(event) => {
+                                allocationForm.setFieldValue(
+                                  ["allocations", field.name, "allocation_rate"],
+                                  allocationRateFromAmount(allocationProfit, event.target.value),
+                                );
+                              }}
                             />
                           </Form.Item>
                         </>
@@ -545,7 +507,6 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
     <>
       <SharedCancellationDialog controller={controller} />
       <CancelTransactionModal controller={controller} />
-      <EditOrderModal controller={controller} />
       <AllocationModal controller={controller} />
       <RefundModal controller={controller} />
       <CreateBusinessModalWrapper controller={controller} />

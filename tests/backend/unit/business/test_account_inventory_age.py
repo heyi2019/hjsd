@@ -21,6 +21,35 @@ from app.stocks import service
 from app.stocks.schemas import AccountOut
 
 
+def test_inventory_uses_sql_scoped_rows(monkeypatch):
+    from app.stocks import inventory
+
+    row = Account(
+        id=1,
+        game_account="sql-inventory",
+        business_mode="SELF",
+        inventory_type="RECOVERY",
+        status="WAITING",
+        inventory_status="IN_STOCK",
+        cost_amount=Decimal("10.00"),
+        created_by="pytest",
+        updated_by="pytest",
+    )
+    monkeypatch.setattr(inventory, "_inventory_rows", lambda session, user=None: [row])
+    monkeypatch.setattr(
+        inventory,
+        "list_accounts",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("must not load all accounts")),
+    )
+    monkeypatch.setattr(
+        inventory.parties_service,
+        "get_extra_values_bulk",
+        lambda *args, **kwargs: {},
+    )
+
+    assert inventory.inventory(object())[0]["account_id"] == 1
+
+
 def _out(
     *,
     entry: datetime | date | None = None,

@@ -52,6 +52,10 @@ def order_profit_detail(
         user,
         session,
     )
+    if from_date is not None:
+        orders_stmt = orders_stmt.where(Order.trade_date >= from_date)
+    if to_date is not None:
+        orders_stmt = orders_stmt.where(Order.trade_date <= to_date)
     orders = session.execute(orders_stmt).all()
     order_ids = [row.id for row in orders]
     extra_values = parties_service.get_extra_values_bulk(
@@ -74,10 +78,6 @@ def order_profit_detail(
     no_totals = (ZERO, ZERO, ZERO)
     items = []
     for order in orders:
-        if from_date and order.trade_date < from_date:
-            continue
-        if to_date and order.trade_date > to_date:
-            continue
         income, expense, buy_amount = cashflow_by_order.get(order.id, no_totals)
         rebate = rebate_by_order.get(order.id, ZERO)
         items.append(

@@ -87,23 +87,31 @@ def stats_audit_logs(
     """
     del user
     wanted = [item.strip() for item in entity_types.split(",") if item.strip()]
-    items: list[schemas.AuditEntityStatOut] = []
-    for entity_type in wanted:
-        count = db.scalar(
-            select(func.count())
-            .select_from(AuditLog)
-            .where(AuditLog.entity_type == entity_type)
+    if not wanted:
+        return schemas.AuditEntityStatsOut(items=[])
+    unique_types = list(dict.fromkeys(wanted))
+    aggregate_rows = db.execute(
+        select(
+            AuditLog.entity_type,
+            func.count(AuditLog.id),
+            func.max(AuditLog.id),
         )
-        last = db.scalars(
-            select(AuditLog)
-            .where(AuditLog.entity_type == entity_type)
-            .order_by(AuditLog.id.desc())
-            .limit(1)
-        ).first()
+        .where(AuditLog.entity_type.in_(unique_types))
+        .group_by(AuditLog.entity_type)
+    ).all()
+    counts = {entity_type: int(count) for entity_type, count, _last_id in aggregate_rows}
+    last_ids = {last_id for _entity_type, _count, last_id in aggregate_rows if last_id is not None}
+    last_by_type = {
+        row.entity_type: row
+        for row in db.scalars(select(AuditLog).where(AuditLog.id.in_(last_ids))).all()
+    } if last_ids else {}
+    items = []
+    for entity_type in wanted:
+        last = last_by_type.get(entity_type)
         items.append(
             schemas.AuditEntityStatOut(
                 entity_type=entity_type,
-                count=int(count or 0),
+                count=counts.get(entity_type, 0),
                 last_at=last.occurred_at if last else None,
                 last_actor=last.actor if last else None,
             )

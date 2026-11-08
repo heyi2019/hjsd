@@ -160,6 +160,33 @@ def test_order_list_payload_includes_counterparty_role(seeded_db):
     assert payloads[0]["party_name"] == "同行乙"
     assert payloads[0]["party_role"] == "PEER"
 
+
+def test_order_list_payload_does_not_use_foreign_source_order(seeded_db):
+    account = _new_account(seeded_db, game_account="router-scope-source")
+    service.create_order(
+        seeded_db,
+        order_type="HS",
+        trade_date=TODAY,
+        actor="pytest",
+        account_id=account.id,
+        owner_id=1,
+        form_extra={"business_responsible_ids": [1]},
+        user=_admin(),
+    )
+    visible = service.create_order(
+        seeded_db,
+        order_type="HS",
+        trade_date=TODAY,
+        actor="pytest",
+        account_id=account.id,
+        owner_id=2,
+        user=_admin(),
+    )
+
+    payload = router._order_list_payload(seeded_db, [visible], _viewer())[0]
+
+    assert payload["inventory_operator"] == account.created_by
+
 # ---- pool_balance：无池授权返回 NotFound（603-605） ----
 
 def test_pool_balance_hidden_for_unauthorized_viewer(seeded_db):

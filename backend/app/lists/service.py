@@ -334,7 +334,9 @@ def _data_extra_keys(session: Session) -> dict[str, dict[str, Any]]:
     """
     result: dict[str, dict[str, Any]] = {}
     for model, source_label in _DATA_EXTRA_SOURCES:
-        for (payload,) in session.execute(select(model.form_extra)).all():
+        for (payload,) in session.execute(
+            select(model.form_extra).where(model.form_extra.is_not(None))
+        ).all():
             if not isinstance(payload, dict):
                 continue
             for key in payload:
@@ -358,14 +360,17 @@ def list_custom_field_options(session: Session) -> list[dict[str, Any]]:
     不按「列表 ↔ 表单」做硬映射：订单/账号实体的 form_extra 会合并多个表单作用域的
     字段值（如 ALLOCATION 也写进订单），硬映射反而会漏。由管理员按来源标签自己挑。
     """
-    rows = session.scalars(
-        select(OrderFormField)
-        .where(
-            OrderFormField.is_custom.is_(True),
-            OrderFormField.is_active.is_(True),
+    field_rows = session.scalars(
+        select(OrderFormField).order_by(
+            OrderFormField.order_type_code,
+            OrderFormField.sort_order,
+            OrderFormField.id,
         )
-        .order_by(OrderFormField.order_type_code, OrderFormField.sort_order, OrderFormField.id)
     ).all()
+    rows = [
+        row for row in field_rows
+        if row.is_custom and row.is_active
+    ]
     options = [
         {
             "scope": row.order_type_code,
@@ -379,11 +384,7 @@ def list_custom_field_options(session: Session) -> list[dict[str, Any]]:
     ]
     known_keys = {item["field_key"] for item in options}
     # 兜底中文名：任意字段定义（含停用/非自定义）里同 key 的 label，没有就用键名本身。
-    label_by_key = {
-        row.field_key: row.label
-        for row in session.scalars(select(OrderFormField)).all()
-        if row.label
-    }
+    label_by_key = {row.field_key: row.label for row in field_rows if row.label}
     for key, info in sorted(_data_extra_keys(session).items()):
         if key in known_keys:
             continue

@@ -208,6 +208,30 @@ class TestSecurityScopes:
         admin = CurrentUser.build(id=1, username="admin", roles=[ROLE_ADMIN])
         assert owner_scope_filter(Pool.id, admin, seeded_db) is None
 
+    def test_team_scope_ids_are_cached_for_one_session(self, seeded_db, monkeypatch):
+        team_user = CurrentUser.build(
+            id=9,
+            username="operator",
+            roles=[ROLE_OPERATOR],
+            owner_scope="TEAM",
+            team_ids=[3],
+        )
+        calls = 0
+        query = seeded_db.query
+
+        def counted_query(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            return query(*args, **kwargs)
+
+        monkeypatch.setattr(seeded_db, "query", counted_query)
+
+        first = owner_scope_ids(seeded_db, team_user)
+        second = owner_scope_ids(seeded_db, team_user)
+
+        assert first == second
+        assert calls == 1
+
 
 class TestTokenGuards:
     def test_malformed_token_rejected(self):

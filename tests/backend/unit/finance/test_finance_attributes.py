@@ -28,3 +28,13 @@ def test_non_negative_returns_decimal_for_valid_input() -> None:
     assert _non_negative("12.30", field="amount") == Decimal("12.30")
     assert _non_negative(0, field="amount") == Decimal("0.00")
 import pytest
+
+
+def test_cashflow_indexes_order_event_id() -> None:
+    from app.domain.trade import Cashflow
+
+    assert any(
+        index.name == "ix_cashflow_order_event"
+        and [column.name for column in index.columns] == ["order_event_id"]
+        for index in Cashflow.__table__.indexes
+    )

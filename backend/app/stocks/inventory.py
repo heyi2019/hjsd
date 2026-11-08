@@ -45,10 +45,7 @@ def count_accounts(session: Session, *, status: str | None = None, user: Current
 
 def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict[str, Any]]:
     """库存健康表：只统计独立库存状态为在库的真实占用。"""
-    rows = [
-        row for row in list_accounts(session, user=user)
-        if row.inventory_status in INVENTORY_STATUSES
-    ]
+    rows = _inventory_rows(session, user=user)
     extra_values = parties_service.get_extra_values_bulk(
         session, entity_type="account", entity_ids=[row.id for row in rows]
     )

@@ -61,6 +61,7 @@ class Cashflow(Base, AuditMixin):
         # 一笔订单事件可派生多笔资金流水，支持拆分进入不同资金池。
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
         Index("ix_cashflow_order", "order_id"),
+        Index("ix_cashflow_order_event", "order_event_id"),
         Index("ix_cashflow_deposit", "deposit_id"),
         Index("ix_cashflow_transfer", "transfer_id"),
         CheckConstraint("amount >= 0", name="amount_nonneg"),

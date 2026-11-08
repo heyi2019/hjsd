@@ -33,27 +33,30 @@ def r3_commission_reconciliation(
     """R3 提成对账：按人员钻取到单；无规则版本时提成率为 0（不臆造）。"""
     _validate_date_range(from_date, to_date)
     order_scope = None if all_people else user
-    rows = session.execute(
-        _apply_order_scope(
-            select(OrderProfitAllocation, Order)
-            .join(Order, Order.id == OrderProfitAllocation.order_id)
-            .where(
-                Order.status.in_(
-                    [
-                        OrderStatus.COMPLETED.value,
-                        OrderStatus.INSTALLMENT.value,
-                        OrderStatus.ACTIVE.value,
-                    ]
-                )
-            ),
-            order_scope,
-            session,
-        )
-    ).all()
+    allocation_stmt = _apply_order_scope(
+        select(OrderProfitAllocation, Order)
+        .join(Order, Order.id == OrderProfitAllocation.order_id)
+        .where(
+            Order.status.in_(
+                [
+                    OrderStatus.COMPLETED.value,
+                    OrderStatus.INSTALLMENT.value,
+                    OrderStatus.ACTIVE.value,
+                ]
+            )
+        ),
+        order_scope,
+        session,
+    )
     if mine and user is not None:
-        rows = [row for row in rows if row[0].user_id == user.id]
+        allocation_stmt = allocation_stmt.where(OrderProfitAllocation.user_id == user.id)
     if user_id is not None:
-        rows = [row for row in rows if row[0].user_id == user_id]
+        allocation_stmt = allocation_stmt.where(OrderProfitAllocation.user_id == user_id)
+    if from_date is not None:
+        allocation_stmt = allocation_stmt.where(Order.trade_date >= from_date)
+    if to_date is not None:
+        allocation_stmt = allocation_stmt.where(Order.trade_date <= to_date)
+    rows = session.execute(allocation_stmt).all()
 
     # 利润 = 该订单所有收入 − 所有支出。
     # 走报表唯一取数口，与分润弹窗同源：收入含返点记录、支出含分期坏账；
@@ -68,10 +71,6 @@ def r3_commission_reconciliation(
 
     grouped: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for allocation, order in rows:
-        if from_date and order.trade_date < from_date:
-            continue
-        if to_date and order.trade_date > to_date:
-            continue
         profit = per_order_profit[order.id]
         rate = _money(allocation.allocation_rate)
         amount = _money(allocation.allocation_amount)

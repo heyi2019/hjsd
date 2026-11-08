@@ -127,16 +127,15 @@ def export_installments_csv(
     )
     rows = [output.model_dump(mode="json") for output in outputs]
     value_labels = list_columns_service.get_value_labels(db, "INSTALLMENT")
+    installment_ids = [output.id for output in outputs]
+    schedules_by_installment = service.list_schedules_bulk(db, installment_ids, _user)
+    dispositions_by_installment = service.list_dispositions_bulk(db, installment_ids, _user)
     for row, output in zip(rows, outputs, strict=True):
         # 列表列注册表里「剩余」的列 key 是 remaining，而字段名是 remaining_receivable；
         # 不补这一行别名，导出那列会整列空掉（页面上却是后端算好的值）。
         row["remaining"] = row.get("remaining_receivable")
-        schedules = db.scalars(
-            select(InstallmentSchedule)
-            .where(InstallmentSchedule.installment_id == output.id)
-            .order_by(InstallmentSchedule.period_no)
-        ).all()
-        dispositions = service.list_dispositions(db, output.id, _user)
+        schedules = schedules_by_installment.get(output.id, [])
+        dispositions = dispositions_by_installment.get(output.id, [])
         row["installment_note"] = row.get("note")
         row["installment_delivery_mode"] = row.get("delivery_mode")
         row["installment_delivered_on"] = row.get("delivered_on")

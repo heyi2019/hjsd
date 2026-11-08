@@ -418,7 +418,7 @@ def list_orders(
         user=_user,
     )
     return PageOut(
-        items=[schemas.OrderListOut.model_validate(item) for item in _order_list_payload(db, orders)],
+        items=[schemas.OrderListOut.model_validate(item) for item in _order_list_payload(db, orders, _user)],
         total=service.count_orders(
             db, order_type=order_type, status=status, trade_date_from=trade_date_from,
             trade_date_to=trade_date_to, owner_id=owner_id, pool_id=pool_id,
@@ -455,7 +455,7 @@ def export_orders_csv(
         offset=0,
         user=_user,
     )
-    rows = _order_list_payload(db, orders)
+    rows = _order_list_payload(db, orders, _user)
     value_labels = list_columns_service.get_value_labels(db, "LEDGER")
     for row, order in zip(rows, orders, strict=True):
         detail = _order_detail_output(db, order, _user).model_dump(mode="json")
@@ -512,7 +512,7 @@ def export_orders_xlsx(
         offset=0,
         user=_user,
     )
-    rows = _order_list_payload(db, orders)
+    rows = _order_list_payload(db, orders, _user)
     value_labels = list_columns_service.get_value_labels(db, "LEDGER")
     # 注册表的 `party` 列是前端由 party_name/party_source 合成的派生列，导出前补齐
     for row in rows:

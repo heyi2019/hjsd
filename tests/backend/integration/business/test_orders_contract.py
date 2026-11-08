@@ -367,6 +367,19 @@ class TestCreateOrderValidation:
                 actor="pytest",
             )
 
+    def test_scoped_user_cannot_read_linked_foreign_order(self, seeded_db):
+        visible = _order(seeded_db, owner_id=9)
+        foreign = _order(seeded_db, owner_id=1)
+        order_service.create_order_link(
+            seeded_db,
+            visible.id,
+            related_order_id=foreign.id,
+            relation_type="FOLLOW_UP",
+            actor="pytest",
+        )
+
+        assert order_service.list_order_links(seeded_db, visible.id, _scoped_user()) == []
+
     def test_order_link_delete_removes_link_and_writes_audit(self, seeded_db):
         source = _order(seeded_db, order_type="HS")
         follow_up = _order(seeded_db, order_type="HS")
@@ -432,6 +445,24 @@ class TestCreateOrderValidation:
         # 重复删除 → 404
         with pytest.raises(NotFound, match="不存在"):
             order_service.delete_order_link(seeded_db, follow_up.id, link.id, actor="pytest")
+
+    def test_scoped_user_cannot_delete_linked_foreign_order(self, seeded_db):
+        visible = _order(seeded_db, owner_id=9)
+        foreign = _order(seeded_db, owner_id=1)
+        link = order_service.create_order_link(
+            seeded_db,
+            visible.id,
+            related_order_id=foreign.id,
+            relation_type="FOLLOW_UP",
+            actor="pytest",
+        )
+
+        with pytest.raises(NotFound, match="不存在"):
+            order_service.delete_order_link(
+                seeded_db, visible.id, link.id, actor="pytest", user=_scoped_user()
+            )
+
+        assert seeded_db.scalar(select(OrderLink).where(OrderLink.id == link.id)) is not None
 
     def test_installment_gate_flags_must_be_boolean_in_service(self, seeded_db):
         order = _order(seeded_db, order_type="HS")

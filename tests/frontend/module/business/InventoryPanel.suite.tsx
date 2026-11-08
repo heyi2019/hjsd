@@ -422,6 +422,19 @@ describe("InventoryPanel：账号台账", () => {
     fireEvent.click(document.querySelector(".ant-table-row-expand-icon") as Element);
   });
 
+  it("展开详情与主表保持同一宽度基准，并只保留主表横向滚动区域", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    fireEvent.click(screen.getByText("acc-1").closest("tr")!.querySelector(".ant-table-row-expand-icon") as Element);
+
+    const inventoryTable = document.querySelector(".inventory-table") as HTMLElement;
+    const detailPanel = (await screen.findByText("当前运营状态")).closest(".inventory-detail") as HTMLElement;
+
+    expect(inventoryTable).toHaveClass("inventory-table--single-scroll");
+    expect(inventoryTable.querySelector(".ant-table-content")).toBeInTheDocument();
+    expect(detailPanel).toHaveClass("inventory-detail--aligned");
+  });
+
   it("未售时长列受列表字段配置控制：配置隐藏后列头消失、其余列不受影响", async () => {
     // 模拟「设置→配置中心→字段配置→列表字段→库存中心」里把 inventory_age 设为隐藏。
     // 修复前该列 key 为 inventoryAge（与注册表 inventory_age 不符），隐藏/调序均不生效。

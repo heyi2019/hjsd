@@ -28,7 +28,12 @@
 .inventory-table .ant-table-tbody > tr.ant-table-expanded-row .inventory-detail {
   /* 展开详情与弹窗跟随父容器铺满，板块框直接对齐到面板最右边界。 */
   width: 100%;
+  max-width: 100%;
   margin-inline: 0;
+}
+.inventory-detail--aligned {
+  inline-size: 100%;
+  max-inline-size: 100%;
 }
 .inventory-detail__meta {
   overflow: hidden;
@@ -45,8 +50,8 @@
 .inventory-detail .ant-table-wrapper {
   width: 100%;
   max-width: none;
-  /* 窄窗下允许横向滚动而非裁切右侧列（L202） */
-  overflow-x: auto;
+  /* 横向滚动交给 antd 的内容层，避免 DataTable 壳与内容层叠加滚动。 */
+  overflow-x: clip;
   overflow-y: clip;
 }
 .inventory-detail__section > .ui-table-wrap {
@@ -97,8 +102,8 @@
   box-sizing: border-box;
   border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
   border-radius: var(--radius-sm);
-  /* 窄窗下允许横向滚动而非裁切右侧列（L202） */
-  overflow-x: auto;
+  /* 横向滚动交给内部 .ant-table-content，容器自身不再重复滚动。 */
+  overflow-x: clip;
   overflow-y: auto;
 }
 .inventory-execution-table .ant-table,
@@ -143,8 +148,8 @@
   box-sizing: border-box;
   border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
   border-radius: var(--radius-sm);
-  /* 窄窗下允许横向滚动而非裁切右侧列（L202） */
-  overflow-x: auto;
+  /* 横向滚动交给内部 .ant-table-content，容器自身不再重复滚动。 */
+  overflow-x: clip;
   overflow-y: auto;
 }
 .inventory-finance-table .ant-table-container { border: 0; border-radius: 0; overflow: hidden; }

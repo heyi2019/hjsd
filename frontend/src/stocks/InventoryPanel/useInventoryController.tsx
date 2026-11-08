@@ -104,19 +104,23 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   }, [refreshKey]);
 
   // 横向滚动记忆：手风琴展开/收起会以 key 重建整张 Table，旧滚动位置归零。
-  // 展开前抓取 .ant-table-body 的 scrollLeft，重建后用 useLayoutEffect 还原（绘制前写回，无闪烁）。
+  // 当前表格只由 .ant-table-content 接管横向滚动；保留 body 作为兼容回退，避免 antd 版本差异造成失忆。
   const scrollLeftRef = useRef(0);
   function captureScroll() {
-    const body = document.querySelector<HTMLElement>(".inventory-table .ant-table-body");
-    if (body) scrollLeftRef.current = body.scrollLeft;
+    const scrollRegion = document.querySelector<HTMLElement>(
+      ".inventory-table--single-scroll .ant-table-content, .inventory-table--single-scroll .ant-table-body",
+    );
+    if (scrollRegion) scrollLeftRef.current = scrollRegion.scrollLeft;
   }
   function expandTo(ids: Key[]) {
     captureScroll();
     setExpandedAccountIds(ids);
   }
   useLayoutEffect(() => {
-    const body = document.querySelector<HTMLElement>(".inventory-table .ant-table-body");
-    if (body && scrollLeftRef.current) body.scrollLeft = scrollLeftRef.current;
+    const scrollRegion = document.querySelector<HTMLElement>(
+      ".inventory-table--single-scroll .ant-table-content, .inventory-table--single-scroll .ant-table-body",
+    );
+    if (scrollRegion && scrollLeftRef.current) scrollRegion.scrollLeft = scrollLeftRef.current;
   }, [expandedAccountIds]);
 
   const inventoryRows = useMemo(

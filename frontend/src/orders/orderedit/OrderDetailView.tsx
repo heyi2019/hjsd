@@ -115,7 +115,7 @@ export function OrderDetailView({
   }
 
   return (
-    <div className="inventory-detail">
+    <div className="inventory-detail inventory-detail--aligned">
       <OrderDetailProfileSection meta={meta} detail={detail} account={account} />
       <OrderDetailDeliverySection meta={meta} detail={detail} account={account} employees={employees} />
       <OrderDetailOperationSection meta={meta} />

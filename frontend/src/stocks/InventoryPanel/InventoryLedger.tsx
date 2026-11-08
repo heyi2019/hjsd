@@ -120,7 +120,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
       </Space>
       <DataTable
         key={`account-ledger-${expandedAccountIds.join("|")}`}
-        className="inventory-table"
+        className="inventory-table inventory-table--single-scroll"
         columns={arrangeColumns(columns)}
         rows={orderedRows}
         page={page}

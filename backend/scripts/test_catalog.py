@@ -18,7 +18,6 @@ from __future__ import annotations
 import csv
 from functools import lru_cache
 import os
-import re
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # /Users/aries/黑金时代
 BACKEND = os.path.join(REPO, "backend")

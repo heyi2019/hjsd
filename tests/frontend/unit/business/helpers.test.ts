@@ -226,7 +226,7 @@ describe("OrdersPage 资金与编辑 payload", () => {
     game_type: "原神",
     game_password: "pwd-1",
     channel_region: "天空岛",
-    bound_phone: "13800000000",
+    bound_phone: "test-phone-0000",
     wallet_realname: "何一",
     camp_account: "camp-1",
     platform: "安卓",

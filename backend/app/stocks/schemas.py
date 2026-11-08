@@ -105,6 +105,8 @@ class ExecutionEditItem(RequestModel):
     expected_amount: Decimal = Field(ge=0, max_digits=18, decimal_places=2)
     amount: Decimal = Field(ge=0, max_digits=18, decimal_places=2)
     note: str | None = None
+    occurred_at: datetime | None = None
+    flow_occurred_at: datetime | None = None
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 

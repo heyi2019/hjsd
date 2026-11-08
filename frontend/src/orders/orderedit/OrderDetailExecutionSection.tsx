@@ -1,7 +1,7 @@
 import { Input, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { AccountAuditEntry, AccountExecutionEvent } from "../shared/api/catalog";
-import { DataTable, MoneyInput, MoneyText, Select } from "../shared/ui";
+import type { AccountAuditEntry, AccountExecutionEvent } from "../../shared/api/catalog";
+import { DataTable, MoneyInput, MoneyText, Select } from "../../shared/ui";
 import {
   InventorySectionHeading,
   OPERATION_CATEGORY_LABEL,
@@ -27,7 +27,7 @@ export function OrderDetailExecutionSection({
   audit?: AccountAuditEntry[];
   editing?: boolean;
   eventDrafts?: Record<number, InventoryEventDraft>;
-  onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
+  onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string | null; flow_occurred_at?: string | null; operator_user_ids?: number[] }) => void;
   employees: InventoryEmployeeOption[];
 }) {
   const sortedRows = [...rows].sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category));
@@ -40,7 +40,18 @@ export function OrderDetailExecutionSection({
     },
     { title: "动作", dataIndex: "action", key: "action" },
     { title: "平台", dataIndex: "platform", key: "platform", render: (value: string) => value || "-" },
-    { title: "动作时间", dataIndex: "occurredAt", key: "occurredAt" },
+    {
+      title: "动作时间",
+      key: "occurredAt",
+      render: (_value, item) => editing ? (
+        <Input
+          type="datetime-local"
+          aria-label={`编辑执行时间 ${item.action}`}
+          value={(eventDrafts?.[item.event.id]?.occurred_at ?? item.event.occurred_at ?? `${item.event.occurred_on}T00:00:00`).replace(" ", "T").slice(0, 16)}
+          onChange={(event) => onEventEdit?.(item.event, { occurred_at: event.target.value || null })}
+        />
+      ) : item.occurredAt,
+    },
     {
       title: "操作人",
       dataIndex: "operator",

@@ -15,7 +15,7 @@ import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 import type { BusinessOrderType } from "../CreateBusinessModal";
 import { DEFAULT_BUSINESS_CENTER_TAB, type BusinessCenterEntryTab, type BusinessCenterTab } from "../businessCenter";
 import { BusinessFilterKey, BusinessModeFilterKey, CancelFormScope, buildActionAllocationCandidates, buildActionAllocationRows, filterBusinessOrders, formatOrderAmount, pickCancelableEvent, resolveCancelAmount, type ActionAllocationCandidates, type AllocationFormRow, type AllocationMode } from "./helpers";
-import { useAccountExecutionEditor } from "../../stocks/InventoryPanel/useAccountExecutionEditor";
+import { useOrderEditor } from "../orderedit";
 
 export function useOrdersPageController(params: {
   active?: boolean;
@@ -93,7 +93,7 @@ export function useOrdersPageController(params: {
       setLedgerDetailLoading((current) => ({ ...current, [accountId]: false }));
     }
   };
-  const accountEditor = useAccountExecutionEditor({
+  const orderEditor = useOrderEditor({
     getExecutionDetail: (id) => ledgerDetails[id],
     onSaved: (id, detail) => setLedgerDetails((current) => ({ ...current, [id]: detail })),
   });
@@ -379,7 +379,7 @@ export function useOrdersPageController(params: {
     try {
       const detail = await stocksApi.executionDetail(order.account_id);
       setLedgerDetails((current) => ({ ...current, [order.account_id as number]: detail }));
-      await accountEditor.openEditor(detail.account);
+      await orderEditor.openEditor(detail.account, detail);
       setExpandedOrderIds([String(order.id)]);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
@@ -451,7 +451,7 @@ export function useOrdersPageController(params: {
               permission="order.create"
               type="link"
               size="small"
-              disabled={accountEditor.editingAccount !== null}
+              disabled={orderEditor.editingAccount !== null}
               onClick={() => void openAccountEditor(order)}
             >
               编辑
@@ -552,17 +552,23 @@ export function useOrdersPageController(params: {
     ledgerExporting,
     ledgerDetailLoading,
     ledgerDetails,
-    editingAccount: accountEditor.editingAccount,
-    setEditingAccount: accountEditor.setEditingAccount,
-    inlineEditId: accountEditor.inlineEditId,
-    eventDrafts: accountEditor.eventDrafts,
-    updateEventDraft: accountEditor.updateEventDraft,
-    employees: accountEditor.employees,
-    invEditExtraForm: accountEditor.invEditExtraForm,
-    savingAccount: accountEditor.savingAccount,
+    editingAccount: orderEditor.editingAccount,
+    setEditingAccount: orderEditor.setEditingAccount,
+    inlineEditId: orderEditor.inlineEditId,
+    eventDrafts: orderEditor.eventDrafts,
+    updateEventDraft: orderEditor.updateEventDraft,
+    timeDrafts: orderEditor.timeDrafts,
+    updateTimeDraft: orderEditor.updateTimeDraft,
+    orderDrafts: orderEditor.orderDrafts,
+    updateOrderDraft: orderEditor.updateOrderDraft,
+    partyDrafts: orderEditor.partyDrafts,
+    updatePartyDraft: orderEditor.updatePartyDraft,
+    employees: orderEditor.employees,
+    orderEditExtraForm: orderEditor.orderEditExtraForm,
+    savingAccount: orderEditor.savingAccount,
     openAccountEditor,
-    cancelInlineEdit: accountEditor.cancelInlineEdit,
-    saveInline: accountEditor.saveInline,
+    cancelInlineEdit: orderEditor.cancelInlineEdit,
+    saveInline: orderEditor.saveInline,
     ledgerSortDesc,
     load,
     loadError,

@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -60,6 +60,19 @@ const orders = [
     sale_operator: "售卖员",
     sale_at: "2026-10-17T16:45:00",
   },
+  {
+    id: 3,
+    order_no: "HS-2026-0003",
+    order_type: "HS",
+    capital_type: "SELF",
+    trade_date: "2026-10-03",
+    status: "COMPLETED",
+    account_id: 100,
+    account_game_type: "原神",
+    account_game_account: "sold-account",
+    account_platform: "安卓",
+    account_status: "SOLD",
+  },
   { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
 ];
 const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
@@ -74,18 +87,18 @@ beforeEach(() => {
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);
-  vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+  vi.mocked(catalog.stocksApi.executionDetail).mockImplementation(async (accountId: number) => ({
     account: {
-      id: 99,
-      stock_no: "KU_00001",
-      game_account: "acc-99",
+      id: accountId,
+      stock_no: `KU_${accountId}`,
+      game_account: accountId === 100 ? "sold-account" : "acc-99",
       game_type: "原神",
-      status: "WAITING",
+      status: accountId === 100 ? "SOLD" : "WAITING",
       inventory_type: "RECOVERY",
     },
     orders: [],
     finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
-  } as never);
+  } as never));
   vi.mocked(catalog.stocksApi.updateProfile).mockResolvedValue({ id: 99, game_account: "acc-99" } as never);
 });
 
@@ -98,14 +111,14 @@ describe("订单台账编辑与库存中心同步（#15 需求1）", () => {
     );
 
     // 订单台账的「编辑」直接复用完整详情编辑态，覆盖账号、时间、执行信息等板块。
-    const editBtn = await screen.findByRole("button", { name: /^编辑$/ });
+    const editBtn = (await screen.findAllByRole("button", { name: /^编辑$/ }))[0];
     await ui.click(editBtn);
 
     // 编辑态标志：底部「保存修改」按钮 + 完整详情编辑字段；不再出现订单级小窗。
     await waitFor(() => expect(screen.getByText("保存修改")).toBeInTheDocument());
     expect(screen.getByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
     expect(screen.getByLabelText("编辑账号描述")).toBeInTheDocument();
-    expect(screen.queryByLabelText("编辑订单创建时间")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("编辑登记时间")).toBeInTheDocument();
     expect(screen.queryByText(/编辑订单 ·/)).not.toBeInTheDocument();
   });
 
@@ -121,5 +134,16 @@ describe("订单台账编辑与库存中心同步（#15 需求1）", () => {
       expect(screen.getAllByText("TH-2026-0002").length).toBeGreaterThanOrEqual(1),
     );
     expect(screen.queryAllByRole("button", { name: /^编辑$/ }).length).toBe(0);
+  });
+
+  it("已售订单仍显示完整台账编辑入口", async () => {
+    renderLight(<OrdersPage />, { user: "admin" });
+    await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
+    const soldCell = await screen.findByText("HS-2026-0003");
+    await ui.click(within(soldCell.closest("tr") as HTMLElement).getByRole("button", { name: /^编辑$/ }));
+
+    await waitFor(() => expect(screen.getByText("保存修改")).toBeInTheDocument());
+    expect(screen.getByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑登记时间")).toBeInTheDocument();
   });
 });

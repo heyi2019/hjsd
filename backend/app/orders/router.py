@@ -911,6 +911,22 @@ def add_order_customer_role(
     return _order_output(db, order, user)
 
 
+@router.put("/orders/{order_id}/participants", response_model=schemas.OrderOut)
+def replace_order_participants(
+    order_id: int,
+    payload: schemas.OrderParticipantsUpdate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = update_orders,
+) -> schemas.OrderOut:
+    order = service.replace_order_participants(
+        db, order_id,
+        customer_roles=[(item.customer_id, item.role) for item in payload.customer_roles],
+        counterparty_roles=[(item.counterparty_id, item.role) for item in payload.counterparty_roles],
+        actor=_actor(user), user=user,
+    )
+    return _order_output(db, order, user)
+
+
 @router.get("/pools/balances", response_model=schemas.PoolBalanceListOut)
 def pool_balances_summary(
     db: Session = Depends(get_db),

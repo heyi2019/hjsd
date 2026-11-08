@@ -415,6 +415,43 @@ def add_customer_role(
     return order
 
 
+def replace_order_participants(
+    session: Session, order_id: int, *,
+    customer_roles: Sequence[tuple[int, str]],
+    counterparty_roles: Sequence[tuple[int, str]],
+    actor: str, user: CurrentUser | None = None,
+) -> Order:
+    """替换订单参与方角色集合，支持订单编辑时增删参与方。"""
+    order = get_order(session, order_id, user)
+    from app.domain.parties import OrderCounterpartyRole, OrderCustomerRole
+
+    customer_keys = {(customer_id, role) for customer_id, role in customer_roles}
+    counterparty_keys = {(counterparty_id, role) for counterparty_id, role in counterparty_roles}
+    for customer_id, _role in customer_keys:
+        parties_service.assert_customer_usable(session, customer_id, user=user)
+    for counterparty_id, role in counterparty_keys:
+        parties_service.assert_counterparty_usable(session, counterparty_id, expected_type=role)
+
+    current_customers = list(session.scalars(select(OrderCustomerRole).where(OrderCustomerRole.order_id == order_id)).all())
+    current_counterparties = list(session.scalars(select(OrderCounterpartyRole).where(OrderCounterpartyRole.order_id == order_id)).all())
+    for item in current_customers:
+        if (item.customer_id, item.role) not in customer_keys:
+            session.delete(item)
+    for item in current_counterparties:
+        if (item.counterparty_id, item.role) not in counterparty_keys:
+            session.delete(item)
+    existing_customers = {(item.customer_id, item.role) for item in current_customers}
+    existing_counterparties = {(item.counterparty_id, item.role) for item in current_counterparties}
+    for customer_id, role in customer_keys - existing_customers:
+        session.add(_customer_role(order_id, customer_id, role))
+    for counterparty_id, role in counterparty_keys - existing_counterparties:
+        session.add(_counterparty_role(order_id, counterparty_id, role))
+    session.flush()
+    record_audit(session, action=AuditAction.ORDER_UPDATE, entity_type="order_participants", entity_id=order.order_no, actor=actor,
+                 after={"customer_roles": sorted(customer_keys), "counterparty_roles": sorted(counterparty_keys)})
+    return order
+
+
 def _counterparty_role(order_id: int, counterparty_id: int, role: str):
     from app.domain.parties import OrderCounterpartyRole
 

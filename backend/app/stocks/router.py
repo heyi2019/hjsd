@@ -3,7 +3,7 @@
 账号状态与成本由订单事件驱动，本模块**不提供**改状态/改成本入口（ACC-01-03/04）。
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -312,6 +312,10 @@ def update_execution_detail(
         event.amount = item.amount
         if "note" in item.model_fields_set:
             event.note = item.note
+        if "occurred_at" in item.model_fields_set:
+            event.posted_at = item.occurred_at
+        if flow is not None and "flow_occurred_at" in item.model_fields_set:
+            flow.created_at = item.flow_occurred_at
         if item.operator_user_ids is not None:
             event.operator_user_ids = item.operator_user_ids
         event.updated_by = user.username

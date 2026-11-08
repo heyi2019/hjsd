@@ -10,7 +10,7 @@ import { InventoryPlatformOffsaleModal } from "../InventoryPlatformOffsaleModal"
 import { InventoryProfileModal } from "../InventoryProfileModal";
 import { InventoryRebateModal } from "../InventoryRebateModal";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../InventorySaleModal";
-import { OrderDetail } from "../OrderDetail";
+import { OrderDetail } from "../../orders/orderedit";
 import type { InventoryController } from "./useInventoryController";
 
 export function InventoryModals({ controller }: { controller: InventoryController }) {
@@ -26,7 +26,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     executionDetails,
     executionLoading,
     inlineEditId,
-    invEditExtraForm,
+    orderEditExtraForm,
     load,
     onOrdersChanged,
     platformOffsaleTarget,
@@ -158,7 +158,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           eventDrafts={eventDrafts}
           onEventEdit={updateEventDraft}
           employees={employees}
-          extraForm={invEditExtraForm}
+          extraForm={orderEditExtraForm}
           onSave={saveInline}
           onCancel={cancelInlineEdit}
           saving={savingAccount}

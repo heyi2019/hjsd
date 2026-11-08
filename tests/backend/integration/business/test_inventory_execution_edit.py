@@ -42,6 +42,23 @@ def test_inventory_edit_saves_profile_and_amount_together(seeded_client, seeded_
     assert seeded_db.get(OrderEvent, event.id).amount == Decimal("150")
 
 
+def test_inventory_edit_updates_event_timestamp(seeded_client, seeded_db, headers):
+    account = accounts.create_account(seeded_db, game_account="event-time-edit", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = orders.create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    orders.post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
+    seeded_db.commit()
+    event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
+    response = seeded_client.patch(
+        f"/api/v1/stocks/{account.id}/execution-edit",
+        headers=headers,
+        json={"events": [{"id": event.id, "expected_amount": "100.00", "amount": "100.00", "occurred_at": "2026-10-02T11:22:00"}]},
+    )
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    edited = seeded_db.get(OrderEvent, event.id)
+    assert edited.posted_at == datetime(2026, 10, 2, 11, 22, 0)
+
+
 def test_stale_amount_rejects_whole_edit(seeded_client, seeded_db, headers):
     account = accounts.create_account(seeded_db, game_account="stale-before", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = orders.create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

@@ -1,6 +1,6 @@
 import { Card, DatePicker, Input, Segmented, Space, Typography } from "antd";
 import { DataTable, PermissionButton, Select } from "../../shared/ui";
-import { OrderDetail } from "../OrderDetail";
+import { OrderDetail } from "../../orders/orderedit";
 import type { InventoryController } from "./useInventoryController";
 
 export function InventoryLedger({ controller }: { controller: InventoryController }) {
@@ -20,8 +20,10 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     handleExport,
     inventoryType,
     inventoryTypeOptions,
+    inventoryStatus,
+    inventoryStatusOptions,
     inlineEditId,
-    invEditExtraForm,
+    orderEditExtraForm,
     keyword,
     orderedRows,
     page,
@@ -31,6 +33,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     setBusinessMode,
     setGameTypeFilter,
     setInventoryType,
+    setInventoryStatus,
     setPage,
     setPageSize,
     setSortDesc,
@@ -38,6 +41,12 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     exporting,
     editingAccount,
     eventDrafts,
+    timeDrafts,
+    updateTimeDraft,
+    orderDrafts,
+    updateOrderDraft,
+    partyDrafts,
+    updatePartyDraft,
     employees,
     updateEventDraft,
     saveInline,
@@ -86,6 +95,13 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
           ]}
           onChange={(value) => { setInventoryType(value === "all" ? undefined : String(value)); setPage(1); }}
         />
+        <Typography.Text strong>库存状态筛选</Typography.Text>
+        <Segmented
+          aria-label="库存状态筛选"
+          value={inventoryStatus}
+          options={inventoryStatusOptions}
+          onChange={(value) => setInventoryStatus(value as "WAITING" | "SOLD")}
+        />
         <Typography.Text strong>业务筛选</Typography.Text>
         <Segmented
           aria-label="库存业务筛选"
@@ -123,8 +139,14 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
               onEdit={controller.setEditingAccount}
               eventDrafts={eventDrafts}
               onEventEdit={updateEventDraft}
+              timeDrafts={timeDrafts}
+              onTimeEdit={updateTimeDraft}
+              orderDrafts={orderDrafts}
+              onOrderEdit={updateOrderDraft}
+              partyDrafts={partyDrafts}
+              onPartyEdit={updatePartyDraft}
               employees={employees}
-              extraForm={invEditExtraForm}
+              extraForm={orderEditExtraForm}
               onSave={saveInline}
               onCancel={cancelInlineEdit}
               saving={savingAccount}

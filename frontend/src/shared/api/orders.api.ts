@@ -20,6 +20,7 @@ export const orderTypesApi = {
 export interface OrderPatchPayload {
   trade_date?: string;
   form_extra?: Record<string, unknown>;
+  extra_values?: Record<string, unknown>;
   note?: string | null;
   account_snapshot?: {
     game_account: string;
@@ -179,6 +180,8 @@ export const ordersApi = {
     orderId: number,
     payload: { customer_id: number; role: string },
   ) => api.post<Order>(`/orders/${orderId}/customer-roles`, payload).then((r) => r.data),
+  replaceParticipants: (orderId: number, payload: { customer_roles: { customer_id: number; role: string }[]; counterparty_roles: { counterparty_id: number; role: string }[] }) =>
+    api.put<Order>(`/orders/${orderId}/participants`, payload).then((r) => r.data),
   /** 订单编辑（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
   patch: (orderId: number, payload: OrderPatchPayload) =>
     api.patch<Order>(`/orders/${orderId}`, payload).then((r) => r.data),

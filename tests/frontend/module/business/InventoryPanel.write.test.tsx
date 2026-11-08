@@ -5,7 +5,7 @@ import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
 import { InventoryRebateModal } from "@/stocks/InventoryRebateModal";
 import { InventoryConsignmentModal } from "@/stocks/InventoryConsignmentModal";
-import { OrderDetailDeliverySection } from "@/stocks/OrderDetailDeliverySection";
+import { OrderDetailDeliverySection } from "@/orders/orderedit/OrderDetailDeliverySection";
 
 import type { Account } from "@/shared/api/catalog";
 import * as catalog from "@/shared/api/catalog";
@@ -143,6 +143,16 @@ beforeEach(() => {
 });
 
 describe("InventoryPanel：写入与长路径", () => {
+  it("库存中心切换已售状态后仍可进入完整编辑器", async () => {
+    vi.mocked(catalog.stocksApi.list).mockImplementation(async (params) => params?.status === "SOLD" ? [accounts[1]] : [accounts[0]]);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    fireEvent.click(screen.getByText("已售", { selector: ".ant-segmented-item-label" }));
+    expect(await screen.findByText("acc-2")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByText("acc-2").closest("tr") as HTMLElement).getByRole("button", { name: "编辑" }));
+    expect(await screen.findByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
+  });
+
   it("库存编辑通过弹窗保存账号资料", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");

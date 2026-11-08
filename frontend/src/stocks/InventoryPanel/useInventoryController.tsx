@@ -8,7 +8,7 @@ import { isRequestAborted, normalizeError } from "../../shared/api/client";
 import { formatDateTimeMinute, today } from "../../shared/lib/format";
 import { MoneyText, PermissionButton, StatusTag } from "../../shared/ui";
 import { consignmentRecords, type ActiveConsignment } from "../InventoryPlatformOffsaleModal";
-import type { InventoryPartyLink } from "../OrderDetailView";
+import type { InventoryPartyLink } from "../../orders/orderedit";
 import type { InventoryProfileTarget } from "../InventoryProfileModal";
 import type { InventoryCancellationValues } from "../InventoryCancellationDialog";
 import { BUSINESS_MODE_LABEL, INVENTORY_AGE_COLOR, INVENTORY_TYPE_LABEL, isEditableAccountType } from "../inventory-logic";
@@ -19,7 +19,7 @@ import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 import { useSession } from "../../shared/state/session";
 import type { BusinessCenterEntryTab } from "../../orders/businessCenter";
 import { filterInventoryRows, findCancelableBuy, inventoryCellValue, moreMenuItems } from "./helpers";
-import { useAccountExecutionEditor } from "./useAccountExecutionEditor";
+import { useOrderEditor } from "../../orders/orderedit";
 
 // 关键字逐键输入时合并请求：指标不是主流程，200ms 足够跟手。
 const INVENTORY_STATS_DEBOUNCE_MS = 200;
@@ -33,6 +33,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null);
   const [businessMode, setBusinessMode] = useState<string | undefined>(undefined);
   const [inventoryType, setInventoryType] = useState<string | undefined>(undefined);
+  const [inventoryStatus, setInventoryStatus] = useState<"WAITING" | "SOLD">("WAITING");
   const [gameTypeFilter, setGameTypeFilter] = useState<string | undefined>(undefined);
   const [keyword, setKeyword] = useState("");
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
@@ -68,9 +69,9 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     .filter((value): value is string => Boolean(value))))
     .sort((a, b) => a.localeCompare(b, "zh-CN"))
     .map((value) => ({ value, label: value })), [rows]);
-  const load = useCallback(async () => {
+  const load = useCallback(async (requestedStatus: "WAITING" | "SOLD" = inventoryStatus) => {
     try {
-      const list = await stocksApi.list({ status: "WAITING" });
+      const list = await stocksApi.list({ status: requestedStatus });
       const freshIds = new Set((list ?? []).map((row) => row.id));
       locallyRemovedIdsRef.current.forEach((id) => {
         if (!freshIds.has(id)) locallyRemovedIdsRef.current.delete(id);
@@ -80,7 +81,13 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     } catch (err) {
       setError(normalizeError(err));
     }
-  }, []);
+  }, [inventoryStatus]);
+
+  function switchInventoryStatus(status: "WAITING" | "SOLD") {
+    setInventoryStatus(status);
+    setPage(1);
+    void load(status);
+  }
 
   useReloadOnActive(active, load);
 
@@ -113,8 +120,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   }, [expandedAccountIds]);
 
   const inventoryRows = useMemo(
-    () => filterInventoryRows(rows ?? [], { businessMode, gameType: gameTypeFilter }),
-    [rows, businessMode, gameTypeFilter],
+    () => filterInventoryRows(rows ?? [], { businessMode, gameType: gameTypeFilter, status: inventoryStatus }),
+    [rows, businessMode, gameTypeFilter, inventoryStatus],
   );
   const inventoryTypeCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -131,7 +138,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     inventoryType,
     keyword,
     dateRange,
-  }), [inventoryRows, inventoryType, keyword, dateRange]);
+    status: inventoryStatus,
+  }), [inventoryRows, inventoryType, keyword, dateRange, inventoryStatus]);
   // 展示排序：默认最新在前，可切换最旧在前（统计口径不受影响）。
   const orderedRows = useMemo(
     () => [...visibleRows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id)),
@@ -160,7 +168,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     setProfileTarget({ account, mode });
   }
 
-  const accountEditor = useAccountExecutionEditor({
+  const orderEditor = useOrderEditor({
     getExecutionDetail: (accountId) => executionDetails[accountId],
     onSaved: (accountId, detail) => {
       setExecutionDetails((current) => ({ ...current, [accountId]: detail }));
@@ -170,14 +178,14 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   });
 
   async function openEditor(account: Account) {
-    await loadExecution(account);
-    await accountEditor.openEditor(account);
+    const detail = await loadExecution(account);
+    await orderEditor.openEditor(account, detail);
     // 就地展开该行进入内联编辑（不弹窗）。
     expandTo([String(account.id)]);
   }
 
   function cancelInlineEdit() {
-    accountEditor.cancelInlineEdit();
+    orderEditor.cancelInlineEdit();
     setDetailTarget(null);
   }
 
@@ -274,7 +282,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
       await stocksApi.remove(target.id, reason);
       setDeleteTarget(null);
       dropExecutionCache(target.id);
-      if (accountEditor.inlineEditId === target.id) cancelInlineEdit();
+      if (orderEditor.inlineEditId === target.id) cancelInlineEdit();
       expandTo(expandedAccountIds.filter((key) => String(key) !== String(target.id)));
       appMessage.success("账号已删除");
       await load();
@@ -396,7 +404,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
               type="link"
               size="small"
               aria-label="编辑"
-              disabled={accountEditor.editingAccount !== null}
+              disabled={orderEditor.editingAccount !== null}
               onClick={(event) => {
                 event.stopPropagation();
                 openEditor(row);
@@ -447,19 +455,22 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
 
   async function handleExpand(expanded: boolean, row: Account) {
     // 手风琴：一次只展开一行。多行同时展开会各自挂载一份完整明细（3 张子表 + 图片组），DOM 与页面长度随之翻倍。
-    if (!expanded && accountEditor.inlineEditId === row.id) cancelInlineEdit();
+    if (!expanded && orderEditor.inlineEditId === row.id) cancelInlineEdit();
     expandTo(expanded ? [String(row.id)] : []);
     if (expanded) await loadExecution(row);
   }
 
-  async function loadExecution(row: Account, force = false) {
-    if (!force && (executionDetails[row.id] || executionLoading[row.id])) return;
+  async function loadExecution(row: Account, force = false): Promise<AccountExecutionDetail | undefined> {
+    if (!force && executionDetails[row.id]) return executionDetails[row.id];
+    if (!force && executionLoading[row.id]) return undefined;
     setExecutionLoading((current) => ({ ...current, [row.id]: true }));
     try {
       const detail = await stocksApi.executionDetail(row.id);
       setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
+      return detail;
     } catch (err) {
       setError(normalizeError(err));
+      return undefined;
     } finally {
       setExecutionLoading((current) => ({ ...current, [row.id]: false }));
     }
@@ -542,10 +553,16 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     deleting,
     detailTarget,
     dropExecutionCache,
-    editingAccount: accountEditor.editingAccount,
-    employees: accountEditor.employees,
+    editingAccount: orderEditor.editingAccount,
+    employees: orderEditor.employees,
     error,
-    eventDrafts: accountEditor.eventDrafts,
+    eventDrafts: orderEditor.eventDrafts,
+    timeDrafts: orderEditor.timeDrafts,
+    updateTimeDraft: orderEditor.updateTimeDraft,
+    orderDrafts: orderEditor.orderDrafts,
+    updateOrderDraft: orderEditor.updateOrderDraft,
+    partyDrafts: orderEditor.partyDrafts,
+    updatePartyDraft: orderEditor.updatePartyDraft,
     executionDetails,
     executionLoading,
     exporting,
@@ -557,8 +574,13 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     handleMoreAction,
     inventoryType,
     inventoryTypeOptions,
-    inlineEditId: accountEditor.inlineEditId,
-    invEditExtraForm: accountEditor.invEditExtraForm,
+    inventoryStatus,
+    inventoryStatusOptions: [
+      { value: "WAITING", label: "在库" },
+      { value: "SOLD", label: "已售" },
+    ],
+    inlineEditId: orderEditor.inlineEditId,
+    orderEditExtraForm: orderEditor.orderEditExtraForm,
     keyword,
     load,
     loadExecution,
@@ -581,17 +603,18 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     refreshExecution,
     rows,
     saleTarget,
-    savingAccount: accountEditor.savingAccount,
+    savingAccount: orderEditor.savingAccount,
     setBusinessMode,
     setConsignmentTarget,
     setDeleteTarget,
     setDetailTarget,
     setDateRange,
-    setEditingAccount: accountEditor.setEditingAccount,
+    setEditingAccount: orderEditor.setEditingAccount,
     setExecutionDetails,
     setError,
     setGameTypeFilter,
     setInventoryType,
+    setInventoryStatus: switchInventoryStatus,
     setKeyword,
     setPage,
     setPageSize,
@@ -604,13 +627,13 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     setSortDesc,
     sortDesc,
     inventoryStats,
-    updateEventDraft: accountEditor.updateEventDraft,
+    updateEventDraft: orderEditor.updateEventDraft,
     voidForm,
     voidPools,
     voidTarget,
     voiding,
     cancelInlineEdit,
-    saveInline: accountEditor.saveInline,
+    saveInline: orderEditor.saveInline,
     submitDelete,
     submitVoid,
     visibleRows,

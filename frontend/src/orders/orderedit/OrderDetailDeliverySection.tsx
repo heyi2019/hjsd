@@ -1,14 +1,14 @@
-import { Descriptions } from "antd";
+import { Descriptions, Input } from "antd";
 import { useMemo, type ReactNode } from "react";
-import type { Account, AccountExecutionDetail, AccountExecutionOrder, EmployeeOption } from "../shared/api/catalog";
-import { CustomFieldSection } from "../orders/ConfigurableField";
+import type { Account, AccountExecutionDetail, AccountExecutionOrder, EmployeeOption } from "../../shared/api/catalog";
+import { CustomFieldSection } from "../ConfigurableField";
 import {
   buildFormExtraDisplay,
   fieldLabel,
   formatExtraDisplayValue,
   isFieldActive,
   useOrderFormConfig,
-} from "../orders/ConfigurableField";
+} from "../ConfigurableField";
 import {
   InventorySectionHeading,
   findCreationOrder,
@@ -102,12 +102,16 @@ export function OrderDetailDeliverySection({
   detail,
   account,
   employees,
+  onEdit,
+  onOrderEdit,
 }: {
   meta: OrderDetailMeta;
   editing?: boolean;
   detail?: AccountExecutionDetail | null;
   account?: Account | null;
   employees?: EmployeeOption[];
+  onEdit?: (account: Account) => void;
+  onOrderEdit?: (orderId: number, changes: { extra_values?: Record<string, unknown> }) => void;
 }) {
   const creationOrder = useMemo(() => findCreationOrder(detail, meta.sourceOrderNo), [detail, meta.sourceOrderNo]);
   const sellOrder = useMemo(() => findSellOrder(detail, creationOrder), [detail, creationOrder]);
@@ -117,9 +121,46 @@ export function OrderDetailDeliverySection({
   );
 
   if (editing) {
+    const editOrderField = (order: AccountExecutionOrder, key: string, label: string) => (
+      <Descriptions.Item key={`${order.order_id}-${key}`} label={label}>
+        <Input
+          aria-label={`编辑${label}`}
+          defaultValue={String(order.extra_values?.[key] ?? "")}
+          onChange={(event) => onOrderEdit?.(order.order_id, { extra_values: { ...(order.extra_values ?? {}), [key]: event.target.value } })}
+        />
+      </Descriptions.Item>
+    );
+    const editOrderSection = (title: string, order?: AccountExecutionOrder) => order ? (
+      <div className="inventory-detail__meta-group" key={order.order_id}>
+        <div className="inventory-detail__meta-group-title">{title}</div>
+        <Descriptions className="inventory-detail__meta-table" size="small" bordered column={6}>
+          {editOrderField(order, "bound_phone_owner", "手机号绑定人")}
+          {editOrderField(order, "intermediary_platform", "中介平台")}
+          {editOrderField(order, "intermediary_type", "中介类型")}
+          {editOrderField(order, "compensation_type", "包赔类型")}
+          {editOrderField(order, "delivery_responsible_ids", "交付负责人")}
+        </Descriptions>
+      </div>
+    ) : (
+      <div className="inventory-detail__meta-group" key={title}>
+        <div className="inventory-detail__meta-group-title">{title}</div>
+        <span className="inventory-detail__empty">暂无{title}</span>
+      </div>
+    );
     return (
       <div className="inventory-detail__section inventory-detail__section--delivery">
         <InventorySectionHeading title="交付信息" />
+        {account ? <div className="inventory-detail__meta">
+          <div className="inventory-detail__meta-group">
+            <div className="inventory-detail__meta-group-title">账号交付资料</div>
+            <Descriptions className="inventory-detail__meta-table" size="small" bordered column={6}>
+              <Descriptions.Item label="换绑手机号"><Input aria-label="编辑换绑手机号" value={account.bound_phone ?? ""} onChange={(event) => onEdit?.({ ...account, bound_phone: event.target.value })} /></Descriptions.Item>
+              <Descriptions.Item label="交易平台"><Input aria-label="编辑交易平台" value={account.platform ?? ""} onChange={(event) => onEdit?.({ ...account, platform: event.target.value })} /></Descriptions.Item>
+            </Descriptions>
+          </div>
+          {editOrderSection("买号交付", creationOrder)}
+          {editOrderSection("卖号交付", sellOrder)}
+        </div> : null}
         <CustomFieldSection section="DELIVER" testIdSuffix="inv-edit-deliver" />
       </div>
     );

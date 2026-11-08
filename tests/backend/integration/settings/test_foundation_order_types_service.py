@@ -12,6 +12,28 @@ from app.foundation import service
 
 
 class TestOrderTypes:
+    def test_catalog_seed_repairs_empty_sale_payment_options(self, db):
+        db.add(
+            OrderFormField(
+                order_type_code="SALEREC",
+                field_key="payment_method",
+                label="付款方式",
+                field_type="SELECT",
+                options=[],
+            )
+        )
+        db.flush()
+
+        seed_catalog(db, actor="pytest")
+
+        repaired = db.query(OrderFormField).filter_by(
+            order_type_code="SALEREC", field_key="payment_method"
+        ).one()
+        assert repaired.options == [
+            {"value": "FULL", "label": "全款"},
+            {"value": "INSTALLMENT", "label": "分期付款"},
+        ]
+
     def test_catalog_seed_is_idempotent_and_sets_cancel_flow_direction(self, db):
         seed_catalog(db, actor="pytest")
         db.commit()

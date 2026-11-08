@@ -16,8 +16,10 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import NotFound, Validation
 from app.domain.enums import PoolOwnership, PoolStatus, Portion
+from app.domain.trade import Order
 from app.domain.foundation import OrderTypeDef, OrderTypePool
-from app.foundation import seeds, service
+from app.foundation import pools as pools_service, seeds, service
+from app.foundation.seed_orders import seed_order_matrix
 from app.orders import service as order_service
 
 
@@ -105,6 +107,21 @@ class TestPoolGuards:
         # PG 下 cashflow 表恒存在；此处验证「该池无流水时返回 False」（delete_pool 据此放行）
         pool = _pool(seeded_db, "TMPCF")
         assert service._has_cashflow(seeded_db, pool.id) is False
+
+    def test_has_cashflow_returns_false_before_cashflow_table_exists(self, monkeypatch):
+        class Inspector:
+            @staticmethod
+            def has_table(name):
+                assert name == "cashflow"
+                return False
+
+        class SessionWithoutCashflow:
+            @staticmethod
+            def get_bind():
+                return object()
+
+        monkeypatch.setattr(pools_service, "inspect", lambda bind: Inspector())
+        assert pools_service._has_cashflow(SessionWithoutCashflow(), 1) is False
 
 
 class TestOrderTypeGuards:
@@ -418,3 +435,11 @@ class TestFoundationApi:
         )
         assert response.status_code == 200, response.text
         assert response.json()["ownership"] == "CUSTODY"
+
+
+def test_seed_order_matrix_is_idempotent(seeded_orders_db):
+    before = seeded_orders_db.query(Order).count()
+
+    seed_order_matrix(seeded_orders_db)
+
+    assert seeded_orders_db.query(Order).count() == before

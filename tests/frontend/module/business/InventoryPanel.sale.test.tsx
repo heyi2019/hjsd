@@ -278,7 +278,7 @@ it("提号库存售出可选择分期出售，确立时收首付", async () => {
 
     await waitFor(() => expect(vi.mocked(catalog.installmentsApi.create)).toHaveBeenCalledWith(expect.objectContaining({
       order_id: 21,
-      contract_type: "STOCK_SALE",
+      contract_type: "PICKUP_SALE",
       principal: "1200",
       down_payment: "300",
     })));
@@ -302,6 +302,21 @@ it("库存中心不为售出单提供取消入口", async () => {
 });
 
 describe("库存售出三表单分支", () => {
+  it("提号售出不展示第二笔售出金额和资金账户", async () => {
+    renderLight(
+      <PickupSaleModal
+        account={{ ...accounts[0], inventory_type: "PICKUP" }}
+        onClose={() => undefined}
+        onCreated={() => undefined}
+      />,
+      { user: "admin" },
+    );
+
+    expect(await screen.findByText("售出提号账号")).toBeInTheDocument();
+    expect(screen.queryByLabelText("售出金额2")).toBeNull();
+    expect(screen.queryByLabelText("资金账户2")).toBeNull();
+  });
+
   it("回收、提号、代挂三种售出表单都展示统一的交付信息", async () => {
     const deliveryLabels = ["换绑手机号", "手机号绑定人", "交易平台", "中介类型", "包赔类型", "交付负责人"];
     const cases = [

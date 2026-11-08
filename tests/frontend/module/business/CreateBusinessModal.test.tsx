@@ -158,6 +158,16 @@ it("提号建单不渲染客户板块，也不加载客户主数据", async () =
     expect(vi.mocked(catalog.customersApi.list)).not.toHaveBeenCalled();
   });
 
+it("提号建单从合作方主数据选择供货方，不展示来源分类", async () => {
+    await openTypedModal("TH");
+    const field = await screen.findByLabelText("供货合作伙伴");
+    expect(field).toBeInTheDocument();
+    await ui.click(field.closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    expect(await screen.findByText("同行甲", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(screen.queryByText("氪金联盟", { selector: ".ant-select-item-option-content" })).toBeNull();
+    expect(screen.queryByLabelText("供货方来源")).toBeNull();
+  });
+
 it("回收订单渲染已启用的其他补充字段", async () => {
   vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([
     ...allFormFields(),

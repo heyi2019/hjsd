@@ -18,6 +18,11 @@ export interface CollectPaymentInput {
   isConsignment: boolean;
 }
 
+export interface InstallmentPaymentInput extends CollectPaymentInput {
+  /** 分期合同编码：回收库存用 STOCK_SALE，提号售出用 PICKUP_SALE。 */
+  contractType: "STOCK_SALE" | "PICKUP_SALE";
+}
+
 /** 全款收款：登记 SELL 事件，金额作为 PROFIT 份额入账。 */
 export async function collectFullPayment(input: CollectPaymentInput): Promise<void> {
   const { sourceOrderId, values, isConsignment } = input;
@@ -41,9 +46,9 @@ export async function collectFullPayment(input: CollectPaymentInput): Promise<vo
   });
 }
 
-/** 分期收款：建立库存分期出售合同（STOCK_SALE），并在确立时收首付（期次 0）。 */
-export async function collectInstallmentPayment(input: CollectPaymentInput): Promise<void> {
-  const { sourceOrderId, values } = input;
+/** 分期收款：按货源建立对应分期出售合同，并在确立时收首付（期次 0）。 */
+export async function collectInstallmentPayment(input: InstallmentPaymentInput): Promise<void> {
+  const { sourceOrderId, values, contractType } = input;
   const schedule = serializeInstallmentSchedule(
     values.installment_schedule as Array<{ due_on?: unknown }> | undefined,
     (value) => value && typeof value === "object" && "format" in value
@@ -54,8 +59,7 @@ export async function collectInstallmentPayment(input: CollectPaymentInput): Pro
   const installment = await installmentsApi.create({
     order_id: sourceOrderId,
     adjust_final_period: true,
-    // 提号账号进入库存后，分期售出统一按库存分期出售处理（代挂售出仅全款，不在本表单分期）。
-    contract_type: "STOCK_SALE",
+    contract_type: contractType,
     principal: String(values.amount ?? 0),
     down_payment: String(values.down_payment ?? 0),
     service_fee: String(values.service_fee ?? 0),

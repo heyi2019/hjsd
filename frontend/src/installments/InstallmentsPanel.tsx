@@ -1,11 +1,11 @@
 /** 分期：按业务合约类型分列，展示库存分期出售的收款、交付和风险处理。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
-import { Button, Card, DatePicker, Segmented, Space, Typography } from "antd";
+import { Button, Card, Segmented, Space, Typography } from "antd";
 import { useState } from "react";
 import type { Dayjs } from "dayjs";
 import type { Installment, Schedule } from "../shared/api/catalog";
 import { configurableLabel } from "../shared/lib/optionSets";
-import { DataTable, ErrorBanner, StatRow } from "../shared/ui";
+import { DataTable, DateRangeField, ErrorBanner, StatRow } from "../shared/ui";
 import { DISPOSITION_LABEL } from "./InstallmentsPanel.fragments";
 import { useContractTableController } from "./useContractTableController";
 import { ContractModals } from "./InstallmentsPanel.modals";
@@ -64,8 +64,9 @@ function ContractTable({
         className="glass"
         extra={
           <Space size={8}>
-            <DatePicker.RangePicker
-              aria-label="分期日期区间"
+            <DateRangeField
+              ariaLabel="分期日期区间"
+              rangeId="installments-date-range"
               placeholder={["开始日期", "结束日期"]}
               format="YYYY-MM-DD"
               size="small"
@@ -101,7 +102,7 @@ function ContractTable({
           page={1}
           pageSize={Math.max(rows.length, 10)}
           total={rows.length}
-         
+          ariaLabel="分期合约表格"
           emptyText="暂无分期合约"
           onPageChange={() => undefined}
           expandable={{
@@ -119,6 +120,7 @@ function ContractTable({
                     page={1}
                     pageSize={20}
                     total={(schedules[row.id] ?? []).length}
+                    ariaLabel="回款计划表格"
                     onPageChange={() => undefined}
                     emptyText="暂无期次"
                     columns={scheduleColumns}

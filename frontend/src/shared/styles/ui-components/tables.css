@@ -9,6 +9,14 @@
 .ui-datatable .ant-pagination {
   margin-block: var(--space-4) var(--space-1) !important;
 }
+
+/* 业务台账操作多时允许换行，保留每个动作的可点击区域，避免整张表被操作列撑宽。 */
+.orders-row-actions,
+.installment-row-actions {
+  flex-wrap: wrap;
+  max-width: 220px;
+  row-gap: 2px !important;
+}
 /* 业务中心：把默认 Tab / 表格组合收成一个轻量工作面板。 */
 .page-content .page-enter > .ui-stack > .ant-tabs > .ant-tabs-nav {
   margin-block-end: var(--space-3);

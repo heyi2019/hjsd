@@ -74,6 +74,21 @@
   opacity: 0.56;
 }
 
+/* 库存更多操作最多五项，横向排布后可在一行内快速扫读，避免长竖向菜单遮住表格。 */
+:where(.inventory-more-menu) {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+  min-width: 280px;
+  max-width: min(420px, calc(100vw - 32px));
+}
+:where(.inventory-more-menu .ant-dropdown-menu-item) {
+  min-width: 0;
+  justify-content: center;
+  padding-inline: 8px !important;
+  text-align: center;
+  white-space: nowrap;
+}
+
 /* 表头不折行。
    背景：antd 表头默认可折行（实测 computed 为 normal，且全仓无任何规则声明 th 的
    white-space），窄列（如「状态」「操作」）会被压成两行；而项目既有的

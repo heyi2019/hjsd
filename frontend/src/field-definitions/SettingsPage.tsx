@@ -32,6 +32,7 @@ export function SettingsPage() {
   const { can } = useSession();
   const [compact, setCompact] = useState(false);
   const [activeTab, setActiveTab] = useState("business-dictionary");
+  const [configSelectedKey, setConfigSelectedKey] = useState("order-types");
 
   useEffect(() => {
     const media = window.matchMedia?.("(max-width: 960px)");
@@ -43,6 +44,9 @@ export function SettingsPage() {
   }, []);
 
   const renderTab = (key: string): React.ReactElement => {
+    if (key === "config-center") {
+      return <ConfigCenterPanel selectedKey={configSelectedKey} onSelectedChange={setConfigSelectedKey} />;
+    }
     return PANEL_REGISTRY[key]?.(() => {}) ?? null;
   };
 
@@ -57,7 +61,7 @@ export function SettingsPage() {
   // 「配置中心」为容器页签，置于「业务字典」之后。
   const items: TabItem[] = [
     ...standaloneTabs.filter((t) => t.key === "business-dictionary"),
-    { key: "config-center", label: "配置中心", render: () => <ConfigCenterPanel /> },
+    { key: "config-center", label: "配置中心", render: () => renderTab("config-center") },
     ...standaloneTabs.filter((t) => t.key !== "business-dictionary"),
   ];
 

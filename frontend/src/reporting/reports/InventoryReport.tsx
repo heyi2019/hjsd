@@ -16,16 +16,16 @@ export function InventoryReport() {
   const { arrange: arrangeInventoryHealth } = useListViewColumns("RPT_INVENTORY_HEALTH");
   const columns: ColumnsType<InventoryHealthRow> = [
     { title: "游戏账号/产品", dataIndex: "game_account" },
-    { title: "平台", dataIndex: "platform", width: 110 },
+    { title: "平台", dataIndex: "platform", width: 110, render: (v: string | null | undefined) => v || "未填写" },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} /> },
-    { title: "买入", dataIndex: "buy_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "附加成本", dataIndex: "extra_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "买入", dataIndex: "buy_amount", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
+    { title: "附加成本", dataIndex: "extra_cost", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" />},
     {
       title: "占用成本",
 
       dataIndex: "total_cost",
       align: "right",
-      render: (v: string) => <MoneyText value={v} strong />,
+      render: (v: string) => <MoneyText value={v} currency="CNY" strong />,
     },
     {
       title: "持有天数",
@@ -47,10 +47,11 @@ export function InventoryReport() {
       <StatRow
         items={[
           { label: "在库账号", kind: "count", amount: error ? "不可用" : String(data?.items.length ?? 0) },
-          { label: "占用成本合计", amount: error ? "不可用" : data?.total_cost ?? "-" },
+          { label: "占用成本合计", amount: error ? "不可用" : data?.total_cost ?? "-", currency: "CNY" },
         ]}
       />
              <DataTable<InventoryHealthRow>
+         ariaLabel="库存健康表格"
          columns={arrangeInventoryHealth(columns)}
          rows={data?.items ?? []}
          loading={loading}

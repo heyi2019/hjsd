@@ -81,4 +81,18 @@ describe("AuditPanel：审计记录", () => {
     expect(screen.getByText("admin")).toBeInTheDocument();
     expect(screen.queryByText("finance")).toBeNull();
   });
+
+  it("筛选控件和表格都有明确名称，对象编号带对象类型上下文", async () => {
+    vi.mocked(catalog.auditApi.list).mockResolvedValueOnce({
+      items: [{ ...rows[0], entity_id: "43" }],
+      total: 1,
+    });
+    renderLight(<AuditPanel />, { user: "admin" });
+    expect(await screen.findByText("订单 #43")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "对象类型" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "动作" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "对象编号" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "操作人" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "审计记录表格" })).toBeInTheDocument();
+  });
 });

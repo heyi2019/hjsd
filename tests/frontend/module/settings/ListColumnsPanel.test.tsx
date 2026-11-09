@@ -92,6 +92,14 @@ describe("ListColumnsPanel", () => {
     }));
   });
 
+  it("列选择框有中文且带列名上下文", async () => {
+    renderLight(<ListColumnsPanel />);
+    await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());
+
+    expect(screen.getByRole("checkbox", { name: "全选列" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "选择列 对方 / 来源" })).toBeInTheDocument();
+  });
+
   it("隐藏列：提交整表且该列 is_visible=false", async () => {
     renderLight(<ListColumnsPanel />);
     await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());

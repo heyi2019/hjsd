@@ -22,9 +22,17 @@ import "./ConfigCenterPanel.css";
 /** 分组展示顺序：配置中心聚合字段、业务主数据与工作台提醒。 */
 const GROUP_ORDER: ConfigGroupCode[] = ["FIELD", "MASTER", "BUSINESS"];
 
-export function ConfigCenterPanel() {
+export function ConfigCenterPanel(props: {
+  selectedKey?: string;
+  onSelectedChange?: (key: string) => void;
+} = {}) {
   const { can } = useSession();
-  const [selected, setSelected] = useState<string>("order-types");
+  const [localSelected, setLocalSelected] = useState<string>("order-types");
+  const selected = props.selectedKey ?? localSelected;
+  const setSelected = (key: string) => {
+    props.onSelectedChange?.(key);
+    if (!props.onSelectedChange) setLocalSelected(key);
+  };
 
   const groups = GROUP_ORDER.map((code) => ({
     code,

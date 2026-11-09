@@ -171,6 +171,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? COUNTERPARTY_STATUS_OPTIONS} onChange={(value) => setStatusFilter(value)} />
       </Space>
       <DataTable<Counterparty>
+        ariaLabel="往来单位表格"
         columns={columns}
         rows={visibleCounterparties}
         page={1}

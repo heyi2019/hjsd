@@ -17,15 +17,15 @@ export function MonthlyPnl({ range }: { range: ReportRange }) {
   const { arrange: arrangeMonthlyPnl } = useListViewColumns("RPT_MONTHLY_PNL");
   const columns: ColumnsType<MonthlyPnlRow> = [
     { title: "月份", dataIndex: "month", width: 110 },
-    { title: "销售收入", dataIndex: "sales_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "账号直接成本", dataIndex: "account_direct_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
-    { title: "运营费用", dataIndex: "operating_expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "返点收益", dataIndex: "rebate_income", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "销售收入", dataIndex: "sales_income", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
+    { title: "账号直接成本", dataIndex: "account_direct_cost", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" />},
+    { title: "运营费用", dataIndex: "operating_expense", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
+    { title: "返点收益", dataIndex: "rebate_income", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" />},
     {
       title: "经营利润（报表口径）",
       dataIndex: "operating_profit",
       align: "right",
-      render: (v: string) => <MoneyText value={v} tone="auto" strong />,
+      render: (v: string) => <MoneyText value={v} currency="CNY" tone="auto" strong />,
     },
   ];
   return (
@@ -34,11 +34,12 @@ export function MonthlyPnl({ range }: { range: ReportRange }) {
       <Space className="ui-filter-bar">{picker}</Space>
       <StatRow
         items={[
-          { label: "销售收入", amount: data?.total.sales_income ?? "-" },
-          { label: "经营利润（报表口径）", amount: data?.total.operating_profit ?? "-", tone: "auto" },
+          { label: "销售收入", amount: data?.total.sales_income ?? "-", currency: "CNY" },
+          { label: "经营利润（报表口径）", amount: data?.total.operating_profit ?? "-", currency: "CNY", tone: "auto" },
         ]}
       />
              <DataTable<MonthlyPnlRow>
+         ariaLabel="月度损益表格"
          columns={arrangeMonthlyPnl(columns)}
          rows={data?.items ?? []}
          loading={loading}

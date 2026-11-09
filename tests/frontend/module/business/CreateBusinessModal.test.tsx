@@ -313,6 +313,26 @@ it("FE-123：提号供货方下拉只读取 SUPPLIER 合作方主数据", async 
     expect(vi.mocked(catalog.counterpartiesApi.list)).toHaveBeenCalledWith({ type: "SUPPLIER", status: "ACTIVE" });
   });
 
+it("提号可就地新建供货方并自动选中", async () => {
+    vi.mocked(catalog.counterpartiesApi.create).mockResolvedValue({
+      id: 3,
+      counterparty_no: "CP-0002",
+      display_name: "供货方甲",
+      type: "SUPPLIER",
+      status: "ACTIVE",
+    } as never);
+    await openTypedModal("TH");
+    await ui.click(screen.getByRole("button", { name: "新建供货方" }));
+    expect(await screen.findByText("新建供货方", { selector: ".ant-modal-title" })).toBeInTheDocument();
+    await ui.type(screen.getByLabelText("名称"), "供货方甲");
+    await ui.click(screen.getByRole("button", { name: "建档" }));
+    await waitFor(() => expect(catalog.counterpartiesApi.create).toHaveBeenCalledWith(expect.objectContaining({
+      display_name: "供货方甲",
+      type: "SUPPLIER",
+    })));
+    expect(await screen.findByText(/供货方甲（CP-0002）/)).toBeInTheDocument();
+  });
+
 it("订单已创建后不等待列表刷新，提交按钮立即结束 loading", async () => {
     resolveMockOnce(vi.mocked(catalog.ordersApi.create), { id: 31, order_no: "TH-2026-0031", status: "ACTIVE" });
     let resolveRefresh!: () => void;

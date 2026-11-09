@@ -33,6 +33,7 @@ import { DataTable,
   StatRow,
   StatusTag,
   CompactActions, } from "../shared/ui";
+import { DateRangeField } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { DepositSection } from "./FundsPage.tabs";
 import type { FundsPageController } from "./useFundsPageController";
@@ -295,16 +296,17 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       <StatRow
         items={[
           // 失败态一律显示「—」（amount: null），不把未知状态当成可信 0
-          { label: "已入账收入", amount: error ? null : approvedIncome },
-          { label: "已入账支出", amount: error ? null : approvedExpense },
-          { label: "净额", amount: error ? null : netTotal },
+          { label: "已入账收入", amount: error ? null : approvedIncome, currency: "CNY" },
+          { label: "已入账支出", amount: error ? null : approvedExpense, currency: "CNY" },
+          { label: "净额", amount: error ? null : netTotal, currency: "CNY" },
           { label: "笔数", kind: "count", amount: error ? null : flows.length },
         ]}
       />
       <Card className="glass studio-expense-card">
         <div className="ui-filter-bar studio-expense-filters studio-expense-filters--single-row">
-          <DatePicker.RangePicker
-            aria-label="工作室支出日期区间"
+          <DateRangeField
+            ariaLabel="工作室支出日期区间"
+            rangeId="studio-expense-date-range"
             placeholder={["开始日期", "结束日期"]}
             format="YYYY-MM-DD"
             size="small"
@@ -345,6 +347,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
           pageSize={10}
           total={flows.length}
           emptyText="暂无工作室收支"
+          ariaLabel="工作室收支表格"
           loading={loading}
           pagination={error ? false : undefined}
           onPageChange={() => undefined}

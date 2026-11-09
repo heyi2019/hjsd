@@ -26,4 +26,4 @@ export {
   BusinessRegistrationSection,
 } from "./BusinessRegistrationForm";
 export { BusinessRegistrationModal } from "./BusinessRegistrationModal";
-export { DateField, dateValueFromEvent, dateValueProps } from "./DateField";
+export { DateField, DateRangeField, dateValueFromEvent, dateValueProps } from "./DateField";

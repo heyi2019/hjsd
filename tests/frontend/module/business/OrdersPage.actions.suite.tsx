@@ -278,6 +278,14 @@ async function clickModalOk(modal: HTMLElement) {
 
 export function registerOrdersPageFilterTests() {
 describe("OrdersPage：筛选与分期", () => {
+  it("订单台账操作通过描述关联订单编号，并允许紧凑换行", async () => {
+    await openLedger();
+    const row = tableRow("HS-2026-0001");
+    expect(within(row).getByRole("button", { name: "编辑" })).toHaveAttribute("aria-describedby", "order-action-context-1");
+    expect(within(row).getByText("订单 HS-2026-0001")).toHaveClass("ui-visually-hidden");
+    expect(row.querySelector(".orders-row-actions")).toBeTruthy();
+  });
+
   it("类型筛选：切换 Segmented 后仅保留该类型订单", async () => {
     await openLedger();
     fireEvent.click(screen.getByRole("radio", { name: /回收/ }));

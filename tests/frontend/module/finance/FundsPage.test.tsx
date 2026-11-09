@@ -96,6 +96,7 @@ describe("FundsPage：资金池卡片", () => {
     });
     renderLight(<FundsPage />, { user: "admin" });
     expect(await screen.findByRole("alert")).toHaveTextContent("存在负余额资金池");
+    expect(screen.getByText("-5.00")).toHaveClass("ui-money--expense");
   });
 
   it("资金池列表按列表字段配置排序", async () => {

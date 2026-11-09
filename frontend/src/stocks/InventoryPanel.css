@@ -2,6 +2,14 @@
   align-items: center;
 }
 
+.inventory-row-actions {
+  flex-wrap: wrap;
+  white-space: normal;
+  width: 176px;
+  max-width: 176px;
+  row-gap: 2px !important;
+}
+
 /* 库存主表只保留 antd 内容层这一处横向滚动，外层壳不再与它叠加滚动。
  * 这样展开行与表头使用同一条横向坐标，避免左侧字段被旧 scrollLeft 裁掉。 */
 .ui-table-wrap.inventory-table--single-scroll {

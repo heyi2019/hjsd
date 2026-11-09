@@ -9,6 +9,18 @@
   outline-offset: var(--border-w-2);
 }
 
+.ui-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* 侧栏项目已有选中材质，焦点提示内嵌以避免产生额外的框线层级。 */
 .sidebar .nav-item:focus-visible,
 .sidebar .nav-level-two:focus-visible,

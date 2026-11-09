@@ -95,6 +95,17 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     expect(screen.getAllByText("500.00").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("R1 平台空值显示明确占位，不保留空白单元格", async () => {
+    resolveMockOnce(vi.mocked(catalog.reportsApi.inventoryHealth), {
+      generated_on: "2026-10-01",
+      total_cost: "0.00",
+      items: [{ account_id: 9, game_account: "missing-platform", platform: null, status: "IN_STOCK", buy_amount: "1.00", extra_cost: "0.00", total_cost: "1.00", holding_days: 1 }],
+    });
+    renderLight(<ReportsPage />, { user: "admin" });
+    await screen.findByText("missing-platform");
+    expect(screen.getByText("未填写")).toBeInTheDocument();
+  });
+
   it("R1 无数据时显示空态文案", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     expect(await screen.findByText("暂无在库账号")).toBeInTheDocument();

@@ -27,7 +27,7 @@ import "./shared/styles/responsive.css";
 function ThemedApp() {
   const { resolvedMode } = useTheme();
   return (
-    <ConfigProvider locale={zhCN} theme={buildTheme(resolvedMode)}>
+    <ConfigProvider locale={zhCN} button={{ autoInsertSpace: false }} theme={buildTheme(resolvedMode)}>
       <App>
         <AppFeedbackBridge />
         <SessionProvider>

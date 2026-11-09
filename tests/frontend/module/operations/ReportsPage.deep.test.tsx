@@ -50,6 +50,9 @@ async function gotoTab(label: string) {
 
 describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   it("R3 提成对账：渲染人员/订单/费率/应付与差异统计", async () => {
+    vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+      { id: 1, username: "alice", display_name: "小雅", is_active: true },
+    ]);
     resolveMockOnce(vi.mocked(catalog.reportsApi.commission), {
       items: [
         { user_id: 1, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10", payable: "10.00", paid: "5.00", difference: "5.00" },
@@ -59,7 +62,8 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("提成对账 R3");
     await screen.findByText("HS-2026-0010");
-    expect(screen.getByText("0.10")).toBeInTheDocument(); // 费率列
+    expect(await screen.findByText("小雅（alice）")).toBeInTheDocument(); // 人员列
+    expect(screen.getByText("10%")).toBeInTheDocument(); // 费率列
     expect(screen.getByText("应付合计")).toBeInTheDocument(); // StatRow label
     expect(screen.getAllByText("差异").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
   });

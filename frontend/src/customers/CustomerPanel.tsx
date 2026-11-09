@@ -364,6 +364,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
         />
       </Space>
       <DataTable<Customer>
+        ariaLabel="客户档案表格"
         // 移动端隐藏按列 key 绑定，不随「设置 → 列表字段」的过滤/排序而错位。
         columns={markMobileHiddenColumns(arrangeColumns(columns), CUSTOMER_MOBILE_HIDDEN_KEYS)}
         rows={rows ?? []}
@@ -601,6 +602,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
                 />
                 <Typography.Title level={5} className="ui-title-spaced">关联订单</Typography.Title>
                 <DataTable<CustomerBusiness>
+                  ariaLabel="客户业务表格"
                   columns={[
                     { title: "订单", dataIndex: "order_no" },
                     { title: "业务", render: (_value, row) => orderTypeLabel(row.order_type) },
@@ -624,6 +626,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
                />
                 <Typography.Title level={5} className="ui-title-spaced">分期收款</Typography.Title>
                 <DataTable<CustomerInstallment>
+                  ariaLabel="客户分期表格"
                   columns={[
                     { title: "合约", dataIndex: "inst_no" },
                     { title: "订单", dataIndex: "order_no" },

@@ -1,4 +1,5 @@
 /* ── MoneyText ────────────────────────────────────────────── */
+.ui-money--currency-cny::before { content: "¥"; margin-inline-end: 0.1em; }
 .ui-money {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -31,6 +32,9 @@
   color: var(--color-text-secondary);
 }
 .ui-error-banner { margin-block-end: var(--space-3); }
+
+/* 负余额是警示而非删除错误：用深色警示墨保证浅色玻璃底上的 AA 对比度。 */
+.funds-negative-balance-warning { color: var(--warning-ink) !important; }
 
 /* 减少动效偏好：玻璃模糊属于装饰，直接关闭。 */
 @media (prefers-reduced-motion: reduce) {

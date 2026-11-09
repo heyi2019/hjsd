@@ -18,7 +18,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
   checkBackendHealth: vi.fn(),
 }));
 import { renderLight } from "@fixtures/render";
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { SettingsPage } from "@/field-definitions/SettingsPage";
 import { BusinessDictionaryPanel } from "@/field-definitions/panels/BusinessDictionaryPanel";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,6 +49,14 @@ it("业务字典按账号流转、资金动作和账务动作三层结构渲染"
   expect(document.querySelectorAll(".business-dictionary__group").length).toBeGreaterThanOrEqual(3);
   // 动作行数量健康，防止整段误删
   expect(document.querySelectorAll(".business-dictionary__action-line").length).toBeGreaterThan(10);
+});
+
+it("业务字典的平台下架说明使用下架时间，不误写成上架时间", () => {
+  renderLight(<BusinessDictionaryPanel />, { user: "admin" });
+
+  const row = [...document.querySelectorAll(".business-dictionary__action-line")]
+    .find((item) => item.textContent?.includes("平台下架"));
+  expect(row).toHaveTextContent("记录实际下架时间与平台信息；不改变账号库存状态。");
 });
 
 it("业务字典可进入编辑态并保存全员共享内容", async () => {
@@ -104,4 +112,22 @@ it("业务字典展示账号入库规则：未售出禁止重复，已售出允�
   expect(
     screen.getByText("取消模型").compareDocumentPosition(screen.getByText("入库规则")) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
+});
+
+it("业务字典的终态文案带对象上下文，避免三个已取消无法区分", () => {
+  renderLight(<SettingsPage />, { user: "admin" });
+
+  expect(screen.getByText("订单已取消")).toBeInTheDocument();
+  expect(screen.getByText("账号已取消")).toBeInTheDocument();
+  expect(screen.getByText("分期已取消")).toBeInTheDocument();
+});
+
+it("业务字典提供目录锚点，长内容可以直接定位到各主题", () => {
+  renderLight(<SettingsPage />, { user: "admin" });
+
+  const nav = screen.getByRole("navigation", { name: "业务字典目录" });
+  expect(within(nav).getByRole("link", { name: "业务动作" })).toHaveAttribute("href", "#business-dictionary-actions");
+  expect(within(nav).getByRole("link", { name: "状态机" })).toHaveAttribute("href", "#business-dictionary-states");
+  expect(document.getElementById("business-dictionary-actions")).toBeInTheDocument();
+  expect(document.getElementById("business-dictionary-states")).toBeInTheDocument();
 });

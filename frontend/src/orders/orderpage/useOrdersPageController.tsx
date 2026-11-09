@@ -444,13 +444,16 @@ export function useOrdersPageController(params: {
       ellipsis: true,
       render: (_, order) => {
         const canOffsaleConsignment = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
+        const actionContextId = `order-action-context-${order.id}`;
         return (
-          <Space size={2}>
+          <Space className="orders-row-actions" size={2}>
+          <span id={actionContextId} className="ui-visually-hidden">订单 {order.order_no}</span>
           {order.account_id ? (
             <PermissionButton
               permission="order.create"
               type="link"
               size="small"
+              aria-describedby={actionContextId}
               disabled={orderEditor.editingAccount !== null}
               onClick={() => void openAccountEditor(order)}
             >
@@ -462,6 +465,7 @@ export function useOrdersPageController(params: {
               permission="order.event.post"
               type="link"
               size="small"
+              aria-describedby={actionContextId}
               disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
               onClick={() => void openAllocations(order)}
             >分润</PermissionButton>
@@ -469,6 +473,7 @@ export function useOrdersPageController(params: {
               permission="order.event.post"
               type="link"
               size="small"
+              aria-describedby={actionContextId}
               disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
               onClick={() => void openRefund(order)}
             >资金收支</PermissionButton>
@@ -477,6 +482,7 @@ export function useOrdersPageController(params: {
               type="link"
               size="small"
               danger
+              aria-describedby={actionContextId}
               disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
               onClick={() => {
                 if (canOffsaleConsignment) openSystemOffsale();

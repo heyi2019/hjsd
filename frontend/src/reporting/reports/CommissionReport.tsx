@@ -42,18 +42,34 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
   );
   const { arrange: arrangeCommission } = useListViewColumns("RPT_COMMISSION");
   const hasUnassignedRows = (data?.items ?? []).some((row) => row.user_id == null);
+  const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
+  const formatRate = (value: string | number | null | undefined) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "—";
+    const percent = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+    return `${percent.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1")}%`;
+  };
   const columns: ColumnsType<CommissionRow> = [
-    ...(mine ? [] : [{ title: "人员 ID", dataIndex: "user_id", width: 100 }]),
+    ...(mine ? [] : [{
+      title: "人员 ID",
+      dataIndex: "user_id",
+      width: 150,
+      render: (value: number | null | undefined) => {
+        if (value == null) return "未分配";
+        const employee = employeeById.get(value);
+        return employee ? `${employee.display_name}（${employee.username}）` : `人员 #${value}`;
+      },
+    }]),
     { title: "订单号", dataIndex: "order_no", width: 160 },
-    { title: "订单利润基数", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} />},
-    { title: "费率", dataIndex: "rate", align: "right", width: 90},
-    { title: "应付", dataIndex: "payable", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "已付", dataIndex: "paid", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "订单利润基数", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" />},
+    { title: "费率", dataIndex: "rate", align: "right", width: 90, render: (v: string) => formatRate(v) },
+    { title: "应付", dataIndex: "payable", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
+    { title: "已付", dataIndex: "paid", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" />},
     {
       title: "差异",
       dataIndex: "difference",
       align: "right",
-      render: (v: string) => <MoneyText value={v} tone="auto" strong />,
+      render: (v: string) => <MoneyText value={v} currency="CNY" tone="auto" strong />,
     },
   ];
   return (
@@ -83,13 +99,14 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
       <StatRow
         items={[
           { label: mine ? "收益订单数" : "订单数", kind: "count", amount: String(data?.total.order_count ?? 0) },
-          { label: mine ? "我的收益" : "分润基数", amount: data?.total.profit_base ?? "-" },
-          { label: "应付合计", amount: data?.total.payable ?? "-" },
-          { label: "已付合计", amount: data?.total.paid ?? "-" },
-          { label: "差异", amount: data?.total.difference ?? "-", tone: "auto" },
+          { label: mine ? "我的收益" : "分润基数", amount: data?.total.profit_base ?? "-", currency: "CNY" },
+          { label: "应付合计", amount: data?.total.payable ?? "-", currency: "CNY" },
+          { label: "已付合计", amount: data?.total.paid ?? "-", currency: "CNY" },
+          { label: "差异", amount: data?.total.difference ?? "-", currency: "CNY", tone: "auto" },
         ]}
       />
              <DataTable<CommissionRow>
+         ariaLabel={mine ? "我的收益表格" : "提成对账表格"}
          columns={arrangeCommission(columns)}
          rows={data?.items ?? []}
          loading={loading}

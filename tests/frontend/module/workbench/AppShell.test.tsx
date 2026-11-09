@@ -101,6 +101,22 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
     expect(nav.querySelectorAll(".nav-item").length).toBe(navigation.length);
   });
 
+  it("移动端底部入口顺序为业务、客户、工作台、资金、管理", async () => {
+    await renderShell();
+    const nav = screen.getByRole("navigation", { name: "主导航" });
+
+    expect(
+      [...nav.querySelectorAll<HTMLElement>("[data-mobile-order]")]
+        .map((item) => item.dataset.mobileOrder)
+        .sort(),
+    ).toEqual(["1", "2", "3", "4", "5"]);
+    expect(nav.querySelector('[data-nav-key="business"]')).toHaveAttribute("data-mobile-order", "1");
+    expect(nav.querySelector('[data-nav-key="customers"]')).toHaveAttribute("data-mobile-order", "2");
+    expect(nav.querySelector('[data-nav-key="dashboard"]')).toHaveAttribute("data-mobile-order", "3");
+    expect(nav.querySelector('[data-nav-key="funds"]')).toHaveAttribute("data-mobile-order", "4");
+    expect(nav.querySelector(".mobile-more-button")).toHaveAttribute("data-mobile-order", "5");
+  });
+
   it("默认落工作台，标题区显示当前页名", async () => {
     await renderShell();
     expect(document.querySelector(".topbar__page")?.textContent).toBe("工作台");

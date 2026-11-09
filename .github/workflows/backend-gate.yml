@@ -2,7 +2,9 @@ name: backend-gate
 
 on:
   push:
-    branches: [main, master, test]
+    # coverage-gate 已在 test 上运行同一套完整后端测试；这里保留 main/PR 反馈，
+    # 避免一次 test 推送重复跑两套 90 秒级后端回归。
+    branches: [main, master]
     paths:
       - "backend/**"
       - ".github/workflows/backend-gate.yml"

@@ -205,7 +205,7 @@ export function AppShell() {
                   aria-pressed={mode === "light"}
                   onClick={() => setMode("light")}
                 >
-                  浅色
+                  浅色（默认）
                 </button>
                 <button
                   type="button"

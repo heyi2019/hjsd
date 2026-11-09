@@ -40,3 +40,26 @@ describe("AppearancePanel：玻璃材质透明度滑桿", () => {
     expect(screen.getByText(/强制为不透明实底/)).toBeInTheDocument();
   });
 });
+
+describe("AppearancePanel：默认浅色主题", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("未保存主题偏好时默认选中浅色", () => {
+    renderApp(<AppearancePanel />);
+
+    expect(screen.getByRole("radiogroup", { name: "界面主题" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "浅色（默认）" })).toBeChecked();
+  });
+
+  it("在外观设置中切换主题并持久化选择", () => {
+    renderApp(<AppearancePanel />);
+
+    fireEvent.click(screen.getByRole("radio", { name: "深色" }));
+    expect(localStorage.getItem("heijin-theme-mode")).toBe("dark");
+
+    fireEvent.click(screen.getByRole("radio", { name: "浅色（默认）" }));
+    expect(localStorage.getItem("heijin-theme-mode")).toBe("light");
+  });
+});

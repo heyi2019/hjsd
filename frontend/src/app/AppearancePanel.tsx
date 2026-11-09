@@ -2,7 +2,7 @@
  * 外观设置：玻璃材质透明度（iOS 27 透明度滑桿口径）。
  * 单一系数驱动全站玻璃，实时预览，无需刷新。
  */
-import { Card, Slider, Typography } from "antd";
+import { Card, Radio, Slider, Typography } from "antd";
 import {
   GLASS_DEFAULT,
   GLASS_MAX,
@@ -10,12 +10,23 @@ import {
   GLASS_STEP,
   useGlass,
 } from "../shared/state/glass";
+import { useTheme } from "../shared/state/theme";
 
 export function AppearancePanel() {
   const { alpha, setAlpha, reduced } = useGlass();
+  const { mode, setMode } = useTheme();
 
   return (
     <div className="ui-stack">
+      <Card className="glass" title="界面主题">
+        <div role="radiogroup" aria-label="界面主题">
+          <Radio.Group value={mode} onChange={(event) => setMode(event.target.value)}>
+            <Radio value="light">浅色（默认）</Radio>
+            <Radio value="system">跟随系统</Radio>
+            <Radio value="dark">深色</Radio>
+          </Radio.Group>
+        </div>
+      </Card>
       <Card className="glass" title="玻璃材质透明度">
         <div className="ui-stack">
           <Slider

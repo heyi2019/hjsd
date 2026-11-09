@@ -1,6 +1,6 @@
 import { appMessage } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
-import { Form } from "antd";
+import { Form, Input, Modal } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection } from "./ConfigurableField";
 import {
@@ -64,6 +64,9 @@ export function CreateBusinessModal(props: {
   const repurchaseConfirmedFor = useRef<string | null>(null);
   const [repurchasePrompt, setRepurchasePrompt] = useState<{ values: Record<string, unknown>; gameAccount: string } | null>(null);
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
+  const [supplierCreateOpen, setSupplierCreateOpen] = useState(false);
+  const [supplierSubmitting, setSupplierSubmitting] = useState(false);
+  const [supplierForm] = Form.useForm();
   const initialValuesRef = useRef<Record<string, unknown>>({});
   const { totalRecoveryCost } = useRecoveryFormState(form);
   const customersByName = useMemo(() => {
@@ -303,6 +306,27 @@ export function CreateBusinessModal(props: {
     }
   };
 
+  const createSupplier = async (values: Record<string, unknown>) => {
+    setSupplierSubmitting(true);
+    try {
+      const supplier = await counterpartiesApi.create({
+        display_name: String(values.display_name ?? "").trim(),
+        type: "SUPPLIER",
+        contact_name: values.contact_name as string,
+        phone: values.phone as string,
+      });
+      setCounterparties((items) => [...items, supplier]);
+      form.setFieldValue("supplier_counterparty_id", supplier.id);
+      supplierForm.resetFields();
+      setSupplierCreateOpen(false);
+      appMessage.success("供货方已建档");
+    } catch (error) {
+      setLoadError(normalizeError(error));
+    } finally {
+      setSupplierSubmitting(false);
+    }
+  };
+
   return (
     <>
     <BusinessActionModal
@@ -354,13 +378,45 @@ export function CreateBusinessModal(props: {
           <SectionLabelsContext.Provider value={labels}>
             {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes} employees={employees} businessResponsibleLabel="回收负责人" showIntermediaryDelivery accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
               <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} financeExtras={<CustomFieldSection section="FINANCE" testIdSuffix="finance" />} />
-            </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} counterparties={counterparties} gameTypes={gameTypes} employees={employees} /> : <DgOrderSection gameTypes={gameTypes} employees={employees} />}
+            </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} counterparties={counterparties} gameTypes={gameTypes} employees={employees} onCreateSupplier={() => setSupplierCreateOpen(true)} /> : <DgOrderSection gameTypes={gameTypes} employees={employees} />}
             {isRecovery ? <RecoveryCustomerSection customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
             <CustomFieldSection section="EXTRA" testIdSuffix="extra" />
           </SectionLabelsContext.Provider>
         </FieldConfigContext.Provider>
       </BusinessRegistrationForm>
     </BusinessActionModal>
+    <Modal
+      title="新建供货方"
+      open={supplierCreateOpen}
+      destroyOnHidden
+      onCancel={() => {
+        setSupplierCreateOpen(false);
+        supplierForm.resetFields();
+      }}
+      onOk={() => supplierForm.submit()}
+      okText="建档"
+      cancelText="取消"
+      confirmLoading={supplierSubmitting}
+    >
+      <BusinessRegistrationForm
+        layout="horizontal"
+        labelAlign="left"
+        labelCol={{ flex: "88px" }}
+        wrapperCol={{ flex: "auto" }}
+        form={supplierForm}
+        onFinish={createSupplier}
+      >
+        <Form.Item name="display_name" label="名称" rules={[{ required: true, message: "请输入供货方名称" }]}>
+          <Input />
+        </Form.Item>
+        <Form.Item name="contact_name" label="联系人">
+          <Input />
+        </Form.Item>
+        <Form.Item name="phone" label="手机号">
+          <Input />
+        </Form.Item>
+      </BusinessRegistrationForm>
+    </Modal>
     {/* 确认框必须渲染在业务弹窗「外侧」（与它同级），不能作为其 children。
         嵌在 children 里时，主弹窗一旦 open=false，嵌套 Modal 的关闭渲染会被跳过：
         DOM 卡在可见状态，而 state 已是 false —— 之后点 X / 取消 都是幂等 setState，

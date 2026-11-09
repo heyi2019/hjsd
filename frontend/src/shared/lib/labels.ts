@@ -49,8 +49,8 @@ export const LINK_STATUS_LABEL: Record<string, string> = {
 };
 
 export const COUNTERPARTY_TYPE_LABEL: Record<string, string> = {
-  PEER: "同行",
-  SUPPLIER: "供货方",
+  PEER: "合作伙伴",
+  SUPPLIER: "合作伙伴",
   PLATFORM: "平台",
 };
 
@@ -70,8 +70,8 @@ export const PERMISSION_LABEL: Record<string, string> = {
   "customer.update": "编辑客户",
   "customer.contact.write": "维护客户联系人",
   "customer.merge": "合并客户",
-  "counterparty.read": "查看合作方",
-  "counterparty.manage": "管理合作方",
+  "counterparty.read": "查看合作伙伴",
+  "counterparty.manage": "管理合作伙伴",
   "order.create": "新建订单",
   "order.update": "编辑订单",
   "order.event.post": "登记订单事件",
@@ -104,7 +104,7 @@ export const ENTITY_TYPE_LABEL: Record<string, string> = {
   pool: "资金池",
   cashflow: "资金流水",
   lead: "需求",
-  counterparty: "合作方",
+  counterparty: "合作伙伴",
 };
 
 export const FIELD_TYPE_LABEL: Record<string, string> = {

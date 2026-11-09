@@ -77,7 +77,7 @@ export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
 
 export const EVENT_TYPE_LABEL: Record<string, string> = {
   BUY: "买号",
-  COST: "附加成本",
+  COST: "费用支出",
   SELL: "售出",
   PAYMENT: "回款（分期）",
   DELIVER: "交付",

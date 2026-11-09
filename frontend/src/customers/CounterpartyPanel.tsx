@@ -17,12 +17,14 @@ const COUNTERPARTY_STATUS_OPTIONS = [
   { value: "DISABLED", label: "已拉黑" },
 ];
 
-// 类型词典不可用时回落的只读集合：保证默认类型 PEER 始终是带名称的 selected option，
-// 避免出现"控件外游离文本 PEER"。来源与 COUNTERPARTY_TYPE_LABEL 一致（含 PEER/SUPPLIER/PLATFORM 等）。
-const COUNTERPARTY_TYPE_FALLBACK = Object.entries(COUNTERPARTY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
+// 类型词典不可用时回落的只读集合；PEER 仅为历史兼容值，不再作为新档案类型展示。
+const COUNTERPARTY_TYPE_FALLBACK = Object.entries(COUNTERPARTY_TYPE_LABEL)
+  .filter(([value]) => value !== "PEER")
+  .map(([value, label]) => ({ value, label }));
 
 export function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
-  const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
+  const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE")
+    ?.filter((item) => item.value !== "PEER");
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [rows, setRows] = useState<Counterparty[]>([]);
@@ -45,7 +47,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
     }
   }, []);
 
-  // 提号建单会自动建档供货方，重新激活时重拉避免列表过期。
+  // 提号建单会自动建档合作伙伴，重新激活时重拉避免列表过期。
   useReloadOnActive(active, load);
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         note: (values.note as string) || null,
         extra_values: collectExtras(values, fieldDefs),
       });
-      appMessage.success("合作方已建档");
+      appMessage.success("合作伙伴已建档");
       setOpen(false);
       form.resetFields();
       await load();
@@ -109,7 +111,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         note: (values.note as string) || null,
         extra_values: collectExtras(values, fieldDefs),
       });
-      appMessage.success("合作方已更新");
+      appMessage.success("合作伙伴已更新");
       setEditTarget(null);
       editForm.resetFields();
       await load();
@@ -136,14 +138,14 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
           <ConfirmButton
             permission="counterparty.manage"
             size="small"
-            title={row.status === "ACTIVE" ? "拉黑该合作方" : "解除拉黑"}
+            title={row.status === "ACTIVE" ? "拉黑该合作伙伴" : "解除拉黑"}
             description={row.status === "ACTIVE"
               ? "拉黑后不可作为新订单对手方；有历史参与关系的仅可拉黑，不可删除。"
               : "解除后可重新作为新订单对手方。"}
             danger={row.status === "ACTIVE"}
             onConfirm={async () => {
               await counterpartiesApi.setStatus(row.id, row.status !== "ACTIVE");
-              appMessage.success(row.status === "ACTIVE" ? "合作方已拉黑，历史关系保留" : "合作方已解除拉黑");
+              appMessage.success(row.status === "ACTIVE" ? "合作伙伴已拉黑，历史关系保留" : "合作伙伴已解除拉黑");
               await load();
             }}
           >
@@ -159,16 +161,16 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
   return (
     <Card
       className="glass"
-      title="合作方"
+      title="合作伙伴"
       extra={
         <PermissionButton permission="counterparty.manage" type="primary" disabled={Boolean(error) || !counterpartyTypeOptions} onClick={() => setOpen(true)}>
-          新建合作方
+          新建合作伙伴
         </PermissionButton>
       }
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Space wrap className="counterparty-filter-bar">
-        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? COUNTERPARTY_STATUS_OPTIONS} onChange={(value) => setStatusFilter(value)} />
+        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作伙伴状态" value={statusFilter} options={counterpartyStatusOptions ?? COUNTERPARTY_STATUS_OPTIONS} onChange={(value) => setStatusFilter(value)} />
       </Space>
       <DataTable<Counterparty>
         ariaLabel="往来单位表格"
@@ -177,16 +179,16 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         page={1}
         pageSize={10}
         total={visibleCounterparties.length}
-        emptyText="暂无合作方"
+        emptyText="暂无合作伙伴"
         onPageChange={() => undefined}
      />
-      <BusinessActionModal title="新建合作方" fieldCount={5} open={open} onCancel={() => setOpen(false)} footer={null}>
+      <BusinessActionModal title="新建合作伙伴" fieldCount={5} open={open} onCancel={() => setOpen(false)} footer={null}>
         <FieldConfigScope scope="COUNTERPARTY" active={open}>
         <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
-          wrapperCol={{ flex: "auto" }} scope="COUNTERPARTY" form={form} colon={false} className="form-no-colon" onFinish={submit} initialValues={{ type: "PEER" }}>
+          wrapperCol={{ flex: "auto" }} scope="COUNTERPARTY" form={form} colon={false} className="form-no-colon" onFinish={submit} initialValues={{ type: "SUPPLIER" }}>
           <CfgItem name="display_name" label="名称" rules={[{ required: true }]}>
             <Input />
           </CfgItem>
@@ -211,7 +213,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
       </BusinessActionModal>
 
       <BusinessActionModal
-        title={editTarget ? `编辑合作方 · ${editTarget.counterparty_no}` : "编辑合作方"}
+        title={editTarget ? `编辑合作伙伴 · ${editTarget.counterparty_no}` : "编辑合作伙伴"}
         fieldCount={6}
         open={Boolean(editTarget)}
         onCancel={() => {
@@ -274,7 +276,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
       </BusinessActionModal>
 
       <Drawer
-        title={detailTarget ? `合作方档案 · ${detailTarget.counterparty_no}` : "合作方档案"}
+        title={detailTarget ? `合作伙伴档案 · ${detailTarget.counterparty_no}` : "合作伙伴档案"}
         open={Boolean(detailTarget)}
         onClose={() => {
           setDetailTarget(null);
@@ -298,10 +300,10 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         }
       >
         {detailLoading ? (
-          <div role="status" aria-label="正在加载合作方详情"><Spin /></div>
+          <div role="status" aria-label="正在加载合作伙伴详情"><Spin /></div>
         ) : detailData ? (
           <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="合作方编号">{detailData.counterparty_no}</Descriptions.Item>
+            <Descriptions.Item label="合作伙伴编号">{detailData.counterparty_no}</Descriptions.Item>
             <Descriptions.Item label="名称">{detailData.display_name}</Descriptions.Item>
             <Descriptions.Item label="类型">{COUNTERPARTY_TYPE_LABEL[detailData.type] ?? detailData.type}</Descriptions.Item>
             <Descriptions.Item label="联系人">{detailData.contact_name || "-"}</Descriptions.Item>

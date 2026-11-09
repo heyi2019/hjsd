@@ -101,7 +101,10 @@ export function useOrdersPageController(params: {
   const handleLedgerExpand = (expanded: boolean, record: Order) => {
     // 手风琴：一次只展开一行，避免多行展开同时挂载多份详情导致 DOM 与页面长度翻倍。
     setExpandedOrderIds(expanded ? [String(record.id)] : []);
-    if (expanded && record.account_id) void loadLedgerDetail(record.account_id);
+    if (expanded) {
+      void orderEditor.ensureEmployees();
+      if (record.account_id) void loadLedgerDetail(record.account_id);
+    }
   };
   const [cancelOrderTarget, setCancelOrderTarget] = useState<Order | null>(null);
   const [cancelInstallmentTarget, setCancelInstallmentTarget] = useState<Installment | null>(null);

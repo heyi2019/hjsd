@@ -180,6 +180,34 @@ def test_order_list_payload_includes_inventory_and_sale_responsibility_timestamp
     assert row["sale_at"] == datetime(2026, 10, 4, 0, 0, 0)
     assert row["sale_operator"] == "sale-user"
 
+
+def test_order_list_payload_does_not_add_buy_cost_to_sale_amount(seeded_db):
+    order = _order(seeded_db)
+    order_service.post_event(
+        seeded_db,
+        order.id,
+        event_type="BUY",
+        amount="1000.00",
+        occurred_on=D,
+        actor="inventory-user",
+        pool_id=1,
+    )
+    order_service.post_event(
+        seeded_db,
+        order.id,
+        event_type="SELL",
+        amount="1500.00",
+        occurred_on=D,
+        actor="sale-user",
+        pool_id=2,
+    )
+
+    row = _order_list_payload(seeded_db, [order])[0]
+
+    assert row["event_total"] == Decimal("1500.00")
+    assert row["cost_amount"] == Decimal("1000.00")
+    assert row["profit_base"] == Decimal("500.00")
+
 def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_engine, headers, monkeypatch):
     from fastapi.testclient import TestClient
     from sqlalchemy.orm import sessionmaker

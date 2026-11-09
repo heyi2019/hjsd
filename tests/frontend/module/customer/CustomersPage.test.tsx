@@ -39,7 +39,7 @@ const counterparties = [
   {
     id: 11,
     counterparty_no: "CP-0001",
-    display_name: "同行甲",
+    display_name: "合作伙伴甲",
     type: "PEER",
     contact_name: "李经理",
     phone: "136****6666",
@@ -99,11 +99,11 @@ describe("CustomersPage：客户档案", () => {
     expect(await screen.findByText("客户档案 · CUS-0001")).toBeInTheDocument();
   });
 
-  it("从客户中心深链参数打开指定合作方卡片", async () => {
+  it("从客户中心深链参数打开指定合作伙伴卡片", async () => {
     vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue(counterparties);
     vi.mocked(catalog.counterpartiesApi.get).mockResolvedValue(counterparties[0]);
     renderLight(<CustomersPage focusCounterpartyId={11} />);
-    expect(await screen.findByText("合作方档案 · CP-0001")).toBeInTheDocument();
+    expect(await screen.findByText("合作伙伴档案 · CP-0001")).toBeInTheDocument();
   });
 
   it("加载成功后渲染客户编号与状态标签", async () => {
@@ -145,14 +145,14 @@ describe("CustomersPage：客户档案", () => {
     expect(await screen.findByText(/联系管理员/)).toBeInTheDocument();
   });
 
-  it("客户与合作方分 Tab，不混用（CUS-01）", async () => {
+  it("客户与合作伙伴分 Tab，不混用（CUS-01）", async () => {
     renderLight(<CustomersPage />);
     await screen.findByText("CUS-0001");
     expect(screen.getByRole("tab", { name: "客户档案" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /合作方/ })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /合作伙伴/ })).toBeInTheDocument();
   });
 
-  it("新建客户与合作方分别加载各自的表单字段配置", async () => {
+  it("新建客户与合作伙伴分别加载各自的表单字段配置", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(catalog.orderFormFieldsApi.list).mockImplementation(async (scope) => (
       scope === "CUSTOMER"
@@ -167,20 +167,20 @@ describe("CustomersPage：客户档案", () => {
     expect(screen.getByLabelText("客户称呼")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Close" }));
-    await user.click(screen.getByRole("tab", { name: /合作方/ }));
-    await user.click((await screen.findByRole("button", { name: /新建合作方$/ })));
+    await user.click(screen.getByRole("tab", { name: /合作伙伴/ }));
+    await user.click((await screen.findByRole("button", { name: /新建合作伙伴$/ })));
     await waitFor(() => expect(catalog.orderFormFieldsApi.list).toHaveBeenCalledWith("COUNTERPARTY", true));
     expect(screen.getByLabelText("合作类型")).toBeInTheDocument();
   });
 
-  it("合作方复用客户的详情、编辑和拉黑操作", async () => {
+  it("合作伙伴复用客户的详情、编辑和拉黑操作", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue(counterparties);
     vi.mocked(catalog.counterpartiesApi.get).mockResolvedValue(counterparties[0]);
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
 
-    await user.click(screen.getByRole("tab", { name: /合作方/ }));
+    await user.click(screen.getByRole("tab", { name: /合作伙伴/ }));
     const panel = await screen.findByRole("tabpanel");
     expect(within(panel).getByText("CP-0001")).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: /详情/ })).toBeInTheDocument();
@@ -189,7 +189,7 @@ describe("CustomersPage：客户档案", () => {
 
     await user.click(within(panel).getByRole("button", { name: /详情/ }));
     const drawer = await screen.findByRole("dialog");
-    expect(within(drawer).getByText("合作方档案 · CP-0001")).toBeInTheDocument();
+    expect(within(drawer).getByText("合作伙伴档案 · CP-0001")).toBeInTheDocument();
     expect(within(drawer).getByRole("button", { name: /编辑/ })).toBeInTheDocument();
   });
 
@@ -301,7 +301,7 @@ describe("CustomersPage：行内动作", () => {
     { id: 3, customer_no: "CUS-0003", display_name: "王五", contact_name: "", phone: "", wechat: "", qq: "", status: "DISABLED", note: "", extra_values: {} },
   ];
   const counterparties = [
-    { id: 11, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", contact_name: "李经理", phone: "136", wechat: "peer_a", qq: "20001", status: "ACTIVE" },
+    { id: 11, counterparty_no: "CP-0001", display_name: "合作伙伴甲", type: "PEER", contact_name: "李经理", phone: "136", wechat: "peer_a", qq: "20001", status: "ACTIVE" },
   ];
   const detail = {
     customer: customers[0],
@@ -321,7 +321,18 @@ describe("CustomersPage：行内动作", () => {
     vi.mocked(catalog.counterpartiesApi.get).mockResolvedValue(counterparties[0] as unknown as never);
   });
 
-  describe("CustomersPage：客户与合作方操作流", () => {
+  describe("CustomersPage：客户与合作伙伴操作流", () => {
+    it("合作伙伴建档不再提供同行类型", async () => {
+      renderLight(<CustomersPage />, { user: "admin" });
+      await screen.findByText("CUS-0001");
+      await ui.click(screen.getByRole("tab", { name: /合作伙伴/ }));
+      const panel = await screen.findByRole("tabpanel");
+      await ui.click(within(panel).getByRole("button", { name: /新建合作伙伴/ }));
+      const modal = await screen.findByRole("dialog");
+      await ui.click(within(modal).getByLabelText("类型").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+      expect(screen.queryByText("同行", { selector: ".ant-select-item-option-content" })).toBeNull();
+    });
+
     it("拉黑 ACTIVE 客户：确认后调用 setStatus(DISABLED) 并提示", async () => {
       renderLight(<CustomersPage />, { user: "admin" });
       await screen.findByText("CUS-0001");
@@ -366,26 +377,26 @@ describe("CustomersPage：行内动作", () => {
       expect(payload.display_name).toBe("张三新");
     });
 
-    it("合作方编辑提交：修改名称后调用 counterpartiesApi.patch", async () => {
+    it("合作伙伴编辑提交：修改名称后调用 counterpartiesApi.patch", async () => {
       renderLight(<CustomersPage />, { user: "admin" });
       await screen.findByText("CUS-0001");
-      await ui.click(screen.getByRole("tab", { name: /合作方/ }));
+      await ui.click(screen.getByRole("tab", { name: /合作伙伴/ }));
       const panel = await screen.findByRole("tabpanel");
       await ui.click(within(panel).getByRole("button", { name: /编\s*辑/ }));
-      await screen.findByText("编辑合作方 · CP-0001");
+      await screen.findByText("编辑合作伙伴 · CP-0001");
       await ui.clear(screen.getByLabelText("名称"));
-      await ui.type(screen.getByLabelText("名称"), "同行甲新");
+      await ui.type(screen.getByLabelText("名称"), "合作伙伴甲新");
       await ui.click(screen.getByRole("button", { name: /保\s*存/ }));
       await waitFor(() => expect(vi.mocked(catalog.counterpartiesApi.patch)).toHaveBeenCalled());
       const [id, payload] = vi.mocked(catalog.counterpartiesApi.patch).mock.calls[0] as [number, Record<string, unknown>];
       expect(id).toBe(11);
-      expect(payload.display_name).toBe("同行甲新");
+      expect(payload.display_name).toBe("合作伙伴甲新");
     });
 
-    it("FE-259：合作方拉黑使用后端 active 语义并调用状态接口", async () => {
+    it("FE-259：合作伙伴拉黑使用后端 active 语义并调用状态接口", async () => {
       renderLight(<CustomersPage />, { user: "admin" });
       await screen.findByText("CUS-0001");
-      await ui.click(screen.getByRole("tab", { name: /合作方/ }));
+      await ui.click(screen.getByRole("tab", { name: /合作伙伴/ }));
       const panel = await screen.findByRole("tabpanel");
       await ui.click(within(panel).getByRole("button", { name: /拉\s*黑/ }));
       const confirm = await screen.findByRole("button", { name: /确\s*定|确\s*认/ });

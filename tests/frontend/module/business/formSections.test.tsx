@@ -1,4 +1,4 @@
-/** 订单表单小组件：客户来源与附加费用（中介费/支出行）字段路径。 */
+/** 订单表单小组件：客户来源与资金支出明细字段路径。 */
 import { useState } from "react";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { Button, Form, type FormInstance } from "antd";
 import { renderLight } from "@fixtures/render";
 import { CustomerSourceFields } from "@/orders/CustomerSourceInput";
-import { AdditionalFeeFields } from "@/orders/AdditionalFeeFields";
+import { ExpenseDetails } from "@/orders/ExpenseDetails";
 
 describe("CustomerSourceFields：客户来源校验文案", () => {
   function Harness() {
@@ -42,8 +42,8 @@ describe("CustomerSourceFields：客户来源校验文案", () => {
   });
 });
 
-/** 回归锁：中介费是顶层表单字段，不能放进 Form.List 内部；资金账户由父级主金额字段统一提供。 */
-describe("AdditionalFeeFields：中介费字段路径", () => {
+/** 回归锁：资金支出明细与主金额位于同一个蓝色资金明细组，且不再暴露附加费用概念。 */
+describe("ExpenseDetails：资金支出明细位置", () => {
   let ui: ReturnType<typeof userEvent.setup>;
 
   function renderFeeForm() {
@@ -53,7 +53,9 @@ describe("AdditionalFeeFields：中介费字段路径", () => {
       formRef = form;
       return (
         <Form form={form}>
-          <AdditionalFeeFields />
+          <ExpenseDetails>
+            <div data-testid="primary-finance-field">主金额</div>
+          </ExpenseDetails>
         </Form>
       );
     }
@@ -65,22 +67,19 @@ describe("AdditionalFeeFields：中介费字段路径", () => {
     ui = userEvent.setup({ pointerEventsCheck: 0 });
   });
 
-  it("中介费写入顶层字段，不污染 expense_items 数组", async () => {
+  it("不再渲染附加费用或中介费输入", () => {
     const { getForm } = renderFeeForm();
-    const feeInput = screen.getByPlaceholderText("金额");
-    await ui.type(feeInput, "500");
-
-    // 顶层字段能读到（修复前此处为 undefined，因为值被塞进了 expense_items.intermediary_fee）
-    expect(getForm().getFieldValue("intermediary_fee")).toBe("500");
-
-    // 数组字段不得被混入对象属性而变成混合结构
-    const expenseItems = getForm().getFieldValue("expense_items");
-    expect(expenseItems == null || Array.isArray(expenseItems)).toBe(true);
-    expect({}.hasOwnProperty.call(expenseItems ?? {}, "intermediary_fee")).toBe(false);
+    expect(screen.queryByText("附加费用")).not.toBeInTheDocument();
+    expect(screen.queryByText("中介费")).not.toBeInTheDocument();
+    expect(screen.getByTestId("primary-finance-field")).toBeInTheDocument();
+    expect(getForm().getFieldValue("intermediary_fee")).toBeUndefined();
   });
 
-  it("点击增加支出向 expense_items 追加一项且不污染中介费", async () => {
+  it("点击增加支出向 expense_items 追加一项且按钮位于蓝色资金明细组", async () => {
     const { getForm } = renderFeeForm();
+    const group = screen.getByTestId("primary-finance-field").closest(".business-registration-group");
+    expect(group).toHaveClass("primary-amount-fields");
+    expect(group).toContainElement(screen.getByText("+ 增加支出"));
     await ui.click(screen.getByText("+ 增加支出"));
     const list = getForm().getFieldValue("expense_items");
     expect(Array.isArray(list) && list.length === 1).toBe(true);

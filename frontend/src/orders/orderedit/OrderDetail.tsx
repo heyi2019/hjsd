@@ -99,8 +99,8 @@ const PARTY_ROLE_LABEL: Record<string, string> = {
   SELLER: "卖家",
   BUYER: "买家",
   CONSIGNOR: "寄售方",
-  PEER: "同行",
-  SUPPLIER: "供货方",
+  PEER: "合作伙伴",
+  SUPPLIER: "合作伙伴",
   PLATFORM: "平台",
   INSTALLMENT_CUSTOMER: "分期客户",
 };
@@ -133,7 +133,7 @@ function renderOrderParties(
           onPartyClick?.(party);
         }}
       >
-        {party.entityType === "customer" ? "客户" : "合作方"}_{PARTY_ROLE_LABEL[party.role] ?? party.role}：{party.display_name}
+        {party.entityType === "customer" ? "客户" : "合作伙伴"}_{PARTY_ROLE_LABEL[party.role] ?? party.role}：{party.display_name}
       </Typography.Link>
       {index < parties.length - 1 ? "、" : null}
     </span>
@@ -181,6 +181,7 @@ function resolveOperationStatus(
 
 export function OrderDetail({
   row,
+  className,
   detail,
   contextOrderNo,
   loading,
@@ -202,6 +203,7 @@ export function OrderDetail({
   saving,
 }: {
   row: Account;
+  className?: string;
   detail?: AccountExecutionDetail;
   /** 订单台账从订单行展开时，优先使用当前订单作为详情上下文；库存中心不传则沿用账号来源单。 */
   contextOrderNo?: string | null;
@@ -330,6 +332,7 @@ export function OrderDetail({
   return (
     <OrderDetailView
       meta={meta}
+      className={className}
       detail={detail}
       account={row}
       editing={editing}

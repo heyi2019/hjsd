@@ -131,7 +131,7 @@ class TestA01HsStock:
         )
         seeded_db.commit()
 
-        # 账号成本 = 买入 + 附加成本；售出后释放
+        # 账号成本 = 买入 + 直接成本；售出后释放
         account = seeded_db.get(Account, account.id)
         assert account.cost_amount == Decimal("1050.00")
         assert account.status == AccountStatus.SOLD.value

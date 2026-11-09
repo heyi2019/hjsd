@@ -48,7 +48,7 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
   TH: [
     { key: "has_secondary", label: "有无二次", type: "SELECT", options: [{ value: "有", label: "有" }, { value: "无", label: "无" }] },
     { key: "customer_source", label: "客户来源", type: "SELECT", options: SRC },
-    { key: "supplier_source", label: "供货方来源", type: "SELECT", options: [{ value: "氪金联盟", label: "氪金联盟" }, { value: "同行", label: "同行" }, { value: "其他", label: "其他" }] },
+    { key: "supplier_source", label: "供货方来源", type: "SELECT", options: [{ value: "氪金联盟", label: "氪金联盟" }, { value: "其他", label: "其他" }] },
     { key: "intermediary_platform", label: "交易平台", type: "SELECT", options: PLAT },
     { key: "intermediary_type", label: "中介类型", type: "SELECT", options: [{ value: "普中", label: "普中" }, { value: "包赔", label: "包赔" }] },
     { key: "compensation_type", label: "包赔类型", type: "SELECT", options: [{ value: "首保", label: "首保" }, { value: "续保", label: "续保" }] },
@@ -144,7 +144,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "ACTIVE", label: "进行中" }, { value: "DISABLED", label: "已拉黑" },
   ] },
   { code: "COUNTERPARTY_TYPE", label: "合作方类型", group: "CUSTOMER", editable: false, options: [
-    { value: "PEER", label: "同行" }, { value: "SUPPLIER", label: "供货方" }, { value: "PLATFORM", label: "平台" },
+    { value: "SUPPLIER", label: "合作伙伴" }, { value: "PLATFORM", label: "平台" },
   ] },
   { code: "LEAD_STATUS", label: "需求状态", group: "CUSTOMER", editable: false, options: [
     { value: "OPEN", label: "未结算" }, { value: "CONVERTED", label: "已转化" }, { value: "CLOSED", label: "已关闭" },
@@ -344,7 +344,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   ] },
   { code: "ORDER_EVENT_TYPE", label: "订单事件类型", group: "ORDER", editable: false, options: [
     { value: "BUY", label: "买号" },
-    { value: "COST", label: "附加成本" },
+    { value: "COST", label: "费用支出" },
     { value: "SELL", label: "售出" },
     { value: "PAYMENT", label: "回款（分期）" },
     { value: "DELIVER", label: "交付" },

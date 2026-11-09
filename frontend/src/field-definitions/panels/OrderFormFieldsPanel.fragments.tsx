@@ -32,7 +32,7 @@ export const FIELD_SECTION_OPTIONS = [
   { value: "OPERATION", label: "运营信息" },
   { value: "FINANCE", label: "费用与资金" },
   { value: "EXTRA", label: "其他补充信息" },
-  { value: "PARTICIPANT", label: "客户 / 供货方信息" },
+  { value: "PARTICIPANT", label: "客户 / 合作伙伴信息" },
 ];
 export const ORDER_SCOPE_OPTIONS = [
   { value: "HS", label: "回收" },

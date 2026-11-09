@@ -176,6 +176,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
               return (
                 <OrderDetail
                   row={detail.account}
+                  className="inventory-detail--ledger"
                   detail={detail}
                   contextOrderNo={order.order_no}
                   loading={Boolean(ledgerDetailLoading[accountId])}

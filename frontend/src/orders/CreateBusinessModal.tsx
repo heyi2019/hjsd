@@ -1,7 +1,7 @@
 import { appMessage } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form, Input, Modal } from "antd";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection } from "./ConfigurableField";
 import {
   counterpartiesApi,
@@ -18,13 +18,14 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
-import { BusinessActionModal, BusinessRegistrationForm, ConfirmDialog, ErrorBanner, PermissionButton } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, ConfirmDialog, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { RecoveryAccountSection } from "./recovery/RecoveryAccountSection";
 import { RecoveryCustomerSection } from "./recovery/RecoveryCustomerSection";
 import { RecoveryFeeSection } from "./recovery/RecoveryFeeSection";
 import { useRecoveryFormState } from "./recovery/useRecoveryFormState";
 import { ThOrderSection } from "./th/ThOrderSection";
 import { DgOrderSection } from "./dg/DgOrderSection";
+import { PARTY_SOURCE_FALLBACK_OPTIONS } from "./CustomerSourceInput";
 import {
   buildCounterpartyRoles,
   buildCustomerRoles,
@@ -64,20 +65,14 @@ export function CreateBusinessModal(props: {
   const repurchaseConfirmedFor = useRef<string | null>(null);
   const [repurchasePrompt, setRepurchasePrompt] = useState<{ values: Record<string, unknown>; gameAccount: string } | null>(null);
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
+  const [customerCreateOpen, setCustomerCreateOpen] = useState(false);
+  const [customerSubmitting, setCustomerSubmitting] = useState(false);
+  const [customerForm] = Form.useForm();
   const [supplierCreateOpen, setSupplierCreateOpen] = useState(false);
   const [supplierSubmitting, setSupplierSubmitting] = useState(false);
   const [supplierForm] = Form.useForm();
   const initialValuesRef = useRef<Record<string, unknown>>({});
   const { totalRecoveryCost } = useRecoveryFormState(form);
-  const customersByName = useMemo(() => {
-    const index = new Map<string, Customer[]>();
-    for (const customer of customers) {
-      const list = index.get(customer.display_name) ?? [];
-      list.push(customer);
-      index.set(customer.display_name, list);
-    }
-    return index;
-  }, [customers]);
   const formId = "business-order-form";
   // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
   // 不同业务类型通过 orderType 变化自动切换配置（get/post 走已落地的 GET 缓存层）。
@@ -184,32 +179,12 @@ export function CreateBusinessModal(props: {
       }
       let resolvedCustomerSource: string | undefined;
       if (isRecovery || isDg) {
-        const customerPrefix = isDg ? "dg_" : "";
         const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
         const selectedCustomerSource = values[customerSourceField] as string | undefined;
         const customerSourceOtherField = isDg ? "dg_customer_source_other" : "customer_source_other";
         resolvedCustomerSource = selectedCustomerSource === "其他"
           ? values[customerSourceOtherField] as string
           : selectedCustomerSource;
-        const customerNickname = values[`${customerPrefix}customer_nickname`];
-        if (customerNickname) {
-          const existingCustomer = (customersByName.get(String(customerNickname)) ?? []).find((customer) =>
-            customer.display_name === customerNickname
-            && ((values[`${customerPrefix}customer_phone`] && customer.phone === values[`${customerPrefix}customer_phone`])
-              || (values[`${customerPrefix}customer_wechat`] && customer.wechat === values[`${customerPrefix}customer_wechat`])
-              || (!values[`${customerPrefix}customer_phone`] && !values[`${customerPrefix}customer_wechat`])),
-          );
-          const customer = existingCustomer ?? (await customersApi.create({
-            display_name: customerNickname as string,
-            contact_name: values[isDg ? "dg_customer_contact" : "customer_contact_name"] as string,
-            phone: values[`${customerPrefix}customer_phone`] as string,
-            wechat: values[`${customerPrefix}customer_wechat`] as string,
-            qq: values[`${customerPrefix}customer_qq`] as string,
-            source: resolvedCustomerSource,
-            note: (isDg ? values.dg_note : values.note) as string,
-          })).customer;
-          values.customer_id = customer.id;
-        }
       }
       const note = (isRecovery || isDg) && resolvedCustomerSource
         ? `客户来源：${String(resolvedCustomerSource)}${values[isDg ? "dg_note" : "note"] ? `｜${String(values[isDg ? "dg_note" : "note"])}` : ""}`
@@ -230,11 +205,6 @@ export function CreateBusinessModal(props: {
         values.counterparty_role as string | undefined,
       );
       const initialCosts = (isRecovery || isTh) ? [
-        ...(Number(values.intermediary_fee) > 0 ? [{
-          amount: String(values.intermediary_fee), occurred_on: today(), portion: "PRINCIPAL",
-          pool_id: values.payment_pool_id as number, flow_category: "FEE",
-          note: `${isTh ? "提号中介费" : "中介费"}｜平台：${String(values.intermediary_platform ?? "")}｜类型：${String(values.intermediary_type ?? "")}${values.compensation_type ? `｜${String(values.compensation_type)}` : ""}`,
-        }] : []),
         ...((values.expense_items as Array<{ name?: unknown; amount?: unknown; note?: unknown }> | undefined) ?? [])
           .filter((item) => Number(item.amount) > 0)
           .map((item) => ({
@@ -306,6 +276,30 @@ export function CreateBusinessModal(props: {
     }
   };
 
+  const createCustomer = async (values: Record<string, unknown>) => {
+    setCustomerSubmitting(true);
+    try {
+      const customer = await customersApi.create({
+        display_name: String(values.display_name ?? "").trim(),
+        contact_name: values.contact_name as string,
+        phone: values.phone as string,
+        wechat: values.wechat as string,
+        qq: values.qq as string,
+        source: values.source as string,
+        note: values.note as string,
+      });
+      setCustomers((items) => [...items, customer.customer]);
+      form.setFieldValue("customer_id", customer.customer.id);
+      customerForm.resetFields();
+      setCustomerCreateOpen(false);
+      appMessage.success("客户已建档");
+    } catch (error) {
+      setLoadError(normalizeError(error));
+    } finally {
+      setCustomerSubmitting(false);
+    }
+  };
+
   const createSupplier = async (values: Record<string, unknown>) => {
     setSupplierSubmitting(true);
     try {
@@ -319,7 +313,7 @@ export function CreateBusinessModal(props: {
       form.setFieldValue("supplier_counterparty_id", supplier.id);
       supplierForm.resetFields();
       setSupplierCreateOpen(false);
-      appMessage.success("供货方已建档");
+      appMessage.success("合作伙伴已建档");
     } catch (error) {
       setLoadError(normalizeError(error));
     } finally {
@@ -378,15 +372,49 @@ export function CreateBusinessModal(props: {
           <SectionLabelsContext.Provider value={labels}>
             {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes} employees={employees} businessResponsibleLabel="回收负责人" showIntermediaryDelivery accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
               <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} financeExtras={<CustomFieldSection section="FINANCE" testIdSuffix="finance" />} />
-            </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} counterparties={counterparties} gameTypes={gameTypes} employees={employees} onCreateSupplier={() => setSupplierCreateOpen(true)} /> : <DgOrderSection gameTypes={gameTypes} employees={employees} />}
-            {isRecovery ? <RecoveryCustomerSection customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
+            </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} counterparties={counterparties} gameTypes={gameTypes} employees={employees} onCreateSupplier={() => setSupplierCreateOpen(true)} /> : <DgOrderSection customers={customers} onCreateCustomer={() => setCustomerCreateOpen(true)} gameTypes={gameTypes} employees={employees} />}
+            {isRecovery ? <RecoveryCustomerSection customers={customers} onCreateCustomer={() => setCustomerCreateOpen(true)} customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
             <CustomFieldSection section="EXTRA" testIdSuffix="extra" />
           </SectionLabelsContext.Provider>
         </FieldConfigContext.Provider>
       </BusinessRegistrationForm>
     </BusinessActionModal>
     <Modal
-      title="新建供货方"
+      title="新建客户"
+      open={customerCreateOpen}
+      destroyOnHidden
+      onCancel={() => {
+        setCustomerCreateOpen(false);
+        customerForm.resetFields();
+      }}
+      onOk={() => customerForm.submit()}
+      okText="建档"
+      cancelText="取消"
+      confirmLoading={customerSubmitting}
+    >
+      <BusinessRegistrationForm
+        layout="horizontal"
+        labelAlign="left"
+        labelCol={{ flex: "88px" }}
+        wrapperCol={{ flex: "auto" }}
+        form={customerForm}
+        onFinish={createCustomer}
+      >
+        <Form.Item name="display_name" label="名字" rules={[{ required: true, message: "请输入客户名字" }]}>
+          <Input />
+        </Form.Item>
+        <Form.Item name="contact_name" label="联系人"><Input /></Form.Item>
+        <Form.Item name="phone" label="手机号"><Input /></Form.Item>
+        <Form.Item name="wechat" label="微信号"><Input /></Form.Item>
+        <Form.Item name="qq" label="QQ"><Input /></Form.Item>
+        <Form.Item name="source" label="客户来源">
+          <Select options={PARTY_SOURCE_FALLBACK_OPTIONS} placeholder="可选填" />
+        </Form.Item>
+        <Form.Item name="note" label="备注"><Input placeholder="可选填" /></Form.Item>
+      </BusinessRegistrationForm>
+    </Modal>
+    <Modal
+      title="新建合作伙伴"
       open={supplierCreateOpen}
       destroyOnHidden
       onCancel={() => {
@@ -406,7 +434,7 @@ export function CreateBusinessModal(props: {
         form={supplierForm}
         onFinish={createSupplier}
       >
-        <Form.Item name="display_name" label="名称" rules={[{ required: true, message: "请输入供货方名称" }]}>
+        <Form.Item name="display_name" label="名称" rules={[{ required: true, message: "请输入合作伙伴名称" }]}>
           <Input />
         </Form.Item>
         <Form.Item name="contact_name" label="联系人">

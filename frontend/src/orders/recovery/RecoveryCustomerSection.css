@@ -1,3 +1,7 @@
 .customer-section {
   min-width: 0;
 }
+
+.customer-section .customer-note {
+  grid-column: 1 / -1;
+}

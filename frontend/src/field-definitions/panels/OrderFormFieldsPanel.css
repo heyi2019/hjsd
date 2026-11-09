@@ -13,6 +13,13 @@
 
 .order-form-fields__container .ui-toolbar-spaced {
   margin-top: 0;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.order-form-fields__toolbar-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .order-form-fields__container .ant-table-wrapper,

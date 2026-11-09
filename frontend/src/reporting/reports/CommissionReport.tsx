@@ -1,6 +1,6 @@
 /** Commission：从 ReportsPage.tsx 拆出的单个报表视图。 */
 
-import { Card, Space } from "antd";
+import { Card, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useEffect, useState } from "react";
 import { employeesApi, reportsApi, type CommissionReport, type CommissionRow } from "../../shared/api/catalog";
@@ -41,6 +41,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
     [params.from, params.to, mine, selectedUserId],
   );
   const { arrange: arrangeCommission } = useListViewColumns("RPT_COMMISSION");
+  const hasUnassignedRows = (data?.items ?? []).some((row) => row.user_id == null);
   const columns: ColumnsType<CommissionRow> = [
     ...(mine ? [] : [{ title: "人员 ID", dataIndex: "user_id", width: 100 }]),
     { title: "订单号", dataIndex: "order_no", width: 160 },
@@ -74,6 +75,11 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
       </Space>
       <ErrorBanner error={employeeError} />
       {mine ? <Note>仅展示当前登录用户在分润配置中获得的收益。</Note> : null}
+      {hasUnassignedRows ? (
+        <Typography.Text type="warning" role="alert" className="report-warning">
+          存在未分配人员的提成记录，请补充分润人员后再进行对账。
+        </Typography.Text>
+      ) : null}
       <StatRow
         items={[
           { label: mine ? "收益订单数" : "订单数", kind: "count", amount: String(data?.total.order_count ?? 0) },

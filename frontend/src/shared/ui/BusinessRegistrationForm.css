@@ -17,7 +17,7 @@
 .business-registration-modal .ant-modal-body {
   min-height: 0;
   flex: 1 1 auto;
-  max-height: calc(var(--resizable-modal-height) - 132px);
+  max-height: calc(var(--resizable-modal-height) - 196px);
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -45,7 +45,7 @@
 }
 .business-registration-modal .ant-modal-footer .ant-btn {
   width: 100%;
-  min-height: calc(var(--ui-control-height-lg) * 2);
+  min-height: var(--ui-control-height-lg);
   font-size: var(--fs-callout);
   font-weight: 600;
   margin: 0;
@@ -123,12 +123,17 @@
 .business-registration-modal:not(.compact-form-modal) .business-registration-form > .ant-btn[type="submit"] {
   grid-column: 1 / -1;
   width: 100%;
-  min-height: calc(var(--ui-control-height-lg) * 2);
+  min-height: var(--ui-control-height-lg);
   border-radius: var(--radius-sm);
   font-size: var(--fs-title-3);
   font-weight: 600;
   transition: opacity 160ms ease, filter 160ms ease;
 }
+
+/* 带 extra / 校验提示的对账项会变高；标签始终从控件顶部对齐，避免出现
+   「对账账户」文字落在输入框和帮助文案之间的错位。 */
+.business-registration-modal .ant-form-item-row { align-items: flex-start; }
+.business-registration-modal .ant-form-item-label { padding-top: 2px; }
 
 .business-registration-modal:not(.compact-form-modal) .business-registration-form > .ant-btn[type="submit"]:hover {
   filter: brightness(1.06);

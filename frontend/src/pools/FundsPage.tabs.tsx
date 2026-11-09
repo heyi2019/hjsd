@@ -17,6 +17,7 @@ import type { Cashflow, Deposit, Pool, Reconciliation } from "../shared/api/cata
 export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
   const { pools, balances, totalCash, totalAvailable, totalDeposit, totalOwned, transferForm, setTransferOpen, loading, fundsReady, error } = ctrl;
   const { arrange: arrangeFundPoolColumns } = useListViewColumns("FUND_POOLS");
+  const hasNegativeAvailable = pools.some((pool) => Number(balances[pool.id]?.available ?? 0) < 0);
   const poolColumns: ColumnsType<Pool> = [
     {
       title: "资金池",
@@ -52,6 +53,11 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
         ]}
       />
       <Typography.Text type="secondary">自有权益仅计归属为「自有」的池；托管/第三方池只计现金头寸。</Typography.Text>
+      {hasNegativeAvailable ? (
+        <Typography.Text type="danger" role="alert" className="funds-negative-balance-warning">
+          ⚠ 存在负余额资金池，请先处理资金异常。
+        </Typography.Text>
+      ) : null}
       <DataTable<Pool>
         columns={arrangeFundPoolColumns(poolColumns)}
         rows={pools}

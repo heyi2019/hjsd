@@ -89,6 +89,15 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
 }
 
 describe("FundsPage：资金池卡片", () => {
+  it("存在负可用余额时显示资金异常预警", async () => {
+    resolveMock(vi.mocked(catalog.poolsApi.balances), {
+      items: [{ ...balance, pool_id: 1, pool_code: "POOL-A", available: "-5.00" }, { ...balance, pool_id: 2, pool_code: "POOL-B" }],
+      totals: { cash_balance: "1600.00", available: "1395.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
+    });
+    renderLight(<FundsPage />, { user: "admin" });
+    expect(await screen.findByRole("alert")).toHaveTextContent("存在负余额资金池");
+  });
+
   it("资金池列表按列表字段配置排序", async () => {
     vi.mocked(catalog.listColumnsApi.all).mockResolvedValueOnce([{
       code: "FUND_POOLS",

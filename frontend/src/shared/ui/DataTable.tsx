@@ -35,6 +35,8 @@ export function DataTable<T>(props: {
   onRow?: TableProps<T>["onRow"];
   className?: string;
   size?: TableProps<T>["size"];
+  /** 为读屏和键盘用户说明表格是可横向查看的。 */
+  ariaLabel?: string;
 }) {
   const fallbackKeysRef = useRef(new WeakMap<object, string>());
   const nextFallbackKeyRef = useRef(0);
@@ -112,7 +114,11 @@ export function DataTable<T>(props: {
   const pagination = props.pagination !== undefined ? props.pagination : defaultPagination;
 
   return (
-    <div className={`ui-table-wrap ui-datatable${props.className ? ` ${props.className}` : ""}`}>
+    <div
+      className={`ui-table-wrap ui-datatable${props.className ? ` ${props.className}` : ""}`}
+      role="region"
+      aria-label={props.ariaLabel ?? "数据表格，可左右滚动查看更多"}
+    >
       <Table<T>
         size={props.size ?? "small"}
         columns={props.columns}

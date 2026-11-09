@@ -134,4 +134,13 @@ describe("UsersPanel：用户管理动作", () => {
     await waitFor(() => expect(document.querySelector(".ant-form-item-explain-error")).toBeTruthy());
     expect(vi.mocked(client.api).post).not.toHaveBeenCalledWith("/users", expect.any(Object));
   });
+
+  it("新增用户字段提供持久可访问标签", async () => {
+    renderLight(<UsersPanel />, { user: "admin" });
+    await screen.findByText("operator01");
+    expect(screen.getByLabelText("用户名")).toBeInTheDocument();
+    expect(screen.getByLabelText("姓名")).toBeInTheDocument();
+    expect(screen.getByLabelText(/手机号（用于免密登录）/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/初始密码（至少 8 位）/)).toBeInTheDocument();
+  });
 });

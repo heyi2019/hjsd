@@ -14,17 +14,19 @@ name: frontend-gate
 on:
   push:
     branches: [main, master, test]
+    paths-ignore:
+      - "RELEASE.md"
   pull_request:
   workflow_dispatch:
   # 夜间兜底：deep 层已移出 PR 门禁，靠定时跑保证不会长期无人验证。
   schedule:
     - cron: "0 18 * * *" # UTC 18:00 = 北京时间 02:00
 
-# 同一 ref 的新提交取消旧运行（仅 PR）。push 到 main/test 不取消：gate 结果需要完整落库，
-# auto-merge 依赖前端全绿的 conclusion，取消会写入 cancelled 直接中止自动合并。
+# 同一 test ref 的新提交取消旧运行；旧提交已被新提交取代，不应继续占用 runner 或阻塞发布。
+# main 保留完整结果，PR 继续取消旧运行。
 concurrency:
   group: frontend-gate-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/test' || github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

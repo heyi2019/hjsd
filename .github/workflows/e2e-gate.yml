@@ -5,11 +5,14 @@ name: e2e-gate
 # 两者都走 e2e_db.py 默认 keep 分支（create_all 补表 + 幂等播种），夹具按
 # (business_mode, inventory_type) 补足 IN_STOCK 账号，用例消耗后下一轮自动补齐；
 # 自动化不再注入 E2E_RESET=1。绝不触碰 dev/test/release。
-# main / test 推送、PR、手动触发均阻塞。
+# main 推送、PR、手动触发均运行；test 已由 coverage/frontend 门禁负责，避免在合并前重复跑
+# 一套不参与自动合并判定的 45 分钟 E2E。
 
 on:
   push:
-    branches: [main, master, test]
+    branches: [main, master]
+    paths-ignore:
+      - "RELEASE.md"
   pull_request:
   workflow_dispatch:
 

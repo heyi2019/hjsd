@@ -1,15 +1,21 @@
 name: auto-merge-test-to-main
 
 # 触发：每次 push 到 test 分支（即 dev 推上来）
-# 行为：轮询 3 个 CI gate（lint/frontend-gate/coverage），
+# 行为：代码提交轮询 3 个 CI gate（lint/frontend-gate/coverage）；
+#       只有 RELEASE.md 的说明提交直接同步，不重复跑整套门禁；
 #       全部 success 后将 test 以 non-ff merge commit 合入 main，
-#       注：frontend-e2e 已随 E2E 体系整体下线（2026-11-02），勿再加回；
+#       E2E 只在 main/PR 运行，不作为 test -> main 的阻塞门禁；
 #       从而触发 deploy-production 自动部署 ECS。
 # 安全：仅 --no-ff 合并（main 含旧 merge commit 8257024，无法纯快进）；
 #       幂等（test 已合入 main 则跳过）；任一 gate 失败则中止，绝不强制合并。
 on:
   push:
     branches: [test]
+
+concurrency:
+  # 新提交代表最新发布意图；取消旧提交的等待，避免修复一次就并行跑多套旧 CI。
+  group: auto-merge-test-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write   # 推送 main 触发部署
@@ -27,11 +33,19 @@ jobs:
           fetch-depth: 0
           token: ${{ github.token }}
 
-      - name: Wait for all 3 CI gates to be green
+      - name: Wait for required CI gates
+        id: gate
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          changed=$(git diff-tree --no-commit-id --name-only -r "$SHA")
+          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qv '^RELEASE.md$'; then
+            echo "RELEASE.md-only commit; skip code gates"
+            echo "notes_only=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "notes_only=false" >> "$GITHUB_OUTPUT"
           for wf in lint-gate.yml frontend-gate.yml coverage-gate.yml; do
             echo "waiting for $wf ..."
             ok=""
@@ -48,7 +62,7 @@ jobs:
             fi
             echo "$wf: success"
           done
-          echo "ALL 4 GATES GREEN for $SHA"
+          echo "ALL 3 REQUIRED GATES GREEN for $SHA"
 
       - name: Merge test -> main (non-fast-forward)
         id: merge
@@ -72,7 +86,7 @@ jobs:
       # 关键修复：用 GITHUB_TOKEN 推送 main 不会自动触发下游 push 事件 workflow，
       # 必须用 gh workflow run（API 触发，不受该限制）显式拉起部署。
       - name: Trigger production deploy
-        if: steps.merge.outputs.merged == 'true'
+        if: steps.merge.outputs.merged == 'true' && steps.gate.outputs.notes_only != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

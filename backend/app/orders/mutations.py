@@ -14,6 +14,7 @@ from app.foundation import service as foundation_service
 from app.orders.form_fields import validate_form_extra
 from app.parties import service as parties_service
 from app.policy import service as policy_service
+from app.stocks import service as stocks_service
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import Validation
@@ -24,6 +25,7 @@ from app.domain.trade import (
 )
 from app.domain.enums import (
     AuditAction,
+    OrderStatus,
     PolicyType,
 )
 
@@ -33,6 +35,65 @@ from ._shared import (
 )
 
 _UNSET = object()
+
+
+def materialize_inventory_account(
+    session: Session,
+    order_id: int,
+    *,
+    actor: str,
+    user: CurrentUser | None = None,
+) -> Order:
+    """为历史未关联库存的进行中订单补建库存实体。
+
+    只接受仍在进行中的 HS/TH/DG 订单，并且必须已有完整账号快照；
+    不为缺少账号资料的历史行凭空生成库存编号。
+    """
+    order = get_order(session, order_id, user)
+    if order.account_id is not None:
+        return order
+    if order.status not in {OrderStatus.ACTIVE.value, OrderStatus.INSTALLMENT.value}:
+        raise Validation("只有进行中的订单可以补建库存账号", details={"order_id": order_id})
+    context = {
+        "HS": ("SELF", "RECOVERY"),
+        "TH": ("DISTRIBUTION", "PICKUP"),
+        "DG": ("DISTRIBUTION", "CONSIGNMENT"),
+    }.get(order.order_type)
+    if context is None:
+        raise Validation("当前订单类型不支持补建库存账号", details={"order_type": order.order_type})
+    snapshot = order.account_snapshot or {}
+    game_account = snapshot.get("game_account")
+    if not isinstance(game_account, str) or not game_account.strip():
+        raise Validation(
+            "订单缺少游戏账号资料，无法生成库存编号",
+            details={"field": "account_snapshot.game_account", "order_id": order_id},
+        )
+    business_mode, inventory_type = context
+    account = stocks_service.create_account(
+        session,
+        game_account=game_account,
+        actor=actor,
+        game_type=snapshot.get("game_type"),
+        business_mode=business_mode,
+        inventory_type=inventory_type,
+        game_password=snapshot.get("game_password"),
+        camp_account=snapshot.get("camp_account"),
+        channel_region=snapshot.get("channel_region"),
+        bound_phone=snapshot.get("bound_phone"),
+        has_secondary=snapshot.get("has_secondary"),
+        secondary_images=snapshot.get("secondary_images"),
+        wallet_realname=snapshot.get("wallet_realname"),
+        wallet_realname_images=snapshot.get("wallet_realname_images"),
+        platform=snapshot.get("platform"),
+        note=snapshot.get("note"),
+        extra_values=snapshot.get("extra_values"),
+    )
+    if order.created_at is not None:
+        account.inventory_entry_at = order.created_at.replace(microsecond=0)
+    order.account_id = account.id
+    order.updated_by = actor
+    session.flush()
+    return order
 
 
 def _shift_accounting_dates(

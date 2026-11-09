@@ -183,6 +183,9 @@ export const ordersApi = {
   /** 订单编辑（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
   patch: (orderId: number, payload: OrderPatchPayload) =>
     api.patch<Order>(`/orders/${orderId}`, payload).then((r) => r.data),
+  /** 为历史进行中订单补建库存账号，生成库存编号后再进入完整编辑。 */
+  materializeAccount: (orderId: number) =>
+    api.post<Order>(`/orders/${orderId}/materialize-account`).then((r) => r.data),
 };
 
 export const orderFormFieldsApi = {

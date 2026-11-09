@@ -824,6 +824,19 @@ def update_order(
     return _order_output(db, order, user)
 
 
+@router.post("/orders/{order_id}/materialize-account", response_model=schemas.OrderOut)
+def materialize_order_account(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = update_orders,
+) -> schemas.OrderOut:
+    """为历史进行中订单补建库存账号并回填库存编号。"""
+    order = service.materialize_inventory_account(
+        db, order_id, actor=_actor(user), user=user
+    )
+    return _order_output(db, order, user)
+
+
 @router.post("/orders/{order_id}/cancel", response_model=schemas.OrderOut)
 def cancel_order(
     order_id: int,

@@ -45,6 +45,6 @@ def test_every_json_api_route_declares_response_model(app):
                 f"{method} {route.path} must not use Any as its response model"
             )
 
-    # 当前公开路由总数固定为 180，新增或移除路由时同步更新契约。
+    # 当前公开路由总数固定为 181，新增或移除路由时同步更新契约。
     # 180 条包含订单编辑新增的参与方整体替换接口。
-    assert public_routes == 180
+    assert public_routes == 181

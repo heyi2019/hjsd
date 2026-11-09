@@ -21,6 +21,7 @@ import type {
 
 export type OrderEditPanelProps = {
   meta: OrderDetailMeta;
+  className?: string;
   detail?: AccountExecutionDetail | null;
   account?: Account | null;
   editing: Account;
@@ -50,6 +51,7 @@ export type OrderEditPanelProps = {
 /** 订单编辑功能板块：库存中心与订单台账共享的完整编辑界面。 */
 export function OrderEditPanel({
   meta,
+  className,
   detail,
   account,
   editing,
@@ -80,7 +82,11 @@ export function OrderEditPanel({
     .map((field) => ({ key: `order-extra-${field.key}`, label: field.label, value: field.value }));
 
   return (
-    <div className="inventory-detail" data-testid="order-edit-feature-panel" aria-label="订单编辑功能板块">
+    <div
+      className={["inventory-detail", "inventory-detail--editing", className].filter(Boolean).join(" ")}
+      data-testid="order-edit-feature-panel"
+      aria-label="订单编辑功能板块"
+    >
       <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onEdit={onEdit} timeDrafts={timeDrafts} onTimeEdit={onTimeEdit} orderDrafts={orderDrafts} onOrderEdit={onOrderEdit} />
       <BusinessRegistrationForm
         layout="horizontal"

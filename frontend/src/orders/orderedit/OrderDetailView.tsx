@@ -89,6 +89,7 @@ export function OrderDetailView({
   if (editing) {
     return <OrderEditPanel
       meta={meta}
+      className={className}
       detail={detail}
       account={account}
       editing={editing}

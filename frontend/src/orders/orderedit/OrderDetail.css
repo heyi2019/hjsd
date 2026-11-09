@@ -35,9 +35,56 @@
   inline-size: 100%;
   max-inline-size: 100%;
 }
+.inventory-detail--editing {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+.inventory-detail--editing .inventory-detail__meta,
+.inventory-detail--editing .inventory-detail__meta-group,
+.inventory-detail--editing .ant-descriptions,
+.inventory-detail--editing .ant-descriptions-view {
+  min-width: 0;
+  max-width: 100%;
+}
+.inventory-detail--editing .ant-descriptions-view > table {
+  min-width: 0 !important;
+}
+.inventory-detail--editing .ant-input,
+.inventory-detail--editing .ant-input-affix-wrapper,
+.inventory-detail--editing .ant-select,
+.inventory-detail--editing .ant-picker,
+.inventory-detail--editing .ant-input-number {
+  min-width: 0;
+  max-width: 100%;
+}
 /* 订单台账是嵌在主表行里的详情，限制首屏高度，明细在本区域内滚动，避免把整张台账拉得过长。 */
 .inventory-detail--ledger {
   max-height: 24rem;
+}
+/* 展开行所在的 antd 表格可能因为列总宽度变成横向滚动表；详情内容不应继承那块
+   远超视口的表宽，否则编辑输入框会被拉到屏幕外。桌面按主内容区限宽，窄屏按视口限宽。 */
+@media (min-width: 961px) {
+  .inventory-table .ant-table-tbody > tr.ant-table-expanded-row .inventory-detail.inventory-detail--ledger,
+  .orders-ledger .ant-table-tbody > tr.ant-table-expanded-row .inventory-detail.inventory-detail--ledger {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 1;
+    width: min(100%, calc(100vw - var(--sidebar-width) - (var(--space-6) * 2)));
+    max-width: min(100%, calc(100vw - var(--sidebar-width) - (var(--space-6) * 2)));
+    background: var(--color-bg);
+  }
+}
+@media (max-width: 960px) {
+  .inventory-table .ant-table-tbody > tr.ant-table-expanded-row .inventory-detail.inventory-detail--ledger,
+  .orders-ledger .ant-table-tbody > tr.ant-table-expanded-row .inventory-detail.inventory-detail--ledger {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 1;
+    width: min(100%, calc(100vw - (var(--space-6) * 2)));
+    max-width: min(100%, calc(100vw - (var(--space-6) * 2)));
+    background: var(--color-bg);
+  }
 }
 .inventory-detail__meta {
   overflow: hidden;

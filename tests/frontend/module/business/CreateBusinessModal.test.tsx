@@ -137,7 +137,7 @@ it("选中已有客户后自动回填下方的非必填资料", async () => {
     customer_no: "CUS-0001",
     display_name: "张三",
     contact_name: "张经理",
-    phone: "13800138000",
+    phone: "test-phone-a",
     wechat: "zhangsan",
     qq: "10001",
     source: "小红书",
@@ -147,7 +147,7 @@ it("选中已有客户后自动回填下方的非必填资料", async () => {
   await openTypedModal("HS");
   await pickCustomer();
   expect(screen.getByLabelText("姓名")).toHaveValue("张经理");
-  expect(screen.getByLabelText("手机号")).toHaveValue("13800138000");
+  expect(screen.getByLabelText("手机号")).toHaveValue("test-phone-a");
   expect(screen.getByLabelText("微信号")).toHaveValue("zhangsan");
   expect(screen.getByLabelText("QQ")).toHaveValue("10001");
   expect(screen.getByLabelText("客户备注")).toHaveValue("重点客户");
@@ -169,14 +169,14 @@ it("输入未建档客户名称也可以直接建单并自动建档", async () =
   await ui.type(customerField, "新客户");
   await ui.keyboard("{Escape}");
   await ui.type(screen.getByLabelText("姓名"), "新客户联系人");
-  await ui.type(screen.getByLabelText("手机号"), "13900000000");
+  await ui.type(screen.getByLabelText("手机号"), "test-phone-b");
   await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
   await pickMainPool();
   await ui.click(screen.getByRole("button", { name: /创建订单/ }));
   await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
     display_name: "新客户",
     contact_name: "新客户联系人",
-    phone: "13900000000",
+    phone: "test-phone-b",
   })));
   await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
     customer_roles: [{ customer_id: 3, role: "SELLER" }],
@@ -307,7 +307,7 @@ it("选中已有合作伙伴后自动回填联系方式和备注", async () => {
       type: "SUPPLIER",
       status: "ACTIVE",
       contact_name: "李经理",
-      phone: "13700137000",
+      phone: "test-phone-c",
       wechat: "supplier-a",
       qq: "20001",
       note: "长期合作",
@@ -315,7 +315,7 @@ it("选中已有合作伙伴后自动回填联系方式和备注", async () => {
     await openTypedModal("TH");
     await pickSupplier();
     expect(screen.getByLabelText("联系人")).toHaveValue("李经理");
-    expect(screen.getByLabelText("手机号")).toHaveValue("13700137000");
+    expect(screen.getByLabelText("手机号")).toHaveValue("test-phone-c");
     expect(screen.getByLabelText("微信号")).toHaveValue("supplier-a");
     expect(screen.getByLabelText("QQ")).toHaveValue("20001");
     expect(screen.getByLabelText("合作伙伴备注")).toHaveValue("长期合作");

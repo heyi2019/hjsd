@@ -23,7 +23,7 @@ export function RecoveryFeeSection(props: {
           <Select placeholder="请选择资金账户" options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} />
         </CfgItem>
       </BusinessRegistrationGroup>
-      <AdditionalFeeFields pools={props.pools} />
+      <AdditionalFeeFields />
       {props.financeExtras}
       <div className="finance-total"><span>付款金额（含全部附加费用）</span><strong>¥ {props.totalRecoveryCost}</strong></div>
     </BusinessRegistrationSection>

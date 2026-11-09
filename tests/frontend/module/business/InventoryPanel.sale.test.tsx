@@ -310,7 +310,7 @@ it("库存中心不为售出单提供取消入口", async () => {
 });
 
 describe("库存售出三表单分支", () => {
-  it("提号售出不展示第二笔售出金额和资金账户", async () => {
+  it("提号售出只使用一个资金账户", async () => {
     renderLight(
       <PickupSaleModal
         account={{ ...accounts[0], inventory_type: "PICKUP" }}

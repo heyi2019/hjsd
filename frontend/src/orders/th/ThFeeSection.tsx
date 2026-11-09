@@ -31,7 +31,7 @@ export function ThFeeSection(props: { pools: Pool[]; financeExtras?: ReactNode }
             <MoneyInput placeholder="请输入金额" />
           </CfgItem>
       </BusinessRegistrationGroup>
-      <AdditionalFeeFields pools={props.pools} />
+      <AdditionalFeeFields />
       {props.financeExtras}
       <div className="finance-total">
         <span>总成本（含全部附加费用）</span>

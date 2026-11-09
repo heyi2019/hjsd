@@ -229,14 +229,14 @@ export function CreateBusinessModal(props: {
       const initialCosts = (isRecovery || isTh) ? [
         ...(Number(values.intermediary_fee) > 0 ? [{
           amount: String(values.intermediary_fee), occurred_on: today(), portion: "PRINCIPAL",
-          pool_id: (values.intermediary_pool_id ?? values.payment_pool_id) as number, flow_category: "FEE",
+          pool_id: values.payment_pool_id as number, flow_category: "FEE",
           note: `${isTh ? "提号中介费" : "中介费"}｜平台：${String(values.intermediary_platform ?? "")}｜类型：${String(values.intermediary_type ?? "")}${values.compensation_type ? `｜${String(values.compensation_type)}` : ""}`,
         }] : []),
-        ...((values.expense_items as Array<{ name?: unknown; amount?: unknown; pool_id?: unknown; note?: unknown }> | undefined) ?? [])
+        ...((values.expense_items as Array<{ name?: unknown; amount?: unknown; note?: unknown }> | undefined) ?? [])
           .filter((item) => Number(item.amount) > 0)
           .map((item) => ({
             amount: String(item.amount), occurred_on: today(), portion: "PRINCIPAL",
-            pool_id: (item.pool_id ?? values.payment_pool_id) as number, flow_category: "OTHER",
+            pool_id: values.payment_pool_id as number, flow_category: "OTHER",
             note: [String(item.name || "其他支出"), item.note ? String(item.note) : ""].filter(Boolean).join("｜"),
           })),
       ] : [];

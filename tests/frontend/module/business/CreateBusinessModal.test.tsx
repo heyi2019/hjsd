@@ -25,6 +25,14 @@ async function pickMainPool() {
   await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
 }
 
+function getMainPoolSelector() {
+  const field = document.getElementById("payment_pool_id");
+  if (!field) throw new Error("未找到主资金账户字段");
+  const selector = field.closest(".ant-form-item")?.querySelector(".ant-select-selector");
+  if (!selector) throw new Error("未找到主资金账户下拉");
+  return selector;
+}
+
 async function pickSupplier() {
   const field = screen.getByLabelText("供货合作伙伴");
   await ui.click(field.closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
@@ -139,7 +147,7 @@ it("回收建单将资金账户紧跟回收金额，不再展示独立资金流�
   const content = container.textContent ?? "";
   expect(screen.getByText("资金明细", { exact: true })).toBeInTheDocument();
   expect(screen.queryByText("资金流水", { exact: true })).toBeNull();
-  expect(screen.getByLabelText("资金账户")).toBeInTheDocument();
+  expect(document.getElementById("payment_pool_id")).toBeInTheDocument();
   expect(content.indexOf("资金明细")).toBeLessThan(content.indexOf("交付信息"));
 });
 
@@ -401,7 +409,7 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     );
     await screen.findByText("新建回收订单");
     // 仅展开「资金账户」下拉（默认已注入主账户选项），不选择任何值
-    const selector = screen.getByLabelText("资金账户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element;
+    const selector = getMainPoolSelector();
     await ui.click(selector);
     await waitFor(() => expect(screen.getByText("主账户", { selector: ".ant-select-item-option-content" })).toBeInTheDocument());
     await ui.click(selector); // 收起下拉

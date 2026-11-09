@@ -10,6 +10,14 @@ import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 vi.mock("@/shared/api/catalog")
 
+function getSalePoolSelector() {
+  const field = document.getElementById("pool_id");
+  if (!field) throw new Error("未找到售出资金账户字段");
+  const selector = field.closest(".ant-form-item")?.querySelector(".ant-select-selector");
+  if (!selector) throw new Error("未找到售出资金账户下拉");
+  return selector;
+}
+
 const accounts = [
   { id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
   { id: 2, source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
@@ -120,7 +128,7 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
   expect(screen.getByText("资金流水")).toBeInTheDocument();
   await ui.type(screen.getByLabelText("客户昵称"), "新买家");
   await ui.type(screen.getByLabelText("售出金额"), "350");
-  await ui.click(screen.getByLabelText("资金账户"));
+  await ui.click(getSalePoolSelector());
   await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
   fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
 
@@ -148,7 +156,7 @@ it("库存售出：成功后立即从库存列表移除账号，即使列表重�
   await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "售出" }));
   await ui.type(screen.getByLabelText("客户昵称"), "买家A");
   await ui.type(screen.getByLabelText("售出金额"), "350");
-  await ui.click(screen.getByLabelText("资金账户"));
+  await ui.click(getSalePoolSelector());
   await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
   await ui.click(screen.getByRole("button", { name: /确认售出/ }));
 
@@ -166,7 +174,7 @@ it("FE-042：已拉黑客户不能参与库存售出", async () => {
   await screen.findByText("买家信息");
   await ui.type(screen.getByLabelText("客户昵称"), "买家A");
   await ui.type(screen.getByLabelText("售出金额"), "350");
-  await ui.click(screen.getByLabelText("资金账户"));
+  await ui.click(getSalePoolSelector());
   await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
   await ui.click(screen.getByRole("button", { name: /确认售出/ }));
 
@@ -202,7 +210,7 @@ it("代挂账号售出：全款收佣金入账、售出金额仅记录、不提�
     await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入利润（代挂佣金）"), "200");
     await ui.type(screen.getByPlaceholderText("代挂无买入价，此处仅作记录，不计入利润"), "1000");
-    await ui.click(screen.getByLabelText("资金账户"));
+    await ui.click(getSalePoolSelector());
     await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalled());
@@ -241,7 +249,7 @@ it("代挂售出复用买号交付信息块，交付负责人提交落库到来�
     await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
     await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入利润（代挂佣金）"), "200");
-    await ui.click(screen.getByLabelText("资金账户"));
+    await ui.click(getSalePoolSelector());
     await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
     await waitFor(() => expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalled());
@@ -265,7 +273,7 @@ it("提号库存售出可选择分期出售，确立时收首付", async () => {
     await ui.click(await screen.findByText("分期付款"));
     await ui.clear(screen.getByLabelText("首付金额"));
     await ui.type(screen.getByLabelText("首付金额"), "300");
-    await ui.click(screen.getByLabelText("资金账户"));
+    await ui.click(getSalePoolSelector());
     await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     await ui.clear(screen.getByLabelText("分期期数"));
     await ui.type(screen.getByLabelText("分期期数"), "2");

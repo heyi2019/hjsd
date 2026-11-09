@@ -178,19 +178,34 @@
   max-width: var(--col-w-140);
 }
 .funds-cashflow-filters .ant-select { width: 100%; }
-.funds-cashflow-filters > :nth-child(5),
-.funds-cashflow-filters > :nth-child(6) { flex-basis: var(--col-w-140); }
-.funds-cashflow-filters > :nth-child(7),
-.funds-cashflow-filters > :nth-child(8) { flex: 0 0 auto; width: auto; }
+.funds-cashflow-date-range {
+  display: flex;
+  align-items: center;
+  flex: 1 1 300px;
+  min-width: min(300px, 100%);
+  gap: var(--space-2);
+}
+.funds-cashflow-date-range > .ant-input { flex: 1 1 0; min-width: 0; width: auto; }
+.funds-cashflow-date-range > .muted { flex: 0 0 auto; }
+.funds-cashflow-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--space-2);
+}
 
 @media (--bp-md) {
   .funds-cashflow-filters > * {
     flex: 1 1 100%;
     max-width: none;
   }
+  .funds-cashflow-date-range { flex-basis: 100%; }
 }
 @media (--bp-sm) {
   .funds-cashflow-filters > * { flex-basis: 100%; }
+  .funds-cashflow-date-range { min-width: 0; }
+  .funds-cashflow-actions { width: 100%; }
+  .funds-cashflow-actions > * { flex: 1 1 0; }
 }
 
 .ui-admin-table .ant-table-wrapper { margin-block: 0; }

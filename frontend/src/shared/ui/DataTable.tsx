@@ -62,6 +62,8 @@ export function DataTable<T>(props: {
   // 前端分页自管状态：默认开启；显式 controlledPaging 时交回调用方做服务端分页。
   const [innerPage, setInnerPage] = useState(1);
   const [innerSize, setInnerSize] = useState(props.pageSize ?? 10);
+  const tableWrapRef = useRef<HTMLDivElement>(null);
+  const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false);
   const controlled = props.controlledPaging === true;
   // 记录调用方上一次传入的 page 值：仅当该值「真的发生变化」时才重置内部页码。
   // 不依赖 innerPage 判断，否则内部翻页（onChange→setInnerPage）会被立刻拉回 props.page，
@@ -85,6 +87,20 @@ export function DataTable<T>(props: {
       setInnerPage(props.page);
     }
   }, [controlled, props.page]);
+
+  useEffect(() => {
+    const content = tableWrapRef.current?.querySelector<HTMLElement>(".ant-table-content");
+    if (!content) return undefined;
+    const measure = () => setHasHorizontalOverflow(content.scrollWidth > content.clientWidth + 1);
+    measure();
+    window.addEventListener("resize", measure);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(content);
+    return () => {
+      window.removeEventListener("resize", measure);
+      observer?.disconnect();
+    };
+  }, [props.columns, props.rows, props.pageSize, props.total]);
 
   if (props.loading) {
     return (
@@ -115,10 +131,12 @@ export function DataTable<T>(props: {
 
   return (
     <div
+      ref={tableWrapRef}
       className={`ui-table-wrap ui-datatable${props.className ? ` ${props.className}` : ""}`}
       role="region"
       aria-label={props.ariaLabel ?? "数据表格，可左右滚动查看更多"}
     >
+      {hasHorizontalOverflow ? <div className="ui-table-scroll-hint" role="note">右侧还有内容，可横向滚动查看</div> : null}
       <Table<T>
         size={props.size ?? "small"}
         columns={props.columns}

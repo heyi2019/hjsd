@@ -8,7 +8,7 @@ import {
   type InventoryPartyDraft,
 } from "./OrderDetail.shared";
 
-/** 板块6：参与方信息 = 参与方链接（客户 / 合作方）+ PARTICIPANT 自定义字段。复用既有渲染（meta.orderParties 与 orderExtras）。 */
+/** 板块6：参与方信息 = 参与方链接（客户 / 合作伙伴）+ PARTICIPANT 自定义字段。复用既有渲染（meta.orderParties 与 orderExtras）。 */
 export function OrderDetailPartySection({ meta, detail, editing, partyDraft, onPartyEdit }: { meta: OrderDetailMeta; detail?: AccountExecutionDetail | null; editing?: boolean; partyDraft?: InventoryPartyDraft; onPartyEdit?: (orderId: number, draft: InventoryPartyDraft) => void }) {
   const order = detail?.orders[0];
   const parties = [

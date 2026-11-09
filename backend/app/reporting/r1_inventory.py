@@ -92,10 +92,8 @@ def r1_inventory_health(
         for order in orders:
             expected_price += order_income[order.id]
         buy_amount = _money(account.cost_amount)
-        extra_cost = max(
-            ZERO, sum((order_cost[o.id] for o in orders), ZERO) - buy_amount
-        )
-        occupied_cost = buy_amount + extra_cost
+        order_cost_total = sum((order_cost[o.id] for o in orders), ZERO)
+        occupied_cost = max(buy_amount, order_cost_total)
         items.append(
             {
                 "account_id": account.id,
@@ -104,7 +102,6 @@ def r1_inventory_health(
                 "business": ",".join({o.order_type for o in orders}) or None,
                 "status": account.inventory_status,
                 "buy_amount": buy_amount,
-                "extra_cost": extra_cost,
                 "total_cost": occupied_cost,
                 "holding_days": holding_days,
                 "expected_price": expected_price,

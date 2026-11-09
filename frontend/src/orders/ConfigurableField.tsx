@@ -21,7 +21,7 @@ const CUSTOM_SECTION_LABEL: Record<NonNullable<OrderFormField["section"]>, strin
   DELIVER: "交付补充信息",
   OPERATION: "运营信息",
   FINANCE: "费用与资金补充信息",
-  PARTICIPANT: "客户 / 供货方补充信息",
+  PARTICIPANT: "客户 / 合作伙伴补充信息",
   EXTRA: "其他补充信息",
 };
 function fieldConfigFor(config: FieldConfigMap, key: string): OrderFormField | undefined {

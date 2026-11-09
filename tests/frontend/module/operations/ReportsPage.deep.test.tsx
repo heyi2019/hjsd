@@ -127,10 +127,10 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
       generated_on: "2026-10-01",
       total_cost: "0.00",
       items: [
-        { game_account: "a1", platform: "P", status: "IN_STOCK", buy_amount: "1", extra_cost: "0", total_cost: "1", holding_days: 5 },
-        { game_account: "a2", platform: "P", status: "IN_STOCK", buy_amount: "1", extra_cost: "0", total_cost: "1", holding_days: 15 },
-        { game_account: "a3", platform: "P", status: "IN_STOCK", buy_amount: "1", extra_cost: "0", total_cost: "1", holding_days: 45 },
-        { game_account: "a4", platform: "P", status: "IN_STOCK", buy_amount: "1", extra_cost: "0", total_cost: "1", holding_days: null },
+        { game_account: "a1", platform: "P", status: "IN_STOCK", buy_amount: "1", total_cost: "1", holding_days: 5 },
+        { game_account: "a2", platform: "P", status: "IN_STOCK", buy_amount: "1", total_cost: "1", holding_days: 15 },
+        { game_account: "a3", platform: "P", status: "IN_STOCK", buy_amount: "1", total_cost: "1", holding_days: 45 },
+        { game_account: "a4", platform: "P", status: "IN_STOCK", buy_amount: "1", total_cost: "1", holding_days: null },
       ],
     });
     renderLight(<ReportsPage />, { user: "admin" });

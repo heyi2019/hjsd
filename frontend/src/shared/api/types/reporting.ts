@@ -11,7 +11,6 @@ export interface InventoryHealthRow {
   buy_amount: string;
   expected_price?: string | null;
   expected_profit?: string | null;
-  extra_cost: string;
   total_cost: string;
   holding_days?: number | null;
   owner_id?: number | null;

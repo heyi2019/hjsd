@@ -23,6 +23,7 @@ import "./OrderDetail.css";
 export type { InventoryExecutionRow, InventoryFinanceRow, InventoryPartyLink } from "./OrderDetail.shared";
 type OrderDetailViewProps = {
   meta: OrderDetailMeta;
+  className?: string;
   detail?: AccountExecutionDetail | null;
   account?: Account | null;
   executionRows: InventoryExecutionRow[];
@@ -55,6 +56,7 @@ type OrderDetailViewProps = {
  *  - 只读态（行展开 / 库存详情弹窗）：5 板块分栏，默认落在游戏账号信息。 */
 export function OrderDetailView({
   meta,
+  className,
   detail,
   account,
   editing,
@@ -115,7 +117,7 @@ export function OrderDetailView({
   }
 
   return (
-    <div className="inventory-detail inventory-detail--aligned">
+    <div className={["inventory-detail", "inventory-detail--aligned", className].filter(Boolean).join(" ")}>
       <OrderDetailProfileSection meta={meta} detail={detail} account={account} />
       <OrderDetailDeliverySection meta={meta} detail={detail} account={account} employees={employees} />
       <OrderDetailOperationSection meta={meta} />

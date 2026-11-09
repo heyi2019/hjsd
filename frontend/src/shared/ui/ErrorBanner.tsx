@@ -9,7 +9,7 @@ const HINTS: Record<string, string> = {
   POOL_ROUTE_MISSING: "该业务尚未配置资金池路由，请到「设置 → 主数据」补路由。",
   POOL_DISABLED: "资金池已停用，请改用启用中的资金池。",
   CUSTOMER_DISABLED: "客户已拉黑，不能作为新订单参与方。",
-  COUNTERPARTY_DISABLED: "合作方已拉黑，不能作为新订单参与方。",
+  COUNTERPARTY_DISABLED: "合作伙伴已拉黑，不能作为新订单参与方。",
   PAYMENT_EXCEEDS_RECEIVABLE: "金额超过可收/可结算上限，请核对后重填。",
   ORDER_STATUS_CONFLICT: "订单当前状态不允许该操作，请刷新详情。",
   VALIDATION_ERROR: "提交内容未通过校验，请检查必填项与格式。",

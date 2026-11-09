@@ -4,7 +4,7 @@ import { ThFeeSection } from "./ThFeeSection";
 import { ThSupplierSection } from "./ThSupplierSection";
 import { CustomFieldSection } from "../ConfigurableField";
 
-/** 提号复用回收页主结构：账号信息、费用明细、付款信息保持一致，仅登记合作伙伴供货方。 */
+/** 提号复用回收页主结构：账号信息、费用明细、付款信息保持一致，仅登记合作伙伴。 */
 export function ThOrderSection(props: {
   pools: Pool[];
   counterparties: Counterparty[];

@@ -120,7 +120,7 @@ export function BusinessDictionaryPanel() {
       <Descriptions bordered size="small" column={1} labelStyle={{ width: 96 }}>
         <Descriptions.Item label={<span id="business-dictionary-business">业务</span>}>
           <EntryLine name="自营" desc="本方承担资金、库存和利润。" />
-          <EntryLine name="分销" desc="向供货方提号后销售或帮客户代售（代挂）游戏账号，提号可使用本方资金。" />
+          <EntryLine name="分销" desc="向合作伙伴提号后销售或帮客户代售（代挂）游戏账号，提号可使用本方资金。" />
         </Descriptions.Item>
         <Descriptions.Item label="业务类型">
           <EntryLine name="回收" desc="自营买入账号。" />

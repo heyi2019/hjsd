@@ -34,7 +34,7 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
           <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}>
             <Select aria-label="资金池" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} />
           </CfgItem>
-          <CfgItem name="counterparty_id" label="对手方 ID" extra="可选，填写已建档合作方 ID">
+          <CfgItem name="counterparty_id" label="对手方 ID" extra="可选，填写已建档合作伙伴 ID">
             <Input inputMode="numeric" />
           </CfgItem>
           <CfgItem name="source_order_id" label="来源订单 ID" extra="可选，填写关联订单 ID">

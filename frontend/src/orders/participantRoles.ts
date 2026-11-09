@@ -2,7 +2,7 @@
 
 export type BusinessOrderType = "HS" | "TH" | "DG";
 
-/** 提号建单的供货源只属于合作伙伴主数据。 */
+/** 提号建单的合作伙伴角色统一为 SUPPLIER。 */
 export const TH_COUNTERPARTY_ROLE = "SUPPLIER" as const;
 
 export function participantLookupKey(displayName: string, type: string): string {

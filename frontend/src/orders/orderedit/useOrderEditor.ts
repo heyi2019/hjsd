@@ -36,6 +36,7 @@ export interface OrderEditor {
   partyDrafts: Record<number, InventoryPartyDraft>;
   updatePartyDraft: (orderId: number, draft: InventoryPartyDraft) => void;
   employees: EmployeeOption[];
+  ensureEmployees: () => Promise<void>;
   orderEditExtraForm: ReturnType<typeof Form.useForm>[0];
   savingAccount: boolean;
   openEditor: (account: Account, detail?: AccountExecutionDetail) => Promise<void>;
@@ -65,6 +66,15 @@ export function useOrderEditor(params: {
   const [orderEditExtraForm] = Form.useForm();
   const [savingAccount, setSavingAccount] = useState(false);
 
+  async function ensureEmployees() {
+    if (employees.length) return;
+    try {
+      setEmployees(await employeesApi.list());
+    } catch {
+      // 只读详情没有员工名单时保留占位文案；编辑态仍可在保存前重试。
+    }
+  }
+
   async function openEditor(account: Account, detail?: AccountExecutionDetail) {
     setEditingAccount({ ...account });
     setEventDrafts({});
@@ -76,12 +86,7 @@ export function useOrderEditor(params: {
       registered_at: source?.created_at ?? account.created_at ?? null,
       sold_at: sell?.occurred_at ?? null,
     });
-    try {
-      const list = await employeesApi.list();
-      setEmployees(list);
-    } catch {
-      // 员工列表加载失败不阻断编辑：事件操作人下拉可在保存前重试或留空由后端校验。
-    }
+    await ensureEmployees();
     setInlineEditId(account.id);
   }
 
@@ -239,6 +244,7 @@ export function useOrderEditor(params: {
     partyDrafts,
     updatePartyDraft,
     employees,
+    ensureEmployees,
     orderEditExtraForm,
     savingAccount,
     openEditor,

@@ -434,7 +434,9 @@ def _order_list_payload(
             "sale_at": sale_at,
             "sale_operator": sale_operator,
             "in_hand_time": _elapsed_label(inventory_entry_at, sale_at),
-            "event_total": sum((event.amount for event in events), 0),
+            # 台账「金额」展示订单主金额：已售单取净售出收入，未售单取买入本金。
+            # 不能把 BUY 与 SELL 相加，否则会把买入成本重复混入售出金额（如 1000 + 1500 = 2500）。
+            "event_total": income if sale_event is not None else buy_amount,
             "cost_amount": total_cost,
             "profit_base": income - total_cost,
             "last_event_type": latest.event_type if latest else None,

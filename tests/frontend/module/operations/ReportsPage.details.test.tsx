@@ -62,7 +62,6 @@ describe("ReportsPage：各报表渲染与错误态", () => {
           platform: "A",
           status: "IN_STOCK",
           buy_amount: "100.00",
-          extra_cost: "10.00",
           total_cost: "110.00",
           holding_days: 5,
         },
@@ -72,6 +71,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     await screen.findByText("acc-1");
     expect(screen.getAllByText("100.00").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("5天")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "占用成本" })).toBeInTheDocument();
   });
 
   it("FE-254：库存健康报表展示在库提号账号，不丢失 PICKUP 成本", async () => {
@@ -84,7 +84,6 @@ describe("ReportsPage：各报表渲染与错误态", () => {
         platform: "盼之",
         status: "IN_STOCK",
         buy_amount: "500.00",
-        extra_cost: "0.00",
         total_cost: "500.00",
         holding_days: 2,
       }],
@@ -99,7 +98,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     resolveMockOnce(vi.mocked(catalog.reportsApi.inventoryHealth), {
       generated_on: "2026-10-01",
       total_cost: "0.00",
-      items: [{ account_id: 9, game_account: "missing-platform", platform: null, status: "IN_STOCK", buy_amount: "1.00", extra_cost: "0.00", total_cost: "1.00", holding_days: 1 }],
+      items: [{ account_id: 9, game_account: "missing-platform", platform: null, status: "IN_STOCK", buy_amount: "1.00", total_cost: "1.00", holding_days: 1 }],
     });
     renderLight(<ReportsPage />, { user: "admin" });
     await screen.findByText("missing-platform");

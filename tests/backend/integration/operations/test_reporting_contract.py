@@ -163,7 +163,7 @@ class TestR1Inventory:
 
         assert pickup.id in {item["account_id"] for item in data["items"]}
 
-    def test_account_loop_extra_cost_and_expected_price(self, seeded_db):
+    def test_account_loop_cost_and_expected_price(self, seeded_db):
         in_stock = Account(
             business_mode="SELF",
             inventory_type="RECOVERY",
@@ -220,13 +220,12 @@ class TestR1Inventory:
         held = items[in_stock.id]
         assert held["business"] == "HS"
         assert held["buy_amount"] == 1800
-        assert held["extra_cost"] == 0
         assert held["total_cost"] == 1800
         assert held["expected_price"] == 1500
         assert held["expected_profit"] == -300
         assert held["holding_days"] == (date.today() - in_stock.inventory_entry_at.date()).days
 
-    def test_extra_cost_is_included_in_occupied_cost(self, seeded_db):
+    def test_order_cost_is_included_in_occupied_cost(self, seeded_db):
         account = Account(
             business_mode="SELF",
             inventory_type="RECOVERY",
@@ -252,7 +251,6 @@ class TestR1Inventory:
         row = next(item for item in report["items"] if item["account_id"] == account.id)
 
         assert row["buy_amount"] == Decimal("0.00")
-        assert row["extra_cost"] == Decimal("800.00")
         assert row["total_cost"] == Decimal("800.00")
         assert report["total_cost"] == Decimal("800.00")
 

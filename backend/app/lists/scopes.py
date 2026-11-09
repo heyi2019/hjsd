@@ -202,7 +202,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("platform", "平台"),
             ListColumn("status", "状态", value_set="INVENTORY_STATUS"),
             ListColumn("buy_amount", "买入"),
-            ListColumn("extra_cost", "附加成本"),
             ListColumn("total_cost", "占用成本"),
             ListColumn("holding_days", "持有天数"),
         ),

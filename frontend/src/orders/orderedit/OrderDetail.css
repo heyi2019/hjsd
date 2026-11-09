@@ -35,6 +35,10 @@
   inline-size: 100%;
   max-inline-size: 100%;
 }
+/* 订单台账是嵌在主表行里的详情，限制首屏高度，明细在本区域内滚动，避免把整张台账拉得过长。 */
+.inventory-detail--ledger {
+  max-height: 24rem;
+}
 .inventory-detail__meta {
   overflow: hidden;
   box-sizing: border-box;
@@ -169,4 +173,5 @@
 @media (--bp-sm) {
   .inventory-table .ant-table-tbody > tr.ant-table-expanded-row > td { padding: var(--space-2) var(--space-3) !important; }
   .inventory-detail { max-height: 28rem; padding: var(--space-3) 0; }
+  .inventory-detail--ledger { max-height: 20rem; }
 }

@@ -127,7 +127,7 @@ describe("OrderDetail", () => {
 
     const buyer = screen.getByRole("link", { name: "客户_买家：买家A" });
     expect(screen.getByRole("link", { name: "客户_卖家：卖家B" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "合作方_平台：平台A" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "合作伙伴_平台：平台A" })).toBeInTheDocument();
     fireEvent.click(buyer);
     expect(onPartyClick).toHaveBeenCalledWith({ id: 7, display_name: "买家A", role: "BUYER", entityType: "customer" });
   });

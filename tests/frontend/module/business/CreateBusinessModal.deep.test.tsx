@@ -62,7 +62,9 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
   it("已填写表单点关闭触发放弃确认，确认后 onClose", async () => {
     const onClose = vi.fn();
     await openTypedModal("HS", onClose);
-    await ui.type(screen.getByLabelText("客户昵称"), "李四");
+    const customerField = screen.getByLabelText("客户");
+    await ui.click(customerField.closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText(/CUS-0001 · 张三/, { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: "Close" }));
     // 放弃确认框出现，未确认前不关闭
     expect(await screen.findByText("放弃未保存的建单内容？")).toBeInTheDocument();

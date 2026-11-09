@@ -10,7 +10,7 @@ export const FORM_SCOPE_GROUP_LABEL: Record<string, string> = {
   INVENTORY: "库存中心",
   INVOP: "库存操作",
   CUSTOMER: "客户",
-  PARTY: "客户与合作方",
+  PARTY: "客户与合作伙伴",
   INSTALLMENT: "分期与回款",
   FUND: "资金",
   STUDIO: "工作室",

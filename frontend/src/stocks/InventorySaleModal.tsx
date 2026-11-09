@@ -236,7 +236,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope={saleScope ?? ""} form={form} onFinish={submit}>
-          <RecoveryCustomerSection title={buyerInfoTitle} />
+          <RecoveryCustomerSection title={buyerInfoTitle} customerInputMode="nickname" />
           <DeliveryInfoSection showIntermediary employees={employees} />
           <section className="inventory-sale-cashflow inventory-sale-cashflow--full-width" aria-labelledby="inventory-sale-cashflow-title">
             <div id="inventory-sale-cashflow-title" className="inventory-sale-cashflow__title">资金流水</div>

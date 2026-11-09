@@ -30,7 +30,7 @@ const order = (overrides: Partial<Order> = {}): Order => ({
 });
 
 describe("OrdersPage helpers", () => {
-  it("提号建单只生成 SUPPLIER 合作伙伴角色，不生成客户角色", () => {
+  it("提号建单只生成合作伙伴角色，不生成客户角色", () => {
     expect(buildCustomerRoles("TH", 7)).toEqual([]);
     expect(buildCounterpartyRoles("TH", 9, "PEER")).toEqual([
       { counterparty_id: 9, role: TH_COUNTERPARTY_ROLE },

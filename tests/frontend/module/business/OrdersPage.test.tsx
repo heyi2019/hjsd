@@ -274,6 +274,7 @@ describe("OrdersPage：四类订单台账", () => {
         trade_date: "2026-10-01",
         created_at: "2026-10-01T09:30:00",
         status: "ACTIVE",
+        extra_values: { delivery_responsible_ids: [1] },
         events: [{
           id: 11,
           event_no: "EV0011",
@@ -298,7 +299,11 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.getByText("资金明细")).toBeInTheDocument();
     expect(screen.getByText("操作明细")).toBeInTheDocument();
     expect(screen.getByText("参与方信息")).toBeInTheDocument();
+    expect(screen.getByText("管理员")).toBeInTheDocument();
+    expect(screen.queryByText("负责人信息加载中")).toBeNull();
+    expect(document.querySelector(".orders-ledger .inventory-detail")).toHaveClass("inventory-detail--ledger");
     expect(vi.mocked(catalog.stocksApi.executionDetail)).toHaveBeenCalledWith(1);
+    expect(vi.mocked(catalog.employeesApi.list)).toHaveBeenCalled();
   });
 
   it("同一账号有多张订单时，订单台账展开使用当前订单的详情上下文", async () => {

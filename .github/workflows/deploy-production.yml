@@ -48,21 +48,34 @@ jobs:
       - name: Build production images
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           VERSION="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' backend/app/version.py | head -1)"
           [[ -n "$VERSION" ]] || { echo 'Unable to read backend/app/version.py' >&2; exit 1; }
           echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
 
+          # 两个镜像互不依赖，后台并行构建；后续打包、上传与 ECS 校验口径不变。
           docker buildx build --platform linux/amd64 --load \
             --cache-from type=gha,scope=heijin-backend \
             --cache-to type=gha,mode=max,scope=heijin-backend \
             -t "heijin-backend:${VERSION}" \
-            -f backend/Dockerfile backend
+            -f backend/Dockerfile backend &
+          backend_pid=$!
+
           docker buildx build --platform linux/amd64 --load \
             --cache-from type=gha,scope=heijin-frontend \
             --cache-to type=gha,mode=max,scope=heijin-frontend \
             -t "heijin-frontend:${VERSION}" \
-            -f frontend/Dockerfile .
+            -f frontend/Dockerfile . &
+          frontend_pid=$!
+
+          backend_status=0
+          frontend_status=0
+          wait "$backend_pid" || backend_status=$?
+          wait "$frontend_pid" || frontend_status=$?
+          if [[ "$backend_status" -ne 0 || "$frontend_status" -ne 0 ]]; then
+            echo "backend build exit=${backend_status}; frontend build exit=${frontend_status}" >&2
+            exit 1
+          fi
 
       - name: Create deployment package
         shell: bash

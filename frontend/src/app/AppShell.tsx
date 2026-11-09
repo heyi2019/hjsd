@@ -1,7 +1,7 @@
 import { Modal, Space } from "antd";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { navigation } from "./navigation";
+import { MOBILE_NAV_ORDER, navigation } from "./navigation";
 import { DEV_ROLES, useSession } from "../shared/state/session";
 import { useTheme } from "../shared/state/theme";
 import { loadOptionSets } from "../shared/lib/optionSets";
@@ -160,6 +160,8 @@ export function AppShell() {
             <button
               key={n.key}
               type="button"
+              data-nav-key={n.key}
+              data-mobile-order={MOBILE_NAV_ORDER[n.key]}
               className={`nav-item${n.key === "operations" || n.key === "settings" ? " nav-item--secondary" : ""}${active === n.key ? " nav-item--active" : ""}`}
               onClick={() => navigateTo(n.key)}
               aria-label={n.label}
@@ -173,6 +175,7 @@ export function AppShell() {
           <button
             type="button"
             className="mobile-more-button"
+            data-mobile-order="5"
             onClick={() => setMoreOpen(true)}
             aria-label="更多导航"
             aria-expanded={moreOpen}

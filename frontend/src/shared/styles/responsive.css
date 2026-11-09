@@ -68,6 +68,11 @@
     overflow: hidden;
   }
   .sidebar .nav-item--secondary { display: none; }
+  .nav-list .nav-item[data-mobile-order="1"] { order: 1; }
+  .nav-list .nav-item[data-mobile-order="2"] { order: 2; }
+  .nav-list .nav-item[data-mobile-order="3"] { order: 3; }
+  .nav-list .nav-item[data-mobile-order="4"] { order: 4; }
+  .nav-list .mobile-more-button { order: 5; }
   .mobile-more-button {
     display: flex;
     flex: 1 1 0;

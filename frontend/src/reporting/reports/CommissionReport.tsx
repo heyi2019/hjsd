@@ -51,7 +51,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
   };
   const columns: ColumnsType<CommissionRow> = [
     ...(mine ? [] : [{
-      title: "人员",
+      title: "人员 ID",
       dataIndex: "user_id",
       width: 150,
       render: (value: number | null | undefined) => {

@@ -46,6 +46,7 @@ export function moreMenuItems(row: Account, detail?: AccountExecutionDetail) {
   const canSystemOffsale = row.inventory_type === "CONSIGNMENT" && canPlatformOffsale;
   const hasActiveConsignment = Boolean(detail?.orders.some((order) => order.order_type === "DG" && order.status !== "CANCELLED"));
   const items = [] as Array<{ key: string; label: string; danger?: boolean }>;
+  if (canPlatformOffsale) items.push({ key: "consignment", label: "寄售" });
   if (canPlatformOffsale && (hasActiveConsignment || canSystemOffsale)) items.push({ key: "offsale", label: "下架" });
   if (canPlatformOffsale) items.push({ key: "void", label: "取消", danger: true });
   if (row.status !== "SOLD") items.push({ key: "description", label: "描述" }, { key: "images", label: "作图" });

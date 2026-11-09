@@ -54,7 +54,6 @@ from .router_output import (
 router = APIRouter(tags=["ORD-01/02 订单与事件"])
 
 ORDER_DETAIL_EXPORT_COLUMNS = [
-    ("detail_account_password", "账号密码", True),
     ("detail_account_channel_region", "渠道 / 区服", True),
     ("detail_account_bound_phone", "绑定手机号", True),
     ("detail_account_secondary", "有无二次", True),
@@ -89,7 +88,6 @@ ORDER_DETAIL_EXPORT_COLUMNS = [
 # 详情 sheet 单独带「订单标识」组，用来承载跨 sheet 关联键（订单号）。
 DETAIL_EXPORT_HEADER_GROUPS: dict[str, str] = {
     "order_no": "订单标识",
-    "detail_account_password": "账号详情",
     "detail_account_channel_region": "账号详情",
     "detail_account_bound_phone": "账号详情",
     "detail_account_secondary": "账号详情",
@@ -360,7 +358,6 @@ def _order_detail_export_fields(detail: dict, value_labels: dict[str, dict[str, 
     account = detail.get("account_snapshot") or {}
     form_extra = detail.get("form_extra") or {}
     return {
-        "detail_account_password": account.get("game_password"),
         "detail_account_channel_region": account.get("channel_region"),
         "detail_account_bound_phone": account.get("bound_phone"),
         "detail_account_secondary": account.get("has_secondary"),

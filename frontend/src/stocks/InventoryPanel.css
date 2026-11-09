@@ -5,7 +5,8 @@
 .inventory-row-actions {
   flex-wrap: wrap;
   white-space: normal;
-  max-width: 280px;
+  width: 176px;
+  max-width: 176px;
   row-gap: 2px !important;
 }
 

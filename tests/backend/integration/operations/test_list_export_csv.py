@@ -101,10 +101,27 @@ def test_orders_export_appends_full_detail_in_the_same_csv_table(seeded_client, 
     body = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text
     header = _headers(body)
     assert "详情" not in header
-    assert "账号密码" in header
+    assert "账号密码" not in header
     assert "操作明细" in header
     assert "delivery_note" in body
     assert "HS9803" in body
+
+
+def test_orders_export_never_exposes_game_password(seeded_client, headers, seeded_db):
+    """导出是高扩散场景，账号密码不能出现在 CSV 或 Excel 详情列。"""
+    _seed_order(seeded_db, order_no="HS9808")
+
+    csv_response = seeded_client.get("/api/v1/orders/export.csv", headers=headers)
+    assert "账号密码" not in _headers(csv_response.text)
+    assert "game_password" not in csv_response.text
+
+    xlsx_response = seeded_client.get("/api/v1/orders/export.xlsx", headers=headers)
+    workbook = openpyxl.load_workbook(io.BytesIO(xlsx_response.content))
+    detail_labels = [
+        workbook["详情信息"].cell(row=3, column=index).value
+        for index in range(1, workbook["详情信息"].max_column + 1)
+    ]
+    assert "账号密码" not in detail_labels
 
 
 def test_installments_export_appends_full_detail_in_the_same_csv_table(seeded_client, headers):

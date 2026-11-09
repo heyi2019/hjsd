@@ -79,9 +79,10 @@ describe("InventoryPanel：账号台账", () => {
 
     renderLight(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByRole("button", { name: "导出" })).toBeInTheDocument();
-    for (const label of ["售出", "寄售", "返点", "编辑", "更多"]) {
+    for (const label of ["售出", "返点", "编辑", "更多"]) {
       expect(screen.getAllByRole("button", { name: label }).length).toBeGreaterThan(0);
     }
+    expect(screen.queryByRole("button", { name: "寄售" })).toBeNull();
     expect(screen.queryByRole("button", { name: "下架" })).toBeNull();
     await ui.click(screen.getAllByRole("button", { name: "更多" })[0]);
     // 术语统一后「取消交易」改名「取消」，在库账号（acc-1）可从更多菜单取消。
@@ -103,6 +104,21 @@ describe("InventoryPanel：账号台账", () => {
     for (const label of ["描述", "作图"]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
     }
+  });
+
+  it("寄售收进更多菜单，更多操作保持横向紧凑布局", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    const row = await screen.findByText("acc-1").then(() => {
+      const rows = screen.getAllByRole("row");
+      return rows.find((item) => within(item).queryByText("acc-1") !== null)!;
+    });
+    await ui.click(within(row).getByRole("button", { name: "更多" }));
+
+    const consignmentItem = await screen.findByRole("menuitem", { name: "寄售" });
+    expect(consignmentItem).toBeInTheDocument();
+    expect(document.querySelector(".inventory-more-menu")).toBeInTheDocument();
+    await ui.click(consignmentItem);
+    expect(await screen.findByRole("dialog", { name: "登记寄售" })).toBeInTheDocument();
   });
 
   it("系统下架只对代挂账号开放，平台下架对在库账号开放", async () => {

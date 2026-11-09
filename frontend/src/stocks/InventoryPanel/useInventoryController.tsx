@@ -300,6 +300,10 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   }
 
   function handleMoreAction(key: string, row: Account) {
+    if (key === "consignment") {
+      setConsignmentTarget(row);
+      return;
+    }
     if (key === "offsale") {
       void openPlatformOffsale(row);
       return;
@@ -381,20 +385,6 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
             }}
           >
             售出
-          </PermissionButton>
-          <PermissionButton
-            permission="order.create"
-            type="link"
-            size="small"
-            aria-label="寄售"
-            aria-describedby={actionContextId}
-            disabled={row.status === "SOLD"}
-            onClick={(event) => {
-              event.stopPropagation();
-              setConsignmentTarget(row);
-            }}
-          >
-            寄售
           </PermissionButton>
           <PermissionButton
             permission="order.event.post"

@@ -2,7 +2,7 @@ name: auto-merge-test-to-main
 
 # 触发：每次 push 到 test 分支（即 dev 推上来）
 # 行为：代码提交轮询 3 个 CI gate（lint/frontend-gate/coverage）；
-#       只有 RELEASE.md 的说明提交直接同步，不重复跑整套门禁；
+#       只有发布说明或工作流的元数据提交直接同步，不重复跑整套门禁；
 #       全部 success 后将 test 以 non-ff merge commit 合入 main，
 #       E2E 只在 main/PR 运行，不作为 test -> main 的阻塞门禁；
 #       从而触发 deploy-production 自动部署 ECS。
@@ -40,12 +40,12 @@ jobs:
         run: |
           set -euo pipefail
           changed=$(git diff-tree --no-commit-id --name-only -r "$SHA")
-          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qv '^RELEASE.md$'; then
-            echo "RELEASE.md-only commit; skip code gates"
-            echo "notes_only=true" >> "$GITHUB_OUTPUT"
+          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '^(RELEASE.md|\.github/workflows/)'; then
+            echo "metadata-only commit; skip code gates and production deploy"
+            echo "metadata_only=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "notes_only=false" >> "$GITHUB_OUTPUT"
+          echo "metadata_only=false" >> "$GITHUB_OUTPUT"
           for wf in lint-gate.yml frontend-gate.yml coverage-gate.yml; do
             echo "waiting for $wf ..."
             ok=""
@@ -86,7 +86,7 @@ jobs:
       # 关键修复：用 GITHUB_TOKEN 推送 main 不会自动触发下游 push 事件 workflow，
       # 必须用 gh workflow run（API 触发，不受该限制）显式拉起部署。
       - name: Trigger production deploy
-        if: steps.merge.outputs.merged == 'true' && steps.gate.outputs.notes_only != 'true'
+        if: steps.merge.outputs.merged == 'true' && steps.gate.outputs.metadata_only != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

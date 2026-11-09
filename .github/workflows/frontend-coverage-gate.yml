@@ -1,0 +1,42 @@
+name: frontend-coverage-gate
+
+# 覆盖率是质量度量，不重复阻塞 test -> main 的功能发布门禁。
+# test 分支已经跑 fast/quick/react 功能测试；覆盖率在 main、夜间或手动触发时完整测量。
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - "RELEASE.md"
+  workflow_dispatch:
+  schedule:
+    - cron: "0 18 * * *" # UTC 18:00 = 北京时间 02:00
+
+concurrency:
+  group: frontend-coverage-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'schedule' || github.ref == 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    name: Frontend coverage gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        working-directory: .
+        run: npm ci
+
+      - name: Run coverage (fast+quick+react)
+        working-directory: frontend
+        run: ../node_modules/.bin/vitest run --coverage --project=fast --project=quick --project=react --reporter=dot

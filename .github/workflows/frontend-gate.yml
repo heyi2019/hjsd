@@ -91,34 +91,6 @@ jobs:
       - name: Run ${{ matrix.layer }} layer
         run: ${{ matrix.command }}
 
-  frontend-coverage:
-    # 覆盖率门禁（阶段七）：显式跑 --coverage，触发 vitest.config.ts 的 coverage.thresholds.global。
-    # 仅聚合阈值（lines≥80 / statements≥76 / functions≥66 / branches≥72；2026-11-03 基线
-    # 82.45 / 78.92 / 68.86 / 75.49）。不并入 test-layers——覆盖测量需 v8 provider，单开
-    # job 隔离，且失败不污染分层测试结论。缓冲约 2~3pt：真实回归才失败，正常波动不误伤。
-    name: Frontend coverage gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install dependencies
-        working-directory: .
-        run: npm ci
-
-      - name: Run coverage (fast+quick+react)
-        # npm ci 在仓库根执行（workspaces hoisted），vitest 二进制落在根 node_modules/.bin，
-        # 不是 frontend/node_modules/.bin。CI 实测 ./node_modules/.bin/vitest 直接
-        # "No such file or directory"，故显式走根路径。
-        run: ../node_modules/.bin/vitest run --coverage --project=fast --project=quick --project=react --reporter=dot
-
   test-react-deep:
     # 仅在 main/master 的 push、定时与手动触发时运行，PR 与 test 分支跳过。
     # deep 按区域拆成 6 个矩阵分片（共 16 个 .deep 文件），既保留单分片隔离，又缩短 CI 总等待时间。
@@ -186,7 +158,7 @@ jobs:
     defaults:
       run:
         working-directory: .
-    needs: [static-checks, test-layers, test-react-deep, frontend-coverage]
+    needs: [static-checks, test-layers, test-react-deep]
     if: always()
     steps:
       - name: Assert upstream jobs succeeded
@@ -196,14 +168,12 @@ jobs:
           static="${{ needs.static-checks.result }}"
           layers="${{ needs.test-layers.result }}"
           deep="${{ needs.test-react-deep.result }}"
-          coverage="${{ needs.frontend-coverage.result }}"
           echo "static-checks=${static}"
           echo "test-layers=${layers}"
           echo "test-react-deep=${deep}"
-          echo "frontend-coverage=${coverage}"
           failed=0
           # skipped 视为通过：deep 层在 PR 与 test 分支按设计跳过。
-          for result in "$static" "$layers" "$deep" "$coverage"; do
+          for result in "$static" "$layers" "$deep"; do
             case "$result" in
               success|skipped) ;;
               *)
@@ -224,7 +194,6 @@ jobs:
             echo "- static-checks: \`${{ needs.static-checks.result }}\`"
             echo "- test-layers: \`${{ needs.test-layers.result }}\`"
             echo "- test-react-deep: \`${{ needs.test-react-deep.result }}\`"
-            echo "- frontend-coverage: \`${{ needs.frontend-coverage.result }}\`"
             echo "- trigger: \`${{ github.event_name }}\` on \`${{ github.ref_name }}\`"
             echo
             echo "react-deep 仅在 main/master push、定时与手动触发时运行；PR 与 test 分支跳过。"

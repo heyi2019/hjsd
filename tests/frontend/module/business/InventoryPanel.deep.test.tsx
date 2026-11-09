@@ -133,6 +133,13 @@ beforeEach(() => {
 });
 
 describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
+  it("库存行操作保留简短文案，并通过描述关联具体账号", async () => {
+    await openPanel([inStockRow]);
+    const row = rowOf(1);
+    expect(within(row).getByRole("button", { name: "售出" })).toHaveAttribute("aria-describedby", "inventory-action-context-1");
+    expect(within(row).getByText("记录 acc-1")).toHaveClass("ui-visually-hidden");
+  });
+
   it("更多菜单 → 描述：打开描述编辑弹窗", async () => {
     await openPanel([inStockRow]);
     await clickMore(rowOf(1), "描述");

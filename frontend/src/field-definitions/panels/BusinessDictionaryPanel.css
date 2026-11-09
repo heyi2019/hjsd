@@ -7,6 +7,41 @@
   white-space: pre-wrap;
 }
 
+.business-dictionary__toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2);
+  border: var(--border-w) solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+}
+
+.business-dictionary__toc a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.business-dictionary__toc a::before {
+  content: attr(data-label);
+}
+
+.business-dictionary__toc a:hover,
+.business-dictionary__toc a:focus-visible {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.business-dictionary__toc [id] {
+  scroll-margin-top: 84px;
+}
+
 /* 一级列表标签：文字加粗并上下左右居中（以账号流转标题为样板） */
 .business-dictionary .ant-descriptions-item-label {
   font-weight: 600;

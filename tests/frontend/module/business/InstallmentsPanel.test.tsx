@@ -70,6 +70,15 @@ describe("InstallmentsPanel：分期合约", () => {
     expect(screen.getAllByText("HS-2026-0010").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("分期行操作通过描述关联合约编号，并使用紧凑操作区", async () => {
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    const contractNo = await screen.findByText("HS0001-INS01");
+    const row = contractNo.closest("tr") as HTMLElement;
+    expect(within(row).getByRole("button", { name: "登记收款" })).toHaveAttribute("aria-describedby", "installment-action-context-1");
+    expect(within(row).getByText("合约 HS0001-INS01")).toHaveClass("ui-visually-hidden");
+    expect(row.querySelector(".installment-row-actions")).toBeTruthy();
+  });
+
   it("提供分期合约日期区间筛选", async () => {
     renderLight(<InstallmentsPanel />, { user: "admin" });
 

@@ -428,10 +428,12 @@ export function useContractTableController(params: { contractType: string; reloa
       title: "操作",
       key: "actions",
       render: (_v, row) => (
-        <Space size={2}>
+        <Space className="installment-row-actions" size={2}>
+          <span id={`installment-action-context-${row.id}`} className="ui-visually-hidden">合约 {row.inst_no}</span>
           <PermissionButton
             permission="order.event.post"
             size="small"
+            aria-describedby={`installment-action-context-${row.id}`}
             disabled={["SETTLED", "DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
             onClick={() => void openPay(row)}
           >
@@ -441,6 +443,7 @@ export function useContractTableController(params: { contractType: string; reloa
             permission="order.event.post"
             size="small"
             type="primary"
+            aria-describedby={`installment-action-context-${row.id}`}
             disabled={row.status !== "SETTLED"}
             onClick={() => openDeliver(row)}
           >
@@ -449,6 +452,7 @@ export function useContractTableController(params: { contractType: string; reloa
           <PermissionButton
             permission="order.update"
             size="small"
+            aria-describedby={`installment-action-context-${row.id}`}
             disabled={
               !(["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status)) ||
               dispositions[row.id]?.some((item) => item.action === "RECOVER")
@@ -461,6 +465,7 @@ export function useContractTableController(params: { contractType: string; reloa
             permission="order.event.post"
             size="small"
             danger
+            aria-describedby={`installment-action-context-${row.id}`}
             disabled={!(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status))}
             onClick={() => { cancelForm.resetFields(); setCancelTarget(row); cancelForm.setFieldsValue({ cancelled_on: today() }); }}
           >
@@ -469,6 +474,7 @@ export function useContractTableController(params: { contractType: string; reloa
           <PermissionButton
             permission={settlePermission}
             size="small"
+            aria-describedby={`installment-action-context-${row.id}`}
             disabled={!(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status))}
             onClick={() => { settleForm.resetFields(); setSettleTarget(row); settleForm.setFieldsValue({ paid_on: today() }); }}
           >
@@ -478,6 +484,7 @@ export function useContractTableController(params: { contractType: string; reloa
             permission="order.update"
             size="small"
             danger
+            aria-describedby={`installment-action-context-${row.id}`}
             disabled={!(["ACTIVE", "OVERDUE"].includes(row.status))}
             onClick={() => { defaultForm.resetFields(); setDefaultTarget(row); }}
           >
@@ -489,6 +496,7 @@ export function useContractTableController(params: { contractType: string; reloa
               <PermissionButton
                 permission="order.update"
                 size="small"
+                aria-describedby={`installment-action-context-${row.id}`}
                 onClick={() => { resaleForm.resetFields(); setResaleTarget(row); resaleForm.setFieldsValue({ occurred_on: today() }); }}
               >
                 登记出售

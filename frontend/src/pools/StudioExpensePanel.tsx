@@ -296,9 +296,9 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       <StatRow
         items={[
           // 失败态一律显示「—」（amount: null），不把未知状态当成可信 0
-          { label: "已入账收入", amount: error ? null : approvedIncome },
-          { label: "已入账支出", amount: error ? null : approvedExpense },
-          { label: "净额", amount: error ? null : netTotal },
+          { label: "已入账收入", amount: error ? null : approvedIncome, currency: "CNY" },
+          { label: "已入账支出", amount: error ? null : approvedExpense, currency: "CNY" },
+          { label: "净额", amount: error ? null : netTotal, currency: "CNY" },
           { label: "笔数", kind: "count", amount: error ? null : flows.length },
         ]}
       />

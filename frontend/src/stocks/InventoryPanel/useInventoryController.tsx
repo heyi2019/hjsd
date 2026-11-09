@@ -362,13 +362,18 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
       className: "inventory-actions-col",
       onHeaderCell: () => ({ className: "inventory-actions-col" }),
       onCell: () => ({ className: "inventory-actions-col" }),
-      render: (_value, row) => (
+      render: (_value, row) => {
+        const actionContextId = `inventory-action-context-${row.id}`;
+        const recordLabel = row.game_account || row.source_order_no || `账号 #${row.id}`;
+        return (
         <Space className="inventory-row-actions" size={4}>
+          <span id={actionContextId} className="ui-visually-hidden">记录 {recordLabel}</span>
           <PermissionButton
             permission="order.create"
             type="link"
             size="small"
             aria-label="售出"
+            aria-describedby={actionContextId}
             disabled={row.status !== 'WAITING'}
             onClick={(event) => {
               event.stopPropagation();
@@ -382,6 +387,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
             type="link"
             size="small"
             aria-label="寄售"
+            aria-describedby={actionContextId}
             disabled={row.status === "SOLD"}
             onClick={(event) => {
               event.stopPropagation();
@@ -395,6 +401,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
             type="link"
             size="small"
             aria-label="返点"
+            aria-describedby={actionContextId}
             onClick={(event) => {
               event.stopPropagation();
               setRebateTarget(row);
@@ -408,6 +415,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
               type="link"
               size="small"
               aria-label="编辑"
+              aria-describedby={actionContextId}
               disabled={orderEditor.editingAccount !== null}
               onClick={(event) => {
                 event.stopPropagation();
@@ -431,6 +439,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
                 type="link"
                 size="small"
                 aria-label="更多"
+                aria-describedby={actionContextId}
                 onClick={(event) => event.stopPropagation()}
               >
                 更多
@@ -443,6 +452,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
             size="small"
             danger
             aria-label="删除账号"
+            aria-describedby={actionContextId}
             onClick={(event) => {
               event.stopPropagation();
               setDeleteTarget(row);
@@ -451,7 +461,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
             删除
           </PermissionButton> : null}
         </Space>
-      ),
+        );
+      },
     },
   ];
 

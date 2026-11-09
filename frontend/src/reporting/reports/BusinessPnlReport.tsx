@@ -23,13 +23,13 @@ export function BusinessPnl({ range }: { range: ReportRange }) {
       width: 150,
       render: (v: string, row) => `${BUSINESS_MODE_LABEL[row.business_mode ?? ""] ?? "-"}·${BUSINESS_TYPE_LABEL[row.business_type ?? ""] ?? ORDER_TYPE_LABEL[v] ?? v}（${v}）`,
     },
-    { title: "主营收入", dataIndex: "main_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "主营成本", dataIndex: "main_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "主营收入", dataIndex: "main_income", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
+    { title: "主营成本", dataIndex: "main_cost", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" />},
     {
       title: "业务利润（汇总）",
       dataIndex: "main_profit",
       align: "right",
-      render: (v: string) => <MoneyText value={v} tone="auto" strong />,
+      render: (v: string) => <MoneyText value={v} currency="CNY" tone="auto" strong />,
     },
   ];
   return (
@@ -38,9 +38,9 @@ export function BusinessPnl({ range }: { range: ReportRange }) {
       <Space className="ui-filter-bar">{picker}</Space>
       <StatRow
         items={[
-          { label: "主营收入", amount: data?.total.main_income ?? "-" },
-          { label: "主营成本", amount: data?.total.main_cost ?? "-" },
-          { label: "业务利润（汇总）", amount: data?.total.main_profit ?? "-", tone: "auto" },
+          { label: "主营收入", amount: data?.total.main_income ?? "-", currency: "CNY" },
+          { label: "主营成本", amount: data?.total.main_cost ?? "-", currency: "CNY" },
+          { label: "业务利润（汇总）", amount: data?.total.main_profit ?? "-", currency: "CNY", tone: "auto" },
         ]}
       />
              <DataTable<BusinessPnlRow>

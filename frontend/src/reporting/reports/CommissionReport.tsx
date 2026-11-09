@@ -61,15 +61,15 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
       },
     }]),
     { title: "订单号", dataIndex: "order_no", width: 160 },
-    { title: "订单利润基数", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "订单利润基数", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" />},
     { title: "费率", dataIndex: "rate", align: "right", width: 90, render: (v: string) => formatRate(v) },
-    { title: "应付", dataIndex: "payable", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "已付", dataIndex: "paid", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "应付", dataIndex: "payable", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
+    { title: "已付", dataIndex: "paid", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" />},
     {
       title: "差异",
       dataIndex: "difference",
       align: "right",
-      render: (v: string) => <MoneyText value={v} tone="auto" strong />,
+      render: (v: string) => <MoneyText value={v} currency="CNY" tone="auto" strong />,
     },
   ];
   return (
@@ -99,10 +99,10 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
       <StatRow
         items={[
           { label: mine ? "收益订单数" : "订单数", kind: "count", amount: String(data?.total.order_count ?? 0) },
-          { label: mine ? "我的收益" : "分润基数", amount: data?.total.profit_base ?? "-" },
-          { label: "应付合计", amount: data?.total.payable ?? "-" },
-          { label: "已付合计", amount: data?.total.paid ?? "-" },
-          { label: "差异", amount: data?.total.difference ?? "-", tone: "auto" },
+          { label: mine ? "我的收益" : "分润基数", amount: data?.total.profit_base ?? "-", currency: "CNY" },
+          { label: "应付合计", amount: data?.total.payable ?? "-", currency: "CNY" },
+          { label: "已付合计", amount: data?.total.paid ?? "-", currency: "CNY" },
+          { label: "差异", amount: data?.total.difference ?? "-", currency: "CNY", tone: "auto" },
         ]}
       />
              <DataTable<CommissionRow>

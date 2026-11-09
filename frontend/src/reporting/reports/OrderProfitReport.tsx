@@ -21,15 +21,15 @@ export function OrderProfit({ range }: { range: ReportRange }) {
     { title: "业务", dataIndex: "order_type", width: 90, render: (v: string) => `${ORDER_TYPE_LABEL[v] ?? v}（${v}）`},
     { title: "成交日", dataIndex: "trade_date", width: 110 },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} /> },
-    { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "账号采购成本", dataIndex: "buy_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "直接成本", dataIndex: "direct_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
-    { title: "返点（收入子项）", dataIndex: "rebate", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
+    { title: "账号采购成本", dataIndex: "buy_amount", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
+    { title: "直接成本", dataIndex: "direct_cost", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" />},
+    { title: "返点（收入子项）", dataIndex: "rebate", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" />},
     {
       title: "订单利润（净利）",
       dataIndex: "net_profit",
       align: "right",
-      render: (v: string) => <MoneyText value={v} tone="auto" strong />,
+      render: (v: string) => <MoneyText value={v} currency="CNY" tone="auto" strong />,
     },
   ];
   return (
@@ -39,11 +39,11 @@ export function OrderProfit({ range }: { range: ReportRange }) {
       <Typography.Text type="secondary">订单利润 = 所有收入 − 所有支出；返点已包含在收入中，分期按实际收付款确认。</Typography.Text>
       <StatRow
         items={[
-          { label: "收入合计", amount: data?.total.income ?? "-" },
-          { label: "账号采购成本合计", amount: data?.total.buy_amount ?? "-" },
-          { label: "直接成本合计", amount: data?.total.direct_cost ?? "-" },
-          { label: "返点（收入子项）合计", amount: data?.total.rebate ?? "-" },
-          { label: "订单利润合计", amount: data?.total.net_profit ?? "-", tone: "auto" },
+          { label: "收入合计", amount: data?.total.income ?? "-", currency: "CNY" },
+          { label: "账号采购成本合计", amount: data?.total.buy_amount ?? "-", currency: "CNY" },
+          { label: "直接成本合计", amount: data?.total.direct_cost ?? "-", currency: "CNY" },
+          { label: "返点（收入子项）合计", amount: data?.total.rebate ?? "-", currency: "CNY" },
+          { label: "订单利润合计", amount: data?.total.net_profit ?? "-", currency: "CNY", tone: "auto" },
         ]}
       />
              <DataTable<OrderProfitRow>

@@ -41,6 +41,8 @@ export function StatRow(props: {
     amount?: string | number | null;
     /** count=计数（整数原样显示）；money=金额（千分位两位小数）。默认按 amount 推断。 */
     kind?: "count" | "money";
+    /** 金额币种标识；当前业务金额统一为人民币。 */
+    currency?: "CNY";
     hint?: string;
     onClick?: () => void;
     /** auto：按金额正负自动上色（中国区惯例：正红负绿）。 */
@@ -59,6 +61,7 @@ export function StatRow(props: {
         ) : (
           <MoneyText
             value={item.amount}
+            currency={item.currency}
             tone={item.tone === "warn" ? "plain" : (item.tone ?? "plain")}
           />
         );

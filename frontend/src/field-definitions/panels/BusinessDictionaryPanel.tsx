@@ -46,6 +46,16 @@ function EntryGroup({ title, children, stacked = false }: { title: string; child
   );
 }
 
+const dictionarySections = [
+  { id: "business-dictionary-business", label: "业务" },
+  { id: "business-dictionary-product", label: "产品" },
+  { id: "business-dictionary-actions", label: "业务动作" },
+  { id: "business-dictionary-states", label: "状态机" },
+  { id: "business-dictionary-profit", label: "分润规则" },
+  { id: "business-dictionary-cancel", label: "取消模型" },
+  { id: "business-dictionary-stock", label: "入库规则" },
+];
+
 export function BusinessDictionaryPanel() {
   const { can } = useSession();
   const [editing, setEditing] = useState(false);
@@ -102,8 +112,13 @@ export function BusinessDictionaryPanel() {
       {editing ? <Input.TextArea aria-label="业务字典内容" value={draft} onChange={(event) => setDraft(event.target.value)} autoSize={{ minRows: 18 }} /> : null}
       {!editing && savedContent ? <Typography.Paragraph className="business-dictionary__saved-content">{savedContent}</Typography.Paragraph> : null}
       {!editing && !savedContent ? <div ref={contentRef}>
+      <nav className="business-dictionary__toc" aria-label="业务字典目录">
+        {dictionarySections.map((section) => (
+          <a key={section.id} href={`#${section.id}`} aria-label={section.label} data-label={section.label} />
+        ))}
+      </nav>
       <Descriptions bordered size="small" column={1} labelStyle={{ width: 96 }}>
-        <Descriptions.Item label="业务">
+        <Descriptions.Item label={<span id="business-dictionary-business">业务</span>}>
           <EntryLine name="自营" desc="本方承担资金、库存和利润。" />
           <EntryLine name="分销" desc="向供货方提号后销售或帮客户代售（代挂）游戏账号，提号可使用本方资金。" />
         </Descriptions.Item>
@@ -112,7 +127,7 @@ export function BusinessDictionaryPanel() {
           <EntryLine name="提号" desc="分销取得账号。" />
           <EntryLine name="代挂" desc="受委托挂售账号，付款和收款按实际发生登记。" />
         </Descriptions.Item>
-        <Descriptions.Item label="产品">
+        <Descriptions.Item label={<span id="business-dictionary-product">产品</span>}>
           具体的游戏账号，是可以进入库存中心的产品实例，包含游戏账号、账号密码、渠道/区服等信息。
         </Descriptions.Item>
         <Descriptions.Item label="产品类型">
@@ -124,7 +139,7 @@ export function BusinessDictionaryPanel() {
             desc="本方账号售出后，买家分期支付售卖款。账号售出后建立自营分期合约，按期登记买家回款；收齐后完成账号交付，每笔回款归集到原售出订单及其分期合约。"
           />
         </Descriptions.Item>
-        <Descriptions.Item label="业务动作">
+        <Descriptions.Item label={<span id="business-dictionary-actions">业务动作</span>}>
           <Typography.Paragraph type="secondary">
             业务动作分为账号流转、资金动作和账务动作三层；账号流转描述账号从取得到交付的状态变化，资金动作按资金实际流入或流出归类，账务动作描述入账、结算和更正。退款、押金等按实际方向登记，审计动作只记录谁在什么时候操作，不等同于业务事实。
           </Typography.Paragraph>
@@ -172,7 +187,7 @@ export function BusinessDictionaryPanel() {
           </EntryGroup>
           </div>
         </Descriptions.Item>
-        <Descriptions.Item label="状态机">
+        <Descriptions.Item label={<span id="business-dictionary-states">状态机</span>}>
           <Typography.Paragraph type="secondary">
             状态机描述业务对象的生命周期，状态只能通过领域动作流转并由后端受控校验。订单、账号、分期为受控状态机（对应后端核心状态机模块的转移表）；库存状态为业务概念描述，无独立转移表。
           </Typography.Paragraph>
@@ -191,7 +206,7 @@ export function BusinessDictionaryPanel() {
               <span className="business-dictionary__action-detail">业务与资金结清并交付；受控冲销可回退订单处理中，或到已取消。</span>
             </div>
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
-              <span className="business-dictionary__tertiary"><strong>已取消</strong></span>
+              <span className="business-dictionary__tertiary"><strong>订单已取消</strong></span>
               <span className="business-dictionary__action-detail">终态，不得再产生新事件；已发生资金事实走冲销或退款流程。</span>
             </div>
           </EntryGroup>
@@ -205,7 +220,7 @@ export function BusinessDictionaryPanel() {
               <span className="business-dictionary__action-detail">已售出或赊购；回收、取消入库、取消售出回待售，赊购保持，取消售出并终结或取消到终态。</span>
             </div>
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
-              <span className="business-dictionary__tertiary"><strong>已取消</strong></span>
+              <span className="business-dictionary__tertiary"><strong>账号已取消</strong></span>
               <span className="business-dictionary__action-detail">终态。</span>
             </div>
           </EntryGroup>
@@ -239,7 +254,7 @@ export function BusinessDictionaryPanel() {
               <span className="business-dictionary__action-detail">终态。</span>
             </div>
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
-              <span className="business-dictionary__tertiary"><strong>已取消</strong></span>
+              <span className="business-dictionary__tertiary"><strong>分期已取消</strong></span>
               <span className="business-dictionary__action-detail">终态。</span>
             </div>
           </EntryGroup>
@@ -269,13 +284,13 @@ export function BusinessDictionaryPanel() {
             desc="卖号的返点。"
           />
         </Descriptions.Item>
-        <Descriptions.Item label="分润规则">
+        <Descriptions.Item label={<span id="business-dictionary-profit">分润规则</span>}>
           <EntryLine
             name="分润"
             desc="订单利润分润：按参与方分配订单利润，支持按比例或按金额两种口径。"
           />
         </Descriptions.Item>
-        <Descriptions.Item label="取消模型">
+        <Descriptions.Item label={<span id="business-dictionary-cancel">取消模型</span>}>
           <EntryLine
             name="取消原则"
             desc="取消不删除已登记记录；对已有资金流水建立反向流水，并记录取消原因、实际登录操作人和操作时间。"
@@ -297,7 +312,7 @@ export function BusinessDictionaryPanel() {
             desc="取消用于全额反向处理并结束该笔交易；部分退钱走退款流程，订单仍保持已售出。"
           />
         </Descriptions.Item>
-        <Descriptions.Item label="入库规则">
+        <Descriptions.Item label={<span id="business-dictionary-stock">入库规则</span>}>
           <EntryLine name="首次入库" desc="回收、提号、代挂订单创建成功后，账号进入库存中心并按在库状态管理。" />
           <EntryLine name="未售出重复账号" desc="按游戏类型 + 游戏账号精确匹配；只要历史账号仍未售出，就禁止重复入库，不能通过确认强行建单。" />
           <EntryLine name="已售出账号回流" desc="历史账号已售出后，重复建单视为账号回流；经复购确认后允许重新进入库存。" />

@@ -29,10 +29,10 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
     },
     { title: "归属", dataIndex: "ownership", render: (v: string) => POOL_OWNERSHIP_LABEL[v] ?? v },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} optionSet="POOL_STATUS" /> },
-    { title: "收入", key: "income", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.income} /> },
-    { title: "支出", key: "expense", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.expense} /> },
-    { title: "押金", key: "deposit_held", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.deposit_held} /> },
-    { title: "可用余额", key: "available", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.available} tone="auto" strong /> },
+    { title: "收入", key: "income", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.income} currency="CNY" /> },
+    { title: "支出", key: "expense", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.expense} currency="CNY" /> },
+    { title: "押金", key: "deposit_held", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.deposit_held} currency="CNY" /> },
+    { title: "可用余额", key: "available", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.available} currency="CNY" tone="auto" strong /> },
   ];
   return (
     <Card
@@ -46,10 +46,10 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
     >
       <StatRow
         items={[
-          { label: "现金头寸合计", amount: totalCash },
-          { label: "可用余额合计", amount: totalAvailable },
-          { label: "押金占用", amount: totalDeposit },
-          { label: "自有权益合计", amount: totalOwned },
+          { label: "现金头寸合计", amount: totalCash, currency: "CNY" },
+          { label: "可用余额合计", amount: totalAvailable, currency: "CNY" },
+          { label: "押金占用", amount: totalDeposit, currency: "CNY" },
+          { label: "自有权益合计", amount: totalOwned, currency: "CNY" },
         ]}
       />
       <Typography.Text type="secondary">自有权益仅计归属为「自有」的池；托管/第三方池只计现金头寸。</Typography.Text>
@@ -95,7 +95,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       dataIndex: "direction",
       render: (v: string) => (v === "IN" ? "收入" : "支出"),
     },
-    { title: "金额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
+    { title: "金额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
     {
       title: "归属",
       key: "scope",
@@ -152,8 +152,8 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       )}
       <StatRow
         items={[
-          { label: "总收入", amount: cashflowUnavailable ? "不可用" : totalFlowIncome },
-          { label: "总支出", amount: cashflowUnavailable ? "不可用" : totalFlowExpense },
+          { label: "总收入", amount: cashflowUnavailable ? "不可用" : totalFlowIncome, currency: "CNY" },
+          { label: "总支出", amount: cashflowUnavailable ? "不可用" : totalFlowExpense, currency: "CNY" },
           { label: "当前结果", kind: "count", amount: cashflowUnavailable ? "不可用" : visibleCashflows.length },
         ]}
       />
@@ -188,13 +188,13 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
   const { deposits, setDepositOpen, returnForm, setReturnTarget, lossForm, setLossTarget, cancelForm, setCancelTarget, loading } = ctrl;
   const { arrange: arrangeDepositColumns } = useListViewColumns("DEPOSITS");
   const depositColumns: ColumnsType<Deposit> = [
-    { title: "占用金额", dataIndex: "paid_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
+    { title: "占用金额", dataIndex: "paid_amount", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
     { title: "对手方", key: "counterparty", render: (_v, row) => row.counterparty_id == null ? "—" : `#${row.counterparty_id}` },
     { title: "来源订单", key: "source_order", render: (_v, row) => row.source_order_id == null ? "—" : `#${row.source_order_id}` },
     { title: "预计释放", dataIndex: "expected_release_on", render: (v: string | null | undefined) => v || "—" },
-    { title: "已释放", dataIndex: "returned_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "已损失", dataIndex: "lost_amount", align: "right", render: (v: string | null | undefined) => <MoneyText value={v ?? "0.00"} /> },
-    { title: "剩余", key: "remaining", align: "right", render: (_v, row) => (<MoneyText value={row.remaining_amount} tone="auto" />) },
+    { title: "已释放", dataIndex: "returned_amount", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
+    { title: "已损失", dataIndex: "lost_amount", align: "right", render: (v: string | null | undefined) => <MoneyText value={v ?? "0.00"} currency="CNY" /> },
+    { title: "剩余", key: "remaining", align: "right", render: (_v, row) => (<MoneyText value={row.remaining_amount} currency="CNY" tone="auto" />) },
     { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="DEPOSIT_STATUS" /> },
     {
       title: "操作",
@@ -264,9 +264,9 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "资金池", key: "pool", render: (_v, row) => poolById.get(row.pool_id) ?? row.pool_id },
     { title: "对账日期", dataIndex: "reconciled_on" },
     { title: "账户", dataIndex: "account_label" },
-    { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已入账流水">系统余额</Tooltip>, key: "system_balance", align: "right", render: (_v, row) => <MoneyText value={row.system_balance} tone="auto" /> },
-    { title: "账面余额", key: "statement_balance", align: "right", render: (_v, row) => <MoneyText value={row.statement_balance} tone="auto" /> },
-    { title: "差异", key: "difference", align: "right", render: (_v, row) => <MoneyText value={row.difference} tone="auto" /> },
+    { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已入账流水">系统余额</Tooltip>, key: "system_balance", align: "right", render: (_v, row) => <MoneyText value={row.system_balance} currency="CNY" tone="auto" /> },
+    { title: "账面余额", key: "statement_balance", align: "right", render: (_v, row) => <MoneyText value={row.statement_balance} currency="CNY" tone="auto" /> },
+    { title: "差异", key: "difference", align: "right", render: (_v, row) => <MoneyText value={row.difference} currency="CNY" tone="auto" /> },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("RECONCILIATION_STATUS", v, RECONCILIATION_STATUS_LABEL)} /> },
     {
       title: "操作",
@@ -310,7 +310,7 @@ export function ControlsTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "现有流水", key: "flow_no", render: (_v, row) => row.flow.flow_no },
     { title: "资金池", key: "pool", render: (_v, row) => poolById.get(row.flow.pool_id) ?? row.flow.pool_id },
     { title: "方向", key: "direction", render: (_v, row) => row.flow.direction === "IN" ? "转入" : "转出" },
-    { title: "金额", key: "amount", align: "right", render: (_v, row) => <MoneyText value={row.flow.amount} /> },
+    { title: "金额", key: "amount", align: "right", render: (_v, row) => <MoneyText value={row.flow.amount} currency="CNY" /> },
     {
       title: "操作",
       key: "actions",

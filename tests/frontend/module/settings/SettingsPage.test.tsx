@@ -18,7 +18,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
   checkBackendHealth: vi.fn(),
 }));
 import { renderLight } from "@fixtures/render";
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { SettingsPage } from "@/field-definitions/SettingsPage";
 import { BusinessDictionaryPanel } from "@/field-definitions/panels/BusinessDictionaryPanel";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -112,4 +112,22 @@ it("业务字典展示账号入库规则：未售出禁止重复，已售出允�
   expect(
     screen.getByText("取消模型").compareDocumentPosition(screen.getByText("入库规则")) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
+});
+
+it("业务字典的终态文案带对象上下文，避免三个已取消无法区分", () => {
+  renderLight(<SettingsPage />, { user: "admin" });
+
+  expect(screen.getByText("订单已取消")).toBeInTheDocument();
+  expect(screen.getByText("账号已取消")).toBeInTheDocument();
+  expect(screen.getByText("分期已取消")).toBeInTheDocument();
+});
+
+it("业务字典提供目录锚点，长内容可以直接定位到各主题", () => {
+  renderLight(<SettingsPage />, { user: "admin" });
+
+  const nav = screen.getByRole("navigation", { name: "业务字典目录" });
+  expect(within(nav).getByRole("link", { name: "业务动作" })).toHaveAttribute("href", "#business-dictionary-actions");
+  expect(within(nav).getByRole("link", { name: "状态机" })).toHaveAttribute("href", "#business-dictionary-states");
+  expect(document.getElementById("business-dictionary-actions")).toBeInTheDocument();
+  expect(document.getElementById("business-dictionary-states")).toBeInTheDocument();
 });

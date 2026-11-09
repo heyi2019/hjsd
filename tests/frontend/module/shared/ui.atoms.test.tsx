@@ -36,6 +36,13 @@ describe("MoneyText：金额只展示，不做浮点运算", () => {
     expect(a.textContent).toBe("0.10");
     expect(b.textContent).toBe("0.20");
   });
+
+  it("可选的人民币标识只作为金额语义增强，不改变原始可复制文本", () => {
+    render(<MoneyText value="100" currency="CNY" />);
+    const money = screen.getByText("100.00");
+    expect(money).toHaveClass("ui-money--currency-cny");
+    expect(money).toHaveAttribute("aria-label", "人民币 100.00");
+  });
 });
 
 describe("StatusTag：文案承载语义，颜色只是辅助", () => {
@@ -121,6 +128,11 @@ describe("StatRow：金额与计数不能混", () => {
   it("kind=money → 千分位两位小数", () => {
     render(<StatRow items={[{ label: "成交额", amount: "1234.5", kind: "money" }]} />);
     expect(screen.getByText("1,234.50")).toBeInTheDocument();
+  });
+
+  it("金额汇总卡可以明确标识人民币", () => {
+    render(<StatRow items={[{ label: "成交额", amount: "1234.5", currency: "CNY" }]} />);
+    expect(screen.getByText("1,234.50")).toHaveClass("ui-money--currency-cny");
   });
 
   it("kind=count → 原样显示，不加小数（订单数不能被当成金额）", () => {

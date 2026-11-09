@@ -19,16 +19,16 @@ export function DailyFunds() {
   const { arrange: arrangeDailyFunds } = useListViewColumns("RPT_DAILY_FUNDS");
   const columns: ColumnsType<DailyFundsRow> = [
     { title: "资金池", dataIndex: "pool_name", width: 150 },
-    { title: "期初", dataIndex: "opening", align: "right", render: (v: string) => <MoneyText value={v} />},
-    { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "支出", dataIndex: "expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "押金占用", dataIndex: "deposit_held", align: "right", render: (v: string) => <MoneyText value={v} />},
-    { title: "现金余额", dataIndex: "cash_balance", align: "right", render: (v: string) => <MoneyText value={v} tone="auto" />},
+    { title: "期初", dataIndex: "opening", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" />},
+    { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
+    { title: "支出", dataIndex: "expense", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" /> },
+    { title: "押金占用", dataIndex: "deposit_held", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" />},
+    { title: "现金余额", dataIndex: "cash_balance", align: "right", render: (v: string) => <MoneyText value={v} currency="CNY" tone="auto" />},
     {
       title: "可用余额",
       dataIndex: "available",
       align: "right",
-      render: (v: string) => <MoneyText value={v} tone="auto" strong />,
+      render: (v: string) => <MoneyText value={v} currency="CNY" tone="auto" strong />,
     },
   ];
   return (
@@ -40,9 +40,9 @@ export function DailyFunds() {
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <StatRow
         items={[
-          { label: "现金余额", amount: data?.total.cash_balance ?? "-" },
-          { label: "押金占用", amount: data?.total.deposit_held ?? "-" },
-          { label: "可用余额", amount: data?.total.available ?? "-", tone: "auto" },
+          { label: "现金余额", amount: data?.total.cash_balance ?? "-", currency: "CNY" },
+          { label: "押金占用", amount: data?.total.deposit_held ?? "-", currency: "CNY" },
+          { label: "可用余额", amount: data?.total.available ?? "-", currency: "CNY", tone: "auto" },
         ]}
       />
              <DataTable<DailyFundsRow>

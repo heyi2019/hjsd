@@ -165,6 +165,7 @@
 .funds-cashflow-filters {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   margin-block-end: var(--space-4);
 }
 .funds-cashflow-filters > * { min-width: 0; width: 100%; }
@@ -177,6 +178,10 @@
   max-width: var(--col-w-140);
 }
 .funds-cashflow-filters .ant-select { width: 100%; }
+.funds-cashflow-filters > :nth-child(5),
+.funds-cashflow-filters > :nth-child(6) { flex-basis: var(--col-w-140); }
+.funds-cashflow-filters > :nth-child(7),
+.funds-cashflow-filters > :nth-child(8) { flex: 0 0 auto; width: auto; }
 
 @media (--bp-md) {
   .funds-cashflow-filters > * {

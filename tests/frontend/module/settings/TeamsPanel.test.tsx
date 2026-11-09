@@ -101,6 +101,14 @@ describe("TeamsPanel：团队管理", () => {
     expect(String(vi.mocked(message.error).mock.calls[0][0])).toMatch(/create fail/);
   });
 
+  it("新增团队字段提供持久可访问标签", async () => {
+    renderLight(<TeamsPanel />, { user: "admin" });
+    await screen.findByText("T01");
+    expect(screen.getByLabelText("团队编码")).toBeInTheDocument();
+    expect(screen.getByLabelText("团队名称")).toBeInTheDocument();
+    expect(screen.getByLabelText("说明")).toBeInTheDocument();
+  });
+
   it("停用团队需二次确认", async () => {
     renderLight(<TeamsPanel />, { user: "admin" });
     await screen.findByText("T01");

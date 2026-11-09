@@ -28,9 +28,9 @@ export function ReportsPage({ active = true, initialReportTab }: { active?: bool
     params: { from: reportFrom || undefined, to: reportTo || undefined },
     picker: (
       <Space size="small">
-        <Input type="date" value={reportFrom} onChange={(event) => setReportFrom(event.target.value)} className="ui-control-width-date" />
+        <Input aria-label="报表开始日期" type="date" value={reportFrom} onChange={(event) => setReportFrom(event.target.value)} className="ui-control-width-date" />
         <span className="muted">至</span>
-        <Input type="date" value={reportTo} onChange={(event) => setReportTo(event.target.value)} className="ui-control-width-date" />
+        <Input aria-label="报表结束日期" type="date" value={reportTo} onChange={(event) => setReportTo(event.target.value)} className="ui-control-width-date" />
       </Space>
     ),
   };

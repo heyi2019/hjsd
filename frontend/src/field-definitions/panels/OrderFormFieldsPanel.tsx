@@ -49,7 +49,7 @@ export function OrderFormFieldsPanel({
       <ErrorBanner error={error} onRetry={() => void load(activeType)} />
       <div className="order-form-fields__container">
         <Space className="ui-toolbar-spaced" align="center">
-          <Typography.Text strong>表单</Typography.Text>
+          <Typography.Text strong className="order-form-fields__toolbar-label">表单</Typography.Text>
           <Select
             className="ui-control-width-260"
             value={activeType}
@@ -64,7 +64,7 @@ export function OrderFormFieldsPanel({
             optionFilterProp="label"
             showSearch
           />
-          <Typography.Text strong>建单快捷入口</Typography.Text>
+          <Typography.Text strong className="order-form-fields__toolbar-label">建单快捷入口</Typography.Text>
           <Segmented
             aria-label="建单表快捷入口"
             options={ORDER_SCOPE_OPTIONS}
@@ -78,7 +78,7 @@ export function OrderFormFieldsPanel({
               form.resetFields();
             }}
           />
-          <Typography.Text strong>板块筛选</Typography.Text>
+          <Typography.Text strong className="order-form-fields__toolbar-label">板块筛选</Typography.Text>
           <Select
             aria-label="字段板块筛选"
             value={sectionFilter}
@@ -87,7 +87,7 @@ export function OrderFormFieldsPanel({
             options={[{ value: "ALL", label: "全部板块" }, ...orderedSectionOptions]}
             popupClassName="order-form-section-filter-pop"
           />
-          <Typography.Text strong>状态筛选</Typography.Text>
+          <Typography.Text strong className="order-form-fields__toolbar-label">状态筛选</Typography.Text>
           <Select
             aria-label="字段启用状态筛选"
             value={activeFilter}

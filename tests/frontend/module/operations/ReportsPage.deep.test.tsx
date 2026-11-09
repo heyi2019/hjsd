@@ -64,6 +64,16 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     expect(screen.getAllByText("差异").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
   });
 
+  it("R3 存在未分配人员时显示补录预警", async () => {
+    resolveMockOnce(vi.mocked(catalog.reportsApi.commission), {
+      items: [{ user_id: null, order_no: "HS-UNASSIGNED", profit_base: "100.00", rate: "0.10", payable: "10.00", paid: "0.00", difference: "10.00" }],
+      total: { order_count: 1, payable: "10.00", paid: "0.00", difference: "10.00" },
+    });
+    renderLight(<ReportsPage />, { user: "admin" });
+    await gotoTab("提成对账 R3");
+    expect(await screen.findByRole("alert")).toHaveTextContent("未分配人员");
+  });
+
   it("R4 资金日报：渲染资金池/期初/收支/余额与标题日期", async () => {
     resolveMockOnce(vi.mocked(catalog.reportsApi.dailyFunds), {
       date: "2026-10-08",

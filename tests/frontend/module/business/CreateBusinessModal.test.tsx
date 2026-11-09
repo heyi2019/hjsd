@@ -106,6 +106,12 @@ it("回收和代挂均提供手机号绑定人这一核心账号字段", async (
   expect((await screen.findAllByLabelText("手机号绑定人")).length).toBeGreaterThan(0);
 });
 
+it("回收客户联系方式字段提供持久可访问标签", async () => {
+  await openTypedModal("HS");
+  expect(screen.getByLabelText("姓名")).toBeInTheDocument();
+  expect(screen.getByLabelText("手机号")).toBeInTheDocument();
+});
+
 it("回收建单将平台与交付条件集中展示在交付信息", async () => {
   await openTypedModal("HS");
 

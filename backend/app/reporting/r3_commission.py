@@ -92,9 +92,9 @@ def r3_commission_reconciliation(
                 "profit_base": base,
                 "rate": allocation.allocation_rate,
                 "amount": allocation.allocation_amount,
-                "payable": ZERO,
+                "payable": base,
                 "paid": ZERO,
-                "difference": ZERO,
+                "difference": base,
             }
         )
 

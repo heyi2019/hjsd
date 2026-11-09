@@ -226,6 +226,36 @@ class TestR1Inventory:
         assert held["expected_profit"] == -300
         assert held["holding_days"] == (date.today() - in_stock.inventory_entry_at.date()).days
 
+    def test_extra_cost_is_included_in_occupied_cost(self, seeded_db):
+        account = Account(
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            status=AccountStatus.WAITING.value,
+            inventory_entry_at=datetime.combine(D, datetime.min.time()),
+            buy_date=D,
+            cost_amount=to_money("0"),
+            created_by="pytest",
+            updated_by="pytest",
+        )
+        seeded_db.add(account)
+        seeded_db.flush()
+        order = _order(seeded_db, account_id=account.id)
+        order_service.post_event(
+            seeded_db, order.id, event_type="COST", amount="800.00",
+            occurred_on=D, actor="pytest",
+        )
+        # 模拟历史数据中账号成本未同步、但订单事件已存在的状态。
+        account.cost_amount = to_money("0")
+        seeded_db.flush()
+
+        report = reporting_service.r1_inventory_health(seeded_db)
+        row = next(item for item in report["items"] if item["account_id"] == account.id)
+
+        assert row["buy_amount"] == Decimal("0.00")
+        assert row["extra_cost"] == Decimal("800.00")
+        assert row["total_cost"] == Decimal("800.00")
+        assert report["total_cost"] == Decimal("800.00")
+
 
 # --------------------------------------------------------------------- R2 月度
 class TestR2MonthlyPnl:
@@ -353,6 +383,36 @@ def test_order_profit_totals_are_consistent(seeded_db):
 
 # --------------------------------------------------------------------- R3 提成
 class TestR3Commission:
+    def test_payable_and_difference_follow_the_calculated_profit_base(self, seeded_db):
+        order = _order(seeded_db)
+        order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="1000.00",
+            occurred_on=D, actor="seeduser1",
+        )
+        order_service.post_event(
+            seeded_db, order.id, event_type="SELL", amount="1300.00",
+            occurred_on=D, actor="seeduser1",
+        )
+        policy_service.set_allocations(
+            seeded_db,
+            order.id,
+            items=[
+                {"user_id": 7, "role": "OWNER", "allocation_rate": 50},
+                {"user_id": 8, "role": "OWNER", "allocation_rate": 50},
+            ],
+            actor="pytest",
+        )
+
+        report = reporting_service.r3_commission_reconciliation(seeded_db)
+        row = next(item for item in report["items"] if item["user_id"] == 7)
+
+        assert row["profit_base"] == Decimal("150.00")
+        assert row["payable"] == Decimal("150.00")
+        assert row["paid"] == Decimal("0.00")
+        assert row["difference"] == Decimal("150.00")
+        assert report["total"]["payable"] == Decimal("300.00")
+        assert report["total"]["difference"] == Decimal("300.00")
+
     def test_my_commission_only_returns_the_logged_in_users_allocations(self, seeded_db):
         order = order_service.create_order(
             seeded_db,

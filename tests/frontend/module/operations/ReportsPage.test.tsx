@@ -98,9 +98,11 @@ describe("ReportsPage：经营中心报表", () => {
     vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("订单利润");
-    // 报表统计周期 picker：激活 Tab 面板内的两枚日期输入（父级提升、无独立 label）
+    // 报表统计周期 picker：激活 Tab 面板内的两枚日期输入
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
     const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
+    expect(screen.getByLabelText("报表开始日期")).toBeInTheDocument();
+    expect(screen.getByLabelText("报表结束日期")).toBeInTheDocument();
     await ui.type(dateInputs[0], "2026-01-01");
     await ui.type(dateInputs[1], "2026-01-31");
     await ui.click(screen.getByRole("button", { name: "导出 CSV" }));

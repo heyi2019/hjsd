@@ -305,15 +305,23 @@ export function CfgNestedItem(props: {
   const condValues = useConditionValues(cfg, props.name);
   const resolvedRules = resolveRules(cfg, props.name, props.rules, condValues);
   if (!isFieldActive(cfg, props.name)) return null;
+  const resolvedLabel = props.fixedLabel ?? fieldLabel(cfg, props.name, props.label ?? "");
+  const child = injectOptionsIfMissing(props.children, fieldConfigFor(cfg, props.name));
+  const labelledChild = Children.map(child, (item) => {
+    if (!isValidElement(item)) return item;
+    const existing = (item.props as { "aria-label"?: string })["aria-label"];
+    return cloneElement(item as ReactElement, { "aria-label": existing ?? resolvedLabel } as never);
+  });
+  const normalizedChild = labelledChild?.length === 1 ? labelledChild[0] : labelledChild;
   return (
-    <BusinessRegistrationField className={props.className} label={props.fixedLabel ?? fieldLabel(cfg, props.name, props.label ?? "")} required={resolvedRules.some((rule) => Boolean((rule as { required?: boolean }).required))}>
+    <BusinessRegistrationField className={props.className} label={resolvedLabel} required={resolvedRules.some((rule) => Boolean((rule as { required?: boolean }).required))}>
       <Form.Item
         noStyle={props.noStyle ?? true}
         name={props.name}
         rules={resolvedRules}
         initialValue={props.initialValue}
       >
-        {injectOptionsIfMissing(props.children, fieldConfigFor(cfg, props.name))}
+        {normalizedChild}
       </Form.Item>
     </BusinessRegistrationField>
   );

@@ -14,7 +14,6 @@ import { customersApi,
 import { normalizeError } from "../shared/api/client";
 import { AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
-import { AdditionalFeeFields } from "../orders/AdditionalFeeFields";
 import { InstallmentScheduleFields, resizeInstallmentSchedule } from "../orders/InstallmentScheduleFields";
 import { RecoveryCustomerSection } from "../orders/recovery/RecoveryCustomerSection";
 import { DeliveryInfoSection } from "../orders/DeliveryInfoSection";
@@ -59,7 +58,6 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const { inventoryType, title = "售出账号", buyerInfoTitle = "买家信息" } = props;
   const resolvedType = inventoryType;
   const isConsignment = resolvedType === "CONSIGNMENT";
-  const supportsSplitPayment = !isConsignment && resolvedType !== "PICKUP";
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
@@ -70,7 +68,6 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const saleScope = SALE_SCOPE_BY_INVENTORY_TYPE[resolvedType];
   const paymentMethod = Form.useWatch("payment_method", form) ?? "FULL";
   const saleAmount = Form.useWatch("amount", form);
-  const amount2 = Form.useWatch("amount2", form);
   const downPayment = Form.useWatch("down_payment", form);
   const serviceFee = Form.useWatch("service_fee", form);
   const periodServiceFee = Form.useWatch("per_period_service_fee", form);
@@ -265,24 +262,6 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
                 <CfgItem name="pool_id" label="资金账户" rules={[{ required: true, message: "请选择资金账户" }]}>
                   <Select placeholder="资金账户" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
                 </CfgItem>
-                {supportsSplitPayment && (
-                  <CfgItem
-                    name="amount2"
-                    label="售出金额2"
-                    rules={[{ validator: async (_, v) => { if (v !== undefined && v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) throw new Error("请输入非负金额"); } }]}
-                  >
-                    <MoneyInput placeholder="可选填，分笔进不同资金池" />
-                  </CfgItem>
-                )}
-                {supportsSplitPayment && (
-                  <CfgItem
-                    name="pool_id2"
-                    label="资金账户2"
-                    rules={amount2 != null && Number(amount2) > 0 ? [{ required: true, message: "请选择资金账户2" }] : []}
-                  >
-                    <Select placeholder="资金账户2" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
-                  </CfgItem>
-                )}
                 <CfgItem name="cashflow_note" label="资金流水备注">
                   <Input placeholder="可选填" />
                 </CfgItem>
@@ -308,7 +287,6 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
                 </div>
               )}
             </AdaptiveFormGrid>
-            <AdditionalFeeFields pools={pools} />
           </section>
           <CustomFieldSection testIdSuffix="inventory-sale" />
         </BusinessRegistrationForm>

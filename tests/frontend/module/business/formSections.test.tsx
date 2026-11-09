@@ -7,7 +7,6 @@ import { Button, Form, type FormInstance } from "antd";
 import { renderLight } from "@fixtures/render";
 import { CustomerSourceFields } from "@/orders/CustomerSourceInput";
 import { AdditionalFeeFields } from "@/orders/AdditionalFeeFields";
-import type { Pool } from "@/shared/api/catalog";
 
 describe("CustomerSourceFields：客户来源校验文案", () => {
   function Harness() {
@@ -43,13 +42,7 @@ describe("CustomerSourceFields：客户来源校验文案", () => {
   });
 });
 
-const pools: Pool[] = [
-  { id: 1, code: "MAIN", name: "主账户", pool_type: "CASH", ownership: "OWNED", status: "ACTIVE" },
-];
-
-/** 回归锁：中介费 / 资金账户是顶层表单字段，绝不能放进 Form.List 内部，
- *  否则 antd 会强制给 name 加 expense_items. 前缀，导致值写入
- *  expense_items.intermediary_fee、污染数组并让 Form.List 重渲染崩溃（点击即报错）。 */
+/** 回归锁：中介费是顶层表单字段，不能放进 Form.List 内部；资金账户由父级主金额字段统一提供。 */
 describe("AdditionalFeeFields：中介费字段路径", () => {
   let ui: ReturnType<typeof userEvent.setup>;
 
@@ -60,7 +53,7 @@ describe("AdditionalFeeFields：中介费字段路径", () => {
       formRef = form;
       return (
         <Form form={form}>
-          <AdditionalFeeFields pools={pools} />
+          <AdditionalFeeFields />
         </Form>
       );
     }
@@ -94,18 +87,17 @@ describe("AdditionalFeeFields：中介费字段路径", () => {
     expect(getForm().getFieldValue("intermediary_fee")).toBeUndefined();
   });
 
-  it("新增支出行只保留金额、资金账户和支出备注", async () => {
+  it("新增支出行只保留金额和支出备注，不重复资金账户", async () => {
     renderFeeForm();
     await ui.click(screen.getByText("+ 增加支出"));
 
     expect(screen.queryByText("支出名称")).not.toBeInTheDocument();
     expect(screen.getByText("支出备注")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("可选填")).toBeInTheDocument();
-    // 账户统一术语：中介费账户与每笔支出的账户都叫「资金账户」
     const accountLabels = Array.from(
       document.querySelectorAll(".form-field__label, .ant-form-item-label > label"),
     ).map((el) => el.textContent ?? "");
-    expect(accountLabels.filter((text) => text.includes("资金账户")).length).toBe(2);
-    expect(accountLabels.filter((text) => text.includes("支出账户")).length).toBe(0);
+    expect(accountLabels.filter((text) => text.includes("资金账户")).length).toBe(0);
+    expect(document.getElementById("intermediary_pool_id")).toBeNull();
   });
 });

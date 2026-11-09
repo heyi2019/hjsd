@@ -159,8 +159,6 @@ export const ordersApi = {
       amount?: string;
       occurred_on: string;
       pool_id?: number;
-      pool_id2?: number;
-      amount2?: string;
       portion?: string;
       delivery_mode?: string;
       offset_event_id?: number;

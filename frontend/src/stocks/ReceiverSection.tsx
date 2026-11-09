@@ -39,9 +39,6 @@ export async function collectFullPayment(input: CollectPaymentInput): Promise<vo
     note: values.cashflow_note as string | undefined,
     bound_phone: values.bound_phone as string | undefined,
     bound_phone_owner: values.bound_phone_owner as string | undefined,
-    ...(values.amount2 != null && String(values.amount2) !== ""
-      ? { amount2: String(values.amount2), pool_id2: values.pool_id2 as number }
-      : {}),
     ...consignmentExtra,
   });
 }

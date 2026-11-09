@@ -155,24 +155,12 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
   const watchedRows = Form.useWatch<AllocationFormRow[]>("allocations", allocationForm) ?? [];
   const groupOf = (kind?: AllocationType) =>
     kind ? watchedRows.filter((row) => row.allocation_type === kind) : [];
-  /** 本单是否有已过账的买号/售出动作；没有的动作位不给填人。 */
-  const hasPosted = (kind: AllocationType) =>
-    (kind === "BUY" || kind === "SELL") &&
-    (actionOrder?.events ?? []).some((event) => event.event_type === kind && event.is_posted);
   const staffOptions = employeeOptions.filter((option) => option.value !== "COMPANY");
   /**
-   * 按操作四项的人员只能取业务事实上已登记的执行人：
-   * 买号看业务负责人、售出看交付负责人、运营看运营负责人或运营类事件的操作人。
-   * 没有候选时返回空（不退回全部员工）——人员编辑入口只在账号台账与库存中心，
-   * 这里留空即表示该动作尚未登记负责人，由页面提示去台账补，而不是就地挑一个人。
+   * 按操作四项默认带出业务事实上已登记的执行人，但分润人员允许在此直接配置，
+   * 因此下拉选项使用全部在职员工；allocationCandidates 只负责生成默认值与多人均分行。
    */
   const optionsFor = (kind?: AllocationType) => {
-    if (kind === "BUY" || kind === "SELL" || kind === "OPERATION") {
-      const ids = allocationCandidates[kind];
-      return employeeOptions.filter(
-        (option) => typeof option.value === "number" && ids.includes(option.value),
-      );
-    }
     return staffOptions;
   };
   return (
@@ -238,7 +226,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
           />
           <Typography.Paragraph type="secondary">
             {isAction
-              ? "按操作分配：买号、售出、运营、公司四项。运营为可选项，留空即不分运营份额。人员已锁定为账号台账 / 库存中心登记的执行人（买号=业务负责人、售出=交付负责人、运营=运营负责人）。一个动作有多人时，该动作的份额按人数均分（2 人各半、3 人各三分之一），只需在首行填该动作合计。台账之后增删执行人，这里的人数与均分会自动跟着变，合计不变；需要换人请到账号台账或库存中心修改。"
+              ? "按操作分配：买号、售出必须填写；运营和公司可不填。每个动作的人员支持多选，选中多人后该动作的比例或金额按人数平均分配，只需填写动作合计。人员默认带出账号台账 / 库存中心登记的执行人，也可以在这里配置或更换。"
               : "每行一位员工：比例和金额任填其一，填写任一项会按本单利润双向换算，最后编辑的一项为准。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。亏损单按金额分润请填负数（如 -300 表示分担 300 亏损）。"}
           </Typography.Paragraph>
           <Form.List name="allocations">
@@ -248,8 +236,9 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                   const row = watchedRows[field.name] ?? {};
                   const kind = isAction ? ((row.allocation_type || undefined) as AllocationType | undefined) : undefined;
                   const group = groupOf(kind);
-                  const people = group.length;
                   const shareMode = isAction ? row.share_mode ?? "PER_PERSON" : "PER_PERSON";
+                  const selectedPeople = Array.isArray(row.employee) ? row.employee.length : row.employee != null ? 1 : 0;
+                  const people = isAction && shareMode === "TOTAL" ? Math.max(selectedPeople, 1) : group.length;
                   // 同一动作的第 2 人及以后：不给输入，直接显示「合计 ÷ 人数」。
                   const shared = isAction && shareMode === "SHARED";
                   const totalRow = group.find((item) => (item.share_mode ?? "PER_PERSON") === "TOTAL");
@@ -259,12 +248,10 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                   const totalAmountText = String(totalRow?.allocation_amount ?? "").trim();
                   const splitRate = totalRow && totalRateText !== "" ? splitEven(Number(totalRateText) || 0, people) : [];
                   const splitAmount = totalRow && totalAmountText !== "" ? splitEven(Number(totalAmountText) || 0, people) : [];
-                  // 公司位不绑人；本单没有的动作位（如代挂无买号）也不给填。
+                  // 公司位不绑人；其余动作人员可在分润弹窗直接配置。
                   const company = kind === "COMPANY";
-                  const actionMissing = (kind === "BUY" || kind === "SELL") && !hasPosted(kind);
-                  // 按操作四项的人员一律锁定为台账登记的执行人：分润只分钱、不编人。
-                  // 人员编辑入口只在账号台账与库存中心，避免两处口径打架。
-                  const employeeDisabled = isAction || company || actionMissing;
+                  const employeeDisabled = company;
+                  const employeeRequired = isAction && (kind === "BUY" || kind === "SELL");
                   const kindLabel = kind ? ALLOCATION_TYPE_LABEL[kind] : "姓名";
                   const employeeLabel = isAction && shareMode === "TOTAL" && people > 1 ? `${kindLabel}（${people} 人均分）` : kindLabel;
                   const split = isAction && shareMode === "TOTAL" && people > 1;
@@ -279,10 +266,11 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                       <Form.Item
                         name={[field.name, "employee"]}
                         label={employeeLabel}
-                        rules={employeeDisabled ? [] : [{ required: true, message: "请选择姓名" }]}
+                        rules={employeeDisabled || !employeeRequired ? [] : [{ required: true, message: "请选择姓名" }]}
                       >
                         <Select
-                          placeholder={actionMissing ? "本单无此动作" : isAction && !company ? "由台账登记的执行人决定" : "选择员工"}
+                          mode={isAction && !company && shareMode === "TOTAL" ? "multiple" : undefined}
+                          placeholder={isAction && !company ? "可多选，自动平均" : "选择员工"}
                           options={company ? [{ value: "COMPANY", label: "公司（不绑定人员）" }] : optionsFor(kind)}
                           disabled={employeeDisabled}
                           className="ui-control-width-200"

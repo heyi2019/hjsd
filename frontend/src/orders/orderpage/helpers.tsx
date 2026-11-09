@@ -40,7 +40,7 @@ export const ALLOCATION_TYPE_ROLE: Record<AllocationType, string> = {
 export type AllocationShareMode = "TOTAL" | "SHARED" | "PER_PERSON";
 
 export type AllocationFormRow = {
-  employee?: number | "COMPANY";
+  employee?: number | number[] | "COMPANY";
   role?: string;
   allocation_type?: AllocationType | "";
   allocation_rate?: string;
@@ -62,6 +62,11 @@ export type AllocationValidation =
   | { ok: true; items: AllocationItem[] }
   | { ok: false; error: string };
 
+function employeeIds(value: AllocationFormRow["employee"]): number[] {
+  const values = Array.isArray(value) ? value : [value];
+  return [...new Set(values.filter((item): item is number => typeof item === "number" && Number.isInteger(item) && item > 0))];
+}
+
 function responsibleIds(value: unknown): number[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.filter((item): item is number => typeof item === "number" && Number.isInteger(item) && item > 0))];
@@ -73,7 +78,7 @@ function postedEventOperatorIds(order: Pick<Order, "events">, eventTypes?: Set<s
     .flatMap((event) => responsibleIds(event.operator_user_ids)))];
 }
 
-/** 从订单事实提取四类动作负责人：建单负责人、卖出表单负责人和运营信息中的操作人。 */
+/** 从订单事实提取四类动作负责人，作为按操作分润的默认人员与多人均分候选。 */
 export function buildActionAllocationCandidates(order: Pick<Order, "events" | "form_extra">): ActionAllocationCandidates {
   const formExtra = order.form_extra ?? {};
   const businessResponsibleIds = responsibleIds(formExtra.business_responsible_ids);
@@ -112,14 +117,12 @@ function sumRowValue(
 }
 
 /**
- * 按操作四项构建表单行。人员只认账号台账 / 库存中心登记的执行人，不猜当前登录人。
+ * 按操作四项构建表单行。人员默认来自账号台账 / 库存中心登记的执行人，但可在分润弹窗中更换。
  * 一个动作登记了 N 位执行人时展开成 N 行：首行填「该动作合计」，其余行只读显示
  * 合计 ÷ N，提交时按人数均分（两人各半、三人各三分之一）。
  *
- * 存量分润与台账执行人一致时，按存量逐人回显（PER_PERSON），不折叠成合计，
- * 避免静默改动已存份额；台账之后**增删**了该动作的执行人时，把已存份额合成合计
- * 并按台账现有执行人均分（首行 TOTAL、其余只读 SHARED）——台账是执行人的唯一来源。
- * 该动作在台账没有任何执行人（候选为空）时不做联动，原样回显。
+ * 一个动作只显示一行人员选择：可多选执行人，比例/金额填写该动作合计，提交时均分到所选人员。
+ * 已有分润会合并为该动作合计；候选为空时沿用已有人员，避免打开弹窗时丢失存量数据。
  */
 export function buildActionAllocationRows(
   items: Array<{
@@ -136,47 +139,18 @@ export function buildActionAllocationRows(
   for (const kind of order) {
     const existed = items.filter((item) => item.allocation_type === kind);
     if (existed.length > 0) {
-      const existedIds = kind === "COMPANY"
+      const existedIds = [...new Set(existed.map((item) => item.user_id).filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0))];
+      const selectedIds = kind === "COMPANY"
         ? []
-        : [...new Set(existed.map((item) => item.user_id).filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0))];
-      const candidateIds = kind === "COMPANY" ? [] : candidates[kind];
-      const existedIdSet = new Set(existedIds);
-      const candidateIdSet = new Set(candidateIds);
-      const added = candidateIds.filter((id) => !existedIdSet.has(id));
-      const removed = existedIds.filter((id) => !candidateIdSet.has(id));
-      // 有执行人无法匹配用户时不做联动，原样回显，避免静默丢行。
-      const aligned = kind !== "COMPANY"
-        && candidateIds.length > 0
-        && (added.length > 0 || removed.length > 0)
-        && existedIds.length === existed.length;
-      if (aligned) {
-        // 收益人必须是该动作执行人（后端强校验），所以一律以台账为准：
-        // 新增的人补一行；台账移除的人保留不了（会被后端 422），其份额先并入合计，
-        // 再按现在的执行人数均分——合计不变、人数跟着台账走。
-        const rateTotal = sumRowValue(existed, "allocation_rate");
-        const amountTotal = sumRowValue(existed, "allocation_amount");
-        candidateIds.forEach((id, index) => {
-          rows.push({
-            allocation_type: kind,
-            employee: id,
-            role: existed[0]?.role || ALLOCATION_TYPE_ROLE[kind],
-            allocation_rate: index === 0 ? rateTotal : "",
-            allocation_amount: index === 0 ? amountTotal : "",
-            share_mode: index === 0 ? "TOTAL" : "SHARED",
-          });
-        });
-        continue;
-      }
-      for (const item of existed) {
-        rows.push({
-          allocation_type: kind,
-          employee: kind === "COMPANY" ? "COMPANY" : item.user_id ?? undefined,
-          role: item.role || ALLOCATION_TYPE_ROLE[kind],
-          allocation_rate: item.allocation_rate ?? "",
-          allocation_amount: item.allocation_amount ?? "",
-          share_mode: "PER_PERSON",
-        });
-      }
+        : (candidates[kind].length ? candidates[kind] : existedIds);
+      rows.push({
+        allocation_type: kind,
+        employee: kind === "COMPANY" ? "COMPANY" : selectedIds.length ? selectedIds : undefined,
+        role: existed[0]?.role || ALLOCATION_TYPE_ROLE[kind],
+        allocation_rate: sumRowValue(existed, "allocation_rate"),
+        allocation_amount: sumRowValue(existed, "allocation_amount"),
+        share_mode: "TOTAL",
+      });
       continue;
     }
     if (kind === "COMPANY") {
@@ -202,15 +176,13 @@ export function buildActionAllocationRows(
       });
       continue;
     }
-    ids.forEach((id, index) => {
-      rows.push({
-        allocation_type: kind,
-        employee: id,
-        role: ALLOCATION_TYPE_ROLE[kind],
-        allocation_rate: "",
-        allocation_amount: "",
-        share_mode: index === 0 ? "TOTAL" : "SHARED",
-      });
+    rows.push({
+      allocation_type: kind,
+      employee: ids.length ? ids : undefined,
+      role: ALLOCATION_TYPE_ROLE[kind],
+      allocation_rate: "",
+      allocation_amount: "",
+      share_mode: "TOTAL",
     });
   }
   return rows;
@@ -263,47 +235,40 @@ export function validateAllocations(
       }
       groups.set(kind, [...(groups.get(kind) ?? []), row]);
     }
-    if (order.some((kind) => !(groups.get(kind)?.length))) {
-      return { ok: false, error: "按操作分配必须包含买号、售出、运营、公司四项" };
-    }
-    if ((groups.get("COMPANY")?.length ?? 0) !== 1) {
-      return { ok: false, error: "公司归属只能有一行" };
+    for (const requiredKind of ["BUY", "SELL"] as const) {
+      if (!(groups.get(requiredKind)?.length)) {
+        return { ok: false, error: "按操作分配必须包含买号和售出" };
+      }
     }
 
     type Expanded = { kind: AllocationType; employee?: number | "COMPANY"; role?: string; rate: number; amount: number; hasRate: boolean; hasAmount: boolean };
     const expanded: Expanded[] = [];
     for (const kind of order) {
       const group = groups.get(kind) ?? [];
-      // 运营是可选动作：整组留空时按 0 份额提交，不要求填写人员。
-      // 只要运营组实际填了比例或金额，仍沿用逐行校验，避免出现半填状态。
-      const operationIsBlank = kind === "OPERATION"
-        && group.length > 0
-        && group.every((row) => String(row.allocation_rate ?? "").trim() === "" && String(row.allocation_amount ?? "").trim() === "");
-      if (operationIsBlank) {
-        group.forEach((row) => {
-          expanded.push({
-            kind,
-            employee: row.employee,
-            role: row.role || ALLOCATION_TYPE_ROLE[kind],
-            rate: 0,
-            amount: 0,
-            hasRate: false,
-            hasAmount: false,
-          });
-        });
-        continue;
-      }
+      if (!group.length) continue;
       const totalRow = group.find((row) => (row.share_mode ?? "PER_PERSON") === "TOTAL");
       if (totalRow) {
-        // 多人均分：本行填的是该动作合计，按该动作人数拆到人。
-        const people = group.length;
         const rateText = String(totalRow.allocation_rate ?? "").trim();
         const amountText = String(totalRow.allocation_amount ?? "").trim();
+        const selectedMembers = employeeIds(totalRow.employee);
+        const members = Array.isArray(totalRow.employee) || group.length === 1
+          ? selectedMembers
+          : group.flatMap((row) => employeeIds(row.employee));
+        const optional = kind === "OPERATION" || kind === "COMPANY";
+        if (!members.length && rateText === "" && amountText === "") {
+          continue;
+        }
+        if (!members.length && kind !== "COMPANY") {
+          return { ok: false, error: `${ALLOCATION_TYPE_LABEL[kind]} 请选择分润人员` };
+        }
+        const expandedMembers: Array<number | "COMPANY"> = kind === "COMPANY" ? ["COMPANY"] : members;
+        const people = expandedMembers.length || 1;
         const rate = rateText === "" ? 0 : Number(rateText);
         const amount = amountText === "" ? 0 : Number(amountText);
         const hasRate = rateText !== "" && Number.isFinite(rate);
         const hasAmount = amountText !== "" && Number.isFinite(amount);
         if (!hasRate && !hasAmount) {
+          if (optional) continue;
           return { ok: false, error: `${ALLOCATION_TYPE_LABEL[kind]} 请填写比例或金额` };
         }
         if (hasRate && rate < 0) {
@@ -311,11 +276,11 @@ export function validateAllocations(
         }
         const rates = hasRate ? splitEven(rate, people) : [];
         const amounts = hasAmount ? splitEven(amount, people) : [];
-        group.forEach((row, index) => {
+        expandedMembers.forEach((member, index) => {
           expanded.push({
             kind,
-            employee: row.employee,
-            role: row.role || ALLOCATION_TYPE_ROLE[kind],
+            employee: member,
+            role: totalRow.role || ALLOCATION_TYPE_ROLE[kind],
             rate: rates[index] ?? 0,
             amount: amounts[index] ?? 0,
             hasRate,
@@ -332,6 +297,7 @@ export function validateAllocations(
         const hasRate = rateText !== "" && Number.isFinite(rate);
         const hasAmount = amountText !== "" && Number.isFinite(amount);
         if (!hasRate && !hasAmount) {
+          if ((kind === "OPERATION" || kind === "COMPANY") && !employeeIds(row.employee).length) continue;
           return { ok: false, error: `${ALLOCATION_TYPE_LABEL[kind]} 请填写比例或金额` };
         }
         if (hasRate && rate < 0) {
@@ -339,7 +305,7 @@ export function validateAllocations(
         }
         expanded.push({
           kind,
-          employee: row.employee,
+          employee: row.employee === "COMPANY" ? "COMPANY" : employeeIds(row.employee)[0],
           role: row.role || ALLOCATION_TYPE_ROLE[kind],
           rate: hasRate ? rate : 0,
           amount: hasAmount ? amount : 0,
@@ -396,7 +362,7 @@ export function validateAllocations(
     if (hasRate) rateTotal += Number(rate);
     if (hasAmount) amountTotal += Number(amount);
     items.push({
-      user_id: row.employee === "COMPANY" ? null : Number(row.employee),
+      user_id: row.employee === "COMPANY" || Array.isArray(row.employee) ? null : Number(row.employee),
       role: row.role || "OWNER",
       allocation_rate: "0",
       allocation_amount: "0",

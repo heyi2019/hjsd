@@ -79,6 +79,23 @@ describe("OrdersPage helpers", () => {
     expect(total).toBeCloseTo(100, 6);
   });
 
+  it("按操作分润支持一个动作多选人员并平均拆分该动作份额", () => {
+    const result = validateAllocations([
+      { allocation_type: "BUY", employee: [1, 2], role: "BUYER", allocation_rate: "50", share_mode: "TOTAL" },
+      { allocation_type: "SELL", employee: [3, 4], role: "SALES", allocation_rate: "50", share_mode: "TOTAL" },
+    ], "1000.00", "ACTION");
+
+    expect(result).toEqual({
+      ok: true,
+      items: [
+        { user_id: 1, role: "BUYER", allocation_type: "BUY", allocation_rate: "25", allocation_amount: "0" },
+        { user_id: 2, role: "BUYER", allocation_type: "BUY", allocation_rate: "25", allocation_amount: "0" },
+        { user_id: 3, role: "SALES", allocation_type: "SELL", allocation_rate: "25", allocation_amount: "0" },
+        { user_id: 4, role: "SALES", allocation_type: "SELL", allocation_rate: "25", allocation_amount: "0" },
+      ],
+    });
+  });
+
   it("按操作分润支持直接填金额", () => {
     expect(validateAllocations([
       { allocation_type: "BUY", employee: 1, allocation_rate: "20", allocation_amount: "200" },
@@ -109,7 +126,6 @@ describe("OrdersPage helpers", () => {
       items: [
         { user_id: 1, role: "BUYER", allocation_type: "BUY", allocation_rate: "25", allocation_amount: "0" },
         { user_id: 2, role: "SALES", allocation_type: "SELL", allocation_rate: "25", allocation_amount: "0" },
-        { user_id: null, role: "SERVICE", allocation_type: "OPERATION", allocation_rate: "0", allocation_amount: "0" },
         { user_id: null, role: "OWNER", allocation_type: "COMPANY", allocation_rate: "50", allocation_amount: "0" },
       ],
     });
@@ -125,16 +141,14 @@ describe("OrdersPage helpers", () => {
     ], { BUY: [1, 2], SELL: [4], OPERATION: [5], COMPANY: [] });
 
     const buyRows = rows.filter((row) => row.allocation_type === "BUY");
-    // 新增的执行人 2 自动多出一行；首行仍是「买号合计」，其余只读人均。
-    expect(buyRows.map((row) => row.employee)).toEqual([1, 2]);
-    expect(buyRows.map((row) => row.share_mode)).toEqual(["TOTAL", "SHARED"]);
+    // 新增的执行人 2 自动进入同一行的多选；保存时按人数均分。
+    expect(buyRows.map((row) => row.employee)).toEqual([[1, 2]]);
+    expect(buyRows.map((row) => row.share_mode)).toEqual(["TOTAL"]);
     expect(buyRows[0].allocation_rate).toBe("100");
     expect(buyRows[0].allocation_amount).toBe("30");
-    expect(buyRows[1].allocation_rate).toBe("");
-    expect(buyRows[1].allocation_amount).toBe("");
-    // 人数没变的动作保持逐人原值回显，不折叠。
+    // 人数没变的动作也统一使用多选行。
     const sellRows = rows.filter((row) => row.allocation_type === "SELL");
-    expect(sellRows).toEqual([expect.objectContaining({ employee: 4, share_mode: "PER_PERSON", allocation_rate: "20" })]);
+    expect(sellRows).toEqual([expect.objectContaining({ employee: [4], share_mode: "TOTAL", allocation_rate: "20" })]);
     expect(rows.filter((row) => row.allocation_type === "COMPANY")).toHaveLength(1);
   });
 
@@ -156,7 +170,7 @@ describe("OrdersPage helpers", () => {
     expect(buyRows.map((item) => item.allocation_amount)).toEqual(["10", "10", "10"]);
   });
 
-  it("台账执行人与存量一致时不折叠；台账换人后份额并入合计，候选为空时原样回显", () => {
+  it("台账执行人进入多选；台账换人后份额并入合计，候选为空时原样回显", () => {
     const same = buildActionAllocationRows([
       { allocation_type: "BUY", user_id: 1, role: "BUYER", allocation_rate: "60", allocation_amount: "18" },
       { allocation_type: "BUY", user_id: 2, role: "BUYER", allocation_rate: "40", allocation_amount: "12" },
@@ -165,8 +179,7 @@ describe("OrdersPage helpers", () => {
       { allocation_type: "COMPANY", user_id: null, role: "OWNER", allocation_rate: "0", allocation_amount: "0" },
     ], { BUY: [1, 2], SELL: [4], OPERATION: [5], COMPANY: [] });
     expect(same.filter((row) => row.allocation_type === "BUY")).toEqual([
-      expect.objectContaining({ employee: 1, share_mode: "PER_PERSON", allocation_rate: "60" }),
-      expect.objectContaining({ employee: 2, share_mode: "PER_PERSON", allocation_rate: "40" }),
+      expect.objectContaining({ employee: [1, 2], share_mode: "TOTAL", allocation_rate: "100", allocation_amount: "30" }),
     ]);
 
     // 台账把买号从 1 换成 3：1 已不是该动作执行人（后端会拒绝非执行人收益人），
@@ -178,7 +191,7 @@ describe("OrdersPage helpers", () => {
       { allocation_type: "COMPANY", user_id: null, role: "OWNER", allocation_rate: "0", allocation_amount: "0" },
     ], { BUY: [3], SELL: [4], OPERATION: [5], COMPANY: [] });
     expect(replaced.filter((row) => row.allocation_type === "BUY")).toEqual([
-      expect.objectContaining({ employee: 3, share_mode: "TOTAL", allocation_rate: "100", allocation_amount: "30" }),
+      expect.objectContaining({ employee: [3], share_mode: "TOTAL", allocation_rate: "100", allocation_amount: "30" }),
     ]);
 
     // 台账没登记该动作执行人时（候选为空）不联动，存量原样回显。
@@ -186,7 +199,7 @@ describe("OrdersPage helpers", () => {
       { allocation_type: "BUY", user_id: 1, role: "BUYER", allocation_rate: "100", allocation_amount: "30" },
     ], { BUY: [], SELL: [], OPERATION: [], COMPANY: [] });
     expect(noCandidate.filter((row) => row.allocation_type === "BUY")).toEqual([
-      expect.objectContaining({ employee: 1, share_mode: "PER_PERSON", allocation_amount: "30" }),
+      expect.objectContaining({ employee: [1], share_mode: "TOTAL", allocation_amount: "30" }),
     ]);
   });
 });

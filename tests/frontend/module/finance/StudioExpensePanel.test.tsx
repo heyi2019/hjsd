@@ -176,7 +176,8 @@ describe("StudioExpensePanel：工作室支出", () => {
     await screen.findByText("房租");
     expect(screen.getByPlaceholderText("开始日期")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("结束日期")).toBeInTheDocument();
-    expect(screen.getAllByLabelText("工作室支出日期区间")).toHaveLength(2);
+    expect(screen.getByLabelText("工作室支出日期区间开始日期")).toBeInTheDocument();
+    expect(screen.getByLabelText("工作室支出日期区间结束日期")).toBeInTheDocument();
 
     await ui.click(await screen.findByRole("button", { name: /记一笔/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;

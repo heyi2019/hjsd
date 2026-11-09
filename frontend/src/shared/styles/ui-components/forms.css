@@ -269,3 +269,7 @@
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--glass) 72%, transparent);
 }
+.ui-date-range-field {
+  display: inline-flex;
+  min-width: 0;
+}

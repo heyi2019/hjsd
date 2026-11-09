@@ -92,7 +92,8 @@ describe("OrdersPage：四类订单台账", () => {
 
     // 搜索框右侧紧跟订单日期区间筛选
     const search = screen.getByPlaceholderText("搜索订单号 / 游戏账号/产品 / 对方 / 备注");
-    const startDate = screen.getAllByLabelText("订单日期区间")[0];
+    const startDate = screen.getByLabelText("订单日期区间开始日期");
+    expect(screen.getByLabelText("订单日期区间结束日期")).toBeInTheDocument();
     expect(search.compareDocumentPosition(startDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     // 订单编号与库存状态按行渲染
@@ -145,6 +146,7 @@ describe("OrdersPage：四类订单台账", () => {
       ["已取消订单", "1"],
     ];
     const ledger = screen.getByRole("tabpanel", { name: "订单台账" });
+    expect(within(ledger).getByRole("region", { name: "订单台账表格" })).toBeInTheDocument();
     for (const [label, value] of expectedStats) {
       const card = within(ledger).getByText(label).closest(".ui-stat") as HTMLElement | null;
       expect(card).not.toBeNull();
@@ -224,6 +226,12 @@ describe("OrdersPage：四类订单台账", () => {
     const ledger = screen.getByRole("tabpanel", { name: "订单台账" });
     await waitFor(() => expect(within(ledger).queryByText("HS-2026-0001")).toBeNull());
     expect(within(ledger).getAllByText("DG-2026-0003").length).toBeGreaterThan(0);
+  });
+
+  it("订单台账的类型与业务分段筛选带有明确名称", async () => {
+    await openLedger();
+    expect(screen.getByRole("radiogroup", { name: "类型筛选" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "业务筛选" })).toBeInTheDocument();
   });
 
   it("订单台账提供库存状态下拉筛选", async () => {

@@ -16,7 +16,7 @@
  */
 import { Input, InputNumber, Modal, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   listColumnsApi,
   type ListColumnConfig,
@@ -486,7 +486,15 @@ export function ListColumnsPanel() {
           rowSelection={{
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys),
-            getCheckboxProps: () => ({ disabled: saving }),
+            columnTitle: (checkboxNode) => (
+              isValidElement(checkboxNode)
+                ? cloneElement(checkboxNode, { "aria-label": "全选列" } as never)
+                : <span aria-label="全选列">{checkboxNode}</span>
+            ),
+            getCheckboxProps: (row) => ({
+              disabled: saving,
+              "aria-label": `选择列 ${row.label}`,
+            }),
           }}
           /** 整行拖拽排序：拖起记录来源键，drop 到目标行位置后整表重排提交。 */
           onRow={(row) => ({

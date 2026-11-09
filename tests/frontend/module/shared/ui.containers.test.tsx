@@ -259,6 +259,28 @@ describe("DataTable：三态一致（加载 / 空 / 有数据）", () => {
     expect(screen.getByText("第1行")).toBeInTheDocument();
   });
 
+  it("分页控件使用中文标签，避免读屏暴露英文 Page Size", () => {
+    render(<DataTable columns={tableColumns} rows={tableRows} page={1} pageSize={10} total={12} onPageChange={() => {}} />);
+    expect(screen.getByRole("combobox", { name: "每页条数" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "上一页" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "下一页" })).toBeInTheDocument();
+  });
+
+  it("展开列有明确的无障碍表头", () => {
+    render(
+      <DataTable
+        columns={tableColumns}
+        rows={tableRows.slice(0, 1)}
+        page={1}
+        pageSize={10}
+        total={1}
+        onPageChange={() => {}}
+        expandable={{ expandedRowRender: () => <div>详情</div> }}
+      />,
+    );
+    expect(screen.getByRole("columnheader", { name: "展开详情" })).toBeInTheDocument();
+  });
+
   it("前端分页尊重调用方 pageSize（初值取 props.pageSize，不再硬编码 10）", () => {
     // 修复前：const [innerSize] = useState(10) 忽略 props.pageSize，传 20 仍只渲染 10 行。
     // 修复后：初值取 props.pageSize ?? 10，rows 共 12 行 < 20 应全渲染。

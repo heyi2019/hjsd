@@ -6,9 +6,10 @@
  *  - 服务端分页（controlledPaging=true）：调用方自管 page/pageSize 并向后端取数
  *    （如历史批次行用 offset 分页），DataTable 完全受控。
  */
-import { Empty, Spin, Table } from "antd";
+import { ConfigProvider, Empty, Spin, Table } from "antd";
+import zhCN from "antd/locale/zh_CN";
 import type { ColumnsType, TableProps } from "antd/es/table";
-import { useEffect, useRef, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useRef, useState, type ReactNode } from "react";
 
 export function DataTable<T>(props: {
   columns: ColumnsType<T>;
@@ -114,20 +115,42 @@ export function DataTable<T>(props: {
         current: props.page,
         pageSize: props.pageSize,
         total: props.total,
-        showSizeChanger: true,
+        showSizeChanger: { "aria-label": "每页条数" },
+        locale: zhCN.Pagination,
+        showTitle: false,
+        itemRender: (_page: number, type: string, originalElement: ReactNode) => {
+          if ((type === "prev" || type === "next") && isValidElement(originalElement)) {
+            return cloneElement(originalElement, { "aria-label": type === "prev" ? "上一页" : "下一页" } as never);
+          }
+          return originalElement;
+        },
         onChange: props.onPageChange,
       }
     : {
         current: innerPage,
         pageSize: innerSize,
         total: props.total,
-        showSizeChanger: true,
+        showSizeChanger: { "aria-label": "每页条数" },
+        locale: zhCN.Pagination,
+        showTitle: false,
+        itemRender: (_page: number, type: string, originalElement: ReactNode) => {
+          if ((type === "prev" || type === "next") && isValidElement(originalElement)) {
+            return cloneElement(originalElement, { "aria-label": type === "prev" ? "上一页" : "下一页" } as never);
+          }
+          return originalElement;
+        },
         onChange: (p: number, s: number) => {
           setInnerPage(p);
           setInnerSize(s);
         },
       };
   const pagination = props.pagination !== undefined ? props.pagination : defaultPagination;
+  const expandable = props.expandable
+    ? {
+        ...props.expandable,
+        columnTitle: props.expandable.columnTitle ?? <span className="ui-visually-hidden" aria-label="展开详情" />,
+      }
+    : undefined;
 
   return (
     <div
@@ -137,22 +160,25 @@ export function DataTable<T>(props: {
       aria-label={props.ariaLabel ?? "数据表格，可左右滚动查看更多"}
     >
       {hasHorizontalOverflow ? <div className="ui-table-scroll-hint" role="note">右侧还有内容，可横向滚动查看</div> : null}
-      <Table<T>
-        size={props.size ?? "small"}
-        columns={props.columns}
-        dataSource={props.rows}
-        rowKey={props.rowKey ?? defaultRowKey}
-        expandable={props.expandable}
-        rowSelection={props.rowSelection}
-        onRow={props.onRow}
-        // 横向滚动为表格默认标准：内容超出容器（“看不到了”）时自动可滑动；
-        // 调用方传 scroll 则覆盖默认值（如 InventoryDetail 的固定宽度）。
-        scroll={props.scroll ?? { x: "max-content" }}
-        pagination={pagination}
-        locale={{
-          emptyText: <Empty description={props.emptyText ?? "暂无数据"} />,
-        }}
-      />
+      <ConfigProvider locale={zhCN}>
+        <Table<T>
+          size={props.size ?? "small"}
+          columns={props.columns}
+          dataSource={props.rows}
+          rowKey={props.rowKey ?? defaultRowKey}
+          expandable={expandable}
+          rowSelection={props.rowSelection}
+          onRow={props.onRow}
+          // 横向滚动为表格默认标准：内容超出容器（“看不到了”）时自动可滑动；
+          // 调用方传 scroll 则覆盖默认值（如 InventoryDetail 的固定宽度）。
+          scroll={props.scroll ?? { x: "max-content" }}
+          pagination={pagination}
+          locale={{
+            ...zhCN.Table,
+            emptyText: <Empty description={props.emptyText ?? "暂无数据"} />,
+          }}
+        />
+      </ConfigProvider>
     </div>
   );
 }

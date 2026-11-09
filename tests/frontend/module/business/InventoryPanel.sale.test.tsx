@@ -368,6 +368,7 @@ describe("库存售出三表单分支", () => {
       await screen.findByText("付款方式");
       expect(screen.getByText("全款")).toBeInTheDocument();
       expect(screen.getByText("分期付款")).toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: "付款方式" })).toBeInTheDocument();
       unmount();
     }
   });

@@ -23,12 +23,12 @@ export function DailyFunds() {
     { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "支出", dataIndex: "expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "押金占用", dataIndex: "deposit_held", align: "right", render: (v: string) => <MoneyText value={v} />},
-    { title: "现金余额", dataIndex: "cash_balance", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "现金余额", dataIndex: "cash_balance", align: "right", render: (v: string) => <MoneyText value={v} tone="auto" />},
     {
       title: "可用余额",
       dataIndex: "available",
       align: "right",
-      render: (v: string) => <MoneyText value={v} strong />,
+      render: (v: string) => <MoneyText value={v} tone="auto" strong />,
     },
   ];
   return (
@@ -46,6 +46,7 @@ export function DailyFunds() {
         ]}
       />
              <DataTable<DailyFundsRow>
+         ariaLabel="资金日报表格"
          columns={arrangeDailyFunds(columns)}
          rows={data?.items ?? []}
          loading={loading}

@@ -44,6 +44,7 @@ export function BusinessPnl({ range }: { range: ReportRange }) {
         ]}
       />
              <DataTable<BusinessPnlRow>
+         ariaLabel="业务损益表格"
          columns={arrangeBusinessPnl(columns)}
          rows={data?.items ?? []}
          loading={loading}

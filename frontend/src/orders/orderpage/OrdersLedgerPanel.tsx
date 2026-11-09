@@ -1,6 +1,6 @@
-import { Card, DatePicker, Dropdown, Input, Segmented, Space, Spin, Typography } from "antd";
+import { Card, Dropdown, Input, Segmented, Space, Spin, Typography } from "antd";
 import type { BusinessCenterEntryTab } from "../businessCenter";
-import { DataTable, PermissionButton, Select, StatRow } from "../../shared/ui";
+import { DataTable, DateRangeField, PermissionButton, Select, StatRow } from "../../shared/ui";
 import { OrderDetail, type InventoryPartyLink } from "../orderedit";
 import { countBusinessOrders } from "./helpers";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
@@ -98,8 +98,9 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
             className="ui-ledger-search"
             onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
           />
-          <DatePicker.RangePicker
-            aria-label="订单日期区间"
+          <DateRangeField
+            ariaLabel="订单日期区间"
+            rangeId="orders-date-range"
             placeholder={["开始日期", "结束日期"]}
             format="YYYY-MM-DD"
             size="small"
@@ -113,6 +114,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
           <Select aria-label="库存状态筛选" className="ui-filter-select" value={inventoryStatusFilter} options={inventoryStatusOptions} onChange={(value) => { setInventoryStatusFilter(value); setPage(1); }} />
           <Typography.Text strong>类型筛选</Typography.Text>
           <Segmented
+            aria-label="类型筛选"
             value={orderTypeFilter}
             options={[
               { value: "all", label: `全部 ${countBusinessOrders(orders, "all", businessModeFilter)}` },
@@ -122,6 +124,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
           />
           <Typography.Text strong>业务筛选</Typography.Text>
           <Segmented
+            aria-label="业务筛选"
             value={businessModeFilter}
             options={[{ value: "all", label: "全部业务" }, ...orderBusinessModeOptions.map((item) => ({ value: item.value, label: item.label }))]}
             onChange={(value) => { setBusinessModeFilter(value as BusinessModeFilterKey); setPage(1); }}
@@ -160,6 +163,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
           pageSize={pageSize}
           total={filteredOrders.length}
           emptyText="暂无业务订单"
+          ariaLabel="订单台账表格"
           className="orders-ledger"
           expandable={{
             expandedRowKeys: expandedOrderIds,

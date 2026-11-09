@@ -39,6 +39,7 @@ export function MonthlyPnl({ range }: { range: ReportRange }) {
         ]}
       />
              <DataTable<MonthlyPnlRow>
+         ariaLabel="月度损益表格"
          columns={arrangeMonthlyPnl(columns)}
          rows={data?.items ?? []}
          loading={loading}

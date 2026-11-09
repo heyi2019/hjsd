@@ -1,5 +1,5 @@
-import { Card, DatePicker, Input, Segmented, Space, Typography } from "antd";
-import { DataTable, PermissionButton, Select } from "../../shared/ui";
+import { Card, Input, Segmented, Space, Typography } from "antd";
+import { DataTable, DateRangeField, PermissionButton, Select } from "../../shared/ui";
 import { OrderDetail } from "../../orders/orderedit";
 import type { InventoryController } from "./useInventoryController";
 
@@ -65,8 +65,9 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
           className="ui-ledger-search"
           onChange={(event) => { controller.setKeyword(event.target.value); setPage(1); }}
         />
-        <DatePicker.RangePicker
-          aria-label="库存日期区间"
+        <DateRangeField
+          ariaLabel="库存日期区间"
+          rangeId="inventory-date-range"
           placeholder={["开始日期", "结束日期"]}
           format="YYYY-MM-DD"
           size="small"
@@ -156,6 +157,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
           onExpand: (expanded, row) => void handleExpand(expanded, row),
         }}
         emptyText="暂无账号"
+        ariaLabel="库存台账表格"
         onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
       />
     </Card>

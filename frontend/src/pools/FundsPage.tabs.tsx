@@ -32,7 +32,7 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "收入", key: "income", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.income} /> },
     { title: "支出", key: "expense", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.expense} /> },
     { title: "押金", key: "deposit_held", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.deposit_held} /> },
-    { title: "可用余额", key: "available", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.available} strong /> },
+    { title: "可用余额", key: "available", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.available} tone="auto" strong /> },
   ];
   return (
     <Card
@@ -194,7 +194,7 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
     { title: "预计释放", dataIndex: "expected_release_on", render: (v: string | null | undefined) => v || "—" },
     { title: "已释放", dataIndex: "returned_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "已损失", dataIndex: "lost_amount", align: "right", render: (v: string | null | undefined) => <MoneyText value={v ?? "0.00"} /> },
-    { title: "剩余", key: "remaining", align: "right", render: (_v, row) => (<MoneyText value={row.remaining_amount} />) },
+    { title: "剩余", key: "remaining", align: "right", render: (_v, row) => (<MoneyText value={row.remaining_amount} tone="auto" />) },
     { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="DEPOSIT_STATUS" /> },
     {
       title: "操作",
@@ -264,9 +264,9 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "资金池", key: "pool", render: (_v, row) => poolById.get(row.pool_id) ?? row.pool_id },
     { title: "对账日期", dataIndex: "reconciled_on" },
     { title: "账户", dataIndex: "account_label" },
-    { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已入账流水">系统余额</Tooltip>, key: "system_balance", align: "right", render: (_v, row) => <MoneyText value={row.system_balance} /> },
-    { title: "账面余额", key: "statement_balance", align: "right", render: (_v, row) => <MoneyText value={row.statement_balance} /> },
-    { title: "差异", key: "difference", align: "right", render: (_v, row) => <MoneyText value={row.difference} /> },
+    { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已入账流水">系统余额</Tooltip>, key: "system_balance", align: "right", render: (_v, row) => <MoneyText value={row.system_balance} tone="auto" /> },
+    { title: "账面余额", key: "statement_balance", align: "right", render: (_v, row) => <MoneyText value={row.statement_balance} tone="auto" /> },
+    { title: "差异", key: "difference", align: "right", render: (_v, row) => <MoneyText value={row.difference} tone="auto" /> },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("RECONCILIATION_STATUS", v, RECONCILIATION_STATUS_LABEL)} /> },
     {
       title: "操作",

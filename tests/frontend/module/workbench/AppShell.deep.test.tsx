@@ -86,9 +86,9 @@ async function renderShell(options: { user?: string; initialPath?: string } = {}
 describe("AppShell：主题三态切换", () => {
   it("点系统/浅色/深色分别写入 localStorage 且对应按钮激活", async () => {
     await renderShell({ user: "admin" });
-    const sys = () => screen.getByRole("button", { name: /系统/ });
-    const light = () => screen.getByRole("button", { name: /浅色/ });
-    const dark = () => screen.getByRole("button", { name: /深色/ });
+    const sys = () => screen.getByRole("radio", { name: /系统/ });
+    const light = () => screen.getByRole("radio", { name: /浅色/ });
+    const dark = () => screen.getByRole("radio", { name: /深色/ });
 
     await ui.click(light());
     expect(localStorage.getItem("heijin-theme-mode")).toBe("light");
@@ -103,6 +103,15 @@ describe("AppShell：主题三态切换", () => {
     await ui.click(sys());
     expect(localStorage.getItem("heijin-theme-mode")).toBe("system");
     expect(sys().className).toContain("is-active");
+  });
+
+  it("主题三态以互斥单选语义暴露给辅助技术", async () => {
+    await renderShell({ user: "admin" });
+
+    expect(screen.getByRole("radiogroup", { name: "主题切换" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "系统" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "浅色" })).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("radio", { name: "深色" })).toHaveAttribute("aria-checked", "false");
   });
 });
 

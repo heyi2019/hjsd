@@ -136,7 +136,7 @@ export function BusinessDictionaryPanel() {
             </div>
             <ActionLine category="买号交付" action="账号交付" desc="采购方把账号交给本方；按实际记录换绑手机号、手机号绑定人、交易平台或中介信息，并记录交付登记审计事件。" />
             <ActionLine category="账号运营" action="平台上架" desc="库存中心账号可到平台寄售，记录实际上架时间与平台信息；不改变账号库存状态。" />
-            <ActionLine category="" action="平台下架" desc="记录实际上架时间与平台信息；不改变账号库存状态。" mergeCategory />
+            <ActionLine category="" action="平台下架" desc="记录实际下架时间与平台信息；不改变账号库存状态。" mergeCategory />
             <ActionLine category="" action="系统下架" desc="特指代挂订单，直接下架本系统，库存状态改为出库。" mergeCategory />
             <ActionLine category="" action="描述" desc="描述库存账号的等级、资源、限制等说明，不改变账号业务状态或资金事实。" mergeCategory />
             <ActionLine category="" action="作图" desc="作库存账号图片资料，不改变账号业务状态或资金事实。" mergeCategory />

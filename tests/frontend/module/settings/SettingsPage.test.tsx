@@ -51,6 +51,14 @@ it("业务字典按账号流转、资金动作和账务动作三层结构渲染"
   expect(document.querySelectorAll(".business-dictionary__action-line").length).toBeGreaterThan(10);
 });
 
+it("业务字典的平台下架说明使用下架时间，不误写成上架时间", () => {
+  renderLight(<BusinessDictionaryPanel />, { user: "admin" });
+
+  const row = [...document.querySelectorAll(".business-dictionary__action-line")]
+    .find((item) => item.textContent?.includes("平台下架"));
+  expect(row).toHaveTextContent("记录实际下架时间与平台信息；不改变账号库存状态。");
+});
+
 it("业务字典可进入编辑态并保存全员共享内容", async () => {
   vi.mocked(catalog.optionSetsApi.get).mockResolvedValue({
     id: 1,

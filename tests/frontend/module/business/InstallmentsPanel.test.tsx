@@ -76,6 +76,8 @@ describe("InstallmentsPanel：分期合约", () => {
     await screen.findByText("HS0001-INS01");
     expect(screen.getByPlaceholderText("开始日期")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("结束日期")).toBeInTheDocument();
+    expect(screen.getByLabelText("分期日期区间开始日期")).toBeInTheDocument();
+    expect(screen.getByLabelText("分期日期区间结束日期")).toBeInTheDocument();
   });
 
   it("坏账列使用列表配置键参与排序", async () => {

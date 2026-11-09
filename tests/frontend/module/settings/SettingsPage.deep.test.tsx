@@ -34,6 +34,7 @@ beforeEach(() => {
   vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(orderTypes);
   vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
   vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([]);
+  vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([] as never);
   vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: [], total: 0 });
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
   // 默认非紧凑：matchMedia 对任何查询返回 matches=false（与 setup.ts afterEach 一致）。
@@ -93,5 +94,19 @@ describe("SettingsPage.deep", () => {
     await ui.click(screen.getByRole("tab", { name: "外观" }));
     expect(await screen.findByText("玻璃材质透明度")).toBeInTheDocument();
 
+  });
+
+  it("返回配置中心时保留最近打开的子页面", async () => {
+    renderLight(<SettingsPage />, { user: "admin" });
+    await screen.findByRole("tab", { name: "业务字典" });
+
+    await openConfigCenter();
+    await ui.click(screen.getByTestId("center-nav-list-columns"));
+    expect(screen.getByTestId("center-nav-list-columns").className).toContain("config-center__item--active");
+
+    await ui.click(screen.getByRole("tab", { name: "业务字典" }));
+    await ui.click(screen.getByRole("tab", { name: "配置中心" }));
+    await screen.findByTestId("center-nav-list-columns");
+    expect(screen.getByTestId("center-nav-list-columns").className).toContain("config-center__item--active");
   });
 });

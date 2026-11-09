@@ -33,6 +33,7 @@ import { DataTable,
   StatRow,
   StatusTag,
   CompactActions, } from "../shared/ui";
+import { DateRangeField } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { DepositSection } from "./FundsPage.tabs";
 import type { FundsPageController } from "./useFundsPageController";
@@ -303,8 +304,9 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       />
       <Card className="glass studio-expense-card">
         <div className="ui-filter-bar studio-expense-filters studio-expense-filters--single-row">
-          <DatePicker.RangePicker
-            aria-label="工作室支出日期区间"
+          <DateRangeField
+            ariaLabel="工作室支出日期区间"
+            rangeId="studio-expense-date-range"
             placeholder={["开始日期", "结束日期"]}
             format="YYYY-MM-DD"
             size="small"
@@ -345,6 +347,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
           pageSize={10}
           total={flows.length}
           emptyText="暂无工作室收支"
+          ariaLabel="工作室收支表格"
           loading={loading}
           pagination={error ? false : undefined}
           onPageChange={() => undefined}

@@ -51,6 +51,7 @@ export function InventoryReport() {
         ]}
       />
              <DataTable<InventoryHealthRow>
+         ariaLabel="库存健康表格"
          columns={arrangeInventoryHealth(columns)}
          rows={data?.items ?? []}
          loading={loading}

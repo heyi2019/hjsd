@@ -47,6 +47,7 @@ export function OrderProfit({ range }: { range: ReportRange }) {
         ]}
       />
              <DataTable<OrderProfitRow>
+         ariaLabel="订单利润表格"
          columns={arrangeOrderProfit(columns)}
          rows={data?.items ?? []}
          loading={loading}

@@ -2,7 +2,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 /** 库存账号售出：回收 / 提号 / 代挂账号从库存中心售出，按货源类型映射订单类型与买家角色。 */
 import { Form, Input, Radio } from "antd";
 import dayjs from "dayjs";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { customersApi,
   employeesApi,
   ordersApi,
@@ -255,7 +255,14 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
               </CfgItem>
               {!isConsignment && (
                 <CfgItem name="payment_method" label="付款方式" initialValue="FULL">
-                  <Radio.Group optionType="button" buttonStyle="solid" />
+                  <Radio.Group
+                    {...({
+                      role: "radiogroup",
+                      "aria-label": "付款方式",
+                      optionType: "button",
+                      buttonStyle: "solid",
+                    } as unknown as ComponentProps<typeof Radio.Group>)}
+                  />
                 </CfgItem>
               )}
               {paymentMethod === "FULL" ? <>

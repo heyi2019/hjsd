@@ -59,7 +59,8 @@ def set_allocations(
     两种录入口径，整单只能选其一：
 
     - **按动作**（items 都带 allocation_type）：沿用 BAS-06-03 的四项结构
-      （买号/售出/运营/公司归属），比例合计必须 100%，收益人绑定动作执行人。
+      （买号/售出/运营/公司归属），支持按比例或按金额录入；人员默认可从业务事实带出，
+      但允许在分润中直接配置。
     - **按人**（items 都不带 allocation_type）：每行一个姓名（user_id；为空表示
       公司归属），比例与金额都选填——填比例按利润占比分、填金额按固定额分。
       纯比例时合计仍须 100%；一旦出现金额，改为校验金额合计不超过订单利润，
@@ -234,16 +235,19 @@ def _set_action_allocations(
     actor: str = "system",
     user: CurrentUser | None = None,
 ) -> list[dict[str, Any]]:
-    """整单重设利润分配。**有效比例合计必须为 100%**（BAS-06-03）。"""
+    """整单重设利润分配，支持按比例或按金额录入（BAS-06-03）。"""
+    from app.orders.amounts import order_amounts
+
     order = _scoped_order(session, order_id, user)
     if not items:
         raise Validation("利润分配不能为空", details={"field": "items"})
 
     normalized_items = [_normalize_allocation_item(item) for item in items]
-    total = Decimal("0")
+    total_rate = Decimal("0")
+    total_amount = Decimal("0")
     user_ids: set[int] = set()
     allocation_types: set[str] = set()
-    # 四类必须齐全，但每个动作可以有多行（一个动作多人时按人数分别录一行，份额均分）。
+    # 买号、售出是动作分润的必填项；运营和公司为可选项。
     if any(not item.get("allocation_type") for item in normalized_items):
         raise Validation("利润分配项必须标注买号、售出、运营或公司归属")
     # 类型合法性先判：否则一个 BAD 会先被「四类不齐全」吞掉，用户看到的不是真实原因。
@@ -255,8 +259,8 @@ def _set_action_allocations(
                 details={"field": "allocation_type", "value": item["allocation_type"]},
             )
     present_types = {str(item["allocation_type"]).upper() for item in normalized_items}
-    if present_types != {"BUY", "SELL", "OPERATION", "COMPANY"}:
-        raise Validation("利润分配必须包含买号、售出、运营和公司归属四项")
+    if not {"BUY", "SELL"}.issubset(present_types):
+        raise Validation("利润分配必须包含买号和售出")
     has_typed_items = True
     # 动作执行人候选：建单/卖出表单中的业务负责人是业务事实来源；
     # 没有表单负责人时，再回退到事件 operator_user_ids / created_by。
@@ -362,30 +366,21 @@ def _set_action_allocations(
                 allocation_amount = to_money(item.get("allocation_amount") or 0)
                 if rate != Decimal("0") or allocation_amount != Decimal("0"):
                     raise Validation("人员收益必须绑定人员", details={"field": "user_id"})
-            if allocation_type in {"BUY", "SELL"} and allocation_type not in action_actor_ids and item.get("user_id") is not None:
-                raise Validation(f"{allocation_type} 收益人必须绑定对应动作执行人", details={"field": "user_id"})
             if allocation_type in {"BUY", "SELL"} and allocation_type in action_actor_ids:
                 candidates = action_actor_ids[allocation_type]
                 if item.get("user_id") is None:
-                    # 只有唯一执行人时自动绑定；多人协作时为每人各录一行，不替用户猜。
+                    # 没有显式配置时，单一事实执行人仍可自动带出；多人协作时不替用户猜。
                     if len(candidates) == 1:
                         item["user_id"] = candidates[0]
                     else:
                         raise Validation(
-                            f"{allocation_type} 有 {len(candidates)} 位执行人，请为每人分别填写分润行",
+                            f"{allocation_type} 有 {len(candidates)} 位默认执行人，请配置分润人员",
                             details={"field": "user_id", "allowed_user_ids": candidates},
                         )
-                elif int(item["user_id"]) not in candidates:
-                    raise Validation(
-                        f"{allocation_type} 收益人必须绑定对应动作执行人，且必须是该动作的执行人",
-                        details={
-                            "field": "user_id",
-                            "allowed_user_ids": candidates,
-                        },
-                    )
         if item.get("user_id") is not None:
             user_ids.add(int(item["user_id"]))
-        total += rate
+        total_rate += rate
+        total_amount += to_money(item.get("allocation_amount") or 0)
 
     existing_user_ids = {
         user_id
@@ -398,10 +393,33 @@ def _set_action_allocations(
             details={"field": "items.user_id", "missing": missing_user_ids},
         )
 
-    if total != Decimal("100.00"):
+    if total_amount != Decimal("0.00"):
+        profit = order_amounts(session, order_id)["PROFIT"]
+        # 金额方向与订单盈亏一致：盈利单分正数，亏损单分负数。
+        if profit > 0 and total_amount < 0:
+            raise Validation(
+                f"该单为盈利单（利润 {profit}），分润金额不能为负数",
+                details={"total_amount": str(total_amount), "profit": str(profit)},
+            )
+        if profit < 0 and total_amount > 0:
+            raise Validation(
+                f"该单为亏损单（利润 {profit}），分润金额必须填负数（亏损分担额）",
+                details={"total_amount": str(total_amount), "profit": str(profit)},
+            )
+        if profit == 0:
+            raise Validation(
+                "该单利润为 0，按金额分润只能填 0；请改用比例分润",
+                details={"total_amount": str(total_amount)},
+            )
+        if abs(total_amount) > abs(profit):
+            raise Validation(
+                f"分润金额合计 {total_amount} 超过订单利润 {profit}",
+                details={"total_amount": str(total_amount), "profit": str(profit)},
+            )
+    elif total_rate != Decimal("100.00"):
         raise Validation(
             "有效分配比例合计必须为 100%",
-            details={"total": str(total), "items": len(items)},
+            details={"total": str(total_rate), "items": len(items)},
         )
 
     # 整单重设：先清后写，避免残留旧比例
@@ -420,8 +438,16 @@ def _set_action_allocations(
             user_id=int(item["user_id"]) if item.get("user_id") is not None else None,
             role=str(item["role"]).upper(),
             allocation_type=allocation_type,
-            allocation_rate=to_money(item.get("allocation_rate")),
-            allocation_amount=to_money(item.get("allocation_amount") or 0),
+            allocation_rate=(
+                Decimal("0")
+                if total_amount != Decimal("0.00")
+                else to_money(item.get("allocation_rate"))
+            ),
+            allocation_amount=(
+                to_money(item.get("allocation_amount") or 0)
+                if total_amount != Decimal("0.00")
+                else Decimal("0")
+            ),
             policy_version_id=order.policy_version_id,
         )
         session.add(row)

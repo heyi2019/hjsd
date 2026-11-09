@@ -17,3 +17,11 @@ export const navigation = [
   { key: "operations", label: "经营中心", icon: createElement(BarChartOutlined), requiredPermission: "report.read" },
   { key: "settings", label: "设置", icon: createElement(SettingOutlined) },
 ];
+
+/** 移动端底部导航的视觉顺序；桌面端仍沿用 navigation 的原有顺序。 */
+export const MOBILE_NAV_ORDER: Record<string, number> = {
+  business: 1,
+  customers: 2,
+  dashboard: 3,
+  funds: 4,
+};

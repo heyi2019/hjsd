@@ -37,6 +37,74 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 ---
 
+## V1.0.8
+
+**发布时间：** 2026-11-10 CST（Asia/Shanghai）
+
+| 项目 | 版本 / 标识 |
+| --- | --- |
+| 系统发布版本 | `V1.0.8` |
+| 前端构建版本 | `1.0.8` |
+| 后端 API 版本 | `1.0.8`（唯一事实源 `backend/app/version.py`） |
+| 数据库迁移基线 | `0001`（活动链 head；存量库由启动修复脚本补齐结构） |
+
+### 本次内容
+
+相对 `v1.0.7` 共 25 个非合并提交；变更规模：153 files changed, 2491 insertions(+), 814 deletions(-)。
+
+**业务变更**
+
+- feat: reorder mobile navigation（`9db254e2`）
+- feat: add default light theme setting（`0da4126f`）
+- fix: 修复订单台账展开详情布局和库存编辑（`bda2caed`）
+- fix: 完善订单台账与业务表单（`502d87f7`）
+- fix: unify frontend cash account flow（`daa64811`）
+- fix: clarify table scrolling and modal alignment（`90a0ec08`）
+- fix: repair ERP reporting and layout issues（`01fd2310`）
+
+**测试与文档**（对外可不列）
+
+- test: target sale pool field explicitly（`87a54163`）
+- test: stabilize main pool selectors（`e9f57e7a`）
+
+**其他变更**
+
+- 优化客户合作伙伴联想建档（`449c911b`）
+- 修复订单利润分配规则（`da404d35`）
+- 修复提成报表人员列名（`0ba6c27c`）
+- 更新寄售入口测试（`4bbbfb4c`）
+- 修复资金负余额警示对比度（`318a716f`）
+- 调整库存更多操作与导出敏感字段（`247a70ad`）
+- 修复 ERP 业务可访问性与金额展示（`bb7d328b`）
+- 修复 ERP 前端可访问性与业务展示问题（`a23c6111`）
+- 提号支持新建供货方（`d56c7861`）
+- 并行构建发布镜像（`efab4081`）
+- 移除重复前端构建（`ca54a544`）
+- 缩短发布门禁等待（`b2fe75f4`）
+- 优化发布流水线（`ef73e31a`）
+- 补充发布实测结果（`203c489f`）
+- 补齐发布覆盖率测试（`7870b901`）
+- 修复发布门禁问题（`999d6219`）
+
+**对用户的影响：**
+
+- 新建回收、代挂订单时，客户支持输入名称模糊检索；选中已有客户会自动回填联系方式、来源和备注。
+- 新建提号订单时，合作伙伴支持同样的联想选择和信息回填。
+- 客户或合作伙伴未建档时，可直接输入新名称并用本次填写的信息自动建档后继续建单。
+- 订单利润分配、库存/订单台账编辑和移动端导航等问题得到修复或优化。
+
+### 发布前检查
+
+- [ ] 发版前回归 `python run_regression.py ci` 退出码 0（发版前允许全量）
+- [ ] 版本三处一致 `scripts/ops/bump_version.sh --check` → `1.0.8`
+- [ ] 部署后 `curl /api/v1/health` 的 `app_version` 为 `1.0.8`；`docker compose ps` 中 backend 为 `Up (healthy)`
+
+### 回滚
+
+- 镜像回退到上一份通过验收的 tag（本次基线 `v1.0.7` 对应的镜像）；数据库按部署前快照恢复。
+
+---
+
 ## V1.0.7
 
 **发布时间：** 2026-11-09 CST（Asia/Shanghai）

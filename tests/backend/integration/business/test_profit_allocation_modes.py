@@ -21,6 +21,7 @@ from app.stocks import service as account_service
 from app.core.errors import Validation
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
+from app.domain.trade import Order
 from app.orders import service as order_service
 from app.policy import service as policy_service
 from app.reporting import service as reporting_service
@@ -128,6 +129,55 @@ def test_person_mode_accepts_amount_only(seeded_db):
     assert [row["allocation_amount"] for row in rows] == ["300.00", "200.00"]
     assert all(row["allocation_rate"] == "0.00" for row in rows)
     assert rows[0]["total_amount"] == "500.00"
+
+
+def test_action_mode_accepts_amount_only(seeded_db):
+    """按操作分润也支持直接填金额，不能只校验比例。"""
+    order_id = _order_with_profit(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    order.form_extra = {
+        "business_responsible_ids": [1],
+        "delivery_responsible_ids": [2],
+    }
+    seeded_db.flush()
+
+    rows = policy_service.set_allocations(
+        seeded_db,
+        order_id,
+        items=[
+            {"allocation_type": "BUY", "user_id": 1, "role": "BUYER", "allocation_amount": "200"},
+            {"allocation_type": "SELL", "user_id": 2, "role": "SALES", "allocation_amount": "100"},
+            {"allocation_type": "OPERATION", "user_id": 1, "role": "SERVICE", "allocation_amount": "100"},
+            {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_amount": "100"},
+        ],
+    )
+
+    assert [row["allocation_amount"] for row in rows] == [
+        "200.00", "100.00", "100.00", "100.00",
+    ]
+    assert all(row["allocation_rate"] == "0.00" for row in rows)
+
+
+def test_action_mode_requires_only_buy_and_sell(seeded_db):
+    """按操作分润只要求买号、售出；运营和公司项可以省略。"""
+    order_id = _order_with_profit(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    order.form_extra = {
+        "business_responsible_ids": [1],
+        "delivery_responsible_ids": [2],
+    }
+    seeded_db.flush()
+
+    rows = policy_service.set_allocations(
+        seeded_db,
+        order_id,
+        items=[
+            {"allocation_type": "BUY", "user_id": 1, "role": "BUYER", "allocation_rate": "50"},
+            {"allocation_type": "SELL", "user_id": 2, "role": "SALES", "allocation_rate": "50"},
+        ],
+    )
+
+    assert {row["allocation_type"] for row in rows} == {"BUY", "SELL"}
 
 
 def test_person_mode_rejects_rate_and_amount_on_the_same_row(seeded_db):

@@ -414,15 +414,16 @@ class TestProfitAllocation:
         with pytest.raises(Validation):
             policy_service.set_allocations(seeded_db, order.id, items=items)
 
-    def test_allocation_cannot_choose_seller_before_sale(self, seeded_db):
-        from app.core.errors import Validation
+    def test_allocation_can_choose_seller_before_sale(self, seeded_db):
+        """人员配置不锁定：售出动作尚未发生时也可以先配置分润人员。"""
         order = self._order(seeded_db)
         items = [
             {"allocation_type": kind, "user_id": 1 if kind in ("SELL", "OPERATION") else None, "role": "OWNER", "allocation_rate": 25}
             for kind in ("BUY", "SELL", "OPERATION", "COMPANY")
         ]
-        with pytest.raises(Validation):
-            policy_service.set_allocations(seeded_db, order.id, items=items)
+        rows = policy_service.set_allocations(seeded_db, order.id, items=items)
+        seller = next(item for item in rows if item["allocation_type"] == "SELL")
+        assert seller["user_id"] == 1
 
     """BAS-06-03：订单多人利润分配，合计必须 100%。"""
 

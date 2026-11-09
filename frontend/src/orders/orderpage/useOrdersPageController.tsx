@@ -378,10 +378,17 @@ export function useOrdersPageController(params: {
 
   /** 订单台账编辑：与库存中心使用同一份完整详情编辑态，删除订单级小窗，避免一行出现两套编辑模型。 */
   const openAccountEditor = async (order: Order) => {
-    if (!order.account_id) return;
     try {
-      const detail = await stocksApi.executionDetail(order.account_id);
-      setLedgerDetails((current) => ({ ...current, [order.account_id as number]: detail }));
+      let accountId = order.account_id;
+      if (!accountId) {
+        const materialized = await ordersApi.materializeAccount(order.id);
+        accountId = materialized.account_id;
+        if (!accountId) throw new Error("补建库存后仍未返回库存账号");
+        setOrders((current) => current.map((item) => item.id === order.id ? { ...item, account_id: accountId } : item));
+        appMessage.success("已补建库存账号");
+      }
+      const detail = await stocksApi.executionDetail(accountId);
+      setLedgerDetails((current) => ({ ...current, [accountId as number]: detail }));
       await orderEditor.openEditor(detail.account, detail);
       setExpandedOrderIds([String(order.id)]);
     } catch (error) {
@@ -451,12 +458,13 @@ export function useOrdersPageController(params: {
         return (
           <Space className="orders-row-actions" size={2}>
           <span id={actionContextId} className="ui-visually-hidden">订单 {order.order_no}</span>
-          {order.account_id ? (
+          {order.account_id || ['ACTIVE', 'INSTALLMENT'].includes(order.status) ? (
             <PermissionButton
               permission="order.create"
               type="link"
               size="small"
               aria-describedby={actionContextId}
+              title={order.account_id ? undefined : "未关联库存时会先生成库存编号"}
               disabled={orderEditor.editingAccount !== null}
               onClick={() => void openAccountEditor(order)}
             >

@@ -35,7 +35,7 @@ from .create import (
 from .events import _apply_account_effect, _opposite_direction, post_event
 from .links import create_order_link, delete_order_link, list_order_links
 from .cancellation_model import cancel_order
-from .mutations import update_order
+from .mutations import materialize_inventory_account, update_order
 from .pools import pool_balance, pool_balance_summary, pool_balances
 from .queries import _order_list_stmt, count_orders, list_orders
 
@@ -61,6 +61,7 @@ __all__ = [
     "get_order",
     "list_order_links",
     "list_orders",
+    "materialize_inventory_account",
     "pool_balance",
     "pool_balance_summary",
     "pool_balances",

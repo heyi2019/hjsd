@@ -478,7 +478,7 @@ class TestPolicyAllocationGuards:
             policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_buy_recipient_mismatch(self, seeded_db):
-        # BUY 收益人必须绑定对应动作执行人。
+        # 按操作分润允许在分润弹窗重新配置收益人，不强制锁定为 BUY 执行人。
         order = _order(seeded_db)
         _add_buy_event(seeded_db, order, created_by="seeduser1")  # 执行人 = 用户 1
         seeded_db.commit()
@@ -488,8 +488,9 @@ class TestPolicyAllocationGuards:
             {"allocation_type": "OPERATION", "user_id": 1, "role": "OWNER", "allocation_rate": "25"},
             {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
         ]
-        with pytest.raises(Validation, match="收益人必须绑定对应动作执行人"):
-            policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
+        result = policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
+        buy = next(item for item in result if item["allocation_type"] == "BUY")
+        assert buy["user_id"] == 2
 
     def test_allocation_rate_sum_over_100_rejected(self, seeded_db):
         # 有效分配比例合计必须为 100%

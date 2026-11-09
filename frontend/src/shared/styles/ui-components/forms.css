@@ -227,10 +227,27 @@
   width: 100%;
 }
 .allocation-modal .orders-allocation-row.is-action {
-  grid-template-columns: minmax(0, 1.35fr) minmax(100px, 0.75fr) minmax(110px, 0.85fr);
+  width: min(100%, 680px);
+  margin-inline: auto;
+  grid-template-columns: minmax(220px, 1.4fr) minmax(120px, 0.8fr) minmax(140px, 0.9fr);
+  align-items: center;
+  justify-items: center;
 }
 .allocation-modal .orders-allocation-row.is-action .ant-form-item .ant-form-item-row {
   grid-template-columns: max-content minmax(0, 1fr);
+}
+.allocation-modal .orders-allocation-row.is-action .ant-form-item {
+  width: 100%;
+  text-align: center;
+}
+.allocation-modal .orders-allocation-row.is-action .ant-form-item-label > label {
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+}
+.allocation-modal .orders-allocation-row.is-action .ant-form-item-control-input-content {
+  display: flex;
+  justify-content: center;
 }
  .party-preview {
   display: flex;

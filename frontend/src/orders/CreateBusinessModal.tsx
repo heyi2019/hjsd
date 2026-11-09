@@ -41,6 +41,11 @@ const MODAL_TITLES: Record<string, string> = {
   DG: "新建代挂订单",
 };
 
+function positiveId(value: unknown): number | undefined {
+  const id = typeof value === "number" ? value : Number(value);
+  return Number.isInteger(id) && id > 0 ? id : undefined;
+}
+
 export function CreateBusinessModal(props: {
   open: boolean;
   onClose: () => void;
@@ -186,6 +191,23 @@ export function CreateBusinessModal(props: {
           ? values[customerSourceOtherField] as string
           : selectedCustomerSource;
       }
+      let customerId = positiveId(values.customer_id);
+      if ((isRecovery || isDg) && customerId == null) {
+        const displayName = String(values.customer_lookup ?? "").trim();
+        if (displayName) {
+          const created = await customersApi.create({
+            display_name: displayName,
+            contact_name: (isDg ? values.dg_customer_contact : values.customer_contact_name) as string,
+            phone: (isDg ? values.dg_customer_phone : values.customer_phone) as string,
+            wechat: (isDg ? values.dg_customer_wechat : values.customer_wechat) as string,
+            qq: (isDg ? values.dg_customer_qq : values.customer_qq) as string,
+            source: resolvedCustomerSource,
+            note: (isDg ? values.dg_note : values.note) as string,
+          });
+          customerId = created.customer.id;
+          setCustomers((items) => [...items, created.customer]);
+        }
+      }
       const note = (isRecovery || isDg) && resolvedCustomerSource
         ? `客户来源：${String(resolvedCustomerSource)}${values[isDg ? "dg_note" : "note"] ? `｜${String(values[isDg ? "dg_note" : "note"])}` : ""}`
         : isTh
@@ -195,10 +217,26 @@ export function CreateBusinessModal(props: {
               values.th_receive_amount ? `预期收买家：${String(values.th_receive_amount)}` : "",
             ].filter(Boolean).join("｜") || undefined
           : values.note as string;
-      const counterpartyId = isTh
-        ? values.supplier_counterparty_id as number | undefined
-        : values.counterparty_id as number | undefined;
-      const customerRoles = buildCustomerRoles(orderType, values.customer_id as number | undefined);
+      let counterpartyId = isTh
+        ? positiveId(values.supplier_counterparty_id)
+        : positiveId(values.counterparty_id);
+      if (isTh && counterpartyId == null) {
+        const displayName = String(values.supplier_lookup ?? "").trim();
+        if (displayName) {
+          const created = await counterpartiesApi.create({
+            display_name: displayName,
+            type: "SUPPLIER",
+            contact_name: values.supplier_contact_name as string,
+            phone: values.supplier_phone as string,
+            wechat: values.supplier_wechat as string,
+            qq: values.supplier_qq as string,
+            note: values.supplier_note as string,
+          });
+          counterpartyId = created.id;
+          setCounterparties((items) => [...items, created]);
+        }
+      }
+      const customerRoles = buildCustomerRoles(orderType, customerId);
       const counterpartyRoles = buildCounterpartyRoles(
         orderType,
         counterpartyId,

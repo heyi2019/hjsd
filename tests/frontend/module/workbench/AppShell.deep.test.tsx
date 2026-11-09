@@ -105,12 +105,12 @@ describe("AppShell：主题三态切换", () => {
     expect(sys().className).toContain("is-active");
   });
 
-  it("主题三态以互斥单选语义暴露给辅助技术", async () => {
+  it("主题三态以互斥单选语义暴露给辅助技术且默认浅色", async () => {
     await renderShell({ user: "admin" });
 
     expect(screen.getByRole("radiogroup", { name: "主题切换" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "系统" })).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByRole("radio", { name: "浅色" })).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("radio", { name: "系统" })).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("radio", { name: "浅色（默认）" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("radio", { name: "深色" })).toHaveAttribute("aria-checked", "false");
   });
 });

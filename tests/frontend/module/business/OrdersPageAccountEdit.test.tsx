@@ -19,7 +19,7 @@ vi.mock("@/shared/api/catalog", async (importOriginal) => {
     "list", "get", "create", "update", "patch", "post", "postEvent", "cancel", "remove",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search", "materializeAccount",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -122,8 +122,8 @@ describe("订单台账编辑与库存中心同步（#15 需求1）", () => {
     expect(screen.queryByText(/编辑订单 ·/)).not.toBeInTheDocument();
   });
 
-  it("未关联库存账号的订单不显示完整台账编辑入口", async () => {
-    // 本用例刻意去掉所有订单的 account_id，验证没有可编辑的账号台账详情时不出现入口。
+  it("已完成且未关联库存账号的订单不显示完整台账编辑入口", async () => {
+    // 已完成且未关联库存的历史订单没有可编辑的库存详情；进行中订单由补建库存入口接管。
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([
       { id: 1, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE", account_game_type: "原神", account_game_account: "seller-001", account_platform: "安卓", account_status: "WAITING" },
       { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
@@ -133,7 +133,26 @@ describe("订单台账编辑与库存中心同步（#15 需求1）", () => {
     await waitFor(() =>
       expect(screen.getAllByText("TH-2026-0002").length).toBeGreaterThanOrEqual(1),
     );
-    expect(screen.queryAllByRole("button", { name: /^编辑$/ }).length).toBe(0);
+    expect(screen.queryAllByRole("button", { name: /^编辑$/ }).length).toBe(1);
+  });
+
+  it("进行中的未关联库存订单点击编辑会先补建库存编号", async () => {
+    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+      { id: 24, order_no: "DG-2026-0024", order_type: "DG", capital_type: "DISTRIBUTION", trade_date: "2026-10-01", status: "ACTIVE", account_id: null, account_game_type: "王者荣耀", account_game_account: "legacy-dg", account_platform: "安卓", account_status: null },
+    ] as never);
+    vi.mocked(catalog.ordersApi.materializeAccount).mockResolvedValue({ id: 24, order_no: "DG-2026-0024", order_type: "DG", trade_date: "2026-10-01", status: "ACTIVE", account_id: 101 } as never);
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+      account: { id: 101, stock_no: "KU_00101", game_account: "legacy-dg", game_type: "王者荣耀", status: "WAITING", inventory_type: "CONSIGNMENT" },
+      orders: [],
+      finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
+    } as never);
+
+    renderLight(<OrdersPage />, { user: "admin" });
+    await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
+    await ui.click(await screen.findByRole("button", { name: /^编辑$/ }));
+
+    await waitFor(() => expect(catalog.ordersApi.materializeAccount).toHaveBeenCalledWith(24));
+    await waitFor(() => expect(screen.getByText("保存修改")).toBeInTheDocument());
   });
 
   it("已售订单仍显示完整台账编辑入口", async () => {

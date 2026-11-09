@@ -198,8 +198,8 @@ const allocationRows: ProfitAllocation[] = [
 ];
 // 按操作四项的存量数据：带 allocation_type 时弹窗走「买号/售出/运营/公司」视图。
 const actionAllocationRows: ProfitAllocation[] = [
-  { id: 1, order_id: 1, user_id: null, role: "BUYER", allocation_type: "BUY", allocation_rate: "30" },
-  { id: 2, order_id: 1, user_id: null, role: "SALES", allocation_type: "SELL", allocation_rate: "40" },
+  { id: 1, order_id: 1, user_id: 11, role: "BUYER", allocation_type: "BUY", allocation_rate: "30" },
+  { id: 2, order_id: 1, user_id: 22, role: "SALES", allocation_type: "SELL", allocation_rate: "40" },
   { id: 3, order_id: 1, user_id: 9, role: "SERVICE", allocation_type: "OPERATION", allocation_rate: "20" },
   { id: 4, order_id: 1, user_id: null, role: "OWNER", allocation_type: "COMPANY", allocation_rate: "10" },
 ];
@@ -493,9 +493,8 @@ describe("OrdersPage：分润", () => {
     expect(within(modal).getByText("运营员（operator）")).toBeInTheDocument();
   });
 
-  it("分润：按操作四项无候选执行人时人员留空且锁定（不猜当前登录人）", async () => {
-    // 人员只认账号台账 / 库存中心登记的执行人，分润弹窗不就地猜人。
-    // 本单无任何动作负责人，四行人员全部锁定且留空，等待台账补登记。
+  it("分润：按操作四项无候选执行人时人员留空但可以配置", async () => {
+    // 没有默认动作负责人时不猜当前登录人，但分润弹窗允许直接配置人员。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: [],
       total: 0,
@@ -513,12 +512,12 @@ describe("OrdersPage：分润", () => {
     expect(within(modal).queryByText("李四（lisi）")).toBeNull();
     // 公司位固定不绑人，不能被当前登录人覆盖。
     expect(within(modal).getByText("公司（不绑定人员）")).toBeInTheDocument();
-    // 买号/售出/运营/公司四项的人员控件全部禁用：人员编辑只在台账与库存中心。
-    expect(modal.querySelectorAll(".ant-select-disabled").length).toBe(4);
+    // 公司位固定不绑人，其他三项可以在这里配置。
+    expect(modal.querySelectorAll(".ant-select-disabled").length).toBe(1);
   });
 
-  it("分润：按操作四项的人员锁定为台账登记的执行人", async () => {
-    // 买号=业务负责人、售出=交付负责人、运营=运营负责人；三行都不可就地改人。
+  it("分润：按操作四项默认带出登记人员但可以更换", async () => {
+    // 买号=业务负责人、售出=交付负责人、运营=运营负责人；默认值来自订单，但可在分润里更换。
     vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
       items: [],
       total: 0,
@@ -543,8 +542,8 @@ describe("OrdersPage：分润", () => {
     expect(within(modal).getByText("回收员（recovery）")).toBeInTheDocument();
     expect(within(modal).getByText("售出员（seller）")).toBeInTheDocument();
     expect(within(modal).getByText("运营员（operator）")).toBeInTheDocument();
-    // 四行人员控件全部禁用，买号/售出/运营不能改选其他人
-    expect(modal.querySelectorAll(".ant-select-disabled").length).toBe(4);
+    // 仅公司位不可绑定人员，买号/售出/运营均可改选。
+    expect(modal.querySelectorAll(".ant-select-disabled").length).toBe(1);
   });
 
   it("分润：按人分配点「增加一行」时姓名默认当前登录人", async () => {
@@ -626,13 +625,13 @@ describe("OrdersPage：分润", () => {
     await openRowMenu("HS-2026-0001", "分润");
     const modal = await modalOf(/分润 · HS-2026-0001/);
 
-    // 买号两人 → 展开两行：首行写字号合计，第二行只读显示人均值。
+    // 买号两人 → 同一行多选，首行填写该动作合计。
     expect(within(modal).getByText("买号（2 人均分）")).toBeInTheDocument();
     const totalRates = within(modal).getAllByLabelText("比例合计");
     expect(totalRates).toHaveLength(1);
+    expect(within(modal).getAllByRole("combobox")).toHaveLength(4);
     fireEvent.change(totalRates[0], { target: { value: "30" } });
-    // 另一人的比例是只读的人均值：30 ÷ 2 = 15%
-    expect(within(modal).getByText("15%")).toBeInTheDocument();
+    // 多选人员不再展开额外只读行，提交时由校验逻辑拆成两人的 15%。
     expect(within(modal).queryByLabelText("比例（人均）")).toBeNull();
 
     // 售出 40、运营 20、公司 10，四项合计 100

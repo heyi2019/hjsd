@@ -92,8 +92,7 @@ describe("OrderDetail", () => {
 
     const editPanel = screen.getByTestId("order-edit-feature-panel");
     expect(editPanel).toHaveAttribute("aria-label", "订单编辑功能板块");
-    expect(editPanel).toHaveClass("inventory-detail");
-    expect(editPanel).not.toHaveClass("inventory-detail--editing");
+    expect(editPanel).toHaveClass("inventory-detail", "inventory-detail--editing");
     expect(editPanel.querySelector(".inventory-detail__edit-grid")).not.toBeInTheDocument();
     expect(editPanel.querySelectorAll(".inventory-detail__meta").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("编辑登记时间")).toBeInTheDocument();
@@ -104,6 +103,22 @@ describe("OrderDetail", () => {
     expect(screen.getByLabelText("编辑执行时间 买号")).toBeInTheDocument();
     expect(screen.getByLabelText("编辑资金金额 CF0001")).toBeInTheDocument();
     expect(screen.getByLabelText("编辑参与方 买家A")).toBeInTheDocument();
+  });
+
+  it("订单台账编辑态保留详情容器 class，避免展开行被详情内容撑长", () => {
+    renderLight(
+      <OrderDetail
+        row={account}
+        className="inventory-detail--ledger"
+        detail={{ orders: [] } as unknown as AccountExecutionDetail}
+        loading={false}
+        editing={account}
+      />,
+      { user: "admin" },
+    );
+
+    const panel = screen.getByTestId("order-edit-feature-panel");
+    expect(panel).toHaveClass("inventory-detail", "inventory-detail--editing", "inventory-detail--ledger");
   });
 
   it("参与方按角色与名称展示，并可打开客户中心卡片", () => {

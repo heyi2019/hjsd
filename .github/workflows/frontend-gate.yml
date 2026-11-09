@@ -8,8 +8,8 @@ name: frontend-gate
 # 现改为矩阵并行 + deep 层按事件分流：
 #   - PR / push(test)：static + fast/quick/react 并行，跳过 react-deep  → 门禁 ~3-4min
 #   - push(main) / schedule / dispatch：额外跑 react-deep              → 发版与夜间兜底
-# 兼容性：保留原 job 名 "Frontend checks and tests" 与 "Frontend build" 作为汇总 gate，
-# 避免分支保护若绑定了旧 check 名导致 PR 永久 pending。gate 自身只做结果断言，近零耗时。
+# 兼容性：保留原 job 名 "Frontend checks and tests" 作为汇总 gate，避免分支保护若绑定了旧
+# check 名导致 PR 永久 pending。生产镜像构建由 deploy-production 统一负责，避免前置重复构建。
 
 on:
   push:
@@ -123,27 +123,6 @@ jobs:
 
       - name: Run react-deep shard
         run: npm run test:react-deep:shard -- ${{ matrix.shard }}
-
-  frontend-build:
-    name: Frontend build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install dependencies
-        working-directory: .
-        run: npm ci
-
-      - name: Build frontend
-        run: npm run build
 
   # 汇总 gate：保留原有 job 名，兼容可能存在的分支保护必需检查项
   # （本账号 token 无 admin 权限，无法读取分支保护配置，故按最保守方式保留原名）。

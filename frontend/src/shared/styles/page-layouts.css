@@ -15,6 +15,13 @@
 * + .ui-table-wrap { margin-block-start: var(--space-4); }
 .ui-table-wrap { overflow: auto; }
 .ui-table-wrap table { font: var(--font-body-s); white-space: nowrap; }
+.ui-table-scroll-hint {
+  margin-block-end: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--fs-caption-2);
+  line-height: 1.4;
+  text-align: end;
+}
 
 .fin-form-grid {
   display: grid;

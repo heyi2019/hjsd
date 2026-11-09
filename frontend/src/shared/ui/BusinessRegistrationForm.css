@@ -189,6 +189,14 @@
   grid-column: 1 / -1;
 }
 
+/* 最终覆盖建单网格的默认居中：带 extra / 校验提示的行仍从控件顶部对齐。 */
+.business-registration-modal:not(.compact-form-modal) .business-registration-form .ant-form-item-row {
+  align-items: flex-start !important;
+}
+.business-registration-modal:not(.compact-form-modal) .business-registration-form .ant-form-item-label {
+  padding-top: 2px !important;
+}
+
 /* 弹窗拖拽缩放时按「容器宽度」降列，不看浏览器视口宽度。 */
 @container (max-width: 1040px) {
   .business-form-layout-3x5 .business-registration-form,

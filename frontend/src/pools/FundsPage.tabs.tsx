@@ -129,12 +129,17 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
         <Select aria-label="流水资金池" allowClear disabled={cashflowUnavailable} value={cashflowPoolId} placeholder="全部资金池" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
         <Select aria-label="流水状态" allowClear disabled={cashflowUnavailable} value={cashflowStatus} placeholder="全部状态" options={flowStatusOptions ?? []} onChange={setCashflowStatus} />
         <Input aria-label="流水中类别筛选" allowClear value={cashflowCategory} placeholder="类别，如 REVERSAL" onChange={(event) => setCashflowCategory(event.target.value)} />
-        <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
-        <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
-        <PermissionButton permission="finance.read" onClick={() => void fetchCashflows()}>查询</PermissionButton>
-        <PermissionButton permission="finance.read" size="small" loading={cashflowExporting} onClick={() => void exportCashflows()}>
-          导出 CSV
-        </PermissionButton>
+        <div className="funds-cashflow-date-range">
+          <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
+          <span className="muted">至</span>
+          <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
+        </div>
+        <div className="funds-cashflow-actions">
+          <PermissionButton permission="finance.read" onClick={() => void fetchCashflows()}>查询</PermissionButton>
+          <PermissionButton permission="finance.read" size="small" loading={cashflowExporting} onClick={() => void exportCashflows()}>
+            导出 CSV
+          </PermissionButton>
+        </div>
       </div>
       {cashflowUnavailable ? (
         <Typography.Text type="warning">资金流水数据不可用，请点击“查询”或页面顶部的“重新加载”。</Typography.Text>

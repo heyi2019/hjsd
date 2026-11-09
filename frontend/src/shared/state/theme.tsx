@@ -1,6 +1,6 @@
 /**
  * 主题（亮/暗）状态层。
- * - 初值：localStorage > 系统 prefers-color-scheme > 浅色。
+ * - 初值：localStorage > 浅色。
  * - 同步把 data-theme 打到 documentElement（:root），驱动 tokens.css /
  *   hierarchy.css 里所有 [data-theme="dark"] 令牌块（自定义 CSS 玻璃/渐变/语义色）。
  * - 持久化到 localStorage，刷新不丢。
@@ -22,8 +22,8 @@ function resolveInitial(): ThemeMode {
     document.documentElement.setAttribute("data-theme", stored === "system" ? resolveSystem() : stored);
     return stored;
   }
-  document.documentElement.setAttribute("data-theme", resolveSystem());
-  return "system";
+  document.documentElement.setAttribute("data-theme", "light");
+  return "light";
 }
 
 function resolveSystem(): ResolvedThemeMode {

@@ -451,12 +451,25 @@ describe("OrdersPage：四类订单台账", () => {
         account_status: "WAITING",
       },
     ]);
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce({
+      account: { id: 9, source_order_id: 3, source_order_no: "DG-2026-0003", inventory_type: "CONSIGNMENT", status: "WAITING", cost_amount: "0.00" },
+      orders: [{
+        order_id: 3,
+        order_no: "DG-2026-0003",
+        order_type: "DG",
+        trade_date: "2026-10-03",
+        status: "ACTIVE",
+        extra_values: { consignment_platform: "寄售平台A", listed_at: "2026-10-03T10:00" },
+        events: [],
+      }],
+    } as never);
     await openLedger("admin");
 
     const row = screen.getAllByText("DG-2026-0003").find((element) => element.closest("tr"))?.closest("tr");
     expect(row).not.toBeNull();
     fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "下架" }));
-    expect(screen.getByRole("tab", { name: "库存中心" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByText("下架")).toBeInTheDocument();
+    expect(await screen.findByText("寄售平台A")).toBeInTheDocument();
     // 只断言这一行不提供「取消」入口；页面上其它行/库存中心自带「取消」按钮，不能全局查。
     expect(within(row as HTMLElement).queryByText("取消")).toBeNull();
   });

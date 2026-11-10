@@ -112,7 +112,7 @@ class TestA01HsStock:
             )
         assert "采购入库" in str(exc.value)
 
-    def test_buy_cost_sell_derives_cost_and_cashflow(self, seeded_db):
+    def test_buy_sell_derives_cashflow(self, seeded_db):
         account = _new_account(seeded_db)
         seller = _customer(seeded_db, "卖家甲")
         buyer = _customer(seeded_db, "买家乙")
@@ -135,30 +135,25 @@ class TestA01HsStock:
             occurred_on=TODAY, actor="pytest",
         )
         service.post_event(
-            seeded_db, order.id, event_type="COST", amount=Decimal("50"),
-            occurred_on=TODAY, actor="pytest",
-        )
-        service.post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("1400"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
         seeded_db.commit()
 
-        # 账号成本 = 买入 + 附加成本；售出后释放
+        # 账号成本只由 BUY 采购事实形成；售出后释放
         account = seeded_db.get(Account, account.id)
-        assert account.cost_amount == Decimal("1050.00")
+        assert account.cost_amount == Decimal("1000.00")
         assert account.status == AccountStatus.SOLD.value
 
-        # 现金流：BUY/COST 出、SELL 入，且每个事件各一条
+        # 现金流：BUY 出、SELL 入，且每个事件各一条
         invest = _pool(seeded_db, "HJ_INVEST")
         profit = _pool(seeded_db, "HJ_PROFIT")
         out_flows = _flows(seeded_db, invest.id)
         in_flows = _flows(seeded_db, profit.id)
-        assert [str(flow.amount) for flow in out_flows] == ["1000.00", "50.00"]
+        assert [str(flow.amount) for flow in out_flows] == ["1000.00"]
         assert all(flow.direction == Direction.OUT.value for flow in out_flows)
         assert out_flows[0].fund_nature == "BUSINESS"
         assert out_flows[0].accounting_attribute == "SELF_DIRECT_COST"
-        assert out_flows[1].accounting_attribute == "SELF_DIRECT_COST"
         assert [str(flow.amount) for flow in in_flows] == ["1400.00"]
         assert in_flows[0].direction == Direction.IN.value
         assert in_flows[0].fund_nature == "BUSINESS"
@@ -167,11 +162,10 @@ class TestA01HsStock:
         events = seeded_db.scalars(
             select(OrderEvent).where(OrderEvent.order_id == order.id)
         ).all()
-        assert len(events) == 3
-        assert len({event.event_no for event in events}) == 3
+        assert len(events) == 2
+        assert len({event.event_no for event in events}) == 2
         assert events[0].event_no == f"{order.order_no}-EV-BUY-01"
         assert out_flows[0].flow_no == f"{order.order_no}-CF-BUY-01"
-        assert out_flows[1].flow_no == f"{order.order_no}-CF-COST-01"
         assert in_flows[0].flow_no == f"{order.order_no}-CF-SELL-01"
 
     def test_sell_splits_into_two_pools(self, seeded_db):
@@ -249,27 +243,15 @@ class TestA01HsStock:
                 pool_id=profit.id, pool_id2=invest.id, amount2=Decimal("0"),
             )
 
-    def test_cost_cashflow_uses_its_business_category_in_number(self, seeded_db):
-        account = _new_account(seeded_db)
-        seeded_db.commit()
+    def test_cost_event_is_removed(self, seeded_db):
         order = service.create_order(
-            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
+            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest"
         )
-        seeded_db.commit()
-
-        _event, flow = service.post_event(
-            seeded_db,
-            order.id,
-            event_type="COST",
-            amount=Decimal("50"),
-            occurred_on=TODAY,
-            actor="pytest",
-            flow_category="FEE",
-        )
-
-        assert flow is not None
-        assert flow.category == "FEE"
-        assert flow.flow_no == f"{order.order_no}-CF-FEE-01"
+        with pytest.raises(Validation, match="事件类型必须为"):
+            service.post_event(
+                seeded_db, order.id, event_type="COST", amount=Decimal("50"),
+                occurred_on=TODAY, actor="pytest",
+            )
 
     def test_duplicate_posting_not_allowed_for_completed_order(self, seeded_db):
         order = _settled_hs_installment(seeded_db)
@@ -414,41 +396,37 @@ class TestEventRules:
         assert account.status == "WAITING"
         assert account.cost_amount == Decimal("0.00")
 
-    def test_dg_cannot_post_buy_or_cost(self, seeded_db):
+    def test_dg_cannot_post_buy(self, seeded_db):
         order = service.create_order(
             seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
         )
 
-        for event_type in ("BUY", "COST"):
-            with pytest.raises(Validation) as exc:
-                service.post_event(
-                    seeded_db,
-                    order.id,
-                    event_type=event_type,
-                    amount=Decimal("100"),
-                    occurred_on=TODAY,
-                    actor="pytest",
-                )
-            assert "代挂业务不允许" in str(exc.value)
+        with pytest.raises(Validation, match="代挂业务不允许 BUY"):
+            service.post_event(
+                seeded_db,
+                order.id,
+                event_type="BUY",
+                amount=Decimal("100"),
+                occurred_on=TODAY,
+                actor="pytest",
+            )
 
-    def test_th_can_post_cost(self, seeded_db):
+    def test_cost_is_not_a_th_event(self, seeded_db):
         order = service.create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
 
-        event, flow = service.post_event(
-            seeded_db,
-            order.id,
-            event_type="COST",
-            amount=Decimal("100"),
-            occurred_on=TODAY,
-            actor="pytest",
-            flow_category="FEE",
-        )
-        assert event.event_type == "COST"
-        assert flow.accounting_attribute == "TH_DIRECT_COST"
+        with pytest.raises(Validation, match="事件类型必须为"):
+            service.post_event(
+                seeded_db,
+                order.id,
+                event_type="COST",
+                amount=Decimal("100"),
+                occurred_on=TODAY,
+                actor="pytest",
+            )
 
-    def test_hs_cannot_add_cost_after_account_is_sold(self, seeded_db):
+    def test_hs_cannot_add_removed_cost_event_after_account_is_sold(self, seeded_db):
         account = _new_account(seeded_db, game_account="sold-cost-guard")
         order = service.create_order(
             seeded_db,
@@ -474,7 +452,7 @@ class TestEventRules:
             actor="pytest",
         )
 
-        with pytest.raises(Validation, match="已售账号不能新增 COST"):
+        with pytest.raises(Validation, match="事件类型必须为"):
             service.post_event(
                 seeded_db,
                 order.id,
@@ -533,12 +511,12 @@ class TestEventRules:
                 offset_event_id=buy.id,
             )
 
-    def test_payment_requires_a_source_installment(self, seeded_db):
+    def test_payment_event_is_removed(self, seeded_db):
         order = service.create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest"
         )
 
-        with pytest.raises(Validation) as exc:
+        with pytest.raises(Validation, match="事件类型必须为"):
             service.post_event(
                 seeded_db,
                 order.id,
@@ -547,8 +525,6 @@ class TestEventRules:
                 occurred_on=TODAY,
                 actor="pytest",
             )
-
-        assert "分期合约" in str(exc.value)
 
     def test_unknown_account_is_rejected_before_database_flush(self, seeded_db):
         with pytest.raises(NotFound) as exc:
@@ -605,6 +581,57 @@ class TestEventRules:
         assert seeded_db.scalar(
             select(Cashflow).where(Cashflow.order_event_id == event.id)
         ) is None
+
+    def test_full_sale_can_record_sell_delivery_without_cashflow(self, seeded_db):
+        account = _new_account(seeded_db, game_account="full-sale-delivery")
+        order = service.create_order(
+            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
+        )
+        service.post_event(
+            seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
+            occurred_on=TODAY, actor="pytest",
+        )
+        service.post_event(
+            seeded_db, order.id, event_type="SELL", amount=Decimal("200"),
+            occurred_on=TODAY, actor="pytest", portion="PROFIT",
+        )
+        event, flow = service.post_event(
+            seeded_db,
+            order.id,
+            event_type="DELIVER",
+            delivery_direction="SELL",
+            delivery_mode="CUSTOMER_SELF",
+            occurred_on=TODAY,
+            actor="pytest",
+            note="客户自行换绑凭证",
+        )
+        assert event.event_type == EventType.DELIVER.value
+        assert event.form_extra["delivery_direction"] == "SELL"
+        assert flow is None
+        assert seeded_db.scalar(
+            select(Cashflow).where(Cashflow.order_event_id == event.id)
+        ) is None
+
+    def test_dg_sale_can_record_sell_delivery_without_buy(self, seeded_db):
+        order = service.create_order(
+            seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
+        )
+        service.post_event(
+            seeded_db, order.id, event_type="SELL", amount=Decimal("200"),
+            occurred_on=TODAY, actor="pytest", portion="GROSS",
+        )
+        event, flow = service.post_event(
+            seeded_db,
+            order.id,
+            event_type="DELIVER",
+            delivery_direction="SELL",
+            delivery_mode="PLATFORM_OPERATOR",
+            occurred_on=TODAY,
+            actor="pytest",
+            note="代挂订单交付凭证",
+        )
+        assert event.form_extra["delivery_direction"] == "SELL"
+        assert flow is None
 
     def test_direct_deliver_event_cannot_bypass_installment_service(self, seeded_db):
         order = _settled_hs_installment(seeded_db)
@@ -747,6 +774,7 @@ class TestOrdersApi:
         assert body["event"]["reason"] == "买家确认收款"
         assert body["event"]["note"] == "售出动作备注"
         assert body["event"]["form_extra"] == {
+            "sale_mode": "FULL",
             "bound_phone": "13900000000",
             "bound_phone_owner": "李四",
         }

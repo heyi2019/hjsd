@@ -6,14 +6,14 @@ import "./AdditionalFeeFields.css";
 import type { Pool } from "../shared/api/catalog";
 import { Select } from "../shared/ui";
 
-/** 回收、提号共用的附加费用字段；业务自身的主金额和提交事件由上层处理。 */
+/** 回收、提号共用的其他支出字段；业务自身的主金额和提交事件由上层处理。 */
 export function AdditionalFeeFields(props: { pools: Pool[] }) {
   const addExpenseRef = useRef<((defaultValue?: unknown, insertIndex?: number) => void) | null>(null);
 
   return (
     <BusinessRegistrationGroup
       className="additional-fee-fields"
-      title="附加费用"
+      title="其他支出"
       action={
         <PermissionButton permission="order.create" type="link" onClick={() => addExpenseRef.current?.({})}>
           + 增加支出

@@ -19,6 +19,9 @@ import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 import { useSession } from "../../shared/state/session";
 import type { BusinessCenterEntryTab } from "../../orders/businessCenter";
 import { filterInventoryRows, findCancelableBuy, inventoryCellValue, moreMenuItems } from "./helpers";
+import type { InventoryCashflowTarget } from "../InventoryCashflowModal";
+import type { OrderDeliveryTarget } from "../../orders/OrderDeliveryModal";
+import type { OrderProfitShareTarget } from "../../orders/OrderProfitShareModal";
 
 // 关键字逐键输入时合并请求：指标不是主流程，200ms 足够跟手。
 const INVENTORY_STATS_DEBOUNCE_MS = 200;
@@ -41,6 +44,13 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const [saleTarget, setSaleTarget] = useState<Account | null>(null);
   const [consignmentTarget, setConsignmentTarget] = useState<Account | null>(null);
   const [rebateTarget, setRebateTarget] = useState<Account | null>(null);
+  const [cashflowTarget, setCashflowTarget] = useState<InventoryCashflowTarget | null>(null);
+  const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
+  const [deliveryTarget, setDeliveryTarget] = useState<OrderDeliveryTarget | null>(null);
+  const [deliveryEmployees, setDeliveryEmployees] = useState<EmployeeOption[]>([]);
+  const [profitShareTarget, setProfitShareTarget] = useState<OrderProfitShareTarget | null>(null);
+  const [profitSharePools, setProfitSharePools] = useState<Pool[]>([]);
+  const [profitShareEmployees, setProfitShareEmployees] = useState<EmployeeOption[]>([]);
   const [executionDetails, setExecutionDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [executionLoading, setExecutionLoading] = useState<Record<number, boolean>>({});
   const [expandedAccountIds, setExpandedAccountIds] = useState<Key[]>([]);
@@ -173,6 +183,89 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     setDetailTarget(account);
   }
 
+  async function openCashflow(account: Account) {
+    try {
+      const [detail, poolList] = await Promise.all([
+        executionDetails[account.id] ?? stocksApi.executionDetail(account.id),
+        poolsApi.list(),
+      ]);
+      setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
+      const sourceOrder = detail.orders.find((order) => order.order_id === account.source_order_id)
+        ?? detail.orders.find((order) => order.order_type !== "DG")
+        ?? detail.orders[0];
+      if (!sourceOrder) {
+        appMessage.warning("当前账号没有可关联的业务订单");
+        return;
+      }
+      setCashflowPools(poolList.filter((pool) => pool.status === "ACTIVE"));
+      setCashflowTarget({ account, orderId: sourceOrder.order_id, orderNo: sourceOrder.order_no });
+    } catch (cause) {
+      setError(normalizeError(cause));
+    }
+  }
+
+  async function openDelivery(account: Account) {
+    try {
+      const [detail, employeeList] = await Promise.all([
+        executionDetails[account.id] ?? stocksApi.executionDetail(account.id),
+        employeesApi.list(),
+      ]);
+      setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
+      const sourceOrder = detail.orders.find((order) => order.order_id === account.source_order_id)
+        ?? detail.orders.find((order) => order.order_type !== "DG")
+        ?? detail.orders[0];
+      if (!sourceOrder) {
+        appMessage.warning("当前账号没有可关联的业务订单");
+        return;
+      }
+      const direction: "BUY" | "SELL" = sourceOrder.order_type === "DG"
+        || sourceOrder.events.some((event) => event.event_type === "SELL")
+        ? "SELL"
+        : "BUY";
+      const alreadyDelivered = sourceOrder.events.some(
+        (event) => event.event_type === "DELIVER"
+          && event.delivery_direction === direction,
+      );
+      if (alreadyDelivered) {
+        appMessage.warning(`${direction === "BUY" ? "买号" : "卖号"}交付已经登记`);
+        return;
+      }
+      setDeliveryEmployees(employeeList.filter((employee) => employee.is_active));
+      setDeliveryTarget({
+        orderId: sourceOrder.order_id,
+        orderNo: sourceOrder.order_no,
+        direction,
+        boundPhone: detail.account.bound_phone,
+        boundPhoneOwner: detail.account.bound_phone_owner,
+      });
+    } catch (cause) {
+      setError(normalizeError(cause));
+    }
+  }
+
+  async function openProfitShare(account: Account) {
+    try {
+      const [detail, poolList, employeeList] = await Promise.all([
+        executionDetails[account.id] ?? stocksApi.executionDetail(account.id),
+        poolsApi.list(),
+        employeesApi.list(),
+      ]);
+      setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
+      const sourceOrder = detail.orders.find((order) => order.order_id === account.source_order_id)
+        ?? detail.orders.find((order) => order.order_type !== "DG")
+        ?? detail.orders[0];
+      if (!sourceOrder) {
+        appMessage.warning("当前账号没有可关联的业务订单");
+        return;
+      }
+      setProfitSharePools(poolList.filter((pool) => pool.status === "ACTIVE"));
+      setProfitShareEmployees(employeeList.filter((employee) => employee.is_active));
+      setProfitShareTarget({ id: sourceOrder.order_id, order_no: sourceOrder.order_no });
+    } catch (cause) {
+      setError(normalizeError(cause));
+    }
+  }
+
   async function openVoid(account: Account) {
     try {
       const [detail, poolList] = await Promise.all([
@@ -218,11 +311,21 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
       await Promise.all(
         detail.orders
           .filter((order) => order.order_type === "DG" && order.status !== "CANCELLED")
-          .map((order) => ordersApi.cancel(order.order_id, {
-            reason: "系统下架同步取消寄售平台上架",
-            form_extra_scope: "INVOID",
-            form_extra: { platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
-          })),
+          .map(async (order) => {
+            await ordersApi.postEvent(order.order_id, {
+              event_type: "OPERATE",
+              operation_type: "UNLIST",
+              occurred_on: today(),
+              note: "系统下架同步取消寄售平台上架",
+              form_extra_scope: "INVOID",
+              form_extra: { platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
+            });
+            return ordersApi.cancel(order.order_id, {
+              reason: "系统下架同步取消寄售平台上架",
+              form_extra_scope: "INVOID",
+              form_extra: { platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
+            });
+          }),
       );
       await ordersApi.postEvent(voidTarget.orderId, {
         event_type: "CANCEL",
@@ -333,7 +436,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     {
       title: "操作",
       key: "actions",
-      width: 292,
+      width: 420,
       render: (_value, row) => (
         <Space className="inventory-row-actions" size={4}>
           <PermissionButton
@@ -373,6 +476,42 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
             }}
           >
             返点
+          </PermissionButton>
+          <PermissionButton
+            permission="order.event.post"
+            type="link"
+            size="small"
+            aria-label="资金收支"
+            onClick={(event) => {
+              event.stopPropagation();
+              void openCashflow(row);
+            }}
+          >
+            资金收支
+          </PermissionButton>
+          <PermissionButton
+            permission="order.event.post"
+            type="link"
+            size="small"
+            aria-label="交付"
+            onClick={(event) => {
+              event.stopPropagation();
+              void openDelivery(row);
+            }}
+          >
+            交付
+          </PermissionButton>
+          <PermissionButton
+            permission="order.event.post"
+            type="link"
+            size="small"
+            aria-label="分润"
+            onClick={(event) => {
+              event.stopPropagation();
+              void openProfitShare(row);
+            }}
+          >
+            分润
           </PermissionButton>
           {isEditableAccountType(row.inventory_type) ? <>
             <PermissionButton
@@ -554,6 +693,13 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     businessMode,
     businessOptions,
     canDelete,
+    cashflowPools,
+    cashflowTarget,
+    deliveryEmployees,
+    deliveryTarget,
+    profitShareEmployees,
+    profitSharePools,
+    profitShareTarget,
     columns,
     consignmentTarget,
     countInventoryRows,
@@ -586,6 +732,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     onNavigate,
     onOrdersChanged,
     openDetail,
+    openDelivery,
+    openProfitShare,
     openEditor,
     openPartyCard,
     openPlatformOffsale,
@@ -617,6 +765,9 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     setPlatformOffsaleTarget,
     setProfileTarget,
     setRebateTarget,
+    setCashflowTarget,
+    setDeliveryTarget,
+    setProfitShareTarget,
     setRows,
     setSaleTarget,
     setVoidTarget,

@@ -89,32 +89,22 @@ def _delivered_hs_order(seeded_db):
 
 
 # --------------------------------------------------------------------- events.py
-def test_defer_order_cancel_requires_installment_cancel_flag(seeded_db):
+def test_removed_cost_event_is_rejected(seeded_db):
     order = service.create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
-    with pytest.raises(Validation, match="defer_order_cancel 只能用于分期取消流程"):
+    with pytest.raises(Validation, match="事件类型必须为"):
         service.post_event(
-            seeded_db, order.id, event_type="BUY", amount=Decimal("10"),
-            occurred_on=TODAY, actor="pytest", defer_order_cancel=True,
+            seeded_db, order.id, event_type="COST", amount=Decimal("10"),
+            occurred_on=TODAY, actor="pytest",
         )
 
 
-def test_refund_rejects_invalid_responsibility(seeded_db):
-    order = _delivered_hs_order(seeded_db)
-    with pytest.raises(Validation, match="退款责任方必须为"):
+def test_refund_is_not_an_order_event(seeded_db):
+    order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
+    with pytest.raises(Validation, match="事件类型必须为"):
         service.post_event(
             seeded_db, order.id, event_type="REFUND", amount=Decimal("10"),
-            occurred_on=TODAY, actor="pytest", reason="x", refund_responsibility="BAD",
-        )
-
-
-def test_refund_rejects_offset_event_id(seeded_db):
-    order = _delivered_hs_order(seeded_db)
-    with pytest.raises(Validation, match="退款不使用 offset_event_id"):
-        service.post_event(
-            seeded_db, order.id, event_type="REFUND", amount=Decimal("10"),
-            occurred_on=TODAY, actor="pytest", reason="x",
-            refund_responsibility="COMPANY", offset_event_id=1,
+            occurred_on=TODAY, actor="pytest",
         )
 
 
@@ -182,10 +172,10 @@ def test_hs_sell_requires_account_in_stock(seeded_db):
         )
 
 
-def test_hs_cost_requires_account(seeded_db):
+def test_hs_removed_cost_event_does_not_require_account(seeded_db):
     order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
-    with pytest.raises(Validation, match="回收订单 COST 必须关联库存账号"):
+    with pytest.raises(Validation, match="事件类型必须为"):
         service.post_event(
             seeded_db, order.id, event_type="COST", amount=Decimal("10"),
             occurred_on=TODAY, actor="pytest",
@@ -215,17 +205,17 @@ def test_th_sell_blocked_when_installment_exists(seeded_db):
         per_period=Decimal("100"), first_due_on=TODAY, actor="pytest",
     )
     seeded_db.commit()
-    with pytest.raises(Validation, match="已建立分期合约，只能通过 PAYMENT 收款"):
+    with pytest.raises(Validation, match="已建立分期合约，只能通过分期收款"):
         service.post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("100"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
 
 
-def test_deliver_requires_installment(seeded_db):
+def test_deliver_requires_prior_business_event(seeded_db):
     order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
-    with pytest.raises(Validation, match="必须通过分期合约交付"):
+    with pytest.raises(Validation, match="登记卖号交付前必须先登记售出"):
         service.post_event(
             seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY, actor="pytest",
             delivery_mode="PLATFORM_OPERATOR", note="voucher",
@@ -261,27 +251,10 @@ def test_assert_sellable_rejects_missing_account(seeded_db):
         events._assert_sellable_order(seeded_db, order)
 
 
-def test_assert_event_allowed_rejects_missing_account_for_cost(seeded_db):
-    order = Order(order_type="HS", account_id=999999)
-    with pytest.raises(NotFound, match="不存在"):
-        events._assert_event_allowed(seeded_db, order, "COST")
-
-
-def test_assert_event_allowed_rejects_payment_offset_without_installment(seeded_db):
-    order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
-    seeded_db.commit()
-    payment_event = OrderEvent(
-        order_id=order.id, event_type="PAYMENT", event_no="EV-GUARD-01", is_posted=True,
-        amount=Decimal("0"), portion="PRINCIPAL", occurred_on=TODAY,
-        created_by="pytest", updated_by="pytest",
-    )
-    seeded_db.add(payment_event)
-    seeded_db.flush()
-    with pytest.raises(Validation, match="PAYMENT 冲销必须关联分期合约"):
-        events._assert_event_allowed(
-            seeded_db, order, "CANCEL", offset_event_id=payment_event.id,
-            reason="x", allow_installment_cancel=True,
-        )
+def test_assert_event_allowed_rejects_buy_without_account_snapshot(seeded_db):
+    order = Order(order_type="HS", account_id=None, account_snapshot={})
+    with pytest.raises(Validation, match="游戏账号"):
+        events._assert_event_allowed(seeded_db, order, "BUY")
 
 
 def test_opposite_direction_returns_in_for_none(seeded_db):

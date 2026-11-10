@@ -17,8 +17,8 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-/** 选中主资金账户。附加费用区的中介费账户与主资金账户同名同占位（资金账户），
- *  故排除附加费用区后再定位（回收走 payment-info-section、提号走 th-fee-primary）。 */
+/** 选中主资金账户。支出明细区的中介费账户与主资金账户同名同占位（资金账户），
+ *  故排除支出明细区后再定位（回收走 payment-info-section、提号走 th-fee-primary）。 */
 async function pickMainPool() {
   const placeholder = screen
     .getAllByText("请选择资金账户", { exact: true })
@@ -339,7 +339,7 @@ it("订单已创建后不等待列表刷新，提交按钮立即结束 loading",
     resolveRefresh();
   });
 
-it("附加费用只保留中介费", async () => {
+it("支出明细只保留中介费", async () => {
     await openModal();
     expect(screen.queryByLabelText("设计费")).toBeNull();
   expect(screen.queryByLabelText("收款对象")).toBeNull();

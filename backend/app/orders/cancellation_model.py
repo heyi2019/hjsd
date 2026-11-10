@@ -39,15 +39,13 @@ from ._shared import get_order
 
 _CANCELLABLE_EVENT_TYPES = frozenset({
     EventType.BUY.value,
-    EventType.COST.value,
     EventType.SELL.value,
-    EventType.PAYMENT.value,
 })
 
 
 def cancellation_direction_for_offset_type(event_type: str) -> str:
     """返回冲销原资金事件后应产生的现金流方向。"""
-    if event_type in {EventType.BUY.value, EventType.COST.value}:
+    if event_type == EventType.BUY.value:
         return Direction.IN.value
     return Direction.OUT.value
 
@@ -114,9 +112,6 @@ def apply_cancellation_account_effect(
                 else "CANCEL_SELL"
             )
             account.status = transition(ACCOUNT_TRANSITIONS, account.status, action, entity="账号")
-    elif offset_event is not None and offset_event.event_type == EventType.PAYMENT.value:
-        # 分期收款取消只产生原路退款资金流，不改写账号成本或库存状态。
-        pass
     else:
         account.cost_amount = to_money(account.cost_amount) - amount
         if offset_event is None or (

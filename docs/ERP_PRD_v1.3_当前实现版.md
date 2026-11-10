@@ -14,6 +14,8 @@
 > **事实源**：当前仓库 `frontend/src`、`backend/app`、`tests/backend`
 > **适用范围**：宜游轩单团队经营系统
 
+> **动作模型更新（2026-11-10）**：业务动作、业务事件、业务属性、资金明细和审计动作以 [ERP 系统动作定义 v1.0](ERP_系统动作定义_v1.0.md) 为当前 `dev` 口径。`COST`、`PAYMENT`、`REFUND`、`BUY_CREDIT` 已从当前业务事件模型移除，不得作为新流程设计依据。
+
 ## 变更说明
 
 | 来源版本 | 日期 | 本次变更 | 变更原因 |
@@ -122,18 +124,18 @@
 
 ### 4.2 订单与业务事件
 
-订单创建支持业务类型、交易日期、账号快照或库存账号、负责人、资金类型、备注、活字段、客户角色和合作方角色；代分期仍可在建单时提交首笔付款和分期合约。提号、代挂不在建单时勾选分期，必须到出售动作中选择全款或分期并建立对应合约。代挂不再使用独立抽成结算字段。
+订单创建支持业务类型、交易日期、账号快照或库存账号、负责人、资金类型、备注、活字段、客户角色和合作方角色。售出统一使用 `SELL`，通过 `SALE_MODE=FULL` 或 `SALE_MODE=INSTALLMENT` 区分全款和分期；分期合约在售出动作中建立。代挂不使用独立抽成结算字段。
 
 订单状态为 `ACTIVE`、`COMPLETED`、`CANCELLED`。订单号按业务类型独立递增，创建后不可由前端修改。订单详情包含：
 
-- 业务事件时间线：`BUY`、`COST`、`SELL`、`PAYMENT`、`DELIVER`、`CANCEL`、`REFUND`；每条事件记录操作人和发生日期；
-- 动作性质统一为买号、售出、运营：回收/提号/代挂归入买号，运营人员按订单配置；公司只作为利润归属。售出统一绑定实际操作人：全款售出记录 `SELL`，分期出售记录合约及操作人，并通过 `PAYMENT` 收款；
+- 业务事件时间线：`BUY`、`SELL`、`DELIVER`、`CANCEL`、`OPERATE`、`REBATE`、`PROFIT_SHARE`；每条事件记录操作人和发生日期；收入和支出另记 `cashflow`；
+- 动作性质统一为买号、售出、运营：回收/提号归入买号，运营通过 `OPERATION_TYPE` 区分作图、描述、寄售、下架；公司只作为利润归属。售出统一绑定实际操作人，全款和分期都记录同一个 `SELL`；
 - 关联订单、资金流水、返点、分期合约/期次、附件和审计摘要；
 - 订单编辑、取消和事件登记；
 - 订单台账的“操作”列和订单详情统一通过“更多”菜单提供利润分配、登记退款、取消交易；行级操作会重新读取订单最新状态，避免使用列表快照执行资金动作；
 - 资金池路由：显式指定资金池优先，否则使用业务默认路由。
 
-金额类业务事件登记后生成对应资金事实；交付事件不产生现金流。业务事件按类型驱动订单、库存和分期状态；已登记事实只能通过冲销或补充事件修正。
+业务事件可以关联零条、一条或多条资金明细；交付事件不产生现金流。业务事件按类型驱动订单、库存和分期状态；已登记事实只能通过冲销或补充事件修正。
 
 #### 4.2.1 订单状态机
 
@@ -141,21 +143,21 @@
 
 | 当前状态 | 触发动作/事件 | 适用条件 | 下一状态 | 说明 |
 |---|---|---|---|---|
-| `ACTIVE` | `BUY`、`COST`、`PAYMENT` | 业务事实登记，尚未形成终态 | `ACTIVE` | 记录买入、直接成本或分期收款，订单继续进行 |
+| `ACTIVE` | `BUY` | 业务事实登记，尚未形成终态 | `ACTIVE` | 记录买入；其他收入 / 支出通过 `cashflow` 关联订单 |
 | `ACTIVE` | `SELL` | 非分期订单完成售出 | `COMPLETED` | 生成售出事实并完成订单 |
 | `ACTIVE` | `DELIVER` | 分期合约已满足交付前提 | `COMPLETED` | 交付事件不产生现金流，只确认业务完成 |
 | `ACTIVE` | `CANCEL` | 取消未完成交易，或按原事件完成冲销 | `CANCELLED` | 必须填写原因；有资金事实时保留反向事件和退款金额 |
 | `COMPLETED` | `CANCEL` | 已完成售出需要完整冲销 | `CANCELLED` | 必须关联被冲销事件，不能直接改状态 |
-| `COMPLETED` | `REFUND` | 交付后发生全部或部分退款 | `COMPLETED` | 退款记录资金事实，不把已完成订单改成取消 |
+| `COMPLETED` | `CASHFLOW_CREATE[CASHFLOW_REASON=REFUND]` | 交付后发生全部或部分退款 | `COMPLETED` | 退款记录支出资金事实，不把已完成订单改成取消 |
 | `COMPLETED` | `BUY` | 仅 HS/TH 且无分期合约，重新买入同一业务资源 | `ACTIVE` | 重新开启业务周期并保留原历史 |
 | `CANCELLED` | 任意业务动作 | — | 拒绝 | 取消是终态，不再接受新业务事件 |
 
 四类业务的主路径如下：
 
-- HS：`ACTIVE → BUY → SELL → COMPLETED`；若进入分期出售，则为 `ACTIVE → BUY/PAYMENT → DELIVER → COMPLETED`。
-- TH：全款路径为 `ACTIVE → BUY → SELL → COMPLETED`；分期路径为 `ACTIVE → BUY/PAYMENT → DELIVER → COMPLETED`。
-- DG：`ACTIVE → SELL → COMPLETED`；代挂不登记 `BUY` 或 `COST`。
-- 取消路径：`ACTIVE` 或 `COMPLETED → CANCELLED`；交付前取消按原资金池冲销，交付后使用 `REFUND`，两者均保留原始业务事实和审计链。
+- HS：`ACTIVE → BUY → SELL[SALE_MODE=FULL] → DELIVER[DELIVERY_DIRECTION=SELL] → COMPLETED`；分期为 `ACTIVE → BUY → SELL[SALE_MODE=INSTALLMENT] → INSTALLMENT → CASHFLOW[CASHFLOW_REASON=INSTALLMENT_PAYMENT] → DELIVER[DELIVERY_DIRECTION=SELL] → COMPLETED`。
+- TH：全款路径为 `ACTIVE → BUY → SELL[SALE_MODE=FULL] → DELIVER[DELIVERY_DIRECTION=SELL] → COMPLETED`；分期路径为 `ACTIVE → BUY → SELL[SALE_MODE=INSTALLMENT] → INSTALLMENT → CASHFLOW[CASHFLOW_REASON=INSTALLMENT_PAYMENT] → DELIVER[DELIVERY_DIRECTION=SELL] → COMPLETED`。
+- DG：`ACTIVE → SELL[SALE_MODE=FULL/INSTALLMENT] → DELIVER[DELIVERY_DIRECTION=SELL] → COMPLETED`；代挂不登记 `BUY`。
+- 取消路径：`ACTIVE` 或 `COMPLETED → CANCELLED`；交付前取消按 `CANCEL_MODE` 和原资金池冲销，交付后使用 `CASHFLOW_REASON=REFUND`，两者均保留原始业务事实和审计链。
 
 订单状态机与账号、分期合约同步约束：`CANCELLED` 订单不得再产生新事件；HS/DG 等库存型分期取消后账号回到库存，TH 取消后账号结束；状态变化必须与事件、资金流水、账号和分期状态在同一事务内完成。
 
@@ -167,13 +169,13 @@
 |---|---|---|
 | 买号 `BUY` | 回收、提号、代挂均属于买号动作 | 绑定对应业务的操作人；当前回收、提号取已登记的买号事件操作人，代卷取建单操作人 |
 | 售出 `SELL` | 账号售出统一使用标准售出动作；代挂和分期出售不另设售出名称 | 绑定执行售出的操作人；全款售出取售出事件操作人，分期出售取创建分期合约的操作人 |
-| 运营 `OPERATION` | 订单的运营工作 | 不建立独立运营动作台账；在每张订单的利润分配中选择运营人员和比例 |
+| 运营 `OPERATE` | 订单的运营工作；通过 `OPERATION_TYPE` 区分运营类型 | 不建立独立运营动作台账；在每张订单的利润分配中选择运营人员和比例 |
 
-公司是利润归属方，不是动作性质，也不绑定个人。分期是收款方式，不是独立动作性质。订单事件中的成本、回款、交付、退款和冲销用于记录具体业务或资金事实，不因此新增利润分配动作性质。
+公司是利润归属方，不是动作性质，也不绑定个人。分期是 `SELL` 的售出方式属性，不是独立动作性质。订单事件、资金明细、交付和冲销用于记录具体业务或资金事实，不因此新增利润分配动作性质。
 
-利润分配按订单配置买号、售出、运营和公司归属四项，比例合计 100%。买号收益绑定买号操作人，售出收益绑定售出操作人，运营人员按订单选择，公司归属不绑定个人。分配基数为订单利润，即售出金额减买入成本和直接成本；返点收益单独核算，不参与分配。库存售出订单可追溯同一账号的买号事件；分期出售根据分期合约登记人绑定售出人员。
+利润分配按订单配置买号、售出、运营和公司归属四项，比例合计 100%。买号收益绑定买号操作人，售出收益绑定售出操作人，运营人员按订单选择，公司归属不绑定个人。分配基数按订单收入与关联支出资金明细计算；返点收益单独核算，不参与分配。库存售出订单可追溯同一账号的买号事件；分期出售根据分期合约登记人绑定售出人员。
 
-退款规则要求交付前使用取消或冲销，交付后可登记全额或部分退款；原因和责任方必填，退款不得超过已收减已退，原收入与收款事实保留。取消交易完成后必须显示实际退款金额，并按原资金池回执；`REFUND` 校验交付状态、退款上限及责任方，支持已完成订单退款。
+退款规则要求交付前使用取消或冲销，交付后登记 `CASHFLOW_DIRECTION=OUT`、`CASHFLOW_REASON=REFUND`；原因和责任方必填，退款不得超过已收减已退，原收入与收款事实保留。取消交易完成后必须显示实际退款金额，并按原资金池回执；退款校验交付状态、退款上限及责任方，支持已完成订单退款。
 
 ### 4.3 账号库存
 
@@ -196,11 +198,9 @@
 | 当前状态 | 触发动作 | 下一状态 | 业务说明 |
 |---|---|---|---|
 | `WAITING` | `BUY_STOCK` | `WAITING` | 自营买入后保留在库，同一账号可再次买入形成新轨迹 |
-| `WAITING` | `BUY_CREDIT` | `SOLD` | 分期型买入，账号进入已售 |
-| `WAITING` | `SELL` | `SOLD` | 全款售出后标记已售 |
+| `WAITING` | `SELL` | `SOLD` | 登记售出；由 `SALE_MODE=FULL` 或 `SALE_MODE=INSTALLMENT` 区分售出方式 |
 | `WAITING` | `VOID` | `VOID` | 账号被取消 |
 | `SOLD` | `BUY_STOCK` | `WAITING` | 售出撤销后重新入库 |
-| `SOLD` | `BUY_CREDIT` | `SOLD` | 撤销后重新进入分期型买入 |
 | `SOLD` | `RECOVER` | `WAITING` | 分期逾期回收后恢复在库 |
 | `SOLD` | `CANCEL_STOCK` | `WAITING` | 买入事实被取消，退回在库 |
 | `SOLD` | `CANCEL_SELL` | `WAITING` | 售出冲销后恢复在库 |
@@ -239,20 +239,20 @@
 
 | 当前状态 | 触发动作 | 下一状态 | 业务说明 |
 |---|---|---|---|
-| `PENDING` | `PAYMENT` | `ACTIVE` 或 `SETTLED` | 登记首笔收款或还款后生效；本次达到全部应收时继续结清 |
+| `PENDING` | `CASHFLOW_CREATE[CASHFLOW_REASON=INSTALLMENT_PAYMENT]` | `ACTIVE` 或 `SETTLED` | 登记首笔收入资金明细后生效；本次达到全部应收时继续结清 |
 | `PENDING` | `MARK_OVERDUE` | `OVERDUE` | 到期仍未达到应收 |
 | `PENDING` | `SETTLE` | `SETTLED` | 应收已通过收款或减免完成 |
 | `PENDING` | `CANCEL` | `CANCELLED` | 合约取消 |
-| `ACTIVE` | `PAYMENT` | `ACTIVE` 或 `SETTLED` | 持续登记收款或还款；本次达到全部应收时结清 |
+| `ACTIVE` | `CASHFLOW_CREATE[CASHFLOW_REASON=INSTALLMENT_PAYMENT]` | `ACTIVE` 或 `SETTLED` | 持续登记收入资金明细；本次达到全部应收时结清 |
 | `ACTIVE` | `MARK_OVERDUE` | `OVERDUE` | 存在未结清逾期期次 |
 | `ACTIVE` | `SETTLE` | `SETTLED` | 全部应收已完成 |
 | `ACTIVE` | `DEFAULT` / `CANCEL` | `DEFAULTED` / `CANCELLED` | 进入违约或取消 |
-| `OVERDUE` | `PAYMENT` | `OVERDUE` 或 `SETTLED` | 逾期合约继续收款，达到全部应收时结清 |
+| `OVERDUE` | `CASHFLOW_CREATE[CASHFLOW_REASON=INSTALLMENT_PAYMENT]` | `OVERDUE` 或 `SETTLED` | 逾期合约继续登记收入资金明细，达到全部应收时结清 |
 | `OVERDUE` | `SETTLE` | `SETTLED` | 逾期应收全部完成 |
 | `OVERDUE` | `DEFAULT` / `CLOSE` / `CANCEL` | `DEFAULTED` / `CLOSED` / `CANCELLED` | 风险处置、关闭或取消 |
 | `SETTLED` | `DELIVER` | `DELIVERED` | 仅结清合约允许交付 |
 | `SETTLED` | `CANCEL` | `CANCELLED` | 交付前取消并按取消规则处理 |
-| `DEFAULTED` | `PAYMENT` | `DEFAULTED` | 违约后收款保留违约状态 |
+| `DEFAULTED` | `CASHFLOW_CREATE[CASHFLOW_REASON=INSTALLMENT_PAYMENT]` | `DEFAULTED` | 违约后收入资金明细保留违约状态 |
 | `DEFAULTED` | `CLOSE` | `CLOSED` | 完成风险处置后关闭 |
 | `DELIVERED` / `CLOSED` / `CANCELLED` | 任意业务动作 | 拒绝 | 终态不接受新动作 |
 
@@ -260,7 +260,7 @@
 
 | 当前状态 | 触发动作 | 下一状态 | 业务说明 |
 |---|---|---|---|
-| `PENDING` / `PARTIAL` / `OVERDUE` | `PAYMENT` | `PARTIAL` 或 `PAID` | 收款未达到应收为部分收款，达到应收为已收齐 |
+| `PENDING` / `PARTIAL` / `OVERDUE` | `CASHFLOW_CREATE[CASHFLOW_REASON=INSTALLMENT_PAYMENT]` | `PARTIAL` 或 `PAID` | 收入资金明细未达到应收为部分收款，达到应收为已收齐 |
 | `PENDING` / `PARTIAL` | 到期检查 | `OVERDUE` | 到期且收款与减免合计不足应收 |
 | `OVERDUE` | `EXTEND` | `PENDING` | 展期后恢复待收，保留原日期与原因 |
 | `PENDING` / `PARTIAL` / `OVERDUE` | `WAIVE` | 原状态或 `WAIVED` | 减免未完成时保留原状态，达到应收后为已减免 |
@@ -297,19 +297,19 @@
 | 核算属性 | 定义 | 典型场景 |
 |---|---|---|
 | `SELF_REVENUE` | 自营销售或自营分期回款收入 | HS 售出、`STOCK_SALE` 分期回款 |
-| `SELF_DIRECT_COST` | 自营账号买入及订单直接成本 | HS `BUY`、订单 `COST` |
-| `TH_DIRECT_COST` | 为客户需求向同行采购账号形成的分销直接采购成本 | TH 向同行买号 |
+| `PURCHASE` | 自营或分销账号买入支出 | HS / TH `BUY` 关联的 `OUT` 资金明细 |
+| `PURCHASE` | 为客户需求向同行采购账号形成的分销买入支出 | TH 向同行买号 |
 | `TH_REVENUE` | 将按客户需求采购的账号卖给客户形成的分销销售收入 | TH 向客户售号 |
 | `SERVICE_REVENUE` | 已确认的服务费、佣金等收入 | 分期合约已确认服务费；DG 仅在实际结算口径确认后使用 |
-| `ADDITIONAL_INCOME` | 附加收入：返点到账、打赏、违约金等非卖号收入（内部以 `cashflow.category` 区分：`REBATE`/`TIP`/`PENALTY`） | `REBATE` 等资金流水 |
-| `ADDITIONAL_EXPENSE` | 附加支出：随成交发生、既非号价成本也非日常经营的过手性支出（代收代付同行分成等），与附加收入对称核算 | HS0051 成交 888 转付同行 277.60 |
+| `REBATE_INCOME` | 返点收入 | `REBATE` 业务事件关联的 `IN` 资金明细 |
+| `PROFIT_SHARE` | 分润支出 | `PROFIT_SHARE` 业务事件关联的 `OUT` 资金明细 |
 | `OPERATING_EXPENSE` | 与具体订单无直接对应的日常经营费用 | 平台费、人工、办公等 |
 | `DEPOSIT` | 外部/受托押金的占用、释放或损失 | `DEPOSIT_HOLD`、`DEPOSIT_RELEASE` |
 | `EXTERNAL_FUNDING` | 非经营性的外部资金注入或退出 | 股东注资、借款 |
 | `INTERNAL_TRANSFER` | 资金池或账户之间的内部调拨 | `TRANSFER` |
 | `REVERSAL` | 对原资金事实的反向冲销 | 流水、返点或费用冲销 |
 
-外部/受托资金的所有权不属于本方，例如代客户暂存的款项和客户/合作方押金。TH 是客户需求驱动的分销直接买卖：向同行采购形成 `TH_DIRECT_COST`，卖给客户形成 `TH_REVENUE`，不归入泛化的“业务往来”。服务费、佣金和返点实际归本方后，按经营资金和对应收入属性记录。核算属性不替代资金性质和现金方向；同一核算属性可根据业务动作产生收入或支出方向，但必须关联来源订单、事件、押金或划转记录。
+外部/受托资金的所有权不属于本方，例如代客户暂存的款项和客户/合作方押金。TH 是客户需求驱动的分销买卖：向同行采购形成 `OUT` 买入资金明细，卖给客户形成 `TH_REVENUE` 收入。服务费、佣金和返点实际归本方后，按经营资金和对应收入属性记录。核算属性不替代资金性质和现金方向；同一核算属性必须关联来源订单、事件、押金或划转记录。
 
 当前前端已提供流水查询、新增、审核、拒绝、冲销、押金占用、释放与损失登记、池间划转、单边划转修复、日对账和差异核销；后端接口、权限门控和异常提示已接入。池间划转由一次事务直接生成共享 `transfer_id` 的一出一入 `APPROVED` 流水，不存在独立划转草稿或二次审核阶段。押金释放更新 `deposits` 并生成同池 `DEPOSIT_RELEASE` 流水，不单独维护释放明细表。
 
@@ -343,13 +343,13 @@
 
 返点作为资金中心的一项核算属性（不单独拆分产品章节）：
 
-返点不单独作为业务类型或资金性质，而是直接挂入资金流水的核算属性：返点实际归本方时使用 `BUSINESS + IN + ADDITIONAL_INCOME`（`category=REBATE`）；返点冲销使用 `BUSINESS + OUT + REVERSAL`，并通过 `reversal_of_id` 关联原流水。返点金额进入经营收入统计，但必须与订单收益和平台手续费分开核算，避免重复计入销售收入。
+返点是 `REBATE` 业务事件，并关联资金明细：返点实际归本方时使用 `CASHFLOW_DIRECTION=IN`、`CASHFLOW_REASON=REBATE`；返点冲销使用 `CASHFLOW_DIRECTION=OUT`、`CASHFLOW_REASON=REVERSAL`，并通过 `reversal_of_id` 关联原流水。返点金额进入经营收入统计，但必须与订单收益和平台手续费分开核算，避免重复计入销售收入。
 
 业务口径：返点是收入，返点收益为返点金额，金额全站唯一取 `rebate_records.base_amount`，`rate` 只留痕不参与金额计算；返点登记即完成收入确认，不再生成分次结算流水。报表按返点金额展示，不得再 `+rebate` / `+settled_rebate` 重复加回。`rebate_settlements` 表 / ORM / 编号器于 2026-11-05 下线，已有库历史表保留不 drop。
 
-返点业务事实仍必须关联来源订单，记录返点类型 `BUY`/`SELL`、渠道、费率、基数、预计/实际日期和状态。到账支持多次结算，每次记录返点金额、平台手续费、回款池、资金性质、现金方向、核算属性和收入/费用流水关联；只有审核通过的结算才生成 `ADDITIONAL_INCOME` 资金流水（`category=REBATE`）。
+返点业务事实仍必须关联来源订单，记录 `REBATE_TYPE=BUY/SELL`、渠道、费率、基数、实际日期和状态。返点登记直接关联一笔 `IN` 返点收入资金明细；如产生平台手续费，另登记一笔 `OUT` 经营支出资金明细。
 
-返点状态为 `OPEN`、`PARTIALLY_SETTLED`、`SETTLED`、`VOID`。库存详情提供返点登记入口，返点工作台负责登记与结算，资金中心负责查看其资金属性和冲销结果，并受 `rebate.read`、`rebate.create`、`rebate.settle` 权限控制。
+返点状态按当前记录生命周期使用 `OPEN`、`VOID`；库存详情和订单台账提供返点登记入口，资金中心负责查看收入明细和冲销结果，并受 `rebate.read`、`rebate.create` 权限控制。
 
 #### 4.6.3 返点状态机
 
@@ -370,13 +370,13 @@
 
 | 报表 | 内容 |
 |---|---|
-| R1 库存健康 | 在库账号、买入成本、附加成本、占用成本、持有天数 |
-| R2 月度损益 | 销售收入、账号直接成本、运营费用、返点和经营利润，可按日期区间筛选；返点收益按返点金额统计，平台手续费计入费用 |
+| R1 库存健康 | 在库账号、买入支出、资金占用、持有天数 |
+| R2 月度损益 | 销售收入、关联支出、运营费用、返点和经营利润，可按日期区间筛选；返点收益按返点金额统计，平台手续费计入费用 |
 | R3 提成对账 | 人员、订单、利润基数、费率、应付、已付和差异，可按日期区间筛选 |
 | R4 资金日报 | 各资金池期初、收入、支出、押金、现金余额和可用余额 |
 | R5 业务损益 | 各业务订单数、主营收入、主营成本、主营利润；返点收入与分期坏账已计入主营收入 / 成本，“已结算返点 / 未归集返点 / 完整收益”三列已下线 |
 | 资金属性分析 | 已审核流水按资金性质、核算属性、现金方向和资金池账户聚合，展示发生额与净方向金额 |
-| 订单利润 | 订单收入、直接成本、返点和净利润，可按日期区间筛选 |
+| 订单利润 | 订单收入、关联支出、返点和净利润，可按日期区间筛选 |
 | 数据中心 | 资金池和订单的快捷分析入口 |
 
 报表接口支持按权限范围取数，并提供 CSV 导出接口；经营中心已提供七类业务/资金报表导出按钮、统一起止日期筛选和 `report.export` 权限门控。
@@ -469,7 +469,7 @@
 5. 请求带 `X-Request-ID`，后端在响应中回传；错误和审计记录使用同一请求上下文。
 6. 生产环境使用 JWT 登录和令牌撤销；开发环境仅保留本地角色直通用于权限联调。
 7. 数据库通过 Alembic 管理，启动前必须完成迁移和基础种子；历史导入批次保留原始行、映射依据和回滚记录。
-8. 资金流水必须同时具备资金性质、现金方向和核算属性；TH 向同行采购归 `BUSINESS + OUT + TH_DIRECT_COST`，向客户售出归 `BUSINESS + IN + TH_REVENUE`；客户/合作方押金归 `EXTERNAL + DEPOSIT`。
+8. 资金流水必须同时具备资金性质、现金方向和核算属性；TH 向同行采购归 `BUSINESS + OUT + PURCHASE`，向客户售出归 `BUSINESS + IN + TH_REVENUE`；客户/合作方押金归 `EXTERNAL + DEPOSIT`。
 
 ## 7. 验收标准
 
@@ -519,7 +519,7 @@
 - [x] DG 代挂结算已统一接入出售标准：通过统一 `SELL` 事实登记卖出金额和订单利润，寄售方使用 `CONSIGNOR` 关联，不再展示或接收独立抽成结算字段。
 - [x] 分期逾期、减免、展期、违约、回收和转售动作已实现；展期不设次数/天数限制，减免和违约使用现有异常处置权限。
 - [x] 多人利润分配已支持四项比例配置和合计校验；`OPERATION` 运营人员按订单配置，`COMPANY` 是利润归属项，不属于动作性质且不绑定个人。
-- [x] 多人利润分配口径已确认：分配项为买号、售出、运营三类动作性质及公司归属四项，每一项比例均可独立配置，四项比例合计 100%；回收/提号通过 BUY 执行人绑定，代挂取建单操作人员，售出取 SELL 执行人，分配基数为订单利润（售出金额−买入成本−直接成本），返点收益独立核算，不参与四项分配。
+- [x] 多人利润分配口径已确认：分配项为买号、售出、运营三类动作性质及公司归属四项，每一项比例均可独立配置，四项比例合计 100%；回收/提号通过 BUY 执行人绑定，代挂取建单操作人员，售出取 SELL 执行人，分配基数按订单收入与关联支出资金明细计算，返点收益独立核算，不参与四项分配。
 - [x] 运营人员分配口径已确认：不单独建立运营动作台账；每个订单在利润分配中单独配置运营人员及比例，客户跟进、售后处理、退款处理、分期跟进等均归入该订单的运营分配。
 - [x] 售后退款规则已确认：交付前使用取消/冲销，交付后支持全额或部分退款；退款金额不得超过已收减已退，原因必填，退款方向为 `OUT`、核算属性为 `REFUND`；责任方默认公司，可改选客户、寄售方、平台或其他，并保留责任说明。
 

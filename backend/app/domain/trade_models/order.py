@@ -215,7 +215,6 @@ class OrderEvent(Base, AuditMixin):
     is_posted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    refund_responsibility: Mapped[str | None] = mapped_column(String(32), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 表单字段配置体系：订单操作类作用域（ORDERCANC/REFUND/INVREFUND/INVOID 等）
     # 的自定义字段值（与 Order.form_extra 同构）。

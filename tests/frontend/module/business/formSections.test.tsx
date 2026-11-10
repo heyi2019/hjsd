@@ -1,4 +1,4 @@
-/** 订单表单小组件：客户来源（L258）与附加费用（中介费/支出行）字段路径。
+/** 订单表单小组件：客户来源（L258）与支出明细（中介费/支出行）字段路径。
  *  两文件原本各自一套 Form + renderLight，无 vi.mock，合并后只省一次文件级固定成本。 */
 import { useState } from "react";
 import { screen, waitFor } from "@testing-library/react";
@@ -98,7 +98,7 @@ describe("AdditionalFeeFields：中介费字段路径", () => {
     expect(getForm().getFieldValue("intermediary_fee")).toBeUndefined();
   });
 
-  it("将增加支出放在附加费用容器的右上方标题区", () => {
+  it("将增加支出放在支出明细容器的右上方标题区", () => {
     const { container } = renderFeeForm();
     const addButton = screen.getByText("+ 增加支出").closest("button");
     const card = container.querySelector(".additional-fee-fields");

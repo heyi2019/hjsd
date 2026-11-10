@@ -21,7 +21,7 @@ import psycopg
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -401,6 +401,13 @@ def v1_engine(request):
     terminal = request.config.pluginmanager.get_plugin("terminalreporter")
     lock_connection = _acquire_session_lock(engine, terminal)
     try:
+        # 测试库是持久 PG 实例；create_all 只会补表，不会修复既有表缺失的
+        # CHECK/UNIQUE 约束。先删除测试库 public schema 的全部表（CASCADE 处理
+        # 已退役表的外键），再按当前 ORM schema 重建，避免旧动作模型或旧约束
+        # 残留污染回归结果。该库由 TEST_DATABASE_URL 独立配置。
+        with engine.begin() as connection:
+            for table in inspect(connection).get_table_names(schema="public"):
+                connection.execute(text(f'DROP TABLE IF EXISTS public."{table}" CASCADE'))
         Base.metadata.create_all(bind=engine)
         _truncate_all(engine)
         yield engine

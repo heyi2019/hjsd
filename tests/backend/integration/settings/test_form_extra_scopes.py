@@ -116,18 +116,21 @@ def test_post_event_persists_form_extra(seeded_client, seeded_db, headers):
     response = seeded_client.post(
         f"/api/v1/orders/{order['id']}/events",
         json={
-            "event_type": "COST",
-            "amount": "10",
+            "event_type": "OPERATE",
+            "operation_type": "IMAGE",
             "occurred_on": D,
-            "flow_category": "FEE",
-            "reason": "额外成本",
+            "note": "作图",
             "form_extra": {"channel": "微信", "ticket_no": "TK-1"},
         },
         headers=headers,
     )
     assert response.status_code == 201, response.text
     event = seeded_db.get(OrderEvent, response.json()["event"]["id"])
-    assert event.form_extra == {"channel": "微信", "ticket_no": "TK-1"}
+    assert event.form_extra == {
+        "channel": "微信",
+        "ticket_no": "TK-1",
+        "operation_type": "IMAGE",
+    }
 
 
 def test_cancel_order_merges_form_extra_into_order(seeded_client, seeded_db, headers):

@@ -8,6 +8,7 @@ import zlib
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.domain.enums import AuditAction
 from app.domain.options import OptionSet
 from app.domain.trade_models.form_config import OrderFormField
 
@@ -181,9 +182,51 @@ Qlhbi/rMspSNNTruNLMGshvFaiKM3ShWE6DsRrGaAGI3itUggN0oVqMIdqNYdmDrRrFO/fNv//xfi4j0
 """
 
 
+_ORDER_EVENT_OPTIONS = [
+    {"value": "BUY", "label": "买号"},
+    {"value": "SELL", "label": "售出"},
+    {"value": "DELIVER", "label": "交付"},
+    {"value": "CANCEL", "label": "取消"},
+    {"value": "OPERATE", "label": "运营"},
+    {"value": "REBATE", "label": "返点"},
+    {"value": "PROFIT_SHARE", "label": "分润"},
+]
+_AUDIT_ACTION_ADDITIONS = {
+    "ACCOUNT_DELETE": "删除账号",
+    "LIST_COLUMNS_UPDATE": "列表列显示配置变更",
+    "LIST_COLUMNS_RESET": "列表列配置恢复默认",
+    "LIST_COLUMN_ADD": "列表新增自定义列",
+    "LIST_COLUMN_REMOVE": "列表删除自定义列",
+    "LIST_EXPORT": "导出列表",
+    "REBATE_UPDATE": "编辑返点",
+    "REBATE_DELETE": "删除返点",
+    "WECHAT_BIND": "绑定微信",
+    "WECHAT_UNBIND": "解绑微信",
+}
+
+
+def _normalized_option_set(values: dict) -> dict:
+    """Return the current option dictionary without retired business concepts."""
+    if values.get("code") != "ORDER_EVENT_TYPE":
+        if values.get("code") != "AUDIT_ACTION":
+            return values
+        existing = {item.get("value"): item for item in (values.get("options") or [])}
+        options = []
+        for action in AuditAction:
+            options.append(
+                existing.get(
+                    action.value,
+                    {"value": action.value, "label": _AUDIT_ACTION_ADDITIONS.get(action.value, action.value)},
+                )
+            )
+        return {**values, "options": options}
+    return {**values, "options": [*(_ORDER_EVENT_OPTIONS)]}
+
+
 def seed_catalog(session: Session, *, actor: str = "system") -> None:
     data = json.loads(zlib.decompress(base64.b64decode(_CATALOG_BLOB)))
-    for values in data["option_sets"]:
+    for raw_values in data["option_sets"]:
+        values = _normalized_option_set(raw_values)
         if session.scalar(select(OptionSet).where(OptionSet.code == values["code"])):
             continue
         values = {**values, "created_by": actor, "updated_by": actor}

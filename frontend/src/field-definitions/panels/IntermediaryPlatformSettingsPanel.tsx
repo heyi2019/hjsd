@@ -57,7 +57,7 @@ export function OptionDictionarySection({ code, title, description }: { code: st
 
 export function IntermediaryPlatformSettingsPanel() {
   return <Card className="glass" title="中介业务配置">
-    <Typography.Paragraph type="secondary">统一维护附加费用相关业务字典；修改后会同步到回收、提号等建单表单。</Typography.Paragraph>
+    <Typography.Paragraph type="secondary">统一维护资金明细相关业务字典；修改后会同步到回收、提号等建单表单。</Typography.Paragraph>
     <div className="ui-stack">
       <OptionDictionarySection code="INTERMEDIARY_PLATFORM" title="经手平台" description="维护回收、提号等业务使用的经手平台。" />
       <OptionDictionarySection code="INTERMEDIARY_TYPE" title="中介类型" description="维护中介费的业务类型选项。" />

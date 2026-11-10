@@ -157,6 +157,10 @@ export const ordersApi = {
     orderId: number,
     payload: {
       event_type: string;
+      sale_mode?: "FULL" | "INSTALLMENT";
+      operation_type?: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST";
+      rebate_type?: "BUY" | "SELL";
+      profit_recipient?: "BUY" | "SELL" | "OPERATION" | "COMPANY";
       amount?: string;
       occurred_on: string;
       pool_id?: number;
@@ -164,11 +168,10 @@ export const ordersApi = {
       amount2?: string;
       portion?: string;
       delivery_mode?: string;
+      delivery_direction?: "BUY" | "SELL";
       offset_event_id?: number;
       reason?: string;
-      refund_responsibility?: "COMPANY" | "CUSTOMER" | "CONSIGNOR" | "PLATFORM" | "OTHER";
       operator_user_ids?: number[];
-      flow_category?: string;
       note?: string;
       bound_phone?: string;
       bound_phone_owner?: string;

@@ -19,7 +19,6 @@ export function InventoryReport() {
     { title: "平台", dataIndex: "platform", width: 110 },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} /> },
     { title: "买入", dataIndex: "buy_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "附加成本", dataIndex: "extra_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
     {
       title: "占用成本",
 

@@ -18,12 +18,18 @@ from app.core.security import CurrentUser
 from app.core.time import now_second
 from app.core.state_machine import ORDER_TRANSITIONS, transition
 from app.domain.enums import (
+    AccountingAttribute,
     AuditAction,
     Direction,
     EventType,
+    FundNature,
     Nature,
+    OperationType,
     OrderStatus,
     Portion,
+    ProfitRecipient,
+    RebateType,
+    SaleMode,
 )
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderProfitAllocation
 from app.domain.users import User
@@ -42,11 +48,9 @@ from ._common import (
 # 事件 → 现金流方向 / 性质 / 分类
 EVENT_FLOW_MAP: dict[str, tuple[str, str, str]] = {
     EventType.BUY.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "BUY"),
-    EventType.COST.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "COST"),
     EventType.SELL.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "SELL"),
-    EventType.PAYMENT.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "PAYMENT"),
     EventType.CANCEL.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "CANCEL"),
-    EventType.REFUND.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "REFUND"),
+    EventType.PROFIT_SHARE.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "PROFIT_SHARE"),
 }
 
 
@@ -75,6 +79,10 @@ def post_event(
     order_id: int,
     *,
     event_type: str,
+    sale_mode: str | None = None,
+    operation_type: str | None = None,
+    rebate_type: str | None = None,
+    profit_recipient: str | None = None,
     amount: Any = 0,
     occurred_on: date,
     actor: str,
@@ -83,39 +91,24 @@ def post_event(
     amount2: Any = 0,
     portion: str = "PRINCIPAL",
     delivery_mode: str | None = None,
+    delivery_direction: str | None = None,
     offset_event_id: int | None = None,
     reason: str | None = None,
-    refund_responsibility: str | None = None,
     operator_user_ids: list[int] | None = None,
-    flow_category: str | None = None,
     note: str | None = None,
     bound_phone: str | None = None,
     bound_phone_owner: str | None = None,
     form_extra: Mapping[str, Any] | None = None,
     form_extra_scope: str | None = None,
     user: CurrentUser | None = None,
-    allow_installment_payment: bool = False,
     allow_installment_delivery: bool = False,
-    allow_installment_cancel: bool = False,
-    defer_order_cancel: bool = False,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
     from .service import _create_inline_inventory_account, get_order
 
-    allow_installment_payment = _required_bool(
-        allow_installment_payment, field="allow_installment_payment"
-    )
     allow_installment_delivery = _required_bool(
         allow_installment_delivery, field="allow_installment_delivery"
     )
-    allow_installment_cancel = _required_bool(
-        allow_installment_cancel, field="allow_installment_cancel"
-    )
-    defer_order_cancel = _required_bool(
-        defer_order_cancel, field="defer_order_cancel"
-    )
-    if defer_order_cancel and not allow_installment_cancel:
-        raise Validation("defer_order_cancel 只能用于分期取消流程")
     try:
         EventType(event_type)
     except ValueError as exc:
@@ -123,6 +116,55 @@ def post_event(
             f"事件类型必须为 {EventType.values()}",
             details={"field": "event_type", "value": event_type},
         ) from exc
+    if event_type == EventType.SELL.value:
+        sale_mode = (sale_mode or SaleMode.FULL.value).strip().upper()
+        try:
+            sale_mode = SaleMode(sale_mode).value
+        except ValueError as exc:
+            raise Validation(
+                f"sale_mode 必须为 {SaleMode.values()}",
+                details={"field": "sale_mode", "value": sale_mode},
+            ) from exc
+    elif sale_mode is not None:
+        raise Validation(
+            "只有 SELL 事件可以填写 sale_mode",
+            details={"field": "sale_mode", "event_type": event_type},
+        )
+    action_attributes = {
+        EventType.OPERATE.value: ("operation_type", operation_type, OperationType),
+        EventType.REBATE.value: ("rebate_type", rebate_type, RebateType),
+        EventType.PROFIT_SHARE.value: ("profit_recipient", profit_recipient, ProfitRecipient),
+    }
+    action_attribute = action_attributes.get(event_type)
+    if action_attribute is not None:
+        field, value, enum_type = action_attribute
+        if value is None or not isinstance(value, str) or not value.strip():
+            raise Validation(
+                f"{event_type} 必须填写 {field}",
+                details={"field": field, "event_type": event_type},
+            )
+        try:
+            normalized = enum_type(value.strip().upper()).value
+        except ValueError as exc:
+            raise Validation(
+                f"{field} 必须为 {enum_type.values()}",
+                details={"field": field, "value": value},
+            ) from exc
+        if field == "operation_type":
+            operation_type = normalized
+        elif field == "rebate_type":
+            rebate_type = normalized
+        else:
+            profit_recipient = normalized
+    elif any(value is not None for value in (operation_type, rebate_type, profit_recipient)):
+        raise Validation(
+            "运营、返点、分润属性只能用于对应的 OPERATE、REBATE、PROFIT_SHARE 事件",
+            details={"event_type": event_type},
+        )
+    installment_sale = (
+        event_type == EventType.SELL.value
+        and sale_mode == SaleMode.INSTALLMENT.value
+    )
     try:
         portion = Portion(portion).value
     except ValueError as exc:
@@ -144,10 +186,6 @@ def post_event(
             raise Validation("所选操作人不存在或已停用", details={"field": "operator_user_ids"})
     if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
-    can_refund_completed = (
-        event_type == EventType.REFUND.value
-        and order.status == OrderStatus.COMPLETED.value
-    )
     can_cancel_completed = (
         event_type == EventType.CANCEL.value
         and order.status == OrderStatus.COMPLETED.value
@@ -169,17 +207,24 @@ def post_event(
         )
         is None
     )
-    can_validate_completed_cost = (
-        event_type == EventType.COST.value
-        and order.status == OrderStatus.COMPLETED.value
-        and order.order_type == "HS"
+    can_register_delivery = (
+        event_type == EventType.DELIVER.value
+        and order.status != OrderStatus.CANCELLED.value
+    )
+    can_register_action = (
+        event_type in {
+            EventType.OPERATE.value,
+            EventType.REBATE.value,
+            EventType.PROFIT_SHARE.value,
+        }
+        and order.status != OrderStatus.CANCELLED.value
     )
     if order.status not in {OrderStatus.ACTIVE.value, OrderStatus.INSTALLMENT.value} and not (
-        can_refund_completed
-        or can_cancel_completed
+        can_cancel_completed
         or can_reopen_for_buy
         or can_validate_completed_sell
-        or can_validate_completed_cost
+        or can_register_delivery
+        or can_register_action
     ):
         raise Conflict(
             f"订单 {order.order_no} 当前状态 {order.status}，不能登记事件",
@@ -216,8 +261,6 @@ def post_event(
         event_type,
         offset_event_id=offset_event_id,
         reason=reason,
-        allow_installment_payment=allow_installment_payment,
-        allow_installment_cancel=allow_installment_cancel,
     )
 
     if event_type == EventType.DELIVER.value:
@@ -227,6 +270,7 @@ def post_event(
             occurred_on=occurred_on,
             actor=actor,
             delivery_mode=delivery_mode,
+            delivery_direction=delivery_direction,
             note=note,
             bound_phone=bound_phone,
             bound_phone_owner=bound_phone_owner,
@@ -237,59 +281,39 @@ def post_event(
     if event_type == EventType.SELL.value:
         _assert_sellable_order(session, order)
 
-    direction, nature, category = EVENT_FLOW_MAP[event_type]
-    if flow_category is not None:
-        if (
-            not isinstance(flow_category, str)
-            or event_type != EventType.COST.value
-            or flow_category not in {"FEE", "DESIGN", "OTHER"}
-        ):
+    has_cashflow = event_type in EVENT_FLOW_MAP and not installment_sale
+    if not has_cashflow and event_type != EventType.DELIVER.value:
+        if pool_id is not None or pool_id2 is not None:
             raise Validation(
-                "仅 COST 事件可使用 FEE、DESIGN 或 OTHER 资金分类",
-                details={"event_type": event_type, "flow_category": flow_category},
+                f"{event_type} 业务动作不直接选择资金账户",
+                details={"field": "pool_id", "event_type": event_type},
             )
-        category = flow_category
-
+        if amount2 is not None and _non_negative_money(amount2, field="amount2") > 0:
+            raise Validation(
+                f"{event_type} 业务动作不支持第二笔金额",
+                details={"field": "amount2", "event_type": event_type},
+            )
+    direction, nature, category = EVENT_FLOW_MAP.get(event_type, (None, None, None))
     # 初始买入(BUY)对应的号价/成本允许为 0：提号表单将该字段设为选填时前端以 0 兜底，
     # 此处需放行 0；其余资金事件金额必须为正数，以保持账务完整。
-    if event_type == EventType.BUY.value:
+    if not has_cashflow:
+        money = _non_negative_money(amount, field="amount")
+    elif event_type == EventType.BUY.value:
         money = _non_negative_money(amount, field="amount")
     else:
         money = _positive_money(amount, field="amount")
-    if event_type == EventType.REFUND.value:
-        _required_text(reason, field="reason", message="退款必须填写原因")
-        refund_responsibility = refund_responsibility or "COMPANY"
-        installment = session.scalar(select(Installment).where(Installment.order_id == order.id))
-        delivered = session.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == (EventType.DELIVER.value if installment else EventType.SELL.value), OrderEvent.is_posted.is_(True)))
-        if delivered is None:
-            raise Validation("交付前请使用取消或冲销，交付后才能退款")
-        if refund_responsibility not in {"COMPANY", "CUSTOMER", "CONSIGNOR", "PLATFORM", "OTHER"}:
-            raise Validation(
-                "退款责任方必须为 COMPANY、CUSTOMER、CONSIGNOR、PLATFORM 或 OTHER",
-                details={"field": "refund_responsibility"},
-            )
-        if offset_event_id is not None:
-            raise Validation("退款不使用 offset_event_id")
-        received = session.scalar(
-            select(func.coalesce(func.sum(OrderEvent.amount), 0)).where(
-                OrderEvent.order_id == order.id,
-                OrderEvent.event_type.in_((EventType.SELL.value, EventType.PAYMENT.value)),
-                OrderEvent.is_posted.is_(True),
-            )
-        ) or 0
-        refunded = session.scalar(
-            select(func.coalesce(func.sum(OrderEvent.amount), 0)).where(
-                OrderEvent.order_id == order.id,
-                OrderEvent.event_type == EventType.REFUND.value,
-                OrderEvent.is_posted.is_(True),
-            )
-        ) or 0
-        remaining_refundable = to_money(received) - to_money(refunded)
-        if money > remaining_refundable:
-            raise Validation(
-                f"退款金额超过可退余额 {remaining_refundable}",
-                details={"remaining_refundable": str(remaining_refundable), "amount": str(money)},
-            )
+    if installment_sale and (
+        pool_id is not None
+        or pool_id2 is not None
+        or (
+            amount2 is not None
+            and _non_negative_money(amount2, field="amount2") > 0
+        )
+    ):
+        raise Validation(
+            "分期售出只登记 SELL 业务事实，资金账户与金额应在分期收款时填写",
+            details={"field": "pool_id"},
+        )
     offset = None
     cancel_fully_consumed = False
     if event_type == EventType.CANCEL.value and offset_event_id is not None:
@@ -321,22 +345,30 @@ def post_event(
                 },
             )
         cancel_fully_consumed = money >= remaining
-    fund_nature, accounting_attribute = accounting_attribute_for_order_event(
-        order.order_type, event_type
-    )
-    resolved_pool_id = (
-        pool_id
-        or (offset.pool_id if offset is not None else None)
-        or _resolve_pool(session, order, portion, fund_nature=fund_nature).id
-    )
-    if user is not None and not user.can_see_pool(resolved_pool_id):
-        raise NotFound("资金池不存在", details={"pool_id": resolved_pool_id})
-    _assert_pool_active(session, resolved_pool_id)
+    fund_nature: str | None = None
+    accounting_attribute: str | None = None
+    resolved_pool_id: int | None = None
+    if has_cashflow:
+        if event_type == EventType.PROFIT_SHARE.value:
+            fund_nature = FundNature.BUSINESS.value
+            accounting_attribute = AccountingAttribute.PROFIT_SHARE.value
+        else:
+            fund_nature, accounting_attribute = accounting_attribute_for_order_event(
+                order.order_type, event_type
+            )
+        resolved_pool_id = (
+            pool_id
+            or (offset.pool_id if offset is not None else None)
+            or _resolve_pool(session, order, portion, fund_nature=fund_nature).id
+        )
+        if user is not None and not user.can_see_pool(resolved_pool_id):
+            raise NotFound("资金池不存在", details={"pool_id": resolved_pool_id})
+        _assert_pool_active(session, resolved_pool_id)
     # 售出拆分：同一笔 SELL 可同时进入两个资金池（资金账户1 + 资金账户2）。
     # 仅当显式传入 pool_id2 时启用；金额2 必须为正，且二者须成对出现。
     secondary_money: Decimal = Decimal("0")
     resolved_pool_id2: int | None = None
-    if pool_id2 is not None:
+    if pool_id2 is not None and has_cashflow:
         secondary_money = _non_negative_money(amount2, field="amount2")
         if secondary_money <= 0:
             raise Validation("售出金额2 必须为正数", details={"field": "amount2"})
@@ -344,7 +376,7 @@ def post_event(
         if user is not None and not user.can_see_pool(resolved_pool_id2):
             raise NotFound("资金池不存在", details={"pool_id": resolved_pool_id2})
         _assert_pool_active(session, resolved_pool_id2)
-    elif amount2 is not None:
+    elif amount2 is not None and has_cashflow:
         if _non_negative_money(amount2, field="amount2") > 0:
             raise Validation("填写了售出金额2 必须选择资金账户2", details={"field": "pool_id2"})
     cancel_direction = Direction.IN.value
@@ -356,6 +388,14 @@ def post_event(
     event_form_extra = validate_form_extra(
         session, order_type_code=(form_extra_scope or "REFUND"), values=form_extra
     )
+    if event_type == EventType.SELL.value and sale_mode is not None:
+        event_form_extra["sale_mode"] = sale_mode
+    if operation_type is not None:
+        event_form_extra["operation_type"] = operation_type
+    if rebate_type is not None:
+        event_form_extra["rebate_type"] = rebate_type
+    if profit_recipient is not None:
+        event_form_extra["profit_recipient"] = profit_recipient
     if event_type == EventType.SELL.value and (normalized_bound_phone is not None or normalized_bound_phone_owner is not None):
         account = session.get(Account, order.account_id) if order.account_id is not None else None
         snapshot = dict(order.account_snapshot or {})
@@ -397,7 +437,6 @@ def post_event(
         pool_id=resolved_pool_id,
         offset_event_id=offset_event_id,
         reason=reason,
-        refund_responsibility=refund_responsibility,
         operator_user_ids=operator_user_ids,
         note=note,
         form_extra=event_form_extra or None,
@@ -412,62 +451,69 @@ def post_event(
     if event_type == EventType.CANCEL.value:
         direction = cancel_direction
 
-    flow = Cashflow(
-        flow_no=next_cashflow_no(
-            session, order_no=order.order_no, order_id=order.id, category=category
-        ),
-        pool_id=event.pool_id,
-        occurred_on=occurred_on,
-        nature=nature,
-        fund_nature=fund_nature,
-        accounting_attribute=accounting_attribute,
-        category=category,
-        direction=direction,
-        amount=money,
-        order_id=order.id,
-        order_event_id=event.id,
-        note=note,
-        created_by=actor,
-        updated_by=actor,
-    )
-    session.add(flow)
-    # 先落库主流水，确保拆分流水编号（count+1）能正确递增、不与主流水冲突。
-    session.flush()
-
-    # 售出拆分：将金额2 派生为同一 SELL 事件下的第二笔资金流水，进入资金账户2。
-    if resolved_pool_id2 is not None:
-        secondary_flow = Cashflow(
+    flow: Cashflow | None = None
+    if has_cashflow:
+        flow = Cashflow(
             flow_no=next_cashflow_no(
                 session, order_no=order.order_no, order_id=order.id, category=category
             ),
-            pool_id=resolved_pool_id2,
+            pool_id=event.pool_id,
             occurred_on=occurred_on,
             nature=nature,
             fund_nature=fund_nature,
             accounting_attribute=accounting_attribute,
             category=category,
             direction=direction,
-            amount=secondary_money,
+            amount=money,
             order_id=order.id,
             order_event_id=event.id,
             note=note,
             created_by=actor,
             updated_by=actor,
         )
-        session.add(secondary_flow)
+        session.add(flow)
+        # 先落库主流水，确保拆分流水编号（count+1）能正确递增、不与主流水冲突。
+        session.flush()
 
-    _apply_account_effect(
-        session,
-        order,
-        event_type,
-        money,
-        offset_event=offset,
-        cancel_fully_consumed=(offset is None or cancel_fully_consumed),
-        actor=actor,
-    )
-    if event_type == EventType.SELL.value:
+        # 售出拆分：将金额2 派生为同一 SELL 事件下的第二笔资金流水，进入资金账户2。
+        if resolved_pool_id2 is not None:
+            secondary_flow = Cashflow(
+                flow_no=next_cashflow_no(
+                    session, order_no=order.order_no, order_id=order.id, category=category
+                ),
+                pool_id=resolved_pool_id2,
+                occurred_on=occurred_on,
+                nature=nature,
+                fund_nature=fund_nature,
+                accounting_attribute=accounting_attribute,
+                category=category,
+                direction=direction,
+                amount=secondary_money,
+                order_id=order.id,
+                order_event_id=event.id,
+                note=note,
+                created_by=actor,
+                updated_by=actor,
+            )
+            session.add(secondary_flow)
+
+    if event_type in {
+        EventType.BUY.value,
+        EventType.SELL.value,
+        EventType.CANCEL.value,
+    }:
+        _apply_account_effect(
+            session,
+            order,
+            event_type,
+            money,
+            offset_event=offset,
+            cancel_fully_consumed=(offset is None or cancel_fully_consumed),
+            actor=actor,
+        )
+    if event_type == EventType.SELL.value and not installment_sale:
         # 非分期订单以 SELL 作为终态事件；分期订单不会进入此分支，
-        # 它们必须通过 PAYMENT -> DELIVER 完成闭环。
+        # 它们必须通过分期合同收款并在结清后 DELIVER 完成闭环。
         order.status = transition(
             ORDER_TRANSITIONS, order.status, "COMPLETE", entity="订单"
         )
@@ -484,7 +530,7 @@ def post_event(
             ORDER_TRANSITIONS, order.status, "BUY", entity="订单"
         )
     if event_type == EventType.CANCEL.value and (
-        (offset is None or cancel_fully_consumed) and not defer_order_cancel
+        (offset is None or cancel_fully_consumed)
     ):
         # 冲销事件闭环：订单进入 CANCELLED，此后不再接受任何新事件
         order.status = transition(
@@ -517,7 +563,7 @@ def post_event(
             "event_type": event_type,
             "amount": str(money),
             "pool_id": event.pool_id,
-            "flow_no": flow.flow_no,
+            "flow_no": flow.flow_no if flow is not None else None,
         },
         reason=reason,
     )

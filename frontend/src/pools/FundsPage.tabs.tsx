@@ -53,6 +53,7 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
           { label: "自有权益合计", amount: totalOwned },
         ]}
       />
+      <Typography.Text type="secondary">自有权益仅计归属为「自有」的池</Typography.Text>
       <DataTable<Pool>
         columns={arrangeFundPoolColumns(poolColumns)}
         rows={pools}
@@ -275,6 +276,7 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
   ];
   return (
     <Card className="glass" title="资金对账" extra={<PermissionButton permission="deposit.post" type="primary" disabled={reconciliationUnavailable || loading} onClick={() => { reconciliationForm.setFieldsValue({ reconciled_on: today() }); setReconciliationOpen(true); }}>新增对账</PermissionButton>}>
+      <Typography.Text type="secondary">系统余额口径：截至对账日期「已入账」流水的累计 = 期初余额 + 截至对账日已入账流水</Typography.Text>
       <DataTable<Reconciliation>
         columns={arrangeReconciliationColumns(reconciliationColumns)}
         rows={reconciliations}

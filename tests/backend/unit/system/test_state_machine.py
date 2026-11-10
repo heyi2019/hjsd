@@ -24,13 +24,18 @@ def test_order_has_only_active_exit_paths():
 
 def test_account_paths_keep_account_cycle_separate_from_installment():
     assert transition(ACCOUNT_TRANSITIONS, "WAITING", "BUY_STOCK", entity="账号") == "WAITING"
-    assert transition(ACCOUNT_TRANSITIONS, "WAITING", "BUY_CREDIT", entity="账号") == "SOLD"
+    assert transition(ACCOUNT_TRANSITIONS, "SOLD", "BUY_STOCK", entity="账号") == "WAITING"
     assert transition(ACCOUNT_TRANSITIONS, "SOLD", "RECOVER", entity="账号") == "WAITING"
+    with pytest.raises(Validation):
+        transition(ACCOUNT_TRANSITIONS, "WAITING", "BUY_CREDIT", entity="账号")
     with pytest.raises(Validation):
         transition(ACCOUNT_TRANSITIONS, "SOLD", "SELL", entity="账号")
 
 
 def test_installment_delivery_requires_settlement():
+    assert transition(INSTALLMENT_TRANSITIONS, "PENDING", "INSTALLMENT_PAYMENT", entity="分期合约") == "ACTIVE"
+    with pytest.raises(Validation):
+        transition(INSTALLMENT_TRANSITIONS, "PENDING", "PAYMENT", entity="分期合约")
     assert transition(INSTALLMENT_TRANSITIONS, "SETTLED", "DELIVER", entity="分期合约") == "DELIVERED"
     with pytest.raises(Validation):
         transition(INSTALLMENT_TRANSITIONS, "ACTIVE", "DELIVER", entity="分期合约")

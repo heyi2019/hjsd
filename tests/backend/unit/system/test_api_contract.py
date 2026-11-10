@@ -63,4 +63,5 @@ def test_every_json_api_route_declares_response_model(app):
     # → 179（派生运算下沉后端 +4：GET /pools/balances、GET /installments/totals、
     # GET /cashflows/studio-summary、POST /stocks/inventory/stats）。
     # → 189（2026-11-05 实测：账号删除 + 免密登录/绑定、列表列配置、库存统计等累计 +10）
-    assert public_routes == 189
+    # → 190（订单退款改为独立资金明细接口）→ 191（订单关联收入/支出资金明细）
+    assert public_routes == 191

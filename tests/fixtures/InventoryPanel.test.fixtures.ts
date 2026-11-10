@@ -27,6 +27,7 @@ export const resetInventoryPanelMocks = () => {
   seedOptionSets(catalog);
   resolveMock(vi.mocked(catalog.ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});
+  resolveMock(vi.mocked(catalog.cashflowsApi.createForOrder), {});
   resolveMock(vi.mocked(catalog.customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
   resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
   vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);

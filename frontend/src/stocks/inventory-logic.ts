@@ -26,15 +26,26 @@ export function inventoryStatusLabel(value: string): string {
   return STATUS_LABEL[value] ?? value;
 }
 
-export function financeTypeLabel(eventType: string, direction: string): string {
+export function financeTypeLabel(eventType: string, direction: string, category?: string | null): string {
   const labels: Record<string, string> = {
-    BUY: "买号本金",
-    COST: "账号成本",
-    SELL: "售出回款",
-    PAYMENT: "分期回款",
-    CANCEL: "取消退款",
+    BUY: "买号支出",
+    SELL: "售出收入",
+    SALE: "售出收入",
+    INSTALLMENT_PAYMENT: "分期回款",
+    REBATE: "返点收入",
+    PROFIT_SHARE: "分润支出",
+    REFUND: "退款支出",
+    CANCEL: "取消冲销",
+    SELF_DIRECT_COST: "自营直接成本",
+    TH_DIRECT_COST: "提号/代挂直接成本",
+    TH_REVENUE: "提号/代挂收入",
+    SELF_REVENUE: "自营收入",
+    OPERATING_EXPENSE: "运营费用",
+    ADDITIONAL_INCOME: "附加收入",
+    ADDITIONAL_EXPENSE: "附加支出",
+    REVERSAL: "冲销",
   };
-  return labels[eventType] ?? (direction === "IN" ? "其他收入" : "其他支出");
+  return labels[eventType] ?? labels[category ?? ""] ?? (direction === "IN" ? "其他收入" : "其他支出");
 }
 
 export function accountFinancialFlows(detail: AccountExecutionDetail | undefined) {

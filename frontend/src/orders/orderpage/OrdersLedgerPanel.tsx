@@ -63,7 +63,6 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     setTimeShiftDays,
     invEditExtraForm,
     savingAccount,
-    openAccountEditor,
     cancelInlineEdit,
     saveInline,
   } = controller;

@@ -24,7 +24,7 @@
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
         "files": 117,
-        "cases": 1728,
+        "cases": 1736,
         "kinds": {
           "unit": {
             "files": 32,
@@ -51,7 +51,7 @@
             }
           }
         },
-        "_baseline_note": "1676 是搬迁前基线（113 文件）；1684 = 1676 + test_manifest_parity.py 8 条。2026-11-05 补齐 3 个并发会话新增文件（共 32 例）入 GROUPS 后，磁盘 117 文件 / ci 全量收集 1728 例 = 1696 + 32，按实测对齐"
+        "_baseline_note": "1676 是搬迁前基线（113 文件）；1684 = 1676 + test_manifest_parity.py 8 条。2026-11-05 补齐 3 个并发会话新增文件（共 32 例）入 GROUPS 后，磁盘 117 文件 / ci 全量收集 1728 例 = 1696 + 32；当前动作模型清理新增 8 条测试，按实测对齐至 1736"
       },
       "budgets": {
         "fast": 60,
@@ -64,11 +64,11 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 96,
+        "files": 97,
         "layers": {
           "fast": 14,
           "quick": 8,
-          "react": 58,
+          "react": 59,
           "deep": 16
         },
         "cases": {
@@ -87,7 +87,7 @@
           },
           "module": {
             "workbench": 6,
-            "business": 19,
+            "business": 20,
             "customer": 3,
             "finance": 5,
             "operations": 7,
@@ -96,7 +96,7 @@
             "system": 10
           }
         },
-        "_baseline_note": "93 是搬迁前基线；94 = 93 + 新增 manifest-parity.test.ts（6 条用例）。2026-11-04 前端测试整体迁入 tests/frontend/{unit,module}/<区域>/。本次改动前 HEAD 已有 95 个测试文件但 expected 仍记 94（守卫本来就是红的，非本次引入）；本次新增 InventoryPanel.delete.test.tsx 后按实际扫描对齐为 96 / react 58 / module.business 19。StocksApiRoutes.test.ts 与新增文件共 +5 例，cases.react 只按本轮增量记 761，HEAD 遗留那 1 个文件的用例数待下次全量基线刷新；baseline 两块是 2026-11-04 时点实测，保持原值不动。",
+        "_baseline_note": "93 是搬迁前基线；94 = 93 + 新增 manifest-parity.test.ts（6 条用例）。2026-11-04 前端测试整体迁入 tests/frontend/{unit,module}/<区域>/。当前磁盘实际为 97 个测试文件、react 59 个、module.business 20 个；新增文件按守卫实测对齐，cases 的历史基线另行刷新。",
         "root_layout": "tests/frontend/<unit|module>/<区域>/",
         "baseline": {
           "_doc": "2026-11-04 搬迁后实测（同机同代码）。cpu = user+sys，跨会话可比；wall 受并发会话干扰。",

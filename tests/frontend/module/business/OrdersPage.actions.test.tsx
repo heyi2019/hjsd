@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage, validateAllocations } from "@/orders/OrdersPage";
-import { buildOrderPatchPayload, buildRefundEventPayload, pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
+import { buildOrderPatchPayload, buildRefundCashflowPayload, pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
 
 import * as catalog from "@/shared/api/catalog";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
@@ -21,7 +21,7 @@ vi.mock("@/shared/api/catalog", async (importOriginal) => {
     "list", "get", "create", "update", "patch", "post", "postEvent", "cancel", "remove",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "inventoryStats", "updateProfile", "updateExecution", "merge", "search",
+    "balance", "executionDetail", "inventoryStats", "updateProfile", "updateExecution", "merge", "search", "refund", "createForOrder",
     "orderSnapshot", "links", "createLink", "deleteLink", "listSectionLabels", "saveSectionLabels",
     "markOverdue",
   ];
@@ -368,6 +368,13 @@ describe("OrdersPage：操作与筛选分支", () => {
     })));
   });
 
+  it("订单台账：编辑账号不作为独立操作，统一只展示编辑", async () => {
+    await openLedger();
+    const row = tableRow("HS-2026-0001");
+    expect(within(row).getByRole("button", { name: "编辑" })).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "编辑账号" })).toBeNull();
+  });
+
   it("编辑有登记事件订单：成交日期可改、PATCH 带日期、提示「订单已更新」并关闭弹窗", async () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([
       {
@@ -397,7 +404,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   // 原两条（按姓名预填 / 展示订单总利润）同一份夹具、同一入口、纯只读，合并为一次挂载。
   it("分润：弹窗按姓名预填已有比例，并展示订单总利润", async () => {
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(document.querySelector(".allocation-modal")).toBeInTheDocument();
     expect(catalog.policyApi.allocations).toHaveBeenCalledWith(1);
@@ -416,7 +423,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     // 旧实现用 syncAllocationPair 在 onValuesChange 里双向回填，改金额会静默改写比例，
     // 用户无法手动精调；此处锁死「只写自己这一格」的行为。
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     const rate = within(modal).getByLabelText("比例");
     const amount = within(modal).getByLabelText("金额");
@@ -448,11 +455,11 @@ describe("OrdersPage：操作与筛选分支", () => {
       events: [
         { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "1000.00" },
         { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "1500.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [], cancellable_amount: "1500.00" },
-        { id: 103, event_no: "EV-103", order_id: 1, event_type: "COST", amount: "100.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33], cancellable_amount: "100.00" },
+        { id: 103, event_no: "EV-103", order_id: 1, event_type: "OPERATE", operation_type: "DESCRIPTION", amount: "100.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33], cancellable_amount: "100.00" },
       ],
     });
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(within(modal).getAllByLabelText("比例")).toHaveLength(4);
     for (const label of ["买号", "售出", "运营", "公司"]) {
@@ -462,6 +469,32 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("回收员（recovery）")).toBeInTheDocument();
     expect(within(modal).getByText("售出员（seller）")).toBeInTheDocument();
     expect(within(modal).getByText("运营员（operator）")).toBeInTheDocument();
+  });
+
+  it("分润出账：登记 PROFIT_SHARE 并生成支出资金明细", async () => {
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润");
+    const modal = await modalOf(/登记分润 · HS-2026-0001/);
+    await ui.type(within(modal).getByLabelText("分润金额"), "300");
+    await clickModalOk(modal);
+    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        event_type: "PROFIT_SHARE",
+        profit_recipient: "COMPANY",
+        amount: "300",
+        pool_id: 7,
+      }),
+    ));
+  });
+
+  it("订单台账：操作中同时提供返点和删除账号", async () => {
+    await openLedger();
+    const row = tableRow("HS-2026-0001");
+    expect(within(row).getByRole("button", { name: "返点" })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "售出" })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "寄售" })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "删除账号" })).toBeInTheDocument();
   });
 
   it("分润：按操作四项无候选执行人时人员留空且锁定（不猜当前登录人）", async () => {
@@ -478,7 +511,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       events: [],
     });
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     // 无登记执行人 → 不再默认当前登录人
     expect(within(modal).queryByText("李四（lisi）")).toBeNull();
@@ -508,7 +541,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       ],
     });
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
 
     expect(within(modal).getByText("回收员（recovery）")).toBeInTheDocument();
@@ -526,7 +559,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       order_profit: "5000.00",
     });
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(within(modal).getByText("回收员（recovery）")).toBeInTheDocument();
     await ui.click(within(modal).getByRole("button", { name: /增加一行/ }));
@@ -556,7 +589,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       ],
     });
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     const rates = within(modal).getAllByLabelText("比例");
     const amounts = within(modal).getAllByLabelText("金额");
@@ -595,7 +628,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       ],
     });
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
 
     // 买号两人 → 展开两行：首行写字号合计，第二行只读显示人均值。
@@ -632,7 +665,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       order_profit: "5000.00",
     });
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(within(modal).getAllByLabelText("比例")).toHaveLength(4);
     await clickModalOk(modal);
@@ -653,7 +686,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       order_profit: "5000.00",
     });
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(within(modal).getByText("销售")).toBeInTheDocument();
     await clickModalOk(modal);
@@ -664,7 +697,7 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   it("分润：角色下拉改成服务后随提交上送", async () => {
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     fireEvent.mouseDown(within(modal).getByRole("combobox", { name: "角色" }));
     await ui.click(await screen.findByTitle("服务"));
@@ -679,7 +712,7 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   it("分润：纯比例合计非 100% 时拒绝提交", async () => {
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     await clickModalOk(modal);
     await waitFor(() =>
@@ -692,7 +725,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   it("分润：比例合计 100% 提交成功并绑定员工，随后刷新订单详情", async () => {
     vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({ account: {}, orders: [] } as never);
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     const rates = within(modal).getAllByLabelText("比例");
     await ui.clear(rates[0]);
@@ -715,7 +748,7 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   it("分润：改成按金额分润时提交 allocation_amount", async () => {
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     const rates = within(modal).getAllByLabelText("比例");
     await ui.clear(rates[0]);
@@ -738,7 +771,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       order_profit: "-800.00",
     });
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(within(modal).getByText(/（亏损）金额分润请填负数/)).toBeInTheDocument();
     expect(within(modal).queryByText(/金额分润不可用/)).toBeNull();
@@ -757,7 +790,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   it("分润：保存失败提示错误", async () => {
     vi.mocked(catalog.policyApi.setAllocations).mockRejectedValue(new Error("alloc fail"));
     await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
+    await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     const rates = within(modal).getAllByLabelText("比例");
     await ui.clear(rates[0]);
@@ -766,7 +799,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("alloc fail")));
   });
 
-  it("资金收支：填写金额与备注后调用 postEvent(REFUND)", async () => {
+  it("资金收支：填写金额与备注后登记退款支出明细", async () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "资金收支");
     const modal = await modalOf(/资金收支 · HS-2026-0001/);
@@ -775,13 +808,13 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("支出")).toBeInTheDocument();
     await clickModalOk(modal);
     await waitFor(() =>
-      expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(1, expect.objectContaining({ event_type: "REFUND", occurred_on: today() }))
+      expect(catalog.cashflowsApi.refund).toHaveBeenCalledWith(1, expect.objectContaining({ refunded_on: today(), amount: "500", pool_id: expect.any(Number) }))
     );
     expect(message.success).toHaveBeenCalledWith("退款已登记");
   });
 
   it("资金收支：提交失败提示错误并关闭 loading", async () => {
-    vi.mocked(catalog.ordersApi.postEvent).mockRejectedValue(new Error("refund fail"));
+    vi.mocked(catalog.cashflowsApi.refund).mockRejectedValue(new Error("refund fail"));
     await openLedger();
     await openRowMenu("HS-2026-0001", "资金收支");
     const modal = await modalOf(/资金收支 · HS-2026-0001/);
@@ -789,6 +822,74 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.type(within(modal).getByLabelText("收支备注"), "客户取消");
     await clickModalOk(modal);
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("refund fail")));
+  });
+
+  it("资金收支：资金流向可切换为收入并关联订单", async () => {
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "资金收支");
+    const modal = await modalOf(/资金收支 · HS-2026-0001/);
+    const direction = within(modal).getByRole("combobox", { name: "资金流向" });
+    expect(direction).not.toBeDisabled();
+    await ui.click(direction);
+    await ui.click(await screen.findByText("收入", { exact: true }));
+    await ui.type(within(modal).getByLabelText("金额"), "100");
+    await ui.type(within(modal).getByLabelText("收支备注"), "补登记收入");
+    await clickModalOk(modal);
+    await waitFor(() => expect(catalog.cashflowsApi.createForOrder).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ direction: "IN", amount: "100", category: "OTHER" }),
+    ));
+  });
+
+  it("交付：订单台账可登记买号交付并记录 DELIVER 事件", async () => {
+    vi.mocked(catalog.ordersApi.get).mockResolvedValueOnce({
+      ...order1,
+      events: [{
+        id: 1,
+        event_no: "EV-BUY",
+        order_id: 1,
+        event_type: "BUY",
+        amount: "1000.00",
+        occurred_on: "2026-10-01",
+        is_posted: true,
+        cancellable_amount: "1000.00",
+      }],
+    });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "交付");
+    const modal = await modalOf(/交付 · HS-2026-0001/);
+    expect(within(modal).getByText("买号交付")).toBeInTheDocument();
+    await ui.type(within(modal).getByLabelText("交付凭证"), "卖家已完成换绑");
+    await clickModalOk(modal);
+    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        event_type: "DELIVER",
+        delivery_direction: "BUY",
+        delivery_mode: "CUSTOMER_SELF",
+        note: "卖家已完成换绑",
+      }),
+    ));
+  });
+
+  it("运营：订单台账提供描述快捷入口并登记 DESCRIPTION 业务事件", async () => {
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce({
+      account: { id: 5, source_order_id: 1, source_order_no: "HS-2026-0001", game_account: "seller-001", status: "WAITING", cost_amount: "100.00" },
+      orders: [],
+    } as never);
+    vi.mocked(catalog.stocksApi.updateProfile).mockResolvedValueOnce({
+      id: 5, source_order_id: 1, source_order_no: "HS-2026-0001", game_account: "seller-001", status: "WAITING", cost_amount: "100.00",
+    } as never);
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "描述");
+    const descriptionInput = await screen.findByPlaceholderText("补充账号等级、资源、限制等信息");
+    const modal = descriptionInput.closest(".ant-modal-content") as HTMLElement;
+    await ui.type(descriptionInput, "台账补充描述");
+    await ui.click(within(modal).getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ event_type: "OPERATE", operation_type: "DESCRIPTION" }),
+    ));
   });
 
   it("取消：存在可冲销已登记动作时发起 CANCEL 冲销", async () => {
@@ -1198,35 +1299,33 @@ describe("buildOrderPatchPayload 纯函数", () => {
   });
 });
 
-// —— 资金收支（REFUND）入参：日期兜底与「资金账户未选就保持 undefined」此前仅靠挂载覆盖。
-describe("buildRefundEventPayload 纯函数", () => {
+// —— 资金收支退款入参：日期兜底与资金账户数字化。
+describe("buildRefundCashflowPayload 纯函数", () => {
   const fallbackDate = "2026-11-03";
 
   it("发生日期留空 → 取当天", () => {
-    const payload = buildRefundEventPayload({
+    const payload = buildRefundCashflowPayload({
       values: { amount: "88.00", occurred_on: null, pool_id: 3, reason: "退款" },
       fallbackDate,
     });
-    expect(payload.occurred_on).toBe(fallbackDate);
+    expect(payload.refunded_on).toBe(fallbackDate);
   });
 
   it("发生日期已选 → 按 YYYY-MM-DD 提交", () => {
-    const payload = buildRefundEventPayload({
+    const payload = buildRefundCashflowPayload({
       values: { amount: "88.00", occurred_on: dayjs("2026-10-20"), pool_id: 3, reason: "退款" },
       fallbackDate,
     });
-    expect(payload).toMatchObject({ event_type: "REFUND", amount: "88.00", occurred_on: "2026-10-20", pool_id: 3 });
+    expect(payload).toMatchObject({ amount: "88.00", refunded_on: "2026-10-20", pool_id: 3 });
   });
 
-  it("资金账户未选 → pool_id 保持 undefined（交给后端按订单类型路由），不填 0/空串", () => {
-    const payload = buildRefundEventPayload({ values: { amount: "1", reason: "x" }, fallbackDate });
-    expect(payload.pool_id).toBeUndefined();
-    expect(buildRefundEventPayload({ values: { amount: "1", reason: "x", pool_id: "" as never }, fallbackDate }).pool_id)
-      .toBeUndefined();
+  it("资金账户未选 → 保持空值，让表单必填规则拦截", () => {
+    const payload = buildRefundCashflowPayload({ values: { amount: "1", reason: "x", pool_id: undefined }, fallbackDate });
+    expect(Number.isNaN(payload.pool_id)).toBe(true);
   });
 
   it("资金账户显式选择 → 数字化提交", () => {
-    const payload = buildRefundEventPayload({ values: { amount: "1", reason: "x", pool_id: "7" }, fallbackDate });
+    const payload = buildRefundCashflowPayload({ values: { amount: "1", reason: "x", pool_id: "7" }, fallbackDate });
     expect(payload.pool_id).toBe(7);
   });
 });

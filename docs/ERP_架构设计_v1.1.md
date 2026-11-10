@@ -8,6 +8,8 @@
 
 
 > **权威来源**：[PRD v1.3](ERP_PRD_v1.3_当前实现版.md) → [ERP_PRD_F01_功能规格说明书](ERP_PRD_F01_功能规格说明书.md)。本文负责落实架构，不得改变前两者。前端目录和 UI 设计系统以 `/Users/aries/Developer/business-line-erp/frontend` 为参考源。
+>
+> **动作模型补充（2026-11-10）**：业务事件、资金明细、状态机动作、审计动作和页面动作以 [ERP 系统动作定义 v1.0](ERP_系统动作定义_v1.0.md) 为当前 `dev` 口径；`COST`、订单事件 `PAYMENT`、订单事件 `REFUND`、`BUY_CREDIT` 已直接移除，不作为兼容入口或新流程动作。退款、分期收款和一般支出统一登记资金明细。
 
 ## 设计边界
 
@@ -89,12 +91,12 @@ erDiagram
 
 | 领域 | 核心表 | 规则 |
 |---|---|---|
-| 资金 | pools / cashflow / deposits | OWNED/CUSTODY/THIRD_PART；押金不计损益；新 INTERNAL 成对 |
+| 资金 | pools / cashflow / deposits | OWNED/CUSTODY/THIRD_PART；押金不计损益；新 INTERNAL 成对；所有收入和支出统一落 `cashflow` |
 | 订单 | order_type_defs / orders / order_events | HS/TH/DG 为首批业务；订单汇总由事件派生 |
-| 账号 | stocks | HS/TH/DG 均关联库存账号；`stock_no` 为 KU_ 五位编号；`game_account` 不唯一（可反复收购）；`status` 与 `inventory_status` 两条轴；BUY+COST 按业务规则累加成本 |
+| 账号 | stocks | HS/TH/DG 均关联库存账号；`stock_no` 为 KU_ 五位编号；`game_account` 不唯一（可反复收购）；`status` 与 `inventory_status` 两条轴；`BUY` 及其关联支出资金明细共同形成库存占用 |
 | 客户 | customers / order_customer_roles | 微信号、QQ、手机号、备注等复购资料；客户可跨订单多角色；联系方式非唯一 |
 | 合作方 | counterparties / order_counterparty_roles | 同行、供货方、平台；与客户分离，按业务角色关联 |
-| 分期 | installments / installment_schedules | `installments` 三类合约 STOCK_SALE(HS) / PICKUP_SALE(TH) / CONSIGNMENT_SALE(DG)；一单一合约，均从所属订单取库存信息、不单独存 account_id；`installment_schedules` 为期次明细；PAYMENT→换绑→DELIVER |
+| 分期 | installments / installment_schedules | `installments` 三类合约 STOCK_SALE(HS) / PICKUP_SALE(TH) / CONSIGNMENT_SALE(DG)；一单一合约，均从所属订单取库存信息、不单独存 account_id；`installment_schedules` 为期次明细；`CASHFLOW_REASON=INSTALLMENT_PAYMENT`→换绑→DELIVER |
 | 返点 | rebate_records | `HS0001-RB01` 返点记录；登记即收入确认，金额取 `base_amount`（分次到账已下线） |
 | 经营规则 | policy_definitions / policy_versions / order_profit_allocations | 费率、提成、分期、跌价等版本化；已发生业务保存快照 |
 | 活字段 | field_definitions / entity_extra_values | 可增、停用、排序；历史值不可删除 |
@@ -103,7 +105,7 @@ erDiagram
 
 | 服务 | 职责 |
 |---|---|
-| EventService | BUY/COST/SELL/PAYMENT/DELIVER/CANCEL、池路由、编号和现金流派生；DELIVER 不派生现金流 |
+| EventService | BUY/SELL/DELIVER/CANCEL/OPERATE/REBATE/PROFIT_SHARE、池路由、编号和关联关系；DELIVER 不派生现金流 |
 | LedgerService | 池余额、库存、经营损益、权益、划转对称性 |
 | TransferService | 新跨池划转一次生成两条流水和同一 transfer_id |
 | InstallmentService | 三类分期合约、应收/已收/剩余、逾期与违约、回收/转售处置；结清后生成无现金流 DELIVER 释放库存 |

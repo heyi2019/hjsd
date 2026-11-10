@@ -25,6 +25,7 @@ from app.domain.enums import (
 )
 from app.domain.foundation import Pool
 from app.domain.trade import Account, RebateRecord
+from app.finance.cashflows import create_cashflow
 from app.orders import service as order_service
 from app.policy import service as policy_service
 from app.reporting import service as reporting_service
@@ -139,6 +140,25 @@ def _month_item(data: dict, month: str) -> dict:
     return matched[0]
 
 
+def _direct_cost(seeded_db, order_id: int, amount: str, occurred_on: date) -> None:
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    assert pool is not None
+    create_cashflow(
+        seeded_db,
+        pool_id=pool.id,
+        occurred_on=occurred_on,
+        direction="OUT",
+        nature="BUSINESS_OUT",
+        fund_nature="BUSINESS",
+        accounting_attribute="SELF_DIRECT_COST",
+        category="OTHER",
+        amount=Decimal(amount),
+        actor="pytest",
+        order_id=order_id,
+        note="订单直接支出",
+    )
+
+
 # --------------------------------------------------------------------- R1 库存
 class TestR1Inventory:
     def test_inventory_health_api_accepts_missing_platform_and_returns_total_cost(
@@ -181,7 +201,7 @@ class TestR1Inventory:
 
         assert pickup.id in {item["account_id"] for item in data["items"]}
 
-    def test_account_loop_extra_cost_and_expected_price(self, seeded_db):
+    def test_account_loop_buy_outflow_and_expected_price(self, seeded_db):
         in_stock = Account(
             business_mode="SELF",
             inventory_type="RECOVERY",
@@ -233,12 +253,11 @@ class TestR1Inventory:
         assert idle["holding_days"] == 0
         assert idle["business"] is None
         assert idle["owner_id"] is None
-        # 在库账号：成本按 BUY 累加（0+1000+800=1800）；
-        # order_cost（1800）− 账号成本（1800）= 0；expected_price = 历史 SELL 合计 1500
+        # 在库账号：买入支出按 BUY 累加（0+1000+800=1800）；
+        # expected_price = 历史 SELL 合计 1500；不再拆分附加成本字段
         held = items[in_stock.id]
         assert held["business"] == "HS"
         assert held["buy_amount"] == 1800
-        assert held["extra_cost"] == 0
         assert held["total_cost"] == 1800
         assert held["expected_price"] == 1500
         assert held["expected_profit"] == -300
@@ -261,10 +280,7 @@ class TestR2MonthlyPnl:
             seeded_db, order.id, event_type="BUY", amount="1000.00",
             occurred_on=D, actor="pytest",
         )
-        order_service.post_event(
-            seeded_db, order.id, event_type="COST", amount="200.00",
-            occurred_on=EARLY, actor="pytest",
-        )
+        _direct_cost(seeded_db, order.id, "200.00", EARLY)
         order_service.post_event(
             seeded_db, order.id, event_type="SELL", amount="1300.00",
             occurred_on=D, actor="pytest",
@@ -484,10 +500,7 @@ class TestReportsApiDateParams:
             seeded_db, order.id, event_type="BUY", amount="1000.00",
             occurred_on=D, actor="pytest",
         )
-        order_service.post_event(
-            seeded_db, order.id, event_type="COST", amount="200.00",
-            occurred_on=EARLY, actor="pytest",
-        )
+        _direct_cost(seeded_db, order.id, "200.00", EARLY)
         order_service.post_event(
             seeded_db, order.id, event_type="SELL", amount="1300.00",
             occurred_on=D, actor="pytest",

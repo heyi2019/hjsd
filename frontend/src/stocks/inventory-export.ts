@@ -48,7 +48,7 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
     consignmentAt: platformListingDate(detail),
     consignmentPlatforms: consignmentPlatforms(detail),
     execution: orders.flatMap((order) => order.events.map((event) => [
-      `${event.event_no} · ${executionActionLabel(event.event_type, order.order_type)}`,
+      `${event.event_no} · ${executionActionLabel(event.event_type, order.order_type, event.delivery_direction)}`,
       dateTimeMinute(event.occurred_at ?? event.occurred_on),
       event.amount,
       event.note || "-",
@@ -56,7 +56,7 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
     ].join(" / "))).join("；"),
     finance: [
       ...financialFlows.map(({ order, event, cashflow }) => [
-        financeTypeLabel(event?.event_type ?? "", cashflow.direction),
+        financeTypeLabel(event?.event_type ?? "", cashflow.direction, cashflow.category),
         order.order_no,
         cashflow.flow_no,
         cashflow.direction === "OUT" ? "支出" : "收入",

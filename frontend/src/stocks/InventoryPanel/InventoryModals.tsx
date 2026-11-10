@@ -1,5 +1,5 @@
 import { BusinessActionModal } from "../../shared/ui";
-import { money } from "../../shared/lib/format";
+import { money, today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { ordersApi, stocksApi } from "../../shared/api/catalog";
@@ -9,6 +9,9 @@ import { InventoryConsignmentModal } from "../InventoryConsignmentModal";
 import { InventoryPlatformOffsaleModal } from "../InventoryPlatformOffsaleModal";
 import { InventoryProfileModal } from "../InventoryProfileModal";
 import { InventoryRebateModal } from "../InventoryRebateModal";
+import { InventoryCashflowModal } from "../InventoryCashflowModal";
+import { OrderDeliveryModal } from "../../orders/OrderDeliveryModal";
+import { OrderProfitShareModal } from "../../orders/OrderProfitShareModal";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../InventorySaleModal";
 import { OrderDetail } from "../OrderDetail";
 import type { InventoryController } from "./useInventoryController";
@@ -33,6 +36,13 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     platformOffsaleTarget,
     profileTarget,
     rebateTarget,
+    cashflowPools,
+    cashflowTarget,
+    deliveryEmployees,
+    deliveryTarget,
+    profitShareEmployees,
+    profitSharePools,
+    profitShareTarget,
     refreshExecution,
     saleTarget,
     saveInline,
@@ -44,6 +54,8 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     setPlatformOffsaleTarget,
     setProfileTarget,
     setRebateTarget,
+    setCashflowTarget,
+    setDeliveryTarget,
     setSaleTarget,
     submitDelete,
     submitVoid,
@@ -91,6 +103,39 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           onOrdersChanged?.();
         }}
       />
+      <InventoryCashflowModal
+        target={cashflowTarget}
+        pools={cashflowPools}
+        onClose={() => setCashflowTarget(null)}
+        onCreated={async () => {
+          const account = cashflowTarget?.account;
+          setCashflowTarget(null);
+          await load();
+          if (account) refreshExecution(account);
+          onOrdersChanged?.();
+        }}
+      />
+      <OrderDeliveryModal
+        target={deliveryTarget}
+        employees={deliveryEmployees}
+        onClose={() => setDeliveryTarget(null)}
+        onCreated={async () => {
+          setDeliveryTarget(null);
+          await load();
+          onOrdersChanged?.();
+        }}
+      />
+      <OrderProfitShareModal
+        target={profitShareTarget}
+        pools={profitSharePools}
+        employees={profitShareEmployees}
+        onClose={() => controller.setProfitShareTarget(null)}
+        onCreated={async () => {
+          controller.setProfitShareTarget(null);
+          await load();
+          onOrdersChanged?.();
+        }}
+      />
       <InventoryCancellationDialog
         title="系统下架登记"
         open={Boolean(voidTarget)}
@@ -116,11 +161,22 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           setPlatformOffsaleTarget(null);
           if (!target || target.records.length === 0) return;
           try {
-            await Promise.all(target.records.map((record) => ordersApi.cancel(record.orderId, {
-              reason,
-              form_extra_scope: "INVOID",
-              form_extra: { ...form_extra, platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
-            })));
+            const occurredOn = new Date().toISOString().slice(0, 10);
+            await Promise.all(target.records.map(async (record) => {
+              await ordersApi.postEvent(record.orderId, {
+                event_type: "OPERATE",
+                operation_type: "UNLIST",
+                occurred_on: occurredOn,
+                note: `系统下架：${reason}`,
+                form_extra_scope: "INVOID",
+                form_extra: { ...form_extra, platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
+              });
+              return ordersApi.cancel(record.orderId, {
+                reason,
+                form_extra_scope: "INVOID",
+                form_extra: { ...form_extra, platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
+              });
+            }));
             appMessage.success("代挂订单已取消，账号已出库");
             await load();
             refreshExecution(target.account);
@@ -175,6 +231,23 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           });
         }}
         onError={(error) => controller.setError(normalizeError(error))}
+        onOperation={async (operationType) => {
+          const account = profileTarget?.account;
+          let orderId = profileTarget?.orderId ?? account?.source_order_id;
+          if (!orderId && account) {
+            const detail = await stocksApi.executionDetail(account.id);
+            orderId = detail.orders.find((order) => order.order_type !== "DG")?.order_id
+              ?? detail.orders[0]?.order_id;
+          }
+          if (!orderId) throw new Error("账号没有可关联的来源订单，无法登记运营事件");
+          await ordersApi.postEvent(orderId, {
+            event_type: "OPERATE",
+            operation_type: operationType,
+            occurred_on: today(),
+            note: operationType === "IMAGE" ? "库存中心登记作图" : "库存中心登记描述",
+            form_extra_scope: "OPERATION",
+          });
+        }}
       />
       {/* 删除确认与其它弹窗同级渲染：嵌套进受控 Modal 的 children 会被父级 open=false 打断关闭渲染。 */}
       <InventoryDeleteDialog

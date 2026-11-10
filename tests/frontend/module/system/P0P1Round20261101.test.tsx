@@ -411,17 +411,17 @@ it("P1/FE-051：经营报表日期筛选传递到各报表查询", async () => {
 
 it("P1/FE-053：报表导出成功后显示可核对的结果反馈", async () => {
   vi.mocked(catalog.reportsApi.exportCsv).mockResolvedValue(new Blob(["csv"]) as never);
+  vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValue({ items: [], total: {} } as never);
+  const successSpy = vi.spyOn(appMessage, "success").mockImplementation(() => ({} as never));
   const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   const createUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:report");
   const revokeUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
   const user = userEvent.setup({ pointerEventsCheck: 0 });
   renderLight(<ReportsPage />, { user: "admin" });
-  const selector = screen.getByText("选择导出报表").closest(".ant-select")!.querySelector(".ant-select-selector") as HTMLElement;
-  await user.click(selector);
-  await user.click(await screen.findByText("订单利润", { selector: ".ant-select-item-option-content" }));
-  await user.click(screen.getByRole("button", { name: /导出/ }));
+  await user.click(await screen.findByRole("tab", { name: /订单利润/ }));
+  await user.click(await screen.findByRole("button", { name: "导出 CSV" }));
 
-  await waitFor(() => expect(screen.getByText(/已导出 1 份报表/)).toBeInTheDocument());
+  await waitFor(() => expect(successSpy).toHaveBeenCalledWith("已导出 order-profit.csv"));
   expect(anchorClick).toHaveBeenCalled();
   expect(createUrl).toHaveBeenCalled();
   expect(revokeUrl).toHaveBeenCalledWith("blob:report");
@@ -609,7 +609,7 @@ it("P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定", (
     events: [
       { id: 1, event_no: "EV-1", order_id: 10, event_type: "BUY", amount: "100", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "100" },
       { id: 2, event_no: "EV-2", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [], cancellable_amount: "200" },
-      { id: 3, event_no: "EV-3", order_id: 10, event_type: "COST", amount: "20", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33], cancellable_amount: "20" },
+      { id: 3, event_no: "EV-3", order_id: 10, event_type: "OPERATE", operation_type: "DESCRIPTION", amount: "20", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33], cancellable_amount: "20" },
     ],
   });
   const rows = buildActionAllocationRows([], candidates);

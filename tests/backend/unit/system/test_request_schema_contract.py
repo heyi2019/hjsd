@@ -18,6 +18,7 @@ from app.auth.router import (
 )
 from app.finance.schemas import (
     CashflowCreate,
+    CashflowRefundCreate,
     CashflowReverse,
     DepositCreate,
     DepositLoss,
@@ -46,6 +47,7 @@ from app.value_added_services.schemas import (
     ScheduleExtendIn,
     ScheduleWaiveIn,
 )
+from app.orders.schemas import EventCreate
 from app.parties.schemas import (
     CounterpartyCreate,
     CounterpartyUpdate,
@@ -104,6 +106,10 @@ from app.parties.schemas import (
             CashflowCreate,
             {"pool_id": 1, "occurred_on": date(2026, 10, 1), "direction": "IN", "nature": "BUSINESS_IN", "category": "OTHER", "amount": "1.00"},
         ),
+        (
+            CashflowRefundCreate,
+            {"pool_id": 1, "amount": "1.00", "refunded_on": date(2026, 10, 1), "reason": "售后退款"},
+        ),
         (CashflowReverse, {"reversed_on": date(2026, 10, 1), "reason": "重复"}),
         (
             ReconciliationCreate,
@@ -123,6 +129,7 @@ from app.parties.schemas import (
         (OrderTypeCreate, {"code": "TB", "name": "测试业务", "capital_type": "STOCK"}),
         (OrderTypeUpdate, {}),
         (RouteIn, {"portion": "PRINCIPAL", "pool_code": "POOL1"}),
+        (EventCreate, {"event_type": "SELL", "occurred_on": date(2026, 10, 1)}),
     ],
 )
 def test_request_models_reject_unknown_fields(
@@ -130,3 +137,25 @@ def test_request_models_reject_unknown_fields(
 ):
     with pytest.raises(ValidationError):
         model.model_validate({**payload, "legacy_field": "must not be ignored"})
+
+
+def test_sell_event_accepts_sale_mode_attribute():
+    payload = EventCreate(
+        event_type="SELL",
+        sale_mode="INSTALLMENT",
+        amount="1000.00",
+        occurred_on=date(2026, 10, 1),
+    )
+
+    assert payload.sale_mode == "INSTALLMENT"
+
+
+def test_operate_event_accepts_operation_type_attribute():
+    payload = EventCreate(
+        event_type="OPERATE",
+        operation_type="CONSIGNMENT",
+        occurred_on=date(2026, 10, 1),
+        note="已上架寄售平台",
+    )
+
+    assert payload.operation_type == "CONSIGNMENT"

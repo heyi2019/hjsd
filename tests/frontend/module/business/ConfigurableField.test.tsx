@@ -227,12 +227,34 @@ describe("CustomFormField", () => {
 it("运营板块自定义字段显示运营信息分组", () => {
   const def = makeField({ field_key: "consignment_note", label: "寄售运营备注", section: "OPERATION" });
   renderLight(
-    <FieldConfigContext.Provider value={{ [def.field_key]: def }}>
-      <CustomFieldSection section="OPERATION" testIdSuffix="operation" />
-    </FieldConfigContext.Provider>,
+    <Form>
+      <FieldConfigContext.Provider value={{ [def.field_key]: def }}>
+        <CustomFieldSection section="OPERATION" testIdSuffix="operation" />
+      </FieldConfigContext.Provider>
+    </Form>,
   );
   expect(screen.getByText("运营信息")).toBeInTheDocument();
   expect(screen.getByLabelText("寄售运营备注")).toBeInTheDocument();
+});
+
+it("自定义字段配置异步出现时不改变 hooks 顺序", () => {
+  const def = makeField({ field_key: "operation_note", label: "运营备注", section: "OPERATION" });
+  const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  const { rerender } = renderLight(
+    <FieldConfigContext.Provider value={{}}>
+      <CustomFieldSection section="OPERATION" testIdSuffix="async" />
+    </FieldConfigContext.Provider>,
+  );
+
+  rerender(
+    <FieldConfigContext.Provider value={{ [def.field_key]: def }}>
+      <CustomFieldSection section="OPERATION" testIdSuffix="async" />
+    </FieldConfigContext.Provider>,
+  );
+
+  expect(screen.getByLabelText("运营备注")).toBeInTheDocument();
+  expect(consoleError.mock.calls.flat().join(" ")).not.toContain("change in the order of Hooks");
+  consoleError.mockRestore();
 });
 
 describe("CfgItem 配置门控", () => {

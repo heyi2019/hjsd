@@ -172,8 +172,8 @@ class TestCreateInstallmentValidation:
         assert contract.status == InstallmentStatus.SETTLED.value
 
     def test_installment_refund_only_after_delivery(self, seeded_db):
-        """REFUND 走 PRINCIPAL 资金池路由，DG 未配置该路由，故用 HS + STOCK_SALE。"""
-        from app.orders import service as order_service
+        """退款是交付后的支出资金明细，不新增订单事件。"""
+        from app.finance import cashflows
         account = _account(seeded_db, "refund-after-delivery")
         purchase = _order(seeded_db, order_type="HS", account_id=account.id)
         _buy(seeded_db, purchase.id)
@@ -189,11 +189,17 @@ class TestCreateInstallmentValidation:
         )
         installment_service.pay(seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=1, actor="pytest")
         with pytest.raises(Validation, match="交付前"):
-            order_service.post_event(seeded_db, order.id, event_type="REFUND", amount="30", occurred_on=TODAY, actor="pytest", reason="退款")
+            cashflows.create_order_refund(
+                seeded_db, order_id=order.id, pool_id=2, amount="30",
+                refunded_on=TODAY, actor="pytest", reason="退款",
+            )
         installment_service.deliver(seeded_db, contract.id, delivery_mode="CUSTOMER_SELF", delivered_on=TODAY, note="交付凭证", actor="pytest")
-        refund, flow = order_service.post_event(seeded_db, order.id, event_type="REFUND", amount="30", occurred_on=TODAY, actor="pytest", reason="退款")
-        assert refund.refund_responsibility == "COMPANY"
-        assert flow.direction == "OUT"
+        refund = cashflows.create_order_refund(
+            seeded_db, order_id=order.id, pool_id=2, amount="30",
+            refunded_on=TODAY, actor="pytest", reason="退款",
+        )
+        assert refund.category == "REFUND"
+        assert refund.direction == Direction.OUT.value
 
     def test_installment_sale_binds_buyer_and_seller_across_orders(self, seeded_db):
         from app.policy import service as policy_service
@@ -503,9 +509,9 @@ def test_cancel_stock_installment_refunds_payments_and_returns_account(seeded_db
         seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="pytest"
     )
     payment = seeded_db.scalar(
-        select(OrderEvent).where(
-            OrderEvent.order_id == sale.id,
-            OrderEvent.event_type == "PAYMENT",
+        select(Cashflow).where(
+            Cashflow.order_id == sale.id,
+            Cashflow.category == "INSTALLMENT_PAYMENT",
         )
     )
     assert payment is not None
@@ -518,10 +524,9 @@ def test_cancel_stock_installment_refunds_payments_and_returns_account(seeded_db
     seeded_db.refresh(sale)
     seeded_db.refresh(account)
     cancel = seeded_db.scalar(
-        select(OrderEvent).where(
-            OrderEvent.order_id == sale.id,
-            OrderEvent.event_type == "CANCEL",
-            OrderEvent.offset_event_id.isnot(None),
+        select(Cashflow).where(
+            Cashflow.order_id == sale.id,
+            Cashflow.reversal_of_id == payment.id,
         )
     )
     assert result["refund_amount"] == Decimal("100.00")
@@ -529,9 +534,8 @@ def test_cancel_stock_installment_refunds_payments_and_returns_account(seeded_db
     assert sale.status == "CANCELLED"
     assert account.status == AccountStatus.WAITING.value
     assert cancel is not None
-    assert cancel.offset_event_id == payment.id
     assert cancel.amount == Decimal("100.00")
-    assert seeded_db.scalar(select(Cashflow).where(Cashflow.order_event_id == cancel.id)).direction == Direction.OUT.value
+    assert cancel.direction == Direction.OUT.value
 
 @pytest.mark.parametrize(
     ("order_type", "contract_type", "business_mode", "inventory_type", "expected_status"),
@@ -569,30 +573,20 @@ def test_cancel_distribution_installment_uses_business_specific_account_result(
     seeded_db.refresh(account)
     assert account.status == expected_status
 
-def test_installment_payment_cannot_be_cancelled_through_generic_event_endpoint(seeded_db):
+def test_installment_payment_is_cashflow_only(seeded_db):
     order = _order(seeded_db)
     contract = _contract(seeded_db, order.id, down_payment="0", periods=1, per_period="100", principal="100")
     installment_service.pay(
         seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=1, actor="pytest"
     )
-    payment = seeded_db.scalar(
-        select(OrderEvent).where(
-            OrderEvent.order_id == order.id,
-            OrderEvent.event_type == EventType.PAYMENT.value,
+    payment_flow = seeded_db.scalar(
+        select(Cashflow).where(
+            Cashflow.order_id == order.id,
+            Cashflow.category == "INSTALLMENT_PAYMENT",
         )
     )
-    assert payment is not None
-    with pytest.raises(Validation, match="分期取消流程"):
-        orders_service.post_event(
-            seeded_db,
-            order.id,
-            event_type=EventType.CANCEL.value,
-            amount=Decimal("100"),
-            occurred_on=TODAY,
-            actor="pytest",
-            offset_event_id=payment.id,
-            reason="绕过服务层",
-        )
+    assert payment_flow is not None
+    assert payment_flow.order_event_id is None
 
 def test_installment_scope_follows_order_owner(seeded_db):
     scoped_user = CurrentUser.build(
@@ -1190,6 +1184,7 @@ class TestInstallmentsApi:
         assert event.form_extra == {
             "bound_phone": "13800000000",
             "bound_phone_owner": "张三",
+            "delivery_direction": "SELL",
         }
 
     def test_settle_early_and_default_endpoints(

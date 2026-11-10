@@ -83,6 +83,18 @@ export function InventoryPlatformOffsaleModal(props: {
     setSubmitting(true);
     try {
       const unlistedAt = values.unlisted_at ?? dayjs();
+      await ordersApi.postEvent(selected.orderId, {
+        event_type: "OPERATE",
+        operation_type: "UNLIST",
+        occurred_on: unlistedAt.format("YYYY-MM-DD"),
+        note: `寄售下架：${selected.platform}`,
+        form_extra_scope: "INVOID",
+        form_extra: {
+          ...values.form_extra,
+          platform_unlisted_at: unlistedAt.format("YYYY-MM-DDTHH:mm"),
+          platform_unlist_scope: "PLATFORM",
+        },
+      });
       await ordersApi.cancel(selected.orderId, {
         reason: values.reason.trim(),
         form_extra_scope: "INVOID",

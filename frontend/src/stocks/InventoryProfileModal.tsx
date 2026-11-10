@@ -9,6 +9,8 @@ import "./InventoryProfileModal.css";
 export type InventoryProfileTarget = {
   account: Account;
   mode: "description" | "images" | "all";
+  /** 订单台账入口明确指定的业务订单；库存入口回退使用账号来源订单。 */
+  orderId?: number;
 };
 
 function readImageData(file: Blob): Promise<string> {
@@ -35,11 +37,13 @@ export function InventoryProfileModal({
   onClose,
   onSaved,
   onError,
+  onOperation,
 }: {
   target: InventoryProfileTarget | null;
   onClose: () => void;
   onSaved: (account: Account) => void;
   onError: (error: unknown) => void;
+  onOperation?: (operationType: "IMAGE" | "DESCRIPTION") => void | Promise<void>;
 }) {
   const [form, setForm] = useState({
     gameAccount: "",
@@ -114,6 +118,9 @@ export function InventoryProfileModal({
             note: form.note,
           };
       const updated = await stocksApi.updateProfile(target.account.id, payload);
+      if (onOperation && (target.mode === "description" || target.mode === "images")) {
+        await onOperation(target.mode === "images" ? "IMAGE" : "DESCRIPTION");
+      }
       onSaved(updated);
       onClose();
       appMessage.success("账号资料已保存");

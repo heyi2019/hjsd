@@ -106,15 +106,16 @@ describe("状态枚举标签：与后端枚举一一对应", () => {
 
   it("事件类型覆盖后端 EventType", () => {
     expect(Object.keys(EVENT_TYPE_LABEL).sort()).toEqual(
-      ["BUY", "CANCEL", "COST", "DELIVER", "PAYMENT", "REFUND", "SELL"].sort(),
+      ["BUY", "CANCEL", "DELIVER", "OPERATE", "PROFIT_SHARE", "REBATE", "SELL"].sort(),
     );
   });
 
-  it("交付动作文案：DELIVER 统一为买入交付，不再按订单类型区分", () => {
-    expect(executionActionLabel("DELIVER", "HS")).toBe("买入交付");
-    expect(executionActionLabel("DELIVER", "DG")).toBe("买入交付");
+  it("交付动作文案：按交付方向区分买号交付与卖号交付", () => {
+    expect(executionActionLabel("DELIVER", "HS")).toBe("卖号交付");
+    expect(executionActionLabel("DELIVER", "DG", "BUY")).toBe("买号交付");
     expect(executionActionLabel("BUY", "HS")).toBe("买号");
-    expect(executionActionLabel("PAYMENT", "HS")).toBe("回款（分期）");
+    expect(executionActionLabel("OPERATE", "DG")).toBe("运营");
+    expect(executionActionLabel("REBATE", "HS")).toBe("返点");
   });
 });
 

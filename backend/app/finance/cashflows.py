@@ -22,7 +22,7 @@ from app.domain.enums import (
     Direction,
     Nature,
 )
-from app.domain.trade import Cashflow, Order
+from app.domain.trade import Cashflow, Installment, Order, OrderEvent
 from app.finance.attributes import (
     accounting_attributes_for_manual_cashflow,
     validate_fund_accounting_attribute,
@@ -74,6 +74,7 @@ def create_cashflow(
     amount: Any,
     actor: str,
     order_id: int | None = None,
+    order_event_id: int | None = None,
     note: str | None = None,
     extra_values: Mapping[str, Any] | None = None,
     form_extra: Mapping[str, Any] | None = None,
@@ -129,6 +130,12 @@ def create_cashflow(
     pool = foundation_service.assert_pool_usable(session, pool_id)
     if order_id is not None:
         orders_service.get_order(session, order_id, user)
+    if order_event_id is not None:
+        from app.domain.trade import OrderEvent
+
+        event = session.get(OrderEvent, order_event_id)
+        if event is None or (order_id is not None and event.order_id != order_id):
+            raise Validation("资金明细关联的业务事件不存在或不属于该订单")
     money = _positive(amount, field="amount")
     flow = Cashflow(
         flow_no=allocate_flow_no(session, direction),
@@ -141,6 +148,7 @@ def create_cashflow(
         direction=direction,
         amount=money,
         order_id=order_id,
+        order_event_id=order_event_id,
         status=CashflowStatus.APPROVED.value,
         note=note,
         form_extra=validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None,
@@ -173,6 +181,99 @@ def create_cashflow(
     return flow
 
 
+def create_order_refund(
+    session: Session,
+    *,
+    order_id: int,
+    pool_id: int,
+    amount: Any,
+    refunded_on: date,
+    reason: str,
+    actor: str,
+    refund_responsibility: str | None = None,
+    operator_user_ids: list[int] | None = None,
+    form_extra: Mapping[str, Any] | None = None,
+    form_extra_scope: str = "REFUND",
+    user: CurrentUser | None = None,
+) -> Cashflow:
+    """登记售后退款：只写 OUT 资金明细，保留原售出/收款业务事实。"""
+    order = orders_service.get_order(session, order_id, user)
+    text_reason = _text(
+        reason,
+        field="reason",
+        message="退款必须填写原因",
+        type_message="退款必须填写原因",
+    )
+    responsibility = (refund_responsibility or "COMPANY").strip().upper()
+    allowed_responsibilities = {"COMPANY", "CUSTOMER", "CONSIGNOR", "PLATFORM", "OTHER"}
+    if responsibility not in allowed_responsibilities:
+        raise Validation(
+            "退款责任方必须为 COMPANY、CUSTOMER、CONSIGNOR、PLATFORM 或 OTHER",
+            details={"field": "refund_responsibility"},
+        )
+    installment = session.scalar(
+        select(Installment).where(Installment.order_id == order.id)
+    )
+    delivered_type = "DELIVER" if installment is not None else "SELL"
+    delivered = session.scalar(
+        select(OrderEvent.id).where(
+            OrderEvent.order_id == order.id,
+            OrderEvent.event_type == delivered_type,
+            OrderEvent.is_posted.is_(True),
+        )
+    )
+    if delivered is None:
+        raise Validation("交付前请使用取消或冲销，交付后才能退款")
+    money = _positive(amount, field="amount")
+    received = session.scalar(
+        select(func.coalesce(func.sum(Cashflow.amount), 0)).where(
+            Cashflow.order_id == order.id,
+            Cashflow.direction == Direction.IN.value,
+            Cashflow.category.in_(("SELL", "SALE", "INSTALLMENT_PAYMENT")),
+            Cashflow.status == CashflowStatus.APPROVED.value,
+        )
+    ) or 0
+    refunded = session.scalar(
+        select(func.coalesce(func.sum(Cashflow.amount), 0)).where(
+            Cashflow.order_id == order.id,
+            Cashflow.direction == Direction.OUT.value,
+            Cashflow.category == "REFUND",
+            Cashflow.status == CashflowStatus.APPROVED.value,
+        )
+    ) or 0
+    remaining = to_money(received) - to_money(refunded)
+    if money > remaining:
+        raise Validation(
+            f"退款金额超过可退余额 {remaining}",
+            details={"remaining_refundable": str(remaining), "amount": str(money)},
+        )
+    flow = create_cashflow(
+        session,
+        pool_id=pool_id,
+        occurred_on=refunded_on,
+        direction=Direction.OUT.value,
+        nature=Nature.BUSINESS_OUT.value,
+        fund_nature="BUSINESS",
+        accounting_attribute=AccountingAttribute.REFUND.value,
+        category="REFUND",
+        amount=money,
+        actor=actor,
+        order_id=order.id,
+        note=text_reason,
+        form_extra=form_extra,
+        form_extra_scope=form_extra_scope,
+        user=user,
+    )
+    flow.form_extra = {
+        **(flow.form_extra or {}),
+        "refund_responsibility": responsibility,
+        **({"operator_user_ids": operator_user_ids} if operator_user_ids else {}),
+    }
+    flow.updated_by = actor
+    session.flush()
+    return flow
+
+
 def reverse_cashflow(
     session: Session,
     cashflow_id: int,
@@ -194,7 +295,9 @@ def reverse_cashflow(
     if flow.status != CashflowStatus.APPROVED.value:
         raise Validation("只有已审核流水可以冲销", details={"cashflow_id": cashflow_id})
     if flow.order_event_id is not None:
-        raise Validation("业务事件现金流必须通过业务事件冲销")
+        event = session.get(OrderEvent, flow.order_event_id)
+        if event is None or event.event_type not in {"REBATE", "PROFIT_SHARE"}:
+            raise Validation("业务事件现金流必须通过业务事件冲销")
     if flow.deposit_id is not None or flow.transfer_id is not None:
         raise Validation("押金或划转现金流必须通过原业务流程冲销")
     if session.scalar(select(Cashflow.id).where(Cashflow.reversal_of_id == flow.id)):

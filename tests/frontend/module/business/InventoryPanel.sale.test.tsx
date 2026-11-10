@@ -253,8 +253,12 @@ it("提号库存售出可选择分期出售，确立时收首付", async () => {
       expect.objectContaining({ amount: "300", period_no: 0, pool_id: 3 }),
     ));
     expect(vi.mocked(catalog.ordersApi.create)).not.toHaveBeenCalled();
-    // 首付走分期 pay 通道（PAYMENT/PROFIT），不单独再挂 SELL 事件。
-    expect(vi.mocked(catalog.ordersApi.postEvent)).not.toHaveBeenCalled();
+    // 分期出售先登记 SELL 业务事实；首付再走分期 pay 通道登记资金明细。
+    expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
+      event_type: "SELL",
+      sale_mode: "INSTALLMENT",
+      amount: "1200",
+    }));
   });
 
 it("库存中心不为售出单提供取消入口", async () => {

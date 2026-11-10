@@ -13,6 +13,8 @@
 
 > **修订（2026-11-01）**：删除已不存在的 `/period-locks` 端点（账期锁定整体移除）；补记 `lists` 列表列配置模块；更正前端 `catalog.ts` 已按域拆分。
 
+> **动作模型（2026-11-10）**：业务事件、资金明细和页面动作的边界以 [ERP 系统动作定义 v1.0](ERP_系统动作定义_v1.0.md) 为准。分期回款、退款和经营支出均通过资金明细记录，不新增 `PAYMENT`、`REFUND` 或 `COST` 订单业务事件。
+
 > **本次升级（2026-10-28）**：高频列表 `/orders`、`/customers`、`/stocks` 改为统一分页对象；旧的裸数组响应不再属于 v1.1 契约。前端领域 API 会自动翻页后向页面提供数组，但后端接口本身只接受/返回新契约。旧版独立字段定义接口已下线，统一使用订单表单字段配置。
 
 ## 1. 公共约定
@@ -44,7 +46,7 @@
 | 库存账号 | `GET /stocks`；`PATCH /stocks/{account_id}`；`GET /stocks/inventory`、`/stocks/{account_id}/execution-detail`；`PATCH /stocks/{account_id}/execution-edit` | 账号台账、库存健康、执行明细与受控编辑；账号列表为分页列表 |
 | 分期 | `GET/POST /installments`；`POST /installments/mark-overdue`；`GET /installments/{installment_id}/schedules`、`/dispositions`；`POST /installments/{installment_id}/payments`、`/recover`、`/resale`、`/settle-early`、`/default`、`/deliver`、`/cancel`；`POST /installments/{installment_id}/schedules/{period_no}/waive`、`/extend` | 分期合约、期次、收款与处置 |
 | 人员/团队 | `GET/POST /users`；`PATCH /users/{user_id}`；`POST /users/{user_id}/reset-password`；`GET/POST /teams`；`PATCH /teams/{team_id}` | 人员、角色、数据范围与团队 |
-| 资金 | `GET/POST /cashflows`；`POST /cashflows/{cashflow_id}/approve`、`/reject`、`/reverse`；`GET/POST /deposits`；`POST /deposits/{deposit_id}/returns`、`/cancel`、`/losses`；`GET/POST /rebates`；`GET /rebates/overdue`、`/rebates/{rebate_id}`；`GET/POST /rebates/{rebate_id}/settlements`；`POST /rebates/{rebate_id}/settlements/{settlement_id}/reverse`、`/rebates/{rebate_id}/void`；`GET/POST /reconciliations`；`POST /reconciliations/{reconciliation_id}/resolve` | 资金流水、押金、返点与对账；资金列表是否分页以各自响应模型为准 |
+| 资金 | `GET/POST /cashflows`；`POST /cashflows/{cashflow_id}/approve`、`/reject`、`/reverse`；`GET/POST /deposits`；`POST /deposits/{deposit_id}/returns`、`/cancel`、`/losses`；`GET/POST /rebates`；`GET /rebates/overdue`、`GET /rebates/{rebate_id}`；`PATCH/DELETE /rebates/{rebate_id}`；`GET/POST /reconciliations`；`POST /reconciliations/{reconciliation_id}/resolve` | 资金流水、押金、返点与对账；返点登记即完成收入确认，不再使用分次结算端点 |
 | 划转 | POST `/transfers`、`/transfers/{transfer_id}/repair` | 原子资金划转与单边划转修复。**账期锁定能力已整体移除**：原 `GET/POST /period-locks` 端点、`period_locks` 表、`finance.period.lock` 权限与「锁定账期」入口均不存在，调用将返回 404 |
 | 报表 | GET `/reports/inventory-health`、`/monthly-pnl`、`/commission`、`/business-pnl`、`/finance-dimensions`、`/daily-funds`、`/order-profit`；GET `/reports/{report_name}/export.csv` | 库存健康、损益、佣金、资金、订单利润与导出 |
 | 质量 | `GET /quality/exceptions`、`/metrics`、`/issues`、`/issues/{issue_id}`；`POST /quality/scan`、`/issues`、`/issues/{issue_id}/close`、`/issues/batch-close`；`PATCH /quality/issues/{issue_id}` | 数据质量异常与指标 |
@@ -110,10 +112,10 @@
 
 成功后返回 event、派生 cashflow、重算后的订单摘要。TRANSFER 不允许由此接口单条创建。
 
-### 分期收款与返点结算
+### 分期收入与返点登记
 
-- 分期收款（业务名称统一为「分期出售」；合约类型按订单类型编码：`HS + STOCK_SALE`、`TH + PICKUP_SALE`；代挂售出仅全款，不建分期合约）：`PAYMENT`，须同步更新 installment.paid，累计不得超过总应收。
-- 返点结算：`{"settled_on":"2026-10-04","gross_amount":"100","platform_fee":"5","net_amount":"95","pool_id":2}`；净额自动入池。
+- 分期收入（业务名称统一为「分期出售」；合约类型按订单类型编码：`HS + STOCK_SALE`、`TH + PICKUP_SALE`、`DG + CONSIGNMENT_SALE`）：通过 `CASHFLOW` 记录 `CASHFLOW_DIRECTION=IN`、`CASHFLOW_REASON=INSTALLMENT_PAYMENT`，同步更新 `installment.paid`，累计不得超过总应收；不新增 `PAYMENT` 订单事件。
+- 返点登记：`{"rebate_type":"BUY","base_amount":"100","collected_on":"2026-10-04","pool_id":2}`；登记即关联一笔 `IN` 返点收入资金明细。如产生平台手续费，另登记 `OUT` 资金明细，不从返点收入中改写净额。
 
 ## 4. 前后端联调与治理
 

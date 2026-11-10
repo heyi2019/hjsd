@@ -322,13 +322,14 @@ export function CfgNestedItem(props: {
  *  值通过 CustomFormField 归集到 form_extra.<field_key>，随表单提交上报。 */
 export function CustomFieldSection(props: { testIdSuffix?: string; section?: OrderFormField["section"] } = {}): ReactElement | null {
   const cfg = useFieldConfig();
+  const sectionLabels = useSectionLabels();
   const defs = Object.values(cfg)
     .filter((field) => field.is_custom && field.is_active && (field.section ?? "EXTRA") === (props.section ?? "EXTRA"))
     .sort((a, b) => a.sort_order - b.sort_order);
   if (defs.length === 0) return null;
   return (
     <section className="ui-stack custom-field-section" data-testid={`custom-fields${props.testIdSuffix ? `-${props.testIdSuffix}` : ""}`}>
-      <Typography.Text type="secondary" strong>{sectionLabel(props.section ?? "EXTRA", CUSTOM_SECTION_LABEL[props.section ?? "EXTRA"])}</Typography.Text>
+      <Typography.Text type="secondary" strong>{sectionLabels[props.section ?? "EXTRA"] ?? CUSTOM_SECTION_LABEL[props.section ?? "EXTRA"]}</Typography.Text>
       {defs.map((def) => (
         <CustomFormField key={def.id} def={def} />
       ))}

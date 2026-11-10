@@ -111,7 +111,7 @@ class TestA04DistributionInstallmentSale:
         assert seeded_db.get(Order, order.id).status == OrderStatus.COMPLETED.value
         # DELIVER 不新增现金流
         deliver_flows = seeded_db.scalars(
-            select(Cashflow).where(Cashflow.category == "PAYMENT")
+            select(Cashflow).where(Cashflow.category == "INSTALLMENT_PAYMENT")
         ).all()
         assert len(deliver_flows) == 3  # 首付 + 两期
 

@@ -119,7 +119,7 @@ export type OrderDetailMeta = {
 export type InventoryEventDraft = { amount: string; note: string | null; operator_user_ids?: number[] };
 export type InventoryEmployeeOption = EmployeeOption;
 
-const EDITABLE_CASHFLOW_EVENTS = new Set(["BUY", "SELL", "COST"]);
+const EDITABLE_CASHFLOW_EVENTS = new Set(["BUY", "SELL"]);
 
 export function isEditableCashflowEvent(event: AccountExecutionEvent): boolean {
   return Boolean(event.cashflow && EDITABLE_CASHFLOW_EVENTS.has(event.event_type));

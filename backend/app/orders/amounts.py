@@ -6,7 +6,7 @@
 - 该口径是订单域事实，不属于报表，下沉到 orders 域避免反向依赖。
 
 口径（勿凭直觉改）：
-- GROSS / PRINCIPAL：已过账事件口径，SELL=成交额、BUY=本金占用、COST=直接费用；
+- GROSS / PRINCIPAL：已过账事件口径，SELL=成交额、BUY=本金占用；直接支出统一取资金明细；
   CANCEL 仅在其显式 offset 某事件时才做会计冲销；裸取消只改流程状态。
 - PROFIT（2026-11-05 用户裁决）：该订单**所有收入 − 所有支出**，可正、可负、可为 0。
   资金走向只有收入 / 支出两种，不以「有没有生成 cashflow 行」为界：
@@ -54,16 +54,12 @@ def event_contribution(
         return amount, ZERO, ZERO
     if event.event_type == EventType.BUY.value:
         return ZERO, amount, ZERO
-    if event.event_type == EventType.COST.value:
-        return ZERO, ZERO, amount
     if event.event_type == EventType.CANCEL.value and event.offset_event_id is not None:
         offset_type = event_types.get(event.offset_event_id)
         if offset_type == EventType.SELL.value:
             return -amount, ZERO, ZERO
         if offset_type == EventType.BUY.value:
             return ZERO, -amount, ZERO
-        if offset_type == EventType.COST.value:
-            return ZERO, ZERO, -amount
     return ZERO, ZERO, ZERO
 
 
@@ -108,7 +104,19 @@ def _profit_flow_rows(
     """
     rows: list[tuple[int, date, Decimal, Decimal]] = []
 
+    action_model_rebate_ids = {
+        int((extra or {}).get("rebate_record_id"))
+        for extra in session.scalars(
+            select(OrderEvent.form_extra).where(
+                OrderEvent.event_type == EventType.REBATE.value,
+                OrderEvent.is_posted.is_(True),
+            )
+        ).all()
+        if isinstance(extra, dict)
+        and str((extra or {}).get("rebate_record_id", "")).isdigit()
+    }
     rebate_stmt = select(
+        RebateRecord.id,
         RebateRecord.source_order_id,
         RebateRecord.collected_on,
         RebateRecord.base_amount,
@@ -119,7 +127,9 @@ def _profit_flow_rows(
         rebate_stmt = rebate_stmt.where(RebateRecord.collected_on >= from_date)
     if to_date is not None:
         rebate_stmt = rebate_stmt.where(RebateRecord.collected_on <= to_date)
-    for order_id, occurred_on, amount in session.execute(rebate_stmt).all():
+    for rebate_id, order_id, occurred_on, amount in session.execute(rebate_stmt).all():
+        if rebate_id in action_model_rebate_ids:
+            continue
         rows.append((int(order_id), occurred_on, _money(amount), ZERO))
 
     bad_debt_stmt = (

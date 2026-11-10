@@ -1,9 +1,9 @@
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Form, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { Dayjs } from "dayjs";
+import dayjs, { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { employeesApi, installmentsApi, ordersApi, orderTypesApi, poolsApi, policyApi, stocksApi, type AccountExecutionDetail, type Installment, type Order, type OrderType, type Pool } from "../../shared/api/catalog";
+import { employeesApi, installmentsApi, ordersApi, orderTypesApi, poolsApi, policyApi, stocksApi, type Account, type AccountExecutionDetail, type Installment, type Order, type OrderType, type Pool } from "../../shared/api/catalog";
 import { currentDevUser, currentUser, normalizeError } from "../../shared/api/client";
 import { downloadBlob } from "../../shared/api/download";
 import { ACCOUNT_STATUS_LABEL, formatDateTimeMinute, formatElapsedTime, money, today } from "../../shared/lib/format";
@@ -13,9 +13,13 @@ import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
 import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 import type { BusinessOrderType } from "../CreateBusinessModal";
+import type { OrderDeliveryTarget } from "../OrderDeliveryModal";
+import type { InventoryProfileTarget } from "../../stocks/InventoryProfileModal";
 import { DEFAULT_BUSINESS_CENTER_TAB, type BusinessCenterEntryTab, type BusinessCenterTab } from "../businessCenter";
 import { BusinessFilterKey, BusinessModeFilterKey, CancelFormScope, buildActionAllocationCandidates, buildActionAllocationRows, buildOrderPatchPayload, filterBusinessOrders, formatOrderAmount, pickCancelableEvent, resolveCancelAmount, type ActionAllocationCandidates, type AllocationFormRow, type AllocationMode } from "./helpers";
 import { useAccountExecutionEditor } from "../../stocks/InventoryPanel/useAccountExecutionEditor";
+import { consignmentRecords, type ActiveConsignment } from "../../stocks/InventoryPlatformOffsaleModal";
+import { useSession } from "../../shared/state/session";
 
 export function useOrdersPageController(params: {
   active?: boolean;
@@ -25,6 +29,8 @@ export function useOrdersPageController(params: {
 } = {}) {
   const { active = true, initialTab, initialMine = false, onNavigate } = params;
   const currentOperator = currentDevUser();
+  const { role } = useSession();
+  const canDeleteAccount = role === "admin";
   const [orders, setOrders] = useState<Order[]>([]);
   const [types, setTypes] = useState<OrderType[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
@@ -118,6 +124,18 @@ export function useOrdersPageController(params: {
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [allocationSubmitting, setAllocationSubmitting] = useState(false);
   const [allocationForm] = Form.useForm();
+  const [profitShareOpen, setProfitShareOpen] = useState(false);
+  const [profitShareSubmitting, setProfitShareSubmitting] = useState(false);
+  const [profitSharePools, setProfitSharePools] = useState<Pool[]>([]);
+  const [profitShareForm] = Form.useForm();
+  const [orderRebateTarget, setOrderRebateTarget] = useState<Account | null>(null);
+  const [orderSaleTarget, setOrderSaleTarget] = useState<Account | null>(null);
+  const [orderConsignmentTarget, setOrderConsignmentTarget] = useState<Account | null>(null);
+  const [orderDeleteTarget, setOrderDeleteTarget] = useState<Account | null>(null);
+  const [deliveryTarget, setDeliveryTarget] = useState<OrderDeliveryTarget | null>(null);
+  const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
+  const [orderOffsaleTarget, setOrderOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
+  const [orderDeleteSubmitting, setOrderDeleteSubmitting] = useState(false);
   /** 订单总利润（后端 order_amounts 口径），负数即亏损单；分润弹窗顶部展示并作为金额分润上限。 */
   const [allocationProfit, setAllocationProfit] = useState<string>("0");
   /** 分润口径：按操作四项（买号/售出/运营/公司）或按人自由分配。默认按操作。 */
@@ -220,21 +238,228 @@ export function useOrdersPageController(params: {
       setCancelPools(activePools);
       setActionOrder(order);
       refundForm.resetFields();
-      refundForm.setFieldValue("pool_id", activePools[0]?.id);
+      refundForm.setFieldsValue({
+        direction: "OUT",
+        category: "REFUND",
+        pool_id: activePools[0]?.id,
+      });
       setRefundOpen(true);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
   };
 
+  const openProfitShare = async (sourceOrder?: Order) => {
+    try {
+      const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
+      if (!order) return;
+      const [poolList, employeeList] = await Promise.all([poolsApi.list(), employeesApi.list()]);
+      const activePools = poolList.filter((pool) => pool.status === "ACTIVE");
+      setUsers(employeeList.filter((employee) => employee.is_active));
+      setProfitSharePools(activePools);
+      setActionOrder(order);
+      profitShareForm.resetFields();
+      profitShareForm.setFieldsValue({
+        occurred_on: dayjs(today()),
+        pool_id: activePools[0]?.id,
+      });
+      setProfitShareOpen(true);
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    }
+  };
+
+  const submitProfitShare = async (values: {
+    profit_recipient: "BUY" | "SELL" | "OPERATION" | "COMPANY";
+    amount: string;
+    occurred_on: Dayjs;
+    pool_id: number;
+    operator_user_ids?: number[];
+    note?: string;
+  }) => {
+    if (!actionOrder) return;
+    setProfitShareSubmitting(true);
+    try {
+      await ordersApi.postEvent(actionOrder.id, {
+        event_type: "PROFIT_SHARE",
+        profit_recipient: values.profit_recipient,
+        amount: values.amount,
+        occurred_on: values.occurred_on.format("YYYY-MM-DD"),
+        pool_id: Number(values.pool_id),
+        operator_user_ids: values.operator_user_ids,
+        note: values.note,
+      });
+      appMessage.success("分润已登记，支出资金明细已生成");
+      setProfitShareOpen(false);
+      setActionOrder(null);
+      if (actionOrder.account_id != null) await loadLedgerDetail(actionOrder.account_id, true);
+      await load();
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    } finally {
+      setProfitShareSubmitting(false);
+    }
+  };
+
+  const loadOrderAccount = async (sourceOrder: Order) => {
+    if (!sourceOrder.account_id) {
+      appMessage.warning("该订单未关联库存账号，无法执行账号动作");
+      return null;
+    }
+    const detail = await stocksApi.executionDetail(sourceOrder.account_id);
+    return detail.account;
+  };
+
+  const openOrderRebate = async (sourceOrder: Order) => {
+    try {
+      const account = await loadOrderAccount(sourceOrder);
+      if (account) setOrderRebateTarget(account);
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    }
+  };
+
+  const openOrderSale = async (sourceOrder: Order) => {
+    try {
+      const account = await loadOrderAccount(sourceOrder);
+      if (account) setOrderSaleTarget(account);
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    }
+  };
+
+  const openOrderConsignment = async (sourceOrder: Order) => {
+    try {
+      const account = await loadOrderAccount(sourceOrder);
+      if (account) setOrderConsignmentTarget(account);
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    }
+  };
+
+  const openOrderDelete = async (sourceOrder: Order) => {
+    try {
+      const account = await loadOrderAccount(sourceOrder);
+      if (account) setOrderDeleteTarget(account);
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    }
+  };
+
+  const openOrderDelivery = async (sourceOrder: Order) => {
+    try {
+      const order = await ordersApi.get(sourceOrder.id);
+      const events = order.events ?? [];
+      const direction: "BUY" | "SELL" =
+        order.order_type === "DG" ||
+        events.some((event) => event.event_type === "SELL") ||
+        order.last_event_type === "SELL"
+          ? "SELL"
+          : "BUY";
+      const alreadyDelivered = events.some(
+        (event) => event.event_type === "DELIVER"
+          && (event.delivery_direction ?? event.form_extra?.delivery_direction) === direction,
+      );
+      if (alreadyDelivered) {
+        appMessage.warning(`${direction === "BUY" ? "买号" : "卖号"}交付已经登记`);
+        return;
+      }
+      const employeeList = await employeesApi.list();
+      setUsers(employeeList.filter((employee) => employee.is_active));
+      setDeliveryTarget({
+        orderId: order.id,
+        orderNo: order.order_no,
+        direction,
+        boundPhone: order.account_snapshot?.bound_phone,
+        boundPhoneOwner: order.account_snapshot?.bound_phone_owner,
+      });
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    }
+  };
+
+  const openOrderProfile = async (sourceOrder: Order, mode: "description" | "images") => {
+    try {
+      const account = await loadOrderAccount(sourceOrder);
+      if (account) setProfileTarget({ account, mode, orderId: sourceOrder.id });
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    }
+  };
+
+  const openOrderOffsale = async (sourceOrder: Order) => {
+    try {
+      if (!sourceOrder.account_id) {
+        appMessage.warning("该订单未关联库存账号，无法下架");
+        return;
+      }
+      const detail = await stocksApi.executionDetail(sourceOrder.account_id);
+      const records = consignmentRecords(detail.orders);
+      if (!records.length) {
+        appMessage.warning("当前账号没有仍在平台上的寄售记录");
+        return;
+      }
+      setOrderOffsaleTarget({ account: detail.account, records });
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    }
+  };
+
+  const handleOrderSystemOffsale = async (payload: { reason: string; form_extra?: Record<string, unknown> }) => {
+    const target = orderOffsaleTarget;
+    if (!target) return;
+    try {
+      await Promise.all(target.records.map(async (record) => {
+        await ordersApi.postEvent(record.orderId, {
+          event_type: "OPERATE",
+          operation_type: "UNLIST",
+          occurred_on: today(),
+          note: `系统下架：${payload.reason}`,
+          form_extra_scope: "INVOID",
+          form_extra: { ...payload.form_extra, platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
+        });
+        return ordersApi.cancel(record.orderId, {
+          reason: payload.reason,
+          form_extra_scope: "INVOID",
+          form_extra: { ...payload.form_extra, platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
+        });
+      }));
+      appMessage.success("代挂订单已取消，账号已出库");
+      setOrderOffsaleTarget(null);
+      await load();
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    }
+  };
+
+  const handleOrderOffsaleChanged = async () => {
+    setOrderOffsaleTarget(null);
+    await load();
+  };
+
+  const submitOrderDelete = async (reason: string) => {
+    if (!orderDeleteTarget) return;
+    setOrderDeleteSubmitting(true);
+    try {
+      await stocksApi.remove(orderDeleteTarget.id, reason);
+      appMessage.success("账号已删除，订单和资金明细已保留");
+      setOrderDeleteTarget(null);
+      await load();
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    } finally {
+      setOrderDeleteSubmitting(false);
+    }
+  };
+
   /**
-   * 可冲销动作：已过账的 BUY/COST/SELL，按「剩余可冲金额」过滤（后端支持部分冲销）。
+   * 可冲销动作：已过账的 BUY/SELL，按「剩余可冲金额」过滤（后端支持部分冲销）。
    * 余额由后端 `event.cancellable_amount` 下发，前端只负责挑哪一条、按什么顺序 -
    * 不再自己遍历 CANCEL 事件做 `amount − Σcancel`（那是与库存页、提交校验并行的第三套。
    */
   const reversibleEvents = (order: Order | null) => {
     return (order?.events ?? [])
-      .filter((event) => event.is_posted && ["BUY", "COST", "SELL"].includes(event.event_type))
+      .filter((event) => event.is_posted && ["BUY", "SELL"].includes(event.event_type))
       .map((event) => ({ event, remaining: event.cancellable_amount ?? "0.00" }))
       .filter((item) => Number(item.remaining) > 0)
       .reverse();
@@ -242,7 +467,7 @@ export function useOrdersPageController(params: {
 
   const cancelableEventsForScope = (order: Order | null, scope: CancelFormScope) => reversibleEvents(order)
     .filter(({ event }) => scope === "INVREFUND"
-      ? ["BUY", "COST"].includes(event.event_type)
+      ? event.event_type === "BUY"
       : event.event_type === "SELL");
 
   const openCancelTransaction = async (sourceOrder?: Order) => {
@@ -263,7 +488,7 @@ export function useOrdersPageController(params: {
         // 避免用户在下拉尚未加载时确认导致无请求、无结果的“假提交”。
         const reversible = reversibleEvents(order);
         const first = reversible[0];
-        const nextScope: CancelFormScope = first && ["BUY", "COST"].includes(first.event.event_type) ? "INVREFUND" : "ORDERCANC";
+        const nextScope: CancelFormScope = first?.event.event_type === "BUY" ? "INVREFUND" : "ORDERCANC";
         cancelForm.setFieldsValue({
           cancelled_on: today(),
           offset_event_id: first?.event.id,
@@ -299,11 +524,6 @@ export function useOrdersPageController(params: {
     setCancelInstallmentTarget(null);
     setCancelScope("ORDERCANC");
     cancelForm.resetFields();
-  };
-
-  const openSystemOffsale = () => {
-    setActiveTab("inventory");
-    setSelectedOrder(null);
   };
 
   const submitCancelTransaction = async (values: { cancelled_on: string; reason: string; offset_event_id?: number; amount?: string; cancel_amount?: string; refund_amount?: string; pool_id?: number; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
@@ -401,20 +621,6 @@ export function useOrdersPageController(params: {
     setEditOpen(true);
   };
 
-  /** 打开账号台账内联编辑：与库存中心「编辑」入口一致——取该订单关联的 stocks 账号详情，
-   *  进入编辑态并展开所在行。两入口面向同一份 stocks 记录，保存后各自 re-fetch 即时反映。 */
-  const openAccountEditor = async (order: Order) => {
-    if (!order.account_id) return;
-    try {
-      const detail = await stocksApi.executionDetail(order.account_id);
-      setLedgerDetails((current) => ({ ...current, [order.account_id as number]: detail }));
-      await accountEditor.openEditor(detail.account);
-      setExpandedOrderIds([String(order.id)]);
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    }
-  };
-
   const submitEditOrder = async (values: Record<string, unknown>) => {
     if (!selectedOrder) return;
     // 成交日期现在也可改（后端联动平移账期）；hasPosted 仅用于决定账号快照是否回写。
@@ -496,24 +702,13 @@ export function useOrdersPageController(params: {
     {
       title: "操作",
       key: "actions",
-      width: 220,
+      width: 470,
       ellipsis: true,
       render: (_, order) => {
         const canOffsaleConsignment = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
         return (
           <Space size={2}>
           <PermissionButton permission="order.update" type="link" size="small" onClick={() => openEditOrder(order)}>编辑</PermissionButton>
-          {order.account_id ? (
-            <PermissionButton
-              permission="order.create"
-              type="link"
-              size="small"
-              disabled={accountEditor.editingAccount !== null}
-              onClick={() => void openAccountEditor(order)}
-            >
-              编辑账号
-            </PermissionButton>
-          ) : null}
           <PermissionGate permission="order.event.post">
             <PermissionButton
               permission="order.event.post"
@@ -521,6 +716,13 @@ export function useOrdersPageController(params: {
               size="small"
               disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
               onClick={() => void openAllocations(order)}
+            >分润配置</PermissionButton>
+            <PermissionButton
+              permission="order.event.post"
+              type="link"
+              size="small"
+              disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
+              onClick={() => void openProfitShare(order)}
             >分润</PermissionButton>
             <PermissionButton
               permission="order.event.post"
@@ -533,14 +735,66 @@ export function useOrdersPageController(params: {
               permission="order.event.post"
               type="link"
               size="small"
+              disabled={order.status === "CANCELLED"}
+              onClick={() => void openOrderDelivery(order)}
+            >交付</PermissionButton>
+            <PermissionButton
+              permission="order.create"
+              type="link"
+              size="small"
+              disabled={!order.account_id || order.status === "CANCELLED"}
+              onClick={() => void openOrderProfile(order, "description")}
+            >描述</PermissionButton>
+            <PermissionButton
+              permission="order.create"
+              type="link"
+              size="small"
+              disabled={!order.account_id || order.status === "CANCELLED"}
+              onClick={() => void openOrderProfile(order, "images")}
+            >作图</PermissionButton>
+            <PermissionButton
+              permission="order.event.post"
+              type="link"
+              size="small"
+              disabled={!order.account_id}
+              onClick={() => void openOrderRebate(order)}
+            >返点</PermissionButton>
+            <PermissionButton
+              permission="order.create"
+              type="link"
+              size="small"
+              disabled={order.account_status !== "WAITING" || !order.account_id}
+              onClick={() => void openOrderSale(order)}
+            >售出</PermissionButton>
+            <PermissionButton
+              permission="order.create"
+              type="link"
+              size="small"
+              disabled={order.account_status !== "WAITING" || !order.account_id}
+              onClick={() => void openOrderConsignment(order)}
+            >寄售</PermissionButton>
+            <PermissionButton
+              permission="order.event.post"
+              type="link"
+              size="small"
               danger
               disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
               onClick={() => {
-                if (canOffsaleConsignment) openSystemOffsale();
+                if (canOffsaleConsignment) void openOrderOffsale(order);
                 else void openCancelTransaction(order);
               }}
             >{canOffsaleConsignment ? "下架" : "取消"}</PermissionButton>
           </PermissionGate>
+          {canDeleteAccount ? (
+            <PermissionButton
+              permission="order.create"
+              type="link"
+              size="small"
+              danger
+              disabled={!order.account_id}
+              onClick={() => void openOrderDelete(order)}
+            >删除账号</PermissionButton>
+          ) : null}
         </Space>
         );
       },
@@ -622,7 +876,6 @@ export function useOrdersPageController(params: {
     setTimeShiftDays: accountEditor.setTimeShiftDays,
     invEditExtraForm: accountEditor.invEditExtraForm,
     savingAccount: accountEditor.savingAccount,
-    openAccountEditor,
     cancelInlineEdit: accountEditor.cancelInlineEdit,
     saveInline: accountEditor.saveInline,
     ledgerSortDesc,
@@ -633,13 +886,41 @@ export function useOrdersPageController(params: {
     openAllocations,
     openCancelTransaction,
     openEditOrder,
+    openProfitShare,
+    openOrderDelete,
+    openOrderDelivery,
+    openOrderOffsale,
+    openOrderRebate,
+    openOrderSale,
+    openOrderConsignment,
     openRefund,
-    openSystemOffsale,
+    handleOrderOffsaleChanged,
+    handleOrderSystemOffsale,
     orderHasPostedEvents,
     orderTypeFilter,
     orders,
     page,
     pageSize,
+    profitShareForm,
+    profitShareOpen,
+    profitSharePools,
+    profitShareSubmitting,
+    orderRebateTarget,
+    orderSaleTarget,
+    orderConsignmentTarget,
+    orderDeleteTarget,
+    orderDeleteSubmitting,
+    deliveryTarget,
+    profileTarget,
+    orderOffsaleTarget,
+    submitOrderDelete,
+    setOrderRebateTarget,
+    setOrderSaleTarget,
+    setOrderConsignmentTarget,
+    setOrderDeleteTarget,
+    setDeliveryTarget,
+    setProfileTarget,
+    setOrderOffsaleTarget,
     refundForm,
     refundOpen,
     refundSubmitting,
@@ -675,6 +956,8 @@ export function useOrdersPageController(params: {
     setOrders,
     setPage,
     setPageSize,
+    setProfitShareOpen,
+    setProfitShareSubmitting,
     setRefundOpen,
     setRefundSubmitting,
     setSelectedOrder,
@@ -683,6 +966,7 @@ export function useOrdersPageController(params: {
     sharedCancellationEvent,
     submitCancelTransaction,
     submitEditOrder,
+    submitProfitShare,
     typeNames,
     types,
     users,

@@ -77,12 +77,12 @@ export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
 
 export const EVENT_TYPE_LABEL: Record<string, string> = {
   BUY: "买号",
-  COST: "附加成本",
   SELL: "售出",
-  PAYMENT: "回款（分期）",
   DELIVER: "交付",
   CANCEL: "取消",
-  REFUND: "退款",
+  OPERATE: "运营",
+  REBATE: "返点",
+  PROFIT_SHARE: "分润",
 };
 
 /**
@@ -90,20 +90,23 @@ export const EVENT_TYPE_LABEL: Record<string, string> = {
  */
 const EXECUTION_ACTION_LABEL: Record<string, string> = {
   BUY: "买号",
-  COST: "费用支出",
   SELL: "售出",
-  PAYMENT: "回款（分期）",
   DELIVER: "交付",
   CANCEL: "取消",
-  REFUND: "退款",
+  OPERATE: "运营",
+  REBATE: "返点",
+  PROFIT_SHARE: "分润",
 };
 
 export function executionActionLabel(
   eventType: string | null | undefined,
   orderType?: string | null,
+  deliveryDirection?: "BUY" | "SELL" | null,
 ): string {
   if (!eventType) return "-";
-  if (eventType === "DELIVER") return "买入交付";
+  if (eventType === "DELIVER") {
+    return deliveryDirection === "BUY" ? "买号交付" : "卖号交付";
+  }
   // 词典未加载时回落模块常量，保证零行为变化。
   return configurableLabel("ORDER_EVENT_TYPE", eventType, EXECUTION_ACTION_LABEL);
 }

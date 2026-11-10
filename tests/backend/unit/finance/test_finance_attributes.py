@@ -15,7 +15,6 @@ from app.finance.attributes import (
     [
         ("HS", "BUY", AccountingAttribute.SELF_DIRECT_COST.value),
         ("HS", "SELL", AccountingAttribute.SELF_REVENUE.value),
-        ("HS", "PAYMENT", AccountingAttribute.SELF_REVENUE.value),
         ("TH", "BUY", AccountingAttribute.TH_DIRECT_COST.value),
         ("TH", "SELL", AccountingAttribute.TH_REVENUE.value),
         ("DG", "SELL", AccountingAttribute.SERVICE_REVENUE.value),

@@ -1,6 +1,6 @@
 """reporting._shared：报表共用的期间校验、金额归集、坏账与范围过滤工具。
 
-口径红线：账号 COST 属直接成本，**不进运营费用**；未归集返点独立成列，不摊给业务。
+口径红线：账号买入及订单直接支出通过资金明细归集为直接成本，**不进运营费用**；未归集返点独立成列，不摊给业务。
 """
 
 from __future__ import annotations
@@ -218,7 +218,7 @@ def _visible_pool_ids(user: CurrentUser | None) -> set[int] | None:
 def _event_gain_cases(amount):
     """事件损益的三个条件求和分支（income / buy / cost）。
 
-    口径与 order_event_totals 一致：SELL=收入 / BUY=买入成本 / COST=直接费用；
+    口径与 order_event_totals 一致：SELL=收入 / BUY=买入成本；直接支出由资金明细汇总；
     CANCEL 仅当显式 offset 且被冲销事件与本单同单时才冲销（跨单 offset 视同
     无冲销——同单约束由外连接的 ON 条件保证，与 Python 侧按本单事件表解析
     offset 类型行为一致）。
@@ -238,14 +238,6 @@ def _event_gain_cases(amount):
             (and_(
                 OrderEvent.event_type == EventType.CANCEL.value,
                 offset.event_type == EventType.BUY.value,
-            ), -amount),
-            else_=0,
-        ),
-        case(
-            (OrderEvent.event_type == EventType.COST.value, amount),
-            (and_(
-                OrderEvent.event_type == EventType.CANCEL.value,
-                offset.event_type == EventType.COST.value,
             ), -amount),
             else_=0,
         ),

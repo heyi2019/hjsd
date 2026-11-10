@@ -132,7 +132,7 @@ describe("InventoryPanel：账号台账", () => {
 
     renderLight(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByRole("button", { name: "导出" })).toBeInTheDocument();
-    for (const label of ["售出", "寄售", "返点", "编辑", "更多"]) {
+    for (const label of ["售出", "寄售", "返点", "资金收支", "交付", "分润", "编辑", "更多"]) {
       expect(screen.getAllByRole("button", { name: label }).length).toBeGreaterThan(0);
     }
     expect(screen.queryByRole("button", { name: "下架" })).toBeNull();
@@ -146,6 +146,58 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.queryByRole("button", { name: "查看明细" })).toBeNull();
   });
 
+  it("库存中心：资金收支可登记收入并关联来源订单", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    const row = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
+    await ui.click(within(row).getByRole("button", { name: "资金收支" }));
+    const modal = (await screen.findByText("资金收支 · HS0001")).closest(".ant-modal-content") as HTMLElement;
+    const direction = within(modal).getByRole("combobox", { name: "资金流向" });
+    await ui.click(direction);
+    await ui.click(await screen.findByText("收入", { exact: true }));
+    await ui.type(within(modal).getByLabelText("金额"), "100");
+    await ui.type(within(modal).getByLabelText("收支备注"), "补登记收入");
+    await ui.click(within(modal).getByRole("button", { name: "确定" }));
+    await waitFor(() => expect(catalog.cashflowsApi.createForOrder).toHaveBeenCalledWith(
+      21,
+      expect.objectContaining({ direction: "IN", amount: "100", category: "OTHER" }),
+    ));
+  });
+
+  it("库存中心：与订单台账共用交付登记入口", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    const row = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
+    await ui.click(within(row).getByRole("button", { name: "交付" }));
+    const modal = (await screen.findByText("交付 · HS0001")).closest(".ant-modal-content") as HTMLElement;
+    expect(within(modal).getByText("买号交付")).toBeInTheDocument();
+    await ui.type(within(modal).getByLabelText("交付凭证"), "库存中心完成换绑");
+    await ui.click(within(modal).getByRole("button", { name: "确定交付" }));
+    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+      21,
+      expect.objectContaining({
+        event_type: "DELIVER",
+        delivery_direction: "BUY",
+        delivery_mode: "CUSTOMER_SELF",
+        note: "库存中心完成换绑",
+      }),
+    ));
+  });
+
+  it("库存中心：可以登记分润并生成 PROFIT_SHARE 支出", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    const row = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
+    await ui.click(within(row).getByRole("button", { name: "分润" }));
+    const modal = (await screen.findByText("登记分润 · HS0001")).closest(".ant-modal-content") as HTMLElement;
+    await ui.type(within(modal).getByLabelText("分润金额"), "30");
+    await ui.click(within(modal).getByRole("button", { name: /确定|OK/ }));
+    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+      21,
+      expect.objectContaining({ event_type: "PROFIT_SHARE", amount: "30", profit_recipient: "COMPANY" }),
+    ));
+  });
+
   it("更多菜单收纳下架、取消、描述和作图", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
@@ -156,6 +208,23 @@ describe("InventoryPanel：账号台账", () => {
     for (const label of ["描述", "作图"]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
     }
+  });
+
+  it("运营：描述保存时同时登记 DESCRIPTION 业务事件", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    const stockRow = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
+    await ui.click(within(stockRow).getByRole("button", { name: "更多" }));
+    await ui.click(screen.getByRole("menuitem", { name: "描述" }));
+    const descriptionLabels = await screen.findAllByText("描述");
+    const modalTitle = descriptionLabels[descriptionLabels.length - 1]!;
+    const modal = modalTitle.closest(".ant-modal-content") as HTMLElement;
+    await ui.type(within(modal).getByPlaceholderText("补充账号等级、资源、限制等信息"), "已完成账号描述");
+    await ui.click(within(modal).getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+      21,
+      expect.objectContaining({ event_type: "OPERATE", operation_type: "DESCRIPTION" }),
+    ));
   });
 
   it("将取消放进更多菜单，不在行内单独展示", async () => {
@@ -225,7 +294,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(csv).not.toContain("账号密码");
     expect(csv).toContain("执行明细,资金明细,支出笔数,收入笔数,总支出,总收入");
     expect(csv).toContain("EV0001 · 买号 / 2026-10-15 10:20 / 100.00 / 回收登记 / admin");
-    expect(csv).toContain("买号本金 / HS0001 / CF0001");
+    expect(csv).toContain("买号支出 / HS0001 / CF0001");
     expect(csv).toContain("CF0001");
   });
 
@@ -241,13 +310,12 @@ describe("InventoryPanel：账号台账", () => {
         status: "ACTIVE",
         events: [
           { event_no: "EV-BUY", event_type: "BUY", amount: "100.00", occurred_on: "2026-10-15", cashflow: { flow_no: "CF-BUY", direction: "OUT", amount: "100.00" } },
-          { event_no: "EV-COST", event_type: "COST", amount: "20.00", occurred_on: "2026-10-15", cashflow: { flow_no: "CF-COST", direction: "OUT", amount: "20.00" } },
           { event_no: "EV-SELL", event_type: "SELL", amount: "350.00", occurred_on: "2026-10-16", cashflow: { flow_no: "CF-SELL", direction: "IN", amount: "350.00" } },
-          { event_no: "EV-PAY", event_type: "PAYMENT", amount: "100.00", occurred_on: "2026-10-17", cashflow: { flow_no: "CF-PAY", direction: "IN", amount: "100.00" } },
           { event_no: "EV-CANCEL", event_type: "CANCEL", amount: "20.00", occurred_on: "2026-10-18", cashflow: { flow_no: "CF-CANCEL", direction: "IN", amount: "20.00" } },
         ],
         cashflows: [
-          { flow_no: "CF-OTHER", occurred_on: "2026-10-18", direction: "OUT", amount: "12.00" },
+          { flow_no: "CF-OTHER", occurred_on: "2026-10-18", direction: "OUT", category: "OTHER", amount: "12.00" },
+          { flow_no: "CF-INSTALLMENT", occurred_on: "2026-10-17", direction: "IN", category: "INSTALLMENT_PAYMENT", amount: "100.00" },
         ],
         rebates: [{
           id: 41,
@@ -263,7 +331,7 @@ describe("InventoryPanel：账号台账", () => {
     } as unknown as AccountExecutionDetail;
 
     const csv = buildInventoryCsv([accounts[0]], { 1: detail });
-    for (const label of ["买号本金", "账号成本", "售出回款", "分期回款", "取消退款", "其他支出", "买号返点"]) {
+    for (const label of ["买号支出", "售出收入", "分期回款", "取消冲销", "其他支出", "买号返点"]) {
       expect(csv).toContain(label);
     }
     expect(csv).not.toContain("订单资金");
@@ -465,7 +533,7 @@ describe("InventoryPanel：账号台账", () => {
     expect(within(financePanel).queryByText("CF0001", { exact: true })).toBeNull();
     expect(within(executionTable).queryByText("EV0001", { exact: true })).toBeNull();
     expect(within(financeSummary).getByText("100.00")).toBeInTheDocument();
-    // 总收入 = IN 流水（售出回款 350）+ 返点登记额（夹具 base_amount 1000）。
+    // 总收入 = IN 流水（售出收入 350）+ 返点登记额（夹具 base_amount 1000）。
     // 返点当前按 base_amount 计入收入（登记即收入）；口径争议见返点基数/费率待裁决，
     // 若口径改为「基数×费率」，此处应同步改成 400.00。
     expect(within(financeSummary).getByText("1,350.00")).toBeInTheDocument();
@@ -473,8 +541,8 @@ describe("InventoryPanel：账号台账", () => {
     expect(financeTable.querySelector(".ant-pagination")).toBeNull();
     expect(within(financeTable).getByText("100.00")).toBeInTheDocument();
     expect(within(financeTable).getByText("350.00")).toBeInTheDocument();
-    expect(within(financeTable).getByText("买号本金")).toBeInTheDocument();
-    expect(within(financeTable).getByText("售出回款")).toBeInTheDocument();
+    expect(within(financeTable).getByText("买号支出")).toBeInTheDocument();
+    expect(within(financeTable).getByText("售出收入")).toBeInTheDocument();
     expect(within(financeTable).getByText("买号返点")).toBeInTheDocument();
     expect(within(financeTable).getByText("1,000.00")).toBeInTheDocument();
     expect(within(financeTable).getByText("5.00%")).toBeInTheDocument();

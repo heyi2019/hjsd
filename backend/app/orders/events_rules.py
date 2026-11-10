@@ -36,8 +36,8 @@ from app.core.state_machine import (
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
-    CapitalType,
     EventType,
+    OrderStatus,
     PoolStatus,
 )
 from app.domain.trade import (
@@ -83,7 +83,7 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
     if session.scalar(
         select(Installment.id).where(Installment.order_id == order.id)
     ) is not None:
-        raise Validation("HS 已建立分期合约，必须通过 PAYMENT 收款并在结清后交付")
+        raise Validation("HS 已建立分期合约，必须通过分期收款并在结清后交付")
     if order.account_id is None:
         raise Validation(
             "自营账号售出必须关联已回收账号",
@@ -123,8 +123,6 @@ def _assert_event_allowed(
     *,
     offset_event_id: int | None = None,
     reason: str | None = None,
-    allow_installment_payment: bool = False,
-    allow_installment_cancel: bool = False,
 ) -> None:
     """按业务类型限制事件组合，避免只依赖资金路由间接拦截非法动作。"""
     if order.order_type == "HS" and event_type == EventType.BUY.value and order.account_id is None:
@@ -135,32 +133,15 @@ def _assert_event_allowed(
                 details={"field": "game_account"},
             )
         raise Validation("回收订单 BUY 必须关联库存账号")
-    if order.order_type == "DG" and event_type in {
-        EventType.BUY.value,
-        EventType.COST.value,
-    }:
-        raise Validation("代挂业务不允许 BUY 或 COST 事件")
-    if order.order_type == "HS" and event_type == EventType.COST.value:
-        if order.account_id is None:
-            raise Validation("回收订单 COST 必须关联库存账号")
-        account = session.get(Account, order.account_id)
-        if account is None:
-            raise NotFound(
-                f"账号 {order.account_id} 不存在",
-                details={"account_id": order.account_id},
-            )
-        if account.status in {
-            AccountStatus.SOLD.value,
-            AccountStatus.VOID.value,
-        }:
-            raise Validation("已售账号不能新增 COST")
+    if order.order_type == "DG" and event_type == EventType.BUY.value:
+        raise Validation("代挂业务不允许 BUY 事件")
     if order.order_type in {"TH", "DG"} and event_type == EventType.SELL.value:
         installment = session.scalar(
             select(Installment).where(Installment.order_id == order.id)
         )
         if installment is not None:
             raise Validation(
-                f"{order.order_type} 已建立分期合约，只能通过 PAYMENT 收款，不能直接 SELL"
+                f"{order.order_type} 已建立分期合约，只能通过分期收款，不能重复登记 SELL"
             )
     if event_type == EventType.SELL.value and session.scalar(
         select(OrderEvent.id).where(
@@ -170,14 +151,6 @@ def _assert_event_allowed(
         )
     ) is not None:
         raise Validation("每张订单只能登记一次 SELL")
-    if event_type == EventType.PAYMENT.value:
-        installment = session.scalar(
-            select(Installment.id).where(Installment.order_id == order.id)
-        )
-        if installment is None:
-            raise Validation("PAYMENT 必须关联分期合约")
-        if not allow_installment_payment:
-            raise Validation("PAYMENT 必须通过分期收款流程")
     if event_type == EventType.CANCEL.value:
         _required_text(reason, field="reason", message="CANCEL 必须填写冲销原因")
         if offset_event_id is None:
@@ -187,17 +160,6 @@ def _assert_event_allowed(
             )
         if offset_event_id is not None:
             offset = _get_offset_event(session, offset_event_id, order_id=order.id)
-            if offset.event_type == EventType.PAYMENT.value:
-                if not allow_installment_cancel:
-                    raise Validation(
-                        "分期收款不能直接冲销，请通过分期取消流程处理",
-                        details={"offset_event_id": offset_event_id},
-                    )
-                installment = session.scalar(
-                    select(Installment).where(Installment.order_id == order.id)
-                )
-                if installment is None:
-                    raise Validation("PAYMENT 冲销必须关联分期合约")
 
 
 
@@ -214,6 +176,7 @@ def _post_deliver(
     occurred_on: date,
     actor: str,
     delivery_mode: str | None,
+    delivery_direction: str | None,
     note: str | None,
     bound_phone: str | None,
     bound_phone_owner: str | None,
@@ -222,6 +185,12 @@ def _post_deliver(
 ) -> tuple[OrderEvent, None]:
     """`DELIVER`：无金额、无现金流，必须记录交付方式与凭证（A04 / A05）。"""
     modes = ("PLATFORM_OPERATOR", "CUSTOMER_SELF")
+    direction = (delivery_direction or "SELL").strip().upper()
+    if direction not in {"BUY", "SELL"}:
+        raise Validation(
+            "DELIVER 的 delivery_direction 必须为 BUY 或 SELL",
+            details={"field": "delivery_direction", "value": delivery_direction},
+        )
     if delivery_mode not in modes:
         raise Validation(
             f"DELIVER 必须提供 delivery_mode，取值 {modes}",
@@ -237,23 +206,56 @@ def _post_deliver(
     note = note.strip()
     normalized_bound_phone = bound_phone.strip() if isinstance(bound_phone, str) and bound_phone.strip() else None
     normalized_bound_phone_owner = bound_phone_owner.strip() if isinstance(bound_phone_owner, str) and bound_phone_owner.strip() else None
+    previous_delivery = next(
+        (
+            event
+            for event in session.scalars(
+                select(OrderEvent).where(
+                    OrderEvent.order_id == order.id,
+                    OrderEvent.event_type == EventType.DELIVER.value,
+                    OrderEvent.is_posted.is_(True),
+                )
+            ).all()
+            if (event.form_extra or {}).get("delivery_direction") == direction
+        ),
+        None,
+    )
+    if previous_delivery is not None:
+        delivery_label = "买号" if direction == "BUY" else "卖号"
+        raise Validation(
+            f"该订单已经登记过{delivery_label}交付",
+            code=ErrorCode.DELIVERY_CONDITION_UNMET,
+            details={"delivery_direction": direction},
+        )
     installment = session.scalar(
         select(Installment).where(Installment.order_id == order.id)
     )
-    if installment is None:
-        raise Validation(
-            "DELIVER 必须通过分期合约交付",
-            code=ErrorCode.DELIVERY_CONDITION_UNMET,
-            details={"order_no": order.order_no},
+    if installment is not None:
+        if installment.status != "SETTLED":
+            raise Validation(
+                f"分期合约 {installment.inst_no} 未结清，不能 DELIVER",
+                code=ErrorCode.DELIVERY_CONDITION_UNMET,
+                details={"inst_no": installment.inst_no, "status": installment.status},
+            )
+        if not allow_installment_delivery:
+            raise Validation("分期 DELIVER 必须通过分期交付流程")
+    else:
+        required_event = EventType.SELL.value if direction == "SELL" else EventType.BUY.value
+        has_required_event = session.scalar(
+            select(OrderEvent.id).where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.event_type == required_event,
+                OrderEvent.is_posted.is_(True),
+            )
         )
-    if installment.status != "SETTLED":
-        raise Validation(
-            f"分期合约 {installment.inst_no} 未结清，不能 DELIVER",
-            code=ErrorCode.DELIVERY_CONDITION_UNMET,
-            details={"inst_no": installment.inst_no, "status": installment.status},
-        )
-    if not allow_installment_delivery:
-        raise Validation("DELIVER 必须通过分期交付流程")
+        if has_required_event is None:
+            label = "售出" if direction == "SELL" else "买入"
+            delivery_label = "卖号" if direction == "SELL" else "买号"
+            raise Validation(
+                f"登记{delivery_label}交付前必须先登记{label}",
+                code=ErrorCode.DELIVERY_CONDITION_UNMET,
+                details={"delivery_direction": direction, "required_event": required_event},
+            )
     event = OrderEvent(
         event_no=next_event_no(
             session,
@@ -272,6 +274,7 @@ def _post_deliver(
         note=note,
         form_extra={
             **(dict(form_extra) if form_extra else {}),
+            "delivery_direction": direction,
             **({"bound_phone": normalized_bound_phone} if normalized_bound_phone is not None else {}),
             **({"bound_phone_owner": normalized_bound_phone_owner} if normalized_bound_phone_owner is not None else {}),
         } or None,
@@ -298,7 +301,7 @@ def _post_deliver(
             snapshot["bound_phone_owner"] = normalized_bound_phone_owner
         if snapshot.get("game_account"):
             order.account_snapshot = snapshot
-    if order.account_id is not None:
+    if order.account_id is not None and direction == "SELL":
         account = session.get(Account, order.account_id)
         if account is not None:
             if normalized_bound_phone is not None:
@@ -306,9 +309,10 @@ def _post_deliver(
                 account.updated_by = actor
             account.status = AccountStatus.SOLD.value
             account.updated_by = actor
-    order.status = transition(
-        ORDER_TRANSITIONS, order.status, "COMPLETE", entity="订单"
-    )
+    if direction == "SELL" and order.status != OrderStatus.COMPLETED.value:
+        order.status = transition(
+            ORDER_TRANSITIONS, order.status, "COMPLETE", entity="订单"
+        )
     session.flush()
     record_audit(
         session,
@@ -374,18 +378,14 @@ def _apply_account_effect(
     account = session.get(Account, order.account_id)
     if account is None:
         return
-    stock_type = order.order_type == "HS" or order.capital_type == CapitalType.STOCK.value
-
     if event_type == EventType.BUY.value:
         account.cost_amount = to_money(account.cost_amount) + amount
         account.buy_date = order.trade_date
-        next_action = "BUY_STOCK" if stock_type else "BUY_CREDIT"
-        # 合约先行（建约已把账号置为分期中）时，BUY 仅补记成本，不重复转换。
-        target = ACCOUNT_TRANSITIONS.get(account.status, {}).get(next_action)
+        # 买号统一使用 BUY_STOCK；全款/分期由 SELL 的 SALE_MODE 属性区分，
+        # 不再把“信用买入”伪装成账号状态动作。
+        target = ACCOUNT_TRANSITIONS.get(account.status, {}).get("BUY_STOCK")
         if target is not None:
             account.status = target
-    elif event_type == EventType.COST.value:
-        account.cost_amount = to_money(account.cost_amount) + amount
     elif event_type == EventType.SELL.value:
         account.status = transition(ACCOUNT_TRANSITIONS, account.status, "SELL", entity="账号")
     elif event_type == EventType.CANCEL.value:

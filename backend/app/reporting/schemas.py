@@ -18,7 +18,6 @@ class InventoryHealthItemOut(ReportModel):
     business: str | None = None
     status: str
     buy_amount: Decimal
-    extra_cost: Decimal
     total_cost: Decimal
     holding_days: int | None = None
     expected_price: Decimal

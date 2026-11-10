@@ -1,7 +1,7 @@
 import dayjs, { type Dayjs } from "dayjs";
 import type { AllocationFormRow } from "./helpers";
 import { Alert, DatePicker, Form, Input, Typography } from "antd";
-import { ALLOCATION_TYPE_LABEL, buildActionAllocationRows, buildRefundEventPayload, splitEven, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
+import { ALLOCATION_TYPE_LABEL, buildActionAllocationRows, buildRefundCashflowPayload, splitEven, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import { CreateBusinessModal } from "../CreateBusinessModal";
 import { DateField, MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
@@ -9,9 +9,16 @@ import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { executionActionLabel, money, today } from "../../shared/lib/format";
-import { ordersApi, policyApi } from "../../shared/api/catalog";
+import { cashflowsApi, ordersApi, policyApi } from "../../shared/api/catalog";
 import { requiredMoneyRules, percentRules, moneyRules } from "../../shared/lib/validators";
 import { InventoryCancellationDialog } from "../../stocks/InventoryCancellationDialog";
+import { InventoryDeleteDialog } from "../../stocks/InventoryPanel/InventoryDeleteDialog";
+import { InventoryConsignmentModal } from "../../stocks/InventoryConsignmentModal";
+import { InventoryRebateModal } from "../../stocks/InventoryRebateModal";
+import { InventoryProfileModal } from "../../stocks/InventoryProfileModal";
+import { InventoryPlatformOffsaleModal } from "../../stocks/InventoryPlatformOffsaleModal";
+import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../../stocks/InventorySaleModal";
+import { OrderDeliveryModal } from "../OrderDeliveryModal";
 import type { OrdersPageController } from "./useOrdersPageController";
 
 export function SharedCancellationDialog({ controller }: { controller: OrdersPageController }) {
@@ -423,6 +430,94 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
   );
 }
 
+/**
+ * 分润是实际业务动作：登记后写入 PROFIT_SHARE 事件，并由后端生成一笔支出资金明细。
+ * 「分润配置」弹窗仍保留给收益分配规则；这里单独登记实际发生的分润动作。
+ */
+export function ProfitShareModal({ controller }: { controller: OrdersPageController }) {
+  const {
+    actionOrder,
+    profitShareForm,
+    profitShareOpen,
+    profitSharePools,
+    profitShareSubmitting,
+    setActionOrder,
+    setProfitShareOpen,
+    submitProfitShare,
+    users,
+  } = controller;
+  return (
+    <BusinessActionModal
+      title={actionOrder ? `登记分润 · ${actionOrder.order_no}` : "登记分润"}
+      fieldCount={6}
+      open={profitShareOpen}
+      confirmLoading={profitShareSubmitting}
+      onCancel={() => { setProfitShareOpen(false); setActionOrder(null); }}
+      onOk={() => void profitShareForm.submit()}
+    >
+      <BusinessRegistrationForm
+        layout="horizontal"
+        labelAlign="left"
+        labelCol={{ flex: "108px" }}
+        wrapperCol={{ flex: "auto" }}
+        scope="ALLOCATION"
+        form={profitShareForm}
+        onFinish={(values: {
+          profit_recipient: "BUY" | "SELL" | "OPERATION" | "COMPANY";
+          amount: string;
+          occurred_on: Dayjs;
+          pool_id: number;
+          operator_user_ids?: number[];
+          note?: string;
+        }) => void submitProfitShare(values)}
+      >
+        <CfgItem
+          name="profit_recipient"
+          label="分润归属"
+          initialValue="COMPANY"
+          rules={[{ required: true, message: "请选择分润归属" }]}
+        >
+          <Select
+            options={[
+              { value: "BUY", label: "买号" },
+              { value: "SELL", label: "售出" },
+              { value: "OPERATION", label: "运营" },
+              { value: "COMPANY", label: "公司" },
+            ]}
+          />
+        </CfgItem>
+        <CfgItem name="amount" label="分润金额" rules={requiredMoneyRules("分润金额")}>
+          <MoneyInput aria-label="分润金额" placeholder="请输入分润金额" />
+        </CfgItem>
+        <CfgItem
+          name="occurred_on"
+          label="发生日期"
+          rules={[{ required: true, message: "请选择发生日期" }]}
+          getValueFromEvent={dateValueFromEvent}
+          getValueProps={dateValueProps}
+        >
+          <DatePicker format="YYYY-MM-DD" className="ui-control-full" />
+        </CfgItem>
+        <CfgItem name="pool_id" label="支出账户" rules={[{ required: true, message: "请选择支出账户" }]}>
+          <Select
+            aria-label="支出账户"
+            placeholder="请选择分润支出的资金账户"
+            options={profitSharePools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))}
+            notFoundContent="暂无可用资金账户"
+          />
+        </CfgItem>
+        <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={users} />
+        <CfgItem name="note" label="备注">
+          <Input.TextArea rows={3} placeholder="请输入分润备注（选填）" />
+        </CfgItem>
+      </BusinessRegistrationForm>
+      <Typography.Paragraph type="secondary" className="ui-form-spaced">
+        分润会生成一笔「支出」资金明细，归属只记录业务属性，不改变资金流向。
+      </Typography.Paragraph>
+    </BusinessActionModal>
+  );
+}
+
 export function RefundModal({ controller }: { controller: OrdersPageController }) {
   const {
     actionOrder,
@@ -437,6 +532,7 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
     setRefundSubmitting,
     users,
   } = controller;
+  const direction = Form.useWatch<string>("direction", refundForm) ?? "OUT";
   return (
       <BusinessActionModal
         title={actionOrder ? `资金收支 · ${actionOrder.order_no}` : "资金收支"}
@@ -452,13 +548,32 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="REFUND"
           form={refundForm}
-          onFinish={async (values: { amount: string; occurred_on?: Dayjs; direction?: string; pool_id?: number; operator_user_ids?: number[]; reason: string; form_extra?: Record<string, unknown> }) => {
+          onFinish={async (values: { amount: string; occurred_on?: Dayjs; direction?: string; category?: string; pool_id?: number; operator_user_ids?: number[]; reason: string; form_extra?: Record<string, unknown> }) => {
             if (!actionOrder) return;
             setRefundSubmitting(true);
             try {
-              // 每笔收支都要指认资金账户：显式选择优先于订单类型的默认路由（规则见 helpers）。
-              await ordersApi.postEvent(actionOrder.id, buildRefundEventPayload({ values, fallbackDate: today() }));
-              appMessage.success("退款已登记");
+              const flowDirection = values.direction === "IN" ? "IN" : "OUT";
+              const flowCategory = values.category || (flowDirection === "IN" ? "OTHER" : "REFUND");
+              if (flowDirection === "OUT" && flowCategory === "REFUND") {
+                // 退款继续走专用接口，保留退款责任与退款日期等业务字段。
+                await cashflowsApi.refund(actionOrder.id, buildRefundCashflowPayload({ values, fallbackDate: today() }));
+                appMessage.success("退款已登记");
+              } else {
+                // 其他收入/支出是资金明细动作，不创建业务事件。
+                await cashflowsApi.createForOrder(actionOrder.id, {
+                  pool_id: values.pool_id,
+                  occurred_on: (values.occurred_on ?? dayjs(today())).format("YYYY-MM-DD"),
+                  direction: flowDirection,
+                  nature: flowDirection === "IN" ? "BUSINESS_IN" : "BUSINESS_OUT",
+                  fund_nature: "BUSINESS",
+                  accounting_attribute: flowDirection === "IN" ? "SELF_REVENUE" : "OPERATING_EXPENSE",
+                  category: flowCategory,
+                  amount: values.amount,
+                  note: values.reason,
+                  form_extra: values.form_extra,
+                });
+                appMessage.success("资金收支已登记");
+              }
               setRefundOpen(false);
               setActionOrder(null);
               await load();
@@ -474,7 +589,18 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
             <DatePicker format="YYYY-MM-DD" className="ui-control-full" />
           </CfgItem>
           <CfgItem name="direction" label="资金流向" initialValue="OUT" rules={[{ required: true, message: "请选择资金流向" }]}>
-            <Select disabled options={[{ value: "OUT", label: "支出" }]} />
+            <Select
+              aria-label="资金流向"
+              options={[{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }]}
+              onChange={(value) => refundForm.setFieldValue("category", value === "IN" ? "OTHER" : "REFUND")}
+            />
+          </CfgItem>
+          <CfgItem name="category" label="资金原因" initialValue="REFUND" rules={[{ required: true, message: "请选择资金原因" }]}>
+            <Select
+              options={direction === "IN"
+                ? [{ value: "SALE", label: "售出/回款" }, { value: "OTHER", label: "其他收入" }]
+                : [{ value: "REFUND", label: "退款" }, { value: "OTHER", label: "其他支出" }]}
+            />
           </CfgItem>
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={users} />
           <CfgItem name="amount" label="金额" rules={requiredMoneyRules("金额")}>
@@ -543,6 +669,36 @@ export function CreateBusinessModalWrapper({ controller }: { controller: OrdersP
   );
 }
 
+export function OrderAccountActionModals({ controller }: { controller: OrdersPageController }) {
+  const sale = controller.orderSaleTarget;
+  const saleCommon = {
+    account: sale,
+    onClose: () => controller.setOrderSaleTarget(null),
+    onCreated: async () => {
+      controller.setOrderSaleTarget(null);
+      await controller.load();
+    },
+  };
+  const consignment = controller.orderConsignmentTarget;
+  return (
+    <>
+      {sale?.inventory_type === "CONSIGNMENT"
+        ? <ConsignmentSaleModal {...saleCommon} />
+        : sale?.inventory_type === "PICKUP"
+          ? <PickupSaleModal {...saleCommon} />
+          : <RecoverySaleModal {...saleCommon} />}
+      <InventoryConsignmentModal
+        account={consignment}
+        onClose={() => controller.setOrderConsignmentTarget(null)}
+        onCreated={async () => {
+          controller.setOrderConsignmentTarget(null);
+          await controller.load();
+        }}
+      />
+    </>
+  );
+}
+
 export function OrderModals({ controller }: { controller: OrdersPageController }) {
   return (
     <>
@@ -550,7 +706,62 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
       <CancelTransactionModal controller={controller} />
       <EditOrderModal controller={controller} />
       <AllocationModal controller={controller} />
+      <ProfitShareModal controller={controller} />
       <RefundModal controller={controller} />
+      <OrderDeliveryModal
+        target={controller.deliveryTarget}
+        employees={controller.users}
+        onClose={() => controller.setDeliveryTarget(null)}
+        onCreated={async () => {
+          controller.setDeliveryTarget(null);
+          await controller.load();
+        }}
+      />
+      <InventoryProfileModal
+        target={controller.profileTarget}
+        onClose={() => controller.setProfileTarget(null)}
+        onSaved={(updated) => {
+          const accountId = controller.profileTarget?.account.id ?? updated.id;
+          controller.setProfileTarget(null);
+          void controller.loadLedgerDetail(accountId, true);
+          void controller.load();
+        }}
+        onError={(error) => appMessage.error(normalizeError(error).message)}
+        onOperation={async (operationType) => {
+          const target = controller.profileTarget;
+          const orderId = target?.orderId ?? target?.account.source_order_id;
+          if (!orderId) throw new Error("账号没有可关联的来源订单，无法登记运营事件");
+          await ordersApi.postEvent(orderId, {
+            event_type: "OPERATE",
+            operation_type: operationType,
+            occurred_on: today(),
+            note: operationType === "IMAGE" ? "订单台账登记作图" : "订单台账登记描述",
+            form_extra_scope: "OPERATION",
+          });
+        }}
+      />
+      <InventoryPlatformOffsaleModal
+        account={controller.orderOffsaleTarget?.account ?? null}
+        records={controller.orderOffsaleTarget?.records ?? []}
+        onClose={() => controller.setOrderOffsaleTarget(null)}
+        onSystemOffsale={controller.handleOrderSystemOffsale}
+        onChanged={controller.handleOrderOffsaleChanged}
+      />
+      <InventoryRebateModal
+        account={controller.orderRebateTarget}
+        onClose={() => controller.setOrderRebateTarget(null)}
+        onCreated={async () => {
+          controller.setOrderRebateTarget(null);
+          await controller.load();
+        }}
+      />
+      <InventoryDeleteDialog
+        account={controller.orderDeleteTarget}
+        submitting={controller.orderDeleteSubmitting}
+        onCancel={() => controller.setOrderDeleteTarget(null)}
+        onConfirm={controller.submitOrderDelete}
+      />
+      <OrderAccountActionModals controller={controller} />
       <CreateBusinessModalWrapper controller={controller} />
     </>
   );

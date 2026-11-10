@@ -65,7 +65,7 @@ export function InventoryConsignmentModal(props: {
     const price = typeof values.consignment_price === "number" ? values.consignment_price : undefined;
     setSubmitting(true);
     try {
-      await ordersApi.create({
+      const created = await ordersApi.create({
         order_type: "DG",
         trade_date: listedAt.format("YYYY-MM-DD"),
         account_id: props.account.id,
@@ -77,6 +77,19 @@ export function InventoryConsignmentModal(props: {
           listed_at: listedAt.format("YYYY-MM-DDTHH:mm"),
         },
         form_extra_scope: "CONSIGN",
+      });
+      await ordersApi.postEvent(created.id, {
+        event_type: "OPERATE",
+        operation_type: "CONSIGNMENT",
+        occurred_on: listedAt.format("YYYY-MM-DD"),
+        note: `寄售上架：${values.platform}`,
+        form_extra_scope: "CONSIGN",
+        form_extra: {
+          ...values.form_extra,
+          consignment_platform: values.platform,
+          ...(price === undefined ? {} : { consignment_price: price }),
+          listed_at: listedAt.format("YYYY-MM-DDTHH:mm"),
+        },
       });
       appMessage.success(`${values.platform} 已上架，账号仍保持在库`);
       form.setFieldsValue({ platform: undefined, consignment_price: null, listed_at: dayjs().second(0).millisecond(0) });

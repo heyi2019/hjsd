@@ -142,7 +142,7 @@ export const FUND_NATURE_LABEL: Record<string, string> = {
   INTERNAL: "内部调拨",
 };
 
-/** 核算属性（AccountingAttribute 13 值）：与 backend/app/domain/enums.py AccountingAttribute 一致。 */
+/** 核算属性：与 backend/app/domain/enums.py AccountingAttribute 一致。 */
 export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
   SELF_REVENUE: "自营收入",
   SELF_DIRECT_COST: "自营直接成本",
@@ -157,6 +157,7 @@ export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
   INTERNAL_TRANSFER: "内部调拨",
   REVERSAL: "冲销",
   REFUND: "退款",
+  PROFIT_SHARE: "分润支出",
 };
 
 /** 日对账快照状态（ReconciliationStatus）：OPEN=差异待处理（未核销）、RESOLVED=差异已处理（已核销）。

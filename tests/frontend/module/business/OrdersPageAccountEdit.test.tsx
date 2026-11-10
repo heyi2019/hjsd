@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -89,21 +89,21 @@ beforeEach(() => {
   vi.mocked(catalog.stocksApi.updateProfile).mockResolvedValue({ id: 99, game_account: "acc-99" } as never);
 });
 
-describe("订单台账编辑与库存中心同步（#15 需求1）", () => {
-  it("列表行「编辑账号」按钮进入与库存中心一致的账号台账编辑态", async () => {
+describe("订单台账统一编辑入口（#15 需求1）", () => {
+  it("列表行只展示「编辑」，不再单列「编辑账号」", async () => {
     renderLight(<OrdersPage />, { user: "admin" });
     await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
     await waitFor(() =>
       expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThanOrEqual(1),
     );
 
-    // 关联了库存账号的订单才显示「编辑账号」入口（与库存中心列表行「编辑」同口径）。
-    const editBtn = await screen.findByRole("button", { name: "编辑账号" });
+    const row = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))?.closest("tr");
+    expect(row).not.toBeNull();
+    const editBtn = within(row as HTMLElement).getByRole("button", { name: "编辑" });
     await ui.click(editBtn);
 
-    // 编辑态标志：底部「保存修改」按钮 + 账号资料可编辑输入框（来自 OrderDetailView 编辑态）。
-    await waitFor(() => expect(screen.getByText("保存修改")).toBeInTheDocument());
-    expect(screen.getByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
+    expect(await screen.findByText("编辑订单 · HS-2026-0001")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "编辑账号" })).toBeNull();
   });
 
   it("未关联库存账号的订单不显示「编辑账号」入口", async () => {

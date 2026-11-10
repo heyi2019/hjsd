@@ -147,7 +147,7 @@ def update_execution_detail(
         if item.amount == Decimal(str(event.amount)):
             changes.append((event, flow, item))
             continue
-        if event.event_type not in {"BUY", "SELL", "COST"} or item.amount <= 0:
+        if event.event_type not in {"BUY", "SELL"} or item.amount <= 0:
             raise Validation("该类型执行记录暂不支持修改金额")
         if flow is None:
             raise NotFound("关联资金流水不存在")
@@ -163,7 +163,7 @@ def update_execution_detail(
             raise Validation("关联返点的记录不能直接修改，请先核对返点")
         if db.scalar(select(Reconciliation.id).where(Reconciliation.pool_id == flow.pool_id, Reconciliation.reconciled_on >= flow.occurred_on)) is not None:
             raise Validation("资金池已有后续对账记录，不能直接修改")
-        if event.event_type in {"BUY", "COST"}:
+        if event.event_type == "BUY":
             cost_delta += item.amount - Decimal(str(event.amount))
         changes.append((event, flow, item))
     if Decimal(str(account.cost_amount)) + cost_delta < 0:
@@ -514,6 +514,12 @@ def execution_detail(
             .order_by(OrderEvent.occurred_on, OrderEvent.id)
         ).all()
     ) if order_ids else []
+    action_model_rebate_ids = {
+        int((event.form_extra or {}).get("rebate_record_id"))
+        for event in events
+        if event.event_type == EventType.REBATE.value
+        and str((event.form_extra or {}).get("rebate_record_id", "")).isdigit()
+    }
     event_ids = [item.id for item in events]
     flow_by_event: dict[int, ExecutionCashflowOut] = {}
     if event_ids:
@@ -580,6 +586,9 @@ def execution_detail(
                 id=event.id,
                 event_no=event.event_no,
                 event_type=event.event_type,
+                operation_type=(event.form_extra or {}).get("operation_type"),
+                rebate_type=(event.form_extra or {}).get("rebate_type"),
+                profit_recipient=(event.form_extra or {}).get("profit_recipient"),
                 amount=event.amount,
                 cancellable_amount=cancellable,
                 occurred_on=event.occurred_on,
@@ -590,6 +599,7 @@ def execution_detail(
                 offset_event_id=event.offset_event_id,
                 portion=event.portion,
                 delivery_mode=event.delivery_mode,
+                delivery_direction=(event.form_extra or {}).get("delivery_direction"),
                 is_posted=event.is_posted,
                 reason=event.reason,
                 note=event.note,
@@ -640,7 +650,8 @@ def execution_detail(
     rebate_income = zero
     for order_rebates in rebates_by_order.values():
         for rebate in order_rebates:
-            rebate_income += rebate.base_amount
+            if rebate.id not in action_model_rebate_ids:
+                rebate_income += rebate.base_amount
     # 坏账是支出，与订单利润同源；它不占「资金明细」流水行，但必须扣减净额。
     bad_debt_expense = zero
     if order_ids:

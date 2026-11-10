@@ -704,6 +704,34 @@ class TestFinanceApi:
         assert reversed_flow.status_code == 200, reversed_flow.text
         assert reversed_flow.json()["reversal_of_id"] == flow["id"]
 
+    def test_order_cashflow_endpoint_links_income_without_creating_event(
+        self, seeded_client, seeded_db, headers
+    ):
+        order_id = _active_order(seeded_db)
+        created = seeded_client.post(
+            f"/api/v1/orders/{order_id}/cashflows",
+            json={
+                "pool_id": 1,
+                "occurred_on": TODAY.isoformat(),
+                "direction": "IN",
+                "nature": "BUSINESS_IN",
+                "fund_nature": "BUSINESS",
+                "accounting_attribute": "SELF_REVENUE",
+                "category": "OTHER",
+                "amount": "100.00",
+                "note": "补登记收入",
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        flow = created.json()
+        assert flow["order_id"] == order_id
+        assert flow["direction"] == "IN"
+        assert flow["category"] == "OTHER"
+        assert seeded_db.scalar(
+            select(Cashflow).where(Cashflow.id == flow["id"])
+        ).order_event_id is None
+
     def test_pool_scoped_finance_user_cannot_transfer_or_read_other_pool(
         self, seeded_client, seeded_db
     ):

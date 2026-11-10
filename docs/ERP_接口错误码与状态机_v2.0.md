@@ -2,7 +2,7 @@
 
 > 本文补充 [API 接口规范](ERP_API接口规范_v1.2.md)。状态变化只能由 Service 事务触发；前端根据权限、当前状态和接口返回控制按钮，不得自行推算财务状态。
 >
-> **权威来源**：`backend/app/core/state_machine.py`（`ORDER_TRANSITIONS` / `ACCOUNT_TRANSITIONS` / `INSTALLMENT_TRANSITIONS`）与 `app/domain/enums.py`。本文与代码逐条对齐。
+> **权威来源**：状态机结构以 `backend/app/core/state_machine.py`（`ORDER_TRANSITIONS` / `ACCOUNT_TRANSITIONS` / `INSTALLMENT_TRANSITIONS`）为实现参考；业务动作、业务事件和资金明细的目标定义以 [ERP 系统动作定义 v1.0](ERP_系统动作定义_v1.0.md) 为准。`BUY_CREDIT`、`PAYMENT` 等旧值已移除。
 
 ## 1. 通用错误结构
 
@@ -33,7 +33,7 @@
 |---|---|---|---|
 | `ACTIVE` | 可继续登记业务事件 | `INSTALLMENT`（转分期）、`COMPLETE`、`CANCEL` | 删除已发生事件 |
 | `INSTALLMENT` | 已挂分期合约，回款中 | `COMPLETE`、`CANCEL` | 重复登记分期 |
-| `COMPLETED` | 业务闭环 | `BUY`（撤销售出，回退 `ACTIVE`）、`CANCEL` | 新增普通 BUY/SELL/PAYMENT |
+| `COMPLETED` | 业务闭环 | `BUY`（撤销售出，回退 `ACTIVE`）、`CANCEL` | 新增普通 BUY/SELL；资金明细须按冲销规则处理 |
 | `CANCELLED` | 已按冲销规则取消 | 无 | 重新启用原单；应新建订单 |
 
 订单创建即为 `ACTIVE`（不设草稿态：订单不挂金额，空壳草稿无业务信息）。已产生现金流的事件不能删除，只能用 `CANCEL` / offset 事件按原池、原日期冲销。`CANCELLED` 为终态。
@@ -45,11 +45,9 @@
 | 当前 | 动作 | 下一状态 | 说明 |
 |---|---|---|---|
 | `WAITING` | `BUY_STOCK` | `WAITING` | 自营买入后保留在库 |
-| `WAITING` | `BUY_CREDIT` | `SOLD` | 分期型买入 |
-| `WAITING` | `SELL` | `SOLD` | 全款售出 |
+| `WAITING` | `SELL` | `SOLD` | 登记售出；售出方式由 `SALE_MODE=FULL` 或 `SALE_MODE=INSTALLMENT` 区分 |
 | `WAITING` | `VOID` | `VOID` | 取消 |
 | `SOLD` | `BUY_STOCK` | `WAITING` | 售出撤销后重新入库 |
-| `SOLD` | `BUY_CREDIT` | `SOLD` | 撤销后重新进入分期型买入 |
 | `SOLD` | `RECOVER` | `WAITING` | 分期逾期回收 |
 | `SOLD` | `CANCEL_STOCK` | `WAITING` | 买入事实被取消 |
 | `SOLD` | `CANCEL_SELL` | `WAITING` | 售出冲销 |
@@ -63,16 +61,16 @@
 
 | 状态 | 进入条件 | 允许动作 |
 |---|---|---|
-| `PENDING` | 合约创建、首付未确认 | `PAYMENT`→ACTIVE、`MARK_OVERDUE`、`SETTLE`、`CANCEL` |
-| `ACTIVE` | 已有应收计划 | `PAYMENT`、`MARK_OVERDUE`、`SETTLE`、`DEFAULT`、`CANCEL` |
-| `OVERDUE` | 到期未足额收款 | `PAYMENT`、`SETTLE`、`DEFAULT`、`CLOSE`、`CANCEL` |
+| `PENDING` | 合约创建、首笔收入未确认 | `CASHFLOW_CREATE[CASHFLOW_REASON=INSTALLMENT_PAYMENT]`→ACTIVE、`MARK_OVERDUE`、`SETTLE`、`CANCEL` |
+| `ACTIVE` | 已有应收计划 | `CASHFLOW_CREATE[CASHFLOW_REASON=INSTALLMENT_PAYMENT]`、`MARK_OVERDUE`、`SETTLE`、`DEFAULT`、`CANCEL` |
+| `OVERDUE` | 到期未足额收款 | `CASHFLOW_CREATE[CASHFLOW_REASON=INSTALLMENT_PAYMENT]`、`SETTLE`、`DEFAULT`、`CLOSE`、`CANCEL` |
 | `SETTLED` | 所有应收已收或受控减免 | `DELIVER`→DELIVERED、`CANCEL` |
 | `DELIVERED` | 已生成无金额 `DELIVER` | 只读 |
-| `DEFAULTED` | 仅可从 `ACTIVE` / `OVERDUE` 登记违约 | `PAYMENT`（追偿收款）、`CLOSE` |
+| `DEFAULTED` | 仅可从 `ACTIVE` / `OVERDUE` 登记违约 | `CASHFLOW_CREATE[CASHFLOW_REASON=INSTALLMENT_PAYMENT]`（追偿收入）、`CLOSE` |
 | `CLOSED` | 逾期或违约后关闭结案 | 只读，终态 |
 | `CANCELLED` | 无资金事实时取消 | 只读，终态 |
 
-`DELIVER` 只能从 `SETTLED` 进入 `DELIVERED`，必须提供 `delivery_mode=PLATFORM_OPERATOR` 或 `CUSTOMER_SELF` 及凭证。`PAYMENT` 是收入事实；`DELIVER` 不生成现金流、不再确认收入。
+`DELIVER` 只能从 `SETTLED` 进入 `DELIVERED`，必须提供 `DELIVERY_DIRECTION=BUY/SELL`，并按技术交付方式提供 `delivery_mode=PLATFORM_OPERATOR` 或 `CUSTOMER_SELF` 及凭证。分期收入由 `CASHFLOW_DIRECTION=IN`、`CASHFLOW_REASON=INSTALLMENT_PAYMENT` 记录；`DELIVER` 不生成现金流、不再确认收入。
 
 **期次状态**（`installment_schedules.status`）：`PENDING` / `PARTIAL` / `PAID` / `OVERDUE` / `WAIVED`。每期 `due_amount` = 当期本金 + 当期服务费；减免累计 `waived_amount` 不改写原应收；展期只更新 `due_on`，不是独立状态。
 

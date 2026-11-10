@@ -14,6 +14,7 @@ _ALLOWED_ATTRIBUTES_BY_FUND_NATURE: dict[str, frozenset[str]] = {
         AccountingAttribute.ADDITIONAL_INCOME.value,
         AccountingAttribute.ADDITIONAL_EXPENSE.value,
         AccountingAttribute.OPERATING_EXPENSE.value,
+        AccountingAttribute.PROFIT_SHARE.value,
         AccountingAttribute.REVERSAL.value,
         AccountingAttribute.REFUND.value,
     }),
@@ -37,21 +38,13 @@ def validate_fund_accounting_attribute(fund_nature: str, accounting_attribute: s
 
 _ORDER_EVENT_ATTRIBUTES: dict[tuple[str, str], str] = {
     ("HS", "BUY"): AccountingAttribute.SELF_DIRECT_COST.value,
-    ("HS", "COST"): AccountingAttribute.SELF_DIRECT_COST.value,
     ("HS", "SELL"): AccountingAttribute.SELF_REVENUE.value,
-    ("HS", "PAYMENT"): AccountingAttribute.SELF_REVENUE.value,
     ("HS", "CANCEL"): AccountingAttribute.REVERSAL.value,
     ("TH", "BUY"): AccountingAttribute.TH_DIRECT_COST.value,
-    ("TH", "COST"): AccountingAttribute.TH_DIRECT_COST.value,
     ("TH", "SELL"): AccountingAttribute.TH_REVENUE.value,
-    ("TH", "PAYMENT"): AccountingAttribute.TH_REVENUE.value,
     ("TH", "CANCEL"): AccountingAttribute.REVERSAL.value,
     ("DG", "SELL"): AccountingAttribute.SERVICE_REVENUE.value,
-    ("DG", "PAYMENT"): AccountingAttribute.SERVICE_REVENUE.value,
     ("DG", "CANCEL"): AccountingAttribute.REVERSAL.value,
-    ("HS", "REFUND"): AccountingAttribute.REFUND.value,
-    ("TH", "REFUND"): AccountingAttribute.REFUND.value,
-    ("DG", "REFUND"): AccountingAttribute.REFUND.value,
 }
 
 

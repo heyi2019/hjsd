@@ -24,9 +24,16 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.domain.enums import AuditAction
+from app.domain.enums import (
+    AccountingAttribute,
+    AuditAction,
+    Direction,
+    FundNature,
+    Nature,
+)
 from app.domain.foundation import Pool
-from app.domain.trade import OrderEvent
+from app.domain.trade import Account, OrderEvent
+from app.foundation import service as foundation_service
 from app.domain.options import OptionSet
 from app.value_added_services import service as installments_service
 from app.lists import service as list_columns_service
@@ -592,7 +599,7 @@ def export_orders_xlsx(
         columns=ORDER_EVENT_EXPORT_COLUMNS,
         value_labels={"event_type": option_labels.get("ORDER_EVENT_TYPE", {})},
     )
-    # 资金明细：类别与事件类型同值域（BUY/SELL/PAYMENT），复用同一组字典；
+    # 资金明细：类别使用资金原因编码（SALE/INSTALLMENT_PAYMENT 等），不复用订单事件编码；
     # 现金性质与方向重复，已从列里移除，不再需要 CASHFLOW_NATURE
     write_sheet(
         workbook,
@@ -741,11 +748,47 @@ def create_order(
             user=user,
         )
     for cost in payload.initial_costs:
-        service.post_event(
-            db, order.id, event_type="COST", amount=cost.amount,
-            occurred_on=cost.occurred_on, actor=_actor(user), pool_id=cost.pool_id,
-            portion=cost.portion, flow_category=cost.flow_category, note=cost.note, user=user,
+        # 初始费用是支出资金明细；业务事件只记录
+        # BUY/SELL/DELIVER/OPERATE 等业务事实。账号成本仍由这笔订单支出明细累计。
+        pool_id = cost.pool_id
+        if pool_id is None:
+            pool = foundation_service.resolve_default_pool(
+                db,
+                order.order_type,
+                cost.portion,
+                fund_nature=FundNature.BUSINESS.value,
+            )
+            if pool is None:
+                raise Validation(
+                    f"业务 {order.order_type} 未配置 {cost.portion} 资金池",
+                    details={"order_type": order.order_type, "portion": cost.portion},
+                )
+            pool_id = pool.id
+        from app.finance import service as finance_service
+
+        finance_service.create_cashflow(
+            db,
+            pool_id=pool_id,
+            occurred_on=cost.occurred_on,
+            direction=Direction.OUT.value,
+            nature=Nature.BUSINESS_OUT.value,
+            fund_nature=FundNature.BUSINESS.value,
+            accounting_attribute=(
+                AccountingAttribute.SELF_DIRECT_COST.value
+                if order.order_type == "HS"
+                else AccountingAttribute.TH_DIRECT_COST.value
+            ),
+            category=cost.flow_category or "OTHER",
+            amount=cost.amount,
+            actor=_actor(user),
+            order_id=order.id,
+            note=cost.note,
+            user=user,
         )
+        account = db.get(Account, order.account_id) if order.account_id else None
+        if account is not None:
+            account.cost_amount = to_money(account.cost_amount) + to_money(cost.amount)
+            account.updated_by = _actor(user)
     return _order_output(db, order, user)
 
 
@@ -859,13 +902,17 @@ def post_event(
     if user.has(PERM_FINANCE_ORDER_EVENT_POST) and not user.has(PERM_ORDER_EVENT_POST):
         if event_type not in {"BUY", "SELL"}:
             raise PermissionDenied(
-                "财务只能登记付款或回款事件",
+                "财务只能登记买号或售出事件",
                 details={"allowed_event_types": ["BUY", "SELL"], "event_type": event_type},
             )
     event, flow = service.post_event(
         db,
         order_id,
         event_type=event_type,
+        sale_mode=payload.sale_mode,
+        operation_type=payload.operation_type,
+        rebate_type=payload.rebate_type,
+        profit_recipient=payload.profit_recipient,
         amount=payload.amount,
         occurred_on=payload.occurred_on,
         actor=_actor(user),
@@ -874,11 +921,10 @@ def post_event(
         amount2=payload.amount2,
         portion=payload.portion,
         delivery_mode=payload.delivery_mode,
+        delivery_direction=payload.delivery_direction,
         offset_event_id=payload.offset_event_id,
         reason=payload.reason,
-        refund_responsibility=payload.refund_responsibility,
         operator_user_ids=payload.operator_user_ids,
-        flow_category=payload.flow_category,
         note=payload.note,
         bound_phone=payload.bound_phone,
         bound_phone_owner=payload.bound_phone_owner,

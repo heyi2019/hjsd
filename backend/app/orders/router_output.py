@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from decimal import Decimal
@@ -15,6 +15,7 @@ from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
 )
+from app.domain.enums import AccountingAttribute, Direction
 from app.domain.attachments import Attachment
 from app.domain.foundation import AuditLog
 from app.domain.parties import (
@@ -34,7 +35,7 @@ from app.domain.trade import (
 )
 from app.domain.users import User
 from app.orders import schemas, service
-from app.orders.amounts import event_totals
+from app.orders.amounts import ZERO, event_totals
 
 def _actor(user: CurrentUser) -> str:
     return user.username
@@ -118,16 +119,20 @@ def _event_output(
             "event_no": event.event_no,
             "order_id": event.order_id,
             "event_type": event.event_type,
+            "sale_mode": (event.form_extra or {}).get("sale_mode"),
+            "operation_type": (event.form_extra or {}).get("operation_type"),
+            "rebate_type": (event.form_extra or {}).get("rebate_type"),
+            "profit_recipient": (event.form_extra or {}).get("profit_recipient"),
             "amount": event.amount,
             "occurred_on": event.occurred_on,
             "pool_id": event.pool_id,
             "offset_event_id": event.offset_event_id,
             "portion": event.portion,
             "delivery_mode": event.delivery_mode,
+            "delivery_direction": (event.form_extra or {}).get("delivery_direction"),
             "is_posted": event.is_posted,
             "posted_at": event.posted_at,
             "reason": event.reason,
-            "refund_responsibility": event.refund_responsibility,
             "operator_user_ids": event.operator_user_ids,
             "note": event.note,
             "form_extra": event.form_extra,
@@ -354,6 +359,27 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         ).all():
             events_by_order.setdefault(event.order_id, []).append(event)
 
+    # 订单初始费用是直接资金明细，不生成额外业务事件。
+    # 只取未关联业务事件的直接成本流水，避免把业务事件派生流水重复计入。
+    direct_cost_by_order = {
+        order_id: to_money(total or 0)
+        for order_id, total in db.execute(
+            select(Cashflow.order_id, func.coalesce(func.sum(Cashflow.amount), 0))
+            .where(
+                Cashflow.order_id.in_(order_ids),
+                Cashflow.order_event_id.is_(None),
+                Cashflow.direction == Direction.OUT.value,
+                Cashflow.accounting_attribute.in_(
+                    (
+                        AccountingAttribute.SELF_DIRECT_COST.value,
+                        AccountingAttribute.TH_DIRECT_COST.value,
+                    )
+                ),
+            )
+            .group_by(Cashflow.order_id)
+        ).all()
+    } if order_ids else {}
+
     operator_names = _operator_names(
         db,
         [event for events in events_by_order.values() for event in events],
@@ -371,7 +397,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         events = events_by_order.get(order.id, [])
         installment = installments.get(order.id)
         income, buy_amount, direct_cost = event_totals(events)
-        total_cost = buy_amount + direct_cost
+        total_cost = buy_amount + direct_cost + direct_cost_by_order.get(order.id, ZERO)
         latest = events[0] if events else None
         sale_event = next((event for event in events if event.event_type == "SELL"), None)
         party = parties.get(order.id)

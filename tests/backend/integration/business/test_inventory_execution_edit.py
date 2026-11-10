@@ -144,7 +144,7 @@ def test_inventory_time_shift_moves_all_three_displayed_times_together(seeded_cl
     event_dates_before = {item["id"]: item["occurred_on"] for item in before["events"]}
     buy_before = next(item for item in before["events"] if item["event_type"] == "BUY")
 
-    response = seeded_client.patch(f"{url}/execution-edit", headers=headers, json={"events": [], "time_shift": {"delta_days": 5}})
+    response = seeded_client.patch(f"{url}/execution-edit", headers=headers, json={"events": [], "time_shift": {"delta_minutes": 5 * 24 * 60}})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     shifted = seeded_db.get(Order, order.id)
@@ -165,7 +165,7 @@ def test_inventory_time_shift_moves_all_three_displayed_times_together(seeded_cl
     assert seeded_db.scalar(select(AuditLog).where(AuditLog.entity_type == "inventory_time_shift", AuditLog.entity_id == str(account.id))) is not None
 
     # 零平移是 no-op，不会重复改动时间轴
-    idle = seeded_client.patch(f"{url}/execution-edit", headers=headers, json={"events": [], "time_shift": {"delta_days": 0}})
+    idle = seeded_client.patch(f"{url}/execution-edit", headers=headers, json={"events": [], "time_shift": {"delta_minutes": 0}})
     assert idle.status_code == 200, idle.text
     seeded_db.expire_all()
     assert seeded_db.get(Order, order.id).trade_date == date(2026, 10, 6)

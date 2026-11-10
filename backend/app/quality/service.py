@@ -52,9 +52,7 @@ from .issues import (
 MONEY_EVENT_TYPES = frozenset(
     {
         EventType.BUY.value,
-        EventType.COST.value,
         EventType.SELL.value,
-        EventType.PAYMENT.value,
         EventType.CANCEL.value,
     }
 )

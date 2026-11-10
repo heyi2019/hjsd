@@ -21,6 +21,9 @@ export interface AccountExecutionEvent {
   id: number;
   event_no: string;
   event_type: string;
+  operation_type?: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST" | null;
+  rebate_type?: "BUY" | "SELL" | null;
+  profit_recipient?: "BUY" | "SELL" | "OPERATION" | "COMPANY" | null;
   amount: string;
   /** 仍可被冲销的余额（后端按已冲销合计算好并夹底 0），前端不再自行相减。 */
   cancellable_amount: string;
@@ -30,6 +33,7 @@ export interface AccountExecutionEvent {
   offset_event_id?: number | null;
   portion: string;
   delivery_mode?: string | null;
+  delivery_direction?: "BUY" | "SELL" | null;
   is_posted: boolean;
   note?: string | null;
   cashflow?: AccountExecutionCashflow | null;

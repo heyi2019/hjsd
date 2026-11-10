@@ -190,12 +190,35 @@ class OrderLinkType(StrEnum):
 
 class EventType(StrEnum):
     BUY = "BUY"
-    COST = "COST"
     SELL = "SELL"
-    PAYMENT = "PAYMENT"
     DELIVER = "DELIVER"
     CANCEL = "CANCEL"
-    REFUND = "REFUND"
+    OPERATE = "OPERATE"
+    REBATE = "REBATE"
+    PROFIT_SHARE = "PROFIT_SHARE"
+
+
+class SaleMode(StrEnum):
+    """售出业务属性：售出动作本身只有一个，结算方式由属性区分。"""
+
+    FULL = "FULL"
+    INSTALLMENT = "INSTALLMENT"
+
+
+class OperationType(StrEnum):
+    """运营动作属性：事件名统一为 OPERATE，具体动作由属性区分。"""
+
+    IMAGE = "IMAGE"
+    DESCRIPTION = "DESCRIPTION"
+    CONSIGNMENT = "CONSIGNMENT"
+    UNLIST = "UNLIST"
+
+
+class ProfitRecipient(StrEnum):
+    BUY = "BUY"
+    SELL = "SELL"
+    OPERATION = "OPERATION"
+    COMPANY = "COMPANY"
 
 
 class Nature(StrEnum):
@@ -224,6 +247,7 @@ class AccountingAttribute(StrEnum):
     ADDITIONAL_INCOME = "ADDITIONAL_INCOME"  # 附加收入：返点(category=REBATE)与其他(TIP/PENALTY)
     ADDITIONAL_EXPENSE = "ADDITIONAL_EXPENSE"  # 附加支出：同行分成等成交环节的附加费用
     OPERATING_EXPENSE = "OPERATING_EXPENSE"
+    PROFIT_SHARE = "PROFIT_SHARE"
     DEPOSIT = "DEPOSIT"
     EXTERNAL_FUNDING = "EXTERNAL_FUNDING"
     INTERNAL_TRANSFER = "INTERNAL_TRANSFER"
@@ -561,6 +585,9 @@ __all__ = [
     "ImportBatchStatus",
     "ImportRowStatus",
     "EventType",
+    "SaleMode",
+    "OperationType",
+    "ProfitRecipient",
     "FundNature",
     "InstallmentContractType",
     "InstallmentDispositionAction",

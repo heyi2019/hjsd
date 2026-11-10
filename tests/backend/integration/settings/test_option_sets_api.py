@@ -1,12 +1,30 @@
 """MASTER-01 T20 / 选项词典（option_sets）API：只读查询 + 管理端点 + 死枚举防改。"""
 from __future__ import annotations
 
+from app.foundation.catalog_seed import seed_catalog
+
 OPTION_SETS = "/api/v1/option-sets"
 
 
 def test_list_empty_initially(client, headers):
     body = client.get(OPTION_SETS, headers=headers).json()
     assert body["items"] == []
+
+
+def test_seeded_order_event_dictionary_excludes_retired_cost(seeded_client, seeded_db, headers):
+    seed_catalog(seeded_db, actor="pytest")
+    seeded_db.commit()
+    body = seeded_client.get(OPTION_SETS, headers=headers).json()
+    event_types = next(item for item in body["items"] if item["code"] == "ORDER_EVENT_TYPE")
+    assert [item["value"] for item in event_types["options"]] == [
+        "BUY",
+        "SELL",
+        "DELIVER",
+        "CANCEL",
+        "OPERATE",
+        "REBATE",
+        "PROFIT_SHARE",
+    ]
 
 
 def test_read_requires_login(client):

@@ -15,12 +15,16 @@ from app.core.money import to_money
 from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import (
     AuditAction,
+    Direction,
+    FundNature,
+    Nature,
     OrderStatus,
+    Portion,
     PolicyType,
     RebateStatus,
     RebateType,
 )
-from app.domain.trade import RebateRecord
+from app.domain.trade import Cashflow, OrderEvent, RebateRecord
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.orders import service as orders_service
@@ -80,7 +84,7 @@ def create_rebate(
             "买号返点只能关联回收、提号订单",
             details={"rebate_type": rebate_type, "order_type": order.order_type},
         )
-    # 返点资格由业务订单是否已创建决定；BUY/SELL/PAYMENT 仅作为后续业务流水，
+    # 返点资格由业务订单是否已创建决定；BUY/SELL 仅作为后续业务事实，
     # 不能阻止在订单创建后先登记预计返点。
 
     rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
@@ -129,13 +133,66 @@ def create_rebate(
     )
     session.add(record)
     session.flush()
+    # 返点是业务动作，同时形成一笔收入资金明细；两者共享订单与发生日，
+    # 资金明细通过 order_event_id 回指动作，避免返点只停留在附属表里。
+    event, _ = orders_service.post_event(
+        session,
+        order.id,
+        event_type="REBATE",
+        amount=base,
+        occurred_on=collected_on,
+        actor=actor,
+        rebate_type=rebate_type,
+        note=note,
+        form_extra_scope="INVREBATE",
+        form_extra=form_extra,
+        user=user,
+    )
+    event_extra = dict(event.form_extra or {})
+    event_extra["rebate_record_id"] = record.id
+    event.form_extra = event_extra
+    pool = foundation_service.resolve_default_pool(
+        session,
+        order.order_type,
+        Portion.PROFIT.value,
+        fund_nature=FundNature.BUSINESS.value,
+    )
+    if pool is None:
+        raise Validation(
+            f"业务 {order.order_type} 未配置 {Portion.PROFIT.value} 资金池",
+            code=ErrorCode.POOL_ROUTE_MISSING,
+            details={"order_type": order.order_type, "portion": Portion.PROFIT.value},
+        )
+    from app.finance.cashflows import create_cashflow
+
+    flow = create_cashflow(
+        session,
+        pool_id=pool.id,
+        occurred_on=collected_on,
+        direction=Direction.IN.value,
+        nature=Nature.BUSINESS_IN.value,
+        category="REBATE",
+        amount=base,
+        actor=actor,
+        order_id=order.id,
+        order_event_id=event.id,
+        note=note or f"{rebate_type} 返点",
+        form_extra={**(form_extra or {}), "rebate_record_id": record.id},
+        form_extra_scope="INVREBATE",
+        user=user,
+    )
     record_audit(
         session,
         action=AuditAction.REBATE_CREATE,
         entity_type="rebate_record",
         entity_id=record.rebate_no,
         actor=actor,
-        after={"source_order": order.order_no, "base_amount": str(base)},
+        after={
+            "source_order": order.order_no,
+            "base_amount": str(base),
+            "event_no": event.event_no,
+            "flow_no": flow.flow_no,
+        },
     )
     return record
 
@@ -268,6 +325,18 @@ def update_rebate(
         record.operator_user_ids = _validate_operator_user_ids(session, operator_user_ids)
     if form_extra is not None:
         record.form_extra = validate_form_extra(session, order_type_code="INVREBATE", values=form_extra) or None
+    action_event = _rebate_action_event(session, record)
+    if action_event is not None:
+        action_event.amount = record.base_amount
+        action_event.occurred_on = record.collected_on
+        action_event.note = record.note
+        action_event.updated_by = actor
+        flow = session.scalar(select(Cashflow).where(Cashflow.order_event_id == action_event.id))
+        if flow is not None:
+            flow.amount = record.base_amount
+            flow.occurred_on = record.collected_on
+            flow.note = record.note or flow.note
+            flow.updated_by = actor
     record.updated_by = actor
     session.flush()
     record_audit(session, action=AuditAction.REBATE_UPDATE, entity_type="rebate_record", entity_id=record.rebate_no, actor=actor, before=before, after={"base_amount": str(record.base_amount), "rate": str(record.rate), "collected_on": str(record.collected_on), "note": record.note})
@@ -278,9 +347,40 @@ def delete_rebate(session: Session, rebate_id: int, *, actor: str, user: Current
     record = get_rebate(session, rebate_id, user=user)
     rebate_no = record.rebate_no
     status = record.status
-    session.delete(record)
+    if status == RebateStatus.VOID.value:
+        raise Validation("返点记录已经作废", details={"rebate_no": rebate_no})
+    action_event = _rebate_action_event(session, record)
+    flow = session.scalar(select(Cashflow).where(Cashflow.order_event_id == action_event.id)) if action_event else None
+    if flow is not None:
+        from app.finance.cashflows import reverse_cashflow
+
+        reverse_cashflow(
+            session,
+            flow.id,
+            reversed_on=date.today(),
+            actor=actor,
+            reason=f"作废返点 {rebate_no}",
+            form_extra_scope="INVREBATE",
+            user=user,
+        )
+    record.status = RebateStatus.VOID.value
+    record.updated_by = actor
     session.flush()
-    record_audit(session, action=AuditAction.REBATE_DELETE, entity_type="rebate_record", entity_id=rebate_no, actor=actor, before={"rebate_no": rebate_no, "status": status})
+    record_audit(session, action=AuditAction.REBATE_DELETE, entity_type="rebate_record", entity_id=rebate_no, actor=actor, before={"rebate_no": rebate_no, "status": status}, after={"status": RebateStatus.VOID.value})
+
+
+def _rebate_action_event(session: Session, record: RebateRecord) -> OrderEvent | None:
+    """查找新动作模型的返点事件；旧记录没有该事件，继续走兼容口径。"""
+    events = session.scalars(
+        select(OrderEvent).where(
+            OrderEvent.order_id == record.source_order_id,
+            OrderEvent.event_type == "REBATE",
+        )
+    ).all()
+    for event in events:
+        if (event.form_extra or {}).get("rebate_record_id") == record.id:
+            return event
+    return None
 
 __all__ = [
     "create_rebate",

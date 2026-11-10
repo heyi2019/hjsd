@@ -27,6 +27,7 @@ export async function collectFullPayment(input: CollectPaymentInput): Promise<vo
   }
   await ordersApi.postEvent(sourceOrderId, {
     event_type: "SELL",
+    sale_mode: "FULL",
     amount: values.amount as string,
     occurred_on: today(),
     pool_id: values.pool_id as number,
@@ -51,6 +52,14 @@ export async function collectInstallmentPayment(input: CollectPaymentInput): Pro
       : today(),
   );
   const firstDueOn = schedule[0]?.due_on ?? today();
+  await ordersApi.postEvent(sourceOrderId, {
+    event_type: "SELL",
+    sale_mode: "INSTALLMENT",
+    amount: String(values.amount ?? 0),
+    occurred_on: today(),
+    portion: "PROFIT",
+    note: values.note as string | undefined,
+  });
   const installment = await installmentsApi.create({
     order_id: sourceOrderId,
     adjust_final_period: true,
@@ -66,7 +75,7 @@ export async function collectInstallmentPayment(input: CollectPaymentInput): Pro
     schedule,
     note: values.note as string | undefined,
   });
-  // 分期计划确立时即收首付：首付是期次 0，收一笔 PAYMENT（PROFIT 入账到资金账户）。
+  // 分期计划确立时即收首付：首付是期次 0，登记一笔 INSTALLMENT_PAYMENT 收入资金明细。
   // 无首付（首付为 0）则不产生收款事件，仅建合同。
   const downPayment = Number(values.down_payment ?? 0);
   if (downPayment > 0) {

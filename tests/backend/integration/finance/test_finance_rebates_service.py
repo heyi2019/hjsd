@@ -5,13 +5,16 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 
 from app.stocks import service as stocks_service
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.finance import rebates
+from app.finance import cashflows
 from app.finance.rebates import _rebate_rate_from_snapshot
 from app.orders import service as orders_service
+from app.domain.trade import Cashflow, OrderEvent
 
 
 TODAY = date(2026, 10, 17)
@@ -120,6 +123,56 @@ def test_rebate_module_creates_record_directly(seeded_db):
 
     assert record.rebate_no.endswith("-RB01")
     assert record.rate == Decimal("5.00")
+
+
+def test_rebate_creates_business_event_and_income_cashflow(seeded_db):
+    order_id = _order_with_buy(seeded_db)
+    record = rebates.create_rebate(
+        seeded_db,
+        source_order_id=order_id,
+        rebate_type="BUY",
+        base_amount=Decimal("1000"),
+        rate=Decimal("5"),
+        collected_on=TODAY,
+        actor="pytest",
+    )
+
+    event = seeded_db.scalar(
+        select(OrderEvent).where(
+            OrderEvent.order_id == order_id,
+            OrderEvent.event_type == "REBATE",
+        )
+    )
+    assert event is not None
+    assert (event.form_extra or {}).get("rebate_record_id") == record.id
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_event_id == event.id))
+    assert flow is not None
+    assert flow.direction == "IN"
+    assert flow.category == "REBATE"
+    assert flow.amount == Decimal("1000.00")
+
+
+def test_order_refund_creates_expense_cashflow_without_refund_event(seeded_db):
+    order_id = _order_with_sell(seeded_db, "DG")
+    flow = cashflows.create_order_refund(
+        seeded_db,
+        order_id=order_id,
+        pool_id=2,
+        amount=Decimal("200"),
+        refunded_on=TODAY,
+        reason="客户售后",
+        actor="pytest",
+    )
+
+    assert flow.direction == "OUT"
+    assert flow.category == "REFUND"
+    assert flow.accounting_attribute == "REFUND"
+    assert seeded_db.scalar(
+        select(OrderEvent.id).where(
+            OrderEvent.order_id == order_id,
+            OrderEvent.event_type == "REFUND",
+        )
+    ) is None
 
 
 # ----------------------------------------------------- 费率快照解析分支

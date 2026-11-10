@@ -160,15 +160,6 @@ def test_event_contribution_cancel_offset_buy():
     )  # 246
 
 
-def test_event_contribution_cancel_offset_cost():
-    ev = _FakeEvent(EventType.CANCEL.value, 1, Decimal("10"))
-    assert _event_contribution(ev, {1: EventType.COST.value}) == (
-        ZERO,
-        ZERO,
-        -to_money("10"),
-    )  # 248
-
-
 def test_event_contribution_cancel_offset_unknown():
     ev = _FakeEvent(EventType.CANCEL.value, 1, Decimal("10"))
     assert _event_contribution(ev, {}) == (ZERO, ZERO, ZERO)  # 250

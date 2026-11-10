@@ -9,7 +9,10 @@ from decimal import Decimal
 from typing import Any
 from app.core.audit import record_audit
 from app.core.security import CurrentUser
-from app.orders import service as orders_service
+from app.domain.enums import CashflowStatus, Direction, Nature
+from app.finance.attributes import accounting_attribute_for_order_event
+from app.finance.cashflows import create_cashflow, reverse_cashflow
+from app.orders.events_rules import _resolve_pool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import (
@@ -25,17 +28,12 @@ from app.core.state_machine import (
     transition,
 )
 from app.orders.cancellation_model import apply_installment_cancellation_account_effect
-from app.domain.enums import (
-    AuditAction,
-    EventType,
-    InstallmentStatus,
-    ScheduleStatus,
-)
+from app.domain.enums import AuditAction, EventType, InstallmentStatus, ScheduleStatus
 from app.domain.trade import (
     Installment,
     InstallmentSchedule,
     Order,
-    OrderEvent,
+    Cashflow,
 )
 
 from ._shared import (
@@ -59,8 +57,11 @@ def pay(
     form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> tuple[Installment, InstallmentSchedule]:
-    """收款：`PAYMENT` 是收入事实，派生现金流并累计已收。"""
+    """收款：直接登记收入资金明细，不创建订单业务事件。"""
     installment = get_installment(session, installment_id, user)
+    order = session.get(Order, installment.order_id)
+    if order is None:
+        raise NotFound("分期合约所属订单不存在", details={"order_id": installment.order_id})
     _merge_form_extra(session, installment, scope="INSTPAY", values=form_extra)
     if installment.status in (
         InstallmentStatus.CANCELLED.value,
@@ -98,20 +99,29 @@ def pay(
             details={"period_no": schedule.period_no, "outstanding": str(outstanding)},
         )
 
-    orders_service.post_event(
+    fund_nature, accounting_attribute = accounting_attribute_for_order_event(
+        order.order_type, EventType.SELL.value
+    )
+    resolved_pool_id = pool_id
+    if resolved_pool_id is None:
+        resolved_pool_id = _resolve_pool(
+            session, order, "PROFIT", fund_nature=fund_nature
+        ).id
+    create_cashflow(
         session,
-        installment.order_id,
-        event_type=EventType.PAYMENT.value,
-        amount=money,
+        pool_id=resolved_pool_id,
         occurred_on=paid_on,
+        direction=Direction.IN.value,
+        nature=Nature.BUSINESS_IN.value,
+        fund_nature=fund_nature,
+        accounting_attribute=accounting_attribute,
+        category="INSTALLMENT_PAYMENT",
+        amount=money,
         actor=actor,
-        pool_id=pool_id,
-        portion="PROFIT",
+        order_id=order.id,
         note=note or f"分期收款 {installment.inst_no} 第 {schedule.period_no} 期",
         user=user,
-        allow_installment_payment=True,
     )
-
     schedule.received_amount = to_money(schedule.received_amount) + money
     schedule.received_on = paid_on
     schedule.status = (
@@ -124,7 +134,10 @@ def pay(
 
     if installment.status == InstallmentStatus.PENDING.value:
         installment.status = transition(
-            INSTALLMENT_TRANSITIONS, installment.status, "PAYMENT", entity="分期合约"
+            INSTALLMENT_TRANSITIONS,
+            installment.status,
+            "INSTALLMENT_PAYMENT",
+            entity="分期合约",
         )
     if to_money(installment.paid_amount) >= total_receivable(installment):
         if installment.status != InstallmentStatus.DEFAULTED.value:
@@ -162,11 +175,7 @@ def cancel_installment(
     form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
-    """终止交付前分期并登记原路退款。
-
-    PAYMENT 逐笔用 CANCEL 冲销，沿用每笔收款的资金池。
-    分期账号的回流/结束由合约类型决定：HS、DG 回库存，TH 直接失效。
-    """
+    """终止交付前分期并冲销已登记的收款资金明细。"""
     text_reason = _required_text(reason, field="reason", message="取消分期必须填写原因")
     installment = get_installment(session, installment_id, user)
     cancellable = {
@@ -196,53 +205,40 @@ def cancel_installment(
     event_ids: list[int] = []
     refund_amount = Decimal("0")
     reversed_amount = Decimal("0")
-    original_events = session.scalars(
-        select(OrderEvent)
+    direct_cashflows = session.scalars(
+        select(Cashflow)
         .where(
-            OrderEvent.order_id == order.id,
-            OrderEvent.event_type == EventType.PAYMENT.value,
-            OrderEvent.is_posted.is_(True),
+            Cashflow.order_id == order.id,
+            Cashflow.category == "INSTALLMENT_PAYMENT",
+            Cashflow.order_event_id.is_(None),
+            Cashflow.status == CashflowStatus.APPROVED.value,
         )
-        .order_by(OrderEvent.id)
+        .order_by(Cashflow.id)
     ).all()
-    # 一次性取回全部已登记冲销，本地按被冲销事件归集，避免逐笔查询（N+1）。
-    # 不在 SQL 里 SUM：金额列是 DECIMAL TypeDecorator，SQLite 聚合存在浮点精度风险；
-    # 金额一律 Python 侧 Decimal 累加，与「逐笔求和」的原实现完全等价。
-    original_ids = [original.id for original in original_events]
-    refunded_by_event: dict[int, Decimal] = {}
-    if original_ids:
-        for offset_id, cancel_amount in session.execute(
-            select(OrderEvent.offset_event_id, OrderEvent.amount).where(
-                OrderEvent.offset_event_id.in_(original_ids),
-                OrderEvent.event_type == EventType.CANCEL.value,
-                OrderEvent.is_posted.is_(True),
-            )
-        ).all():
-            refunded_by_event[offset_id] = refunded_by_event.get(
-                offset_id, Decimal("0")
-            ) + to_money(cancel_amount)
-    for original in original_events:
-        remaining = to_money(original.amount) - refunded_by_event.get(original.id, Decimal("0"))
-        if remaining <= 0:
-            continue
-        reversal, _flow = orders_service.post_event(
-            session,
-            order.id,
-            event_type=EventType.CANCEL.value,
-            amount=remaining,
-            occurred_on=cancelled_on,
-            actor=actor,
-            portion=original.portion,
-            offset_event_id=original.id,
-            reason=text_reason,
-            note=f"取消退款：{installment.inst_no}",
-            user=user,
-            allow_installment_cancel=True,
-            defer_order_cancel=True,
+    if direct_cashflows:
+        reversed_cashflow_ids = set(
+            session.scalars(
+                select(Cashflow.reversal_of_id).where(
+                    Cashflow.reversal_of_id.in_([flow.id for flow in direct_cashflows])
+                )
+            ).all()
         )
-        event_ids.append(reversal.id)
-        refund_amount += remaining
-
+        for flow in direct_cashflows:
+            if flow.id in reversed_cashflow_ids:
+                continue
+            reversal = reverse_cashflow(
+                session,
+                flow.id,
+                reversed_on=cancelled_on,
+                actor=actor,
+                reason=text_reason,
+                form_extra=None,
+                user=user,
+            )
+            amount = to_money(flow.amount)
+            refund_amount += amount
+            reversed_amount += amount
+        direct_cashflows = [flow for flow in direct_cashflows if flow.id not in reversed_cashflow_ids]
     order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
     installment.status = transition(
         INSTALLMENT_TRANSITIONS, installment.status, "CANCEL", entity="分期合约"

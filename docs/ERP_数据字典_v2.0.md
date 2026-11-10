@@ -66,7 +66,10 @@ ORM 模型共 **39 张表**，另有 Alembic 自建的 `alembic_version` 与迁�
 | 枚举 | 取值 |
 |---|---|
 | `OrderStatus` | `ACTIVE` / `INSTALLMENT` / `COMPLETED` / `CANCELLED` |
-| `EventType` | `BUY` / `COST` / `SELL` / `PAYMENT` / `DELIVER` / `CANCEL` / `REFUND` |
+| `EventType` | `BUY` / `SELL` / `DELIVER` / `CANCEL` / `OPERATE` / `REBATE` / `PROFIT_SHARE` |
+| `SaleMode` | `FULL` / `INSTALLMENT` |
+| `DeliveryDirection` | `BUY` / `SELL` |
+| `OperationType` | `IMAGE` / `DESCRIPTION` / `CONSIGNMENT` / `UNLIST` |
 | `OrderLinkType` | `SOURCE` / `FOLLOW_UP` |
 | `LinkStatus` | `LINKED` / `UNLINKED` / `ORPHAN` / `UNLINKED_TRANSFER`（禁止 `AUTO_MATCHED`） |
 | `AccountStatus` | `WAITING` / `SOLD` / `VOID` |
@@ -79,6 +82,7 @@ ORM 模型共 **39 张表**，另有 Alembic 自建的 `alembic_version` 与迁�
 | `InstallmentStatus` | `PENDING` / `ACTIVE` / `OVERDUE` / `SETTLED` / `DELIVERED` / `DEFAULTED` / `CLOSED` / `CANCELLED` |
 | `ScheduleStatus` | `PENDING` / `PARTIAL` / `PAID` / `OVERDUE` / `WAIVED` |
 | `InstallmentDispositionAction` | `RECOVER` / `RESELL` |
+| `CashflowReason` | `SALE` / `INSTALLMENT_PAYMENT` / `REBATE` / `PURCHASE` / `REFUND` / `PROFIT_SHARE` / `OPERATING_EXPENSE` / `REVERSAL` |
 | `DeliveryMode` | `PLATFORM_OPERATOR` / `CUSTOMER_SELF` |
 | `CommissionMode` | `DEDUCT_FROM_SETTLEMENT` / `SEPARATE_PAYMENT` |
 | `CommissionPayer` | `BUYER` / `CONSIGNOR` / `PLATFORM` |
@@ -90,7 +94,7 @@ ORM 模型共 **39 张表**，另有 Alembic 自建的 `alembic_version` 与迁�
 |---|---|
 | `Nature` | `EXTERNAL_IN` / `BUSINESS_IN` / `BUSINESS_OUT` / `INTERNAL` |
 | `FundNature` | `BUSINESS` / `EXTERNAL` / `INTERNAL` |
-| `AccountingAttribute` | `SELF_REVENUE` / `SELF_DIRECT_COST` / `TH_DIRECT_COST` / `TH_REVENUE` / `SERVICE_REVENUE` / `ADDITIONAL_INCOME` / `ADDITIONAL_EXPENSE` / `OPERATING_EXPENSE` / `DEPOSIT` / `EXTERNAL_FUNDING` / `INTERNAL_TRANSFER` / `REVERSAL` / `REFUND` |
+| `AccountingAttribute` | `SELF_REVENUE` / `TH_REVENUE` / `SERVICE_REVENUE` / `REBATE_INCOME` / `PURCHASE` / `OPERATING_EXPENSE` / `DEPOSIT` / `EXTERNAL_FUNDING` / `INTERNAL_TRANSFER` / `REVERSAL` / `REFUND` / `PROFIT_SHARE` |
 | `Direction` | `IN` / `OUT` |
 | `CashflowStatus` | `PENDING` / `APPROVED` / `REJECTED` |
 | `DepositStatus` | `PAID` / `PARTIALLY_RETURNED` / `RETURNED` / `LOST` / `CANCELLED` |
@@ -155,9 +159,9 @@ ORM 模型共 **39 张表**，另有 Alembic 自建的 `alembic_version` 与迁�
 | 表 | 关键字段 | 约束 |
 |---|---|---|
 | `orders` | order_no, order_type, capital_type, trade_date, commission_mode, commission_payer, account_snapshot(JSON), account_id, status, policy_version_id, policy_snapshot, link_status, owner_id, note, form_extra | 汇总金额由事件派生，不落冗余列；HS/TH/DG 经 `account_id` 关联 `stocks`；代挂的 `commission_mode` / `commission_payer` 登记在订单头，不另设抽成公式 |
-| `order_events` | event_no, order_id, event_type, amount, portion, occurred_on, pool_id, offset_event_id, delivery_mode, is_posted, posted_at, reason, refund_responsibility, note, form_extra, operator_user_ids | 有资金事件必须有池；`BUY`/`SELL` 按 `portion` 拆本金与利润；`REFUND` 责任方必填且金额 ≤ 已收 − 已退；`CANCEL` 走冲销不物理删；`is_posted` 控制过账时序 |
+| `order_events` | event_no, order_id, event_type, amount, portion, occurred_on, pool_id, offset_event_id, delivery_mode, is_posted, posted_at, reason, note, form_extra, operator_user_ids | 仅记录当前业务事件；售出、买入等事实按业务规则关联资金明细；分期收款和退款直接写入 `cashflow`；`CANCEL` 走冲销不物理删；`is_posted` 控制过账时序 |
 | `order_links` | source_order_id, target_order_id, relation_type, split_ratio, split_amount, note, created_by, updated_by | 关系分 `SOURCE` / `FOLLOW_UP`；拆单金额与比例二选一必须自洽 |
-| `stocks` | game_type, business_mode, inventory_type, value_added_service, stock_no, game_account, game_password, channel_region, bound_phone, has_secondary, platform, status, inventory_status, inventory_entry_at, buy_date, cost_amount, account_description, account_images(JSON), note, form_extra | `stock_no`（`KU_` 五位）为库存主键语义编号；`game_account` 仅是文本，**不唯一**（同一账号可多次收购）；`game_password` 按既定裁决明文存储，不做加密或脱敏；滞销颜色由前端按 `buy_date` 计算，不落库；`status` 与 `inventory_status` 两轴并存——前者为账号生命周期（WAITING/SOLD/VOID），后者为库存在场状态（IN_STOCK/OUT_OF_STOCK） |
+| `stocks` | game_type, business_mode, inventory_type, value_added_service, stock_no, game_account, game_password, channel_region, bound_phone, has_secondary, platform, status, inventory_status, inventory_entry_at, buy_date, cost_amount, account_description, account_images(JSON), note, form_extra | `stock_no`（`KU_` 五位）为库存主键语义编号；`game_account` 仅是文本，**不唯一**（同一账号可多次收购）；`game_password` 按既定裁决明文存储，不做加密或脱敏；滞销颜色由前端按 `buy_date` 计算，不落库；`status` 与 `inventory_status` 两轴并存——前者为账号生命周期（WAITING/SOLD/VOID），后者为库存在场状态（IN_STOCK/OUT_OF_STOCK）；库存占用由 `BUY` 及关联支出资金明细计算，不新增 `COST` 事件 |
 
 ### 4.5 分期
 
@@ -243,7 +247,7 @@ ORM 模型共 **39 张表**，另有 Alembic 自建的 `alembic_version` 与迁�
 
 固定不可配置项：DG 代挂沿用统一 `SELL` 事件登记卖出金额与订单利润，寄售方经 `CONSIGNOR` 关联，不配抽成比例或单独结算公式。
 
-多人分配规则：`order_profit_allocations` 的 `allocation_type` 表动作性质（`BUY` / `SELL` / `OPERATION`）或 `COMPANY`（不绑人），`role` 取 `AllocationRole`；分配基数为订单利润（售出金额 − 买入成本 − 直接成本），返点收益独立核算；买号/售出执行人自动绑定不可手改；四项合计必须 100%。
+多人分配规则：`order_profit_allocations` 的 `allocation_type` 表示分润归属（`BUY` / `SELL` / `OPERATION`）或 `COMPANY`（不绑人），`role` 取 `AllocationRole`；分配基数按订单收入与关联支出资金明细计算，返点收益独立核算；买号/售出执行人自动绑定不可手改；四项合计必须 100%。
 
 ## 8. 口径裁决（长期有效）
 
@@ -251,4 +255,4 @@ ORM 模型共 **39 张表**，另有 Alembic 自建的 `alembic_version` 与迁�
 2. `total` 语义 = 成交总额（gross），不等于 principal + profit。
 3. 资金只到池一级，系统余额为池内已审核流水有符号和，无「开户余额」概念。
 4. 历史 89 单可标 `UNLINKED`；19 笔返点保留未关联待人工补齐；不得自动匹配，不阻塞新单上线。
-5. 蹭点→DG；氪金联盟提号/氪金提号/提号→TH；小荷包/经营池→`HJ_INVEST`；介绍费、作图费为账号附加 `COST`，不计运营消耗；八月利润转 `UNLINKED_TRANSFER`，无原始凭证不补另一侧。
+5. 蹭点→DG；氪金联盟提号/氪金提号/提号→TH；小荷包/经营池→`HJ_INVEST`；介绍费、作图费等支出统一登记为 `cashflow` 的 `OUT`，按资金原因和来源业务关联，不新增账号附加 `COST`；八月利润转 `UNLINKED_TRANSFER`，无原始凭证不补另一侧。

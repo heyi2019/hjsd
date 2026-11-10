@@ -192,12 +192,13 @@ export function AppShell() {
             <h1 className="topbar__page">{item?.label ?? "用户中心"}</h1>
           </div>
           <Space size="small" className="topbar-actions">
-            <div className="theme-switch" role="group" aria-label="主题切换">
+            <div className="theme-switch" role="radiogroup" aria-label="主题切换">
               <div className="theme-switch-options">
                 <button
                   type="button"
                   className={mode === "system" ? "is-active" : ""}
-                  aria-pressed={mode === "system"}
+                  role="radio"
+                  aria-checked={mode === "system"}
                   onClick={() => setMode("system")}
                 >
                   系统
@@ -205,7 +206,8 @@ export function AppShell() {
                 <button
                   type="button"
                   className={mode === "light" ? "is-active" : ""}
-                  aria-pressed={mode === "light"}
+                  role="radio"
+                  aria-checked={mode === "light"}
                   onClick={() => setMode("light")}
                 >
                   浅色（默认）
@@ -213,7 +215,8 @@ export function AppShell() {
                 <button
                   type="button"
                   className={mode === "dark" ? "is-active" : ""}
-                  aria-pressed={mode === "dark"}
+                  role="radio"
+                  aria-checked={mode === "dark"}
                   onClick={() => setMode("dark")}
                 >
                   深色

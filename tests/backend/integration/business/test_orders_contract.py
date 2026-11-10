@@ -1,7 +1,7 @@
 """API-01 orders 订单/事件契约测试（ORD-01/02、FIN-01/03）。
 
 与 test_orders.py / test_bughunt.py / test_m2.py 的分工：既有文件已覆盖四类业务建单、
-BUY/COST/SELL/PAYMENT/DELIVER/CANCEL(无 offset) 登记、状态机、路由缺失等主路径；
+BUY/SELL/DELIVER/CANCEL/OPERATE(无 offset) 登记、状态机、路由缺失等主路径；
 本文件补NotFound/越权/过滤/非法入参分支、`_opposite_direction` 三分支、
 `_apply_account_effect` 防御与 CANCEL 分支、以及 3 个未测路由端点。
 """
@@ -121,6 +121,26 @@ def test_inline_order_creates_inventory_in_one_request(seeded_client, seeded_db,
     assert account is not None
     assert account.inventory_type == inventory_type
     assert account.cost_amount == Decimal("110.00" if order_type != "DG" else "0.00")
+
+    if order_type != "DG":
+        order_id = response.json()["id"]
+        assert not seeded_db.scalars(
+            select(OrderEvent).where(
+                OrderEvent.order_id == order_id,
+                OrderEvent.event_type == "COST",
+            )
+        ).first()
+        expense = seeded_db.scalars(
+            select(Cashflow).where(
+                Cashflow.order_id == order_id,
+                Cashflow.category == "FEE",
+            )
+        ).first()
+        assert expense is not None
+        assert expense.direction == "OUT"
+        assert expense.accounting_attribute in {"SELF_DIRECT_COST", "TH_DIRECT_COST"}
+        list_row = _order_list_payload(seeded_db, [seeded_db.get(Order, order_id)])[0]
+        assert list_row["cost_amount"] == Decimal("110.00")
 
 def test_order_success_time_is_inventory_entry_time(seeded_db):
     account = stocks_service.create_account(
@@ -436,16 +456,6 @@ class TestCreateOrderValidation:
 
     def test_installment_gate_flags_must_be_boolean_in_service(self, seeded_db):
         order = _order(seeded_db, order_type="HS")
-        with pytest.raises(Validation, match="allow_installment_payment 必须为布尔值"):
-            order_service.post_event(
-                seeded_db,
-                order.id,
-                event_type="BUY",
-                amount=Decimal("100"),
-                occurred_on=D,
-                actor="pytest",
-                allow_installment_payment="false",
-            )
         with pytest.raises(Validation, match="allow_installment_delivery 必须为布尔值"):
             order_service.post_event(
                 seeded_db,
@@ -504,19 +514,27 @@ class TestCreateOrderValidation:
         )
         assert sell.status_code == 201, sell.text
 
-        cost = seeded_client.post(
+    def test_order_api_rejects_removed_event(self, seeded_client, seeded_db, headers):
+        order = order_service.create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=D,
+            actor="pytest",
+        )
+        seeded_db.commit()
+
+        response = seeded_client.post(
             f"/api/v1/orders/{order.id}/events",
-            headers=auth,
+            headers=headers,
             json={
                 "event_type": "COST",
                 "amount": "10",
                 "occurred_on": D.isoformat(),
-                "pool_id": 1,
-                "flow_category": "FEE",
             },
         )
-        assert cost.status_code == 403, cost.text
-        assert cost.json()["code"] == ErrorCode.PERMISSION_DENIED
+
+        assert response.status_code == 422, response.text
+        assert "事件类型必须为" in response.json()["message"]
 
     def test_order_creation_validates_participants_before_creating_order(self, seeded_db):
         customer = parties_service.create_customer(
@@ -637,15 +655,14 @@ class TestCreateOrderValidation:
     def test_invalid_order_amounts_are_business_errors_in_service(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation, match="必须大于 0"):
-            # BUY 金额允许为 0（提号表单金额选填以 0 兜底，events.post_event 放行 0），
-            # 故用 COST（金额必须为正）验证“非法金额=业务错误”的语义。
             order_service.post_event(
                 seeded_db,
                 order.id,
-                event_type="COST",
+                event_type="PROFIT_SHARE",
                 amount=Decimal("0"),
                 occurred_on=D,
                 actor="pytest",
+                profit_recipient="COMPANY",
             )
 
     @pytest.mark.parametrize("field", ["event_type", "portion"])
@@ -1230,38 +1247,6 @@ class TestPostEventValidation:
             select(OrderEvent.id).where(OrderEvent.order_id == order.id)
         )
 
-    def test_invalid_cost_category_leaves_no_event_or_cashflow(self, seeded_db):
-        order = _order(seeded_db)
-
-        with pytest.raises(Validation):
-            order_service.post_event(
-                seeded_db,
-                order.id,
-                event_type="COST",
-                amount="10.00",
-                occurred_on=D,
-                actor="pytest",
-                flow_category="INVALID",
-            )
-
-        assert seeded_db.scalars(
-            select(OrderEvent).where(OrderEvent.order_id == order.id)
-        ).all() == []
-        assert seeded_db.scalars(
-            select(Cashflow).where(Cashflow.order_id == order.id)
-        ).all() == []
-
-        with pytest.raises(Validation, match="资金分类"):
-            order_service.post_event(
-                seeded_db,
-                order.id,
-                event_type="COST",
-                amount="1.00",
-                occurred_on=D,
-                actor="pytest",
-                flow_category=[],
-            )
-
     def test_invalid_event_type_rejected(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation) as exc:
@@ -1303,43 +1288,6 @@ class TestPostEventValidation:
                 seeded_db, order.id, event_type="BUY", amount="1.00",
                 occurred_on=D, actor="pytest", pool_id=999999,
             )
-
-    def test_refund_event_records_responsibility_and_limits_amount(self, seeded_db):
-        order = _order(seeded_db, order_type="TH")
-        order_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount="60.00",
-            occurred_on=D, actor="pytest",
-        )
-        order_service.post_event(
-            seeded_db, order.id, event_type="SELL", amount="100.00",
-            occurred_on=D, actor="pytest",
-        )
-        refund, flow = order_service.post_event(
-            seeded_db, order.id, event_type="REFUND", amount="40.00",
-            occurred_on=D, actor="pytest", reason="售后退款",
-            refund_responsibility="COMPANY",
-        )
-        assert refund.refund_responsibility == "COMPANY"
-        assert flow.direction == "OUT"
-        assert flow.accounting_attribute == "REFUND"
-        with pytest.raises(Validation, match="退款金额超过可退余额"):
-            order_service.post_event(
-                seeded_db, order.id, event_type="REFUND", amount="61.00",
-                occurred_on=D, actor="pytest", reason="超额退款",
-                refund_responsibility="COMPANY",
-            )
-
-    def test_refund_requires_sale_and_defaults_responsibility(self, seeded_db):
-        order = _order(seeded_db, order_type="TH")
-        with pytest.raises(Validation):
-            order_service.post_event(seeded_db, order.id, event_type="REFUND", amount="1", occurred_on=D, actor="pytest", reason="售后")
-        order_service.post_event(seeded_db, order.id, event_type="BUY", amount="60", occurred_on=D, actor="pytest")
-        order_service.post_event(seeded_db, order.id, event_type="SELL", amount="100", occurred_on=D, actor="pytest")
-        refund, _ = order_service.post_event(seeded_db, order.id, event_type="REFUND", amount="20", occurred_on=D, actor="pytest", reason="售后")
-        assert refund.refund_responsibility == "COMPANY"
-        order.status = "COMPLETED"
-        refund, _ = order_service.post_event(seeded_db, order.id, event_type="REFUND", amount="30", occurred_on=D, actor="pytest", reason="售后")
-        assert refund.amount == 30
 
 # ------------------------------------------------------------------ 冲销方向
 class TestCancelOffsetDirection:
@@ -1503,30 +1451,6 @@ class TestCancelOffsetDirection:
         assert exc.value.code == ErrorCode.VALIDATION_ERROR
         assert "同一订单" in str(exc.value)
 
-    def test_cancel_cost_reverses_cashflow_to_income(self, seeded_db):
-        order = _order(seeded_db)
-        cost, _ = order_service.post_event(
-            seeded_db,
-            order.id,
-            event_type="COST",
-            amount="30.00",
-            occurred_on=D,
-            actor="pytest",
-        )
-
-        _cancel, flow = order_service.post_event(
-            seeded_db,
-            order.id,
-            event_type="CANCEL",
-            amount="30.00",
-            occurred_on=D,
-            actor="pytest",
-            offset_event_id=cost.id,
-            reason="费用退回",
-        )
-
-        assert flow.direction == "IN"
-
 # ------------------------------------------------------------------ 账号效果
 class TestAccountEffect:
     def test_event_updates_account_operator(self, seeded_db):
@@ -1666,20 +1590,9 @@ class TestAccountEffect:
 
         assert account.status == AccountStatus.VOID.value
 
-    def test_payment_event_cannot_bypass_installment_service(self, seeded_db):
+    def test_removed_payment_event_is_rejected(self, seeded_db):
         order = _order(seeded_db, order_type="TH")
-        installments_service.create_installment(
-            seeded_db,
-            order_id=order.id,
-            contract_type=InstallmentContractType.PICKUP_SALE.value,
-            principal=Decimal("1000"),
-            periods=1,
-            per_period=Decimal("1000"),
-            first_due_on=D,
-            actor="pytest",
-        )
-
-        with pytest.raises(Validation, match="分期收款流程"):
+        with pytest.raises(Validation, match="事件类型必须为"):
             order_service.post_event(
                 seeded_db,
                 order.id,
@@ -1688,40 +1601,6 @@ class TestAccountEffect:
                 occurred_on=D,
                 actor="pytest",
             )
-
-    def test_cancel_payment_is_rejected_until_schedule_reversal_is_supported(self, seeded_db):
-        order = _order(seeded_db, order_type="TH")
-        contract = installments_service.create_installment(
-            seeded_db,
-            order_id=order.id,
-            contract_type=InstallmentContractType.PICKUP_SALE.value,
-            principal=to_money("1000"),
-            periods=1,
-            per_period=to_money("1000"),
-            first_due_on=D,
-            actor="pytest",
-        )
-        installments_service.pay(
-            seeded_db, contract.id, amount="100.00", paid_on=D, actor="pytest"
-        )
-        payment = seeded_db.scalar(
-            select(OrderEvent)
-            .where(
-                OrderEvent.order_id == order.id,
-                OrderEvent.event_type == "PAYMENT",
-            )
-            .order_by(OrderEvent.id.desc())
-        )
-        assert payment is not None
-
-        with pytest.raises(Validation) as exc:
-            order_service.post_event(
-                seeded_db, order.id, event_type="CANCEL", amount="100.00",
-                occurred_on=D, actor="pytest", offset_event_id=payment.id,
-                reason="收款撤销",
-            )
-
-        assert "分期" in str(exc.value)
 
     def test_account_none_branch_is_defensive(self, seeded_db):
         # FK 全局强制使 ORM 路径不可达（账号删除是 SET NULL）；直调私有函数覆盖防御分支

@@ -88,6 +88,9 @@ class OrderInstallmentCreate(BaseModel):
     adjust_final_period: bool = False
     first_due_on: date
     delivery_mode: str | None = None
+    delivery_direction: str | None = Field(
+        default=None, description="DELIVER 的交付方向：BUY / SELL"
+    )
     note: str | None = None
     schedule: list[OrderInstallmentScheduleCreate] | None = None
 
@@ -220,6 +223,18 @@ class EventCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     event_type: str
+    sale_mode: str | None = Field(
+        default=None, description="SELL 的售出方式：FULL / INSTALLMENT"
+    )
+    operation_type: str | None = Field(
+        default=None, description="OPERATE 的运营动作：IMAGE / DESCRIPTION / CONSIGNMENT / UNLIST"
+    )
+    rebate_type: str | None = Field(
+        default=None, description="REBATE 的返点归属：BUY / SELL"
+    )
+    profit_recipient: str | None = Field(
+        default=None, description="PROFIT_SHARE 的分润对象：BUY / SELL / OPERATION / COMPANY"
+    )
     amount: Decimal = Field(default=Decimal("0"))
     occurred_on: date
     pool_id: int | None = Field(default=None, description="显式池优先于默认路由")
@@ -227,13 +242,10 @@ class EventCreate(BaseModel):
     amount2: Decimal | None = Field(default=None, description="售出拆分：分笔进不同资金池的第二笔金额")
     portion: str = "PRINCIPAL"
     delivery_mode: str | None = None
+    delivery_direction: str | None = None
     offset_event_id: int | None = None
     reason: str | None = None
-    refund_responsibility: str | None = None
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
-    flow_category: str | None = Field(
-        default=None, description="COST 时可填 FEE / DESIGN / OTHER"
-    )
     note: str | None = None
     bound_phone: str | None = Field(default=None, max_length=64)
     bound_phone_owner: str | None = Field(default=None, max_length=128)
@@ -249,16 +261,20 @@ class EventOut(BaseModel):
     event_no: str
     order_id: int
     event_type: str
+    sale_mode: str | None = None
+    operation_type: str | None = None
+    rebate_type: str | None = None
+    profit_recipient: str | None = None
     amount: Decimal
     occurred_on: date
     pool_id: int | None = None
     offset_event_id: int | None = None
     portion: str
     delivery_mode: str | None = None
+    delivery_direction: str | None = None
     is_posted: bool
     posted_at: datetime | None = None
     reason: str | None = None
-    refund_responsibility: str | None = None
     operator_user_ids: list[int] | None = None
     note: str | None = None
     form_extra: dict[str, object] | None = None

@@ -3,7 +3,7 @@ A01,A,工作台看板与经营聚合,前端 DashboardPage / app/reporting 聚合
 A02,A,经营数据可视化组件,前端图表/卡片组件,图表与卡片渲染,低,
 B01,B,订单创建(HS/TH/DG),app/orders/router.py,create.py,POST /orders→201+order_no+ACTIVE,高,BIZ-ORDER-001
 B02,B,订单状态流转,app/orders/events.py,mutations.py,core/state_machine,ACTIVE→COMPLETED/CANCELLED；非法流转拒绝,高,BIZ-ORDER-002
-B03,B,订单事件与资金派生(BUY/SELL/COST),app/orders/events.py,amounts.py,事件→生成 Cashflow 并派生成本/收入,高,BIZ-ORDER-003
+B03,B,订单事件与资金明细派生(BUY/SELL),app/orders/events.py,amounts.py,业务事件按规则关联资金明细；支出不新增 COST 事件,高,BIZ-ORDER-003
 B04,B,账号入库/库存创建,app/orders/create.py(_create_inline_inventory_account),KU_+5、inventory_entry_at 写入,高,BIZ-INV-INTAKE-001/002/003/004/005
 B05,B,库存健康与占用成本(R1),app/stocks/inventory.py,在库账号占用成本与库龄档位,中,BIZ-INV-STAT-001
 B06,B,库存售出/出库,app/stocks,orders events,售出后库存状态与利润核算,中,BIZ-E2E-FLOW-B

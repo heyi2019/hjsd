@@ -48,7 +48,7 @@ from app.domain.enums import (
     InstallmentStatus,
     ScheduleStatus,
 )
-from app.domain.trade import InstallmentSchedule, OrderEvent
+from app.domain.trade import Cashflow, InstallmentSchedule, OrderEvent
 from app.value_added_services import service as installment_service
 from app.orders import service as orders_service
 
@@ -118,6 +118,61 @@ def _contract(
         actor="pytest",
         **kwargs,
     )
+
+
+def test_installment_sale_posts_sell_attribute_without_sale_cashflow(seeded_db):
+    """分期售出先登记 SELL 属性，收入在后续分期资金明细中登记。"""
+    account = _account(seeded_db, "installment-sale-attribute")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id)
+
+    event, flow = orders_service.post_event(
+        seeded_db,
+        order.id,
+        event_type=EventType.SELL.value,
+        sale_mode="INSTALLMENT",
+        amount=Decimal("1000.00"),
+        occurred_on=TODAY,
+        actor="pytest",
+        portion="PROFIT",
+    )
+
+    assert flow is None
+    assert event.event_type == EventType.SELL.value
+    assert event.form_extra == {"sale_mode": "INSTALLMENT"}
+    assert order.status == "ACTIVE"
+    assert seeded_db.scalar(
+        select(Cashflow.id).where(Cashflow.order_event_id == event.id)
+    ) is None
+
+    contract = _contract(
+        seeded_db,
+        order.id,
+        contract_type=InstallmentContractType.STOCK_SALE.value,
+        principal="1000.00",
+        down_payment="100.00",
+        periods=1,
+        per_period="900.00",
+    )
+    assert contract.order_id == order.id
+    assert order.status == "INSTALLMENT"
+
+    installment_service.pay(
+        seeded_db,
+        contract.id,
+        amount=Decimal("100.00"),
+        paid_on=TODAY,
+        period_no=0,
+        actor="pytest",
+    )
+    payment_flow = seeded_db.scalar(
+        select(Cashflow).where(
+            Cashflow.order_id == order.id,
+            Cashflow.category == "INSTALLMENT_PAYMENT",
+        )
+    )
+    assert payment_flow is not None
+    assert payment_flow.order_event_id is None
 
 def _posted_event(seeded_db, order_id: int, *, event_type: str, amount: str, offset_event_id=None):
     event = OrderEvent(
@@ -234,105 +289,23 @@ def test_cancel_rejects_non_active_order(seeded_db):
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
         )  # 674-682
 
-def test_cancel_skips_payment_already_reversed(seeded_db):
-    """PAYMENT 已被 CANCEL 冲销同额 → remaining<=0，跳过逐笔退款（L712）。"""
+def test_cancel_reverses_direct_installment_cashflows(seeded_db):
+    """取消分期只冲销分期收入资金明细，不创建 CANCEL 订单事件。"""
     order = _order(seeded_db, order_type="TH")
-    contract = _contract(seeded_db, order.id)
-    payment = _posted_event(seeded_db, order.id, event_type=EventType.PAYMENT.value, amount="100")
-    _posted_event(
-        seeded_db,
-        order.id,
-        event_type=EventType.CANCEL.value,
-        amount="100",
-        offset_event_id=payment.id,
-    )
+    contract = _contract(seeded_db, order.id, principal="1000", down_payment="100", periods=1, per_period="900")
+    installment_service.pay(seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="pytest")
     result = installment_service.cancel_installment(
         seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
     )
-    assert result["refund_amount"] == Decimal("0.00")  # 696-712
-
-def test_cancel_refund_total_matches_per_event_recompute(seeded_db):
-    """取消退款总额必须与「逐笔 PAYMENT 独立核算」一致。
-
-    2026-10-28 把 cancel_installment 内逐笔 SUM(CANCEL) 改写成一次 GROUP BY
-    （原实现是循环内查询，N+1）。这条用例用**与实现无关的循环重算**做交叉验证：
-    退款 = Σ max(0, 该笔 PAYMENT 金额 − 该笔已被冲销金额)。
-    覆盖三种情形：全额未退、部分已退、多笔并存（应退 100 / 80 / 300）。
-    """
-    account = _account(seeded_db, "cancel-multi-refund")
-    purchase = _order(seeded_db, order_type="HS", account_id=account.id)
-    _buy(seeded_db, purchase.id, amount="800")
-    order = _order(seeded_db, order_type="HS", account_id=account.id)
-    contract = _contract(
-        seeded_db,
-        order.id,
-        contract_type=InstallmentContractType.STOCK_SALE.value,
-        principal="1000",
-        down_payment="100",
-        periods=1,
-        per_period="900",
-    )
-    # 两笔真实收款（走 pay 才会"被合约承认"，后续才有可退金额）
-    installment_service.pay(
-        seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="pytest"
-    )
-    installment_service.pay(
-        seeded_db, contract.id, amount=Decimal("300"), paid_on=TODAY, period_no=1, actor="pytest"
-    )
-    payments = list(
-        seeded_db.scalars(
-            select(OrderEvent)
-            .where(
-                OrderEvent.order_id == order.id,
-                OrderEvent.event_type == EventType.PAYMENT.value,
-                OrderEvent.is_posted.is_(True),
-            )
-            .order_by(OrderEvent.id)
-        ).all()
-    )
-    # 第 2 笔先手工冲销 120（直接写事件，避免再触发资金池路由），应只剩 180 可退
-    seeded_db.add(OrderEvent(
-        event_no="EVT-OFFSET-PRIOR-120",
-        order_id=order.id,
-        event_type=EventType.CANCEL.value,
-        amount=Decimal("120"),
-        occurred_on=TODAY,
-        is_posted=True,
-        offset_event_id=payments[1].id,
-    ))
-    seeded_db.flush()
-
-    def _loop_total() -> Decimal:
-        """原口径重算：逐笔查该 PAYMENT 的已冲销额。"""
-        expected = Decimal("0")
-        for payment in payments:
-            already = sum(
-                (
-                    item.amount
-                    for item in seeded_db.scalars(
-                        select(OrderEvent).where(
-                            OrderEvent.offset_event_id == payment.id,
-                            OrderEvent.event_type == EventType.CANCEL.value,
-                            OrderEvent.is_posted.is_(True),
-                        )
-                    ).all()
-                ),
-                Decimal("0"),
-            )
-            remaining = payment.amount - already
-            if remaining > 0:
-                expected += remaining
-        return expected
-
-    expected = _loop_total()
-    assert expected == Decimal("280.00")  # 100 + (300 - 120)
-
-    result = installment_service.cancel_installment(
-        seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
-    )
-    assert result["refund_amount"] == expected
-    # 两笔可退：第 1 笔 100 + 第 2 笔剩余 180
-    assert len(result["cancel_event_ids"]) == 2
+    assert result["refund_amount"] == Decimal("100.00")
+    assert result["cancel_event_ids"] == []
+    assert seeded_db.scalar(
+        select(Cashflow.id).where(
+            Cashflow.order_id == order.id,
+            Cashflow.category == "REVERSAL",
+            Cashflow.reversal_of_id.is_not(None),
+        )
+    ) is not None
 
 # ------------------------------------------------------------- 减免：期次守卫
 def test_waive_rejects_missing_period(seeded_db):
@@ -900,16 +873,19 @@ def test_settle_early_filters_settled_rows_but_keeps_one_cent(seeded_db):
 
     def _payments():
         return seeded_db.scalars(
-            select(OrderEvent).where(OrderEvent.event_type == EventType.PAYMENT.value)
+            select(Cashflow).where(
+                Cashflow.order_id == contract.order_id,
+                Cashflow.category == "INSTALLMENT_PAYMENT",
+            )
         ).all()
 
-    before = {event.id for event in _payments()}
+    before = {flow.id for flow in _payments()}
     result = installment_service.settle_early(
         seeded_db, contract.id, paid_on=TODAY, actor="pytest", pool_id=1
     )
     assert result.id == contract.id
-    created = [event for event in _payments() if event.id not in before]
-    assert len(created) == 1, "付清/超额付的行不得生成 PAYMENT，只差 1 分的行必须结清"
+    created = [flow for flow in _payments() if flow.id not in before]
+    assert len(created) == 1, "付清/超额付的行不得重复生成资金明细，只差 1 分的行必须结清"
     assert created[0].amount == Decimal("0.01")
 
 def test_recover_rejects_dangling_order(seeded_db):

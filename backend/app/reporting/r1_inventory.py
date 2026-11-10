@@ -36,7 +36,6 @@ def r1_inventory_health(
     """R1 库存健康表：统计独立库存状态为在库的回收/代挂账号。"""
     today = date.today()
 
-    order_cost: dict[int, Decimal] = defaultdict(lambda: ZERO)
     order_income: dict[int, Decimal] = defaultdict(lambda: ZERO)
     event_rows = session.scalars(
         _apply_order_scope(
@@ -51,9 +50,8 @@ def r1_inventory_health(
     for event in event_rows:
         events_by_order[event.order_id].append(event)
     for order_id, events in events_by_order.items():
-        income, buy_amount, direct_cost = _event_totals(events)
+        income, _buy_amount, _direct_cost = _event_totals(events)
         order_income[order_id] = income
-        order_cost[order_id] = buy_amount + direct_cost
 
     active_stmt = select(Order).where(Order.status == OrderStatus.ACTIVE.value)
     active_stmt = _apply_order_scope(active_stmt, user, session)
@@ -97,9 +95,6 @@ def r1_inventory_health(
                 "business": ",".join({o.order_type for o in orders}) or None,
                 "status": account.inventory_status,
                 "buy_amount": total_cost,
-                "extra_cost": max(
-                    ZERO, sum((order_cost[o.id] for o in orders), ZERO) - total_cost
-                ),
                 "total_cost": total_cost,
                 "holding_days": holding_days,
                 "expected_price": expected_price,

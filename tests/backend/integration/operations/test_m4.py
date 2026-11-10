@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from sqlalchemy import func, select
@@ -12,7 +13,9 @@ from sqlalchemy.exc import IntegrityError
 
 from app.stocks import service as stocks_service
 from app.domain.enums import ImportRowStatus
+from app.domain.foundation import Pool
 from app.domain.imports import ImportBatch, ImportRow
+from app.finance.cashflows import create_cashflow
 from app.imports import service as import_service
 from app.orders import service as order_service
 from app.reporting import service as reporting_service
@@ -27,8 +30,8 @@ class TestReports:
         for item in data["items"]:
             assert item["status"] == "IN_STOCK"
 
-    def test_r2_operating_expense_excludes_account_cost(self, seeded_db):
-        """账号 COST 只能进直接成本，不能进运营费用（R2 验收口径）。"""
+    def test_r2_operating_expense_excludes_account_direct_cashflow(self, seeded_db):
+        """账号直接支出资金明细进入直接成本，不进入运营费用（R2 验收口径）。"""
         from datetime import date
 
         account = stocks_service.create_account(
@@ -53,13 +56,20 @@ class TestReports:
             occurred_on=date(2026, 10, 4),
             actor="pytest",
         )
-        order_service.post_event(
+        pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+        create_cashflow(
             seeded_db,
-            order.id,
-            event_type="COST",
-            amount="300.00",
+            pool_id=pool.id,
             occurred_on=date(2026, 10, 4),
+            direction="OUT",
+            nature="BUSINESS_OUT",
+            fund_nature="BUSINESS",
+            accounting_attribute="SELF_DIRECT_COST",
+            category="OTHER",
+            amount=Decimal("300.00"),
             actor="pytest",
+            order_id=order.id,
+            note="账号直接支出",
         )
         data = reporting_service.r2_monthly_pnl(seeded_db)
         month = [i for i in data["items"] if i["month"] == "2026-10"]

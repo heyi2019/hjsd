@@ -54,7 +54,7 @@ describe("OrderDetail", () => {
     expect(within(panel).getAllByText("操作人").length).toBeGreaterThanOrEqual(1);
     expect(within(panel).getAllByText("admin").length).toBeGreaterThanOrEqual(2);
     expect(within(panel).getAllByText("100.00").length).toBeGreaterThanOrEqual(2);
-    expect(within(panel).getByText("买号本金")).toBeInTheDocument();
+    expect(within(panel).getByText("买号支出")).toBeInTheDocument();
     expect(within(panel).getByText("总支出")).toBeInTheDocument();
   });
 
@@ -182,7 +182,7 @@ describe("OrderDetail", () => {
     render(<OrderDetail row={account} detail={detail} loading={false} />);
 
     expect(screen.getByText("操作追溯")).toBeInTheDocument();
-    expect(screen.getByText("取消")).toBeInTheDocument();
+    expect(screen.getAllByText(/取消/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("系统下架同步取消寄售平台上架")).toBeInTheDocument();
   });
 

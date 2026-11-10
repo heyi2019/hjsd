@@ -231,6 +231,69 @@ def create_cashflow(
     return _cashflow_out(db, flow)
 
 
+@router.post("/orders/{order_id}/cashflows", response_model=schemas.CashflowOut, status_code=201)
+def create_order_cashflow(
+    order_id: int,
+    payload: schemas.CashflowCreate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_rebate,
+) -> schemas.CashflowOut:
+    """登记订单关联的收入/支出资金明细，不新增业务事件。"""
+    if payload.order_id is not None and payload.order_id != order_id:
+        raise Validation(
+            "资金明细关联订单与路径订单不一致",
+            details={"field": "order_id", "order_id": order_id},
+        )
+    flow = service.create_cashflow(
+        db,
+        pool_id=payload.pool_id,
+        occurred_on=payload.occurred_on,
+        direction=payload.direction.strip().upper(),
+        nature=payload.nature.strip().upper(),
+        fund_nature=payload.fund_nature.strip().upper() if payload.fund_nature else None,
+        accounting_attribute=(
+            payload.accounting_attribute.strip().upper()
+            if payload.accounting_attribute
+            else None
+        ),
+        category=payload.category,
+        amount=payload.amount,
+        order_id=order_id,
+        note=payload.note,
+        extra_values=payload.extra_values,
+        form_extra=payload.form_extra,
+        form_extra_scope=payload.form_extra_scope,
+        actor=_actor(user),
+        user=user,
+    )
+    return _cashflow_out(db, flow)
+
+
+@router.post("/orders/{order_id}/cashflows/refund", response_model=schemas.CashflowOut, status_code=201)
+def create_order_refund(
+    order_id: int,
+    payload: schemas.CashflowRefundCreate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_rebate,
+) -> schemas.CashflowOut:
+    """交付后的退款只登记支出资金明细，不再写入 REFUND 业务事件。"""
+    flow = service.create_order_refund(
+        db,
+        order_id=order_id,
+        pool_id=payload.pool_id,
+        amount=payload.amount,
+        refunded_on=payload.refunded_on,
+        reason=payload.reason,
+        refund_responsibility=payload.refund_responsibility,
+        operator_user_ids=payload.operator_user_ids,
+        form_extra=payload.form_extra,
+        form_extra_scope=payload.form_extra_scope,
+        actor=_actor(user),
+        user=user,
+    )
+    return _cashflow_out(db, flow)
+
+
 @router.post("/cashflows/{cashflow_id}/reverse", response_model=schemas.CashflowOut)
 def reverse_cashflow(
     cashflow_id: int,

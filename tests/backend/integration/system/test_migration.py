@@ -423,6 +423,39 @@ def test_upgrade_is_repeatable(migration_db):
     assert (pool_count, type_count, route_count) == (2, 3, 6)
 
 
+def test_upgrade_repairs_existing_dev_schema_drift(migration_db):
+    """增量迁移应修复旧 dev 库的已知漂移，而不是只对空库建模。"""
+    engine, target, env = migration_db
+    downgraded = _alembic(env, "downgrade", "0007_sync_audit_action_option_set")
+    assert downgraded.returncode == 0, downgraded.stdout + downgraded.stderr
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE rebate_settlements (id INTEGER PRIMARY KEY)"))
+        connection.execute(text("DROP INDEX IF EXISTS ix_cashflow_nature"))
+        connection.execute(text("DROP INDEX IF EXISTS ix_cashflow_fund_nature"))
+        connection.execute(text("ALTER TABLE order_type_pools DROP CONSTRAINT IF EXISTS uq_order_type_pools_route"))
+        connection.execute(text("ALTER TABLE cashflow ALTER COLUMN created_at DROP NOT NULL"))
+        connection.execute(text("ALTER TABLE orders ALTER COLUMN created_at DROP NOT NULL"))
+
+    upgraded = _alembic(env, "upgrade", "head")
+    assert upgraded.returncode == 0, upgraded.stdout + upgraded.stderr
+
+    with engine.connect() as connection:
+        inspector = inspect(connection)
+        assert "rebate_settlements" not in inspector.get_table_names()
+        cashflow_indexes = {item["name"] for item in inspector.get_indexes("cashflow")}
+        assert {"ix_cashflow_nature", "ix_cashflow_fund_nature"} <= cashflow_indexes
+        unique_constraints = {
+            item["name"] for item in inspector.get_unique_constraints("order_type_pools")
+        }
+        assert "uq_order_type_pools_route" in unique_constraints
+        assert next(
+            column for column in inspector.get_columns("cashflow") if column["name"] == "created_at"
+        )["nullable"] is False
+        assert next(
+            column for column in inspector.get_columns("orders") if column["name"] == "created_at"
+        )["nullable"] is False
+
+
 def test_current_migration_head_is_exposed():
     result = _alembic({}, "heads")
     assert result.returncode == 0, result.stdout + result.stderr
@@ -442,12 +475,12 @@ def test_current_migration_head_is_exposed():
 def test_active_migration_chain_has_timestamp_follow_ups():
     result = _alembic({}, "heads")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip().startswith("0001 ")
+    assert result.stdout.strip().endswith("(head)")
 
     active_dir = BACKEND_DIR / "alembic" / "squashed_versions"
-    assert sorted(path.name for path in active_dir.glob("*.py")) == [
-        "0001_current_schema_baseline.py",
-    ]
+    active_files = sorted(path.name for path in active_dir.glob("*.py"))
+    assert active_files[0] == "0001_current_schema_baseline.py"
+    assert active_files[-1] == "0008_align_existing_schema.py"
 
 
 def test_downgrade_and_upgrade_roundtrip(migration_db):

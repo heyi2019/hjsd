@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.errors import AppError, ErrorCode
-from app.domain.enums import CapitalType, PoolStatus, Portion
+from app.domain.enums import AuditAction, CapitalType, EventType, PoolStatus, Portion
 from app.domain.options import OptionSet
 from app.domain.trade_models.form_config import OrderFormField
 from app.foundation.catalog_seed import seed_catalog
@@ -28,6 +28,32 @@ class TestOrderTypes:
 
         assert db.query(OptionSet).count() == first_option_count
         assert db.query(OrderFormField).count() == first_field_count
+
+    def test_order_event_dictionary_excludes_retired_cost_event(self, db):
+        seed_catalog(db, actor="pytest")
+        db.commit()
+
+        event_types = db.query(OptionSet).filter_by(code="ORDER_EVENT_TYPE").one()
+        values = [item["value"] for item in event_types.options or []]
+        labels = [item["label"] for item in event_types.options or []]
+        assert values == ["BUY", "SELL", "DELIVER", "CANCEL", "OPERATE", "REBATE", "PROFIT_SHARE"]
+        assert "COST" not in values
+        assert "PAYMENT" not in values
+        assert "REFUND" not in values
+        assert "附加成本" not in labels
+
+    def test_active_event_enum_excludes_legacy_finance_events(self):
+        assert [event.value for event in EventType] == [
+            "BUY", "SELL", "DELIVER", "CANCEL", "OPERATE", "REBATE", "PROFIT_SHARE"
+        ]
+
+    def test_audit_action_dictionary_matches_runtime_enum(self, db):
+        seed_catalog(db, actor="pytest")
+        db.commit()
+
+        audit_actions = db.query(OptionSet).filter_by(code="AUDIT_ACTION").one()
+        values = [item["value"] for item in audit_actions.options or []]
+        assert values == [action.value for action in AuditAction]
 
     def test_new_business_needs_no_code_change(self, db):
         order_type = service.create_order_type(

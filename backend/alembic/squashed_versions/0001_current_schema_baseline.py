@@ -14,21 +14,12 @@ from alembic import op
 from sqlalchemy.orm import Session
 
 from app.core.database import Base
-from app.domain import (  # noqa: F401
-    attachments,
-    foundation,
-    imports,
-    lists,
-    notifications,
-    options,
-    parties,
-    quality,
-    trade,
-    users,
-)
+from app.domain import attachments, foundation, imports, lists, notifications, options, parties, quality, trade, users  # noqa: F401
 from app.foundation.seeds import seed_foundation
 from app.foundation.catalog_seed import seed_catalog
 
+# 导入模块会向 Base.metadata 注册全部当前模型；元组同时让该副作用显式可见。
+_DOMAIN_MODULES = (attachments, foundation, imports, lists, notifications, options, parties, quality, trade, users)
 
 revision = "0001"
 down_revision = None

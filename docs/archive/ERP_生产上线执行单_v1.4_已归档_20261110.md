@@ -1,3 +1,8 @@
+> 已归档，不得作为当前发布执行依据。
+> 原因：已合并到《发布流程》，当前发布从本地 `main` 推送远端 `test`。
+> 现行文件：`docs/发布流程.md`
+> 归档日期：2026-11-10
+
 # 宜游轩 ERP·生产升级执行单（1.0.3 → 1.0.4，原地增量）
 
 **文件编号**：ERP-OPS-001　**版本**：v1.4
@@ -22,7 +27,7 @@
 | 结构比对预期**恰好 4 条 `remove_*`** | `remove_index` × 3 + `remove_table` × 1，全部指向历史表 `rebate_settlements`。**该表在生产保留、不 drop**（历史数据留痕） |
 | 比对脚本退出码 1 是**预期** | `schema_diff.py` / `compare_metadata` 是双向比对，`remove_*` 会让它返回 1；**不要当成失败，更不要据此删表** |
 | **唯一必须执行的数据变更 = B4** | 三份售出表单作用域补齐，`order_form_fields` 从 **220 → 297**（+77），旧 `SALE` 13 行保留 |
-| **发布通道 = `git push origin dev:refs/heads/test` 自动 CI/CD** | 见第 2 章：CI 已去除两个副作用、内置 B4 与库状态自检，本版按自动链路发布 |
+| **发布通道 = `git push origin main:refs/heads/test` 自动 CI/CD** | 见第 2 章：本地 `dev` 先合入本地 `main`，再由本地 `main` 推送 `test`；CI 已去除两个副作用、内置 B4 与库状态自检，本版按自动链路发布 |
 | **`deploy.sh` 自检失败即中止发布** | 表数 / `db_version` 表 / `policy_definitions` / `option_sets` / 历史 `SALE` 行数 / alembic 戳升级前后必须逐项一致；字段总数只增不减，三作用域字段均非空 |
 | **生产数据不落本机** | 本单**不导出、不回传、不在本机恢复**任何生产库。所有生产数字在 ECS 上现场只读采集（A0），升级后逐字比对（C 段） |
 
@@ -53,7 +58,7 @@
 `test` 分支**不是测试环境，是生产发布通道**。本版起 CI 链路已按执行单口径修好，正常发布走自动链路：
 
 ```
-git push origin dev:refs/heads/test
+git push origin main:refs/heads/test
   → lint-gate / frontend-gate / coverage-gate（3 gate 全绿）
   → auto-merge-test-to-main.yml（--no-ff 合入 main）
   → gh workflow run deploy-production.yml（GitHub runner 上交叉构建 amd64 双镜像）
@@ -72,8 +77,8 @@ git push origin dev:refs/heads/test
 
 > **自检硬断言**：`deploy.sh` 在备份后采集库状态基线，在 health 与 B4 之后复核——表数 / `db_version` 表 / `policy_definitions` / `option_sets` / 历史 `SALE` 行数 / alembic 戳必须逐项不变，字段总数只增不减，三作用域字段均非空；任一不符即 `exit 1`，CI 判红。
 
-- [ ] 推送前确认这 4 条修复已随 `auto-merge` 进入 `main`（workflow checkout 的是 main 的 release commit）
-- [ ] 推送用 `git push origin dev:refs/heads/test`，**不要**再手工跑 `deploy.sh` 或 B0.4 / B0.5 的传输命令
+- [ ] 推送前确认 `dev` 的改动已合入本地 `main`，并在本地 `main` 的 5199/8125 环境验收
+- [ ] 推送用 `git push origin main:refs/heads/test`，**不要**再手工跑 `deploy.sh` 或 B0.4 / B0.5 的传输命令
 - [ ] 若 `main` / `test` 分支已被他人推进，先停手核对，不合并、不强推
 - [ ] B0.2–B0.7 / B1–B4 的命令是**等价步骤与本机预检**，正常发布由 CI 执行，勿重复手工操作；B3.1 与 C 段仍为人工必做
 
@@ -432,7 +437,7 @@ ssh heijin-prod 'cd /opt/heijin/deploy && docker compose ps --format "table {{.S
 
 | 段 | 内容 | 预估 |
 |---|---|---|
-| 发布前 | 升版本 + 四处 CI 修复 + push dev | 已完成（`69dc502f` 及后续提交） |
+| 发布前 | 升版本 + 四处 CI 修复 + dev 合入本地 main + push main 到 test | 已完成（`69dc502f` 及后续提交） |
 | CI gate | 3 gate 全绿 → `auto-merge` 合入 main | 3–8 min |
 | CI 构建 | runner 交叉构建 amd64 双镜像 + 打包 scp + `docker load` | 4–6 min |
 | B1–B4 | ECS `deploy.sh`：备份 → 迁移 → 换镜像 → health → B4 → 不变量自检 | **停机约 20 s** |

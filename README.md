@@ -2,6 +2,9 @@
 
 FastAPI + React 的工作室经营系统。**v1 是唯一入口**（`app/main.py`）。
 
+开发、测试和发布按以下三份流程执行：
+[开发流程](docs/开发流程.md) · [测试流程](docs/测试流程.md) · [发布流程](docs/发布流程.md)
+
 ## 快速启动
 
 ```bash
@@ -23,25 +26,11 @@ cd backend && ADMIN_PASSWORD='请替换为强密码' .venv/bin/python scripts/cr
 # 3) 起后端（0.0.0.0:8123，局域网可访问）
 cd backend && .venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8123
 
-# 4) 起前端（:5173，新终端）
-cd frontend && npm run dev
+# 4) 起开发前端（:5188，新终端）
+cd frontend && VITE_BACKEND_PORT=8123 npm run dev -- --host 0.0.0.0 --port 5188 --strictPort
 ```
 
-前端代理端口读取顺序为 `process.env.VITE_BACKEND_PORT` → `process.env.ERP_E2E_BACKEND_PORT`
-→ `frontend/.env.local` 的 `VITE_BACKEND_PORT`（仓库内默认 `8123`）。改端口必须前后端一致，例如：
-
-```bash
-# 后端终端
-export ERP_E2E_BACKEND_PORT=18123
-cd backend && .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 18123
-```
-
-新终端中同样设置端口后启动前端：
-
-```bash
-export ERP_E2E_BACKEND_PORT=18123
-cd frontend && npm run dev
-```
+前端代理端口读取 `VITE_BACKEND_PORT`，开发环境固定为前端 `5188` → 后端 `8123`；本地 `main` worktree 使用前端 `5199` → 后端 `8125`。其他测试端口和验证方式见 [测试流程](docs/测试流程.md)。
 
 登录页会先检查 `/api/v1/health`。后端未启动或端口不一致时，会直接提示连接问题，
 不会再把 Vite 代理错误显示成笼统的 500。
@@ -51,9 +40,9 @@ cd frontend && npm run dev
 | 地址 | 用途 |
 |---|---|
 | http://127.0.0.1:8123/ | 服务信息（库路径、env 路径、版本） |
-| http://127.0.0.1:8123/api/v1/health | 健康检查（返回 sqlite 是否已建） |
+| http://127.0.0.1:8123/api/v1/health | 健康检查 |
 | http://127.0.0.1:8123/docs | Swagger，全部 v1 端点 |
-| http://127.0.0.1:5173/ | 前端（开发账号 `admin`） |
+| http://127.0.0.1:5188/ | dev 前端（开发账号 `admin`） |
 
 生产环境进入登录页，使用上一步创建的 `admin` 账号登录；开发环境仍保留角色直通，仅用于本地权限联调。
 

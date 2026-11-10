@@ -86,4 +86,4 @@
   `useOrderFormFieldsPanelController` 删除字段。
 - 建单 2 处 `appModal.confirm` → `ConfirmDialog`：`CreateBusinessModal` 复购确认、放弃确认。
 - 客户合并确认按钮补 `danger`，对齐 Modal 级危险确认规范。
-- 详见 `前端建单与页面交互测试报告_20261101_P1修复版.md` 的 L1805 闭环章节。
+- 详见归档的 `archive/前端建单与页面交互测试报告_20261101_P1修复版_已归档_20261110.md` 闭环章节。

@@ -1,6 +1,8 @@
 # 宜游轩 ERP 发布记录
 
-## 发版流程（每次发正式版照此执行）
+## 发版流程入口
+
+正式版发布、阿里云部署、备份和回滚统一按 [docs/发布流程.md](docs/发布流程.md) 执行。本文件只保留版本记录和版本号生成规则，避免维护两套发布步骤。
 
 > **版本号不会自动升。** 必须显式执行下面第 1 步；不做则三处版本停在旧值，
 > 且 `test_frontend_version_matches_backend_release_version` 会在只改一处时直接红。
@@ -64,7 +66,7 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 ### 升级与回滚
 
-按 `docs/ERP_生产上线执行单_v1.4_20261105.md` **自动 CI/CD 原地增量升级**：`git push origin dev:refs/heads/test` → 3 gate → `auto-merge` → `deploy-production` → ECS。零 DDL、B4 已内置进 `deploy.sh`、生产数据不出 ECS。回滚：先把 `.env` 的 `APP_VERSION` 写回 `1.0.3` 再 `docker compose up -d`（只给单条命令加变量前缀会被持久化值覆盖），B4 插入行对旧镜像不可见，无需清理数据。
+按 `docs/发布流程.md` **自动 CI/CD 原地增量升级**：`git push origin main:refs/heads/test` → 3 gate → `auto-merge` → `deploy-production` → ECS。零 DDL、B4 已内置进 `deploy.sh`、生产数据不出 ECS。回滚按发布流程中的备份与恢复步骤执行。
 
 ### 已知遗留
 
@@ -95,7 +97,7 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 ### 发布前检查
 
 - `scripts/ops/bump_version.sh --check` 三处版本一致；`run_regression.py ci` / `fe` 与 Playwright E2E 结果已定性。
-- 已有库按 `docs/ERP_生产上线执行单_v1.3_20261105.md` B4 跑拆分脚本，并检查 C1 字段数增量为预期。
+- 已有库按 `docs/发布流程.md` 的发布前检查执行 B4，并检查字段数增量为预期。
 - 结构比对除列与索引外，必须核对 `pg_constraint.contype='p'`（业务表缺失主键数为 0）。
 
 ### 回滚

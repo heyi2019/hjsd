@@ -24,14 +24,14 @@
 #   --local-dir DIR     直接从本机已有目录读（自测/同机留存用）
 #   --remote-dir DIR    ECS 上的备份目录，默认 /opt/heijin/backups
 #   --dest DIR          本地存放目录，默认 $HOME/heijin_backups（可用 ERP_BACKUP_DEST 覆盖）
-#   --keep N            本地保留最近 N 份，默认 30（可用 ERP_BACKUP_KEEP 覆盖）
+#   --keep N            本地保留最近 N 份，默认 7（可用 ERP_BACKUP_KEEP 覆盖）
 set -euo pipefail
 
 HOST=""
 LOCAL_DIR=""
 REMOTE_DIR="${ERP_PG_BACKUP_DIR:-/opt/heijin/backups}"
 DEST="${ERP_BACKUP_DEST:-$HOME/heijin_backups}"
-KEEP="${ERP_BACKUP_KEEP:-30}"
+KEEP="${ERP_BACKUP_KEEP:-7}"
 PREFIX="heijin_erp_pg"
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15 -o LogLevel=ERROR)
 

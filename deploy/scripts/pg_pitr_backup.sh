@@ -17,8 +17,8 @@
 #   ERP_PG_CONTAINER   容器名，默认 heijin-db-1
 #   ERP_PG_USER        库用户，默认 erp_app（须 rolsuper 或 rolreplication）
 #   ERP_WAL_DIR        归档目录，默认 backups/pg_wal_live
-#   ERP_WAL_KEEP_DAYS  归档保留天数，默认 14
-#   ERP_BASE_KEEP      基备保留份数，默认 2
+#   ERP_WAL_KEEP_DAYS  归档保留天数，默认 7
+#   ERP_BASE_KEEP      基备保留份数，默认 1（每周一份 × 1 = 7 天，与 WAL 窗口绑定）
 #
 # 退出码：0 正常 / 1 归档器异常 / 2 环境错误。
 
@@ -30,8 +30,8 @@ REPO_ROOT="$(pwd)"
 CONTAINER="${ERP_PG_CONTAINER:-heijin-db-1}"
 PGUSER="${ERP_PG_USER:-erp_app}"
 WAL_DIR="${ERP_WAL_DIR:-${REPO_ROOT}/backups/pg_wal_live}"
-WAL_KEEP_DAYS="${ERP_WAL_KEEP_DAYS:-14}"
-BASE_KEEP="${ERP_BASE_KEEP:-2}"
+WAL_KEEP_DAYS="${ERP_WAL_KEEP_DAYS:-7}"
+BASE_KEEP="${ERP_BASE_KEEP:-1}"
 BASE_DIR="${REPO_ROOT}/backups/pg_base"
 MODE="${1:-wal}"
 
@@ -57,8 +57,9 @@ do_wal() {
   total=$(find "${WAL_DIR}" -type f | wc -l | tr -d ' ')
   bytes=$(du -sh "${WAL_DIR}" | awk '{print $1}')
 
-  # 保留策略：删掉超过 N 天的归档段。基备保留 2 份、每份自带回放起点，
-  # 所以最老的基备之前那些段删了也不影响「能回到最近两周内任意时刻」。
+  # 保留策略：删掉超过 N 天的归档段。基备保留 1 份（每周一份 = 覆盖 7 天），
+  # 与 WAL 7 天窗口绑定；WAL 保留期必须 ≥ 基备周期，否则最老基备失去前滚能力。
+  # 注意 find -mtime +N 是整日粒度、实际约 N+1 天，故 +7 实际保留约 8 天（偏保守，不丢数据）。
   find "${WAL_DIR}" -type f -mtime "+${WAL_KEEP_DAYS}" -delete 2>/dev/null || true
   local after kept
   after=$(find "${WAL_DIR}" -type f | wc -l | tr -d ' ')

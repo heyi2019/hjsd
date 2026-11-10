@@ -19,7 +19,7 @@
 # 用法：
 #   bash deploy/scripts/backup_local.sh
 #   ERP_LOCAL_BACKUP_DBS="heijin_erp_dev" bash deploy/scripts/backup_local.sh   # 只备一个库
-#   ERP_BACKUP_KEEP=30 bash deploy/scripts/backup_local.sh
+#   ERP_BACKUP_KEEP=7 bash deploy/scripts/backup_local.sh
 #
 # crontab（2026-11-03 01:20 已安装，每日 04:10，错开 ECS 的 03:20）：
 #   PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
@@ -39,7 +39,7 @@ cd "$(dirname "$0")/../.."   # -> 仓库根
 CONTAINER="${ERP_PG_CONTAINER:-heijin-db-1}"
 DB_USER="${ERP_PG_USER:-erp_app}"
 DBS="${ERP_LOCAL_BACKUP_DBS:-heijin_erp_dev}"
-KEEP="${ERP_BACKUP_KEEP:-14}"
+KEEP="${ERP_BACKUP_KEEP:-7}"
 OUT="${ERP_LOCAL_BACKUP_DIR:-backups/local}"
 
 die() { echo "✗ $*" >&2; exit 1; }
@@ -107,9 +107,10 @@ done
 # 本脚本每天 04:10 已被连续验证；保留策略按 -mtime 整日粒度算，每天跑一次与每
 # 小时跑一次效果等价，因此并入此处，不再单独占用一个 cron 条目。
 #
-# 保留天数维持 14 天（ERP_WAL_KEEP_DAYS）不缩短：基备每周日一份、保留 2 份 =
-# 覆盖 14 天，WAL 保留期必须 ≥ 这个周期，否则最老那份基备会因所需 WAL 被删而
-# 失去 PITR 能力。要缩短保留必须先缩基备周期，两者是绑定的。
+# 保留窗口统一 7 天：ERP_WAL_KEEP_DAYS / ERP_BACKUP_KEEP 默认均为 7。
+# 绑定约束不变：基备每周日一份、保留 1 份 = 覆盖 7 天，WAL 保留期必须 ≥ 基备
+# 周期，否则最老那份基备会因所需 WAL 被删而失去 PITR 能力。要改窗口必须同时改
+# 基备份数，两者是一个整体。
 echo "--- WAL 归档巡检（PITR）---"
 PITR_RC=0
 bash deploy/scripts/pg_pitr_backup.sh wal || PITR_RC=$?

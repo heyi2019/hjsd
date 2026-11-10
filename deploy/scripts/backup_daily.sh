@@ -9,12 +9,14 @@
 #      用户/库名直接取容器内 $POSTGRES_USER / $POSTGRES_DB，宿主机不 export 也能连对库。
 #   3) 产物落在**宿主机磁盘** ${ERP_PG_BACKUP_DIR}（默认 deploy/../backups），不在 docker
 #      卷里：`docker compose down -v` 或卷损坏不会把「库 + 备份」一起带走。
-#   4) 每份备份 = 一个 .dump + 一个 .sha256 sidecar，滚动保留最近 N 份。
+#   4) 每份备份 = 一个 .dump + 一个 .sha256 sidecar，滚动保留最近 N 份（默认 7 份≈7 天）。
+#      注意：本地副本已下线，ECS 是唯一源；缩窗口后首次运行会清掉超出 N 份的历史 dump，
+#      deploy.sh 上线前与 restore_pg.sh 恢复前都会调用本脚本，届时同样会触发滚动清理。
 #   5) 任何一步失败必须非零退出：cron 日志要能看见，不能伪装成「今天没数据」。
 #
 # 用法（在 ECS 上）：
 #   bash /opt/heijin/deploy/scripts/backup_daily.sh
-#   ERP_BACKUP_KEEP=14 bash deploy/scripts/backup_daily.sh          # 覆盖保留份数
+#   ERP_BACKUP_KEEP=14 bash deploy/scripts/backup_daily.sh          # 覆盖保留份数（默认 7）
 #   ERP_PG_BACKUP_DIR=/data/backups bash deploy/scripts/backup_daily.sh
 #
 # crontab（每日 03:20）：
@@ -22,7 +24,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."   # -> deploy/
 
-KEEP="${ERP_BACKUP_KEEP:-30}"
+KEEP="${ERP_BACKUP_KEEP:-7}"
 OUT="${ERP_PG_BACKUP_DIR:-../backups}"
 PREFIX="heijin_erp_pg"
 SERVICE="db"

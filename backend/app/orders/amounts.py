@@ -185,6 +185,53 @@ def order_profit_flow_by_order(
     return {key: (value[0], value[1]) for key, value in totals.items()}
 
 
+def order_cashflow_profit_by_order(
+    session: Session,
+    *,
+    order_ids: Iterable[int] | None = None,
+) -> dict[int, Decimal]:
+    """按订单批量汇总现金流利润，供列表与报表复用。
+
+    收入 = 资金流水 IN + 返点记录；支出 = 资金流水 OUT + 分期坏账。
+    与 :func:`order_cashflow_profit` 使用同一口径，避免订单列表逐行回查或复制利润公式。
+    """
+    ids = _resolved_ids(order_ids)
+    if ids is not None and not ids:
+        return {}
+
+    stmt = (
+        select(
+            Cashflow.order_id,
+            Cashflow.direction,
+            func.coalesce(func.sum(Cashflow.amount), 0),
+        )
+        .where(Cashflow.order_id.is_not(None))
+        .group_by(Cashflow.order_id, Cashflow.direction)
+    )
+    if ids is not None:
+        stmt = stmt.where(Cashflow.order_id.in_(ids))
+
+    totals: dict[int, list[Decimal]] = defaultdict(lambda: [ZERO, ZERO])
+    for order_id, direction, total in session.execute(stmt).all():
+        bucket = totals[int(order_id)]
+        if direction == Direction.IN.value:
+            bucket[0] += _money(total)
+        else:
+            bucket[1] += _money(total)
+
+    for order_id, (rebate_income, bad_debt_expense) in order_profit_flow_by_order(
+        session, order_ids=ids
+    ).items():
+        bucket = totals.setdefault(order_id, [ZERO, ZERO])
+        bucket[0] += rebate_income
+        bucket[1] += bad_debt_expense
+
+    return {
+        order_id: to_money(income - expense)
+        for order_id, (income, expense) in totals.items()
+    }
+
+
 def order_profit_flow_by_date(
     session: Session,
     *,
@@ -211,22 +258,7 @@ def order_cashflow_profit(session: Session, order_id: int) -> Decimal:
     收入 = 资金流水 IN 合计 + 返点记录金额；支出 = 资金流水 OUT 合计 + 分期坏账。
     不过滤审核状态与资金性质；冲销流水本身是反向流水，自然被计入。
     """
-    rows = session.execute(
-        select(Cashflow.direction, func.coalesce(func.sum(Cashflow.amount), 0))
-        .where(Cashflow.order_id == order_id)
-        .group_by(Cashflow.direction)
-    ).all()
-    income = ZERO
-    expense = ZERO
-    for direction, total in rows:
-        if direction == Direction.IN.value:
-            income += _money(total)
-        else:
-            expense += _money(total)
-    rebate_income, bad_debt_expense = order_profit_flow_by_order(
-        session, order_ids=[order_id]
-    ).get(order_id, (ZERO, ZERO))
-    return to_money((income + rebate_income) - (expense + bad_debt_expense))
+    return order_cashflow_profit_by_order(session, order_ids=[order_id]).get(order_id, ZERO)
 
 
 def order_amounts(session: Session, order_id: int) -> dict[str, Decimal]:

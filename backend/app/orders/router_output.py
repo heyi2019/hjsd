@@ -35,7 +35,7 @@ from app.domain.trade import (
 )
 from app.domain.users import User
 from app.orders import schemas, service
-from app.orders.amounts import ZERO, event_totals
+from app.orders.amounts import ZERO, event_totals, order_cashflow_profit_by_order
 
 def _actor(user: CurrentUser) -> str:
     return user.username
@@ -311,6 +311,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         item.id: dict(item.form_extra or {}) for item in orders
     }
     order_ids = [item.id for item in orders]
+    cashflow_profits = order_cashflow_profit_by_order(db, order_ids=order_ids)
     account_ids = [item.account_id for item in orders if item.account_id is not None]
     accounts = (
         {item.id: item for item in db.scalars(select(Account).where(Account.id.in_(account_ids))).all()}
@@ -454,7 +455,9 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "in_hand_time": _elapsed_label(inventory_entry_at, sale_at),
             "event_total": sum((event.amount for event in events), 0),
             "cost_amount": total_cost,
-            "profit_base": income - total_cost,
+            # 台账利润与利润分配、报表共用现金流口径：所有收入 − 所有支出，
+            # 收入含返点，支出含分期坏账；不能再用 SELL/BUY/COST 事件推导。
+            "profit_base": cashflow_profits.get(order.id, ZERO),
             "last_event_type": latest.event_type if latest else None,
             "last_event_amount": latest.amount if latest else None,
             "last_event_on": latest.occurred_on if latest else None,

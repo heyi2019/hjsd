@@ -120,10 +120,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # ECS 侧的 SFTP 传输曾出现大文件截断，使用 legacy SCP 并在远端复核 SHA256。
-          scp -O -P "$ECS_PORT" \
-            output/heijin-deploy.tgz \
-            "${ECS_USER}@${ECS_HOST}:/tmp/heijin-deploy.tgz"
+          # 不依赖 ECS 侧的 SFTP/SCP 子系统，直接通过 SSH 流式写入临时文件。
+          # 保活与超时避免网络异常时占满整个 job；只有校验通过才替换正式包。
+          SSH_OPTS=(
+            -o BatchMode=yes
+            -o ConnectTimeout=20
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+          )
+          REMOTE="${ECS_USER}@${ECS_HOST}"
+          timeout --signal=TERM --kill-after=30s 8m \
+            ssh "${SSH_OPTS[@]}" -p "$ECS_PORT" "$REMOTE" \
+            'umask 077; cat > /tmp/heijin-deploy.tgz.part && mv -f /tmp/heijin-deploy.tgz.part /tmp/heijin-deploy.tgz' \
+            < output/heijin-deploy.tgz
+
+          REMOTE_PACKAGE_SHA256="$(
+            ssh "${SSH_OPTS[@]}" -p "$ECS_PORT" "$REMOTE" \
+              "sha256sum /tmp/heijin-deploy.tgz | cut -d ' ' -f1"
+          )"
+          [[ "$REMOTE_PACKAGE_SHA256" == "$DEPLOY_PACKAGE_SHA256" ]] || {
+            echo "Deployment package checksum mismatch: local=$DEPLOY_PACKAGE_SHA256 remote=$REMOTE_PACKAGE_SHA256" >&2
+            exit 1
+          }
 
       - name: Deploy and verify production
         shell: bash

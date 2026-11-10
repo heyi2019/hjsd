@@ -4,8 +4,9 @@
 
 正式版发布、阿里云部署、备份和回滚统一按 [docs/发布流程.md](docs/发布流程.md) 执行。本文件只保留版本记录和版本号生成规则，避免维护两套发布步骤。
 
-> **版本号不会自动升。** 必须显式执行下面第 1 步；不做则三处版本停在旧值，
-> 且 `test_frontend_version_matches_backend_release_version` 会在只改一处时直接红。
+> **正常推送 `main` 会自动发版。** CI 会按提交类型自动升版：普通修复/工程变更升
+> patch，`feat` 升 minor，带 `!` 或 `BREAKING CHANGE` 升 major，并同步三处版本、
+> 生成本轮提交摘要和发布章节。下面命令保留给需要本地预览或手动指定版本的场景。
 
 ```bash
 # 1 升版本号（patch=修 bug / minor=加功能 / major=不兼容）

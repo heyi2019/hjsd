@@ -22,7 +22,7 @@ jobs:
       - name: Wait for required CI gates
         run: |
           set -euo pipefail
-          for wf in lint-gate.yml frontend-gate.yml; do
+          for wf in lint-gate.yml frontend-gate.yml backend-gate.yml; do
             echo "waiting for $wf ..."
             for i in $(seq 1 80); do
               status=$(gh run list --commit "$SHA" --workflow "$wf" --limit 1 --json conclusion --jq '.[0].conclusion' 2>/dev/null || true)

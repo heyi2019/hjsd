@@ -80,7 +80,7 @@ cd frontend && npm run build
 | `backend/app/domain` | 当前 ORM 模型与领域对象 |
 | `backend/app` 领域包 | 20 个已挂载 router：`foundation` `parties` `search` `orders` + `orders.form_fields` `value_added_services`（分期域，路由名仍为 installments）`finance` `stocks` `reporting` `policy` `quality` `notifications` `imports` `audit` `auth` + `auth.admin`（人员）+ `auth.teams` `attachments` `options` `lists`；`core`/`domain` 为基础设施与 ORM |
 | `backend/alembic/squashed_versions` | **活动迁移链**：只有 `0001_current_schema_baseline`，head = `0001`（`alembic.ini` 的 `version_locations` 只指向此目录；改 ORM 即改基线，不再加增量迁移） |
-| `backend/alembic/versions` | 74 个历史增量迁移，**不被 alembic 加载**，仅作追溯（`run_regression.py lint` 仍扫描） |
+| `backend/alembic/squashed_versions` | 唯一活动迁移基线 `0001`，用于全新 PostgreSQL 数据库初始化 |
 | `tests/backend` | 后端测试（pytest，111 个文件） |
 | `frontend/src` | 按业务域拆分（`orders/` `stocks/` `customers/` `installments/` `pools/` `rebates/` `reporting/` 等 20 个目录），无 `pages/`；`shared/` 为 UI 与 API 基础层 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |

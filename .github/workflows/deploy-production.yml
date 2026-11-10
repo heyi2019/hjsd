@@ -5,6 +5,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      reset_database:
+        description: "Recreate the production PostgreSQL volume from the current 0001 baseline"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -24,6 +30,7 @@ jobs:
       ECS_USER: ${{ secrets.ECS_USER || 'root' }}
       ECS_SSH_PRIVATE_KEY: ${{ secrets.ECS_SSH_PRIVATE_KEY }}
       ECS_KNOWN_HOSTS: ${{ secrets.ECS_KNOWN_HOSTS }}
+      RESET_DATABASE: ${{ inputs.reset_database || 'false' }}
 
     steps:
       - name: Checkout release commit
@@ -148,7 +155,7 @@ jobs:
         run: |
           set -euo pipefail
           ssh -p "$ECS_PORT" "${ECS_USER}@${ECS_HOST}" \
-            "APP_VERSION='${APP_VERSION}' DEPLOY_PACKAGE_SHA256='${DEPLOY_PACKAGE_SHA256}' bash -s" <<'REMOTE'
+            "APP_VERSION='${APP_VERSION}' DEPLOY_PACKAGE_SHA256='${DEPLOY_PACKAGE_SHA256}' RESET_DATABASE='${RESET_DATABASE}' bash -s" <<'REMOTE'
           set -euo pipefail
           rm -rf /tmp/heijin-gh-cd
           mkdir -p /tmp/heijin-gh-cd
@@ -162,6 +169,11 @@ jobs:
           tar -xzf /tmp/heijin-gh-cd/heijin-source.tar.gz -C /opt/heijin
 
           cd /opt/heijin/deploy
+
+          if [ "$RESET_DATABASE" = "true" ]; then
+            echo "==> 重建 PostgreSQL 数据卷（仅限本次手动确认的全量置换）"
+            docker compose down -v
+          fi
 
           # 持久化发布版本：deploy.sh 只在本次进程内覆盖 APP_VERSION，.env 若仍写旧 tag，
           # 之后在 ECS 上单独执行 docker compose up -d 会静默回落到旧镜像（回滚事故）。

@@ -94,7 +94,6 @@ def _initial_markers_for_file(filename: str) -> set[str]:
             "bughunt",
             "_gaps",
             "unreachable_status_paths",
-            "repair_baseline_schema",
             "coverage_gate",
             "deploy_script_contract",
             "account_stock_no",

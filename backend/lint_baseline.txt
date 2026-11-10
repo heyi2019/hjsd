@@ -3,14 +3,6 @@ scripts/create_admin.py :: 'app.domain.imports' imported but unused
 scripts/create_admin.py :: 'app.domain.parties' imported but unused
 scripts/create_admin.py :: 'app.domain.trade' imported but unused
 scripts/create_admin.py :: 'app.domain.users' imported but unused
-scripts/stamp_baseline.py :: 'app.domain.attachments' imported but unused
-scripts/stamp_baseline.py :: 'app.domain.foundation' imported but unused
-scripts/stamp_baseline.py :: 'app.domain.imports' imported but unused
-scripts/stamp_baseline.py :: 'app.domain.notifications' imported but unused
-scripts/stamp_baseline.py :: 'app.domain.parties' imported but unused
-scripts/stamp_baseline.py :: 'app.domain.quality' imported but unused
-scripts/stamp_baseline.py :: 'app.domain.trade' imported but unused
-scripts/stamp_baseline.py :: 'app.domain.users' imported but unused
 tests/backend/conftest.py :: 'app.domain.attachments' imported but unused
 tests/backend/conftest.py :: 'app.domain.foundation' imported but unused
 tests/backend/conftest.py :: 'app.domain.imports' imported but unused

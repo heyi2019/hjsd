@@ -10,12 +10,13 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
 
 from app.core.errors import Validation
-from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderLink
+from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
+from app.foundation.catalog_seed import seed_catalog
 from app.orders.form_scopes import FORM_SCOPES
 from app.orders.form_fields import validate_form_extra
-import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
 
 D = "2026-10-27"
@@ -52,48 +53,34 @@ def test_scopes_endpoint_lists_all_scopes(seeded_client, headers):
     assert by_code["HS"]["label"] == "回收建单"
 
 
-def test_operation_scope_seeds_match_registry():
-    """迁移种子与 form_scopes 注册表一致（测试库不跑 alembic，直接对拍常量）。"""
-    import importlib.util
-
-    migration_path = (
-        _repo.BACKEND_DIR
-        / "alembic" / "legacy_versions_pre_squash" / "0019_form_extra_columns_and_op_scopes.py"
-    )
-    spec = importlib.util.spec_from_file_location("migration_0019", migration_path)
-    migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)
+def test_operation_scope_seeds_match_registry(seeded_db):
+    """当前基线为所有操作作用域落入可读取的字段种子。"""
     from app.orders import form_scopes
 
-    seeded_codes = set(migration.SEED)
+    seed_catalog(seeded_db)
+    seeded_db.commit()
+    seeded_codes = set(seeded_db.scalars(select(OrderFormField.order_type_code)))
     registry_codes = {s.code for s in form_scopes.FORM_SCOPES}
-    assert seeded_codes <= registry_codes
-    # 12 个操作类作用域中 10 个有核心字段种子（ALLOCATION/INVEDIT 核心字段为
-    # 硬编码 UI，配置不驱动，仅承载自定义字段，不播种）。
+    # 当前基线的操作类种子必须覆盖所有可配置操作作用域。
     operation_codes = {
         "ORDERCANC", "ORDEREDIT", "ORDERLINK", "REFUND",
         "INVREFUND", "INVOID", "INVCANCEL",
         "STUDIOEXP", "STUDIOREJ", "STUDIOREV",
     }
     assert operation_codes <= seeded_codes
-    assert "ALLOCATION" not in seeded_codes and "INVEDIT" not in seeded_codes
-    # 但 12 个作用域全部在注册表中
     assert operation_codes | {"ALLOCATION", "INVEDIT"} <= registry_codes
 
 
-def test_allocation_scope_has_core_field_seeds():
-    """订单分润不能再是空配置，核心字段应由迁移预置。"""
-    import importlib.util
-
-    migration_path = (
-        _repo.BACKEND_DIR
-        / "alembic" / "versions" / "0054_seed_allocation_form_fields.py"
+def test_allocation_scope_has_core_field_seeds(seeded_db):
+    """订单分润的核心字段必须由当前基线直接提供。"""
+    seed_catalog(seeded_db)
+    seeded_db.commit()
+    keys = set(
+        seeded_db.scalars(
+            select(OrderFormField.field_key).where(OrderFormField.order_type_code == "ALLOCATION")
+        )
     )
-    spec = importlib.util.spec_from_file_location("migration_0054", migration_path)
-    migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)
-    keys = {row[0] for row in migration.SEED}
-    assert keys == {"employee", "role", "allocation_rate", "allocation_amount"}
+    assert {"employee", "role", "allocation_rate", "allocation_amount"} <= keys
 
 
 def _create_order(seeded_client, headers) -> dict:

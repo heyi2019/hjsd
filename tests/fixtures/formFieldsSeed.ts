@@ -1,5 +1,5 @@
 /**
- * 测试用建单表单字段种子：与 backend alembic/versions/0005_seed_select_options.py
+ * 测试用建单表单字段种子：与当前 ORM 基线的订单字段口径一致。
  * 保持一致。前端下拉改为从 OrderFormField 配置读选项后，UI 测试需要一份可用的
  * 默认配置，否则 Select/Radio 无选项（注入逻辑 injectOptionsIfMissing 仅在配置
  * 有 options 时才注入）。各测试文件在 beforeEach 调 seedOrderFormFields 即可零改动
@@ -131,7 +131,7 @@ export function seedOrderFormFields(catalog: {
   (catalog.orderFormFieldsApi.list as unknown as { mockResolvedValue(value: unknown): void }).mockResolvedValue(all);
 }
 
-/** T20：选项词典种子，与 backend alembic/versions/0007_create_option_sets.py 一致。 */
+/** T20：选项词典种子与当前 ORM 基线一致。 */
 export interface SeedOptionSet {
   code: string;
   label: string;

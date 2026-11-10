@@ -4,10 +4,7 @@
 - **schema 随 ORM 走**：直接 `Base.metadata.create_all()`，改模型即改基线，不再加增量 DDL 迁移；
 - **种子随 blob 走**：`option_sets` / `order_form_fields` 由 `app.foundation.catalog_seed`
   的内嵌 base64+zlib blob 提供，新增内置字段要更新 blob，而不是再加一条 seed 迁移；
-- 原 0002~0013（加列、列改名、时间戳归一、四次 seed）已并入基线并删除，
-  追溯见 git 历史与 ``alembic/versions``（后者只存档、不参与加载）；
-- 既有库（版本戳还是旧 revision）**必须先对齐**：``alembic stamp --purge 0001``；
-  空库直接 ``alembic upgrade head``。
+- 当前项目只支持全新数据库：直接 ``alembic upgrade head`` 初始化。
 
 旧 SQLite 专用 DDL（如 DATETIME）不进基线，避免污染 PostgreSQL 初始化。
 """

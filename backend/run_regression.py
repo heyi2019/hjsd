@@ -32,8 +32,8 @@ from test_catalog import (  # noqa: E402
     type_files,
 )
 
-# pyflakes 扫描范围：业务代码 + 测试 + 迁移 + 脚本（与历史「pyflakes 干净」口径一致）
-LINT_TARGETS = ["app", "../tests/backend", "alembic/versions", "scripts", "run_regression.py", "run_coverage_gate.py"]
+# pyflakes 扫描范围：业务代码 + 测试 + 唯一活动迁移 + 脚本。
+LINT_TARGETS = ["app", "../tests/backend", "alembic/squashed_versions", "scripts", "run_regression.py", "run_coverage_gate.py"]
 # 基线只记「文件 + 消息」，不含行列号——行号漂移不应判定为新增告警
 LINT_BASELINE = ROOT / "lint_baseline.txt"
 LINT_LINE_RE = re.compile(r"^(?P<path>.+?):\d+:\d+: (?P<msg>.+)$")

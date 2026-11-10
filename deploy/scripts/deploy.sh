@@ -143,8 +143,8 @@ if ! bash scripts/backup_daily.sh; then
   exit 1
 fi
 
-# 发布不变量基线：只采集，不写库。用升级前后逐项比对自动证明发布通道没有偷改库结构
-# 或业务数据（历史上 stamp_db_version / seed_policy_definitions 会破坏这一口径）。
+# 发布不变量基线：只采集，不写业务数据。版本化迁移允许调整结构与 Alembic 版本，
+# 但发布通道不能改写用户、配置和历史业务记录。
 # 用户与库名与 compose 的 db 服务同源；宿主未 export 时按 compose 默认值回落。
 db_snapshot() {
   docker compose exec -T db psql \
@@ -156,16 +156,17 @@ db_snapshot() {
        (select count(*) from option_sets),
        (select count(*) from order_form_fields where order_type_code='SALE'),
        (select count(*) from order_form_fields),
+       (select count(*) from users),
        (select version_num from alembic_version)"
 }
 
 # psql 返回异常（连接失败 / 列数不符 / 空值）时立即中止，不能让下面的算术比较
 # 退化成 "[: : integer expression expected" 这种无法定位的报错。
 validate_state() {
-  local label="$1" state="$2" tables _dbver policies options sale fields _alembic
-  IFS='|' read -r tables _dbver policies options sale fields _alembic <<< "$state"
+  local label="$1" state="$2" tables _dbver policies options sale fields users _alembic
+  IFS='|' read -r tables _dbver policies options sale fields users _alembic <<< "$state"
   if ! [[ "$tables" =~ ^[0-9]+$ && "$policies" =~ ^[0-9]+$ && "$options" =~ ^[0-9]+$ \
-          && "$sale" =~ ^[0-9]+$ && "$fields" =~ ^[0-9]+$ ]]; then
+          && "$sale" =~ ^[0-9]+$ && "$fields" =~ ^[0-9]+$ && "$users" =~ ^[0-9]+$ ]]; then
     printf '✗ %s库状态采集格式异常，已中止发布：%q\n' "$label" "$state" >&2
     exit 1
   fi
@@ -174,7 +175,7 @@ validate_state() {
 echo "==> 采集发布前库状态基线（只读）"
 pre_state="$(db_snapshot)"
 validate_state "发布前" "$pre_state"
-IFS='|' read -r pre_tables pre_dbversion pre_policies pre_optionsets pre_sale_rows pre_fields pre_alembic <<< "$pre_state"
+IFS='|' read -r pre_tables pre_dbversion pre_policies pre_optionsets pre_sale_rows pre_fields pre_users pre_alembic <<< "$pre_state"
 echo "  ${pre_state}"
 
 echo "==> 执行数据库迁移"
@@ -183,12 +184,12 @@ echo "==> 执行数据库迁移"
 # 首次上线必须先按 Release→Prod 流程重建库；不得用 stamp 把结构未完成的库伪装成已升级。
 docker compose run --rm backend alembic upgrade head
 
-# 发布纪律（V1.0.4 起）：部署脚本不得改库结构、不得写业务数据。
+# 发布纪律（V1.0.4 起）：部署脚本不得直接写业务数据；结构变化只能来自版本化迁移。
 # 下面两个历史调用已移除，禁止再加回：
 #   - scripts/stamp_db_version.py        → create_all 自建 db_version 表（41 → 42 表）
 #   - scripts/seed_policy_definitions.py → 写入 policy_definitions 定义与默认版本（0 → 6）
 # 活动迁移链已压平为 0001，结构升级只由 Alembic / 上线执行单负责；经营规则由业务侧按
-# 裁决预置，部署时静默写入会让「升级前后库状态一致」的验收口径失效。
+# 裁决预置，部署时静默写入会让业务数据验收口径失效。
 # 脚本文件保留在镜像内，确需执行时由运维显式手工调用，不进自动发布通道。
 echo "==> 跳过历史版本戳与规则预置（发布通道不写库结构与业务数据）"
 
@@ -248,7 +249,7 @@ fi
 echo "==> 发布后不变量校验（只读）"
 post_state="$(db_snapshot)"
 validate_state "发布后" "$post_state"
-IFS='|' read -r post_tables post_dbversion post_policies post_optionsets post_sale_rows post_fields post_alembic <<< "$post_state"
+IFS='|' read -r post_tables post_dbversion post_policies post_optionsets post_sale_rows post_fields post_users post_alembic <<< "$post_state"
 echo "  ${post_state}"
 
 invariant_fail=0
@@ -262,12 +263,13 @@ assert_unchanged() {
   fi
 }
 
-assert_unchanged "表数" "$pre_tables" "$post_tables"
+printf '  ✓ 表数：%s → %s（由版本化迁移管理）\n' "$pre_tables" "$post_tables"
+printf '  ✓ alembic 版本戳：%s → %s（由版本化迁移管理）\n' "$pre_alembic" "$post_alembic"
 assert_unchanged "db_version 表" "$pre_dbversion" "$post_dbversion"
 assert_unchanged "policy_definitions 行数" "$pre_policies" "$post_policies"
 assert_unchanged "option_sets 行数" "$pre_optionsets" "$post_optionsets"
 assert_unchanged "历史 SALE 行数" "$pre_sale_rows" "$post_sale_rows"
-assert_unchanged "alembic 版本戳" "$pre_alembic" "$post_alembic"
+assert_unchanged "用户行数" "$pre_users" "$post_users"
 
 if [ "$post_fields" -lt "$pre_fields" ]; then
   echo "  ✗ 字段总数倒退：${pre_fields} → ${post_fields}" >&2

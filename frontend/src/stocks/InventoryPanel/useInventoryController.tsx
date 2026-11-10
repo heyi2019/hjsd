@@ -3,7 +3,7 @@ import { Dropdown, Form, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { Dayjs } from "dayjs";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Key } from "react";
-import { stocksApi, employeesApi, ordersApi, poolsApi, type Account, type AccountExecutionDetail, type AccountExecutionEvent, type EmployeeOption, type InventoryStats, type Pool } from "../../shared/api/catalog";
+import { stocksApi, employeesApi, ordersApi, poolsApi, type Account, type AccountExecutionDetail, type EmployeeOption, type InventoryStats, type Pool } from "../../shared/api/catalog";
 import { normalizeError } from "../../shared/api/client";
 import { formatDateTimeMinute, money, today } from "../../shared/lib/format";
 import { MoneyText, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
@@ -22,6 +22,7 @@ import { filterInventoryRows, findCancelableBuy, inventoryCellValue, moreMenuIte
 import type { InventoryCashflowTarget } from "../InventoryCashflowModal";
 import type { OrderDeliveryTarget } from "../../orders/OrderDeliveryModal";
 import type { OrderProfitShareTarget } from "../../orders/OrderProfitShareModal";
+import { useAccountExecutionEditor } from "./useAccountExecutionEditor";
 
 // 关键字逐键输入时合并请求：指标不是主流程，200ms 足够跟手。
 const INVENTORY_STATS_DEBOUNCE_MS = 200;
@@ -57,11 +58,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const [exporting, setExporting] = useState(false);
   const locallyRemovedIdsRef = useRef(new Set<number>());
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
-  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  // 内联编辑：标记当前正在编辑（且已展开）的行；与 editingAccount（草稿副本）配合，决定展开区是否进入编辑态。
-  const [inlineEditId, setInlineEditId] = useState<number | null>(null);
   const [detailTarget, setDetailTarget] = useState<Account | null>(null);
-  const [savingAccount, setSavingAccount] = useState(false);
   const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
   const [voidPools, setVoidPools] = useState<Pool[]>([]);
   const [platformOffsaleTarget, setPlatformOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
@@ -70,11 +67,25 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [voidForm] = Form.useForm<InventoryCancellationValues>();
-  const [invEditExtraForm] = Form.useForm();
-  const [eventDrafts, setEventDrafts] = useState<Record<number, { id: number; expected_amount: string; amount: string; note: string | null; operator_user_ids?: number[] }>>({});
-  // 编辑态时间联动：三个锚点共用一个平移天数，保存时整单时间轴按此 delta 平移。
-  const [timeShiftMinutes, setTimeShiftDays] = useState(0);
-  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const accountEditor = useAccountExecutionEditor({
+    getExecutionDetail: (accountId) => executionDetails[accountId],
+    onSaved: (accountId, detail) => {
+      setExecutionDetails((current) => ({ ...current, [accountId]: detail }));
+      setRows((current) => current.map((row) => row.id === accountId ? { ...row, ...detail.account } : row));
+    },
+  });
+  const {
+    editingAccount,
+    setEditingAccount,
+    inlineEditId,
+    eventDrafts,
+    updateEventDraft,
+    timeShiftMinutes,
+    setTimeShiftDays,
+    employees,
+    invEditExtraForm,
+    savingAccount,
+  } = accountEditor;
   // T20：筛选项从「选项词典」配置读取（库存业务 / 类型）。
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
   const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
@@ -162,24 +173,14 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   }
 
   async function openEditor(account: Account) {
-    setEditingAccount({ ...account });
-    setEventDrafts({});
-    setTimeShiftDays(0);
-    await Promise.all([
-      employeesApi.list().then(setEmployees).catch((cause) => setError(normalizeError(cause))),
-      loadExecution(account),
-    ]);
+    await loadExecution(account);
+    await accountEditor.openEditor(account);
     // 就地展开该行进入内联编辑（不弹窗）。
     expandTo([String(account.id)]);
-    setInlineEditId(account.id);
   }
 
   function cancelInlineEdit() {
-    setInlineEditId(null);
-    setEditingAccount(null);
-    setEventDrafts({});
-    setTimeShiftDays(0);
-    invEditExtraForm.resetFields();
+    accountEditor.cancelInlineEdit();
     setDetailTarget(null);
   }
 
@@ -573,59 +574,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
 
   const mobileFieldOrder = arrangeColumns(columns).map(columnKey);
 
-  async function saveInline() {
-    if (!editingAccount) return;
-    setSavingAccount(true);
-    try {
-      const { id, game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, note } = editingAccount;
-      const profile = { game_account, game_type, game_password, channel_region, bound_phone, has_secondary, platform, note, form_extra: invEditExtraForm.getFieldsValue()?.form_extra };
-      const events = Object.values(eventDrafts).filter((draft) => {
-        const original = executionDetails[id]?.orders.flatMap((order) => order.events).find((event) => event.id === draft.id);
-        return original && (draft.amount !== original.amount || draft.note !== (original.note ?? null) || draft.operator_user_ids !== undefined);
-      });
-      if (events.length || timeShiftMinutes !== 0) {
-        await stocksApi.updateExecution(id, {
-          profile,
-          events,
-          time_shift: timeShiftMinutes !== 0 ? { delta_minutes: timeShiftMinutes } : undefined,
-        });
-        setEditingAccount(null);
-        setEventDrafts({});
-        setInlineEditId(null);
-        setDetailTarget(null);
-        try {
-          const detail = await stocksApi.executionDetail(id);
-          setExecutionDetails((current) => ({ ...current, [id]: detail }));
-          setRows((current) => current.map((row) => row.id === id ? { ...row, ...detail.account } : row));
-        } catch (refreshError) {
-          setExecutionDetails((current) => { const next = { ...current }; delete next[id]; return next; });
-          setError(normalizeError(refreshError));
-          appMessage.warning("修改已保存，但刷新明细失败，请重新加载");
-        }
-      } else {
-        const updated = await stocksApi.updateProfile(id, profile);
-        setRows((current) => current.map((row) => row.id === id ? { ...row, ...updated } : row));
-      }
-      setEditingAccount(null);
-      setEventDrafts({});
-      setTimeShiftDays(0);
-      invEditExtraForm.resetFields();
-      setInlineEditId(null);
-      setDetailTarget(null);
-      appMessage.success("修改已保存");
-    } catch (err) {
-      setError(normalizeError(err));
-    } finally {
-      setSavingAccount(false);
-    }
-  }
-
-  function updateEventDraft(event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) {
-    setEventDrafts((current) => ({ ...current, [event.id]: {
-      ...(current[event.id] ?? { id: event.id, expected_amount: event.amount, amount: event.amount, note: event.note ?? null }),
-      ...changes,
-    } }));
-  }
+  const saveInline = accountEditor.saveInline;
 
   async function handleExpand(expanded: boolean, row: Account) {
     // 手风琴：一次只展开一行。多行同时展开会各自挂载一份完整明细（3 张子表 + 图片组），DOM 与页面长度随之翻倍。

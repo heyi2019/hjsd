@@ -14,6 +14,8 @@ name: frontend-gate
 on:
   push:
     branches: [main, master, test]
+    paths-ignore:
+      - "RELEASE.md"
   pull_request:
   workflow_dispatch:
   # 夜间兜底：deep 层已移出 PR 门禁，靠定时跑保证不会长期无人验证。
@@ -24,7 +26,7 @@ on:
 # auto-merge 依赖前端全绿的 conclusion，取消会写入 cancelled 直接中止自动合并。
 concurrency:
   group: frontend-gate-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/test' || github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

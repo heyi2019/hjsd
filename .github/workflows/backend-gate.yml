@@ -2,7 +2,7 @@ name: backend-gate
 
 on:
   push:
-    branches: [main, master, test]
+    branches: [main, master]
     paths:
       - "backend/**"
       - ".github/workflows/backend-gate.yml"

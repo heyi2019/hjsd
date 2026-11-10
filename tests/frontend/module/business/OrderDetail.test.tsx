@@ -186,6 +186,27 @@ describe("OrderDetail", () => {
     expect(screen.getByText("系统下架同步取消寄售平台上架")).toBeInTheDocument();
   });
 
+  it("操作追溯中的审计动作统一显示中文名称", () => {
+    const detail = {
+      orders: [],
+      audit: [
+        { id: 902, action: "ORDER_CREATE", entity_type: "order", entity_id: "HS-01", actor: "admin", occurred_at: "2026-11-02T10:20:00" },
+        { id: 903, action: "ACCOUNT_CREATE", entity_type: "account", entity_id: "KU-01", actor: "admin", occurred_at: "2026-11-02T10:21:00" },
+        { id: 904, action: "ACCOUNT_DELETE", entity_type: "account", entity_id: "KU-02", actor: "admin", occurred_at: "2026-11-02T10:22:00" },
+        { id: 905, action: "ORDER_FORM_FIELD_CHANGE", entity_type: "order_form_field", entity_id: "field-01", actor: "admin", occurred_at: "2026-11-02T10:23:00" },
+      ],
+    } as unknown as AccountExecutionDetail;
+
+    render(<OrderDetail row={account} detail={detail} loading={false} />);
+
+    expect(screen.getByText("新建订单")).toBeInTheDocument();
+    expect(screen.getByText("新建账号")).toBeInTheDocument();
+    expect(screen.getByText("删除账号")).toBeInTheDocument();
+    expect(screen.getByText("变更订单表单字段")).toBeInTheDocument();
+    expect(screen.queryByText("ORDER_CREATE")).not.toBeInTheDocument();
+    expect(screen.queryByText("ACCOUNT_CREATE")).not.toBeInTheDocument();
+  });
+
   it("FE-269：返点进入收入笔数，总收入取服务端 finance_summary", () => {
     const detail = {
       orders: [{

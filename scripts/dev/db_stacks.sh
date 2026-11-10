@@ -2,8 +2,8 @@
 # 四库端口映射的唯一真相：一个库绑一套前端/后端，互不串库。
 #
 #   用途           前端   后端   库
-#   本地使用(主)    5188   8123   heijin_erp_release   ← launchd 守护，本脚本只管不启
-#   本地开发        5199   8125   heijin_erp_dev
+#   本地开发(dev)   5188   8123   heijin_erp_dev
+#   本地使用(main)  5199   8125   heijin_erp_release  ← launchd 守护，本脚本只管不启
 #   pytest 测试     5200   8126   heijin_erp_test
 #   Playwright E2E  5201   8127   heijin_erp_e2e
 #
@@ -44,7 +44,7 @@ dsn_for() {
 
 db_of() {
   case "$1" in
-    release) echo heijin_erp_release ;;
+    main|release) echo heijin_erp_release ;;
     dev)     echo heijin_erp_dev ;;
     test)    echo heijin_erp_test ;;
     e2e)     echo heijin_erp_e2e ;;
@@ -53,8 +53,8 @@ db_of() {
 
 be_of() {
   case "$1" in
-    release) echo 8123 ;;
-    dev)     echo 8125 ;;
+    main|release) echo 8125 ;;
+    dev)     echo 8123 ;;
     test)    echo 8126 ;;
     e2e)     echo 8127 ;;
   esac
@@ -62,8 +62,8 @@ be_of() {
 
 fe_of() {
   case "$1" in
-    release) echo 5188 ;;
-    dev)     echo 5199 ;;
+    main|release) echo 5199 ;;
+    dev)     echo 5188 ;;
     test)    echo 5200 ;;
     e2e)     echo 5201 ;;
   esac
@@ -82,8 +82,8 @@ actual_db() {
 
 label_of() {
   case "$1" in
-    release) echo "本地使用" ;;
-    dev)     echo "本地开发" ;;
+    main|release) echo "本地main" ;;
+    dev)     echo "本地dev" ;;
     test)    echo "pytest" ;;
     e2e)     echo "E2E" ;;
   esac
@@ -142,7 +142,7 @@ stop_one() {
 do_status() {
   printf "%-10s %-6s %-6s %-8s %s\n" "用途" "前端" "后端" "页面" "实际库"
   local e fe be code db
-  for e in release dev test e2e; do
+  for e in dev main test e2e; do
     fe=$(fe_of "${e}")
     be=$(be_of "${e}")
     code=$(curl -s -m 2 -o /dev/null -w '%{http_code}' "http://127.0.0.1:${fe}/" 2>/dev/null)
@@ -160,7 +160,7 @@ do_up() {
       start_backend "${e}"
       start_frontend "${e}"
     done
-    echo "提示：release（5188/8123）由 launchd 守护，不需要本脚本启动。"
+    echo "提示：main（5199/8125）由 launchd 守护，不需要本脚本启动。"
   else
     start_backend "${target}"
     start_frontend "${target}"
@@ -169,8 +169,8 @@ do_up() {
 
 do_down() {
   local target="$1" e
-  if [[ "${target}" == "release" ]]; then
-    echo "拒绝：release 由 launchd 守护，请用 launchctl 操作。" >&2
+  if [[ "${target}" == "main" || "${target}" == "release" ]]; then
+    echo "拒绝：main 由 launchd 守护，请用 launchctl 操作。" >&2
     return 1
   fi
   if [[ "${target}" == "all" ]]; then
@@ -189,7 +189,7 @@ case "${cmd}" in
   down)    do_down "${target}" ;;
   restart) do_down "${target}" && sleep 1 && do_up "${target}" ;;
   *)
-    echo "用法: bash scripts/dev/db_stacks.sh {status|up|down|restart} [release|dev|test|e2e|all]" >&2
+    echo "用法: bash scripts/dev/db_stacks.sh {status|up|down|restart} [main|release|dev|test|e2e|all]" >&2
     exit 1
     ;;
 esac

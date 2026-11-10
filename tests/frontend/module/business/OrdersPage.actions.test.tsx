@@ -21,7 +21,7 @@ vi.mock("@/shared/api/catalog", async (importOriginal) => {
     "list", "get", "create", "update", "patch", "post", "postEvent", "cancel", "remove",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "inventoryStats", "updateProfile", "updateExecution", "merge", "search", "refund", "createForOrder",
+    "balance", "executionDetail", "inventoryStats", "updateProfile", "updateExecution", "merge", "search", "refund", "createForOrder", "materializeAccount",
     "orderSnapshot", "links", "createLink", "deleteLink", "listSectionLabels", "saveSectionLabels",
     "markOverdue",
   ];
@@ -221,6 +221,11 @@ beforeEach(() => {
   // 下架弹窗背后会渲染库存上下文，卡片指标走这个接口；不桩会真调 api.get 返回 undefined。
   vi.mocked(catalog.stocksApi.inventoryStats).mockResolvedValue({ account_count: 0, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 });
   vi.mocked(catalog.ordersApi.get).mockResolvedValue(order1);
+  vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+    account: { id: order1.account_id, stock_no: "KU_00001", game_account: "seller-001", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
+    orders: [],
+    finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
+  } as never);
   vi.mocked(catalog.ordersApi.links).mockResolvedValue([link1]);
   vi.mocked(catalog.ordersApi.deleteLink).mockResolvedValue(undefined);
   vi.mocked(catalog.ordersApi.cancel).mockResolvedValue({ ...order1, status: "CANCELLED" });
@@ -352,20 +357,11 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("当前无新增逾期合约"));
   });
 
-  it("编辑订单：行操作列打开编辑弹窗并提交 PATCH（成交日期+备注）", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...order1 });
-    vi.mocked(catalog.ordersApi.patch).mockResolvedValue({ ...order1 });
+  it("编辑订单：行操作列打开统一库存详情编辑并保存账号资料", async () => {
     await openLedger();
     await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
-    const modal = await modalOf(/编辑订单 · HS-2026-0001/);
-    await ui.clear(within(modal).getByLabelText("成交日期"));
-    await ui.type(within(modal).getByLabelText("成交日期"), "2026-10-05");
-    await ui.type(within(modal).getByLabelText("备注"), "补登记");
-    await ui.click(within(modal).getByRole("button", { name: /保存修改/ }));
-    await waitFor(() => expect(catalog.ordersApi.patch).toHaveBeenCalledWith(1, expect.objectContaining({
-      trade_date: "2026-10-05",
-      note: "补登记",
-    })));
+    expect(await screen.findByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存修改" })).toBeInTheDocument();
   });
 
   it("订单台账：编辑账号不作为独立操作，统一只展示编辑", async () => {
@@ -375,30 +371,16 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(row).queryByRole("button", { name: "编辑账号" })).toBeNull();
   });
 
-  it("编辑有登记事件订单：成交日期可改、PATCH 带日期、提示「订单已更新」并关闭弹窗", async () => {
+  it("编辑有登记事件订单：统一编辑入口仍可打开库存详情", async () => {
     vi.mocked(catalog.ordersApi.list).mockResolvedValue([
       {
         ...order1,
         events: [{ id: 1, event_no: "EV-1", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "1000.00" }],
       },
     ]);
-    vi.mocked(catalog.ordersApi.patch).mockResolvedValue({ ...order1 });
     await openLedger();
     await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
-    const modal = await modalOf(/编辑订单 · HS-2026-0001/);
-    // 回归：有登记事件时日期不再被禁用（后端会联动平移账期）
-    expect(within(modal).getByLabelText("成交日期")).not.toBeDisabled();
-    await ui.clear(within(modal).getByLabelText("成交日期"));
-    await ui.type(within(modal).getByLabelText("成交日期"), "2026-10-05");
-    await ui.type(within(modal).getByLabelText("备注"), "仅更新备注");
-    await ui.click(within(modal).getByRole("button", { name: /保存修改/ }));
-    await waitFor(() => expect(catalog.ordersApi.patch).toHaveBeenCalledWith(1, expect.objectContaining({
-      trade_date: "2026-10-05",
-      note: "仅更新备注",
-    })));
-    await waitFor(() => expect(message.success).toHaveBeenCalledWith("订单已更新"));
-    // 保存后弹窗应关闭
-    await waitFor(() => expect(screen.queryByText(/编辑订单 · HS-2026-0001/)).toBeNull());
+    expect(await screen.findByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
   });
 
   // 原两条（按姓名预填 / 展示订单总利润）同一份夹具、同一入口、纯只读，合并为一次挂载。

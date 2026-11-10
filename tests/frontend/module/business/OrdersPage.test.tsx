@@ -423,15 +423,15 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.queryByText("旧平台")).toBeNull();
   });
 
-  // 原两条（操作列四个小号入口 / 行级操作）同一份 admin 夹具，合并为一次挂载。
-  it("操作列直接提供编辑、分润、资金收支、取消四个小号入口", async () => {
+  // 已完成且未关联库存账号的历史单不提供编辑；其余订单继续提供行级操作。
+  it("操作列提供统一编辑、分润、资金收支、取消入口", async () => {
     await openLedger("admin");
 
     // 不再有「更多」收纳入口
     expect(screen.queryAllByRole("button", { name: "更多" })).toHaveLength(0);
     for (const label of ["编辑", "分润", "资金收支", "取消"]) {
       const buttons = screen.getAllByRole("button", { name: label });
-      expect(buttons).toHaveLength(2);
+      expect(buttons).toHaveLength(label === "编辑" ? 1 : 2);
       expect(buttons.every((button) => button.classList.contains("ant-btn-sm"))).toBe(true);
       expect(buttons[0]).toBeInTheDocument();
     }

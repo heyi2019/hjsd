@@ -187,6 +187,8 @@ export const ordersApi = {
   /** 订单编辑（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
   patch: (orderId: number, payload: OrderPatchPayload) =>
     api.patch<Order>(`/orders/${orderId}`, payload).then((r) => r.data),
+  materializeAccount: (orderId: number) =>
+    api.post<Order>(`/orders/${orderId}/materialize-account`).then((r) => r.data),
 };
 
 export const orderFormFieldsApi = {

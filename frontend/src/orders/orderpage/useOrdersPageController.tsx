@@ -106,6 +106,33 @@ export function useOrdersPageController(params: {
     onSaved: (id, detail) => setLedgerDetails((current) => ({ ...current, [id]: detail })),
   });
 
+  const openLedgerAccountEditor = async (account: Account) => {
+    await accountEditor.openEditor(account);
+  };
+
+  const openLedgerEditor = async (order: Order) => {
+    try {
+      let accountId = order.account_id;
+      if (accountId == null) {
+        if (!['ACTIVE', 'INSTALLMENT'].includes(order.status)) {
+          appMessage.warning("该历史订单未关联库存账号，当前状态不能补建库存");
+          return;
+        }
+        const materialized = await ordersApi.materializeAccount(order.id);
+        accountId = materialized.account_id;
+        if (accountId == null) throw new Error("补建库存账号后未返回库存编号");
+        setOrders((current) => current.map((item) => item.id === order.id ? { ...item, ...materialized } : item));
+        appMessage.success("已补建库存账号");
+      }
+      const detail = ledgerDetails[accountId] ?? await stocksApi.executionDetail(accountId);
+      setLedgerDetails((current) => ({ ...current, [accountId]: detail }));
+      setExpandedOrderIds([String(order.id)]);
+      await openLedgerAccountEditor(detail.account);
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    }
+  };
+
   const handleLedgerExpand = (expanded: boolean, record: Order) => {
     // 手风琴：一次只展开一行，避免多行展开同时挂载多份详情导致 DOM 与页面长度翻倍。
     setExpandedOrderIds(expanded ? [String(record.id)] : []);
@@ -708,7 +735,15 @@ export function useOrdersPageController(params: {
         const canOffsaleConsignment = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
         return (
           <Space size={2}>
-          <PermissionButton permission="order.update" type="link" size="small" onClick={() => openEditOrder(order)}>编辑</PermissionButton>
+          {order.account_id || ["ACTIVE", "INSTALLMENT"].includes(order.status) ? (
+            <PermissionButton
+              permission="order.update"
+              type="link"
+              size="small"
+              title={order.account_id ? undefined : "未关联库存时会先生成库存编号"}
+              onClick={() => void openLedgerEditor(order)}
+            >编辑</PermissionButton>
+          ) : null}
           <PermissionGate permission="order.event.post">
             <PermissionButton
               permission="order.event.post"
@@ -884,6 +919,8 @@ export function useOrdersPageController(params: {
     loadLedgerDetail,
     loading,
     openAllocations,
+    openLedgerAccountEditor,
+    openLedgerEditor,
     openCancelTransaction,
     openEditOrder,
     openProfitShare,

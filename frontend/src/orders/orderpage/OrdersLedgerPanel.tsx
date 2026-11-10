@@ -54,7 +54,6 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     setPage,
     setPageSize,
     editingAccount,
-    setEditingAccount,
     inlineEditId,
     eventDrafts,
     updateEventDraft,
@@ -65,6 +64,8 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     savingAccount,
     cancelInlineEdit,
     saveInline,
+    openLedgerAccountEditor,
+    openLedgerEditor,
   } = controller;
 
   const statValue = (value: number) => (loading ? "—" : loadError ? "不可用" : String(value));
@@ -166,7 +167,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
                   loading={Boolean(ledgerDetailLoading[accountId])}
                   onPartyClick={(party: InventoryPartyLink) => onNavigate?.(party.entityType === "customer" ? `customers?customer_id=${party.id}` : `customers?counterparty_id=${party.id}`)}
                   editing={inlineEditId === detail.account.id ? editingAccount : undefined}
-                  onEdit={setEditingAccount}
+                  onEdit={openLedgerAccountEditor}
                   eventDrafts={eventDrafts}
                   onEventEdit={updateEventDraft}
                   employees={employees}

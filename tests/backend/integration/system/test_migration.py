@@ -480,7 +480,7 @@ def test_active_migration_chain_has_timestamp_follow_ups():
     active_dir = BACKEND_DIR / "alembic" / "squashed_versions"
     active_files = sorted(path.name for path in active_dir.glob("*.py"))
     assert active_files[0] == "0001_current_schema_baseline.py"
-    assert active_files[-1] == "0008_align_existing_schema.py"
+    assert active_files[-1] == "0009_backfill_sale_payment_method_options.py"
 
 
 def test_downgrade_and_upgrade_roundtrip(migration_db):

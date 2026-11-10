@@ -44,7 +44,9 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 **发布时间：** 2026-11-11 01:55:27 CST（Asia/Shanghai）
 
-### 本轮提交
+### 本次内容
+
+本轮自动汇总以下提交，按 Bug 修复、功能更新和工程变更分类：
 
 相对提交 `21e9031290ab`，共 1 个非合并提交；4 files changed, 206 insertions(+), 11 deletions(-)。
 

@@ -77,7 +77,8 @@ shortstat = git("diff", "--shortstat", f"{base}..{head}") or "文件统计不可
 lines = [
     f"## V{version}", "",
     f"**发布时间：** {today}（Asia/Shanghai）", "",
-    "### 本轮提交", "",
+    "### 本次内容", "",
+    "本轮自动汇总以下提交，按 Bug 修复、功能更新和工程变更分类：", "",
     f"相对提交 `{base[:12]}`，共 {len(commits)} 个非合并提交；{shortstat}。", "",
 ]
 if groups["fix"]:

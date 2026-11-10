@@ -1,0 +1,40 @@
+name: main-ci-cd
+
+# 本地 main 直接推送云端 main：三项 CI 全绿后才触发生产发布。
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: main-ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: write
+
+jobs:
+  wait-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      SHA: ${{ github.sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Wait for required CI gates
+        run: |
+          set -euo pipefail
+          for wf in lint-gate.yml frontend-gate.yml coverage-gate.yml; do
+            echo "waiting for $wf ..."
+            for i in $(seq 1 80); do
+              status=$(gh run list --commit "$SHA" --workflow "$wf" --limit 1 --json conclusion --jq '.[0].conclusion' 2>/dev/null || true)
+              if [ "$status" = success ]; then break; fi
+              if [ "$status" = failure ] || [ "$status" = cancelled ] || [ "$status" = timed_out ]; then
+                echo "$wf: $status" >&2
+                exit 1
+              fi
+              sleep 15
+            done
+            [ "$status" = success ] || { echo "$wf timed out" >&2; exit 1; }
+          done
+
+      - name: Trigger production deploy
+        run: gh workflow run deploy-production.yml --ref main

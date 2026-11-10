@@ -2,8 +2,6 @@ name: deploy-production
 
 # main 通过 PR 合并且 CI 通过后，自动部署到 ECS；保留手动触发用于补发/回滚验证。
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       reset_database:

@@ -34,6 +34,7 @@ from app.domain.trade import (
 )
 from app.orders import service as order_service
 from app.orders.amounts import event_totals, order_amounts
+from app.orders.router_output import _order_list_payload
 from app.policy import service as policy_service
 from app.reporting import service as reporting_service
 from app.stocks import service as account_service
@@ -160,6 +161,29 @@ def test_profit_follows_cashflow_not_events(seeded_db):
     # 成交额 / 本金仍按事件口径，不受资金明细影响。
     assert order_amounts(seeded_db, order_id)["GROSS"] == Decimal("1500.00")
     assert order_amounts(seeded_db, order_id)["PRINCIPAL"] == Decimal("1000.00")
+
+
+def test_order_ledger_profit_uses_cashflow_basis(seeded_db):
+    """订单台账利润必须与利润分配同源，额外资金支出应同步扣减。"""
+    order_id = _order_with_events(seeded_db)
+    _add_flow(seeded_db, order_id, "OUT", "200")
+
+    order = seeded_db.get(Order, order_id)
+    row = _order_list_payload(seeded_db, [order])[0]
+
+    assert row["profit_base"] == Decimal("300.00")
+
+
+def test_order_ledger_profit_includes_rebate_and_bad_debt(seeded_db):
+    """台账利润也必须包含不生成资金流水的返点收入与分期坏账。"""
+    order_id = _order_with_events(seeded_db)
+    _add_rebate(seeded_db, order_id, "100")
+    _add_bad_debt(seeded_db, order_id, "400")
+
+    order = seeded_db.get(Order, order_id)
+    row = _order_list_payload(seeded_db, [order])[0]
+
+    assert row["profit_base"] == Decimal("200.00")
 
 
 def test_profit_counts_all_income_and_expense(seeded_db):

@@ -40,6 +40,26 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 ---
 
+## V0.1.0
+
+**发布时间：** 2026-11-11 01:55:27 CST（Asia/Shanghai）
+
+### 本轮提交
+
+相对提交 `21e9031290ab`，共 1 个非合并提交；4 files changed, 206 insertions(+), 11 deletions(-)。
+
+### 功能更新
+
+- automate release versioning and change summaries（`8a9040d6`）
+
+### 发布结果
+
+- 自动版本：`V0.1.0`
+- 更新级别：`minor`
+- CI 门禁：lint、前端构建/测试、后端核心测试
+- 部署：门禁全部通过后自动发布到 ECS
+
+---
 ## V0.0.9
 
 **发布时间：** 2026-11-10 CST（Asia/Shanghai）

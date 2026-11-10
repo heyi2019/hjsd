@@ -1,0 +1,115 @@
+name: main-ci-cd
+
+# 本地 main 直接推送云端 main：自动分级升版、生成变更摘要，三项 CI 全绿后发布。
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: main-ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  prepare-release:
+    name: Prepare automatic release
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.release.outputs.sha }}
+      version: ${{ steps.release.outputs.version }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump version and summarize changes
+        id: release
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          release_started=$(date +%s)
+          echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] automatic release preparation started"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          current_subject="$(git log -1 --format=%s)"
+          if [[ "$current_subject" == chore\(release\):* ]]; then
+            version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' backend/app/version.py | head -1)"
+            echo "本提交已完成自动发版，跳过重复升号：V${version}"
+          else
+            summary_file="${RUNNER_TEMP}/release-summary.md"
+            scripts/ops/auto_release.sh "$BASE_SHA" "$HEAD_SHA" | tee "$summary_file"
+            {
+              echo "## Automatic release"
+              cat "$summary_file"
+            } >> "$GITHUB_STEP_SUMMARY"
+            git add backend/app/version.py frontend/package.json package-lock.json RELEASE.md
+            version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' backend/app/version.py | head -1)"
+            git commit -m "chore(release): v${version}"
+            git push origin HEAD:main
+          fi
+          version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' backend/app/version.py | head -1)"
+          release_sha="$(git rev-parse HEAD)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$release_sha" >> "$GITHUB_OUTPUT"
+          release_duration=$(( $(date +%s) - release_started ))
+          echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] automatic release preparation finished in ${release_duration}s"
+          echo "- 自动发版准备耗时：${release_duration}s" >> "$GITHUB_STEP_SUMMARY"
+          for wf in lint-gate.yml frontend-gate.yml backend-gate.yml; do
+            gh api --method POST "repos/$REPO/actions/workflows/$wf/dispatches" -f ref=main
+          done
+
+  wait-and-deploy:
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    env:
+      SHA: ${{ needs.prepare-release.outputs.sha }}
+      REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Wait for required CI gates
+        run: |
+          set -euo pipefail
+          workflow_started=$(date +%s)
+          for wf in lint-gate.yml frontend-gate.yml backend-gate.yml; do
+            gate_started=$(date +%s)
+            echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] waiting for $wf ..."
+            for i in $(seq 1 80); do
+              run_id=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
+                --jq "[.workflow_runs[] | select(.path == \".github/workflows/$wf\")] | sort_by(.created_at) | last | .id // empty" \
+                2>/dev/null || true)
+              status=""
+              if [ -n "$run_id" ]; then
+                status=$(gh api "repos/$REPO/actions/runs/$run_id" \
+                  --jq '.conclusion // .status' 2>/dev/null || true)
+              fi
+              echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] attempt=$i run_id=${run_id:-none} status=${status:-unknown}"
+              if [ "$status" = success ]; then break; fi
+              if [ "$status" = failure ] || [ "$status" = cancelled ] || [ "$status" = timed_out ]; then
+                echo "$wf: $status" >&2
+                exit 1
+              fi
+              sleep 15
+            done
+            [ "$status" = success ] || { echo "$wf timed out" >&2; exit 1; }
+            echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] $wf passed in $(( $(date +%s) - gate_started ))s"
+          done
+          echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] all CI gates passed in $(( $(date +%s) - workflow_started ))s"
+
+      - name: Trigger production deploy
+        run: |
+          started=$(date +%s)
+          echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] dispatch deploy-production ref=$SHA"
+          gh api --method POST "repos/$REPO/actions/workflows/deploy-production.yml/dispatches" \
+            --input - <<EOF
+          {"ref":"main","inputs":{"release_sha":"$SHA"}}
+          EOF
+          echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] deploy-production dispatched in $(( $(date +%s) - started ))s"

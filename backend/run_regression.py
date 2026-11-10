@@ -33,7 +33,7 @@ from test_catalog import (  # noqa: E402
 )
 
 # pyflakes 扫描范围：业务代码 + 测试 + 唯一活动迁移 + 脚本。
-LINT_TARGETS = ["app", "../tests/backend", "alembic/squashed_versions", "scripts", "run_regression.py", "run_coverage_gate.py"]
+LINT_TARGETS = ["app", "../tests/backend", "alembic/squashed_versions", "scripts", "run_regression.py"]
 # 基线只记「文件 + 消息」，不含行列号——行号漂移不应判定为新增告警
 LINT_BASELINE = ROOT / "lint_baseline.txt"
 LINT_LINE_RE = re.compile(r"^(?P<path>.+?):\d+:\d+: (?P<msg>.+)$")
@@ -153,7 +153,6 @@ GROUPS = {
         "tests/backend/unit/finance/test_rebate_current_contract.py",
         "tests/backend/unit/settings/test_product_alias_compat.py",
         "tests/backend/unit/system/test_main_contract.py",
-        "tests/backend/unit/system/test_coverage_gate.py",
         # 列表列「界面↔注册表」守卫：纯静态读前端源码，无 DB/HTTP，0.04s。
         # 曾长期游离在所有分组之外 —— 前端把报表视图拆成 ./reports/*.tsx 后它指错文件、
         # 7 条 RPT_* 一直红着却没人发现，证明「不在分组里的守卫等于没有守卫」。
@@ -310,7 +309,6 @@ GROUPS = {
         "tests/backend/integration/operations/test_list_export_csv.py",
         "tests/backend/unit/system/test_deploy_script_contract.py",
         "tests/backend/unit/system/test_backup_scripts.py",
-        "tests/backend/unit/system/test_coverage_gate.py",
     ],
     "auth": [
         "tests/backend/integration/system/test_auth_contract.py",

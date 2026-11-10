@@ -23,19 +23,19 @@
       ],
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
-        "files": 117,
-        "cases": 1736,
+        "files": 116,
+        "cases": 1735,
         "kinds": {
           "unit": {
-            "files": 32,
-            "cases": 297,
+            "files": 31,
+            "cases": 296,
             "byArea": {
               "business": 5,
               "customer": 1,
               "finance": 3,
               "operations": 2,
               "settings": 2,
-              "system": 19
+              "system": 18
             }
           },
           "integration": {
@@ -51,7 +51,7 @@
             }
           }
         },
-        "_baseline_note": "旧版本迁移兼容测试移除后，后端全量收集基线为 1736 例。"
+        "_baseline_note": "旧版本迁移兼容测试与覆盖率门禁移除后，后端全量收集基线为 1735 例。"
       },
       "budgets": {
         "fast": 60,

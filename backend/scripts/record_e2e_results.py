@@ -13,7 +13,7 @@
 
 关联口径：case_index.json 的 E2E 键为 `tests/e2e/<区域>/<规格文件名>::<标题>`
 （2026-11-04 规格从包内 frontend/e2e/ 迁到仓库根 tests/e2e/<区域>/）。
-case_index.json 按设计不入库，e2e-gate 也不跑生成器 → 文件缺失时脚本从入库的
+case_index.json 按设计不入库，CI 也不跑生成器 → 文件缺失时脚本从入库的
 《测试用例库.csv》自举同一份映射，避免整步因 FileNotFoundError 失败。
 Playwright JSON 的 `spec.file` 是**相对 testDir 的路径**（`system/modal-footer.spec.ts`），
 故必须补 `tests/e2e/` 前缀；漏了就是全部记录落空、报告仍旧显示 0。
@@ -144,7 +144,7 @@ def _load_case_index() -> dict:
     """nodeid -> 测试编号。
 
     case_index.json 由 gen_test_case_library.py 生成、按设计不入库
-    （docs/README.md：CI 重建、本地各自生成）。但 e2e-gate 并不跑该生成器，
+    （docs/README.md：CI 重建、本地各自生成）。自动化门禁不跑该生成器，
     所以 CI 上这份文件根本不存在——旧实现直接 read_text() 会抛
     FileNotFoundError，令「记录 E2E 结果」整步失败、门禁红。
 

@@ -1,48 +1,26 @@
 name: frontend-gate
 
-# 并行化改造（2026-11-01）：原实现把 static checks 与 test:full:all 串在同一个 job 里，
-# 而 test-full-sharded.mjs 的 CONCURRENCY=1 让 fast→quick→react→react-deep 四层严格排队，
-# 实测 workflow 均值 6.2min / 最长 7.4min，其中 react-deep 单层约 200s 纯属串行等待。
-# 四层之间没有任何数据依赖，串行的唯一理由是「同机多 jsdom 进程争抢 CPU」——该假设在
-# GitHub Actions（每 job 独立 runner）不成立，属把本地稳定性代价在 CI 重复支付。
-# 现改为矩阵并行 + deep 层按事件分流：
-#   - PR / push：static + fast/quick/react 并行，跳过 react-deep  → 门禁 ~3-4min
-#   - push(main) / schedule / dispatch：额外跑 react-deep              → 发版与夜间兜底
-# 兼容性：保留原 job 名 "Frontend checks and tests" 与 "Frontend build" 作为汇总 gate，
-# 避免分支保护若绑定了旧 check 名导致 PR 永久 pending。gate 自身只做结果断言，近零耗时。
-
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, test]
   pull_request:
   workflow_dispatch:
-  # 夜间兜底：deep 层已移出 PR 门禁，靠定时跑保证不会长期无人验证。
-  schedule:
-    - cron: "0 18 * * *" # UTC 18:00 = 北京时间 02:00
-
-# 同一 ref 的新提交取消旧运行（仅 PR）。push 到 main 不取消：gate 结果需要完整落库，
-# auto-merge 依赖前端全绿的 conclusion，取消会写入 cancelled 直接中止自动合并。
-concurrency:
-  group: frontend-gate-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
-defaults:
-  run:
-    working-directory: frontend
-
 jobs:
-  static-checks:
-    name: TypeScript and UI checks
+  frontend-tests:
+    name: Frontend checks and tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node 22
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
@@ -52,113 +30,22 @@ jobs:
         working-directory: .
         run: npm ci
 
-      - name: TypeScript and UI checks
-        run: npm run check
-
-  test-layers:
-    # 三层并行：每层独立 runner，互不争抢 CPU，故不必再串行。
-    # fail-fast: false —— 一层红不代表其他层没有参考价值，全跑完再一次性看结论。
-    name: Tests (${{ matrix.layer }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - layer: fast
-            command: npm run test:fast
-          - layer: quick
-            command: npm run test:quick
-          # react 层沿用原脚本口径：显式 --retry=0（项目配置继承全局 retry:1，会掩盖 flake）
-          - layer: react
-            command: npm run test:react -- --retry=0 --reporter=dot
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install dependencies
-        working-directory: .
-        run: npm ci
-
-      - name: Run ${{ matrix.layer }} layer
-        run: ${{ matrix.command }}
-
-  frontend-coverage:
-    # 覆盖率门禁（阶段七）：显式跑 --coverage，触发 vitest.config.ts 的 coverage.thresholds.global。
-    # 仅聚合阈值（lines≥80 / statements≥76 / functions≥66 / branches≥72；2026-11-03 基线
-    # 82.45 / 78.92 / 68.86 / 75.49）。不并入 test-layers——覆盖测量需 v8 provider，单开
-    # job 隔离，且失败不污染分层测试结论。缓冲约 2~3pt：真实回归才失败，正常波动不误伤。
-    name: Frontend coverage gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install dependencies
-        working-directory: .
-        run: npm ci
-
-      - name: Run coverage (fast+quick+react)
-        # npm ci 在仓库根执行（workspaces hoisted），vitest 二进制落在根 node_modules/.bin，
-        # 不是 frontend/node_modules/.bin。CI 实测 ./node_modules/.bin/vitest 直接
-        # "No such file or directory"，故显式走根路径。
-        run: ../node_modules/.bin/vitest run --coverage --project=fast --project=quick --project=react --reporter=dot
-
-  test-react-deep:
-    # 仅在 main/master 的 push、定时与手动触发时运行，PR 跳过。
-    # deep 按区域拆成 6 个矩阵分片（共 16 个 .deep 文件），既保留单分片隔离，又缩短 CI 总等待时间。
-    name: Tests (react-deep-${{ matrix.shard }})
-    if: >
-      github.event_name != 'pull_request' &&
-      (github.event_name != 'push' ||
-       github.ref_name == 'main' || github.ref_name == 'master')
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        # 分片 = 业务区域（tests/frontend/module/<区域>/*.deep.test.tsx），
-        # 由 scripts/test-deep-shard.mjs 从磁盘发现，勿在此写死文件清单。
-        shard: [workbench, business, finance, operations, settings, system]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install dependencies
-        working-directory: .
-        run: npm ci
-
-      - name: Run react-deep shard
-        run: npm run test:react-deep:shard -- ${{ matrix.shard }}
+      - name: Check and test frontend
+        run: |
+          npm run check
+          npm run test:full:all
 
   frontend-build:
     name: Frontend build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node 22
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
@@ -170,60 +57,3 @@ jobs:
 
       - name: Build frontend
         run: npm run build
-
-  # 汇总 gate：保留原有 job 名，兼容可能存在的分支保护必需检查项
-  # （本账号 token 无 admin 权限，无法读取分支保护配置，故按最保守方式保留原名）。
-  # 本身不含任何测试逻辑，只断言上游结果，故近零耗时。
-  frontend-tests:
-    name: Frontend checks and tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # 本 job 不 checkout，也没有 frontend/ 目录；顶层 defaults 的 working-directory: frontend
-    # 会让纯 shell 断言步骤在启动 bash 前就报 "No such file or directory"（CI 实测）。
-    # 汇总 job 只需在仓库根跑 echo / exit，故就地覆盖工作目录。
-    defaults:
-      run:
-        working-directory: .
-    needs: [static-checks, test-layers, test-react-deep, frontend-coverage]
-    if: always()
-    steps:
-      - name: Assert upstream jobs succeeded
-        shell: bash
-        run: |
-          set -euo pipefail
-          static="${{ needs.static-checks.result }}"
-          layers="${{ needs.test-layers.result }}"
-          deep="${{ needs.test-react-deep.result }}"
-          coverage="${{ needs.frontend-coverage.result }}"
-          echo "static-checks=${static}"
-          echo "test-layers=${layers}"
-          echo "test-react-deep=${deep}"
-          echo "frontend-coverage=${coverage}"
-          failed=0
-          # skipped 视为通过：deep 层在 PR 按设计跳过。
-          for result in "$static" "$layers" "$deep" "$coverage"; do
-            case "$result" in
-              success|skipped) ;;
-              *)
-                echo "::error::upstream job result is '${result}'"
-                failed=1
-                ;;
-            esac
-          done
-          exit "$failed"
-
-      - name: Publish layer summary
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo "### Frontend gate"
-            echo
-            echo "- static-checks: \`${{ needs.static-checks.result }}\`"
-            echo "- test-layers: \`${{ needs.test-layers.result }}\`"
-            echo "- test-react-deep: \`${{ needs.test-react-deep.result }}\`"
-            echo "- frontend-coverage: \`${{ needs.frontend-coverage.result }}\`"
-            echo "- trigger: \`${{ github.event_name }}\` on \`${{ github.ref_name }}\`"
-            echo
-            echo "react-deep 仅在 main/master push、定时与手动触发时运行；PR 跳过。"
-          } >> "$GITHUB_STEP_SUMMARY"

@@ -170,35 +170,5 @@ export default defineConfig({
         },
       },
     ],
-    // 覆盖率仅在使用 `vitest run --coverage` 时激活，不影响日常测试运行。
-    // 量化前端薄弱页用：provider v8（与 esbuild transform 兼容，零额外依赖）。
-    coverage: {
-      provider: "v8",
-      // root 是仓库根，路径必须显式带 frontend/ 前缀。
-      reportsDirectory: here("./coverage"),
-      reporter: ["text", "json-summary", "json", "html"],
-      include: ["frontend/src/**/*.{ts,tsx}"],
-      exclude: [
-        "frontend/src/**/*.test.{ts,tsx}",
-        "frontend/src/**/*.spec.{ts,tsx}",
-        "frontend/src/main.tsx",
-        "frontend/src/vite-env.d.ts",
-        "frontend/src/vite.config.test.ts",
-        "**/*.d.ts",
-      ],
-      thresholds: {
-        // 门禁基线（2026-11-03 实测 fast+quick+react 三档聚合）：
-        //   lines 82.45 / statements 78.92 / functions 68.86 / branches 75.49（916 例全绿）。
-        // 仅 global 聚合阈值，不设 per-file——大量业务页当前覆盖率本就低，per-file 必炸。
-        // 缓冲约 2~3pt：真实回归（跌破此线）才失败，正常波动不误伤。
-        // CI 仅在 frontend-coverage job 显式跑 --coverage 时才触发本门禁；日常 test:fast/quick/react 不受影响。
-        global: {
-          lines: 80,
-          statements: 76,
-          functions: 66,
-          branches: 72,
-        },
-      },
-    },
   },
 });

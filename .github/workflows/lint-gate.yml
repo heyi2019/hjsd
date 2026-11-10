@@ -2,17 +2,17 @@ name: lint-gate
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, test]
   pull_request:
   workflow_dispatch:
 
 concurrency:
   group: lint-gate-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/test' || github.event_name == 'pull_request' }}
 
 jobs:
   lint:
-    # 与 coverage-gate 保持一致：python:3.12
+    # 与后端门禁保持一致：python:3.12
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

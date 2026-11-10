@@ -4,8 +4,9 @@
 
 正式版发布、阿里云部署、备份和回滚统一按 [docs/发布流程.md](docs/发布流程.md) 执行。本文件只保留版本记录和版本号生成规则，避免维护两套发布步骤。
 
-> **版本号不会自动升。** 必须显式执行下面第 1 步；不做则三处版本停在旧值，
-> 且 `test_frontend_version_matches_backend_release_version` 会在只改一处时直接红。
+> **正常推送 `main` 会自动发版。** CI 会按提交类型自动升版：普通修复/工程变更升
+> patch，`feat` 升 minor，带 `!` 或 `BREAKING CHANGE` 升 major，并同步三处版本、
+> 生成本轮提交摘要和发布章节。下面命令保留给需要本地预览或手动指定版本的场景。
 
 ```bash
 # 1 升版本号（patch=修 bug / minor=加功能 / major=不兼容）
@@ -39,6 +40,50 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 ---
 
+## V0.1.1
+
+**发布时间：** 2026-11-11 01:59:58 CST（Asia/Shanghai）
+
+### 本次内容
+
+本轮自动汇总以下提交，按 Bug 修复、功能更新和工程变更分类：
+
+相对提交 `4f2b23da5b72`，共 1 个非合并提交；2 files changed, 5 insertions(+), 2 deletions(-)。
+
+### Bug 修复
+
+- include required release content heading（`f071a2ed`）
+
+### 发布结果
+
+- 自动版本：`V0.1.1`
+- 更新级别：`patch`
+- CI 门禁：lint、前端构建/测试、后端核心测试
+- 部署：门禁全部通过后自动发布到 ECS
+
+---
+## V0.1.0
+
+**发布时间：** 2026-11-11 01:55:27 CST（Asia/Shanghai）
+
+### 本次内容
+
+本轮自动汇总以下提交，按 Bug 修复、功能更新和工程变更分类：
+
+相对提交 `21e9031290ab`，共 1 个非合并提交；4 files changed, 206 insertions(+), 11 deletions(-)。
+
+### 功能更新
+
+- automate release versioning and change summaries（`8a9040d6`）
+
+### 发布结果
+
+- 自动版本：`V0.1.0`
+- 更新级别：`minor`
+- CI 门禁：lint、前端构建/测试、后端核心测试
+- 部署：门禁全部通过后自动发布到 ECS
+
+---
 ## V0.0.9
 
 **发布时间：** 2026-11-10 CST（Asia/Shanghai）

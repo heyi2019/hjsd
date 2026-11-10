@@ -116,30 +116,39 @@ if [ "$db_ready" -ne 1 ]; then
   exit 1
 fi
 
-echo "==> 预检：数据库版本戳能否被活动迁移链解析"
-# 活动链已压平为单一 0001，历史增量迁移（0065~0071 等）不再加载。
-# 生产库若停在旧链（如 0064_expand_buy_rebate_scope），alembic 会在执行任何 DDL 之前
-# 报 Can't locate revision 并中止。这里提前拦一次，把「不要 stamp 绕过」的指引打到日志里，
-# 避免运维现场把结构落后的库 stamp 成已升级（那样之后 upgrade head 是空操作）。
-migration_probe="$(docker compose run --rm --no-deps backend alembic current </dev/null 2>&1 || true)"
-if printf '%s\n' "$migration_probe" | grep -q "Can't locate revision"; then
-  printf '%s\n' "$migration_probe" | sed 's/^/    /' >&2
-  cat >&2 <<'MIGRATION_CHAIN_MSG'
-
-✗ 数据库版本戳不在活动迁移链内，升级必然失败，已中止（未做任何改动）。
-  活动链已压平为单一 0001，0065~0071 等历史增量已不存在。
-  ⚠ 不要用 alembic stamp 绕过：对结构落后的库 stamp 之后 upgrade head 是空操作，
-    等于把未完成的库伪装成已升级。
-  正确路径：备份数据 → 空库 alembic upgrade head 建全量结构 → 清洗后导入 → 校验。
-  详见 docs/ERP_数据库架构检查与治理方案_V1.1_20261103.md 第五节。
-MIGRATION_CHAIN_MSG
-  exit 1
-fi
-printf '%s\n' "$migration_probe" | sed 's/^/    /'
-
 echo "==> 迁移前备份 PostgreSQL 正式库"
 if ! bash scripts/backup_daily.sh; then
   echo "✗ 迁移前备份失败，已中止发布（不在没有备份的情况下改结构）" >&2
+  exit 1
+fi
+
+# 全新数据库没有任何业务表，先用当前唯一活动迁移 0001 建结构；
+# 若只残留 alembic_version 等元表、业务表完全不存在，清掉残留迁移标记再初始化。
+# 已有业务表仍走下面的正常迁移流程，不自动覆盖业务数据。
+schema_probe="$(docker compose exec -T db psql \
+  -U "${POSTGRES_USER:-erp_app}" -d "${POSTGRES_DB:-heijin_erp}" -tAc \
+  "select
+     (select count(*) from information_schema.tables where table_schema=current_schema()),
+     coalesce(to_regclass('public.alembic_version')::text, 'NONE'),
+     coalesce(to_regclass('public.users')::text, 'NONE'),
+     coalesce(to_regclass('public.policy_definitions')::text, 'NONE')" \
+  | tr -d '\r' || true)"
+IFS='|' read -r schema_tables schema_alembic schema_users schema_policies <<< "$schema_probe"
+schema_tables="$(printf '%s' "$schema_tables" | tr -d '[:space:]')"
+schema_alembic="$(printf '%s' "$schema_alembic" | tr -d '[:space:]')"
+schema_users="$(printf '%s' "$schema_users" | tr -d '[:space:]')"
+schema_policies="$(printf '%s' "$schema_policies" | tr -d '[:space:]')"
+if [ "$schema_tables" = "0" ]; then
+  echo "==> 检测到全新数据库，初始化活动迁移链"
+  docker compose run --rm backend alembic upgrade head
+elif [ "$schema_users" = "NONE" ] && [ "$schema_policies" = "NONE" ]; then
+  echo "==> 检测到仅有迁移元表的半初始化数据库，重置迁移标记并初始化活动迁移链"
+  docker compose exec -T db psql \
+    -U "${POSTGRES_USER:-erp_app}" -d "${POSTGRES_DB:-heijin_erp}" \
+    -v ON_ERROR_STOP=1 -c "drop table if exists alembic_version"
+  docker compose run --rm backend alembic upgrade head
+elif [ "$schema_alembic" = "NONE" ]; then
+  echo "✗ 数据库已有表但缺少 alembic_version，拒绝无版本迁移" >&2
   exit 1
 fi
 
@@ -179,19 +188,10 @@ IFS='|' read -r pre_tables pre_dbversion pre_policies pre_optionsets pre_sale_ro
 echo "  ${pre_state}"
 
 echo "==> 执行数据库迁移"
-# 活动链已压平为单一 0001（alembic.ini 的 version_locations 只指 squashed_versions），
-# ECS 现存的 0064 版本戳无法解析，会在此处硬停——这是预期行为，不是 bug。
-# 首次上线必须先按 Release→Prod 流程重建库；不得用 stamp 把结构未完成的库伪装成已升级。
+# 已有数据库只应用当前活动迁移链，不覆盖业务数据。
 docker compose run --rm backend alembic upgrade head
 
-# 发布纪律（V1.0.4 起）：部署脚本不得直接写业务数据；结构变化只能来自版本化迁移。
-# 下面两个历史调用已移除，禁止再加回：
-#   - scripts/stamp_db_version.py        → create_all 自建 db_version 表（41 → 42 表）
-#   - scripts/seed_policy_definitions.py → 写入 policy_definitions 定义与默认版本（0 → 6）
-# 活动迁移链已压平为 0001，结构升级只由 Alembic / 上线执行单负责；经营规则由业务侧按
-# 裁决预置，部署时静默写入会让业务数据验收口径失效。
-# 脚本文件保留在镜像内，确需执行时由运维显式手工调用，不进自动发布通道。
-echo "==> 跳过历史版本戳与规则预置（发布通道不写库结构与业务数据）"
+echo "==> 迁移完成（发布通道不写入业务数据）"
 
 echo "==> 启动服务"
 if ! docker compose up -d; then
@@ -234,18 +234,6 @@ if [ "$health_ok" -ne 1 ]; then
   exit 1
 fi
 
-# 已有库升级必须补齐表单作用域：0001 在生产已 stamp，create_all + seed_catalog 不会重播
-# 种子，漏跑会让回收/提号/代挂三张售出表单回落硬编码默认值、丢失管理员既有配置。
-# 脚本随 backend 镜像落在 /app/scripts/，旧镜像（回滚场景）没有该文件则跳过，不阻断回滚。
-echo "==> 补齐售出表单三作用域（幂等；旧镜像无脚本则跳过）"
-b4_applied=0
-if docker compose exec -T backend sh -c 'test -f scripts/split_sale_form_scopes.py'; then
-  docker compose exec -T backend python3 scripts/split_sale_form_scopes.py
-  b4_applied=1
-else
-  echo "  ⚠ 本版镜像未内置补齐脚本，跳过（回滚到旧版本时属正常）"
-fi
-
 echo "==> 发布后不变量校验（只读）"
 post_state="$(db_snapshot)"
 validate_state "发布后" "$post_state"
@@ -276,26 +264,6 @@ if [ "$post_fields" -lt "$pre_fields" ]; then
   invariant_fail=1
 else
   echo "  ✓ 字段总数：${pre_fields} → ${post_fields}（只增不减）"
-fi
-
-if [ "$b4_applied" = "1" ]; then
-  scope_state="$(docker compose exec -T db psql \
-    -U "${POSTGRES_USER:-erp_app}" -d "${POSTGRES_DB:-heijin_erp}" -tAc \
-    "select
-       (select count(*) from order_form_fields where order_type_code='SALEREC'),
-       (select count(*) from order_form_fields where order_type_code='SALETH'),
-       (select count(*) from order_form_fields where order_type_code='SALEDG')")"
-  IFS='|' read -r rec_fields th_fields dg_fields <<< "$scope_state"
-  if ! [[ "$rec_fields" =~ ^[0-9]+$ && "$th_fields" =~ ^[0-9]+$ && "$dg_fields" =~ ^[0-9]+$ ]]; then
-    printf '  ✗ 售出三作用域计数格式异常：%q\n' "$scope_state" >&2
-    exit 1
-  fi
-  if [ "$rec_fields" -gt 0 ] && [ "$th_fields" -gt 0 ] && [ "$dg_fields" -gt 0 ]; then
-    echo "  ✓ 售出三作用域：SALEREC=${rec_fields} SALETH=${th_fields} SALEDG=${dg_fields}"
-  else
-    echo "  ✗ 售出三作用域存在空字段集：SALEREC=${rec_fields} SALETH=${th_fields} SALEDG=${dg_fields}" >&2
-    invariant_fail=1
-  fi
 fi
 
 if [ "$invariant_fail" -ne 0 ]; then

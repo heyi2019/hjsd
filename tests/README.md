@@ -109,7 +109,7 @@ cd backend
 .venv/bin/python3 run_regression.py changed      # 按 git 变更反查分组
 .venv/bin/python3 run_regression.py <域>         # orders / finance / parties / …
 .venv/bin/python3 run_regression.py all          # 全量（发版前）
-.venv/bin/python3 run_coverage_gate.py           # 四域覆盖率闸门（缺失行基线）
+.venv/bin/python3 run_regression.py ci          # 后端全量回归
 .venv/bin/python3 run_regression.py lint         # pyflakes，只拦净增
 .venv/bin/python3 scripts/promise_catalog.py     # 承诺覆盖报告
 .venv/bin/python3 scripts/trim_test_results.py   # 裁剪执行历史（先 --dry-run 看计划）

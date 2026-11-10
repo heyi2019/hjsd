@@ -15,7 +15,12 @@ COMPOSE_FILE = PROJECT_ROOT / "deploy" / "docker-compose.yml"
 
 
 def _release_tree(
-    tmp_path: Path, *, curl_exit: int = 0, dump_exit: int = 0, admin_password: str | None = None
+    tmp_path: Path,
+    *,
+    curl_exit: int = 0,
+    dump_exit: int = 0,
+    admin_password: str | None = None,
+    partial_schema: bool = False,
 ) -> tuple[Path, Path]:
     """创建隔离发布目录；仅替换 Docker 与 curl 这两个外部边界。"""
     deploy_dir = tmp_path / "deploy"
@@ -35,6 +40,7 @@ def _release_tree(
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     docker = fake_bin / "docker"
+    schema_probe = "2|alembic_version|NONE|NONE" if partial_schema else "41|alembic_version|users|policy_definitions"
     docker.write_text(
         "#!/usr/bin/env bash\n"
         "set -uo pipefail\n"
@@ -42,9 +48,9 @@ def _release_tree(
         'case "$args" in\n'
         '  *"ps --status running --services"*) printf "db\\nbackend\\n"; exit 0 ;;\n'
         '  *"ps -q"*) printf "fakecid0123456789\\n"; exit 0 ;;\n'
-        # deploy.sh 的发布前后库状态自检需要 8 列状态与 3 列售出作用域计数；
-        # 其余 psql（backup_daily.sh 的表数探测）沿用原来的单列返回。
-        "  *information_schema.tables*) printf '41|NONE|0|63|13|220|1|0001\\n'; exit 0 ;;\n"
+        # schema_probe 需要 4 列；db_snapshot 需要 8 列状态。
+        '  *"from policy_definitions"*) printf "41|NONE|0|63|13|220|1|0001\\n"; exit 0 ;;\n'
+        f'  *"public.users"*) printf "{schema_probe}\\n"; exit 0 ;;\n'
         "  *SALEREC*) printf '28|28|21\\n'; exit 0 ;;\n"
         "  *psql*)\n"
         "    printf '1\\n'\n"
@@ -93,6 +99,16 @@ def test_first_deployment_backs_up_empty_database_then_deploys(tmp_path):
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "BACKUP_OK" in result.stdout, "迁移前应产出一次 pg_dump 备份"
+
+
+def test_partial_schema_rebuilds_from_active_migration_chain(tmp_path):
+    """只剩 Alembic 元表的半初始化库必须恢复到完整 0001 结构。"""
+    script, fake_bin = _release_tree(tmp_path, partial_schema=True)
+
+    result = _run(script, fake_bin)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "半初始化数据库" in result.stdout
 
 
 def test_deploy_aborts_when_pre_migration_backup_fails(tmp_path):

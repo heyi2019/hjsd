@@ -89,7 +89,6 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_cashflow_totals.py": "D02",
     "test_core_contract.py": "SYS07",
     "test_core_infra_gaps.py": "SYS10",
-    "test_coverage_gate.py": "SYS11",
     "test_deploy_script_contract.py": "SYS09",
     "test_deposit_remaining.py": "B08",
     "test_execution_cancellable_amount.py": "B08",

@@ -49,7 +49,6 @@ const STRUCTURAL = new Set([
   "scripts/test-panel.mjs",
   "scripts/test-changed.mjs",
   "scripts/test-full-sharded.mjs",
-  "scripts/test-deep-shard.mjs",
 ]);
 
 /** src 目录 → 区域。新增 src 目录必须在此登记，否则该目录的改动会被判成「未落在业务板块内」。 */

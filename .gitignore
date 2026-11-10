@@ -45,21 +45,15 @@ htmlcov/
 # 运行期目录：日志与截图产物，不入版本库
 /logs/*
 !/logs/.gitkeep
+# outputs：运行产物目录。11-11 清退一次性导入脚本后，入库的只剩目录说明与
+# legacy_import 的核对脚本；csv/xlsx/json 等数据产物一律不入库。
 /outputs/*
-!/outputs/.gitkeep
 !/outputs/README.md
-# 例外：数据导入/迁移的一次性脚本与对账报告是「历史执行记录」而非产物，
-# 它们是上线数据的唯一可追溯来源（见 docs/ERP_数据库架构检查与治理方案 对 wps_import 的定位），
-# 必须入库，否则删目录即永久丢失。csv/xlsx/json 产物仍忽略。
+# 父目录被 /outputs/* 忽略后，子文件需先放行父目录才能被 ! 救回
 /outputs/*/
-# 注意：父目录被 /outputs/* 忽略后，子文件需先放行父目录才能被 ! 救回
 !/outputs/legacy_import/
-!/outputs/wps_import/
 /outputs/legacy_import/*
-/outputs/wps_import/*
 !/outputs/legacy_import/*.py
-!/outputs/wps_import/*.py
-!/outputs/wps_import/*.md
 
 # 附件上传运行产物，不纳入代码版本库
 /backend/data/attachments/*

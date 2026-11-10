@@ -3,8 +3,6 @@ name: lint-gate
 on:
   push:
     branches: [main, master]
-    paths-ignore:
-      - "RELEASE.md"
   pull_request:
   workflow_dispatch:
 

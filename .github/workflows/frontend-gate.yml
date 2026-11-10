@@ -6,27 +6,25 @@ name: frontend-gate
 # 四层之间没有任何数据依赖，串行的唯一理由是「同机多 jsdom 进程争抢 CPU」——该假设在
 # GitHub Actions（每 job 独立 runner）不成立，属把本地稳定性代价在 CI 重复支付。
 # 现改为矩阵并行 + deep 层按事件分流：
-#   - PR / push(test)：static + fast/quick/react 并行，跳过 react-deep  → 门禁 ~3-4min
+#   - PR / push：static + fast/quick/react 并行，跳过 react-deep  → 门禁 ~3-4min
 #   - push(main) / schedule / dispatch：额外跑 react-deep              → 发版与夜间兜底
 # 兼容性：保留原 job 名 "Frontend checks and tests" 与 "Frontend build" 作为汇总 gate，
 # 避免分支保护若绑定了旧 check 名导致 PR 永久 pending。gate 自身只做结果断言，近零耗时。
 
 on:
   push:
-    branches: [main, master, test]
-    paths-ignore:
-      - "RELEASE.md"
+    branches: [main, master]
   pull_request:
   workflow_dispatch:
   # 夜间兜底：deep 层已移出 PR 门禁，靠定时跑保证不会长期无人验证。
   schedule:
     - cron: "0 18 * * *" # UTC 18:00 = 北京时间 02:00
 
-# 同一 ref 的新提交取消旧运行（仅 PR）。push 到 main/test 不取消：gate 结果需要完整落库，
+# 同一 ref 的新提交取消旧运行（仅 PR）。push 到 main 不取消：gate 结果需要完整落库，
 # auto-merge 依赖前端全绿的 conclusion，取消会写入 cancelled 直接中止自动合并。
 concurrency:
   group: frontend-gate-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/test' || github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -120,7 +118,7 @@ jobs:
         run: ../node_modules/.bin/vitest run --coverage --project=fast --project=quick --project=react --reporter=dot
 
   test-react-deep:
-    # 仅在 main/master 的 push、定时与手动触发时运行，PR 与 test 分支跳过。
+    # 仅在 main/master 的 push、定时与手动触发时运行，PR 跳过。
     # deep 按区域拆成 6 个矩阵分片（共 16 个 .deep 文件），既保留单分片隔离，又缩短 CI 总等待时间。
     name: Tests (react-deep-${{ matrix.shard }})
     if: >
@@ -202,7 +200,7 @@ jobs:
           echo "test-react-deep=${deep}"
           echo "frontend-coverage=${coverage}"
           failed=0
-          # skipped 视为通过：deep 层在 PR 与 test 分支按设计跳过。
+          # skipped 视为通过：deep 层在 PR 按设计跳过。
           for result in "$static" "$layers" "$deep" "$coverage"; do
             case "$result" in
               success|skipped) ;;
@@ -227,5 +225,5 @@ jobs:
             echo "- frontend-coverage: \`${{ needs.frontend-coverage.result }}\`"
             echo "- trigger: \`${{ github.event_name }}\` on \`${{ github.ref_name }}\`"
             echo
-            echo "react-deep 仅在 main/master push、定时与手动触发时运行；PR 与 test 分支跳过。"
+            echo "react-deep 仅在 main/master push、定时与手动触发时运行；PR 跳过。"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -2,15 +2,13 @@ name: coverage-gate
 
 on:
   push:
-    branches: [main, master, test]
-    paths-ignore:
-      - "RELEASE.md"
+    branches: [main, master]
   pull_request:
   workflow_dispatch:
 
 concurrency:
   group: coverage-gate-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/test' || github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   coverage:

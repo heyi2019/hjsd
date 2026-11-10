@@ -2,7 +2,7 @@ name: lint-gate
 
 on:
   push:
-    branches: [main, master, test]
+    branches: [main, master]
     paths-ignore:
       - "RELEASE.md"
   pull_request:
@@ -10,7 +10,7 @@ on:
 
 concurrency:
   group: lint-gate-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/test' || github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:

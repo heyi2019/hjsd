@@ -60,7 +60,7 @@ jobs:
           elif [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "master" ]; then
             echo "groups=ci" >> "$GITHUB_OUTPUT"      # 发布前：全系统回归 + 高风险跨模块
           else
-            echo "groups=unit cross B C D" >> "$GITHUB_OUTPUT"  # PR/test：单元 + 核心集成 + 跨模块
+            echo "groups=unit cross B C D" >> "$GITHUB_OUTPUT"  # PR：单元 + 核心集成 + 跨模块
           fi
 
       # CI 走串行：--parallel 会让每个 xdist worker 各自建库，在 GitHub runner 上
@@ -92,4 +92,4 @@ jobs:
             docs/testing/测试报告.md
             docs/testing/测试报告.json
             docs/testing/测试结果库/results.jsonl
-          retention-days: 30
+          retention-days: 7

@@ -36,6 +36,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     platformOffsaleTarget,
     profileTarget,
     rebateTarget,
+    removeFromInventory,
     cashflowPools,
     cashflowTarget,
     deliveryEmployees,
@@ -72,6 +73,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         const onCreated = async () => {
           const account = saleTarget;
           setSaleTarget(null);
+          if (account) removeFromInventory(account.id);
           await load();
           if (account) controller.dropExecutionCache(account.id);
           onOrdersChanged?.();

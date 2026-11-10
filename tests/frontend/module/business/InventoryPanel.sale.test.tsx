@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -138,6 +138,22 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
     pool_id: 3,
     portion: "PROFIT",
   }));
+});
+
+it("库存售出：成功后立即从库存列表移除账号，即使列表重拉暂时返回旧快照", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<InventoryPanel />, { user: "admin" });
+
+  expect(await screen.findByText("acc-1")).toBeInTheDocument();
+  await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "售出" }));
+  await ui.type(screen.getByLabelText("客户昵称"), "买家A");
+  await ui.type(screen.getByLabelText("售出金额"), "350");
+  await ui.click(screen.getByLabelText("资金账户"));
+  await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  await ui.click(screen.getByRole("button", { name: /确认售出/ }));
+
+  await waitFor(() => expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalled());
+  await waitFor(() => expect(screen.queryByText("acc-1")).not.toBeInTheDocument());
 });
 
 ;

@@ -3,12 +3,7 @@ name: backend-gate
 on:
   push:
     branches: [main, master]
-    paths:
-      - "backend/**"
-      - ".github/workflows/backend-gate.yml"
   pull_request:
-    paths:
-      - "backend/**"
   workflow_dispatch:
 
 jobs:

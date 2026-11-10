@@ -226,7 +226,7 @@ def cancel_installment(
         for flow in direct_cashflows:
             if flow.id in reversed_cashflow_ids:
                 continue
-            reversal = reverse_cashflow(
+            reverse_cashflow(
                 session,
                 flow.id,
                 reversed_on=cancelled_on,

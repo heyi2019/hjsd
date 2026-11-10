@@ -42,7 +42,6 @@ from ._common import (
     _non_negative_money,
     _positive_money,
     _required_bool,
-    _required_text,
 )
 
 # 事件 → 现金流方向 / 性质 / 分类

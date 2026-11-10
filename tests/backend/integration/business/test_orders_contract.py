@@ -25,7 +25,6 @@ from app.domain.enums import (
     AuditAction,
     CapitalType,
     CustomerStatus,
-    InstallmentContractType,
     OrderStatus,
 )
 from app.stocks import service as stocks_service

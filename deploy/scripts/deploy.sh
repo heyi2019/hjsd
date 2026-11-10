@@ -122,17 +122,30 @@ if ! bash scripts/backup_daily.sh; then
   exit 1
 fi
 
-# 全新数据库没有任何业务表，先用当前唯一活动迁移 0001 建结构，
-# 再采集发布前快照。已有数据库仍走下面的正常迁移流程，不自动覆盖业务数据。
+# 全新数据库没有任何业务表，先用当前唯一活动迁移 0001 建结构；
+# 若只残留 alembic_version 等元表、业务表完全不存在，清掉残留迁移标记再初始化。
+# 已有业务表仍走下面的正常迁移流程，不自动覆盖业务数据。
 schema_probe="$(docker compose exec -T db psql \
   -U "${POSTGRES_USER:-erp_app}" -d "${POSTGRES_DB:-heijin_erp}" -tAc \
-  "select (select count(*) from information_schema.tables where table_schema=current_schema()), coalesce(to_regclass('public.alembic_version')::text, 'NONE')" \
+  "select
+     (select count(*) from information_schema.tables where table_schema=current_schema()),
+     coalesce(to_regclass('public.alembic_version')::text, 'NONE'),
+     coalesce(to_regclass('public.users')::text, 'NONE'),
+     coalesce(to_regclass('public.policy_definitions')::text, 'NONE')" \
   | tr -d '\r' || true)"
-IFS='|' read -r schema_tables schema_alembic <<< "$schema_probe"
+IFS='|' read -r schema_tables schema_alembic schema_users schema_policies <<< "$schema_probe"
 schema_tables="$(printf '%s' "$schema_tables" | tr -d '[:space:]')"
 schema_alembic="$(printf '%s' "$schema_alembic" | tr -d '[:space:]')"
+schema_users="$(printf '%s' "$schema_users" | tr -d '[:space:]')"
+schema_policies="$(printf '%s' "$schema_policies" | tr -d '[:space:]')"
 if [ "$schema_tables" = "0" ]; then
   echo "==> 检测到全新数据库，初始化活动迁移链"
+  docker compose run --rm backend alembic upgrade head
+elif [ "$schema_users" = "NONE" ] && [ "$schema_policies" = "NONE" ]; then
+  echo "==> 检测到仅有迁移元表的半初始化数据库，重置迁移标记并初始化活动迁移链"
+  docker compose exec -T db psql \
+    -U "${POSTGRES_USER:-erp_app}" -d "${POSTGRES_DB:-heijin_erp}" \
+    -v ON_ERROR_STOP=1 -c "drop table if exists alembic_version"
   docker compose run --rm backend alembic upgrade head
 elif [ "$schema_alembic" = "NONE" ]; then
   echo "✗ 数据库已有表但缺少 alembic_version，拒绝无版本迁移" >&2

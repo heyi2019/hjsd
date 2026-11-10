@@ -16,7 +16,7 @@ beforeEach(() => {
 vi.mock("@/shared/api/catalog", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/api/catalog")>();
   const METHODS = [
-    "list", "get", "create", "update", "patch", "post", "postEvent", "cancel", "remove",
+    "list", "get", "create", "update", "patch", "post", "postEvent", "cancel", "remove", "materializeAccount",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
     "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
@@ -102,7 +102,8 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
     const editBtn = within(row as HTMLElement).getByRole("button", { name: "编辑" });
     await ui.click(editBtn);
 
-    expect(await screen.findByText("编辑订单 · HS-2026-0001")).toBeInTheDocument();
+    expect(await screen.findByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存修改" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "编辑账号" })).toBeNull();
   });
 

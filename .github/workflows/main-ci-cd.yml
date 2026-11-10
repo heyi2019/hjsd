@@ -54,5 +54,7 @@ jobs:
           started=$(date +%s)
           echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] dispatch deploy-production ref=$SHA"
           gh api --method POST "repos/$REPO/actions/workflows/deploy-production.yml/dispatches" \
-            -f ref="$SHA"
+            --input - <<EOF
+          {"ref":"main","inputs":{"release_sha":"$SHA"}}
+          EOF
           echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] deploy-production dispatched in $(( $(date +%s) - started ))s"

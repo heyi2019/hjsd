@@ -67,6 +67,13 @@ def upgrade() -> None:
         op.execute("ALTER TABLE cashflow ALTER COLUMN fund_nature SET DEFAULT 'BUSINESS'")
     op.execute("ALTER TABLE cashflow ALTER COLUMN fund_nature SET NOT NULL")
 
+    # 同一类旧库还可能缺少路由表的可选资金性质列；必须先补列，下面的
+    # 重复路由检查和唯一约束才有可执行的业务键。
+    op.execute(
+        "ALTER TABLE order_type_pools "
+        "ADD COLUMN IF NOT EXISTS fund_nature VARCHAR(16)"
+    )
+
     index_names = {item["name"] for item in inspector.get_indexes("cashflow")}
     if "ix_cashflow_nature" not in index_names:
         op.create_index("ix_cashflow_nature", "cashflow", ["nature"])

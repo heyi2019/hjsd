@@ -435,6 +435,9 @@ def test_upgrade_repairs_existing_dev_schema_drift(migration_db):
         # 生产库曾存在压平前 cashflow 表，版本戳虽已到 0007，但缺少
         # 当前 ORM 必需的 fund_nature 列；0008 必须先补列再建索引。
         connection.execute(text("ALTER TABLE cashflow DROP COLUMN IF EXISTS fund_nature"))
+        # 同一批压平前正式库也可能缺少路由表的可选资金性质列；0008
+        # 必须在检查重复路由前先恢复它。
+        connection.execute(text("ALTER TABLE order_type_pools DROP COLUMN IF EXISTS fund_nature"))
         connection.execute(text("ALTER TABLE order_type_pools DROP CONSTRAINT IF EXISTS uq_order_type_pools_route"))
         connection.execute(text("ALTER TABLE cashflow ALTER COLUMN created_at DROP NOT NULL"))
         connection.execute(text("ALTER TABLE orders ALTER COLUMN created_at DROP NOT NULL"))

@@ -3,8 +3,6 @@ name: lint-gate
 on:
   push:
     branches: [main, master, test]
-    paths-ignore:
-      - "RELEASE.md"
   pull_request:
   workflow_dispatch:
 
@@ -14,7 +12,7 @@ concurrency:
 
 jobs:
   lint:
-    # 与 coverage-gate 保持一致：python:3.12
+    # 与后端门禁保持一致：python:3.12
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -44,7 +44,6 @@ BOOT-01,L1,后端,唯一入口必须可导入且已挂载 v1 路由,服务起不
 BACKUP-01,L1,后端,备份必须每日产出且可恢复,灾难发生时无可用备份,test_backup_scripts.py,已覆盖,,
 DEPLOY-01,L1,后端,发布脚本退出码契约（首次部署与健康检查）,发布失败却报成功,test_deploy_script_contract.py,已覆盖,,
 CORE-01,L1,后端,core 基础设施（money / numbering / errors / settings / database）契约稳定,基础层缺陷扩散至全系统,test_core_contract.py;test_core_infra_gaps.py,已覆盖,,
-TESTING-03,L2,后端,覆盖率门禁只降不升,覆盖率静默下滑无人察觉,test_coverage_gate.py,已覆盖,,
 ROBUST-01,L2,后端,非法输入必须被明确拒绝，不得 500 或静默吞错,攻击面暴露、故障不可诊断,test_bughunt.py,已覆盖,,
 TESTING-04,L2,双端,测试内 vi.mock 的模块标识必须是 @/ 别名或包名，禁止相对路径；相对路径存量冻结只减不增,测试文件搬家后相对 mock 静默不命中，测试改用真实现仍通过，保护消失且不报警,tests/frontend/unit/system/mock-specifier.test.ts,已覆盖,,基线 tests/config/mock-specifier-baseline.json，2026-11-04 存量清零，新增即红
 TESTING-05,L2,后端,"快速通道（pytest -m ""not db""）内不得出现任何连库用例；db 标记由 v1_engine 夹具依赖派生，自建连接的文件必须显式声明",快通道静默连库：慢、依赖外部服务，极端情况下连错库或污染数据,test_db_channel.py,已覆盖,,"判据来自死端口实验：DATABASE_URL 指向不可达端口后跑 -m ""not db""，曾暴露 test_migration 12 错误 + test_numbering 1 失败"

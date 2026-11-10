@@ -1,25 +1,8 @@
-/** 限并发全量回归：fast/quick 并发跑，react / react-deep 各自独占机器跑（单进程、共享 vite transform 缓存）。
- *  关键提速（2026-10-27）：react/deep 不再切成多个子进程 shard —— 每个子进程是独立的 vite
- *  实例，会各自重 transform antd/react，把单进程 249s（78 文件）放大到分片 408s（69 非 deep）。
- *  改为「每层一个 vitest 进程」后，同层文件共享一份 transform 缓存，日常层由 ~408s 降至 ~170s。
- *  层间并行度（2026-11-04 实测，8 核，同机同代码）：
- *    fast + quick 并发          25.1s（串行 8.4+23.3=31.7s，-21%）← 采纳
- *    react + react-deep 并发   148.3s（串行 153.9s，-3.6%）且 deep 出现 1 条 60s 超时 ← 否决
- *    fast+quick+deep 三者并发   64.4s（串行 69.0s，-6.7%），但 deep 被拖慢 37.3s→~60s，不稳定 ← 否决
- *  结论：只有「两个轻量层」值得并发。react / deep 都是 jsdom+antd 重负载，同时跑会互相抢
- *  CPU 并触发深度用例的 60s 超时，宁可串行换可重复性。
- *
- *  模式：
- *    默认          ：fast + quick + 常规 react（不含 deep）  —— 日常 CI / 里程碑前
- *    --deep-only   ：仅 react-deep（.deep 重型文件）         —— 夜间定时 / 手动深测
- *    --all         ：fast + quick + 常规 react + react-deep   —— 发版前完整回归
- *  react / react-deep 的项目归属与 deep 剥离口径在 vitest.config.ts（react.exclude + react-deep
- *  项目）单一事实源，本脚本只按 --project 触发，不另写文件清单。 */
+/** 分层全量回归脚本：各层依次执行，避免本地与 CI 争抢资源。 */
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { spawn } from "node:child_process";
-import os from "node:os";
 import { fastTests, quickTests, matchesAny } from "./test-layers.mjs";
 
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -28,12 +11,7 @@ const mode = rawArgs.includes("--deep-only") ? "deep-only" : rawArgs.includes("-
 // 模式标志不传给 vitest，其余参数（如 --reporter）原样透传。
 const extraArgs = rawArgs.filter((arg) => arg !== "--deep-only" && arg !== "--all");
 
-// react / react-deep 层内已是多 worker，层间并行会超订 CPU：本文件的重层一律串行。
-const CONCURRENCY = 1;
-// 两个轻量层（fast 3 worker + quick 2 worker）互相独立、且都在十几秒量级，
-// 并发只在核数足够时才划算。CI 2~4 vCPU 上 5 个 worker 会超订，超订代价大于省下的时间，
-// 因此按核数回落成串行（8 核 → 并发，4 核以下 → 串行）。
-const PARALLEL_LIGHT = os.cpus().length >= 6;
+// 各层内部可使用 Vitest worker；层间保持串行，避免资源争抢和日志交错。
 
 const testFilePattern = /\.(test|spec)\.(ts|tsx)$/;
 const DEEP_PATTERN = /\.deep\.test\.(ts|tsx)$/;
@@ -153,45 +131,15 @@ const layerDesc = mode === "deep-only"
   : mode === "all"
     ? `全量（含 deep）：fast ${fastFiles.length} / quick ${quickFiles.length} / react ${reactFiles.length} / react-deep ${deepFiles.length}`
     : `日常（不含 deep）：fast ${fastFiles.length} / quick ${quickFiles.length} / react ${reactFiles.length}（react-deep ${deepFiles.length} 移出，由 test:full:deep 承担）`;
-console.log(
-  `${layerDesc}，轻量层${PARALLEL_LIGHT ? "并发" : "串行"}、重量层串行（并发度 ${CONCURRENCY}）`,
-);
+console.log(`${layerDesc}，各层串行`);
 const failures = [];
-// 轻量层（fast / quick）互相独立：核数够就并发，跑完再进重层，保证快环结果先出且日志不交错。
-const lightJobs = mode === "deep-only" ? [] : jobs.slice(0, 2);
-const heavyJobs = jobs.slice(lightJobs.length);
-if (PARALLEL_LIGHT && lightJobs.length > 1) {
-  await Promise.all(lightJobs.map(async ([name, args, timeout]) => {
-    try {
-      await run(name, args, timeout, { buffered: true });
-    } catch (error) {
-      failures.push({ name, error });
-    }
-  }));
-} else {
-  for (const [name, args, timeout] of lightJobs) {
-    try {
-      await run(name, args, timeout);
-    } catch (error) {
-      failures.push({ name, error });
-    }
+for (const [name, args, timeout] of jobs) {
+  try {
+    await run(name, args, timeout);
+  } catch (error) {
+    failures.push({ name, error });
   }
 }
-
-let nextJob = 0;
-const worker = async () => {
-  while (nextJob < heavyJobs.length) {
-    const index = nextJob;
-    nextJob += 1;
-    const [name, args, timeout] = heavyJobs[index];
-    try {
-      await run(name, args, timeout);
-    } catch (error) {
-      failures.push({ name, error });
-    }
-  }
-};
-await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 
 if (failures.length > 0) {
   for (const { name, error } of failures) console.error(`${name} 失败：${error.message}`);

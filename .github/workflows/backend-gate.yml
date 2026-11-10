@@ -26,7 +26,7 @@ jobs:
           --health-retries 5
     env:
       # 普通 runner（非 container job）里 services.postgres 只能通过映射端口访问，
-      # 主机名 postgres 无法解析；CI 必须用 127.0.0.1，与 coverage-gate 口径一致。
+      # 主机名 postgres 无法解析；CI 必须用 127.0.0.1。
       # DATABASE_URL 也必须给：test_numbering.test_concurrent_allocation_is_unique
       # 读 Settings.alembic_url（= database_url）去 CREATE DATABASE 探针库，
       # 不注入时会落到无密码的缺省开发地址，报 fe_sendauth: no password supplied。
@@ -60,7 +60,7 @@ jobs:
 
       # CI 走串行：--parallel 会让每个 xdist worker 各自建库，在 GitHub runner 上
       # 曾因连接失败触发 worker_errordown / KeyError: WorkerController 使整轮 INTERNALERROR。
-      # 本地仍可用 --parallel 提速；CI 以稳定为准，coverage-gate 已覆盖全量。
+      # 本地仍可用 --parallel 提速；CI 以稳定为准。
       - name: Run backend regression (分层)
         working-directory: backend
         run: |

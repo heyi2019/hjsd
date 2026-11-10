@@ -37,4 +37,4 @@ jobs:
           done
 
       - name: Trigger production deploy
-        run: gh workflow run deploy-production.yml --ref main
+        run: gh workflow run deploy-production.yml --ref "$SHA"

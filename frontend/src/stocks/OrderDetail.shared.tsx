@@ -166,6 +166,8 @@ export function findSellOrder(
   return (
     detail.orders.find((order) => order.events.some((event) => event.event_type === "SELL"))
     ?? detail.orders.find((order) => order !== creationOrder && order.order_type === "DG")
+    // 代挂订单本身就是卖号交付单；尚未登记 SELL 事件时仍要展示其交付表格。
+    ?? (creationOrder?.order_type === "DG" ? creationOrder : undefined)
     ?? undefined
   );
 }

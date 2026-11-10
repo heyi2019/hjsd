@@ -483,6 +483,41 @@ describe("OrderDetailDeliverySection", () => {
       expect(screen.getByText("13800000002")).toBeInTheDocument();
     });
   });
+
+  it("FE-268：仅有代挂订单时卖号交付仍展示交付表格", async () => {
+    const detail = {
+      orders: [{
+        order_id: 25,
+        order_no: "DG-FE268",
+        order_type: "DG",
+        created_at: "2026-11-02T10:00:00",
+        extra_values: {
+          intermediary_platform: "盼之",
+          intermediary_type: "普中",
+          compensation_type: "首保",
+          delivery_responsible_ids: [1],
+        },
+        events: [],
+      }],
+    };
+
+    renderLight(
+      <OrderDetailDeliverySection
+        meta={{ sourceOrderNo: "DG-FE268" } as never}
+        detail={detail as never}
+        employees={[{ id: 1, username: "admin", display_name: "管理员", is_active: true }]}
+      />,
+      { user: "admin" },
+    );
+
+    await waitFor(() => {
+      const sellerSection = screen.getByText("卖号交付").closest(".inventory-detail__meta-group") as HTMLElement;
+      expect(sellerSection).not.toBeNull();
+      expect(within(sellerSection).getByText("交易平台")).toBeInTheDocument();
+      expect(within(sellerSection).getByText("盼之")).toBeInTheDocument();
+      expect(within(sellerSection).queryByText("暂无卖号交付")).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe("InventoryPanel：账号台账编辑态时间联动", () => {

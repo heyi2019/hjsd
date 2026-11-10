@@ -173,6 +173,8 @@ jobs:
           if [ "$RESET_DATABASE" = "true" ]; then
             echo "==> 重建 PostgreSQL 数据卷（仅限本次手动确认的全量置换）"
             docker compose down -v
+            docker compose up -d db
+            docker compose run --rm backend alembic upgrade head
           fi
 
           # 持久化发布版本：deploy.sh 只在本次进程内覆盖 APP_VERSION，.env 若仍写旧 tag，

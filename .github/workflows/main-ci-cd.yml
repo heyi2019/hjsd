@@ -17,22 +17,26 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SHA: ${{ github.sha }}
+      REPO: ${{ github.repository }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Wait for required CI gates
         run: |
           set -euo pipefail
+          workflow_started=$(date +%s)
           for wf in lint-gate.yml frontend-gate.yml backend-gate.yml; do
-            echo "waiting for $wf ..."
+            gate_started=$(date +%s)
+            echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] waiting for $wf ..."
             for i in $(seq 1 80); do
-              run_id=$(gh run list --workflow "$wf" --limit 20 --json databaseId,headSha \
-                --jq "[.[] | select(.headSha == \"$SHA\")] | .[0].databaseId // empty" 2>/dev/null || true)
+              run_id=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
+                --jq "[.workflow_runs[] | select(.path == \".github/workflows/$wf\")] | sort_by(.created_at) | last | .id // empty" \
+                2>/dev/null || true)
               status=""
               if [ -n "$run_id" ]; then
-                status=$(gh run view "$run_id" --json status,conclusion \
+                status=$(gh api "repos/$REPO/actions/runs/$run_id" \
                   --jq '.conclusion // .status' 2>/dev/null || true)
               fi
-              echo "  attempt=$i run_id=${run_id:-none} status=${status:-unknown}"
+              echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] attempt=$i run_id=${run_id:-none} status=${status:-unknown}"
               if [ "$status" = success ]; then break; fi
               if [ "$status" = failure ] || [ "$status" = cancelled ] || [ "$status" = timed_out ]; then
                 echo "$wf: $status" >&2
@@ -41,7 +45,13 @@ jobs:
               sleep 15
             done
             [ "$status" = success ] || { echo "$wf timed out" >&2; exit 1; }
+            echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $wf passed in $(( $(date +%s) - gate_started ))s"
           done
+          echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] all CI gates passed in $(( $(date +%s) - workflow_started ))s"
 
       - name: Trigger production deploy
-        run: gh workflow run deploy-production.yml --ref "$SHA"
+        run: |
+          started=$(date +%s)
+          echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] dispatch deploy-production ref=$SHA"
+          gh workflow run deploy-production.yml --ref "$SHA"
+          echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] deploy-production dispatched in $(( $(date +%s) - started ))s"

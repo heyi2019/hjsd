@@ -159,7 +159,7 @@ def _assert_event_allowed(
                 details={"field": "offset_event_id"},
             )
         if offset_event_id is not None:
-            offset = _get_offset_event(session, offset_event_id, order_id=order.id)
+            _get_offset_event(session, offset_event_id, order_id=order.id)
 
 
 

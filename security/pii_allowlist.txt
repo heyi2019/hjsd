@@ -41,8 +41,8 @@ docs/archive/ERP_生产上线执行单_v1.1_20261103_已作废.md :: phone
 docs/archive/ERP_生产上线执行单_v1.2_20261104_已作废.md :: phone
 docs/testing/测试用例库.csv :: phone
 docs/testing/测试用例库.md :: phone
-docs/前端建单与页面交互测试报告_20261101.md :: phone
-docs/前端建单与页面交互测试报告_20261101_P1修复版.md :: phone
+docs/archive/前端建单与页面交互测试报告_20261101_已归档_20261110.md :: phone
+docs/archive/前端建单与页面交互测试报告_20261101_P1修复版_已归档_20261110.md :: phone
 tests/backend/integration/business/test_bughunt.py :: phone
 tests/backend/integration/business/test_installments_contract.py :: phone
 tests/backend/integration/business/test_orders.py :: phone

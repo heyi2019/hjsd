@@ -52,6 +52,21 @@ def upgrade() -> None:
             )
         op.drop_table("rebate_settlements")
 
+    # 压平前的正式库可能已将版本戳推进到 0007，但 cashflow 仍缺少当前
+    # ORM 必需的 fund_nature 列。先补齐列、回填历史行并收紧约束，再创建索引。
+    cashflow_columns = {item["name"] for item in inspector.get_columns("cashflow")}
+    if "fund_nature" not in cashflow_columns:
+        op.execute(
+            "ALTER TABLE cashflow ADD COLUMN fund_nature VARCHAR(16) "
+            "DEFAULT 'BUSINESS'"
+        )
+    else:
+        op.execute(
+            "UPDATE cashflow SET fund_nature = 'BUSINESS' WHERE fund_nature IS NULL"
+        )
+        op.execute("ALTER TABLE cashflow ALTER COLUMN fund_nature SET DEFAULT 'BUSINESS'")
+    op.execute("ALTER TABLE cashflow ALTER COLUMN fund_nature SET NOT NULL")
+
     index_names = {item["name"] for item in inspector.get_indexes("cashflow")}
     if "ix_cashflow_nature" not in index_names:
         op.create_index("ix_cashflow_nature", "cashflow", ["nature"])

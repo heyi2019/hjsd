@@ -9,7 +9,9 @@ name: e2e-gate
 
 on:
   push:
-    branches: [main, master, test]
+    branches: [main, master]
+    paths-ignore:
+      - "RELEASE.md"
   pull_request:
   workflow_dispatch:
 

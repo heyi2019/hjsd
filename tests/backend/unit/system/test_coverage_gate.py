@@ -17,10 +17,10 @@ def test_load_gates_reads_all_business_domains():
     gates = run_coverage_gate.load_gates()
 
     assert gates == {
-        "app/foundation": 1,
+        "app/foundation": 2,
         "app/core": 0,
         "app/reporting": 22,
-        "app/finance": 41,
+        "app/finance": 73,
     }
 
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Order } from "@/shared/api/catalog";
 import {
+  allocationAmountFromRate,
+  allocationRateFromAmount,
   buildActionAllocationRows,
   filterBusinessOrders,
   formatOrderAmount,
@@ -20,6 +22,16 @@ const order = (overrides: Partial<Order> = {}): Order => ({
 });
 
 describe("OrdersPage helpers", () => {
+  it("按订单利润把分润比例换算成金额", () => {
+    expect(allocationAmountFromRate("5000.00", "30")).toBe("1500.00");
+    expect(allocationAmountFromRate("5000.00", "")).toBe("");
+  });
+
+  it("按订单利润把分润金额反算成比例", () => {
+    expect(allocationRateFromAmount("5000.00", "1500")).toBe("30.00");
+    expect(allocationRateFromAmount("0.00", "1500")).toBe("");
+  });
+
   it("按业务类型、模式、游戏和库存状态筛选订单", () => {
     expect(filterBusinessOrders([
       order({ account_game_type: "原神", account_status: "WAITING" }),

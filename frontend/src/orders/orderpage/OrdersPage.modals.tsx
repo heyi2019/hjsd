@@ -1,7 +1,7 @@
 import dayjs, { type Dayjs } from "dayjs";
 import type { AllocationFormRow } from "./helpers";
 import { Alert, DatePicker, Form, Input, Typography } from "antd";
-import { ALLOCATION_TYPE_LABEL, buildActionAllocationRows, buildRefundCashflowPayload, splitEven, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
+import { ALLOCATION_TYPE_LABEL, allocationAmountFromRate, allocationRateFromAmount, buildActionAllocationRows, buildRefundCashflowPayload, splitEven, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import { CreateBusinessModal } from "../CreateBusinessModal";
 import { DateField, MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
@@ -296,7 +296,7 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
           <Typography.Paragraph type="secondary">
             {isAction
               ? "按操作分配：买号、售出、运营、公司四项。人员已锁定为账号台账 / 库存中心登记的执行人（买号=业务负责人、售出=交付负责人、运营=运营负责人）。一个动作有多人时，该动作的份额按人数均分（2 人各半、3 人各三分之一），只需在首行填该动作合计。台账之后增删执行人，这里的人数与均分会自动跟着变，合计不变；需要换人请到账号台账或库存中心修改。"
-              : "每行一位员工：比例和金额任填其一，填写时不会互相改写；两者都填时须自洽。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。亏损单按金额分润请填负数（如 -300 表示分担 300 亏损）。"}
+              : "每行一位员工：比例和金额任填其一，填写任一项会按本单利润双向换算，最后编辑的一项为准。纯比例分润时合计须为 100%，用金额时剩余部分默认留在公司。亏损单按金额分润请填负数（如 -300 表示分担 300 亏损）。"}
           </Typography.Paragraph>
           <Form.List name="allocations">
             {(fields, { add, remove }) => (
@@ -378,6 +378,12 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                               suffix="%"
                               inputMode="decimal"
                               className="ui-control-width-120"
+                              onChange={(event) => {
+                                allocationForm.setFieldValue(
+                                  ["allocations", field.name, "allocation_amount"],
+                                  allocationAmountFromRate(allocationProfit, event.target.value),
+                                );
+                              }}
                             />
                           </Form.Item>
                           <Form.Item
@@ -389,6 +395,12 @@ export function AllocationModal({ controller }: { controller: OrdersPageControll
                               prefix="¥"
                               inputMode="decimal"
                               className="ui-control-width-140"
+                              onChange={(event) => {
+                                allocationForm.setFieldValue(
+                                  ["allocations", field.name, "allocation_rate"],
+                                  allocationRateFromAmount(allocationProfit, event.target.value),
+                                );
+                              }}
                             />
                           </Form.Item>
                         </>

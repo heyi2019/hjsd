@@ -17,7 +17,7 @@ from sqlalchemy import select
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.domain.trade import Order, OrderFormField
-from app.orders.router import _event_platform
+from app.orders.router import _event_platform, _order_detail_export_fields
 
 
 def _seed_select_field(db, *, field_key: str = "trade_role") -> OrderFormField:
@@ -102,10 +102,20 @@ def test_orders_export_appends_full_detail_in_the_same_csv_table(seeded_client, 
     body = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text
     header = _headers(body)
     assert "详情" not in header
-    assert "账号密码" in header
+    assert "账号密码" not in header
     assert "操作明细" in header
     assert "delivery_note" in body
     assert "HS9803" in body
+
+
+def test_order_detail_export_does_not_include_account_password():
+    fields = _order_detail_export_fields(
+        {"account_snapshot": {"game_password": "secret-password"}},
+        {},
+    )
+
+    assert "detail_account_password" not in fields
+    assert "secret-password" not in str(fields)
 
 
 def test_installments_export_appends_full_detail_in_the_same_csv_table(seeded_client, headers):

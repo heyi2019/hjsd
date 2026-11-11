@@ -14,6 +14,11 @@ on:
         required: false
         type: string
         default: ""
+      wait_for_gates:
+        description: "Wait for the three CI gates before uploading to ECS (set by main-ci-cd)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -29,7 +34,10 @@ jobs:
   deploy:
     name: Build and deploy to ECS
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # 自动发布轮把「等三道 gate」搬进本 job（上限 20 分钟），加上冷缓存构建、
+    # 上传与 ECS 校验可能接近 25 分钟；放宽到 30 分钟，避免被 job 级硬超时误杀，
+    # 让失败原因始终落在明确的 gate 状态上。
+    timeout-minutes: 30
     env:
       ECS_HOST: ${{ secrets.ECS_HOST }}
       ECS_PORT: ${{ secrets.ECS_PORT || '22' }}
@@ -37,6 +45,8 @@ jobs:
       ECS_SSH_PRIVATE_KEY: ${{ secrets.ECS_SSH_PRIVATE_KEY }}
       ECS_KNOWN_HOSTS: ${{ secrets.ECS_KNOWN_HOSTS }}
       RESET_DATABASE: ${{ inputs.reset_database || 'false' }}
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
 
     steps:
       - name: Checkout release commit
@@ -125,6 +135,46 @@ jobs:
             exit 1
           fi
           echo "DEPLOY_PACKAGE_SHA256=$(shasum -a 256 output/heijin-deploy.tgz | awk '{print $1}')" >> "$GITHUB_ENV"
+
+      # 自动发布轮由 main-ci-cd 与三道 gate 同时启动：走到这里镜像构建与打包已完成，
+      # 但「上传 ECS」必须等门禁全绿。未过门禁的包只留在 runner，不落 ECS；
+      # 手动补发 / 回滚（wait_for_gates=false）跳过本步，行为与改动前一致。
+      - name: Wait for required CI gates
+        if: ${{ inputs.wait_for_gates == true || inputs.wait_for_gates == 'true' }}
+        shell: bash
+        env:
+          SHA: ${{ inputs.release_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          started=$(date +%s)
+          # 一次 API 取三道 gate 在 release sha 上的最新 run，按 path 分组后只判每组最新一条，
+          # 避免「每个 wf 各查一次列表 + 各查一次详情」的 6 次/轮串行请求拖长轮询周期。
+          for i in $(seq 1 240); do
+            state="$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
+              --jq '
+                [.workflow_runs[]
+                  | select((.path | split("/") | last) as $n
+                    | ["lint-gate.yml", "frontend-gate.yml", "backend-gate.yml"]
+                      | index($n) != null)]
+                | group_by(.path)
+                | map(sort_by(.created_at) | last)
+                | if length < 3 then "pending"
+                  elif any(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out")
+                    then "failed:" + ([.[]
+                      | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out")
+                      | .path] | join(","))
+                  elif all(.conclusion == "success") then "success"
+                  else "pending" end
+              ' 2>/dev/null || echo pending)"
+            echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] attempt=$i gates=$state"
+            case "$state" in
+              success) break ;;
+              failed:*) echo "CI gate(s) not green: $state" >&2; exit 1 ;;
+            esac
+            sleep 5
+          done
+          [ "$state" = success ] || { echo "CI gates timed out" >&2; exit 1; }
+          echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] all CI gates passed in $(( $(date +%s) - started ))s"
 
       - name: Configure SSH
         shell: bash

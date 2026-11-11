@@ -90,6 +90,15 @@ jobs:
               | gh api --method POST "repos/$REPO/actions/workflows/$wf/dispatches" --input -
           done
 
+          # 生产部署与三道 gate 同时启动：镜像构建 + 打包（上次实测 166s）不依赖门禁结果，
+          # 提前跑完即可从发布关键路径上摘掉。deploy-production 内部仍要在「上传 ECS 之前」
+          # 等三道 gate 全绿；门禁不过的包只留在 runner，不落 ECS。手动补发/回滚不传
+          # wait_for_gates，行为完全不变。
+          jq -n --arg ref main --arg sha "$release_sha" \
+            '{ref:$ref, inputs:{release_sha:$sha, wait_for_gates:"true"}}' \
+            | gh api --method POST "repos/$REPO/actions/workflows/deploy-production.yml/dispatches" --input -
+          echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] deploy-production dispatched alongside gates at sha $release_sha"
+
   wait-and-deploy:
     needs: prepare-release
     if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
@@ -129,12 +138,5 @@ jobs:
           done
           echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] all CI gates passed in $(( $(date +%s) - workflow_started ))s"
 
-      - name: Trigger production deploy
-        run: |
-          started=$(date +%s)
-          echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] dispatch deploy-production ref=$SHA"
-          gh api --method POST "repos/$REPO/actions/workflows/deploy-production.yml/dispatches" \
-            --input - <<EOF
-          {"ref":"main","inputs":{"release_sha":"$SHA"}}
-          EOF
-          echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] deploy-production dispatched in $(( $(date +%s) - started ))s"
+      # 部署 run 已由 prepare-release 与三道 gate 同时 dispatch；本 job 只把门禁结果
+      # 反映到 main-ci-cd 的 run 结论（任一 gate 失败即判红），不再二次触发部署。

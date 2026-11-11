@@ -18,9 +18,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import Validation
 from app.domain.trade import (
+    Account,
     Cashflow,
+    Installment,
+    InstallmentDisposition,
     Order,
     OrderEvent,
+    RebateRecord,
+    Reconciliation,
 )
 from app.domain.enums import (
     AuditAction,
@@ -113,12 +118,69 @@ def _shift_accounting_dates(
     flows = session.scalars(
         select(Cashflow).where(Cashflow.order_id == order.id)
     ).all()
+
+    # #14 对账边界：平移会改动流水的 occurred_on；若任一流水所属资金池在
+    # 「该流水旧日期→新日期」移动区间内已有对账快照（含 OPEN/RESOLVED，对账一旦
+    # 建立即固化当日余额），平移会把流水挪进/挪出已对账期间，破坏快照，必须拒绝。
+    # 用流水实际日期区间而非 trade_date：买入/收款常发生在成交日之前，区间更宽。
+    if delta != 0 and flows:
+        dated = [(f.pool_id, f.occurred_on) for f in flows if f.pool_id is not None and f.occurred_on is not None]
+        for pool_id, old_on in dated:
+            new_on = old_on + shift
+            lo, hi = sorted((old_on, new_on))
+            locked = session.scalars(
+                select(Reconciliation.id).where(
+                    Reconciliation.pool_id == pool_id,
+                    Reconciliation.reconciled_on >= lo,
+                    Reconciliation.reconciled_on <= hi,
+                )
+            ).first()
+            if locked is not None:
+                raise Validation(
+                    "成交日期涉及资金池已对账期间，不能平移账期",
+                    details={"from": order.trade_date.isoformat(), "to": new_trade_date.isoformat()},
+                )
+
     for event in events:
         event.occurred_on = event.occurred_on + shift
         event.updated_by = actor
     for flow in flows:
         flow.occurred_on = flow.occurred_on + shift
         flow.updated_by = actor
+
+    # #6 分期坏账按回收处置日（InstallmentDisposition.occurred_on）归期；
+    # 只平移事件与流水会让坏账留在旧月份，跨期口径撕裂。
+    dispositions = session.scalars(
+        select(InstallmentDisposition)
+        .join(Installment, Installment.id == InstallmentDisposition.installment_id)
+        .where(Installment.order_id == order.id)
+    ).all()
+    for disposition in dispositions:
+        if disposition.occurred_on is not None:
+            disposition.occurred_on = disposition.occurred_on + shift
+            disposition.updated_by = actor
+
+    # #7 旧模型返点按 collected_on 归期；新模型返点走 REBATE 事件
+    # （已在上面 events 平移），此处覆盖旧模型无事件的返点记录。
+    rebates = session.scalars(
+        select(RebateRecord).where(RebateRecord.source_order_id == order.id)
+    ).all()
+    for rebate in rebates:
+        if rebate.collected_on is not None:
+            rebate.collected_on = rebate.collected_on + shift
+            rebate.updated_by = actor
+
+    # #18 账号 buy_date 在 BUY 时被置为 order.trade_date（events_rules._apply_account_effect），
+    # 成交日期平移后须同步，否则账号台账「买入日期」与订单成交日期脱节。
+    # 只在「本单确有已过账 BUY 事件」时同步：同一账号的 SELL 单平移不应改动买入日期。
+    has_posted_buy = any(
+        e.event_type == "BUY" and e.is_posted for e in events
+    )
+    if order.account_id is not None and delta != 0 and has_posted_buy:
+        account = session.get(Account, order.account_id)
+        if account is not None and account.buy_date is not None:
+            account.buy_date = account.buy_date + shift
+            account.updated_by = actor
 
     definition = foundation_service.get_order_type_by_code(session, order.order_type)
     if definition is not None:
@@ -143,6 +205,8 @@ def _shift_accounting_dates(
         "shifted_days": delta,
         "shifted_events": len(events),
         "shifted_cashflows": len(flows),
+        "shifted_bad_debts": len(dispositions),
+        "shifted_rebates": len(rebates),
     }
 
 

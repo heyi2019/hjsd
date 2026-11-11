@@ -449,6 +449,15 @@ def post_event(
 
     if event_type == EventType.CANCEL.value:
         direction = cancel_direction
+        # nature 必须随反转后的 direction 走，否则会产出 OUT/BUSINESS_IN（或
+        # IN/BUSINESS_OUT）这种自相矛盾的流水：余额按方向变了，但资金池收支卡片
+        # 与资金日报发生额列按 (direction, nature) 取数，两边都不体现，账对不上。
+        # 与 finance/cashflows.py::reverse_cashflow 的反向约定保持一致。
+        nature = (
+            Nature.BUSINESS_IN.value
+            if direction == Direction.IN.value
+            else Nature.BUSINESS_OUT.value
+        )
 
     flow: Cashflow | None = None
     if has_cashflow:

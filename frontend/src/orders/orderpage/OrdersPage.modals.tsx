@@ -1,7 +1,7 @@
 import dayjs, { type Dayjs } from "dayjs";
 import type { AllocationFormRow } from "./helpers";
 import { Alert, DatePicker, Form, Input, Typography } from "antd";
-import { ALLOCATION_TYPE_LABEL, allocationAmountFromRate, allocationRateFromAmount, buildActionAllocationRows, buildRefundCashflowPayload, splitEven, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
+import { ALLOCATION_TYPE_LABEL, allocationAmountFromRate, allocationRateFromAmount, buildActionAllocationRows, splitEven, validateAllocations, type AllocationMode, type AllocationType } from "./helpers";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import { CreateBusinessModal } from "../CreateBusinessModal";
 import { DateField, MoneyInput, MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
@@ -564,28 +564,22 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
             if (!actionOrder) return;
             setRefundSubmitting(true);
             try {
+              // 退款已并入普通支出：收入/支出统一走订单资金明细接口，不创建业务事件。
               const flowDirection = values.direction === "IN" ? "IN" : "OUT";
-              const flowCategory = values.category || (flowDirection === "IN" ? "OTHER" : "REFUND");
-              if (flowDirection === "OUT" && flowCategory === "REFUND") {
-                // 退款继续走专用接口，保留退款责任与退款日期等业务字段。
-                await cashflowsApi.refund(actionOrder.id, buildRefundCashflowPayload({ values, fallbackDate: today() }));
-                appMessage.success("退款已登记");
-              } else {
-                // 其他收入/支出是资金明细动作，不创建业务事件。
-                await cashflowsApi.createForOrder(actionOrder.id, {
-                  pool_id: values.pool_id,
-                  occurred_on: (values.occurred_on ?? dayjs(today())).format("YYYY-MM-DD"),
-                  direction: flowDirection,
-                  nature: flowDirection === "IN" ? "BUSINESS_IN" : "BUSINESS_OUT",
-                  fund_nature: "BUSINESS",
-                  accounting_attribute: flowDirection === "IN" ? "SELF_REVENUE" : "OPERATING_EXPENSE",
-                  category: flowCategory,
-                  amount: values.amount,
-                  note: values.reason,
-                  form_extra: values.form_extra,
-                });
-                appMessage.success("资金收支已登记");
-              }
+              const flowCategory = values.category || "OTHER";
+              await cashflowsApi.createForOrder(actionOrder.id, {
+                pool_id: values.pool_id,
+                occurred_on: (values.occurred_on ?? dayjs(today())).format("YYYY-MM-DD"),
+                direction: flowDirection,
+                nature: flowDirection === "IN" ? "BUSINESS_IN" : "BUSINESS_OUT",
+                fund_nature: "BUSINESS",
+                accounting_attribute: flowDirection === "IN" ? "SELF_REVENUE" : "OPERATING_EXPENSE",
+                category: flowCategory,
+                amount: values.amount,
+                note: values.reason,
+                form_extra: values.form_extra,
+              });
+              appMessage.success("资金收支已登记");
               setRefundOpen(false);
               setActionOrder(null);
               await load();
@@ -604,14 +598,14 @@ export function RefundModal({ controller }: { controller: OrdersPageController }
             <Select
               aria-label="资金流向"
               options={[{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }]}
-              onChange={(value) => refundForm.setFieldValue("category", value === "IN" ? "OTHER" : "REFUND")}
+              onChange={(value) => refundForm.setFieldValue("category", "OTHER")}
             />
           </CfgItem>
-          <CfgItem name="category" label="资金原因" initialValue="REFUND" rules={[{ required: true, message: "请选择资金原因" }]}>
+          <CfgItem name="category" label="资金原因" initialValue="OTHER" rules={[{ required: true, message: "请选择资金原因" }]}>
             <Select
               options={direction === "IN"
                 ? [{ value: "SALE", label: "售出/回款" }, { value: "OTHER", label: "其他收入" }]
-                : [{ value: "REFUND", label: "退款" }, { value: "OTHER", label: "其他支出" }]}
+                : [{ value: "OTHER", label: "其他支出" }]}
             />
           </CfgItem>
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={users} />

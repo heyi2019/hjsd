@@ -5,15 +5,6 @@ export const cashflowsApi = {
   create: (data: Record<string, unknown>) => api.post<Cashflow>("/cashflows", data).then(r => r.data),
   createForOrder: (orderId: number, data: Record<string, unknown>) =>
     api.post<Cashflow>(`/orders/${orderId}/cashflows`, data).then(r => r.data),
-  refund: (orderId: number, data: {
-    pool_id: number;
-    amount: string;
-    refunded_on: string;
-    reason: string;
-    refund_responsibility?: string;
-    operator_user_ids?: number[];
-    form_extra?: Record<string, unknown>;
-  }) => api.post<Cashflow>(`/orders/${orderId}/cashflows/refund`, data).then(r => r.data),
   reverse: (id: number, data: {reversed_on: string; reason: string; form_extra?: Record<string, unknown>}) => api.post<Cashflow>(`/cashflows/${id}/reverse`, data).then(r => r.data),
   list: (params?: {
     pool_id?: number;

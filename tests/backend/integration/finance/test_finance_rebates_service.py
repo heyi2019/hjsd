@@ -152,21 +152,25 @@ def test_rebate_creates_business_event_and_income_cashflow(seeded_db):
     assert flow.amount == Decimal("1000.00")
 
 
-def test_order_refund_creates_expense_cashflow_without_refund_event(seeded_db):
+def test_outflow_cashflow_does_not_create_refund_event(seeded_db):
+    """退款已并入普通支出：OUT 资金明细走通用录入，不再产生 REFUND 业务事件。"""
     order_id = _order_with_sell(seeded_db, "DG")
-    flow = cashflows.create_order_refund(
+    flow = cashflows.create_cashflow(
         seeded_db,
-        order_id=order_id,
         pool_id=2,
+        occurred_on=TODAY,
+        direction="OUT",
+        nature="BUSINESS_OUT",
+        category="OTHER",
         amount=Decimal("200"),
-        refunded_on=TODAY,
-        reason="客户售后",
         actor="pytest",
+        order_id=order_id,
+        note="客户售后退款（普通支出）",
     )
 
     assert flow.direction == "OUT"
-    assert flow.category == "REFUND"
-    assert flow.accounting_attribute == "REFUND"
+    assert flow.category == "OTHER"
+    assert flow.accounting_attribute == "OPERATING_EXPENSE"
     assert seeded_db.scalar(
         select(OrderEvent.id).where(
             OrderEvent.order_id == order_id,

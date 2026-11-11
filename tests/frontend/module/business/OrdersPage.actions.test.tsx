@@ -4,11 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage, validateAllocations } from "@/orders/OrdersPage";
-import { buildOrderPatchPayload, buildRefundCashflowPayload, pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
+import { buildOrderPatchPayload, pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
 
 import * as catalog from "@/shared/api/catalog";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
-import dayjs from "dayjs";
 import { today } from "@/shared/lib/format";
 import * as client from "@/shared/api/client";
 import type { Installment, InstallmentCancelResult, Order, OrderLink, ProfitAllocation } from "@/shared/api/catalog";
@@ -21,7 +20,7 @@ vi.mock("@/shared/api/catalog", async (importOriginal) => {
     "list", "get", "create", "update", "patch", "post", "postEvent", "cancel", "remove",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "inventoryStats", "updateProfile", "updateExecution", "merge", "search", "refund", "createForOrder", "materializeAccount",
+    "balance", "executionDetail", "inventoryStats", "updateProfile", "updateExecution", "merge", "search", "createForOrder", "materializeAccount",
     "orderSnapshot", "links", "createLink", "deleteLink", "listSectionLabels", "saveSectionLabels",
     "markOverdue",
   ];
@@ -776,7 +775,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("alloc fail")));
   });
 
-  it("资金收支：填写金额与备注后登记退款支出明细", async () => {
+  it("资金收支：退款已并入普通支出，登记为 OTHER 支出明细", async () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "资金收支");
     const modal = await modalOf(/资金收支 · HS-2026-0001/);
@@ -785,20 +784,23 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("支出")).toBeInTheDocument();
     await clickModalOk(modal);
     await waitFor(() =>
-      expect(catalog.cashflowsApi.refund).toHaveBeenCalledWith(1, expect.objectContaining({ refunded_on: today(), amount: "500", pool_id: expect.any(Number) }))
+      expect(catalog.cashflowsApi.createForOrder).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ direction: "OUT", amount: "500", category: "OTHER", pool_id: expect.any(Number) }),
+      )
     );
-    expect(message.success).toHaveBeenCalledWith("退款已登记");
+    expect(message.success).toHaveBeenCalledWith("资金收支已登记");
   });
 
   it("资金收支：提交失败提示错误并关闭 loading", async () => {
-    vi.mocked(catalog.cashflowsApi.refund).mockRejectedValue(new Error("refund fail"));
+    vi.mocked(catalog.cashflowsApi.createForOrder).mockRejectedValue(new Error("create fail"));
     await openLedger();
     await openRowMenu("HS-2026-0001", "资金收支");
     const modal = await modalOf(/资金收支 · HS-2026-0001/);
     await ui.type(within(modal).getByLabelText("金额"), "500");
     await ui.type(within(modal).getByLabelText("收支备注"), "客户取消");
     await clickModalOk(modal);
-    await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("refund fail")));
+    await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("create fail")));
   });
 
   it("资金收支：资金流向可切换为收入并关联订单", async () => {
@@ -1273,36 +1275,5 @@ describe("buildOrderPatchPayload 纯函数", () => {
   it("备注留空 → note 显式 null（清空），不是空串", () => {
     const payload = buildOrderPatchPayload({ values: { note: "   " }, snapshot: null, hasPosted: false });
     expect(payload.note).toBeNull();
-  });
-});
-
-// —— 资金收支退款入参：日期兜底与资金账户数字化。
-describe("buildRefundCashflowPayload 纯函数", () => {
-  const fallbackDate = "2026-11-03";
-
-  it("发生日期留空 → 取当天", () => {
-    const payload = buildRefundCashflowPayload({
-      values: { amount: "88.00", occurred_on: null, pool_id: 3, reason: "退款" },
-      fallbackDate,
-    });
-    expect(payload.refunded_on).toBe(fallbackDate);
-  });
-
-  it("发生日期已选 → 按 YYYY-MM-DD 提交", () => {
-    const payload = buildRefundCashflowPayload({
-      values: { amount: "88.00", occurred_on: dayjs("2026-10-20"), pool_id: 3, reason: "退款" },
-      fallbackDate,
-    });
-    expect(payload).toMatchObject({ amount: "88.00", refunded_on: "2026-10-20", pool_id: 3 });
-  });
-
-  it("资金账户未选 → 保持空值，让表单必填规则拦截", () => {
-    const payload = buildRefundCashflowPayload({ values: { amount: "1", reason: "x", pool_id: undefined }, fallbackDate });
-    expect(Number.isNaN(payload.pool_id)).toBe(true);
-  });
-
-  it("资金账户显式选择 → 数字化提交", () => {
-    const payload = buildRefundCashflowPayload({ values: { amount: "1", reason: "x", pool_id: "7" }, fallbackDate });
-    expect(payload.pool_id).toBe(7);
   });
 });

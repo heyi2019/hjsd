@@ -269,31 +269,6 @@ def create_order_cashflow(
     return _cashflow_out(db, flow)
 
 
-@router.post("/orders/{order_id}/cashflows/refund", response_model=schemas.CashflowOut, status_code=201)
-def create_order_refund(
-    order_id: int,
-    payload: schemas.CashflowRefundCreate,
-    db: Session = Depends(get_db),
-    user: CurrentUser = post_rebate,
-) -> schemas.CashflowOut:
-    """交付后的退款只登记支出资金明细，不再写入 REFUND 业务事件。"""
-    flow = service.create_order_refund(
-        db,
-        order_id=order_id,
-        pool_id=payload.pool_id,
-        amount=payload.amount,
-        refunded_on=payload.refunded_on,
-        reason=payload.reason,
-        refund_responsibility=payload.refund_responsibility,
-        operator_user_ids=payload.operator_user_ids,
-        form_extra=payload.form_extra,
-        form_extra_scope=payload.form_extra_scope,
-        actor=_actor(user),
-        user=user,
-    )
-    return _cashflow_out(db, flow)
-
-
 @router.post("/cashflows/{cashflow_id}/reverse", response_model=schemas.CashflowOut)
 def reverse_cashflow(
     cashflow_id: int,

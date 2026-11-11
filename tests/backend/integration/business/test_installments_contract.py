@@ -171,36 +171,6 @@ class TestCreateInstallmentValidation:
         seeded_db.refresh(contract)
         assert contract.status == InstallmentStatus.SETTLED.value
 
-    def test_installment_refund_only_after_delivery(self, seeded_db):
-        """退款是交付后的支出资金明细，不新增订单事件。"""
-        from app.finance import cashflows
-        account = _account(seeded_db, "refund-after-delivery")
-        purchase = _order(seeded_db, order_type="HS", account_id=account.id)
-        _buy(seeded_db, purchase.id)
-        order = _order(seeded_db, order_type="HS", account_id=account.id)
-        contract = _contract(
-            seeded_db,
-            order.id,
-            contract_type=InstallmentContractType.STOCK_SALE.value,
-            down_payment="0",
-            periods=1,
-            per_period="100",
-            principal="100",
-        )
-        installment_service.pay(seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=1, actor="pytest")
-        with pytest.raises(Validation, match="交付前"):
-            cashflows.create_order_refund(
-                seeded_db, order_id=order.id, pool_id=2, amount="30",
-                refunded_on=TODAY, actor="pytest", reason="退款",
-            )
-        installment_service.deliver(seeded_db, contract.id, delivery_mode="CUSTOMER_SELF", delivered_on=TODAY, note="交付凭证", actor="pytest")
-        refund = cashflows.create_order_refund(
-            seeded_db, order_id=order.id, pool_id=2, amount="30",
-            refunded_on=TODAY, actor="pytest", reason="退款",
-        )
-        assert refund.category == "REFUND"
-        assert refund.direction == Direction.OUT.value
-
     def test_installment_sale_binds_buyer_and_seller_across_orders(self, seeded_db):
         from app.policy import service as policy_service
         from app.orders import service as order_service

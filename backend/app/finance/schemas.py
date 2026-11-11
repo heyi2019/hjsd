@@ -150,19 +150,6 @@ class CashflowCreate(RequestModel):
     form_extra_scope: str = "FUNDFLOW"
 
 
-class CashflowRefundCreate(RequestModel):
-    """订单售后退款：退款是支出资金明细，不新增 REFUND 业务事件。"""
-
-    pool_id: int
-    amount: Decimal
-    refunded_on: date
-    reason: str = Field(min_length=1, max_length=2000)
-    refund_responsibility: str | None = Field(default=None, max_length=32)
-    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
-    form_extra: dict[str, Any] | None = None
-    form_extra_scope: str = "REFUND"
-
-
 class CashflowReverse(RequestModel):
     reversed_on: date
     reason: str

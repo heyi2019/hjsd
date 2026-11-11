@@ -18,7 +18,6 @@ from app.auth.router import (
 )
 from app.finance.schemas import (
     CashflowCreate,
-    CashflowRefundCreate,
     CashflowReverse,
     DepositCreate,
     DepositLoss,
@@ -105,10 +104,6 @@ from app.parties.schemas import (
         (
             CashflowCreate,
             {"pool_id": 1, "occurred_on": date(2026, 10, 1), "direction": "IN", "nature": "BUSINESS_IN", "category": "OTHER", "amount": "1.00"},
-        ),
-        (
-            CashflowRefundCreate,
-            {"pool_id": 1, "amount": "1.00", "refunded_on": date(2026, 10, 1), "reason": "售后退款"},
         ),
         (CashflowReverse, {"reversed_on": date(2026, 10, 1), "reason": "重复"}),
         (

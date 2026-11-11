@@ -70,7 +70,6 @@ export function useOrdersPageController(params: {
   // 业务类型、业务模式、责任方和关联关系均来自后端选项词典。
   type Opt = { value: string; label: string };
   const orderBusinessOptions: Opt[] = filterRetiredOrderTypeOptions(useOptionSet("ORDER_BUSINESS") ?? []);
-  const refundResponsibilityOptions: Opt[] = useOptionSet("REFUND_RESPONSIBILITY") ?? [];
   const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];
   const relationTypeOptions: Opt[] = useOptionSet("ORDER_RELATION_TYPE") ?? [];
   const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? [];
@@ -267,7 +266,7 @@ export function useOrdersPageController(params: {
       refundForm.resetFields();
       refundForm.setFieldsValue({
         direction: "OUT",
-        category: "REFUND",
+        category: "OTHER",
         pool_id: activePools[0]?.id,
       });
       setRefundOpen(true);

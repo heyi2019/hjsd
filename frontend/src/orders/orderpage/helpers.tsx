@@ -476,42 +476,6 @@ export function buildOrderPatchPayload(params: {
   return payload;
 }
 
-/**
- * 资金收支退款明细入参组装。退款是 OUT 资金明细，不再写入 REFUND 业务事件。
- * 两条规则此前只能靠挂载页面才能碰到：
- *  - 发生日期留空 → 取当天（后端不接受空日期）；
- *  - 资金账户「显式选择优先」：未选时保持 undefined，让后端按订单类型默认路由，
- *    不要擅自填 0 或空串（会被当成某个池的 id）。
- */
-export function buildRefundCashflowPayload(params: {
-  values: {
-    amount: string;
-    occurred_on?: Dayjs | null;
-    pool_id?: number | string;
-    reason?: string;
-    operator_user_ids?: number[];
-    form_extra?: Record<string, unknown>;
-  };
-  fallbackDate: string;
-}): {
-  amount: string;
-  refunded_on: string;
-  pool_id: number;
-  reason: string;
-  operator_user_ids?: number[];
-  form_extra?: Record<string, unknown>;
-} {
-  const { values, fallbackDate } = params;
-  return {
-    amount: values.amount,
-    refunded_on: values.occurred_on?.format("YYYY-MM-DD") ?? fallbackDate,
-    pool_id: Number(values.pool_id),
-    reason: values.reason ?? "",
-    operator_user_ids: values.operator_user_ids,
-    form_extra: values.form_extra,
-  };
-}
-
 export function formatOrderAmount(order: Order): string {
   if (order.installment_principal) {
     return `¥${order.installment_paid ?? "0.00"}/${order.installment_principal} · ${order.installment_periods ?? 0}期`;

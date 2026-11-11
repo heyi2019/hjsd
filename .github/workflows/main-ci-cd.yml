@@ -6,8 +6,10 @@ on:
     branches: [main]
 
 concurrency:
+  # 自动发版推回的 chore(release) 提交会再次触发本工作流；不能让它取消
+  # 正在进行中的发版轮次（否则 wait-and-deploy 被掐断，生产会漏部署）。
   group: main-ci-cd-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   actions: write
@@ -16,6 +18,9 @@ permissions:
 jobs:
   prepare-release:
     name: Prepare automatic release
+    # chore(release) 是自动发版自己推回 main 的提交：整轮跳过，
+    # 避免重复升版、重复 dispatch 门禁、重复触发生产部署。
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
     outputs:
       sha: ${{ steps.release.outputs.sha }}
@@ -69,6 +74,7 @@ jobs:
 
   wait-and-deploy:
     needs: prepare-release
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
     env:
       SHA: ${{ needs.prepare-release.outputs.sha }}

@@ -1,6 +1,6 @@
 name: deploy-production
 
-# main 通过 PR 合并且 CI 通过后，自动部署到 ECS；保留手动触发用于补发/回滚验证。
+# 仅由 main-ci-cd 在三个门禁全绿后 dispatch；也保留手动触发用于补发/回滚验证。
 on:
   workflow_dispatch:
     inputs:
@@ -190,8 +190,9 @@ jobs:
           fi
           grep '^APP_VERSION=' .env
 
-          # deploy.sh 内含发布前后库状态不变量校验与售出表单三作用域补齐（B4），
-          # 任一校验失败即非零退出，CI 判红，不会静默上线。
+          # deploy.sh 内含发布前后的只读库状态不变量校验，任一校验失败即非零退出，
+          # CI 判红，不会静默上线。B4（售出表单三作用域补齐）不在 deploy.sh 内自动执行：
+          # 已有库升级须在 ECS 现场按当期执行单手动跑 backend/scripts/split_sale_form_scopes.py。
           ERP_SKIP_BUILD=1 APP_VERSION="$APP_VERSION" bash scripts/deploy.sh
           curl -fsS http://127.0.0.1/api/v1/health
           REMOTE
@@ -215,7 +216,7 @@ jobs:
             echo "- Target: ECS"
             echo "- Health check: passed"
             echo "- DB invariants: verified (deploy.sh)"
-            echo "- Sale form scopes: backfilled (B4)"
+            echo "- Sale form scopes: B4 is a manual ECS step (not auto backfilled)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Tag release

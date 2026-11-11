@@ -699,7 +699,7 @@ def _write_md(cases: list[dict], reg: dict) -> None:
         groups.setdefault(c["功能编号"], []).append(c)
     lines = ["# 宜游轩 ERP 测试用例库", "",
              f"> 生成时间：{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} ｜ "
-             "自动生成（scripts/gen_test_case_library.py）｜ 编号规则见《测试编号设计规范》",
+             "自动生成（scripts/gen_test_case_library.py）｜ 编号规则见《测试规范》",
              "", "## 总览", ""]
     by_type: dict[str, int] = {}
     for c in cases:

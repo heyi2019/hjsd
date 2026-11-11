@@ -109,6 +109,11 @@ def daily_funds_report(
                 "income": bucket.get(
                     (Direction.IN.value, Nature.BUSINESS_IN.value), ZERO
                 ),
+                # 外部流入（投资款/老板打款）是独立资金大类，进现金余额但不属
+                # 经营收入；单列后「各发生额列合计 = 余额变动」才成立。
+                "external_in": bucket.get(
+                    (Direction.IN.value, Nature.EXTERNAL_IN.value), ZERO
+                ),
                 "expense": bucket.get(
                     (Direction.OUT.value, Nature.BUSINESS_OUT.value), ZERO
                 ),
@@ -130,6 +135,7 @@ def daily_funds_report(
         "total": {
             "opening": _sum_report_field(items, "opening"),
             "income": _sum_report_field(items, "income"),
+            "external_in": _sum_report_field(items, "external_in"),
             "expense": _sum_report_field(items, "expense"),
             "transfer_in": _sum_report_field(items, "transfer_in"),
             "transfer_out": _sum_report_field(items, "transfer_out"),

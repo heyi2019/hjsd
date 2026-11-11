@@ -65,6 +65,7 @@ export interface DailyFundsRow {
   pool_name: string;
   opening: string;
   income: string;
+  external_in: string;
   expense: string;
   deposit_paid: string;
   deposit_held: string;

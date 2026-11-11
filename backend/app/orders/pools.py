@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFound
 from app.domain.trade import Cashflow
 from app.domain.enums import (
+    AccountingAttribute,
     CashflowStatus,
     Direction,
     Nature,
@@ -46,22 +47,31 @@ def pool_balances(
         ):
             raise NotFound(f"资金池 {pool_id} 不存在", details={"pool_id": pool_id})
 
-    # (direction, nature) -> 已审金额合计；同一池多个 nature 会返回多行。
-    cells: dict[int, dict[tuple[str, str], Decimal]] = {}
-    for pool_id, direction, nature, amount in session.execute(
+    # (direction, nature, accounting_attribute) -> 已审金额合计。
+    # 带上核算属性是为了把押金占用/释放（accounting_attribute=DEPOSIT）从经营
+    # 收支卡片里剔除：押金进出是「资金占用」而非经营收入/支出，只有现金头寸
+    # （cash_balance）才应体现押金的流出流入。
+    cells: dict[int, dict[tuple[str, str, str | None], Decimal]] = {}
+    for pool_id, direction, nature, attribute, amount in session.execute(
         select(
             Cashflow.pool_id,
             Cashflow.direction,
             Cashflow.nature,
+            Cashflow.accounting_attribute,
             func.coalesce(func.sum(Cashflow.amount), 0),
         )
         .where(
             Cashflow.pool_id.in_(ids),
             Cashflow.status == CashflowStatus.APPROVED.value,
         )
-        .group_by(Cashflow.pool_id, Cashflow.direction, Cashflow.nature)
+        .group_by(
+            Cashflow.pool_id,
+            Cashflow.direction,
+            Cashflow.nature,
+            Cashflow.accounting_attribute,
+        )
     ):
-        cells.setdefault(pool_id, {})[(direction, nature)] = to_money(amount or 0)
+        cells.setdefault(pool_id, {})[(direction, nature, attribute)] = to_money(amount or 0)
     deposits = {
         pool_id: to_money(amount or 0)
         for pool_id, amount in session.execute(
@@ -85,19 +95,31 @@ def pool_balances(
     for pool_id in ids:
         bucket = cells.get(pool_id, {})
 
-        def total(direction: str, nature: str | None = None) -> Decimal:
-            if nature is not None:
-                return bucket.get((direction, nature), Decimal("0.00"))
+        def total(
+            direction: str,
+            nature: str | None = None,
+            *,
+            exclude_deposit: bool = False,
+        ) -> Decimal:
             return sum(
-                (amount for (d, _n), amount in bucket.items() if d == direction),
+                (
+                    amount
+                    for (d, n, attribute), amount in bucket.items()
+                    if d == direction
+                    and (nature is None or n == nature)
+                    and not (exclude_deposit and attribute == AccountingAttribute.DEPOSIT.value)
+                ),
                 Decimal("0.00"),
             )
 
-        income = total(Direction.IN.value, Nature.BUSINESS_IN.value)
-        expense = total(Direction.OUT.value, Nature.BUSINESS_OUT.value)
+        # 经营收入/支出只统计 BUSINESS_* 且剔除押金占用/释放：
+        # 押金是资金占用（EXTERNAL/DEPOSIT），不是经营收支，否则押金进出会
+        # 同时虚增 income 与 expense，与「收入/支出大类」口径矛盾。
+        income = total(Direction.IN.value, Nature.BUSINESS_IN.value, exclude_deposit=True)
+        expense = total(Direction.OUT.value, Nature.BUSINESS_OUT.value, exclude_deposit=True)
         transfer_in = total(Direction.IN.value, Nature.INTERNAL.value)
         transfer_out = total(Direction.OUT.value, Nature.INTERNAL.value)
-        # 现金头寸包含 INTERNAL 划转；经营收入/支出仍只统计 BUSINESS_*，避免把划转算进损益。
+        # 现金头寸含 INTERNAL 划转与押金进出（现金确实流出流入），口径不动。
         cash_balance = total(Direction.IN.value) - total(Direction.OUT.value)
         deposit_held = deposits.get(pool_id, Decimal("0.00"))
         pool = pools[pool_id]

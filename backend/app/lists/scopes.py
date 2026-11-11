@@ -231,6 +231,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("pool_label", "名称"),
             ListColumn("opening", "期初"),
             ListColumn("income", "收入"),
+            ListColumn("external_in", "外部流入"),
             ListColumn("expense", "支出"),
             ListColumn("deposit_held", "押金占用"),
             ListColumn("cash_balance", "现金余额"),

@@ -66,6 +66,15 @@ def r2_monthly_pnl(
             func.coalesce(func.sum(expense_case), 0),
         )
         .join(Order, Order.id == Cashflow.order_id)
+        # 押金占用/释放/损失是资金占用（EXTERNAL/DEPOSIT），不是订单经营直接
+        # 成本；挂了 source_order_id 也不能混进 R2 支出大类，否则虚增该单成本。
+        # 注意放行 NULL：SQL 中 NULL != 'DEPOSIT' 为假，会误删未设属性的流水。
+        .where(
+            or_(
+                Cashflow.accounting_attribute != AccountingAttribute.DEPOSIT.value,
+                Cashflow.accounting_attribute.is_(None),
+            )
+        )
         .group_by(Cashflow.occurred_on)
     )
     if from_date is not None:

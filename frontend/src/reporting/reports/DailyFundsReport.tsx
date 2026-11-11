@@ -22,6 +22,7 @@ export function DailyFunds() {
     { title: "名称", key: "pool_label", dataIndex: "pool_name"},
     { title: "期初", dataIndex: "opening", align: "right", render: (v: string) => <MoneyText value={v} />},
     { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },
+    { title: "外部流入", dataIndex: "external_in", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "支出", dataIndex: "expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "押金占用", dataIndex: "deposit_held", align: "right", render: (v: string) => <MoneyText value={v} />},
     { title: "现金余额", dataIndex: "cash_balance", align: "right", render: (v: string) => <MoneyText value={v} />},

@@ -26,7 +26,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
-from app.lists.export import build_list_csv, csv_file_response
+from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
 from app.parties import schemas, service
 
 router = APIRouter(tags=["CUS-01 客户与合作方"])
@@ -120,10 +120,10 @@ def export_customers_csv(
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> Response:
-    """客户按可见列导出 CSV：同 /customers 筛选与联系方式脱敏口径，全量不分页。"""
+    """客户按可见列导出 CSV：同 /customers 筛选与联系方式脱敏口径，上限 EXPORT_ROW_LIMIT。"""
     reveal = user.has(PERM_CUSTOMER_CONTACT_READ)
     customers = service.list_customers(
-        db, keyword=keyword, status=status, user=user, limit=None, offset=0
+        db, keyword=keyword, status=status, user=user, limit=EXPORT_ROW_LIMIT, offset=0
     )
     extras = service.get_extra_values_bulk(
         db, entity_type="customer", entity_ids=[item.id for item in customers]
@@ -146,9 +146,10 @@ def export_customers_csv(
         entity_id="CUSTOMER",
         actor=user.username,
         after={
-            "rows": len(rows),
+            "rows": meta["row_count"],
             "column_count": meta["column_count"],
             "contact_revealed": reveal,
+            "truncated": meta["truncated"],
         },
     )
     return csv_file_response(csv_text, f"客户-{date.today().isoformat()}.csv")

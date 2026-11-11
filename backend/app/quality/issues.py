@@ -10,6 +10,7 @@ from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.time import now_second
 from app.core.numbering import allocate_number
+from app.core.state_machine import QUALITY_ISSUE_TRANSITIONS, transition
 from app.domain.enums import AuditAction, QualityIssueStatus, SequenceKey
 from app.domain.quality import QualityIssue
 
@@ -107,7 +108,11 @@ def update_issue(
     if status == QualityIssueStatus.CLOSED.value:
         raise Validation("关闭质量工单必须使用 close 接口")
     before = {"status": issue.status}
-    issue.status = status
+    # 状态流转统一走状态机：仅 OPEN → IN_PROGRESS 单向，
+    # 禁止 IN_PROGRESS → OPEN 回退与重复「开始处理」；关闭仍只走 close 接口。
+    issue.status = transition(
+        QUALITY_ISSUE_TRANSITIONS, issue.status, status, entity="质量工单"
+    )
     issue.updated_by = actor
     session.flush()
     record_audit(

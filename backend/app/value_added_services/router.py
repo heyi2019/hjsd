@@ -119,10 +119,12 @@ def export_installments_csv(
     _user: CurrentUser = read_access,
 ) -> Response:
     """分期与回款按可见列导出 CSV：同 /installments 口径，天然全量。"""
-    # 直接调路由函数时 Query(default=None) 的默认值不会生效，必须把区间显式传 None。
+    # 直接调路由函数时 Query(default=None) 的默认值不会生效，每个可选筛选都要显式传 None。
+    # 此前漏传 contract_type，Query(None) 对象被透传进 SQL 触发 psycopg 参数适配错误。
     outputs = list_installments(
         status=status,
         order_id=order_id,
+        contract_type=None,
         trade_date_from=None,
         trade_date_to=None,
         db=db,

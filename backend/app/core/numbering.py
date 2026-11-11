@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.core.errors import ErrorCode, Validation
@@ -35,20 +36,33 @@ def ensure_sequence(
     prefix: str,
     padding: int = DEFAULT_PADDING,
 ) -> DocumentSequence:
-    """取（必要时建）编号序列；同一 key 幂等返回既有行。"""
+    """取（必要时建）编号序列；同一 key 幂等返回既有行。
+
+    并发安全：旧版 select-then-insert 在多进程/多请求同时初始化同一 key 时
+    （种子并行、订单类型初始化），各方 select 都返回 None → 各自 insert →
+    后到者撞 `uq_document_sequences_key` 唯一约束直接 500。
+    改为 PG `ON CONFLICT DO NOTHING` 由数据库保证同 key 只落一行，冲突即跳过，
+    再统一回读；与旧版一样不改写既有行的 prefix/padding。
+    """
     key_value = key.value if isinstance(key, SequenceKey) else key
-    row = session.scalar(
-        select(DocumentSequence).where(DocumentSequence.sequence_key == key_value)
-    )
-    if row is None:
-        row = DocumentSequence(
+    session.execute(
+        pg_insert(DocumentSequence)
+        .values(
             sequence_key=key_value,
             prefix=prefix,
             padding=padding,
             current_value=0,
         )
-        session.add(row)
-        session.flush()
+        .on_conflict_do_nothing(index_elements=["sequence_key"])
+    )
+    row = session.scalar(
+        select(DocumentSequence).where(DocumentSequence.sequence_key == key_value)
+    )
+    if row is None:  # 防御：约束/方言异常下仍未落行时明确报错，不静默发号
+        raise Validation(
+            f"编号序列 {key_value} 初始化失败",
+            details={"sequence_key": key_value},
+        )
     return row
 
 

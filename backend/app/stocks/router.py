@@ -23,7 +23,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.domain.enums import AuditAction, EventType
-from app.lists.export import build_list_csv, csv_file_response
+from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
 from app.stocks import service
 from app.parties import service as parties_service
 from app.domain.foundation import AuditLog, Pool
@@ -335,7 +335,9 @@ def export_accounts_csv(
     _user: CurrentUser = read_access,
 ) -> Response:
     """库存中心按可见列导出 CSV，沿用 /stocks 的权限口径。"""
-    accounts = service.list_accounts(db, status=status, user=_user, limit=None, offset=0)
+    accounts = service.list_accounts(
+        db, status=status, user=_user, limit=EXPORT_ROW_LIMIT, offset=0
+    )
     outputs = _account_outputs(
         db,
         accounts,
@@ -361,7 +363,11 @@ def export_accounts_csv(
         entity_type="list_export",
         entity_id="INVENTORY",
         actor=_user.username,
-        after={"rows": len(outputs), "column_count": meta["column_count"]},
+        after={
+            "rows": meta["row_count"],
+            "column_count": meta["column_count"],
+            "truncated": meta["truncated"],
+        },
     )
     return csv_file_response(csv_text, f"库存中心-{date.today().isoformat()}.csv")
 

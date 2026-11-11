@@ -213,11 +213,21 @@ class Settings(BaseSettings):
         return True, None
 
     @property
+    def is_production(self) -> bool:
+        """是否生产环境（统一口径）。
+
+        登录限流、mock 短信回显、CORS 放行等安全开关都以此为准，避免散落的
+        `app_env == "production"` 字符串比较漏判大小写/空白导致生产被当成开发。
+        大小写与首尾空白归一：PRODUCTION / " production " 均识别为生产。
+        """
+        return self.app_env.strip().lower() == "production"
+
+    @property
     def sms_code_deliverable(self) -> bool:
         """验证码能否真的送达。mock 只在非 production 下可用于回显。"""
         if self.sms_provider == "disabled":
             return False
-        if self.sms_provider == "mock" and self.app_env.lower() == "production":
+        if self.sms_provider == "mock" and self.is_production:
             return False
         return True
 
@@ -250,7 +260,7 @@ class Settings(BaseSettings):
 
     @property
     def is_development(self) -> bool:
-        return self.app_env.lower() in {"development", "dev", "local"}
+        return self.app_env.strip().lower() in {"development", "dev", "local"}
 
     def describe(self) -> dict[str, str]:
         """健康检查/排障用：不泄露密钥原文，也不回显连接串里的口令。"""

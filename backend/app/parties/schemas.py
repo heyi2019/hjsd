@@ -246,6 +246,7 @@ class CounterpartyOut(BaseModel):
     note: str | None = None
     created_at: datetime
     extra_values: dict[str, Any] = Field(default_factory=dict)
+    contact_masked: bool = False
 
 
 class ExtraValueIn(RequestModel):

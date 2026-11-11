@@ -95,6 +95,8 @@ export interface Counterparty {
   source?: string | null;
   note?: string | null;
   created_at?: string;
+  /** 联系方式是否已被后端遮罩（无 customer.contact.read 权限）；同 Customer 口径 */
+  contact_masked?: boolean;
   extra_values?: Record<string, unknown>;
   extra_fields?: Array<{ key: string; label: string; section: string; value: unknown }>;
 }

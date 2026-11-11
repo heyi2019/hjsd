@@ -209,5 +209,42 @@ def to_customer_out(
     return payload
 
 
+def to_counterparty_out(
+    counterparty: Counterparty,
+    *,
+    reveal_contact: bool,
+    extra_values: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """合作方输出：联系方式默认脱敏，与客户同口径（权限在路由层判定）。
+
+    合作方联系人电话/微信/QQ 与客户联系方式同属敏感信息，之前 list/get 直接
+    明文序列化，任何持 counterparty.read 的角色（含 EMPLOYEE）都能拿到全量号码。
+    这里复用 mask_phone / mask_id，未获 customer.contact.read 时只回显遮罩值。
+    """
+    payload = {
+        "id": counterparty.id,
+        "counterparty_no": counterparty.counterparty_no,
+        "display_name": counterparty.display_name,
+        "type": counterparty.type,
+        "contact_name": counterparty.contact_name,
+        "phone": counterparty.phone,
+        "wechat": counterparty.wechat,
+        "qq": counterparty.qq,
+        "source": counterparty.source,
+        "status": counterparty.status,
+        "note": counterparty.note,
+        "created_at": counterparty.created_at,
+        "extra_values": dict(extra_values or {}),
+        "contact_masked": False,
+    }
+    if reveal_contact:
+        return payload
+    payload["phone"] = mask_phone(counterparty.phone)
+    payload["wechat"] = mask_id(counterparty.wechat)
+    payload["qq"] = mask_id(counterparty.qq)
+    payload["contact_masked"] = True
+    return payload
+
+
 
 

@@ -46,7 +46,7 @@ def deliver_code(settings: Settings, *, phone: str, code: str, purpose: str) -> 
         raise Validation("短信通道未配置，暂时无法使用验证码登录")
 
     if channel == "mock":
-        if settings.app_env.lower() == "production":
+        if settings.is_production:
             # 生产环境用 mock = 验证码根本没发出去，必须显式报错而不是静默。
             raise Validation("短信通道未配置（当前为 mock 且运行在生产环境），请联系管理员")
         # 只打手机号后四位，避免验证码与完整手机号同时进日志。

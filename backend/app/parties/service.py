@@ -12,7 +12,12 @@
 """
 from __future__ import annotations
 
-from ._common import mask_id, mask_phone, to_customer_out
+from ._common import (
+    mask_id,
+    mask_phone,
+    to_counterparty_out,
+    to_customer_out,
+)
 from .counterparties import (
     assert_counterparty_usable,
     create_counterparty,
@@ -78,6 +83,7 @@ __all__ = [
     "set_counterparty_status",
     "set_customer_status",
     "set_extra_values",
+    "to_counterparty_out",
     "to_customer_out",
     "update_counterparty",
     "update_customer",

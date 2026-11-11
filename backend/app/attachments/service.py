@@ -15,11 +15,14 @@ from app.core.audit import record_audit
 from app.core.errors import NotFound, PermissionDenied, Validation
 from app.core.time import now_second
 from app.core.security import (
+    PERM_DEPOSIT_POST,
+    PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
     PERM_ORDER_EVENT_POST,
     PERM_ORDER_UPDATE,
     PERM_REPORT_READ,
+    PERM_TRANSFER_POST,
     CurrentUser,
     owner_scope_filter,
 )
@@ -100,7 +103,14 @@ def _assert_permission(user: CurrentUser, target: _Target, *, write: bool) -> No
     if target.entity_type == "quality_issue":
         allowed = user.has(PERM_ORDER_UPDATE if write else PERM_REPORT_READ)
     elif target.entity_type == "cashflow":
-        allowed = user.has(PERM_FINANCE_READ)
+        # 资金流水附件「写」不得只凭读权限放行：须持任一资金写权限，
+        # 否则 finance.read 的只读角色也能给流水挂/改附件（越权）。
+        if write:
+            allowed = user.has_any((
+                PERM_DEPOSIT_POST, PERM_TRANSFER_POST, PERM_FINANCE_ORDER_EVENT_POST,
+            ))
+        else:
+            allowed = user.has(PERM_FINANCE_READ)
     elif write:
         allowed = user.has_any((PERM_ORDER_UPDATE, PERM_ORDER_EVENT_POST))
     else:

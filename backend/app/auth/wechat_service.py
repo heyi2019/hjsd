@@ -77,6 +77,23 @@ def _deactivate(db: Session, binding: UserWeChatBinding) -> None:
     binding.is_active = False
 
 
+def _audit_auto_unbind(db: Session, binding: UserWeChatBinding, reason: str) -> None:
+    """惰性失效（账号停用 / 手机号变更）也留审计——绑定被谁、为何作废必须可追溯。"""
+    record_audit(
+        db,
+        action=AuditAction.WECHAT_UNBIND,
+        entity_type="user",
+        entity_id=binding.user_id,
+        actor="system",
+        before={
+            "provider": binding.provider,
+            "open_id": binding.open_id,
+            "phone": verification.mask_phone(binding.bound_phone or ""),
+        },
+        reason=reason,
+    )
+
+
 def resolve_login(db: Session, settings: Settings, identity: WeChatIdentity) -> LoginResolution:
     """已绑定就直接登录；未绑定或绑定失效则下发绑定票据。"""
     binding = find_binding(db, provider=identity.provider, open_id=identity.open_id)
@@ -84,10 +101,13 @@ def resolve_login(db: Session, settings: Settings, identity: WeChatIdentity) -> 
         user = db.get(User, binding.user_id)
         if user is None or not user.is_active:
             _deactivate(db, binding)
+            _audit_auto_unbind(db, binding, "绑定账号不存在或已停用，微信绑定自动失效")
+            db.flush()
             raise AuthError("绑定账号已停用，请联系管理员")
         if user.phone != binding.bound_phone:
             # 手机号已变更：旧微信不再代表该账号，作废绑定并要求重新绑定。
             _deactivate(db, binding)
+            _audit_auto_unbind(db, binding, "账号手机号已变更，旧微信绑定自动失效")
             db.flush()
             return LoginResolution(
                 state="bind_required",

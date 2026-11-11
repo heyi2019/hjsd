@@ -142,10 +142,22 @@ def _admin(actor: CurrentUser) -> None:
 
 
 def _client_ip(request: Request) -> str:
-    """取真实客户端 IP：优先 X-Forwarded-For（反向代理后），否则直连地址。"""
+    """取真实客户端 IP 用于登录限流，必须抗伪造（否则攻击者每请求换一个
+    X-Forwarded-For 首段即可绕过限流）。
+
+    生产由前置 nginx 代理：nginx 以 `$remote_addr` **覆盖写入** X-Real-IP（客户端
+    自带同名头会被覆盖，不可伪造），故最可信；X-Forwarded-For 用
+    `$proxy_add_x_forwarded_for` **追加**真实对端到最右，客户端自带的伪造值只在左侧。
+    因此取 X-Real-IP 优先、XFF 最右段兜底，**绝不取首段**。
+    """
+    real_ip = (request.headers.get("x-real-ip") or "").strip()
+    if real_ip:
+        return real_ip
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        parts = [seg.strip() for seg in forwarded.split(",") if seg.strip()]
+        if parts:
+            return parts[-1]
     return request.client.host if request.client else "unknown"
 
 
@@ -154,7 +166,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     # 登录限流：仅在生产生效（app_env=production），避免打断开发与 k6 压测。
     # PBKDF2 校验约 45ms/次，在 2 核服务器上暴力破解会显著挤占 CPU，故在 DB 查询前拦截。
     settings = get_settings()
-    if settings.login_rate_limit_enabled and settings.app_env == "production":
+    if settings.login_rate_limit_enabled and settings.is_production:
         if not login_limiter.is_allowed(
             f"login:{_client_ip(request)}", settings.login_rate_limit_per_minute, 60
         ):

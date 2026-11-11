@@ -108,7 +108,7 @@ class BindingOut(BaseModel):
 
 def _limits_enforced(settings: Settings) -> bool:
     """限流只在生产生效：与账号密码登录保持同一策略，避免打断本地联调与自动化。"""
-    return settings.login_rate_limit_enabled and settings.app_env == "production"
+    return settings.login_rate_limit_enabled and settings.is_production
 
 
 def _guard(key: str, limit: int, window: int, settings: Settings, message: str) -> None:
@@ -117,9 +117,16 @@ def _guard(key: str, limit: int, window: int, settings: Settings, message: str) 
 
 
 def _client_ip(request: Request) -> str:
+    """与 auth.router._client_ip 同口径：X-Real-IP 优先、XFF 最右段兜底，绝不取
+    可被客户端伪造的首段（否则微信登录限流可被同法绕过）。"""
+    real_ip = (request.headers.get("x-real-ip") or "").strip()
+    if real_ip:
+        return real_ip
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        parts = [seg.strip() for seg in forwarded.split(",") if seg.strip()]
+        if parts:
+            return parts[-1]
     return request.client.host if request.client else "unknown"
 
 

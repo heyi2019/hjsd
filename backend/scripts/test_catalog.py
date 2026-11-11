@@ -7,7 +7,7 @@
   - gen_test_case_library.py：生成测试用例库（含所属模块 / 关联模块）。
 
 设计要点：
-  - 文件 -> 功能编号 -> 模块字母（A/B/C/D/E/F/SYS），功能编号见《功能编号注册表.csv》。
+  - 文件 -> 功能编号 -> 模块字母（A/B/C/D/E/F/SYS），功能编号见《测试元数据台账.csv》的 FEATURE 记录。
   - 测试类型：落在 run_regression.py 的 `unit` 组的后端文件 = UT，其余后端 = IT；
     前端 vitest = IT；E2E 为独立层（当前无常住 E2E，预留）。
   - 跨模块用例：FLOW-* 流程文件显式登记，可同时关联多个业务模块（同一用例多模块归属）。
@@ -29,7 +29,8 @@ FRONTEND = os.path.join(REPO, "frontend")
 # 包外能跑的前提是仓库根有 node_modules（npm workspaces + hoisted），2026-11-04 已落地，
 # 并在 vitest.config.ts 里把 root 改成仓库根、放开 server.fs.allow。
 FRONTEND_TEST_DIRS = (os.path.join(REPO, "tests", "frontend"),)
-REGISTRY = os.path.join(REPO, "docs/testing", "功能编号注册表.csv")
+# 功能编号与业务承诺合并于一份台账；本模块只取 FEATURE 记录（见 load_registry）。
+REGISTRY = os.path.join(REPO, "docs/testing", "测试元数据台账.csv")
 
 
 def is_frontend_test(relpath: str) -> bool:
@@ -364,14 +365,21 @@ def frontend_func_for(relpath: str) -> str:
 
 
 def load_registry() -> dict[str, dict]:
+    """读取合并台账中的 FEATURE 记录，返回 {功能编号: {module, name, old}}。
+
+    台账按「记录类型」分 FEATURE / PROMISE 两类共用一张稀疏表；PROMISE 行的
+    功能编号为空，必须跳过，否则会写入空 key 并污染 FUNC_TO_MODULE。
+    """
     reg: dict[str, dict] = {}
-    with open(REGISTRY, encoding="utf-8-sig") as f:
+    with open(REGISTRY, encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
-            code = row["功能编号"].strip()
+            code = (row.get("功能编号") or "").strip()
+            if not code:
+                continue
             reg[code] = {
-                "module": row["模块"].strip(),
-                "name": row["功能名称"].strip(),
-                "old": row.get("关联旧编号(BIZ)", "").strip(),
+                "module": (row.get("模块") or "").strip(),
+                "name": (row.get("功能名称") or "").strip(),
+                "old": (row.get("关联旧编号(BIZ)") or "").strip(),
             }
     return reg
 

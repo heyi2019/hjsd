@@ -8,7 +8,7 @@
   - tests/backend/_report/case_index.json   （nodeid -> 测试用例编号，供执行记录器关联）
   - tests/backend/_report/case_number_map.json（本地持久化序号；不入库）
 
-编号规则：<类型>-<功能编号>-<三位序号>，类型=UT/IT/E2E，功能编号见 功能编号注册表.csv。
+编号规则：<类型>-<功能编号>-<三位序号>，类型=UT/IT/E2E，功能编号见《测试元数据台账.csv》的 FEATURE 记录。
 类型判定：后端落在 run_regression.py 的 unit 组 -> UT，其余 -> IT；前端 vitest -> IT。
 幂等：重复运行只追加新用例序号，已分配编号冻结。该 map 不入库，全新 checkout /
 CI 缺失时由 _load_number_map() 从入库的《测试用例库.csv》自举恢复，否则按排序
@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # /Users/aries/黑金时代
 BACKEND = os.path.join(REPO, "backend")
 FRONTEND = os.path.join(REPO, "frontend")
-REGISTRY = os.path.join(REPO, "docs/testing", "功能编号注册表.csv")
+# 功能编号由 test_catalog.load_registry() 从合并台账 FEATURE 记录读取，本脚本不直接引用台账路径。
 OUT_CSV = os.path.join(REPO, "docs/testing", "测试用例库.csv")
 OUT_MD = os.path.join(REPO, "docs/testing", "测试用例库.md")
 REPORT_DIR = os.path.join(REPO, "tests", "backend", "_report")

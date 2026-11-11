@@ -46,7 +46,7 @@ def test_unregistered_promise_budget() -> None:
     pending = sorted(row["file"] for row in _rows() if row["source"] == "unregistered")
     assert len(pending) <= UNREGISTERED_BUDGET, (
         f"未登记承诺声明 {len(pending)} 个，超出基线 {UNREGISTERED_BUDGET}。"
-        "新增测试请先把承诺写进 docs/testing/承诺清单.csv，再改基线。\n"
+        "新增测试请先把承诺写进 docs/testing/测试元数据台账.csv（PROMISE 记录），再改基线。\n"
         f"当前未登记：{pending}"
     )
 
@@ -136,5 +136,5 @@ def test_no_file_relies_on_legacy_fallback() -> None:
     assert not legacy, (
         "以下测试文件未在 docstring 首行声明已登记的承诺码，仍靠历史回落：\n"
         + "\n".join(f"  - {item}" for item in legacy)
-        + "\n请在文件第一行写 `\"\"\"<承诺编号> <一句话说明>\"\"\"`，并在 docs/testing/承诺清单.csv 登记。"
+        + "\n请在文件第一行写 `\"\"\"<承诺编号> <一句话说明>\"\"\"`，并在 docs/testing/测试元数据台账.csv 登记 PROMISE 记录。"
     )

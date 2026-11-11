@@ -1,6 +1,6 @@
 """承诺（promise）单一事实源：把「什么绝对不能错」从文件路径里解耦出来。
 
-设计背景（见 docs/testing/承诺清单.csv 与 tests/README.md）：
+设计背景（见 docs/testing/测试元数据台账.csv 的 PROMISE 记录与 tests/README.md）：
 - 承诺 ID 形如 ``MONEY-01`` / ``POOL-01``，与文件路径无关——搬目录、改文件名都不影响；
 - 测试文件在 docstring 头部声明 ``（MONEY-01 …）``；解析不到时回落到
   ``test_catalog.BACKEND_FILE_TO_FUNC`` 的历史功能码，保证过渡期 110 个文件
@@ -19,21 +19,30 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 BACKEND_TESTS = REPO / "tests" / "backend"
-LEDGER = REPO / "docs" / "testing" / "承诺清单.csv"
+# 功能编号与业务承诺合并于一份台账；本模块只取 PROMISE 记录（见 load_ledger）。
+LEDGER = REPO / "docs" / "testing" / "测试元数据台账.csv"
 
 # 承诺 ID：两段式，域字母 2-12 位 + 两位序号（MONEY-01 / INSTALLMENT-02）
 PROMISE_RE = re.compile(r"(?<![A-Z0-9-])([A-Z]{2,12}-\d{2})(?![0-9])")
-# 历史功能码：A01 / SYS12 形态（注册表 功能编号注册表.csv）
+# 历史功能码：A01 / SYS12 形态（合并台账 FEATURE 记录）
 FUNC_RE = re.compile(r"(?<![A-Za-z0-9])([A-FS][0-9]{2}|SYS[0-9]{2})(?![0-9])")
 
 HEADER_LINES = 6
 
 
 def load_ledger(path: Path | str | None = None) -> dict[str, dict]:
-    """读取承诺清单，返回 {承诺编号: 行字典}。"""
+    """读取合并台账中的 PROMISE 记录，返回 {承诺编号: 行字典}。
+
+    FEATURE 行的承诺编号为空，必须跳过；否则会生成空 key，守卫测试
+    test_ledger_entries_are_well_formed 会把它判成非法编号。
+    """
     target = Path(path) if path else LEDGER
     with open(target, encoding="utf-8-sig", newline="") as handle:
-        return {row["承诺编号"].strip(): row for row in csv.DictReader(handle)}
+        return {
+            row["承诺编号"].strip(): row
+            for row in csv.DictReader(handle)
+            if (row.get("承诺编号") or "").strip()
+        }
 
 
 def alias_index(ledger: dict[str, dict] | None = None) -> dict[str, str]:

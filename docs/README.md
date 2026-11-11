@@ -37,13 +37,14 @@
 
 | 文件 | 用途 | 可手改 |
 |---|---|---|
-| `testing/功能编号注册表.csv` | A01…SYS0x 功能编号权威清单（由代码盘点确定） | 维护 |
+| `testing/测试元数据台账.csv` | **人维护元数据**：按 `记录类型` 分两类 —— `FEATURE` 功能编号（A01…SYS0x、旧编号映射、代码域、风险等级）、`PROMISE` 业务承诺（L0-L3、负责端、失效后果、验证证据，测试文件头声明的权威源） | 维护 |
 | `testing/测试用例库.md`、`testing/测试用例库.csv` | 全栈可执行用例清单（含自动化文件与断言定位） | **禁手改**（脚本生成） |
 | `testing/测试报告_YYYYMMDD.md`、`.json` | 最近执行批次报告，含历史批次计数；按生成日期命名，**现役目录只留最新一份**，过期件由生成器移入 `testing/报告归档/`（不入库） | **禁手改**（脚本生成） |
 | `testing/测试结果库/results.jsonl` | 逐次执行结果流水 | **禁手改**（脚本生成） |
-| `testing/承诺清单.csv` | **承诺清单**：L0-L3 分级、负责端、失效后果、验证证据（测试文件头声明的权威源） | 维护 |
 
-上表除 `testing/功能编号注册表.csv`、`testing/承诺清单.csv` 外均由脚本生成，**跑完测试若产生 diff 应随该次改动一并提交**（它们是「当前测了什么」的快照）。
+上表除 `testing/测试元数据台账.csv` 外均由脚本生成，**跑完测试若产生 diff 应随该次改动一并提交**（它们是「当前测了什么」的快照）。
+
+`测试元数据台账.csv` 按 `记录类型` 分 `FEATURE` / `PROMISE` 两类：共用一张稀疏表、列名互不重叠。`test_catalog.load_registry()` 只取「功能编号」非空的行，`promise_catalog.load_ledger()` 只取「承诺编号」非空的行 —— **新增行必须填对应主键，否则读取方会静默跳过**。手工维护，不参与生成器整份覆盖。
 
 另有两份 nodeid ↔ 测试编号的映射索引**不入库**：`tests/backend/_report/case_index.json`、`tests/backend/_report/case_number_map.json`。原因：每次执行都整份重写（约 584KB），入库只剩无意义 diff；`backend-gate.yml` 在跑完测试后执行 `scripts/gen_test_case_library.py` 重建，本地同理。**编号不依赖这两份不入库文件**：生成器在映射缺失时由 `_load_number_map()` 从入库的《测试用例库.csv》自举恢复序号，否则全新 checkout 会按排序重排、与入库快照错位（实测 2666 条里 1640 条漂移）。`tests/backend/conftest.py` 同样在索引缺失时由 `_load_case_index()` 自举，故全新 checkout / CI 跑 pytest 时执行记录仍带编号；两份都读不到才返回空映射（编号列缺省），且记录器异常一律吞掉，绝不阻断测试。另注：`backend-gate` 的 xdist 并行模式下记录器按设计不落结果库（避免多 worker 并发写坏 jsonl），自举主要保障串行运行与本地全新环境。
 

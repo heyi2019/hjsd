@@ -60,7 +60,7 @@ tests/
 |---|---|---|
 | 怎么跑 | `db` marker（**由夹具依赖派生**）+ `GROUPS` | 这次改动该跑哪些、要多久 |
 | 属于哪个板块 | `run_regression.py` 的 `GROUPS` + 文件名前缀 | 改这个板块要回归什么 |
-| 保护什么 | **文件头承诺 ID** + `docs/testing/承诺清单.csv` | 前后端是否对得上、哪条承诺无人守 |
+| 保护什么 | **文件头承诺 ID** + `docs/testing/测试元数据台账.csv`（`PROMISE`） | 前后端是否对得上、哪条承诺无人守 |
 
 承诺轴独立于路径，所以搬目录、改文件名都不会影响功能归属。解析与校验见
 `backend/scripts/promise_catalog.py` 与 `tests/backend/test_promise_declaration.py`。
@@ -69,7 +69,7 @@ tests/
 
 1. **进分组**：在 `backend/run_regression.py` 的 `GROUPS` 里登记（否则 `all` / `ci` / `changed` 都不会跑它）。
 2. **声明承诺**：文件 docstring 第一段写上承诺 ID，如 `"""REVERSAL-01 冲销必须成对…"""`。
-   新承诺先写进 `docs/testing/承诺清单.csv`，注明层级、负责端、失效后果、验证证据。
+   新承诺先写进 `docs/testing/测试元数据台账.csv`，`记录类型` 填 `PROMISE`，注明层级、负责端、失效后果、验证证据。
 3. **标类型**：`pytestmark = [pytest.mark.unit]` 或 `integration`，与目录归属保持一致。
 4. **跑完再交**：只跑直接相关文件，不跑全量（见第 5 节）。
 
@@ -79,11 +79,9 @@ tests/
   反向也查死条目（白名单指向已改名/删除的文件）与路径前缀（必须是 `tests/backend/`）。
 - 第 2 步 → `test_promise_declaration.py`：无归属文件、超基线的新增未登记声明、清单证据指向不存在的文件，均报错。
 
-## 4. 承诺清单（新引入）
+## 4. 业务承诺（PROMISE 记录）
 
-`docs/testing/承诺清单.csv` 是「什么绝对不能错」的单一事实源，按失效后果分层：
-
-当前 **48 条**（L0 12 / L1 20 / L2 14 / L3 2），112 个后端测试文件全部自带已登记承诺码。
+`docs/testing/测试元数据台账.csv` 的 `PROMISE` 记录是「什么绝对不能错」的单一事实源，按失效后果分层；条数与覆盖状态以台账实时内容为准，不在本文写时点数字。后端测试文件必须全部自带已登记承诺码。
 
 | 层级 | 含义 | 典型 |
 |---|---|---|
@@ -289,7 +287,7 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 
 **快照**：`visual.spec.ts-snapshots/` 必须与 spec 同目录整目录搬迁，快照按 spec 路径定位，spec 动而快照留原地会导致 `visual.spec.ts` 全部失败。
 
-**承诺对齐**：新增 spec 时在文件头声明承诺 ID，并在 `docs/testing/承诺清单.csv` 更新对应条目的 E2E 证据。
+**承诺对齐**：新增 spec 时在文件头声明承诺 ID，并在 `docs/testing/测试元数据台账.csv` 更新对应 `PROMISE` 记录的 E2E 证据。
 
 ### 7.3 `fixtures/`
 

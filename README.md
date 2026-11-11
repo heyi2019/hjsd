@@ -92,7 +92,7 @@ cd frontend && npm run build
 
 ## 关键业务约束
 
-写代码前必看 `docs/PRD.md` 与 `docs/数据字典.md`（旧功能规格 F01 已下线，编号体系见 `docs/testing/功能编号注册表.csv`），几条最容易踩的：
+写代码前必看 `docs/PRD.md` 与 `docs/数据字典.md`（旧功能规格 F01 已下线，编号体系见 `docs/testing/测试元数据台账.csv`（`FEATURE` 记录）），几条最容易踩的：
 
 - **规则快照**（BAS-06-04）：订单 / 返点 / 分期创建时固化当时生效的规则版本与参数
   （`policy_version_id` + `policy_snapshot`）。改未来费率**不会**改写已发生业务的利润。

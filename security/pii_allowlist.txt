@@ -32,7 +32,7 @@ tests/fixtures/v1_acceptance_seed.json :: phone
 # 均为 138****0000 一类合成号码（非真实客户数据）；email 一条为测试占位邮箱。
 # 两份治理方案文档里的真实号码已改为 198****3890 脱敏写法，未登记进本清单。
 backend/scripts/e2e_db.py :: phone
-docs/API接口规范.md :: phone
+docs/接口与权限契约.md :: phone
 docs/testing/测试用例库.csv :: phone
 docs/testing/测试用例库.md :: phone
 tests/backend/integration/business/test_bughunt.py :: phone

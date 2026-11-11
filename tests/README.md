@@ -27,9 +27,7 @@ tests/
 │   ├── <区域>/*.spec.ts          按区域分布；cross/ 是跨区域串联
 │   └── support/api-stub.ts       规格共用夹具
 ├── fixtures/                     测试基建：render/mock-api/桩/种子数据（`@fixtures` 别名）
-├── config/                       setup.ts、mock-specifier 基线
-├── manifests/                    用例 ↔ 文件映射表（人写）
-└── results/                      执行基线记录（人写）
+└── config/                       setup.ts、mock-specifier 基线
 ```
 
 **区域目录名 = 一级导航名**：`system`（系统级兜底）/ `workbench`（工作台）/ `business`（业务中心）
@@ -300,9 +298,50 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 
 `account-image-test-20261101.png` 是仅用于图片上传 / 预览 / 保存 / 详情回显验证的合成测试图片（图内已标注「测试图片 TEST」），仅限 dev / 测试环境，不得上传生产或作为真实账号资料；优先验证「添加图片 → 预览 → 保存 → 详情回显 → 再次编辑」完整链路。
 
-## 8. 维护规则
+## 8. FE 手工用例 ↔ 自动化映射
 
-- 本文件是测试资产的唯一索引；新增测试目录或执行入口时同步更新第 1、5、7 节；`FE-*` 用例与自动化的映射在 `tests/manifests/测试资产映射.md`。
+`FE-001 ~ FE-240` 是前端手工用例锚点（`docs/前端测试用例库.md`），**不得废弃**。下表按业务范围登记自动化归属；「已有关联自动化」只表示对应模块已有测试，**不代表逐用例覆盖，也不代表当前通过**。各资产的执行入口见第 5 节，生成物登记见 `docs/README.md` 3.2；`docs/archive/ux-audit/` 被 E2E 用例与 `ux-audit.mjs` 直接读取，**不可删**。
+
+| 用例范围 | 业务范围 | Vitest 归属（`tests/frontend/module/`） | Playwright 归属（`tests/e2e/`） | 覆盖判断 |
+|---|---|---|---|---|
+| FE-001 ~ FE-007 | 登录态、导航、首次加载、空态、弹窗基础行为 | `workbench/`、`shared/`、`system/` | `system/smoke.spec.ts`、`system/navigation-leaves.spec.ts`、`system/fallback.spec.ts`、`system/visual.spec.ts` | 模块自动化已有；异常路径仍以手工为主 |
+| FE-008 ~ FE-024 | 回收/提号/代挂建单、字段校验、费用、图片、库存 | `business/`、`shared/` | `cross/business-write.spec.ts`、`cross/integration.spec.ts` | 建单主路径已有；下拉、图片、重复提交需补逐用例关联 |
+| FE-025 ~ FE-037 | 售出、分期、寄售、返点、取消和重复操作 | `business/`、`finance/` | `cross/business-write.spec.ts`、`cross/finance-write-ui.spec.ts`、`cross/integration.spec.ts` | 业务模块已有；终态与跨页面一致性需补专项回归 |
+| FE-038 ~ FE-047 | 客户、合作方、用户、团队、密码和权限 | `customer/`、`settings/`、`system/` | `cross/crud.spec.ts`、`system/auth-login.spec.ts`、`system/role-switch.spec.ts` | 主路径已有；格式校验、重复编码和异常反馈需补关联 |
+| FE-048 ~ FE-056 | 资金划转、冲销、报表、导出和审计 | `finance/`、`operations/`、`system/` | `cross/finance-write-ui.spec.ts`、`finance/other-integration.spec.ts`、`cross/integration.spec.ts` | 模块自动化已有；导出反馈和报表口径需补专项场景 |
+| FE-057 ~ FE-073 | 自定义字段、列配置、游戏渠道、资金池、导入、视觉 | `settings/`、`operations/`、`workbench/` | `system/visual.spec.ts`、`cross/integration.spec.ts` | 配置与视觉已有；导入异常和下拉完整性需补逐用例关联 |
+| FE-074 ~ FE-140 | 终态动作、附件、质量、需求、资金和权限扩展场景 | `business/`、`customer/`、`operations/`、`finance/`、`settings/` | `cross/crud.spec.ts`、`cross/finance-write-ui.spec.ts`、`finance/other-integration.spec.ts` | 组件级覆盖较多；组合流程与异常恢复以手工为主 |
+| FE-141 ~ FE-240 | 跨页面一致性、可访问性、超时、错误态、下拉和保存保护 | 各业务区域的 `.deep.test.tsx` / `.actions.test.tsx` / `.write.test.tsx` | `system/fallback.spec.ts`、`cross/integration.spec.ts`、`cross/upgrade-integration.spec.ts`、`system/visual.spec.ts` | 主要来自手工探索发现，自动化映射与稳定复现仍不足 |
+
+### 8.1 补映射规则
+
+新增或补齐自动化时，在手工用例表格中增加「自动化路径」字段，格式统一为：
+
+```text
+Vitest: tests/frontend/module/business/CreateBusinessModal.test.tsx
+或
+Playwright: tests/e2e/cross/business-write.spec.ts
+```
+
+同一条 FE 用例可以关联多个自动化文件，但不能把「同模块已有测试」直接当作该用例已覆盖。优先补：
+
+1. 当前失败且涉及数据正确性的用例。
+2. 重复提交、超时、刷新、重试和结果未知场景。
+3. 下拉选项完整性和字段联动。
+4. 弹窗关闭、错误清理和保存反馈。
+5. 报表导出、敏感字段和跨页面状态一致性。
+
+### 8.2 结果归档与当前结论
+
+- 运行日志、覆盖率、Playwright HTML 报告和临时截图不入库，走 `.gitignore` 产物规则。
+- 可复用假数据、图片与导入样本放 `tests/fixtures/`；`.env.*-test`、数据库备份及含密钥或业务数据的文件不得提交。
+- 可复现的测试结论与缺陷证据放 `docs/` 现役文档；过期的 `测试报告_YYYYMMDD.*` 由生成器移入 `docs/testing/报告归档/`（不入库），不得用历史报告替代当前结果。
+
+前端自动化已覆盖主要模块，但与 240 条手工用例还不是一对一关系。修复一个问题时补一条自动化关联，避免只增加手工用例数量而不增加可重复的自动化保护。
+
+## 9. 维护规则
+
+- 本文件是测试资产的唯一索引；新增测试目录或执行入口时同步更新第 1、5、7 节；`FE-*` 用例与自动化的映射见第 8 节。
 - 手工用例在 `docs/前端测试用例库.md`，自动生成的用例库与报告在 `docs/testing/`；UX 审计证据在 `docs/archive/ux-audit/`，不作为现行通过依据。
 - Fixture 不得包含真实账号、密码、手机号、客户资料或生产数据。
 - 视觉快照失败先确认是否为预期产品变更，**不得直接按实际图覆盖快照**；拖拽、loading 与退出反馈类失败要复核事件命中与样式清理，**不得靠放宽断言超时掩盖**。

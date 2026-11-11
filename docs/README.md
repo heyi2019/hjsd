@@ -81,7 +81,7 @@
 | 轨 1：执行事实 | `testing/测试用例库.md`、`testing/测试用例库.csv` | `UT/IT/E2E-<功能编号>-<序号>` | 脚本从测试代码反向生成的**可执行清单**，覆盖后端 + 前端 + CI |
 | 轨 2：前端方法论 | `前端测试用例库_20261101.md` | `FE-001 ~ FE-240` | **人工**用例 + 测试方法说明（轨 1 不含方法论） |
 
-两者由 `tests/manifests/前端用例自动化映射_20261101.md` 打通（FE-xxx → Vitest / Playwright 文件）。`FE-*` 是前端锚点编号，已被下游映射与报告引用，**不得废弃**。
+两者由 `tests/manifests/测试资产映射.md` 打通（FE-xxx → Vitest / Playwright 归属）。`FE-*` 是前端锚点编号，已被下游映射与报告引用，**不得废弃**。
 
 测试用例库与功能编号映射保持双轨：前者由脚本生成执行清单，后者维护功能编号，不合并，避免破坏编号和生成流水线。
 
@@ -115,9 +115,7 @@
 |---|---|
 | `backend/ARCHITECTURE.md` | 后端按领域拆分的目录架构速查 |
 | `tests/README.md` | 测试文件与执行入口索引：目录结构、三根轴、新增测试四步、`db` 标记派生的快/慢通道 |
-| `tests/manifests/测试资产映射_20261101.md` | 测试文件 ↔ 执行入口 |
-| `tests/manifests/前端用例自动化映射_20261101.md` | `FE-xxx` → Vitest / Playwright 文件 |
-| `tests/results/前端快速回归基线_20261101.md` | 前端快速回归耗时基线 |
+| `tests/manifests/测试资产映射.md` | `FE-xxx` ↔ 自动化归属、测试资产 ↔ 执行入口（两份 11-01 映射已合并；快速回归基线已吸收进 `tests/README.md`） |
 | `tests/fixtures/README.md` | v1 验收种子数据（假数据）的使用约束 |
 | `tests/frontend/README.md` | 前端测试的 unit/module 分层、区域归属、别名定位与新增测试四步 |
 | `tests/e2e/README.md` | E2E 职责边界、独立库约束、快照目录迁移陷阱 |

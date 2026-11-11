@@ -103,6 +103,8 @@ jobs:
     needs: prepare-release
     if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
+    # 批量轮询上限 20 分钟；25 分钟 job 兜底避免 gh api 异常挂住时整轮无限等待。
+    timeout-minutes: 25
     env:
       SHA: ${{ needs.prepare-release.outputs.sha }}
       REPO: ${{ github.repository }}
@@ -112,30 +114,35 @@ jobs:
         run: |
           set -euo pipefail
           workflow_started=$(date +%s)
-          for wf in lint-gate.yml frontend-gate.yml backend-gate.yml; do
-            gate_started=$(date +%s)
-            echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] waiting for $wf ..."
-            # 5s 轮询 / 240 次上限：总等待上限仍是 20 分钟，尾部空转从最多 15s 降到 5s。
-            for i in $(seq 1 240); do
-              run_id=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
-                --jq "[.workflow_runs[] | select(.path == \".github/workflows/$wf\")] | sort_by(.created_at) | last | .id // empty" \
-                2>/dev/null || true)
-              status=""
-              if [ -n "$run_id" ]; then
-                status=$(gh api "repos/$REPO/actions/runs/$run_id" \
-                  --jq '.conclusion // .status' 2>/dev/null || true)
-              fi
-              echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] attempt=$i run_id=${run_id:-none} status=${status:-unknown}"
-              if [ "$status" = success ]; then break; fi
-              if [ "$status" = failure ] || [ "$status" = cancelled ] || [ "$status" = timed_out ]; then
-                echo "$wf: $status" >&2
-                exit 1
-              fi
-              sleep 5
-            done
-            [ "$status" = success ] || { echo "$wf timed out" >&2; exit 1; }
-            echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] $wf passed in $(( $(date +%s) - gate_started ))s"
+          # 一次 API 取三道 gate 在 release sha 上的最新 run，按 path 分组只判每组最新一条，
+          # 避免旧版「每个 wf 各查一次列表 + 各查一次详情」的 6 次/轮串行请求。
+          # 表达式与 deploy-production.yml 的 Wait 步骤必须逐字一致，改动须两处同步。
+          # 三道 gate 并行 dispatch，实测最慢约 400s，5s×240 的 20 分钟上限充足。
+          for i in $(seq 1 240); do
+            state="$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
+              --jq '
+                [.workflow_runs[]
+                  | select((.path | split("/") | last) as $n
+                    | ["lint-gate.yml", "frontend-gate.yml", "backend-gate.yml"]
+                      | index($n) != null)]
+                | group_by(.path)
+                | map(sort_by(.created_at) | last)
+                | if length < 3 then "pending"
+                  elif any(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out")
+                    then "failed:" + ([.[]
+                      | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out")
+                      | .path] | join(","))
+                  elif all(.conclusion == "success") then "success"
+                  else "pending" end
+              ' 2>/dev/null || echo pending)"
+            echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] attempt=$i gates=$state"
+            case "$state" in
+              success) break ;;
+              failed:*) echo "CI gate(s) not green: $state" >&2; exit 1 ;;
+            esac
+            sleep 5
           done
+          [ "$state" = success ] || { echo "CI gates timed out" >&2; exit 1; }
           echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] all CI gates passed in $(( $(date +%s) - workflow_started ))s"
 
       # 部署 run 已由 prepare-release 与三道 gate 同时 dispatch；本 job 只把门禁结果

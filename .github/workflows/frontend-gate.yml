@@ -3,9 +3,11 @@ name: frontend-gate
 # 前端门禁三档（2026-11-11 裁决，替代「每次 push 都跑全量」）：
 #   ① full_suite=true（手动 workflow_dispatch）→ npm run test:ci，全量含 deep，发版收口/里程碑用
 #   ② 本次提交有前端/测试变更 → npm run test:changed，按变更区域选测；命中公共层/分层配置自动降级 quick
-#   ③ 无前端/测试变更 → npm run test:quick 冒烟，不静默跳过（release 提交只改版本文件即走此档）
+#   ③ 无前端/测试变更 → npm run test:quick 冒烟，不静默跳过
 # 变更路径由 workflow 计算并经 TEST_CHANGED_PATHS 注入：CI checkout 后 git status 恒为空，
 # 不能靠脚本自己读工作区，必须显式喂「本次 commit diff」。
+# main/master 的 push 不跑本门禁：由 main-ci-cd 在 release sha 上统一 dispatch 一轮，
+# 并由它把「原始 push 范围」的变更路径集经 changed_paths 传入，天然不含自动发版改的版本文件。
 on:
   push:
     branches: [main, master]
@@ -17,6 +19,11 @@ on:
         required: false
         type: boolean
         default: false
+      changed_paths:
+        description: "Comma-separated changed paths from the original push (set by main-ci-cd)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -24,6 +31,9 @@ permissions:
 jobs:
   frontend-tests:
     name: Frontend checks and tests
+    # main/master 的 push 由 main-ci-cd 在 release sha 上统一 dispatch 门禁；
+    # 这里再跑一遍只是重复计算。PR 与手动 dispatch 仍照常执行。
+    if: ${{ github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -47,22 +57,32 @@ jobs:
       - name: Resolve changed paths
         working-directory: .
         shell: bash
+        env:
+          INJECTED_PATHS: ${{ inputs.changed_paths || '' }}
         run: |
           set -euo pipefail
-          base="${{ github.event.before || '' }}"
-          pr_base="${{ github.event.pull_request.base.sha || '' }}"
-          if [[ -n "$pr_base" ]]; then
-            base="$pr_base"
-          elif [[ -z "$base" || "$base" =~ ^0{40}$ ]]; then
-            base="HEAD^"
+          if [[ -n "${INJECTED_PATHS:-}" ]]; then
+            # main-ci-cd 在 release dispatch 时算好「原始 push 范围」原样传入：不含自动
+            # 发版产生的版本文件，避免把升版改动混进变更集导致选测误降级。
+            paths="$INJECTED_PATHS"
+            echo "source=main-ci-cd"
+          else
+            base="${{ github.event.before || '' }}"
+            pr_base="${{ github.event.pull_request.base.sha || '' }}"
+            if [[ -n "$pr_base" ]]; then
+              base="$pr_base"
+            elif [[ -z "$base" || "$base" =~ ^0{40}$ ]]; then
+              base="HEAD^"
+            fi
+            if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              base="HEAD^"
+            fi
+            paths="$(git diff --name-only "$base" "${{ github.sha }}" | paste -sd, -)"
+            echo "source=local git diff base=$base"
           fi
-          if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
-            base="HEAD^"
-          fi
-          paths="$(git diff --name-only "$base" "${{ github.sha }}" | paste -sd, -)"
           printf 'TEST_CHANGED_PATHS=%s\n' "$paths" >> "$GITHUB_ENV"
           fe="$(printf '%s' "$paths" | tr ',' '\n' | grep -cE '^(frontend/|tests/)' || true)"
-          echo "base=$base frontend_related=$fe paths=${paths:-<none>}"
+          echo "frontend_related=$fe paths=${paths:-<none>}"
 
       - name: Check and test frontend
         env:
@@ -84,6 +104,9 @@ jobs:
 
   frontend-build:
     name: Frontend build
+    # main/master 的 push 由 main-ci-cd 在 release sha 上统一 dispatch 门禁；
+    # 这里再跑一遍只是重复计算。PR 与手动 dispatch 仍照常执行。
+    if: ${{ github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:

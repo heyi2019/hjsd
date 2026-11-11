@@ -13,6 +13,9 @@ concurrency:
 jobs:
   lint:
     # 与后端门禁保持一致：python:3.12
+    # main/master 的 push 由 main-ci-cd 在 release sha 上统一 dispatch 门禁；
+    # 这里再跑一遍只是重复计算。PR 与手动 dispatch 仍照常执行。
+    if: ${{ github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +41,9 @@ jobs:
 
   pii:
     name: PII 扫描
+    # main/master 的 push 由 main-ci-cd 在 release sha 上统一 dispatch 门禁；
+    # 这里再跑一遍只是重复计算。PR 与手动 dispatch 仍照常执行。
+    if: ${{ github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

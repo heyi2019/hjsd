@@ -68,9 +68,24 @@ jobs:
           release_duration=$(( $(date +%s) - release_started ))
           echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] automatic release preparation finished in ${release_duration}s"
           echo "- 自动发版准备耗时：${release_duration}s" >> "$GITHUB_STEP_SUMMARY"
-          for wf in lint-gate.yml frontend-gate.yml backend-gate.yml; do
+          # 三道 gate 的 push 触发已跳过 main/master：只保留本轮（release sha）门禁，
+          # 避免同一批代码被校验两遍；wait-and-deploy 等待的正是本轮 run。
+          for wf in lint-gate.yml backend-gate.yml; do
             gh api --method POST "repos/$REPO/actions/workflows/$wf/dispatches" -f ref=main
           done
+          # 前端按变更选测：由这里算「原始 push 范围」的变更路径并原样传给 dispatch 轮。
+          # 不能只传 BASE_SHA 让 gate 自己 diff：release 提交必然改 frontend/package.json，
+          # 该路径属选测脚本的 STRUCTURAL，会把任何业务区域选测一并降级成 quick 冒烟。
+          diff_base="$BASE_SHA"
+          if [[ -z "$diff_base" || "$diff_base" =~ ^0{40}$ ]] \
+            || ! git cat-file -e "${diff_base}^{commit}" 2>/dev/null; then
+            diff_base="${HEAD_SHA}^"
+          fi
+          changed_paths="$(git diff --name-only "$diff_base" "$HEAD_SHA" | paste -sd, -)"
+          echo "release dispatch changed_paths_chars=${#changed_paths} value=${changed_paths:-<none>}"
+          jq -n --arg ref main --arg paths "$changed_paths" \
+            '{ref:$ref, inputs:{changed_paths:$paths}}' \
+            | gh api --method POST "repos/$REPO/actions/workflows/frontend-gate.yml/dispatches" --input -
 
   wait-and-deploy:
     needs: prepare-release
@@ -88,7 +103,8 @@ jobs:
           for wf in lint-gate.yml frontend-gate.yml backend-gate.yml; do
             gate_started=$(date +%s)
             echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] waiting for $wf ..."
-            for i in $(seq 1 80); do
+            # 5s 轮询 / 240 次上限：总等待上限仍是 20 分钟，尾部空转从最多 15s 降到 5s。
+            for i in $(seq 1 240); do
               run_id=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
                 --jq "[.workflow_runs[] | select(.path == \".github/workflows/$wf\")] | sort_by(.created_at) | last | .id // empty" \
                 2>/dev/null || true)
@@ -103,7 +119,7 @@ jobs:
                 echo "$wf: $status" >&2
                 exit 1
               fi
-              sleep 15
+              sleep 5
             done
             [ "$status" = success ] || { echo "$wf timed out" >&2; exit 1; }
             echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] $wf passed in $(( $(date +%s) - gate_started ))s"

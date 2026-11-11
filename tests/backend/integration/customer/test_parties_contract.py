@@ -65,6 +65,29 @@ def test_customer_list_supports_limit_and_offset(seeded_client, seeded_db):
     assert response.json()["items"][0]["display_name"] == "客户二"
 
 
+def test_customer_keyword_search_escapes_like_wildcards(seeded_client, seeded_db):
+    """客户昵称/微信含 `_` `%` 时按字面匹配，不触发 LIKE 通配误命中。"""
+    hit = _customer(seeded_db, "王者_001", wechat="wx_50%")
+    _customer(seeded_db, "王者X001")  # `_` 若未转义会误命中
+    _customer(seeded_db, "其他客户")
+
+    # 下划线按字面：只命中昵称含真实下划线的行
+    by_underscore = seeded_client.get(
+        CUSTOMERS, params={"keyword": "王者_001"}, headers={"X-Dev-User": "admin"}
+    )
+    assert by_underscore.status_code == 200, by_underscore.text
+    assert by_underscore.json()["total"] == 1
+    assert by_underscore.json()["items"][0]["display_name"] == "王者_001"
+
+    # 微信里的 % 按字面：只命中该行，不命中全表
+    by_percent = seeded_client.get(
+        CUSTOMERS, params={"keyword": "50%"}, headers={"X-Dev-User": "admin"}
+    )
+    assert by_percent.status_code == 200, by_percent.text
+    assert by_percent.json()["total"] == 1
+    assert by_percent.json()["items"][0]["id"] == hit.id
+
+
 def _scoped_user() -> CurrentUser:
     """非 admin、SELF 作用域用户（可见集只有自己）。"""
     return CurrentUser.build(

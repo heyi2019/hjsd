@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
+from app.core.like_pattern import like_contains
 from app.core.money import to_money
 from app.core.numbering import allocate_number
 from app.core.security import CurrentUser, owner_scope_filter
@@ -123,11 +124,11 @@ def list_leads(
             ) from exc
         stmt = stmt.where(CustomerLead.status == status)
     if keyword:
-        text = keyword.strip()
+        pattern, escape = like_contains(keyword)
         stmt = stmt.where(
             or_(
-                CustomerLead.lead_no.ilike(f"%{text}%"),
-                CustomerLead.target.ilike(f"%{text}%"),
+                CustomerLead.lead_no.ilike(pattern, escape=escape),
+                CustomerLead.target.ilike(pattern, escape=escape),
             )
         )
     if user is not None:

@@ -132,6 +132,20 @@ class TestNumberingGuards:
         assert "已达上限" in str(exc.value)
         assert exc.value.details["max"] == 99999
 
+    def test_like_contains_escapes_wildcards(self):
+        """LIKE 元字符必须转义：下划线是单字符通配、百分号是全量通配。"""
+        from app.core.like_pattern import like_contains
+
+        # 下划线：游戏账号/微信号常含，未转义会误匹配 abcX123
+        pattern, escape = like_contains("  abc_123  ")
+        assert (pattern, escape) == (r"%abc\_123%", "\\")
+        # 百分号：未转义会命中全表
+        assert like_contains("50%")[0] == r"%50\%%"
+        # 反斜杠自身先转义，避免破坏后续转义序列
+        assert like_contains(r"a\b")[0] == r"%a\\b%"
+        # 普通关键词不受影响
+        assert like_contains(" 王者 ")[0] == "%王者%"
+
     def test_current_value_defaults_to_zero(self, seeded_db):
         seeded_db.add(
             DocumentSequence(

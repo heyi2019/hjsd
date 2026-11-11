@@ -57,6 +57,30 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
     assert converted.json()["converted_order_id"] == order.id
 
 
+def test_lead_keyword_search_escapes_like_wildcards(seeded_client, seeded_db, headers):
+    """需求目标含 `_` 时按字面匹配，不把 `_` 当单字符通配误命中。"""
+    customer = parties_service.create_customer(
+        seeded_db, display_name="需求搜索客户", owner_id=9, actor="pytest"
+    )
+    hit = seeded_client.post(
+        "/api/v1/leads",
+        json={"customer_id": customer.id, "request_type": "FIND_ACCOUNT", "target": "王者_安卓"},
+        headers=headers,
+    )
+    assert hit.status_code == 201, hit.text
+    seeded_client.post(
+        "/api/v1/leads",
+        json={"customer_id": customer.id, "request_type": "FIND_ACCOUNT", "target": "王者X安卓"},
+        headers=headers,
+    )
+
+    listed = seeded_client.get(
+        "/api/v1/leads", params={"keyword": "王者_安卓"}, headers=headers
+    )
+    assert listed.status_code == 200, listed.text
+    assert [item["id"] for item in listed.json()] == [hit.json()["id"]]
+
+
 def test_lead_close_does_not_create_order_or_cashflow(seeded_client, seeded_db, headers):
     customer = parties_service.create_customer(
         seeded_db, display_name="关闭需求客户", owner_id=9, actor="pytest"

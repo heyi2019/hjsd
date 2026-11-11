@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from datetime import date
+from app.core.like_pattern import like_contains
 from app.core.security import CurrentUser
 from app.core.security import owner_scope_filter
 from sqlalchemy import (
@@ -88,18 +89,18 @@ def _order_list_stmt(
             )
         )
     if keyword and keyword.strip():
-        pattern = f"%{keyword.strip()}%"
+        pattern, escape = like_contains(keyword)
         stmt = stmt.where(
             or_(
-                Order.order_no.ilike(pattern),
+                Order.order_no.ilike(pattern, escape=escape),
                 # 2026-10-28 去冗余：平铺列已删，订单侧账号搜索走快照 JSON。
                 # 必须用 ORM 的 JSON 取值表达式而非 func.json_extract：后者是 SQLite
                 # 的 JSON1 扩展函数，PostgreSQL 无此函数，生产（PG）下订单关键字搜索
                 # 会直接 500。as_string() 由方言各自渲染——PG 出 `->>`，SQLite 出
                 # `json_extract`，两边语义一致。
-                Order.account_snapshot["game_account"].as_string().ilike(pattern),
-                Account.game_account.ilike(pattern),
-                Order.note.ilike(pattern),
+                Order.account_snapshot["game_account"].as_string().ilike(pattern, escape=escape),
+                Account.game_account.ilike(pattern, escape=escape),
+                Order.note.ilike(pattern, escape=escape),
             )
         )
     if mine and user is not None:

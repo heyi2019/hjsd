@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
+from app.core.like_pattern import like_contains
 from app.core.numbering import allocate_number
 from app.core.security import CurrentUser, owner_scope_filter, owner_scope_ids
 from app.domain.enums import AuditAction, CustomerStatus, EntityType, SequenceKey
@@ -119,14 +120,14 @@ def _customer_list_stmt(
     if status:
         stmt = stmt.where(Customer.status == status)
     if keyword:
-        pattern = f"%{keyword.strip()}%"
+        pattern, escape = like_contains(keyword)
         stmt = stmt.where(
             or_(
-                Customer.display_name.like(pattern),
-                Customer.customer_no.like(pattern),
-                Customer.phone.like(pattern),
-                Customer.wechat.like(pattern),
-                Customer.qq.like(pattern),
+                Customer.display_name.like(pattern, escape=escape),
+                Customer.customer_no.like(pattern, escape=escape),
+                Customer.phone.like(pattern, escape=escape),
+                Customer.wechat.like(pattern, escape=escape),
+                Customer.qq.like(pattern, escape=escape),
             )
         )
     if user is not None:

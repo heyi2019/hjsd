@@ -1276,6 +1276,44 @@ class TestGetAndListOrders:
         assert response.json()["total"] == 1
         assert [item["id"] for item in response.json()["items"]] == [mine.id]
 
+    def test_order_keyword_search_treats_underscore_literally(
+        self, seeded_client, seeded_db, headers
+    ):
+        """账号含下划线时按字面匹配，不把 `_` 当单字符通配误匹配其它账号。"""
+        hit = _order(seeded_db, order_type="TH", owner_id=9)
+        hit.account_snapshot = {"game_account": "abc_123"}
+        decoy = _order(seeded_db, order_type="TH", owner_id=9)
+        decoy.account_snapshot = {"game_account": "abcX123"}  # `_` 若未转义会命中此行
+        seeded_db.flush()
+
+        response = seeded_client.get(
+            "/api/v1/orders",
+            params={"keyword": "abc_123", "limit": 10, "offset": 0},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["total"] == 1
+        assert [item["id"] for item in response.json()["items"]] == [hit.id]
+
+    def test_order_keyword_search_treats_percent_literally(
+        self, seeded_client, seeded_db, headers
+    ):
+        """`%` 按字面匹配，不能把关键词里的 % 变成全量通配。"""
+        hit = _order(seeded_db, order_type="TH", owner_id=9)
+        hit.account_snapshot = {"game_account": "50%off"}
+        decoy = _order(seeded_db, order_type="TH", owner_id=9)
+        decoy.account_snapshot = {"game_account": "anything-else"}
+        seeded_db.flush()
+
+        response = seeded_client.get(
+            "/api/v1/orders",
+            params={"keyword": "50%", "limit": 10, "offset": 0},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["total"] == 1
+        assert [item["id"] for item in response.json()["items"]] == [hit.id]
+
 # ------------------------------------------------------------------ 事件入参
 class TestPostEventValidation:
     def test_invalid_portion_rejected_before_event_write(self, seeded_db):

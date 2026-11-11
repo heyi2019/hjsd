@@ -82,6 +82,11 @@ def set_allocations(
         order = _scoped_order(session, order_id, user)
         order.form_extra = {**(order.form_extra or {}), **dict(form_extra)}
         session.flush()
+    # 分润保存完成且订单已闭环 → 通知利润接收人（幂等，重复保存不重复打扰）。
+    # 订单尚未完成时先只落分润，待 SELL 闭环由 notify_on_sell_completed 补发通知。
+    from app.notifications.triggers import notify_profit_recipients
+
+    notify_profit_recipients(session, _scoped_order(session, order_id, user), actor=actor)
     return result
 
 

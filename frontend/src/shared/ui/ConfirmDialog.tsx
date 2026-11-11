@@ -14,7 +14,7 @@ import { appMessage } from "./appFeedback";
  *
  * 注意：本组件由父级用 open 受控，成功/失败后均由父级决定是否关闭；组件自身不在成功时自动关闭。
  */
-import { ConfigProvider, Modal } from "antd";
+import { Modal } from "antd";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { normalizeError } from "../api/client";

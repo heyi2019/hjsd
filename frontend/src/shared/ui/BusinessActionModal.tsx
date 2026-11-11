@@ -1,4 +1,4 @@
-import { ConfigProvider, Modal, type ModalProps } from "antd";
+import { Modal, type ModalProps } from "antd";
 import {
   createContext,
   useEffect,
@@ -162,22 +162,21 @@ export function BusinessActionModal({
   }, [open, instanceClass]);
 
   return (
-    <ConfigProvider button={{ autoInsertSpace: false }}>
-      <Modal
-        {...restProps}
-        keyboard={false}
-        onCancel={onCancel}
-        title={titleNode}
-        width={resolvedWidth}
-        wrapClassName={mergedWrapClassName}
-        modalRender={renderModal}
-      >
-        <ModalCancelContext.Provider value={onCancel as (() => void) | undefined}>
-          <div className="business-action-modal__content">
-            {children}
-          </div>
-        </ModalCancelContext.Provider>
-      </Modal>
-    </ConfigProvider>
+    // autoInsertSpace 已在 main.tsx 全局 ConfigProvider 统一关闭，此处不再局部重复包裹。
+    <Modal
+      {...restProps}
+      keyboard={false}
+      onCancel={onCancel}
+      title={titleNode}
+      width={resolvedWidth}
+      wrapClassName={mergedWrapClassName}
+      modalRender={renderModal}
+    >
+      <ModalCancelContext.Provider value={onCancel as (() => void) | undefined}>
+        <div className="business-action-modal__content">
+          {children}
+        </div>
+      </ModalCancelContext.Provider>
+    </Modal>
   );
 }

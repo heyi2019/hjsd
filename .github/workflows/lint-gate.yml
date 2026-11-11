@@ -49,6 +49,6 @@ jobs:
 
       - name: Scan text files for PII / secrets
         # 只拦「security/pii_allowlist.txt 之外」的新增命中；输出已脱敏，不回显原始值。
-        # 处置口径见 security/PII_处置口径_V1.0.md。
+        # 处置口径见 security/PII_处置口径.md。
         working-directory: backend
         run: python scripts/scan_pii.py

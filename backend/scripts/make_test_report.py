@@ -7,8 +7,10 @@
   - docs/testing/测试结果库/results.jsonl  （每次执行的追加记录，历史不覆盖）
 
 产出：
-  - docs/testing/测试报告.md   （模块×层级矩阵、SKIP/ERROR 单列、跨模块覆盖、按功能查询）
-  - docs/testing/测试报告.json （机器可读汇总，供 CI 上传/比对）
+  - docs/testing/测试报告_YYYYMMDD.md   （模块×层级矩阵、SKIP/ERROR 单列、跨模块覆盖、按功能查询）
+  - docs/testing/测试报告_YYYYMMDD.json （机器可读汇总，供 CI 上传/比对）
+
+现役目录只留最新一份；生成新日期报告时，旧日期的 md/json 移入 报告归档/（本地留存、不入库）。
 
 验收对齐：
   - A–F/SYS 各模块用例数 + 最近执行结果
@@ -21,6 +23,8 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
+import shutil
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
@@ -28,8 +32,31 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 CASE_CSV = os.path.join(REPO, "docs", "testing", "测试用例库.csv")
 RESULTS = os.path.join(REPO, "docs", "testing", "测试结果库", "results.jsonl")
 CASE_INDEX = os.path.join(REPO, "tests", "backend", "_report", "case_index.json")
-OUT_MD = os.path.join(REPO, "docs", "testing", "测试报告.md")
-OUT_JSON = os.path.join(REPO, "docs", "testing", "测试报告.json")
+REPORT_DIR = os.path.join(REPO, "docs", "testing")
+REPORT_ARCHIVE = os.path.join(REPORT_DIR, "报告归档")
+
+
+def report_paths(stamp: str) -> tuple[str, str]:
+    """按生成日期返回 md/json 路径。"""
+    return (
+        os.path.join(REPORT_DIR, f"测试报告_{stamp}.md"),
+        os.path.join(REPORT_DIR, f"测试报告_{stamp}.json"),
+    )
+
+
+def archive_stale_reports(keep_stamp: str) -> list[str]:
+    """把非当日日期的报告移入 报告归档/（不入库），现役目录只留最新一份。"""
+    if not os.path.isdir(REPORT_DIR):
+        return []
+    moved = []
+    for name in sorted(os.listdir(REPORT_DIR)):
+        m = re.fullmatch(r"测试报告_(\d{8})\.(md|json)", name)
+        if not m or m.group(1) == keep_stamp:
+            continue
+        os.makedirs(REPORT_ARCHIVE, exist_ok=True)
+        shutil.move(os.path.join(REPORT_DIR, name), os.path.join(REPORT_ARCHIVE, name))
+        moved.append(name)
+    return moved
 
 MODULES = ["A", "B", "C", "D", "E", "F", "SYS"]
 LAYERS = ["UT", "IT", "E2E"]
@@ -151,7 +178,11 @@ def main() -> None:
         flow_status[latest.get(no, {}).get("status", "—")] += 1
 
     # ----- 输出 MD -----
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now_dt = datetime.now(timezone.utc)
+    now = now_dt.strftime("%Y-%m-%d %H:%M UTC")
+    stamp = now_dt.strftime("%Y%m%d")
+    out_md, out_json = report_paths(stamp)
+    archived = archive_stale_reports(stamp)
     L = ["# 宜游轩 ERP 测试报告", "", f"> 生成：{now} ｜ 最近执行 run_id：`{last_run or '无'}` ｜ "
          f"历史执行批次：{len(run_ids)} 次", ""]
     L.append("## 一、模块 × 层级 用例分布与最近结果")
@@ -270,7 +301,7 @@ def main() -> None:
     L.append("> 运行时展开的多个变体按模板归并回同一条，故实跑例数多于定义条数"
              "（E2E 层最明显：模板标题在库里只记一条，实跑按展开后的条数计）。")
 
-    with open(OUT_MD, "w", encoding="utf-8") as f:
+    with open(out_md, "w", encoding="utf-8") as f:
         f.write("\n".join(L))
 
     # 机器可读汇总
@@ -289,13 +320,15 @@ def main() -> None:
         "pending_criteria": len(pending),
         "weak_criteria": len(weak),
     }
-    with open(OUT_JSON, "w", encoding="utf-8") as f:
+    with open(out_json, "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
 
     print(f"[report] 用例定义={len(cases)} 历史批次={len(run_ids)} 最近 run={last_run}")
     print(f"[report] 未执行={len(no_exec)} FAIL/ERROR={len(fails)} SKIP={len(skips)} "
           f"待确认合格标准={len(pending)} 弱断言={len(weak)}")
-    print(f"[report] 输出：{OUT_MD}")
+    print(f"[report] 输出：{out_md}")
+    if archived:
+        print(f"[report] 旧报告归档 {len(archived)} 份 → {REPORT_ARCHIVE}")
 
 
 if __name__ == "__main__":

@@ -87,7 +87,7 @@ jobs:
           path: |
             docs/testing/测试用例库.csv
             docs/testing/测试用例库.md
-            docs/testing/测试报告.md
-            docs/testing/测试报告.json
+            docs/testing/测试报告_*.md
+            docs/testing/测试报告_*.json
             docs/testing/测试结果库/results.jsonl
           retention-days: 7

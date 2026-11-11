@@ -116,6 +116,19 @@ describe("InstallmentsPanel：分期合约", () => {
     expect(screen.getAllByText("150.00").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("列表与合计同带 contract_type，口径不混入其它类型合约", async () => {
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    await screen.findByText("HS0001-INS01");
+    // 面板专营库存分期出售（STOCK_SALE）：列表与合计必须把同一 contract_type 下发给服务端，
+    // 否则合计会把提号/其它类型合约的钱算进来（#4）。
+    expect(vi.mocked(catalog.installmentsApi.list)).toHaveBeenCalledWith(
+      expect.objectContaining({ contract_type: "STOCK_SALE" }),
+    );
+    expect(vi.mocked(catalog.installmentsApi.totals)).toHaveBeenCalledWith(
+      expect.objectContaining({ contract_type: "STOCK_SALE" }),
+    );
+  });
+
   it("统计卡：应收与已收取服务端合计（金额口径）", async () => {
     renderLight(<InstallmentsPanel />, { user: "admin" });
     await screen.findAllByText("总应收");

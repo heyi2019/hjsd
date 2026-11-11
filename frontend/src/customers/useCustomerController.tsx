@@ -259,7 +259,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
                 permission="customer.merge"
                 size="small"
                 disabled={row.status !== "ACTIVE"}
-                onClick={() => setMergeTarget(row)}
+                onClick={() => requestMerge(row)}
               >
                 合并
               </PermissionButton>
@@ -293,7 +293,10 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
   const cancelEdit = () => { setEditTarget(null); editForm.resetFields(); };
   const closeDetail = () => { setDetailTarget(null); setDetailData(null); };
   const requestEdit = (target: Customer) => { setEditTarget(target); setDetailTarget(null); };
-  const cancelMerge = () => { setMergeTarget(null); };
+  // 合并弹窗复用同一 Form 实例：取消或再次打开都必须清空，避免上次选的目标客户与原因残留
+  // 导致把 A 客户误合并到 B 客户上次选的目标上（#13）。
+  const cancelMerge = () => { setMergeTarget(null); mergeForm.resetFields(); };
+  const requestMerge = (target: Customer) => { mergeForm.resetFields(); setMergeTarget(target); };
 
   return {
     activeDefs,
@@ -326,6 +329,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     pageSize,
     renderContact,
     requestEdit,
+    requestMerge,
     revealed,
     rows,
     searchInput,

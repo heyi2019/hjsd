@@ -6,10 +6,10 @@ export const installmentsApi = {
   recover: (id: number, data: {occurred_on: string; note: string; form_extra?: Record<string, unknown>}) => api.post<InstallmentDisposition>(`/installments/${id}/recover`, data).then(r => r.data),
   /** 回收转售登记：把已回收账号的新售出订单关联回分期合约（后端只认 resale_order_id）。 */
   resale: (id: number, data: {resale_order_id: number; occurred_on: string; note: string; form_extra?: Record<string, unknown>}) => api.post<InstallmentDisposition>(`/installments/${id}/resale`, data).then(r => r.data),
-  list: (params?: { status?: string; order_id?: number; trade_date_from?: string; trade_date_to?: string }) =>
+  list: (params?: { status?: string; order_id?: number; contract_type?: string; trade_date_from?: string; trade_date_to?: string }) =>
     api.get<Installment[]>("/installments", { params }).then((r) => r.data),
-  /** 分期台合计：与 list 同一套筛选条件，服务端 Decimal 聚合，前端不再 reduce。 */
-  totals: (params?: { status?: string; order_id?: number; trade_date_from?: string; trade_date_to?: string }) =>
+  /** 分期台合计：与 list 同一套筛选条件（含 contract_type），服务端 Decimal 聚合，前端不再 reduce。 */
+  totals: (params?: { status?: string; order_id?: number; contract_type?: string; trade_date_from?: string; trade_date_to?: string }) =>
     api
       .get<{ total_receivable: string; total_paid: string; total_remaining: string }>("/installments/totals", { params })
       .then((r) => r.data),

@@ -73,8 +73,9 @@ export function useContractTableController(params: { contractType: string; reloa
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // 日期区间与合计都走服务端：列表与合计同条件，前端不再本地筛/本地求和。
+      // 日期区间、合约类型与合计都走服务端：列表与合计同条件，前端不再本地筛/本地求和。
       const rangeParams = {
+        contract_type: contractType,
         trade_date_from: dateFrom || undefined,
         trade_date_to: dateTo || undefined,
       };
@@ -83,6 +84,7 @@ export function useContractTableController(params: { contractType: string; reloa
         ordersApi.list(),
         installmentsApi.totals(rangeParams),
       ]);
+      // 服务端已按 contract_type 过滤；此处保留幂等过滤作为旧后端防御，不改变口径。
       const filtered = list.filter((item) => item.contract_type === contractType);
       setRows(filtered);
       setOrders(orderList);

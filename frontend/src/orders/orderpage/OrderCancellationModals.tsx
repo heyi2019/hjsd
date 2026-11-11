@@ -99,6 +99,8 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
                     if (target) cancelForm.setFieldsValue({
                       [cancelScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: target.remaining,
                       pool_id: target.event.pool_id ?? cancelPools[0]?.id,
+                      // 切换冲销流水后操作人不沿用上一笔：清空交给写路径按当前会话兜底解析（#19）。
+                      operator_user_ids: undefined,
                     });
                   }}
                 />

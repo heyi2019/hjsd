@@ -63,6 +63,7 @@ def _installment_output(db: Session, item) -> schemas.InstallmentOut:
 def list_installments(
     status: str | None = Query(default=None),
     order_id: int | None = Query(default=None),
+    contract_type: str | None = Query(default=None),
     trade_date_from: date | None = Query(default=None),
     trade_date_to: date | None = Query(default=None),
     db: Session = Depends(get_db),
@@ -72,6 +73,7 @@ def list_installments(
         db,
         status=status,
         order_id=order_id,
+        contract_type=contract_type,
         trade_date_from=trade_date_from,
         trade_date_to=trade_date_to,
         user=_user,
@@ -89,17 +91,19 @@ def list_installments(
 def installment_totals(
     status: str | None = Query(default=None),
     order_id: int | None = Query(default=None),
+    contract_type: str | None = Query(default=None),
     trade_date_from: date | None = Query(default=None),
     trade_date_to: date | None = Query(default=None),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> schemas.InstallmentTotalsOut:
-    """分期台合计：与 `/installments` 同一套筛选条件，Decimal 聚合，前端不再 reduce。"""
+    """分期台合计：与 `/installments` 同一套筛选条件（含 contract_type），Decimal 聚合，前端不再 reduce。"""
     return schemas.InstallmentTotalsOut.model_validate(
         service.installment_totals(
             db,
             status=status,
             order_id=order_id,
+            contract_type=contract_type,
             trade_date_from=trade_date_from,
             trade_date_to=trade_date_to,
             user=_user,

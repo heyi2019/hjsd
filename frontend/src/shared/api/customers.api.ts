@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Counterparty, Customer, CustomerDetail, Lead, PageResponse } from "./types";
+import type { Counterparty, Customer, CustomerDetail, DuplicateCandidate, Lead, PageResponse } from "./types";
 
 export const customersApi = {
   list: async (params?: { keyword?: string; status?: string; limit?: number; offset?: number }): Promise<Customer[]> => {
@@ -18,7 +18,7 @@ export const customersApi = {
     return all;
   },
   create: (payload: Partial<Customer>) =>
-    api.post<{ customer: Customer; duplicate_candidates: unknown[] }>(
+    api.post<{ customer: Customer; duplicate_candidates: DuplicateCandidate[] }>(
       "/customers",
       payload,
     ).then((r) => r.data),

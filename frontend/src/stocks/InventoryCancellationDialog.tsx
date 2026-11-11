@@ -28,6 +28,23 @@ export type InventoryCancellationValues = {
   form_extra?: Record<string, unknown>;
 };
 
+/**
+ * 切换冲销流水后的字段回填（纯函数，供组件与单测共用）。
+ * - 金额取新流水剩余；
+ * - 资金池无条件回填：新流水无池时清空，不能残留上一笔的账户（#19）；
+ * - 操作人属本次冲销动作，重置为默认值；未给默认值则清空，由写路径兜底按当前会话解析。
+ */
+export function applyOffsetEventSelection(
+  setFieldValue: (name: string, value: unknown) => void,
+  target: { remaining: string; pool_id?: number } | undefined,
+  defaultOperatorUserIds?: number[],
+): void {
+  if (!target) return;
+  setFieldValue("amount", target.remaining);
+  setFieldValue("pool_id", target.pool_id ?? undefined);
+  setFieldValue("operator_user_ids", defaultOperatorUserIds ?? undefined);
+}
+
 export function InventoryCancellationDialog<T extends InventoryCancellationValues>(props: {
   open: boolean;
   title: string;
@@ -35,6 +52,8 @@ export function InventoryCancellationDialog<T extends InventoryCancellationValue
   pools: Pool[];
   employees?: EmployeeOption[];
   offsetEvents?: InventoryCancellationOffset[];
+  /** 切换冲销流水时操作人重置到此默认值；未传则清空，由写路径兜底解析当前员工。 */
+  defaultOperatorUserIds?: number[];
   form: FormInstance<T>;
   scope: "INVOID" | "INVREFUND" | "ORDERCANC";
   description: ReactNode;
@@ -82,11 +101,11 @@ export function InventoryCancellationDialog<T extends InventoryCancellationValue
                   options={props.offsetEvents.map((event) => ({ value: event.value, label: event.label }))}
                   onChange={(value: number) => {
                     const target = props.offsetEvents?.find((event) => event.value === value);
-                    if (target) {
-                      const setFieldValue = props.form.setFieldValue as (name: string, value: unknown) => void;
-                      setFieldValue("amount", target.remaining);
-                      if (target.pool_id != null) setFieldValue("pool_id", target.pool_id);
-                    }
+                    applyOffsetEventSelection(
+                      props.form.setFieldValue as (name: string, value: unknown) => void,
+                      target,
+                      props.defaultOperatorUserIds,
+                    );
                   }}
                 />
               </CfgItem>

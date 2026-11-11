@@ -171,22 +171,45 @@ export function CreateBusinessModal(props: {
         : selectedCustomerSource;
       const customerNickname = values[`${customerPrefix}customer_nickname`];
       if ((isRecovery || isDg) && customerNickname) {
-        const existingCustomer = customers.find((customer) =>
-          customer.display_name === customerNickname
-          && ((values[`${customerPrefix}customer_phone`] && customer.phone === values[`${customerPrefix}customer_phone`])
-            || (values[`${customerPrefix}customer_wechat`] && customer.wechat === values[`${customerPrefix}customer_wechat`])
-            || (!values[`${customerPrefix}customer_phone`] && !values[`${customerPrefix}customer_wechat`])),
-        );
-        const customer = existingCustomer ?? (await customersApi.create({
-          display_name: customerNickname as string,
-          contact_name: values[isDg ? "dg_customer_contact" : "customer_contact_name"] as string,
-          phone: values[`${customerPrefix}customer_phone`] as string,
-          wechat: values[`${customerPrefix}customer_wechat`] as string,
-          qq: values[`${customerPrefix}customer_qq`] as string,
-          source: resolvedCustomerSource as string,
-          note: (isDg ? values.dg_note : values.note) as string,
-        })).customer;
-        values.customer_id = customer.id;
+        const inputPhone = values[`${customerPrefix}customer_phone`] as string | undefined;
+        const inputWechat = values[`${customerPrefix}customer_wechat`] as string | undefined;
+        // 客户列表默认脱敏：无 customer.contact.read 时 phone/wechat 是掩码，
+        // 不能拿掩码与用户输入的明文做等值比较（否则永远匹配不上→重复建档）。
+        // 脱敏客户只在「昵称相同且用户未填联系方式」时本地复用；填了联系方式时
+        // 交给后端 POST /customers 用明文精确判重（duplicate_candidates）兜底。
+        const existingCustomer = customers.find((customer) => {
+          if (customer.display_name !== customerNickname) return false;
+          if (customer.contact_masked) return !inputPhone && !inputWechat;
+          return (inputPhone && customer.phone === inputPhone)
+            || (inputWechat && customer.wechat === inputWechat)
+            || (!inputPhone && !inputWechat);
+        });
+        let customerId: number;
+        if (existingCustomer) {
+          customerId = existingCustomer.id;
+        } else {
+          const created = await customersApi.create({
+            display_name: customerNickname as string,
+            contact_name: values[isDg ? "dg_customer_contact" : "customer_contact_name"] as string,
+            phone: inputPhone,
+            wechat: inputWechat,
+            qq: values[`${customerPrefix}customer_qq`] as string,
+            source: resolvedCustomerSource as string,
+            note: (isDg ? values.dg_note : values.note) as string,
+          });
+          const sameContact = (created.duplicate_candidates ?? []).find(
+            (candidate) => candidate.display_name === customerNickname
+              || candidate.matched_on?.length,
+          );
+          if (sameContact) {
+            // 后端用明文联系方式命中了已有客户：复用它，避免同一客户被拆成两条档案。
+            customerId = sameContact.customer_id;
+            appMessage.info(`已关联到同名/同联系方式的已有客户 ${sameContact.customer_no}`);
+          } else {
+            customerId = created.customer.id;
+          }
+        }
+        values.customer_id = customerId;
       }
       const note = (isRecovery || isDg) && resolvedCustomerSource
         ? `客户来源：${String(resolvedCustomerSource)}${values[isDg ? "dg_note" : "note"] ? `｜${String(values[isDg ? "dg_note" : "note"])}` : ""}`

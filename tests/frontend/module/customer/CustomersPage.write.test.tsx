@@ -123,6 +123,40 @@ describe("CustomersPage：权限门控与写操作", () => {
     await waitFor(() => expect(vi.mocked(catalog.customersApi.list)).toHaveBeenCalledTimes(2));
   });
 
+  it("合并弹窗取消后重开不残留上次选的目标客户与原因", async () => {
+    // 两个 ACTIVE 客户互为可合并目标；用本地覆盖避免污染其它用例的共享 mock。
+    vi.mocked(catalog.customersApi.list).mockResolvedValue([
+      { id: 1, customer_no: "CUS-0001", display_name: "张三", phone: "138****8888", status: "ACTIVE", extra_values: {} },
+      { id: 2, customer_no: "CUS-0002", display_name: "李四", phone: "139****9999", status: "ACTIVE", extra_values: {} },
+    ]);
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+
+    // 打开「张三」的合并弹窗（第一个可用合并按钮），选「李四」为目标并填原因。
+    const mergeButtons = screen.getAllByRole("button", { name: /合\s*并/ });
+    await ui.click(mergeButtons[0]);
+    const dialog = await screen.findByRole("dialog");
+    await ui.click(within(dialog).getByLabelText("目标客户（必须为 ACTIVE）").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("CUS-0002 李四", { selector: ".ant-select-item-option-content" }));
+    await ui.type(within(dialog).getByLabelText("合并原因"), "重复建档，保留李四");
+
+    // 取消（Esc / X / 遮罩均走 onCancel=cancelMerge）。jsdom motion-stub 下关闭动画不收尾、
+    // DOM 节点不移除，故不在这一断言「弹窗消失」（那由 E2E 守护），只验证重开后表单已清空。
+    await ui.click(dialog.querySelector(".ant-modal-close") as Element);
+
+    // 再次打开「张三」合并弹窗：目标客户与原因必须为空（#13）。
+    await ui.click(screen.getAllByRole("button", { name: /合\s*并/ })[0]);
+    await waitFor(() => {
+      const dialogs = document.querySelectorAll<HTMLElement>(".ant-modal-content");
+      const reopened = Array.from(dialogs).find((el) => el.textContent?.includes("合并客户 · CUS-0001"));
+      expect(reopened).toBeTruthy();
+      // 原因被清空
+      expect(within(reopened!).getByLabelText("合并原因")).toHaveValue("");
+      // 目标客户下拉无已选项（selection-item 不存在）
+      expect(reopened!.querySelector("#target_customer_id")?.closest(".ant-form-item")?.querySelector(".ant-select-selection-item")).toBeNull();
+    });
+  });
+
   it("客户详情加载经营概览、关联订单和分期收款", async () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");

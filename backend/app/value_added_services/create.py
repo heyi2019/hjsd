@@ -494,6 +494,7 @@ def _apply_installment_filters(
     session: Session,
     status: str | None = None,
     order_id: int | None = None,
+    contract_type: str | None = None,
     trade_date_from: date | None = None,
     trade_date_to: date | None = None,
     user: CurrentUser | None = None,
@@ -501,11 +502,14 @@ def _apply_installment_filters(
     """分期合约的公共筛选条件（列表与合计必须同一份，避免口径漂移）。
 
     调用方需已 `join(Order)`：日期区间按**订单成交日期**筛，与前端原先的本地筛选同义。
+    `contract_type` 是 Installment 自身列（非 Order），面板按类型分列时列表与合计须同条件。
     """
     if status:
         stmt = stmt.where(Installment.status == status)
     if order_id:
         stmt = stmt.where(Installment.order_id == order_id)
+    if contract_type:
+        stmt = stmt.where(Installment.contract_type == contract_type)
     if trade_date_from is not None:
         stmt = stmt.where(Order.trade_date >= trade_date_from)
     if trade_date_to is not None:
@@ -522,6 +526,7 @@ def list_installments(
     *,
     status: str | None = None,
     order_id: int | None = None,
+    contract_type: str | None = None,
     trade_date_from: date | None = None,
     trade_date_to: date | None = None,
     user: CurrentUser | None = None,
@@ -531,6 +536,7 @@ def list_installments(
         session=session,
         status=status,
         order_id=order_id,
+        contract_type=contract_type,
         trade_date_from=trade_date_from,
         trade_date_to=trade_date_to,
         user=user,
@@ -543,6 +549,7 @@ def installment_totals(
     *,
     status: str | None = None,
     order_id: int | None = None,
+    contract_type: str | None = None,
     trade_date_from: date | None = None,
     trade_date_to: date | None = None,
     user: CurrentUser | None = None,
@@ -572,6 +579,7 @@ def installment_totals(
         session=session,
         status=status,
         order_id=order_id,
+        contract_type=contract_type,
         trade_date_from=trade_date_from,
         trade_date_to=trade_date_to,
         user=user,

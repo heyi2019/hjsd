@@ -20,6 +20,14 @@ export interface Customer {
   extra_values?: Record<string, unknown> | null;
 }
 
+/** POST /customers 建档时后端用明文联系方式精确判重返回的候选（只提示不拦截）。 */
+export interface DuplicateCandidate {
+  customer_id: number;
+  customer_no: string;
+  display_name: string;
+  matched_on: string[];
+}
+
 export interface CustomerOverview {
   order_count: number;
   active_order_count: number;

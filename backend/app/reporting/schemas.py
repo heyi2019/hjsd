@@ -116,10 +116,7 @@ class DailyFundsItemOut(ReportModel):
     pool_name: str
     opening: Decimal
     income: Decimal
-    external_in: Decimal
     expense: Decimal
-    transfer_in: Decimal
-    transfer_out: Decimal
     deposit_paid: Decimal
     deposit_held: Decimal
     cash_balance: Decimal
@@ -129,10 +126,7 @@ class DailyFundsItemOut(ReportModel):
 class DailyFundsTotalOut(ReportModel):
     opening: Decimal
     income: Decimal
-    external_in: Decimal
     expense: Decimal
-    transfer_in: Decimal
-    transfer_out: Decimal
     deposit_paid: Decimal
     deposit_held: Decimal
     cash_balance: Decimal

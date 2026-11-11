@@ -51,9 +51,6 @@ export function useFundsResources(active = true) {
   const flowStatusOptions = useOptionSet("FUND_FLOW_STATUS");
   const flowFundNatureOptions = useOptionSet("FUND_FLOW_FUND_NATURE");
   const flowAttributeOptions = useOptionSet("FUND_FLOW_ACCOUNTING_ATTRIBUTE");
-  // 资金流向（nature）从 CASHFLOW_NATURE 词典读取，设置页改文案可同步；词典未加载时回落 NATURE_LABEL。
-  const natureOptionSet = useOptionSet("CASHFLOW_NATURE");
-
   const [loading, setLoading] = useState(false);
 
   // 用 ref 持有最新筛选值，使全局 load()（含写操作后刷新）也能套用当前筛选条件。
@@ -250,7 +247,6 @@ export function useFundsResources(active = true) {
     flowStatusOptions,
     flowFundNatureOptions,
     flowAttributeOptions,
-    natureOptionSet,
     fetchCashflows,
     exportCashflows,
     cashflowExporting,

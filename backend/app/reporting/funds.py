@@ -17,12 +17,12 @@ from sqlalchemy.orm import Session
 from app.domain.enums import (
     CashflowStatus,
     Direction,
-    Nature,
 )
 from app.domain.trade import (
     Cashflow,
     Deposit,
 )
+from app.orders.amounts import business_cashflow_filter
 
 from ._shared import (
     ZERO,
@@ -34,7 +34,16 @@ from ._shared import (
 def daily_funds_report(
     session: Session, *, on: date | None = None, user: CurrentUser | None = None
 ) -> dict[str, Any]:
-    """资金日报：各池期初、经营收支、内部划转、押金与可用余额。"""
+    """资金日报：各池期初、收入/支出两方向、押金与可用余额。
+
+    2026-11-12 口径：资金中心每个资金账户所有流动只按收入(IN)/支出(OUT)两方向
+    呈现——当日该池全部 IN 流水进 income、全部 OUT 流水进 expense。外部注入、
+    押金释放、内部划入并入收入；押金占用、内部划出并入支出。售出/返点是收入
+    子类型、回收/提号是支出子类型，内部划转对划出账户是支出、对划入账户是收入
+    ——这些业务名词都是两方向下的「其中项」，不单列方向。
+    `deposit_paid` 是「其中：押金缴纳」信息列，不参与收入/支出发生额合计，
+    以免与 expense 中的押金占用重复计算。
+    """
     from app.orders.service import pool_balances
 
     target = on or date.today()
@@ -67,6 +76,7 @@ def daily_funds_report(
                 Cashflow.pool_id.in_(ids),
                 Cashflow.occurred_on < target,
                 Cashflow.status == CashflowStatus.APPROVED.value,
+                business_cashflow_filter(),
             )
             .group_by(Cashflow.pool_id)
         ):
@@ -82,6 +92,7 @@ def daily_funds_report(
                 Cashflow.pool_id.in_(ids),
                 Cashflow.occurred_on == target,
                 Cashflow.status == CashflowStatus.APPROVED.value,
+                business_cashflow_filter(),
             )
             .group_by(Cashflow.pool_id, Cashflow.direction, Cashflow.nature)
         ):
@@ -106,22 +117,16 @@ def daily_funds_report(
                 "pool_code": pool.code,
                 "pool_name": pool.name,
                 "opening": opening_by_pool.get(pool.id, ZERO),
-                "income": bucket.get(
-                    (Direction.IN.value, Nature.BUSINESS_IN.value), ZERO
+                # 资金中心只有收入/支出两方向：当日该池全部 IN / 全部 OUT。
+                # 外部注入、押金释放、内部划入并入 income；押金占用、内部划出
+                # 并入 expense。子类型只在明细层作「其中项」，这里不单列方向。
+                "income": sum(
+                    (amount for (d, _n), amount in bucket.items() if d == Direction.IN.value),
+                    ZERO,
                 ),
-                # 外部流入（投资款/老板打款）是独立资金大类，进现金余额但不属
-                # 经营收入；单列后「各发生额列合计 = 余额变动」才成立。
-                "external_in": bucket.get(
-                    (Direction.IN.value, Nature.EXTERNAL_IN.value), ZERO
-                ),
-                "expense": bucket.get(
-                    (Direction.OUT.value, Nature.BUSINESS_OUT.value), ZERO
-                ),
-                "transfer_in": bucket.get(
-                    (Direction.IN.value, Nature.INTERNAL.value), ZERO
-                ),
-                "transfer_out": bucket.get(
-                    (Direction.OUT.value, Nature.INTERNAL.value), ZERO
+                "expense": sum(
+                    (amount for (d, _n), amount in bucket.items() if d == Direction.OUT.value),
+                    ZERO,
                 ),
                 "deposit_paid": deposit_paid_by_pool.get(pool.id, ZERO),
                 "deposit_held": balance["deposit_held"],
@@ -135,10 +140,7 @@ def daily_funds_report(
         "total": {
             "opening": _sum_report_field(items, "opening"),
             "income": _sum_report_field(items, "income"),
-            "external_in": _sum_report_field(items, "external_in"),
             "expense": _sum_report_field(items, "expense"),
-            "transfer_in": _sum_report_field(items, "transfer_in"),
-            "transfer_out": _sum_report_field(items, "transfer_out"),
             "deposit_paid": _sum_report_field(items, "deposit_paid"),
             "deposit_held": _sum_report_field(items, "deposit_held"),
             "cash_balance": _sum_report_field(items, "cash_balance"),

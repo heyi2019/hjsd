@@ -127,14 +127,6 @@ export function orderTypeLabel(code: string | null | undefined, names?: Record<s
   return names?.[code] ?? ORDER_TYPE_LABEL[code] ?? code;
 }
 
-/** 资金流向（Nature 四值）：与 backend/app/domain/enums.py Nature 一致。 */
-export const NATURE_LABEL: Record<string, string> = {
-  EXTERNAL_IN: "外部流入",
-  BUSINESS_IN: "本方流入",
-  BUSINESS_OUT: "本方流出",
-  INTERNAL: "内部调拨",
-};
-
 /** 资金所有权性质（FundNature 三值）：与 backend/app/domain/enums.py FundNature 一致。 */
 export const FUND_NATURE_LABEL: Record<string, string> = {
   BUSINESS: "本方经营",

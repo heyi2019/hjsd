@@ -7,7 +7,7 @@ import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 import { today } from "../shared/lib/format";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { configurableLabel } from "../shared/lib/optionSets";
-import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL, NATURE_LABEL } from "../shared/lib/labels";
+import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL } from "../shared/lib/labels";
 import { ALLOWED_ATTRIBUTES_BY_FUND_NATURE } from "./FundsPage.fragments";
 import type { FundsPageController } from "./useFundsPageController";
 import type { Cashflow } from "../shared/api/catalog";
@@ -336,7 +336,7 @@ export function RepairModal({ ctrl }: { ctrl: FundsPageController }) {
 }
 
 export function UnmatchedModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { unmatchedTarget, setUnmatchedTarget, cashflows, natureOptionSet, loading } = ctrl;
+  const { unmatchedTarget, setUnmatchedTarget, cashflows, loading } = ctrl;
   const unmatchedColumns: ColumnsType<Cashflow> = [
     { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
     { title: "流水号", dataIndex: "flow_no" },
@@ -345,7 +345,6 @@ export function UnmatchedModal({ ctrl }: { ctrl: FundsPageController }) {
     { title: "资金性质", dataIndex: "fund_nature", render: (v: string | null | undefined, row) => FUND_NATURE_LABEL[v ?? (row.nature?.startsWith("EXTERNAL") ? "EXTERNAL" : "BUSINESS")] ?? v ?? "—" },
     { title: "核算属性", dataIndex: "accounting_attribute", render: (v: string | null | undefined) => ACCOUNTING_ATTRIBUTE_LABEL[v ?? ""] ?? v ?? "—" },
     { title: "收支", dataIndex: "direction", render: (v: string) => (v === "IN" ? "收入" : "支出") },
-    { title: "流向", dataIndex: "nature", render: (v: string | null | undefined) => natureOptionSet?.find((o) => o.value === (v ?? ""))?.label ?? NATURE_LABEL[v ?? ""] ?? v ?? "—" },
     { title: "金额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "来源", dataIndex: "source" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("FUND_FLOW_STATUS", v, { APPROVED: "已入账" })} /> },

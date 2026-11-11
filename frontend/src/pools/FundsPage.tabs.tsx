@@ -9,7 +9,6 @@ import { configurableLabel } from "../shared/lib/optionSets";
 import {
   ACCOUNTING_ATTRIBUTE_LABEL,
   FUND_NATURE_LABEL,
-  NATURE_LABEL,
   POOL_OWNERSHIP_LABEL,
   RECONCILIATION_STATUS_LABEL,
 } from "../shared/lib/labels";
@@ -75,7 +74,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
     cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, cashflowFrom, setCashflowFrom,
     cashflowTo, setCashflowTo, flowDirectionOptions, flowStatusOptions, flowFundNatureOptions, flowAttributeOptions,
     fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, totalFlowIncome, totalFlowExpense,
-    cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, natureOptionSet, loading, cashflowsReady, error,
+    cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, loading, cashflowsReady, error,
   } = ctrl;
   const cashflowUnavailable = !cashflowsReady || Boolean(error);
   const { arrange: arrangeCashflowColumns } = useListViewColumns("CASHFLOW");
@@ -99,12 +98,6 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       title: "收支",
       dataIndex: "direction",
       render: (v: string) => (v === "IN" ? "收入" : "支出"),
-    },
-    {
-      title: "流向",
-      dataIndex: "nature",
-      render: (v: string | null | undefined) =>
-        natureOptionSet?.find((o) => o.value === (v ?? ""))?.label ?? NATURE_LABEL[v ?? ""] ?? v ?? "—",
     },
     { title: "金额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "来源", dataIndex: "source" },
@@ -299,7 +292,7 @@ export function ControlsTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "划转号", dataIndex: "transfer_id" },
     { title: "现有流水", key: "flow_no", render: (_v, row) => row.flow.flow_no },
     { title: "资金池", key: "pool", render: (_v, row) => pools.find((pool) => pool.id === row.flow.pool_id)?.name ?? row.flow.pool_id },
-    { title: "方向", key: "direction", render: (_v, row) => row.flow.direction === "IN" ? "转入" : "转出" },
+    { title: "方向", key: "direction", render: (_v, row) => row.flow.direction === "IN" ? "收入" : "支出" },
     { title: "金额", key: "amount", align: "right", render: (_v, row) => <MoneyText value={row.flow.amount} /> },
     {
       title: "操作",

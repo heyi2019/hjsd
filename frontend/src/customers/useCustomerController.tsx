@@ -1,0 +1,345 @@
+import { Form, Space } from "antd";
+import { ColumnsType } from "antd/es/table";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { buildFormExtraDisplay, formatExtraDisplayValue } from "../orders/ConfigurableField";
+import { customersApi, orderFormFieldsApi } from "../shared/api/catalog";
+import type { Customer, CustomerDetail, OrderFormField } from "../shared/api/catalog";
+import { normalizeError } from "../shared/api/client";
+import { downloadBlob } from "../shared/api/download";
+import { formatDateTimeMinute, today } from "../shared/lib/format";
+import { useListViewColumns } from "../shared/lib/listColumns";
+import { useOptionSet } from "../shared/lib/optionSets";
+import { useReloadOnActive } from "../shared/state/reloadOnActive";
+import { ConfirmButton, PermissionButton, StatusTag } from "../shared/ui";
+import { appMessage } from "../shared/ui/appFeedback";
+import { collectExtras, customerDateKey } from "./CustomersPage.fragments";
+
+/** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
+const CUSTOMER_MOBILE_HIDDEN_KEYS = ["phone", "wechat", "qq", "created_at"] as const;
+
+export function useCustomerController({ active = true, focusId }: { active?: boolean; focusId?: number }) {
+  const [rows, setRows] = useState<Customer[] | null>(null);
+  const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Customer | null>(null);
+  const [detailTarget, setDetailTarget] = useState<Customer | null>(null);
+  const [mergeTarget, setMergeTarget] = useState<Customer | null>(null);
+  const [detailData, setDetailData] = useState<CustomerDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  /** 点「查看」后取到的完整联系方式，仅存活于当前会话内存（刷新即回到脱敏值）。 */
+  const [revealed, setRevealed] = useState<Record<number, Customer>>({});
+  const [revealingId, setRevealingId] = useState<number | null>(null);
+  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [searchInput, setSearchInput] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const customerStatusOptions = useOptionSet("CUSTOMER_STATUS");
+  const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
+  const [mergeForm] = Form.useForm();
+
+  const activeDefs = fieldDefs.filter((def) => def.is_active);
+
+  const [exporting, setExporting] = useState(false);
+  /** 客户按列配置导出 CSV：后端沿用筛选与联系方式脱敏口径。 */
+  const exportCustomers = async () => {
+    setExporting(true);
+    try {
+      downloadBlob(
+        await customersApi.exportCsv({
+          ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+          ...(statusFilter ? { status: statusFilter } : {}),
+        }),
+        `客户-${today()}.csv`,
+      );
+      appMessage.success("客户 CSV 已导出");
+    } catch (err) {
+      appMessage.error(normalizeError(err).message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setRows(await customersApi.list({
+        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
+      }));
+      setError(null);
+    } catch (err) {
+      setError(normalizeError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [keyword, statusFilter]);
+
+  // keep-alive：建单流程会自动建档客户，重新激活时重拉避免列表过期。
+  // 首次挂载由筛选 effect 负责；keep-alive 重新激活时仍由统一入口刷新。
+  useReloadOnActive(active, load, { skipFirstMount: true });
+  const wasActiveRef = useRef(active);
+  useEffect(() => {
+    const wasActive = wasActiveRef.current;
+    wasActiveRef.current = active;
+    // 从隐藏页切回时交给 useReloadOnActive，避免激活瞬间重复请求。
+    if (!active || !wasActive) return;
+    void load();
+  }, [active, keyword, statusFilter, load]);
+
+  useEffect(() => {
+    // 扩展字段定义来自「客户建档」表单的自定义字段；加载失败不阻断客户页
+    orderFormFieldsApi
+      .list("CUSTOMER", true)
+      .then((rows) => setFieldDefs((rows ?? []).filter((row) => row.is_custom)))
+      .catch(() => setFieldDefs([]));
+  }, []);
+
+  const openDetail = async (row: Customer) => {
+    setDetailTarget(row);
+    setDetailData(null);
+    setDetailLoading(true);
+    try {
+      setDetailData(await customersApi.detail(row.id));
+    } catch (err) {
+      setError(normalizeError(err));
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handledFocusRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusId == null || handledFocusRef.current === focusId) return;
+    const row = rows?.find((item) => item.id === focusId);
+    if (!row) return;
+    handledFocusRef.current = focusId;
+    void openDetail(row);
+  }, [focusId, rows]);
+
+  /** 后端默认脱敏；点「查看」才取明文，后端同时写一条 CONTACT_READ 审计。 */
+  const revealContact = async (id: number) => {
+    setRevealingId(id);
+    try {
+      const full = await customersApi.get(id, true);
+      setRevealed((prev) => ({ ...prev, [id]: full }));
+    } catch (err) {
+      setError(normalizeError(err));
+    } finally {
+      setRevealingId(null);
+    }
+  };
+
+  /** 联系方式单元格：脱敏值 + 「查看」入口；无 contact.read 权限的人拿不到按钮，也拿不到明文。 */
+  const renderContact = (row: Customer, field: "phone" | "wechat" | "qq") => {
+    const full = revealed[row.id];
+    const value = (full ?? row)[field];
+    if (!row.contact_masked || full) return value || "-";
+    return (
+      <Space size={4}>
+        <span>{value || "-"}</span>
+        <PermissionButton
+          permission="customer.contact.read"
+          type="link"
+          size="small"
+          loading={revealingId === row.id}
+          onClick={() => void revealContact(row.id)}
+        >
+          查看
+        </PermissionButton>
+      </Space>
+    );
+  };
+
+  const submitCreate = async (values: Record<string, unknown>) => {
+    try {
+      const extraValues = collectExtras(values, activeDefs);
+      const result = await customersApi.create({
+        display_name: values.display_name as string,
+        contact_name: values.contact_name as string,
+        phone: values.phone as string,
+        wechat: values.wechat as string,
+        qq: values.qq as string,
+        note: (values.note as string) || null,
+        extra_values: Object.keys(extraValues).length > 0 ? extraValues : undefined,
+      });
+      if (result.duplicate_candidates.length > 0) {
+        appMessage.warning(`已建档，检测到 ${result.duplicate_candidates.length} 条重复候选（未拦截）`);
+      } else {
+        appMessage.success("客户已建档");
+      }
+      setCreateOpen(false);
+      form.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
+  const submitEdit = async (values: Record<string, unknown>) => {
+    if (!editTarget) return;
+    try {
+      const extraValues = collectExtras(values, activeDefs);
+      // 脱敏值不可回写：未取得明文时不提交联系方式，避免把 138****1234 覆盖进库。
+      const contactsVisible = !editTarget.contact_masked || Boolean(revealed[editTarget.id]);
+      await customersApi.patch(editTarget.id, {
+        display_name: values.display_name as string,
+        contact_name: values.contact_name as string,
+        ...(contactsVisible
+          ? {
+              phone: values.phone as string,
+              wechat: values.wechat as string,
+              qq: values.qq as string,
+            }
+          : {}),
+        note: (values.note as string) || null,
+        extra_values: extraValues,
+      });
+      appMessage.success("客户已更新");
+      setEditTarget(null);
+      editForm.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
+  const submitMerge = async (values: Record<string, unknown>) => {
+    if (!mergeTarget) return;
+    try {
+      await customersApi.merge(
+        mergeTarget.id,
+        Number(values.target_customer_id),
+        values.reason as string,
+      );
+      appMessage.success("合并完成，来源客户已置 MERGED 并迁移关联关系");
+      setMergeTarget(null);
+      mergeForm.resetFields();
+      await load();
+    } catch (err) {
+      setError(normalizeError(err));
+    }
+  };
+
+  const { arrange: arrangeColumns } = useListViewColumns("CUSTOMER");
+  const columns: ColumnsType<Customer> = [
+    { title: "客户编号", dataIndex: "customer_no" },
+    { title: "名字", dataIndex: "display_name" },
+    { title: "手机", key: "phone", render: (_v, row) => renderContact(row, "phone") },
+    { title: "微信", key: "wechat", render: (_v, row) => renderContact(row, "wechat") },
+    { title: "QQ", key: "qq", render: (_v, row) => renderContact(row, "qq") },
+    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="CUSTOMER_STATUS" /> },
+    { title: "建立时间", dataIndex: "created_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
+    {
+      title: "扩展字段",
+      key: "extra_values",
+      render: (_v, row) => {
+        const items = buildFormExtraDisplay(row.extra_values, fieldDefs);
+        if (items.length === 0) return "-";
+        const shown = items.slice(0, 2).map((it) =>
+          `${it.label}${it.status === "deleted" ? "（已删除）" : it.status === "inactive" ? "（已停用）" : ""}：${formatExtraDisplayValue(it.value)}`);
+        return items.length > 2 ? `${shown.join("；")} 等 ${items.length} 项` : shown.join("；");
+      },
+    },
+    {
+      title: "操作",
+      key: "actions",
+      render: (_v, row) => (
+        <Space size={2}>
+          <PermissionButton permission="customer.read" size="small" onClick={() => void openDetail(row)}>
+            详情
+          </PermissionButton>
+          {/* 已合并为终态：仅保留详情入口，不再暴露合并 / 拉黑 / 解除拉黑，避免误判终态可再次流转（L1595）。 */}
+          {row.status !== "MERGED" && (
+            <>
+              <PermissionButton
+                permission="customer.merge"
+                size="small"
+                disabled={row.status !== "ACTIVE"}
+                onClick={() => setMergeTarget(row)}
+              >
+                合并
+              </PermissionButton>
+              <ConfirmButton
+                permission="customer.update"
+                size="small"
+                title={row.status === "ACTIVE" ? "拉黑该客户" : "解除拉黑"}
+                description={row.status === "ACTIVE"
+                  ? "拉黑后不可作为新订单参与方；历史订单、分期与需求保留。"
+                  : "解除后可重新作为新订单参与方。"}
+                danger={row.status === "ACTIVE"}
+                onConfirm={async () => {
+                  await customersApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE");
+                  appMessage.success(row.status === "ACTIVE" ? "客户已拉黑，历史关系保留" : "客户已解除拉黑");
+                  await load();
+                }}
+              >
+                {row.status === "ACTIVE" ? "拉黑" : "解除拉黑"}
+              </ConfirmButton>
+            </>
+          )}
+        </Space>
+      ),
+    },
+  ];
+
+  const currentDate = today();
+  const newThisMonthCount = rows?.filter((row) => customerDateKey(row.created_at)?.startsWith(currentDate.slice(0, 7))).length;
+  const newTodayCount = rows?.filter((row) => customerDateKey(row.created_at) === currentDate).length;
+  // —— 弹窗收口：原 JSX 内联的状态更新收为方法，供展示组件回调（语义逐字等价）——
+  const cancelEdit = () => { setEditTarget(null); editForm.resetFields(); };
+  const closeDetail = () => { setDetailTarget(null); setDetailData(null); };
+  const requestEdit = (target: Customer) => { setEditTarget(target); setDetailTarget(null); };
+  const cancelMerge = () => { setMergeTarget(null); };
+
+  return {
+    activeDefs,
+    arrangeColumns,
+    cancelEdit,
+    cancelMerge,
+    closeDetail,
+    columns,
+    createOpen,
+    currentDate,
+    customerStatusOptions,
+    detailData,
+    detailLoading,
+    detailTarget,
+    editForm,
+    editTarget,
+    error,
+    exportCustomers,
+    exporting,
+    fieldDefs,
+    form,
+    keyword,
+    load,
+    loading,
+    mergeForm,
+    mergeTarget,
+    newThisMonthCount,
+    newTodayCount,
+    page,
+    pageSize,
+    renderContact,
+    requestEdit,
+    revealed,
+    rows,
+    searchInput,
+    setCreateOpen,
+    setKeyword,
+    setPage,
+    setPageSize,
+    setSearchInput,
+    setStatusFilter,
+    statusFilter,
+    submitCreate,
+    submitEdit,
+    submitMerge,
+  };
+}
+
+export type CustomerController = ReturnType<typeof useCustomerController>;

@@ -5,6 +5,8 @@ FastAPI + React 的工作室经营系统。**v1 是唯一入口**（`app/main.py
 开发、测试和发布按以下三份流程执行：
 [开发流程](docs/开发流程.md) · [测试流程](docs/测试流程.md) · [发布流程](docs/发布流程.md)
 
+> 发布通道：远端只有 `origin/main`，`git push origin main` → `main-ci-cd` 自动升版 → dispatch lint / frontend / backend 三个门禁 → 全绿后 dispatch `deploy-production` → ECS 生产。**推送即上线**，纯文档提交同样会触发。
+
 ## 快速启动
 
 ```bash
@@ -84,7 +86,7 @@ cd frontend && npm run build
 | `tests/backend` | 后端测试（pytest，111 个文件） |
 | `frontend/src` | 按业务域拆分（`orders/` `stocks/` `customers/` `installments/` `pools/` `rebates/` `reporting/` 等 20 个目录），无 `pages/`；`shared/` 为 UI 与 API 基础层 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |
-| `docs` | 当前有效文档：顶层事实源 / 工程 / 前端测试资产 + `testing/` 测试体系 + `ux-audit/`、`h5_audit_*/` 证据目录；**全仓文档地图见 `docs/README.md`**；时点性报告已归档至 `docs/archive/` |
+| `docs` | 当前有效文档：顶层事实源 / 工程文档 + `testing/` 测试体系；**全仓文档地图见 `docs/README.md`**；`archive/` 只保留 PII 白名单与 ux-audit 证据的最小集，时点性报告已于 2026-11-11 清退 |
 | `rawdata/原始数据` | 金山文档导出的 5 份只读 JSON |
 | `data` `logs` `outputs` | 运行态与生成物，默认不提交 |
 

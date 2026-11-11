@@ -117,13 +117,33 @@ describe("FundsPage：资金写路径深覆盖", () => {
   // nature 口径矩阵走纯函数单测（deriveCashflowNature，毫秒级），不再为每个口径
   // 重复整页挂载 + 弹窗全链路（原 3 条用例各 ~1s，2026-10-27 实测重构）；
   // 弹窗→提交→payload 的接线正确性由下方「本方经营 + 收入」1 条全链路用例守护。
-  it("nature 口径矩阵：外部/内部/本方经营按资金性质与流向推导", () => {
+  // 口径对齐后端 create_cashflow（finance/cashflows.py:97-105）：OUT 一律 BUSINESS_OUT，
+  // 只有 IN 才按资金性质二分；独立流水禁 INTERNAL（submitCashflow 前置拦截）。
+  it("nature 口径矩阵：支出一律 BUSINESS_OUT，收入按资金性质二分", () => {
     expect(deriveCashflowNature("EXTERNAL", "IN")).toBe("EXTERNAL_IN");
-    expect(deriveCashflowNature("EXTERNAL", "OUT")).toBe("EXTERNAL_IN");
-    expect(deriveCashflowNature("INTERNAL", "OUT")).toBe("INTERNAL");
-    expect(deriveCashflowNature("INTERNAL", "IN")).toBe("INTERNAL");
+    expect(deriveCashflowNature("EXTERNAL", "OUT")).toBe("BUSINESS_OUT");
+    expect(deriveCashflowNature("INTERNAL", "OUT")).toBe("BUSINESS_OUT");
+    expect(deriveCashflowNature("INTERNAL", "IN")).toBe("BUSINESS_IN");
     expect(deriveCashflowNature("BUSINESS", "IN")).toBe("BUSINESS_IN");
     expect(deriveCashflowNature("BUSINESS", "OUT")).toBe("BUSINESS_OUT");
+  });
+
+  it("独立流水选内部调拨 → 提交被前端拦截，不发必 422 的请求", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
+    const modal = modalContent();
+    await pickSelect(modal, 0, /经营主池/);
+    // 资金性质 dropdown 序号 2（弹窗 select 顺序：0 资金池 / 1 收支方向 / 2 资金性质 / 3 核算属性）选「内部调拨」
+    await pickSelect(modal, 2, /内部调拨/);
+    await ui.type(modal.querySelector("#occurred_on") ?? modal, "2026-10-17");
+    await ui.type(modal.querySelector("#category") ?? modal, "TRANSFER");
+    await ui.type(modal.querySelector("#amount") ?? modal, "300.00");
+    await ui.type(modal.querySelector("#note") ?? modal, "内部调拨");
+    await ui.click(screen.getByRole("button", { name: /提交/ }));
+    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.create)).not.toHaveBeenCalled());
+    expect(await screen.findByText(/内部调拨请通过/)).toBeInTheDocument();
   });
 
 

@@ -23,7 +23,7 @@ vi.mock("@/shared/api/catalog", async (importOriginal) => {
     "setStatus", "setActive", "resolve", "release", "loss", "repair", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations", "cancel", "voidRecord",
     "supersede", "expireSweep",
-    "balance", "balances", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+    "balance", "balances", "executionDetail", "updateProfile", "updateExecution", "merge", "search", "exportCsv",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -269,6 +269,59 @@ describe("FundsPage：资金流水", () => {
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     expect(document.querySelector(".funds-cashflow-filters")).toBeInTheDocument();
+  });
+
+  it("资金流水导出与列表同口径：带上当前搜索关键词", async () => {
+    // 修复 #2：旧实现 exportCsv 漏传 keyword，筛关键词后导出的是全量。
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:flow");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.mocked(catalog.cashflowsApi.exportCsv).mockResolvedValue(new Blob(["csv"]));
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.type(screen.getByLabelText("流水搜索"), "SELL");
+    await ui.click(screen.getByRole("button", { name: /导出 CSV/ }));
+    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.exportCsv)).toHaveBeenCalledWith(
+      expect.objectContaining({ keyword: "SELL" }),
+    ));
+  });
+
+  it("流水被服务端截断时，本地关键词收窄不回退本地求和（避免少算）", async () => {
+    // 修复 #1：total=5000 > 已加载 2 条（limit=2000 截断）。此时本地可见行只是部分数据，
+    // 用户再输入关键词收窄，合计必须仍取服务端聚合，不能用可见的 1 条冒充全量。
+    vi.mocked(catalog.cashflowsApi.list).mockResolvedValue({
+      items: cashflows, total: 5000, total_in: "123456.78", total_out: "87654.32",
+    });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.type(screen.getByLabelText("流水搜索"), "SELL");
+    // 本地已收窄到只剩 SELL 一条，但合计不得跟着塌成这一条的 800.00。
+    expect(screen.queryByText("HS0001-CF-BUY-01")).not.toBeInTheDocument();
+    expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("123,456.78");
+    expect(screen.getByText("总支出").closest(".ui-stat")).toHaveTextContent("87,654.32");
+  });
+
+  it("本地收窄合计走整数分，1.005 + 0.005 不丢末位", async () => {
+    // 修复 #17：本地即时收窄的合计必须用 money.ts 的 toCents/fromCents，
+    // 浮点直接相加会把 1.005+0.005 算成 1.01（少 1 分），整数分得 1.02。
+    const rows = [
+      { ...cashflows[1], id: 21, amount: "1.005", order_no: "SE-A", direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
+      { ...cashflows[1], id: 22, amount: "0.005", order_no: "SE-B", direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
+      { ...cashflows[0], id: 23, amount: "9.00", order_no: "BUY-C", direction: "OUT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
+    ];
+    vi.mocked(catalog.cashflowsApi.list).mockResolvedValue({
+      items: rows, total: rows.length, total_in: "1.01", total_out: "9.00",
+    });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    // 关键词 "SE" 本地收窄出两条 IN（SE-A / SE-B），排除 BUY-C；
+    // total=3 已全部加载 → 走本地求和，必须按整数分得 1.02 而非浮点的 1.01。
+    await ui.type(screen.getByLabelText("流水搜索"), "SE");
+    expect(screen.queryByText("BUY-C")).not.toBeInTheDocument();
+    expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("1.02");
   });
 });
 

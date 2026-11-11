@@ -143,6 +143,12 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
     await write.run(async () => {
       const fundNature = String(values.fund_nature ?? "BUSINESS");
       const direction = String(values.direction ?? "IN");
+      // 独立流水禁止 INTERNAL：后端 create_cashflow 对 nature=INTERNAL 一律 422，
+      // 且 INTERNAL 资金性质只匹配 INTERNAL_TRANSFER 核算属性，在任何合法 nature 下都无解。
+      // 前端下拉仍露出该选项（来自业务词典），此处作最终防线并给出可操作指引。
+      if (fundNature === "INTERNAL") {
+        throw new Error("内部调拨请通过「资金池划转」登记，独立流水不支持内部调拨性质");
+      }
       await cashflowsApi.create({
         pool_id: Number(values.pool_id),
         occurred_on: values.occurred_on as string,

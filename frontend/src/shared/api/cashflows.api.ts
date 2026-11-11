@@ -60,6 +60,7 @@ export const cashflowsApi = {
     accounting_attribute?: string;
     category?: string;
     created_by?: string;
+    keyword?: string;
   }) =>
     api
       .get<Blob>("/cashflows/export.csv", {

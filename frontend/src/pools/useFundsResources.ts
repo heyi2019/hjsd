@@ -14,6 +14,7 @@ import {
 } from "../shared/api/catalog";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
+import { fromCents, toCents } from "../shared/lib/money";
 import { today } from "../shared/lib/format";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { useOptionSet } from "../shared/lib/optionSets";
@@ -117,6 +118,8 @@ export function useFundsResources(active = true) {
           fund_nature: cashflowFundNatureRef.current || undefined,
           accounting_attribute: cashflowAttributeRef.current || undefined,
           category: cashflowCategoryRef.current.trim() || undefined,
+          // 导出必须与列表同口径：keyword 也要带，否则筛关键词后导出的是全量。
+          keyword: cashflowKeywordRef.current.trim() || undefined,
         }),
         `资金流水-${today()}.csv`,
       );
@@ -200,12 +203,18 @@ export function useFundsResources(active = true) {
   // 总收入 / 总支出：默认取服务端合计（与列表同一套筛选条件、不受 2000 条上限影响）。
   // 若用户刚改了筛选但还没点「查询」，列表已在本地即时收窄，此时合计同步按可见行求和，
   // 保证卡片数字与眼睛看到的行一致；一旦点「查询」，服务端值重新接管。
-  const cashflowLocallyNarrowed = visibleCashflows.length !== cashflows.length;
+  //
+  // 关键护栏：本地求和只在「服务端已返回全部命中行」时才准确。接口 limit=2000，
+  // 当 total_in+total_out 对应的命中总数 > 已加载行数时，cashflows 只是前 2000 条的截断，
+  // 此时本地收窄求和会系统性少算（只覆盖已加载部分）。这种情形下放弃本地求和，
+  // 回退到服务端聚合值——它可能滞后于用户未提交的筛选，但数字口径准确、不误导。
+  const allRowsLoaded = cashflowTotal <= cashflows.length;
+  const cashflowLocallyNarrowed = allRowsLoaded && visibleCashflows.length !== cashflows.length;
   const sumVisible = (directionValue: "IN" | "OUT") => visibleCashflows
     .filter((row) => row.direction === directionValue)
-    .reduce((sum, row) => sum + Math.round(Number(row.amount) * 100), 0) / 100;
-  const totalFlowIncome = cashflowLocallyNarrowed ? sumVisible("IN").toFixed(2) : cashflowTotals.income;
-  const totalFlowExpense = cashflowLocallyNarrowed ? sumVisible("OUT").toFixed(2) : cashflowTotals.expense;
+    .reduce((sum, row) => sum + toCents(row.amount), 0);
+  const totalFlowIncome = cashflowLocallyNarrowed ? fromCents(sumVisible("IN")) : cashflowTotals.income;
+  const totalFlowExpense = cashflowLocallyNarrowed ? fromCents(sumVisible("OUT")) : cashflowTotals.expense;
 
   return {
     pools,

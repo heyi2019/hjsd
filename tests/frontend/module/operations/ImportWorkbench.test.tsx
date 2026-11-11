@@ -1,3 +1,4 @@
+import { clearOptionSetsCache } from "@/shared/lib/optionSets";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -485,6 +486,68 @@ describe("ImportWorkbench：动作流与写路径", () => {
       renderLight(<ImportWorkbench embedded />, { user: "admin" });
       await waitFor(() => expect(screen.getByRole("button", { name: /新建导入/ })).toBeInTheDocument());
       expect(screen.queryByText("导入工作台")).toBeNull();
+    });
+    // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+    it("P1/FE-218：导入批次失败时锁定新建导入入口", async () => {
+      // 错误必须带 response：client.ts 的 lastNetworkFailure 是模块级全局态，CI 上同进程
+      // 其它用例的真实请求（后端不可达 ECONNREFUSED）会置位它；无 response 的 axios 错误
+      // 会被 normalizeError 改写成「后端不可达」兜底文案，使消息断言随用例顺序漂移
+      // （2026-11-05 首次 CI 实测：仅本例红，本地单跑恒绿）。带 v1 响应体后走
+      // data.message 分支，与全局连接态解耦。
+      vi.mocked(catalog.importsApi.batches).mockRejectedValueOnce({
+        isAxiosError: true,
+        message: "batches down",
+        response: { status: 400, data: { message: "batches down" } },
+      });
+      renderLight(<ImportWorkbench />, { user: "admin" });
+
+      expect(await screen.findByText("batches down")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /新建导入/ })).toBeDisabled();
+    });
+
+    it("P1/FE-220：导入数据类型字典失败时仍保持完整可选项", async () => {
+      vi.mocked(catalog.importsApi.batches).mockResolvedValueOnce({ items: [], total: 0 } as never);
+      vi.mocked(catalog.optionSetsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "option sets down" });
+      clearOptionSetsCache();
+      renderLight(<ImportWorkbench />, { user: "admin" });
+
+      await screen.findByRole("button", { name: /新建导入/ });
+      fireEvent.click(screen.getByRole("button", { name: /新建导入/ }));
+      const modal = await screen.findByText("导入导入数据");
+      const modalContent = modal.closest(".ant-modal-content") as HTMLElement;
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      await user.click(modalContent.querySelector(".ant-select-selector") as Element);
+      const dropdown = await waitFor(() => {
+        const dropdowns = [...document.querySelectorAll(".ant-select-dropdown")];
+        const current = dropdowns[dropdowns.length - 1] as HTMLElement | undefined;
+        if (!current) throw new Error("导入类型下拉未打开");
+        return current;
+      });
+      const options = [...dropdown.querySelectorAll(".ant-select-item-option-content")].map((option) => option.textContent);
+      expect(options).toEqual(expect.arrayContaining(["订单", "资金流水"]));
+    });
+
+    it("P1/FE-188：错误大批次原始行按页渲染，避免首屏冻结", () => {
+      const rows = Array.from({ length: 3229 }, (_, index) => ({
+        id: index + 1,
+        batch_id: 1,
+        row_no: index + 1,
+        raw: { 行号: `行-${index + 1}` },
+        status: "PENDING",
+        unlinked_transfer: false,
+      })) as unknown as import("@/shared/api/catalog").ImportRow[];
+      renderLight(
+        <RowsTab
+          columns={[{ title: "行号", dataIndex: "row_no" }, { title: "原始内容", dataIndex: ["raw", "行号"] }]}
+          rows={rows}
+          loading={false}
+        />,
+        { user: "admin" },
+      );
+      const body = document.querySelector("tbody") as HTMLElement;
+      expect(within(body).queryByText("行-3229")).not.toBeInTheDocument();
+      expect(body.querySelectorAll("tr").length).toBeLessThanOrEqual(21);
     });
   });
 });

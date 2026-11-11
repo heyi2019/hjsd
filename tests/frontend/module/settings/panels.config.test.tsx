@@ -199,6 +199,15 @@ describe("SequencesPanel", () => {
 
     expect(await screen.findByText("编号序列加载失败")).toBeInTheDocument();
   });
+  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+  it("P1/FE-219：编号序列数据失败时不伪装成真实空列表", async () => {
+    vi.mocked(catalog.sequencesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "sequences down" });
+    renderLight(<SequencesPanel />, { user: "admin" });
+
+    expect(await screen.findByText("编号序列数据不可用，请点击重新加载")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /重新加载/ })).toBeInTheDocument();
+  });
 });
 
 describe("BusinessReminderSettingsPanel", () => {

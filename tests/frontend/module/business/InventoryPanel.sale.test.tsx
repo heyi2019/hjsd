@@ -359,4 +359,36 @@ describe("库存售出三表单分支", () => {
       unmount();
     }
   });
+  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+  it("P1/FE-042：已拉黑客户不能参与库存售出", async () => {
+    vi.mocked(catalog.customersApi.list).mockResolvedValueOnce([
+      { id: 7, display_name: "买家A", status: "DISABLED" },
+    ] as never);
+    vi.mocked(catalog.poolsApi.list).mockResolvedValue([
+      { id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" },
+    ] as never);
+    vi.mocked(catalog.employeesApi.list).mockResolvedValueOnce([
+      { id: 1, username: "admin", display_name: "管理员", is_active: true },
+    ] as never);
+    renderLight(
+      <InventorySaleModal
+        account={{ id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", game_account: "acc-1", status: "WAITING", inventory_type: "RECOVERY" } as never}
+        onClose={() => undefined}
+        onCreated={() => undefined}
+      />,
+      { user: "admin" },
+    );
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await screen.findByText("买家信息");
+    await user.type(screen.getByLabelText("客户昵称"), "买家A");
+    await user.type(screen.getByLabelText("售出金额"), "350");
+    await user.click(screen.getByLabelText("资金账户"));
+    await user.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+    await user.click(screen.getByRole("button", { name: /确认售出/ }));
+
+    await waitFor(() => expect(screen.getByText(/客户已拉黑，不能作为售出买家/)).toBeInTheDocument());
+    expect(catalog.ordersApi.addCustomerRole).not.toHaveBeenCalled();
+    expect(catalog.ordersApi.postEvent).not.toHaveBeenCalled();
+  });
 });

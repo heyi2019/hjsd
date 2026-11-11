@@ -171,4 +171,12 @@ describe("OrderTypesPanel 业务类型主数据", () => {
     expect(within(row).queryByRole("button", { name: /停用/ })).toBeNull();
     expect(within(row).queryByRole("button", { name: /影响预览/ })).toBeNull();
   });
+  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+  it("P1/FE-238：业务类型主数据失败时锁定新建入口", async () => {
+    vi.mocked(catalog.orderTypesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "types down" });
+    renderLight(<OrderTypesPanel />, { user: "admin" });
+    expect(await screen.findByText("业务类型数据不可用，请点击重新加载")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /新建类型/ })).toBeDisabled();
+  });
 });

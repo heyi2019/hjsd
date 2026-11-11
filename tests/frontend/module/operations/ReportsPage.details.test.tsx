@@ -198,4 +198,31 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     expect(screen.getAllByText("账号采购成本").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("400.00").length).toBeGreaterThanOrEqual(1);
   });
+  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+  it("P1/FE-169：订单利润展示采购成本并给出可复算口径", async () => {
+    vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValueOnce({
+      items: [{
+        order_id: 11,
+        order_no: "HS-2026-0011",
+        order_type: "HS",
+        trade_date: "2026-11-01",
+        status: "COMPLETED",
+        income: "600.00",
+        buy_amount: "400.00",
+        direct_cost: "50.00",
+        rebate: "10.00",
+        net_profit: "160.00",
+      }],
+      total: { income: "600.00", buy_amount: "400.00", direct_cost: "50.00", rebate: "10.00", net_profit: "160.00" },
+    } as never);
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<ReportsPage />, { user: "admin" });
+    await user.click(await screen.findByRole("tab", { name: /订单利润/ }));
+
+    expect(await screen.findByText("HS-2026-0011")).toBeInTheDocument();
+    expect(screen.getAllByText("账号采购成本").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/净利 = 所有收入 − 所有支出/)).toBeInTheDocument();
+    expect(screen.getAllByText("400.00").length).toBeGreaterThanOrEqual(1);
+  });
 });

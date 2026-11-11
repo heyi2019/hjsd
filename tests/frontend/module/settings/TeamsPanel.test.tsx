@@ -78,7 +78,7 @@ describe("TeamsPanel：团队管理", () => {
     expect(vi.mocked(message.success)).toHaveBeenCalledWith("团队已创建");
   });
 
-  it("重复团队编码在前端拦截并保留表单", async () => {
+  it("FE-047：重复团队编码在前端拦截并保留表单", async () => {
     renderLight(<TeamsPanel />, { user: "admin" });
     await screen.findByText("T01");
     await ui.type(screen.getByPlaceholderText("团队编码"), " t01 ");
@@ -132,5 +132,14 @@ describe("TeamsPanel：团队管理", () => {
     await ui.click(await screen.findByRole("button", { name: /确认/ }));
     await waitFor(() => expect(message.error).toHaveBeenCalled());
     expect(String(vi.mocked(message.error).mock.calls[0][0])).toMatch(/toggle fail/);
+  });
+  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+  it("P1/FE-217：团队数据失败时显示错误空态且禁用新增", async () => {
+    vi.mocked(client.api).get.mockRejectedValueOnce(new Error("teams down"));
+    renderLight(<TeamsPanel />, { user: "admin" });
+
+    expect(await screen.findByText("团队数据不可用，请点击重新加载")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /新增团队/ })).toBeDisabled();
   });
 });

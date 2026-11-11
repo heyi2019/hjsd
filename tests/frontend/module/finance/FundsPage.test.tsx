@@ -165,6 +165,18 @@ describe("FundsPage：资金池卡片", () => {
     expect(await screen.findByText("资金对账数据不可用，请点击重新加载")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /新增对账/ })).toBeDisabled();
   });
+  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+  it("P1/FE-244：资金总览数据失败时不显示零统计且禁用划转", async () => {
+    vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
+    vi.mocked(catalog.rebatesApi.list).mockResolvedValue([] as never);
+    renderLight(<FundsPage />, { user: "admin" });
+
+    expect(await screen.findByText("资金池卡片")).toBeInTheDocument();
+    expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("不可用");
+    expect(screen.getByText("可用余额合计").closest(".ui-stat")).toHaveTextContent("不可用");
+    expect(screen.getByRole("button", { name: /资金池划转/ })).toBeDisabled();
+  });
 });
 
 describe("FundsPage：押金占用", () => {
@@ -360,5 +372,70 @@ describe("FundsPage：资金写路径", () => {
       cancelled_on: expect.any(String),
       reason: "押金登记有误",
     }]);
+  });
+  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+  it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () => {
+    vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
+      { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
+      { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
+    ] as never);
+    vi.mocked(catalog.poolsApi.balances).mockResolvedValue({ items: [{ pool_id: 1, pool_code: "POOL-A", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }, { pool_id: 2, pool_code: "POOL-B", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }], totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" } } as never);
+    vi.mocked(catalog.depositsApi.list).mockResolvedValueOnce([] as never);
+    vi.mocked(catalog.cashflowsApi.list).mockResolvedValueOnce({ items: [], total: 0 } as never);
+    vi.mocked(catalog.reconciliationsApi.list).mockResolvedValueOnce([] as never);
+    vi.mocked(catalog.rebatesApi.list).mockResolvedValueOnce([] as never);
+    renderLight(<FundsPage />, { user: "admin" });
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await screen.findByText(/POOL-A/);
+    await user.click(await screen.findByRole("button", { name: /资金池划转/ }));
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    const selectors = modal.querySelectorAll(".ant-select-selector");
+    const choosePool = async (index: number, title: RegExp) => {
+      await user.click(selectors[index]);
+      const dropdowns = document.querySelectorAll(".ant-select-dropdown");
+      const currentDropdown = dropdowns[dropdowns.length - 1] as HTMLElement;
+      await user.click(await within(currentDropdown).findByTitle(title));
+    };
+    await choosePool(0, /经营主池/);
+    await choosePool(1, /押金池/);
+    await user.type(modal.querySelector("#amount") ?? modal, "700.01");
+    await user.click(screen.getByRole("button", { name: /确认划转/ }));
+
+    await waitFor(() => expect(screen.getByText(/可用余额不足/)).toBeInTheDocument());
+    expect(catalog.transfersApi.create).not.toHaveBeenCalled();
+  });
+
+  it("P1/FE-050：流水冲销成功后原流水不再显示重复冲销入口", async () => {
+    const original = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
+    const reversal = { ...original, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", reversal_of_id: 7 };
+    let mainListCalls = 0;
+    vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([
+      { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
+    ] as never);
+    vi.mocked(catalog.poolsApi.balances).mockResolvedValue({ items: [{ pool_id: 1, pool_code: "POOL-A", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }, { pool_id: 2, pool_code: "POOL-B", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }], totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" } } as never);
+    vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => {
+      if (params?.direction) return { items: [], total: 0 } as never;
+      mainListCalls += 1;
+      return (mainListCalls === 1 ? { items: [original], total: 1 } : { items: [original, reversal], total: 2 }) as never;
+    });
+    vi.mocked(catalog.cashflowsApi.reverse).mockResolvedValueOnce(reversal as never);
+    vi.mocked(catalog.depositsApi.list).mockResolvedValue([] as never);
+    vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([] as never);
+    vi.mocked(catalog.rebatesApi.list).mockResolvedValue([] as never);
+    renderLight(<FundsPage />, { user: "admin" });
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await screen.findByText(/POOL-A/);
+    await user.click(screen.getByRole("tab", { name: "流水" }));
+    await screen.findByText("CF-A-07");
+    await user.click(screen.getByRole("button", { name: /冲销/ }));
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    await user.type(modal.querySelector("#reversed_on") ?? modal, "2026-10-18");
+    await user.type(modal.querySelector("#reason") ?? modal, "重复入账");
+    await user.click(screen.getByRole("button", { name: /确认冲销/ }));
+
+    await waitFor(() => expect(catalog.cashflowsApi.reverse).toHaveBeenCalledWith(7, expect.objectContaining({ reason: "重复入账" })));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /^冲销$/ })).toBeNull());
+    expect(screen.getByText("CF-REV-08")).toBeInTheDocument();
   });
 });

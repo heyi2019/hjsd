@@ -1,3 +1,4 @@
+import { buildActionAllocationCandidates, buildActionAllocationRows } from "@/orders/orderpage/helpers";
 import { describe, expect, it } from "vitest";
 import { accountFinancialFlows, INVENTORY_AGE_COLOR, rebateTypeLabel, INVENTORY_TYPE_LABEL } from "@/stocks/inventory-logic";
 
@@ -29,5 +30,25 @@ describe("库存纯逻辑", () => {
       }],
     } as never;
     expect(accountFinancialFlows(detail)).toHaveLength(2);
+  });
+  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+  it("P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定", () => {
+    const candidates = buildActionAllocationCandidates({
+      form_extra: {
+        business_responsible_ids: [11],
+        delivery_responsible_ids: [22],
+      },
+      events: [
+        { id: 1, event_no: "EV-1", order_id: 10, event_type: "BUY", amount: "100", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "100" },
+        { id: 2, event_no: "EV-2", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [], cancellable_amount: "200" },
+        { id: 3, event_no: "EV-3", order_id: 10, event_type: "OPERATE", operation_type: "DESCRIPTION", amount: "20", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33], cancellable_amount: "20" },
+      ],
+    });
+    const rows = buildActionAllocationRows([], candidates);
+
+    expect(candidates).toMatchObject({ BUY: [11], SELL: [22], OPERATION: [33], COMPANY: [] });
+    expect(rows.map((row) => row.employee)).toEqual([11, 22, 33, "COMPANY"]);
+    expect(rows.map((row) => row.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
   });
 });

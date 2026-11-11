@@ -1,3 +1,5 @@
+import { CustomerPanel } from "@/customers/CustomerPanel";
+import { appMessage } from "@/shared/ui/appFeedback";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -432,6 +434,28 @@ describe("CustomersPage：行内动作", () => {
       await ui.click(confirm);
       await waitFor(() => expect(vi.mocked(catalog.counterpartiesApi.setStatus)).toHaveBeenCalledWith(11, false));
     });
+  });
+  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+  it("FE-194：客户 CSV 导出完成后给出成功反馈", async () => {
+    vi.mocked(catalog.customersApi.list).mockResolvedValueOnce([
+      { id: 1, customer_no: "CUS-0001", display_name: "测试客户", status: "ACTIVE" },
+    ] as never);
+    vi.mocked(catalog.customersApi.exportCsv).mockResolvedValueOnce(new Blob(["csv"]) as never);
+    const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:customer");
+    const revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const successSpy = vi.spyOn(appMessage, "success").mockImplementation(() => ({} as never));
+    const keeper = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<CustomerPanel />, { user: "admin" });
+
+    await screen.findByText("CUS-0001");
+    await keeper.click(screen.getByRole("button", { name: "导出客户CSV" }));
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户 CSV 已导出"));
+    createObjectURLSpy.mockRestore();
+    revokeObjectURLSpy.mockRestore();
+    clickSpy.mockRestore();
+    successSpy.mockRestore();
   });
 });
 

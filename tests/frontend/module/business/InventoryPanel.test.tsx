@@ -1,3 +1,4 @@
+import { appMessage } from "@/shared/ui/appFeedback";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -729,6 +730,28 @@ describe("InventoryPanel：编号列与导出", () => {
       expect(csv).toContain("KU_00003");
       expect(csv).toContain("KU_00004");
     });
+  });
+  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+  it("FE-196：库存 CSV 导出完成后给出成功反馈", async () => {
+    vi.mocked(catalog.stocksApi.list).mockResolvedValueOnce([
+      { id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "安卓", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00" },
+    ] as never);
+    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce({ account: { id: 1 }, orders: [] } as never);
+    const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:inventory");
+    const revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const successSpy = vi.spyOn(appMessage, "success").mockImplementation(() => ({} as never));
+    const keeper = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<InventoryPanel />, { user: "admin" });
+
+    await screen.findByText("acc-1");
+    await keeper.click(screen.getByRole("button", { name: /导出/ }));
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("库存 CSV 已导出"));
+    createObjectURLSpy.mockRestore();
+    revokeObjectURLSpy.mockRestore();
+    clickSpy.mockRestore();
+    successSpy.mockRestore();
   });
 });
 

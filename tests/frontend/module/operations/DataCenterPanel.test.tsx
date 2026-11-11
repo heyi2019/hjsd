@@ -1,4 +1,5 @@
-import { screen, waitFor } from "@testing-library/react";
+import { countOngoingOrders } from "@/reporting/DataCenterPanel";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -127,6 +128,23 @@ describe("DataCenterPanel：资金总览", () => {
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
     expect(await screen.findByText(/POOL-A/)).toBeInTheDocument();
   });
+  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+  it("P1/FE-241：数据中心主数据失败时不显示零统计且禁用快捷入口", async () => {
+    vi.mocked(catalog.poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
+    const onNavigate = vi.fn();
+    renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
+
+    const totalCard = await screen.findByRole("button", { name: /订单总数/ });
+    const activeCard = screen.getByRole("button", { name: /进行中/ });
+    expect(totalCard).toHaveTextContent("不可用");
+    expect(activeCard).toHaveTextContent("不可用");
+    expect(totalCard).toHaveAttribute("aria-disabled", "true");
+    expect(activeCard).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(totalCard);
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(screen.getByText("资金池数量").closest(".ui-stat")).toHaveTextContent("不可用");
+  });
 });
 
 describe("DataCenterPanel：业务入口卡（2026-10-13 从工作台迁入）", () => {
@@ -161,6 +179,28 @@ describe("DataCenterPanel：业务入口卡（2026-10-13 从工作台迁入）",
     const card = await screen.findByRole("button", { name: /进行中/ });
     expect(card).toHaveTextContent("2");
     await ui.click(card);
+    expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
+  });
+  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
+
+  it("P1/FE-149：数据中心进行中包含分期订单并跳转订单台账", async () => {
+    expect(countOngoingOrders([{ status: "ACTIVE" }, { status: "INSTALLMENT" }, { status: "COMPLETED" }])).toBe(2);
+    vi.mocked(catalog.poolsApi.list).mockResolvedValueOnce([]);
+    // 数据中心改为一次批量取余额（含服务端汇总），空池时给空 items + 零合计。
+    vi.mocked(catalog.poolsApi.balances).mockResolvedValueOnce({
+      items: [],
+      totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
+    });
+    vi.mocked(catalog.ordersApi.list).mockResolvedValueOnce([
+      { id: 10, order_no: "HS-2026-0001", order_type: "HS", capital_type: "STOCK", trade_date: "2026-10-01", status: "ACTIVE" },
+      { id: 11, order_no: "TH-2026-0002", order_type: "TH", capital_type: "STOCK", trade_date: "2026-10-02", status: "INSTALLMENT" },
+      { id: 12, order_no: "DG-2026-0003", order_type: "DG", capital_type: "ZERO", trade_date: "2026-10-03", status: "COMPLETED" },
+    ]);
+    const onNavigate = vi.fn();
+    renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
+    const card = await screen.findByRole("button", { name: /进行中/ });
+    expect(card).toHaveTextContent("2");
+    await userEvent.setup({ pointerEventsCheck: 0 }).click(card);
     expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
   });
 });

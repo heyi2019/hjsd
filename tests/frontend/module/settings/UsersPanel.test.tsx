@@ -45,7 +45,7 @@ beforeEach(() => {
 });
 
 describe("UsersPanel：用户管理动作", () => {
-  it("开发态角色不在服务端人员列表时给出明确说明", async () => {
+  it("FE-090：开发态角色不在服务端人员列表时给出明确说明", async () => {
     renderLight(<UsersPanel />, { user: "admin" });
 
     expect(await screen.findByText("operator01")).toBeInTheDocument();

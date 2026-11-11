@@ -175,7 +175,7 @@ describe("InstallmentsPanel：分期合约", () => {
     expect(deliverButtons.some((b) => !(b as HTMLButtonElement).disabled)).toBe(true);
   });
 
-  it("已结清合约禁止登记收款和终止退款", async () => {
+  it("FE-074：已结清合约禁止登记收款和终止退款", async () => {
     vi.mocked(catalog.installmentsApi.list).mockResolvedValueOnce([{ ...installments[0], status: "SETTLED" }]);
     renderLight(<InstallmentsPanel />, { user: "admin" });
     await screen.findByText("HS0001-INS01");

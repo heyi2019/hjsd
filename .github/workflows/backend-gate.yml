@@ -66,6 +66,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
+      # 依赖口径正确性门禁：requirements.txt 改了但 lock 没重算 → 生产装的是 lock，改动白费。
+      # 复现命令须与 lock 头注释逐字一致：仓库根执行、输出到 lock 路径本身（复用已 pin 版本保幂等，
+      # 输出临时路径会重新解析传递依赖致 diff 恒非空）、--no-emit-index-url 防止把 runner 源写进注释。
+      # pip-tools 已随 requirements-dev.txt 装入；境外 runner 用默认 pypi.org（本机实测 diff 空 ~7s，
+      # 切勿用阿里云镜像，境外访问反而不稳）。
+      - name: Verify requirements.lock.txt is in sync
+        run: |
+          cp backend/requirements.lock.txt /tmp/req.lock.expected
+          pip-compile --no-emit-index-url \
+            --output-file=backend/requirements.lock.txt --strip-extras \
+            backend/requirements.txt
+          if ! diff -u /tmp/req.lock.expected backend/requirements.lock.txt; then
+            echo "::error::requirements.lock.txt 与 requirements.txt 不同步；请在仓库根重跑 pip-compile --no-emit-index-url --output-file=backend/requirements.lock.txt --strip-extras backend/requirements.txt" >&2
+            exit 1
+          fi
+          echo "lock 一致性校验通过"
+
       - name: Prepare test configuration
         run: cp .env.example .env
 

@@ -107,6 +107,37 @@ jobs:
             exit 1
           fi
 
+      # 镜像回归门禁（构建后、打包前，早失败）：体积用 inspect 真实层去重字节（非 docker images
+      # 层累加假象），amd64 实测基线 29.6MB，阈值 34MB——加速包回归(+6MB)/pyc 回流(+6MB)都会超。
+      # 内容用动态 site-packages 路径（python3 -c import site，防换基础镜像后扫错目录假阴性）：
+      # pyc 必须 0、uvloop/httptools/watchfiles 不得回归、strip(binutils)不进运行层。
+      # 实测：干净 amd64 镜像 PASS；注入假 pyc 的阳性对照 FAIL——两向都已验证。
+      - name: Verify backend image budget & content
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMG="heijin-backend:${APP_VERSION}"
+          SIZE_BYTES="$(docker image inspect "$IMG" --format '{{.Size}}')"
+          SIZE_MB="$(awk "BEGIN{printf \"%.1f\", $SIZE_BYTES/1048576}")"
+          LIMIT_BYTES=$((34 * 1048576))
+          echo "backend image inspect size = ${SIZE_MB} MB (limit 34 MB)"
+          if [ "$SIZE_BYTES" -gt "$LIMIT_BYTES" ]; then
+            echo "::error::backend 镜像 ${SIZE_MB}MB 超过 34MB 上限；检查加速包回归 / pyc 回流 / 误加依赖" >&2
+            exit 1
+          fi
+          docker run --rm --entrypoint sh "$IMG" -c '
+            SP="$(python3 -c "import site; print(site.getsitepackages()[0])")"
+            [ -d "$SP" ] || { echo "site-packages 不存在: $SP" >&2; exit 1; }
+            pyc="$(find "$SP" -name "*.pyc" 2>/dev/null | wc -l | tr -d " ")"
+            acc="$(find "$SP" -maxdepth 1 \( -iname "uvloop*" -o -iname "httptools*" -o -iname "watchfiles*" \) 2>/dev/null | wc -l | tr -d " ")"
+            echo "site-packages=$SP pyc=$pyc accel_dirs=$acc"
+            [ "$pyc" -eq 0 ] || { echo "::error::运行层残留 $pyc 个 .pyc（多阶段构建应在 pip install 同层删除）" >&2; exit 1; }
+            [ "$acc" -eq 0 ] || { echo "::error::加速包回归 $acc 个（裸 uvicorn 不应含 uvloop/httptools/watchfiles）" >&2; exit 1; }
+            if command -v strip >/dev/null 2>&1; then echo "::error::binutils/strip 混入运行层" >&2; exit 1; fi
+            echo "镜像体积与内容门禁通过"
+          '
+          echo "backend image budget & content OK"
+
       - name: Create deployment package
         shell: bash
         run: |

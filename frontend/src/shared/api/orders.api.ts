@@ -63,14 +63,15 @@ export const ordersApi = {
     }
     return all;
   },
-  exportCsv: () =>
+  /** 导出必须与当前视图同口径：「我的订单」视图传 mine=true，由后端按 operator_user_ids 过滤。 */
+  exportCsv: (params?: { mine?: boolean }) =>
     api
-      .get<Blob>("/orders/export.csv", { params: { _t: Date.now() }, responseType: "blob" })
+      .get<Blob>("/orders/export.csv", { params: { ...params, _t: Date.now() }, responseType: "blob" })
       .then((r) => r.data),
   /** 订单台账 Excel：两个 sheet —— 主订单信息（列表可见列）+ 详情信息（订单详情全字段）。 */
-  exportXlsx: () =>
+  exportXlsx: (params?: { mine?: boolean }) =>
     api
-      .get<Blob>("/orders/export.xlsx", { params: { _t: Date.now() }, responseType: "blob" })
+      .get<Blob>("/orders/export.xlsx", { params: { ...params, _t: Date.now() }, responseType: "blob" })
       .then((r) => r.data),
   get: (orderId: number) =>
     api.get<Order>(`/orders/${orderId}`).then((r) => r.data),

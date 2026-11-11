@@ -32,6 +32,15 @@ describe("OrdersPage helpers", () => {
     expect(allocationRateFromAmount("0.00", "1500")).toBe("");
   });
 
+  it("分润比例↔金额走整数分：333.35 × 30% = 100.01，不再少 1 分", () => {
+    // 旧实现 (333.35 * 30 / 100).toFixed(2) 因浮点 100.00499... 得 "100.00"。
+    expect(allocationAmountFromRate("333.35", "30")).toBe("100.01");
+    // 反算同走基点：100.01 / 333.35 → 3000bp → 30.00%。
+    expect(allocationRateFromAmount("333.35", "100.01")).toBe("30.00");
+    // 亏损单允许负数分润，符号必须保留。
+    expect(allocationAmountFromRate("-333.35", "30")).toBe("-100.00");
+  });
+
   it("按业务类型、模式、游戏和库存状态筛选订单", () => {
     expect(filterBusinessOrders([
       order({ account_game_type: "原神", account_status: "WAITING" }),

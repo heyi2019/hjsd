@@ -56,7 +56,7 @@ export function useOrdersPageController(params: {
     gameTypeFilter, setGameTypeFilter, inventoryStatusFilter, setInventoryStatusFilter,
     dateRange, setDateRange, keyword, setKeyword,
     orderBusinessOptions, orderBusinessModeOptions, profitRoleOptions, inventoryStatusOptions,
-    gameTypeOptions, typeNames, filteredOrders, load,
+    gameTypeOptions, typeNames, filteredOrders, typeCountBase, load,
   } = list;
 
   // —— 表格详情 / 账号内联编辑枢纽 ——
@@ -199,6 +199,8 @@ export function useOrdersPageController(params: {
               allocation_rate: item.allocation_rate,
               allocation_amount: item.allocation_amount ?? "",
             }));
+      // 弹窗是复用的：先清空上次打开残留的字段（含 form_extra 自定义字段），再回填本单数据。
+      allocationForm.resetFields();
       allocationForm.setFieldsValue({
         allocations: rows,
       });
@@ -438,6 +440,9 @@ export function useOrdersPageController(params: {
   const openEditOrder = (order: Order) => {
     setSelectedOrder(order);
     const snapshot = order.account_snapshot;
+    // 弹窗复用：CustomFieldSection 的 name 为 form_extra.<key> 且无 initialValue，
+    // 不 reset 会把上个订单的自定义字段值带到本单（提交时随 form_extra 回写 → 串单污染）。
+    editForm.resetFields();
     editForm.setFieldsValue({
       trade_date: order.trade_date,
       note: order.note ?? undefined,
@@ -451,6 +456,8 @@ export function useOrdersPageController(params: {
       snap_platform: snapshot?.platform ?? undefined,
       snap_purchase_price: snapshot?.purchase_price ?? undefined,
       snap_note: snapshot?.note ?? undefined,
+      // 顺带按本单回填历史自定义字段：reset 后不能让编辑态只剩空框（旧值原本就没有回填）。
+      form_extra: order.form_extra ?? {},
     });
     setEditOpen(true);
   };
@@ -685,6 +692,7 @@ export function useOrdersPageController(params: {
     submitOrderDelete: submitOrderDelete,
     submitProfitShare: submitProfitShare,
     timeShiftMinutes: accountEditor.timeShiftMinutes,
+    typeCountBase: typeCountBase,
     typeNames: typeNames,
     types: types,
     updateEventDraft: accountEditor.updateEventDraft,

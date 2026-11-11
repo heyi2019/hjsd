@@ -41,8 +41,8 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     orderBusinessModeOptions,
     orderBusinessOptions,
     orderTypeFilter,
-    orders,
     page,
+    typeCountBase,
     pageSize,
     setBusinessModeFilter,
     setDateRange,
@@ -69,6 +69,9 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
   } = controller;
 
   const statValue = (value: number) => (loading ? "—" : loadError ? "不可用" : String(value));
+  // 计数基线由 useLedgerList 提供（已应用关键词/日期/游戏类型/库存状态/业务模式，独独不含「类型」），
+  // 与「订单总量」卡片同口径；用原始 orders 计数会出现「全部 627 / 订单总量 12」的自相矛盾。
+  const typeCount = (key: BusinessFilterKey) => countBusinessOrders(typeCountBase, key, businessModeFilter);
 
   return (
     <section className="ui-stack">
@@ -105,8 +108,8 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
           <Segmented
             value={orderTypeFilter}
             options={[
-              { value: "all", label: `全部 ${countBusinessOrders(orders, "all", businessModeFilter)}` },
-              ...orderBusinessOptions.map((item) => ({ value: item.value, label: `${item.label} ${countBusinessOrders(orders, item.value as BusinessFilterKey, businessModeFilter)}` })),
+              { value: "all", label: `全部 ${typeCount("all")}` },
+              ...orderBusinessOptions.map((item) => ({ value: item.value, label: `${item.label} ${typeCount(item.value as BusinessFilterKey)}` })),
             ]}
             onChange={(value) => { setOrderTypeFilter(value as BusinessFilterKey); setPage(1); }}
           />

@@ -18,7 +18,7 @@ vi.mock("@/shared/api/catalog", async (importOriginal) => {
     "list", "get", "create", "update", "patch", "post", "postEvent", "cancel", "remove",
     "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
     "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
+    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search", "exportCsv", "exportXlsx",
   ];
   const mk = (api: Record<string, unknown>) => {
     const o: Record<string, unknown> = { ...api };
@@ -123,6 +123,47 @@ describe("OrdersPage：四类订单台账", () => {
     const filterBar = screen.getByPlaceholderText("搜索订单号 / 游戏账号/产品 / 对方 / 备注").closest(".ui-filter-bar")!;
     const buttons = filterBar.querySelectorAll("button");
     expect(buttons[buttons.length - 1]).toBe(exportButton);
+  });
+
+  it("类型 Segmented 计数与「订单总量」同口径：关键词筛选后同步收窄", async () => {
+    await openLedger();
+    expect(screen.getByText("订单总量").closest(".ui-stat")).toHaveTextContent("2");
+    // 带位数的精确正则：页面还有「全部业务 / 全部库存状态」等 Segmented，/全部/ 会命中多个。
+    // antd Segmented 的 radio 文本在兄弟节点，元素自身 textContent 为空；计数体现在可访问名。
+    expect(screen.getByRole("radio", { name: "全部 2" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "回收 1" })).toBeInTheDocument();
+
+    await ui.type(screen.getByLabelText("搜索订单"), "TH-2026");
+    await waitFor(() => expect(screen.getByText("订单总量").closest(".ui-stat")).toHaveTextContent("1"));
+    // 旧实现用原始 orders 计数，关键词筛选后仍显示「全部 2」，与订单总量 1 自相矛盾。
+    expect(screen.getByRole("radio", { name: "全部 1" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "回收 0" })).toBeInTheDocument();
+  });
+
+  it("导出与当前视图同口径：我的订单视图导出 CSV/XLSX 均带 mine=true", async () => {
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:ledger");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.mocked(catalog.ordersApi.exportCsv).mockResolvedValue(new Blob(["csv"]));
+    vi.mocked(catalog.ordersApi.exportXlsx).mockResolvedValue(new Blob(["xlsx"]));
+
+    renderLight(<OrdersPage initialTab="ledger" initialMine />);
+    await screen.findAllByText("HS-2026-0001");
+
+    await ui.click(screen.getByRole("button", { name: /导出/ }));
+    // antd Dropdown 会同时保留上一份隐藏菜单，同文案出现多次；取最新一份直接触发。
+    const csvItem = await screen.findAllByText(/导出 CSV/);
+    fireEvent.click(csvItem[csvItem.length - 1]);
+    await waitFor(() => expect(vi.mocked(catalog.ordersApi.exportCsv)).toHaveBeenCalledWith(
+      expect.objectContaining({ mine: true }),
+    ));
+
+    await ui.click(screen.getByRole("button", { name: /导出/ }));
+    const xlsxItem = await screen.findAllByText(/导出 Excel/);
+    fireEvent.click(xlsxItem[xlsxItem.length - 1]);
+    await waitFor(() => expect(vi.mocked(catalog.ordersApi.exportXlsx)).toHaveBeenCalledWith(
+      expect.objectContaining({ mine: true }),
+    ));
   });
 
   // 原 5 条用例（无流程提示 / 日期区间位置 / 订单编号与状态 / 责任时间列 / 默认视图核心列）

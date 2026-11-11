@@ -12,6 +12,15 @@ import { filterBusinessOrders, type BusinessFilterKey, type BusinessModeFilterKe
 
 type Opt = { value: string; label: string };
 
+/** 交易日是否在筛选区间内（「订单总量」与类型 Segmented 计数共用，避免两处日期判断漂移）。 */
+function withinTradeDateRange(order: Order, range: [Dayjs, Dayjs] | null): boolean {
+  if (!range) return true;
+  const tradeDate = new Date(`${order.trade_date}T00:00:00`);
+  return !Number.isNaN(tradeDate.getTime())
+    && tradeDate >= range[0].startOf("day").toDate()
+    && tradeDate <= range[1].endOf("day").toDate();
+}
+
 /**
  * 订单台账「列表域」：数据加载、筛选、分页、排序、导出与选项词典，以及派生的 filteredOrders。
  * 从 useOrdersPageController 拆出，保持纯参数入 / 扁平返回出，不持有任何 modal / 账号动作状态。
@@ -33,7 +42,8 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
   const exportLedger = async () => {
     setLedgerExporting(true);
     try {
-      downloadBlob(await ordersApi.exportCsv(), `订单台账-${today()}.csv`);
+      // 导出必须与当前视图同口径：「我的订单」视图只导出我负责的单，不借导出绕过筛选拿全量。
+      downloadBlob(await ordersApi.exportCsv({ mine: mineOrders }), `订单台账-${today()}.csv`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     } finally {
@@ -44,7 +54,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
   const exportLedgerXlsx = async () => {
     setLedgerExporting(true);
     try {
-      downloadBlob(await ordersApi.exportXlsx(), `订单台账-${today()}.xlsx`);
+      downloadBlob(await ordersApi.exportXlsx({ mine: mineOrders }), `订单台账-${today()}.xlsx`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     } finally {
@@ -99,15 +109,17 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
   const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
   // 先按业务筛选，再按日期，最后一次排序；避免渲染层重复计算同一批订单。
   const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter)
-    .filter((order) => {
-      if (!dateRange) return true;
-      const tradeDate = new Date(`${order.trade_date}T00:00:00`);
-      return !Number.isNaN(tradeDate.getTime())
-        && tradeDate >= dateRange[0].startOf("day").toDate()
-        && tradeDate <= dateRange[1].endOf("day").toDate();
-    })
+    .filter((order) => withinTradeDateRange(order, dateRange))
     .slice()
     .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
+
+  // 类型 Segmented 计数基线：应用除「类型」外的全部筛选（关键词/日期/游戏类型/库存状态/业务模式），
+  // 保证各类型计数之和恒等于「订单总量」卡片；否则输入关键词后会出现「全部 627 / 订单总量 12」的自相矛盾。
+  const typeCountBase = useMemo(
+    () => filterBusinessOrders(orders, "all", businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter)
+      .filter((order) => withinTradeDateRange(order, dateRange)),
+    [orders, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter, dateRange],
+  );
 
   return {
     orders,
@@ -147,6 +159,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
     gameTypeOptions,
     typeNames,
     filteredOrders,
+    typeCountBase,
     load,
   };
 }

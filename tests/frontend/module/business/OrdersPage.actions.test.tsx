@@ -7,7 +7,7 @@ import { OrdersPage, validateAllocations } from "@/orders/OrdersPage";
 import { buildOrderPatchPayload, pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
 
 import * as catalog from "@/shared/api/catalog";
-import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { allFormFields, seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 import { today } from "@/shared/lib/format";
 import * as client from "@/shared/api/client";
 import type { Installment, InstallmentCancelResult, Order, OrderLink, ProfitAllocation } from "@/shared/api/catalog";
@@ -383,6 +383,45 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   // 原两条（按姓名预填 / 展示订单总利润）同一份夹具、同一入口、纯只读，合并为一次挂载。
+  it("分润弹窗复用不残留 form_extra：取消后打开另一单，自定义字段清空", async () => {
+    // 注入一个 ALLOCATION scope 的自定义字段：CustomFieldSection 只渲染 is_custom && is_active。
+    vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([
+      ...allFormFields(),
+      {
+        id: 9001,
+        order_type_code: "ALLOCATION",
+        field_key: "alloc_note",
+        label: "分润备注",
+        field_type: "TEXT",
+        options: [],
+        required: false,
+        is_active: true,
+        sort_order: 99,
+        locked: false,
+        is_custom: true,
+        section: "EXTRA",
+        note: null,
+      },
+    ] as never);
+
+    await openLedger();
+    // openAllocations 会按 id 重拉订单；默认桩恒返回 order1，这里按 id 分流才能拿到第二单的标题。
+    vi.mocked(catalog.ordersApi.get).mockImplementation(async (id) => (id === 2 ? order2 : order1));
+    // 第一单：填自定义字段后取消（不 reset 会留在被复用的 allocationForm store 里）。
+    await openRowMenu("HS-2026-0001", "分润配置");
+    const first = await modalOf(/分润 · HS-2026-0001/);
+    // 字段配置按 scope 异步加载，必须等自定义字段渲染出来。
+    await ui.type(await within(first).findByLabelText("分润备注"), "上一单的残留值");
+    // 默认 Modal 的取消文案受 ConfigProvider locale 影响，按结构取 X 关闭按钮。
+    fireEvent.click(first.querySelector(".ant-modal-close") as HTMLElement);
+    // antd Modal 默认不销毁内容，关闭后 DOM 仍隐藏保留；等它隐藏后再开第二单。
+    await waitFor(() => expect(first).not.toBeVisible());
+
+    await openRowMenu("DG-2026-0002", "分润配置");
+    const second = await modalOf(/分润 · DG-2026-0002/);
+    await waitFor(() => expect(within(second).getByLabelText("分润备注")).toHaveValue(""));
+  });
+
   it("分润：弹窗按姓名预填已有比例，并展示订单总利润", async () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");

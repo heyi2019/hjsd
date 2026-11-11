@@ -85,6 +85,43 @@ def test_orders_export_uses_chinese_visible_columns(seeded_client, headers, seed
     assert "HS9801" in body  # 明细行带订单号
 
 
+def test_orders_export_mine_only_includes_my_orders(seeded_client, headers, seeded_db):
+    """「我的订单」视图导出必须走 mine 过滤，不能借导出绕过视图拿全量。
+
+    headers = X-Dev-User: admin → id=1；owner_id=1 是本人单，owner_id=2 是他人单。
+    """
+    mine = _seed_order(seeded_db, order_no="HSMINE01")
+    mine.owner_id = 1
+    foreign = _seed_order(seeded_db, order_no="HSFOREIGN01")
+    foreign.owner_id = 2
+    seeded_db.flush()
+
+    full = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text
+    assert "HSMINE01" in full
+    assert "HSFOREIGN01" in full  # 不带 mine 仍是全量
+
+    scoped = seeded_client.get(
+        "/api/v1/orders/export.csv", headers=headers, params={"mine": True}
+    ).text
+    assert "HSMINE01" in scoped
+    assert "HSFOREIGN01" not in scoped
+
+    # XLSX 与 CSV 同口径
+    xlsx = seeded_client.get(
+        "/api/v1/orders/export.xlsx", headers=headers, params={"mine": True}
+    )
+    assert xlsx.status_code == 200
+    workbook = openpyxl.load_workbook(io.BytesIO(xlsx.content))
+    cells = [
+        str(cell.value)
+        for row in workbook.worksheets[0].iter_rows()
+        for cell in row
+        if cell.value is not None
+    ]
+    assert "HSMINE01" in cells
+    assert "HSFOREIGN01" not in cells
+
+
 def test_orders_export_keeps_single_row_header(seeded_client, headers, seeded_db):
     """CSV 必须单行表头：导入解析以首个非空行为表头，多行表头会让回流导入错位。"""
     _seed_order(seeded_db, order_no="HS9804")

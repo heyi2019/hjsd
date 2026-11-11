@@ -2,6 +2,7 @@ import type { Order } from "../../shared/api/catalog";
 import type { OrderPatchPayload } from "../../shared/api/orders.api";
 import type { Dayjs } from "dayjs";
 import { money } from "../../shared/lib/format";
+import { toCents, fromCents, toBasisPoints, amountByBasisPoints, basisPointsByAmount, fromBasisPoints } from "../../shared/lib/money";
 
 export type BusinessFilterKey = "all" | "HS" | "TH" | "DG";
 export type BusinessModeFilterKey = "all" | "SELF" | "DISTRIBUTION";
@@ -223,22 +224,27 @@ export function splitEven(total: number, people: number, scale = 100): number[] 
   return parts.map((unit) => unit / scale);
 }
 
-/** 分润输入联动：按订单利润把比例换算成金额，金额固定保留两位小数。 */
+/** 分润输入联动：按订单利润把比例换算成金额。
+ *  走 money.ts 的整数分/基点口径：333.35 × 30% 必须得 100.01；
+ *  旧实现的浮点 (333.35 * 30 / 100).toFixed(2) 会因 100.00499... 少 1 分得 100.00。 */
 export function allocationAmountFromRate(orderProfit: string, rate: string): string {
   if (String(rate).trim() === "") return "";
-  const profit = Number(orderProfit);
-  const percentage = Number(rate);
-  if (!Number.isFinite(profit) || !Number.isFinite(percentage)) return "";
-  return (profit * percentage / 100).toFixed(2);
+  const profitCents = toCents(orderProfit);
+  const bp = toBasisPoints(rate);
+  if (!Number.isFinite(profitCents) || !Number.isFinite(bp)) return "";
+  return fromCents(amountByBasisPoints(profitCents, bp));
 }
 
-/** 分润输入联动：按订单利润把金额反算成比例；利润为 0 时没有可推导的比例。 */
+/** 分润输入联动：按订单利润把金额反算成比例；利润为 0 时没有可推导的比例。
+ *  同样走整数分/基点，避免浮点换算在末位漂移。 */
 export function allocationRateFromAmount(orderProfit: string, amount: string): string {
   if (String(amount).trim() === "") return "";
-  const profit = Number(orderProfit);
-  const value = Number(amount);
-  if (!Number.isFinite(profit) || !Number.isFinite(value) || profit === 0) return "";
-  return (value / profit * 100).toFixed(2);
+  const profitCents = toCents(orderProfit);
+  const amountCents = toCents(amount);
+  if (!Number.isFinite(profitCents) || !Number.isFinite(amountCents) || profitCents === 0) return "";
+  const bp = basisPointsByAmount(profitCents, amountCents);
+  if (!Number.isFinite(bp)) return "";
+  return fromBasisPoints(bp);
 }
 
 export function validateAllocations(

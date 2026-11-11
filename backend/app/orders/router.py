@@ -442,10 +442,12 @@ def export_orders_csv(
     owner_id: int | None = Query(default=None, gt=0),
     pool_id: int | None = Query(default=None, gt=0),
     keyword: str | None = Query(default=None, max_length=128),
+    mine: bool = Query(default=False),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
 ) -> Response:
-    """订单台账按「设置 → 列表字段」的可见列导出 CSV：同 /orders 筛选口径，全量不分页。"""
+    """订单台账按「设置 → 列表字段」的可见列导出 CSV：同 /orders 筛选口径，全量不分页。
+    mine=true 时与「我的订单」视图一致，只导出我负责/我执行的订单。"""
     orders = service.list_orders(
         db,
         order_type=order_type,
@@ -455,6 +457,7 @@ def export_orders_csv(
         owner_id=owner_id,
         pool_id=pool_id,
         keyword=keyword,
+        mine=mine,
         limit=EXPORT_ROW_LIMIT,
         offset=0,
         user=_user,
@@ -495,6 +498,7 @@ def export_orders_xlsx(
     owner_id: int | None = Query(default=None, gt=0),
     pool_id: int | None = Query(default=None, gt=0),
     keyword: str | None = Query(default=None, max_length=128),
+    mine: bool = Query(default=False),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
 ) -> Response:
@@ -512,6 +516,7 @@ def export_orders_xlsx(
         owner_id=owner_id,
         pool_id=pool_id,
         keyword=keyword,
+        mine=mine,
         limit=EXPORT_ROW_LIMIT,
         offset=0,
         user=_user,

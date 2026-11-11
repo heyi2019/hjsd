@@ -150,7 +150,36 @@
 | UI-06 | 双主题 | 浅色与深色下，文字、边框、浮层、图表、禁用态和焦点均可读 |
 | UI-07 | 无障碍 | 键盘焦点、缩放、降低透明度和减少动效均有可用表现 |
 
-## 9. 维护规则
+## 9. 危险操作两级确认
+
+破坏性 / 丢弃类操作统一收口到 `ConfirmButton`（Popover 级）与 `ConfirmDialog`（Modal 级）两个组件，调用方只声明「做什么」与「影响什么 / 能否撤销」。
+
+| 级别 | 组件 | 底层 | 适用场景 | 遮罩 | Esc |
+| --- | --- | --- | --- | --- | --- |
+| Popover 级 | `ConfirmButton` | antd `Popconfirm` | 可逆 / 简单销毁的单键操作，确认后无需额外输入 | 无 | 点外部 / 取消即关 |
+| Modal 级 | `ConfirmDialog` | antd `Modal` | 需多输入（表单）或丢弃未保存内容等较重确认 | 有 | 可关闭（keyboard） |
+
+选型原则：轻量、可逆、单键 → `ConfirmButton`；较重（要填东西 / 会丢未保存内容 / 多步确认）→ `ConfirmDialog`。
+
+**行为契约（两级对齐）**
+
+1. 提交防重：pending 期间禁用取消、防重触发，确认按钮显示 `loading`。
+2. 失败反馈：统一走全局 toast（`appMessage.error`），组件自身不带页面级错误位。
+3. 受控关闭：`ConfirmDialog` 由父级用 `open` 受控，成功 / 失败后均交由父级决定是否关闭。
+4. 入场动画：默认带 `.heijin-fast-confirm`（50ms 入场，见 `antd-adapter.css`）。
+5. 默认文案：`okText` 默认「确认」，`cancelText` 默认「取消」；Modal 级可显式覆盖。
+
+**文案与样式**：确认键 = 动作动词（删除 / 停用 / 退出 / 放弃 / 确认合并），禁止模糊的「确定」；取消键统一为「取消」或语义明确的「继续编辑」「返回修改」。`danger` 仅标在**不可逆 / 有损**操作的确认按钮上，取消键永不着红。
+
+**Esc 与遮罩**：Modal 级 `keyboard` 开启、`maskClosable={false}`；Popover 级无遮罩，点外部或取消即关。页面级浮层（`ResizableModal` / `BusinessActionModal`）的 Esc 拦截由各浮层自行负责，不在两级组件内重复处理。
+
+**权限门控**：`ConfirmButton` 的 `permission` 可选，需权限的操作传 `permission` 由 `PermissionGate` 门控；`ConfirmDialog` 不做权限门控，由触发页面在调用前把关，避免双重拦截。
+
+**测试约定**：测试环境用 `rc-motion` 桩（`src/test/motion-stub.tsx`），必须遵守 `visible === false && removeOnLeave` 时不渲染 children 的语义 —— 硬编码 `visible: true` 会让 antd Button 总渲染 loading 图标（`aria-label="loading"`），把可访问名污染为「loading 删除」。涉及两级确认按钮的断言优先用可访问名精确匹配 `within(dialog).getByRole("button", { name: "删除" })`；仅在同文案多处出现时退回 `within(...).getByText(...)`，不要用正则绕过可访问名不匹配。
+
+> antd Modal 禁止嵌在受控 Modal 的 children 中，确认框同级渲染；裸 Modal 必须包 `ConfigProvider button={{autoInsertSpace:false}}`。
+
+## 10. 维护规则
 
 | 变更 | 规则 |
 |---|---|

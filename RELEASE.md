@@ -2,7 +2,7 @@
 
 ## 发版流程入口
 
-正式版发布、阿里云部署、备份和回滚统一按 [docs/发布流程.md](docs/发布流程.md) 执行。本文件只保留版本记录和版本号生成规则，避免维护两套发布步骤。
+正式版发布、阿里云部署、备份和回滚统一按 [docs/研发流程.md](docs/研发流程.md) 执行。本文件只保留版本记录和版本号生成规则，避免维护两套发布步骤。
 
 > **正常推送 `main` 会自动发版。** CI 会按提交类型自动升版：普通修复/工程变更升
 > patch，`feat` 升 minor，带 `!` 或 `BREAKING CHANGE` 升 major，并同步三处版本、
@@ -121,17 +121,17 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 - **前端单入口**：H5 两套入口与微信 H5 通道已下线，手机访问靠 `responsive.css` 三断点；移动端隐藏列按列 key 打标，禁用 nth-child。
 - **登录**：桌面端密码 / 手机号验证码 / 微信三入口保留，不开放注册；生产 `.env` 两条免密链路仍显式关闭。
 - **质量口径**：三端全量回归全绿（后端 1728、前端落库 1081 全 PASS、E2E 62），官方报告 FAIL / ERROR / SKIP / 未执行 / 弱标准均归零；版本三处一致由 `bump_version.sh --check` 守卫。
-- **发布通道合规**：`deploy.sh` 移除 `db_version` 自建表与 `policy_definitions` 预置两处副作用，内置售出表单 B4 补齐与升级前后库状态不变量自检（失败即中止发布）；`deploy-production.yml` 持久化 ECS `.env` 的 `APP_VERSION`，避免后续单独 `compose up` 静默回落旧镜像。
+- **发布通道合规**：`deploy.sh` 移除 `db_version` 自建表与 `policy_definitions` 预置两处副作用，只保留升级前后库状态不变量自检（失败即中止发布），不再内置 B4 补齐；`deploy-production.yml` 持久化 ECS `.env` 的 `APP_VERSION`，避免后续单独 `compose up` 静默回落旧镜像。
 
 > 提交历史中曾出现 `feat(h5)` 系列，最终已整体下线，**不属于本版交付内容**。发布记录按终态口径书写，勿按提交列表逐条对外引用。
 
 ### 升级与回滚
 
-按 `docs/发布流程.md` **自动 CI/CD 原地增量升级**：`git push origin main:refs/heads/test` → 3 gate → `auto-merge` → `deploy-production` → ECS。零 DDL、B4 已内置进 `deploy.sh`、生产数据不出 ECS。回滚按发布流程中的备份与恢复步骤执行。
+按 `docs/研发流程.md` **自动 CI/CD 原地增量升级**：`git push origin main` → `main-ci-cd` 自动升版并生成 `chore(release)` 提交 → dispatch 三个 CI 门禁（lint / frontend / backend）→ 全绿后 dispatch `deploy-production` → ECS 原地增量部署。生产数据不出 ECS；B4 不在 `deploy.sh` 内自动执行，已有库升级须在 ECS 现场按当期执行单手动跑 `backend/scripts/split_sale_form_scopes.py`。回滚按研发流程中的备份与恢复步骤执行。
 
 ### 已知遗留
 
-首次设密死锁修复未包含在本版；生产两条免密链路保持关闭，开放前需单独发版。高负载下两条 E2E flake 仍待裁决；`test` 分支自动部署链路已修合规并作为唯一发布通道，**误触等同生产上线**。
+首次设密死锁修复未包含在本版；生产两条免密链路保持关闭，开放前需单独发版。高负载下两条 E2E flake 仍待裁决；`origin/main` 是唯一发布通道，`push origin main` **误触等同生产上线**。
 
 ---
 
@@ -158,7 +158,7 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 ### 发布前检查
 
 - `scripts/ops/bump_version.sh --check` 三处版本一致；`run_regression.py ci` / `fe` 与 Playwright E2E 结果已定性。
-- 已有库按 `docs/发布流程.md` 的发布前检查执行 B4，并检查字段数增量为预期。
+- 已有库按 `docs/研发流程.md` 的发布前检查在 ECS 现场执行 B4，并检查字段数增量为预期。
 - 结构比对除列与索引外，必须核对 `pg_constraint.contype='p'`（业务表缺失主键数为 0）。
 
 ### 回滚

@@ -3,7 +3,7 @@
 FastAPI + React 的工作室经营系统。**v1 是唯一入口**（`app/main.py`）。
 
 开发、测试和发布按以下三份流程执行：
-[开发流程](docs/开发流程.md) · [测试流程](docs/测试流程.md) · [发布流程](docs/发布流程.md)
+[研发流程](docs/研发流程.md)
 
 > 发布通道：远端只有 `origin/main`，`git push origin main` → `main-ci-cd` 自动升版 → dispatch lint / frontend / backend 三个门禁 → 全绿后 dispatch `deploy-production` → ECS 生产。**推送即上线**，纯文档提交同样会触发。
 
@@ -32,7 +32,7 @@ cd backend && .venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 -
 cd frontend && VITE_BACKEND_PORT=8123 npm run dev -- --host 0.0.0.0 --port 5188 --strictPort
 ```
 
-前端代理端口读取 `VITE_BACKEND_PORT`，开发环境固定为前端 `5188` → 后端 `8123`；本地 `main` worktree 使用前端 `5199` → 后端 `8125`。其他测试端口和验证方式见 [测试流程](docs/测试流程.md)。
+前端代理端口读取 `VITE_BACKEND_PORT`，开发环境固定为前端 `5188` → 后端 `8123`；本地 `main` worktree 使用前端 `5199` → 后端 `8125`。其他测试端口和验证方式见 [研发流程](docs/研发流程.md)。
 
 登录页会先检查 `/api/v1/health`。后端未启动或端口不一致时，会直接提示连接问题，
 不会再把 Vite 代理错误显示成笼统的 500。
@@ -92,7 +92,7 @@ cd frontend && npm run build
 
 ## 关键业务约束
 
-写代码前必看 `docs/PRD.md` 与 `docs/数据字典.md`（旧功能规格 F01 已冻结，仅保留编号体系），几条最容易踩的：
+写代码前必看 `docs/PRD.md` 与 `docs/数据字典.md`（旧功能规格 F01 已下线，编号体系见 `docs/testing/功能编号注册表.csv`），几条最容易踩的：
 
 - **规则快照**（BAS-06-04）：订单 / 返点 / 分期创建时固化当时生效的规则版本与参数
   （`policy_version_id` + `policy_snapshot`）。改未来费率**不会**改写已发生业务的利润。

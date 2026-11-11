@@ -35,7 +35,7 @@
 
 | 模块 | 方法与路径 | 用途 |
 |---|---|---|
-| 健康 | GET `/`、GET `/health` | 引擎信息、数据库连通性与 SQLite 运行参数 |
+| 健康 | GET `/`、GET `/health` | 引擎信息、数据库连通性与版本信息 |
 | 认证 | POST `/auth/login`、GET `/auth/me`、POST `/auth/change-password`、POST `/auth/logout` | 登录、当前用户、改密、会话注销 |
 | 主数据 | `GET/POST /pools`；`PATCH/DELETE /pools/{pool_id}`；`PATCH /pools/{pool_id}/status`；`GET /pools/{pool_id}/balance`；`GET/POST /order-types`；`PATCH /order-types/{order_type_id}`、`/active`；`GET/POST /game-types`；`PATCH /game-types/{game_type_id}`、`/active`、`/default`；`DELETE /game-types/{game_type_id}`；`GET/POST /option-sets`；`GET/PUT/DELETE /option-sets/{code}`；`GET /sequences` | 资金池、业务类型、游戏类型、选项集及状态维护 |
 | 路由 | `GET /order-types/{order_type_id}/routes`；`POST /order-types/{code}/routes`；`GET /order-types/{code}/routes/impact-preview` | 业务类型到资金池的过账路由与影响预览；当前无路由 PATCH |

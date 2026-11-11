@@ -4,7 +4,7 @@
  * 设计边界：
  * - 只在发布域（或 VITE_DATA_SOURCE=cloud）启用，本地 5188 / ECS 仍走原 FastAPI；
  * - 复用 axios adapter 接口，因此 src/shared/api/*.api.ts 的 146 处调用点无需改动；
- * - 云端是 heijin_erp_release 的只读快照，写操作一律返回明确的业务错误，不静默造假成功。
+ * - 云端是生产库（ECS `heijin_erp`）的只读快照，写操作一律返回明确的业务错误，不静默造假成功。
  */
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { CLOUD_PUBLIC_CONFIG } from "./config";

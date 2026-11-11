@@ -193,7 +193,7 @@
           return '<tr>' + fields.map(function (f) { return '<td>' + esc(fmt(payload[f[0]])) + '</td>'; }).join('') + '</tr>';
         }).join('');
       }
-      $('total').textContent = '共 ' + total + ' 条，来自 heijin_erp_release（已脱敏）';
+      $('total').textContent = '共 ' + total + ' 条，来自云端只读快照（已脱敏）';
       $('page-info').textContent = '第 ' + page + ' / ' + Math.max(1, Math.ceil(total / PAGE_SIZE)) + ' 页';
       $('prev').disabled = page <= 1;
       $('next').disabled = page * PAGE_SIZE >= total;

@@ -8,14 +8,14 @@
 
 2026-11-03 重写为 PG（原 SQLite 版已下线）：
 - 源库经 pg_dump 还原到临时 PG 库；探针只读写副本；跑完 DROP 临时库。
-- 源库只做 pg_dump（只读），绝不写入/删除源库（dev/release/test 一律不碰）。
+- 源库只做 pg_dump（只读），绝不写入/删除源库（dev/test/e2e 一律不碰）。
 - dump/restore 一律走容器 heijin-db-1（宿主机无 PG 客户端）。
 
 用法（需 backend venv，APP_ENV 自动置 development 走 X-Dev-User 直通）：
     ./.venv/bin/python scripts/perf_probe.py                         # 默认源=dev 沙盒，打印 Top30
     ./.venv/bin/python scripts/perf_probe.py --out base.json         # 同时存 JSON 供前后对比
-    ./.venv/bin/python scripts/perf_probe.py --source-url postgresql+psycopg://erp_app:***@127.0.0.1:5433/heijin_erp_release
-        # 指向有数据的库（只读 dump）；dev 沙盒业务表全空，默认跑只用于工具自检。
+    ./.venv/bin/python scripts/perf_probe.py --source-url postgresql+psycopg://erp_app:***@127.0.0.1:5433/heijin_erp_dev
+        # 示例：显式指定源库（只读 dump），把库名换成有数据的目标库；dev 沙盒业务表全空时默认跑只用于工具自检。
 
 安全红线：
 - 只 CREATE/DROP 前缀为 `heijin_erp_perf_probe_` 的临时库；DROP 前硬性校验前缀。

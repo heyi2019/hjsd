@@ -410,6 +410,10 @@ def add_customer_role(
     用于库存售出时把买家挂到来源单——来源单在入库时已建档，售出不再新建订单。
     """
     order = get_order(session, order_id, user)
+    # 与建单同一套参与方护栏：角色合法、符合订单类型白名单、客户仍可用。
+    # 缺任一校验都会让「售后追挂买家」绕过停用/合并客户与角色白名单。
+    _validate_participant_roles(order.order_type, [(customer_id, role)], [])
+    parties_service.assert_customer_usable(session, customer_id, user=user)
     from app.domain.parties import OrderCustomerRole
     from sqlalchemy import select
 

@@ -15,6 +15,7 @@ from .form_field_rules import (
     ORDER_TYPE_CODE_PATTERN,
     _validate_section,
 )
+from .form_scopes import SCOPE_CODES
 
 def get_section_labels(session: Session, *, order_type_code: str) -> dict[str, str]:
     """返回该业务类型下已自定义（落库）的板块标题映射：section_key -> 显示标题。
@@ -50,6 +51,13 @@ def save_section_labels(
     if not ORDER_TYPE_CODE_PATTERN.match(code):
         raise Validation(
             "业务类型 code 必须为 2-10 位大写字母或数字",
+            details={"field": "order_type_code", "value": order_type_code},
+        )
+    if code not in SCOPE_CODES:
+        # 板块标题属于表单配置，作用域必须先在注册表登记；否则会写入前端
+        # 永远读不到（scopes 接口不下发）、也无法被任何表单消费的僵尸配置。
+        raise Validation(
+            f"表单作用域 {code} 未按注册表登记",
             details={"field": "order_type_code", "value": order_type_code},
         )
     if not isinstance(labels, Mapping):

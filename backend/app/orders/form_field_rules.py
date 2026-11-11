@@ -105,11 +105,14 @@ def _normalize_required_when(
         select(OrderFormField).where(
             OrderFormField.order_type_code == order_type_code,
             OrderFormField.field_key == dep,
+            OrderFormField.is_active.is_(True),
         )
     )
     if dep_row is None:
+        # 依赖字段既不能不存在，也不能已停用：停用的字段不会被前端渲染，
+        # 条件必填会静默失效。历史数据允许保留，但不得再新增悬空依赖。
         raise Validation(
-            "条件必填的依赖字段不存在于当前表单",
+            "条件必填的依赖字段不存在或已停用",
             details={"field": "required_when.field", "value": dep},
         )
     return {"field": dep, "op": op, "values": values or None}

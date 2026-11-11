@@ -546,7 +546,10 @@ def post_event(
         )
     session.flush()
 
-    # BUY/SELL 收益人自动绑定动作执行人，避免手工选错人员。
+    # BUY/SELL 收益人的绑定统一由 policy.allocations.set_allocations 负责
+    # （单一执行人自动绑定、多人协作按人分行、且必须是动作执行人）。
+    # 事件登记阶段只做历史兜底：该动作类型恰好只有一行且尚未绑定人员时回填
+    # 当前执行人；多行分润一律不碰，避免把每个人的独立分润抹成同一个人。
     if event_type in {EventType.BUY.value, EventType.SELL.value}:
         actor_id = session.scalar(select(User.id).where(User.username == actor))
         if actor_id is not None:
@@ -556,9 +559,9 @@ def post_event(
                     OrderProfitAllocation.allocation_type == event_type,
                 )
             ).all()
-            for allocation in allocations:
-                allocation.user_id = actor_id
-                allocation.updated_by = actor
+            if len(allocations) == 1 and allocations[0].user_id is None:
+                allocations[0].user_id = actor_id
+                allocations[0].updated_by = actor
 
     record_audit(
         session,

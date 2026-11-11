@@ -143,14 +143,26 @@ def _assert_event_allowed(
             raise Validation(
                 f"{order.order_type} 已建立分期合约，只能通过分期收款，不能重复登记 SELL"
             )
-    if event_type == EventType.SELL.value and session.scalar(
-        select(OrderEvent.id).where(
-            OrderEvent.order_id == order.id,
-            OrderEvent.event_type == EventType.SELL.value,
-            OrderEvent.is_posted.is_(True),
+    if event_type == EventType.SELL.value:
+        last_sell_id = session.scalar(
+            select(OrderEvent.id).where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.event_type == EventType.SELL.value,
+                OrderEvent.is_posted.is_(True),
+            ).order_by(OrderEvent.id.desc()).limit(1)
         )
-    ) is not None:
-        raise Validation("每张订单只能登记一次 SELL")
+        if last_sell_id is not None:
+            # 重开 BUY（COMPLETED → BUY → ACTIVE）后允许再次售出闭环；
+            # 只在「最近一次 SELL 之后没有新的 BUY」时才拦重复售出。
+            last_buy_id = session.scalar(
+                select(OrderEvent.id).where(
+                    OrderEvent.order_id == order.id,
+                    OrderEvent.event_type == EventType.BUY.value,
+                    OrderEvent.is_posted.is_(True),
+                ).order_by(OrderEvent.id.desc()).limit(1)
+            )
+            if last_buy_id is None or last_buy_id < last_sell_id:
+                raise Validation("每张订单只能登记一次 SELL；重开 BUY 后可再次售出")
     if event_type == EventType.CANCEL.value:
         _required_text(reason, field="reason", message="CANCEL 必须填写冲销原因")
         if offset_event_id is None:
@@ -306,8 +318,17 @@ def _post_deliver(
         if account is not None:
             if normalized_bound_phone is not None:
                 account.bound_phone = normalized_bound_phone
-                account.updated_by = actor
-            account.status = AccountStatus.SOLD.value
+            if account.status == AccountStatus.VOID.value:
+                raise Validation(
+                    f"账号 {account.stock_no} 已作废，不能登记卖号交付",
+                    details={"account_id": account.id, "status": account.status},
+                )
+            if account.status != AccountStatus.SOLD.value:
+                # 正常路径 SELL 事件已把账号置为 SOLD；这里仅为异常数据兜底，
+                # 且必须走状态机，禁止直接赋值复活 VOID 终态账号。
+                account.status = transition(
+                    ACCOUNT_TRANSITIONS, account.status, "SELL", entity="账号"
+                )
             account.updated_by = actor
     if direction == "SELL" and order.status != OrderStatus.COMPLETED.value:
         order.status = transition(

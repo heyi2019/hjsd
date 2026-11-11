@@ -8,11 +8,11 @@
 #   - `#` 开头为注释。新增条目必须能用一句话说清理由。
 #
 # 复核节奏：数据文件更新（重新导出 rawdata）后跑 `--all` 看总量变化，不需要改本文件。
+# 2026-11-11：归档历史文档全部清退，对应 6 条条目同步删除；本清单只登记现役文件。
 
 # ── 一、v1 迁移源数据（真实 PII，业务必要） ─────────────────────────────
 # rawdata/原始数据/*.json 是 v1 迁移的可复现源数据：
 #   * backend/scripts/land_raw_import.py 直接以该目录为 SOURCE_DIR；
-#   * docs/archive/ERP_迁移报告_v1.0_已作废.md 明确「重新导出 JSON 覆盖 rawdata 后重跑迁移脚本」；
 #   * README.md 将其列为「金山文档导出的 5 份只读 JSON」。
 # 其中含游戏账号绑定的手机号（sheet16）与分期记录中的手机号（sheet17）。
 # 处置口径：仓库必须保持 private；如需转公开或对外分享，必须先移出该目录并清理历史。
@@ -24,9 +24,6 @@ rawdata/原始数据/sheet17_installments.json :: phone
 # 138****9999、138****1234、139****0000、139****2222 一类占位值，非真实用户号码。
 # 注意：本文件自身也在扫描范围内，注释中不得出现完整号码（上面已刻意脱敏）。
 # 合成测试号码：仅用于分期交付/订单事件契约，非真实用户数据。
-# 接口规范文档的号码为占位示例值（138 号段全 0 尾号，一眼可辨非真实）；文档已归档，路径随归档目录同步。
-# 原 v1.0 条目已删除：该文件已不存在（死条目只提示不阻断，但会误导后来者）。
-docs/archive/ERP_API接口规范_v1.1_已作废.md :: phone
 tests/fixtures/v1_acceptance_seed.json :: phone
 
 # ── 三、测试目录迁移后的合成占位号码（2026-11-05 登记） ─────────────────
@@ -36,13 +33,8 @@ tests/fixtures/v1_acceptance_seed.json :: phone
 # 两份治理方案文档里的真实号码已改为 198****3890 脱敏写法，未登记进本清单。
 backend/scripts/e2e_db.py :: phone
 docs/ERP_API接口规范_v1.2.md :: phone
-docs/archive/ERP_生产上线执行单_v1.0_20261103_已作废.md :: phone
-docs/archive/ERP_生产上线执行单_v1.1_20261103_已作废.md :: phone
-docs/archive/ERP_生产上线执行单_v1.2_20261104_已作废.md :: phone
 docs/testing/测试用例库.csv :: phone
 docs/testing/测试用例库.md :: phone
-docs/archive/前端建单与页面交互测试报告_20261101_已归档_20261110.md :: phone
-docs/archive/前端建单与页面交互测试报告_20261101_P1修复版_已归档_20261110.md :: phone
 tests/backend/integration/business/test_bughunt.py :: phone
 tests/backend/integration/business/test_installments_contract.py :: phone
 tests/backend/integration/business/test_orders.py :: phone

@@ -20,7 +20,7 @@
 | 事实 | 核验方式 |
 |---|---|
 | 远程仓库为 private | `gh repo view heyi2019/hjsd --json visibility` → `PRIVATE` |
-| `rawdata` 是迁移源数据，非临时产物 | `backend/scripts/land_raw_import.py:42` 以 `rawdata/原始数据` 为 `SOURCE_DIR`；`docs/archive/ERP_迁移报告_v1.0_已作废.md` 要求"重新导出覆盖后重跑迁移"；`README.md` 列为只读源 JSON |
+| `rawdata` 是迁移源数据，非临时产物 | `backend/scripts/land_raw_import.py:42` 以 `rawdata/原始数据` 为 `SOURCE_DIR`；`README.md` 列为只读源 JSON。重新导出覆盖后需重跑迁移脚本，历史迁移报告已清退、需要时从 git 历史追溯 |
 | PII 集中在 2 个数据文件 | `backend/scripts/scan_pii.py --all` → 真实号码仅命中 `sheet16_accounts.json`、`sheet17_installments.json` |
 | 其余命中均为合成占位值 | 同上，测试/文档中为 `138****0000` 一类占位号，已在白名单分组登记 |
 | 无身份证/银行卡/密钥特征命中 | 同上，`id_card` / `bank_card` / `secret_key` / `private_key` 规则零命中 |

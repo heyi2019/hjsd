@@ -86,7 +86,7 @@ cd frontend && npm run build
 | `tests/backend` | 后端测试（pytest，111 个文件） |
 | `frontend/src` | 按业务域拆分（`orders/` `stocks/` `customers/` `installments/` `pools/` `rebates/` `reporting/` 等 20 个目录），无 `pages/`；`shared/` 为 UI 与 API 基础层 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |
-| `docs` | 当前有效文档：顶层事实源 / 工程文档 + `testing/` 测试体系；**全仓文档地图见 `docs/README.md`**；`archive/` 只保留 PII 白名单与 ux-audit 证据的最小集，时点性报告已于 2026-11-11 清退 |
+| `docs` | 当前有效文档：顶层事实源 / 工程文档 + `testing/` 测试体系；**全仓文档地图见 `docs/README.md`**；`archive/` 只保留 ux-audit 的 E2E 证据（JSON 与截图），历史文档已于 2026-11-11 全部清退 |
 | `rawdata/原始数据` | 金山文档导出的 5 份只读 JSON |
 | `data` `logs` `outputs` | 运行态与生成物，默认不提交 |
 

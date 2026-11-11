@@ -1,10 +1,18 @@
 .venv
-__pycache__
-*.pyc
-.pytest_cache
+# Docker 的 .dockerignore 无 **/ 前缀时只匹配构建上下文根目录、不递归子目录。
+# 必须用 **/ 才能挡住 app/*/__pycache__ 与子目录 *.pyc（实测 176 个 pyc/1.8MB 曾漏进镜像）。
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
 tests
 data
 backups
 .env
 .DS_Store
-*.db
+**/*.db
+# 测试/变异/lint 基建：生产运行不需要，避免 COPY . . 无差别带入镜像。
+run_regression.py
+requirements-dev.txt
+.coveragerc
+lint_baseline.txt
+setup.cfg

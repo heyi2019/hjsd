@@ -20,7 +20,7 @@ def list_accounts(
     session: Session, *, status: str | None = None, user: CurrentUser | None = None,
     limit: int | None = None, offset: int = 0,
 ) -> list[Account]:
-    # 账号台账包含所有业务类型的库存实体；库存健康与成本统计使用同一口径。
+    # 账号台账包含所有业务类型的库存实体；在库台账与成本统计使用同一口径。
     stmt = select(Account)
     if status:
         stmt = stmt.where(Account.status == status)
@@ -44,7 +44,7 @@ def count_accounts(session: Session, *, status: str | None = None, user: Current
 
 
 def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict[str, Any]]:
-    """库存健康表：只统计独立库存状态为在库的真实占用。"""
+    """库存中心在库台账：只统计独立库存状态为在库的真实占用。"""
     rows = [
         row for row in list_accounts(session, user=user)
         if row.inventory_status in INVENTORY_STATUSES

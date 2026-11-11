@@ -413,7 +413,7 @@ def inventory(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> InventoryResponseOut:
-    """库存健康表 R1：只统计独立库存状态为在库的真实占用。"""
+    """库存中心在库台账：只统计独立库存状态为在库的真实占用。"""
     rows = service.inventory(db, user=_user)
     total = sum((row["cost_amount"] for row in rows), Decimal("0"))
     return InventoryResponseOut(items=rows, count=len(rows), total_cost=total)

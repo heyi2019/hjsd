@@ -126,7 +126,7 @@ class ExecutionEditRequest(RequestModel):
 
 
 class AccountInventoryOut(BaseModel):
-    """库存健康接口的单行契约；与账号台账共享同一业务字段语义。"""
+    """库存中心在库台账接口的单行契约；与账号台账共享同一业务字段语义。"""
 
     model_config = ConfigDict(extra="forbid")
 

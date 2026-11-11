@@ -160,6 +160,15 @@ CI（`frontend-gate`）默认按变更选测：`workflow_dispatch` 传 `full_sui
 无前端/测试变更 → `test:quick` 冒烟，不静默跳过。变更路径由 workflow 算 commit diff 后经
 `TEST_CHANGED_PATHS` 注入（CI checkout 后 `git status` 恒为空）。
 
+后端 CI（`backend-gate`）同样默认按 `main-ci-cd` 注入的「原始 push 范围」路径集选测：
+`workflow_dispatch` 传 `full_suite=true` → `ci` 全量（发版收口/里程碑）；
+命中核心、共享、配置、测试基建或跨模块取数路径，以及 `backend/` 下无法归入业务域的改动
+→ 自动降级全量；其余按业务域选组，且每轮固定附 `smoke` + `unit` 秒级资产守卫
+（分组覆盖 / 承诺归属 / 清单一致性）；无后端业务变更 → 只跑 `smoke` + `unit`，不静默跳过。
+PR 与手动 dispatch 未带路径集仍走原分层策略。命令形态：
+`run_regression.py changed --backend-only --changed-paths <逗号分隔路径>`，
+不传 `--changed-paths` 时回退本地 `git status --short`。
+
 三层与四档的关系：`fast`/`quick`/`react`/`react-deep` 是**跑法**（执行成本档），
 `unit`/`module` 与区域是**归属**（文件放哪）。`test-layers.mjs` 只登记前者的文件清单，
 归属永远扫磁盘——两套清单必然漂移，这是 2026-10-27 已经付过学费的坑。

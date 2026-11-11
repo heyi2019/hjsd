@@ -6,6 +6,9 @@
   - 测试类型：type ut/it/e2e  —— 单元 / 集成 / 端到端。
   - 跨模块：cross            —— FLOW-* 跨模块流程测试（B↔D 等）。
 维度可组合：module B --type ut  => 业务中心全部单元测试。
+
+CI（backend-gate）默认按 main-ci-cd 注入的变更路径选测；命中核心/共享路径
+自动降级全量，无业务变更走 smoke + unit 冒烟兜底，详见 docs/testing/测试规范.md。
 """
 from __future__ import annotations
 
@@ -122,7 +125,7 @@ def regression_environment() -> dict[str, str]:
 # 三档测试体系（何一裁决）：
 #   ① unit    —— 纯逻辑、无 DB/HTTP，秒级，改完即跑；
 #   ② <业务域> —— 板块测试，改哪个板块只跑哪个（含 platform 跨域基建板块）；
-#   ③ all/ci  —— 全量，只在 CI / 发版前跑。
+#   ③ all/ci  —— 全量，发版收口 / 手动 full_suite / 结构性变更降级时用。
 # 横切组与业务域组可重叠（同一文件既属 unit 又属某域），但反查「文件→组」时
 # 必须排除横切组，否则会把域归属覆盖成横切组导致跑错范围。
 CROSSCUT_GROUPS = {"smoke", "p0", "unit"}
@@ -348,6 +351,69 @@ def changed_paths() -> list[str]:
     return [line[3:] for line in result.stdout.splitlines() if len(line) > 3]
 
 
+def _groups_for_source_path(path: str) -> set[str]:
+    """源码路径 → 业务域组。规则与历史 groups_for_changes 完全一致，抽出来供
+    选测与「结构性变更」判定共用，避免两份 token 规则各自漂移。"""
+    selected: set[str] = set()
+    if path.startswith("backend/app/foundation/") or "foundation" in path \
+        or "order_type" in path or "pool" in path or "live_field" in path:
+        selected.add("foundation")
+    if "account" in path:
+        selected.add("accounts")
+    if path.startswith("backend/app/trade/") or any(
+        t in path for t in ("order", "state_machine", "request_schema")
+    ):
+        selected.add("orders")
+    if "bughunt" in path:
+        selected.add("orders")
+    if "installment" in path or path.endswith("/test_m2.py") or path.endswith("/test_m4.py"):
+        selected.add("installments")
+    if path.startswith("backend/app/finance/") or "finance" in path or "rebate" in path:
+        selected.add("finance")
+    if any(t in path for t in ("parties", "leads")):
+        selected.add("parties")
+    if "report" in path:
+        selected.add("reporting")
+    if "policy" in path:
+        selected.add("policy")
+    if any(t in path for t in ("quality", "notifications", "search", "attachments", "audit")):
+        selected.add("governance")
+    if any(t in path for t in ("import", "migration", "history")):
+        selected.add("imports")
+    if any(t in path for t in ("auth", "backup_restore", "main_contract", "settings")):
+        selected.add("auth")
+    return selected
+
+
+# 核心 / 共享 / 配置 / 测试基建 / 跨模块取数口：启发式选测不许碰，一律降级全量。
+STRUCTURAL_PREFIXES = (
+    "backend/app/core/", "backend/app/domain/", "backend/app/main.py",
+    "backend/app/config", "backend/app/settings", "backend/app/db",
+    "backend/requirements", "backend/alembic/", "backend/run_regression.py",
+    "backend/scripts/test_catalog.py", "backend/scripts/promise_catalog.py",
+    "conftest.py", "pytest.ini", "tests/conftest.py", "tests/backend/conftest.py",
+    "backend/app/orders/amounts.py", "backend/app/reporting/",
+    "backend/app/value_added_services/",
+)
+# 自动发版只改版本常量，不影响测试范围；本地 changed 遇到它也不该触发全量。
+NON_STRUCTURAL_FILES = {"backend/app/version.py"}
+
+
+def is_structural_change(paths: list[str]) -> bool:
+    """看不懂的后端改动一律降级全量：核心路径直接命中，或 backend/ 下路径
+    未被任何业务域 token 命中（说明规则没覆盖，不能靠猜压缩范围）。"""
+    for path in paths:
+        if path.startswith("frontend/") or path.startswith("tests/backend/"):
+            continue
+        if path in NON_STRUCTURAL_FILES:
+            continue
+        if any(path.startswith(x) for x in STRUCTURAL_PREFIXES):
+            return True
+        if path.startswith("backend/") and not _groups_for_source_path(path):
+            return True
+    return False
+
+
 def groups_for_changes(paths: list[str]) -> list[str]:
     selected: set[str] = set()
     test_groups = {
@@ -371,30 +437,7 @@ def groups_for_changes(paths: list[str]) -> list[str]:
                     "把它登记进对应域组后再跑；本次不再退化成跑全量。"
                 )
             continue
-        if path.startswith("backend/app/foundation/") or "foundation" in path or "order_type" in path or "pool" in path or "live_field" in path:
-            selected.add("foundation")
-        if "account" in path:
-            selected.add("accounts")
-        if path.startswith("backend/app/trade/") or any(token in path for token in ("order", "state_machine", "request_schema")):
-            selected.add("orders")
-        if "bughunt" in path:
-            selected.add("orders")
-        if "installment" in path or path.endswith("/test_m2.py") or path.endswith("/test_m4.py"):
-            selected.add("installments")
-        if path.startswith("backend/app/finance/") or "finance" in path or "rebate" in path:
-            selected.add("finance")
-        if any(token in path for token in ("parties", "leads")):
-            selected.add("parties")
-        if "report" in path:
-            selected.add("reporting")
-        if "policy" in path:
-            selected.add("policy")
-        if any(token in path for token in ("quality", "notifications", "search", "attachments", "audit")):
-            selected.add("governance")
-        if any(token in path for token in ("import", "migration", "history")):
-            selected.add("imports")
-        if any(token in path for token in ("auth", "backup_restore", "main_contract", "settings")):
-            selected.add("auth")
+        selected |= _groups_for_source_path(path)
     return [name for name in GROUPS if name in selected]
 
 
@@ -482,7 +525,8 @@ def main() -> int:
         "group",
         choices=[*GROUPS, "changed", "all", "ci", "lint", "cross", "fe", *MODULES, "ut", "it", "e2e"],
         help="回归分组：业务域名=板块档；A-F/SYS=模块档；ut/it/e2e=类型档；"
-             "cross=跨模块流程；ci/all=全量；fe=前端全量(四档)；lint=静态检查；changed=按 git 变更选组",
+             "cross=跨模块流程；ci/all=全量；fe=前端全量(四档)；lint=静态检查；"
+             "changed=按 git 变更或 --changed-paths 选组",
     )
     parser.add_argument("--type", choices=["ut", "it", "e2e"],
                         help="与模块档组合：仅跑该模块的某类型（如 B --type ut）")
@@ -491,6 +535,11 @@ def main() -> int:
     parser.add_argument("--list", action="store_true", help="仅展示将执行的测试文件")
     parser.add_argument(
         "--update-baseline", action="store_true", help="仅用于 lint：把当前存量告警写入基线"
+    )
+    parser.add_argument(
+        "--changed-paths", default="",
+        help="逗号分隔的变更路径（CI 由 main-ci-cd 注入原始 push 范围）；"
+             "缺省时回退 git status --short（本地开发）",
     )
     parser.add_argument(
         "--parallel", action="store_true",
@@ -510,33 +559,50 @@ def main() -> int:
             return 0
         return run_frontend_full()
     if args.group == "changed":
-        paths_changed = changed_paths()
-        selected = groups_for_changes(paths_changed)
-        frontend_changed = any(path.startswith("frontend/") for path in paths_changed)
-        if not selected and not frontend_changed:
-            print("未发现需要回归的前后端业务代码变更")
-            return 0
-        print(f"按变更自动选择分组：{', '.join(selected)}")
-        paths = unique_paths(selected)
-        if frontend_changed:
-            print("按变更自动选择前端关键 E2E")
+        if args.changed_paths:
+            paths_changed = [x.strip() for x in args.changed_paths.split(",") if x.strip()]
+            source = "--changed-paths 注入"
+        else:
+            paths_changed = changed_paths()
+            source = "git status --short"
+        frontend_changed = any(x.startswith("frontend/") for x in paths_changed)
+        if is_structural_change(paths_changed):
+            # 启发式选测看不懂的改动一律全量，绝不靠猜压缩范围。
+            selected: list[str] = []
+            paths = all_paths()
+            label = f"ci（结构性变更降级全量；来源={source}）"
+        else:
+            selected = groups_for_changes(paths_changed)
+            if not selected:
+                # 静默跳过等于没有门禁：无业务变更 / 仅前端变更时跑秒级冒烟 + 资产守卫。
+                selected = ["smoke", "unit"]
+            else:
+                # 横切守卫（分组覆盖 / 承诺归属 / 清单一致性）秒级，每轮都带上，
+                # 保证选测不会让测试资产漂移无人发现。
+                selected = ["smoke", "unit", *selected]
+            paths = unique_paths(selected)
+            label = f"changed（{', '.join(selected)}；来源={source}）"
+        print(f"按变更自动选择：{label}")
         if args.list:
-            if frontend_changed:
+            if frontend_changed and not args.backend_only:
                 print("frontend: npm run test:regression:fast")
             print("\n".join(paths))
             return 0
-        if selected:
-            runner = str(PYTHON) if PYTHON.exists() else sys.executable
-            result = subprocess.run(
-                [runner, "-m", "pytest", "-q", *pytest_parallel_args, *[_pytest_arg(x) for x in paths]],
-                cwd=ROOT,
-                env=regression_environment(),
-                check=False,
-            )
-            if result.returncode:
-                return result.returncode
-        if frontend_changed:
-            return subprocess.run(["npm", "run", "test:regression:fast"], cwd=ROOT.parent / "frontend", check=False).returncode
+        runner = str(PYTHON) if PYTHON.exists() else sys.executable
+        print(f"=== 执行 {label}：{len(paths)} 个后端文件 ===")
+        result = subprocess.run(
+            [runner, "-m", "pytest", "-q", *pytest_parallel_args, *[_pytest_arg(x) for x in paths]],
+            cwd=ROOT,
+            env=regression_environment(),
+            check=False,
+        )
+        if result.returncode:
+            return result.returncode
+        if frontend_changed and not args.backend_only:
+            return subprocess.run(
+                ["npm", "run", "test:regression:fast"],
+                cwd=ROOT.parent / "frontend", check=False,
+            ).returncode
         return 0
     fe_paths: list[str] = []
     if args.group == "cross":

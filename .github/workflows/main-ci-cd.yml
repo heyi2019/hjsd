@@ -70,12 +70,10 @@ jobs:
           echo "- 自动发版准备耗时：${release_duration}s" >> "$GITHUB_STEP_SUMMARY"
           # 三道 gate 的 push 触发已跳过 main/master：只保留本轮（release sha）门禁，
           # 避免同一批代码被校验两遍；wait-and-deploy 等待的正是本轮 run。
-          for wf in lint-gate.yml backend-gate.yml; do
-            gh api --method POST "repos/$REPO/actions/workflows/$wf/dispatches" -f ref=main
-          done
-          # 前端按变更选测：由这里算「原始 push 范围」的变更路径并原样传给 dispatch 轮。
+          # 先算「原始 push 范围」的变更路径集：release 提交是 GITHUB_TOKEN 推回的，
+          # gate checkout 到 release sha 后 git status 恒为空，必须显式传路径集。
           # 不能只传 BASE_SHA 让 gate 自己 diff：release 提交必然改 frontend/package.json，
-          # 该路径属选测脚本的 STRUCTURAL，会把任何业务区域选测一并降级成 quick 冒烟。
+          # 该路径属前端选测的 STRUCTURAL，会把任何业务区域选测一并降级成 quick 冒烟。
           diff_base="$BASE_SHA"
           if [[ -z "$diff_base" || "$diff_base" =~ ^0{40}$ ]] \
             || ! git cat-file -e "${diff_base}^{commit}" 2>/dev/null; then
@@ -83,9 +81,14 @@ jobs:
           fi
           changed_paths="$(git diff --name-only "$diff_base" "$HEAD_SHA" | paste -sd, -)"
           echo "release dispatch changed_paths_chars=${#changed_paths} value=${changed_paths:-<none>}"
-          jq -n --arg ref main --arg paths "$changed_paths" \
-            '{ref:$ref, inputs:{changed_paths:$paths}}' \
-            | gh api --method POST "repos/$REPO/actions/workflows/frontend-gate.yml/dispatches" --input -
+
+          gh api --method POST "repos/$REPO/actions/workflows/lint-gate.yml/dispatches" -f ref=main
+          # 前端 / 后端按变更选测：路径集是「原始 push 范围」，天然不含自动发版改的版本文件。
+          for wf in frontend-gate.yml backend-gate.yml; do
+            jq -n --arg ref main --arg paths "$changed_paths" \
+              '{ref:$ref, inputs:{changed_paths:$paths}}' \
+              | gh api --method POST "repos/$REPO/actions/workflows/$wf/dispatches" --input -
+          done
 
   wait-and-deploy:
     needs: prepare-release

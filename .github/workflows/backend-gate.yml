@@ -5,6 +5,17 @@ on:
     branches: [main, master]
   pull_request:
   workflow_dispatch:
+    inputs:
+      full_suite:
+        description: "Run the full backend CI suite instead of changed-area tests"
+        required: false
+        type: boolean
+        default: false
+      changed_paths:
+        description: "Comma-separated changed paths from the original push (set by main-ci-cd)"
+        required: false
+        type: string
+        default: ""
 
 jobs:
   backend-tests:
@@ -24,9 +35,9 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U erp_app"
-          --health-interval 10s
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 15
     env:
       # 普通 runner（非 container job）里 services.postgres 只能通过映射端口访问，
       # 主机名 postgres 无法解析；CI 必须用 127.0.0.1。
@@ -43,6 +54,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+            backend/requirements.lock.txt
 
       - name: Install dependencies
         working-directory: backend
@@ -53,28 +69,49 @@ jobs:
       - name: Prepare test configuration
         run: cp .env.example .env
 
+      # main-ci-cd 在 release sha 上 dispatch 本门禁，并注入「原始 push 范围」路径集。
+      # CI checkout 后 git status 恒为空，不能靠脚本自己读工作区。
       - name: Determine test scope (分层策略)
         id: scope
+        env:
+          INJECTED_PATHS: ${{ inputs.changed_paths || '' }}
+          FULL_SUITE: ${{ inputs.full_suite || 'false' }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "groups=ci" >> "$GITHUB_OUTPUT"      # 手动触发：全量回归
-          elif [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "master" ]; then
-            echo "groups=ci" >> "$GITHUB_OUTPUT"      # 发布前：全系统回归 + 高风险跨模块
+          if [[ "$FULL_SUITE" == "true" ]]; then
+            echo "mode=full" >> "$GITHUB_OUTPUT"
+            echo "groups=ci" >> "$GITHUB_OUTPUT"          # 手动 full_suite：全量回归
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${INJECTED_PATHS:-}" ]]; then
+            echo "mode=changed" >> "$GITHUB_OUTPUT"       # 发版轮：按原始 push 范围选测
+            echo "groups=" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]] \
+            || [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == "master" ]]; then
+            echo "mode=full" >> "$GITHUB_OUTPUT"
+            echo "groups=ci" >> "$GITHUB_OUTPUT"          # 手动 dispatch 未带路径 / 主分支：全量
           else
+            echo "mode=full" >> "$GITHUB_OUTPUT"
             echo "groups=unit cross B C D" >> "$GITHUB_OUTPUT"  # PR：单元 + 核心集成 + 跨模块
           fi
+          echo "scope mode=$(grep '^mode=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)"
 
       # CI 走串行：--parallel 会让每个 xdist worker 各自建库，在 GitHub runner 上
       # 曾因连接失败触发 worker_errordown / KeyError: WorkerController 使整轮 INTERNALERROR。
       # 本地仍可用 --parallel 提速；CI 以稳定为准。
       - name: Run backend regression (分层)
         working-directory: backend
+        env:
+          INJECTED_PATHS: ${{ inputs.changed_paths || '' }}
         run: |
           python run_regression.py lint
-          for g in ${{ steps.scope.outputs.groups }}; do
-            echo "=== 执行分组: $g ==="
-            python run_regression.py "$g" --backend-only || exit 1
-          done
+          if [[ "${{ steps.scope.outputs.mode }}" == "changed" ]]; then
+            echo "=== 执行分组: changed（main-ci-cd 注入原始 push 范围）==="
+            python run_regression.py changed --backend-only \
+              --changed-paths "$INJECTED_PATHS" || exit 1
+          else
+            for g in ${{ steps.scope.outputs.groups }}; do
+              echo "=== 执行分组: $g ==="
+              python run_regression.py "$g" --backend-only || exit 1
+            done
+          fi
 
       - name: Generate test case library + report
         working-directory: backend

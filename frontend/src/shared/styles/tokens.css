@@ -128,7 +128,9 @@
   --shadow-button: 0 5px 13px color-mix(in srgb, var(--brand-ink) 22%, transparent);
 
   /* 控件 */
-  --ui-control-height: 44px;
+  /* 2026-11-12 用户裁决：全站控件高度口径回退 44px→36px（推翻 Issue #17 的 iOS HIG 44pt 结论），
+     与 forms.css / StudioExpensePanel.css 等注释口径重新对齐；触控目标低于 44pt 属知情取舍。 */
+  --ui-control-height: 36px;
   --ui-control-height-compact: 30px;
   --ui-control-height-compact-inner: 28px;
   --ui-control-height-chip: 24px;

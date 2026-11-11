@@ -498,7 +498,7 @@
   box-shadow: none;
 }
 .ord-segments button {
-  min-height: var(--ui-control-height); /* iOS HIG 触控目标 44pt（此前被此处的 36px 覆盖掉上方的 44px 规则） */
+  min-height: var(--ui-control-height); /* 控件口径 36px（11-12 裁决回退；Issue #17 曾要求此处 44pt） */
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-control);
   color: var(--color-text-secondary);
@@ -510,7 +510,7 @@
   box-shadow: var(--shadow-hairline);
 }
 .query-btn {
-  min-height: var(--ui-control-height); /* iOS HIG 触控目标 44pt */
+  min-height: var(--ui-control-height); /* 控件口径 36px（11-12 裁决回退） */
   border-radius: var(--radius-control);
   background: var(--brand-soft);
   color: var(--primary-ink);

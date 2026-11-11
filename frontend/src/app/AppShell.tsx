@@ -225,8 +225,8 @@ export function AppShell() {
             </div>
             {/* 用户中心入口：DEV 与生产态都可从顶栏进入（改密码、看角色权限）。
                 以 Modal 弹出挂载 UserCenterPage，不占用侧栏 nav 计数与一级路由。
-                用 .topbar-action 紧凑幽灵按钮（36px，与分段控件/选择器同高），
-                不再复用 .nav-item（44px 会把顶栏整行撑高）。 */}
+                用 .topbar-action 紧凑幽灵按钮（36px，11-12 令牌回退后与分段控件/选择器/.nav-item 同高），
+                不再复用 .nav-item 的透明底+15px 标签观感（改用它是为观感，非高度）。 */}
             <button type="button" className="topbar-action" data-user-center-open={userCenterOpen} onClick={() => setUserCenterOpen(true)}>
               用户中心
             </button>

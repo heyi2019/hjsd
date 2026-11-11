@@ -146,7 +146,11 @@ def set_pool_status(session: Session, pool_id: int, status: str, *, actor: str) 
     )
     return pool
 def _has_cashflow(session: Session, pool_id: int) -> bool:
-    """判断该池是否已产生资金流水（M0 阶段 `cashflow` 表尚未创建）。"""
+    """判断该池是否已产生资金流水；有流水则禁止物理删除（见 delete_pool）。
+
+    `has_table` 为防御性兜底：正常库 cashflow 表恒存在，但在尚未建表的空库
+    （如迁移前、极简测试会话）中直接查询会抛错，此时按「无流水」处理。
+    """
     bind = session.get_bind()
     if not inspect(bind).has_table("cashflow"):
         return False

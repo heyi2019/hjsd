@@ -26,15 +26,12 @@ vi.mock("@/shared/ui", async (importOriginal) => {
   return { ...actual, DataTable: LightweightDataTable };
 });
 
-const emptyHealth = { generated_on: "2026-10-01", total_cost: "0.00", items: [] };
-
 beforeEach(() => {
   vi.clearAllMocks();
   // 每个用例重新挂桩，覆盖上一份用例 afterEach(resetAllMocks) 对桩实现的清空。
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
-  resolveMock(vi.mocked(catalog.reportsApi.inventoryHealth), emptyHealth);
   resolveMock(vi.mocked(catalog.reportsApi.monthlyPnl), { items: [], total: {} });
   resolveMock(vi.mocked(catalog.reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
   vi.mocked(catalog.employeesApi.list).mockResolvedValue([
@@ -61,11 +58,10 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：经营中心报表", () => {
-  it("初始只加载当前激活的库存报表，不提前加载隐藏 Tab", async () => {
+  it("初始只加载当前激活的月度损益报表，不提前加载隐藏 Tab", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "库存 R1" });
-    expect(vi.mocked(catalog.reportsApi.inventoryHealth)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(catalog.reportsApi.monthlyPnl)).not.toHaveBeenCalled();
+    await screen.findByRole("tab", { name: "月度损益 R2" });
+    expect(vi.mocked(catalog.reportsApi.monthlyPnl)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(catalog.reportsApi.commission)).not.toHaveBeenCalled();
     expect(vi.mocked(catalog.reportsApi.dailyFunds)).not.toHaveBeenCalled();
     expect(vi.mocked(catalog.reportsApi.businessPnl)).not.toHaveBeenCalled();
@@ -79,7 +75,7 @@ describe("ReportsPage：经营中心报表", () => {
     expect(commissionTab).toHaveAttribute("aria-selected", "true");
     expect((await screen.findAllByText("我的收益")).length).toBeGreaterThan(0);
     expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenCalledWith({ mine: true });
-    expect(vi.mocked(catalog.reportsApi.inventoryHealth)).not.toHaveBeenCalled();
+    expect(vi.mocked(catalog.reportsApi.monthlyPnl)).not.toHaveBeenCalled();
   });
 
   it("FE-260：提成对账可以按人员筛选并传递 user_id", async () => {
@@ -95,12 +91,13 @@ describe("ReportsPage：经营中心报表", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
   });
 
-  it("七个 Tab 齐全（R1-R5 + 订单利润 + 数据中心）", async () => {
+  it("六个 Tab 齐全（R2-R5 + 订单利润 + 数据中心）", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "库存 R1" });
-    for (const label of ["库存 R1", "月度损益 R2", "提成对账 R3", "资金日报 R4", "业务损益 R5", "订单利润", "数据中心"]) {
+    await screen.findByRole("tab", { name: "月度损益 R2" });
+    for (const label of ["月度损益 R2", "提成对账 R3", "资金日报 R4", "业务损益 R5", "订单利润", "数据中心"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
+    expect(screen.queryByRole("tab", { name: "库存 R1" })).not.toBeInTheDocument();
   });
 
   it("数据中心 Tab：渲染资金统计与订单入口卡，点击入口卡跳业务中心", async () => {
@@ -125,13 +122,13 @@ describe("ReportsPage：经营中心报表", () => {
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31" }));
   });
 
-  it("库存报表页内导出按钮无筛选也能导出并给出成功反馈", async () => {
+  it("R2 报表页内导出按钮无筛选也能导出并给出成功反馈", async () => {
     const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "库存 R1" });
+    await gotoTab("月度损益 R2");
     await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("inventory-health", { from: undefined, to: undefined }));
-    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("已导出 inventory-health.csv"));
+    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("已导出 monthly-pnl.csv"));
   });
 
   it("导出日期反向（开始晚于结束）时拦截并给出错误提示，不发起导出", async () => {

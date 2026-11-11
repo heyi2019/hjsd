@@ -1,4 +1,4 @@
-"""REPORT-01 reporting 报表契约测试（RPT-01）：R1/R2/R3/R5 + 订单利润明细的日期过滤与全部分组循环。
+"""REPORT-01 reporting 报表契约测试（RPT-01）：R2/R3/R5 + 订单利润明细的日期过滤与全部分组循环。
 
 与 test_m4.py::TestReports 的分工：m4 已覆盖无数据冒烟、账号 COST 不进运营费用、
 未归集返点独立列、日报与池余额一致、利润合计自洽、R3 空数据钻取；本文件补
@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
@@ -19,12 +19,11 @@ from app.core.errors import Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
-    AccountStatus,
     OrderStatus,
     RebateStatus,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import Account, RebateRecord
+from app.domain.trade import RebateRecord
 from app.finance.cashflows import create_cashflow
 from app.orders import service as order_service
 from app.policy import service as policy_service
@@ -35,7 +34,6 @@ def test_reporting_read_routes_publish_typed_response_models(app):
     paths = app.openapi()["paths"]
 
     expected = {
-        "/api/v1/reports/inventory-health": "InventoryHealthOut",
         "/api/v1/reports/monthly-pnl": "MonthlyPnlOut",
         "/api/v1/reports/commission": "CommissionOut",
         "/api/v1/reports/business-pnl": "BusinessPnlOut",
@@ -157,111 +155,6 @@ def _direct_cost(seeded_db, order_id: int, amount: str, occurred_on: date) -> No
         order_id=order_id,
         note="订单直接支出",
     )
-
-
-# --------------------------------------------------------------------- R1 库存
-class TestR1Inventory:
-    def test_inventory_health_api_accepts_missing_platform_and_returns_total_cost(
-        self, seeded_db, seeded_client, headers
-    ):
-        account = Account(
-            game_account="report-null-platform",
-            inventory_type="RECOVERY",
-            status=AccountStatus.WAITING.value,
-            cost_amount=to_money("125.00"),
-            platform=None,
-            created_by="pytest",
-            updated_by="pytest",
-        )
-        seeded_db.add(account)
-        seeded_db.flush()
-
-        response = seeded_client.get("/api/v1/reports/inventory-health", headers=headers)
-
-        assert response.status_code == 200, response.text
-        payload = response.json()
-        row = next(item for item in payload["items"] if item["account_id"] == account.id)
-        assert row["platform"] is None
-        assert payload["total_cost"] == "125.00"
-
-    def test_pickup_accounts_are_included_in_inventory_health(self, seeded_db):
-        pickup = Account(
-            business_mode="DISTRIBUTION",
-            inventory_type="PICKUP",
-            status=AccountStatus.WAITING.value,
-            buy_date=D,
-            cost_amount=to_money("500.00"),
-            created_by="pytest",
-            updated_by="pytest",
-        )
-        seeded_db.add(pickup)
-        seeded_db.flush()
-
-        data = reporting_service.r1_inventory_health(seeded_db)
-
-        assert pickup.id in {item["account_id"] for item in data["items"]}
-
-    def test_account_loop_buy_outflow_and_expected_price(self, seeded_db):
-        in_stock = Account(
-            business_mode="SELF",
-            inventory_type="RECOVERY",
-            status=AccountStatus.WAITING.value,
-            inventory_entry_at=datetime.combine(D, datetime.min.time()),
-            buy_date=D,
-            cost_amount=to_money("0"),
-            created_by="pytest",
-            updated_by="pytest",
-        )
-        sold = Account(
-            status=AccountStatus.SOLD.value,
-            cost_amount=to_money("800.00"),
-            created_by="pytest",
-            updated_by="pytest",
-        )
-        no_buy_date = Account(
-            status=AccountStatus.WAITING.value,
-            cost_amount=to_money("500.00"),
-            created_by="pytest",
-            updated_by="pytest",
-        )
-        seeded_db.add_all([in_stock, sold, no_buy_date])
-        seeded_db.flush()
-
-        order = _order(seeded_db, account_id=in_stock.id)
-        # 买-卖-买周期：SELL 会把账号翻 SOLD，再 BUY 回 WAITING，
-        # 此时历史 SELL 事件仍计入 expected_price（覆盖 R1 账号循环的售价汇总）
-        order_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount="1000.00",
-            occurred_on=D, actor="pytest",
-        )
-        order_service.post_event(
-            seeded_db, order.id, event_type="SELL", amount="1500.00",
-            occurred_on=D, actor="pytest",
-        )
-        order_service.post_event(
-            seeded_db, order.id, event_type="BUY", amount="800.00",
-            occurred_on=D, actor="pytest",
-        )
-
-        data = reporting_service.r1_inventory_health(seeded_db)
-        items = {item["account_id"]: item for item in data["items"]}
-
-        # 非库存状态账号被 continue 排除
-        assert sold.id not in items
-        # 入库时间独立于买入日期；新建但未产生买入流水的账号从入库当天开始计时
-        idle = items[no_buy_date.id]
-        assert idle["holding_days"] == 0
-        assert idle["business"] is None
-        assert idle["owner_id"] is None
-        # 在库账号：买入支出按 BUY 累加（0+1000+800=1800）；
-        # expected_price = 历史 SELL 合计 1500；不再拆分附加成本字段
-        held = items[in_stock.id]
-        assert held["business"] == "HS"
-        assert held["buy_amount"] == 1800
-        assert held["total_cost"] == 1800
-        assert held["expected_price"] == 1500
-        assert held["expected_profit"] == -300
-        assert held["holding_days"] == (date.today() - in_stock.inventory_entry_at.date()).days
 
 
 # --------------------------------------------------------------------- R2 月度

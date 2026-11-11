@@ -24,11 +24,9 @@ vi.mock("@/shared/ui", async (importOriginal) => {
   return { ...actual, DataTable: LightweightDataTable };
 });
 
-const emptyHealth = { generated_on: "2026-10-01", total_cost: "0.00", items: [] };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resolveMock(vi.mocked(catalog.reportsApi.inventoryHealth), emptyHealth);
   resolveMock(vi.mocked(catalog.reportsApi.monthlyPnl), { items: [], total: {} });
   resolveMock(vi.mocked(catalog.reportsApi.commission), {
     items: [],
@@ -148,37 +146,17 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     expect(screen.getAllByText("净方向金额").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("R1 持有天数多分支：绿/橙/红/空", async () => {
-    resolveMockOnce(vi.mocked(catalog.reportsApi.inventoryHealth), {
-      generated_on: "2026-10-01",
-      total_cost: "0.00",
-      items: [
-        { game_account: "a1", platform: "P", status: "IN_STOCK", buy_amount: "1", extra_cost: "0", total_cost: "1", holding_days: 5 },
-        { game_account: "a2", platform: "P", status: "IN_STOCK", buy_amount: "1", extra_cost: "0", total_cost: "1", holding_days: 15 },
-        { game_account: "a3", platform: "P", status: "IN_STOCK", buy_amount: "1", extra_cost: "0", total_cost: "1", holding_days: 45 },
-        { game_account: "a4", platform: "P", status: "IN_STOCK", buy_amount: "1", extra_cost: "0", total_cost: "1", holding_days: null },
-      ],
-    });
-    renderLight(<ReportsPage />, { user: "admin" });
-    expect(await screen.findByText("a1")).toBeInTheDocument();
-    expect(screen.getByText("5天")).toBeInTheDocument();
-    expect(screen.getByText("15天")).toBeInTheDocument();
-    expect(screen.getByText("45天")).toBeInTheDocument();
-    // holding_days 为 null → 渲染 "-"
-    expect(screen.getAllByText("-").length).toBeGreaterThanOrEqual(1);
-  });
-
   it("FE-053：页内导出成功后创建下载锚点并显示结果反馈", async () => {
     const createUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test");
     const revokeUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "库存 R1" });
+    await gotoTab("月度损益 R2");
     await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("inventory-health", { from: undefined, to: undefined }));
+    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
     expect(createUrl).toHaveBeenCalled();
     expect(revokeUrl).toHaveBeenCalled();
-    expect(successSpy).toHaveBeenCalledWith("已导出 inventory-health.csv");
+    expect(successSpy).toHaveBeenCalledWith("已导出 monthly-pnl.csv");
     createUrl.mockRestore();
     revokeUrl.mockRestore();
   });

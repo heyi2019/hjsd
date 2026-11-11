@@ -45,7 +45,6 @@ from app.orders.amounts import (
 ZERO = Decimal("0")
 REPORT_NAMES = frozenset(
     {
-        "inventory-health",
         "monthly-pnl",
         "commission",
         "business-pnl",
@@ -213,7 +212,6 @@ def _visible_pool_ids(user: CurrentUser | None) -> set[int] | None:
     return set(user.pool_ids)
 
 
-# --------------------------------------------------------------------- R1 库存
 # --------------------------------------------------- 事件增益与冲抵配对
 def _event_gain_cases(amount):
     """事件损益的三个条件求和分支（income / buy / cost）。

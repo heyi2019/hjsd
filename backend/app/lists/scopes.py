@@ -198,18 +198,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         ),
     ),
     ListScope(
-        code="RPT_INVENTORY_HEALTH",
-        label="报表·库存健康",
-        columns=(
-            ListColumn("game_account", "游戏账号/产品"),
-            ListColumn("platform", "平台"),
-            ListColumn("status", "状态", value_set="INVENTORY_STATUS"),
-            ListColumn("buy_amount", "买入"),
-            ListColumn("total_cost", "占用成本"),
-            ListColumn("holding_days", "持有天数"),
-        ),
-    ),
-    ListScope(
         code="RPT_MONTHLY_PNL",
         label="报表·月度损益",
         columns=(
@@ -347,7 +335,6 @@ def get_scope(code: str) -> ListScope | None:
 # 导出据此只导「当前可见列」，并沿用注册表里的中文表头与顺序，
 # 使「界面看到的列」与「导出的列」是同一份口径。
 REPORT_COLUMN_SCOPES: dict[str, str] = {
-    "inventory-health": "RPT_INVENTORY_HEALTH",
     "monthly-pnl": "RPT_MONTHLY_PNL",
     "commission": "RPT_COMMISSION",
     "daily-funds": "RPT_DAILY_FUNDS",

@@ -11,28 +11,6 @@ class ReportModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class InventoryHealthItemOut(ReportModel):
-    account_id: int
-    game_account: str
-    platform: str | None = None
-    business: str | None = None
-    status: str
-    buy_amount: Decimal
-    total_cost: Decimal
-    holding_days: int | None = None
-    expected_price: Decimal
-    expected_profit: Decimal
-    owner_id: int | None = None
-    extra_values: dict[str, Any]
-
-
-class InventoryHealthOut(ReportModel):
-    generated_on: str
-    items: list[InventoryHealthItemOut]
-    total: int
-    total_cost: Decimal
-
-
 class MonthlyPnlItemOut(ReportModel):
     month: str
     sales_income: Decimal
@@ -197,7 +175,6 @@ __all__ = [
     "FinanceDimensionOut",
     "CommissionOut",
     "DailyFundsOut",
-    "InventoryHealthOut",
     "MonthlyPnlOut",
     "OrderProfitOut",
 ]

@@ -32,10 +32,11 @@ _FRONTEND_SRC = _repo.FRONTEND_DIR / "src"
 # 作用域 → 渲染该列表的面板源文件（相对 frontend/src）。
 # 同一文件承载多个列表时（资金中心 5 个、报表 7 个），靠 useListViewColumns 标记定位各自的列数组。
 PANEL_SOURCES: dict[str, str] = {
-    "LEDGER": "orders/orderpage/useOrdersPageController.tsx",
-    "INVENTORY": "stocks/InventoryPanel/useInventoryController.tsx",
+    # 前四轮拆分把列定义下沉到专用 hook 文件；面板壳只剩编排，标记必须跟随列数组。
+    "LEDGER": "orders/orderpage/useLedgerColumns.tsx",
+    "INVENTORY": "stocks/InventoryPanel/useInventoryColumns.tsx",
     "INSTALLMENT": "installments/useContractTableController.tsx",
-    "CUSTOMER": "customers/CustomerPanel.tsx",
+    "CUSTOMER": "customers/useCustomerController.tsx",
     "REBATE": "rebates/RebatesPanel.tsx",
     "CASHFLOW": "pools/FundsPage.tabs.tsx",
     "FUND_POOLS": "pools/FundsPage.tabs.tsx",
@@ -48,7 +49,6 @@ PANEL_SOURCES: dict[str, str] = {
     "QUALITY_ISSUE": "quality/QualityPanel.tsx",
     # 报表视图已从 ReportsPage.tsx 拆到 ./reports/*.tsx（壳文件只剩 Tab 与批量导出），
     # 列定义在各子文件里，映射必须落到子文件，否则这条守卫对 7 张报表形同不存在。
-    "RPT_INVENTORY_HEALTH": "reporting/reports/InventoryReport.tsx",
     "RPT_MONTHLY_PNL": "reporting/reports/MonthlyPnlReport.tsx",
     "RPT_COMMISSION": "reporting/reports/CommissionReport.tsx",
     "RPT_DAILY_FUNDS": "reporting/reports/DailyFundsReport.tsx",

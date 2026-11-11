@@ -1,4 +1,4 @@
-/** 经营中心：库存 R1 / 月度损益 R2 / 提成对账 R3 / 资金日报 R4 / 业务损益 R5 / 数据中心（RPT-01）。
+/** 经营中心：月度损益 R2 / 提成对账 R3 / 资金日报 R4 / 业务损益 R5 / 数据中心（RPT-01）。
  * 各报表视图拆到 ./reports/*.tsx（导出按钮在各自页内），本文件只留 Tab 壳。 */
 import { Input, Space, Tabs } from "antd";
 import { useEffect, useState } from "react";
@@ -12,14 +12,13 @@ import { BusinessPnl } from "./reports/BusinessPnlReport";
 import { Commission } from "./reports/CommissionReport";
 import { DailyFunds } from "./reports/DailyFundsReport";
 import { FinanceDimensions } from "./reports/FinanceDimensionsReport";
-import { InventoryReport } from "./reports/InventoryReport";
 import { MonthlyPnl } from "./reports/MonthlyPnlReport";
 import { OrderProfit } from "./reports/OrderProfitReport";
 import { type ReportRange, ReportsActiveContext } from "./reports/shared";
 
 export function ReportsPage({ onNavigate, active = true, initialReportTab }: { onNavigate?: (key: string) => void; active?: boolean; initialReportTab?: "commission" | "my-earnings" }) {
   const [myEarnings, setMyEarnings] = useState(initialReportTab === "my-earnings");
-  const [activeTab, setActiveTab] = useState(initialReportTab === "commission" || myEarnings ? "r3" : "r1");
+  const [activeTab, setActiveTab] = useState(initialReportTab === "commission" || myEarnings ? "r3" : "r2");
   // 报表视图统计周期：提升到父级，避免切换 Tab（非挂载）后筛选条件丢失。
   const [reportFrom, setReportFrom] = useState("");
   const [reportTo, setReportTo] = useState("");
@@ -41,7 +40,6 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
     ),
   };
   const tabItems = [
-    { key: "r1", label: "库存 R1", render: () => <InventoryReport /> },
     { key: "r2", label: "月度损益 R2", render: () => <MonthlyPnl range={reportRange} /> },
     { key: "r3", label: "提成对账 R3", render: () => <Commission range={reportRange} mine={myEarnings} /> },
     { key: "r4", label: "资金日报 R4", render: () => <DailyFunds /> },

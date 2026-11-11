@@ -1,4 +1,4 @@
-"""REPORT-01 M4：R1-R5 报表 / 审计查询 / P2 导入。
+"""REPORT-01 M4：R2-R5 报表 / 审计查询 / P2 导入。
 
 功能编号：RPT-01-01~06、MIG-01-01~08、BAS-05-03
 """
@@ -25,11 +25,6 @@ REPORTS = "/api/v1/reports"
 
 # --------------------------------------------------------------------- 报表
 class TestReports:
-    def test_r1_excludes_th_and_zero_cost(self, seeded_db):
-        data = reporting_service.r1_inventory_health(seeded_db)
-        for item in data["items"]:
-            assert item["status"] == "IN_STOCK"
-
     def test_r2_operating_expense_excludes_account_direct_cashflow(self, seeded_db):
         """账号直接支出资金明细进入直接成本，不进入运营费用（R2 验收口径）。"""
         from datetime import date
@@ -213,7 +208,6 @@ class TestImport:
 class TestM4Api:
     def test_reports_endpoints_require_permission(self, seeded_client, viewer_headers):
         for path in (
-            "/reports/inventory-health",
             "/reports/monthly-pnl",
             "/reports/business-pnl",
             "/reports/commission",

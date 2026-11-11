@@ -3,7 +3,6 @@
 本模块只做符号再导出，不含业务逻辑：
 - 共用工具 → `app.reporting._shared`
 - 导出 / 维度汇总 → `app.reporting.export`
-- R1 库存健康 → `app.reporting.r1_inventory`
 - R2 月度损益 → `app.reporting.r2_monthly_pnl`
 - R3 提成对账 → `app.reporting.r3_commission`
 - R5 业务损益 → `app.reporting.r5_business_pnl`
@@ -13,7 +12,6 @@
 口径红线：
 - 账号直接支出资金明细属直接成本，**不进运营费用**（R2 验收「作图费不会使运营费用重复增加」）。
 - 未归集返点**独立成列，不摊给业务**（R5）。
-- 回收与代挂账号纳入库存；提号只保留订单账号文本，不纳入库存（R1）。
 """
 from __future__ import annotations
 
@@ -36,7 +34,6 @@ from ._shared import (
 from .export import finance_dimension_report, report_csv, report_for_export
 from .funds import daily_funds_report
 from .profit import order_profit_detail
-from .r1_inventory import r1_inventory_health
 from .r2_monthly_pnl import r2_monthly_pnl
 from .r3_commission import r3_commission_reconciliation
 from .r5_business_pnl import r5_business_pnl
@@ -61,7 +58,6 @@ __all__ = [
     "order_profit_detail",
     "report_csv",
     "report_for_export",
-    "r1_inventory_health",
     "r2_monthly_pnl",
     "r3_commission_reconciliation",
     "r5_business_pnl",

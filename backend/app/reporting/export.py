@@ -33,7 +33,6 @@ from ._shared import (
 
 from .funds import daily_funds_report
 from .profit import order_profit_detail
-from .r1_inventory import r1_inventory_health
 from .r2_monthly_pnl import r2_monthly_pnl
 from .r3_commission import r3_commission_reconciliation
 from .r5_business_pnl import r5_business_pnl
@@ -54,8 +53,6 @@ def report_for_export(
             "不支持导出的报表",
             details={"report_name": report_name, "allowed": sorted(REPORT_NAMES)},
         )
-    if name == "inventory-health":
-        return r1_inventory_health(session, user=user)
     if name == "monthly-pnl":
         return r2_monthly_pnl(session, from_date=from_date, to_date=to_date, user=user)
     if name == "commission":

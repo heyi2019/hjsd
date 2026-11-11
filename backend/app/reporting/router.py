@@ -1,4 +1,4 @@
-"""reporting.router：R1/R2/R3/R5、资金日报与订单利润（RPT-01）。"""
+"""reporting.router：R2/R3/R5、资金日报与订单利润（RPT-01）。"""
 from __future__ import annotations
 
 from datetime import date
@@ -23,7 +23,6 @@ from app.reporting.schemas import (
     FinanceDimensionOut,
     CommissionOut,
     DailyFundsOut,
-    InventoryHealthOut,
     MonthlyPnlOut,
     OrderProfitOut,
 )
@@ -31,15 +30,6 @@ from app.reporting.schemas import (
 router = APIRouter(tags=["reporting"])
 read_access = require_permissions(PERM_REPORT_READ)
 export_access = require_permissions(PERM_REPORT_EXPORT)
-
-
-@router.get("/reports/inventory-health", response_model=InventoryHealthOut)
-def inventory_health(
-    db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = read_access,
-) -> InventoryHealthOut:
-    """R1 自营库存健康表（提号实体可追踪，但不计入自营资产统计）。"""
-    return service.r1_inventory_health(db, user=user)
 
 
 @router.get("/reports/monthly-pnl", response_model=MonthlyPnlOut)

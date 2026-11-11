@@ -1,26 +1,6 @@
-/** 经营报表行（库存健康、月度损益、提成、业务损益、日资金、订单利润）。
+/** 经营报表行（月度损益、提成、业务损益、日资金、订单利润）。
  * 由原 shared/api/types.ts 按领域拆分；对外仍从 `./types` 统一导入。
  * 金额一律以字符串传输，前端不做浮点数计算。 */
-
-export interface InventoryHealthRow {
-  account_id: number;
-  game_account?: string | null;
-  platform?: string | null;
-  business?: string | null;
-  status: string;
-  buy_amount: string;
-  expected_price?: string | null;
-  expected_profit?: string | null;
-  total_cost: string;
-  holding_days?: number | null;
-  owner_id?: number | null;
-}
-
-export interface InventoryHealthReport {
-  generated_on: string;
-  total_cost: string;
-  items: InventoryHealthRow[];
-}
 
 export interface MonthlyPnlRow {
   month: string;

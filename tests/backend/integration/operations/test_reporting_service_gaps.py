@@ -110,7 +110,7 @@ def test_report_for_export_unsupported_raises(seeded_db):
 
 @pytest.mark.parametrize(
     "name",
-    ["inventory-health", "monthly-pnl", "commission", "business-pnl", "daily-funds"],
+    ["monthly-pnl", "commission", "business-pnl", "daily-funds"],
 )
 def test_report_for_export_dispatches(seeded_db, name):
     result = reporting_service.report_for_export(seeded_db, name)

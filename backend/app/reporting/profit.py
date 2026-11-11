@@ -4,8 +4,10 @@
 可正可负可 0；与分润基数同源，取数统一走 `cashflow_totals_by_order`。
 资金走向只有收入 / 支出两种，不以「是否生成资金流水」为界：
 收入 = 资金流水 IN + 返点记录金额；支出 = 资金流水 OUT + 分期坏账金额。
-收入 / 买入成本 / 直接费用三列是该收支的分解；返点列是「其中返点收入」
-的展示项，已含在收入列，不重复计入净利。
+收入大类 = 售出价 + 返点 + 其他收入子类型；支出大类 = 提号价/回收价（买入成本）
++ 直接费用 + 分期坏账 + 其他支出子类型。收入/买入成本/直接费用三列是两个大类的
+分解；返点列是「其中返点收入」展示项、已含在收入大类，不重复计入净利。
+作废（VOID）返点不是收入，随收入大类一起排除，与售出价 CANCEL 冲销同规则。
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from app.core.security import CurrentUser
 from app.parties import service as parties_service
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from app.domain.enums import RebateStatus
 from app.domain.trade import (
     Order,
     RebateRecord,
@@ -67,6 +70,7 @@ def order_profit_detail(
                 func.coalesce(func.sum(RebateRecord.base_amount), 0),
             )
             .where(RebateRecord.source_order_id.in_(order_ids))
+            .where(RebateRecord.status != RebateStatus.VOID.value)
             .group_by(RebateRecord.source_order_id)
         )
         for source_order_id, amount in rebate_rows:

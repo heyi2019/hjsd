@@ -8,11 +8,18 @@
 口径（勿凭直觉改）：
 - GROSS / PRINCIPAL：已过账事件口径，SELL=成交额、BUY=本金占用；直接支出统一取资金明细；
   CANCEL 仅在其显式 offset 某事件时才做会计冲销；裸取消只改流程状态。
-- PROFIT（2026-11-05 用户裁决）：该订单**所有收入 − 所有支出**，可正、可负、可为 0。
-  资金走向只有收入 / 支出两种，不以「有没有生成 cashflow 行」为界：
-  收入 = 资金流水 IN + 返点记录金额；支出 = 资金流水 OUT + 分期坏账金额。
-  返点登记即完成收入确认（app/finance/rebates.py），分期坏账是回收时确认的损失，
-  两者都不生成资金流水，但都有明确资金走向，必须计入利润。
+- PROFIT（2026-11-05 用户裁决）：该订单**收入大类 − 支出大类**，可正、可负、可为 0。
+  **只有收入、支出两个大类**；业务名词都是大类下的子类型，地位平等、同类同规则：
+  · 收入大类：售出价（SELL）、返点、其他一切流入；
+  · 支出大类：提号价 / 回收价（BUY）、直接费用、分期坏账、其他一切流出。
+  子类型只在报表里作「其中项」展示（如「其中返点」「其中买号支出」），不是独立的钱，
+  绝不再加回净利。
+  资金走向不以「有没有生成 cashflow 行」为界：生成流水走流水汇总；不生成流水的
+  （返点登记即收入确认 / 分期坏账回收确认）在各源自成口径补入。
+- 作废 ≠ 结算进度：RebateStatus 的 OPEN / PARTIALLY_SETTLED / SETTLED 是结算进度，
+  按「登记即计入」都要算收入；**VOID 是作废、不代表任何资金走向，收入侧一律排除**。
+  新模型返点作废靠 reverse_cashflow 冲销流水自动减收入，旧模型返点无流水只能靠 status
+  排除——两条路径必须让作废返点都不计收入（一致性修复，不是给返点开特例）。
 """
 
 from __future__ import annotations
@@ -26,7 +33,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
-from app.domain.enums import Direction, EventType, InstallmentDispositionAction
+from app.domain.enums import (
+    Direction,
+    EventType,
+    InstallmentDispositionAction,
+    RebateStatus,
+)
 from app.domain.trade import (
     Cashflow,
     Installment,
@@ -100,7 +112,9 @@ def _profit_flow_rows(
       `InstallmentDisposition.occurred_on` 归期；一份合约只有一次 RECOVER，
       连接不会放大金额。
 
-    不过滤审核状态 / 资金性质：资金走向只有收入、支出两类，登记即计入。
+    结算进度状态（OPEN / PARTIALLY_SETTLED / SETTLED）不过滤、登记即计入收入；
+    VOID 是作废、不代表资金走向，排除（与新模型返点作废 reverse_cashflow 后净额归零同口径）。
+    资金性质不改收入 / 支出归属——资金走向只有这两个大类。
     """
     rows: list[tuple[int, date, Decimal, Decimal]] = []
 
@@ -120,7 +134,7 @@ def _profit_flow_rows(
         RebateRecord.source_order_id,
         RebateRecord.collected_on,
         RebateRecord.base_amount,
-    )
+    ).where(RebateRecord.status != RebateStatus.VOID.value)
     if order_ids is not None:
         rebate_stmt = rebate_stmt.where(RebateRecord.source_order_id.in_(order_ids))
     if from_date is not None:

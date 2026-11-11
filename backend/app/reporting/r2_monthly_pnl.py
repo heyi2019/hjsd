@@ -22,6 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 from app.domain.enums import (
+    AccountingAttribute,
     CashflowStatus,
     Direction,
     Nature,
@@ -98,6 +99,8 @@ def r2_monthly_pnl(
     op_stmt = select(Cashflow).where(
         Cashflow.status == CashflowStatus.APPROVED.value,
         Cashflow.order_event_id.is_(None),
+        # 挂订单的支出归该单「支出大类」（直接成本），不再重复进期间运营费用。
+        Cashflow.order_id.is_(None),
         or_(Cashflow.fund_nature == "BUSINESS", Cashflow.category == "OPERATING_COST"),
         or_(
             Cashflow.accounting_attribute == "OPERATING_EXPENSE",
@@ -117,18 +120,21 @@ def r2_monthly_pnl(
         if to_date and occurred_on > to_date:
             continue
         amount = _money(flow.amount)
-        if (
+        if flow.reversal_of_id is not None:
+            # 冲销流水先按「被冲销的原流水」归类，不能看冲销流水自身的方向 / 性质：
+            # 冲销经营收入会生成 OUT/BUSINESS_OUT，按自身方向判断会被误记成运营费用。
+            # 只有原流水确属运营费用（核算属性 / 类别），才冲减运营费用列。
+            original = session.get(Cashflow, flow.reversal_of_id)
+            if original is not None and (
+                original.accounting_attribute == AccountingAttribute.OPERATING_EXPENSE.value
+                or original.category == "OPERATING_COST"
+            ):
+                operating[_month_key(occurred_on)] -= amount
+        elif (
             flow.direction == Direction.OUT.value
             and flow.nature == Nature.BUSINESS_OUT.value
         ):
             operating[_month_key(occurred_on)] += amount
-        elif flow.reversal_of_id is not None:
-            original = session.get(Cashflow, flow.reversal_of_id)
-            if original is not None and (
-                original.direction == Direction.OUT.value
-                and original.nature == Nature.BUSINESS_OUT.value
-            ):
-                operating[_month_key(occurred_on)] -= amount
 
     for bucket in (revenue, direct_cost, operating, rebate_income):
         for month in list(bucket):

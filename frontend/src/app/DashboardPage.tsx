@@ -113,7 +113,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
     setCreateOpen(true);
   };
   const businessAlerts = [
-    inventoryAgingCount && inventoryAgingCount > 0 ? `库存订单入库超过 7 天 ${inventoryAgingCount} 个` : null,
+    inventoryAgingCount && inventoryAgingCount > 0 ? `库存订单入库超过 ${businessReminderConfig.inventoryAgingDays} 天 ${inventoryAgingCount} 个` : null,
     businessReminderConfig.profitNotificationsEnabled && newProfitNotificationCount && newProfitNotificationCount > 0 ? `新的分润通知 ${newProfitNotificationCount} 条` : null,
     businessReminderConfig.overdueInstallmentsEnabled && overdueInstallmentCount && overdueInstallmentCount > 0 ? `逾期合约 ${overdueInstallmentCount} 个` : null,
   ].filter((item): item is string => Boolean(item));

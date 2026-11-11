@@ -234,6 +234,42 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(screen.queryByText("未结算")).toBeNull();
   });
 
+  it("编辑返点明细后通知上层刷新订单详情与统计（#9）", async () => {
+    const onCreated = vi.fn();
+    resolveMock(vi.mocked(catalog.rebatesApi.update), {
+      id: 41, rebate_no: "HS0001-RB01", source_order_id: 21, rebate_type: "BUY",
+      rate: "5.00", base_amount: "1200.00", status: "OPEN", collected_on: "2026-10-17", operator: "何一",
+    });
+    renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={onCreated} />, { user: "admin" });
+    expect(await screen.findByText("返点明细")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "编辑" }));
+    const title = await screen.findByText(/编辑返点 · HS0001-RB01/);
+    const editModal = title.closest(".ant-modal-content") as HTMLElement;
+    expect(editModal).toBeTruthy();
+    // editForm 打开时已用该行返点值预填（金额/比例/日期均合法），直接保存即走 submitEdit 刷新路径。
+    // 不依赖 MoneyInput 内部 id：自定义控件可能不转发 id，按 id 定位会拿到 null。
+    await userEvent.click(within(editModal).getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(catalog.rebatesApi.update).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+  });
+
+  it("删除返点明细后通知上层刷新（#9）", async () => {
+    const onCreated = vi.fn();
+    resolveMock(vi.mocked(catalog.rebatesApi.remove), {});
+    renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={onCreated} />, { user: "admin" });
+    expect(await screen.findByText("返点明细")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "删除" }));
+    // 触发按钮与二次确认按钮同名，取最后出现的确认按钮。
+    const deleteButtons = await screen.findAllByRole("button", { name: "删除" });
+    await userEvent.click(deleteButtons[deleteButtons.length - 1]);
+
+    await waitFor(() => expect(catalog.rebatesApi.remove).toHaveBeenCalledWith(41));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+  });
+
   it("操作人接口失败时显示错误，不伪造空操作人列表", async () => {
     vi.mocked(catalog.employeesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" } as unknown as never);
     renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });

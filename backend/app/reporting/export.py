@@ -44,9 +44,14 @@ def report_for_export(
     from_date: date | None = None,
     to_date: date | None = None,
     on: date | None = None,
+    mine: bool = False,
+    all_people: bool = False,
+    user_id: int | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
-    """统一执行可导出的报表，所有分支复用既有数据权限和口径。"""
+    """统一执行可导出的报表，所有分支复用既有数据权限和口径。
+    mine/all_people/user_id 仅作用于 R3，使导出与「我的收益/指定员工」页面视图同口径。
+    """
     name = report_name.strip().lower()
     if name not in REPORT_NAMES:
         raise Validation(
@@ -57,7 +62,8 @@ def report_for_export(
         return r2_monthly_pnl(session, from_date=from_date, to_date=to_date, user=user)
     if name == "commission":
         return r3_commission_reconciliation(
-            session, from_date=from_date, to_date=to_date, user=user
+            session, from_date=from_date, to_date=to_date, user=user,
+            mine=mine, all_people=all_people, user_id=user_id,
         )
     if name == "business-pnl":
         return r5_business_pnl(session, from_date=from_date, to_date=to_date, user=user)

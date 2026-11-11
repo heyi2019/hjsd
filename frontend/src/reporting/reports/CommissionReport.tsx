@@ -93,7 +93,8 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
          emptyText="所选区间无提成记录"
          onPageChange={() => undefined}
       />
-      <ReportExportButton name="commission" params={params} />
+      {/* 复用与列表完全相同的筛选对象，确保「我的收益/指定员工」导出与页面同口径（#8）。 */}
+      <ReportExportButton name="commission" params={commissionParams} />
     </Card>
   );
 }

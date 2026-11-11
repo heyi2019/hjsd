@@ -78,6 +78,21 @@ describe("ReportsPage：经营中心报表", () => {
     expect(vi.mocked(catalog.reportsApi.monthlyPnl)).not.toHaveBeenCalled();
   });
 
+  it("我的收益导出带 mine=true，与列表同口径", async () => {
+    vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
+    renderLight(<ReportsPage initialReportTab="my-earnings" />, { user: "admin" });
+    await screen.findAllByText("我的收益");
+    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith(
+      "commission",
+      expect.objectContaining({ mine: true }),
+    ));
+    expect(vi.mocked(catalog.reportsApi.exportCsv)).not.toHaveBeenCalledWith(
+      "commission",
+      expect.objectContaining({ all_people: true }),
+    );
+  });
+
   it("FE-260：提成对账可以按人员筛选并传递 user_id", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await ui.click(screen.getByRole("tab", { name: "提成对账 R3" }));
@@ -89,6 +104,22 @@ describe("ReportsPage：经营中心报表", () => {
     expect(await screen.findByText("全部", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
     await ui.click(await screen.findByText(/业务同事（operator）/, { selector: ".ant-select-item-option-content" }));
     await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
+  });
+
+  it("R3 指定员工导出带 user_id，与列表同口径", async () => {
+    vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
+    renderLight(<ReportsPage />, { user: "admin" });
+    await ui.click(screen.getByRole("tab", { name: "提成对账 R3" }));
+    await waitFor(() => expect(vi.mocked(catalog.employeesApi.list)).toHaveBeenCalled());
+    const personComboboxes = await screen.findAllByRole("combobox");
+    await ui.click(personComboboxes[personComboboxes.length - 1] as HTMLElement);
+    await ui.click(await screen.findByText(/业务同事（operator）/, { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
+    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith(
+      "commission",
+      expect.objectContaining({ all_people: true, user_id: 7 }),
+    ));
   });
 
   it("六个 Tab 齐全（R2-R5 + 订单利润 + 数据中心）", async () => {

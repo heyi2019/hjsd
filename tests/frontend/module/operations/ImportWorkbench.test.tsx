@@ -127,6 +127,30 @@ it("提交批次：DRAFT 状态可提交，admin 点确认批次 调用 vi.mocke
   expect(vi.mocked(catalog.importsApi.commit).mock.calls[0][0]).toBe(1); // batch id
 });
 
+it("写操作触发刷新后保持当前批次，不被重置回第一个（#12）", async () => {
+  const batch2 = { ...batch, id: 2, batch_no: "MIG-01-02", source_name: "8月对账单" } as ImportBatch;
+  resolveMock(vi.mocked(catalog.importsApi.batches), { items: [batch, batch2], total: 2 });
+  vi.mocked(catalog.importsApi.rows).mockImplementation(async (batchId: number) => ({
+    items: importRows.map((row) => ({ ...row, batch_id: batchId })),
+    total: importRows.length,
+  }));
+  renderLight(<ImportWorkbench />, { user: "admin" });
+  await screen.findByText("金额=100"); // 默认加载第一个批次
+
+  // 切到第二个批次
+  await ui.click(screen.getAllByRole("combobox")[0] as HTMLElement); // 批次下拉是页面唯一 combobox
+  await ui.click(await screen.findByText(/8月对账单/, { selector: ".ant-select-item-option-content" }));
+  await waitFor(() => expect(vi.mocked(catalog.importsApi.rows).mock.calls.slice(-1)[0]?.[0]).toBe(2));
+
+  // 写操作 → act() → refreshAll() → loadBatches()
+  await ui.click(screen.getByRole("button", { name: /确认批次/ }));
+  await ui.click(await screen.findByRole("button", { name: /确认提交批次/ }));
+  await waitFor(() => expect(vi.mocked(catalog.importsApi.commit)).toHaveBeenCalledWith(2));
+
+  // 修复前 loadBatches 闭包永久捕获首次 null，会把当前批次重置回第一个 → rows 以 batch 1 重载。
+  expect(vi.mocked(catalog.importsApi.rows).mock.calls.slice(-1)[0]?.[0]).toBe(2);
+});
+
 it("导入对账 Tab：切换后渲染对账 StatCard（源总行/已导入）", async () => {
   renderLight(<ImportWorkbench />, { user: "admin" });
   await screen.findByText("导入工作台");

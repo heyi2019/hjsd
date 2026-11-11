@@ -141,6 +141,47 @@ def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
     assert Decimal(payload["approved_expense"]) == Decimal("0.00")
 
 
+def test_summary_excludes_order_plain_cashflows(seeded_client, seeded_db, headers):
+    """订单普通资金流水（挂 order_id 但无事件/押金/划转）属性命中也不算工作室收支。"""
+    from app.orders import service as orders_service
+    from app.stocks import service as stocks_service
+
+    account = stocks_service.create_account(
+        seeded_db,
+        game_account="studio-summary-plain-acc",
+        platform="王者",
+        actor="pytest",
+        business_mode="SELF",
+        inventory_type="RECOVERY",
+    )
+    order = orders_service.create_order(
+        seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
+    )
+    service.create_cashflow(
+        seeded_db,
+        pool_id=_pool(seeded_db).id,
+        occurred_on=TODAY,
+        direction="OUT",
+        nature="BUSINESS_OUT",
+        accounting_attribute="OPERATING_EXPENSE",
+        category="房租",
+        amount=Decimal("450"),
+        actor="pytest",
+        order_id=order.id,
+        note="订单普通支出",
+    )
+    # 真正的工作室手工支出必须仍在：确认过滤只排订单流水、不误伤手工登记。
+    _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="90")
+
+    payload = _summary(seeded_client, headers)
+
+    amounts = {Decimal(item["amount"]) for item in payload["items"]}
+    assert Decimal("450.00") not in amounts
+    assert Decimal("90.00") in amounts
+    assert Decimal(payload["approved_expense"]) == Decimal("90.00")
+    assert Decimal(payload["approved_net"]) == Decimal("-90.00")
+
+
 def test_pool_ids_filter(seeded_client, seeded_db, headers):
     other = Pool(
         code="STUDIO-OTHER",

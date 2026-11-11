@@ -61,7 +61,7 @@ export function ListColumnsPanel() {
   const [customLabel, setCustomLabel] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
-  /** 批量操作勾选：锁定列的选择框禁用，不会进选中集。 */
+  /** 批量操作勾选：所有列（含身份列）均可勾选切换显示，与单行隐藏按钮同口径。 */
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   /** 拖拽排序：记录拖起行的列键，drop 到目标行时重排并整表提交。 */
   const dragKeyRef = useRef<string | null>(null);
@@ -193,19 +193,13 @@ export function ListColumnsPanel() {
     );
   };
 
-  /** 批量显示/隐藏所选列：一次整表提交；锁定列已被选择框禁用，这里再兜底跳过。 */
+  /** 批量显示/隐藏所选列：一次整表提交；所有列（含身份列）均可批量切换，与单行操作同口径。 */
   const batchSetVisible = (visible: boolean) => {
     const targets = new Set(selectedRowKeys.map(String));
-    const unlocked = rows.filter((column) => targets.has(column.key) && !column.locked);
-    if (!unlocked.length) {
-      appMessage.info("请先勾选可修改的列（锁定列不可隐藏）");
-      return;
-    }
+    if (!targets.size) return;
     setSelectedRowKeys([]);
     void persist(
-      rows.map((column) =>
-        targets.has(column.key) && !column.locked ? { ...column, is_visible: visible } : column,
-      ),
+      rows.map((column) => (targets.has(column.key) ? { ...column, is_visible: visible } : column)),
       visible ? "已显示所选列" : "已隐藏所选列",
     );
   };
@@ -486,6 +480,7 @@ export function ListColumnsPanel() {
           rowSelection={{
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys),
+            // 所有列（含身份列/操作列）均可勾选批量切换显示，与单行隐藏按钮同口径（#15）。
             getCheckboxProps: () => ({ disabled: saving }),
           }}
           /** 整行拖拽排序：拖起记录来源键，drop 到目标行位置后整表重排提交。 */

@@ -303,6 +303,27 @@ describe("ListColumnsPanel", () => {
     expect(party?.is_visible).toBe(false);
   });
 
+  it("批量隐藏：锁定列（身份列）勾选后同样生效，不再静默跳过（#15）", async () => {
+    renderLight(<ListColumnsPanel />);
+    await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());
+
+    // 与「所有列均可隐藏」口径一致：身份列勾选框保持可选
+    const orderRow = screen.getByText("订单号").closest("tr") as HTMLElement;
+    const orderCheckbox = orderRow.querySelector('input[type="checkbox"]') as HTMLElement;
+    expect(orderCheckbox).not.toBeDisabled();
+    await userEvent.click(orderCheckbox);
+
+    await userEvent.click(screen.getByRole("button", { name: "隐藏所选列" }));
+
+    await waitFor(() => expect(catalog.listColumnsApi.save).toHaveBeenCalledTimes(1));
+    const [scope, items] = vi.mocked(catalog.listColumnsApi.save).mock.calls[0];
+    expect(scope).toBe("LEDGER");
+    const orderNo = (items as Array<{ key: string; is_visible: boolean }>).find(
+      (item) => item.key === "order_no",
+    );
+    expect(orderNo?.is_visible).toBe(false);
+  });
+
   it("拖拽排序：拖起一行 drop 到另一行位置后整表提交新顺序", async () => {
     const { fireEvent } = await import("@testing-library/react");
     renderLight(<ListColumnsPanel />);

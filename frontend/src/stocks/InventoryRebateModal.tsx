@@ -147,6 +147,8 @@ export function InventoryRebateModal(props: {
       setEditTarget(null);
       editForm.resetFields();
       appMessage.success("返点明细已更新");
+      // 返点是收入"其中项"，编辑会改变订单利润/分润：必须通知上层刷新订单详情与统计（与登记/删除同口径）。
+      await props.onCreated();
     } catch (cause) {
       setError(normalizeError(cause));
     }
@@ -264,6 +266,8 @@ export function InventoryRebateModal(props: {
                           await rebatesApi.remove(row.id);
                           setRebates((current) => current.filter((item) => item.id !== row.id));
                           appMessage.success("返点明细已删除");
+                          // 删除返点同样影响订单利润与统计，必须刷新上层（#9）。
+                          await props.onCreated();
                         }}
                       >删除</ConfirmButton>
                     </Space>

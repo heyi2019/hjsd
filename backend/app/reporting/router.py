@@ -110,14 +110,22 @@ def export_report(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     on: date | None = Query(default=None),
+    mine: bool = Query(default=False),
+    all_people: bool = Query(default=False),
+    user_id: int | None = Query(default=None, gt=0),
 ) -> Response:
-    """导出当前权限范围内的报表；导出动作写入审计日志。"""
+    """导出当前权限范围内的报表；导出动作写入审计日志。
+    mine/all_people/user_id 仅作用于 R3，与 /reports/commission 列表同口径。
+    """
     report = service.report_for_export(
         db,
         report_name,
         from_date=from_date,
         to_date=to_date,
         on=on,
+        mine=mine,
+        all_people=all_people,
+        user_id=user_id,
         user=user,
     )
     # 导出列 = 该报表在「设置 → 列表字段」里的可见列：隐藏的列不导，表头用中文列名。
@@ -143,6 +151,9 @@ def export_report(
             "from": from_date.isoformat() if from_date else None,
             "to": to_date.isoformat() if to_date else None,
             "on": on.isoformat() if on else None,
+            "mine": mine,
+            "all_people": all_people,
+            "user_id": user_id,
             "column_count": export_meta["column_count"],
             "translated_columns": export_meta["translated_columns"],
         },

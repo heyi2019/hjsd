@@ -505,8 +505,10 @@ def cashflow_totals(
 
 # --------------------------------------------------------------- 工作室手工收支
 
-# 与 `list_cashflows` 里 source 判定保持一致：这几种 category（或挂了押金/事件/划转）
+# 与 `list_cashflows` 里 source 判定「大体」一致：这几种 category（或挂了押金/事件/划转）
 # 都不是「手工登记」，不计入工作室收支。改这里必须同步那段 if/elif。
+# 唯一有意不等价处：挂了 order_id 的普通资金流水在列表里 source 仍是 OTHER，
+# 但它属于订单资金明细而非工作室手工收支，故 _studio_scope 额外排除 order_id。
 _MANUAL_EXCLUDED_CATEGORIES = (
     "REBATE",
     "REBATE_REVERSAL",
@@ -525,6 +527,8 @@ STUDIO_INCOME_ATTRIBUTE = AccountingAttribute.SELF_REVENUE.value
 def _studio_scope() -> Any:
     """「手工登记的工作室收支」的 SQL 条件，与列表里的 source=OTHER 等价。"""
     return and_(
+        # 订单普通资金流水（挂 order_id 但无事件/押金/划转）属订单口径，不计入工作室收支。
+        Cashflow.order_id.is_(None),
         Cashflow.order_event_id.is_(None),
         Cashflow.deposit_id.is_(None),
         Cashflow.transfer_id.is_(None),

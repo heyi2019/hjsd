@@ -382,6 +382,49 @@ class TestR3Commission:
             == []
         )
 
+    def test_commission_export_honors_mine_and_user_id(self, seeded_db, seeded_client, headers):
+        """R3 导出必须跟随页面的「我的收益/指定员工」，不能恒定默认全员口径。"""
+        import csv
+        import io
+
+        order = _order(seeded_db)
+        order_service.post_event(
+            seeded_db, order.id, event_type="BUY", amount="1000.00",
+            occurred_on=D, actor="pytest",
+        )
+        order_service.post_event(
+            seeded_db, order.id, event_type="SELL", amount="1300.00",
+            occurred_on=D, actor="pytest",
+        )
+        policy_service.set_allocations(
+            seeded_db, order.id,
+            items=[
+                {"user_id": 7, "role": "OWNER", "allocation_rate": 50},
+                {"user_id": 8, "role": "OWNER", "allocation_rate": 50},
+            ],
+            actor="pytest",
+        )
+
+        def exported_user_ids(query: dict, auth: dict) -> set[int]:
+            response = seeded_client.get(
+                "/api/v1/reports/commission/export.csv", params=query, headers=auth
+            )
+            assert response.status_code == 200, response.text
+            rows = list(csv.reader(io.StringIO(response.content.decode("utf-8-sig"))))
+            person_index = rows[0].index("人员 ID")
+            return {int(row[person_index]) for row in rows[1:] if row[0] == "ITEM"}
+
+        assert exported_user_ids({"all_people": "true"}, headers) == {7, 8}
+        # 指定员工：修复前 user_id 被导出接口忽略，仍导出两人。
+        assert exported_user_ids({"all_people": "true", "user_id": "8"}, headers) == {8}
+
+        mine_user = CurrentUser.build(
+            id=7, username="seeduser7", roles=["ADMIN"], display_name="种子用户7"
+        )
+        mine_headers = {"Authorization": f"Bearer {build_access_token(mine_user)}"}
+        # 我的收益：修复前 mine 被导出接口忽略，仍导出两人。
+        assert exported_user_ids({"mine": "true"}, mine_headers) == {7}
+
 
 # --------------------------------------------------------------------- R5 业务
 # --------------------------------------------------------------------- 订单利润明细

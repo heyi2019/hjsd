@@ -3,7 +3,7 @@ import type { AuditEntityStat, AuditLogRow, BusinessPnlReport, CommissionReport,
 
 export const reportsApi = {
   financeDimensions: (params?: {from?: string; to?: string}) => api.get<FinanceDimensionReport>("/reports/finance-dimensions", {params}).then(r => r.data),
-  exportCsv: (name: string, params?: {from?: string; to?: string}) => api.get<Blob>(`/reports/${name}/export.csv`, {params, responseType: "blob"}).then(r => r.data),
+  exportCsv: (name: string, params?: {from?: string; to?: string; mine?: boolean; all_people?: boolean; user_id?: number}) => api.get<Blob>(`/reports/${name}/export.csv`, {params, responseType: "blob"}).then(r => r.data),
   monthlyPnl: (params?: { from?: string; to?: string }) =>
     api.get<MonthlyPnlReport>("/reports/monthly-pnl", { params }).then((r) => r.data),
   commission: (params?: { from?: string; to?: string; mine?: boolean; all_people?: boolean; user_id?: number }) =>

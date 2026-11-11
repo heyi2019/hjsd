@@ -1,7 +1,7 @@
 import { Form, Space } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { importsApi,
   type ImportBatch,
   type ImportRow,
@@ -27,6 +27,11 @@ export function useImportWorkbenchController({
   const isBatchControlled = batchIdProp !== undefined;
   const [internalBatchId, setInternalBatchId] = useState<number | null>(null);
   const batchId = isBatchControlled ? (batchIdProp as number | null) : internalBatchId;
+  // loadBatches 必须保持 [] 稳定依赖（否则每次选中批次都重拉列表），但它又要判断
+  // "当前是否已选批次" 才能决定补选第一个。用 ref 读取最新值，避免永久捕获首次的 null
+  // 导致 refreshAll 后把用户当前批次重置回第一个（#12）。
+  const batchIdRef = useRef<number | null>(batchId);
+  batchIdRef.current = batchId;
   const setBatchId = useCallback(
     (value: number | null) => {
       const next = value ?? null;
@@ -59,7 +64,8 @@ export function useImportWorkbenchController({
     try {
       const data = await importsApi.batches();
       setBatches(data.items);
-      if (batchId === null) setBatchId(data.items[0]?.id ?? null);
+      // 仅当"当前确实还没选中任何批次"时才补选第一个；读 ref 而非闭包捕获的首次 batchId。
+      if (batchIdRef.current === null) setBatchId(data.items[0]?.id ?? null);
       setError(null);
       setBatchesReady(true);
     } catch (err) {

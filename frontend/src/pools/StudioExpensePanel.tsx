@@ -52,7 +52,7 @@ const DEFAULT_EXPENSE_ITEMS: OptionItem[] = [
 
 const INCOME_ITEMS: OptionItem[] = [
   { value: "货款", label: "货款" },
-  { value: "退款", label: "退款" },
+  // 「退款」已随订单售后退款专用链路下线（退款统一并入普通支出）：收入科目不再保留退款。
   { value: "其他", label: "其他" },
 ];
 

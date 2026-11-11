@@ -4,6 +4,7 @@ __pycache__
 .pytest_cache
 tests
 data
+backups
 .env
 .DS_Store
 *.db

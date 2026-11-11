@@ -65,8 +65,10 @@ if [ "${ERP_SKIP_BUILD:-0}" = "1" ]; then
 else
 # 基础镜像预检：Docker Hub 在部分网络（尤其 ECS 国内节点）不可达，而失败点落在 Dockerfile
 # 的 FROM 行、报错形似代码问题（TLS handshake timeout）。这里提前拉取，把网络问题变成明示。
+# 三个基础镜像：python:3.12-alpine=后端 FROM；alpine:3.20=前端运行阶段 FROM；
+# node:22-alpine=前端构建阶段 FROM。缺一即构建失败。
 echo "==> 检查基础镜像"
-for img in alpine:3.20 node:22-alpine; do
+for img in python:3.12-alpine alpine:3.20 node:22-alpine; do
   if docker image inspect "$img" >/dev/null 2>&1; then
     echo "  ✓ ${img} 已存在"
     continue

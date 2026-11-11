@@ -12,7 +12,7 @@ FROM python:3.12-alpine
 
 # tzdata 不可省：alpine 默认无时区库，缺失会让 datetime.now() 落 UTC，
 # 与国内 +8 差 8 小时，跨日订单/对账日期会错位。
-# libstdc++ 为 greenlet/uvloop 等 C++ 扩展的运行时依赖。
+# libstdc++ 为 greenlet 等 C++ 扩展的运行时依赖（uvloop 已在极限瘦身中移除，但 greenlet 仍需保留此库）。
 # 官方 python 镜像已自带 python/python3 软链与 pip，无需 apk 装 py3-pip、无需补软链。
 RUN sed -i 's|https://dl-cdn.alpinelinux.org/alpine|https://mirrors.aliyun.com/alpine|g' /etc/apk/repositories \
     && apk add --no-cache libstdc++ tzdata \

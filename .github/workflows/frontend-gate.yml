@@ -1,10 +1,22 @@
 name: frontend-gate
 
+# 前端门禁三档（2026-11-11 裁决，替代「每次 push 都跑全量」）：
+#   ① full_suite=true（手动 workflow_dispatch）→ npm run test:ci，全量含 deep，发版收口/里程碑用
+#   ② 本次提交有前端/测试变更 → npm run test:changed，按变更区域选测；命中公共层/分层配置自动降级 quick
+#   ③ 无前端/测试变更 → npm run test:quick 冒烟，不静默跳过（release 提交只改版本文件即走此档）
+# 变更路径由 workflow 计算并经 TEST_CHANGED_PATHS 注入：CI checkout 后 git status 恒为空，
+# 不能靠脚本自己读工作区，必须显式喂「本次 commit diff」。
 on:
   push:
     branches: [main, master]
   pull_request:
   workflow_dispatch:
+    inputs:
+      full_suite:
+        description: "Run the full CI suite instead of changed-area tests"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -19,6 +31,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -30,10 +44,43 @@ jobs:
         working-directory: .
         run: npm ci
 
-      - name: Check and test frontend
+      - name: Resolve changed paths
+        working-directory: .
+        shell: bash
         run: |
+          set -euo pipefail
+          base="${{ github.event.before || '' }}"
+          pr_base="${{ github.event.pull_request.base.sha || '' }}"
+          if [[ -n "$pr_base" ]]; then
+            base="$pr_base"
+          elif [[ -z "$base" || "$base" =~ ^0{40}$ ]]; then
+            base="HEAD^"
+          fi
+          if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="HEAD^"
+          fi
+          paths="$(git diff --name-only "$base" "${{ github.sha }}" | paste -sd, -)"
+          printf 'TEST_CHANGED_PATHS=%s\n' "$paths" >> "$GITHUB_ENV"
+          fe="$(printf '%s' "$paths" | tr ',' '\n' | grep -cE '^(frontend/|tests/)' || true)"
+          echo "base=$base frontend_related=$fe paths=${paths:-<none>}"
+
+      - name: Check and test frontend
+        env:
+          FULL_SUITE: ${{ inputs.full_suite || 'false' }}
+        run: |
+          set -euo pipefail
           npm run check
-          npm run test:full:all
+          if [[ "$FULL_SUITE" == "true" ]]; then
+            echo "全量 CI 档（full_suite=true）"
+            npm run test:ci
+          elif [[ -n "${TEST_CHANGED_PATHS:-}" ]] \
+            && printf '%s' "$TEST_CHANGED_PATHS" | tr ',' '\n' | grep -qE '^(frontend/|tests/)'; then
+            echo "按变更选测：${TEST_CHANGED_PATHS}"
+            npm run test:changed
+          else
+            echo "无前端/测试变更，跑 quick 冒烟档"
+            npm run test:quick
+          fi
 
   frontend-build:
     name: Frontend build

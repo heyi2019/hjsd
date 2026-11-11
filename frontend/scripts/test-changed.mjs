@@ -5,12 +5,15 @@
  * 三档测试体系（2026-11-02 何一裁决）：
  *   ①单元测试  test:unit     = vitest --project=fast（纯逻辑、无 DOM、秒级）
  *   ②板块测试  test:panel    = 手填区域；test:changed = 自动从 git 变更推断区域
- *   ③CI 测试   test:ci       = 全量（含 deep），只在 CI / 发版前跑
+ *   ③全量档   test:ci       = 全量（含 deep），手动 full_suite / 发版收口跑
  *
  * 用法：
  *   node scripts/test-changed.mjs                # 按 git 变更自动跑对应区域
  *   node scripts/test-changed.mjs --list         # 只打印将执行的命令，不跑
  *   node scripts/test-changed.mjs -- --reporter=dot   # 「--」之后原样透传 vitest
+ *
+ * CI（frontend-gate）通过 TEST_CHANGED_PATHS 注入本次 commit diff 作为变更源：
+ * checkout 后工作区恒为干净，靠 git status 会误判成「无前端变更」。
  *
  * 选档规则（2026-11-04 起测试家在仓库根 tests/frontend/）：
  *   - 变更落在 `frontend/src/<domain>/` → 跑该 domain 对应的区域（tests/frontend/<kind>/<区域>）
@@ -104,8 +107,11 @@ if (unknownFlags.length > 0) {
 
 /** `git status --short` 的路径列：处理重命名 `old -> new`，取新路径。 */
 function changedPaths() {
-  // `TEST_CHANGED_PATHS`（逗号分隔）仅供脚本自测/演练：正常使用不要设置，
-  // 否则会绕开真实 git 状态。用于验证「无变更 / 选区域 / 降级」三条分支。
+  // `TEST_CHANGED_PATHS`（逗号分隔，仓库根相对路径）两种合法来源：
+  //   ① 本地自测/演练：显式喂路径，验证「无变更 / 选区域 / 降级」三条分支；
+  //   ② GitHub Actions：CI checkout 后 git status 恒为空，由 frontend-gate 计算
+  //      commit diff 并注入，否则会误判成「无前端变更」而跳过全部测试。
+  // 本地正常使用时不要设置，以免绕开真实 git 状态。
   const override = process.env.TEST_CHANGED_PATHS;
   if (override !== undefined) {
     return override

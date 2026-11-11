@@ -155,6 +155,11 @@ npm run test:changed         # 按 git 变更自动选区域（改 src/orders �
 npm run test:e2e             # Playwright + 真实后端 + 独立库 heijin_erp_e2e（15 spec / 62 例）
 ```
 
+CI（`frontend-gate`）默认按变更选测：`workflow_dispatch` 传 `full_suite=true` → `test:ci` 全量（发版收口）；
+本次提交有前端/测试变更 → `test:changed`（命中公共层或分层配置自动降级 quick）；
+无前端/测试变更 → `test:quick` 冒烟，不静默跳过。变更路径由 workflow 算 commit diff 后经
+`TEST_CHANGED_PATHS` 注入（CI checkout 后 `git status` 恒为空）。
+
 三层与四档的关系：`fast`/`quick`/`react`/`react-deep` 是**跑法**（执行成本档），
 `unit`/`module` 与区域是**归属**（文件放哪）。`test-layers.mjs` 只登记前者的文件清单，
 归属永远扫磁盘——两套清单必然漂移，这是 2026-10-27 已经付过学费的坑。

@@ -17,6 +17,9 @@ on:
 
 permissions:
   contents: write
+  # type=gha 缓存走 GitHub Actions Cache API；显式声明 permissions 后未列出的项默认 none，
+  # 缺 actions: write 会让 cache-to 静默写不进去（2026-11-11 实测仓库零 buildkit 缓存条目）。
+  actions: write
 
 concurrency:
   group: production-deploy
@@ -56,10 +59,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Docker 官方 gha cache 文档：inline step 手动调用 buildx 时，cache service 变量
+      # 不会自动暴露；由该 helper 写入 GITHUB_ENV，否则 cache-from/to 静默失效。
+      - name: Expose GitHub Actions cache runtime
+        uses: crazy-max/ghaction-github-runtime@v3
+
       - name: Build production images
         shell: bash
         run: |
           set -uo pipefail
+          echo "gha cache env: cache_url=${ACTIONS_CACHE_URL:+set} results_url=${ACTIONS_RESULTS_URL:+set} runtime_token=${ACTIONS_RUNTIME_TOKEN:+set}"
           VERSION="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' backend/app/version.py | head -1)"
           [[ -n "$VERSION" ]] || { echo 'Unable to read backend/app/version.py' >&2; exit 1; }
           echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"

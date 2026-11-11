@@ -4,7 +4,7 @@
  * 三档测试体系中的第二档「板块测试」：
  *   ①单元测试  test:unit   = vitest --project=fast（纯逻辑、无 DOM、秒级）
  *   ②板块测试  test:panel  = 本脚本（改哪个区域只跑 tests/frontend/<kind>/<区域>/）
- *   ③CI 测试   test:ci     = test-full-sharded --all（全量，只在 CI / 发版前跑）
+ *   ③全量档   test:ci     = test-full-sharded --all（手动 full_suite / 发版收口跑）
  *
  * 板块名 = 区域目录名（system/workbench/business/customer/finance/operations/settings/shared），
  * 由磁盘自动发现，与 tests/frontend/<unit|module>/<区域>/ 单一事实源，无需手工维护清单。

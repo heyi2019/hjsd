@@ -69,7 +69,7 @@
 
 ## 五、E2E 证据与归档
 
-`archive/ux-audit/` 只存**证据**：`result.json`、`result-before-scriptfix.json` 与 `shots/` 下截图，被 `tests/e2e/system/visual.spec.ts`、`tests/e2e/finance/other-integration.spec.ts`、`frontend/scripts/ux-audit.mjs` 直接读取，**不得删除**。结论文字在对应报告里，证据不入正文；`security/pii_allowlist.txt` 不登记任何归档路径。
+`archive/ux-audit/` 只存**证据**：`result.json`、`result-before-scriptfix.json` 与 `shots/` 下截图，被 `tests/e2e/system/visual.spec.ts`、`tests/e2e/finance/other-integration.spec.ts`、`frontend/scripts/ux-audit.mjs` 直接读取，**不得删除**。结论文字在对应报告里，证据不入正文。
 
 ## 六、仓外文档登记（不在 `docs/` 下）
 
@@ -78,7 +78,6 @@
 | 路径 | 用途 |
 |---|---|
 | `tests/README.md` | 测试文件与执行入口索引：目录结构、三根轴、子目录约定、新增测试四步、`db` 标记派生的快/慢通道、FE 手工用例 ↔ 自动化映射（第 8 节） |
-| `security/PII_处置口径.md` | PII 处置口径，`lint-gate.yml` 注释引用 |
 | `outputs/README.md` | 运行产物目录说明 |
 | `README.md`（仓库根） | 项目总入口：快速启动、开发命令、目录结构、关键业务约束 |
 | `RELEASE.md`（仓库根） | 发版流程与版本发布记录 |

@@ -40,6 +40,49 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 
 ---
 
+## V0.1.2
+
+**发布时间：** 2026-11-11 18:16:26 CST（Asia/Shanghai）
+
+### 本次内容
+
+本轮自动汇总以下提交，按 Bug 修复、功能更新和工程变更分类：
+
+相对提交 `47336bc8e354`，共 19 个非合并提交；227 files changed, 1305 insertions(+), 32768 deletions(-)。
+
+### Bug 修复
+
+- drop stale test triggers, guard release loop and restore B4 script（`3f543b4e`）
+- restore RELEASE.md and align indexes with purged assets（`b638ea75`）
+
+### 工程与其他变更
+
+- merge interface/state/permission contracts and absorb FE mapping into tests README（`bb1d8071`）
+- merge feature registry and promise ledger into one metadata ledger（`f0e88b36`）
+- merge test specs, drop stale baselines, allow code-to-doc refs（`2be75129`）
+- retire stale specs and merge process/component docs（`7ba0c18e`）
+- normalize doc filenames and date-stamp test reports（`fa8e71da`）
+- retire archived docs and trim PII allowlist to live files（`bb6cb154`）
+- merge test asset manifests and retire dated baselines（`bc2d1653`）
+- absorb finished test-system ledger into tests README（`fbee2f6c`）
+- correct test asset map with live specs and task ledger（`a3bdb035`）
+- align local db ownership with split dev/main env files（`107c572c`）
+- correct stale db name, artifact retention and test-branch wording（`d88782a9`）
+- purge orphan mutation script and redundant placeholders（`5266e145`）
+- sync flows with three-gate auto release chain（`264a5bdf`）
+- align release, development and test flows with origin/main-only CI（`b58a614b`）
+- purge archived docs, import scripts and dev helpers（`e38936a1`）
+- unify backup retention defaults to 7 days（`71fdcebb`）
+- remove stale test-branch triggers and RELEASE.md（`dcddca18`）
+
+### 发布结果
+
+- 自动版本：`V0.1.2`
+- 更新级别：`patch`
+- CI 门禁：lint、前端构建/测试、后端核心测试
+- 部署：门禁全部通过后自动发布到 ECS
+
+---
 ## V0.1.1
 
 **发布时间：** 2026-11-11 01:59:58 CST（Asia/Shanghai）

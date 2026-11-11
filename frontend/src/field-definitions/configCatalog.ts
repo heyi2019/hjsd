@@ -4,7 +4,7 @@
  *
  * entityTypes 取自后端 audit_logs.entity_type 的**实际写入值**（dev 库实证）。
  * ⚠️ 大小写不统一且无规律：`order_form_field`/`field_definition` 是下划线小写，
- * 而 `OrderTypeDef`/`OrderTypePool`/`GameTypeOption`/`Pool`/`pool_account` 是驼峰或首字母大写。
+ * 而 `OrderTypeDef`/`OrderTypePool`/`GameTypeOption`/`Pool` 是驼峰或首字母大写。
  * 不要按模型名推断，必须照抄实际值，否则查不到改动记录。
  */
 
@@ -59,7 +59,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     summary: "回收/提号/代挂等定义，含资金性质与编号前缀",
     group: "MASTER",
     // 只收 OrderTypeDef：路由（OrderTypePool）归「资金池」项，
-    // 否则同一批 ROUTE_UPDATE 会在两项里重复计数（与 Pool / pool_account 的处理口径一致）。
+    // 否则同一批 ROUTE_UPDATE 会在两项里重复计数（与 Pool 的处理口径一致）。
     entityTypes: ["OrderTypeDef"],
     count: async () => (await orderTypesApi.list()).length,
   },

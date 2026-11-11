@@ -37,6 +37,7 @@ from app.domain.trade import (
     OrderEvent,
 )
 from app.orders.amounts import (
+    business_cashflow_filter,
     event_contribution as order_event_contribution,
     event_totals as order_event_totals,
     order_profit_flow_by_order,
@@ -105,6 +106,8 @@ def cashflow_totals_by_order(
     本函数是报表侧唯一取数口，与分润基数 `order_cashflow_profit` 同源：
     不看 status / nature / fund_nature，冲销流水本身是反向流水自然计入；
     返点记录（收入）与分期坏账（支出）由 `order_profit_flow_by_order` 补齐。
+    押金损失是「已占用押金转费用」的定性转换、非第二次现金流出，由
+    `business_cashflow_filter` 排除，与订单利润明细 `order_cashflow_profit_by_order` 同源。
     调用方传入的 order_ids 必须已过权限范围。
     """
     ids = list(order_ids) if order_ids is not None else None
@@ -133,7 +136,7 @@ def cashflow_totals_by_order(
             func.coalesce(func.sum(expense_case), 0),
             func.coalesce(func.sum(buy_case), 0),
         )
-        .where(Cashflow.order_id.is_not(None))
+        .where(Cashflow.order_id.is_not(None), business_cashflow_filter())
         .group_by(Cashflow.order_id)
     )
     if ids is not None:

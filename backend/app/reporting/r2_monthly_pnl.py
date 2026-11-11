@@ -31,7 +31,7 @@ from app.domain.trade import (
     Cashflow,
     Order,
 )
-from app.orders.amounts import order_profit_flow_by_date
+from app.orders.amounts import business_cashflow_filter, order_profit_flow_by_date
 
 from ._shared import (
     ZERO,
@@ -66,15 +66,12 @@ def r2_monthly_pnl(
             func.coalesce(func.sum(expense_case), 0),
         )
         .join(Order, Order.id == Cashflow.order_id)
-        # 押金占用/释放/损失是资金占用（EXTERNAL/DEPOSIT），不是订单经营直接
-        # 成本；挂了 source_order_id 也不能混进 R2 支出大类，否则虚增该单成本。
-        # 注意放行 NULL：SQL 中 NULL != 'DEPOSIT' 为假，会误删未设属性的流水。
-        .where(
-            or_(
-                Cashflow.accounting_attribute != AccountingAttribute.DEPOSIT.value,
-                Cashflow.accounting_attribute.is_(None),
-            )
-        )
+        # 2026-11-12 用户裁决 C：押金完整走业务口径，R2 与订单利润逐笔同源。
+        # 套用 business_cashflow_filter：押金占用(OUT/DEPOSIT_HOLD)计入该单直接
+        # 成本、释放/取消(IN)计入收入；押金损失(OUT/DEPOSIT+非HOLD)是已占用押金
+        # 的定性转换、非第二次现金流出，被排除，损失体现为押金线「收入−支出」
+        # 净额。推翻旧 #9「挂单押金一律剔除、不进直接成本」。
+        .where(business_cashflow_filter())
         .group_by(Cashflow.occurred_on)
     )
     if from_date is not None:

@@ -1150,12 +1150,12 @@ class TestFinanceApi:
 
         report = reporting_service.daily_funds_report(seeded_db, on=TODAY)
         by_code = {item["pool_code"]: item for item in report["items"]}
-        assert by_code["HJ_INVEST"]["transfer_in"] == Decimal("0.00")
-        assert by_code["HJ_INVEST"]["transfer_out"] == Decimal("125.50")
-        assert by_code["HJ_PROFIT"]["transfer_in"] == Decimal("125.50")
-        assert by_code["HJ_PROFIT"]["transfer_out"] == Decimal("0.00")
-        assert report["total"]["transfer_in"] == Decimal("125.50")
-        assert report["total"]["transfer_out"] == Decimal("125.50")
+        # 内部划转并入收入/支出两方向：划出账户记支出、划入账户记收入，日报不再单列划转列。
+        assert by_code["HJ_INVEST"]["expense"] >= Decimal("125.50")
+        assert by_code["HJ_PROFIT"]["income"] >= Decimal("125.50")
+        for key in ("transfer_in", "transfer_out"):
+            assert key not in by_code["HJ_INVEST"], f"资金日报仍有独立方向列 {key}"
+            assert key not in report["total"], f"资金日报合计仍有独立方向列 {key}"
 
     def test_transfer_service_respects_pool_scope(self, seeded_db):
         scoped_finance = CurrentUser.build(

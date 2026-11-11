@@ -29,11 +29,12 @@ from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
 from app.domain.enums import (
+    AccountingAttribute,
     Direction,
     EventType,
     InstallmentDispositionAction,
@@ -48,6 +49,33 @@ from app.domain.trade import (
 )
 
 ZERO = Decimal("0.00")
+
+
+def business_cashflow_filter():
+    """业务现金流口径：排除「押金损失重分类流水」后的保留条件。
+
+    押金损失（已占用押金转为费用）不是第二次现金流出。押金线的真实现金流只有
+    交押金（OUT / DEPOSIT_HOLD）与退回（IN / DEPOSIT_RELEASE|CANCEL）；损失体现为
+    该线「收入 − 支出」的净额。故资金中心 / 订单利润 / 经营损益聚合**只排除损失那笔
+    OUT**，避免虚增支出与现金流出（缴 1000、退 700、损 300 ⇒ 净支出 700、损失 300，
+    不再多记 300 的第二次流出）。
+
+    正向写法规避 SQL 三值逻辑陷阱：放行「非 DEPOSIT 属性（含 NULL）」与
+    「DEPOSIT 且（IN 或 category=DEPOSIT_HOLD）」；仅排除 DEPOSIT + OUT + 其他 category
+    的损失流水。若写成 NOT(DEPOSIT AND OUT AND ...)，属性为 NULL 的普通流水会因
+    NOT(NULL)=NULL 被 WHERE 误删——故坚持正向条件。
+    """
+    return or_(
+        Cashflow.accounting_attribute != AccountingAttribute.DEPOSIT.value,
+        Cashflow.accounting_attribute.is_(None),
+        and_(
+            Cashflow.accounting_attribute == AccountingAttribute.DEPOSIT.value,
+            or_(
+                Cashflow.direction == Direction.IN.value,
+                Cashflow.category == "DEPOSIT_HOLD",
+            ),
+        ),
+    )
 
 
 def _money(value: object) -> Decimal:
@@ -219,7 +247,7 @@ def order_cashflow_profit_by_order(
             Cashflow.direction,
             func.coalesce(func.sum(Cashflow.amount), 0),
         )
-        .where(Cashflow.order_id.is_not(None))
+        .where(Cashflow.order_id.is_not(None), business_cashflow_filter())
         .group_by(Cashflow.order_id, Cashflow.direction)
     )
     if ids is not None:

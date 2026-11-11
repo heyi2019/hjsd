@@ -16,7 +16,7 @@ from app.core.audit import record_audit
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 
-TODAY = date.today()  # occurred_at 由 server_default now() 写入，必须用真实当天
+TODAY = date.today()  # record_audit 显式写本地 now_second()，查询按本地日期边界过滤，须用真实当天
 MARK = "AUDIT-CONTRACT"  # 本文件专属标记，避免与种子审计混淆
 
 

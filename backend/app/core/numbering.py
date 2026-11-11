@@ -3,7 +3,7 @@
 规则（PRD §2.1.1 / V19）：
 - 纯顺序号、不含日期；主业务按类型独立递增（HS/TH/DG 可并存同号）；
 - 事务内递增，取消不回收，编号永不修改、永不复用；
-- 4 位上限 9999，超出即抛 `SEQUENCE_EXHAUSTED`，**禁止静默进位**。
+- 上限按位数算 10^padding − 1（4 位 9999 / 5 位 99999），超出即抛 `SEQUENCE_EXHAUSTED`，**禁止静默进位**；分配层与预览层须共用 `sequence_max`。
 """
 from __future__ import annotations
 
@@ -14,8 +14,19 @@ from app.core.errors import ErrorCode, Validation
 from app.domain.enums import Direction, SequenceKey
 from app.domain.foundation import DocumentSequence
 
-MAX_SEQUENCE_VALUE = 9999  # 默认 4 位序列上限；实际按各序列 padding 计算（10^padding - 1）
 DEFAULT_PADDING = 4
+
+
+def sequence_max(padding: int) -> int:
+    """按序列位数算真实发号上限（10^padding − 1）：4 位 9999、5 位 99999。
+
+    分配层 allocate_number 与预览层 format_next_number/list_sequences 必须共用本函数，
+    否则 5 位高频序列（ZC/SR/KU_）到 9999 时预览会提前误报「已达上限」。
+    """
+    return 10**padding - 1
+
+
+MAX_SEQUENCE_VALUE = sequence_max(DEFAULT_PADDING)  # 默认 4 位序列上限；实际按各序列 padding 计算
 
 
 def ensure_sequence(
@@ -66,7 +77,7 @@ def allocate_number(session: Session, key: str | SequenceKey) -> str:
             details={"sequence_key": key_value},
         )
     prefix, padding = config
-    max_value = 10**padding - 1
+    max_value = sequence_max(padding)
     allocated = session.execute(
         update(DocumentSequence)
         .where(
@@ -94,11 +105,12 @@ def format_next_number(
     直接用本函数即可，无需再逐行回查数据库。
     """
     candidate = current_value + 1
-    if candidate > MAX_SEQUENCE_VALUE:
+    limit = sequence_max(padding)
+    if candidate > limit:
         raise Validation(
             "编号已达上限",
             code=ErrorCode.SEQUENCE_EXHAUSTED,
-            details={"sequence_key": sequence_key},
+            details={"sequence_key": sequence_key, "max": limit},
         )
     return f"{prefix}{candidate:0{padding}d}"
 
@@ -144,4 +156,5 @@ __all__ = [
     "ensure_sequence",
     "format_next_number",
     "peek_number",
+    "sequence_max",
 ]

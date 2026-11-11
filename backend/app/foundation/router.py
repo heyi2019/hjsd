@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.errors import Validation
-from app.core.numbering import MAX_SEQUENCE_VALUE, format_next_number
+from app.core.numbering import format_next_number, sequence_max
 from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_TYPE_MANAGE,
@@ -357,7 +357,7 @@ def list_sequences(
                 current_value=sequence.current_value,
             )
         except Validation:
-            next_number = f"<已达上限 {MAX_SEQUENCE_VALUE}>"
+            next_number = f"<已达上限 {sequence_max(sequence.padding)}>"
         result.append(
             schemas.SequenceOut(
                 sequence_key=sequence.sequence_key,

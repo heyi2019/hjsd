@@ -64,6 +64,32 @@ def test_sequence_exhausted_raises_instead_of_silent_overflow(db):
     assert exc.value.http_status == 422
 
 
+def test_five_digit_sequence_allocates_past_9999(db):
+    """5 位序列（ZC/SR/KU_）分配层能越过 9999 直到 99999（预览层不再提前误报满）。"""
+    ensure_sequence(db, SequenceKey.CASHFLOW_OUT, "ZC", 5)
+    db.commit()
+    sequence = ensure_sequence(db, SequenceKey.CASHFLOW_OUT, "ZC", 5)
+    sequence.current_value = 9999  # DB CHECK 上限 999999，合法
+    db.commit()
+
+    assert allocate_number(db, SequenceKey.CASHFLOW_OUT) == "ZC10000"
+    db.commit()
+
+
+def test_five_digit_sequence_exhausted_at_99999(db):
+    """5 位序列真到 99999 才耗尽（对齐 10^padding−1，而非硬编码 9999）。"""
+    ensure_sequence(db, SequenceKey.CASHFLOW_IN, "SR", 5)
+    db.commit()
+    sequence = ensure_sequence(db, SequenceKey.CASHFLOW_IN, "SR", 5)
+    sequence.current_value = 99999
+    db.commit()
+
+    with pytest.raises(AppError) as exc:
+        allocate_number(db, SequenceKey.CASHFLOW_IN)
+    assert exc.value.code == ErrorCode.SEQUENCE_EXHAUSTED
+    assert exc.value.details["max"] == 99999
+
+
 def test_peek_does_not_consume(db):
     ensure_sequence(db, SequenceKey.COUNTERPARTY, "CP", 4)
     db.commit()

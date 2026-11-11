@@ -394,6 +394,53 @@ class TestFoundationApi:
         )
         assert row["next_number"] == f"<已达上限 {MAX_SEQUENCE_VALUE}>"
 
+    def test_sequences_endpoint_five_digit_not_exhausted_at_9999(
+        self, seeded_client, seeded_db, headers
+    ):
+        """5 位序列（ZC/SR/KU_）到 9999 时 next_number 应显示 10000，不误报上限。"""
+        from app.domain.enums import SequenceKey
+        from app.domain.foundation import DocumentSequence
+
+        target = seeded_db.scalar(
+            select(DocumentSequence).where(
+                DocumentSequence.sequence_key == SequenceKey.CASHFLOW_OUT.value
+            )
+        )
+        assert target.padding == 5
+        target.current_value = 9999
+        seeded_db.commit()
+
+        response = seeded_client.get("/api/v1/sequences", headers=headers)
+        assert response.status_code == 200, response.text
+        row = next(
+            item for item in response.json() if item["sequence_key"] == target.sequence_key
+        )
+        assert row["next_number"] == "ZC10000"
+
+    def test_sequences_endpoint_five_digit_exhausted_text(
+        self, seeded_client, seeded_db, headers
+    ):
+        """5 位序列真耗尽时占位文本写真实上限 99999（非硬编码 9999）。"""
+        from app.core.numbering import sequence_max
+        from app.domain.enums import SequenceKey
+        from app.domain.foundation import DocumentSequence
+
+        target = seeded_db.scalar(
+            select(DocumentSequence).where(
+                DocumentSequence.sequence_key == SequenceKey.STOCK_NO.value
+            )
+        )
+        assert target.padding == 5
+        target.current_value = sequence_max(target.padding)  # 99999
+        seeded_db.commit()
+
+        response = seeded_client.get("/api/v1/sequences", headers=headers)
+        assert response.status_code == 200, response.text
+        row = next(
+            item for item in response.json() if item["sequence_key"] == target.sequence_key
+        )
+        assert row["next_number"] == "<已达上限 99999>"
+
     def test_route_impact_preview_does_not_change_history(
         self, seeded_client, seeded_db, headers
     ):

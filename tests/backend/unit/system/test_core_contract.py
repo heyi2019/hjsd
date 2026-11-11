@@ -108,6 +108,30 @@ class TestNumberingGuards:
             peek_number(seeded_db, "FULL_KEY")
         assert "已达上限" in str(exc.value)
 
+    def test_format_next_number_uses_padding_specific_max(self):
+        """预览层上限按 padding 算：5 位序列 9999→10000 不误报、99999→耗尽才报。"""
+        from app.core.numbering import format_next_number, sequence_max
+
+        assert sequence_max(4) == 9999
+        assert sequence_max(5) == 99999
+        assert MAX_SEQUENCE_VALUE == 9999  # 默认 4 位别名，向后兼容既有引用
+
+        # 缺陷回归：旧实现硬编码 9999，5 位序列到 9999 时预览会误报耗尽
+        assert (
+            format_next_number(
+                sequence_key="CASHFLOW_OUT", prefix="ZC", padding=5, current_value=9999
+            )
+            == "ZC10000"
+        )
+
+        # 真到 5 位上限才抛，且 details.max 是真实上限（非硬编码 9999）
+        with pytest.raises(Validation) as exc:
+            format_next_number(
+                sequence_key="CASHFLOW_OUT", prefix="ZC", padding=5, current_value=99999
+            )
+        assert "已达上限" in str(exc.value)
+        assert exc.value.details["max"] == 99999
+
     def test_current_value_defaults_to_zero(self, seeded_db):
         seeded_db.add(
             DocumentSequence(

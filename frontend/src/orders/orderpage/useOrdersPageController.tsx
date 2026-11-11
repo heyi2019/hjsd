@@ -1,24 +1,37 @@
-import { appMessage } from "../../shared/ui/appFeedback";
-import { Form, Space } from "antd";
-import type { ColumnsType } from "antd/es/table";
+import { Form } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { employeesApi, installmentsApi, ordersApi, orderTypesApi, poolsApi, policyApi, stocksApi, type Account, type AccountExecutionDetail, type Installment, type Order, type OrderType, type Pool } from "../../shared/api/catalog";
+import { useEffect, useState } from "react";
+import {
+  employeesApi,
+  ordersApi,
+  policyApi,
+  poolsApi,
+  stocksApi,
+  type Account,
+  type AccountExecutionDetail,
+  type Order,
+  type Pool,
+} from "../../shared/api/catalog";
 import { currentDevUser, currentUser, normalizeError } from "../../shared/api/client";
-import { downloadBlob } from "../../shared/api/download";
-import { ACCOUNT_STATUS_LABEL, formatDateTimeMinute, formatElapsedTime, money, today } from "../../shared/lib/format";
-import { filterRetiredOrderTypeOptions } from "../../shared/lib/retiredProducts";
-import { useOptionSet } from "../../shared/lib/optionSets";
-import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
-import { useReloadOnActive } from "../../shared/state/reloadOnActive";
-import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { money, today } from "../../shared/lib/format";
+import { appMessage } from "../../shared/ui/appFeedback";
+import { consignmentRecords, type ActiveConsignment } from "../../stocks/InventoryPlatformOffsaleModal";
+import { useAccountExecutionEditor } from "../../stocks/InventoryPanel/useAccountExecutionEditor";
 import type { BusinessOrderType } from "../CreateBusinessModal";
 import type { OrderDeliveryTarget } from "../OrderDeliveryModal";
 import type { InventoryProfileTarget } from "../../stocks/InventoryProfileModal";
 import { DEFAULT_BUSINESS_CENTER_TAB, type BusinessCenterEntryTab, type BusinessCenterTab } from "../businessCenter";
-import { BusinessFilterKey, BusinessModeFilterKey, CancelFormScope, buildActionAllocationCandidates, buildActionAllocationRows, buildOrderPatchPayload, filterBusinessOrders, formatOrderAmount, pickCancelableEvent, resolveCancelAmount, type ActionAllocationCandidates, type AllocationFormRow, type AllocationMode } from "./helpers";
-import { useAccountExecutionEditor } from "../../stocks/InventoryPanel/useAccountExecutionEditor";
-import { consignmentRecords, type ActiveConsignment } from "../../stocks/InventoryPlatformOffsaleModal";
+import {
+  buildActionAllocationCandidates,
+  buildActionAllocationRows,
+  buildOrderPatchPayload,
+  type ActionAllocationCandidates,
+  type AllocationFormRow,
+  type AllocationMode,
+} from "./helpers";
+import { useLedgerList } from "./useLedgerList";
+import { useLedgerColumns } from "./useLedgerColumns";
+import { useOrderCancellation } from "./useOrderCancellation";
 import { useSession } from "../../shared/state/session";
 
 export function useOrdersPageController(params: {
@@ -31,60 +44,25 @@ export function useOrdersPageController(params: {
   const currentOperator = currentDevUser();
   const { role } = useSession();
   const canDeleteAccount = role === "admin";
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [types, setTypes] = useState<OrderType[]>([]);
-  const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [mineOrders, setMineOrders] = useState(initialMine);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  // 订单台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
-  const [ledgerSortDesc, setLedgerSortDesc] = useState(true);
-  const [ledgerExporting, setLedgerExporting] = useState(false);
-  const exportLedger = async () => {
-    setLedgerExporting(true);
-    try {
-      downloadBlob(await ordersApi.exportCsv(), `订单台账-${today()}.csv`);
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    } finally {
-      setLedgerExporting(false);
-    }
-  };
-  /** 导出 Excel：5 个 sheet（主订单 + 详情 + 操作/资金/返点三类明细），表头为合并单元格。 */
-  const exportLedgerXlsx = async () => {
-    setLedgerExporting(true);
-    try {
-      downloadBlob(await ordersApi.exportXlsx(), `订单台账-${today()}.xlsx`);
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    } finally {
-      setLedgerExporting(false);
-    }
-  };
-  const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
-  const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
-  const [gameTypeFilter, setGameTypeFilter] = useState("all");
-  const [inventoryStatusFilter, setInventoryStatusFilter] = useState("all");
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
-  // 业务类型、业务模式、责任方和关联关系均来自后端选项词典。
-  type Opt = { value: string; label: string };
-  const orderBusinessOptions: Opt[] = filterRetiredOrderTypeOptions(useOptionSet("ORDER_BUSINESS") ?? []);
-  const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];
-  const relationTypeOptions: Opt[] = useOptionSet("ORDER_RELATION_TYPE") ?? [];
-  const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? [];
-  const inventoryStatusOptions: Opt[] = [
-    { value: "all", label: "全部库存状态" },
-    ...(["WAITING", "SOLD", "VOID"] as const).map((value) => ({ value, label: ACCOUNT_STATUS_LABEL[value] })),
-  ];
-  const gameTypeOptions = useMemo(() => {
-    const values = Array.from(new Set(orders.map((order) => order.account_game_type).filter((value): value is string => Boolean(value))))
-      .sort((a, b) => a.localeCompare(b, "zh-CN"));
-    return [{ value: "all", label: "全部游戏类型" }, ...values.map((value) => ({ value, label: value }))];
-  }, [orders]);
-  const [keyword, setKeyword] = useState("");
+
+  // —— 列表域：加载 / 筛选 / 分页 / 排序 / 导出 / 选项词典 / 派生 filteredOrders ——
+  const list = useLedgerList({ active, initialMine });
+  const {
+    orders, setOrders, types, setTypes, loadError, setLoadError, loading, setLoading,
+    page, setPage, pageSize, setPageSize,
+    ledgerSortDesc, setLedgerSortDesc, ledgerExporting, setLedgerExporting,
+    exportLedger, exportLedgerXlsx,
+    orderTypeFilter, setOrderTypeFilter, businessModeFilter, setBusinessModeFilter,
+    gameTypeFilter, setGameTypeFilter, inventoryStatusFilter, setInventoryStatusFilter,
+    dateRange, setDateRange, keyword, setKeyword,
+    orderBusinessOptions, orderBusinessModeOptions, profitRoleOptions, inventoryStatusOptions,
+    gameTypeOptions, typeNames, filteredOrders, load,
+  } = list;
+
+  // —— 表格详情 / 账号内联编辑枢纽 ——
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
   const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
   const [ledgerDetails, setLedgerDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [ledgerDetailLoading, setLedgerDetailLoading] = useState<Record<number, boolean>>({});
@@ -137,13 +115,7 @@ export function useOrdersPageController(params: {
     setExpandedOrderIds(expanded ? [String(record.id)] : []);
     if (expanded && record.account_id) void loadLedgerDetail(record.account_id);
   };
-  const [cancelOrderTarget, setCancelOrderTarget] = useState<Order | null>(null);
-  const [cancelInstallmentTarget, setCancelInstallmentTarget] = useState<Installment | null>(null);
-  const [cancelScope, setCancelScope] = useState<CancelFormScope>("ORDERCANC");
-  const [cancelSubmitting, setCancelSubmitting] = useState(false);
-  const [cancelPools, setCancelPools] = useState<Pool[]>([]);
-  const [cancelEmployees, setCancelEmployees] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
-  const [cancelForm] = Form.useForm();
+
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [refundForm] = Form.useForm();
@@ -185,23 +157,6 @@ export function useOrdersPageController(params: {
   const [editOpen, setEditOpen] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editForm] = Form.useForm();
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [list, typeList] = await Promise.all([
-        ordersApi.list(mineOrders ? { mine: true } : undefined),
-        orderTypesApi.list(),
-      ]);
-      setOrders(list);
-      setTypes(typeList);
-      setLoadError(null);
-    } catch (error) {
-      setLoadError(normalizeError(error));
-    } finally {
-      setLoading(false);
-    }
-  }, [mineOrders]);
 
   const openAllocations = async (sourceOrder?: Order) => {
     try {
@@ -478,153 +433,6 @@ export function useOrdersPageController(params: {
     }
   };
 
-  /**
-   * 可冲销动作：已过账的 BUY/SELL，按「剩余可冲金额」过滤（后端支持部分冲销）。
-   * 余额由后端 `event.cancellable_amount` 下发，前端只负责挑哪一条、按什么顺序 -
-   * 不再自己遍历 CANCEL 事件做 `amount − Σcancel`（那是与库存页、提交校验并行的第三套。
-   */
-  const reversibleEvents = (order: Order | null) => {
-    return (order?.events ?? [])
-      .filter((event) => event.is_posted && ["BUY", "SELL"].includes(event.event_type))
-      .map((event) => ({ event, remaining: event.cancellable_amount ?? "0.00" }))
-      .filter((item) => Number(item.remaining) > 0)
-      .reverse();
-  };
-
-  const cancelableEventsForScope = (order: Order | null, scope: CancelFormScope) => reversibleEvents(order)
-    .filter(({ event }) => scope === "INVREFUND"
-      ? event.event_type === "BUY"
-      : event.event_type === "SELL");
-
-  const openCancelTransaction = async (sourceOrder?: Order) => {
-    try {
-      const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
-      if (!order) return;
-      if (order.installment_principal) {
-        const contracts = await installmentsApi.list({ order_id: order.id });
-        const target = contracts.find((item) => !["CANCELLED", "DELIVERED"].includes(item.status));
-        if (!target) {
-          appMessage.error("未找到可取消的分期合约");
-          return;
-        }
-        setCancelInstallmentTarget(target);
-        setCancelOrderTarget(null);
-      } else {
-        // 取消弹窗依赖资金账户和操作人主数据；先准备完整上下文，再打开弹窗，
-        // 避免用户在下拉尚未加载时确认导致无请求、无结果的“假提交”。
-        const reversible = reversibleEvents(order);
-        const first = reversible[0];
-        const nextScope: CancelFormScope = first?.event.event_type === "BUY" ? "INVREFUND" : "ORDERCANC";
-        cancelForm.setFieldsValue({
-          cancelled_on: today(),
-          offset_event_id: first?.event.id,
-          [nextScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: first?.remaining,
-          pool_id: first?.event.pool_id ?? undefined,
-        });
-        const [poolList, employeeList] = await Promise.all([poolsApi.list(), employeesApi.list()]);
-        const activeEmployees = employeeList.filter((employee) => employee.is_active);
-        setCancelPools(poolList.filter((pool) => pool.status === "ACTIVE"));
-        setCancelEmployees(activeEmployees);
-        // 先在打开弹窗的加载阶段写入默认操作人，避免依赖 ResponsibleEmployeeSelect
-        // 内部的 /auth/me 异步回填；提交动作必须始终携带显式员工 ID。
-        if (cancelForm.getFieldValue("operator_user_ids") == null) {
-          const defaultEmployee = activeEmployees.find((employee) => employee.username === currentOperator)
-            ?? (activeEmployees.length === 1 ? activeEmployees[0] : undefined);
-          if (defaultEmployee) cancelForm.setFieldValue("operator_user_ids", [defaultEmployee.id]);
-        }
-        if (first && cancelForm.getFieldValue("pool_id") == null) {
-          cancelForm.setFieldValue("pool_id", poolList[0]?.id);
-        }
-        setCancelScope(nextScope);
-        setCancelOrderTarget(order);
-        setCancelInstallmentTarget(null);
-      }
-      if (order.installment_principal) cancelForm.setFieldsValue({ cancelled_on: today() });
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    }
-  };
-
-  const closeCancelTransaction = () => {
-    setCancelOrderTarget(null);
-    setCancelInstallmentTarget(null);
-    setCancelScope("ORDERCANC");
-    cancelForm.resetFields();
-  };
-
-  const submitCancelTransaction = async (values: { cancelled_on: string; reason: string; offset_event_id?: number; amount?: string; cancel_amount?: string; refund_amount?: string; pool_id?: number; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
-    const installment = cancelInstallmentTarget;
-    const order = cancelOrderTarget;
-    if (!installment && !order) return;
-    setCancelSubmitting(true);
-    try {
-      if (installment) {
-        const result = await installmentsApi.cancel(installment.id, values);
-        const refundSummary = `退款已登记：¥${money(result.refund_amount)}`;
-        appMessage.success(
-          installment.contract_type === "PICKUP_SALE"
-            ? `${refundSummary}，提号交易已结束`
-            : `${refundSummary}，账号已回到库存`,
-        );
-        if (result.order_status === "CANCELLED") await load();
-      } else {
-        if (!order) return;
-        const reversible = cancelableEventsForScope(order, cancelScope);
-        const selected = pickCancelableEvent(reversible, values.offset_event_id);
-        if (selected) {
-          const resolved = resolveCancelAmount({ scope: cancelScope, values, remaining: selected.remaining });
-          if (!resolved.ok) {
-            appMessage.error(resolved.error);
-            return;
-          }
-          const amount = resolved.amount;
-          // 操作人是业务事实的一部分，不能依赖异步下拉组件恰好先完成默认值注入。
-          // 用户直接确认弹窗时，最后一次从当前会话解析员工 ID，确保后端收到显式负责人。
-          let operatorUserIds = values.operator_user_ids?.length ? values.operator_user_ids : undefined;
-          if (!operatorUserIds?.length) {
-            const byDevUser = cancelEmployees.find((employee) => employee.username === currentOperator);
-            if (byDevUser) operatorUserIds = [byDevUser.id];
-            else if (cancelEmployees.length === 1) operatorUserIds = [cancelEmployees[0].id];
-            else if (cancelEmployees.length > 0) {
-              try {
-                const current = await currentUser();
-                const bySessionUser = cancelEmployees.find((employee) => employee.id === current.id || employee.username === current.username);
-                if (bySessionUser) operatorUserIds = [bySessionUser.id];
-              } catch {
-                // 下拉组件已尝试默认当前员工；解析失败时保留空值，让后端按必填规则返回明确错误。
-              }
-            }
-          }
-          const result = await ordersApi.postEvent(order.id, {
-            event_type: "CANCEL",
-            amount,
-            occurred_on: values.cancelled_on,
-            offset_event_id: selected.event.id,
-            pool_id: Number(values.pool_id),
-            operator_user_ids: operatorUserIds,
-            reason: values.reason,
-            note: cancelScope === "INVREFUND" ? "取消：冲销入库并入账" : "取消：原路退款",
-            form_extra_scope: cancelScope,
-            form_extra: values.form_extra,
-          });
-          appMessage.success(cancelScope === "INVREFUND"
-            ? `取消已登记：入账 ¥${money(result.event.amount)}，已进入公司钱包`
-            : `取消已登记：退款 ¥${money(result.event.amount)}，已按原资金池退还客户`);
-        } else {
-          await ordersApi.cancel(order.id, { reason: values.reason, form_extra: values.form_extra });
-          appMessage.success("交易已取消，无已登记款项需要退款");
-        }
-        await load();
-      }
-      closeCancelTransaction();
-      setSelectedOrder(null);
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    } finally {
-      setCancelSubmitting(false);
-    }
-  };
-
   /** 编辑订单：后端限制——已有登记事件的订单只能改备注；账号快照仅特定业务可维护，
    *  且密码被后端隐去（无 order.create 权限）时不允许整体回写快照，避免覆盖隐藏密码。 */
   const openEditOrder = (order: Order) => {
@@ -671,25 +479,6 @@ export function useOrdersPageController(params: {
     }
   };
 
-  // keep-alive：切走再切回不会重挂载。重新激活（active 翻回 true）时重拉列表，
-  // 保证在其他入口新建的订单（工作台快捷建单、库存中心售出/寄售/返点）的订单号及时出现在台账。
-  useReloadOnActive(active, load);
-  useEffect(() => {
-    if (active) setMineOrders(initialMine);
-  }, [active, initialMine]);
-
-  const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
-  // 先按业务筛选，再按日期，最后一次排序；避免渲染层重复计算同一批订单。
-  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter)
-    .filter((order) => {
-      if (!dateRange) return true;
-      const tradeDate = new Date(`${order.trade_date}T00:00:00`);
-      return !Number.isNaN(tradeDate.getTime())
-        && tradeDate >= dateRange[0].startOf("day").toDate()
-        && tradeDate <= dateRange[1].endOf("day").toDate();
-    })
-    .slice()
-    .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
   // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
   const orderHasPostedEvents = (selectedOrder?.events ?? []).some((event) => event.is_posted);
   const legacyInitialTab = initialTab as string | undefined;
@@ -709,308 +498,199 @@ export function useOrdersPageController(params: {
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
   const [installmentRefreshKey, setInstallmentRefreshKey] = useState(0);
 
-  const { arrange: arrangeLedgerColumns } = useListViewColumns("LEDGER");
-  const ledgerColumns: ColumnsType<Order> = [
-    { title: "订单号", dataIndex: "order_no", width: 110, ellipsis: true },
-    { title: "游戏/产品类型", dataIndex: "account_game_type", width: 140, ellipsis: true, render: (v: string | null) => v || "-" },
-    { title: "游戏账号/产品", dataIndex: "account_game_account", width: 140, ellipsis: true, render: (v: string | null) => v || "-" },
-    { title: "入库负责人", dataIndex: "inventory_operator", width: 110, ellipsis: true, render: (v: string | null) => v || "-" },
-    { title: "入库时间", dataIndex: "inventory_entry_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
-    { title: "售卖负责人", dataIndex: "sale_operator", width: 110, ellipsis: true, render: (v: string | null) => v || "-" },
-    { title: "售卖时间", dataIndex: "sale_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
-    { title: "在手时间", key: "in_hand_time", width: 120, ellipsis: true, render: (_v, order) => order.in_hand_time ?? formatElapsedTime(order.inventory_entry_at, order.sale_at) },
-    { title: "金额", dataIndex: "event_total", width: 126, ellipsis: true, render: (_v: string | null, order) => formatOrderAmount(order) },
-    { title: "订单状态", dataIndex: "status", width: 96, ellipsis: true, render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
-    { title: "库存状态", dataIndex: "account_status", width: 102, ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
-    { title: "成本", dataIndex: "cost_amount", width: 110, ellipsis: true, render: (_v: string | null, order) => order.account_status === "SOLD" && order.cost_amount != null ? `¥${money(order.cost_amount)}` : "-" },
-    { title: "利润", dataIndex: "profit_base", width: 110, ellipsis: true, render: (_v: string | null, order) => order.account_status === "SOLD" && order.profit_base != null ? `¥${money(order.profit_base)}` : "-" },
-    { title: "日期", dataIndex: "trade_date", width: 144, ellipsis: true },
-    {
-      title: "操作",
-      key: "actions",
-      width: 470,
-      ellipsis: true,
-      render: (_, order) => {
-        const canOffsaleConsignment = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
-        return (
-          <Space size={2}>
-          {order.account_id || ["ACTIVE", "INSTALLMENT"].includes(order.status) ? (
-            <PermissionButton
-              permission="order.update"
-              type="link"
-              size="small"
-              title={order.account_id ? undefined : "未关联库存时会先生成库存编号"}
-              onClick={() => void openLedgerEditor(order)}
-            >编辑</PermissionButton>
-          ) : null}
-          <PermissionGate permission="order.event.post">
-            <PermissionButton
-              permission="order.event.post"
-              type="link"
-              size="small"
-              disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
-              onClick={() => void openAllocations(order)}
-            >分润配置</PermissionButton>
-            <PermissionButton
-              permission="order.event.post"
-              type="link"
-              size="small"
-              disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
-              onClick={() => void openProfitShare(order)}
-            >分润</PermissionButton>
-            <PermissionButton
-              permission="order.event.post"
-              type="link"
-              size="small"
-              disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
-              onClick={() => void openRefund(order)}
-            >资金收支</PermissionButton>
-            <PermissionButton
-              permission="order.event.post"
-              type="link"
-              size="small"
-              disabled={order.status === "CANCELLED"}
-              onClick={() => void openOrderDelivery(order)}
-            >交付</PermissionButton>
-            <PermissionButton
-              permission="order.create"
-              type="link"
-              size="small"
-              disabled={!order.account_id || order.status === "CANCELLED"}
-              onClick={() => void openOrderProfile(order, "description")}
-            >描述</PermissionButton>
-            <PermissionButton
-              permission="order.create"
-              type="link"
-              size="small"
-              disabled={!order.account_id || order.status === "CANCELLED"}
-              onClick={() => void openOrderProfile(order, "images")}
-            >作图</PermissionButton>
-            <PermissionButton
-              permission="order.event.post"
-              type="link"
-              size="small"
-              disabled={!order.account_id}
-              onClick={() => void openOrderRebate(order)}
-            >返点</PermissionButton>
-            <PermissionButton
-              permission="order.create"
-              type="link"
-              size="small"
-              disabled={order.account_status !== "WAITING" || !order.account_id}
-              onClick={() => void openOrderSale(order)}
-            >售出</PermissionButton>
-            <PermissionButton
-              permission="order.create"
-              type="link"
-              size="small"
-              disabled={order.account_status !== "WAITING" || !order.account_id}
-              onClick={() => void openOrderConsignment(order)}
-            >寄售</PermissionButton>
-            <PermissionButton
-              permission="order.event.post"
-              type="link"
-              size="small"
-              danger
-              disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
-              onClick={() => {
-                if (canOffsaleConsignment) void openOrderOffsale(order);
-                else void openCancelTransaction(order);
-              }}
-            >{canOffsaleConsignment ? "下架" : "取消"}</PermissionButton>
-          </PermissionGate>
-          {canDeleteAccount ? (
-            <PermissionButton
-              permission="order.create"
-              type="link"
-              size="small"
-              danger
-              disabled={!order.account_id}
-              onClick={() => void openOrderDelete(order)}
-            >删除账号</PermissionButton>
-          ) : null}
-        </Space>
-        );
-      },
-    },
-  ];
-  const configuredLedgerColumns = arrangeLedgerColumns(ledgerColumns);
-  const ledgerDateColumn = ledgerColumns.find((column) => columnKey(column) === "trade_date");
-  // 日期是订单台账的核心识别字段，避免配置中心误隐藏后整列消失。
-  const visibleLedgerColumns = ledgerDateColumn && !configuredLedgerColumns.some((column) => columnKey(column) === "trade_date")
-    ? [
-        ...configuredLedgerColumns.filter((column) => columnKey(column) !== "actions"),
-        ledgerDateColumn,
-        ...configuredLedgerColumns.filter((column) => columnKey(column) === "actions"),
-      ]
-    : configuredLedgerColumns;
-  const sharedCancellationEvent = cancelOrderTarget
-    ? cancelableEventsForScope(cancelOrderTarget, cancelScope)[0]
-    : undefined;
-  const hasSharedCancellation = Boolean(sharedCancellationEvent);
 
+  // —— 冲销 / 取消域：分笔冲销、原路退款、分期合约取消 ——
+  const cancellation = useOrderCancellation({ selectedOrder, setSelectedOrder, load });
+  const {
+    cancelEmployees, setCancelEmployees, cancelForm,
+    cancelInstallmentTarget, setCancelInstallmentTarget,
+    cancelOrderTarget, setCancelOrderTarget,
+    cancelPools, setCancelPools, cancelScope, setCancelScope,
+    cancelSubmitting, setCancelSubmitting,
+    cancelableEventsForScope, reversibleEvents,
+    closeCancelTransaction, openCancelTransaction, submitCancelTransaction,
+    sharedCancellationEvent, hasSharedCancellation,
+  } = cancellation;
 
-  return {
-    active,
-    initialTab,
-    onNavigate,
-    actionOrder,
-    activeTab,
-    allocationCandidates,
-    allocationForm,
-    allocationIsLoss,
-    allocationMode,
-    allocationOpen,
-    allocationProfit,
-    allocationSubmitting,
-    arrangeLedgerColumns,
-    businessModeFilter,
-    dateRange,
-    cancelEmployees,
-    cancelForm,
-    cancelInstallmentTarget,
-    cancelOrderTarget,
-    cancelPools,
-    cancelScope,
-    cancelSubmitting,
-    cancelableEventsForScope,
-    closeCancelTransaction,
-    createType,
-    currentEmployeeId,
-    currentOperator,
-    editForm,
-    editOpen,
-    editSubmitting,
-    employeeOptions,
-    expandedOrderIds,
-    exportLedger,
-    exportLedgerXlsx,
-    onExportLedger: exportLedger,
-    onExportLedgerXlsx: exportLedgerXlsx,
-    filteredOrders,
-    gameTypeFilter,
-    gameTypeOptions,
-    handleLedgerExpand,
-    hasSharedCancellation,
-    installmentRefreshKey,
-    inventoryRefreshKey,
-    inventoryStatusFilter,
-    inventoryStatusOptions,
-    keyword,
-    ledgerExporting,
-    ledgerDetailLoading,
-    ledgerDetails,
-    editingAccount: accountEditor.editingAccount,
-    setEditingAccount: accountEditor.setEditingAccount,
-    inlineEditId: accountEditor.inlineEditId,
-    eventDrafts: accountEditor.eventDrafts,
-    updateEventDraft: accountEditor.updateEventDraft,
-    employees: accountEditor.employees,
-    timeShiftMinutes: accountEditor.timeShiftMinutes,
-    setTimeShiftDays: accountEditor.setTimeShiftDays,
-    invEditExtraForm: accountEditor.invEditExtraForm,
-    savingAccount: accountEditor.savingAccount,
-    cancelInlineEdit: accountEditor.cancelInlineEdit,
-    saveInline: accountEditor.saveInline,
-    ledgerSortDesc,
-    load,
-    loadError,
-    loadLedgerDetail,
-    loading,
-    openAllocations,
-    openLedgerAccountEditor,
+  // —— 台账列定义域：纯展示配置 + 点击转发 ——
+  const { arrangeLedgerColumns, visibleLedgerColumns } = useLedgerColumns({
+    canDeleteAccount,
     openLedgerEditor,
-    openCancelTransaction,
-    openEditOrder,
+    openAllocations,
     openProfitShare,
-    openOrderDelete,
+    openRefund,
     openOrderDelivery,
-    openOrderOffsale,
+    openOrderProfile,
     openOrderRebate,
     openOrderSale,
     openOrderConsignment,
-    openRefund,
-    handleOrderOffsaleChanged,
-    handleOrderSystemOffsale,
-    orderHasPostedEvents,
-    orderTypeFilter,
-    orders,
-    page,
-    pageSize,
-    profitShareForm,
-    profitShareOpen,
-    profitSharePools,
-    profitShareSubmitting,
-    orderRebateTarget,
-    orderSaleTarget,
-    orderConsignmentTarget,
-    orderDeleteTarget,
-    orderDeleteSubmitting,
-    deliveryTarget,
-    profileTarget,
-    orderOffsaleTarget,
-    submitOrderDelete,
-    setOrderRebateTarget,
-    setOrderSaleTarget,
-    setOrderConsignmentTarget,
-    setOrderDeleteTarget,
-    setDeliveryTarget,
-    setProfileTarget,
-    setOrderOffsaleTarget,
-    refundForm,
-    refundOpen,
-    refundSubmitting,
-    reversibleEvents,
-    selectedOrder,
-    setActionOrder,
-    setActiveTab,
-    setAllocationOpen,
-    setAllocationProfit,
-    setAllocationSubmitting,
-    setBusinessModeFilter,
-    setDateRange,
-    setCancelEmployees,
-    setCancelInstallmentTarget,
-    setCancelOrderTarget,
-    setCancelPools,
-    setCancelScope,
-    setCancelSubmitting,
-    setCreateType,
-    setEditOpen,
-    setEditSubmitting,
-    setExpandedOrderIds,
-    setInstallmentRefreshKey,
-    setInventoryRefreshKey,
-    setKeyword,
-    setGameTypeFilter,
-    setInventoryStatusFilter,
-    setLedgerExporting,
-    setLedgerSortDesc,
-    setLoadError,
-    setLoading,
-    setOrderTypeFilter,
-    setOrders,
-    setPage,
-    setPageSize,
-    setProfitShareOpen,
-    setProfitShareSubmitting,
-    setRefundOpen,
-    setRefundSubmitting,
-    setSelectedOrder,
-    setTypes,
-    setUsers,
-    sharedCancellationEvent,
-    submitCancelTransaction,
-    submitEditOrder,
-    submitProfitShare,
-    typeNames,
-    types,
-    users,
+    openCancelTransaction,
+    openOrderOffsale,
+    openOrderDelete,
+  });
+
+  return {
+    actionOrder: actionOrder,
+    active: active,
+    activeTab: activeTab,
+    allocationCandidates: allocationCandidates,
+    allocationForm: allocationForm,
+    allocationIsLoss: allocationIsLoss,
+    allocationMode: allocationMode,
+    allocationOpen: allocationOpen,
+    allocationProfit: allocationProfit,
+    allocationSubmitting: allocationSubmitting,
+    arrangeLedgerColumns: arrangeLedgerColumns,
+    businessModeFilter: businessModeFilter,
+    cancelEmployees: cancelEmployees,
+    cancelForm: cancelForm,
+    cancelInlineEdit: accountEditor.cancelInlineEdit,
+    cancelInstallmentTarget: cancelInstallmentTarget,
+    cancelOrderTarget: cancelOrderTarget,
+    cancelPools: cancelPools,
+    cancelScope: cancelScope,
+    cancelSubmitting: cancelSubmitting,
+    cancelableEventsForScope: cancelableEventsForScope,
+    closeCancelTransaction: closeCancelTransaction,
+    createType: createType,
+    currentEmployeeId: currentEmployeeId,
+    currentOperator: currentOperator,
+    dateRange: dateRange,
+    deliveryTarget: deliveryTarget,
+    editForm: editForm,
+    editOpen: editOpen,
+    editSubmitting: editSubmitting,
+    editingAccount: accountEditor.editingAccount,
+    employeeOptions: employeeOptions,
+    employees: accountEditor.employees,
+    eventDrafts: accountEditor.eventDrafts,
+    expandedOrderIds: expandedOrderIds,
+    exportLedger: exportLedger,
+    exportLedgerXlsx: exportLedgerXlsx,
+    filteredOrders: filteredOrders,
+    gameTypeFilter: gameTypeFilter,
+    gameTypeOptions: gameTypeOptions,
+    handleLedgerExpand: handleLedgerExpand,
+    handleOrderOffsaleChanged: handleOrderOffsaleChanged,
+    handleOrderSystemOffsale: handleOrderSystemOffsale,
+    hasSharedCancellation: hasSharedCancellation,
+    initialTab: initialTab,
+    inlineEditId: accountEditor.inlineEditId,
+    installmentRefreshKey: installmentRefreshKey,
+    invEditExtraForm: accountEditor.invEditExtraForm,
+    inventoryRefreshKey: inventoryRefreshKey,
+    inventoryStatusFilter: inventoryStatusFilter,
+    inventoryStatusOptions: inventoryStatusOptions,
+    keyword: keyword,
     ledgerColumns: visibleLedgerColumns,
-    orderBusinessOptions,
-    orderBusinessModeOptions,
-    profitRoleOptions,
+    ledgerDetailLoading: ledgerDetailLoading,
+    ledgerDetails: ledgerDetails,
+    ledgerExporting: ledgerExporting,
+    ledgerSortDesc: ledgerSortDesc,
+    load: load,
+    loadError: loadError,
+    loadLedgerDetail: loadLedgerDetail,
+    loading: loading,
+    onExportLedger: exportLedger,
+    onExportLedgerXlsx: exportLedgerXlsx,
+    onNavigate: onNavigate,
+    openAllocations: openAllocations,
+    openCancelTransaction: openCancelTransaction,
+    openEditOrder: openEditOrder,
+    openLedgerAccountEditor: openLedgerAccountEditor,
+    openLedgerEditor: openLedgerEditor,
+    openOrderConsignment: openOrderConsignment,
+    openOrderDelete: openOrderDelete,
+    openOrderDelivery: openOrderDelivery,
+    openOrderOffsale: openOrderOffsale,
+    openOrderRebate: openOrderRebate,
+    openOrderSale: openOrderSale,
+    openProfitShare: openProfitShare,
+    openRefund: openRefund,
+    orderBusinessModeOptions: orderBusinessModeOptions,
+    orderBusinessOptions: orderBusinessOptions,
+    orderConsignmentTarget: orderConsignmentTarget,
+    orderDeleteSubmitting: orderDeleteSubmitting,
+    orderDeleteTarget: orderDeleteTarget,
+    orderHasPostedEvents: orderHasPostedEvents,
+    orderOffsaleTarget: orderOffsaleTarget,
+    orderRebateTarget: orderRebateTarget,
+    orderSaleTarget: orderSaleTarget,
+    orderTypeFilter: orderTypeFilter,
+    orders: orders,
+    page: page,
+    pageSize: pageSize,
+    profileTarget: profileTarget,
+    profitRoleOptions: profitRoleOptions,
+    profitShareForm: profitShareForm,
+    profitShareOpen: profitShareOpen,
+    profitSharePools: profitSharePools,
+    profitShareSubmitting: profitShareSubmitting,
+    refundForm: refundForm,
+    refundOpen: refundOpen,
+    refundSubmitting: refundSubmitting,
+    reversibleEvents: reversibleEvents,
+    saveInline: accountEditor.saveInline,
+    savingAccount: accountEditor.savingAccount,
+    selectedOrder: selectedOrder,
+    setActionOrder: setActionOrder,
+    setActiveTab: setActiveTab,
+    setAllocationOpen: setAllocationOpen,
+    setAllocationProfit: setAllocationProfit,
+    setAllocationSubmitting: setAllocationSubmitting,
+    setBusinessModeFilter: setBusinessModeFilter,
+    setCancelEmployees: setCancelEmployees,
+    setCancelInstallmentTarget: setCancelInstallmentTarget,
+    setCancelOrderTarget: setCancelOrderTarget,
+    setCancelPools: setCancelPools,
+    setCancelScope: setCancelScope,
+    setCancelSubmitting: setCancelSubmitting,
+    setCreateType: setCreateType,
+    setDateRange: setDateRange,
+    setDeliveryTarget: setDeliveryTarget,
+    setEditOpen: setEditOpen,
+    setEditSubmitting: setEditSubmitting,
+    setEditingAccount: accountEditor.setEditingAccount,
+    setExpandedOrderIds: setExpandedOrderIds,
+    setGameTypeFilter: setGameTypeFilter,
+    setInstallmentRefreshKey: setInstallmentRefreshKey,
+    setInventoryRefreshKey: setInventoryRefreshKey,
+    setInventoryStatusFilter: setInventoryStatusFilter,
+    setKeyword: setKeyword,
+    setLedgerExporting: setLedgerExporting,
+    setLedgerSortDesc: setLedgerSortDesc,
+    setLoadError: setLoadError,
+    setLoading: setLoading,
+    setOrderConsignmentTarget: setOrderConsignmentTarget,
+    setOrderDeleteTarget: setOrderDeleteTarget,
+    setOrderOffsaleTarget: setOrderOffsaleTarget,
+    setOrderRebateTarget: setOrderRebateTarget,
+    setOrderSaleTarget: setOrderSaleTarget,
+    setOrderTypeFilter: setOrderTypeFilter,
+    setOrders: setOrders,
+    setPage: setPage,
+    setPageSize: setPageSize,
+    setProfileTarget: setProfileTarget,
+    setProfitShareOpen: setProfitShareOpen,
+    setProfitShareSubmitting: setProfitShareSubmitting,
+    setRefundOpen: setRefundOpen,
+    setRefundSubmitting: setRefundSubmitting,
+    setSelectedOrder: setSelectedOrder,
+    setTimeShiftDays: accountEditor.setTimeShiftDays,
+    setTypes: setTypes,
+    setUsers: setUsers,
+    sharedCancellationEvent: sharedCancellationEvent,
+    submitCancelTransaction: submitCancelTransaction,
+    submitEditOrder: submitEditOrder,
+    submitOrderDelete: submitOrderDelete,
+    submitProfitShare: submitProfitShare,
+    timeShiftMinutes: accountEditor.timeShiftMinutes,
+    typeNames: typeNames,
+    types: types,
+    updateEventDraft: accountEditor.updateEventDraft,
+    users: users,
   };
+
 }
 
 export type OrdersPageController = ReturnType<typeof useOrdersPageController>;

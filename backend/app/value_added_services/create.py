@@ -20,7 +20,7 @@ from app.value_added_services.schemas import ScheduleCreate
 from app.orders._shared import get_order
 from app.orders.amounts import order_amounts
 from app.parties.fields import set_extra_values
-from app.policy import service as policy_service
+from app.policy import versions as policy_versions
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from app.core.errors import (
@@ -348,7 +348,7 @@ def create_installment(
     order_type_definition = get_order_type_by_code(
         session, order.order_type
     )
-    policy_version_id, policy_snapshot = policy_service.make_snapshot(
+    policy_version_id, policy_snapshot = policy_versions.make_snapshot(
         session,
         policy_code=PolicyType.INSTALLMENT.value,
         on=first_due_on,

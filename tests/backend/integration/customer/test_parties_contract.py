@@ -31,7 +31,7 @@ from app.domain.parties import (
     OrderCustomerRole,
 )
 from app.domain.trade import InstallmentSchedule, OrderFormField
-from app.value_added_services import service as installment_service
+from app.value_added_services import create as inst_create
 from app.orders.create import create_order
 from app.parties._common import mask_id, mask_phone
 from app.parties.counterparties import (
@@ -279,7 +279,7 @@ class TestListAndGetCustomers:
             customer_roles=[(customer.id, "BUYER")],
             actor="pytest",
         )
-        installment = installment_service.create_installment(
+        installment = inst_create.create_installment(
             seeded_db,
             order_id=th.id,
             contract_type="PICKUP_SALE",
@@ -713,7 +713,7 @@ class TestPartiesApi:
             customer_roles=[(customer.id, "BUYER")],
             actor="pytest",
         )
-        installment_service.create_installment(
+        inst_create.create_installment(
             seeded_db,
             order_id=order.id,
             contract_type="PICKUP_SALE",

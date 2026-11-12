@@ -31,7 +31,7 @@ from app.orders._shared import get_order
 from app.orders.events import post_event
 from app.orders.form_fields import validate_form_extra
 from app.orders.amounts import order_amounts
-from app.policy import service as policy_service
+from app.policy import versions as policy_versions
 
 from ._common import _non_negative, _positive
 
@@ -93,7 +93,7 @@ def create_rebate(
     order_type_definition = get_order_type_by_code(
         session, order.order_type
     )
-    policy_version_id, snapshot = policy_service.make_snapshot(
+    policy_version_id, snapshot = policy_versions.make_snapshot(
         session,
         policy_code=PolicyType.REBATE.value,
         on=collected_on,

@@ -45,7 +45,8 @@ from sqlalchemy import select  # noqa: E402
 from app.core.database import get_session_factory  # noqa: E402
 from app.domain.enums import PolicyType  # noqa: E402
 from app.domain.parties import PolicyDefinition, PolicyVersion  # noqa: E402
-from app.policy import service as policy_service  # noqa: E402
+from app.policy import definitions as policy_definitions  # noqa: E402
+from app.policy import versions as policy_versions
 
 # (编码, 名称, 说明) —— 编码严格取自 PolicyType，不新增、不自造。
 POLICY_SEEDS: list[tuple[str, str, str]] = [
@@ -113,7 +114,7 @@ def main() -> int:
             if definition_id is None:
                 created_defs.append(code)
                 if args.apply:
-                    definition = policy_service.create_definition(
+                    definition = policy_definitions.create_definition(
                         session,
                         policy_code=code,
                         name=name,
@@ -140,7 +141,7 @@ def main() -> int:
                 elif latest is None:
                     created_versions.append(code)
                     if args.apply:
-                        policy_service.create_version(
+                        policy_versions.create_version(
                             session,
                             definition_id,
                             effective_from=date.today(),

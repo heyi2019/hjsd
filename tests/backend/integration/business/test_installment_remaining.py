@@ -17,7 +17,7 @@ from sqlalchemy import select
 
 from app.domain.trade import Installment
 from app.orders.create import create_order
-from app.value_added_services import service as installment_service
+from app.value_added_services import create as inst_create
 
 TODAY = date(2026, 10, 12)
 
@@ -29,7 +29,7 @@ def _contract(seeded_db, *, principal="1200.00", down_payment="200.00", periods=
         trade_date=TODAY,
         actor="pytest",
     )
-    return installment_service.create_installment(
+    return inst_create.create_installment(
         seeded_db,
         order_id=order.id,
         contract_type="PICKUP_SALE",

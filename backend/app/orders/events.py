@@ -59,7 +59,7 @@ def _auto_link_recovered_installment_sale(
     note: str | None,
 ) -> None:
     """库存中心完成出售后，自动关联该账号最近一次未转售的回收处置。"""
-    from app.value_added_services.service import link_recovered_sale
+    from app.value_added_services.create import link_recovered_sale
 
     link_recovered_sale(
         session,
@@ -585,13 +585,15 @@ def post_event(
     )
     return event, flow
 
+from .cancellation_model import (
+    get_cancellation_offset as _get_offset_event,
+    opposite_cancellation_direction as _opposite_direction,
+)
 from .events_rules import (
     _apply_account_effect,
     _assert_event_allowed,
     _assert_pool_active,
     _assert_sellable_order,
-    _get_offset_event,
-    _opposite_direction,
     _post_deliver,
     _resolve_pool,
 )

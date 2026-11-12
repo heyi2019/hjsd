@@ -12,7 +12,9 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.imports import schemas, service
+from app.imports import schemas
+from app.imports import batches as imp_batches
+from app.imports import rows as imp_rows
 
 router = APIRouter(tags=["imports"])
 import_access = require_permissions(PERM_IMPORT_MANAGE)
@@ -26,7 +28,7 @@ def create_batch(
 ) -> schemas.ImportBatchOut:
     """上传标准原始行。系统不做任何自动匹配。"""
     return schemas.ImportBatchOut.model_validate(
-        service.create_batch(
+        imp_batches.create_batch(
             db,
             source_name=payload.source_name,
             rows=payload.rows,
@@ -42,7 +44,7 @@ def list_batches(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = import_access,
 ) -> schemas.ImportBatchListOut:
-    items = service.list_batches(db)
+    items = imp_batches.list_batches(db)
     return schemas.ImportBatchListOut(
         items=[schemas.ImportBatchOut.model_validate(item) for item in items],
         total=len(items),
@@ -56,7 +58,7 @@ def list_rows(
     user: CurrentUser = import_access,
     status: str | None = Query(default=None),
 ) -> schemas.ImportRowListOut:
-    items = service.list_rows(db, batch_id, status=status)
+    items = imp_rows.list_rows(db, batch_id, status=status)
     return schemas.ImportRowListOut(
         items=[schemas.ImportRowOut.model_validate(item) for item in items],
         total=len(items),
@@ -72,7 +74,7 @@ def assign_mapping(
 ) -> schemas.ImportRowOut:
     """人工指派映射（禁止自动匹配，接口不提供任何候选推断）。"""
     return schemas.ImportRowOut.model_validate(
-        service.assign_mapping(
+        imp_rows.assign_mapping(
             db,
             row_id,
             order_id=payload.order_id,
@@ -91,7 +93,7 @@ def skip_row(
     user: CurrentUser = import_access,
 ) -> schemas.ImportRowOut:
     return schemas.ImportRowOut.model_validate(
-        service.skip_row(db, row_id, reason=payload.reason, actor=user.username)
+        imp_rows.skip_row(db, row_id, reason=payload.reason, actor=user.username)
     )
 
 
@@ -103,7 +105,7 @@ def commit_batch(
 ) -> schemas.ImportCommitOut:
     """提交批次：未映射行转异常工单；不写任何业务数据。"""
     return schemas.ImportCommitOut.model_validate(
-        service.commit_batch(db, batch_id, actor=user.username)
+        imp_rows.commit_batch(db, batch_id, actor=user.username)
     )
 
 
@@ -114,7 +116,7 @@ def preview_mapping(
     user: CurrentUser = import_access,
 ) -> schemas.ImportPreviewOut:
     """MIG-01-02 字段映射预览：源列 / 目标字段 / 样例 / 异常数。只读，不落库。"""
-    return schemas.ImportPreviewOut.model_validate(service.preview_mapping(db, batch_id))
+    return schemas.ImportPreviewOut.model_validate(imp_rows.preview_mapping(db, batch_id))
 
 
 @router.get(
@@ -128,7 +130,7 @@ def reconciliation(
 ) -> schemas.ImportReconciliationOut:
     """MIG-01-04 导入对账报告：行数 / 金额 / 资金侧前后差异。"""
     return schemas.ImportReconciliationOut.model_validate(
-        service.reconciliation_report(db, batch_id)
+        imp_rows.reconciliation_report(db, batch_id)
     )
 
 
@@ -144,7 +146,7 @@ def mark_unlinked(
 ) -> schemas.ImportRowOut:
     """MIG-01-06 标记单边划转未裁决。只打标记 + 开工单，绝不补造配对流水。"""
     return schemas.ImportRowOut.model_validate(
-        service.mark_unlinked_transfer(
+        imp_batches.mark_unlinked_transfer(
             db, row_id, note=payload.note, actor=user.username
         )
     )
@@ -162,7 +164,7 @@ def rollback_batch(
 ) -> schemas.ImportRollbackOut:
     """MIG-01-07 整批逻辑回滚（仅未确认批次；已确认须走更正批次）。"""
     return schemas.ImportRollbackOut.model_validate(
-        service.rollback_batch(
+        imp_batches.rollback_batch(
             db, batch_id, reason=payload.reason, actor=user.username
         )
     )
@@ -180,7 +182,7 @@ def create_correction(
 ) -> schemas.ImportCorrectionOut:
     """MIG-01-08 更正批次：原批次只读，更正以新批次分层保存。"""
     return schemas.ImportCorrectionOut.model_validate(
-        service.create_correction_batch(
+        imp_batches.create_correction_batch(
             db,
             batch_id,
             rows=payload.rows,
@@ -199,7 +201,7 @@ def reject_batch(
 ) -> schemas.ImportBatchOut:
     """整批驳回（REJECTED，终态）：仅未确认批次可驳回；已确认走回滚/更正。"""
     return schemas.ImportBatchOut.model_validate(
-        service.reject_batch(db, batch_id, reason=payload.reason, actor=user.username)
+        imp_batches.reject_batch(db, batch_id, reason=payload.reason, actor=user.username)
     )
 
 

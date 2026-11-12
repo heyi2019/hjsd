@@ -12,7 +12,8 @@ import pytest
 
 from app.core.money import to_money
 from app.finance.deposits import create_deposit, return_deposit
-from app.value_added_services import service as installment_service
+from app.value_added_services import create as inst_create
+from app.value_added_services import repayment as inst_repayment
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.parties.counterparties import create_counterparty
@@ -206,7 +207,7 @@ class TestInstallment:
             occurred_on=D,
             actor="hunt",
         )
-        return installment_service.create_installment(
+        return inst_create.create_installment(
             seeded_db,
             order_id=order.id,
             contract_type=contract_type,
@@ -221,14 +222,14 @@ class TestInstallment:
     def test_overpayment_is_rejected(self, seeded_db):
         contract = self._contract(seeded_db)
         with pytest.raises(Exception):
-            installment_service.pay(
+            inst_repayment.pay(
                 seeded_db, contract.id, amount="99999.00", paid_on=D, actor="hunt"
             )
 
     def test_payment_zero_is_rejected(self, seeded_db):
         contract = self._contract(seeded_db)
         with pytest.raises(Exception):
-            installment_service.pay(
+            inst_repayment.pay(
                 seeded_db, contract.id, amount="0", paid_on=D, actor="hunt"
             )
 

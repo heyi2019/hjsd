@@ -15,7 +15,10 @@ from app.core.security import (
     require_permissions,
 )
 from app.orders.amounts import order_amounts
-from app.policy import schemas, service
+from app.policy import schemas
+from app.policy import allocations as policy_allocations
+from app.policy import definitions as policy_definitions
+from app.policy import versions as policy_versions
 
 router = APIRouter(tags=["policy"])
 manage_access = require_permissions(PERM_POLICY_MANAGE)
@@ -37,7 +40,7 @@ def list_definitions(
     policy_code: str | None = Query(default=None),
 ) -> schemas.PolicyDefinitionListOut:
     """规则列表：按规则、范围、版本、生效期管理（BAS-06-01）。"""
-    items = service.list_definitions(db, status=status, policy_code=policy_code)
+    items = policy_definitions.list_definitions(db, status=status, policy_code=policy_code)
     return schemas.PolicyDefinitionListOut(
         items=[schemas.PolicyDefinitionOut.model_validate(item) for item in items],
         total=len(items),
@@ -50,7 +53,7 @@ def create_definition(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
 ) -> schemas.PolicyDefinitionOut:
-    return schemas.PolicyDefinitionOut.model_validate(service.create_definition(
+    return schemas.PolicyDefinitionOut.model_validate(policy_definitions.create_definition(
         db,
         policy_code=payload.policy_code,
         name=payload.name,
@@ -67,7 +70,7 @@ def get_definition(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = policy_read_access,
 ) -> schemas.PolicyDefinitionOut:
-    return schemas.PolicyDefinitionOut.model_validate(service.get_definition(db, definition_id))
+    return schemas.PolicyDefinitionOut.model_validate(policy_definitions.get_definition(db, definition_id))
 
 
 @router.get("/policies/{definition_id}/versions", response_model=schemas.PolicyVersionListOut)
@@ -77,7 +80,7 @@ def list_versions(
     user: CurrentUser = policy_read_access,
     status: str | None = Query(default=None),
 ) -> schemas.PolicyVersionListOut:
-    items = service.list_versions(db, definition_id, status=status)
+    items = policy_versions.list_versions(db, definition_id, status=status)
     return schemas.PolicyVersionListOut(
         items=[schemas.PolicyVersionOut.model_validate(item) for item in items],
         total=len(items),
@@ -97,7 +100,7 @@ def create_version(
     user: CurrentUser = manage_access,
 ) -> schemas.PolicyVersionOut:
     """新增规则版本。生效期不得与已有版本重叠（BAS-06-02）。"""
-    return schemas.PolicyVersionOut.model_validate(service.create_version(
+    return schemas.PolicyVersionOut.model_validate(policy_versions.create_version(
         db,
         definition_id,
         effective_from=payload.effective_from,
@@ -117,7 +120,7 @@ def update_version(
 ) -> schemas.PolicyVersionOut:
     """只允许改草稿版本；已发布版本必须新建（BAS-06-02）。"""
     return schemas.PolicyVersionOut.model_validate(
-        service.update_version_draft(db, version_id, config=payload.config, actor=user.username)
+        policy_versions.update_version_draft(db, version_id, config=payload.config, actor=user.username)
     )
 
 
@@ -132,7 +135,7 @@ def supersede_version(
 ) -> schemas.PolicyVersionOut:
     """取消草稿版本（SUPERSEDED）。已发布版本不可取消——它是历史日期的解析口径。"""
     return schemas.PolicyVersionOut.model_validate(
-        service.supersede_draft_version(
+        policy_versions.supersede_draft_version(
             db,
             version_id,
             actor=user.username,
@@ -150,7 +153,7 @@ def expire_sweep(
 ) -> schemas.PolicyExpireSweepOut:
     """把生效期已结束（effective_to < on）的 ACTIVE 版本固化为 EXPIRED。"""
     return schemas.PolicyExpireSweepOut.model_validate(
-        service.expire_lapsed_versions(db, on=on, actor=user.username)
+        policy_versions.expire_lapsed_versions(db, on=on, actor=user.username)
     )
 
 
@@ -164,14 +167,14 @@ def resolve(
     scope_id: int | None = Query(default=None),
 ) -> schemas.PolicyResolveOut:
     """取某日某作用域生效版本（BAS-06-04 快照固化的依据）。"""
-    version = service.resolve_version(
+    version = policy_versions.resolve_version(
         db,
         policy_code=policy_code,
         on=on,
         scope_type=scope_type,
         scope_id=scope_id,
     )
-    from app.policy.service import _ver_out  # noqa: PLC0415
+    from app.policy._shared import _ver_out  # noqa: PLC0415
 
     return schemas.PolicyResolveOut(
         found=version is not None,
@@ -190,7 +193,7 @@ def list_allocations(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = order_policy_read_access,
 ) -> schemas.ProfitAllocationListOut:
-    items = service.list_allocations(db, order_id, user=user)
+    items = policy_allocations.list_allocations(db, order_id, user=user)
     return schemas.ProfitAllocationListOut(
         items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
         total=len(items),
@@ -209,7 +212,7 @@ def set_allocations(
     user: CurrentUser = manage_access,
 ) -> schemas.ProfitAllocationListOut:
     """整单设置利润分配。有效比例合计必须为 100%（BAS-06-03）。"""
-    items = service.set_allocations(
+    items = policy_allocations.set_allocations(
         db,
         order_id,
         items=[item.model_dump() for item in payload.items],
@@ -234,7 +237,7 @@ def order_snapshot(
     user: CurrentUser = order_policy_read_access,
 ) -> schemas.OrderPolicySnapshotOut:
     """订单实际应用的规则快照（BAS-06-04：可追溯）。"""
-    snapshot = service.snapshot_for(db, order_id, user=user)
+    snapshot = policy_versions.snapshot_for(db, order_id, user=user)
     return schemas.OrderPolicySnapshotOut(
         found=snapshot is not None,
         snapshot=(schemas.PolicySnapshotOut.model_validate(snapshot) if snapshot else None),

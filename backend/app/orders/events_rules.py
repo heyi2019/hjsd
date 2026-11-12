@@ -18,7 +18,6 @@ from ._common import _required_text
 from .cancellation_model import (
     apply_cancellation_account_effect,
     get_cancellation_offset,
-    opposite_cancellation_direction,
 )
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -171,14 +170,9 @@ def _assert_event_allowed(
                 details={"field": "offset_event_id"},
             )
         if offset_event_id is not None:
-            _get_offset_event(session, offset_event_id, order_id=order.id)
+            get_cancellation_offset(session, offset_event_id, order_id=order.id)
 
 
-
-
-# 兼容既有 events/service 内部调用路径；实际取消规则统一由 cancellation_model 管理。
-_get_offset_event = get_cancellation_offset
-_opposite_direction = opposite_cancellation_direction
 
 
 def _post_deliver(
@@ -427,8 +421,6 @@ __all__ = [
     "_assert_event_allowed",
     "_assert_pool_active",
     "_assert_sellable_order",
-    "_get_offset_event",
-    "_opposite_direction",
     "_post_deliver",
     "_resolve_pool",
 ]

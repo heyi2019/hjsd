@@ -22,23 +22,24 @@ import pytest
 from app.stocks.profile import create_account
 from app.core.errors import Validation
 from app.finance.rebates import create_rebate
-from app.value_added_services import service as installment_service
+from app.value_added_services import create as inst_create
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy import service as policy_service
+from app.policy import definitions as policy_definitions
+from app.policy import versions as policy_versions
 
 D = date(2026, 10, 17)
 
 
 def _publish(seeded_db, policy_code: str, config: dict) -> None:
-    definition = policy_service.create_definition(
+    definition = policy_definitions.create_definition(
         seeded_db,
         policy_code=policy_code,
         name=f"{policy_code} 规则",
         scope_type="GLOBAL",
         actor="pytest",
     )
-    policy_service.create_version(
+    policy_versions.create_version(
         seeded_db,
         definition["id"],
         effective_from=D,
@@ -149,7 +150,7 @@ def _pickup_order(seeded_db, *, game_account: str) -> int:
 
 
 def _sign(seeded_db, order_id: int, **kwargs):
-    return installment_service.create_installment(
+    return inst_create.create_installment(
         seeded_db,
         order_id=order_id,
         contract_type="PICKUP_SALE",

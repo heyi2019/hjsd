@@ -21,7 +21,10 @@ from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order
 from app.finance.deposits import create_deposit, return_deposit
 from app.finance.rebates import create_rebate
-from app.value_added_services import service as installment_service
+from app.value_added_services import _shared as inst__shared
+from app.value_added_services import create as inst_create
+from app.value_added_services import recovery as inst_recovery
+from app.value_added_services import repayment as inst_repayment
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.orders.pools import pool_balance
@@ -68,7 +71,7 @@ class TestA04DistributionInstallmentSale:
         )
         seeded_db.commit()
 
-        contract = installment_service.create_installment(
+        contract = inst_create.create_installment(
             seeded_db,
             order_id=order.id,
             contract_type=InstallmentContractType.PICKUP_SALE.value,
@@ -82,17 +85,17 @@ class TestA04DistributionInstallmentSale:
         seeded_db.commit()
         # 分期合约号由业务订单号派生：一个订单只有一个分期合约号。
         assert contract.inst_no == f"{order.order_no}-FQ"
-        assert installment_service.total_receivable(contract) == Decimal("1200.00")
+        assert inst__shared.total_receivable(contract) == Decimal("1200.00")
 
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("200"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=1, actor="pytest",
         )
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=2, actor="pytest",
         )
@@ -105,7 +108,7 @@ class TestA04DistributionInstallmentSale:
         flows_before = seeded_db.scalar(select(Cashflow).where(Cashflow.id > 0)) is not None
         assert flows_before
 
-        installment_service.deliver(
+        inst_recovery.deliver(
             seeded_db, contract.id, delivery_mode="PLATFORM_OPERATOR",
             delivered_on=TODAY, note="平台操作换绑凭证IMG_02", actor="pytest",
         )
@@ -125,7 +128,7 @@ class TestA04DistributionInstallmentSale:
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
-        contract = installment_service.create_installment(
+        contract = inst_create.create_installment(
             seeded_db,
             order_id=order.id,
             contract_type=InstallmentContractType.PICKUP_SALE.value,
@@ -138,7 +141,7 @@ class TestA04DistributionInstallmentSale:
         )
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
-            installment_service.deliver(
+            inst_recovery.deliver(
                 seeded_db, contract.id, delivery_mode="CUSTOMER_SELF",
                 delivered_on=TODAY, note="凭证", actor="pytest",
             )
@@ -150,7 +153,7 @@ class TestA04DistributionInstallmentSale:
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
-        contract = installment_service.create_installment(
+        contract = inst_create.create_installment(
             seeded_db,
             order_id=order.id,
             contract_type=InstallmentContractType.PICKUP_SALE.value,
@@ -163,7 +166,7 @@ class TestA04DistributionInstallmentSale:
         )
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
-            installment_service.pay(
+            inst_repayment.pay(
                 seeded_db, contract.id, amount=Decimal("600"), paid_on=TODAY,
                 period_no=1, actor="pytest",
             )
@@ -185,7 +188,7 @@ class TestA05HsStockSale:
         assert seeded_db.get(type(account), account.id).status == AccountStatus.WAITING.value
 
         invest = _pool(seeded_db, "HJ_INVEST")
-        contract = installment_service.create_installment(
+        contract = inst_create.create_installment(
             seeded_db,
             order_id=order.id,
             contract_type=InstallmentContractType.STOCK_SALE.value,
@@ -210,11 +213,11 @@ class TestA05HsStockSale:
         assert len(buys) == 1
         assert str(buys[0].amount) == "800.00"
 
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=1, actor="pytest",
         )
@@ -223,7 +226,7 @@ class TestA05HsStockSale:
         assert contract.status == InstallmentStatus.ACTIVE.value
         assert contract.paid_amount == Decimal("600.00")
 
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=2, actor="pytest",
         )
@@ -232,7 +235,7 @@ class TestA05HsStockSale:
         assert contract.status == InstallmentStatus.SETTLED.value
         assert seeded_db.get(type(account), account.id).status == AccountStatus.SOLD.value
 
-        installment_service.deliver(
+        inst_recovery.deliver(
             seeded_db, contract.id, delivery_mode="CUSTOMER_SELF",
             delivered_on=TODAY, note="客户自行换绑凭证", actor="delivery-operator",
         )
@@ -255,7 +258,7 @@ class TestA05HsStockSale:
         )
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
-            installment_service.create_installment(
+            inst_create.create_installment(
                 seeded_db,
                 order_id=order.id,
                 contract_type=InstallmentContractType.STOCK_SALE.value,
@@ -278,7 +281,7 @@ class TestA05HsStockSale:
             occurred_on=TODAY, actor="pytest",
         )
         seeded_db.commit()
-        contract = installment_service.create_installment(
+        contract = inst_create.create_installment(
             seeded_db,
             order_id=order.id,
             contract_type=InstallmentContractType.STOCK_SALE.value,
@@ -289,7 +292,7 @@ class TestA05HsStockSale:
             actor="pytest",
         )
         seeded_db.commit()
-        marked = installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        marked = inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
         seeded_db.commit()
         assert marked == 2
         overdue = seeded_db.scalars(

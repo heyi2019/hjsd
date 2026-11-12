@@ -18,7 +18,9 @@ from app.core.security import CurrentUser
 from app.domain.enums import Direction
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Installment, Order, OrderEvent
-from app.value_added_services import service as installment_service
+from app.value_added_services import create as inst_create
+from app.value_added_services import recovery as inst_recovery
+from app.value_added_services import repayment as inst_repayment
 from app.orders import events
 from app.orders._shared import _audit_value
 from app.orders.create import create_order
@@ -61,7 +63,7 @@ def _settled_hs_installment(seeded_db):
         seeded_db, order.id, event_type="BUY", amount=Decimal("500"),
         occurred_on=TODAY, actor="pytest",
     )
-    installment_service.create_installment(
+    inst_create.create_installment(
         seeded_db,
         order_id=order.id,
         contract_type="STOCK_SALE",
@@ -75,10 +77,10 @@ def _settled_hs_installment(seeded_db):
     contract_id = seeded_db.scalar(
         select(Installment).where(Installment.order_id == order.id)
     ).id
-    installment_service.pay(
+    inst_repayment.pay(
         seeded_db, contract_id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="pytest"
     )
-    installment_service.pay(
+    inst_repayment.pay(
         seeded_db, contract_id, amount=Decimal("500"), paid_on=TODAY, period_no=1, actor="pytest"
     )
     return order
@@ -87,7 +89,7 @@ def _settled_hs_installment(seeded_db):
 def _delivered_hs_order(seeded_db):
     order = _settled_hs_installment(seeded_db)
     contract = seeded_db.scalar(select(Installment).where(Installment.order_id == order.id))
-    installment_service.deliver(
+    inst_recovery.deliver(
         seeded_db, contract.id, delivery_mode="PLATFORM_OPERATOR",
         delivered_on=TODAY, note="换绑凭证", actor="pytest",
     )
@@ -141,7 +143,7 @@ def test_hs_sell_blocked_when_installment_exists(seeded_db):
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=TODAY, actor="pytest",
     )
-    installment_service.create_installment(
+    inst_create.create_installment(
         seeded_db, order_id=order.id, contract_type="STOCK_SALE",
         principal=Decimal("100"), down_payment=Decimal("0"), periods=1,
         per_period=Decimal("100"), first_due_on=TODAY, actor="pytest",
@@ -206,7 +208,7 @@ def test_th_sell_blocked_when_installment_exists(seeded_db):
     )
     seeded_db.commit()
     # TH 订单仅允许 PICKUP_SALE（STOCK_SALE 仅限 HS），建成分期后应拦 SELL
-    installment_service.create_installment(
+    inst_create.create_installment(
         seeded_db, order_id=order.id, contract_type="PICKUP_SALE",
         principal=Decimal("100"), down_payment=Decimal("0"), periods=1,
         per_period=Decimal("100"), first_due_on=TODAY, actor="pytest",
@@ -239,7 +241,7 @@ def test_deliver_requires_settled_installment(seeded_db):
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=TODAY, actor="pytest",
     )
-    installment_service.create_installment(
+    inst_create.create_installment(
         seeded_db, order_id=order.id, contract_type="STOCK_SALE",
         principal=Decimal("100"), down_payment=Decimal("0"), periods=1,
         per_period=Decimal("100"), first_due_on=TODAY, actor="pytest",

@@ -12,7 +12,7 @@ import json
 import pytest
 
 from app.domain.enums import AuditAction, ImportBatchStatus, ImportRowStatus
-from app.imports import service as import_service
+from app.imports import batches as imp_batches
 import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
 
@@ -114,7 +114,7 @@ class TestNoInference:
     """落地只写原文，绝不推断或自动匹配。"""
 
     def test_create_batch_writes_no_mapping(self, seeded_db):
-        batch = import_service.create_batch(
+        batch = imp_batches.create_batch(
             seeded_db,
             source_name="测试批次",
             rows=[{"日期": "2026-01-01", "本金": 100}],
@@ -133,7 +133,7 @@ class TestNoInference:
 
     def test_land_audit_uses_dedicated_action(self, seeded_db):
         """导入审计不得借用 EXCEPTION_APPROVE（否则日志被误读为异常审批）。"""
-        import_service.create_batch(
+        imp_batches.create_batch(
             seeded_db,
             source_name="审计动作测试",
             rows=[{"日期": "2026-01-01"}],
@@ -160,7 +160,7 @@ class TestIdempotency:
 
         from app.domain.imports import ImportBatch
 
-        import_service.create_batch(
+        imp_batches.create_batch(
             seeded_db,
             source_name=lander.SOURCE_FILES["sheet9_orders"][1],
             rows=[{"日期": "2026-01-01"}],

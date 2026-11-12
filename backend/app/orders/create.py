@@ -18,7 +18,7 @@ from app.orders.form_fields import validate_form_extra
 from app.parties.counterparties import assert_counterparty_usable
 from app.parties.customer_merge import assert_customer_usable
 from app.parties.fields import set_extra_values
-from app.policy import service as policy_service
+from app.policy import versions as policy_versions
 from app.stocks.profile import get_account
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -262,7 +262,7 @@ def create_order(
     snapshot: dict[str, Any] = {}
     primary_version_id: int | None = None
     for code in (PolicyType.REBATE.value, PolicyType.COMMISSION.value):
-        version_id, snap = policy_service.make_snapshot(
+        version_id, snap = policy_versions.make_snapshot(
             session,
             policy_code=code,
             on=trade_date,

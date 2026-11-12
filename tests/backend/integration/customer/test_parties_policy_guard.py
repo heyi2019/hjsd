@@ -24,7 +24,9 @@ from app.parties.customer_detail import get_customer_activity_summary
 from app.parties.customer_merge import merge_customers
 from app.parties.customers import create_customer
 from app.parties.leads import close_lead, convert_lead, create_lead, get_lead, list_leads, update_lead
-from app.policy import service as policy_service
+from app.policy import allocations as policy_allocations
+from app.policy import definitions as policy_definitions
+from app.policy import versions as policy_versions
 
 
 # ───────────────────────────── 共用辅助 ─────────────────────────────
@@ -323,7 +325,7 @@ class TestPolicyDefinitionGuards:
     def test_create_definition_global_with_scope_id(self, seeded_db):
         # 146: GLOBAL 范围不能指定 scope_id
         with pytest.raises(Validation):
-            policy_service.create_definition(
+            policy_definitions.create_definition(
                 seeded_db, policy_code="X1", name="X1", scope_type="GLOBAL",
                 scope_id=1, actor="pytest",
             )
@@ -331,7 +333,7 @@ class TestPolicyDefinitionGuards:
     def test_create_definition_target_missing(self, seeded_db):
         # 163: 关联对象不存在
         with pytest.raises(Validation):
-            policy_service.create_definition(
+            policy_definitions.create_definition(
                 seeded_db, policy_code="X2", name="X2", scope_type="ORDER_TYPE",
                 scope_id=99999, actor="pytest",
             )
@@ -341,14 +343,14 @@ class TestPolicyResolveVersionGuards:
     def test_invalid_scope_type(self, seeded_db):
         # 397: scope_type 非法
         with pytest.raises(Validation):
-            policy_service.resolve_version(
+            policy_versions.resolve_version(
                 seeded_db, policy_code="X", on=date.today(), scope_type="BAD"
             )
 
     def test_global_with_scope_id(self, seeded_db):
         # 403: GLOBAL 范围不能指定 scope_id
         with pytest.raises(Validation):
-            policy_service.resolve_version(
+            policy_versions.resolve_version(
                 seeded_db, policy_code="X", on=date.today(),
                 scope_type="GLOBAL", scope_id=1,
             )
@@ -356,7 +358,7 @@ class TestPolicyResolveVersionGuards:
     def test_scoped_requires_scope_id(self, seeded_db):
         # 407: 非 GLOBAL 必须指定 scope_id
         with pytest.raises(Validation):
-            policy_service.resolve_version(
+            policy_versions.resolve_version(
                 seeded_db, policy_code="X", on=date.today(), scope_type="ORDER_TYPE"
             )
 
@@ -374,7 +376,7 @@ class TestPolicyAllocationGuards:
             {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
         ]
         with pytest.raises(Validation, match="动作执行人不存在"):
-            policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
+            policy_allocations.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_sell_actor_not_found(self, seeded_db):
         # 553: 售出动作执行人不是用户 -> 无法绑定收益人
@@ -400,7 +402,7 @@ class TestPolicyAllocationGuards:
             {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
         ]
         with pytest.raises(Validation, match="售出动作执行人不存在"):
-            policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
+            policy_allocations.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_invalid_allocation_type(self, seeded_db):
         # 581: 分配项类型非法
@@ -412,7 +414,7 @@ class TestPolicyAllocationGuards:
             {"allocation_type": "BAD", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
         ]
         with pytest.raises(Validation, match="分配项必须为"):
-            policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
+            policy_allocations.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_duplicate_allocation_type(self, seeded_db):
         # 583 → 2026-11-05 新口径：一个动作多人时按人数各录一行、份额均分，
@@ -427,7 +429,7 @@ class TestPolicyAllocationGuards:
             {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "20"},
         ]
         with pytest.raises(Validation, match="同一动作下同一人员不可重复分润"):
-            policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
+            policy_allocations.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_company_with_user_rejected(self, seeded_db):
         # 586: 公司收益不绑定人员
@@ -439,7 +441,7 @@ class TestPolicyAllocationGuards:
             {"allocation_type": "COMPANY", "user_id": 1, "role": "OWNER", "allocation_rate": "25"},
         ]
         with pytest.raises(Validation, match="公司收益不绑定人员"):
-            policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
+            policy_allocations.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_operation_without_user_rejected(self, seeded_db):
         # 588: 人员收益必须绑定人员
@@ -451,7 +453,7 @@ class TestPolicyAllocationGuards:
             {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
         ]
         with pytest.raises(Validation, match="人员收益必须绑定人员"):
-            policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
+            policy_allocations.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_buy_recipient_mismatch(self, seeded_db):
         # 594: 买号收益人必须绑定对应动作执行人
@@ -465,7 +467,7 @@ class TestPolicyAllocationGuards:
             {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
         ]
         with pytest.raises(Validation, match="收益人必须绑定对应动作执行人"):
-            policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
+            policy_allocations.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
     def test_total_must_be_100(self, seeded_db):
         # 624: 有效分配比例合计必须为 100%
@@ -477,4 +479,4 @@ class TestPolicyAllocationGuards:
             {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "30"},
         ]
         with pytest.raises(Validation, match="100%"):
-            policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
+            policy_allocations.set_allocations(seeded_db, order.id, items=items, actor="pytest")

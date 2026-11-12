@@ -165,7 +165,7 @@ def main() -> int:
         return 0
 
     from app.core.database import get_session_factory
-    from app.imports import service as import_service
+    from app.imports import batches as imp_batches
 
     session = get_session_factory()()
     try:
@@ -177,7 +177,7 @@ def main() -> int:
                 print(f"  跳过 {stem}：批次「{source_name}」已存在（幂等）")
                 skipped += 1
                 continue
-            batch = import_service.create_batch(
+            batch = imp_batches.create_batch(
                 session,
                 source_name=source_name,
                 rows=rows,

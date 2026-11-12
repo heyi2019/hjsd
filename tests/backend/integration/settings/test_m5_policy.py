@@ -16,11 +16,13 @@ from app.domain.parties import PolicyVersion
 from app.domain.trade import OrderEvent, OrderProfitAllocation
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy import service as policy_service
+from app.policy import allocations as policy_allocations
+from app.policy import definitions as policy_definitions
+from app.policy import versions as policy_versions
 
 
 def _make_policy(seeded_db, *, code="REBATE", name="返点规则") -> dict:
-    return policy_service.create_definition(
+    return policy_definitions.create_definition(
         seeded_db,
         policy_code=code,
         name=name,
@@ -31,7 +33,7 @@ def _make_policy(seeded_db, *, code="REBATE", name="返点规则") -> dict:
 
 
 def _publish(seeded_db, definition, *, frm, to=None, config, approve=True):
-    version = policy_service.create_version(
+    version = policy_versions.create_version(
         seeded_db,
         definition["id"],
         effective_from=frm,
@@ -49,7 +51,7 @@ class TestPolicyDefinition:
         definition = _make_policy(seeded_db)
         assert definition["policy_code"] == "REBATE"
         assert definition["status"] == PolicyStatus.DRAFT.value
-        listed = policy_service.list_definitions(seeded_db)
+        listed = policy_definitions.list_definitions(seeded_db)
         assert any(d["id"] == definition["id"] for d in listed)
 
     def test_duplicate_code_rejected(self, seeded_db):
@@ -59,7 +61,7 @@ class TestPolicyDefinition:
 
     def test_same_code_can_have_different_scopes(self, seeded_db):
         _make_policy(seeded_db)
-        scoped = policy_service.create_definition(
+        scoped = policy_definitions.create_definition(
             seeded_db,
             policy_code="REBATE",
             name="HS 返点规则",
@@ -73,7 +75,7 @@ class TestPolicyDefinition:
     def test_scoped_requires_scope_id(self, seeded_db):
         """非全局范围必须指定 scope_id，否则规则会误伤全部业务。"""
         with pytest.raises(Exception):
-            policy_service.create_definition(
+            policy_definitions.create_definition(
                 seeded_db,
                 policy_code="REBATE_HS",
                 name="HS 返点",
@@ -84,7 +86,7 @@ class TestPolicyDefinition:
 
     def test_invalid_scope_type_rejected(self, seeded_db):
         with pytest.raises(Exception):
-            policy_service.create_definition(
+            policy_definitions.create_definition(
                 seeded_db,
                 policy_code="X",
                 name="X",
@@ -94,7 +96,7 @@ class TestPolicyDefinition:
 
     def test_empty_code_rejected(self, seeded_db):
         with pytest.raises(Exception):
-            policy_service.create_definition(
+            policy_definitions.create_definition(
                 seeded_db, policy_code="  ", name="X", scope_type="GLOBAL", actor="pytest"
             )
 
@@ -123,7 +125,7 @@ class TestPolicyVersion:
     def test_version_increments(self, seeded_db):
         """版本号递增；两个都无失效日的版本必然重叠，必须给前一个封口。"""
         definition = _make_policy(seeded_db)
-        v1 = policy_service.create_version(
+        v1 = policy_versions.create_version(
             seeded_db,
             definition["id"],
             effective_from=date(2026, 1, 1),
@@ -131,7 +133,7 @@ class TestPolicyVersion:
             config={"rate": "5"},
             actor="pytest",
         )
-        v2 = policy_service.create_version(
+        v2 = policy_versions.create_version(
             seeded_db, definition["id"], effective_from=date(2026, 7, 1), config={"rate": "8"}, actor="pytest"
         )
         assert v1["version"] == 1
@@ -144,10 +146,10 @@ class TestPolicyVersion:
         （设置配置「保存即发布」将不可用）。旧版本 config 不被改写。
         """
         definition = _make_policy(seeded_db)
-        v1 = policy_service.create_version(
+        v1 = policy_versions.create_version(
             seeded_db, definition["id"], effective_from=date(2026, 1, 1), config={"rate": "5"}, actor="pytest"
         )
-        v2 = policy_service.create_version(
+        v2 = policy_versions.create_version(
             seeded_db, definition["id"], effective_from=date(2026, 7, 1), config={"rate": "8"}, actor="pytest"
         )
         assert v2["version"] == 2
@@ -158,11 +160,11 @@ class TestPolicyVersion:
     def test_backward_overlap_still_rejected(self, seeded_db):
         """新版本起点早于开放版本的起点 = 真重叠，必须拒绝。"""
         definition = _make_policy(seeded_db)
-        policy_service.create_version(
+        policy_versions.create_version(
             seeded_db, definition["id"], effective_from=date(2026, 7, 1), config={"rate": "5"}, actor="pytest"
         )
         with pytest.raises(Exception):
-            policy_service.create_version(
+            policy_versions.create_version(
                 seeded_db, definition["id"], effective_from=date(2026, 1, 1), config={"rate": "8"}, actor="pytest"
             )
 
@@ -171,7 +173,7 @@ class TestPolicyVersion:
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1), to=date(2026, 7, 1), config={"rate": "5"})
         with pytest.raises(Exception):
-            policy_service.create_version(
+            policy_versions.create_version(
                 seeded_db,
                 definition["id"],
                 effective_from=date(2026, 6, 1),
@@ -192,7 +194,7 @@ class TestPolicyVersion:
     def test_inverted_period_rejected(self, seeded_db):
         definition = _make_policy(seeded_db)
         with pytest.raises(Exception):
-            policy_service.create_version(
+            policy_versions.create_version(
                 seeded_db,
                 definition["id"],
                 effective_from=date(2026, 7, 1),
@@ -208,28 +210,28 @@ class TestPolicyVersion:
             seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"}
         )
         with pytest.raises(Exception):
-            policy_service.update_version_draft(
+            policy_versions.update_version_draft(
                 seeded_db, version["id"], config={"rate": "99"}, actor="pytest"
             )
 
     def test_published_version_not_editable(self, seeded_db):
         definition = _make_policy(seeded_db)
-        version = policy_service.create_version(
+        version = policy_versions.create_version(
             seeded_db, definition["id"], effective_from=date(2026, 1, 1), config={"rate": "5"}, actor="pytest"
         )
         # 创建即发布（ACTIVE）：已发布版本不可改，只能新建版本封口
         with pytest.raises(Exception):
-            policy_service.update_version_draft(
+            policy_versions.update_version_draft(
                 seeded_db, version["id"], config={"rate": "6"}, actor="pytest"
             )
 
     def test_published_version_resolvable(self, seeded_db):
         """创建即发布：版本直接为 ACTIVE，参与生效期解析。"""
         definition = _make_policy(seeded_db)
-        policy_service.create_version(
+        policy_versions.create_version(
             seeded_db, definition["id"], effective_from=date(2026, 1, 1), config={"rate": "5"}, actor="pytest"
         )
-        resolved = policy_service.resolve_version(
+        resolved = policy_versions.resolve_version(
             seeded_db, policy_code="REBATE", on=date(2026, 6, 1)
         )
         assert resolved is not None
@@ -243,33 +245,33 @@ class TestVersionResolution:
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1), to=date(2026, 7, 1), config={"rate": "5"})
         _publish(seeded_db, definition, frm=date(2026, 7, 1), config={"rate": "8"})
-        early = policy_service.resolve_version(seeded_db, policy_code="REBATE", on=date(2026, 3, 1))
-        late = policy_service.resolve_version(seeded_db, policy_code="REBATE", on=date(2026, 9, 1))
+        early = policy_versions.resolve_version(seeded_db, policy_code="REBATE", on=date(2026, 3, 1))
+        late = policy_versions.resolve_version(seeded_db, policy_code="REBATE", on=date(2026, 9, 1))
         assert early is not None and early.config == {"rate": "5"}
         assert late is not None and late.config == {"rate": "8"}
 
     def test_before_first_version_returns_none(self, seeded_db):
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"})
-        assert policy_service.resolve_version(
+        assert policy_versions.resolve_version(
             seeded_db, policy_code="REBATE", on=date(2025, 12, 31)
         ) is None
 
     def test_after_expired_returns_none(self, seeded_db):
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1), to=date(2026, 2, 1), config={"rate": "5"})
-        assert policy_service.resolve_version(
+        assert policy_versions.resolve_version(
             seeded_db, policy_code="REBATE", on=date(2026, 3, 1)
         ) is None
 
     def test_unknown_code_returns_none(self, seeded_db):
-        assert policy_service.resolve_version(
+        assert policy_versions.resolve_version(
             seeded_db, policy_code="NOT_EXIST", on=date(2026, 6, 1)
         ) is None
 
     def test_specific_scope_overrides_global_scope(self, seeded_db):
         global_policy = _make_policy(seeded_db)
-        scoped = policy_service.create_definition(
+        scoped = policy_definitions.create_definition(
             seeded_db,
             policy_code="REBATE",
             name="HS 返点规则",
@@ -284,7 +286,7 @@ class TestVersionResolution:
             seeded_db, scoped, frm=date(2026, 1, 1), config={"rate": "8"}
         )
 
-        resolved = policy_service.resolve_version(
+        resolved = policy_versions.resolve_version(
             seeded_db,
             policy_code="REBATE",
             on=date(2026, 6, 1),
@@ -358,7 +360,7 @@ class TestSnapshotRedline:
         order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
-        found = policy_service.snapshot_for(seeded_db, order.id)
+        found = policy_versions.snapshot_for(seeded_db, order.id)
         assert found is not None
         assert found["policy_snapshot"][PolicyType.REBATE.value]["version"] == 1
 
@@ -370,7 +372,7 @@ class TestProfitAllocation:
         # 按动作模式（items 带 allocation_type）仍要求四项齐全：
         # 单给一个 BUY 行属于「动作模式缺项」，必须拒绝。
         with pytest.raises(Validation):
-            policy_service.set_allocations(
+            policy_allocations.set_allocations(
                 seeded_db,
                 order.id,
                 items=[{"allocation_type": "BUY", "role": "OWNER", "allocation_rate": 100}],
@@ -380,7 +382,7 @@ class TestProfitAllocation:
             for kind in ("BUY", "SELL", "OPERATION", "COMPANY", "SELL")
         ]
         with pytest.raises(Validation):
-            policy_service.set_allocations(seeded_db, order.id, items=items)
+            policy_allocations.set_allocations(seeded_db, order.id, items=items)
 
     def test_allocation_splits_one_action_across_multiple_executors(self, seeded_db):
         """一个动作多人：买号 2 人各占一半份额（30% → 15% / 15%），允许 5 行落库。"""
@@ -395,7 +397,7 @@ class TestProfitAllocation:
             {"allocation_type": "OPERATION", "user_id": 2, "role": "SERVICE", "allocation_rate": "20"},
             {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "10"},
         ]
-        listed = policy_service.set_allocations(seeded_db, order.id, items=items)
+        listed = policy_allocations.set_allocations(seeded_db, order.id, items=items)
 
         buy_rows = [item for item in listed if item["allocation_type"] == "BUY"]
         assert len(buy_rows) == 2
@@ -418,7 +420,7 @@ class TestProfitAllocation:
             {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "10"},
         ]
         with pytest.raises(Validation):
-            policy_service.set_allocations(seeded_db, order.id, items=items)
+            policy_allocations.set_allocations(seeded_db, order.id, items=items)
 
     def test_allocation_rejects_multiple_company_rows(self, seeded_db):
         """公司行仍然只能有一行。"""
@@ -434,7 +436,7 @@ class TestProfitAllocation:
             {"allocation_type": "COMPANY", "user_id": None, "role": "OWNER", "allocation_rate": "10"},
         ]
         with pytest.raises(Validation):
-            policy_service.set_allocations(seeded_db, order.id, items=items)
+            policy_allocations.set_allocations(seeded_db, order.id, items=items)
 
     def test_allocation_cannot_choose_seller_before_sale(self, seeded_db):
         from app.core.errors import Validation
@@ -444,7 +446,7 @@ class TestProfitAllocation:
             for kind in ("BUY", "SELL", "OPERATION", "COMPANY")
         ]
         with pytest.raises(Validation):
-            policy_service.set_allocations(seeded_db, order.id, items=items)
+            policy_allocations.set_allocations(seeded_db, order.id, items=items)
 
     """BAS-06-03：订单多人利润分配，合计必须 100%。"""
 
@@ -483,7 +485,7 @@ class TestProfitAllocation:
     def test_invalid_allocation_role_rejected_by_service(self, seeded_db):
         order = self._order(seeded_db)
         with pytest.raises(Exception) as exc:
-            policy_service.set_allocations(
+            policy_allocations.set_allocations(
                 seeded_db,
                 order.id,
                 items=[{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "UNKNOWN" if kind == "BUY" else "OWNER", "allocation_rate": "25"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
@@ -494,7 +496,7 @@ class TestProfitAllocation:
     def test_unknown_allocation_field_rejected_by_service(self, seeded_db):
         order = self._order(seeded_db)
         with pytest.raises(Exception) as exc:
-            policy_service.set_allocations(
+            policy_allocations.set_allocations(
                 seeded_db,
                 order.id,
                 items=[
@@ -512,7 +514,7 @@ class TestProfitAllocation:
     def test_allocation_user_must_exist(self, seeded_db):
         order = self._order(seeded_db)
         with pytest.raises(Exception) as exc:
-            policy_service.set_allocations(
+            policy_allocations.set_allocations(
                 seeded_db,
                 order.id,
                 items=[{"allocation_type": kind, "user_id": 999999 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": "25"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
@@ -522,7 +524,7 @@ class TestProfitAllocation:
 
     def test_fifty_fifty(self, seeded_db):
         order = self._order(seeded_db)
-        items = policy_service.set_allocations(
+        items = policy_allocations.set_allocations(
             seeded_db,
             order.id,
             items=[{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": "50" if kind in ("OPERATION", "COMPANY") else "0"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
@@ -533,7 +535,7 @@ class TestProfitAllocation:
 
     def test_typed_allocation_requires_four_income_categories(self, seeded_db):
         order = self._order(seeded_db)
-        items = policy_service.set_allocations(
+        items = policy_allocations.set_allocations(
             seeded_db,
             order.id,
             items=[
@@ -562,7 +564,7 @@ class TestProfitAllocation:
             )
         )
         seeded_db.flush()
-        items = policy_service.set_allocations(
+        items = policy_allocations.set_allocations(
             seeded_db,
             order.id,
             items=[
@@ -607,7 +609,7 @@ class TestProfitAllocation:
         ])
         seeded_db.flush()
 
-        items = policy_service.set_allocations(
+        items = policy_allocations.set_allocations(
             seeded_db,
             order.id,
             items=[
@@ -625,15 +627,15 @@ class TestProfitAllocation:
     def test_sale_click_binds_seller_after_allocation(self, seeded_db):
         order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 6, 1), actor="seeduser1")
         items = [{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 25} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")]
-        policy_service.set_allocations(seeded_db, order.id, items=items)
+        policy_allocations.set_allocations(seeded_db, order.id, items=items)
         post_event(seeded_db, order.id, event_type="SELL", amount="100", portion="PROFIT", occurred_on=date(2026, 6, 1), actor="seeduser2")
-        by_type = {item["allocation_type"]: item for item in policy_service.list_allocations(seeded_db, order.id)}
+        by_type = {item["allocation_type"]: item for item in policy_allocations.list_allocations(seeded_db, order.id)}
         assert by_type["SELL"]["user_id"] == 2
 
     def test_total_must_be_100(self, seeded_db):
         order = self._order(seeded_db)
         with pytest.raises(Exception):
-            policy_service.set_allocations(
+            policy_allocations.set_allocations(
                 seeded_db,
                 order.id,
                 items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "60"}],
@@ -643,7 +645,7 @@ class TestProfitAllocation:
     def test_sum_99_rejected(self, seeded_db):
         order = self._order(seeded_db)
         with pytest.raises(Exception):
-            policy_service.set_allocations(
+            policy_allocations.set_allocations(
                 seeded_db,
                 order.id,
                 items=[
@@ -656,7 +658,7 @@ class TestProfitAllocation:
     def test_negative_rate_rejected(self, seeded_db):
         order = self._order(seeded_db)
         with pytest.raises(Exception):
-            policy_service.set_allocations(
+            policy_allocations.set_allocations(
                 seeded_db,
                 order.id,
                 items=[
@@ -669,7 +671,7 @@ class TestProfitAllocation:
     def test_duplicate_user_role_rejected(self, seeded_db):
         order = self._order(seeded_db)
         with pytest.raises(Exception):
-            policy_service.set_allocations(
+            policy_allocations.set_allocations(
                 seeded_db,
                 order.id,
                 items=[
@@ -682,24 +684,24 @@ class TestProfitAllocation:
     def test_empty_items_rejected(self, seeded_db):
         order = self._order(seeded_db)
         with pytest.raises(Exception):
-            policy_service.set_allocations(seeded_db, order.id, items=[], actor="pytest")
+            policy_allocations.set_allocations(seeded_db, order.id, items=[], actor="pytest")
 
     def test_reset_replaces_old_rows(self, seeded_db):
         """整单重设不应留下旧比例残留。"""
         order = self._order(seeded_db)
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db,
             order.id,
             items=[{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": "50" if kind in ("OPERATION", "COMPANY") else "0"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
             actor="pytest",
         )
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db,
             order.id,
             items=[{"allocation_type": kind, "user_id": 3 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": "100" if kind == "OPERATION" else "0"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
             actor="pytest",
         )
-        items = policy_service.list_allocations(seeded_db, order.id)
+        items = policy_allocations.list_allocations(seeded_db, order.id)
         assert len(items) == 4
         assert next(item for item in items if item["allocation_type"] == "OPERATION")["user_id"] == 3
 
@@ -707,7 +709,7 @@ class TestProfitAllocation:
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"})
         order = self._order(seeded_db)
-        items = policy_service.set_allocations(
+        items = policy_allocations.set_allocations(
             seeded_db,
             order.id,
             items=[{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": "100" if kind == "OPERATION" else "0"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],

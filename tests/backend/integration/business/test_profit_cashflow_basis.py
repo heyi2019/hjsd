@@ -36,7 +36,7 @@ from app.orders.create import create_order
 from app.orders.events import post_event
 from app.orders.amounts import event_totals, order_amounts
 from app.orders.router_output import _order_list_payload
-from app.policy import service as policy_service
+from app.policy import allocations as policy_allocations
 from app.reporting.profit import order_profit_detail
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from app.reporting.r3_commission import r3_commission_reconciliation
@@ -213,12 +213,12 @@ def test_allocation_amount_boundary_uses_cashflow_profit(seeded_db):
     _add_flow(seeded_db, order_id, "OUT", "200")
 
     with pytest.raises(Validation, match="超过订单利润"):
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db, order_id,
             items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "400"}],
         )
 
-    rows = policy_service.set_allocations(
+    rows = policy_allocations.set_allocations(
         seeded_db, order_id,
         items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "300"}],
     )
@@ -229,7 +229,7 @@ def test_r3_rate_allocation_uses_cashflow_profit(seeded_db):
     """按比例分润：报表 profit_base = 资金明细利润 × 比例。"""
     order_id = _order_with_events(seeded_db)
     _add_flow(seeded_db, order_id, "OUT", "200")
-    policy_service.set_allocations(
+    policy_allocations.set_allocations(
         seeded_db, order_id,
         items=[
             {"user_id": 1, "role": "OWNER", "allocation_rate": "50"},
@@ -348,7 +348,7 @@ def test_r3_allocation_includes_rebate_and_bad_debt(seeded_db):
     order_id = _order_with_events(seeded_db)
     _add_rebate(seeded_db, order_id, "100")
     _add_bad_debt(seeded_db, order_id, "400")
-    policy_service.set_allocations(
+    policy_allocations.set_allocations(
         seeded_db, order_id,
         items=[
             {"user_id": 1, "role": "OWNER", "allocation_rate": "50"},

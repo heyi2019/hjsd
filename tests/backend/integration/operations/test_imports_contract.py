@@ -15,7 +15,9 @@ from app.core.errors import NotFound, Validation
 from app.domain.enums import AuditAction, ImportBatchStatus, ImportRowStatus, ImportSourceKind
 from app.domain.foundation import AuditLog
 from app.domain.imports import ImportBatch, ImportRow
-from app.imports import service
+from app.imports import _shared as imp__shared
+from app.imports import batches as imp_batches
+from app.imports import rows as imp_rows
 
 ROWS = [
     {"日期": "2026/07/14", "交易金额": 13888, "利润": 429, "订单类型": "代挂", "本金": 0},
@@ -38,44 +40,44 @@ def test_import_routes_publish_typed_response_models(app):
 
 
 def _batch(seeded_db, rows=None, source_name="orders.xlsx"):
-    return service.create_batch(
+    return imp_batches.create_batch(
         seeded_db, source_name=source_name, rows=rows if rows is not None else ROWS,
         actor="pytest",
     )
 
 
 def _first_row_id(seeded_db, batch_id: int) -> int:
-    return service.list_rows(seeded_db, batch_id)[0]["id"]
+    return imp_rows.list_rows(seeded_db, batch_id)[0]["id"]
 
 
 # ------------------------------------------------------------------ 建批守卫
 class TestCreateBatchGuards:
     def test_empty_source_name_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.create_batch(seeded_db, source_name="  ", rows=ROWS, actor="pytest")
+            imp_batches.create_batch(seeded_db, source_name="  ", rows=ROWS, actor="pytest")
         assert "source_name 不能为空" in str(exc.value)
 
     def test_text_inputs_are_business_errors(self, seeded_db):
         with pytest.raises(Validation, match="source_name 不能为空"):
-            service.create_batch(
+            imp_batches.create_batch(
                 seeded_db, source_name=123, rows=ROWS, actor="pytest"
             )
 
         batch = _batch(seeded_db)
         row_id = _first_row_id(seeded_db, batch["id"])
         with pytest.raises(Validation, match="补录关联必须填写依据"):
-            service.assign_mapping(
+            imp_rows.assign_mapping(
                 seeded_db, row_id, basis=123, actor="pytest"
             )
 
     def test_empty_rows_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.create_batch(seeded_db, source_name="orders.xlsx", rows=[])
+            imp_batches.create_batch(seeded_db, source_name="orders.xlsx", rows=[])
         assert "导入内容为空" in str(exc.value)
 
     def test_each_import_row_must_be_an_object(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.create_batch(
+            imp_batches.create_batch(
                 seeded_db,
                 source_name="orders.xlsx",
                 rows=[{"订单号": "HS0001"}, ["不是对象"]],
@@ -85,7 +87,7 @@ class TestCreateBatchGuards:
 
     def test_source_kind_is_closed_to_standard_values(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.create_batch(
+            imp_batches.create_batch(
                 seeded_db,
                 source_name="orders.xlsx",
                 rows=ROWS,
@@ -96,7 +98,7 @@ class TestCreateBatchGuards:
             "value": "LEGACY_ORDER",
         }
 
-        batch = service.create_batch(
+        batch = imp_batches.create_batch(
             seeded_db,
             source_name="accounts.xlsx",
             rows=ROWS,
@@ -111,7 +113,7 @@ class TestBatchQueries:
     def test_list_batches_newest_first(self, seeded_db):
         first = _batch(seeded_db, source_name="第一批")
         second = _batch(seeded_db, source_name="第二批")
-        listed = service.list_batches(seeded_db)
+        listed = imp_batches.list_batches(seeded_db)
         assert [item["batch_no"] for item in listed] == [
             second["batch_no"], first["batch_no"]
         ]
@@ -119,16 +121,16 @@ class TestBatchQueries:
 
     def test_list_rows_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.list_rows(seeded_db, 999999)
+            imp_rows.list_rows(seeded_db, 999999)
 
     def test_list_rows_filters_by_status(self, seeded_db):
         batch = _batch(seeded_db)
         row_id = _first_row_id(seeded_db, batch["id"])
-        service.skip_row(seeded_db, row_id, reason="口径不明", actor="pytest")
-        skipped = service.list_rows(seeded_db, batch["id"], status="skipped")
+        imp_rows.skip_row(seeded_db, row_id, reason="口径不明", actor="pytest")
+        skipped = imp_rows.list_rows(seeded_db, batch["id"], status="skipped")
         assert [row["id"] for row in skipped] == [row_id]
         assert skipped[0]["issue_note"] == "口径不明"
-        remaining = service.list_rows(
+        remaining = imp_rows.list_rows(
             seeded_db, batch["id"], status=ImportRowStatus.UNMAPPED.value
         )
         assert len(remaining) == len(ROWS) - 1
@@ -138,13 +140,13 @@ class TestBatchQueries:
 class TestAssignMappingGuards:
     def test_row_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.assign_mapping(seeded_db, 999999, basis="人工核对", actor="pytest")
+            imp_rows.assign_mapping(seeded_db, 999999, basis="人工核对", actor="pytest")
 
     def test_mapping_ids_must_be_positive_in_service(self, seeded_db):
         batch = _batch(seeded_db, rows=[{"订单号": "HS0001"}])
         row_id = _first_row_id(seeded_db, batch["id"])
         with pytest.raises(Validation, match="订单 ID 必须为正整数"):
-            service.assign_mapping(
+            imp_rows.assign_mapping(
                 seeded_db,
                 row_id,
                 order_id=0,
@@ -161,12 +163,12 @@ class TestAssignMappingGuards:
         )
         batch = _batch(seeded_db)
         row_id = _first_row_id(seeded_db, batch["id"])
-        service.assign_mapping(
+        imp_rows.assign_mapping(
             seeded_db, row_id, order_id=order.id, basis="订单号一致", actor="pytest"
         )
-        service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        imp_rows.commit_batch(seeded_db, batch["id"], actor="pytest")
         with pytest.raises(Validation) as exc:
-            service.assign_mapping(
+            imp_rows.assign_mapping(
                 seeded_db, row_id, order_id=order.id, basis="改一次", actor="pytest"
             )
         assert "已导入的导入行不可再改映射" in str(exc.value)
@@ -174,22 +176,22 @@ class TestAssignMappingGuards:
     def test_committed_unmapped_row_is_read_only(self, seeded_db):
         batch = _batch(seeded_db, rows=[{"订单号": "待人工确认"}])
         row_id = _first_row_id(seeded_db, batch["id"])
-        service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        imp_rows.commit_batch(seeded_db, batch["id"], actor="pytest")
 
         with pytest.raises(Validation, match="已确认批次的导入行不可修改"):
-            service.assign_mapping(
+            imp_rows.assign_mapping(
                 seeded_db, row_id, basis="提交后补录", actor="pytest"
             )
         with pytest.raises(Validation, match="已确认批次的导入行不可修改"):
-            service.skip_row(seeded_db, row_id, reason="提交后跳过", actor="pytest")
+            imp_rows.skip_row(seeded_db, row_id, reason="提交后跳过", actor="pytest")
         with pytest.raises(Validation, match="已确认批次的导入行不可修改"):
-            service.mark_unlinked_transfer(seeded_db, row_id, actor="pytest")
+            imp_batches.mark_unlinked_transfer(seeded_db, row_id, actor="pytest")
 
     def test_unknown_order_rejected(self, seeded_db):
         batch = _batch(seeded_db)
         row_id = _first_row_id(seeded_db, batch["id"])
         with pytest.raises(NotFound) as exc:
-            service.assign_mapping(
+            imp_rows.assign_mapping(
                 seeded_db, row_id, order_id=999999, basis="人工核对", actor="pytest"
             )
         assert "订单" in str(exc.value)
@@ -198,7 +200,7 @@ class TestAssignMappingGuards:
         batch = _batch(seeded_db)
         row_id = _first_row_id(seeded_db, batch["id"])
         with pytest.raises(NotFound) as exc:
-            service.assign_mapping(
+            imp_rows.assign_mapping(
                 seeded_db, row_id, account_id=999999, basis="人工核对", actor="pytest"
             )
         assert "账号" in str(exc.value)
@@ -210,22 +212,22 @@ class TestSkipRow:
         batch = _batch(seeded_db)
         row_id = _first_row_id(seeded_db, batch["id"])
         with pytest.raises(Validation) as exc:
-            service.skip_row(seeded_db, row_id, reason="  ", actor="pytest")
+            imp_rows.skip_row(seeded_db, row_id, reason="  ", actor="pytest")
         assert "跳过导入行必须填写理由" in str(exc.value)
 
     def test_row_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.skip_row(seeded_db, 999999, reason="口径不明", actor="pytest")
+            imp_rows.skip_row(seeded_db, 999999, reason="口径不明", actor="pytest")
 
     def test_skip_updates_row_and_unmapped_count(self, seeded_db):
         batch = _batch(seeded_db)
         row_id = _first_row_id(seeded_db, batch["id"])
-        skipped = service.skip_row(
+        skipped = imp_rows.skip_row(
             seeded_db, row_id, reason="口径不明", actor="pytest"
         )
         assert skipped["status"] == ImportRowStatus.SKIPPED.value
         # 刷新未映射计数：跳过行不再计入 unmapped
-        refreshed = service.list_batches(seeded_db)[0]
+        refreshed = imp_batches.list_batches(seeded_db)[0]
         assert refreshed["unmapped_count"] == len(ROWS) - 1
 
     def test_imported_row_cannot_be_skipped_and_skip_is_audited(self, seeded_db):
@@ -238,13 +240,13 @@ class TestSkipRow:
         )
         batch = _batch(seeded_db, rows=[{"订单号": order.order_no}])
         row_id = _first_row_id(seeded_db, batch["id"])
-        service.assign_mapping(
+        imp_rows.assign_mapping(
             seeded_db, row_id, order_id=order.id, basis="订单号一致", actor="pytest"
         )
-        service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        imp_rows.commit_batch(seeded_db, batch["id"], actor="pytest")
 
         with pytest.raises(Validation, match="已导入的导入行不可跳过"):
-            service.skip_row(seeded_db, row_id, reason="再次核对", actor="pytest")
+            imp_rows.skip_row(seeded_db, row_id, reason="再次核对", actor="pytest")
 
         row = seeded_db.get(ImportRow, row_id)
         assert row is not None
@@ -252,7 +254,7 @@ class TestSkipRow:
 
         batch2 = _batch(seeded_db, rows=[{"订单号": "HS-待判断"}])
         row2_id = _first_row_id(seeded_db, batch2["id"])
-        service.skip_row(seeded_db, row2_id, reason="口径不明", actor="pytest")
+        imp_rows.skip_row(seeded_db, row2_id, reason="口径不明", actor="pytest")
         audit = seeded_db.scalar(
             select(AuditLog)
             .where(
@@ -268,7 +270,7 @@ class TestSkipRow:
 class TestCommitGuards:
     def test_batch_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.commit_batch(seeded_db, 999999, actor="pytest")
+            imp_rows.commit_batch(seeded_db, 999999, actor="pytest")
 
     @pytest.mark.parametrize(
         "status",
@@ -286,7 +288,7 @@ class TestCommitGuards:
         seeded_db.flush()
 
         with pytest.raises(Validation, match="只有未确认批次可提交"):
-            service.commit_batch(seeded_db, batch["id"], actor="pytest")
+            imp_rows.commit_batch(seeded_db, batch["id"], actor="pytest")
 
     def test_skipped_rows_are_not_imported(self, seeded_db):
         from app.orders.create import create_order
@@ -296,17 +298,17 @@ class TestCommitGuards:
             seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest"
         )
         batch = _batch(seeded_db)
-        rows = service.list_rows(seeded_db, batch["id"])
-        service.assign_mapping(
+        rows = imp_rows.list_rows(seeded_db, batch["id"])
+        imp_rows.assign_mapping(
             seeded_db, rows[0]["id"], order_id=order.id, basis="订单号一致", actor="pytest"
         )
-        service.skip_row(seeded_db, rows[1]["id"], reason="口径不明", actor="pytest")
+        imp_rows.skip_row(seeded_db, rows[1]["id"], reason="口径不明", actor="pytest")
 
-        result = service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        result = imp_rows.commit_batch(seeded_db, batch["id"], actor="pytest")
         assert (result["imported"], result["unmapped"]) == (1, 0)
         statuses = {
             row["id"]: row["status"]
-            for row in service.list_rows(seeded_db, batch["id"])
+            for row in imp_rows.list_rows(seeded_db, batch["id"])
         }
         assert statuses[rows[0]["id"]] == ImportRowStatus.IMPORTED.value
         # SKIPPED 行保持跳过，不转为未映射
@@ -317,14 +319,14 @@ class TestCommitGuards:
 class TestMarkUnlinkedGuards:
     def test_row_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.mark_unlinked_transfer(seeded_db, 999999, actor="pytest")
+            imp_batches.mark_unlinked_transfer(seeded_db, 999999, actor="pytest")
 
 
 # ------------------------------------------------------------------ 预览守卫
 class TestPreviewGuards:
     def test_batch_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.preview_mapping(seeded_db, 999999)
+            imp_rows.preview_mapping(seeded_db, 999999)
 
     def test_empty_batch_returns_zero_rows(self, seeded_db):
         # create_batch 拒绝空行，空批次只能直插（对账/预览均须容忍零行批次）
@@ -340,7 +342,7 @@ class TestPreviewGuards:
         )
         seeded_db.add(empty)
         seeded_db.flush()
-        preview = service.preview_mapping(seeded_db, empty.id)
+        preview = imp_rows.preview_mapping(seeded_db, empty.id)
         assert preview["total_rows"] == 0
         assert preview["columns"] == []
         # 零行批次走短路分支：不含核心列缺失统计（非空批次才有）
@@ -352,7 +354,7 @@ class TestPreviewGuards:
             seeded_db,
             rows=[{"日期": None, "交易金额": 13888}, {"日期": "", "交易金额": 20000}],
         )
-        preview = service.preview_mapping(seeded_db, batch["id"])
+        preview = imp_rows.preview_mapping(seeded_db, batch["id"])
         assert preview["abnormal"]["empty_value"] == 2
         column = {
             item["source_column"]: item for item in preview["columns"]
@@ -365,7 +367,7 @@ class TestPreviewGuards:
 class TestReconciliationGuards:
     def test_batch_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.reconciliation_report(seeded_db, 999999)
+            imp_rows.reconciliation_report(seeded_db, 999999)
 
     def test_amount_parsing_tolerates_list_and_garbage(self, seeded_db):
         # 480：数组列（如回款账户）跳过；483-484：无法转金额的值跳过而非崩
@@ -376,7 +378,7 @@ class TestReconciliationGuards:
                 {"交易金额": 20000, "本金": 1000, "利润": "3.5"},
             ],
         )
-        report = service.reconciliation_report(seeded_db, batch["id"])
+        report = imp_rows.reconciliation_report(seeded_db, batch["id"])
         assert report["amounts"]["before"]["交易金额"] == "20000.00"
         assert report["amounts"]["before"]["本金"] == "1000.00"
         assert report["amounts"]["before"]["利润"] == "103.50"
@@ -386,18 +388,18 @@ class TestReconciliationGuards:
 class TestRollbackAndCorrectionGuards:
     def test_rollback_batch_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.rollback_batch(seeded_db, 999999, reason="导错", actor="pytest")
+            imp_batches.rollback_batch(seeded_db, 999999, reason="导错", actor="pytest")
 
     def test_correction_batch_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.create_correction_batch(
+            imp_batches.create_correction_batch(
                 seeded_db, 999999, rows=ROWS, reason="少导一行", actor="pytest"
             )
 
     def test_draft_batch_cannot_be_corrected(self, seeded_db):
         batch = _batch(seeded_db)
         with pytest.raises(Validation, match="只有已提交批次可更正"):
-            service.create_correction_batch(
+            imp_batches.create_correction_batch(
                 seeded_db, batch["id"], rows=ROWS, reason="少导一行", actor="pytest"
             )
 
@@ -408,7 +410,7 @@ class TestRollbackAndCorrectionGuards:
         item.status = ImportBatchStatus.REJECTED.value
         seeded_db.flush()
         with pytest.raises(Validation, match="只有未确认批次可回滚"):
-            service.rollback_batch(seeded_db, batch["id"], reason="再次回滚", actor="pytest")
+            imp_batches.rollback_batch(seeded_db, batch["id"], reason="再次回滚", actor="pytest")
 
 
 # ------------------------------------------------------------------ service 内部守卫（MIG-01 守门分支，提升 imports/service.py 覆盖）
@@ -418,11 +420,11 @@ class TestImportServiceInternalGuards:
         # 存在性，但该函数自身仍应独立守卫；直接调用传入不存在的 batch_id
         # 验证其抛 NotFound（保留防御、零源码改动）。
         with pytest.raises(NotFound):
-            service._assert_batch_editable(seeded_db, 999999)
+            imp__shared._assert_batch_editable(seeded_db, 999999)
 
     def test_skip_row_rejects_rolled_back_row(self, seeded_db):
         batch = _batch(seeded_db)
-        rows = service.list_rows(seeded_db, batch["id"])
+        rows = imp_rows.list_rows(seeded_db, batch["id"])
         row_id = rows[0]["id"]
         item = seeded_db.get(ImportRow, row_id)
         assert item is not None
@@ -430,13 +432,13 @@ class TestImportServiceInternalGuards:
         seeded_db.flush()
 
         with pytest.raises(Validation, match="已回滚的导入行不可跳过"):
-            service.skip_row(seeded_db, row_id, reason="口径不明", actor="pytest")
+            imp_rows.skip_row(seeded_db, row_id, reason="口径不明", actor="pytest")
 
     def test_create_correction_rejects_non_object_rows(self, seeded_db):
         batch = _batch(seeded_db)
-        service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        imp_rows.commit_batch(seeded_db, batch["id"], actor="pytest")
         with pytest.raises(Validation, match="每行必须为对象"):
-            service.create_correction_batch(
+            imp_batches.create_correction_batch(
                 seeded_db,
                 batch["id"],
                 rows=[{"日期": "2026/07/14", "交易金额": 1}, "NOT_A_DICT"],
@@ -527,7 +529,7 @@ class TestImportApi:
 
     def test_correction_endpoint(self, seeded_client, seeded_db, headers):
         batch = _batch(seeded_db)
-        service.commit_batch(seeded_db, batch["id"], actor="pytest")
+        imp_rows.commit_batch(seeded_db, batch["id"], actor="pytest")
         response = seeded_client.post(
             f"/api/v1/imports/batches/{batch['id']}/corrections",
             json={"rows": ROWS, "reason": "少导一行"},

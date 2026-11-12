@@ -35,9 +35,9 @@ def mapper():
 
 def _seed_order_rows(session, rows):
     """把订单原始行灌进 import_rows（复用真实落地链路）。"""
-    from app.imports import service as import_service
+    from app.imports import batches as imp_batches
 
-    batch = import_service.create_batch(
+    batch = imp_batches.create_batch(
         session,
         source_name="金山文档·订单",
         rows=rows,

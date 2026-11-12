@@ -20,7 +20,12 @@ from app.core.security import (
 )
 from app.domain.enums import AuditAction
 from app.domain.trade import InstallmentSchedule
-from app.value_added_services import schemas, service
+from app.value_added_services import schemas
+from app.value_added_services import _shared as inst__shared
+from app.value_added_services import create as inst_create
+from app.value_added_services import recovery as inst_recovery
+from app.value_added_services import repayment as inst_repayment
+from app.value_added_services import settlement as inst_settlement
 from app.lists import service as list_columns_service
 from app.lists.export import build_list_csv, csv_file_response, detail_json
 from app.parties.fields import get_extra_values, get_extra_values_bulk
@@ -69,7 +74,7 @@ def list_installments(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> list[schemas.InstallmentOut]:
-    items = service.list_installments(
+    items = inst_create.list_installments(
         db,
         status=status,
         order_id=order_id,
@@ -99,7 +104,7 @@ def installment_totals(
 ) -> schemas.InstallmentTotalsOut:
     """分期台合计：与 `/installments` 同一套筛选条件（含 contract_type），Decimal 聚合，前端不再 reduce。"""
     return schemas.InstallmentTotalsOut.model_validate(
-        service.installment_totals(
+        inst_create.installment_totals(
             db,
             status=status,
             order_id=order_id,
@@ -141,7 +146,7 @@ def export_installments_csv(
             .where(InstallmentSchedule.installment_id == output.id)
             .order_by(InstallmentSchedule.period_no)
         ).all()
-        dispositions = service.list_dispositions(db, output.id, _user)
+        dispositions = inst_recovery.list_dispositions(db, output.id, _user)
         row["installment_note"] = row.get("note")
         row["installment_delivery_mode"] = row.get("delivery_mode")
         row["installment_delivered_on"] = row.get("delivered_on")
@@ -179,7 +184,7 @@ def create_installment(
     db: Session = Depends(get_db),
     user: CurrentUser = manage,
 ) -> schemas.InstallmentOut:
-    item = service.create_installment(
+    item = inst_create.create_installment(
         db,
         order_id=payload.order_id,
         contract_type=payload.contract_type,
@@ -207,7 +212,7 @@ def list_schedules(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> list[schemas.ScheduleOut]:
-    service.get_installment(db, installment_id, _user)
+    inst__shared.get_installment(db, installment_id, _user)
     rows = db.scalars(
         select(InstallmentSchedule)
         .where(InstallmentSchedule.installment_id == installment_id)
@@ -227,7 +232,7 @@ def waive_schedule(
     db: Session = Depends(get_db),
     user: CurrentUser = default_manage,
 ) -> schemas.ScheduleOut:
-    item = service.waive_schedule(
+    item = inst_repayment.waive_schedule(
         db,
         installment_id,
         period_no=period_no,
@@ -252,7 +257,7 @@ def extend_schedule(
     db: Session = Depends(get_db),
     user: CurrentUser = default_manage,
 ) -> schemas.ScheduleOut:
-    item = service.extend_schedule(
+    item = inst_repayment.extend_schedule(
         db,
         installment_id,
         period_no=period_no,
@@ -274,7 +279,7 @@ def pay_installment(
     db: Session = Depends(get_db),
     user: CurrentUser = post_payment,
 ) -> schemas.PaymentResult:
-    installment, schedule = service.pay(
+    installment, schedule = inst_repayment.pay(
         db,
         installment_id,
         amount=payload.amount,
@@ -302,7 +307,7 @@ def cancel_installment(
     db: Session = Depends(get_db),
     user: CurrentUser = post_payment,
 ) -> schemas.InstallmentCancelResult:
-    result = service.cancel_installment(
+    result = inst_repayment.cancel_installment(
         db,
         installment_id,
         cancelled_on=payload.cancelled_on,
@@ -330,7 +335,7 @@ def settle_early_installment(
     db: Session = Depends(get_db),
     user: CurrentUser = post_payment,
 ) -> schemas.InstallmentOut:
-    item = service.settle_early(
+    item = inst_settlement.settle_early(
         db,
         installment_id,
         paid_on=payload.paid_on,
@@ -352,7 +357,7 @@ def default_installment(
     db: Session = Depends(get_db),
     user: CurrentUser = default_manage,
 ) -> schemas.InstallmentOut:
-    item = service.mark_default(
+    item = inst_settlement.mark_default(
         db,
         installment_id,
         actor=_actor(user),
@@ -373,7 +378,7 @@ def recover_installment_account(
     db: Session = Depends(get_db),
     user: CurrentUser = default_manage,
 ) -> schemas.DispositionOut:
-    item = service.recover_account(
+    item = inst_recovery.recover_account(
         db,
         installment_id,
         occurred_on=payload.occurred_on,
@@ -396,7 +401,7 @@ def list_installment_dispositions(
 ) -> list[schemas.DispositionOut]:
     return [
         schemas.DispositionOut.model_validate(item)
-        for item in service.list_dispositions(db, installment_id, user)
+        for item in inst_recovery.list_dispositions(db, installment_id, user)
     ]
 
 
@@ -410,7 +415,7 @@ def resale_installment_account(
     db: Session = Depends(get_db),
     user: CurrentUser = default_manage,
 ) -> schemas.DispositionOut:
-    item = service.record_sale(
+    item = inst_recovery.record_sale(
         db,
         installment_id,
         sale_order_id=payload.resale_order_id,
@@ -432,7 +437,7 @@ def deliver_installment(
     db: Session = Depends(get_db),
     user: CurrentUser = post_delivery,
 ) -> schemas.InstallmentOut:
-    item = service.deliver(
+    item = inst_recovery.deliver(
         db,
         installment_id,
         delivery_mode=payload.delivery_mode,
@@ -458,7 +463,7 @@ def mark_overdue(
     user: CurrentUser = post_delivery,
 ) -> schemas.MarkOverdueOut:
     return schemas.MarkOverdueOut(
-        marked=service.mark_overdue(db, as_of=as_of, actor=_actor(user), user=user)
+        marked=inst_recovery.mark_overdue(db, as_of=as_of, actor=_actor(user), user=user)
     )
 
 

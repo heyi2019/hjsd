@@ -28,7 +28,7 @@ from app.domain.enums import (
     OrderStatus,
 )
 from app.stocks.profile import create_account
-from app.value_added_services import service as installments_service
+from app.value_added_services import create as inst_create
 from app.finance.rebates import create_rebate
 from app.parties.counterparties import create_counterparty
 from app.parties.customers import create_customer, set_customer_status
@@ -2015,7 +2015,7 @@ class TestOrdersApi:
             collected_on=D,
             actor="pytest",
         )
-        installment = installments_service.create_installment(
+        installment = inst_create.create_installment(
             seeded_db,
             order_id=order.id,
             contract_type="STOCK_SALE",

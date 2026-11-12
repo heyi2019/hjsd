@@ -17,7 +17,9 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import PolicyScopeType, PolicyStatus
 from app.domain.parties import PolicyDefinition
 from app.orders.create import create_order
-from app.policy import service as policy_service
+from app.policy import allocations as policy_allocations
+from app.policy import definitions as policy_definitions
+from app.policy import versions as policy_versions
 
 D = date(2026, 10, 4)
 
@@ -43,14 +45,14 @@ def json_headers(headers):
 
 
 def _make_policy(seeded_db, *, code="REBATE", name="返点规则") -> dict:
-    return policy_service.create_definition(
+    return policy_definitions.create_definition(
         seeded_db, policy_code=code, name=name, scope_type="GLOBAL",
         description="测试用规则", actor="pytest",
     )
 
 
 def _publish(seeded_db, definition, *, frm, to=None, config=None, approve=True):
-    version = policy_service.create_version(
+    version = policy_versions.create_version(
         seeded_db, definition["id"], effective_from=frm, effective_to=to,
         config=config or {"rate": "5"}, actor="pytest",
     )
@@ -112,27 +114,27 @@ class TestPolicyDefinitions:
         item.status = PolicyStatus.ACTIVE.value
         seeded_db.commit()
 
-        all_items = policy_service.list_definitions(seeded_db)
+        all_items = policy_definitions.list_definitions(seeded_db)
         assert {i["policy_code"] for i in all_items} >= {"REBATE", "COMMISSION"}
 
-        by_status = policy_service.list_definitions(
+        by_status = policy_definitions.list_definitions(
             seeded_db, status=PolicyStatus.ACTIVE.value
         )
         assert [i["policy_code"] for i in by_status] == ["REBATE"]
 
-        by_code = policy_service.list_definitions(
+        by_code = policy_definitions.list_definitions(
             seeded_db, policy_code=PolicyStatus.ACTIVE.value and "commission"
         )
         assert [i["policy_code"] for i in by_code] == ["COMMISSION"]
 
     def test_get_definition_notfound(self, seeded_db):
         with pytest.raises(NotFound) as exc:
-            policy_service.get_definition(seeded_db, 999999)
+            policy_definitions.get_definition(seeded_db, 999999)
         assert "不存在" in str(exc.value)
 
     def test_create_definition_empty_name(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            policy_service.create_definition(
+            policy_definitions.create_definition(
                 seeded_db, policy_code="X", name="  ", scope_type="GLOBAL",
                 actor="pytest",
             )
@@ -140,17 +142,17 @@ class TestPolicyDefinitions:
 
     def test_definition_and_approval_text_inputs_are_business_errors(self, seeded_db):
         with pytest.raises(Validation, match="policy_code 不能为空"):
-            policy_service.create_definition(
+            policy_definitions.create_definition(
                 seeded_db, policy_code=123, name="规则", scope_type="GLOBAL",
                 actor="pytest",
             )
         with pytest.raises(Validation, match="name 不能为空"):
-            policy_service.create_definition(
+            policy_definitions.create_definition(
                 seeded_db, policy_code="TEXT_NAME", name=123, scope_type="GLOBAL",
                 actor="pytest",
             )
         with pytest.raises(Validation, match="scope_type 非法"):
-            policy_service.create_definition(
+            policy_definitions.create_definition(
                 seeded_db, policy_code="TEXT_SCOPE", name="规则", scope_type=123,
                 actor="pytest",
             )
@@ -158,7 +160,7 @@ class TestPolicyDefinitions:
 
     def test_create_definition_requires_positive_scoped_id(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            policy_service.create_definition(
+            policy_definitions.create_definition(
                 seeded_db,
                 policy_code="SCOPED",
                 name="范围规则",
@@ -173,11 +175,11 @@ class TestPolicyDefinitions:
 class TestPolicyVersions:
     def test_resolve_inputs_are_strictly_typed(self, seeded_db):
         with pytest.raises(Validation, match="policy_code 不能为空"):
-            policy_service.resolve_version(
+            policy_versions.resolve_version(
                 seeded_db, policy_code=123, on=D
             )
         with pytest.raises(Validation, match="scope_type 非法"):
-            policy_service.resolve_version(
+            policy_versions.resolve_version(
                 seeded_db, policy_code="REBATE", on=D, scope_type=123
             )
 
@@ -186,7 +188,7 @@ class TestPolicyVersions:
         version = _publish(seeded_db, definition, frm=date(2026, 1, 1))
         # 排除自身后不再重叠（覆盖 exclude_version_id 分支）
         assert (
-            policy_service._overlaps(
+            policy_versions._overlaps(
                 seeded_db, definition["id"], date(2026, 6, 1), None,
                 exclude_version_id=version["id"],
             )
@@ -194,7 +196,7 @@ class TestPolicyVersions:
         )
         # 不排除则命中
         assert (
-            policy_service._overlaps(
+            policy_versions._overlaps(
                 seeded_db, definition["id"], date(2026, 6, 1), None
             )
             is not None
@@ -202,45 +204,45 @@ class TestPolicyVersions:
 
     def test_list_versions_notfound_and_status_filter(self, seeded_db):
         with pytest.raises(NotFound):
-            policy_service.list_versions(seeded_db, 999999)
+            policy_versions.list_versions(seeded_db, 999999)
 
         definition = _make_policy(seeded_db)
         # 创建即发布：版本均为 ACTIVE（已删除 DRAFT 草稿态）
-        v1 = policy_service.create_version(
+        v1 = policy_versions.create_version(
             seeded_db, definition["id"], effective_from=date(2026, 1, 1),
             effective_to=date(2026, 12, 31), config={"rate": "5"}, actor="pytest",
         )
-        v2 = policy_service.create_version(
+        v2 = policy_versions.create_version(
             seeded_db, definition["id"], effective_from=date(2027, 1, 1),
             config={"rate": "6"}, actor="pytest",
         )
         assert v1["status"] == PolicyStatus.ACTIVE.value
         assert v2["status"] == PolicyStatus.ACTIVE.value
 
-        only_active = policy_service.list_versions(
+        only_active = policy_versions.list_versions(
             seeded_db, definition["id"], status=PolicyStatus.ACTIVE.value
         )
         assert {v["id"] for v in only_active} == {v1["id"], v2["id"]}
-        only_draft = policy_service.list_versions(
+        only_draft = policy_versions.list_versions(
             seeded_db, definition["id"], status=PolicyStatus.DRAFT.value
         )
         assert only_draft == []
 
     def test_create_version_notfound_and_empty_config(self, seeded_db):
         with pytest.raises(NotFound):
-            policy_service.create_version(
+            policy_versions.create_version(
                 seeded_db, 999999, effective_from=D, config={"rate": "5"},
                 actor="pytest",
             )
         definition = _make_policy(seeded_db)
         with pytest.raises(Validation) as exc:
-            policy_service.create_version(
+            policy_versions.create_version(
                 seeded_db, definition["id"], effective_from=D, config={},
                 actor="pytest",
             )
         assert "参数不能为空" in str(exc.value)
         with pytest.raises(Validation) as exc:
-            policy_service.create_version(
+            policy_versions.create_version(
                 seeded_db, definition["id"], effective_from=D, config=["rate"],
                 actor="pytest",
             )
@@ -248,17 +250,17 @@ class TestPolicyVersions:
 
     def test_update_version_draft_rejects_published_version(self, seeded_db):
         with pytest.raises(NotFound):
-            policy_service.update_version_draft(
+            policy_versions.update_version_draft(
                 seeded_db, 999999, config={"rate": "5"}
             )
         definition = _make_policy(seeded_db)
-        version = policy_service.create_version(
+        version = policy_versions.create_version(
             seeded_db, definition["id"], effective_from=D,
             config={"rate": "5"}, actor="pytest",
         )
         # 创建即发布（ACTIVE）：已发布版本不可改，只能新建版本封口
         with pytest.raises(Validation) as exc:
-            policy_service.update_version_draft(seeded_db, version["id"], config={"rate": "6"})
+            policy_versions.update_version_draft(seeded_db, version["id"], config={"rate": "6"})
         assert "不可修改" in str(exc.value)
 
 
@@ -269,7 +271,7 @@ class TestSnapshotAndAllocations:
         plain = create_order(
             seeded_db, order_type="HS", trade_date=D, actor="pytest"
         )
-        assert policy_service.snapshot_for(seeded_db, plain.id) is None
+        assert policy_versions.snapshot_for(seeded_db, plain.id) is None
 
         # 发布 REBATE 规则后再建单：快照固化
         definition = _make_policy(seeded_db)
@@ -277,14 +279,14 @@ class TestSnapshotAndAllocations:
         snapshotted = create_order(
             seeded_db, order_type="HS", trade_date=D, actor="pytest"
         )
-        snapshot = policy_service.snapshot_for(seeded_db, snapshotted.id)
+        snapshot = policy_versions.snapshot_for(seeded_db, snapshotted.id)
         assert snapshot is not None
         assert snapshot["policy_version_id"] == snapshotted.policy_version_id
         assert "REBATE" in snapshot["policy_snapshot"]
 
     def test_set_allocations_notfound_and_bad_rate(self, seeded_db):
         with pytest.raises(NotFound):
-            policy_service.set_allocations(
+            policy_allocations.set_allocations(
                 seeded_db, 999999,
                 items=[{"user_id": 1, "role": "SALES", "allocation_rate": 100}],
                 actor="pytest",
@@ -293,7 +295,7 @@ class TestSnapshotAndAllocations:
             seeded_db, order_type="HS", trade_date=D, actor="pytest"
         )
         with pytest.raises(Validation) as exc:
-            policy_service.set_allocations(
+            policy_allocations.set_allocations(
                 seeded_db, order.id,
                 items=[{"user_id": 1, "role": "SALES", "allocation_rate": "abc"}],
                 actor="pytest",
@@ -327,7 +329,7 @@ class TestPolicyApi:
 
     def test_patch_version_endpoint_rejects_published(self, seeded_client, seeded_db, json_headers):
         definition = _make_policy(seeded_db)
-        version = policy_service.create_version(
+        version = policy_versions.create_version(
             seeded_db, definition["id"], effective_from=D,
             config={"rate": "5"}, actor="pytest",
         )

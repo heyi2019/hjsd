@@ -35,7 +35,7 @@ from app.domain.foundation import Pool
 from app.domain.trade import Account, OrderEvent
 from app.foundation.order_types import resolve_default_pool
 from app.domain.options import OptionSet
-from app.value_added_services import service as installments_service
+from app.value_added_services import create as inst_create
 from app.lists import service as list_columns_service
 from app.lists.export import (
     EXPORT_ROW_LIMIT,
@@ -726,7 +726,7 @@ def create_order(
         user=user,
     )
     if payload.installment is not None:
-        installments_service.create_installment(
+        inst_create.create_installment(
             db,
             order_id=order.id,
             contract_type=payload.installment.contract_type,

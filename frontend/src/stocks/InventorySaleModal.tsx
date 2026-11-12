@@ -326,8 +326,3 @@ export function PickupSaleModal(props: SaleWrapperProps) {
 export function ConsignmentSaleModal(props: SaleWrapperProps) {
   return <InventorySaleModalBase {...props} inventoryType="CONSIGNMENT" title="售出代挂账号" buyerInfoTitle="委托方信息" />;
 }
-
-/** 兼容默认导出：行为等同原统一售出表单（标题/角色从 account.inventory_type 推断）。 */
-export function InventorySaleModal(props: InventorySaleModalProps) {
-  return <InventorySaleModalBase {...props} />;
-}

@@ -31,7 +31,11 @@ from app.domain.enums import (
 from app.domain.foundation import AuditLog
 from app.domain.trade import Account, Cashflow, Installment, InstallmentDisposition, InstallmentSchedule, Order, OrderEvent
 from app.domain.users import User
-from app.value_added_services import service as installment_service
+from app.value_added_services import _shared as inst__shared
+from app.value_added_services import create as inst_create
+from app.value_added_services import recovery as inst_recovery
+from app.value_added_services import repayment as inst_repayment
+from app.value_added_services import settlement as inst_settlement
 from app.value_added_services import router as installments_router
 from app.value_added_services import schemas
 from app.orders.create import create_order
@@ -86,7 +90,7 @@ def _contract(
 ) -> Installment:
     if principal is None:
         principal = str(Decimal(down_payment) + Decimal(per_period) * periods)
-    return installment_service.create_installment(
+    return inst_create.create_installment(
         seeded_db,
         order_id=order_id,
         contract_type=contract_type,
@@ -156,12 +160,12 @@ class TestCreateInstallmentValidation:
             first_due_on=PAST,
         )
 
-        marked = installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        marked = inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
         assert marked == 1
         seeded_db.refresh(contract)
         assert contract.status == InstallmentStatus.OVERDUE.value
 
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db,
             contract.id,
             amount=Decimal("100"),
@@ -173,19 +177,19 @@ class TestCreateInstallmentValidation:
         assert contract.status == InstallmentStatus.SETTLED.value
 
     def test_installment_sale_binds_buyer_and_seller_across_orders(self, seeded_db):
-        from app.policy import service as policy_service
+        from app.policy import allocations as policy_allocations
         from app.orders.events import post_event
         account = _account(seeded_db, "inst-sale-actors")
         purchase = _order(seeded_db, order_type="HS", account_id=account.id)
         post_event(seeded_db, purchase.id, event_type="BUY", amount="800", occurred_on=TODAY, actor="seeduser1")
         sale = _order(seeded_db, order_type="HS", account_id=account.id)
         items = [{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 25} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")]
-        policy_service.set_allocations(seeded_db, sale.id, items=items)
-        installment_service.create_installment(seeded_db, order_id=sale.id, contract_type="STOCK_SALE", principal="1000", down_payment="100", periods=1, per_period="900", first_due_on=TODAY, actor="seeduser2")
-        allocation = {x["allocation_type"]: x for x in policy_service.list_allocations(seeded_db, sale.id)}
+        policy_allocations.set_allocations(seeded_db, sale.id, items=items)
+        inst_create.create_installment(seeded_db, order_id=sale.id, contract_type="STOCK_SALE", principal="1000", down_payment="100", periods=1, per_period="900", first_due_on=TODAY, actor="seeduser2")
+        allocation = {x["allocation_type"]: x for x in policy_allocations.list_allocations(seeded_db, sale.id)}
         assert allocation["BUY"]["user_id"] == 1
         assert allocation["SELL"]["user_id"] == 2
-        allocation = {x["allocation_type"]: x for x in policy_service.set_allocations(seeded_db, sale.id, items=items)}
+        allocation = {x["allocation_type"]: x for x in policy_allocations.set_allocations(seeded_db, sale.id, items=items)}
         assert allocation["SELL"]["user_id"] == 2
 
     def test_stock_sale_contract_records_account_operator(self, seeded_db):
@@ -193,7 +197,7 @@ class TestCreateInstallmentValidation:
         order = _order(seeded_db, order_type="HS", account_id=account.id)
         _buy(seeded_db, order.id, amount="800")
 
-        contract = installment_service.create_installment(
+        contract = inst_create.create_installment(
             seeded_db,
             order_id=order.id,
             contract_type=InstallmentContractType.STOCK_SALE.value,
@@ -445,7 +449,7 @@ class TestCreateInstallmentValidation:
 class TestGetAndListInstallments:
     def test_get_installment_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            installment_service.get_installment(seeded_db, 999999)
+            inst__shared.get_installment(seeded_db, 999999)
 
     def test_list_filters_by_status_and_order(self, seeded_db):
         order_a = _order(seeded_db)
@@ -453,12 +457,12 @@ class TestGetAndListInstallments:
         contract_a = _contract(seeded_db, order_a.id)
         contract_b = _contract(seeded_db, order_b.id)
 
-        by_status = installment_service.list_installments(
+        by_status = inst_create.list_installments(
             seeded_db, status=InstallmentStatus.PENDING.value
         )
         assert {c.id for c in by_status} == {contract_a.id, contract_b.id}
 
-        by_order = installment_service.list_installments(seeded_db, order_id=order_b.id)
+        by_order = inst_create.list_installments(seeded_db, order_id=order_b.id)
         assert [c.id for c in by_order] == [contract_b.id]
         assert contract_a.id not in [c.id for c in by_order]
 
@@ -476,7 +480,7 @@ def test_cancel_stock_installment_refunds_payments_and_returns_account(seeded_db
         periods=1,
         per_period="900",
     )
-    installment_service.pay(
+    inst_repayment.pay(
         seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="pytest"
     )
     payment = seeded_db.scalar(
@@ -487,7 +491,7 @@ def test_cancel_stock_installment_refunds_payments_and_returns_account(seeded_db
     )
     assert payment is not None
 
-    result = installment_service.cancel_installment(
+    result = inst_repayment.cancel_installment(
         seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
     )
 
@@ -537,7 +541,7 @@ def test_cancel_distribution_installment_uses_business_specific_account_result(
         per_period="100",
     )
 
-    installment_service.cancel_installment(
+    inst_repayment.cancel_installment(
         seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="取消分期"
     )
 
@@ -547,7 +551,7 @@ def test_cancel_distribution_installment_uses_business_specific_account_result(
 def test_installment_payment_is_cashflow_only(seeded_db):
     order = _order(seeded_db)
     contract = _contract(seeded_db, order.id, down_payment="0", periods=1, per_period="100", principal="100")
-    installment_service.pay(
+    inst_repayment.pay(
         seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=1, actor="pytest"
     )
     payment_flow = seeded_db.scalar(
@@ -568,10 +572,10 @@ def test_installment_scope_follows_order_owner(seeded_db):
     own_contract = _contract(seeded_db, own_order.id)
     other_contract = _contract(seeded_db, other_order.id)
 
-    visible = installment_service.list_installments(seeded_db, user=scoped_user)
+    visible = inst_create.list_installments(seeded_db, user=scoped_user)
     assert [item.id for item in visible] == [own_contract.id]
     with pytest.raises(NotFound):
-        installment_service.get_installment(seeded_db, other_contract.id, scoped_user)
+        inst__shared.get_installment(seeded_db, other_contract.id, scoped_user)
 
 # ------------------------------------------------------------------ 收款守卫
 class TestPayGuards:
@@ -581,7 +585,7 @@ class TestPayGuards:
             seeded_db, order.id, down_payment="100", periods=1, per_period="300"
         )
         with pytest.raises(NotFound):
-            installment_service.pay(
+            inst_repayment.pay(
                 seeded_db,
                 contract.id,
                 amount=Decimal("100"),
@@ -608,7 +612,7 @@ class TestPayGuards:
     def test_payment_updates_contract_operator(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id)
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db,
             contract.id,
             amount=Decimal("100"),
@@ -629,7 +633,7 @@ class TestPayGuards:
             principal="100",
         )
 
-        installment_service.waive_schedule(
+        inst_repayment.waive_schedule(
             seeded_db,
             contract.id,
             period_no=1,
@@ -640,7 +644,7 @@ class TestPayGuards:
         )
 
         assert contract.status == InstallmentStatus.SETTLED.value
-        installment_service.deliver(
+        inst_recovery.deliver(
             seeded_db,
             contract.id,
             delivery_mode="CUSTOMER_SELF",
@@ -654,7 +658,7 @@ class TestPayGuards:
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id)
         with pytest.raises(Validation, match="必须大于 0"):
-            installment_service.pay(
+            inst_repayment.pay(
                 seeded_db,
                 contract.id,
                 amount=Decimal("0"),
@@ -667,11 +671,11 @@ class TestPayGuards:
         contract = _contract(
             seeded_db, order.id, down_payment="100", periods=1, per_period="500"
         )
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=1, actor="pytest",
         )
@@ -679,12 +683,12 @@ class TestPayGuards:
 
     def test_pay_on_delivered_contract_conflicts(self, seeded_db):
         order, contract = self._settled_dg(seeded_db, "paid-delivered")
-        installment_service.deliver(
+        inst_recovery.deliver(
             seeded_db, contract.id, delivery_mode=DeliveryMode.PLATFORM_OPERATOR.value,
             delivered_on=TODAY, note="平台操作换绑凭证", actor="pytest",
         )
         with pytest.raises(Conflict) as exc:
-            installment_service.pay(
+            inst_repayment.pay(
                 seeded_db, contract.id, amount=Decimal("1"), paid_on=TODAY,
                 actor="pytest",
             )
@@ -694,7 +698,7 @@ class TestPayGuards:
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id, periods=1)
         with pytest.raises(NotFound) as exc:
-            installment_service.pay(
+            inst_repayment.pay(
                 seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
                 period_no=99, actor="pytest",
             )
@@ -706,13 +710,13 @@ class TestPayGuards:
             seeded_db, order.id, down_payment="100", periods=2, per_period="300"
         )
         # 未指定期次：按到期日顺序取第一笔未收满 → 期次 0（首付）
-        _, first = installment_service.pay(
+        _, first = inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             actor="pytest",
         )
         assert first.period_no == 0
         # 期次 0 收满后自动落到期次 1
-        _, second = installment_service.pay(
+        _, second = inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("50"), paid_on=TODAY,
             actor="pytest",
         )
@@ -724,7 +728,7 @@ class TestPayGuards:
         # 直调私有函数覆盖"所有期次已收满"防御分支
         _, contract = self._settled_dg(seeded_db, "allpaid")
         with pytest.raises(Validation) as exc:
-            installment_service._pick_schedule(seeded_db, contract, None, TODAY)
+            inst_repayment._pick_schedule(seeded_db, contract, None, TODAY)
         assert "所有期次已收满" in str(exc.value)
 
 # ------------------------------------------------------------------ 交付守卫
@@ -734,11 +738,11 @@ class TestDeliverGuards:
         contract = _contract(
             seeded_db, order.id, down_payment="100", periods=1, per_period="500"
         )
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=1, actor="pytest",
         )
@@ -747,7 +751,7 @@ class TestDeliverGuards:
     def test_deliver_invalid_mode_rejected(self, seeded_db):
         contract = self._settled(seeded_db, "bad-mode")
         with pytest.raises(Validation) as exc:
-            installment_service.deliver(
+            inst_recovery.deliver(
                 seeded_db, contract.id, delivery_mode="BOGUS",
                 delivered_on=TODAY, note="凭证", actor="pytest",
             )
@@ -755,7 +759,7 @@ class TestDeliverGuards:
 
     def test_delivery_updates_contract_operator(self, seeded_db):
         contract = self._settled(seeded_db, "delivery-operator")
-        installment_service.deliver(
+        inst_recovery.deliver(
             seeded_db,
             contract.id,
             delivery_mode=DeliveryMode.CUSTOMER_SELF.value,
@@ -768,7 +772,7 @@ class TestDeliverGuards:
     def test_deliver_requires_note(self, seeded_db):
         contract = self._settled(seeded_db, "no-note")
         with pytest.raises(Validation) as exc:
-            installment_service.deliver(
+            inst_recovery.deliver(
                 seeded_db, contract.id,
                 delivery_mode=DeliveryMode.CUSTOMER_SELF.value,
                 delivered_on=TODAY, note="", actor="pytest",
@@ -788,7 +792,7 @@ class TestMarkOverdue:
             first_due_on=PAST,
         )
 
-        installment_service.mark_overdue(seeded_db, as_of=TODAY, actor="risk")
+        inst_recovery.mark_overdue(seeded_db, as_of=TODAY, actor="risk")
 
         assert contract.updated_by == "risk"
 
@@ -805,7 +809,7 @@ class TestMarkOverdue:
         contract.status = InstallmentStatus.CANCELLED.value
         seeded_db.flush()
 
-        marked = installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        marked = inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
 
         assert marked == 0
         schedules = seeded_db.scalars(
@@ -826,7 +830,7 @@ class TestMarkOverdue:
             first_due_on=PAST,
         )
 
-        marked = installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        marked = inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
 
         assert marked == 1  # 零首付期无需逾期，第 1 期进入逾期
         refreshed = seeded_db.get(Installment, contract.id)
@@ -839,11 +843,11 @@ class TestMarkOverdue:
             first_due_on=PAST,
         )
         # 收过首付 → 合约 ACTIVE（区别于 PENDING 分支）
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
-        marked = installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        marked = inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
         assert marked == 1  # 期次 0 已收满不标记；期次 1 到期未收
         refreshed = seeded_db.get(Installment, contract.id)
         assert refreshed.status == InstallmentStatus.OVERDUE.value
@@ -875,7 +879,7 @@ class TestMarkOverdue:
             periods=2,
             per_period="300",
         )
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db,
             contract.id,
             amount=Decimal("100"),
@@ -884,7 +888,7 @@ class TestMarkOverdue:
             actor="pytest",
         )
 
-        settled = installment_service.settle_early(
+        settled = inst_settlement.settle_early(
             seeded_db, contract.id, paid_on=TODAY, actor="pytest"
         )
 
@@ -911,7 +915,7 @@ class TestMarkOverdue:
             per_period="300",
             first_due_on=PAST,
         )
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db,
             contract.id,
             amount=Decimal("100"),
@@ -919,9 +923,9 @@ class TestMarkOverdue:
             period_no=0,
             actor="pytest",
         )
-        installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
 
-        defaulted = installment_service.mark_default(
+        defaulted = inst_settlement.mark_default(
             seeded_db, contract.id, actor="risk", reason="逾期未还"
         )
 
@@ -947,7 +951,7 @@ class TestMarkOverdue:
         with pytest.raises(Validation, match="逾期"):
             other_order = _order(seeded_db)
             other_contract = _contract(seeded_db, other_order.id)
-            installment_service.mark_default(
+            inst_settlement.mark_default(
                 seeded_db, other_contract.id, actor="risk", reason="未逾期"
             )
 
@@ -961,12 +965,12 @@ class TestMarkOverdue:
             per_period="300",
             first_due_on=PAST,
         )
-        installment_service.mark_overdue(seeded_db, as_of=TODAY)
-        installment_service.mark_default(
+        inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
+        inst_settlement.mark_default(
             seeded_db, contract.id, actor="risk", reason="逾期未还"
         )
 
-        paid, _schedule = installment_service.pay(
+        paid, _schedule = inst_repayment.pay(
             seeded_db,
             contract.id,
             amount=Decimal("300"),
@@ -981,9 +985,9 @@ class TestMarkOverdue:
     def test_installment_action_reasons_require_text_values(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id, first_due_on=PAST)
-        installment_service.mark_overdue(seeded_db, as_of=TODAY)
+        inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
         with pytest.raises(Validation, match="违约处置必须填写原因"):
-            installment_service.mark_default(
+            inst_settlement.mark_default(
                 seeded_db, contract.id, actor="risk", reason=123
             )
 
@@ -995,7 +999,7 @@ class TestMarkOverdue:
             seeded_db, order.id, down_payment="100", periods=1, per_period="300"
         )
 
-        schedule = installment_service.waive_schedule(
+        schedule = inst_repayment.waive_schedule(
             seeded_db,
             contract.id,
             period_no=1,
@@ -1010,9 +1014,9 @@ class TestMarkOverdue:
         assert schedule.due_amount == Decimal("300.00")
         assert schedule.waived_amount == Decimal("300.00")
         assert contract.waived_amount == Decimal("300.00")
-        assert installment_service.total_receivable(contract) == Decimal("100.00")
+        assert inst__shared.total_receivable(contract) == Decimal("100.00")
         with pytest.raises(Validation, match="超过剩余应收"):
-            installment_service.pay(
+            inst_repayment.pay(
                 seeded_db, contract.id, amount=Decimal("301"), paid_on=TODAY,
                 period_no=1, actor="pytest",
             )
@@ -1020,12 +1024,12 @@ class TestMarkOverdue:
     def test_waive_received_schedule_is_rejected(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id, periods=1, per_period="300")
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
         with pytest.raises(Validation, match="已收期"):
-            installment_service.waive_schedule(
+            inst_repayment.waive_schedule(
                 seeded_db,
                 contract.id,
                 period_no=0,
@@ -1051,7 +1055,7 @@ class TestMarkOverdue:
         assert schedule is not None
         original_due_on = schedule.due_on
 
-        extended = installment_service.extend_schedule(
+        extended = inst_repayment.extend_schedule(
             seeded_db,
             contract.id,
             period_no=1,
@@ -1121,11 +1125,11 @@ class TestInstallmentsApi:
         contract = _contract(
             seeded_db, order.id, down_payment="100", periods=1, per_period="500"
         )
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
-        installment_service.pay(
+        inst_repayment.pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=1, actor="pytest",
         )
@@ -1340,8 +1344,8 @@ class TestInstallmentsApi:
             principal="1000", down_payment="100", periods=1,
             per_period="900", first_due_on=PAST,
         )
-        installment_service.mark_overdue(seeded_db, as_of=TODAY)
-        recovered = installment_service.recover_account(
+        inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
+        recovered = inst_recovery.recover_account(
             seeded_db, contract.id, occurred_on=TODAY,
             actor="recovery-operator", note="客户逾期回收",
         )
@@ -1369,8 +1373,8 @@ class TestInstallmentsApi:
             per_period="900",
             first_due_on=PAST,
         )
-        installment_service.mark_overdue(seeded_db, as_of=TODAY)
-        installment_service.recover_account(
+        inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
+        inst_recovery.recover_account(
             seeded_db,
             contract.id,
             occurred_on=TODAY,
@@ -1418,8 +1422,8 @@ class TestInstallmentsApi:
             principal="1000", down_payment="100", periods=1,
             per_period="900", first_due_on=PAST,
         )
-        installment_service.mark_overdue(seeded_db, as_of=TODAY)
-        installment_service.recover_account(
+        inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
+        inst_recovery.recover_account(
             seeded_db, contract.id, occurred_on=TODAY,
             actor="recovery-operator", note="客户逾期回收",
         )
@@ -1446,7 +1450,7 @@ class TestInstallmentsApi:
             )
         ) is not None
 
-        history = installment_service.list_dispositions(seeded_db, contract.id)
+        history = inst_recovery.list_dispositions(seeded_db, contract.id)
         assert [item.action for item in history] == ["RECOVER", "RESELL"]
 
     @pytest.mark.parametrize(
@@ -1481,8 +1485,8 @@ class TestInstallmentsApi:
             per_period="900",
             first_due_on=PAST,
         )
-        installment_service.mark_overdue(seeded_db, as_of=TODAY)
-        installment_service.recover_account(
+        inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
+        inst_recovery.recover_account(
             seeded_db,
             contract.id,
             occurred_on=TODAY,
@@ -1516,9 +1520,9 @@ def test_final_period_absorbs_rounding_difference(seeded_db):
     contract = _contract(seeded_db, order.id, principal="1000", down_payment="0", periods=3, per_period="333.34", adjust_final_period=True)
     schedules = seeded_db.scalars(select(InstallmentSchedule).where(InstallmentSchedule.installment_id == contract.id).order_by(InstallmentSchedule.period_no)).all()
     assert [item.due_amount for item in schedules] == [Decimal("0"), Decimal("333.34"), Decimal("333.34"), Decimal("333.32")]
-    assert installment_service.total_receivable(contract) == Decimal("1000.00")
+    assert inst__shared.total_receivable(contract) == Decimal("1000.00")
     for number, amount in [(1, "333.34"), (2, "333.34"), (3, "333.32")]:
-        installment_service.pay(seeded_db, contract.id, amount=amount, paid_on=TODAY, period_no=number, actor="pytest")
+        inst_repayment.pay(seeded_db, contract.id, amount=amount, paid_on=TODAY, period_no=number, actor="pytest")
     assert contract.status == InstallmentStatus.SETTLED.value
     assert contract.paid_amount == Decimal("1000.00")
 

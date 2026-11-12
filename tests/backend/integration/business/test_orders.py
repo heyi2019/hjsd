@@ -12,7 +12,9 @@ from app.core.errors import ErrorCode, NotFound, Validation
 from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
-from app.value_added_services import service as installment_service
+from app.value_added_services import create as inst_create
+from app.value_added_services import recovery as inst_recovery
+from app.value_added_services import repayment as inst_repayment
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.parties.counterparties import create_counterparty
@@ -71,7 +73,7 @@ def _settled_hs_installment(seeded_db):
         seeded_db, order.id, event_type="BUY", amount=Decimal("500"),
         occurred_on=TODAY, actor="pytest",
     )
-    contract = installment_service.create_installment(
+    contract = inst_create.create_installment(
         seeded_db,
         order_id=order.id,
         contract_type="STOCK_SALE",
@@ -82,11 +84,11 @@ def _settled_hs_installment(seeded_db):
         first_due_on=TODAY,
         actor="pytest",
     )
-    installment_service.pay(
+    inst_repayment.pay(
         seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
         period_no=0, actor="pytest",
     )
-    installment_service.pay(
+    inst_repayment.pay(
         seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
         period_no=1, actor="pytest",
     )
@@ -257,7 +259,7 @@ class TestA01HsStock:
 
     def test_duplicate_posting_not_allowed_for_completed_order(self, seeded_db):
         order = _settled_hs_installment(seeded_db)
-        installment_service.deliver(
+        inst_recovery.deliver(
             seeded_db,
             seeded_db.scalar(
                 select(Installment).where(Installment.order_id == order.id)
@@ -559,7 +561,7 @@ class TestEventRules:
             select(Installment).where(Installment.order_id == order.id)
         )
         assert contract is not None
-        installment_service.deliver(
+        inst_recovery.deliver(
             seeded_db,
             contract.id,
             delivery_mode="CUSTOMER_SELF",

@@ -21,15 +21,17 @@ from app.domain.enums import (
 )
 from app.domain.trade import Cashflow, Deposit
 from app.finance.deposits import cancel_deposit, create_deposit, return_deposit
-from app.imports import service as imports_service
-from app.policy import service as policy_service
+from app.imports import batches as imp_batches
+from app.imports import rows as imp_rows
+from app.policy import definitions as policy_definitions
+from app.policy import versions as policy_versions
 
 
 # ── 1. Policy SUPERSEDED：草稿取消 ───────────────────────────────
 
 
 def _make_def(seeded_db, code: str) -> dict:
-    return policy_service.create_definition(
+    return policy_definitions.create_definition(
         seeded_db,
         policy_code=code,
         name=f"{code} 规则",
@@ -41,7 +43,7 @@ def _make_def(seeded_db, code: str) -> dict:
 
 def test_supersede_rejects_published_version(seeded_db):
     definition = _make_def(seeded_db, "SUP-TEST")
-    version = policy_service.create_version(
+    version = policy_versions.create_version(
         seeded_db,
         definition["id"],
         effective_from=date(2027, 1, 1),
@@ -54,7 +56,7 @@ def test_supersede_rejects_published_version(seeded_db):
     from app.core.errors import Validation
 
     with pytest.raises(Validation):
-        policy_service.supersede_draft_version(
+        policy_versions.supersede_draft_version(
             seeded_db,
             version["id"],
             actor="pytest",
@@ -64,7 +66,7 @@ def test_supersede_rejects_published_version(seeded_db):
 
 def test_supersede_rejects_active_version(seeded_db):
     definition = _make_def(seeded_db, "SUP-ACT")
-    version = policy_service.create_version(
+    version = policy_versions.create_version(
         seeded_db,
         definition["id"],
         effective_from=date(2027, 1, 1),
@@ -76,14 +78,14 @@ def test_supersede_rejects_active_version(seeded_db):
     from app.core.errors import Validation
 
     with pytest.raises(Validation):
-        policy_service.supersede_draft_version(
+        policy_versions.supersede_draft_version(
             seeded_db, version["id"], actor="pytest", reason="不该成功"
         )
 
 
 def test_supersede_requires_reason(seeded_db):
     definition = _make_def(seeded_db, "SUP-REASON")
-    version = policy_service.create_version(
+    version = policy_versions.create_version(
         seeded_db,
         definition["id"],
         effective_from=date(2027, 1, 1),
@@ -95,7 +97,7 @@ def test_supersede_requires_reason(seeded_db):
     from app.core.errors import Validation
 
     with pytest.raises(Validation):
-        policy_service.supersede_draft_version(
+        policy_versions.supersede_draft_version(
             seeded_db, version["id"], actor="pytest", reason=""
         )
 
@@ -105,7 +107,7 @@ def test_supersede_requires_reason(seeded_db):
 
 def test_expire_sweep_marks_lapsed_versions(seeded_db):
     definition = _make_def(seeded_db, "EXP-TEST")
-    lapsed = policy_service.create_version(
+    lapsed = policy_versions.create_version(
         seeded_db,
         definition["id"],
         effective_from=date(2026, 1, 1),
@@ -113,7 +115,7 @@ def test_expire_sweep_marks_lapsed_versions(seeded_db):
         config={"rate": "10"},
         actor="pytest",
     )
-    live = policy_service.create_version(
+    live = policy_versions.create_version(
         seeded_db,
         definition["id"],
         effective_from=date(2027, 1, 1),
@@ -122,7 +124,7 @@ def test_expire_sweep_marks_lapsed_versions(seeded_db):
         actor="pytest",
     )
 
-    out = policy_service.expire_lapsed_versions(seeded_db, on=date(2027, 1, 1), actor="pytest")
+    out = policy_versions.expire_lapsed_versions(seeded_db, on=date(2027, 1, 1), actor="pytest")
     assert out["swept"] == 1
     assert lapsed["id"] in out["version_ids"]
     assert live["id"] not in out["version_ids"]
@@ -136,7 +138,7 @@ def test_expire_sweep_marks_lapsed_versions(seeded_db):
 
 def test_expire_sweep_idempotent(seeded_db):
     definition = _make_def(seeded_db, "EXP-IDEM")
-    policy_service.create_version(
+    policy_versions.create_version(
         seeded_db,
         definition["id"],
         effective_from=date(2026, 1, 1),
@@ -144,8 +146,8 @@ def test_expire_sweep_idempotent(seeded_db):
         config={"rate": "10"},
         actor="pytest",
     )
-    first = policy_service.expire_lapsed_versions(seeded_db, on=date(2026, 7, 1), actor="pytest")
-    second = policy_service.expire_lapsed_versions(seeded_db, on=date(2026, 7, 1), actor="pytest")
+    first = policy_versions.expire_lapsed_versions(seeded_db, on=date(2026, 7, 1), actor="pytest")
+    second = policy_versions.expire_lapsed_versions(seeded_db, on=date(2026, 7, 1), actor="pytest")
     assert first["swept"] == 1
     assert second["swept"] == 0
 
@@ -227,7 +229,7 @@ def test_cancel_returned_deposit_rejected(seeded_db):
 
 
 def _make_batch(seeded_db, *, code: str) -> dict:
-    return imports_service.create_batch(
+    return imp_batches.create_batch(
         seeded_db,
         source_name=f"驳回测试 {code}",
         rows=[{"order_no": "X1", "amount": "10"}],
@@ -237,7 +239,7 @@ def _make_batch(seeded_db, *, code: str) -> dict:
 
 def test_reject_uncommitted_batch(seeded_db):
     batch = _make_batch(seeded_db, code="r1")
-    out = imports_service.reject_batch(
+    out = imp_batches.reject_batch(
         seeded_db, batch["id"], reason="源文件口径错误", actor="pytest"
     )
     assert out["status"] == ImportBatchStatus.REJECTED.value
@@ -245,21 +247,21 @@ def test_reject_uncommitted_batch(seeded_db):
 
 def test_reject_committed_batch_rejected(seeded_db):
     batch = _make_batch(seeded_db, code="r2")
-    imports_service.commit_batch(seeded_db, batch["id"], actor="pytest")
+    imp_rows.commit_batch(seeded_db, batch["id"], actor="pytest")
     import pytest
     from app.core.errors import Validation
 
     with pytest.raises(Validation):
-        imports_service.reject_batch(
+        imp_batches.reject_batch(
             seeded_db, batch["id"], reason="已确认不可驳回", actor="pytest"
         )
 
 
 def test_reject_twice_rejected(seeded_db):
     batch = _make_batch(seeded_db, code="r3")
-    imports_service.reject_batch(seeded_db, batch["id"], reason="首次驳回", actor="pytest")
+    imp_batches.reject_batch(seeded_db, batch["id"], reason="首次驳回", actor="pytest")
     import pytest
     from app.core.errors import Validation
 
     with pytest.raises(Validation):
-        imports_service.reject_batch(seeded_db, batch["id"], reason="重复驳回", actor="pytest")
+        imp_batches.reject_batch(seeded_db, batch["id"], reason="重复驳回", actor="pytest")

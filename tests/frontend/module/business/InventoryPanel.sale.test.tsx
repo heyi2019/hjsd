@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
-import { InventorySaleModal, RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/stocks/InventorySaleModal";
+import { RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/stocks/InventorySaleModal";
 
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
 import { installmentsApi } from "@/shared/api/installments.api";
@@ -132,7 +132,7 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
     customer: { id: 8, customer_no: "C0008", display_name: "新买家", status: "ACTIVE" },
     duplicate_candidates: [],
   });
-  renderLight(<InventorySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+  renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
 
   expect(await screen.findByText("买家信息")).toBeInTheDocument();
   expect(screen.getByText("资金流水")).toBeInTheDocument();
@@ -390,7 +390,7 @@ describe("库存售出三表单分支", () => {
       { id: 1, username: "admin", display_name: "管理员", is_active: true },
     ] as never);
     renderLight(
-      <InventorySaleModal
+      <RecoverySaleModal
         account={{ id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", game_account: "acc-1", status: "WAITING", inventory_type: "RECOVERY" } as never}
         onClose={() => undefined}
         onCreated={() => undefined}

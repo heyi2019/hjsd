@@ -13,7 +13,7 @@ from app.core.security import CurrentUser
 from app.foundation.order_types import get_order_type_by_code
 from app.orders.form_fields import validate_form_extra
 from app.parties.fields import set_extra_values
-from app.policy import service as policy_service
+from app.policy import versions as policy_versions
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import Validation
@@ -187,7 +187,7 @@ def _shift_accounting_dates(
         snapshot: dict[str, Any] = {}
         primary_version_id: int | None = None
         for code in (PolicyType.REBATE.value, PolicyType.COMMISSION.value):
-            version_id, snap = policy_service.make_snapshot(
+            version_id, snap = policy_versions.make_snapshot(
                 session,
                 policy_code=code,
                 on=new_trade_date,

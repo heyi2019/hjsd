@@ -15,7 +15,7 @@ from decimal import Decimal
 
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.value_added_services import service as installment_service
+from app.value_added_services import create as inst_create
 
 D1 = date(2026, 9, 1)
 D2 = date(2026, 10, 15)
@@ -48,7 +48,7 @@ def _contract(seeded_db, *, trade_date: date, paid: str = "0", down: str = "200.
         order = create_order(
             seeded_db, order_type="TH", trade_date=trade_date, actor="pytest"
         )
-    contract = installment_service.create_installment(
+    contract = inst_create.create_installment(
         seeded_db,
         order_id=order.id,
         contract_type=contract_type,

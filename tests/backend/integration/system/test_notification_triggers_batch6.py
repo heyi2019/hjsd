@@ -20,7 +20,7 @@ from app.domain.users import User
 from app.notifications import triggers
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy import service as policy_service
+from app.policy import allocations as policy_allocations
 
 TODAY = date(2026, 10, 4)
 TODAY2 = date(2026, 10, 18)
@@ -82,7 +82,7 @@ def _sell(seeded_db, order: Order, *, operator_ids=None, actor: str = "seeduser1
 
 
 def _set_person_allocations(seeded_db, order: Order, items: list[dict]) -> None:
-    policy_service.set_allocations(seeded_db, order.id, items=items, actor="pytest")
+    policy_allocations.set_allocations(seeded_db, order.id, items=items, actor="pytest")
 
 
 def _notifs(seeded_db, recipient_id: int, ntype: str) -> list[Notification]:

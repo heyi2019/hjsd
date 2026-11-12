@@ -30,7 +30,7 @@ from app.domain.trade import (
     OrderEvent,
     Reconciliation,
 )
-from app.value_added_services import service as installments_service
+from app.value_added_services import create as inst_create
 from app.quality import issues
 from app.quality import service as quality_service
 
@@ -107,7 +107,7 @@ def _dg_with_overdue_installment(seeded_db, *, order_no: str, owner_id: int):
         owner_id=owner_id,
         account_id=None,
     )
-    inst = installments_service.create_installment(
+    inst = inst_create.create_installment(
         seeded_db,
         order_id=order.id,
         contract_type="PICKUP_SALE",

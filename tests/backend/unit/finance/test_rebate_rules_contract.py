@@ -8,7 +8,8 @@ from app.finance.rebates import create_rebate
 from app.stocks.profile import create_account
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy import service as policy_service
+from app.policy import definitions as policy_definitions
+from app.policy import versions as policy_versions
 
 
 D = date(2026, 10, 17)
@@ -43,14 +44,14 @@ def _order_with_buy(seeded_db) -> int:
 
 
 def test_rebate_uses_active_rule_rate_when_rate_is_omitted(seeded_db):
-    definition = policy_service.create_definition(
+    definition = policy_definitions.create_definition(
         seeded_db,
         policy_code="REBATE",
         name="返点规则",
         scope_type="GLOBAL",
         actor="pytest",
     )
-    policy_service.create_version(
+    policy_versions.create_version(
         seeded_db,
         definition["id"],
         effective_from=D,

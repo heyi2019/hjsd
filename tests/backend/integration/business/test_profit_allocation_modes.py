@@ -23,7 +23,8 @@ from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy import service as policy_service
+from app.policy import allocations as policy_allocations
+from app.policy import definitions as policy_definitions
 from app.reporting.r3_commission import r3_commission_reconciliation
 
 D = date(2026, 10, 17)
@@ -61,7 +62,7 @@ def test_person_mode_allows_same_user_in_two_roles(seeded_db):
     """同一人可担任多个角色（对齐 DB 唯一约束 uq_order_profit_alloc），但同角色不可重复。"""
     order_id = _order_with_profit(seeded_db)
 
-    rows = policy_service.set_allocations(
+    rows = policy_allocations.set_allocations(
         seeded_db,
         order_id,
         items=[
@@ -73,7 +74,7 @@ def test_person_mode_allows_same_user_in_two_roles(seeded_db):
     assert [row["role"] for row in rows] == ["SALES", "SERVICE"]
 
     with pytest.raises(Validation, match="同一角色下不可重复分润"):
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db,
             order_id,
             items=[
@@ -87,7 +88,7 @@ def test_person_mode_accepts_one_name_with_full_rate(seeded_db):
     """按人模式不再强制四项：一个人拿 100% 是合法的。"""
     order_id = _order_with_profit(seeded_db)
 
-    rows = policy_service.set_allocations(
+    rows = policy_allocations.set_allocations(
         seeded_db,
         order_id,
         items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "100"}],
@@ -103,7 +104,7 @@ def test_person_mode_rate_must_total_one_hundred_without_amount(seeded_db):
     order_id = _order_with_profit(seeded_db)
 
     with pytest.raises(Validation):
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db,
             order_id,
             items=[
@@ -117,7 +118,7 @@ def test_person_mode_accepts_amount_only(seeded_db):
     """按金额分润：金额落库，比例保持 0，合计校验改为金额口径。"""
     order_id = _order_with_profit(seeded_db)
 
-    rows = policy_service.set_allocations(
+    rows = policy_allocations.set_allocations(
         seeded_db,
         order_id,
         items=[
@@ -135,7 +136,7 @@ def test_person_mode_rejects_rate_and_amount_on_the_same_row(seeded_db):
     order_id = _order_with_profit(seeded_db)
 
     with pytest.raises(Validation):
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db,
             order_id,
             items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "10", "allocation_amount": "100"}],
@@ -147,7 +148,7 @@ def test_person_mode_amount_cannot_exceed_order_profit(seeded_db):
     order_id = _order_with_profit(seeded_db, buy="1000", sell="1500")
 
     with pytest.raises(Validation):
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db,
             order_id,
             items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "600"}],
@@ -161,7 +162,7 @@ def test_person_mode_amount_requires_positive_profit(seeded_db):
     )
 
     with pytest.raises(Validation):
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db, order.id, items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "100"}]
         )
 
@@ -170,7 +171,7 @@ def test_person_mode_rejects_duplicate_people(seeded_db):
     order_id = _order_with_profit(seeded_db)
 
     with pytest.raises(Validation):
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db,
             order_id,
             items=[
@@ -184,7 +185,7 @@ def test_person_mode_company_row_has_no_user(seeded_db):
     """姓名可为空表示公司归属，但最多一行。"""
     order_id = _order_with_profit(seeded_db)
 
-    rows = policy_service.set_allocations(
+    rows = policy_allocations.set_allocations(
         seeded_db,
         order_id,
         items=[
@@ -208,7 +209,7 @@ def test_person_allocation_writes_dedicated_audit_action(seeded_db):
     """分润审计单独成动作：不再混进 EXCEPTION_APPROVE（否则审计页按异常审批筛会串味）。"""
     order_id = _order_with_profit(seeded_db)
 
-    policy_service.set_allocations(
+    policy_allocations.set_allocations(
         seeded_db,
         order_id,
         items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "100"}],
@@ -222,7 +223,7 @@ def test_person_allocation_writes_dedicated_audit_action(seeded_db):
 
 def test_policy_definition_creation_audits_as_policy_change(seeded_db):
     """政策定义/版本属「变更经营规则」，不是「审批异常」。"""
-    definition = policy_service.create_definition(
+    definition = policy_definitions.create_definition(
         seeded_db,
         policy_code="AUDIT_PROBE",
         name="审计动作探针",
@@ -238,7 +239,7 @@ def test_policy_definition_creation_audits_as_policy_change(seeded_db):
 def test_commission_report_uses_amount_as_payable_base(seeded_db):
     """报表口径：填金额时直接取金额作为应付基数，不再乘利润比例。"""
     order_id = _order_with_profit(seeded_db, buy="1000", sell="1500")
-    policy_service.set_allocations(
+    policy_allocations.set_allocations(
         seeded_db,
         order_id,
         items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "120"}],
@@ -259,7 +260,7 @@ def test_person_mode_allows_negative_amount_on_loss_order(seeded_db):
     """亏损单（利润 -500）填 -300：落库为负，报表 profit_base 也取 -300。"""
     order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
 
-    rows = policy_service.set_allocations(
+    rows = policy_allocations.set_allocations(
         seeded_db,
         order_id,
         items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "-300"}],
@@ -278,7 +279,7 @@ def test_person_mode_rejects_positive_amount_on_loss_order(seeded_db):
     order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
 
     with pytest.raises(Validation):
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db,
             order_id,
             items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "300"}],
@@ -290,7 +291,7 @@ def test_person_mode_rejects_over_shared_loss(seeded_db):
     order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
 
     with pytest.raises(Validation):
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db,
             order_id,
             items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "-600"}],
@@ -302,7 +303,7 @@ def test_person_mode_rejects_negative_amount_on_profit_order(seeded_db):
     order_id = _order_with_profit(seeded_db, buy="1000", sell="1500")
 
     with pytest.raises(Validation):
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db,
             order_id,
             items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "-300"}],

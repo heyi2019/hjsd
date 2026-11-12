@@ -49,7 +49,10 @@ from app.domain.enums import (
     ScheduleStatus,
 )
 from app.domain.trade import Cashflow, InstallmentSchedule, OrderEvent
-from app.value_added_services import service as installment_service
+from app.value_added_services import create as inst_create
+from app.value_added_services import recovery as inst_recovery
+from app.value_added_services import repayment as inst_repayment
+from app.value_added_services import settlement as inst_settlement
 from app.orders.create import create_order
 from app.orders.events import post_event
 
@@ -107,7 +110,7 @@ def _contract(
 ):
     if principal is None:
         principal = str(Decimal(down_payment) + Decimal(per_period) * periods)
-    return installment_service.create_installment(
+    return inst_create.create_installment(
         seeded_db,
         order_id=order_id,
         contract_type=contract_type,
@@ -158,7 +161,7 @@ def test_installment_sale_posts_sell_attribute_without_sale_cashflow(seeded_db):
     assert contract.order_id == order.id
     assert order.status == "INSTALLMENT"
 
-    installment_service.pay(
+    inst_repayment.pay(
         seeded_db,
         contract.id,
         amount=Decimal("100.00"),
@@ -265,7 +268,7 @@ def test_cancel_rejects_closed_contract(seeded_db):
     contract.status = InstallmentStatus.CLOSED.value
     seeded_db.flush()
     with pytest.raises(Conflict, match="不能取消"):
-        installment_service.cancel_installment(
+        inst_repayment.cancel_installment(
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
         )  # 661-672
 
@@ -276,7 +279,7 @@ def test_cancel_rejects_settled_contract(seeded_db):
     contract.status = InstallmentStatus.SETTLED.value
     seeded_db.flush()
     with pytest.raises(Conflict, match="不能取消"):
-        installment_service.cancel_installment(
+        inst_repayment.cancel_installment(
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
         )
 
@@ -286,7 +289,7 @@ def test_cancel_rejects_non_active_order(seeded_db):
     order.status = "CANCELLED"
     seeded_db.flush()
     with pytest.raises(Conflict, match="不能取消分期"):
-        installment_service.cancel_installment(
+        inst_repayment.cancel_installment(
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
         )  # 674-682
 
@@ -294,8 +297,8 @@ def test_cancel_reverses_direct_installment_cashflows(seeded_db):
     """取消分期只冲销分期收入资金明细，不创建 CANCEL 订单事件。"""
     order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id, principal="1000", down_payment="100", periods=1, per_period="900")
-    installment_service.pay(seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="pytest")
-    result = installment_service.cancel_installment(
+    inst_repayment.pay(seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="pytest")
+    result = inst_repayment.cancel_installment(
         seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="客户取消"
     )
     assert result["refund_amount"] == Decimal("100.00")
@@ -313,7 +316,7 @@ def test_waive_rejects_missing_period(seeded_db):
     order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     with pytest.raises(NotFound, match="期次 99 不存在"):
-        installment_service.waive_schedule(
+        inst_repayment.waive_schedule(
             seeded_db,
             contract.id,
             period_no=99,
@@ -335,7 +338,7 @@ def test_waive_rejects_completed_period(seeded_db):
     schedule.status = ScheduleStatus.PAID.value
     seeded_db.flush()
     with pytest.raises(Validation, match="已完成期次不可减免"):
-        installment_service.waive_schedule(
+        inst_repayment.waive_schedule(
             seeded_db,
             contract.id,
             period_no=1,
@@ -349,7 +352,7 @@ def test_waive_rejects_amount_over_outstanding(seeded_db):
     order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id, per_period="300")
     with pytest.raises(Validation, match="减免金额超过未收金额"):
-        installment_service.waive_schedule(
+        inst_repayment.waive_schedule(
             seeded_db,
             contract.id,
             period_no=1,
@@ -364,7 +367,7 @@ def test_extend_rejects_missing_period(seeded_db):
     order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id)
     with pytest.raises(NotFound, match="期次 99 不存在"):
-        installment_service.extend_schedule(
+        inst_repayment.extend_schedule(
             seeded_db,
             contract.id,
             period_no=99,
@@ -385,7 +388,7 @@ def test_extend_rejects_received_period(seeded_db):
     schedule.received_amount = Decimal("1")
     seeded_db.flush()
     with pytest.raises(Validation, match="已收期不可展期"):
-        installment_service.extend_schedule(
+        inst_repayment.extend_schedule(
             seeded_db,
             contract.id,
             period_no=1,
@@ -406,7 +409,7 @@ def test_extend_rejects_completed_period(seeded_db):
     schedule.status = ScheduleStatus.WAIVED.value
     seeded_db.flush()
     with pytest.raises(Validation, match="已完成期次不可展期"):
-        installment_service.extend_schedule(
+        inst_repayment.extend_schedule(
             seeded_db,
             contract.id,
             period_no=1,
@@ -419,7 +422,7 @@ def test_extend_rejects_earlier_due_on(seeded_db):
     order = _order(seeded_db, order_type="TH")
     contract = _contract(seeded_db, order.id, first_due_on=FUTURE)
     with pytest.raises(Validation, match="展期后的到期日必须晚于原到期日"):
-        installment_service.extend_schedule(
+        inst_repayment.extend_schedule(
             seeded_db,
             contract.id,
             period_no=1,
@@ -439,7 +442,7 @@ def test_extend_resets_overdue_period_to_pending(seeded_db):
     )
     schedule.status = ScheduleStatus.OVERDUE.value
     seeded_db.flush()
-    updated = installment_service.extend_schedule(
+    updated = inst_repayment.extend_schedule(
         seeded_db,
         contract.id,
         period_no=1,
@@ -457,7 +460,7 @@ def test_settle_early_rejects_settled_contract(seeded_db):
     contract.status = InstallmentStatus.SETTLED.value
     seeded_db.flush()
     with pytest.raises(Conflict, match="不可提前结清"):
-        installment_service.settle_early(
+        inst_settlement.settle_early(
             seeded_db, contract.id, paid_on=TODAY, actor="pytest"
         )  # 947-956
 
@@ -472,7 +475,7 @@ def test_settle_early_rejects_when_nothing_outstanding(seeded_db):
         row.received_amount = row.due_amount
     seeded_db.flush()
     with pytest.raises(Validation, match="合约没有剩余应收"):
-        installment_service.settle_early(
+        inst_settlement.settle_early(
             seeded_db, contract.id, paid_on=TODAY, actor="pytest"
         )  # 957-967
 
@@ -485,7 +488,7 @@ def test_recover_rejects_contract_not_overdue(seeded_db):
         InstallmentStatus.ACTIVE.value,
     }
     with pytest.raises(Validation, match="只有逾期或违约合约可以回收账号"):
-        installment_service.recover_account(
+        inst_recovery.recover_account(
             seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
         )  # 1054-1058
 
@@ -504,20 +507,20 @@ def test_recover_rejects_order_without_account(seeded_db):
     contract.status = InstallmentStatus.OVERDUE.value
     seeded_db.flush()
     with pytest.raises(Validation, match="分期合约没有可回收的账号"):
-        installment_service.recover_account(
+        inst_recovery.recover_account(
             seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
         )  # 1062-1065
 
 def test_recover_rejects_duplicate_recovery(seeded_db):
     order, contract = _pickup_overdue(seeded_db, "recover-dup-account")
-    installment_service.recover_account(
+    inst_recovery.recover_account(
         seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
     )
     seeded_db.refresh(contract)
     contract.status = InstallmentStatus.OVERDUE.value  # 回到可回收状态再登记一次
     seeded_db.flush()
     with pytest.raises(Conflict, match="该分期合约已登记回收"):
-        installment_service.recover_account(
+        inst_recovery.recover_account(
             seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
         )  # 1069-1076
 
@@ -525,7 +528,7 @@ def test_recover_rejects_duplicate_recovery(seeded_db):
 def _recovered(seeded_db, game_account: str):
     """返回 (order, contract)：已完成账号回收、合约 CLOSED。"""
     order, contract = _pickup_overdue(seeded_db, game_account)
-    installment_service.recover_account(
+    inst_recovery.recover_account(
         seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
     )
     seeded_db.refresh(order)
@@ -544,7 +547,7 @@ def test_record_sale_requires_note(seeded_db):
     order, contract = _recovered(seeded_db, "resale-need-note")
     sale = _sale_order(seeded_db, order.account_id)
     with pytest.raises(Validation, match="出售必须填写说明"):
-        installment_service.record_sale(
+        inst_recovery.record_sale(
             seeded_db,
             contract.id,
             sale_order_id=sale.id,
@@ -558,7 +561,7 @@ def test_record_sale_rejects_contract_not_closable(seeded_db):
     contract = _contract(seeded_db, order.id)
     sale = _order(seeded_db, order_type="HS")
     with pytest.raises(Validation, match="只有已关闭、逾期或违约合约可以登记出售"):
-        installment_service.record_sale(
+        inst_recovery.record_sale(
             seeded_db,
             contract.id,
             sale_order_id=sale.id,
@@ -574,7 +577,7 @@ def test_record_sale_rejects_order_without_account(seeded_db):
     seeded_db.flush()
     sale = _order(seeded_db, order_type="HS")
     with pytest.raises(Validation, match="分期合约没有可出售的账号"):
-        installment_service.record_sale(
+        inst_recovery.record_sale(
             seeded_db,
             contract.id,
             sale_order_id=sale.id,
@@ -586,7 +589,7 @@ def test_record_sale_rejects_order_without_account(seeded_db):
 def test_record_sale_rejects_unknown_sale_order(seeded_db):
     order, contract = _recovered(seeded_db, "resale-unknown-order")
     with pytest.raises(Validation, match="出售必须关联新的售出订单"):
-        installment_service.record_sale(
+        inst_recovery.record_sale(
             seeded_db,
             contract.id,
             sale_order_id=999999,
@@ -598,7 +601,7 @@ def test_record_sale_rejects_unknown_sale_order(seeded_db):
 def test_record_sale_rejects_same_order(seeded_db):
     order, contract = _recovered(seeded_db, "resale-same-order")
     with pytest.raises(Validation, match="出售必须关联新的售出订单"):
-        installment_service.record_sale(
+        inst_recovery.record_sale(
             seeded_db,
             contract.id,
             sale_order_id=order.id,
@@ -612,7 +615,7 @@ def test_record_sale_rejects_different_account(seeded_db):
     other = _account(seeded_db, "resale-other-account")
     sale = _sale_order(seeded_db, other.id)
     with pytest.raises(Validation, match="出售订单必须关联同一个账号"):
-        installment_service.record_sale(
+        inst_recovery.record_sale(
             seeded_db,
             contract.id,
             sale_order_id=sale.id,
@@ -637,7 +640,7 @@ def test_record_sale_requires_prior_recovery(seeded_db):
     seeded_db.flush()
     sale = _sale_order(seeded_db, order.account_id)
     with pytest.raises(Validation, match="出售前必须先登记回收"):
-        installment_service.record_sale(
+        inst_recovery.record_sale(
             seeded_db,
             contract.id,
             sale_order_id=sale.id,
@@ -650,7 +653,7 @@ def test_record_sale_requires_posted_sell(seeded_db):
     order, contract = _recovered(seeded_db, "resale-no-sell")
     sale = _sale_order(seeded_db, order.account_id, with_sell=False)
     with pytest.raises(Validation, match="出售订单必须先登记 SELL 事件"):
-        installment_service.record_sale(
+        inst_recovery.record_sale(
             seeded_db,
             contract.id,
             sale_order_id=sale.id,
@@ -662,7 +665,7 @@ def test_record_sale_requires_posted_sell(seeded_db):
 def test_record_sale_rejects_duplicate(seeded_db):
     order, contract = _recovered(seeded_db, "resale-duplicate")
     sale = _sale_order(seeded_db, order.account_id)
-    installment_service.record_sale(
+    inst_recovery.record_sale(
         seeded_db,
         contract.id,
         sale_order_id=sale.id,
@@ -671,7 +674,7 @@ def test_record_sale_rejects_duplicate(seeded_db):
         note="出售",
     )
     with pytest.raises(Conflict, match="该分期合约已登记出售"):
-        installment_service.record_sale(
+        inst_recovery.record_sale(
             seeded_db,
             contract.id,
             sale_order_id=sale.id,
@@ -683,7 +686,7 @@ def test_record_sale_rejects_duplicate(seeded_db):
 def test_record_sale_success(seeded_db):
     order, contract = _recovered(seeded_db, "resale-success")
     sale = _sale_order(seeded_db, order.account_id)
-    disposition = installment_service.record_sale(
+    disposition = inst_recovery.record_sale(
         seeded_db,
         contract.id,
         sale_order_id=sale.id,
@@ -751,7 +754,7 @@ def test_cancel_rejects_dangling_order(seeded_db):
         (contract.id,),
     )
     with pytest.raises(NotFound, match="分期合约所属订单不存在"):
-        installment_service.cancel_installment(
+        inst_repayment.cancel_installment(
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="脏数据"
         )
 
@@ -768,7 +771,7 @@ def test_cancel_rejects_dangling_account(seeded_db):
     seeded_db.flush()
     _raw_sql(seeded_db, "UPDATE orders SET account_id = 999739 WHERE id = ?", (order.id,))
     with pytest.raises(NotFound, match="分期合约关联账号不存在"):
-        installment_service.cancel_installment(
+        inst_repayment.cancel_installment(
             seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="脏数据"
         )
 
@@ -881,7 +884,7 @@ def test_settle_early_filters_settled_rows_but_keeps_one_cent(seeded_db):
         ).all()
 
     before = {flow.id for flow in _payments()}
-    result = installment_service.settle_early(
+    result = inst_settlement.settle_early(
         seeded_db, contract.id, paid_on=TODAY, actor="pytest", pool_id=1
     )
     assert result.id == contract.id
@@ -898,7 +901,7 @@ def test_recover_rejects_dangling_order(seeded_db):
         (contract.id,),
     )
     with pytest.raises(Validation, match="分期合约没有所属订单"):
-        installment_service.recover_account(
+        inst_recovery.recover_account(
             seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="脏数据"
         )
 
@@ -916,9 +919,10 @@ def test_recover_rejects_dangling_account(seeded_db):
     seeded_db.flush()
     _raw_sql(seeded_db, "UPDATE orders SET account_id = 999168 WHERE id = ?", (order.id,))
     with pytest.raises(NotFound, match="分期合约关联账号不存在"):
-        installment_service.recover_account(
+        inst_recovery.recover_account(
             seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="脏数据"
         )
 
 def test_record_sale_is_the_only_installment_resale_entrypoint():
-    assert not hasattr(installment_service, "record_resale")
+    # record_sale 归属 recovery 模块；确认不存在旧别名 record_resale。
+    assert not hasattr(inst_recovery, "record_resale")

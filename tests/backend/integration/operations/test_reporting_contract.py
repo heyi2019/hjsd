@@ -27,7 +27,7 @@ from app.domain.trade import RebateRecord
 from app.finance.cashflows import create_cashflow
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy import service as policy_service
+from app.policy import allocations as policy_allocations
 from app.reporting.export import finance_dimension_report
 from app.reporting.profit import order_profit_detail
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
@@ -264,7 +264,7 @@ class TestR3Commission:
             seeded_db, order.id, event_type="SELL", amount="1300.00",
             occurred_on=D, actor="seeduser7",
         )
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db,
             order.id,
             items=[
@@ -298,7 +298,7 @@ class TestR3Commission:
             seeded_db, order.id, event_type="SELL", amount="1300.00",
             occurred_on=D, actor="seeduser1",
         )
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db,
             order.id,
             items=[
@@ -331,7 +331,7 @@ class TestR3Commission:
             seeded_db, order.id, event_type="SELL", amount="1300.00",
             occurred_on=D, actor="seeduser1",
         )
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db, order.id,
             items=[{"allocation_type": kind, "user_id": 7 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 100 if kind == "OPERATION" else 0} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
             actor="pytest",
@@ -359,7 +359,7 @@ class TestR3Commission:
             occurred_on=D, actor="seeduser1",
         )
         completed.status = OrderStatus.COMPLETED.value
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db, completed.id,
             items=[{"allocation_type": kind, "user_id": 7 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 100 if kind == "OPERATION" else 0} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
             actor="pytest",
@@ -401,7 +401,7 @@ class TestR3Commission:
             seeded_db, order.id, event_type="SELL", amount="1300.00",
             occurred_on=D, actor="pytest",
         )
-        policy_service.set_allocations(
+        policy_allocations.set_allocations(
             seeded_db, order.id,
             items=[
                 {"user_id": 7, "role": "OWNER", "allocation_rate": 50},

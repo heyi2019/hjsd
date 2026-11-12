@@ -51,7 +51,7 @@ from app.foundation.pools import (
 from app.foundation.sequences import list_sequences as foundation_list_sequences
 from app.parties.fields import get_extra_values_bulk
 
-from .router_output import _actor, _order_type_output, _pool_output
+from .router_output import _actor, _order_type_output, _pool_output, _route_out
 
 router = APIRouter(tags=["BAS-02/03 业务与资金主数据"])
 
@@ -275,19 +275,7 @@ def list_routes(
 ) -> list[schemas.RouteOut]:
     del user
     routes = foundation_list_routes(db, order_type_id=order_type_id)
-    return [
-        schemas.RouteOut(
-            id=route.id,
-            order_type_code=route.order_type.code,
-            portion=route.portion,
-            fund_nature=route.fund_nature,
-            pool_code=route.pool.code,
-            pool_name=route.pool.name,
-            priority=route.priority,
-            is_active=route.is_active,
-        )
-        for route in routes
-    ]
+    return [_route_out(route) for route in routes]
 
 
 @router.post("/order-types/{code}/routes", response_model=schemas.RouteOut, status_code=201)
@@ -306,16 +294,7 @@ def set_route(
         actor=_actor(user),
         priority=payload.priority,
     )
-    return schemas.RouteOut(
-        id=route.id,
-        order_type_code=route.order_type.code,
-        portion=route.portion,
-        fund_nature=route.fund_nature,
-        pool_code=route.pool.code,
-        pool_name=route.pool.name,
-        priority=route.priority,
-        is_active=route.is_active,
-    )
+    return _route_out(route)
 
 
 @router.get(

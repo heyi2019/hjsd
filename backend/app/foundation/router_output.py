@@ -28,3 +28,16 @@ def _order_type_output(order_type) -> schemas.OrderTypeOut:
         payload.business_type = classification["business_type"]
         payload.value_added_service = classification["value_added_service"]
     return payload
+
+
+def _route_out(route) -> schemas.RouteOut:
+    return schemas.RouteOut(
+        id=route.id,
+        order_type_code=route.order_type.code,
+        portion=route.portion,
+        fund_nature=route.fund_nature,
+        pool_code=route.pool.code,
+        pool_name=route.pool.name,
+        priority=route.priority,
+        is_active=route.is_active,
+    )

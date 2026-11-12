@@ -628,9 +628,15 @@ def operator_headers() -> dict[str, str]:
 # 设计边界：本钩子只读/追加文件，任何异常都吞掉，绝不阻断正常测试运行。
 # ---------------------------------------------------------------------------
 import json as _json  # noqa: E402
-import subprocess as _sp  # noqa: E402
 from datetime import datetime as _dt  # noqa: E402
 from pathlib import Path as _Path  # noqa: E402
+
+# 与 backend/scripts 两个结果记录脚本共用同一份 HEAD 读取实现；该目录不在
+# pytest 默认 sys.path 中，追加到末尾即可，不抢占既有 import 优先级。
+_SCRIPTS_DIR = str(BACKEND_DIR / "scripts")
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.append(_SCRIPTS_DIR)
+from _git import git_commit  # noqa: E402
 
 _RESULTS_DIR = _Path(__file__).resolve().parents[2] / "docs" / "testing" / "测试结果库"
 _RESULTS_JSONL = _RESULTS_DIR / "results.jsonl"
@@ -670,17 +676,6 @@ def _load_case_index() -> dict:
         return {}
 
 
-def _git_commit() -> str:
-    try:
-        out = _sp.run(["git", "rev-parse", "--short", "HEAD"], cwd=_Path(__file__).resolve().parents[2],
-                      capture_output=True, text=True, check=False)
-        if out.returncode == 0 and out.stdout.strip():
-            return out.stdout.strip()
-    except Exception:
-        pass
-    return "unknown"
-
-
 def _env_tag() -> str:
     if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
         return "ci"
@@ -702,10 +697,11 @@ def pytest_sessionstart(session):  # noqa: D401
             return
         _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         ts = _dt.now().strftime("%Y%m%d-%H%M%S")
-        _RUN_STATE["run_id"] = f"{ts}-{_git_commit()}-{os.getpid()}"
+        commit = git_commit(BACKEND_DIR.parent)
+        _RUN_STATE["run_id"] = f"{ts}-{commit}-{os.getpid()}"
         _RUN_STATE["case_index"] = _load_case_index()
         _RUN_STATE["rows"] = {}
-        _RUN_STATE["commit"] = _git_commit()
+        _RUN_STATE["commit"] = commit
         _RUN_STATE["env"] = _env_tag()
         _RUN_STATE["db"] = _mask_db(os.environ.get("TEST_DATABASE_URL", ""))
     except Exception:

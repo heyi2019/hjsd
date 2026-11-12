@@ -33,6 +33,7 @@ from app.domain.trade import Account, Cashflow, Installment, InstallmentDisposit
 from app.domain.users import User
 from app.value_added_services import _shared as inst__shared
 from app.value_added_services import create as inst_create
+from app.value_added_services import queries as inst_queries
 from app.value_added_services import recovery as inst_recovery
 from app.value_added_services import repayment as inst_repayment
 from app.value_added_services import settlement as inst_settlement
@@ -457,12 +458,12 @@ class TestGetAndListInstallments:
         contract_a = _contract(seeded_db, order_a.id)
         contract_b = _contract(seeded_db, order_b.id)
 
-        by_status = inst_create.list_installments(
+        by_status = inst_queries.list_installments(
             seeded_db, status=InstallmentStatus.PENDING.value
         )
         assert {c.id for c in by_status} == {contract_a.id, contract_b.id}
 
-        by_order = inst_create.list_installments(seeded_db, order_id=order_b.id)
+        by_order = inst_queries.list_installments(seeded_db, order_id=order_b.id)
         assert [c.id for c in by_order] == [contract_b.id]
         assert contract_a.id not in [c.id for c in by_order]
 
@@ -572,7 +573,7 @@ def test_installment_scope_follows_order_owner(seeded_db):
     own_contract = _contract(seeded_db, own_order.id)
     other_contract = _contract(seeded_db, other_order.id)
 
-    visible = inst_create.list_installments(seeded_db, user=scoped_user)
+    visible = inst_queries.list_installments(seeded_db, user=scoped_user)
     assert [item.id for item in visible] == [own_contract.id]
     with pytest.raises(NotFound):
         inst__shared.get_installment(seeded_db, other_contract.id, scoped_user)

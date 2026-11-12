@@ -23,6 +23,7 @@ from app.domain.trade import InstallmentSchedule
 from app.value_added_services import schemas
 from app.value_added_services import _shared as inst__shared
 from app.value_added_services import create as inst_create
+from app.value_added_services import queries as inst_queries
 from app.value_added_services import recovery as inst_recovery
 from app.value_added_services import repayment as inst_repayment
 from app.value_added_services import settlement as inst_settlement
@@ -75,7 +76,7 @@ def list_installments(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> list[schemas.InstallmentOut]:
-    items = inst_create.list_installments(
+    items = inst_queries.list_installments(
         db,
         status=status,
         order_id=order_id,
@@ -105,7 +106,7 @@ def installment_totals(
 ) -> schemas.InstallmentTotalsOut:
     """分期台合计：与 `/installments` 同一套筛选条件（含 contract_type），Decimal 聚合，前端不再 reduce。"""
     return schemas.InstallmentTotalsOut.model_validate(
-        inst_create.installment_totals(
+        inst_queries.installment_totals(
             db,
             status=status,
             order_id=order_id,

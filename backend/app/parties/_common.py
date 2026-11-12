@@ -34,16 +34,6 @@ _EXTRA_ENTITY_MODELS: dict[str, type] = {
     EntityType.LEAD.value: CustomerLead,
     EntityType.COUNTERPARTY.value: Counterparty,
 }
-_ENTITY_LABELS = {
-    EntityType.ORDER.value: "订单",
-    EntityType.ACCOUNT.value: "账号",
-    EntityType.CUSTOMER.value: "客户",
-    EntityType.INSTALLMENT.value: "分期合约",
-    EntityType.POOL.value: "资金池",
-    EntityType.CASHFLOW.value: "资金流水",
-    EntityType.LEAD.value: "需求",
-    EntityType.COUNTERPARTY.value: "合作方",
-}
 
 # These fields are assembled by routers rather than persisted on the entity
 # row.  A live field with one of these keys would be silently overwritten in

@@ -38,14 +38,13 @@ from datetime import datetime
 from pathlib import Path
 
 from _git import git_commit
+from _result_rank import RESULT_RANK as _RANK
 
 REPO = Path(__file__).resolve().parents[2]
 FRONTEND = REPO / "frontend"
 CASE_INDEX = REPO / "tests" / "backend" / "_report" / "case_index.json"
 CASE_LIBRARY_CSV = REPO / "docs" / "testing" / "测试用例库.csv"
 RESULTS = REPO / "docs" / "testing" / "测试结果库" / "results.jsonl"
-
-_RANK = {"PASS": 0, "SKIP": 1, "FAIL": 2, "ERROR": 3}
 
 # Playwright test.status -> 体系状态
 _STATUS = {

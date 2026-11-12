@@ -23,7 +23,6 @@ def test_seeded_order_event_dictionary_excludes_retired_cost(seeded_client, seed
         "CANCEL",
         "OPERATE",
         "REBATE",
-        "PROFIT_SHARE",
     ]
 
 

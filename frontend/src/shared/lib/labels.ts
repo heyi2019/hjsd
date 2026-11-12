@@ -142,7 +142,6 @@ export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
   INTERNAL_TRANSFER: "内部调拨",
   REVERSAL: "冲销",
   REFUND: "退款",
-  PROFIT_SHARE: "分润支出",
 };
 
 /** 日对账快照状态（ReconciliationStatus）：OPEN=差异待处理（未核销）、RESOLVED=差异已处理（已核销）。

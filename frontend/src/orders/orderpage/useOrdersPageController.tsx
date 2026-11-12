@@ -58,7 +58,7 @@ export function useOrdersPageController(params: {
     sharedCancellationEvent, hasSharedCancellation,
   } = cancellation;
 
-  // —— 订单动作弹窗域：退款 / 分润 / 交付 / 下架 / 账号动作 / 订单编辑 ——
+  // —— 订单动作弹窗域：退款 / 分润配置 / 交付 / 下架 / 账号动作 / 订单编辑 ——
   // 子 hook 内部持有全部弹窗状态；主 hook 用 spread 并集保持对外返回契约不变。
   const actionModals = useOrderActionModals({
     selectedOrder, setSelectedOrder, load, setCancelPools, loadLedgerDetail,
@@ -66,7 +66,7 @@ export function useOrdersPageController(params: {
   // openOrderProfile 仅供台账列定义内部点击转发，原本不在对外 return 契约中。
   const { openOrderProfile, ...exposedActionModals } = actionModals;
   const {
-    openAllocations, openProfitShare, openRefund, openOrderDelivery,
+    openAllocations, openRefund, openOrderDelivery,
     openOrderRebate, openOrderSale, openOrderConsignment, openOrderOffsale, openOrderDelete,
   } = actionModals;
 
@@ -95,7 +95,6 @@ export function useOrdersPageController(params: {
     canDeleteAccount,
     openLedgerEditor,
     openAllocations,
-    openProfitShare,
     openRefund,
     openOrderDelivery,
     openOrderProfile,

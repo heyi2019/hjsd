@@ -20,7 +20,7 @@ from app.domain.users import User
 from app.notifications import triggers
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy import allocations as policy_allocations
+from app.policy.profit_allocation import service as policy_allocations
 
 TODAY = date(2026, 10, 4)
 TODAY2 = date(2026, 10, 18)

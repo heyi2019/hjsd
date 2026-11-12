@@ -103,7 +103,6 @@ def _event_output(
             "sale_mode": (event.form_extra or {}).get("sale_mode"),
             "operation_type": (event.form_extra or {}).get("operation_type"),
             "rebate_type": (event.form_extra or {}).get("rebate_type"),
-            "profit_recipient": (event.form_extra or {}).get("profit_recipient"),
             "amount": event.amount,
             "occurred_on": event.occurred_on,
             "pool_id": event.pool_id,

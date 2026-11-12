@@ -710,19 +710,6 @@ class TestCreateOrderValidation:
                 capital_type="",
             )
 
-    def test_invalid_order_amounts_are_business_errors_in_service(self, seeded_db):
-        order = _order(seeded_db)
-        with pytest.raises(Validation, match="必须大于 0"):
-            post_event(
-                seeded_db,
-                order.id,
-                event_type="PROFIT_SHARE",
-                amount=Decimal("0"),
-                occurred_on=D,
-                actor="pytest",
-                profit_recipient="COMPANY",
-            )
-
     @pytest.mark.parametrize("field", ["event_type", "portion"])
     def test_event_enum_inputs_reject_unhashable_values_as_validation(
         self, seeded_db, field

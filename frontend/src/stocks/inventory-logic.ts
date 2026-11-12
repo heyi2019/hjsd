@@ -32,7 +32,6 @@ export function financeTypeLabel(eventType: string, direction: string, category?
     SALE: "售出收入",
     INSTALLMENT_PAYMENT: "分期回款",
     REBATE: "返点收入",
-    PROFIT_SHARE: "分润支出",
     REFUND: "退款支出",
     CANCEL: "取消冲销",
     SELF_DIRECT_COST: "自营直接成本",

@@ -17,9 +17,9 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import PolicyScopeType, PolicyStatus
 from app.domain.parties import PolicyDefinition
 from app.orders.create import create_order
-from app.policy import allocations as policy_allocations
 from app.policy import definitions as policy_definitions
 from app.policy import versions as policy_versions
+from app.policy.profit_allocation import service as policy_allocations
 
 D = date(2026, 10, 4)
 

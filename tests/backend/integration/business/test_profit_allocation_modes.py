@@ -23,7 +23,7 @@ from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy import allocations as policy_allocations
+from app.policy.profit_allocation import service as policy_allocations
 from app.policy import definitions as policy_definitions
 from app.reporting.r3_commission import r3_commission_reconciliation
 

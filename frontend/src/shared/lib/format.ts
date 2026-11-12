@@ -82,7 +82,6 @@ export const EVENT_TYPE_LABEL: Record<string, string> = {
   CANCEL: "取消",
   OPERATE: "运营",
   REBATE: "返点",
-  PROFIT_SHARE: "分润",
 };
 
 /**
@@ -95,7 +94,6 @@ const EXECUTION_ACTION_LABEL: Record<string, string> = {
   CANCEL: "取消",
   OPERATE: "运营",
   REBATE: "返点",
-  PROFIT_SHARE: "分润",
 };
 
 export function executionActionLabel(

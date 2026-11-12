@@ -10,7 +10,7 @@ import { OrderDeliveryModal } from "../OrderDeliveryModal";
 import { type OrdersPageController } from "./useOrdersPageController";
 import { SharedCancellationDialog, CancelTransactionModal } from "./OrderCancellationModals";
 import { AllocationModal } from "./OrderAllocationModal";
-import { ProfitShareModal, RefundModal } from "./OrderFinanceModals";
+import { RefundModal } from "./OrderFinanceModals";
 import { EditOrderModal, CreateBusinessModalWrapper, OrderAccountActionModals } from "./OrderActionModals";
 
 export function OrderModals({ controller }: { controller: OrdersPageController }) {
@@ -20,7 +20,6 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
       <CancelTransactionModal controller={controller} />
       <EditOrderModal controller={controller} />
       <AllocationModal controller={controller} />
-      <ProfitShareModal controller={controller} />
       <RefundModal controller={controller} />
       <OrderDeliveryModal
         target={controller.deliveryTarget}

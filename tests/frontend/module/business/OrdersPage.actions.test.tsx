@@ -130,6 +130,7 @@ const order1: Order = {
   party_source: "同行推荐",
   event_total: "1234.00",
   last_event_type: "BUY",
+  sale_at: "2026-10-02T16:45:00",
   account_id: 5,
 };
 const order2: Order = {
@@ -485,23 +486,6 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("运营员（operator）")).toBeInTheDocument();
   });
 
-  it("分润出账：登记 PROFIT_SHARE 并生成支出资金明细", async () => {
-    await openLedger();
-    await openRowMenu("HS-2026-0001", "分润");
-    const modal = await modalOf(/登记分润 · HS-2026-0001/);
-    await ui.type(within(modal).getByLabelText("分润金额"), "300");
-    await clickModalOk(modal);
-    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
-      1,
-      expect.objectContaining({
-        event_type: "PROFIT_SHARE",
-        profit_recipient: "COMPANY",
-        amount: "300",
-        pool_id: 7,
-      }),
-    ));
-  });
-
   it("订单台账：删除账号复用库存中心入口", async () => {
     await openLedger();
     const row = tableRow("HS-2026-0001");
@@ -509,60 +493,6 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(row).getByRole("button", { name: "售出" })).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "寄售" })).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "删除账号" })).toBeInTheDocument();
-  });
-
-  it("分润：按操作四项无候选执行人时人员留空且锁定（不猜当前登录人）", async () => {
-    // 2026-11-05 裁决：人员只认账号台账 / 库存中心登记的执行人，分润弹窗不就地猜人。
-    // 本单无任何动作负责人，四行人员全部锁定且留空，等待台账补登记。
-    vi.mocked(policyApi.allocations).mockResolvedValue({
-      items: [],
-      total: 0,
-      order_profit: "5000.00",
-    });
-    vi.mocked(ordersApi.get).mockResolvedValue({
-      ...order1,
-      form_extra: {},
-      events: [],
-    });
-    await openLedger();
-    await openRowMenu("HS-2026-0001", "分润配置");
-    const modal = await modalOf(/分润 · HS-2026-0001/);
-    // 无登记执行人 → 不再默认当前登录人
-    expect(within(modal).queryByText("李四（lisi）")).toBeNull();
-    // 公司位固定不绑人，不能被当前登录人覆盖。
-    expect(within(modal).getByText("公司（不绑定人员）")).toBeInTheDocument();
-    // 买号/售出/运营/公司四项的人员控件全部禁用：人员编辑只在台账与库存中心。
-    expect(modal.querySelectorAll(".ant-select-disabled").length).toBe(4);
-  });
-
-  it("分润：按操作四项的人员锁定为台账登记的执行人", async () => {
-    // 买号=业务负责人、售出=交付负责人、运营=运营负责人；三行都不可就地改人。
-    vi.mocked(policyApi.allocations).mockResolvedValue({
-      items: [],
-      total: 0,
-      order_profit: "5000.00",
-    });
-    vi.mocked(ordersApi.get).mockResolvedValue({
-      ...order1,
-      form_extra: {
-        business_responsible_ids: [11],
-        delivery_responsible_ids: [22],
-        operation_responsible_ids: [33],
-      },
-      events: [
-        { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "1000.00" },
-        { id: 102, event_no: "EV-102", order_id: 1, event_type: "SELL", amount: "1500.00", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [], cancellable_amount: "1500.00" },
-      ],
-    });
-    await openLedger();
-    await openRowMenu("HS-2026-0001", "分润配置");
-    const modal = await modalOf(/分润 · HS-2026-0001/);
-
-    expect(within(modal).getByText("回收员（recovery）")).toBeInTheDocument();
-    expect(within(modal).getByText("售出员（seller）")).toBeInTheDocument();
-    expect(within(modal).getByText("运营员（operator）")).toBeInTheDocument();
-    // 四行人员控件全部禁用，买号/售出/运营不能改选其他人
-    expect(modal.querySelectorAll(".ant-select-disabled").length).toBe(4);
   });
 
   it("分润：按人分配点「增加一行」时姓名默认当前登录人", async () => {

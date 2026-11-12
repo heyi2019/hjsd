@@ -34,7 +34,6 @@ export interface OrderEvent {
   sale_mode?: "FULL" | "INSTALLMENT" | null;
   operation_type?: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST" | null;
   rebate_type?: "BUY" | "SELL" | null;
-  profit_recipient?: "BUY" | "SELL" | "OPERATION" | "COMPANY" | null;
   amount: string;
   occurred_on: string;
   pool_id?: number | null;

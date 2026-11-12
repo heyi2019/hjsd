@@ -194,7 +194,6 @@ _ORDER_EVENT_OPTIONS = [
     {"value": "CANCEL", "label": "取消"},
     {"value": "OPERATE", "label": "运营"},
     {"value": "REBATE", "label": "返点"},
-    {"value": "PROFIT_SHARE", "label": "分润"},
 ]
 _AUDIT_ACTION_ADDITIONS = {
     "ACCOUNT_DELETE": "删除账号",

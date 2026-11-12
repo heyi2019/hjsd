@@ -507,7 +507,6 @@ def execution_detail(
                 event_type=event.event_type,
                 operation_type=(event.form_extra or {}).get("operation_type"),
                 rebate_type=(event.form_extra or {}).get("rebate_type"),
-                profit_recipient=(event.form_extra or {}).get("profit_recipient"),
                 amount=event.amount,
                 cancellable_amount=cancellable,
                 occurred_on=event.occurred_on,

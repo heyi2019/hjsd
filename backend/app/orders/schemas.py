@@ -232,9 +232,6 @@ class EventCreate(BaseModel):
     rebate_type: str | None = Field(
         default=None, description="REBATE 的返点归属：BUY / SELL"
     )
-    profit_recipient: str | None = Field(
-        default=None, description="PROFIT_SHARE 的分润对象：BUY / SELL / OPERATION / COMPANY"
-    )
     amount: Decimal = Field(default=Decimal("0"))
     occurred_on: date
     pool_id: int | None = Field(default=None, description="显式池优先于默认路由")
@@ -264,7 +261,6 @@ class EventOut(BaseModel):
     sale_mode: str | None = None
     operation_type: str | None = None
     rebate_type: str | None = None
-    profit_recipient: str | None = None
     amount: Decimal
     occurred_on: date
     pool_id: int | None = None

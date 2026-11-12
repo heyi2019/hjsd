@@ -20,14 +20,13 @@ export function useInventoryColumns(params: {
   setDeleteTarget: Dispatch<SetStateAction<Account | null>>;
   openCashflow: (account: Account) => Promise<void>;
   openDelivery: (account: Account) => Promise<void>;
-  openProfitShare: (account: Account) => Promise<void>;
   openEditor: (account: Account) => Promise<void>;
   handleMoreAction: (key: string, row: Account) => void;
 }) {
   const {
     canDelete, editingAccount, executionDetails, loadExecution,
     setSaleTarget, setConsignmentTarget, setRebateTarget, setDeleteTarget,
-    openCashflow, openDelivery, openProfitShare, openEditor, handleMoreAction,
+    openCashflow, openDelivery, openEditor, handleMoreAction,
   } = params;
   const { arrange: arrangeColumns } = useListViewColumns("INVENTORY");
   const columns: ColumnsType<Account> = [
@@ -136,18 +135,6 @@ export function useInventoryColumns(params: {
             }}
           >
             交付
-          </PermissionButton>
-          <PermissionButton
-            permission="order.event.post"
-            type="link"
-            size="small"
-            aria-label="分润"
-            onClick={(event) => {
-              event.stopPropagation();
-              void openProfitShare(row);
-            }}
-          >
-            分润
           </PermissionButton>
           {isEditableAccountType(row.inventory_type) ? <>
             <PermissionButton

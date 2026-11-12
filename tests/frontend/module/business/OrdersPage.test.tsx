@@ -458,12 +458,12 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   // 已完成且未关联库存账号的历史单不提供编辑；其余订单继续提供行级操作。
-  it("操作列提供统一编辑、分润、资金收支、取消入口", async () => {
+  it("操作列提供统一编辑、分润配置、资金收支、取消入口", async () => {
     await openLedger("admin");
 
     // 不再有「更多」收纳入口
     expect(screen.queryAllByRole("button", { name: "更多" })).toHaveLength(0);
-    for (const label of ["编辑", "分润", "资金收支", "取消"]) {
+    for (const label of ["编辑", "分润配置", "资金收支", "取消"]) {
       const buttons = screen.getAllByRole("button", { name: label });
       expect(buttons).toHaveLength(label === "编辑" ? 1 : 2);
       expect(buttons.every((button) => button.classList.contains("ant-btn-sm"))).toBe(true);

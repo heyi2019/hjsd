@@ -1,8 +1,8 @@
 """notifications.triggers：业务动作 → 用户通知的编排（SYS-01-04）。
 
-分润提醒两段式（用户 2026-11-12 裁决）：
-  ① 售出完成 → 通知本次 SELL 事件执行人「去录分润」（PROFIT_PENDING，待办提醒）；
-  ② 分润保存完成 → 通知利润接收人「分润已确认」（PROFIT_ALLOCATED，结果通知）。
+利润分配配置提醒两段式：
+  ① 售出完成 → 通知本次 SELL 事件执行人「去配置分润」（PROFIT_PENDING，待办提醒）；
+  ② 分润配置保存完成 → 通知利润接收人「分润已配置」（PROFIT_ALLOCATED，结果通知）。
 
 两段均复用 service.ensure_notification 的幂等口径（recipient + type + entity），
 同一人同一订单同一阶段只提醒一次。本模块只做「谁该收到什么」的映射，不承载业务事实。
@@ -32,7 +32,7 @@ def _valid_user_ids(session: Session, candidates: set[int]) -> set[int]:
 def notify_seller_to_allocate(
     session: Session, order: Order, event: OrderEvent, *, actor: str
 ) -> int:
-    """段①：售出闭环后提醒本次 SELL 执行人去录分润，返回新建条数。
+    """段①：售出闭环后提醒本次 SELL 执行人去配置分润，返回新建条数。
 
     收件人优先取事件上的多操作人 `operator_user_ids`（前端售出表单的「操作人」），
     为空时回退到事件登记人 actor 对应的用户 id。
@@ -54,8 +54,8 @@ def notify_seller_to_allocate(
             session,
             recipient_user_id=uid,
             notification_type=PROFIT_PENDING,
-            title="订单分润待录入",
-            message=f"订单 {order.order_no} 已售出完成，请前往录入分润。",
+            title="订单分润待配置",
+            message=f"订单 {order.order_no} 已售出完成，请前往配置分润。",
             entity_type="order",
             entity_id=order.order_no,
             actor=actor,
@@ -65,7 +65,7 @@ def notify_seller_to_allocate(
 
 
 def notify_profit_recipients(session: Session, order: Order, *, actor: str) -> int:
-    """段②：分润保存后通知利润接收人（排除公司归属），返回新建条数。
+    """段②：分润配置保存后通知利润接收人（排除公司归属），返回新建条数。
 
     仅在订单已 COMPLETED 时发；订单未完成时先只落分润，待 SELL 闭环补发通知。
     """
@@ -82,8 +82,8 @@ def notify_profit_recipients(session: Session, order: Order, *, actor: str) -> i
             session,
             recipient_user_id=row.user_id,
             notification_type=PROFIT_ALLOCATED,
-            title="订单分润已确认",
-            message=f"订单 {order.order_no} 分润已录入，请到收益明细查看。",
+            title="订单分润已配置",
+            message=f"订单 {order.order_no} 分润配置已保存，请到收益明细查看。",
             entity_type="order",
             entity_id=order.order_no,
             actor=actor,
@@ -95,7 +95,7 @@ def notify_profit_recipients(session: Session, order: Order, *, actor: str) -> i
 def notify_on_sell_completed(
     session: Session, order: Order, event: OrderEvent, *, actor: str
 ) -> int:
-    """售出闭环统一入口：已有分润行则通知接收人（段②），否则提醒售出人去录（段①）。
+    """售出闭环统一入口：已有分润行则通知接收人（段②），否则提醒售出人去配置（段①）。
 
     避免「已经分完润还提醒去分润」；先分润后卖号顺序下由本函数在 SELL 时补发段②。
     """

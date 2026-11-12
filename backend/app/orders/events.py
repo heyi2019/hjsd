@@ -22,12 +22,10 @@ from app.domain.enums import (
     AuditAction,
     Direction,
     EventType,
-    FundNature,
     Nature,
     OperationType,
     OrderStatus,
     Portion,
-    ProfitRecipient,
     RebateType,
     SaleMode,
 )
@@ -46,7 +44,6 @@ EVENT_FLOW_MAP: dict[str, tuple[str, str, str]] = {
     EventType.BUY.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "BUY"),
     EventType.SELL.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "SELL"),
     EventType.CANCEL.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "CANCEL"),
-    EventType.PROFIT_SHARE.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "PROFIT_SHARE"),
 }
 
 
@@ -78,7 +75,6 @@ def post_event(
     sale_mode: str | None = None,
     operation_type: str | None = None,
     rebate_type: str | None = None,
-    profit_recipient: str | None = None,
     amount: Any = 0,
     occurred_on: date,
     actor: str,
@@ -105,6 +101,11 @@ def post_event(
     allow_installment_delivery = _required_bool(
         allow_installment_delivery, field="allow_installment_delivery"
     )
+    if event_type == "PROFIT_SHARE":
+        raise Validation(
+            "PROFIT_SHARE 分润登记已下线，请使用订单利润分配配置",
+            details={"field": "event_type", "value": event_type},
+        )
     try:
         EventType(event_type)
     except ValueError as exc:
@@ -129,7 +130,6 @@ def post_event(
     action_attributes = {
         EventType.OPERATE.value: ("operation_type", operation_type, OperationType),
         EventType.REBATE.value: ("rebate_type", rebate_type, RebateType),
-        EventType.PROFIT_SHARE.value: ("profit_recipient", profit_recipient, ProfitRecipient),
     }
     action_attribute = action_attributes.get(event_type)
     if action_attribute is not None:
@@ -150,11 +150,9 @@ def post_event(
             operation_type = normalized
         elif field == "rebate_type":
             rebate_type = normalized
-        else:
-            profit_recipient = normalized
-    elif any(value is not None for value in (operation_type, rebate_type, profit_recipient)):
+    elif any(value is not None for value in (operation_type, rebate_type)):
         raise Validation(
-            "运营、返点、分润属性只能用于对应的 OPERATE、REBATE、PROFIT_SHARE 事件",
+            "运营、返点属性只能用于对应的 OPERATE、REBATE 事件",
             details={"event_type": event_type},
         )
     installment_sale = (
@@ -211,7 +209,6 @@ def post_event(
         event_type in {
             EventType.OPERATE.value,
             EventType.REBATE.value,
-            EventType.PROFIT_SHARE.value,
         }
         and order.status != OrderStatus.CANCELLED.value
     )
@@ -345,13 +342,9 @@ def post_event(
     accounting_attribute: str | None = None
     resolved_pool_id: int | None = None
     if has_cashflow:
-        if event_type == EventType.PROFIT_SHARE.value:
-            fund_nature = FundNature.BUSINESS.value
-            accounting_attribute = AccountingAttribute.PROFIT_SHARE.value
-        else:
-            fund_nature, accounting_attribute = accounting_attribute_for_order_event(
-                order.order_type, event_type
-            )
+        fund_nature, accounting_attribute = accounting_attribute_for_order_event(
+            order.order_type, event_type
+        )
         resolved_pool_id = (
             pool_id
             or (offset.pool_id if offset is not None else None)
@@ -390,8 +383,6 @@ def post_event(
         event_form_extra["operation_type"] = operation_type
     if rebate_type is not None:
         event_form_extra["rebate_type"] = rebate_type
-    if profit_recipient is not None:
-        event_form_extra["profit_recipient"] = profit_recipient
     if event_type == EventType.SELL.value and (normalized_bound_phone is not None or normalized_bound_phone_owner is not None):
         account = session.get(Account, order.account_id) if order.account_id is not None else None
         snapshot = dict(order.account_snapshot or {})
@@ -543,7 +534,7 @@ def post_event(
         )
     session.flush()
 
-    # BUY/SELL 收益人的绑定统一由 policy.allocations.set_allocations 负责
+    # BUY/SELL 收益人的绑定统一由 policy.profit_allocation.service.set_allocations 负责
     # （单一执行人自动绑定、多人协作按人分行、且必须是动作执行人）。
     # 事件登记阶段只做历史兜底：该动作类型恰好只有一行且尚未绑定人员时回填
     # 当前执行人；多行分润一律不碰，避免把每个人的独立分润抹成同一个人。
@@ -561,7 +552,7 @@ def post_event(
                 allocations[0].updated_by = actor
 
     # 售出闭环通知（用户 11-12 裁决）：该单已有分润行（先分润后卖号）→ 直接通知
-    # 利润接收人；否则提醒本次 SELL 执行人去录分润。两段都靠 ensure_notification
+    # 利润接收人；否则提醒本次 SELL 执行人去配置分润。两段都靠 ensure_notification
     # 按 recipient+type+entity 幂等去重，重复售出/重复保存不重复打扰。
     if event_type == EventType.SELL.value and not installment_sale:
         from app.notifications.triggers import notify_on_sell_completed

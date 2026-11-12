@@ -187,7 +187,6 @@ class ExecutionEventOut(BaseModel):
     event_type: str
     operation_type: str | None = None
     rebate_type: str | None = None
-    profit_recipient: str | None = None
     amount: Decimal
     # 该事件仍可被冲销的余额 = amount − 已冲销合计（夹底 0）；CANCEL 自身恒为 0。
     # 口径与下单/冲销校验（`orders.events.post_event`）同源，前端不再自行相减。

@@ -150,7 +150,7 @@ describe("InventoryPanel：账号台账", () => {
 
     renderLight(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByRole("button", { name: "导出" })).toBeInTheDocument();
-    for (const label of ["售出", "寄售", "返点", "资金收支", "交付", "分润", "编辑", "更多"]) {
+    for (const label of ["售出", "寄售", "返点", "资金收支", "交付", "编辑", "更多"]) {
       expect(screen.getAllByRole("button", { name: label }).length).toBeGreaterThan(0);
     }
     expect(screen.queryByRole("button", { name: "下架" })).toBeNull();
@@ -199,20 +199,6 @@ describe("InventoryPanel：账号台账", () => {
         delivery_mode: "CUSTOMER_SELF",
         note: "库存中心完成换绑",
       }),
-    ));
-  });
-
-  it("库存中心：可以登记分润并生成 PROFIT_SHARE 支出", async () => {
-    renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByText("acc-1");
-    const row = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
-    await ui.click(within(row).getByRole("button", { name: "分润" }));
-    const modal = (await screen.findByText("登记分润 · HS0001")).closest(".ant-modal-content") as HTMLElement;
-    await ui.type(within(modal).getByLabelText("分润金额"), "30");
-    await ui.click(within(modal).getByRole("button", { name: /确定|OK/ }));
-    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
-      21,
-      expect.objectContaining({ event_type: "PROFIT_SHARE", amount: "30", profit_recipient: "COMPANY" }),
     ));
   });
 

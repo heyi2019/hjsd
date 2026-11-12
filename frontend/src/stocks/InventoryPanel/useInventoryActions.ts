@@ -20,7 +20,6 @@ import { type BusinessCenterEntryTab } from "../../orders/businessCenter";
 import { findCancelableBuy } from "./helpers";
 import { type InventoryCashflowTarget } from "../InventoryCashflowModal";
 import { type OrderDeliveryTarget } from "../../orders/OrderDeliveryModal";
-import { type OrderProfitShareTarget } from "../../orders/OrderProfitShareModal";
 
 export function useInventoryActions(params: {
   // list 域注入
@@ -58,9 +57,6 @@ export function useInventoryActions(params: {
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
   const [deliveryTarget, setDeliveryTarget] = useState<OrderDeliveryTarget | null>(null);
   const [deliveryEmployees, setDeliveryEmployees] = useState<EmployeeOption[]>([]);
-  const [profitShareTarget, setProfitShareTarget] = useState<OrderProfitShareTarget | null>(null);
-  const [profitSharePools, setProfitSharePools] = useState<Pool[]>([]);
-  const [profitShareEmployees, setProfitShareEmployees] = useState<EmployeeOption[]>([]);
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
   const [detailTarget, setDetailTarget] = useState<Account | null>(null);
   const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
@@ -142,28 +138,6 @@ export function useInventoryActions(params: {
         boundPhone: detail.account.bound_phone,
         boundPhoneOwner: detail.account.bound_phone_owner,
       });
-    } catch (cause) {
-      setError(normalizeError(cause));
-    }
-  }
-  async function openProfitShare(account: Account) {
-    try {
-      const [detail, poolList, employeeList] = await Promise.all([
-        executionDetails[account.id] ?? stocksApi.executionDetail(account.id),
-        poolsApi.list(),
-        employeesApi.list(),
-      ]);
-      setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
-      const sourceOrder = detail.orders.find((order) => order.order_id === account.source_order_id)
-        ?? detail.orders.find((order) => order.order_type !== "DG")
-        ?? detail.orders[0];
-      if (!sourceOrder) {
-        appMessage.warning("当前账号没有可关联的业务订单");
-        return;
-      }
-      setProfitSharePools(poolList.filter((pool) => pool.status === "ACTIVE"));
-      setProfitShareEmployees(employeeList.filter((employee) => employee.is_active));
-      setProfitShareTarget({ id: sourceOrder.order_id, order_no: sourceOrder.order_no });
     } catch (cause) {
       setError(normalizeError(cause));
     }
@@ -302,10 +276,6 @@ export function useInventoryActions(params: {
     deliveryTarget,
     setDeliveryTarget,
     deliveryEmployees,
-    profitShareTarget,
-    setProfitShareTarget,
-    profitSharePools,
-    profitShareEmployees,
     profileTarget,
     setProfileTarget,
     detailTarget,
@@ -327,7 +297,6 @@ export function useInventoryActions(params: {
     cancelInlineEdit,
     openDetail,
     openDelivery,
-    openProfitShare,
     openVoid,
     openPlatformOffsale,
     handleMoreAction,

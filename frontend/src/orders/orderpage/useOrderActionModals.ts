@@ -1,5 +1,4 @@
 import { Form } from "antd";
-import dayjs, { type Dayjs } from "dayjs";
 import { useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
@@ -35,7 +34,7 @@ interface OrderActionModalsDeps {
 }
 
 /**
- * 订单台账的动作弹窗域：退款 / 分润 / 分润登记 / 交付 / 下架 / 账号动作 / 订单编辑。
+ * 订单台账的动作弹窗域：退款 / 分润配置 / 交付 / 下架 / 账号动作 / 订单编辑。
  * 逐字切片自 useOrdersPageController，返回值与主 hook 的 spread 并集契约逐字段一致。
  */
 export function useOrderActionModals({
@@ -51,10 +50,6 @@ export function useOrderActionModals({
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [allocationSubmitting, setAllocationSubmitting] = useState(false);
   const [allocationForm] = Form.useForm();
-  const [profitShareOpen, setProfitShareOpen] = useState(false);
-  const [profitShareSubmitting, setProfitShareSubmitting] = useState(false);
-  const [profitSharePools, setProfitSharePools] = useState<Pool[]>([]);
-  const [profitShareForm] = Form.useForm();
   const [orderRebateTarget, setOrderRebateTarget] = useState<Account | null>(null);
   const [orderSaleTarget, setOrderSaleTarget] = useState<Account | null>(null);
   const [orderConsignmentTarget, setOrderConsignmentTarget] = useState<{ account: Account; orderId: number } | null>(null);
@@ -96,9 +91,8 @@ export function useOrderActionModals({
         employeesApi.list(),
       ]);
       const candidates = buildActionAllocationCandidates(order);
-      // 分润的「姓名」只能落在用户（users 表）上，取值一律走 /auth/me 的 id / username。
-      // 不能用 session.role（ADMIN/OPERATOR 这类系统角色），
-      // 也不能用 dev 用户名（currentDevUser 在无本地配置时兜底成 "admin"，不是登录人）。
+      // 分润的「姓名」只能落在用户（users 表）上，选项取自 /users/options。
+      // 不能用 session.role（ADMIN/OPERATOR 这类系统角色）。
       let currentId: number | undefined;
       try {
         const current = await currentUser();
@@ -158,58 +152,6 @@ export function useOrderActionModals({
       setRefundOpen(true);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
-    }
-  };
-
-  const openProfitShare = async (sourceOrder?: Order) => {
-    try {
-      const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
-      if (!order) return;
-      const [poolList, employeeList] = await Promise.all([poolsApi.list(), employeesApi.list()]);
-      const activePools = poolList.filter((pool) => pool.status === "ACTIVE");
-      setUsers(employeeList.filter((employee) => employee.is_active));
-      setProfitSharePools(activePools);
-      setActionOrder(order);
-      profitShareForm.resetFields();
-      profitShareForm.setFieldsValue({
-        occurred_on: dayjs(today()),
-        pool_id: activePools[0]?.id,
-      });
-      setProfitShareOpen(true);
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    }
-  };
-
-  const submitProfitShare = async (values: {
-    profit_recipient: "BUY" | "SELL" | "OPERATION" | "COMPANY";
-    amount: string;
-    occurred_on: Dayjs;
-    pool_id: number;
-    operator_user_ids?: number[];
-    note?: string;
-  }) => {
-    if (!actionOrder) return;
-    setProfitShareSubmitting(true);
-    try {
-      await ordersApi.postEvent(actionOrder.id, {
-        event_type: "PROFIT_SHARE",
-        profit_recipient: values.profit_recipient,
-        amount: values.amount,
-        occurred_on: values.occurred_on.format("YYYY-MM-DD"),
-        pool_id: Number(values.pool_id),
-        operator_user_ids: values.operator_user_ids,
-        note: values.note,
-      });
-      appMessage.success("分润已登记，支出资金明细已生成");
-      setProfitShareOpen(false);
-      setActionOrder(null);
-      if (actionOrder.account_id != null) await loadLedgerDetail(actionOrder.account_id, true);
-      await load();
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    } finally {
-      setProfitShareSubmitting(false);
     }
   };
 
@@ -442,7 +384,6 @@ export function useOrderActionModals({
     openOrderOffsale,
     openOrderRebate,
     openOrderSale,
-    openProfitShare,
     openRefund,
     orderConsignmentTarget,
     setOrderConsignmentTarget,
@@ -457,12 +398,6 @@ export function useOrderActionModals({
     setOrderSaleTarget,
     profileTarget,
     setProfileTarget,
-    profitShareForm,
-    profitShareOpen,
-    profitSharePools,
-    profitShareSubmitting,
-    setProfitShareOpen,
-    setProfitShareSubmitting,
     refundForm,
     refundOpen,
     refundSubmitting,
@@ -470,7 +405,6 @@ export function useOrderActionModals({
     setRefundSubmitting,
     submitEditOrder,
     submitOrderDelete,
-    submitProfitShare,
     openOrderProfile,
   };
 }

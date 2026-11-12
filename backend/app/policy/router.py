@@ -14,11 +14,10 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.orders.amounts import order_amounts
 from app.policy import schemas
-from app.policy import allocations as policy_allocations
 from app.policy import definitions as policy_definitions
 from app.policy import versions as policy_versions
+from app.policy.profit_allocation.router import router as profit_allocation_router
 
 router = APIRouter(tags=["policy"])
 manage_access = require_permissions(PERM_POLICY_MANAGE)
@@ -28,6 +27,7 @@ manage_access = require_permissions(PERM_POLICY_MANAGE)
 policy_read_access = require_permissions(PERM_POLICY_MANAGE)
 # 订单自身的规则快照/利润分配属于订单数据，沿用订单读取门控并继续由 Service 做范围隔离。
 order_policy_read_access = require_permissions(PERM_ORDER_CREATE)
+router.include_router(profit_allocation_router)
 
 
 # ── T19 / BAS-06-01：规则定义 ───────────────────────────────────
@@ -179,51 +179,6 @@ def resolve(
     return schemas.PolicyResolveOut(
         found=version is not None,
         version=schemas.PolicyVersionOut.model_validate(_ver_out(version)) if version else None,
-    )
-
-
-# ── T20 / BAS-06-03：订单利润分配 ────────────────────────────────
-
-@router.get(
-    "/orders/{order_id}/profit-allocations",
-    response_model=schemas.ProfitAllocationListOut,
-)
-def list_allocations(
-    order_id: int,
-    db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = order_policy_read_access,
-) -> schemas.ProfitAllocationListOut:
-    items = policy_allocations.list_allocations(db, order_id, user=user)
-    return schemas.ProfitAllocationListOut(
-        items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
-        total=len(items),
-        order_profit=order_amounts(db, order_id)["PROFIT"],
-    )
-
-
-@router.put(
-    "/orders/{order_id}/profit-allocations",
-    response_model=schemas.ProfitAllocationListOut,
-)
-def set_allocations(
-    order_id: int,
-    payload: schemas.ProfitAllocationSet,
-    db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = manage_access,
-) -> schemas.ProfitAllocationListOut:
-    """整单设置利润分配。有效比例合计必须为 100%（BAS-06-03）。"""
-    items = policy_allocations.set_allocations(
-        db,
-        order_id,
-        items=[item.model_dump() for item in payload.items],
-        actor=user.username,
-        form_extra=payload.form_extra,
-        user=user,
-    )
-    return schemas.ProfitAllocationListOut(
-        items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
-        total=len(items),
-        order_profit=order_amounts(db, order_id)["PROFIT"],
     )
 
 

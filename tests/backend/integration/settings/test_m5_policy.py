@@ -16,7 +16,7 @@ from app.domain.parties import PolicyVersion
 from app.domain.trade import OrderEvent, OrderProfitAllocation
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy import allocations as policy_allocations
+from app.policy.profit_allocation import service as policy_allocations
 from app.policy import definitions as policy_definitions
 from app.policy import versions as policy_versions
 

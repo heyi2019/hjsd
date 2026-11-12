@@ -14,7 +14,6 @@ _ALLOWED_ATTRIBUTES_BY_FUND_NATURE: dict[str, frozenset[str]] = {
         AccountingAttribute.ADDITIONAL_INCOME.value,
         AccountingAttribute.ADDITIONAL_EXPENSE.value,
         AccountingAttribute.OPERATING_EXPENSE.value,
-        AccountingAttribute.PROFIT_SHARE.value,
         AccountingAttribute.REVERSAL.value,
         AccountingAttribute.REFUND.value,
     }),

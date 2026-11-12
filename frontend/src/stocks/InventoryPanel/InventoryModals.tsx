@@ -13,7 +13,6 @@ import { InventoryProfileModal } from "../InventoryProfileModal";
 import { InventoryRebateModal } from "../InventoryRebateModal";
 import { InventoryCashflowModal } from "../InventoryCashflowModal";
 import { OrderDeliveryModal } from "../../orders/OrderDeliveryModal";
-import { OrderProfitShareModal } from "../../orders/OrderProfitShareModal";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../InventorySaleModal";
 import { OrderDetail } from "../OrderDetail";
 import type { InventoryController } from "./useInventoryController";
@@ -43,9 +42,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     cashflowTarget,
     deliveryEmployees,
     deliveryTarget,
-    profitShareEmployees,
-    profitSharePools,
-    profitShareTarget,
     refreshExecution,
     saleTarget,
     saveInline,
@@ -125,17 +121,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         onClose={() => setDeliveryTarget(null)}
         onCreated={async () => {
           setDeliveryTarget(null);
-          await load();
-          onOrdersChanged?.();
-        }}
-      />
-      <OrderProfitShareModal
-        target={profitShareTarget}
-        pools={profitSharePools}
-        employees={profitShareEmployees}
-        onClose={() => controller.setProfitShareTarget(null)}
-        onCreated={async () => {
-          controller.setProfitShareTarget(null);
           await load();
           onOrdersChanged?.();
         }}

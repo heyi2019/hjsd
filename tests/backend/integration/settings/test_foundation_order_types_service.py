@@ -46,7 +46,7 @@ class TestOrderTypes:
         event_types = db.query(OptionSet).filter_by(code="ORDER_EVENT_TYPE").one()
         values = [item["value"] for item in event_types.options or []]
         labels = [item["label"] for item in event_types.options or []]
-        assert values == ["BUY", "SELL", "DELIVER", "CANCEL", "OPERATE", "REBATE", "PROFIT_SHARE"]
+        assert values == ["BUY", "SELL", "DELIVER", "CANCEL", "OPERATE", "REBATE"]
         assert "COST" not in values
         assert "PAYMENT" not in values
         assert "REFUND" not in values
@@ -54,7 +54,7 @@ class TestOrderTypes:
 
     def test_active_event_enum_excludes_legacy_finance_events(self):
         assert [event.value for event in EventType] == [
-            "BUY", "SELL", "DELIVER", "CANCEL", "OPERATE", "REBATE", "PROFIT_SHARE"
+            "BUY", "SELL", "DELIVER", "CANCEL", "OPERATE", "REBATE"
         ]
 
     def test_audit_action_dictionary_matches_runtime_enum(self, db):

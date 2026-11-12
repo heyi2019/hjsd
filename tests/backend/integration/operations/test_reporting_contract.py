@@ -27,7 +27,7 @@ from app.domain.trade import RebateRecord
 from app.finance.cashflows import create_cashflow
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy import allocations as policy_allocations
+from app.policy.profit_allocation import service as policy_allocations
 from app.reporting.export import finance_dimension_report
 from app.reporting.profit import order_profit_detail
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl

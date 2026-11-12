@@ -194,7 +194,7 @@ def reverse_cashflow(
         raise Validation("只有已审核流水可以冲销", details={"cashflow_id": cashflow_id})
     if flow.order_event_id is not None:
         event = session.get(OrderEvent, flow.order_event_id)
-        if event is None or event.event_type not in {"REBATE", "PROFIT_SHARE"}:
+        if event is None or event.event_type not in {"REBATE"}:
             raise Validation("业务事件现金流必须通过业务事件冲销")
     if flow.deposit_id is not None or flow.transfer_id is not None:
         raise Validation("押金或划转现金流必须通过原业务流程冲销")

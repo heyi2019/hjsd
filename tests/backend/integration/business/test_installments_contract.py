@@ -178,7 +178,7 @@ class TestCreateInstallmentValidation:
         assert contract.status == InstallmentStatus.SETTLED.value
 
     def test_installment_sale_binds_buyer_and_seller_across_orders(self, seeded_db):
-        from app.policy import allocations as policy_allocations
+        from app.policy.profit_allocation import service as policy_allocations
         from app.orders.events import post_event
         account = _account(seeded_db, "inst-sale-actors")
         purchase = _order(seeded_db, order_type="HS", account_id=account.id)

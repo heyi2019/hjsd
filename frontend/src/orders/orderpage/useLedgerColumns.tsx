@@ -15,7 +15,6 @@ export function useLedgerColumns(params: {
   canDeleteAccount: boolean;
   openLedgerEditor: (order: Order) => void;
   openAllocations: (order: Order) => void;
-  openProfitShare: (order: Order) => void;
   openRefund: (order: Order) => void;
   openOrderDelivery: (order: Order) => void;
   openOrderProfile: (order: Order, mode: "description" | "images") => void;
@@ -30,7 +29,6 @@ export function useLedgerColumns(params: {
     canDeleteAccount,
     openLedgerEditor,
     openAllocations,
-    openProfitShare,
     openRefund,
     openOrderDelivery,
     openOrderProfile,
@@ -64,6 +62,10 @@ export function useLedgerColumns(params: {
       ellipsis: true,
       render: (_, order) => {
         const canOffsaleConsignment = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
+        const hasSold = order.status === "COMPLETED"
+          || order.last_event_type === "SELL"
+          || Boolean(order.sale_at)
+          || (order.events ?? []).some((event) => event.event_type === "SELL");
         return (
           <Space size={2}>
           {order.account_id || ["ACTIVE", "INSTALLMENT"].includes(order.status) ? (
@@ -80,16 +82,10 @@ export function useLedgerColumns(params: {
               permission="order.event.post"
               type="link"
               size="small"
-              disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
+              disabled={!hasSold || !['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
+              title={hasSold ? undefined : "订单售出后才能配置分润"}
               onClick={() => void openAllocations(order)}
             >分润配置</PermissionButton>
-            <PermissionButton
-              permission="order.event.post"
-              type="link"
-              size="small"
-              disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
-              onClick={() => void openProfitShare(order)}
-            >分润</PermissionButton>
             <PermissionButton
               permission="order.event.post"
               type="link"

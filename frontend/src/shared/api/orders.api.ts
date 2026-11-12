@@ -165,7 +165,6 @@ export const ordersApi = {
       sale_mode?: "FULL" | "INSTALLMENT";
       operation_type?: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST";
       rebate_type?: "BUY" | "SELL";
-      profit_recipient?: "BUY" | "SELL" | "OPERATION" | "COMPANY";
       amount?: string;
       occurred_on: string;
       pool_id?: number;

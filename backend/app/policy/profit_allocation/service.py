@@ -1,5 +1,4 @@
-"""policy.allocations：订单多人利润分配（BAS-06-03）。
-"""
+"""订单分润配置服务（BAS-06-03）。"""
 
 from __future__ import annotations
 
@@ -11,7 +10,7 @@ from app.core.audit import record_audit
 from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.users import User
-from app.policy.schemas import ProfitAllocationItem
+from app.policy.profit_allocation.schemas import ProfitAllocationItem
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import Validation
@@ -26,7 +25,7 @@ from app.domain.trade import (
     OrderProfitAllocation,
 )
 
-from ._shared import (
+from .._shared import (
     _scoped_order,
 )
 
@@ -65,6 +64,13 @@ def set_allocations(
       纯比例时合计仍须 100%；一旦出现金额，改为校验金额合计不超过订单利润，
       因为此时「剩余未分配」默认留在公司，强行凑 100% 会逼用户编数字。
     """
+    # 按动作分配时，负责人来源和分润配置必须一次提交、一次生效。
+    # 先合并订单来源字段，后续动作负责人校验才能使用本次刚编辑的人员名单。
+    if form_extra:
+        order = _scoped_order(session, order_id, user)
+        order.form_extra = {**(order.form_extra or {}), **dict(form_extra)}
+        session.flush()
+
     normalized_items = [_normalize_allocation_item(item) for item in items]
     typed = [item for item in normalized_items if item.get("allocation_type")]
     if typed and len(typed) != len(normalized_items):
@@ -77,12 +83,7 @@ def set_allocations(
         result = _set_person_allocations(
             session, order_id, items=normalized_items, actor=actor, user=user
         )
-    if form_extra:
-        # ALLOCATION 作用域自定义字段值合并进订单 form_extra。
-        order = _scoped_order(session, order_id, user)
-        order.form_extra = {**(order.form_extra or {}), **dict(form_extra)}
-        session.flush()
-    # 分润保存完成且订单已闭环 → 通知利润接收人（幂等，重复保存不重复打扰）。
+    # 分润配置保存完成且订单已闭环 → 通知利润接收人（幂等，重复保存不重复打扰）。
     # 订单尚未完成时先只落分润，待 SELL 闭环由 notify_on_sell_completed 补发通知。
     from app.notifications.triggers import notify_profit_recipients
 
@@ -475,3 +476,4 @@ def list_allocations(
         {**item, "total_rate": str(total), "total_amount": str(total_amount)}
         for item in out
     ]
+

@@ -106,7 +106,7 @@ describe("状态枚举标签：与后端枚举一一对应", () => {
 
   it("事件类型覆盖后端 EventType", () => {
     expect(Object.keys(EVENT_TYPE_LABEL).sort()).toEqual(
-      ["BUY", "CANCEL", "DELIVER", "OPERATE", "PROFIT_SHARE", "REBATE", "SELL"].sort(),
+      ["BUY", "CANCEL", "DELIVER", "OPERATE", "REBATE", "SELL"].sort(),
     );
   });
 

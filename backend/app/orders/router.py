@@ -628,7 +628,6 @@ def post_event(
         sale_mode=payload.sale_mode,
         operation_type=payload.operation_type,
         rebate_type=payload.rebate_type,
-        profit_recipient=payload.profit_recipient,
         amount=payload.amount,
         occurred_on=payload.occurred_on,
         actor=_actor(user),

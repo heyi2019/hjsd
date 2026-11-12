@@ -67,31 +67,3 @@ def test_operate_event_records_business_action_without_cashflow(seeded_db):
     assert seeded_db.scalar(
         select(Cashflow.id).where(Cashflow.order_event_id == event.id)
     ) is None
-
-
-def test_profit_share_event_records_out_cashflow(seeded_db):
-    order = create_order(
-        seeded_db,
-        order_type="TH",
-        trade_date=TODAY,
-        actor="pytest",
-    )
-
-    event, flow = events.post_event(
-        seeded_db,
-        order.id,
-        event_type="PROFIT_SHARE",
-        profit_recipient="OPERATION",
-        amount=Decimal("30"),
-        pool_id=1,
-        occurred_on=TODAY,
-        actor="pytest",
-        note="运营分润",
-    )
-
-    assert event.event_type == "PROFIT_SHARE"
-    assert flow is not None
-    assert flow.direction == "OUT"
-    assert flow.category == "PROFIT_SHARE"
-    assert flow.accounting_attribute == "PROFIT_SHARE"
-    assert flow.order_event_id == event.id

@@ -215,6 +215,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   DELIVER_CREATE: "登记交付",
   REBATE_CREATE: "登记返点",
   REBATE_UPDATE: "编辑返点",
+  REBATE_RETURN: "退回返点",
   REBATE_DELETE: "删除返点",
   REBATE_SETTLE: "返点结算",
   REBATE_REVERSE: "冲销返点",

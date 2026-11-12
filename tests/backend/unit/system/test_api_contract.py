@@ -66,5 +66,6 @@ def test_every_json_api_route_declares_response_model(app):
     # → 190（2026-11-12 复核实测：此前断言 192 已过时——HEAD 实测即 190；
     #        注释停在 191 但从未同步断言，属既有漂移，本次据实校正）
     # → 189（2026-11-12 裁决：删除 DELETE /rebates/{id}（返点不可作废），-1）。
+    # → 190（2026-11-12 裁决：返点退回改走真实 OUT，新增 POST /rebates/{id}/return，+1）。
     # 注：public_routes 在豁免判断之前 +1，故豁免路由（含已删的 DELETE /rebates）也计数。
-    assert public_routes == 189
+    assert public_routes == 190

@@ -1,4 +1,4 @@
-/** 返点明细：登记即确认收入，只支持编辑、不可删除/作废（REB-01 / A06）。退回走资金中心录入 OUT 支出。 */
+/** 返点明细：登记即确认收入，不可删除/作废（REB-01 / A06）。退回走专用接口，在来源订单记真实挂单 OUT。 */
 import { Card, Form, Input, Space, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
@@ -40,6 +40,7 @@ export function RebatesPanel() {
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Rebate | null>(null);
+  const [returnTarget, setReturnTarget] = useState<Rebate | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [dataReady, setDataReady] = useState(false);
@@ -47,6 +48,7 @@ export function RebatesPanel() {
   const write = useAsyncAction();
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
+  const [returnForm] = Form.useForm();
 
   const [exporting, setExporting] = useState(false);
   const exportCsv = async () => {
@@ -121,6 +123,30 @@ export function RebatesPanel() {
     });
   };
 
+  const submitReturn = async (values: Record<string, unknown>) => {
+    if (!returnTarget) return;
+    const amount = String(values.amount ?? "");
+    // 前端即时提示，超额最终仍由后端 return_rebate 的累计校验兜底。
+    const remaining = Number(returnTarget.remaining ?? returnTarget.base_amount);
+    if (Number(amount) > remaining) {
+      returnForm.setFields([
+        { name: "amount", errors: [`退回金额不得超过可退余额 ${returnTarget.remaining ?? returnTarget.base_amount}`] },
+      ]);
+      return;
+    }
+    await write.run(async () => {
+      await rebatesApi.returnRebate(returnTarget.id, {
+        amount,
+        returned_on: values.returned_on as string,
+        note: (values.note as string) || null,
+      });
+      appMessage.success(`已登记退回 ${amount}，该笔返点可退余额已更新`);
+      setReturnTarget(null);
+      returnForm.resetFields();
+      await load();
+    });
+  };
+
   const { arrange: arrangeColumns } = useListViewColumns("REBATE");
   const columns: ColumnsType<Rebate> = [
     { title: "返点单号", dataIndex: "rebate_no" },
@@ -163,6 +189,13 @@ export function RebatesPanel() {
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
+    {
+      title: "可退余额",
+      key: "remaining",
+      align: "right",
+      // 可退余额取后端下发值，前端不自行 base−已退（口径收敛到后端）。
+      render: (_v, row) => <MoneyText value={row.remaining ?? row.base_amount} />,
+    },
     { title: "费率", dataIndex: "rate", align: "right", render: (v: string) => `${v}%` },
     { title: "返点时间", dataIndex: "created_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     {
@@ -187,7 +220,19 @@ export function RebatesPanel() {
           >
             编辑
           </PermissionButton>
-          {/* 2026-11-12 裁决：返点不可删除/作废；退回走资金中心录入 OUT 支出。 */}
+          <PermissionButton
+            permission="order.event.post"
+            size="small"
+            disabled={row.status === "VOID" || Number(row.remaining ?? row.base_amount) <= 0}
+            onClick={() => {
+              returnForm.resetFields();
+              returnForm.setFieldsValue({ returned_on: today() });
+              setReturnTarget(row);
+            }}
+          >
+            退回
+          </PermissionButton>
+          {/* 2026-11-12 裁决：返点不可删除/作废；退回走专用接口，挂单真实 OUT。 */}
         </Space>
       ),
     },
@@ -251,6 +296,39 @@ export function RebatesPanel() {
           <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
           <CustomFieldSection testIdSuffix="rebate-edit" />
           <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>保存</PermissionButton>
+        </BusinessRegistrationForm>
+      </BusinessActionModal>
+
+      <BusinessActionModal
+        title={returnTarget ? `退回返点 · ${returnTarget.rebate_no}` : "退回返点"}
+        fieldCount={3}
+        open={Boolean(returnTarget)}
+        onCancel={() => setReturnTarget(null)}
+        footer={null}
+      >
+        <InlineError error={write.error} />
+        {returnTarget && (
+          <Typography.Paragraph type="secondary">
+            该笔返点基数 {returnTarget.base_amount}，累计已退 {returnTarget.already_returned ?? "0.00"}，
+            可退余额 <strong>{returnTarget.remaining ?? returnTarget.base_amount}</strong>。
+            退回将在来源订单登记一笔真实支出，冲减该单利润；归期按实际退回日。
+          </Typography.Paragraph>
+        )}
+        <BusinessRegistrationForm
+          layout="horizontal"
+          labelAlign="left"
+          labelCol={{ flex: "108px" }}
+          wrapperCol={{ flex: "auto" }} scope="FUNDFLOW" form={returnForm}
+          onFinish={submitReturn}
+        >
+          <CfgItem name="amount" label="退回金额" rules={requiredMoneyRules("退回金额")}>
+            <MoneyInput />
+          </CfgItem>
+          <CfgItem name="returned_on" label="退回日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
+            <DateField />
+          </CfgItem>
+          <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
+          <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={write.pending}>确认退回</PermissionButton>
         </BusinessRegistrationForm>
       </BusinessActionModal>
 

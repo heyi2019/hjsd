@@ -1,6 +1,8 @@
 """finance.router_output：流水、押金、返点、对账与划转的输出装配。"""
 from __future__ import annotations
 
+from decimal import Decimal
+
 from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser
@@ -86,10 +88,18 @@ def _deposit_out(item: Deposit) -> schemas.DepositOut:
     )
 
 
-def _rebate_out(item: RebateRecord) -> schemas.RebateOut:
-    return schemas.RebateOut.model_validate(
-        {**vars(item), "created_at": item.created_at, "operator": item.created_by, "operator_user_ids": item.operator_user_ids}
-    )
+def _rebate_out(
+    item: RebateRecord, already_returned: Decimal | None = None
+) -> schemas.RebateOut:
+    payload = {
+        **vars(item),
+        "created_at": item.created_at,
+        "operator": item.created_by,
+        "operator_user_ids": item.operator_user_ids,
+    }
+    if already_returned is not None:
+        payload["already_returned"] = already_returned
+    return schemas.RebateOut.model_validate(payload)
 
 
 def _reconciliation_out(item) -> schemas.ReconciliationOut:

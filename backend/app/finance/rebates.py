@@ -313,7 +313,15 @@ def update_rebate(
     record = get_rebate(session, rebate_id, user=user)
     before = {"base_amount": str(record.base_amount), "rate": str(record.rate), "collected_on": str(record.collected_on), "note": record.note}
     if base_amount is not None:
-        record.base_amount = _positive(base_amount, field="base_amount")
+        new_base = _positive(base_amount, field="base_amount")
+        # 护栏：基数不得低于累计已退，否则架空 return_rebate 的「累计退回≤金额」铁律。
+        already = rebate_returned_totals(session, [record])[record.id]
+        if new_base < already:
+            raise Validation(
+                f"返点基数 {new_base} 不得低于累计已退 {already}",
+                details={"base_amount": str(new_base), "already_returned": str(already)},
+            )
+        record.base_amount = new_base
     if rate is not None:
         record.rate = _non_negative(rate, field="rate")
         if record.rate > Decimal("100.00"):
@@ -361,17 +369,165 @@ def _rebate_action_event(session: Session, record: RebateRecord) -> OrderEvent |
     return None
 
 
+def rebate_returned_totals(
+    session: Session, records: list[RebateRecord]
+) -> dict[int, Decimal]:
+    """批量算每笔返点的累计已退，口径与 return_rebate 的下限校验严格同源。
+
+    只认 category=REBATE_REVERSAL 且 form_extra.rebate_record_id 命中的挂单 OUT；
+    归属判断在 Python 层做（禁 SQL json_extract/.astext，跨方言且聚合量小）。
+    order_id 用批量 IN 查询，避免列表逐笔 N+1。
+    """
+    totals: dict[int, Decimal] = {record.id: Decimal("0.00") for record in records}
+    if not totals:
+        return totals
+    order_ids = {record.source_order_id for record in records}
+    flows = session.scalars(
+        select(Cashflow).where(
+            Cashflow.order_id.in_(order_ids),
+            Cashflow.category == "REBATE_REVERSAL",
+        )
+    ).all()
+    for flow in flows:
+        rebate_id = (flow.form_extra or {}).get("rebate_record_id")
+        if rebate_id in totals:
+            totals[rebate_id] = to_money(totals[rebate_id] + to_money(flow.amount))
+    return totals
+
+
+def return_rebate(
+    session: Session,
+    *,
+    rebate_id: int,
+    amount: Any,
+    returned_on: date,
+    actor: str,
+    note: str | None = None,
+    user: CurrentUser | None = None,
+) -> tuple[RebateRecord, Cashflow, Decimal]:
+    """返点退回：在来源订单上记一笔真实 OUT 资金流水（REB-01 退回口径）。
+
+    2026-11-12 裁决：返点登记即确认收入、不提供作废/删除；确实要退回该笔钱时
+    记一笔真实 OUT 支出，发生日=真实退回日（自然归期），不再用 date.today() 的
+    作废冲销撕裂 R2 / 资金日报的月度归期。
+
+    口径（与押金「一套逻辑」同构，务必勿改）：
+    - 挂单（order_id=来源订单）：收入侧返点保留、支出侧 +一笔 OUT，订单利润
+      =收入−支出 自动冲减；R2 因 op_stmt 的 `order_id.is_(None)` 不会重复进运营费用，
+      只在资金流水段计入该单直接成本。若记成独立流水（不带 order_id）则不冲订单利润，
+      违背「利润=收入−支出」，是缺陷。
+    - 累计退回不得超过该笔返点金额 base_amount（防重复/超额退回）；
+      同一笔返点可分多次部分退回。
+    - 资金池取原返点 IN 流水所在池，取不到再回退默认利润池，保证收支同池。
+
+    返回 ``(返点记录, 退回流水, 退后累计已退)``。
+    """
+    record = get_rebate(session, rebate_id, user=user)
+    if record.status == RebateStatus.VOID.value:
+        raise Validation(
+            "已作废的历史返点不可再退回", details={"rebate_id": rebate_id}
+        )
+    returned = _positive(amount, field="amount")
+    if returned_on is None:
+        raise Validation("退回日期必填", details={"field": "returned_on"})
+
+    base = to_money(record.base_amount)
+    # 累计已退与列表下发、编辑护栏共用同一聚合函数，杜绝三处口径漂移。
+    already = rebate_returned_totals(session, [record])[record.id]
+    if already + returned > base:
+        raise Validation(
+            f"累计退回 {already + returned} 超过返点金额 {base}，可退余额 {base - already}",
+            details={
+                "rebate_id": rebate_id,
+                "base_amount": str(base),
+                "already_returned": str(already),
+                "amount": str(returned),
+            },
+        )
+
+    order = get_order(session, record.source_order_id, user)
+    # 取原返点 IN 流水所在池：该流水由 REBATE 事件派生，form_extra 带 rebate_record_id。
+    # 在 Python 层比对归属（禁 SQL json_extract / .astext，跨方言且量小），收支同池。
+    original_flows = session.scalars(
+        select(Cashflow).where(
+            Cashflow.order_id == record.source_order_id,
+            Cashflow.direction == Direction.IN.value,
+            Cashflow.category == "REBATE",
+            Cashflow.order_event_id.is_not(None),
+        )
+    ).all()
+    original_pool_id = next(
+        (
+            flow.pool_id
+            for flow in original_flows
+            if (flow.form_extra or {}).get("rebate_record_id") == record.id
+        ),
+        None,
+    )
+    if original_pool_id is not None:
+        pool_id = int(original_pool_id)
+    else:
+        # 旧模型返点无派生流水，回退默认利润池；池可用性由 create_cashflow 内校验。
+        fallback = resolve_default_pool(
+            session,
+            order.order_type,
+            Portion.PROFIT.value,
+            fund_nature=FundNature.BUSINESS.value,
+        )
+        if fallback is None:
+            raise Validation(
+                f"业务 {order.order_type} 未配置 {Portion.PROFIT.value} 资金池，无法登记返点退回",
+                code=ErrorCode.POOL_ROUTE_MISSING,
+                details={"order_type": order.order_type, "portion": Portion.PROFIT.value},
+            )
+        pool_id = fallback.id
+
+    from app.finance.cashflows import create_cashflow
+
+    flow = create_cashflow(
+        session,
+        pool_id=pool_id,
+        occurred_on=returned_on,
+        direction=Direction.OUT.value,
+        nature=Nature.BUSINESS_OUT.value,
+        category="REBATE_REVERSAL",
+        amount=returned,
+        order_id=order.id,
+        note=note or f"{record.rebate_no} 返点退回",
+        form_extra={"rebate_record_id": record.id},
+        form_extra_scope="FUNDFLOW",
+        actor=actor,
+        user=user,
+    )
+    record_audit(
+        session,
+        action=AuditAction.REBATE_RETURN,
+        entity_type="rebate_record",
+        entity_id=record.rebate_no,
+        actor=actor,
+        after={
+            "source_order": order.order_no,
+            "amount": str(returned),
+            "already_returned_before": str(already),
+            "returned_on": returned_on.isoformat(),
+            "flow_no": flow.flow_no,
+        },
+    )
+    return record, flow, to_money(already + returned)
+
+
 # 2026-11-12 裁决：返点登记即确认收入，不提供作废/删除。
 # 原 delete_rebate（reverse_cashflow + 置 VOID）移除；返点不再有 VOID 写入路径。
-# 确实要退回该笔钱时，走资金中心「录入流水」(FUNDFLOW) 登记一笔真实 OUT 支出
-# （发生日=真实退回日、自然归期），不再用 date.today() 的作废冲销把 R2 / 资金日报
-# 的月度归期撕裂。RebateStatus.VOID 枚举与收入侧 `status != VOID` 过滤保留，
-# 兼容历史已作废数据。
+# 退回走 return_rebate：在来源订单记一笔挂单真实 OUT（REBATE_REVERSAL），
+# 发生日=真实退回日、自然归期，不撕裂 R2 / 资金日报；累计退回≤返点金额。
+# RebateStatus.VOID 枚举与收入侧 `status != VOID` 过滤保留，兼容历史已作废数据。
 
 __all__ = [
     "create_rebate",
     "get_rebate",
     "list_rebates",
+    "rebate_returned_totals",
+    "return_rebate",
     "update_rebate",
 ]
 

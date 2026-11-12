@@ -100,6 +100,16 @@ export interface Rebate {
   created_at?: string;
   operator?: string;
   operator_user_ids?: number[] | null;
+  /** 后端聚合下发的累计已退 / 可退余额（口径收敛，前端不自行相减）。 */
+  already_returned?: string;
+  remaining?: string;
+}
+
+export interface RebateReturnResult {
+  rebate: Rebate;
+  cashflow: Cashflow;
+  already_returned: string;
+  remaining: string;
 }
 
 export interface Reconciliation { id: number; pool_id: number; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string; reason?: string | null; unmatched_flow_ids?: number[]; note?: string | null }

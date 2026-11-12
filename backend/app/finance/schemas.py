@@ -261,6 +261,39 @@ class RebateOut(BaseModel):
     operator: str
     operator_user_ids: list[int] | None = None
     form_extra: dict[str, Any] | None = None
+    # 累计已退由后端聚合下发（口径收敛，前端不再自行相减）；新返点为 0。
+    already_returned: Decimal = Decimal("0")
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def remaining(self) -> Decimal:
+        """可退余额 = 返点金额 - 累计已退，夹底 0（与押金 remaining_amount 同构）。"""
+        remaining = to_money(self.base_amount) - to_money(self.already_returned)
+        return remaining if remaining > 0 else Decimal("0.00")
+
+
+class RebateReturnIn(RequestModel):
+    """返点退回：金额必填、退回日必填（自然归期），可分多次部分退回。"""
+
+    amount: Decimal
+    returned_on: date
+    note: str | None = None
+
+
+class RebateReturnOut(BaseModel):
+    """退回结果：返点记录 + 退回形成的挂单 OUT 流水 + 累计已退。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    rebate: RebateOut
+    cashflow: CashflowOut
+    already_returned: Decimal
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def remaining(self) -> Decimal:
+        """退后可退余额直接取返点记录口径，避免两处各自相减。"""
+        return self.rebate.remaining
 
 
 __all__ = [
@@ -281,4 +314,6 @@ __all__ = [
     "TransferOut",
     "RebateCreate",
     "RebateOut",
+    "RebateReturnIn",
+    "RebateReturnOut",
 ]

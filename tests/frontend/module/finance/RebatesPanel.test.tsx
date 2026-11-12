@@ -38,8 +38,10 @@ const rebates = [
     rebate_type: "BUY",
     rate: "0.10",
     base_amount: "1000.00",
-    status: "PENDING",
+    status: "SETTLED",
     collected_on: "2026-10-01",
+    already_returned: "400.00",
+    remaining: "600.00",
   },
   {
     id: 2,
@@ -50,6 +52,8 @@ const rebates = [
     base_amount: "2000.00",
     status: "SETTLED",
     collected_on: "2026-10-02",
+    already_returned: "0.00",
+    remaining: "2000.00",
   },
 ];
 const orders = [
@@ -81,6 +85,15 @@ describe("RebatesPanel：返点记录列表", () => {
     expect(screen.getByText("HS0001-RB02")).toBeInTheDocument();
     expect(screen.getAllByText("1,000.00").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("0.10%").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("可退余额取后端下发值，不在前端自行相减", async () => {
+    renderLight(<RebatesPanel />, { user: "admin" });
+    await screen.findByText("HS0001-RB01");
+    expect(screen.getAllByText("可退余额").length).toBeGreaterThanOrEqual(1);
+    // RB01 后端下发 remaining=600.00（而非 base 1000），证明直接消费后端口径。
+    expect(screen.getAllByText("600.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("2,000.00").length).toBeGreaterThanOrEqual(1);
   });
 
   it("统计卡：返点记录数正常展示", async () => {
@@ -152,6 +165,64 @@ describe("RebatesPanel：新增返点记录 / 登记到账", () => {
     await screen.findByText("HS0001-RB01");
     expect(screen.queryByRole("button", { name: /新增返点记录/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /登记结算/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /退回/ })).toBeNull();
   });
 
+});
+
+describe("RebatesPanel：返点退回（REB-01）", () => {
+  beforeEach(() => {
+    vi.mocked(rebatesApi.returnRebate).mockResolvedValue({
+      rebate: { ...rebates[0], already_returned: "600.00", remaining: "400.00" },
+      cashflow: {
+        id: 9, flow_no: "ZC00009", pool_id: 1, occurred_on: "2026-11-12",
+        nature: "BUSINESS_OUT", fund_nature: "BUSINESS", accounting_attribute: "REVERSAL",
+        category: "REBATE_REVERSAL", direction: "OUT", amount: "200.00", status: "APPROVED",
+        source: "REBATE_SETTLEMENT",
+      },
+      already_returned: "600.00", remaining: "400.00",
+    } as never);
+  });
+
+  it("每行渲染退回入口，但历史 VOID / 可退余额为 0 时禁用", async () => {
+    vi.mocked(rebatesApi.list).mockResolvedValueOnce([
+      ...rebates,
+      { ...rebates[1], id: 3, rebate_no: "HS0001-RB03", status: "VOID", remaining: "2000.00" },
+      { ...rebates[1], id: 4, rebate_no: "HS0001-RB04", status: "SETTLED", remaining: "0.00" },
+    ]);
+    renderLight(<RebatesPanel />, { user: "admin" });
+    await screen.findByText("HS0001-RB01");
+    const returnButtons = screen.getAllByRole("button", { name: "退回" });
+    expect(returnButtons.length).toBe(4);
+    // RB01 可退 600 → 可点；RB03 VOID、RB04 余额 0 → 禁用。
+    expect(returnButtons[0]).not.toBeDisabled();
+    expect(returnButtons[2]).toBeDisabled();
+    expect(returnButtons[3]).toBeDisabled();
+  });
+
+  it("提交退回回传金额与真实退回日，成功后刷新列表", async () => {
+    renderLight(<RebatesPanel />, { user: "admin" });
+    await screen.findByText("HS0001-RB01");
+    await ui.click(screen.getAllByRole("button", { name: "退回" })[0]);
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    expect((await within(modal).findAllByText(/可退余额/)).length).toBeGreaterThanOrEqual(1);
+    await ui.type(modal.querySelector("#amount") as Element, "200.00");
+    await ui.click(within(modal).getByRole("button", { name: /确认退回/ }));
+    await waitFor(() => expect(vi.mocked(rebatesApi.returnRebate)).toHaveBeenCalled());
+    const payload = vi.mocked(rebatesApi.returnRebate).mock.calls[0][1] as Record<string, unknown>;
+    expect(payload.amount).toBe("200.00");
+    expect(payload.returned_on).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    await waitFor(() => expect(vi.mocked(rebatesApi.list).mock.calls.length).toBeGreaterThan(1));
+  });
+
+  it("超额退回在前端即时拦截，不发起请求", async () => {
+    renderLight(<RebatesPanel />, { user: "admin" });
+    await screen.findByText("HS0001-RB01");
+    await ui.click(screen.getAllByRole("button", { name: "退回" })[0]);
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    await ui.type(modal.querySelector("#amount") as Element, "700.00"); // > 可退 600
+    await ui.click(within(modal).getByRole("button", { name: /确认退回/ }));
+    await waitFor(() => expect(within(modal).getByText(/不得超过可退余额/)).toBeInTheDocument());
+    expect(vi.mocked(rebatesApi.returnRebate)).not.toHaveBeenCalled();
+  });
 });

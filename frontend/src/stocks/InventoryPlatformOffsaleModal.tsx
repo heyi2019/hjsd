@@ -9,6 +9,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { consignmentPlatform, isActiveConsignmentListing } from "./consignment-logic";
+import { formatDateTimeMinute } from "../shared/lib/format";
 
 export type ActiveConsignment = {
   orderId: number;
@@ -19,12 +20,6 @@ export type ActiveConsignment = {
 
 type DisplayConsignment = Omit<ActiveConsignment, "orderId"> & { orderId: number | "SYSTEM" };
 
-function minute(value: string | null | undefined) {
-  if (!value) return "-";
-  const normalized = value.replace("T", " ");
-  return normalized.length >= 16 ? normalized.slice(0, 16) : `${normalized.slice(0, 10)} 00:00`;
-}
-
 export function consignmentRecords(orders: AccountExecutionOrder[]): ActiveConsignment[] {
   return orders
     .filter(isActiveConsignmentListing)
@@ -32,7 +27,7 @@ export function consignmentRecords(orders: AccountExecutionOrder[]): ActiveConsi
       orderId: order.order_id,
       orderNo: order.order_no,
       platform: consignmentPlatform(order) ?? "-",
-      listedAt: minute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date)),
+      listedAt: formatDateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date)),
     }));
 }
 
@@ -53,7 +48,7 @@ export function InventoryPlatformOffsaleModal(props: {
       orderId: "SYSTEM",
       orderNo: "ERP",
       platform: "本系统",
-      listedAt: minute(String(props.account.created_at ?? props.account.buy_date)),
+      listedAt: formatDateTimeMinute(String(props.account.created_at ?? props.account.buy_date)),
     }
     : null;
   const displayRecords: DisplayConsignment[] = systemRecord ? [...props.records, systemRecord] : props.records;

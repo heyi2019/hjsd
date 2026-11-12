@@ -3,13 +3,9 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.core.security import CurrentUser
 from app.foundation import schemas
 from app.foundation.classification import classification_for_order_type
 from app.parties.fields import get_extra_values
-
-def _actor(user: CurrentUser) -> str:
-    return user.username
 
 
 def _pool_output(db: Session, pool) -> schemas.PoolOut:

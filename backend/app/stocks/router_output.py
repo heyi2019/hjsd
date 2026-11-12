@@ -14,12 +14,9 @@ from app.domain.users import User
 from app.parties.fields import get_extra_values_bulk
 
 from .schemas import AccountOut
+from app.core.actor import actor_name as _actor
 
 INVENTORY_SOURCE_ORDER_TYPES = frozenset({"HS", "TH", "DG"})
-
-
-def _actor(user: CurrentUser) -> str:
-    return user.username
 
 
 def _source_orders(

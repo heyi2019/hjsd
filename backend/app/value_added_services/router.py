@@ -31,6 +31,7 @@ from app.lists import service as list_columns_service
 from app.lists.export import build_list_csv, detail_json
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.parties.fields import get_extra_values, get_extra_values_bulk
+from app.core.actor import actor_name as _actor
 
 router = APIRouter(tags=["HS-01 分期合约"])
 
@@ -52,10 +53,6 @@ INSTALLMENT_DETAIL_EXPORT_COLUMNS = [
     ("installment_schedule", "期次明细", True),
     ("installment_dispositions", "处置记录", True),
 ]
-
-
-def _actor(user: CurrentUser) -> str:
-    return user.username
 
 
 def _installment_output(db: Session, item) -> schemas.InstallmentOut:

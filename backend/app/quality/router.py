@@ -14,14 +14,11 @@ from app.core.security import (
     require_permissions,
 )
 from app.quality import schemas, service
+from app.core.actor import actor_name as _actor
 
 router = APIRouter(tags=["QLT-01 质量与异常"])
 read_quality = require_permissions(PERM_REPORT_READ)
 manage_quality = require_permissions(PERM_ORDER_UPDATE)
-
-
-def _actor(user: CurrentUser) -> str:
-    return user.username
 
 
 @router.get("/quality/exceptions", response_model=schemas.QualitySummaryOut)

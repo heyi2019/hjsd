@@ -51,7 +51,8 @@ from app.foundation.pools import (
 from app.foundation.sequences import list_sequences as foundation_list_sequences
 from app.parties.fields import get_extra_values_bulk
 
-from .router_output import _actor, _order_type_output, _pool_output, _route_out
+from app.core.actor import actor_name as _actor
+from .router_output import _order_type_output, _pool_output, _route_out
 
 router = APIRouter(tags=["BAS-02/03 业务与资金主数据"])
 

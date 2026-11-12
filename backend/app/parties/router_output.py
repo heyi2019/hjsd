@@ -9,9 +9,7 @@ from app.domain.enums import AuditAction
 from app.parties import schemas
 from app.parties._common import to_counterparty_out
 from app.parties.fields import get_extra_values
-
-def _actor(user: CurrentUser) -> str:
-    return user.username
+from app.core.actor import actor_name as _actor
 
 
 def _lead_output(db: Session, item) -> schemas.LeadOut:

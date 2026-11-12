@@ -4,7 +4,7 @@
 既有文件已覆盖种子幂等、池 code 不可改、V17 有流水禁删、无路由不可启用、
 路由 upsert 与停用池拒绝等主路径；本文件补池/业务类型的 404 与取值校验、
 列表的启用过滤、更新池全字段、业务类型更新、路由 portion 校验、
-停用池不可作为默认路由、编号域两个便捷函数、种子「业务类型缺失跳过路由」
+停用池不可作为默认路由、编号域序列初始化与预览、种子「业务类型缺失跳过路由」
 与 `seed_is_applied`，以及 2 个未测路由端点。
 """
 from __future__ import annotations
@@ -37,7 +37,7 @@ from app.foundation.pools import (
     set_pool_status,
     update_pool,
 )
-from app.foundation.sequences import ensure_order_sequence, preview_order_no
+from app.core.numbering import ensure_sequence, peek_number
 from app.orders.create import create_order
 
 
@@ -352,9 +352,9 @@ class TestRouteGuards:
 class TestNumberingHelpers:
     def test_ensure_and_preview_order_no(self, seeded_db):
         definition = get_order_type_by_code(seeded_db, "HS")
-        sequence = ensure_order_sequence(seeded_db, definition)
+        sequence = ensure_sequence(seeded_db, definition.sequence_key, definition.sequence_prefix, 4)
         assert sequence.sequence_key == definition.sequence_key
-        assert preview_order_no(seeded_db, definition).startswith("HS")
+        assert peek_number(seeded_db, definition.sequence_key).startswith("HS")
 
 
 class TestSeedGuards:
@@ -398,13 +398,13 @@ class TestFoundationApi:
         设真实序列行到上限来触发分支，而不是 mock 路由层内部符号：
         这样断言的是对外行为，重构内部实现（如改为按已加载行直接格式化）不会误伤。
         """
-        from app.core.numbering import MAX_SEQUENCE_VALUE
+        from app.core.numbering import sequence_max
         from app.domain.foundation import DocumentSequence
 
         target = seeded_db.scalar(
             select(DocumentSequence).order_by(DocumentSequence.sequence_key)
         )
-        target.current_value = MAX_SEQUENCE_VALUE
+        target.current_value = sequence_max(4)
         seeded_db.commit()
 
         response = seeded_client.get("/api/v1/sequences", headers=headers)
@@ -412,7 +412,7 @@ class TestFoundationApi:
         row = next(
             item for item in response.json() if item["sequence_key"] == target.sequence_key
         )
-        assert row["next_number"] == f"<已达上限 {MAX_SEQUENCE_VALUE}>"
+        assert row["next_number"] == f"<已达上限 {sequence_max(4)}>"
 
     def test_sequences_endpoint_five_digit_not_exhausted_at_9999(
         self, seeded_client, seeded_db, headers

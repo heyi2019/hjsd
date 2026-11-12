@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.errors import AppError, ErrorCode
-from app.core.numbering import MAX_SEQUENCE_VALUE, allocate_number, ensure_sequence, peek_number
+from app.core.numbering import allocate_number, ensure_sequence, peek_number, sequence_max
 from app.domain.enums import SequenceKey
 
 # 本文件含自建临时探针库的并发用例（create_engine + connect），不依赖 v1_engine 夹具，
@@ -55,7 +55,7 @@ def test_sequence_exhausted_raises_instead_of_silent_overflow(db):
     ensure_sequence(db, SequenceKey.CUSTOMER, "CUS", 4)
     db.commit()
     sequence = ensure_sequence(db, SequenceKey.CUSTOMER, "CUS", 4)
-    sequence.current_value = MAX_SEQUENCE_VALUE
+    sequence.current_value = sequence_max(4)
     db.commit()
 
     with pytest.raises(AppError) as exc:

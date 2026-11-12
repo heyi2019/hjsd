@@ -15,7 +15,7 @@ from app.core import database, money, settings as settings_module
 from app import api_v1
 from app.core.errors import AppError, ErrorCode, NotFound, Validation, require_condition
 from app.core.money import Amount, to_money
-from app.core.numbering import MAX_SEQUENCE_VALUE, current_value, peek_number
+from app.core.numbering import peek_number, sequence_max
 from app.core.security import (
     ROLE_ADMIN,
     ROLE_OPERATOR,
@@ -75,7 +75,7 @@ class TestNumberingGuards:
         seeded_db.add(
             DocumentSequence(
                 sequence_key="OVER_PADDING4", prefix="OF4", padding=4,
-                current_value=MAX_SEQUENCE_VALUE + 1,
+                current_value=sequence_max(4) + 1,
             )
         )
         seeded_db.flush()
@@ -100,7 +100,7 @@ class TestNumberingGuards:
         seeded_db.add(
             DocumentSequence(
                 sequence_key="FULL_KEY", prefix="FK", padding=4,
-                current_value=MAX_SEQUENCE_VALUE,
+                current_value=sequence_max(4),
             )
         )
         seeded_db.flush()
@@ -110,11 +110,10 @@ class TestNumberingGuards:
 
     def test_format_next_number_uses_padding_specific_max(self):
         """预览层上限按 padding 算：5 位序列 9999→10000 不误报、99999→耗尽才报。"""
-        from app.core.numbering import format_next_number, sequence_max
+        from app.core.numbering import format_next_number
 
         assert sequence_max(4) == 9999
         assert sequence_max(5) == 99999
-        assert MAX_SEQUENCE_VALUE == 9999  # 默认 4 位别名，向后兼容既有引用
 
         # 缺陷回归：旧实现硬编码 9999，5 位序列到 9999 时预览会误报耗尽
         assert (
@@ -146,15 +145,23 @@ class TestNumberingGuards:
         # 普通关键词不受影响
         assert like_contains(" 王者 ")[0] == "%王者%"
 
-    def test_current_value_defaults_to_zero(self, seeded_db):
+    def test_sequence_current_value_reads_from_database(self, seeded_db):
         seeded_db.add(
             DocumentSequence(
                 sequence_key="CUR_KEY", prefix="CK", padding=4, current_value=7
             )
         )
         seeded_db.flush()
-        assert current_value(seeded_db, "CUR_KEY") == 7
-        assert current_value(seeded_db, "MISSING_KEY") == 0
+        assert seeded_db.scalar(
+            select(DocumentSequence.current_value).where(
+                DocumentSequence.sequence_key == "CUR_KEY"
+            )
+        ) == 7
+        assert seeded_db.scalar(
+            select(DocumentSequence.current_value).where(
+                DocumentSequence.sequence_key == "MISSING_KEY"
+            )
+        ) is None
 
 
 # ------------------------------------------------------------------ errors

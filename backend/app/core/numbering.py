@@ -27,9 +27,6 @@ def sequence_max(padding: int) -> int:
     return 10**padding - 1
 
 
-MAX_SEQUENCE_VALUE = sequence_max(DEFAULT_PADDING)  # 默认 4 位序列上限；实际按各序列 padding 计算
-
-
 def ensure_sequence(
     session: Session,
     key: str | SequenceKey,
@@ -147,14 +144,6 @@ def peek_number(session: Session, key: str | SequenceKey) -> str:
     )
 
 
-def current_value(session: Session, key: str | SequenceKey) -> int:
-    key_value = key.value if isinstance(key, SequenceKey) else key
-    row = session.scalar(
-        select(DocumentSequence).where(DocumentSequence.sequence_key == key_value)
-    )
-    return 0 if row is None else row.current_value
-
-
 def allocate_flow_no(session: Session, direction: str) -> str:
     """资金流水编号（2026-10-28 用户口径）：按方向独立递增——
     支出 ZC+五位流水（ZC00001）、收入 SR+五位流水（SR00001）。"""
@@ -163,10 +152,8 @@ def allocate_flow_no(session: Session, direction: str) -> str:
 
 
 __all__ = [
-    "MAX_SEQUENCE_VALUE",
     "allocate_flow_no",
     "allocate_number",
-    "current_value",
     "ensure_sequence",
     "format_next_number",
     "peek_number",

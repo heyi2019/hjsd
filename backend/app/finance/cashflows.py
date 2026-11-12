@@ -377,6 +377,15 @@ def _flow_row(flow: Cashflow, order_no: str | None) -> dict[str, Any]:
     }
 
 
+def _attach_extra_values(session: Session, rows: list[dict[str, Any]]) -> None:
+    """批量回填流水扩展字段；列表与工作室面板共用，避免两处逐字复制。"""
+    extras = get_extra_values_bulk(
+        session, entity_type="cashflow", entity_ids=[row["id"] for row in rows]
+    )
+    for row in rows:
+        row["extra_values"] = extras.get(row["id"], {})
+
+
 def list_cashflows(
     session: Session,
     *,
@@ -431,11 +440,7 @@ def list_cashflows(
         .offset(offset)
     ).all():
         rows.append(_flow_row(flow, order_no))
-    extras = get_extra_values_bulk(
-        session, entity_type="cashflow", entity_ids=[row["id"] for row in rows]
-    )
-    for row in rows:
-        row["extra_values"] = extras.get(row["id"], {})
+    _attach_extra_values(session, rows)
     return rows, total
 
 
@@ -603,11 +608,7 @@ def studio_summary(
     income = sums.get(Direction.IN.value, Decimal("0.00"))
     expense = sums.get(Direction.OUT.value, Decimal("0.00"))
 
-    extras = get_extra_values_bulk(
-        session, entity_type="cashflow", entity_ids=[row["id"] for row in rows]
-    )
-    for row in rows:
-        row["extra_values"] = extras.get(row["id"], {})
+    _attach_extra_values(session, rows)
 
     return {
         "items": rows,

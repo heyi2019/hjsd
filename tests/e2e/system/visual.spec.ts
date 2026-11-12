@@ -77,6 +77,8 @@ test.describe("UI visual regression", () => {
       // 「今日关注」两个计数取自真实库数据，别的 spec 写订单后数字会变（47px 抖动）。
       // 遮掉动态数值，只锁布局与排版。
       // 「我的消息」条目（如「新的分润通知 N 条」）同样随库数据变化（59px 抖动），一并遮掉。
+      // maskColor 用中性灰：默认 magenta 会在基线图里留大片刺眼品红（实为遮罩色，非页面渲染缺陷）。
+      maskColor: "#8a8a8a",
       mask: [
         page.locator(".dashboard-summary .ui-stat__value"),
         page.locator('section[aria-label="我的消息"]'),
@@ -94,6 +96,8 @@ test.describe("UI visual regression", () => {
       fullPage: true,
       // 同 desktop：遮掉随库数据变化的计数。
       // 「我的消息」条目（如「新的分润通知 N 条」）同样随库数据变化（59px 抖动），一并遮掉。
+      // maskColor 用中性灰：默认 magenta 会在基线图里留大片刺眼品红（实为遮罩色，非页面渲染缺陷）。
+      maskColor: "#8a8a8a",
       mask: [
         page.locator(".dashboard-summary .ui-stat__value"),
         page.locator('section[aria-label="我的消息"]'),

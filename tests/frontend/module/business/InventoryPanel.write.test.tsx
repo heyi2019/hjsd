@@ -255,19 +255,14 @@ describe("InventoryPanel：写入与长路径", () => {
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
   });
 
-  it("删除返点明细后通知上层刷新（#9）", async () => {
-    const onCreated = vi.fn();
-    resolveMock(vi.mocked(catalog.rebatesApi.remove), {});
-    renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={onCreated} />, { user: "admin" });
+  it("返点不可删除/作废：无删除入口，退回走资金中心录入支出（2026-11-12 裁决）", async () => {
+    renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
     expect(await screen.findByText("返点明细")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "删除" }));
-    // 触发按钮与二次确认按钮同名，取最后出现的确认按钮。
-    const deleteButtons = await screen.findAllByRole("button", { name: "删除" });
-    await userEvent.click(deleteButtons[deleteButtons.length - 1]);
-
-    await waitFor(() => expect(catalog.rebatesApi.remove).toHaveBeenCalledWith(41));
-    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    // 返点明细行只保留「编辑」，不再有「删除」按钮。
+    expect(screen.queryByRole("button", { name: "删除" })).not.toBeInTheDocument();
+    // 注册接口不再暴露 remove（DELETE /rebates/{id} 已撤销）。
+    expect(catalog.rebatesApi).not.toHaveProperty("remove");
   });
 
   it("操作人接口失败时显示错误，不伪造空操作人列表", async () => {

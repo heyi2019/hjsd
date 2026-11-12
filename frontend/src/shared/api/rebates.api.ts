@@ -21,5 +21,5 @@ export const rebatesApi = {
     api.post<Rebate>("/rebates", payload).then((r) => r.data),
   update: (id: number, payload: { base_amount?: string; rate?: string; collected_on?: string; note?: string | null; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) =>
     api.patch<Rebate>(`/rebates/${id}`, payload).then((r) => r.data),
-  remove: (id: number) => api.delete<void>(`/rebates/${id}`).then(() => undefined),
+  // 2026-11-12 裁决：返点登记即确认收入，不提供删除/作废。退回走资金中心录入 OUT 支出。
 };

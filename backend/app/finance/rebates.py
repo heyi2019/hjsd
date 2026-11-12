@@ -343,34 +343,11 @@ def update_rebate(
     return record
 
 
-def delete_rebate(session: Session, rebate_id: int, *, actor: str, user: CurrentUser | None = None) -> None:
-    record = get_rebate(session, rebate_id, user=user)
-    rebate_no = record.rebate_no
-    status = record.status
-    if status == RebateStatus.VOID.value:
-        raise Validation("返点记录已经作废", details={"rebate_no": rebate_no})
-    action_event = _rebate_action_event(session, record)
-    flow = session.scalar(select(Cashflow).where(Cashflow.order_event_id == action_event.id)) if action_event else None
-    if flow is not None:
-        from app.finance.cashflows import reverse_cashflow
-
-        reverse_cashflow(
-            session,
-            flow.id,
-            reversed_on=date.today(),
-            actor=actor,
-            reason=f"作废返点 {rebate_no}",
-            form_extra_scope="INVREBATE",
-            user=user,
-        )
-    record.status = RebateStatus.VOID.value
-    record.updated_by = actor
-    session.flush()
-    record_audit(session, action=AuditAction.REBATE_DELETE, entity_type="rebate_record", entity_id=rebate_no, actor=actor, before={"rebate_no": rebate_no, "status": status}, after={"status": RebateStatus.VOID.value})
-
-
 def _rebate_action_event(session: Session, record: RebateRecord) -> OrderEvent | None:
-    """查找新动作模型的返点事件；旧记录没有该事件，继续走兼容口径。"""
+    """查找新动作模型的返点事件；旧记录没有该事件，继续走兼容口径。
+
+    供 update_rebate 编辑时同步事件与资金流水的金额/日期，保持报表同源。
+    """
     events = session.scalars(
         select(OrderEvent).where(
             OrderEvent.order_id == record.source_order_id,
@@ -382,9 +359,16 @@ def _rebate_action_event(session: Session, record: RebateRecord) -> OrderEvent |
             return event
     return None
 
+
+# 2026-11-12 裁决：返点登记即确认收入，不提供作废/删除。
+# 原 delete_rebate（reverse_cashflow + 置 VOID）移除；返点不再有 VOID 写入路径。
+# 确实要退回该笔钱时，走资金中心「录入流水」(FUNDFLOW) 登记一笔真实 OUT 支出
+# （发生日=真实退回日、自然归期），不再用 date.today() 的作废冲销把 R2 / 资金日报
+# 的月度归期撕裂。RebateStatus.VOID 枚举与收入侧 `status != VOID` 过滤保留，
+# 兼容历史已作废数据。
+
 __all__ = [
     "create_rebate",
-    "delete_rebate",
     "get_rebate",
     "list_rebates",
     "update_rebate",

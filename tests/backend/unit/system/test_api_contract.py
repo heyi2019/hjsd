@@ -13,7 +13,6 @@ NON_JSON_ROUTES = frozenset(
         ("GET", "/api/v1/reports/{report_name}/export.csv"),
         ("GET", "/api/v1/attachments/{attachment_id}/download"),
         ("DELETE", "/api/v1/game-types/{game_type_id}"),
-        ("DELETE", "/api/v1/rebates/{rebate_id}"),
         ("DELETE", "/api/v1/stocks/{account_id}"),
         ("GET", "/api/v1/orders/export.csv"),
         ("GET", "/api/v1/orders/export.xlsx"),
@@ -64,4 +63,8 @@ def test_every_json_api_route_declares_response_model(app):
     # GET /cashflows/studio-summary、POST /stocks/inventory/stats）。
     # → 189（2026-11-05 实测：账号删除 + 免密登录/绑定、列表列配置、库存统计等累计 +10）
     # → 190（订单退款改为独立资金明细接口）→ 191（订单关联收入/支出资金明细）
-    assert public_routes == 192
+    # → 190（2026-11-12 复核实测：此前断言 192 已过时——HEAD 实测即 190；
+    #        注释停在 191 但从未同步断言，属既有漂移，本次据实校正）
+    # → 189（2026-11-12 裁决：删除 DELETE /rebates/{id}（返点不可作废），-1）。
+    # 注：public_routes 在豁免判断之前 +1，故豁免路由（含已删的 DELETE /rebates）也计数。
+    assert public_routes == 189

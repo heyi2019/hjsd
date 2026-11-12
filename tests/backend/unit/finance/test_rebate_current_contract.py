@@ -1,4 +1,8 @@
-"""REBATE-01 返点生命周期契约 + 分次结算模型层下线守卫。"""
+"""REBATE-01 返点生命周期契约 + 分次结算模型层下线守卫。
+
+2026-11-12 裁决：返点登记即确认收入，生命周期收窄为「登记 + 编辑」，
+不再有删除/作废（delete_rebate 已移除，退回走资金中心录入 OUT 支出）。
+"""
 
 from app.core import business_numbering
 from app.core.database import Base
@@ -7,12 +11,18 @@ from app.finance import rebates, router, schemas, service
 
 
 def test_rebate_has_only_register_edit_delete_lifecycle():
+    """返点生命周期 = 登记 + 编辑；删除/作废与分次结算均属下线能力。
+
+    函数名保留历史名以维持测试用例索引（UT-D04-001）稳定；断言口径已按
+    2026-11-12 裁决收窄——delete_rebate 一并列入必须不存在的 legacy 名。
+    """
     legacy_names = (
         "settle_rebate",
         "list_rebate_settlements",
         "reverse_rebate_settlement",
         "settled_net_total",
         "void_rebate",
+        "delete_rebate",
         "SettlementCreate",
         "SettlementOut",
         "SettlementReverse",

@@ -588,14 +588,10 @@ def update_rebate(
     return _rebate_out(item)
 
 
-@router.delete("/rebates/{rebate_id}", status_code=204)
-def delete_rebate(
-    rebate_id: int,
-    db: Session = Depends(get_db),
-    user: CurrentUser = post_rebate,
-) -> Response:
-    service.delete_rebate(db, rebate_id, actor=_actor(user), user=user)
-    return Response(status_code=204)
+# 2026-11-12 裁决：返点登记即确认收入，不提供作废/删除接口。
+# 返点不再有 VOID 写入路径；确实要退回该笔钱时，走资金中心「录入流水」登记一笔
+# 真实 OUT 支出（有真实发生日、自然归期），不再用 date.today() 的作废冲销撕裂 R2。
+# RebateStatus.VOID 枚举与收入侧 `!= VOID` 过滤保留，兼容历史已作废数据。
 
 
 __all__ = ["router"]

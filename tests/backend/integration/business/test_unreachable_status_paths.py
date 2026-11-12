@@ -3,7 +3,9 @@
 QA500B 补齐轮确认这 5 个枚举值无写入路径，本文件按补齐端点逐个锁定：
 1. PolicyVersion.SUPERSEDED  — POST /policy-versions/{id}/supersede（仅 DRAFT）
 2. PolicyVersion.EXPIRED     — POST /policies/versions/expire-sweep（effective_to < on）
-3. RebateRecord.VOID         — POST /rebates/{id}/void（仅零结算 OPEN）
+3. RebateRecord.VOID         — 2026-11-12 裁决：返点登记即确认收入，DELETE /rebates/{id}
+                               （原唯一 VOID 写入路径）已撤销，VOID 彻底无写入路径；
+                               枚举值与收入侧 != VOID 过滤保留仅作历史数据兼容。
 4. Deposit.CANCELLED         — POST /deposits/{id}/cancel（仅 PAID 无退还/损失，全额冲正）
 5. ImportBatch.REJECTED      — POST /imports/batches/{id}/reject（仅 DRAFT/MAPPED）
 附带：CounterpartyStatus.DISABLED 走既有 PATCH /counterparties/{id}/status。
@@ -148,7 +150,9 @@ def test_expire_sweep_idempotent(seeded_db):
     assert second["swept"] == 0
 
 
-# ── 3. Rebate VOID：零结算取消 ───────────────────────────────────
+# ── 3. Rebate VOID：已彻底收口（2026-11-12）──────────────────────
+# 原唯一写入路径 delete_rebate（reverse_cashflow + 置 VOID）已移除，
+# VOID 无端点可写；compat：枚举与收入侧 != VOID 过滤保留给历史数据。
 
 TODAY = date(2026, 10, 17)
 

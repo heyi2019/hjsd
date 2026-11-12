@@ -12,7 +12,7 @@ import { stocksApi,
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { moneyRules, percentRules } from "../shared/lib/validators";
-import { BusinessActionModal, BusinessRegistrationForm, ConfirmButton, DateField, ErrorBanner, MoneyInput, MoneyText, PermissionButton, dateValueFromEvent, dateValueProps } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, DateField, ErrorBanner, MoneyInput, MoneyText, PermissionButton, dateValueFromEvent, dateValueProps } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
@@ -255,21 +255,7 @@ export function InventoryRebateModal(props: {
                           setEditTarget(row);
                         }}
                       >编辑</PermissionButton>
-                      <ConfirmButton
-                        permission="order.event.post"
-                        size="small"
-                        danger
-                        title="删除返点明细"
-                        description="删除后该返点记录将不再保留，确定删除吗？"
-                        okText="删除"
-                        onConfirm={async () => {
-                          await rebatesApi.remove(row.id);
-                          setRebates((current) => current.filter((item) => item.id !== row.id));
-                          appMessage.success("返点明细已删除");
-                          // 删除返点同样影响订单利润与统计，必须刷新上层（#9）。
-                          await props.onCreated();
-                        }}
-                      >删除</ConfirmButton>
+                      {/* 2026-11-12 裁决：返点不可删除/作废；退回走资金中心录入 OUT 支出。 */}
                     </Space>
                   </span>
                 </div>

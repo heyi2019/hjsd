@@ -1,4 +1,4 @@
-/** 返点明细：登记即完成一条业务事实，只支持编辑和删除（REB-01 / A06）。 */
+/** 返点明细：登记即确认收入，只支持编辑、不可删除/作废（REB-01 / A06）。退回走资金中心录入 OUT 支出。 */
 import { Card, Form, Input, Space, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
@@ -22,7 +22,6 @@ import {
   InlineError,
   MoneyInput,
   MoneyText,
-  ConfirmButton,
   BusinessActionModal,
   BusinessRegistrationForm,
   PermissionButton,
@@ -190,21 +189,7 @@ export function RebatesPanel() {
           >
             编辑
           </PermissionButton>
-          <ConfirmButton
-            permission="order.event.post"
-            size="small"
-            danger
-            title="删除返点明细"
-            description="删除后该返点明细将不再保留，确定删除吗？"
-            okText="删除"
-            onConfirm={async () => {
-              await rebatesApi.remove(row.id);
-              appMessage.success("返点明细已删除");
-              await load();
-            }}
-          >
-            删除
-          </ConfirmButton>
+          {/* 2026-11-12 裁决：返点不可删除/作废；退回走资金中心录入 OUT 支出。 */}
         </Space>
       ),
     },

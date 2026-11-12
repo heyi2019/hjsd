@@ -80,3 +80,13 @@ def test_rebate_legacy_action_routes_removed(app):
     assert "/api/v1/rebates/{rebate_id}/void" not in paths
     assert "/api/v1/rebates/{rebate_id}/settlements" not in paths
     assert "/api/v1/rebates/{rebate_id}/settlements/{settlement_id}/reverse" not in paths
+    # 2026-11-12 裁决：返点登记即确认收入，DELETE 作废入口一并撤销。
+    assert "delete" not in paths.get("/api/v1/rebates/{rebate_id}", {})
+
+
+def test_rebate_delete_service_removed():
+    """返点作废服务移除；退回走资金中心录入 OUT 支出，不再 reverse_cashflow+VOID。"""
+    from app.finance import rebates, service
+
+    assert not hasattr(rebates, "delete_rebate")
+    assert not hasattr(service, "delete_rebate")

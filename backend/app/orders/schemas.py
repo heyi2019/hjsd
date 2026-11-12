@@ -417,9 +417,10 @@ class PoolBalanceTotalsOut(BaseModel):
     """资金池余额汇总：服务端按 Decimal 聚合，前端只展示不再自己累加。"""
 
     cash_balance: Decimal
+    # 可用余额 = 现金余额；押金占用已在 expense 扣过一次，不再二次减 deposit_held。
     available: Decimal
-    deposit_held: Decimal
-    # 自有权益口径：仅 ownership=OWNED 的池、按现金头寸计（不扣押金占用）。
+    deposit_held: Decimal  # 其中项：押金占用，仅展示不参与 available 计算
+    # 自有权益口径：仅 ownership=OWNED 的池、按现金头寸计（押金占用已进 expense）。
     owned_cash_balance: Decimal
 
 

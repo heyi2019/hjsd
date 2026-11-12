@@ -307,10 +307,10 @@ class TestA08Deposit:
         after = orders_service.pool_balance(seeded_db, invest.id)
 
         assert deposit.status == DepositStatus.PAID.value
-        # 押金流出使现金余额下降，且额外占用可用余额
+        # 押金流出使现金余额下降；available=现金余额，不再二次扣押金占用
         assert after["cash_balance"] == before["cash_balance"] - Decimal("2000")
         assert after["deposit_held"] == Decimal("2000.00")
-        assert after["available"] == after["cash_balance"] - Decimal("2000")
+        assert after["available"] == after["cash_balance"]
 
         # 部分退回
         finance_service.return_deposit(

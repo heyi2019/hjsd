@@ -8,10 +8,12 @@
 
 覆盖修复（2026-11-12 资金中心两方向 + 押金完整走业务口径 C）：
 - #10 押金占用进 expense、释放/取消进 income（原为从经营收支卡片剔除）；
-     cash_balance 与 deposit_held/available 口径不变。
+     cash_balance=income−expense；available=cash_balance（押金占用已在 expense 扣过，
+     不再二次减 deposit_held；deposit_held 降为其中项信息列，2026-11-12 裁决）。
 - #5  外部注入并入 income、删除 external_in 独立列（原为单列）。
 - #9（已由 C 推翻）：押金挂单改为完整进业务口径——占用进 R2 直接成本、
-     释放进收入；损失仅体现为「收入−支出」净额，不另记第二次现金流。
+     释放进收入；押金线只有一套逻辑：净额=收入−支出，正为利润、负为损失
+     （损失=−利润），不另记第二次现金流。
 - 押金损失不重复：business_cashflow_filter 只排除损失那笔 OUT，资金中心/
      订单利润/报表同源(R3/R5)/R2 月度损益共用同一谓词。
 - 售出/返点是收入子类型、回收/提号是支出子类型，均进大类不单列。
@@ -79,7 +81,8 @@ def test_deposit_hold_in_expense_release_in_income(seeded_db):
     # 现金头寸含押金流出；押金占用 +2000；押金占用进资金中心支出。
     assert after_hold["cash_balance"] == before["cash_balance"] - Decimal("2000")
     assert after_hold["deposit_held"] == Decimal("2000.00")
-    assert after_hold["available"] == after_hold["cash_balance"] - Decimal("2000")
+    # 支出口径：押金占用已在 expense/cash_balance 扣过一次，available 不再二次扣 held
+    assert after_hold["available"] == after_hold["cash_balance"]
     assert after_hold["expense"] == before["expense"] + Decimal("2000"), (
         f"[BUG] 押金占用未计入资金中心支出: {before['expense']}->{after_hold['expense']}"
     )
@@ -295,10 +298,11 @@ def test_internal_transfer_is_expense_of_source_income_of_target(seeded_db):
     _assert_reconciles(tgt_item)
 
 
-# ============ 押金损失=收入−支出净额：不另记第二次现金流出（2026-11-12 用户裁决） ============
+# ============ 押金一套逻辑：净额=收入−支出，+利润/−损失（2026-11-12 用户裁决） ============
 def test_deposit_loss_not_double_counted_in_funds_and_profit(seeded_db):
-    """缴1000→损300→退700：资金中心支出只1000、收入700、现金−300（净额=损失300）；
-    订单利润同口径；报表侧 cashflow_totals_by_order 与利润明细同源。"""
+    """缴1000→损300→退700：资金中心支出只1000、收入700、净额−300（利润=−300，
+    损失=−利润=300，不另记第二次 OUT）；订单利润同口径；报表侧 cashflow_totals_by_order
+    与利润明细同源。"""
     from app.orders import service as order_service
     from app.orders.amounts import order_cashflow_profit_by_order
     from app.reporting._shared import cashflow_totals_by_order
@@ -357,6 +361,28 @@ def test_deposit_loss_not_double_counted_in_funds_and_profit(seeded_db):
     assert rep_income - rep_expense == profit1, (
         f"[BUG] 报表取数与订单利润明细不同源: {rep_income}-{rep_expense} != {profit1}"
     )
+
+
+# ============ 裁决：押金占用 available 不二次扣（缴1000 → 可用只减1000，非2000） ============
+def test_deposit_hold_available_not_deducted_twice(seeded_db):
+    """支出口径：押金占用已进 expense、在 cash_balance 扣过一次，available=cash_balance。
+
+    deposit_held 仅作「其中：押金占用」信息列，不再从 available 二次扣减
+    （缴 1000：cash −1000、available −1000，合计只影响一次）。
+    """
+    invest = _pool(seeded_db, "HJ_INVEST")
+    before = orders_service.pool_balance(seeded_db, invest.id)
+    finance_service.create_deposit(
+        seeded_db, pool_id=invest.id, amount=Decimal("1000"),
+        paid_on=TODAY, actor="pytest",
+    )
+    seeded_db.expire_all()
+    after = orders_service.pool_balance(seeded_db, invest.id)
+    assert after["cash_balance"] == before["cash_balance"] - Decimal("1000")
+    assert after["deposit_held"] == Decimal("1000.00")
+    # 关键守卫：available 等于现金余额，不再二次减 deposit_held
+    assert after["available"] == after["cash_balance"]
+    assert after["available"] == before["available"] - Decimal("1000")
 
 
 def test_deposit_loss_null_attribute_other_flows_not_dropped(seeded_db):

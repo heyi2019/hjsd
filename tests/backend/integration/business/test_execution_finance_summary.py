@@ -197,3 +197,48 @@ def test_summary_is_zero_without_any_flow(seeded_client, seeded_db, headers):
 
     for key in ("cashflow_income", "rebate_income", "total_income", "total_expense", "net_amount"):
         assert Decimal(summary[key]) == Decimal("0.00"), key
+
+def test_deposit_loss_visible_in_detail_but_excluded_from_summary(seeded_client, seeded_db, headers):
+    """押金损失：明细列表仍可见（台账），但 finance_summary 与订单利润同源。
+
+    2026-11-12 裁决 C 的库存详情收口：缴 1000 → 损 300 → 退 700。
+    - 明细 orders[].cashflows 仍展示损失那笔 OUT（台账真实可见）；
+    - 汇总 net_amount 排除损失第二次流出，= 订单利润 = −600（不是 −900）。
+    """
+    from app.orders.amounts import order_cashflow_profit_by_order
+
+    account = _account(seeded_db, "summary-deposit-loss")
+    pool = _invest_pool(seeded_db)
+    order = _buy(seeded_db, account, amount="300", pool_id=pool.id)
+
+    dep = finance_service.create_deposit(
+        seeded_db, pool_id=pool.id, amount=Decimal("1000"), paid_on=TODAY,
+        source_order_id=order.id, actor="pytest",
+    )
+    finance_service.lose_deposit(
+        seeded_db, dep.id, amount=Decimal("300"), lost_on=TODAY,
+        category="OPERATING_COST", reason="违约", actor="pytest",
+    )
+    finance_service.return_deposit(
+        seeded_db, dep.id, amount=Decimal("700"), released_on=TODAY, actor="pytest",
+    )
+    seeded_db.flush()
+
+    payload = _detail_row(seeded_client, headers, account.id)
+    summary = payload["finance_summary"]
+    profit = order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id]
+
+    # 明细仍展示押金损失流水（category=OPERATING_COST，OUT 300）作台账
+    loss_rows = [
+        flow
+        for o in payload["orders"]
+        for flow in o["cashflows"]
+        if flow["direction"] == "OUT" and flow["category"] == "OPERATING_COST"
+    ]
+    assert len(loss_rows) == 1, f"押金损失流水应在明细可见（台账），实际 {loss_rows}"
+
+    # 汇总排除损失第二次流出：支出侧只算占用 1000 + BUY 300，不含损失 300
+    assert Decimal(summary["cashflow_income"]) == Decimal("700.00")
+    assert Decimal(summary["total_expense"]) == Decimal("1300.00")
+    # 净额与订单利润逐笔同源（−600，而非把损失重复计入的 −900）
+    assert Decimal(summary["net_amount"]) == profit == Decimal("-600.00")

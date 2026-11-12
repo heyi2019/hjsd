@@ -50,7 +50,8 @@ def pool_balances(
     # (direction, nature, accounting_attribute) -> 已审金额合计。
     # 资金中心两方向口径：押金占用=支出(OUT)、释放/取消=收入(IN)，都进 income/expense；
     # 但押金损失（DEPOSIT + OUT + 非 DEPOSIT_HOLD）是已占用押金的定性转换、非第二次
-    # 现金流出，由 business_cashflow_filter 排除，损失体现为押金线「收入−支出」净额。
+    # 现金流出（那会把同一笔押金重复计算），由 business_cashflow_filter 排除；
+    # 押金线只有一套逻辑：净额=收入−支出，正为利润、负为损失（损失=−利润）。
     cells: dict[int, dict[tuple[str, str, str | None], Decimal]] = {}
     for pool_id, direction, nature, attribute, amount in session.execute(
         select(
@@ -120,6 +121,10 @@ def pool_balances(
         transfer_in = total(Direction.IN.value, Nature.INTERNAL.value)
         transfer_out = total(Direction.OUT.value, Nature.INTERNAL.value)
         cash_balance = income - expense
+        # 2026-11-12 裁决（支出口径）：押金占用已作为 OUT 计入 expense、从而在
+        # cash_balance 里扣过一次；available 不再另减 deposit_held，否则同一笔押金
+        # 被扣两次（缴 1000 → cash −1000、available −2000）。deposit_held 降级为
+        # 「其中：押金占用」信息列，仅供台账展示，不参与可用余额计算。
         deposit_held = deposits.get(pool_id, Decimal("0.00"))
         pool = pools[pool_id]
         result[pool_id] = {
@@ -132,7 +137,7 @@ def pool_balances(
             "transfer_out": transfer_out,
             "cash_balance": cash_balance,
             "deposit_held": deposit_held,
-            "available": cash_balance - deposit_held,
+            "available": cash_balance,
         }
     return result
 
@@ -155,8 +160,9 @@ def pool_balance_summary(
 
     汇总口径：
     - `cash_balance` / `available` / `deposit_held`：全部可见池直接累加；
+      （available 已=cash_balance，押金占用在 expense 扣过一次，不再二次扣 held）
     - `owned_cash_balance`：只累加 `ownership=OWNED` 的池（PRD §1.2 自有权益），
-      且按现金头寸计、不扣押金占用——押金仍是自有资金，只是暂时不可用。
+      按现金头寸计；押金占用已进 expense、反映在该现金头寸里。
     """
     pools = list(
         session.scalars(select(Pool).order_by(Pool.id))

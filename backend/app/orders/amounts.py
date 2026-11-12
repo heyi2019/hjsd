@@ -54,11 +54,12 @@ ZERO = Decimal("0.00")
 def business_cashflow_filter():
     """业务现金流口径：排除「押金损失重分类流水」后的保留条件。
 
-    押金损失（已占用押金转为费用）不是第二次现金流出。押金线的真实现金流只有
-    交押金（OUT / DEPOSIT_HOLD）与退回（IN / DEPOSIT_RELEASE|CANCEL）；损失体现为
-    该线「收入 − 支出」的净额。故资金中心 / 订单利润 / 经营损益聚合**只排除损失那笔
-    OUT**，避免虚增支出与现金流出（缴 1000、退 700、损 300 ⇒ 净支出 700、损失 300，
-    不再多记 300 的第二次流出）。
+    押金线只有**一套逻辑：净额 = 收入 − 支出，为正即利润、为负即损失（损失 = −利润）**。
+    真实现金流只有交押金（OUT / DEPOSIT_HOLD）与退回（IN / DEPOSIT_RELEASE|CANCEL）；
+    损失不是独立的一笔钱、更不是第二次现金流出，它就是这条线净额为负的结果。
+    缴 1000、退 700 ⇒ 净额 −300 ⇒ 损失 300；若把损失再记一笔 OUT，净额会被重复减成
+    −600。故资金中心 / 订单利润 / 经营损益聚合**只排除把损失错记成第二次流出的那笔
+    DEPOSIT+OUT+非HOLD**，正的利润与负的损失都落在同一个净额公式里。
 
     正向写法规避 SQL 三值逻辑陷阱：放行「非 DEPOSIT 属性（含 NULL）」与
     「DEPOSIT 且（IN 或 category=DEPOSIT_HOLD）」；仅排除 DEPOSIT + OUT + 其他 category
@@ -75,6 +76,23 @@ def business_cashflow_filter():
                 Cashflow.category == "DEPOSIT_HOLD",
             ),
         ),
+    )
+
+
+def is_deposit_loss_flow(
+    *, accounting_attribute: str | None, direction: str, category: str | None
+) -> bool:
+    """单行版押金损失判定，与 :func:`business_cashflow_filter` 同源。
+
+    SQL 聚合用 `business_cashflow_filter` 在 WHERE 排除损失流水；而库存详情
+    `execution_detail` 的财务汇总在 Python 层遍历已查出的流水对象（且明细列表仍需
+    展示损失流水作台账），用本函数在同一处判定「该笔是否为押金损失重分类流水」。
+    判定与 SQL 谓词的排除项严格镜像：DEPOSIT + OUT + 非 DEPOSIT_HOLD。
+    """
+    return (
+        accounting_attribute == AccountingAttribute.DEPOSIT.value
+        and direction == Direction.OUT.value
+        and category != "DEPOSIT_HOLD"
     )
 
 

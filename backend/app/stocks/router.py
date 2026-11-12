@@ -42,7 +42,7 @@ from app.domain.trade import (
 from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, PermissionDenied, Validation
 from app.orders import service as orders_service
-from app.orders.amounts import order_profit_flow_by_order
+from app.orders.amounts import is_deposit_loss_flow, order_profit_flow_by_order
 # 复用订单台账「成交日期」的账期平移口径（事件/流水 occurred_on + 规则快照重取）。
 from app.orders.mutations import _shift_accounting_dates
 
@@ -528,12 +528,22 @@ def execution_detail(
     }
     event_ids = [item.id for item in events]
     flow_by_event: dict[int, ExecutionCashflowOut] = {}
+    # 押金损失（DEPOSIT + OUT + 非 DEPOSIT_HOLD）是已占用押金的定性转换、非第二次
+    # 现金流出。明细列表仍展示该流水作台账，但财务汇总须按业务口径排除它，与订单
+    # 利润 / 资金中心 / R2 同源（is_deposit_loss_flow 与 SQL 谓词 business_cashflow_filter 同源）。
+    deposit_loss_flow_nos: set[str] = set()
     if event_ids:
         for flow, pool in db.execute(
             select(Cashflow, Pool)
             .join(Pool, Pool.id == Cashflow.pool_id)
             .where(Cashflow.order_event_id.in_(event_ids))
         ).all():
+            if is_deposit_loss_flow(
+                accounting_attribute=flow.accounting_attribute,
+                direction=flow.direction,
+                category=flow.category,
+            ):
+                deposit_loss_flow_nos.add(flow.flow_no)
             flow_by_event[flow.order_event_id] = ExecutionCashflowOut(
                 flow_no=flow.flow_no,
                 pool_name=pool.name,
@@ -557,6 +567,12 @@ def execution_detail(
             )
             .order_by(Cashflow.occurred_on, Cashflow.id)
         ).all():
+            if is_deposit_loss_flow(
+                accounting_attribute=flow.accounting_attribute,
+                direction=flow.direction,
+                category=flow.category,
+            ):
+                deposit_loss_flow_nos.add(flow.flow_no)
             cashflows_by_order.setdefault(flow.order_id, []).append(
                 ExecutionCashflowOut(
                     flow_no=flow.flow_no,
@@ -638,17 +654,25 @@ def execution_detail(
         ]
     # 财务汇总与上面组装出的明细同源：事件流水 + 订单独立流水 + 返点收入。
     # 资金走向只有收入 / 支出两种：返点登记即收入确认、分期坏账是回收时确认
-    # 的损失（支出），两者都不生成资金流水，但都必须计入总收入 / 总支出与净额。
+    # 的支出，两者都不生成资金流水，但都计入总收入 / 总支出；净额=收入−支出，
+    # 正为利润、负为损失（损失=−利润），一套逻辑到底，不另立「损失」第二笔。
+    # 财务汇总取业务口径：押金损失那笔 OUT 是已占用押金的定性转换，不是第二次现金
+    # 流出，按 flow_no 跳过（明细列表仍完整展示该流水作台账）。扣减后 net_amount 与
+    # 订单利润 order_cashflow_profit_by_order 逐笔同源。
     zero = Decimal("0.00")
     cashflow_income = zero
     total_expense = zero
     for flow in flow_by_event.values():
+        if flow.flow_no in deposit_loss_flow_nos:
+            continue
         if flow.direction == "IN":
             cashflow_income += flow.amount
         else:
             total_expense += flow.amount
     for order_flows in cashflows_by_order.values():
         for flow in order_flows:
+            if flow.flow_no in deposit_loss_flow_nos:
+                continue
             if flow.direction == "IN":
                 cashflow_income += flow.amount
             else:

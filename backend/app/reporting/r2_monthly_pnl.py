@@ -69,8 +69,8 @@ def r2_monthly_pnl(
         # 2026-11-12 用户裁决 C：押金完整走业务口径，R2 与订单利润逐笔同源。
         # 套用 business_cashflow_filter：押金占用(OUT/DEPOSIT_HOLD)计入该单直接
         # 成本、释放/取消(IN)计入收入；押金损失(OUT/DEPOSIT+非HOLD)是已占用押金
-        # 的定性转换、非第二次现金流出，被排除，损失体现为押金线「收入−支出」
-        # 净额。推翻旧 #9「挂单押金一律剔除、不进直接成本」。
+        # 的定性转换、非第二次现金流出，被排除；押金线只有一套逻辑：净额=收入−支出，
+        # 正为利润、负为损失（损失=−利润），不另记第二笔。推翻旧 #9「挂单押金一律剔除」。
         .where(business_cashflow_filter())
         .group_by(Cashflow.occurred_on)
     )

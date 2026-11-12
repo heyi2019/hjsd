@@ -11,7 +11,6 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.money import to_money
 from app.core.security import (
     PERM_AUDIT_READ,
     PERM_FINANCE_READ,
@@ -55,6 +54,7 @@ from app.orders._shared import get_order
 from app.orders.amounts import is_deposit_loss_flow, order_profit_flow_by_order
 # 复用订单台账「成交日期」的账期平移口径（事件/流水 occurred_on + 规则快照重取）。
 from app.orders.mutations import _shift_accounting_dates
+from app.orders.router_output import cancellable_by_event
 
 from .schemas import (
     AccountOut,
@@ -600,19 +600,11 @@ def execution_detail(
     operator_ids = {uid for event in events for uid in (event.operator_user_ids or [])}
     operator_names = {user.id: user.display_name for user in db.scalars(select(User).where(User.id.in_(operator_ids))).all()} if operator_ids else {}
     # 可冲销余额：口径与 post_event 的校验同源（CANCEL 金额累加后从被冲销事件里扣），
-    # 一次遍历算完，避免前端为了「还能冲多少」自己相减。
-    cancelled_by_offset: dict[int, Decimal] = {}
-    for item in events:
-        if item.event_type == EventType.CANCEL.value and item.offset_event_id is not None:
-            cancelled_by_offset[item.offset_event_id] = (
-                cancelled_by_offset.get(item.offset_event_id, Decimal("0.00")) + to_money(item.amount)
-            )
+    # 复用订单台账的 cancellable_by_event，避免两处各算一份。
+    cancellable_amounts = cancellable_by_event(events)
     events_by_order: dict[int, list[ExecutionEventOut]] = {}
     for event in events:
-        cancellable = Decimal("0.00")
-        if event.event_type != EventType.CANCEL.value:
-            remaining = to_money(event.amount) - cancelled_by_offset.get(event.id, Decimal("0.00"))
-            cancellable = remaining if remaining > 0 else Decimal("0.00")
+        cancellable = cancellable_amounts[event.id]
         events_by_order.setdefault(event.order_id, []).append(
             ExecutionEventOut(
                 id=event.id,

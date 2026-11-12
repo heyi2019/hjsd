@@ -718,9 +718,9 @@ describe("InventoryPanel：编号列与导出", () => {
       const rows = screen.getAllByRole("row");
       const first = within(rows[1]);
       expect(first.getByText("KU_00004")).toBeInTheDocument();
-      // 首列库存编号应排在订单号之前
+      // 订单号紧跟库存编号，便于从库存行快速定位来源订单。
       const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
-      expect(headers.indexOf("库存编号")).toBeLessThan(headers.indexOf("订单号"));
+      expect(headers[headers.indexOf("库存编号") + 1]).toBe("订单号");
     });
 
     it("游戏账号独立成列，展示 game_account 而非库存编号", async () => {

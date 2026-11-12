@@ -58,10 +58,10 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         label="库存中心",
         columns=(
             ListColumn("stock_no", "库存编号"),
+            ListColumn("source_order_no", "订单号"),
             ListColumn("game_type", "游戏/产品类型"),
             ListColumn("game_account", "游戏账号/产品"),
             ListColumn("camp_account", "营地账号"),
-            ListColumn("source_order_no", "订单号"),
             ListColumn("inventory_entry_at", "入库时间"),
             ListColumn("inventory_operator", "入库负责人"),
             ListColumn("business_mode", "业务"),

@@ -21,13 +21,13 @@ from app.finance.cashflows import create_cashflow
 from app.finance.deposits import create_deposit, lose_deposit, return_deposit
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.stocks import service
+from app.stocks.profile import create_account
 
 TODAY = date(2026, 10, 4)
 
 
 def _account(seeded_db, game_account: str):
-    return service.create_account(
+    return create_account(
         seeded_db,
         game_account=game_account,
         platform="王者",

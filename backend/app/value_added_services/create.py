@@ -15,11 +15,11 @@ from app.core.business_numbering import installment_no as order_installment_no
 from app.core.security import CurrentUser
 from app.core.security import owner_scope_filter
 from app.domain.users import User
-from app.foundation import service as foundation_service
+from app.foundation.order_types import get_order_type_by_code
 from app.value_added_services.schemas import ScheduleCreate
 from app.orders._shared import get_order
 from app.orders.amounts import order_amounts
-from app.parties import service as parties_service
+from app.parties.fields import set_extra_values
 from app.policy import service as policy_service
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -345,7 +345,7 @@ def create_installment(
     )
     # BAS-06-04：签约日固化分期规则（期数/首付/利率），改版不影响历史合约。
     # 提前到金额计算之前，服务费省略时才能按规则补算。
-    order_type_definition = foundation_service.get_order_type_by_code(
+    order_type_definition = get_order_type_by_code(
         session, order.order_type
     )
     policy_version_id, policy_snapshot = policy_service.make_snapshot(
@@ -448,7 +448,7 @@ def create_installment(
             )
         )
     session.flush()
-    parties_service.set_extra_values(
+    set_extra_values(
         session,
         entity_type="installment",
         entity_id=installment.id,

@@ -46,16 +46,16 @@ def test_build_list_csv_under_limit_not_truncated(seeded_db):
 
 def test_stocks_export_passes_export_row_limit(seeded_client, headers, monkeypatch):
     """库存导出查询层传 EXPORT_ROW_LIMIT，不再 limit=None 拉全量。"""
-    from app.stocks import service as stock_service
+    from app.stocks.inventory import list_accounts
 
     seen: dict[str, object] = {}
-    original = stock_service.list_accounts
+    original = list_accounts
 
     def spy(db, **kwargs):
         seen.update(kwargs)
         return original(db, **kwargs)
 
-    monkeypatch.setattr(stock_service, "list_accounts", spy)
+    monkeypatch.setattr("app.stocks.router.stocks_list_accounts", spy)
     resp = seeded_client.get("/api/v1/stocks/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
     assert seen.get("limit") == EXPORT_ROW_LIMIT
@@ -63,16 +63,16 @@ def test_stocks_export_passes_export_row_limit(seeded_client, headers, monkeypat
 
 def test_customers_export_passes_export_row_limit(seeded_client, headers, monkeypatch):
     """客户导出查询层传 EXPORT_ROW_LIMIT，不再 limit=None 拉全量。"""
-    from app.parties import service as party_service
+    from app.parties.customers import list_customers
 
     seen: dict[str, object] = {}
-    original = party_service.list_customers
+    original = list_customers
 
     def spy(db, **kwargs):
         seen.update(kwargs)
         return original(db, **kwargs)
 
-    monkeypatch.setattr(party_service, "list_customers", spy)
+    monkeypatch.setattr("app.parties.router.parties_list_customers", spy)
     resp = seeded_client.get("/api/v1/customers/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
     assert seen.get("limit") == EXPORT_ROW_LIMIT

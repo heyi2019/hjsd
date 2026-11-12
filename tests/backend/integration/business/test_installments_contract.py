@@ -49,9 +49,9 @@ def test_installment_action_routes_use_declared_response_types():
     assert get_type_hints(installments_router.resale_installment_account)["return"] == schemas.DispositionOut
 
 def _account(seeded_db, game_account: str):
-    from app.stocks import service as stocks_service
+    from app.stocks.profile import create_account
 
-    return stocks_service.create_account(
+    return create_account(
         seeded_db,
         game_account=game_account,
         platform="王者",
@@ -517,9 +517,9 @@ def test_cancel_stock_installment_refunds_payments_and_returns_account(seeded_db
 def test_cancel_distribution_installment_uses_business_specific_account_result(
     seeded_db, order_type, contract_type, business_mode, inventory_type, expected_status
 ):
-    from app.stocks import service as stocks_service
+    from app.stocks.profile import create_account
 
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db,
         game_account=f"cancel-{order_type.lower()}-installment",
         business_mode=business_mode,
@@ -1459,9 +1459,9 @@ class TestInstallmentsApi:
     def test_recovered_account_installment_sale_auto_links_resale(
         self, seeded_db, order_type, contract_type, business_mode, inventory_type
     ):
-        from app.stocks import service as stocks_service
+        from app.stocks.profile import create_account
 
-        account = stocks_service.create_account(
+        account = create_account(
             seeded_db,
             game_account=f"recovered-installment-{order_type.lower()}",
             business_mode=business_mode,

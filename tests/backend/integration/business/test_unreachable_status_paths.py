@@ -161,9 +161,9 @@ TODAY = date(2026, 10, 17)
 
 
 def _make_deposit(seeded_db, *, code: str) -> Deposit:
-    from app.foundation import service as foundation_service
+    from app.foundation.pools import create_pool
 
-    pool = foundation_service.create_pool(
+    pool = create_pool(
         seeded_db,
         code=f"VDP{code.upper()}",
         name=f"押金取消测试池 {code}",

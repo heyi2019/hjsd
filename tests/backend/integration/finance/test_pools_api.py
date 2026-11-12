@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.errors import ErrorCode
-from app.foundation import service
+from app.foundation.pools import get_pool_by_code
 
 POOLS = "/api/v1/pools"
 
@@ -61,7 +61,7 @@ def test_duplicate_pool_code_returns_422(client, headers):
 
 
 def test_update_and_disable_pool(client, seeded_db, headers):
-    pool = service.get_pool_by_code(seeded_db, "HJ_INVEST")
+    pool = get_pool_by_code(seeded_db, "HJ_INVEST")
     patched = client.patch(
         f"{POOLS}/{pool.id}", json={"name": "投资款荷包（本金）"}, headers=headers
     )

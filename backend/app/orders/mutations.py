@@ -10,9 +10,9 @@ from datetime import date, timedelta
 from typing import Any
 from app.core.audit import record_audit
 from app.core.security import CurrentUser
-from app.foundation import service as foundation_service
+from app.foundation.order_types import get_order_type_by_code
 from app.orders.form_fields import validate_form_extra
-from app.parties import service as parties_service
+from app.parties.fields import set_extra_values
 from app.policy import service as policy_service
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -182,7 +182,7 @@ def _shift_accounting_dates(
             account.buy_date = account.buy_date + shift
             account.updated_by = actor
 
-    definition = foundation_service.get_order_type_by_code(session, order.order_type)
+    definition = get_order_type_by_code(session, order.order_type)
     if definition is not None:
         snapshot: dict[str, Any] = {}
         primary_version_id: int | None = None
@@ -266,7 +266,7 @@ def update_order(
     order.updated_by = actor
     session.flush()
     if extra_values is not _UNSET:
-        parties_service.set_extra_values(
+        set_extra_values(
             session,
             entity_type="order",
             entity_id=order.id,

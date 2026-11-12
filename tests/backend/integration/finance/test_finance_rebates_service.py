@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.stocks import service as stocks_service
+from app.stocks.profile import create_account
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.finance import rebates
@@ -51,7 +51,7 @@ _ACCOUNT_CONTEXT = {
 
 def _order_with_buy(seeded_db, order_type: str = "HS") -> int:
     business_mode, inventory_type = _ACCOUNT_CONTEXT[order_type]
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db,
         game_account=f"rebate-buy-{order_type.lower()}",
         business_mode=business_mode,
@@ -79,7 +79,7 @@ def _order_with_buy(seeded_db, order_type: str = "HS") -> int:
 
 def _order_with_sell(seeded_db, order_type: str = "DG") -> int:
     business_mode, inventory_type = _ACCOUNT_CONTEXT[order_type]
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db,
         game_account=f"{order_type.lower()}-sell-rebate-account",
         business_mode=business_mode,

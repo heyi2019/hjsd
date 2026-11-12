@@ -14,7 +14,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus, AuditAction, InstallmentContractType, SequenceKey
 from app.domain.imports import ImportRow
 from app.domain.trade import Account, InstallmentDisposition, Order
-from app.parties import service as parties_service
+from app.parties.fields import set_extra_values
 from ._common import (
     _UNSET,
     account_is_visible,
@@ -95,7 +95,7 @@ def create_account(
     )
     session.add(account)
     session.flush()
-    parties_service.set_extra_values(
+    set_extra_values(
         session,
         entity_type="account",
         entity_id=account.id,
@@ -226,7 +226,7 @@ def update_account_profile(
     account.updated_by = actor
     session.flush()
     if extra_values is not _UNSET:
-        parties_service.set_extra_values(
+        set_extra_values(
             session,
             entity_type="account",
             entity_id=account.id,

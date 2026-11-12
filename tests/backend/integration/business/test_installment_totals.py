@@ -26,9 +26,9 @@ def _contract(seeded_db, *, trade_date: date, paid: str = "0", down: str = "200.
     # PICKUP_SALE 仅 TH 且天然不带账号（保持其余合计用例的最简构造）。
     # STOCK_SALE 要求账号已入库：先建账号 + BUY 事件，再走 HS 订单。
     if contract_type == "STOCK_SALE":
-        from app.stocks import service as account_service
+        from app.stocks.profile import create_account
 
-        account = account_service.create_account(
+        account = create_account(
             seeded_db,
             game_account=f"totals-stock-{trade_date.isoformat()}",
             platform="王者",

@@ -23,7 +23,15 @@ from app.domain.enums import (
     SequenceKey,
 )
 from app.domain.foundation import OrderTypeDef
-from app.foundation import service
+from app.foundation.game_types import create_game_type, list_game_types
+from app.foundation.order_types import (
+    create_order_type,
+    get_order_type_by_code,
+    list_routes,
+    set_order_type_active,
+    set_route,
+)
+from app.foundation.pools import create_pool, get_pool_by_code
 
 SEED_ACTOR = "system"
 
@@ -88,10 +96,10 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
     }
 
     for code, name, pool_type, ownership in SEED_POOLS:
-        if service.get_pool_by_code(session, code) is not None:
+        if get_pool_by_code(session, code) is not None:
             stats["pools_skipped"] += 1
             continue
-        service.create_pool(
+        create_pool(
             session,
             code=code,
             name=name,
@@ -103,12 +111,12 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
         stats["pools_created"] += 1
 
     for code, name, capital_type, sort_order, description in SEED_ORDER_TYPES:
-        existing = service.get_order_type_by_code(session, code)
+        existing = get_order_type_by_code(session, code)
         if existing is not None:
             stats["order_types_skipped"] += 1
             order_type = existing
         else:
-            order_type = service.create_order_type(
+            order_type = create_order_type(
                 session,
                 code=code,
                 name=name,
@@ -121,11 +129,11 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
         ensure_sequence(session, order_type.sequence_key, order_type.sequence_prefix, 4)
 
     for name, sort_order, is_default in SEED_GAME_TYPES:
-        existing = next((item for item in service.list_game_types(session) if item.name == name), None)
+        existing = next((item for item in list_game_types(session) if item.name == name), None)
         if existing is not None:
             stats["game_types_skipped"] += 1
             continue
-        service.create_game_type(
+        create_game_type(
             session,
             name=name,
             sort_order=sort_order,
@@ -135,11 +143,11 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
         stats["game_types_created"] += 1
 
     for order_type_code, portion, pool_code in SEED_ROUTES:
-        order_type = service.get_order_type_by_code(session, order_type_code)
+        order_type = get_order_type_by_code(session, order_type_code)
         if order_type is None:
             continue
         existed = _route_exists(session, order_type.id, portion)
-        service.set_route(
+        set_route(
             session,
             order_type_code=order_type_code,
             portion=portion,
@@ -150,11 +158,11 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
 
     # 路由就绪后启用业务：一次执行即达到可用状态，不依赖“再跑一遍种子”
     for code, _name, _capital_type, _sort_order, _description in SEED_ORDER_TYPES:
-        order_type = service.get_order_type_by_code(session, code)
+        order_type = get_order_type_by_code(session, code)
         if order_type is None or order_type.is_active:
             continue
         if _route_exists_any(session, order_type.id):
-            service.set_order_type_active(session, order_type.id, True, actor=actor)
+            set_order_type_active(session, order_type.id, True, actor=actor)
 
     for sequence_key, prefix, padding in SEED_SEQUENCES:
         _ensure_sequence_once(session, sequence_key, prefix, stats, padding=padding)
@@ -173,13 +181,13 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
 
 
 def _route_exists_any(session: Session, order_type_id: int) -> bool:
-    return bool(service.list_routes(session, order_type_id=order_type_id))
+    return bool(list_routes(session, order_type_id=order_type_id))
 
 
 def _route_exists(session: Session, order_type_id: int, portion: str) -> bool:
     return any(
         route.order_type_id == order_type_id and route.portion == portion
-        for route in service.list_routes(session, order_type_id=order_type_id)
+        for route in list_routes(session, order_type_id=order_type_id)
     )
 
 
@@ -201,12 +209,12 @@ def _ensure_sequence_once(
 def seed_is_applied(session: Session) -> bool:
     """判断 M0 种子是否已落地（迁移前置检查）。"""
     return (
-        service.get_pool_by_code(session, "HJ_INVEST") is not None
-        and service.get_pool_by_code(session, "HJ_PROFIT") is not None
-        and all(service.get_order_type_by_code(session, code) is not None for code in ("HS", "TH", "DG"))
+        get_pool_by_code(session, "HJ_INVEST") is not None
+        and get_pool_by_code(session, "HJ_PROFIT") is not None
+        and all(get_order_type_by_code(session, code) is not None for code in ("HS", "TH", "DG"))
         and _all_seed_routes_ready(session)
         and all(
-            any(item.name == name for item in service.list_game_types(session))
+            any(item.name == name for item in list_game_types(session))
             for name, _sort_order, _is_default in SEED_GAME_TYPES
         )
     )
@@ -214,7 +222,7 @@ def seed_is_applied(session: Session) -> bool:
 
 def _all_seed_routes_ready(session: Session) -> bool:
     for order_type_code, portion, _pool_code in SEED_ROUTES:
-        order_type: OrderTypeDef | None = service.get_order_type_by_code(session, order_type_code)
+        order_type: OrderTypeDef | None = get_order_type_by_code(session, order_type_code)
         if order_type is None or not _route_exists(session, order_type.id, portion):
             return False
     return True

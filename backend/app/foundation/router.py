@@ -23,9 +23,34 @@ from app.core.security import (
     get_current_user,
     require_permissions,
 )
-from app.foundation import schemas, service
+from app.foundation import schemas
+from app.foundation.game_types import (
+    create_game_type as foundation_create_game_type,
+    delete_game_type as foundation_delete_game_type,
+    list_game_types as foundation_list_game_types,
+    set_game_type_active as foundation_set_game_type_active,
+    set_game_type_default as foundation_set_game_type_default,
+    update_game_type as foundation_update_game_type,
+)
+from app.foundation.order_types import (
+    create_order_type as foundation_create_order_type,
+    list_order_types as foundation_list_order_types,
+    list_routes as foundation_list_routes,
+    route_impact_preview as foundation_route_impact_preview,
+    set_order_type_active as foundation_set_order_type_active,
+    set_route as foundation_set_route,
+    update_order_type as foundation_update_order_type,
+)
+from app.foundation.pools import (
+    create_pool as foundation_create_pool,
+    delete_pool as foundation_delete_pool,
+    list_pools as foundation_list_pools,
+    set_pool_status as foundation_set_pool_status,
+    update_pool as foundation_update_pool,
+)
+from app.foundation.sequences import list_sequences as foundation_list_sequences
 from app.foundation.classification import classification_for_order_type
-from app.parties import service as parties_service
+from app.parties.fields import get_extra_values, get_extra_values_bulk
 
 router = APIRouter(tags=["BAS-02/03 业务与资金主数据"])
 
@@ -41,7 +66,7 @@ def _actor(user: CurrentUser) -> str:
 
 def _pool_output(db: Session, pool) -> schemas.PoolOut:
     output = schemas.PoolOut.model_validate(pool)
-    output.extra_values = parties_service.get_extra_values(
+    output.extra_values = get_extra_values(
         db, entity_type="pool", entity_id=pool.id
     )
     return output
@@ -66,7 +91,7 @@ def list_game_types(
 ) -> list[schemas.GameTypeOut]:
     return [
         schemas.GameTypeOut.model_validate(item)
-        for item in service.list_game_types(db, include_inactive=include_inactive)
+        for item in foundation_list_game_types(db, include_inactive=include_inactive)
     ]
 
 
@@ -76,7 +101,7 @@ def create_game_type(
     db: Session = Depends(get_db),
     user: CurrentUser = manage_game_types,
 ) -> schemas.GameTypeOut:
-    item = service.create_game_type(
+    item = foundation_create_game_type(
         db,
         name=payload.name,
         sort_order=payload.sort_order,
@@ -94,7 +119,7 @@ def update_game_type(
     db: Session = Depends(get_db),
     user: CurrentUser = manage_game_types,
 ) -> schemas.GameTypeOut:
-    item = service.update_game_type(db, game_type_id, actor=_actor(user), **payload.model_dump(exclude_unset=True))
+    item = foundation_update_game_type(db, game_type_id, actor=_actor(user), **payload.model_dump(exclude_unset=True))
     return schemas.GameTypeOut.model_validate(item)
 
 
@@ -105,7 +130,7 @@ def set_game_type_active(
     db: Session = Depends(get_db),
     user: CurrentUser = manage_game_types,
 ) -> schemas.GameTypeOut:
-    item = service.set_game_type_active(db, game_type_id, active, actor=_actor(user))
+    item = foundation_set_game_type_active(db, game_type_id, active, actor=_actor(user))
     return schemas.GameTypeOut.model_validate(item)
 
 
@@ -116,7 +141,7 @@ def set_game_type_default(
     db: Session = Depends(get_db),
     user: CurrentUser = manage_game_types,
 ) -> schemas.GameTypeOut:
-    item = service.set_game_type_default(db, game_type_id, is_default, actor=_actor(user))
+    item = foundation_set_game_type_default(db, game_type_id, is_default, actor=_actor(user))
     return schemas.GameTypeOut.model_validate(item)
 
 
@@ -126,7 +151,7 @@ def delete_game_type(
     db: Session = Depends(get_db),
     user: CurrentUser = manage_game_types,
 ) -> Response:
-    service.delete_game_type(db, game_type_id, actor=_actor(user))
+    foundation_delete_game_type(db, game_type_id, actor=_actor(user))
     db.commit()
     return Response(status_code=204)
 
@@ -138,8 +163,8 @@ def list_pools(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> list[schemas.PoolOut]:
-    pools = service.list_pools(db, include_disabled=include_disabled, user=_user)
-    extras = parties_service.get_extra_values_bulk(
+    pools = foundation_list_pools(db, include_disabled=include_disabled, user=_user)
+    extras = get_extra_values_bulk(
         db, entity_type="pool", entity_ids=[pool.id for pool in pools]
     )
     return [
@@ -154,7 +179,7 @@ def create_pool(
     db: Session = Depends(get_db),
     user: CurrentUser = manage_pools,
 ) -> schemas.PoolOut:
-    pool = service.create_pool(
+    pool = foundation_create_pool(
         db,
         code=payload.code,
         name=payload.name,
@@ -177,7 +202,7 @@ def update_pool(
     changes = payload.model_dump(exclude_unset=True)
     if "ownership" in changes and changes["ownership"] is not None:
         changes["ownership"] = changes["ownership"].value
-    pool = service.update_pool(db, pool_id, actor=_actor(user), **changes)
+    pool = foundation_update_pool(db, pool_id, actor=_actor(user), **changes)
     return _pool_output(db, pool)
 
 
@@ -188,7 +213,7 @@ def set_pool_status(
     db: Session = Depends(get_db),
     user: CurrentUser = manage_pools,
 ) -> schemas.PoolOut:
-    pool = service.set_pool_status(db, pool_id, payload.status.value, actor=_actor(user))
+    pool = foundation_set_pool_status(db, pool_id, payload.status.value, actor=_actor(user))
     return _pool_output(db, pool)
 
 
@@ -199,7 +224,7 @@ def delete_pool(
     user: CurrentUser = manage_pools,
 ) -> Response:
     """V17：有流水的池会被 Service 拦下来，此处不提供绕过开关。"""
-    service.delete_pool(db, pool_id, actor=_actor(user))
+    foundation_delete_pool(db, pool_id, actor=_actor(user))
     return Response(status_code=204)
 
 
@@ -211,7 +236,7 @@ def list_order_types(
     user: CurrentUser = Depends(get_current_user),
 ) -> list[schemas.OrderTypeOut]:
     del user  # 登录即可读；数据范围由上层查询条件施加
-    items = service.list_order_types(db, include_inactive=include_inactive)
+    items = foundation_list_order_types(db, include_inactive=include_inactive)
     return [_order_type_output(item) for item in items]
 
 
@@ -221,7 +246,7 @@ def create_order_type(
     db: Session = Depends(get_db),
     user: CurrentUser = manage_order_types,
 ) -> schemas.OrderTypeOut:
-    order_type = service.create_order_type(
+    order_type = foundation_create_order_type(
         db,
         code=payload.code,
         name=payload.name,
@@ -241,7 +266,7 @@ def update_order_type(
     db: Session = Depends(get_db),
     user: CurrentUser = manage_order_types,
 ) -> schemas.OrderTypeOut:
-    order_type = service.update_order_type(
+    order_type = foundation_update_order_type(
         db,
         order_type_id,
         actor=_actor(user),
@@ -259,7 +284,7 @@ def set_order_type_active(
     db: Session = Depends(get_db),
     user: CurrentUser = manage_order_types,
 ) -> schemas.OrderTypeOut:
-    order_type = service.set_order_type_active(db, order_type_id, is_active, actor=_actor(user))
+    order_type = foundation_set_order_type_active(db, order_type_id, is_active, actor=_actor(user))
     return _order_type_output(order_type)
 
 
@@ -270,7 +295,7 @@ def list_routes(
     user: CurrentUser = Depends(get_current_user),
 ) -> list[schemas.RouteOut]:
     del user
-    routes = service.list_routes(db, order_type_id=order_type_id)
+    routes = foundation_list_routes(db, order_type_id=order_type_id)
     return [
         schemas.RouteOut(
             id=route.id,
@@ -293,7 +318,7 @@ def set_route(
     db: Session = Depends(get_db),
     user: CurrentUser = manage_order_types,
 ) -> schemas.RouteOut:
-    route = service.set_route(
+    route = foundation_set_route(
         db,
         order_type_code=code,
         portion=payload.portion.value,
@@ -327,7 +352,7 @@ def route_impact_preview(
     _user: CurrentUser = manage_order_types,
 ) -> schemas.RouteImpactPreviewOut:
     return schemas.RouteImpactPreviewOut.model_validate(
-        service.route_impact_preview(
+        foundation_route_impact_preview(
             db,
             order_type_code=code,
             portion=portion.value,
@@ -345,7 +370,7 @@ def list_sequences(
 ) -> list[schemas.SequenceOut]:
     del user
     result: list[schemas.SequenceOut] = []
-    for sequence in service.list_sequences(db):
+    for sequence in foundation_list_sequences(db):
         next_number = ""
         try:
             # 序列行已随列表取出，直接按同一口径格式化；

@@ -10,7 +10,11 @@ from app.domain.enums import AuditAction, CustomerStatus
 from app.domain.foundation import AuditLog
 from app.domain.parties import Customer, OrderCustomerRole
 from app.domain.trade import Order, OrderFormField
-from app.parties import service
+from app.parties._common import to_customer_out
+from app.parties.counterparties import assert_counterparty_usable, create_counterparty, set_counterparty_status
+from app.parties.customer_merge import assert_customer_usable, duplicate_candidates, merge_customers
+from app.parties.customers import create_customer, set_customer_status, update_customer
+from app.parties.fields import get_extra_values, get_extra_values_bulk, set_extra_values
 
 CUSTOMERS = "/api/v1/customers"
 COUNTERPARTIES = "/api/v1/counterparties"
@@ -18,18 +22,18 @@ COUNTERPARTIES = "/api/v1/counterparties"
 
 class TestCustomerNumbering:
     def test_cus_number_allocated_independently(self, seeded_db):
-        first = service.create_customer(seeded_db, display_name="阿甲", actor="pytest")
-        second = service.create_customer(seeded_db, display_name="阿乙", actor="pytest")
+        first = create_customer(seeded_db, display_name="阿甲", actor="pytest")
+        second = create_customer(seeded_db, display_name="阿乙", actor="pytest")
         seeded_db.commit()
         assert first.customer_no == "CUS0001"
         assert second.customer_no == "CUS0002"
 
     def test_duplicate_contact_does_not_block(self, seeded_db):
         """联系方式允许重复：只返回候选，不拦截建档（CUS-01-05）。"""
-        first = service.create_customer(seeded_db, display_name="甲", wechat="wx001", actor="pytest")
+        first = create_customer(seeded_db, display_name="甲", wechat="wx001", actor="pytest")
         seeded_db.commit()
-        second = service.create_customer(seeded_db, display_name="乙", wechat="wx001", actor="pytest")
-        candidates = service.duplicate_candidates(
+        second = create_customer(seeded_db, display_name="乙", wechat="wx001", actor="pytest")
+        candidates = duplicate_candidates(
             seeded_db, wechat="wx001", exclude_customer_id=second.id
         )
         seeded_db.commit()
@@ -40,7 +44,7 @@ class TestCustomerNumbering:
 
 class TestMasking:
     def test_default_response_is_masked(self, seeded_db):
-        customer = service.create_customer(
+        customer = create_customer(
             seeded_db,
             display_name="甲",
             phone="13800001234",
@@ -49,37 +53,37 @@ class TestMasking:
             actor="pytest",
         )
         seeded_db.commit()
-        out = service.to_customer_out(customer, reveal_contact=False)
+        out = to_customer_out(customer, reveal_contact=False)
         assert out["contact_masked"] is True
         assert out["phone"] == "138****1234"
         assert out["wechat"].startswith("wx") and "*" in out["wechat"]
         assert "*" in out["qq"]
 
     def test_reveal_returns_full_contact(self, seeded_db):
-        customer = service.create_customer(
+        customer = create_customer(
             seeded_db, display_name="甲", phone="13800001234", actor="pytest"
         )
         seeded_db.commit()
-        out = service.to_customer_out(customer, reveal_contact=True)
+        out = to_customer_out(customer, reveal_contact=True)
         assert out["contact_masked"] is False
         assert out["phone"] == "13800001234"
 
 
 class TestCustomerUsability:
     def test_disabled_customer_rejected(self, seeded_db):
-        customer = service.create_customer(seeded_db, display_name="甲", actor="pytest")
+        customer = create_customer(seeded_db, display_name="甲", actor="pytest")
         seeded_db.commit()
-        service.set_customer_status(seeded_db, customer.id, "DISABLED", actor="pytest")
+        set_customer_status(seeded_db, customer.id, "DISABLED", actor="pytest")
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
-            service.assert_customer_usable(seeded_db, customer.id)
+            assert_customer_usable(seeded_db, customer.id)
         assert exc.value.code == ErrorCode.CUSTOMER_DISABLED
 
     def test_merged_customer_rejected(self, seeded_db):
-        source = service.create_customer(seeded_db, display_name="源", actor="pytest")
-        target = service.create_customer(seeded_db, display_name="目标", actor="pytest")
+        source = create_customer(seeded_db, display_name="源", actor="pytest")
+        target = create_customer(seeded_db, display_name="目标", actor="pytest")
         seeded_db.commit()
-        service.merge_customers(
+        merge_customers(
             seeded_db,
             source_customer_id=source.id,
             target_customer_id=target.id,
@@ -89,14 +93,14 @@ class TestCustomerUsability:
         seeded_db.commit()
         assert source.status == CustomerStatus.MERGED.value
         with pytest.raises(Exception) as exc:
-            service.assert_customer_usable(seeded_db, source.id)
+            assert_customer_usable(seeded_db, source.id)
         assert exc.value.code == ErrorCode.CUSTOMER_DISABLED
 
 
 class TestMerge:
     def test_merge_moves_roles_and_keeps_history(self, seeded_db):
-        source = service.create_customer(seeded_db, display_name="源", actor="pytest")
-        target = service.create_customer(seeded_db, display_name="目标", actor="pytest")
+        source = create_customer(seeded_db, display_name="源", actor="pytest")
+        target = create_customer(seeded_db, display_name="目标", actor="pytest")
         seeded_db.commit()
         # 迁移 0008 后 order_customer_roles.order_id 指向 orders，占位订单 1 必须先存在
         seeded_db.add(Order(
@@ -108,7 +112,7 @@ class TestMerge:
         seeded_db.add(OrderCustomerRole(order_id=1, customer_id=source.id, role="SELLER"))
         seeded_db.commit()
 
-        service.merge_customers(
+        merge_customers(
             seeded_db,
             source_customer_id=source.id,
             target_customer_id=target.id,
@@ -132,13 +136,13 @@ class TestMerge:
         assert audit[0].reason == "重复建档"
 
     def test_merge_rejects_inactive_target(self, seeded_db):
-        source = service.create_customer(seeded_db, display_name="源", actor="pytest")
-        target = service.create_customer(seeded_db, display_name="目标", actor="pytest")
+        source = create_customer(seeded_db, display_name="源", actor="pytest")
+        target = create_customer(seeded_db, display_name="目标", actor="pytest")
         seeded_db.commit()
-        service.set_customer_status(seeded_db, target.id, "DISABLED", actor="pytest")
+        set_customer_status(seeded_db, target.id, "DISABLED", actor="pytest")
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
-            service.merge_customers(
+            merge_customers(
                 seeded_db,
                 source_customer_id=source.id,
                 target_customer_id=target.id,
@@ -150,10 +154,10 @@ class TestMerge:
 
 class TestCounterparty:
     def test_cp_number_and_type_separation(self, seeded_db):
-        peer = service.create_counterparty(
+        peer = create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
         )
-        supplier = service.create_counterparty(
+        supplier = create_counterparty(
             seeded_db, display_name="供货方B", type="SUPPLIER", actor="pytest"
         )
         seeded_db.commit()
@@ -163,29 +167,29 @@ class TestCounterparty:
 
     def test_invalid_type_rejected(self, seeded_db):
         with pytest.raises(Exception) as exc:
-            service.create_counterparty(
+            create_counterparty(
                 seeded_db, display_name="X", type="CUSTOMER", actor="pytest"
             )
         assert exc.value.code == ErrorCode.VALIDATION_ERROR
 
     def test_disabled_counterparty_rejected(self, seeded_db):
-        peer = service.create_counterparty(
+        peer = create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
         )
         seeded_db.commit()
-        service.set_counterparty_status(seeded_db, peer.id, False, actor="pytest")
+        set_counterparty_status(seeded_db, peer.id, False, actor="pytest")
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
-            service.assert_counterparty_usable(seeded_db, peer.id)
+            assert_counterparty_usable(seeded_db, peer.id)
         assert exc.value.code == ErrorCode.COUNTERPARTY_DISABLED
 
     def test_role_type_mismatch_rejected(self, seeded_db):
-        peer = service.create_counterparty(
+        peer = create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
         )
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
-            service.assert_counterparty_usable(seeded_db, peer.id, expected_type="SUPPLIER")
+            assert_counterparty_usable(seeded_db, peer.id, expected_type="SUPPLIER")
         assert exc.value.code == ErrorCode.PARTICIPANT_ROLE_INVALID
 
 
@@ -198,9 +202,9 @@ class TestFieldDefinitions:
         )
         seeded_db.add(definition)
         seeded_db.commit()
-        customer = service.create_customer(seeded_db, display_name="甲", actor="pytest")
+        customer = create_customer(seeded_db, display_name="甲", actor="pytest")
         seeded_db.commit()
-        saved = service.set_extra_values(
+        saved = set_extra_values(
             seeded_db,
             entity_type="customer",
             entity_id=customer.id,
@@ -211,11 +215,11 @@ class TestFieldDefinitions:
 
         definition.is_active = False
         seeded_db.commit()
-        assert service.get_extra_values(
+        assert get_extra_values(
             seeded_db, entity_type="customer", entity_id=customer.id
         ) == {"preference": "低价"}
         with pytest.raises(Exception) as exc:
-            service.set_extra_values(
+            set_extra_values(
                 seeded_db,
                 entity_type="customer",
                 entity_id=customer.id,
@@ -320,14 +324,14 @@ class TestCustomerExtraValues:
 
     def test_create_customer_persists_extra_values(self, seeded_db):
         self._defs(seeded_db)
-        customer = service.create_customer(
+        customer = create_customer(
             seeded_db, display_name="甲", actor="pytest",
             extra_values={"game_category": ["王者荣耀"], "credit_level": "优质", "budget": 500},
         )
         seeded_db.commit()
-        out = service.to_customer_out(
+        out = to_customer_out(
             customer, reveal_contact=True,
-            extra_values=service.get_extra_values(
+            extra_values=get_extra_values(
                 seeded_db, entity_type="customer", entity_id=customer.id
             ),
         )
@@ -338,7 +342,7 @@ class TestCustomerExtraValues:
     def test_required_field_missing_rejected(self, seeded_db):
         self._defs(seeded_db)
         with pytest.raises(Exception) as exc:
-            service.create_customer(
+            create_customer(
                 seeded_db, display_name="甲", actor="pytest",
                 extra_values={"credit_level": "优质"},
             )
@@ -348,7 +352,7 @@ class TestCustomerExtraValues:
     def test_select_value_outside_options_rejected(self, seeded_db):
         self._defs(seeded_db)
         with pytest.raises(Exception) as exc:
-            service.create_customer(
+            create_customer(
                 seeded_db, display_name="甲", actor="pytest",
                 extra_values={"credit_level": "不存在", "budget": 1},
             )
@@ -357,35 +361,35 @@ class TestCustomerExtraValues:
     def test_number_field_rejects_text(self, seeded_db):
         self._defs(seeded_db)
         with pytest.raises(Exception) as exc:
-            service.create_customer(
+            create_customer(
                 seeded_db, display_name="甲", actor="pytest", extra_values={"budget": "五百"}
             )
         assert exc.value.code == ErrorCode.VALIDATION_ERROR
 
     def test_update_customer_extra_values(self, seeded_db):
         self._defs(seeded_db)
-        customer = service.create_customer(
+        customer = create_customer(
             seeded_db, display_name="甲", actor="pytest", extra_values={"budget": 500}
         )
         seeded_db.commit()
-        service.update_customer(
+        update_customer(
             seeded_db, customer.id, actor="pytest", extra_values={"credit_level": "观察"}
         )
         seeded_db.commit()
-        assert service.get_extra_values(
+        assert get_extra_values(
             seeded_db, entity_type="customer", entity_id=customer.id
         ) == {"budget": 500, "credit_level": "观察"}
 
     def test_bulk_extra_values_for_list(self, seeded_db):
         self._defs(seeded_db)
-        first = service.create_customer(
+        first = create_customer(
             seeded_db, display_name="甲", actor="pytest", extra_values={"budget": 100}
         )
-        second = service.create_customer(
+        second = create_customer(
             seeded_db, display_name="乙", actor="pytest", extra_values={"budget": 200}
         )
         seeded_db.commit()
-        bulk = service.get_extra_values_bulk(
+        bulk = get_extra_values_bulk(
             seeded_db, entity_type="customer", entity_ids=[first.id, second.id]
         )
         assert bulk[first.id] == {"budget": 100}

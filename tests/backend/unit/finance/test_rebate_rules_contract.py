@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 
 from app.finance.rebates import create_rebate
-from app.stocks import service as account_service
+from app.stocks.profile import create_account
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.policy import service as policy_service
@@ -15,7 +15,7 @@ D = date(2026, 10, 17)
 
 
 def _order_with_buy(seeded_db) -> int:
-    account = account_service.create_account(
+    account = create_account(
         seeded_db,
         game_account="rebate-rule-account",
         business_mode="SELF",

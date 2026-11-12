@@ -19,7 +19,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.stocks import service as account_service
+from app.stocks.profile import create_account
 from app.core.errors import Validation
 from app.finance.rebates import create_rebate
 from app.value_added_services import service as installment_service
@@ -48,7 +48,7 @@ def _publish(seeded_db, policy_code: str, config: dict) -> None:
 
 
 def _order_with_buy(seeded_db, *, game_account: str) -> int:
-    account = account_service.create_account(
+    account = create_account(
         seeded_db,
         game_account=game_account,
         business_mode="SELF",
@@ -131,7 +131,7 @@ def test_explicit_rebate_base_wins_over_rule(seeded_db):
 # ------------------------------------------------------------ 分期服务费率
 def _pickup_order(seeded_db, *, game_account: str) -> int:
     """TH 订单要求账号为 DISTRIBUTION/PICKUP。"""
-    account = account_service.create_account(
+    account = create_account(
         seeded_db,
         game_account=game_account,
         business_mode="DISTRIBUTION",

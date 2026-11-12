@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.stocks import service as stocks_service
+from app.stocks.profile import create_account
 from app.core.errors import ErrorCode
 from app.domain.enums import (
     AccountStatus,
@@ -25,7 +25,8 @@ from app.value_added_services import service as installment_service
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.orders.pools import pool_balance
-from app.parties import service as parties_service
+from app.parties.counterparties import create_counterparty
+from app.parties.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 
@@ -35,7 +36,7 @@ def _pool(seeded_db, code: str) -> Pool:
     return pool
 
 def _account(seeded_db, game_account: str):
-    return stocks_service.create_account(
+    return create_account(
         seeded_db,
         game_account=game_account,
         platform="王者",
@@ -51,10 +52,10 @@ class TestA04DistributionInstallmentSale:
     """
 
     def test_downpayment_two_periods_deliver(self, seeded_db):
-        platform = parties_service.create_counterparty(
+        platform = create_counterparty(
             seeded_db, display_name="寄售平台B", type="PEER", actor="pytest"
         )
-        customer = parties_service.create_customer(seeded_db, display_name="分期客户", actor="pytest")
+        customer = create_customer(seeded_db, display_name="分期客户", actor="pytest")
         seeded_db.commit()
 
         order = create_order(
@@ -240,7 +241,7 @@ class TestA05HsStockSale:
         assert seeded_db.get(type(account), account.id).updated_by == "delivery-operator"
 
     def test_stock_sale_requires_hs_order(self, seeded_db):
-        account = stocks_service.create_account(
+        account = create_account(
             seeded_db,
             game_account="hs-acc-stock-sale",
             platform="王者",
@@ -359,7 +360,7 @@ class TestA06Rebate:
 
 class TestM2Api:
     def test_installment_and_payment_endpoints(self, seeded_client, headers, seeded_db):
-        account = stocks_service.create_account(
+        account = create_account(
             seeded_db,
             game_account="api-acc",
             platform="王者",
@@ -430,7 +431,7 @@ class TestM2Api:
         assert returned.json()["status"] == "PARTIALLY_RETURNED"
 
     def test_inventory_endpoint(self, seeded_client, seeded_db, headers):
-        account = stocks_service.create_account(
+        account = create_account(
             seeded_db,
             game_account="inv-acc",
             platform="王者",

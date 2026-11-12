@@ -27,10 +27,10 @@ from app.finance.attributes import (
     accounting_attributes_for_manual_cashflow,
     validate_fund_accounting_attribute,
 )
-from app.foundation import service as foundation_service
+from app.foundation.pools import assert_pool_usable
 from app.orders._shared import get_order
 from app.orders.form_fields import validate_form_extra
-from app.parties import service as parties_service
+from app.parties.fields import get_extra_values_bulk, set_extra_values
 
 from ._common import _positive, _text
 
@@ -118,7 +118,7 @@ def create_cashflow(
         raise Validation("独立收款必须填写摘要", details={"field": "note"})
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
-    pool = foundation_service.assert_pool_usable(session, pool_id)
+    pool = assert_pool_usable(session, pool_id)
     if order_id is not None:
         get_order(session, order_id, user)
     if order_event_id is not None:
@@ -148,7 +148,7 @@ def create_cashflow(
     )
     session.add(flow)
     session.flush()
-    parties_service.set_extra_values(
+    set_extra_values(
         session,
         entity_type="cashflow",
         entity_id=flow.id,
@@ -431,7 +431,7 @@ def list_cashflows(
         .offset(offset)
     ).all():
         rows.append(_flow_row(flow, order_no))
-    extras = parties_service.get_extra_values_bulk(
+    extras = get_extra_values_bulk(
         session, entity_type="cashflow", entity_ids=[row["id"] for row in rows]
     )
     for row in rows:
@@ -603,7 +603,7 @@ def studio_summary(
     income = sums.get(Direction.IN.value, Decimal("0.00"))
     expense = sums.get(Direction.OUT.value, Decimal("0.00"))
 
-    extras = parties_service.get_extra_values_bulk(
+    extras = get_extra_values_bulk(
         session, entity_type="cashflow", entity_ids=[row["id"] for row in rows]
     )
     for row in rows:

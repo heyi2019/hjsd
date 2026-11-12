@@ -16,11 +16,12 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from app.domain.trade import Account
-from app.stocks import service
+from app.stocks.inventory import inventory_age_days, inventory_stats
+from app.stocks.profile import create_account
 
 
 def _account(seeded_db, game_account: str, *, cost: str = "0", entry_days_ago: int | None = None):
-    account = service.create_account(
+    account = create_account(
         seeded_db,
         game_account=game_account,
         platform="王者",
@@ -43,7 +44,7 @@ def test_occupied_cost_sums_with_decimal_and_never_drifts(seeded_db):
     second = _account(seeded_db, "stats-decimal-2", cost="0.20")
     third = _account(seeded_db, "stats-decimal-3", cost="0.00")
 
-    stats = service.inventory_stats(
+    stats = inventory_stats(
         seeded_db, account_ids=[first.id, second.id, third.id]
     )
 
@@ -56,7 +57,7 @@ def test_only_given_account_ids_take_part_in_totals(seeded_db):
     visible = _account(seeded_db, "stats-visible", cost="100.00")
     hidden = _account(seeded_db, "stats-hidden", cost="900.00")
 
-    stats = service.inventory_stats(seeded_db, account_ids=[visible.id])
+    stats = inventory_stats(seeded_db, account_ids=[visible.id])
 
     assert stats["account_count"] == 1
     assert stats["occupied_cost"] == Decimal("100.00")
@@ -68,7 +69,7 @@ def test_age_buckets_are_strictly_greater_than_7_and_30_days(seeded_db):
     aging = _account(seeded_db, "stats-age-8", cost="0", entry_days_ago=8)
     stale = _account(seeded_db, "stats-age-31", cost="0", entry_days_ago=31)
 
-    stats = service.inventory_stats(
+    stats = inventory_stats(
         seeded_db, account_ids=[fresh.id, aging.id, stale.id]
     )
 
@@ -94,21 +95,21 @@ def test_age_falls_back_to_buy_date_when_entry_missing():
         updated_by="pytest",
     )
 
-    assert service.inventory_age_days(legacy) == 10
-    assert service.inventory_age_days(legacy, today=date.today() + timedelta(days=21)) == 31
+    assert inventory_age_days(legacy) == 10
+    assert inventory_age_days(legacy, today=date.today() + timedelta(days=21)) == 31
 
 
 def test_unknown_ids_are_ignored_instead_of_failing(seeded_db):
     account = _account(seeded_db, "stats-known", cost="20.00")
 
-    stats = service.inventory_stats(seeded_db, account_ids=[account.id, 999_999])
+    stats = inventory_stats(seeded_db, account_ids=[account.id, 999_999])
 
     assert stats["account_count"] == 1
     assert stats["occupied_cost"] == Decimal("20.00")
 
 
 def test_empty_selection_returns_zeros(seeded_db):
-    stats = service.inventory_stats(seeded_db, account_ids=[])
+    stats = inventory_stats(seeded_db, account_ids=[])
 
     assert stats == {
         "account_count": 0,

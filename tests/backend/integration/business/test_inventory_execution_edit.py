@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.stocks import service as accounts
+from app.stocks.profile import create_account
 from app.domain.foundation import AuditLog
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
 from app.orders.create import create_order
@@ -13,7 +13,7 @@ from app.orders.events import post_event
 
 
 def test_inventory_edit_updates_event_flow_and_cost_without_changing_time(seeded_client, seeded_db, headers):
-    account = accounts.create_account(seeded_db, game_account="edit-inventory", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    account = create_account(seeded_db, game_account="edit-inventory", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
@@ -31,7 +31,7 @@ def test_inventory_edit_updates_event_flow_and_cost_without_changing_time(seeded
 
 
 def test_inventory_edit_saves_profile_and_amount_together(seeded_client, seeded_db, headers):
-    account = accounts.create_account(seeded_db, game_account="before-edit", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    account = create_account(seeded_db, game_account="before-edit", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
@@ -44,7 +44,7 @@ def test_inventory_edit_saves_profile_and_amount_together(seeded_client, seeded_
 
 
 def test_stale_amount_rejects_whole_edit(seeded_client, seeded_db, headers):
-    account = accounts.create_account(seeded_db, game_account="stale-before", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    account = create_account(seeded_db, game_account="stale-before", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
@@ -57,8 +57,8 @@ def test_stale_amount_rejects_whole_edit(seeded_client, seeded_db, headers):
 
 
 def test_cannot_edit_event_of_another_account(seeded_client, seeded_db, headers):
-    first = accounts.create_account(seeded_db, game_account="first", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
-    second = accounts.create_account(seeded_db, game_account="second", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    first = create_account(seeded_db, game_account="first", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    second = create_account(seeded_db, game_account="second", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=second.id)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
@@ -70,7 +70,7 @@ def test_cannot_edit_event_of_another_account(seeded_client, seeded_db, headers)
 
 
 def test_edit_execution_operator_preserves_time_and_records_actual_editor(seeded_client, seeded_db, headers):
-    account = accounts.create_account(seeded_db, game_account="operator-edit", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    account = create_account(seeded_db, game_account="operator-edit", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
@@ -91,7 +91,7 @@ def test_edit_execution_operator_preserves_time_and_records_actual_editor(seeded
 
 
 def test_operator_selection_rejects_unknown_users(seeded_client, seeded_db, headers):
-    account = accounts.create_account(seeded_db, game_account="unknown-operator", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    account = create_account(seeded_db, game_account="unknown-operator", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
@@ -103,7 +103,7 @@ def test_operator_selection_rejects_unknown_users(seeded_client, seeded_db, head
 
 
 def test_zero_amount_execution_can_change_operators_without_cashflow(seeded_client, seeded_db, headers):
-    account = accounts.create_account(seeded_db, game_account="zero-event", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    account = create_account(seeded_db, game_account="zero-event", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     event = OrderEvent(order_id=order.id, event_no="ZERO-OP-001", event_type="DELIVER", amount=Decimal("0"), portion="GROSS", occurred_on=date(2026, 10, 1), is_posted=True, created_by="pytest", updated_by="pytest")
     seeded_db.add(event)
@@ -115,7 +115,7 @@ def test_zero_amount_execution_can_change_operators_without_cashflow(seeded_clie
 
 
 def test_operator_edit_does_not_change_existing_cashflow_amount(seeded_client, seeded_db, headers):
-    account = accounts.create_account(seeded_db, game_account="operator-flow", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    account = create_account(seeded_db, game_account="operator-flow", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
@@ -130,8 +130,8 @@ def test_operator_edit_does_not_change_existing_cashflow_amount(seeded_client, s
 
 def test_inventory_time_shift_moves_all_three_displayed_times_together(seeded_client, seeded_db, headers):
     """台账编辑态时间联动：任一锚点改 N 天，账期、事件、流水与三个展示时间同步平移。"""
-    account = accounts.create_account(seeded_db, game_account="time-shift", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
-    other = accounts.create_account(seeded_db, game_account="time-shift-other", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    account = create_account(seeded_db, game_account="time-shift", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    other = create_account(seeded_db, game_account="time-shift-other", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     other_order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=other.id)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")

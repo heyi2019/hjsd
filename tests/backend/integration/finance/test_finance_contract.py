@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.stocks import service as stocks_service
+from app.stocks.profile import create_account
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
@@ -27,7 +27,7 @@ from app.finance.transfers import create_transfer, repair_transfer
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.orders.pools import pool_balance
-from app.parties import service as parties_service
+from app.parties.counterparties import create_counterparty, set_counterparty_status
 from app.reporting.funds import daily_funds_report
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 
@@ -41,7 +41,7 @@ def _pool(seeded_db, code: str) -> Pool:
 
 
 def _active_order(seeded_db) -> int:
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db,
         game_account=f"finance-active-{uuid4().hex[:10]}",
         business_mode="SELF",
@@ -267,13 +267,13 @@ class TestDepositQueries:
 
     def test_deposit_rejects_disabled_counterparty(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
-        counterparty = parties_service.create_counterparty(
+        counterparty = create_counterparty(
             seeded_db,
             display_name="已停用押金合作方",
             type="PEER",
             actor="pytest",
         )
-        parties_service.set_counterparty_status(
+        set_counterparty_status(
             seeded_db, counterparty.id, False, actor="pytest"
         )
 
@@ -788,7 +788,7 @@ class TestFinanceApi:
         create_deposit(
             seeded_db, pool_id=2, amount=Decimal("20"), paid_on=TODAY, actor="pytest"
         )
-        own_account = stocks_service.create_account(
+        own_account = create_account(
             seeded_db,
             game_account="finance-own-account",
             business_mode="SELF",
@@ -803,7 +803,7 @@ class TestFinanceApi:
             owner_id=9,
             account_id=own_account.id,
         )
-        other_account = stocks_service.create_account(
+        other_account = create_account(
             seeded_db,
             game_account="finance-other-account",
             business_mode="SELF",

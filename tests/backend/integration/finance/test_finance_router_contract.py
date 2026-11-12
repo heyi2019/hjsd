@@ -10,7 +10,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.stocks import service as stocks_service
+from app.stocks.profile import create_account
 from app.core.errors import NotFound
 from app.core.security import CurrentUser
 from app.finance import deposits
@@ -46,7 +46,7 @@ def _all_scope_user() -> CurrentUser:
 
 
 def _order_with_buy(seeded_db) -> int:
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db,
         game_account="router-rebate-account",
         business_mode="SELF",

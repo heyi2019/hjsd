@@ -16,7 +16,8 @@ from app.domain.trade import Account
 from app.domain.enums import AccountStatus
 from app.orders import router, schemas
 from app.orders.create import create_order
-from app.parties import service as parties_service
+from app.parties.counterparties import create_counterparty
+from app.parties.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 
@@ -122,7 +123,7 @@ def test_order_output_strips_game_password_for_non_admin(seeded_db):
 
 def test_order_list_payload_includes_customer_role(seeded_db):
     account = _new_account(seeded_db)
-    customer = parties_service.create_customer(seeded_db, display_name="甲", actor="pytest")
+    customer = create_customer(seeded_db, display_name="甲", actor="pytest")
     order = create_order(
         seeded_db,
         order_type="HS",
@@ -144,7 +145,7 @@ def test_order_list_payload_includes_counterparty_role(seeded_db):
         business_mode="DISTRIBUTION",
         inventory_type="PICKUP",
     )
-    cp = parties_service.create_counterparty(
+    cp = create_counterparty(
         seeded_db, display_name="同行乙", type="PEER", actor="pytest"
     )
     order = create_order(

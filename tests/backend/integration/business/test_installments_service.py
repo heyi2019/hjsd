@@ -63,9 +63,9 @@ def _account(
     business_mode="SELF",
     inventory_type="RECOVERY",
 ):
-    from app.stocks import service as stocks_service
+    from app.stocks.profile import create_account
 
-    return stocks_service.create_account(
+    return create_account(
         seeded_db,
         game_account=game_account,
         platform="王者",

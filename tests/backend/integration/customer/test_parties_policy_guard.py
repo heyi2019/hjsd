@@ -20,14 +20,17 @@ from app.domain.parties import (
 from app.domain.trade import Order, OrderEvent
 from app.domain.users import User
 from app.orders.create import create_order
-from app.parties import service as parties_service
+from app.parties.customer_detail import get_customer_activity_summary
+from app.parties.customer_merge import merge_customers
+from app.parties.customers import create_customer
+from app.parties.leads import close_lead, convert_lead, create_lead, get_lead, list_leads, update_lead
 from app.policy import service as policy_service
 
 
 # ───────────────────────────── 共用辅助 ─────────────────────────────
 
 def _customer(session, **kwargs):
-    return parties_service.create_customer(
+    return create_customer(
         session, display_name=kwargs.pop("display_name", "守门客户"), actor="pytest", **kwargs
     )
 
@@ -87,7 +90,7 @@ def _add_buy_event(session, order, *, created_by="seeduser1"):
 class TestPartiesActivitySummary:
     def test_empty_ids_returns_empty(self, seeded_db):
         # 249: not ids -> 直接返回空 summary
-        assert parties_service.get_customer_activity_summary(seeded_db, []) == {}
+        assert get_customer_activity_summary(seeded_db, []) == {}
 
     def test_event_last_interaction(self, seeded_db):
         # 285/289: 事件时间线回写 last_interaction_at
@@ -110,7 +113,7 @@ class TestPartiesActivitySummary:
             )
         )
         seeded_db.flush()
-        result = parties_service.get_customer_activity_summary(seeded_db, [cust.id])
+        result = get_customer_activity_summary(seeded_db, [cust.id])
         assert result[cust.id]["last_interaction_at"] is not None
 
 
@@ -120,12 +123,12 @@ class TestPartiesMerge:
         source = _customer(seeded_db)
         target = _customer(seeded_db)
         seeded_db.commit()
-        parties_service.create_lead(
+        create_lead(
             seeded_db, customer_id=source.id, request_type="FIND_ACCOUNT",
             target="找号", actor="pytest",
         )
         seeded_db.commit()
-        parties_service.merge_customers(
+        merge_customers(
             seeded_db, source_customer_id=source.id, target_customer_id=target.id,
             reason="重复建档", actor="admin",
         )
@@ -143,7 +146,7 @@ class TestPartiesMerge:
         target.form_extra = {"k1": "目标值"}
         seeded_db.commit()
         # 不应抛错；来源仍被标记为 MERGED
-        parties_service.merge_customers(
+        merge_customers(
             seeded_db, source_customer_id=source.id, target_customer_id=target.id,
             reason="重复建档", actor="admin",
         )
@@ -154,25 +157,25 @@ class TestPartiesLeadGuards:
     def test_get_lead_missing(self, seeded_db):
         # 697: 需求不存在 -> NotFound
         with pytest.raises(NotFound):
-            parties_service.get_lead(seeded_db, 99999)
+            get_lead(seeded_db, 99999)
 
     def test_get_lead_scope_excludes(self, seeded_db):
         # 703: 非管理员且 owner 不在可见范围 -> NotFound
         user = _non_admin_user(seeded_db)
-        lead = parties_service.create_lead(
+        lead = create_lead(
             seeded_db, customer_id=_customer(seeded_db).id, request_type="FIND_ACCOUNT",
             target="x", actor="pytest",
         )
         seeded_db.commit()
         scoped = _scoped_user(user)
         with pytest.raises(NotFound):
-            parties_service.get_lead(seeded_db, lead.id, user=scoped)
+            get_lead(seeded_db, lead.id, user=scoped)
 
     def test_create_lead_invalid_type(self, seeded_db):
         # 729/730: 非法 request_type -> Validation
         cust = _customer(seeded_db)
         with pytest.raises(Validation):
-            parties_service.create_lead(
+            create_lead(
                 seeded_db, customer_id=cust.id, request_type="BADTYPE",
                 target="x", actor="pytest",
             )
@@ -181,7 +184,7 @@ class TestPartiesLeadGuards:
         # 736: 预算为负 -> Validation
         cust = _customer(seeded_db)
         with pytest.raises(Validation):
-            parties_service.create_lead(
+            create_lead(
                 seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
                 target="x", budget=Decimal("-1"), actor="pytest",
             )
@@ -189,98 +192,98 @@ class TestPartiesLeadGuards:
     def test_list_leads_invalid_status(self, seeded_db):
         # 784/785: 非法 status -> Validation
         with pytest.raises(Validation):
-            parties_service.list_leads(seeded_db, status="BADSTATUS")
+            list_leads(seeded_db, status="BADSTATUS")
 
     def test_list_leads_keyword(self, seeded_db):
         # 791/792: 关键字过滤分支
-        parties_service.create_lead(
+        create_lead(
             seeded_db, customer_id=_customer(seeded_db).id, request_type="FIND_ACCOUNT",
             target="守门专用目标", actor="pytest",
         )
         seeded_db.commit()
-        rows = parties_service.list_leads(seeded_db, keyword="守门专用")
+        rows = list_leads(seeded_db, keyword="守门专用")
         assert any("守门专用" in r.target for r in rows)
 
     def test_list_leads_scope(self, seeded_db):
         # 801: 非管理员用户触发范围过滤
         user = _non_admin_user(seeded_db)
         scoped = _scoped_user(user)
-        rows = parties_service.list_leads(seeded_db, user=scoped)
+        rows = list_leads(seeded_db, user=scoped)
         assert isinstance(rows, list)
 
     def test_update_lead_not_open(self, seeded_db):
         # 816: 非 OPEN 需求不可编辑 -> Conflict
         cust = _customer(seeded_db)
-        lead = parties_service.create_lead(
+        lead = create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
             target="x", actor="pytest",
         )
         seeded_db.commit()
-        parties_service.close_lead(seeded_db, lead.id, reason="关闭", actor="pytest")
+        close_lead(seeded_db, lead.id, reason="关闭", actor="pytest")
         seeded_db.commit()
         with pytest.raises(Conflict):
-            parties_service.update_lead(seeded_db, lead.id, actor="pytest", note="改")
+            update_lead(seeded_db, lead.id, actor="pytest", note="改")
 
     def test_update_lead_unknown_field(self, seeded_db):
         # 820: 不支持的更新字段 -> Validation
         cust = _customer(seeded_db)
-        lead = parties_service.create_lead(
+        lead = create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
             target="x", actor="pytest",
         )
         seeded_db.commit()
         with pytest.raises(Validation):
-            parties_service.update_lead(seeded_db, lead.id, actor="pytest", bogus="y")
+            update_lead(seeded_db, lead.id, actor="pytest", bogus="y")
 
     def test_update_lead_negative_budget(self, seeded_db):
         # 836: 更新预算为负 -> Validation
         cust = _customer(seeded_db)
-        lead = parties_service.create_lead(
+        lead = create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
             target="x", actor="pytest",
         )
         seeded_db.commit()
         with pytest.raises(Validation):
-            parties_service.update_lead(
+            update_lead(
                 seeded_db, lead.id, actor="pytest", budget=Decimal("-1")
             )
 
     def test_update_lead_invalid_owner(self, seeded_db):
         # 838: owner_id 非法 -> _validate_owner_id -> Validation
         cust = _customer(seeded_db)
-        lead = parties_service.create_lead(
+        lead = create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
             target="x", actor="pytest",
         )
         seeded_db.commit()
         with pytest.raises(Validation):
-            parties_service.update_lead(seeded_db, lead.id, actor="pytest", owner_id=-1)
+            update_lead(seeded_db, lead.id, actor="pytest", owner_id=-1)
 
     def test_convert_lead_not_open(self, seeded_db):
         # 883: 非 OPEN 需求不可转单 -> Conflict
         cust = _customer(seeded_db)
-        lead = parties_service.create_lead(
+        lead = create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
             target="x", actor="pytest",
         )
         seeded_db.commit()
-        parties_service.close_lead(seeded_db, lead.id, reason="关闭", actor="pytest")
+        close_lead(seeded_db, lead.id, reason="关闭", actor="pytest")
         seeded_db.commit()
         with pytest.raises(Conflict):
-            parties_service.convert_lead(
+            convert_lead(
                 seeded_db, lead.id, order_id=1, actor="pytest"
             )
 
     def test_convert_lead_order_missing(self, seeded_db):
         # 886: 订单不存在 -> NotFound
         cust = _customer(seeded_db)
-        lead = parties_service.create_lead(
+        lead = create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
             target="x", actor="pytest",
         )
         seeded_db.commit()
         with pytest.raises(NotFound):
-            parties_service.convert_lead(
+            convert_lead(
                 seeded_db, lead.id, order_id=99999, actor="pytest"
             )
 
@@ -289,29 +292,29 @@ class TestPartiesLeadGuards:
         user = _non_admin_user(seeded_db)
         scoped = _scoped_user(user)
         cust = _customer(seeded_db)
-        lead = parties_service.create_lead(
+        lead = create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
             target="x", actor="pytest", owner_id=user.id,
         )
         order = _order(seeded_db)  # owner_id 默认 None -> 不被 SELF 用户可见
         seeded_db.commit()
         with pytest.raises(NotFound):
-            parties_service.convert_lead(
+            convert_lead(
                 seeded_db, lead.id, order_id=order.id, actor="pytest", user=scoped
             )
 
     def test_close_lead_not_open(self, seeded_db):
         # 917: 非 OPEN 需求不可关闭 -> Conflict
         cust = _customer(seeded_db)
-        lead = parties_service.create_lead(
+        lead = create_lead(
             seeded_db, customer_id=cust.id, request_type="FIND_ACCOUNT",
             target="x", actor="pytest",
         )
         seeded_db.commit()
-        parties_service.close_lead(seeded_db, lead.id, reason="关闭", actor="pytest")
+        close_lead(seeded_db, lead.id, reason="关闭", actor="pytest")
         seeded_db.commit()
         with pytest.raises(Conflict):
-            parties_service.close_lead(seeded_db, lead.id, reason="再关闭", actor="pytest")
+            close_lead(seeded_db, lead.id, reason="再关闭", actor="pytest")
 
 
 # ───────────────────────────── policy.service ─────────────────────────────

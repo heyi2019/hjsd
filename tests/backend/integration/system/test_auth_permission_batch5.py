@@ -28,7 +28,7 @@ from app.core.settings import Settings
 from app.core.audit import AuditLog
 from app.domain.enums import AuditAction
 from app.domain.users import User, UserWeChatBinding
-from app.parties import service as parties_service
+from app.parties.customers import create_customer
 
 COUNTERPARTIES = "/api/v1/counterparties"
 CUSTOMERS = "/api/v1/customers"
@@ -177,7 +177,7 @@ def test_customer_update_masks_when_role_lacks_contact_read(seeded_db):
     """
     from app.parties._common import to_customer_out
 
-    cust = parties_service.create_customer(
+    cust = create_customer(
         seeded_db, display_name="客户丁", phone="13800006666", actor="pytest"
     )
     actor = _user(perms=("customer.update",))

@@ -34,9 +34,6 @@ from app.domain.enums import (
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderProfitAllocation
 from app.domain.users import User
 from app.finance.attributes import accounting_attribute_for_order_event
-# 保留 re-export：既有调用方/测试按 `app.orders.events.foundation_service` 打桩，
-# 拆分到 events_rules 后该路径仍需可解析（指向同一模块对象）。
-from app.foundation import service as foundation_service
 from app.orders.form_fields import validate_form_extra
 from ._common import (
     _non_negative_money,
@@ -602,6 +599,5 @@ from .events_rules import (
 __all__ = [
     "_apply_account_effect",
     "_opposite_direction",
-    "foundation_service",
     "post_event",
 ]

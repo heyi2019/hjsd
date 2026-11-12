@@ -26,7 +26,8 @@ from app.orders.events import post_event
 from app.orders.links import create_order_link
 from app.orders.mutations import update_order
 from app.orders.queries import list_orders
-from app.parties import service as parties_service
+from app.parties.counterparties import create_counterparty
+from app.parties.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 TODAY2 = date(2026, 10, 18)
@@ -48,7 +49,7 @@ def _new_account(seeded_db, *, game_account: str = "guard-acc") -> Account:
 
 
 def _customer(seeded_db, name: str = "甲"):
-    return parties_service.create_customer(seeded_db, display_name=name, actor="pytest")
+    return create_customer(seeded_db, display_name=name, actor="pytest")
 
 
 def _settled_hs_installment(seeded_db):
@@ -189,7 +190,7 @@ def test_hs_removed_cost_event_does_not_require_account(seeded_db):
 
 
 def test_th_sell_blocked_when_installment_exists(seeded_db):
-    peer = parties_service.create_counterparty(
+    peer = create_counterparty(
         seeded_db, display_name="peer", type="PEER", actor="pytest"
     )
     buyer = _customer(seeded_db)
@@ -298,7 +299,7 @@ def test_get_offset_event_rejects_non_money_event(seeded_db):
 def test_resolve_pool_rejects_unrouted_type(seeded_db):
     unknown_order = Order(order_type="ZZ")
     # resolve_default_pool 对未知类型会先抛 NotFound，这里强制返回 None 直达 696 行
-    with patch("app.orders.events.foundation_service.resolve_default_pool", return_value=None):
+    with patch("app.orders.events_rules.resolve_default_pool", return_value=None):
         with pytest.raises(Validation, match="未配置"):
             events._resolve_pool(seeded_db, unknown_order, "PRINCIPAL")
 
@@ -328,7 +329,7 @@ def test_update_order_rejects_account_snapshot(seeded_db):
 
 
 def test_create_order_rejects_invalid_counterparty_role(seeded_db):
-    peer = parties_service.create_counterparty(
+    peer = create_counterparty(
         seeded_db, display_name="p", type="PEER", actor="pytest"
     )
     seeded_db.commit()
@@ -348,7 +349,7 @@ def test_create_order_rejects_non_positive_counterparty_id(seeded_db):
 
 
 def test_create_order_rejects_duplicate_counterparty(seeded_db):
-    peer = parties_service.create_counterparty(
+    peer = create_counterparty(
         seeded_db, display_name="p", type="PEER", actor="pytest"
     )
     seeded_db.commit()

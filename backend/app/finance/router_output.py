@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.security import CurrentUser
 from app.domain.trade import Deposit, Order, RebateRecord
 from app.finance import schemas
-from app.parties import service as parties_service
+from app.parties.fields import get_extra_values
 
 def _actor(user: CurrentUser) -> str:
     return user.username
@@ -74,7 +74,7 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         operator=(value("operator") or value("created_by"))
         if isinstance(flow, dict)
         else flow.created_by,
-        extra_values=parties_service.get_extra_values(
+        extra_values=get_extra_values(
             db, entity_type="cashflow", entity_id=value("id")
         ),
     )

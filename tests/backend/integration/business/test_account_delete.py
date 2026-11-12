@@ -28,13 +28,13 @@ from app.domain.trade import (
 )
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.stocks import service as stocks_service
+from app.stocks.profile import create_account
 
 D = date(2026, 10, 20)
 
 
 def _account_with_order(seeded_db, name: str = "delete-target") -> tuple[int, int]:
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db,
         game_account=name,
         business_mode="SELF",

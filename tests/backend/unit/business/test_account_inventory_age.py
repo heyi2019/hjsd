@@ -17,7 +17,8 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from app.domain.trade import Account
-from app.stocks import service
+from app.stocks.inventory import inventory_stats
+from app.stocks.profile import create_account
 from app.stocks.schemas import AccountOut
 
 
@@ -90,7 +91,7 @@ def test_age_falls_back_when_entry_time_missing():
 
 
 def _account(seeded_db, game_account: str, *, days_ago: int):
-    account = service.create_account(
+    account = create_account(
         seeded_db,
         game_account=game_account,
         platform="王者",
@@ -117,7 +118,7 @@ def test_api_list_publishes_age_consistent_with_card_stats(seeded_client, seeded
     assert items["age-api-8"]["inventory_age_level"] == "WARNING"
     assert items["age-api-31"]["inventory_age_level"] == "OVERDUE"
 
-    stats = service.inventory_stats(
+    stats = inventory_stats(
         seeded_db, account_ids=[fresh.id, aging.id, stale.id]
     )
     overdue = sum(1 for item in items.values() if item["inventory_age_level"] == "OVERDUE")

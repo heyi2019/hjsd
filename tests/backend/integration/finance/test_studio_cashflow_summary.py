@@ -112,9 +112,9 @@ def test_summary_ignores_item_limit(seeded_client, seeded_db, headers):
 def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
     from app.orders.create import create_order
     from app.orders.events import post_event
-    from app.stocks import service as stocks_service
+    from app.stocks.profile import create_account
 
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db,
         game_account="studio-summary-acc",
         platform="王者",
@@ -145,9 +145,9 @@ def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
 def test_summary_excludes_order_plain_cashflows(seeded_client, seeded_db, headers):
     """订单普通资金流水（挂 order_id 但无事件/押金/划转）属性命中也不算工作室收支。"""
     from app.orders.create import create_order
-    from app.stocks import service as stocks_service
+    from app.stocks.profile import create_account
 
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db,
         game_account="studio-summary-plain-acc",
         platform="王者",

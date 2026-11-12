@@ -12,11 +12,14 @@ from typing import Any
 from app.core.audit import record_audit
 from app.core.security import CurrentUser
 from app.domain.users import User
-from app.foundation import service as foundation_service
+from app.foundation.order_types import get_order_type_by_code
+from app.foundation.sequences import next_order_no
 from app.orders.form_fields import validate_form_extra
-from app.parties import service as parties_service
+from app.parties.counterparties import assert_counterparty_usable
+from app.parties.customer_merge import assert_customer_usable
+from app.parties.fields import set_extra_values
 from app.policy import service as policy_service
-from app.stocks import service as stocks_service
+from app.stocks.profile import get_account
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import (
@@ -122,7 +125,7 @@ def create_order(
     form_extra_scope: str | None = None,
     user: CurrentUser | None = None,
 ) -> Order:
-    definition = foundation_service.get_order_type_by_code(session, order_type)
+    definition = get_order_type_by_code(session, order_type)
     if definition is None:
         raise Validation(
             f"业务类型 {order_type} 不存在", details={"order_type": order_type}
@@ -203,7 +206,7 @@ def create_order(
                 details={"field": "commission_payer", "value": normalized_commission_payer},
             )
     if account_id is not None:
-        account = stocks_service.get_account(session, account_id, user)
+        account = get_account(session, account_id, user)
         _validate_existing_account_context(
             definition.code,
             account,
@@ -217,7 +220,7 @@ def create_order(
         (
             customer_id,
             role,
-            parties_service.assert_customer_usable(session, customer_id, user=user),
+            assert_customer_usable(session, customer_id, user=user),
         )
         for customer_id, role in customer_roles
     ]
@@ -225,7 +228,7 @@ def create_order(
         (
             counterparty_id,
             role,
-            parties_service.assert_counterparty_usable(
+            assert_counterparty_usable(
                 session, counterparty_id, expected_type=role
             ),
         )
@@ -338,7 +341,7 @@ def create_order(
             if key not in {"secondary_images", "wallet_realname_images"}
         }
     order = Order(
-        order_no=foundation_service.next_order_no(session, definition),
+        order_no=next_order_no(session, definition),
         order_type=definition.code,
         capital_type=selected_capital_type,
         trade_date=trade_date,
@@ -376,7 +379,7 @@ def create_order(
         )
         session.add(_counterparty_role(order.id, counterparty_id, role))
     session.flush()
-    parties_service.set_extra_values(
+    set_extra_values(
         session,
         entity_type="order",
         entity_id=order.id,
@@ -413,7 +416,7 @@ def add_customer_role(
     # 与建单同一套参与方护栏：角色合法、符合订单类型白名单、客户仍可用。
     # 缺任一校验都会让「售后追挂买家」绕过停用/合并客户与角色白名单。
     _validate_participant_roles(order.order_type, [(customer_id, role)], [])
-    parties_service.assert_customer_usable(session, customer_id, user=user)
+    assert_customer_usable(session, customer_id, user=user)
     from app.domain.parties import OrderCustomerRole
     from sqlalchemy import select
 

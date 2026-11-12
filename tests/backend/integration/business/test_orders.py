@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.stocks import service as stocks_service
+from app.stocks.profile import create_account
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
 from app.domain.foundation import Pool
@@ -15,7 +15,8 @@ from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.value_added_services import service as installment_service
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.parties import service as parties_service
+from app.parties.counterparties import create_counterparty
+from app.parties.customers import create_customer, set_customer_status
 
 TODAY = date(2026, 10, 4)
 
@@ -47,7 +48,7 @@ def _new_account(seeded_db, *, game_account: str = "acc-001") -> Account:
     return account
 
 def _customer(seeded_db, name: str = "甲"):
-    return parties_service.create_customer(seeded_db, display_name=name, actor="pytest")
+    return create_customer(seeded_db, display_name=name, actor="pytest")
 
 def _pool(seeded_db, code: str) -> Pool:
     pool = seeded_db.scalar(select(Pool).where(Pool.code == code))
@@ -299,7 +300,7 @@ class TestA02ThStock:
         assert seeded_db.get(Order, order.id).account_snapshot is None
 
     def test_advance_then_settle(self, seeded_db):
-        peer = parties_service.create_counterparty(
+        peer = create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
         )
         buyer = _customer(seeded_db)
@@ -674,7 +675,7 @@ class TestEventRules:
     def test_disabled_participant_rejected(self, seeded_db):
         customer = _customer(seeded_db)
         seeded_db.commit()
-        parties_service.set_customer_status(seeded_db, customer.id, "DISABLED", actor="pytest")
+        set_customer_status(seeded_db, customer.id, "DISABLED", actor="pytest")
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
             create_order(
@@ -688,7 +689,7 @@ class TestEventRules:
 
 class TestOrdersApi:
     def test_invalid_money_input_returns_business_422(self, seeded_client, seeded_db, headers):
-        account = stocks_service.create_account(
+        account = create_account(
             seeded_db,
             game_account="api-invalid-money",
             business_mode="SELF",
@@ -720,7 +721,7 @@ class TestOrdersApi:
         assert response.json()["code"] == ErrorCode.VALIDATION_ERROR
 
     def test_create_order_and_post_event(self, seeded_client, seeded_db, headers):
-        account = stocks_service.create_account(
+        account = create_account(
             seeded_db,
             game_account="api-sale-account",
             business_mode="SELF",

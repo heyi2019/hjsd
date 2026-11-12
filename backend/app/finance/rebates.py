@@ -26,7 +26,7 @@ from app.domain.enums import (
 )
 from app.domain.trade import Cashflow, OrderEvent, RebateRecord
 from app.domain.users import User
-from app.foundation import service as foundation_service
+from app.foundation.order_types import get_order_type_by_code, resolve_default_pool
 from app.orders._shared import get_order
 from app.orders.events import post_event
 from app.orders.form_fields import validate_form_extra
@@ -90,7 +90,7 @@ def create_rebate(
 
     rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
     # BAS-06-04：按返点日期固化规则版本，改版不影响历史记录
-    order_type_definition = foundation_service.get_order_type_by_code(
+    order_type_definition = get_order_type_by_code(
         session, order.order_type
     )
     policy_version_id, snapshot = policy_service.make_snapshot(
@@ -152,7 +152,7 @@ def create_rebate(
     event_extra = dict(event.form_extra or {})
     event_extra["rebate_record_id"] = record.id
     event.form_extra = event_extra
-    pool = foundation_service.resolve_default_pool(
+    pool = resolve_default_pool(
         session,
         order.order_type,
         Portion.PROFIT.value,

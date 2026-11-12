@@ -24,8 +24,18 @@ from app.core.security import (
 )
 from app.domain.enums import AuditAction, EventType
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
-from app.stocks import service
-from app.parties import service as parties_service
+from app.stocks.inventory import (
+    count_accounts,
+    inventory as stocks_inventory,
+    inventory_stats as stocks_inventory_stats,
+    list_accounts as stocks_list_accounts,
+)
+from app.stocks.profile import (
+    delete_account as stocks_delete_account,
+    get_account,
+    update_account_profile as stocks_update_account_profile,
+)
+from app.parties.fields import get_extra_values, get_extra_values_bulk
 from app.domain.foundation import AuditLog, Pool
 from app.domain.parties import Customer, Counterparty, OrderCounterpartyRole, OrderCustomerRole
 from app.domain.users import User
@@ -121,7 +131,7 @@ def update_execution_detail(
     account_id: int, payload: ExecutionEditRequest,
     db: Session = Depends(get_db), user: CurrentUser = edit_execution,
 ) -> dict[str, bool]:
-    account = service.get_account(db, account_id, user)
+    account = get_account(db, account_id, user)
     db.scalar(select(Account).where(Account.id == account_id).with_for_update())
     if len({item.id for item in payload.events}) != len(payload.events):
         raise Validation("同一执行记录不能重复修改")
@@ -169,7 +179,7 @@ def update_execution_detail(
     if Decimal(str(account.cost_amount)) + cost_delta < 0:
         raise Validation("修改后库存成本不能为负数")
     if payload.profile is not None:
-        account = service.update_account_profile(db, account_id, actor=user.username, user=user,
+        account = stocks_update_account_profile(db, account_id, actor=user.username, user=user,
             **payload.profile.model_dump(exclude_unset=True))
     for event, flow, item in changes:
         before = {"amount": str(event.amount), "note": event.note, "operator_user_ids": event.operator_user_ids, "flow_amount": str(flow.amount) if flow else None, "flow_note": flow.note if flow else None}
@@ -284,7 +294,7 @@ def _account_outputs(
         item.id: item.display_name or item.username
         for item in db.scalars(select(User).where(User.id.in_(responsible_ids))).all()
     } if responsible_ids else {}
-    extra_values = parties_service.get_extra_values_bulk(
+    extra_values = get_extra_values_bulk(
         db, entity_type="account", entity_ids=[account.id for account in accounts]
     )
     return [
@@ -314,7 +324,7 @@ def list_accounts(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> AccountListOut:
-    items = service.list_accounts(db, status=status, user=_user, limit=limit, offset=offset)
+    items = stocks_list_accounts(db, status=status, user=_user, limit=limit, offset=offset)
     return AccountListOut(
         items=_account_outputs(
             db,
@@ -322,7 +332,7 @@ def list_accounts(
             _user,
             include_credentials=_user.has(PERM_ORDER_CREATE),
         ),
-        total=service.count_accounts(db, status=status, user=_user),
+        total=count_accounts(db, status=status, user=_user),
         limit=limit,
         offset=offset,
     )
@@ -335,7 +345,7 @@ def export_accounts_csv(
     _user: CurrentUser = read_access,
 ) -> Response:
     """库存中心按可见列导出 CSV，沿用 /stocks 的权限口径。"""
-    accounts = service.list_accounts(
+    accounts = stocks_list_accounts(
         db, status=status, user=_user, limit=EXPORT_ROW_LIMIT, offset=0
     )
     outputs = _account_outputs(
@@ -379,15 +389,15 @@ def update_account_profile(
     db: Session = Depends(get_db),
     user: CurrentUser = manage,
 ) -> AccountOut:
-    service.get_account(db, account_id, user)
+    get_account(db, account_id, user)
     changes = {
         field: getattr(payload, field)
         for field in payload.model_fields_set
     }
-    item = service.update_account_profile(
+    item = stocks_update_account_profile(
         db, account_id, actor=_actor(user), user=user, **changes
     )
-    extras = parties_service.get_extra_values(db, entity_type="account", entity_id=item.id)
+    extras = get_extra_values(db, entity_type="account", entity_id=item.id)
     return _account_output(item, include_credentials=True, extra_values=extras)
 
 
@@ -410,7 +420,7 @@ def delete_account(
     全部保留并解绑，账号快照与原因写入审计日志，操作不可恢复。
     """
     _require_admin(user)
-    service.delete_account(db, account_id, actor=_actor(user), reason=payload.reason, user=user)
+    stocks_delete_account(db, account_id, actor=_actor(user), reason=payload.reason, user=user)
     return Response(status_code=204)
 
 
@@ -420,7 +430,7 @@ def inventory(
     _user: CurrentUser = read_access,
 ) -> InventoryResponseOut:
     """库存中心在库台账：只统计独立库存状态为在库的真实占用。"""
-    rows = service.inventory(db, user=_user)
+    rows = stocks_inventory(db, user=_user)
     total = sum((row["cost_amount"] for row in rows), Decimal("0"))
     return InventoryResponseOut(items=rows, count=len(rows), total_cost=total)
 
@@ -436,7 +446,7 @@ def inventory_stats(
     入参是界面此刻展示的账号集合，因此筛选口径只有一份（前端视图），
     金额累加与库龄天数只在后端算，前端不再做 float 求和。
     """
-    stats = service.inventory_stats(db, account_ids=payload.account_ids, user=_user)
+    stats = stocks_inventory_stats(db, account_ids=payload.account_ids, user=_user)
     return InventoryStatsOut(**stats)
 
 
@@ -447,7 +457,7 @@ def execution_detail(
     _user: CurrentUser = read_access,
 ) -> AccountExecutionDetailOut:
     """查询库存账号关联的全部订单、已登记事件和资金流水。"""
-    account = service.get_account(db, account_id, _user)
+    account = get_account(db, account_id, _user)
     order_stmt = select(Order).where(Order.account_id == account_id)
     order_scope = owner_scope_filter(Order.owner_id, _user, db)
     if order_scope is not None:

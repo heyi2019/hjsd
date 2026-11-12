@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.stocks import service as stocks_service
+from app.stocks.profile import create_account
 from app.core.security import CurrentUser, build_access_token
 from app.orders.create import create_order
-from app.parties import service as parties_service
+from app.parties.counterparties import create_counterparty
+from app.parties.customers import create_customer
 
 
 def _types(response) -> set[str]:
@@ -16,13 +17,13 @@ def _types(response) -> set[str]:
 def test_global_search_covers_order_inventory_customer_and_counterparty(
     seeded_client, seeded_db, headers
 ):
-    customer = parties_service.create_customer(
+    customer = create_customer(
         seeded_db, display_name="搜索客户", owner_id=9, actor="pytest"
     )
-    counterparty = parties_service.create_counterparty(
+    counterparty = create_counterparty(
         seeded_db, display_name="搜索平台", type="PLATFORM", actor="pytest"
     )
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db,
         game_account="search-game-account",
         game_type="王者",
@@ -64,7 +65,7 @@ def test_global_search_covers_order_inventory_customer_and_counterparty(
 
 
 def test_global_search_respects_customer_and_owner_scope(seeded_client, seeded_db):
-    customer = parties_service.create_customer(
+    customer = create_customer(
         seeded_db, display_name="不可见客户", owner_id=1, actor="pytest"
     )
     viewer = CurrentUser.build(

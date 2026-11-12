@@ -27,7 +27,7 @@ from app.orders import form_fields as ff
 from app.orders.create import add_customer_role, create_order
 from app.orders.events import post_event
 from app.orders.queries import count_orders, list_orders
-from app.parties import service as parties_service
+from app.parties.customers import create_customer, set_customer_status
 
 TODAY = date(2026, 10, 4)
 TODAY2 = date(2026, 10, 18)
@@ -80,7 +80,7 @@ def _sell(seeded_db, order: Order, *, amount: str = "800", occurred: date = TODA
 def test_add_customer_role_rejects_role_outside_order_type_whitelist(seeded_db):
     """TH 订单仅允许 BUYER，追挂 SELLER 必须被白名单拦截（原实现三元组去重放行）。"""
     th = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")
-    cust = parties_service.create_customer(seeded_db, display_name="追挂甲", actor="pytest")
+    cust = create_customer(seeded_db, display_name="追挂甲", actor="pytest")
     seeded_db.commit()
     with pytest.raises(Validation, match="不允许客户角色"):
         add_customer_role(seeded_db, th.id, cust.id, "SELLER", actor="pytest")
@@ -88,7 +88,7 @@ def test_add_customer_role_rejects_role_outside_order_type_whitelist(seeded_db):
 
 def test_add_customer_role_rejects_invalid_role(seeded_db):
     order = _hs_order(seeded_db)
-    cust = parties_service.create_customer(seeded_db, display_name="追挂乙", actor="pytest")
+    cust = create_customer(seeded_db, display_name="追挂乙", actor="pytest")
     seeded_db.commit()
     with pytest.raises(Validation, match="客户角色必须为"):
         add_customer_role(seeded_db, order.id, cust.id, "NOT_A_ROLE", actor="pytest")
@@ -97,8 +97,8 @@ def test_add_customer_role_rejects_invalid_role(seeded_db):
 def test_add_customer_role_rejects_disabled_customer(seeded_db):
     """停用客户不得作为新订单参与方（原实现缺 assert_customer_usable）。"""
     order = _hs_order(seeded_db)
-    cust = parties_service.create_customer(seeded_db, display_name="停用买家", actor="pytest")
-    parties_service.set_customer_status(seeded_db, cust.id, "DISABLED", actor="pytest")
+    cust = create_customer(seeded_db, display_name="停用买家", actor="pytest")
+    set_customer_status(seeded_db, cust.id, "DISABLED", actor="pytest")
     seeded_db.commit()
     with pytest.raises(Validation, match="不可作为新订单参与方"):
         add_customer_role(seeded_db, order.id, cust.id, "BUYER", actor="pytest")
@@ -106,7 +106,7 @@ def test_add_customer_role_rejects_disabled_customer(seeded_db):
 
 def test_add_customer_role_allows_valid_buyer(seeded_db):
     order = _hs_order(seeded_db)
-    cust = parties_service.create_customer(seeded_db, display_name="正常买家", actor="pytest")
+    cust = create_customer(seeded_db, display_name="正常买家", actor="pytest")
     seeded_db.commit()
     result = add_customer_role(seeded_db, order.id, cust.id, "BUYER", actor="pytest")
     row = seeded_db.scalar(

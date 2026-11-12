@@ -12,7 +12,7 @@ from pydantic import ValidationError as PydanticValidationError
 from app.core.security import CurrentUser
 from app.core.security import owner_scope_ids
 from app.orders.schemas import OrderAccountSnapshot
-from app.stocks import service as stocks_service
+from app.stocks.profile import create_account
 from sqlalchemy.orm import Session
 from app.core.errors import (
     ErrorCode,
@@ -181,7 +181,7 @@ def _create_inline_inventory_account(session: Session, *, order_type: str, game_
         "TH": ("DISTRIBUTION", "PICKUP"),
         "DG": ("DISTRIBUTION", "CONSIGNMENT"),
     }[order_type]
-    return stocks_service.create_account(
+    return create_account(
         session, game_account=game_account, actor=actor, game_type=game_type,
         business_mode=mode, inventory_type=inventory_type, game_password=game_password,
         channel_region=channel_region, bound_phone=bound_phone,

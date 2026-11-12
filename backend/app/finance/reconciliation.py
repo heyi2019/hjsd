@@ -17,7 +17,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, CashflowStatus, Direction, ReconciliationStatus
 from app.domain.trade import Cashflow, Reconciliation
 from app.orders.form_fields import validate_form_extra
-from app.foundation import service as foundation_service
+from app.foundation.pools import assert_pool_usable
 
 from ._common import _non_negative, _text
 
@@ -67,7 +67,7 @@ def create_reconciliation(
 ) -> Reconciliation:
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
-    pool = foundation_service.assert_pool_usable(session, pool_id)
+    pool = assert_pool_usable(session, pool_id)
     label = _text(
         account_label,
         field="account_label",

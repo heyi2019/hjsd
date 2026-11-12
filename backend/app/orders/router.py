@@ -33,7 +33,7 @@ from app.domain.enums import (
 )
 from app.domain.foundation import Pool
 from app.domain.trade import Account, OrderEvent
-from app.foundation import service as foundation_service
+from app.foundation.order_types import resolve_default_pool
 from app.domain.options import OptionSet
 from app.value_added_services import service as installments_service
 from app.lists import service as list_columns_service
@@ -766,7 +766,7 @@ def create_order(
         # BUY/SELL/DELIVER/OPERATE 等业务事实。账号成本仍由这笔订单支出明细累计。
         pool_id = cost.pool_id
         if pool_id is None:
-            pool = foundation_service.resolve_default_pool(
+            pool = resolve_default_pool(
                 db,
                 order.order_type,
                 cost.portion,

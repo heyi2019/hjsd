@@ -9,18 +9,24 @@ from __future__ import annotations
 import pytest
 
 from app.core.errors import NotFound, Validation
-from app.foundation import service
+from app.foundation.game_types import (
+    create_game_type,
+    list_game_types,
+    set_game_type_active,
+    set_game_type_default,
+    update_game_type,
+)
 from app.foundation.game_types import _get_game_type_or_404
 
 
 class TestGameTypeService:
     def test_list_excludes_inactive_when_requested(self, seeded_db):
-        created = service.create_game_type(seeded_db, name="临时停用类型", actor="pytest")
+        created = create_game_type(seeded_db, name="临时停用类型", actor="pytest")
         seeded_db.commit()
-        service.set_game_type_active(seeded_db, created.id, False, actor="pytest")
+        set_game_type_active(seeded_db, created.id, False, actor="pytest")
         seeded_db.commit()
-        all_items = service.list_game_types(seeded_db)
-        active_only = service.list_game_types(seeded_db, include_inactive=False)
+        all_items = list_game_types(seeded_db)
+        active_only = list_game_types(seeded_db, include_inactive=False)
         assert created.id in [it.id for it in all_items]
         assert created.id not in [it.id for it in active_only]
         assert all(item.is_active for item in active_only)
@@ -30,33 +36,33 @@ class TestGameTypeService:
             _get_game_type_or_404(seeded_db, 999999)
 
     def test_update_game_type_applies_fields(self, seeded_db):
-        created = service.create_game_type(seeded_db, name="测试类型A", actor="pytest")
+        created = create_game_type(seeded_db, name="测试类型A", actor="pytest")
         seeded_db.commit()
-        updated = service.update_game_type(
+        updated = update_game_type(
             seeded_db, created.id, actor="pytest", name="测试类型A改", sort_order=7
         )
         assert updated.name == "测试类型A改"
         assert updated.sort_order == 7
 
     def test_update_game_type_rejects_duplicate_name(self, seeded_db):
-        created = service.create_game_type(seeded_db, name="重名类型", actor="pytest")
+        created = create_game_type(seeded_db, name="重名类型", actor="pytest")
         seeded_db.commit()
         with pytest.raises(Validation, match="游戏类型已存在"):
-            service.update_game_type(seeded_db, created.id, actor="pytest", name="王者荣耀")
+            update_game_type(seeded_db, created.id, actor="pytest", name="王者荣耀")
 
     def test_set_game_type_active_success(self, seeded_db):
-        created = service.create_game_type(seeded_db, name="测试类型B", actor="pytest")
+        created = create_game_type(seeded_db, name="测试类型B", actor="pytest")
         seeded_db.commit()
-        updated = service.set_game_type_active(seeded_db, created.id, False, actor="pytest")
+        updated = set_game_type_active(seeded_db, created.id, False, actor="pytest")
         assert updated.is_active is False
 
     def test_cannot_set_inactive_as_default(self, seeded_db):
-        created = service.create_game_type(seeded_db, name="测试类型C", actor="pytest")
+        created = create_game_type(seeded_db, name="测试类型C", actor="pytest")
         seeded_db.commit()
-        service.set_game_type_active(seeded_db, created.id, False, actor="pytest")
+        set_game_type_active(seeded_db, created.id, False, actor="pytest")
         seeded_db.commit()
         with pytest.raises(Validation, match="停用的游戏类型不能设为默认"):
-            service.set_game_type_default(seeded_db, created.id, True, actor="pytest")
+            set_game_type_default(seeded_db, created.id, True, actor="pytest")
 
 
 class TestGameTypeApi:

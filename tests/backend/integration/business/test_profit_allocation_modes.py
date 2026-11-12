@@ -17,7 +17,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.stocks import service as account_service
+from app.stocks.profile import create_account
 from app.core.errors import Validation
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
@@ -31,7 +31,7 @@ D = date(2026, 10, 17)
 
 def _order_with_profit(seeded_db, *, buy: str = "1000", sell: str = "1500") -> int:
     """造一单有已过账 BUY/SELL 的订单，利润 = sell - buy。"""
-    account = account_service.create_account(
+    account = create_account(
         seeded_db,
         game_account=f"alloc-{buy}-{sell}",
         business_mode="SELF",

@@ -25,10 +25,10 @@ from app.domain.enums import (
     Nature,
 )
 from app.domain.trade import Cashflow, Deposit
-from app.foundation import service as foundation_service
+from app.foundation.pools import assert_pool_usable
 from app.orders._shared import get_order
 from app.orders.form_fields import validate_form_extra
-from app.parties import service as parties_service
+from app.parties.counterparties import assert_counterparty_usable
 
 from ._common import _positive, _text
 
@@ -50,9 +50,9 @@ def create_deposit(
     money = _positive(amount, field="amount")
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
-    pool = foundation_service.assert_pool_usable(session, pool_id)
+    pool = assert_pool_usable(session, pool_id)
     if counterparty_id is not None:
-        parties_service.assert_counterparty_usable(session, counterparty_id)
+        assert_counterparty_usable(session, counterparty_id)
     if source_order_id is not None:
         try:
             get_order(session, source_order_id, user)

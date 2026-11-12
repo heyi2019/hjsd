@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.trade import Account
-from app.parties import service as parties_service
+from app.parties.fields import get_extra_values_bulk
 from ._common import INVENTORY_STATUSES, inventory_age_days as age_days, scope_filter
 
 
@@ -49,7 +49,7 @@ def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict
         row for row in list_accounts(session, user=user)
         if row.inventory_status in INVENTORY_STATUSES
     ]
-    extra_values = parties_service.get_extra_values_bulk(
+    extra_values = get_extra_values_bulk(
         session, entity_type="account", entity_ids=[row.id for row in rows]
     )
     return [

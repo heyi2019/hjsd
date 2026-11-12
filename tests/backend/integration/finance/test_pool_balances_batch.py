@@ -16,7 +16,7 @@ from decimal import Decimal
 
 from app.domain.enums import Direction, Nature, PoolOwnership
 from app.finance.cashflows import create_cashflow
-from app.foundation import service as foundation_service
+from app.foundation.pools import create_pool
 
 TODAY = date(2026, 10, 4)
 
@@ -70,7 +70,7 @@ def test_batch_items_match_single_pool_and_totals_are_decimal_sums(
 
 
 def test_owned_cash_excludes_custody_and_third_part_pools(seeded_client, seeded_db, headers):
-    custody = foundation_service.create_pool(
+    custody = create_pool(
         seeded_db,
         code="CUSTODY_PROBE",
         name="代管探针池",

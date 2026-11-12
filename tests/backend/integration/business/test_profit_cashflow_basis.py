@@ -41,14 +41,14 @@ from app.reporting.profit import order_profit_detail
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from app.reporting.r3_commission import r3_commission_reconciliation
 from app.reporting.r5_business_pnl import r5_business_pnl
-from app.stocks import service as account_service
+from app.stocks.profile import create_account
 from sqlalchemy import select
 
 D = date(2026, 10, 17)
 
 
 def _order_with_events(seeded_db, *, buy: str = "1000", sell: str = "1500") -> int:
-    account = account_service.create_account(
+    account = create_account(
         seeded_db,
         game_account=f"cashbasis-{buy}-{sell}-{uuid4().hex[:6]}",
         business_mode="SELF",

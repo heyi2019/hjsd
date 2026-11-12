@@ -17,57 +17,77 @@ from sqlalchemy.exc import IntegrityError
 from app.core.errors import NotFound, Validation
 from app.domain.enums import CapitalType, PoolOwnership, PoolStatus, Portion
 from app.domain.foundation import OrderTypeDef, OrderTypePool
-from app.foundation import seeds, service
+from app.foundation import seeds
+from app.foundation.order_types import (
+    create_order_type,
+    get_order_type_by_code,
+    list_order_types,
+    require_default_pool,
+    require_order_type_by_code,
+    resolve_default_pool,
+    set_order_type_active,
+    set_route,
+    update_order_type,
+)
+from app.foundation.pools import (
+    _has_cashflow,
+    create_pool,
+    list_pools,
+    require_pool_by_code,
+    set_pool_status,
+    update_pool,
+)
+from app.foundation.sequences import ensure_order_sequence, preview_order_no
 from app.orders.create import create_order
 
 
 def _pool(seeded_db, code: str, **kwargs):
-    return service.create_pool(seeded_db, code=code, name=f"池-{code}", actor="pytest", **kwargs)
+    return create_pool(seeded_db, code=code, name=f"池-{code}", actor="pytest", **kwargs)
 
 
 class TestPoolGuards:
     def test_invalid_code_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.create_pool(seeded_db, code="!", name="坏码池", actor="pytest")
+            create_pool(seeded_db, code="!", name="坏码池", actor="pytest")
         assert "必须为" in str(exc.value)
 
     def test_non_string_code_is_rejected_as_business_error(self, seeded_db):
         with pytest.raises(Validation):
-            service.create_pool(seeded_db, code=123, name="坏类型池", actor="pytest")
+            create_pool(seeded_db, code=123, name="坏类型池", actor="pytest")
 
     def test_pool_type_cannot_be_blank(self, seeded_db):
         with pytest.raises(Validation, match="pool_type"):
-            service.create_pool(
+            create_pool(
                 seeded_db, code="TMPPT", name="空用途池", pool_type="   ", actor="pytest"
             )
 
     def test_pool_name_is_required(self, seeded_db):
         with pytest.raises(Validation):
-            service.create_pool(seeded_db, code="TMPNAME", name="   ", actor="pytest")
+            create_pool(seeded_db, code="TMPNAME", name="   ", actor="pytest")
 
     def test_pool_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.update_pool(seeded_db, 999999, actor="pytest", name="不存在")
+            update_pool(seeded_db, 999999, actor="pytest", name="不存在")
         with pytest.raises(NotFound):
-            service.set_pool_status(seeded_db, 999999, PoolStatus.ACTIVE.value, actor="pytest")
+            set_pool_status(seeded_db, 999999, PoolStatus.ACTIVE.value, actor="pytest")
 
     def test_pool_code_lookup_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.require_pool_by_code(seeded_db, "NO_SUCH_POOL")
+            require_pool_by_code(seeded_db, "NO_SUCH_POOL")
 
     def test_list_pools_excludes_disabled_when_requested(self, seeded_db):
         active = _pool(seeded_db, "TMPACT")
         disabled = _pool(seeded_db, "TMPDIS")
-        service.set_pool_status(seeded_db, disabled.id, PoolStatus.DISABLED.value, actor="pytest")
-        visible = [p.id for p in service.list_pools(seeded_db, include_disabled=False)]
+        set_pool_status(seeded_db, disabled.id, PoolStatus.DISABLED.value, actor="pytest")
+        visible = [p.id for p in list_pools(seeded_db, include_disabled=False)]
         assert active.id in visible
         assert disabled.id not in visible
         # 不停用时两个种子池 + 本用例两个全可见
-        assert len(service.list_pools(seeded_db)) == 4
+        assert len(list_pools(seeded_db)) == 4
 
     def test_update_pool_applies_all_optional_fields(self, seeded_db):
         pool = _pool(seeded_db, "TMPUPD")
-        updated = service.update_pool(
+        updated = update_pool(
             seeded_db, pool.id, actor="pytest", note="改备注",
             pool_type="PROFIT", ownership=PoolOwnership.CUSTODY.value,
         )
@@ -75,14 +95,14 @@ class TestPoolGuards:
         assert updated.pool_type == "PROFIT"
         assert updated.ownership == PoolOwnership.CUSTODY.value
         with pytest.raises(Validation) as exc:
-            service.update_pool(seeded_db, pool.id, actor="pytest", ownership="MARS")
+            update_pool(seeded_db, pool.id, actor="pytest", ownership="MARS")
         assert "ownership 取值非法" in str(exc.value)
 
     def test_update_pool_validates_all_fields_before_mutating(self, seeded_db):
         pool = _pool(seeded_db, "TMPATOMIC")
 
         with pytest.raises(Validation, match="ownership"):
-            service.update_pool(
+            update_pool(
                 seeded_db,
                 pool.id,
                 actor="operator",
@@ -98,18 +118,18 @@ class TestPoolGuards:
     def test_invalid_pool_status_rejected(self, seeded_db):
         pool = _pool(seeded_db, "TMPSTA")
         with pytest.raises(Validation) as exc:
-            service.set_pool_status(seeded_db, pool.id, "BOGUS", actor="pytest")
+            set_pool_status(seeded_db, pool.id, "BOGUS", actor="pytest")
         assert "资金池状态取值非法" in str(exc.value)
 
     def test_has_cashflow_returns_false_without_flows(self, seeded_db):
         # PG 下 cashflow 表恒存在；此处验证「该池无流水时返回 False」（delete_pool 据此放行）
         pool = _pool(seeded_db, "TMPCF")
-        assert service._has_cashflow(seeded_db, pool.id) is False
+        assert _has_cashflow(seeded_db, pool.id) is False
 
 
 class TestOrderTypeGuards:
     def test_active_flags_must_be_boolean_in_service(self, seeded_db):
-        order_type = service.create_order_type(
+        order_type = create_order_type(
             seeded_db,
             code="TBOOL",
             name="布尔状态校验",
@@ -117,11 +137,11 @@ class TestOrderTypeGuards:
             actor="pytest",
         )
         with pytest.raises(Validation, match="is_active 必须为布尔值"):
-            service.set_order_type_active(
+            set_order_type_active(
                 seeded_db, order_type.id, "false", actor="pytest"
             )
         with pytest.raises(Validation, match="is_active 必须为布尔值"):
-            service.set_route(
+            set_route(
                 seeded_db,
                 order_type_code=order_type.code,
                 portion=Portion.PRINCIPAL.value,
@@ -131,14 +151,14 @@ class TestOrderTypeGuards:
             )
 
     def test_activation_requires_an_active_route_to_an_active_pool(self, seeded_db):
-        order_type = service.create_order_type(
+        order_type = create_order_type(
             seeded_db,
             code="TBR",
             name="路由状态校验",
             capital_type=CapitalType.STOCK.value,
             actor="pytest",
         )
-        service.set_route(
+        set_route(
             seeded_db,
             order_type_code=order_type.code,
             portion=Portion.PRINCIPAL.value,
@@ -147,11 +167,11 @@ class TestOrderTypeGuards:
             actor="pytest",
         )
         with pytest.raises(Validation, match="启用中的资金池路由"):
-            service.set_order_type_active(seeded_db, order_type.id, True, actor="pytest")
+            set_order_type_active(seeded_db, order_type.id, True, actor="pytest")
 
     def test_order_type_name_and_prefix_are_validated(self, seeded_db):
         with pytest.raises(Validation):
-            service.create_order_type(
+            create_order_type(
                 seeded_db,
                 code="TBN",
                 name="   ",
@@ -159,7 +179,7 @@ class TestOrderTypeGuards:
                 actor="pytest",
             )
         with pytest.raises(Validation):
-            service.create_order_type(
+            create_order_type(
                 seeded_db,
                 code="TBP",
                 name="同行代收",
@@ -170,7 +190,7 @@ class TestOrderTypeGuards:
 
     def test_negative_sort_order_rejected_on_create(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.create_order_type(
+            create_order_type(
                 seeded_db,
                 code="TB",
                 name="同行代收",
@@ -182,7 +202,7 @@ class TestOrderTypeGuards:
 
     def test_sort_order_must_be_an_integer(self, seeded_db):
         with pytest.raises(Validation, match="排序值必须为非负整数"):
-            service.create_order_type(
+            create_order_type(
                 seeded_db,
                 code="TBT",
                 name="类型值校验",
@@ -193,7 +213,7 @@ class TestOrderTypeGuards:
 
     def test_duplicate_sequence_prefix_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.create_order_type(
+            create_order_type(
                 seeded_db,
                 code="TB",
                 name="同行代收",
@@ -204,9 +224,9 @@ class TestOrderTypeGuards:
         assert "编号前缀 HS 已存在" in str(exc.value)
 
     def test_negative_sort_order_rejected_on_update(self, seeded_db):
-        definition = service.get_order_type_by_code(seeded_db, "DG")
+        definition = get_order_type_by_code(seeded_db, "DG")
         with pytest.raises(Validation) as exc:
-            service.update_order_type(
+            update_order_type(
                 seeded_db, definition.id, actor="pytest", sort_order=-1
             )
         assert "排序值不能为负数" in str(exc.value)
@@ -245,24 +265,24 @@ class TestOrderTypeGuards:
 
     def test_order_type_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.update_order_type(seeded_db, 999999, actor="pytest", name="不存在")
+            update_order_type(seeded_db, 999999, actor="pytest", name="不存在")
         with pytest.raises(NotFound):
-            service.set_order_type_active(seeded_db, 999999, False, actor="pytest")
+            set_order_type_active(seeded_db, 999999, False, actor="pytest")
         with pytest.raises(NotFound):
-            service.require_order_type_by_code(seeded_db, "ZZ")
+            require_order_type_by_code(seeded_db, "ZZ")
 
     def test_list_order_types_excludes_inactive_when_requested(self, seeded_db):
-        codes = [item.code for item in service.list_order_types(seeded_db)]
+        codes = [item.code for item in list_order_types(seeded_db)]
         assert "HS" in codes
-        definition = service.get_order_type_by_code(seeded_db, "HS")
-        service.set_order_type_active(seeded_db, definition.id, False, actor="pytest")
-        active = [item.code for item in service.list_order_types(seeded_db, include_inactive=False)]
+        definition = get_order_type_by_code(seeded_db, "HS")
+        set_order_type_active(seeded_db, definition.id, False, actor="pytest")
+        active = [item.code for item in list_order_types(seeded_db, include_inactive=False)]
         assert "HS" not in active
         assert "TH" in active
 
     def test_update_order_type_applies_fields(self, seeded_db):
-        definition = service.get_order_type_by_code(seeded_db, "DG")
-        updated = service.update_order_type(
+        definition = get_order_type_by_code(seeded_db, "DG")
+        updated = update_order_type(
             seeded_db, definition.id, actor="pytest", name="代挂改名",
             description="客户让我帮忙卖他的号", sort_order=99,
         )
@@ -276,7 +296,7 @@ class TestOrderTypeGuards:
 class TestRouteGuards:
     def test_negative_priority_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.set_route(
+            set_route(
                 seeded_db,
                 order_type_code="HS",
                 portion=Portion.PRINCIPAL.value,
@@ -287,8 +307,8 @@ class TestRouteGuards:
         assert "优先级不能为负数" in str(exc.value)
 
     def test_database_rejects_negative_route_priority(self, seeded_db):
-        order_type = service.require_order_type_by_code(seeded_db, "HS")
-        pool = service.require_pool_by_code(seeded_db, "HJ_INVEST")
+        order_type = require_order_type_by_code(seeded_db, "HS")
+        pool = require_pool_by_code(seeded_db, "HJ_INVEST")
         with pytest.raises(IntegrityError):
             seeded_db.execute(
                 OrderTypePool.__table__.insert().values(
@@ -302,39 +322,39 @@ class TestRouteGuards:
 
     def test_invalid_portion_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.set_route(
+            set_route(
                 seeded_db, order_type_code="HS", portion="BOGUS",
                 pool_code="HJ_INVEST", actor="pytest",
             )
         assert "portion 取值非法" in str(exc.value)
 
     def test_default_pool_resolved_for_seeded_route(self, seeded_db):
-        pool = service.require_default_pool(seeded_db, "HS", "PRINCIPAL")
+        pool = require_default_pool(seeded_db, "HS", "PRINCIPAL")
         assert pool.code == "HJ_INVEST"
 
     def test_disabled_pool_cannot_be_default_route(self, seeded_db):
-        invest = service.require_pool_by_code(seeded_db, "HJ_INVEST")
-        service.set_pool_status(seeded_db, invest.id, PoolStatus.DISABLED.value, actor="pytest")
+        invest = require_pool_by_code(seeded_db, "HJ_INVEST")
+        set_pool_status(seeded_db, invest.id, PoolStatus.DISABLED.value, actor="pytest")
         with pytest.raises(Validation) as exc:
-            service.require_default_pool(seeded_db, "HS", "PRINCIPAL")
+            require_default_pool(seeded_db, "HS", "PRINCIPAL")
         assert "已停用" in str(exc.value)
 
     def test_unknown_order_type_route_returns_none(self, seeded_db):
         with pytest.raises(NotFound):
-            service.resolve_default_pool(seeded_db, "ZZ", "PRINCIPAL")
+            resolve_default_pool(seeded_db, "ZZ", "PRINCIPAL")
 
     def test_invalid_portion_in_default_pool_lookup_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.resolve_default_pool(seeded_db, "HS", "BOGUS")
+            resolve_default_pool(seeded_db, "HS", "BOGUS")
         assert "portion 取值非法" in str(exc.value)
 
 
 class TestNumberingHelpers:
     def test_ensure_and_preview_order_no(self, seeded_db):
-        definition = service.get_order_type_by_code(seeded_db, "HS")
-        sequence = service.ensure_order_sequence(seeded_db, definition)
+        definition = get_order_type_by_code(seeded_db, "HS")
+        sequence = ensure_order_sequence(seeded_db, definition)
         assert sequence.sequence_key == definition.sequence_key
-        assert service.preview_order_no(seeded_db, definition).startswith("HS")
+        assert preview_order_no(seeded_db, definition).startswith("HS")
 
 
 class TestSeedGuards:
@@ -348,7 +368,7 @@ class TestSeedGuards:
         stats = seeds.seed_foundation(db, actor="pytest")
         db.commit()
         assert stats["pools_created"] == 2
-        assert service.get_order_type_by_code(db, "ZZ") is None
+        assert get_order_type_by_code(db, "ZZ") is None
 
     def test_seed_is_applied_true(self, seeded_db):
         assert seeds.seed_is_applied(seeded_db) is True
@@ -363,7 +383,7 @@ class TestSeedGuards:
 
 class TestFoundationApi:
     def test_update_order_type_endpoint(self, seeded_client, seeded_db, headers):
-        definition = service.get_order_type_by_code(seeded_db, "DG")
+        definition = get_order_type_by_code(seeded_db, "DG")
         response = seeded_client.patch(
             f"/api/v1/order-types/{definition.id}",
             json={"name": "代挂API", "description": "接口改名", "sort_order": 33},

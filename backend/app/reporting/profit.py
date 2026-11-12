@@ -17,7 +17,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 from app.core.security import CurrentUser
-from app.parties import service as parties_service
+from app.parties.fields import get_extra_values_bulk
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from app.domain.enums import RebateStatus
@@ -57,7 +57,7 @@ def order_profit_detail(
     )
     orders = session.execute(orders_stmt).all()
     order_ids = [row.id for row in orders]
-    extra_values = parties_service.get_extra_values_bulk(
+    extra_values = get_extra_values_bulk(
         session, entity_type="order", entity_ids=order_ids
     )
     cashflow_by_order = cashflow_totals_by_order(session, order_ids=order_ids)

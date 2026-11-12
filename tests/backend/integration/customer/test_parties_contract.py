@@ -33,7 +33,18 @@ from app.domain.parties import (
 from app.domain.trade import InstallmentSchedule, OrderFormField
 from app.value_added_services import service as installment_service
 from app.orders.create import create_order
-from app.parties import service
+from app.parties._common import mask_id, mask_phone
+from app.parties.counterparties import (
+    create_counterparty,
+    get_counterparty,
+    list_counterparties,
+    set_counterparty_status,
+    update_counterparty,
+)
+from app.parties.customer_detail import get_customer_activity_summary, get_customer_detail
+from app.parties.customer_merge import duplicate_candidates, merge_customers
+from app.parties.customers import create_customer, get_customer, list_customers, set_customer_status, update_customer
+from app.parties.fields import get_extra_values, set_extra_values
 from app.parties import router as parties_router
 from app.parties import schemas
 
@@ -96,7 +107,7 @@ def _scoped_user() -> CurrentUser:
 
 
 def _customer(seeded_db, name: str, **kwargs):
-    return service.create_customer(seeded_db, display_name=name, actor="pytest", **kwargs)
+    return create_customer(seeded_db, display_name=name, actor="pytest", **kwargs)
 
 
 def _audit_actions(seeded_db, action: AuditAction) -> list[str]:
@@ -109,33 +120,33 @@ def _audit_actions(seeded_db, action: AuditAction) -> list[str]:
 # ------------------------------------------------------------------ 脱敏边界
 class TestMaskingEdgeCases:
     def test_mask_phone_empty_and_short(self, seeded_db):
-        assert service.mask_phone(None) is None  # 46
-        assert service.mask_phone("") == ""
-        assert service.mask_phone("12345") == "123**"  # 49（长度 ≤ 7 走短串分支）
+        assert mask_phone(None) is None  # 46
+        assert mask_phone("") == ""
+        assert mask_phone("12345") == "123**"  # 49（长度 ≤ 7 走短串分支）
 
     def test_mask_id_empty_and_short(self, seeded_db):
-        assert service.mask_id(None) is None  # 56
-        assert service.mask_id("") == ""
-        assert service.mask_id("ab") == "a*"  # 59（长度 ≤ 2 走短串分支）
+        assert mask_id(None) is None  # 56
+        assert mask_id("") == ""
+        assert mask_id("ab") == "a*"  # 59（长度 ≤ 2 走短串分支）
 
 
 # ------------------------------------------------------------------ 客户建档
 class TestCreateCustomerGuards:
     def test_empty_display_name_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.create_customer(seeded_db, display_name="   ", actor="pytest")
+            create_customer(seeded_db, display_name="   ", actor="pytest")
         assert "称呼/昵称必填" in str(exc.value)
 
     def test_extra_values_require_object_with_string_keys(self, seeded_db):
         with pytest.raises(Validation, match="表单扩展字段值必须为对象"):
-            service.create_customer(
+            create_customer(
                 seeded_db,
                 display_name="表单扩展字段结构错误",
                 actor="pytest",
                 extra_values=["not-an-object"],
             )
         with pytest.raises(Validation, match="表单扩展字段键必须为非空字符串"):
-            service.create_customer(
+            create_customer(
                 seeded_db,
                 display_name="表单扩展字段键错误",
                 actor="pytest",
@@ -144,25 +155,25 @@ class TestCreateCustomerGuards:
 
     def test_customer_owner_must_exist(self, seeded_db):
         with pytest.raises(Validation, match="客户负责人不存在"):
-            service.create_customer(
+            create_customer(
                 seeded_db, display_name="负责人校验", actor="pytest", owner_id=999999
             )
 
     def test_create_names_reject_non_text_values(self, seeded_db):
         with pytest.raises(Validation, match="称呼/昵称必填"):
-            service.create_customer(seeded_db, display_name=123, actor="pytest")
+            create_customer(seeded_db, display_name=123, actor="pytest")
         with pytest.raises(Validation, match="合作方名称必填"):
-            service.create_counterparty(
+            create_counterparty(
                 seeded_db, display_name=123, type="PEER", actor="pytest"
             )
 
     def test_duplicate_candidates_without_conditions_returns_empty(self, seeded_db):
         # 150：无任何联系方式入参 → 直接返回空候选，不查库
-        assert service.duplicate_candidates(seeded_db) == []
+        assert duplicate_candidates(seeded_db) == []
 
     def test_duplicate_candidates_reject_non_text_contact_values(self, seeded_db):
         with pytest.raises(Validation, match="联系方式必须为文本"):
-            service.duplicate_candidates(seeded_db, phone=123)
+            duplicate_candidates(seeded_db, phone=123)
 
     def test_scoped_user_cannot_assign_created_customer_to_other_owner(
         self, seeded_client, seeded_db
@@ -201,18 +212,18 @@ class TestListAndGetCustomers:
     def test_list_filters_keyword_status_and_scope(self, seeded_db):
         mine = _customer(seeded_db, "阿甲", phone="13800001111", owner_id=9)
         other = _customer(seeded_db, "阿乙", phone="13900002222", owner_id=1)
-        service.set_customer_status(seeded_db, other.id, "DISABLED", actor="pytest")
+        set_customer_status(seeded_db, other.id, "DISABLED", actor="pytest")
 
-        by_status = service.list_customers(seeded_db, status=CustomerStatus.ACTIVE.value)
+        by_status = list_customers(seeded_db, status=CustomerStatus.ACTIVE.value)
         assert [c.id for c in by_status] == [mine.id]
 
-        by_name = service.list_customers(seeded_db, keyword="阿甲")
+        by_name = list_customers(seeded_db, keyword="阿甲")
         assert [c.id for c in by_name] == [mine.id]
         # 关键词同时匹配客户编号/手机/微信/QQ
-        by_phone = service.list_customers(seeded_db, keyword="13800001111")
+        by_phone = list_customers(seeded_db, keyword="13800001111")
         assert [c.id for c in by_phone] == [mine.id]
 
-        scoped = service.list_customers(seeded_db, user=_scoped_user())
+        scoped = list_customers(seeded_db, user=_scoped_user())
         assert [c.id for c in scoped] == [mine.id]
         assert other.id not in [c.id for c in scoped]
 
@@ -229,7 +240,7 @@ class TestListAndGetCustomers:
             actor="pytest",
         )
 
-        summary = service.get_customer_activity_summary(seeded_db, [customer.id])
+        summary = get_customer_activity_summary(seeded_db, [customer.id])
 
         assert summary[customer.id]["order_roles"] == ["BUYER", "SELLER"]
         assert summary[customer.id]["active_order_count"] == 1
@@ -237,11 +248,11 @@ class TestListAndGetCustomers:
 
     def test_get_customer_notfound_and_scope_forbidden(self, seeded_db):
         with pytest.raises(NotFound):
-            service.get_customer(seeded_db, 999999)
+            get_customer(seeded_db, 999999)
         # 他人 owner 的客户对 SELF 作用域同样 404（不泄露存在性）
         other = _customer(seeded_db, "阿丙", owner_id=1)
         with pytest.raises(NotFound):
-            service.get_customer(seeded_db, other.id, _scoped_user())
+            get_customer(seeded_db, other.id, _scoped_user())
 
     def test_customer_detail_aggregates_business_installments_and_audit(self, seeded_db):
         customer = _customer(seeded_db, "详情客户", owner_id=9)
@@ -288,7 +299,7 @@ class TestListAndGetCustomers:
         overdue.status = ScheduleStatus.OVERDUE.value
         seeded_db.flush()
 
-        detail = service.get_customer_detail(seeded_db, customer.id)
+        detail = get_customer_detail(seeded_db, customer.id)
 
         assert detail["overview"]["order_count"] == 2
         assert detail["overview"]["active_order_count"] == 2
@@ -324,8 +335,8 @@ class TestListAndGetCustomers:
             actor="pytest",
         )
 
-        detail = service.get_customer_detail(seeded_db, customer.id, _scoped_user())
-        summary = service.get_customer_activity_summary(
+        detail = get_customer_detail(seeded_db, customer.id, _scoped_user())
+        summary = get_customer_activity_summary(
             seeded_db, [customer.id], _scoped_user()
         )
 
@@ -340,7 +351,7 @@ class TestUpdateCustomer:
         customer = _customer(seeded_db, "原客户")
 
         with pytest.raises(Validation, match="客户更新字段不受支持"):
-            service.update_customer(
+            update_customer(
                 seeded_db,
                 customer.id,
                 actor="operator",
@@ -356,15 +367,15 @@ class TestUpdateCustomer:
     def test_customer_and_counterparty_names_cannot_be_blank_on_update(self, seeded_db):
         customer = _customer(seeded_db, "客户名")
         with pytest.raises(Validation, match="称呼/昵称不能清空"):
-            service.update_customer(
+            update_customer(
                 seeded_db, customer.id, actor="pytest", display_name="   "
             )
 
-        counterparty = service.create_counterparty(
+        counterparty = create_counterparty(
             seeded_db, display_name="合作方名", type="PEER", actor="pytest"
         )
         with pytest.raises(Validation, match="合作方名称不能清空"):
-            service.update_counterparty(
+            update_counterparty(
                 seeded_db, counterparty.id, actor="pytest", display_name="   "
             )
 
@@ -372,7 +383,7 @@ class TestUpdateCustomer:
         other = _customer(seeded_db, "他人客户", owner_id=1)
 
         with pytest.raises(NotFound):
-            service.update_customer(
+            update_customer(
                 seeded_db,
                 other.id,
                 actor="operator",
@@ -380,7 +391,7 @@ class TestUpdateCustomer:
                 note="越权修改",
             )
         with pytest.raises(NotFound):
-            service.set_customer_status(
+            set_customer_status(
                 seeded_db,
                 other.id,
                 CustomerStatus.DISABLED.value,
@@ -403,7 +414,7 @@ class TestUpdateCustomer:
     def test_merged_customer_cannot_be_updated(self, seeded_db):
         source = _customer(seeded_db, "源")
         target = _customer(seeded_db, "目标")
-        service.merge_customers(
+        merge_customers(
             seeded_db,
             source_customer_id=source.id,
             target_customer_id=target.id,
@@ -411,17 +422,17 @@ class TestUpdateCustomer:
             actor="admin",
         )
         with pytest.raises(Conflict) as exc:
-            service.update_customer(seeded_db, source.id, actor="pytest", note="x")
+            update_customer(seeded_db, source.id, actor="pytest", note="x")
         assert "已合并客户不可修改" in str(exc.value)
 
         with pytest.raises(Validation, match="已合并客户不可修改状态"):
-            service.set_customer_status(
+            set_customer_status(
                 seeded_db, source.id, CustomerStatus.ACTIVE.value, actor="pytest"
             )
 
     def test_contact_change_writes_contact_audit(self, seeded_db):
         customer = _customer(seeded_db, "阿甲", phone="13800001111")
-        service.update_customer(
+        update_customer(
             seeded_db, customer.id, actor="pytest", phone="13800009999", note=None
         )
         assert customer.phone == "13800009999"
@@ -433,7 +444,7 @@ class TestUpdateCustomer:
 
     def test_non_contact_change_writes_customer_audit(self, seeded_db):
         customer = _customer(seeded_db, "阿甲")
-        service.update_customer(seeded_db, customer.id, actor="pytest", source="转介绍")
+        update_customer(seeded_db, customer.id, actor="pytest", source="转介绍")
         assert customer.source == "转介绍"
         assert _audit_actions(seeded_db, AuditAction.CUSTOMER_UPDATE) == [
             customer.customer_no
@@ -443,7 +454,7 @@ class TestUpdateCustomer:
     def test_status_cannot_be_set_to_merged_manually(self, seeded_db):
         customer = _customer(seeded_db, "阿甲")
         with pytest.raises(Validation) as exc:
-            service.set_customer_status(
+            set_customer_status(
                 seeded_db, customer.id, CustomerStatus.MERGED.value, actor="pytest"
             )
         assert "MERGED 只能由合并动作产生" in str(exc.value)
@@ -451,7 +462,7 @@ class TestUpdateCustomer:
     def test_status_rejects_unknown_value_in_service(self, seeded_db):
         customer = _customer(seeded_db, "阿甲")
         with pytest.raises(Validation) as exc:
-            service.set_customer_status(
+            set_customer_status(
                 seeded_db, customer.id, "PENDING", actor="pytest"
             )
         assert "客户状态无效" in str(exc.value)
@@ -463,7 +474,7 @@ class TestMergeGuards:
         source = _customer(seeded_db, "源")
         target = _customer(seeded_db, "目标")
         with pytest.raises(Validation, match="客户合并必须填写原因"):
-            service.merge_customers(
+            merge_customers(
                 seeded_db,
                 source_customer_id=source.id,
                 target_customer_id=target.id,
@@ -475,7 +486,7 @@ class TestMergeGuards:
         source = _customer(seeded_db, "他人来源", owner_id=1)
         target = _customer(seeded_db, "我的目标", owner_id=9)
         with pytest.raises(NotFound):
-            service.merge_customers(
+            merge_customers(
                 seeded_db,
                 source_customer_id=source.id,
                 target_customer_id=target.id,
@@ -487,7 +498,7 @@ class TestMergeGuards:
     def test_same_source_and_target_rejected(self, seeded_db):
         customer = _customer(seeded_db, "阿甲")
         with pytest.raises(Validation) as exc:
-            service.merge_customers(
+            merge_customers(
                 seeded_db,
                 source_customer_id=customer.id,
                 target_customer_id=customer.id,
@@ -500,7 +511,7 @@ class TestMergeGuards:
         source = _customer(seeded_db, "源")
         target = _customer(seeded_db, "目标")
         third = _customer(seeded_db, "第三方")
-        service.merge_customers(
+        merge_customers(
             seeded_db,
             source_customer_id=source.id,
             target_customer_id=target.id,
@@ -508,7 +519,7 @@ class TestMergeGuards:
             actor="admin",
         )
         with pytest.raises(Validation) as exc:
-            service.merge_customers(
+            merge_customers(
                 seeded_db,
                 source_customer_id=source.id,
                 target_customer_id=third.id,
@@ -531,7 +542,7 @@ class TestMergeGuards:
         )
         seeded_db.flush()
 
-        service.merge_customers(
+        merge_customers(
             seeded_db,
             source_customer_id=source.id,
             target_customer_id=target.id,
@@ -561,14 +572,14 @@ class TestMergeGuards:
         )
         source = _customer(seeded_db, "带表单扩展字段的源")
         target = _customer(seeded_db, "没有表单扩展字段的目标")
-        service.set_extra_values(
+        set_extra_values(
             seeded_db,
             entity_type="customer",
             entity_id=source.id,
             values=[(definition.field_key, "王者荣耀")],
         )
 
-        service.merge_customers(
+        merge_customers(
             seeded_db,
             source_customer_id=source.id,
             target_customer_id=target.id,
@@ -576,10 +587,10 @@ class TestMergeGuards:
             actor="admin",
         )
 
-        assert service.get_extra_values(
+        assert get_extra_values(
             seeded_db, entity_type="customer", entity_id=target.id
         ) == {"preferred_platform": "王者荣耀"}
-        assert service.get_extra_values(
+        assert get_extra_values(
             seeded_db, entity_type="customer", entity_id=source.id
         ) == {"preferred_platform": "王者荣耀"}
 
@@ -590,7 +601,7 @@ class TestCounterpartyGuards:
         order = create_order(
             seeded_db, order_type="TH", trade_date=date(2026, 10, 4), actor="pytest"
         )
-        counterparty = service.create_counterparty(
+        counterparty = create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
         )
         seeded_db.add(
@@ -606,17 +617,17 @@ class TestCounterpartyGuards:
 
     def test_empty_display_name_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.create_counterparty(
+            create_counterparty(
                 seeded_db, display_name="  ", type="PEER", actor="pytest"
             )
         assert "合作方名称必填" in str(exc.value)
 
     def test_counterparty_active_must_be_boolean_in_service(self, seeded_db):
-        peer = service.create_counterparty(
+        peer = create_counterparty(
             seeded_db, display_name="布尔状态校验", type="PEER", actor="pytest"
         )
         with pytest.raises(Validation, match="active 必须为布尔值"):
-            service.set_counterparty_status(
+            set_counterparty_status(
                 seeded_db, peer.id, "false", actor="pytest"
             )
         seeded_db.commit()
@@ -624,30 +635,30 @@ class TestCounterpartyGuards:
         assert peer.status == CounterpartyStatus.ACTIVE.value
 
     def test_list_filters_by_type_and_status(self, seeded_db):
-        peer = service.create_counterparty(
+        peer = create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
         )
-        supplier = service.create_counterparty(
+        supplier = create_counterparty(
             seeded_db, display_name="供货方B", type="SUPPLIER", actor="pytest"
         )
-        service.set_counterparty_status(seeded_db, supplier.id, False, actor="pytest")
+        set_counterparty_status(seeded_db, supplier.id, False, actor="pytest")
 
-        by_type = service.list_counterparties(seeded_db, type="PEER")
+        by_type = list_counterparties(seeded_db, type="PEER")
         assert [p.id for p in by_type] == [peer.id]
-        by_status = service.list_counterparties(
+        by_status = list_counterparties(
             seeded_db, status=CounterpartyStatus.ACTIVE.value
         )
         assert [p.id for p in by_status] == [peer.id]
 
     def test_get_counterparty_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.get_counterparty(seeded_db, 999999)
+            get_counterparty(seeded_db, 999999)
 
     def test_update_counterparty_applies_fields(self, seeded_db):
-        peer = service.create_counterparty(
+        peer = create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
         )
-        updated = service.update_counterparty(
+        updated = update_counterparty(
             seeded_db, peer.id, actor="pytest", display_name="同行A2", note="长期合作",
             phone=None,
         )
@@ -659,12 +670,12 @@ class TestCounterpartyGuards:
         ]
 
     def test_counterparty_update_validates_all_fields_before_mutating(self, seeded_db):
-        peer = service.create_counterparty(
+        peer = create_counterparty(
             seeded_db, display_name="原合作方", type="PEER", actor="pytest"
         )
 
         with pytest.raises(Validation, match="合作方更新字段不受支持"):
-            service.update_counterparty(
+            update_counterparty(
                 seeded_db,
                 peer.id,
                 actor="operator",
@@ -757,7 +768,7 @@ class TestPartiesApi:
         assert response.json()["id"] == target.id
 
     def test_list_counterparties_endpoint(self, seeded_client, seeded_db, headers):
-        peer = service.create_counterparty(
+        peer = create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
         )
         response = seeded_client.get(
@@ -769,7 +780,7 @@ class TestPartiesApi:
         ]
 
     def test_update_counterparty_endpoint(self, seeded_client, seeded_db, headers):
-        peer = service.create_counterparty(
+        peer = create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
         )
         response = seeded_client.patch(

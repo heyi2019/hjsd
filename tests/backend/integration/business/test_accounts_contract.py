@@ -18,13 +18,15 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import AccountStatus, AuditAction
 from app.domain.foundation import AuditLog, Pool
 from app.domain.trade import Account
-from app.stocks import service
+from app.stocks.inventory import inventory, list_accounts, total_inventory_cost
+from app.stocks.profile import create_account, get_account, update_account_profile
 from app.finance.cashflows import create_cashflow
 from app.finance.rebates import create_rebate
 from app.orders.cancellation_model import cancel_order
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.parties import service as parties_service
+from app.parties.counterparties import create_counterparty
+from app.parties.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 
@@ -35,7 +37,7 @@ def _account(seeded_db, game_account: str, **kwargs):
         "DISTRIBUTION" if inventory_type in {"PICKUP", "CONSIGNMENT"} else "SELF",
     )
     kwargs.setdefault("inventory_type", inventory_type)
-    return service.create_account(
+    return create_account(
         seeded_db, game_account=game_account, platform="王者", actor="pytest", **kwargs
     )
 
@@ -85,7 +87,7 @@ class TestCreateAccountGuards:
         assert item["inventory_entry_at"] is not None
 
     def test_pickup_inventory_type_can_be_created_for_th(self, seeded_db):
-        account = service.create_account(
+        account = create_account(
             seeded_db,
             game_account="pickup-inventory-entity",
             business_mode="DISTRIBUTION",
@@ -155,7 +157,7 @@ class TestCreateAccountGuards:
     def test_account_update_rejects_more_than_nine_images(self, seeded_db):
         account = _account(seeded_db, "too-many-update-images")
         with pytest.raises(Validation, match="最多 9 张"):
-            service.update_account_profile(
+            update_account_profile(
                 seeded_db,
                 account.id,
                 actor="pytest",
@@ -176,7 +178,7 @@ class TestCreateAccountGuards:
         seeded_db.flush()
 
         with pytest.raises(Validation, match="仅适用于回收或代挂"):
-            service.update_account_profile(
+            update_account_profile(
                 seeded_db,
                 account.id,
                 actor="operator",
@@ -199,7 +201,7 @@ class TestCreateAccountGuards:
 
         account = _account(seeded_db, "invalid-secondary-update")
         with pytest.raises(Validation, match="has_secondary 必须为布尔值"):
-            service.update_account_profile(
+            update_account_profile(
                 seeded_db, account.id, actor="pytest", has_secondary="false"
             )
         seeded_db.commit()
@@ -218,7 +220,7 @@ class TestCreateAccountGuards:
             occurred_on=TODAY, actor="pytest",
         )
 
-        updated = service.update_account_profile(
+        updated = update_account_profile(
             seeded_db, account.id, actor="pytest", note="售出后补充说明"
         )
 
@@ -233,7 +235,7 @@ class TestCreateAccountGuards:
             note="旧备注",
         )
 
-        updated = service.update_account_profile(
+        updated = update_account_profile(
             seeded_db,
             account.id,
             actor="pytest",
@@ -248,7 +250,7 @@ class TestCreateAccountGuards:
 
     def test_account_profile_update_is_recorded_as_account_audit(self, seeded_db):
         account = _account(seeded_db, "audited-account")
-        service.update_account_profile(
+        update_account_profile(
             seeded_db,
             account.id,
             actor="pytest",
@@ -282,23 +284,23 @@ class TestCreateAccountGuards:
 
     def test_empty_identifier_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.create_account(seeded_db, game_account="  ", actor="pytest")
+            create_account(seeded_db, game_account="  ", actor="pytest")
         assert "库存编号必填" in str(exc.value)
 
     def test_identifier_must_be_text_in_service(self, seeded_db):
         with pytest.raises(Validation, match="库存编号必填"):
-            service.create_account(seeded_db, game_account=123, actor="pytest")
+            create_account(seeded_db, game_account=123, actor="pytest")
 
         account = _account(seeded_db, "update-identifier-type")
         with pytest.raises(Validation, match="库存编号必填"):
-            service.update_account_profile(
+            update_account_profile(
                 seeded_db, account.id, actor="pytest", game_account=123
             )
 
     def test_duplicate_identifier_allowed_as_repeat_purchase(self, seeded_db):
         """2026-10-28 口径：game_account 不唯一——复购同号各建独立实体。"""
         first = _account(seeded_db, "dup-acc")
-        second = service.create_account(seeded_db, game_account="dup-acc", actor="pytest")
+        second = create_account(seeded_db, game_account="dup-acc", actor="pytest")
         assert second.id != first.id
         assert second.stock_no != first.stock_no
         assert second.game_account == first.game_account == "dup-acc"
@@ -310,36 +312,36 @@ class TestCreateAccountGuards:
 class TestAccountQueries:
     def test_get_account_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.get_account(seeded_db, 999999)
+            get_account(seeded_db, 999999)
 
     def test_get_account_returns_entity(self, seeded_db):
         account = _account(seeded_db, "get-acc")
-        assert service.get_account(seeded_db, account.id).id == account.id
+        assert get_account(seeded_db, account.id).id == account.id
 
     def test_list_accounts_filters_by_status(self, seeded_db):
         first = _account(seeded_db, "first-acc")
         second = _account(seeded_db, "second-acc")
 
         assert [
-            item.id for item in service.list_accounts(seeded_db)
+            item.id for item in list_accounts(seeded_db)
         ] == [first.id, second.id]
         assert [
             item.id
-            for item in service.list_accounts(
+            for item in list_accounts(
                 seeded_db, status=AccountStatus.WAITING.value
             )
         ] == [first.id, second.id]
-        assert service.list_accounts(seeded_db, status="VOID") == []
+        assert list_accounts(seeded_db, status="VOID") == []
 
     def test_inventory_and_total_cost_count_only_occupied(self, seeded_db):
         stocked = _account(seeded_db, "stock-acc")
         _buy(seeded_db, stocked, amount="500")
 
-        inventory = service.inventory(seeded_db)
-        assert [row["account_id"] for row in inventory] == [stocked.id]
-        assert inventory[0]["cost_amount"] == Decimal("500.00")
+        inv_rows = inventory(seeded_db)
+        assert [row["account_id"] for row in inv_rows] == [stocked.id]
+        assert inv_rows[0]["cost_amount"] == Decimal("500.00")
         # total_inventory_cost 复用同一库存口径
-        assert service.total_inventory_cost(seeded_db) == Decimal("500.00")
+        assert total_inventory_cost(seeded_db) == Decimal("500.00")
 
     def test_inventory_rejects_removed_for_sale_status(self, seeded_db):
         account = _account(seeded_db, "removed-for-sale-acc")
@@ -362,9 +364,9 @@ class TestAccountQueries:
         seeded_db.add(pickup)
         seeded_db.flush()
 
-        assert pickup in service.list_accounts(seeded_db)
-        assert pickup.id in {row["account_id"] for row in service.inventory(seeded_db)}
-        assert service.total_inventory_cost(seeded_db) == Decimal("300.00")
+        assert pickup in list_accounts(seeded_db)
+        assert pickup.id in {row["account_id"] for row in inventory(seeded_db)}
+        assert total_inventory_cost(seeded_db) == Decimal("300.00")
 
 class TestAccountsApi:
     def test_inventory_endpoint_publishes_typed_response_contract(self, app):
@@ -433,7 +435,7 @@ class TestAccountsApi:
     def test_visible_account_does_not_leak_foreign_source_order(
         self, seeded_client, seeded_db
     ):
-        account = service.create_account(
+        account = create_account(
             seeded_db,
             game_account="scope-source-account",
             platform="王者",
@@ -740,7 +742,7 @@ class TestAccountsApi:
             business_mode="DISTRIBUTION",
             inventory_type="CONSIGNMENT",
         )
-        platform = parties_service.create_counterparty(
+        platform = create_counterparty(
             seeded_db, display_name="寄售平台A", type="PLATFORM", actor="pytest"
         )
         order = create_order(
@@ -764,8 +766,8 @@ class TestAccountsApi:
 
     def test_execution_detail_includes_customer_participants(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-customer-party-acc")
-        customer = parties_service.create_customer(seeded_db, display_name="买家A", actor="pytest")
-        seller = parties_service.create_customer(seeded_db, display_name="卖家B", actor="pytest")
+        customer = create_customer(seeded_db, display_name="买家A", actor="pytest")
+        seller = create_customer(seeded_db, display_name="卖家B", actor="pytest")
         create_order(
             seeded_db,
             order_type="HS",

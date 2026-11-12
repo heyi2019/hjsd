@@ -14,7 +14,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
-from app.stocks import service as account_service
+from app.stocks.profile import create_account
 from app.core.errors import Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, build_access_token
@@ -124,7 +124,7 @@ MID_GATE = date(2026, 10, 1)  # 月份闸门
 
 def _order(seeded_db, *, trade_date: date = D, account_id: int | None = None):
     if account_id is None:
-        account_id = account_service.create_account(
+        account_id = create_account(
             seeded_db,
             game_account=f"report-{uuid4().hex[:12]}",
             business_mode="SELF",

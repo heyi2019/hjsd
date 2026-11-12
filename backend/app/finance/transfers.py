@@ -16,7 +16,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import AccountingAttribute, AuditAction, Direction, FundNature, Nature
 from app.domain.trade import Cashflow
 from app.orders.form_fields import validate_form_extra
-from app.foundation import service as foundation_service
+from app.foundation.pools import assert_pool_usable
 
 from ._common import _positive, _text
 
@@ -40,8 +40,8 @@ def create_transfer(
     ):
         raise NotFound("资金池不存在", details={"pool_id": source_pool_id})
     money = _positive(amount, field="amount")
-    source = foundation_service.assert_pool_usable(session, source_pool_id)
-    target = foundation_service.assert_pool_usable(session, target_pool_id)
+    source = assert_pool_usable(session, source_pool_id)
+    target = assert_pool_usable(session, target_pool_id)
     # Cashflow.flow_no 长度为 32；保留可读前缀并控制两条流水编号不超列长度。
     transfer_id = f"TRF-{uuid4().hex[:20].upper()}"
     common = {
@@ -138,7 +138,7 @@ def repair_transfer(
         not user.can_see_pool(source.pool_id) or not user.can_see_pool(counterpart_pool_id)
     ):
         raise NotFound("资金池不存在", details={"pool_id": counterpart_pool_id})
-    target = foundation_service.assert_pool_usable(session, counterpart_pool_id)
+    target = assert_pool_usable(session, counterpart_pool_id)
     if target.id == source.pool_id:
         raise Validation("修复对端资金池不能与原资金池相同")
     if source.direction == Direction.OUT.value:

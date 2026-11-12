@@ -27,14 +27,15 @@ from app.domain.enums import (
     CustomerStatus,
     OrderStatus,
 )
-from app.stocks import service as stocks_service
+from app.stocks.profile import create_account
 from app.value_added_services import service as installments_service
 from app.finance.rebates import create_rebate
-from app.parties import service as parties_service
+from app.parties.counterparties import create_counterparty
+from app.parties.customers import create_customer, set_customer_status
 from app.domain.foundation import AuditLog
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
 from app.domain.users import User
-from app.foundation import service as foundation_service
+from app.foundation.order_types import get_order_type_by_code, set_order_type_active
 from app.orders import schemas
 from app.orders._shared import get_order
 from app.orders.cancellation_model import cancel_order
@@ -150,7 +151,7 @@ def test_inline_order_creates_inventory_in_one_request(seeded_client, seeded_db,
         assert list_row["cost_amount"] == Decimal("110.00")
 
 def test_order_success_time_is_inventory_entry_time(seeded_db):
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db,
         game_account="inventory-entry-from-order",
         business_mode="SELF",
@@ -291,7 +292,7 @@ def _order(
     form_extra_scope=None,
 ):
     if order_type == "HS" and account_id is None:
-        account_id = stocks_service.create_account(
+        account_id = create_account(
             seeded_db,
             game_account=f"orders-contract-{uuid4().hex[:10]}",
             business_mode="SELF",
@@ -311,7 +312,7 @@ def _scoped_user() -> CurrentUser:
     )
 
 def test_database_allows_inventory_links_for_th_orders(seeded_db):
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db,
         game_account="th-inventory-link",
         business_mode="DISTRIBUTION",
@@ -346,7 +347,7 @@ def test_sell_completes_non_installment_orders(seeded_db, order_type):
         "TH": ("DISTRIBUTION", "PICKUP"),
         "DG": ("DISTRIBUTION", "CONSIGNMENT"),
     }[order_type]
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db,
         game_account=f"sell-completes-{order_type.lower()}-{uuid4().hex[:10]}",
         business_mode=inventory_context[0],
@@ -531,7 +532,7 @@ class TestCreateOrderValidation:
         finance_account.pool_ids = [1]
         seeded_db.flush()
 
-        account = stocks_service.create_account(
+        account = create_account(
             seeded_db,
             game_account=f"finance-event-{uuid4().hex[:10]}",
             business_mode="SELF",
@@ -594,10 +595,10 @@ class TestCreateOrderValidation:
         assert "事件类型必须为" in response.json()["message"]
 
     def test_order_creation_validates_participants_before_creating_order(self, seeded_db):
-        customer = parties_service.create_customer(
+        customer = create_customer(
             seeded_db, display_name="已停用客户", actor="pytest"
         )
-        parties_service.set_customer_status(
+        set_customer_status(
             seeded_db, customer.id, CustomerStatus.DISABLED.value, actor="pytest"
         )
 
@@ -747,7 +748,7 @@ class TestCreateOrderValidation:
     def test_duplicate_participant_role_rejected_before_unique_constraint(
         self, seeded_db
     ):
-        customer = parties_service.create_customer(
+        customer = create_customer(
             seeded_db, display_name="重复角色客户", actor="pytest"
         )
         with pytest.raises(Validation, match="不可重复"):
@@ -763,10 +764,10 @@ class TestCreateOrderValidation:
             )
 
     def test_participant_roles_must_match_order_type(self, seeded_db):
-        customer = parties_service.create_customer(
+        customer = create_customer(
             seeded_db, display_name="业务角色客户", actor="pytest"
         )
-        supplier = parties_service.create_counterparty(
+        supplier = create_counterparty(
             seeded_db, display_name="供货方", type="SUPPLIER", actor="pytest"
         )
 
@@ -799,8 +800,8 @@ class TestCreateOrderValidation:
             )
 
     def test_disabled_order_type_rejected(self, seeded_db):
-        definition = foundation_service.get_order_type_by_code(seeded_db, "HS")
-        foundation_service.set_order_type_active(
+        definition = get_order_type_by_code(seeded_db, "HS")
+        set_order_type_active(
             seeded_db, definition.id, False, actor="pytest"
         )
         with pytest.raises(Validation) as exc:
@@ -879,7 +880,7 @@ class TestCreateOrderValidation:
             )
 
     def test_scoped_user_cannot_attach_foreign_customer(self, seeded_db):
-        customer = parties_service.create_customer(
+        customer = create_customer(
             seeded_db,
             display_name="foreign-customer",
             actor="another-operator",
@@ -964,7 +965,7 @@ class TestCreateOrderValidation:
             )
 
     def test_th_links_pickup_inventory_account_without_snapshot(self, seeded_db):
-        account = stocks_service.create_account(
+        account = create_account(
             seeded_db,
             game_account="th-pickup-account",
             business_mode="DISTRIBUTION",

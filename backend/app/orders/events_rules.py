@@ -13,7 +13,7 @@ from app.core.audit import record_audit
 from app.core.business_numbering import event_no as next_event_no
 from app.core.money import to_money
 from app.domain.foundation import Pool
-from app.foundation import service as foundation_service
+from app.foundation.order_types import resolve_default_pool
 from ._common import _required_text
 from .cancellation_model import (
     apply_cancellation_account_effect,
@@ -353,7 +353,7 @@ def _resolve_pool(
     *,
     fund_nature: str | None = None,
 ) -> Pool:
-    pool = foundation_service.resolve_default_pool(
+    pool = resolve_default_pool(
         session, order.order_type, portion, fund_nature=fund_nature
     )
     if pool is None:

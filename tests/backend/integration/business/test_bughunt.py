@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date
 from uuid import uuid4
 
-from app.stocks import service as account_service
+from app.stocks.profile import create_account
 import pytest
 
 from app.core.money import to_money
@@ -15,13 +15,15 @@ from app.finance.deposits import create_deposit, return_deposit
 from app.value_added_services import service as installment_service
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.parties import service as party_service
+from app.parties.counterparties import create_counterparty
+from app.parties.customer_merge import duplicate_candidates, merge_customers
+from app.parties.customers import create_customer
 
 D = date(2026, 10, 4)
 
 def _order(seeded_db, order_type: str = "HS", **kw):
     if order_type == "HS" and kw.get("account_id") is None:
-        account = account_service.create_account(
+        account = create_account(
             seeded_db,
             game_account=f"hunt-{uuid4().hex[:12]}",
             business_mode="SELF",
@@ -142,7 +144,7 @@ class TestPickupSale:
     """
 
     def _pickup_account(self, seeded_db):
-        return account_service.create_account(
+        return create_account(
             seeded_db,
             game_account=f"hunt-pickup-{uuid4().hex[:8]}",
             business_mode="DISTRIBUTION",
@@ -185,9 +187,9 @@ class TestPickupSale:
 class TestInstallment:
     def _contract(self, seeded_db, contract_type: str = "STOCK_SALE"):
         """先买入使账号在库，STOCK_SALE 才有可用账号。"""
-        from app.stocks import service as account_service
+        from app.stocks.profile import create_account
 
-        account = account_service.create_account(
+        account = create_account(
             seeded_db,
             game_account="hunt-acc",
             platform="王者",
@@ -250,9 +252,9 @@ class TestDepositAndRebate:
 # ------------------------------------------------------------------ 主数据
 class TestMasterData:
     def test_disabled_pool_cannot_receive_new_event(self, seeded_db):
-        from app.foundation import service as foundation_service
+        from app.foundation.pools import set_pool_status
 
-        foundation_service.set_pool_status(seeded_db, 1, "DISABLED", actor="hunt")
+        set_pool_status(seeded_db, 1, "DISABLED", actor="hunt")
         order = _order(seeded_db)
         with pytest.raises(Exception):
             post_event(
@@ -266,26 +268,26 @@ class TestMasterData:
             )
 
     def test_customer_number_is_not_reused(self, seeded_db):
-        first = party_service.create_customer(seeded_db, display_name="甲", actor="hunt")
-        merged_target = party_service.create_customer(seeded_db, display_name="乙", actor="hunt")
-        party_service.merge_customers(
+        first = create_customer(seeded_db, display_name="甲", actor="hunt")
+        merged_target = create_customer(seeded_db, display_name="乙", actor="hunt")
+        merge_customers(
             seeded_db,
             source_customer_id=first.id,
             target_customer_id=merged_target.id,
             reason="重复建档",
             actor="hunt",
         )
-        third = party_service.create_customer(seeded_db, display_name="丙", actor="hunt")
+        third = create_customer(seeded_db, display_name="丙", actor="hunt")
         assert third.customer_no != first.customer_no
 
     def test_duplicate_phone_raises_candidate(self, seeded_db):
-        party_service.create_customer(seeded_db, display_name="甲", phone="13800000001", actor="hunt")
-        candidates = party_service.duplicate_candidates(seeded_db, phone="13800000001")
+        create_customer(seeded_db, display_name="甲", phone="13800000001", actor="hunt")
+        candidates = duplicate_candidates(seeded_db, phone="13800000001")
         assert candidates
 
     def test_counterparty_cannot_be_created_as_customer(self, seeded_db):
         """同行不能被写成客户：类型边界由两张表物理隔离。"""
-        peer = party_service.create_counterparty(
+        peer = create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="hunt"
         )
         from sqlalchemy import select

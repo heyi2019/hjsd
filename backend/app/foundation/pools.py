@@ -9,7 +9,7 @@ from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, PoolOwnership, PoolStatus, PoolType
 from app.domain.foundation import Pool
-from app.parties import service as parties_service
+from app.parties.fields import set_extra_values
 from ._common import _UNSET, _get_pool_or_404, _normalize_pool_code, _required_name, _required_pool_type, _snapshot
 # --------------------------------------------------------------------- 资金池
 def list_pools(session: Session, *, include_disabled: bool = True, user: CurrentUser | None = None) -> list[Pool]:
@@ -62,7 +62,7 @@ def create_pool(
     )
     session.add(pool)
     session.flush()
-    parties_service.set_extra_values(
+    set_extra_values(
         session,
         entity_type="pool",
         entity_id=pool.id,
@@ -110,7 +110,7 @@ def update_pool(
     pool.updated_by = actor
     session.flush()
     if extra_values is not _UNSET:
-        parties_service.set_extra_values(
+        set_extra_values(
             session,
             entity_type="pool",
             entity_id=pool.id,

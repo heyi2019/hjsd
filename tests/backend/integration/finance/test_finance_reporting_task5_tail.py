@@ -36,11 +36,11 @@ def _admin() -> CurrentUser:
 
 
 def _order_with_buy(seeded_db):
-    from app.stocks import service as stocks_service
+    from app.stocks.profile import create_account
     from app.orders.create import create_order
     from app.orders.events import post_event
 
-    account = stocks_service.create_account(
+    account = create_account(
         seeded_db, game_account="task5-account", business_mode="SELF",
         inventory_type="RECOVERY", actor="pytest",
     )

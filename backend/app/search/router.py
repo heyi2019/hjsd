@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.stocks import service as stocks_service
+from app.stocks.inventory import list_accounts
 from app.core.database import get_db
 from app.core.errors import Validation
 from app.core.security import (
@@ -20,7 +20,8 @@ from app.core.security import (
 )
 from app.finance.rebates import list_rebates
 from app.orders.queries import list_orders
-from app.parties import service as parties_service
+from app.parties.counterparties import list_counterparties
+from app.parties.customers import list_customers
 
 router = APIRouter(tags=["SYS-01 通用能力"])
 read_access = require_permissions(
@@ -76,7 +77,7 @@ def global_search(
                 )
             )
 
-    for account in stocks_service.list_accounts(db, user=user):
+    for account in list_accounts(db, user=user):
         if any(
             _matches(value, query)
             for value in (
@@ -99,7 +100,7 @@ def global_search(
             )
 
     if user.has(PERM_CUSTOMER_READ):
-        for customer in parties_service.list_customers(db, keyword=query, user=user):
+        for customer in list_customers(db, keyword=query, user=user):
             results.append(
                 SearchResult(
                     type="CUSTOMER",
@@ -112,7 +113,7 @@ def global_search(
             )
 
     if user.has(PERM_COUNTERPARTY_READ):
-        for counterparty in parties_service.list_counterparties(db):
+        for counterparty in list_counterparties(db):
             if any(
                 _matches(value, query)
                 for value in (counterparty.counterparty_no, counterparty.display_name)

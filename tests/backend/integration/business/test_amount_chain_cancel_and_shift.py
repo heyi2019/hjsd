@@ -51,14 +51,14 @@ from app.orders.create import create_order
 from app.orders.events import post_event
 from app.orders.mutations import update_order
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
-from app.stocks import service as account_service
+from app.stocks.profile import create_account
 
 D1 = date(2026, 9, 10)
 D2 = date(2026, 10, 10)
 
 
 def _recovery_order(seeded_db, *, trade_date: date = D1) -> tuple[Order, Account]:
-    account = account_service.create_account(
+    account = create_account(
         seeded_db,
         game_account=f"shift-{uuid4().hex[:8]}",
         business_mode="SELF",

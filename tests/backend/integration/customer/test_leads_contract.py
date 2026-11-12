@@ -4,11 +4,11 @@ from __future__ import annotations
 from datetime import date
 
 from app.orders.create import create_order
-from app.parties import service as parties_service
+from app.parties.customers import create_customer
 
 
 def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, headers):
-    customer = parties_service.create_customer(
+    customer = create_customer(
         seeded_db, display_name="需求客户", owner_id=9, actor="pytest"
     )
 
@@ -59,7 +59,7 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
 
 def test_lead_keyword_search_escapes_like_wildcards(seeded_client, seeded_db, headers):
     """需求目标含 `_` 时按字面匹配，不把 `_` 当单字符通配误命中。"""
-    customer = parties_service.create_customer(
+    customer = create_customer(
         seeded_db, display_name="需求搜索客户", owner_id=9, actor="pytest"
     )
     hit = seeded_client.post(
@@ -82,7 +82,7 @@ def test_lead_keyword_search_escapes_like_wildcards(seeded_client, seeded_db, he
 
 
 def test_lead_close_does_not_create_order_or_cashflow(seeded_client, seeded_db, headers):
-    customer = parties_service.create_customer(
+    customer = create_customer(
         seeded_db, display_name="关闭需求客户", owner_id=9, actor="pytest"
     )
     created = seeded_client.post(
@@ -107,7 +107,7 @@ def test_lead_close_does_not_create_order_or_cashflow(seeded_client, seeded_db, 
 
 
 def test_get_lead_endpoint_returns_lead(seeded_client, seeded_db, headers):
-    customer = parties_service.create_customer(
+    customer = create_customer(
         seeded_db, display_name="查询需求客户", owner_id=9, actor="pytest"
     )
     created = seeded_client.post(
@@ -125,7 +125,7 @@ def test_get_lead_endpoint_returns_lead(seeded_client, seeded_db, headers):
 def test_update_lead_rejects_owner_transfer_for_scoped_user(seeded_client, seeded_db, headers):
     from app.core.security import CurrentUser, build_access_token
 
-    customer = parties_service.create_customer(
+    customer = create_customer(
         seeded_db, display_name="转交需求客户", owner_id=9, actor="pytest"
     )
     created = seeded_client.post(

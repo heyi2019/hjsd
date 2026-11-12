@@ -36,7 +36,7 @@ from app.domain.trade import (
     Reconciliation,
 )
 from app.domain.quality import QualityIssue
-from app.foundation import service as foundation_service
+from app.foundation.pools import list_pools
 from app.orders.pools import pool_balances
 
 from .issues import (
@@ -246,7 +246,7 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
     # （真实库 7 个池实测 21 条），批量后恒为 3 条。
     pools = [
         pool
-        for pool in foundation_service.list_pools(session)
+        for pool in list_pools(session)
         if user is None or user.can_see_pool(pool.id)
     ]
     balances = (

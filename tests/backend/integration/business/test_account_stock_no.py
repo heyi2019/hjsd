@@ -15,7 +15,7 @@ from datetime import date
 import pytest
 from sqlalchemy import select, text
 
-from app.stocks import service
+from app.stocks.profile import create_account
 from app.domain.trade import Account, OrderEvent
 from app.orders import events as order_events
 
@@ -26,7 +26,7 @@ def _make(db, game_account, inventory_type="RECOVERY", **kw):
     business_mode = kw.pop("business_mode", None) or (
         "DISTRIBUTION" if inventory_type in {"PICKUP", "CONSIGNMENT"} else "SELF"
     )
-    return service.create_account(
+    return create_account(
         db,
         business_mode=business_mode,
         inventory_type=inventory_type,

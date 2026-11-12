@@ -10,7 +10,8 @@ import pytest
 from app.core.errors import NotFound, Validation
 from app.domain.trade import OrderFormField
 from app.parties import fields as fields_module
-from app.parties import service
+from app.parties.customers import create_customer
+from app.parties.fields import get_extra_values, get_extra_values_bulk, set_extra_values
 
 
 def _add_field(seeded_db, field_key: str, *, field_type: str = "TEXT", options=None,
@@ -35,13 +36,13 @@ def _add_field(seeded_db, field_key: str, *, field_type: str = "TEXT", options=N
 
 
 def _customer(seeded_db, name: str = "甲"):
-    customer = service.create_customer(seeded_db, display_name=name, actor="pytest")
+    customer = create_customer(seeded_db, display_name=name, actor="pytest")
     seeded_db.flush()
     return customer
 
 
 def _set(seeded_db, customer_id: int, pairs: list[tuple[str, object]], **kwargs):
-    return service.set_extra_values(
+    return set_extra_values(
         seeded_db, entity_type="customer", entity_id=customer_id, values=pairs, **kwargs
     )
 
@@ -183,7 +184,7 @@ def test_set_values_merges_without_dropping_history(seeded_db):
     _set(seeded_db, customer.id, [("k1", "v1")])
     saved = _set(seeded_db, customer.id, [("k2", "v2")])
     assert saved == {"k2": "v2"}
-    assert service.get_extra_values(
+    assert get_extra_values(
         seeded_db, entity_type="customer", entity_id=customer.id
     ) == {"k1": "v1", "k2": "v2"}
 
@@ -204,24 +205,24 @@ def test_set_values_empty_input_is_noop(seeded_db):
 
 def test_set_values_rejects_non_customer_entities(seeded_db):
     # 其余实体暂无扩展字段体系：空入参兼容放行，非空入参拒绝
-    assert service.set_extra_values(
+    assert set_extra_values(
         seeded_db, entity_type="order", entity_id=1, values=[]
     ) == {}
     with pytest.raises(Validation, match="该实体未启用扩展字段"):
-        service.set_extra_values(
+        set_extra_values(
             seeded_db, entity_type="order", entity_id=1, values=[("k", "v")]
         )
 
 
 # --------------------------------------------------------------- 读取
 def test_get_values_for_non_customer_returns_empty(seeded_db):
-    assert service.get_extra_values(
+    assert get_extra_values(
         seeded_db, entity_type="order", entity_id=1
     ) == {}
 
 
 def test_get_values_missing_customer_returns_empty(seeded_db):
-    assert service.get_extra_values(
+    assert get_extra_values(
         seeded_db, entity_type="customer", entity_id=999999
     ) == {}
 
@@ -231,7 +232,7 @@ def test_bulk_values(seeded_db):
     first = _customer(seeded_db, "甲")
     second = _customer(seeded_db, "乙")
     _set(seeded_db, first.id, [("k1", "a")])
-    bulk = service.get_extra_values_bulk(
+    bulk = get_extra_values_bulk(
         seeded_db, entity_type="customer", entity_ids=[first.id, second.id]
     )
     assert bulk[first.id] == {"k1": "a"}
@@ -239,9 +240,9 @@ def test_bulk_values(seeded_db):
 
 
 def test_bulk_values_empty_and_non_customer(seeded_db):
-    assert service.get_extra_values_bulk(
+    assert get_extra_values_bulk(
         seeded_db, entity_type="customer", entity_ids=[]
     ) == {}
-    assert service.get_extra_values_bulk(
+    assert get_extra_values_bulk(
         seeded_db, entity_type="order", entity_ids=[1, 2]
     ) == {1: {}, 2: {}}

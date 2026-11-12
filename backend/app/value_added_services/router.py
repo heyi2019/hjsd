@@ -23,7 +23,7 @@ from app.domain.trade import InstallmentSchedule
 from app.value_added_services import schemas, service
 from app.lists import service as list_columns_service
 from app.lists.export import build_list_csv, csv_file_response, detail_json
-from app.parties import service as parties_service
+from app.parties.fields import get_extra_values, get_extra_values_bulk
 
 router = APIRouter(tags=["HS-01 分期合约"])
 
@@ -53,7 +53,7 @@ def _actor(user: CurrentUser) -> str:
 
 def _installment_output(db: Session, item) -> schemas.InstallmentOut:
     output = schemas.InstallmentOut.model_validate(item)
-    output.extra_values = parties_service.get_extra_values(
+    output.extra_values = get_extra_values(
         db, entity_type="installment", entity_id=item.id
     )
     return output
@@ -78,7 +78,7 @@ def list_installments(
         trade_date_to=trade_date_to,
         user=_user,
     )
-    extras = parties_service.get_extra_values_bulk(
+    extras = get_extra_values_bulk(
         db, entity_type="installment", entity_ids=[item.id for item in items]
     )
     return [

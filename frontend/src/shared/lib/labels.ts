@@ -46,13 +46,6 @@ export const POOL_OWNERSHIP_LABEL: Record<string, string> = {
   THIRD_PART: "第三方",
 };
 
-export const LINK_STATUS_LABEL: Record<string, string> = {
-  LINKED: "已关联",
-  UNLINKED: "未关联",
-  ORPHAN: "孤儿单",
-  UNLINKED_TRANSFER: "单边划转未关联",
-};
-
 export const COUNTERPARTY_TYPE_LABEL: Record<string, string> = {
   PEER: "同行",
   SUPPLIER: "供货方",

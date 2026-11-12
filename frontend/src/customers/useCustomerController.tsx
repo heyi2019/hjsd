@@ -347,5 +347,3 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     submitMerge,
   };
 }
-
-export type CustomerController = ReturnType<typeof useCustomerController>;

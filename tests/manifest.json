@@ -64,18 +64,18 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 96,
+        "files": 95,
         "layers": {
           "fast": 14,
           "quick": 8,
           "react": 58,
-          "deep": 16
+          "deep": 15
         },
         "cases": {
           "fast": 98,
           "quick": 88,
-          "react": 711,
-          "deep": 124
+          "react": 708,
+          "deep": 119
         },
         "byArea": {
           "unit": {
@@ -87,7 +87,7 @@
           },
           "module": {
             "workbench": 6,
-            "business": 20,
+            "business": 19,
             "customer": 3,
             "finance": 5,
             "operations": 7,
@@ -96,7 +96,7 @@
             "system": 9
           }
         },
-        "_baseline_note": "93 是搬迁前基线；94 = 93 + 新增 manifest-parity.test.ts（6 条用例）。2026-11-04 前端测试整体迁入 tests/frontend/{unit,module}/<区域>/。当前磁盘实际为 96 个测试文件、react 58 个、module.business 20 个；新增文件按守卫实测对齐，cases 的历史基线另行刷新。",
+        "_baseline_note": "93 是搬迁前基线；94 = 93 + 新增 manifest-parity.test.ts（6 条用例）。2026-11-04 前端测试整体迁入 tests/frontend/{unit,module}/<区域>/。当前磁盘实际为 95 个测试文件、react 58 个、module.business 19 个；新增文件按守卫实测对齐，cases 的历史基线另行刷新。",
         "root_layout": "tests/frontend/<unit|module>/<区域>/",
         "baseline": {
           "_doc": "2026-11-04 搬迁后实测（同机同代码）。cpu = user+sys，跨会话可比；wall 受并发会话干扰。",

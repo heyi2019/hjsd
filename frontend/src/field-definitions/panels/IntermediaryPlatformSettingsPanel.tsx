@@ -4,6 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { optionSetsApi } from "../../shared/api/options.api";
 import type { OptionItem } from "../../shared/api/types/common";
+import { clearOptionSetsCache } from "../../shared/lib/optionSets";
 import { normalizeError } from "../../shared/api/client";
 import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
 
@@ -18,9 +19,9 @@ export function OptionDictionarySection({ code, title, description }: { code: st
     const value = option.trim(); if (!value) return;
     const next = editingValue ? rows.map((item) => item.value === editingValue ? { value, label: value } : item) : [...rows, { value, label: value }];
     if (next.some((item, index) => next.findIndex((candidate) => candidate.value === item.value) !== index)) { form.setFields([{ name: "option", errors: [`${title}不能重复`] }]); return; }
-    try { await optionSetsApi.update(code, { options: next }); appMessage.success(editingValue ? `${title}已更新` : `${title}已新增`); setEditingValue(null); form.resetFields(); await load(); } catch (err) { setError(normalizeError(err)); }
+    try { await optionSetsApi.update(code, { options: next }); clearOptionSetsCache(); appMessage.success(editingValue ? `${title}已更新` : `${title}已新增`); setEditingValue(null); form.resetFields(); await load(); } catch (err) { setError(normalizeError(err)); }
   };
-  const move = async (value: string, offset: -1 | 1) => { const index = rows.findIndex((item) => item.value === value); const nextIndex = index + offset; if (index < 0 || nextIndex < 0 || nextIndex >= rows.length) return; const next = [...rows]; [next[index], next[nextIndex]] = [next[nextIndex], next[index]]; try { await optionSetsApi.update(code, { options: next }); await load(); } catch (err) { setError(normalizeError(err)); } };
+  const move = async (value: string, offset: -1 | 1) => { const index = rows.findIndex((item) => item.value === value); const nextIndex = index + offset; if (index < 0 || nextIndex < 0 || nextIndex >= rows.length) return; const next = [...rows]; [next[index], next[nextIndex]] = [next[nextIndex], next[index]]; try { await optionSetsApi.update(code, { options: next }); clearOptionSetsCache(); await load(); } catch (err) { setError(normalizeError(err)); } };
   const columns: ColumnsType<OptionItem> = [
     { title, dataIndex: "label" },
     { title: "排序", render: (_value, _row, index) => index + 1, width: 80 },
@@ -37,6 +38,7 @@ export function OptionDictionarySection({ code, title, description }: { code: st
         okText="删除"
         onConfirm={async () => {
           await optionSetsApi.update(code, { options: rows.filter((item) => item.value !== row.value) });
+          clearOptionSetsCache();
           appMessage.success(`${title}已删除`);
           await load();
         }}

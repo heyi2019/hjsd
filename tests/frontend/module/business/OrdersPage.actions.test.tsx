@@ -6,40 +6,36 @@ import { renderLight } from "@fixtures/render";
 import { OrdersPage, validateAllocations } from "@/orders/OrdersPage";
 import { buildOrderPatchPayload, pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
 
-import * as catalog from "@/shared/api/catalog";
+import { cashflowsApi } from "@/shared/api/cashflows.api";
+import { installmentsApi } from "@/shared/api/installments.api";
+import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { policyApi } from "@/shared/api/policy.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { allFormFields, seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 import { today } from "@/shared/lib/format";
 import * as client from "@/shared/api/client";
-import type { Installment, InstallmentCancelResult, Order, OrderLink, ProfitAllocation } from "@/shared/api/catalog";
+import type { Installment, InstallmentCancelResult } from "@/shared/api/types/installments";
+import type { OrderLink } from "@/shared/api/types/order-events";
+import type { Order } from "@/shared/api/types/orders";
+import type { ProfitAllocation } from "@/shared/api/types/policy";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
-vi.mock("@/shared/api/catalog", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/shared/api/catalog")>();
-  const METHODS = [
-    "list", "get", "create", "update", "patch", "post", "postEvent", "cancel", "remove",
-    "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
-    "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "inventoryStats", "updateProfile", "updateExecution", "merge", "search", "createForOrder", "materializeAccount",
-    "orderSnapshot", "links", "createLink", "deleteLink", "listSectionLabels", "saveSectionLabels",
-    "markOverdue",
-  ];
-  const mk = (api: Record<string, unknown>) => {
-    const o: Record<string, unknown> = { ...api };
-    for (const m of METHODS) {
-      if (m in o) o[m] = vi.fn();
-    }
-    return o;
-  };
-  const out: Record<string, unknown> = { ...actual };
-  for (const key of Object.keys(actual)) {
-    const v = (actual as Record<string, unknown>)[key];
-    if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v as object).some((x) => typeof x === "function")) {
-      out[key] = mk(v as Record<string, unknown>);
-    }
-  }
-  return out as unknown as typeof actual;
-});
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 // openAllocations 会调用 api.get("/users") 拉取收益人；normalizeError 必须保留真实实现。
 vi.mock("@/shared/api/client", async (importOriginal) => {
@@ -208,50 +204,50 @@ const actionAllocationRows: ProfitAllocation[] = [
 ];
 
 beforeEach(() => {
-  seedOptionSets(catalog);
-  seedOrderFormFields(catalog);
-  vi.mocked(catalog.orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
+  seedOptionSets();
+  seedOrderFormFields();
+  vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
   ui = userEvent.setup({ pointerEventsCheck: 0 });
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
-  vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue([
+  vi.mocked(ordersApi.list).mockResolvedValue(orders);
+  vi.mocked(orderTypesApi.list).mockResolvedValue(types);
+  vi.mocked(poolsApi.list).mockResolvedValue([
     { id: 7, code: "HJ_INVEST", name: "投资款荷包", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
   ]);
   // 下架弹窗背后会渲染库存上下文，卡片指标走这个接口；不桩会真调 api.get 返回 undefined。
-  vi.mocked(catalog.stocksApi.inventoryStats).mockResolvedValue({ account_count: 0, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 });
-  vi.mocked(catalog.ordersApi.get).mockResolvedValue(order1);
-  vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+  vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: 0, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 });
+  vi.mocked(ordersApi.get).mockResolvedValue(order1);
+  vi.mocked(stocksApi.executionDetail).mockResolvedValue({
     account: { id: order1.account_id, stock_no: "KU_00001", game_account: "seller-001", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
     orders: [],
     finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
   } as never);
-  vi.mocked(catalog.ordersApi.links).mockResolvedValue([link1]);
-  vi.mocked(catalog.ordersApi.deleteLink).mockResolvedValue(undefined);
-  vi.mocked(catalog.ordersApi.cancel).mockResolvedValue({ ...order1, status: "CANCELLED" });
-  vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({
+  vi.mocked(ordersApi.links).mockResolvedValue([link1]);
+  vi.mocked(ordersApi.deleteLink).mockResolvedValue(undefined);
+  vi.mocked(ordersApi.cancel).mockResolvedValue({ ...order1, status: "CANCELLED" });
+  vi.mocked(ordersApi.postEvent).mockResolvedValue({
     event: { id: 2, event_no: "EV-2", order_id: 1, event_type: "CANCEL", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "0.00" },
     installment: { id: 11, inst_no: "INS-1", status: "CANCELLED" },
     cash_flows: [],
     warnings: [],
   } as never);
-  vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+  vi.mocked(policyApi.allocations).mockResolvedValue({
     items: allocationRows,
     total: allocationRows.length,
     order_profit: "5000.00",
   });
-  vi.mocked(catalog.policyApi.setAllocations).mockResolvedValue({
+  vi.mocked(policyApi.setAllocations).mockResolvedValue({
     items: allocationRows,
     total: allocationRows.length,
     order_profit: "5000.00",
   });
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+  vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 9, username: "lisi", display_name: "李四", is_active: true },
     { id: 11, username: "recovery", display_name: "回收员", is_active: true },
     { id: 22, username: "seller", display_name: "售出员", is_active: true },
     { id: 33, username: "operator", display_name: "运营员", is_active: true },
   ]);
-  vi.mocked(catalog.installmentsApi.list).mockResolvedValue([installment]);
-  vi.mocked(catalog.installmentsApi.cancel).mockResolvedValue(installmentCancelResult);
+  vi.mocked(installmentsApi.list).mockResolvedValue([installment]);
+  vi.mocked(installmentsApi.cancel).mockResolvedValue(installmentCancelResult);
   vi.mocked(client.currentUser).mockResolvedValue({ id: 9, username: "lisi", role: "operator", display_name: "李四" });
   vi.spyOn(message, "success").mockImplementation((() => undefined) as never);
   vi.spyOn(message, "error").mockImplementation((() => undefined) as never);
@@ -286,7 +282,7 @@ async function clickModalOk(modal: HTMLElement) {
 
 describe("OrdersPage：操作与筛选分支", () => {
   it("分期订单金额展示为 已付/本金 · 期数", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([order3]);
+    vi.mocked(ordersApi.list).mockResolvedValue([order3]);
     await openLedger();
     expect(screen.getAllByText("¥3000.00/12000.00 · 6期").length).toBeGreaterThan(0);
   });
@@ -316,42 +312,42 @@ describe("OrdersPage：操作与筛选分支", () => {
   // 逾期标记是全局动作（后端按 as_of 扫描全部合约），入口从分期面板收敛到
   // 订单页「分期与回款」Tab 的右上角，这两个用例随功能入口一起从 InstallmentsPanel.flows 迁入。
   it("切走再切回「分期与回款」会重拉分期列表（切入即刷新）", async () => {
-    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
+    vi.mocked(installmentsApi.list).mockResolvedValue([]);
     await openLedger();
     fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
-    await waitFor(() => expect(catalog.installmentsApi.list).toHaveBeenCalled());
+    await waitFor(() => expect(installmentsApi.list).toHaveBeenCalled());
     // 首次切入只靠挂载 load，不自增 refreshKey（避免双请求）
-    expect(vi.mocked(catalog.installmentsApi.list)).toHaveBeenCalledTimes(1);
-    const callsAfterFirstEntry = vi.mocked(catalog.installmentsApi.list).mock.calls.length;
+    expect(vi.mocked(installmentsApi.list)).toHaveBeenCalledTimes(1);
+    const callsAfterFirstEntry = vi.mocked(installmentsApi.list).mock.calls.length;
 
     fireEvent.click(screen.getByRole("tab", { name: "订单台账" }));
     await waitFor(() => expect(screen.getByRole("tab", { name: "订单台账" })).toHaveAttribute("aria-selected", "true"));
     fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
 
     await waitFor(() =>
-      expect(vi.mocked(catalog.installmentsApi.list).mock.calls.length).toBeGreaterThan(callsAfterFirstEntry),
+      expect(vi.mocked(installmentsApi.list).mock.calls.length).toBeGreaterThan(callsAfterFirstEntry),
     );
   });
 
   // 原两条（有新增 / 无新增）是同一条「标记逾期」路径的两个分支，合并为一次挂载逐次点击。
   it("标记逾期：有新增提示笔数并刷新列表，无新增提示当前无新增", async () => {
-    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
-    vi.mocked(catalog.installmentsApi.markOverdue).mockResolvedValue({ marked: 3 });
+    vi.mocked(installmentsApi.list).mockResolvedValue([]);
+    vi.mocked(installmentsApi.markOverdue).mockResolvedValue({ marked: 3 });
     await openLedger();
     fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
-    await waitFor(() => expect(catalog.installmentsApi.list).toHaveBeenCalled());
-    const callsBefore = vi.mocked(catalog.installmentsApi.list).mock.calls.length;
+    await waitFor(() => expect(installmentsApi.list).toHaveBeenCalled());
+    const callsBefore = vi.mocked(installmentsApi.list).mock.calls.length;
 
     await ui.click(screen.getByRole("button", { name: /标记逾期/ }));
 
-    await waitFor(() => expect(catalog.installmentsApi.markOverdue).toHaveBeenCalled());
+    await waitFor(() => expect(installmentsApi.markOverdue).toHaveBeenCalled());
     expect(message.success).toHaveBeenCalledWith("已标记 3 笔逾期");
     // installmentRefreshKey 自增 → 分期面板重新 load
     await waitFor(() => expect(screen.getByRole("tab", { name: "分期与回款" })).toBeInTheDocument());
-    expect(vi.mocked(catalog.installmentsApi.list).mock.calls.length).toBeGreaterThan(callsBefore);
+    expect(vi.mocked(installmentsApi.list).mock.calls.length).toBeGreaterThan(callsBefore);
 
     // 分支二：本次标记 0 笔
-    vi.mocked(catalog.installmentsApi.markOverdue).mockResolvedValue({ marked: 0 });
+    vi.mocked(installmentsApi.markOverdue).mockResolvedValue({ marked: 0 });
     await ui.click(screen.getByRole("button", { name: /标记逾期/ }));
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("当前无新增逾期合约"));
   });
@@ -371,7 +367,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("编辑有登记事件订单：统一编辑入口仍可打开库存详情", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+    vi.mocked(ordersApi.list).mockResolvedValue([
       {
         ...order1,
         events: [{ id: 1, event_no: "EV-1", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "1000.00" }],
@@ -385,7 +381,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   // 原两条（按姓名预填 / 展示订单总利润）同一份夹具、同一入口、纯只读，合并为一次挂载。
   it("分润弹窗复用不残留 form_extra：取消后打开另一单，自定义字段清空", async () => {
     // 注入一个 ALLOCATION scope 的自定义字段：CustomFieldSection 只渲染 is_custom && is_active。
-    vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue([
       ...allFormFields(),
       {
         id: 9001,
@@ -406,7 +402,7 @@ describe("OrdersPage：操作与筛选分支", () => {
 
     await openLedger();
     // openAllocations 会按 id 重拉订单；默认桩恒返回 order1，这里按 id 分流才能拿到第二单的标题。
-    vi.mocked(catalog.ordersApi.get).mockImplementation(async (id) => (id === 2 ? order2 : order1));
+    vi.mocked(ordersApi.get).mockImplementation(async (id) => (id === 2 ? order2 : order1));
     // 第一单：填自定义字段后取消（不 reset 会留在被复用的 allocationForm store 里）。
     await openRowMenu("HS-2026-0001", "分润配置");
     const first = await modalOf(/分润 · HS-2026-0001/);
@@ -427,7 +423,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(document.querySelector(".allocation-modal")).toBeInTheDocument();
-    expect(catalog.policyApi.allocations).toHaveBeenCalledWith(1);
+    expect(policyApi.allocations).toHaveBeenCalledWith(1);
     // 一行 = 一位员工（李四 40%），不再固定四个动作位
     expect(within(modal).getAllByLabelText("比例")).toHaveLength(1);
     expect(within(modal).getByDisplayValue("40")).toBeInTheDocument();
@@ -458,12 +454,12 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   it("分润：无存量时按操作四项展开，买号/售出自动绑定动作执行人", async () => {
     // 空分润 → 按操作口径起步：买号、售出、运营、公司四项固定展开。
-    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+    vi.mocked(policyApi.allocations).mockResolvedValue({
       items: [],
       total: 0,
       order_profit: "5000.00",
     });
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+    vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       form_extra: {
         business_responsible_ids: [11],
@@ -494,7 +490,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     const modal = await modalOf(/登记分润 · HS-2026-0001/);
     await ui.type(within(modal).getByLabelText("分润金额"), "300");
     await clickModalOk(modal);
-    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
       1,
       expect.objectContaining({
         event_type: "PROFIT_SHARE",
@@ -517,12 +513,12 @@ describe("OrdersPage：操作与筛选分支", () => {
   it("分润：按操作四项无候选执行人时人员留空且锁定（不猜当前登录人）", async () => {
     // 2026-11-05 裁决：人员只认账号台账 / 库存中心登记的执行人，分润弹窗不就地猜人。
     // 本单无任何动作负责人，四行人员全部锁定且留空，等待台账补登记。
-    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+    vi.mocked(policyApi.allocations).mockResolvedValue({
       items: [],
       total: 0,
       order_profit: "5000.00",
     });
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+    vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       form_extra: {},
       events: [],
@@ -540,12 +536,12 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   it("分润：按操作四项的人员锁定为台账登记的执行人", async () => {
     // 买号=业务负责人、售出=交付负责人、运营=运营负责人；三行都不可就地改人。
-    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+    vi.mocked(policyApi.allocations).mockResolvedValue({
       items: [],
       total: 0,
       order_profit: "5000.00",
     });
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+    vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       form_extra: {
         business_responsible_ids: [11],
@@ -570,7 +566,7 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   it("分润：按人分配点「增加一行」时姓名默认当前登录人", async () => {
     // 存量按人（无 allocation_type）走 PERSON 口径；新增行过去只默认 role=OWNER、姓名留空。
-    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+    vi.mocked(policyApi.allocations).mockResolvedValue({
       items: [{ id: 1, order_id: 1, user_id: 11, role: "OWNER", allocation_type: null, allocation_rate: "100" }],
       total: 1,
       order_profit: "5000.00",
@@ -587,12 +583,12 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：按操作四项时比例与金额同样双向换算", async () => {
-    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+    vi.mocked(policyApi.allocations).mockResolvedValue({
       items: [],
       total: 0,
       order_profit: "5000.00",
     });
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+    vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       form_extra: {
         business_responsible_ids: [11],
@@ -625,12 +621,12 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   it("分润：一个动作多人时按人数均分，买号 2 人各得一半", async () => {
     // 2026-11-05 口径：买号登记 2 人，买号这一份利润由 2 人均分；3 人则三人均分。
-    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+    vi.mocked(policyApi.allocations).mockResolvedValue({
       items: [],
       total: 0,
       order_profit: "5000.00",
     });
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+    vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       form_extra: {
         business_responsible_ids: [11, 22],
@@ -663,8 +659,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     fireEvent.change(plainRates[2], { target: { value: "10" } });
 
     await clickModalOk(modal);
-    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
-    const [, payload] = vi.mocked(catalog.policyApi.setAllocations).mock.calls[0];
+    await waitFor(() => expect(policyApi.setAllocations).toHaveBeenCalled());
+    const [, payload] = vi.mocked(policyApi.setAllocations).mock.calls[0];
     const buyRows = payload.filter((item) => item.allocation_type === "BUY");
     // 买号 30% 拆成两人各 15%，不是一人独得 30%
     expect(buyRows).toHaveLength(2);
@@ -674,7 +670,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：按操作四项提交时带上 allocation_type 与比例", async () => {
-    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+    vi.mocked(policyApi.allocations).mockResolvedValue({
       items: actionAllocationRows,
       total: actionAllocationRows.length,
       order_profit: "5000.00",
@@ -684,8 +680,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(within(modal).getAllByLabelText("比例")).toHaveLength(4);
     await clickModalOk(modal);
-    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
-    const [, payload] = vi.mocked(catalog.policyApi.setAllocations).mock.calls[0];
+    await waitFor(() => expect(policyApi.setAllocations).toHaveBeenCalled());
+    const [, payload] = vi.mocked(policyApi.setAllocations).mock.calls[0];
     expect(payload).toHaveLength(4);
     expect(payload.map((item) => item.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
     expect(payload.find((item) => item.allocation_type === "OPERATION")).toMatchObject({ user_id: 9, role: "SERVICE" });
@@ -693,7 +689,7 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   it("分润：既有角色回显并原样提交，不被默认 OWNER 覆盖", async () => {
     // 存量行角色为 SALES：编辑保存必须保留，否则会被默认值静默改写（数据损坏）。
-    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+    vi.mocked(policyApi.allocations).mockResolvedValue({
       items: [
         { id: 1, order_id: 1, user_id: 9, role: "SALES", allocation_type: null, allocation_rate: "100" },
       ],
@@ -705,8 +701,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(within(modal).getByText("销售")).toBeInTheDocument();
     await clickModalOk(modal);
-    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
-    const [, payload] = vi.mocked(catalog.policyApi.setAllocations).mock.calls[0];
+    await waitFor(() => expect(policyApi.setAllocations).toHaveBeenCalled());
+    const [, payload] = vi.mocked(policyApi.setAllocations).mock.calls[0];
     expect(payload[0]).toMatchObject({ user_id: 9, role: "SALES", allocation_rate: "100" });
   });
 
@@ -720,8 +716,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.clear(rates[0]);
     await ui.type(rates[0], "100");
     await clickModalOk(modal);
-    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
-    const [, payload] = vi.mocked(catalog.policyApi.setAllocations).mock.calls[0];
+    await waitFor(() => expect(policyApi.setAllocations).toHaveBeenCalled());
+    const [, payload] = vi.mocked(policyApi.setAllocations).mock.calls[0];
     expect(payload[0]).toMatchObject({ user_id: 9, role: "SERVICE", allocation_rate: "100" });
   });
 
@@ -733,12 +729,12 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() =>
       expect(message.error).toHaveBeenCalledWith("按比例分润时合计必须为 100%（也可改用金额）"),
     );
-    expect(catalog.policyApi.setAllocations).not.toHaveBeenCalled();
+    expect(policyApi.setAllocations).not.toHaveBeenCalled();
   });
 
   // 原两条（合计 100% 提交成功 / L266 保存后刷新详情）是一次提交路径的两组断言，合并为一次挂载。
   it("分润：比例合计 100% 提交成功并绑定员工，随后刷新订单详情", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({ account: {}, orders: [] } as never);
+    vi.mocked(stocksApi.executionDetail).mockResolvedValue({ account: {}, orders: [] } as never);
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
@@ -746,8 +742,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.clear(rates[0]);
     await ui.type(rates[0], "100");
     await clickModalOk(modal);
-    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
-    const [orderId, payload] = vi.mocked(catalog.policyApi.setAllocations).mock.calls[0];
+    await waitFor(() => expect(policyApi.setAllocations).toHaveBeenCalled());
+    const [orderId, payload] = vi.mocked(policyApi.setAllocations).mock.calls[0];
     expect(orderId).toBe(1);
     expect(payload).toHaveLength(1);
     expect(payload[0]).toMatchObject({
@@ -758,7 +754,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     });
     expect(message.success).toHaveBeenCalledWith("分润已保存");
     // L266：分润保存后应按 account_id 强制刷新订单详情（ledgerDetails 缓存），使明细回显
-    await waitFor(() => expect(catalog.stocksApi.executionDetail).toHaveBeenCalledWith(order1.account_id));
+    await waitFor(() => expect(stocksApi.executionDetail).toHaveBeenCalledWith(order1.account_id));
   });
 
   it("分润：改成按金额分润时提交 allocation_amount", async () => {
@@ -769,8 +765,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.clear(rates[0]);
     await ui.type(within(modal).getByLabelText("金额"), "200");
     await clickModalOk(modal);
-    await waitFor(() => expect(catalog.policyApi.setAllocations).toHaveBeenCalled());
-    const [, payload] = vi.mocked(catalog.policyApi.setAllocations).mock.calls[0];
+    await waitFor(() => expect(policyApi.setAllocations).toHaveBeenCalled());
+    const [, payload] = vi.mocked(policyApi.setAllocations).mock.calls[0];
     expect(payload[0]).toMatchObject({
       user_id: 9,
       allocation_rate: "0",
@@ -780,7 +776,7 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   it("分润：亏损单提示改为「金额填负数」而非「不可用」", async () => {
     // 2026-11-05 裁决后亏损单允许按金额分润，提示语必须说明填负数（-300 = 分担 300 亏损）。
-    vi.mocked(catalog.policyApi.allocations).mockResolvedValue({
+    vi.mocked(policyApi.allocations).mockResolvedValue({
       items: allocationRows,
       total: allocationRows.length,
       order_profit: "-800.00",
@@ -803,7 +799,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：保存失败提示错误", async () => {
-    vi.mocked(catalog.policyApi.setAllocations).mockRejectedValue(new Error("alloc fail"));
+    vi.mocked(policyApi.setAllocations).mockRejectedValue(new Error("alloc fail"));
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
@@ -823,7 +819,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("支出")).toBeInTheDocument();
     await clickModalOk(modal);
     await waitFor(() =>
-      expect(catalog.cashflowsApi.createForOrder).toHaveBeenCalledWith(
+      expect(cashflowsApi.createForOrder).toHaveBeenCalledWith(
         1,
         expect.objectContaining({ direction: "OUT", amount: "500", category: "OTHER", pool_id: expect.any(Number) }),
       )
@@ -832,7 +828,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("资金收支：提交失败提示错误并关闭 loading", async () => {
-    vi.mocked(catalog.cashflowsApi.createForOrder).mockRejectedValue(new Error("create fail"));
+    vi.mocked(cashflowsApi.createForOrder).mockRejectedValue(new Error("create fail"));
     await openLedger();
     await openRowMenu("HS-2026-0001", "资金收支");
     const modal = await modalOf(/资金收支 · HS-2026-0001/);
@@ -853,14 +849,14 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.type(within(modal).getByLabelText("金额"), "100");
     await ui.type(within(modal).getByLabelText("收支备注"), "补登记收入");
     await clickModalOk(modal);
-    await waitFor(() => expect(catalog.cashflowsApi.createForOrder).toHaveBeenCalledWith(
+    await waitFor(() => expect(cashflowsApi.createForOrder).toHaveBeenCalledWith(
       1,
       expect.objectContaining({ direction: "IN", amount: "100", category: "OTHER" }),
     ));
   });
 
   it("交付：订单台账可登记买号交付并记录 DELIVER 事件", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValueOnce({
+    vi.mocked(ordersApi.get).mockResolvedValueOnce({
       ...order1,
       events: [{
         id: 1,
@@ -879,7 +875,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("买号交付")).toBeInTheDocument();
     await ui.type(within(modal).getByLabelText("交付凭证"), "卖家已完成换绑");
     await clickModalOk(modal);
-    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
       1,
       expect.objectContaining({
         event_type: "DELIVER",
@@ -891,11 +887,11 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("运营：订单台账提供描述快捷入口并登记 DESCRIPTION 业务事件", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce({
+    vi.mocked(stocksApi.executionDetail).mockResolvedValueOnce({
       account: { id: 5, source_order_id: 1, source_order_no: "HS-2026-0001", game_account: "seller-001", status: "WAITING", cost_amount: "100.00" },
       orders: [],
     } as never);
-    vi.mocked(catalog.stocksApi.updateProfile).mockResolvedValueOnce({
+    vi.mocked(stocksApi.updateProfile).mockResolvedValueOnce({
       id: 5, source_order_id: 1, source_order_no: "HS-2026-0001", game_account: "seller-001", status: "WAITING", cost_amount: "100.00",
     } as never);
     await openLedger();
@@ -904,14 +900,14 @@ describe("OrdersPage：操作与筛选分支", () => {
     const modal = descriptionInput.closest(".ant-modal-content") as HTMLElement;
     await ui.type(descriptionInput, "台账补充描述");
     await ui.click(within(modal).getByRole("button", { name: "保存" }));
-    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
       1,
       expect.objectContaining({ event_type: "OPERATE", operation_type: "DESCRIPTION" }),
     ));
   });
 
   it("取消：存在可冲销已登记动作时发起 CANCEL 冲销", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+    vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       events: [{ id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "1000.00" }],
     });
@@ -922,7 +918,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.type(screen.getByLabelText("取消原因"), "重复登记");
     await clickModalOk(modal);
     await waitFor(() =>
-      expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+      expect(ordersApi.postEvent).toHaveBeenCalledWith(
         1,
         expect.objectContaining({ event_type: "CANCEL", offset_event_id: 101, form_extra_scope: "INVREFUND" }),
       )
@@ -941,13 +937,13 @@ describe("OrdersPage：操作与筛选分支", () => {
       resolvePools = resolve;
     });
 
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([cancelOrder]);
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+    vi.mocked(ordersApi.list).mockResolvedValue([cancelOrder]);
+    vi.mocked(ordersApi.get).mockResolvedValue({
       ...cancelOrder,
       events: [{ id: 2101, order_id: 21, event_type: "BUY", event_no: "EV-CANCEL-ASYNC-01", amount: "100.00", occurred_on: "2026-11-01", pool_id: 7, is_posted: true, cancellable_amount: "100.00" }],
     });
-    vi.mocked(catalog.poolsApi.list).mockImplementation(() => poolsPending as never);
-    vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
+    vi.mocked(poolsApi.list).mockImplementation(() => poolsPending as never);
+    vi.mocked(employeesApi.list).mockResolvedValue([]);
 
     await openLedger();
     await openRowMenu("HS-CANCEL-ASYNC-01", "取消");
@@ -958,14 +954,14 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.type(within(modal).getByLabelText("取消原因"), "异步加载回归");
     await clickModalOk(modal);
 
-    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
       21,
       expect.objectContaining({ event_type: "CANCEL", offset_event_id: 2101, pool_id: 7 }),
     ));
   });
 
   it("取消：冲销入库流水并进入公司钱包", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+    vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       events: [{ id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", pool_id: 7, is_posted: true, cancellable_amount: "1000.00" }],
     });
@@ -978,14 +974,14 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.click((await screen.findAllByText("投资款荷包（HJ_INVEST）"))[1]);
     await ui.type(within(modal).getByLabelText("取消原因"), "对方退款");
     await clickModalOk(modal);
-    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
       1,
       expect.objectContaining({ event_type: "CANCEL", pool_id: 7, form_extra_scope: "INVREFUND", operator_user_ids: expect.arrayContaining([expect.any(Number)]) }),
     ));
   });
 
   it("取消：按售出流水做部分退款冲销", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+    vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       events: [
         { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "1000.00" },
@@ -1006,7 +1002,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.type(screen.getByLabelText("取消原因"), "部分冲销");
     await clickModalOk(modal);
     await waitFor(() =>
-      expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+      expect(ordersApi.postEvent).toHaveBeenCalledWith(
         1,
         expect.objectContaining({ event_type: "CANCEL", offset_event_id: 102, amount: "300", form_extra_scope: "ORDERCANC" }),
       )
@@ -1014,29 +1010,29 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("取消：分期订单按合约取消并提示退款金额", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([order3]);
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue(order3);
+    vi.mocked(ordersApi.list).mockResolvedValue([order3]);
+    vi.mocked(ordersApi.get).mockResolvedValue(order3);
     await openLedger();
     await openRowMenu("HS-2026-0003", "取消");
     const modal = await modalOf(/取消 · INS-1/);
     await ui.type(screen.getByLabelText("取消原因"), "提前结清");
     fireEvent.click(screen.getByRole("button", { name: /确认取消/ }));
-    await waitFor(() => expect(catalog.installmentsApi.cancel).toHaveBeenCalledWith(11, expect.objectContaining({ reason: "提前结清" })));
+    await waitFor(() => expect(installmentsApi.cancel).toHaveBeenCalledWith(11, expect.objectContaining({ reason: "提前结清" })));
     // money() 走千分位格式化
     expect(message.success).toHaveBeenCalledWith(expect.stringContaining("退款已登记：¥3,000.00"));
   });
 
   it("取消：分期订单无可用合约时提示", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([order3]);
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue(order3);
-    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{ ...installment, status: "CANCELLED" }]);
+    vi.mocked(ordersApi.list).mockResolvedValue([order3]);
+    vi.mocked(ordersApi.get).mockResolvedValue(order3);
+    vi.mocked(installmentsApi.list).mockResolvedValue([{ ...installment, status: "CANCELLED" }]);
     await openLedger();
     await openRowMenu("HS-2026-0003", "取消");
     await waitFor(() => expect(message.error).toHaveBeenCalledWith("未找到可取消的分期合约"));
   });
 
   it("取消：打开详情失败时提示错误", async () => {
-    vi.mocked(catalog.ordersApi.get).mockRejectedValue(new Error("detail fail"));
+    vi.mocked(ordersApi.get).mockRejectedValue(new Error("detail fail"));
     await openLedger();
     await openRowMenu("HS-2026-0001", "取消");
     await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("detail fail")));
@@ -1045,7 +1041,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   // 原三条（弹窗开关 / P2-190 菜单收起 / 成功后刷新列表）同一入口同一夹具，合并为一次挂载。
   it("新建订单：菜单收起、弹窗开关与成功后刷新列表", async () => {
     await openLedger();
-    const before = vi.mocked(catalog.ordersApi.list).mock.calls.length;
+    const before = vi.mocked(ordersApi.list).mock.calls.length;
     const trigger = screen.getByRole("button", { name: /新建订单/ });
 
     await ui.click(trigger);
@@ -1066,7 +1062,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await screen.findByTestId("create-stub");
     await ui.click(screen.getByRole("button", { name: /模拟新建成功/ }));
     await waitFor(() => expect(screen.queryByTestId("create-stub")).toBeNull());
-    expect(vi.mocked(catalog.ordersApi.list).mock.calls.length).toBeGreaterThan(before);
+    expect(vi.mocked(ordersApi.list).mock.calls.length).toBeGreaterThan(before);
   });
 
 });

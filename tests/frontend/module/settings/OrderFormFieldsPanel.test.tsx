@@ -3,8 +3,23 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
-import * as catalog from "@/shared/api/catalog";
-vi.mock("@/shared/api/catalog");
+import { gameTypesApi } from "@/shared/api/misc.api";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { orderFormFieldsApi } from "@/shared/api/orders.api";
+import type { OrderFormField } from "@/shared/api/types/forms";
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 import * as client from "@/shared/api/client";
 import { renderLight } from "@fixtures/render";
 import { OrderFormFieldsPanel } from "@/field-definitions/panels/OrderFormFieldsPanel";
@@ -19,7 +34,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
   checkBackendHealth: vi.fn(),
 }));
 
-type Field = catalog.OrderFormField;
+type Field = OrderFormField;
 
 const makeField = (over: Partial<Field> = {}): Field => ({
   id: 1,
@@ -45,10 +60,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(message, "success").mockImplementation(() => ({}) as never);
   vi.spyOn(message, "error").mockImplementation(() => ({}) as never);
-  vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([]);
-  vi.mocked(catalog.orderFormFieldsApi).scopes = vi.fn().mockResolvedValue([]);
-  vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.optionSetsApi).get = vi.fn().mockResolvedValue({ options: [] } as never);
+  vi.mocked(orderFormFieldsApi).list.mockResolvedValue([]);
+  vi.mocked(orderFormFieldsApi).scopes = vi.fn().mockResolvedValue([]);
+  vi.mocked(gameTypesApi.list).mockResolvedValue([]);
+  vi.mocked(optionSetsApi).get = vi.fn().mockResolvedValue({ options: [] } as never);
 });
 
 describe("OrderFormFieldsPanel", () => {
@@ -107,7 +122,7 @@ describe("OrderFormFieldsPanel", () => {
       "ACCOUNT_PRODUCT", "BUSINESS", "DELIVER", "OPERATION", "FINANCE", "EXTRA", "PARTICIPANT", "CUSTOM_OPS",
     ]));
     // 板块标题改走后端落库：设置面板加载时从 listSectionLabels 读取覆盖映射。
-    vi.mocked(catalog.orderFormFieldsApi).listSectionLabels.mockResolvedValue({ CUSTOM_OPS: "自定义运营" });
+    vi.mocked(orderFormFieldsApi).listSectionLabels.mockResolvedValue({ CUSTOM_OPS: "自定义运营" });
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
     await screen.findByText("板块管理");
 
@@ -116,7 +131,7 @@ describe("OrderFormFieldsPanel", () => {
   });
 
   it("编辑板块名称调用 saveSectionLabels 落库（设置改板块名 → 建单同步显示）", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).listSectionLabels.mockResolvedValue({});
+    vi.mocked(orderFormFieldsApi).listSectionLabels.mockResolvedValue({});
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
     await screen.findByText("板块管理");
 
@@ -127,9 +142,9 @@ describe("OrderFormFieldsPanel", () => {
     await ui.click(screen.getByText("保存板块"));
 
     await waitFor(() =>
-      expect(vi.mocked(catalog.orderFormFieldsApi).saveSectionLabels).toHaveBeenCalled(),
+      expect(vi.mocked(orderFormFieldsApi).saveSectionLabels).toHaveBeenCalled(),
     );
-    const payload = vi.mocked(catalog.orderFormFieldsApi).saveSectionLabels.mock.calls[0][0] as {
+    const payload = vi.mocked(orderFormFieldsApi).saveSectionLabels.mock.calls[0][0] as {
       order_type_code: string;
       labels: Record<string, string>;
     };
@@ -138,16 +153,16 @@ describe("OrderFormFieldsPanel", () => {
   });
 
   it("挂载时按当前业务类型拉取字段列表", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 10, field_key: "tag", label: "自定义标签A", locked: false, is_custom: true }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
     expect(await screen.findByText("自定义标签A")).toBeInTheDocument();
-    expect(vi.mocked(catalog.orderFormFieldsApi).list).toHaveBeenCalledWith("HS", true);
+    expect(vi.mocked(orderFormFieldsApi).list).toHaveBeenCalledWith("HS", true);
   });
 
   it("新增自定义字段调用 create 并刷新列表", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([]);
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
     await screen.findByText("该表单暂无字段配置");
 
@@ -156,16 +171,16 @@ describe("OrderFormFieldsPanel", () => {
     await ui.click(screen.getByRole("button", { name: /新增字段/ }));
 
     await waitFor(() =>
-      expect(vi.mocked(catalog.orderFormFieldsApi).create).toHaveBeenCalled(),
+      expect(vi.mocked(orderFormFieldsApi).create).toHaveBeenCalled(),
     );
-    const payload = vi.mocked(catalog.orderFormFieldsApi).create.mock.calls[0][0] as Partial<Field>;
+    const payload = vi.mocked(orderFormFieldsApi).create.mock.calls[0][0] as Partial<Field>;
     expect(payload.field_key).toBe("vip_tag");
     expect(payload.label).toBe("VIP标签");
     expect(payload.order_type_code).toBe("HS");
   });
 
   it("停用字段调用 setActive(false)", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 20, field_key: "tag", label: "可停用字段", locked: false, is_custom: true, is_active: true }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
@@ -175,12 +190,12 @@ describe("OrderFormFieldsPanel", () => {
     await ui.click(await screen.findByRole("button", { name: /确认/ }));
 
     await waitFor(() =>
-      expect(vi.mocked(catalog.orderFormFieldsApi).setActive).toHaveBeenCalledWith(20, false),
+      expect(vi.mocked(orderFormFieldsApi).setActive).toHaveBeenCalledWith(20, false),
     );
   });
 
   it("预置字段（非自定义）删除按钮禁用", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 30, field_key: "core", label: "预置字段X", locked: true, is_custom: false }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
@@ -190,10 +205,10 @@ describe("OrderFormFieldsPanel", () => {
 
   it("游戏类型字段显示数据源并可进入游戏类型配置", async () => {
     const onConfigureGameTypes = vi.fn();
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ field_key: "game_type", label: "游戏类型", field_type: "SELECT", locked: true, is_custom: false }),
     ]);
-    vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([
+    vi.mocked(gameTypesApi.list).mockResolvedValue([
       { id: 1, name: "王者荣耀", sort_order: 1, is_active: true, is_default: false },
       { id: 2, name: "原神", sort_order: 2, is_active: true, is_default: false },
     ]);
@@ -206,7 +221,7 @@ describe("OrderFormFieldsPanel", () => {
   });
 
   it("编辑字段时将编辑区展开在该字段行的下方", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 61, field_key: "tag", label: "行内编辑字段", is_custom: true }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
@@ -218,7 +233,7 @@ describe("OrderFormFieldsPanel", () => {
   });
 
   it("资金账户是系统统一术语：配置中心标签只读，不可改名", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({
         id: 63,
         field_key: "payment_pool_id",
@@ -238,7 +253,7 @@ describe("OrderFormFieldsPanel", () => {
   });
 
   it("普通字段的标签仍可编辑", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 64, field_key: "vip_tag", label: "会员标签", is_custom: true }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
@@ -250,7 +265,7 @@ describe("OrderFormFieldsPanel", () => {
   });
 
   it("编辑区修改标签、归属板块、必填和排序后可成功保存", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 62, field_key: "tag", label: "编辑前标签", is_custom: true }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
@@ -270,7 +285,7 @@ describe("OrderFormFieldsPanel", () => {
     await ui.type(sortInput, "20");
     await ui.click(screen.getByRole("button", { name: /保存字段/ }));
 
-    await waitFor(() => expect(vi.mocked(catalog.orderFormFieldsApi).update).toHaveBeenCalledWith(
+    await waitFor(() => expect(vi.mocked(orderFormFieldsApi).update).toHaveBeenCalledWith(
       62,
       expect.objectContaining({
         label: "编辑后标签",
@@ -279,11 +294,11 @@ describe("OrderFormFieldsPanel", () => {
         sort_order: 20,
       }),
     ));
-    expect(vi.mocked(catalog.orderFormFieldsApi).list).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(orderFormFieldsApi).list).toHaveBeenCalledTimes(2);
   });
 
   it("归属板块支持运营信息", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 63, field_key: "operation_note", label: "运营备注" }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
@@ -296,7 +311,7 @@ describe("OrderFormFieldsPanel", () => {
     await ui.click(operationOption!);
     await ui.click(screen.getByRole("button", { name: /保存字段/ }));
 
-    await waitFor(() => expect(vi.mocked(catalog.orderFormFieldsApi.update)).toHaveBeenCalledWith(
+    await waitFor(() => expect(vi.mocked(orderFormFieldsApi.update)).toHaveBeenCalledWith(
       63,
       expect.objectContaining({ section: "OPERATION" }),
     ));
@@ -314,7 +329,7 @@ describe("OrderFormFieldsPanel", () => {
           ? [{ value: "A", label: "A" }, { value: "B", label: "B" }]
           : null,
       });
-      vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([field]);
+      vi.mocked(orderFormFieldsApi).list.mockResolvedValue([field]);
       renderLight(<OrderFormFieldsPanel />, { user: "admin" });
       await screen.findByText(`${fieldType}编辑前`);
 
@@ -324,11 +339,11 @@ describe("OrderFormFieldsPanel", () => {
       await ui.type(labelInput, `${fieldType}编辑后`);
       await ui.click(screen.getByRole("button", { name: /保存字段/ }));
 
-      await waitFor(() => expect(vi.mocked(catalog.orderFormFieldsApi).update).toHaveBeenCalledWith(
+      await waitFor(() => expect(vi.mocked(orderFormFieldsApi).update).toHaveBeenCalledWith(
         field.id,
         expect.objectContaining({ label: `${fieldType}编辑后` }),
       ));
-      const payload = vi.mocked(catalog.orderFormFieldsApi).update.mock.calls[0][1] as Partial<Field>;
+      const payload = vi.mocked(orderFormFieldsApi).update.mock.calls[0][1] as Partial<Field>;
       if (fieldType === "SELECT" || fieldType === "MULTI_SELECT") {
         expect(payload.options).toEqual([
           { value: "A", label: "A" },
@@ -341,7 +356,7 @@ describe("OrderFormFieldsPanel", () => {
   );
 
   it("行内必填开关切换调用 update 并刷新", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 50, field_key: "vip", label: "VIP字段", required: false, is_custom: true }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
@@ -352,13 +367,13 @@ describe("OrderFormFieldsPanel", () => {
     await ui.click(toggle);
 
     await waitFor(() =>
-      expect(vi.mocked(catalog.orderFormFieldsApi).update).toHaveBeenCalledWith(50, { required: true }),
+      expect(vi.mocked(orderFormFieldsApi).update).toHaveBeenCalledWith(50, { required: true }),
     );
-    expect(vi.mocked(catalog.orderFormFieldsApi).list).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(orderFormFieldsApi).list).toHaveBeenCalledTimes(2);
   });
 
   it("已必填字段再次点击行内开关改为选填", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 51, field_key: "note", label: "备注字段", required: true, is_custom: true }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
@@ -369,12 +384,12 @@ describe("OrderFormFieldsPanel", () => {
     await ui.click(toggle);
 
     await waitFor(() =>
-      expect(vi.mocked(catalog.orderFormFieldsApi).update).toHaveBeenCalledWith(51, { required: false }),
+      expect(vi.mocked(orderFormFieldsApi).update).toHaveBeenCalledWith(51, { required: false }),
     );
   });
 
   it("删除自定义字段调用 remove", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 40, field_key: "c1", label: "自定义字段Z", locked: false, is_custom: true }),
     ]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
@@ -384,14 +399,14 @@ describe("OrderFormFieldsPanel", () => {
     await ui.click(await screen.findByRole("button", { name: /确认删除/ }));
 
     await waitFor(() =>
-      expect(vi.mocked(catalog.orderFormFieldsApi).remove).toHaveBeenCalledWith(40),
+      expect(vi.mocked(orderFormFieldsApi).remove).toHaveBeenCalledWith(40),
     );
   });
 });
 
 describe("OrderFormFieldsPanel 条件必填", () => {
   it("列表展示条件必填描述", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 70, field_key: "customer_source", label: "客户来源", field_type: "SELECT", options: [{ value: "其他", label: "其他" }, { value: "微信", label: "微信" }] }),
       makeField({
         id: 71,
@@ -409,7 +424,7 @@ describe("OrderFormFieldsPanel 条件必填", () => {
   });
 
   it("保存条件必填时提交 required_when 并把 required 置为 false", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 80, field_key: "customer_source", label: "客户来源", field_type: "SELECT", options: [{ value: "其他", label: "其他" }, { value: "微信", label: "微信" }] }),
       makeField({ id: 81, field_key: "other_source", label: "其他来源", required: true }),
     ]);
@@ -424,8 +439,8 @@ describe("OrderFormFieldsPanel 条件必填", () => {
 
     await ui.click(screen.getByRole("button", { name: /保存字段/ }));
 
-    await waitFor(() => expect(vi.mocked(catalog.orderFormFieldsApi).update).toHaveBeenCalled());
-    const [id, payload] = vi.mocked(catalog.orderFormFieldsApi).update.mock.calls[0];
+    await waitFor(() => expect(vi.mocked(orderFormFieldsApi).update).toHaveBeenCalled());
+    const [id, payload] = vi.mocked(orderFormFieldsApi).update.mock.calls[0];
     expect(id).toBe(81);
     expect(payload.required).toBe(false);
     expect(payload.required_when).toMatchObject({ field: "customer_source", op: "eq" });
@@ -434,15 +449,15 @@ describe("OrderFormFieldsPanel 条件必填", () => {
 
 describe("OrderFormFieldsPanel 依赖防护", () => {
   it("停用被条件引用的字段失败时即时提示原因，不重载列表", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 90, field_key: "src", label: "来源字段", is_active: true, locked: false, is_custom: true }),
     ]);
-    vi.mocked(catalog.orderFormFieldsApi).setActive.mockRejectedValue(
+    vi.mocked(orderFormFieldsApi).setActive.mockRejectedValue(
       new Error("字段「来源字段」被 1 个条件必填引用（「其他来源」），无法停用；请先解除这些字段的条件必填"),
     );
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
     await screen.findByText("来源字段");
-    const listCalls = vi.mocked(catalog.orderFormFieldsApi).list.mock.calls.length;
+    const listCalls = vi.mocked(orderFormFieldsApi).list.mock.calls.length;
 
     await ui.click(screen.getByText("停用"));
     await ui.click(await screen.findByRole("button", { name: /确认/ }));
@@ -451,14 +466,14 @@ describe("OrderFormFieldsPanel 依赖防护", () => {
       expect(message.error).toHaveBeenCalledWith(expect.stringContaining("请先解除")),
     );
     // 操作失败不触发重新拉取
-    expect(vi.mocked(catalog.orderFormFieldsApi).list.mock.calls.length).toBe(listCalls);
+    expect(vi.mocked(orderFormFieldsApi).list.mock.calls.length).toBe(listCalls);
   });
 
   it("删除被条件引用的字段失败时即时提示原因", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([
       makeField({ id: 91, field_key: "src2", label: "来源字段2", locked: false, is_custom: true }),
     ]);
-    vi.mocked(catalog.orderFormFieldsApi).remove.mockRejectedValue(
+    vi.mocked(orderFormFieldsApi).remove.mockRejectedValue(
       new Error("字段「来源字段2」被 1 个条件必填引用（「其他来源2」），无法删除；请先解除这些字段的条件必填"),
     );
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
@@ -470,13 +485,13 @@ describe("OrderFormFieldsPanel 依赖防护", () => {
     await waitFor(() =>
       expect(message.error).toHaveBeenCalledWith(expect.stringContaining("无法删除")),
     );
-    expect(vi.mocked(catalog.orderFormFieldsApi).remove).toHaveBeenCalledWith(91);
+    expect(vi.mocked(orderFormFieldsApi).remove).toHaveBeenCalledWith(91);
   });
 });
 
 describe("OrderFormFieldsPanel 字段键格式校验", () => {
   it("字段键含大写或非法字符时前端拦截、不提交（L1723）", async () => {
-    vi.mocked(catalog.orderFormFieldsApi).list.mockResolvedValue([]);
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
     await screen.findByText("该表单暂无字段配置");
 
@@ -486,6 +501,6 @@ describe("OrderFormFieldsPanel 字段键格式校验", () => {
 
     // 字段下方出现格式提示，且未发起任何创建请求
     expect(await screen.findByText("仅支持小写字母与下划线，且以小写字母开头")).toBeInTheDocument();
-    expect(vi.mocked(catalog.orderFormFieldsApi).create).not.toHaveBeenCalled();
+    expect(vi.mocked(orderFormFieldsApi).create).not.toHaveBeenCalled();
   });
 });

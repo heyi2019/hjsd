@@ -6,7 +6,9 @@ import { appMessage as message } from "@/shared/ui/appFeedback";
 import { CustomersPage } from "@/customers/CustomersPage";
 import { resolveMockOnce } from "@fixtures/mock-api";
 
-import * as catalog from "@/shared/api/catalog";
+import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
+import { orderFormFieldsApi } from "@/shared/api/orders.api";
+import type { OrderFormField } from "@/shared/api/types/forms";
 import { seedOptionSets } from "@fixtures/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -14,30 +16,19 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-vi.mock("@/shared/api/catalog", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/shared/api/catalog")>();
-  const METHODS = [
-    "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
-    "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
-    "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search", "exportCsv",
-  ];
-  const mk = (api: Record<string, unknown>) => {
-    const o: Record<string, unknown> = { ...api };
-    for (const m of METHODS) {
-      if (m in o) o[m] = vi.fn();
-    }
-    return o;
-  };
-  const out: Record<string, unknown> = { ...actual };
-  for (const key of Object.keys(actual)) {
-    const v = (actual as Record<string, unknown>)[key];
-    if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v as object).some((x) => typeof x === "function")) {
-      out[key] = mk(v as Record<string, unknown>);
-    }
-  }
-  return out as unknown as typeof actual;
-});
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 vi.mock("@/customers/CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
 
 const fieldDefs = [
@@ -45,7 +36,7 @@ const fieldDefs = [
   { id: 2, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "credit_level", label: "信用评级", field_type: "SELECT", options: [{ value: "优质", label: "优质" }, { value: "一般", label: "一般" }, { value: "观察", label: "观察" }, { value: "黑名单", label: "黑名单" }], required: false, sort_order: 20, is_active: true },
   { id: 3, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "referrer", label: "转介绍人", field_type: "TEXT", options: null, required: false, sort_order: 30, is_active: true },
   { id: 4, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "legacy_note", label: "历史备注", field_type: "TEXT", options: null, required: false, sort_order: 40, is_active: false },
-] as unknown as import("@/shared/api/catalog").OrderFormField[];
+] as unknown as import("@/shared/api/types/forms").OrderFormField[];
 
 const customers = [
   { id: 1, customer_no: "CUS-0001", display_name: "张三", phone: "138****8888", wechat: "zhangsan", qq: "10001", status: "ACTIVE", extra_values: { credit_level: "优质", legacy_note: "早期客户" } },
@@ -54,11 +45,11 @@ const customers = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  seedOptionSets(catalog);
-  vi.mocked(catalog.customersApi.list).mockResolvedValue(customers);
-  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue(fieldDefs);
-  vi.mocked(catalog.customersApi.detail).mockResolvedValue({
+  seedOptionSets();
+  vi.mocked(customersApi.list).mockResolvedValue(customers);
+  vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
+  vi.mocked(orderFormFieldsApi.list).mockResolvedValue(fieldDefs);
+  vi.mocked(customersApi.detail).mockResolvedValue({
     customer: customers[0],
     overview: { order_count: 1, active_order_count: 1, completed_order_count: 0, cancelled_order_count: 0, last_trade_date: "2026-10-18", installment_paid_total: "100.00", installment_receivable_total: "1000.00", installment_remaining_total: "900.00", overdue_period_count: 1 },
     business: [{ order_id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "STOCK", status: "ACTIVE", trade_date: "2026-10-18", roles: ["BUYER"] }],
@@ -86,14 +77,14 @@ describe("CustomersPage：权限门控与写操作", () => {
   });
 
   it("新建客户提交后回传字段并刷新列表", async () => {
-    resolveMockOnce(vi.mocked(catalog.customersApi.create), { customer: { id: 3, customer_no: "CUS-0003" }, duplicate_candidates: [] });
+    resolveMockOnce(vi.mocked(customersApi.create), { customer: { id: 3, customer_no: "CUS-0003" }, duplicate_candidates: [] });
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getByRole("button", { name: /新建/ }));
     await ui.type(await screen.findByLabelText("名字"), "王五");
     await ui.click(screen.getByRole("button", { name: /建\s*档/ }));
-    await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalled());
-    expect(vi.mocked(catalog.customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五" });
+    await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五" });
   });
 
   it("新建客户弹窗采用订单式分区与底部全宽建档按钮", async () => {
@@ -110,22 +101,22 @@ describe("CustomersPage：权限门控与写操作", () => {
 
   it("重复候选不拦截，只提示（创建仍成功）", async () => {
     const warningSpy = vi.spyOn(message, "warning");
-    resolveMockOnce(vi.mocked(catalog.customersApi.create), { customer: { id: 4 }, duplicate_candidates: [{ id: 2 }] });
+    resolveMockOnce(vi.mocked(customersApi.create), { customer: { id: 4 }, duplicate_candidates: [{ id: 2 }] });
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getByRole("button", { name: /新建/ }));
     await ui.type(await screen.findByLabelText("名字"), "李四");
     await ui.click(screen.getByRole("button", { name: /建\s*档/ }));
-    await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalled());
     // 只提示：message.warning 携带「重复候选」文案（renderLight 未用 antd <App>，静态 message 不进 React 树，故不查 DOM 文本）
     expect(warningSpy).toHaveBeenCalledWith(expect.stringContaining("重复候选"));
     // 未拦截：创建成功后走成功分支刷新列表（customersApi.list 第 2 次调用）
-    await waitFor(() => expect(vi.mocked(catalog.customersApi.list)).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(vi.mocked(customersApi.list)).toHaveBeenCalledTimes(2));
   });
 
   it("合并弹窗取消后重开不残留上次选的目标客户与原因", async () => {
     // 两个 ACTIVE 客户互为可合并目标；用本地覆盖避免污染其它用例的共享 mock。
-    vi.mocked(catalog.customersApi.list).mockResolvedValue([
+    vi.mocked(customersApi.list).mockResolvedValue([
       { id: 1, customer_no: "CUS-0001", display_name: "张三", phone: "138****8888", status: "ACTIVE", extra_values: {} },
       { id: 2, customer_no: "CUS-0002", display_name: "李四", phone: "139****9999", status: "ACTIVE", extra_values: {} },
     ]);
@@ -161,7 +152,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getAllByRole("button", { name: /详\s*情/ })[0]);
-    expect(vi.mocked(catalog.customersApi.detail)).toHaveBeenCalledWith(1);
+    expect(vi.mocked(customersApi.detail)).toHaveBeenCalledWith(1);
     const drawer = await screen.findByRole("dialog");
     expect(within(drawer).getByText("经营概览")).toBeInTheDocument();
     expect(within(drawer).getAllByText("关联订单").length).toBeGreaterThanOrEqual(2);
@@ -180,12 +171,12 @@ describe("CustomersPage：权限门控与写操作", () => {
     await ui.click(screen.getByRole("button", { name: "搜索客户" }));
     // 用 toHaveBeenCalledWith 而非 toHaveBeenLastCalledWith：搜索后页面可能再触发一次刷新调用，
     // 断言「关键词确实传给了后端」才是本用例的意图，避免与刷新调用竞争导致偶发红。
-    await waitFor(() => expect(vi.mocked(catalog.customersApi.list)).toHaveBeenCalledWith({ keyword: "张三" }));
+    await waitFor(() => expect(vi.mocked(customersApi.list)).toHaveBeenCalledWith({ keyword: "张三" }));
   });
 
   it("客户 CSV 导出完成后给出成功反馈", async () => {
     const successSpy = vi.spyOn(message, "success");
-    vi.mocked(catalog.customersApi.exportCsv).mockResolvedValueOnce(new Blob(["csv"]));
+    vi.mocked(customersApi.exportCsv).mockResolvedValueOnce(new Blob(["csv"]));
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:customer");
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);

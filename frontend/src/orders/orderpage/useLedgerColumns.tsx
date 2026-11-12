@@ -1,6 +1,6 @@
 import { Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { Order } from "../../shared/api/catalog";
+import type { Order } from "../../shared/api/types/orders";
 import { ACCOUNT_STATUS_LABEL, formatDateTimeMinute, formatElapsedTime, money } from "../../shared/lib/format";
 import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
 import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";

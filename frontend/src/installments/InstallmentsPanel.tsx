@@ -3,7 +3,8 @@
 import { Button, Card, DatePicker, Segmented, Space, Typography } from "antd";
 import { useState } from "react";
 import type { Dayjs } from "dayjs";
-import { installmentsApi, type Installment, type Schedule } from "../shared/api/catalog";
+import { installmentsApi } from "../shared/api/installments.api";
+import type { Installment, Schedule } from "../shared/api/types/installments";
 import { today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { DataTable, ErrorBanner, PermissionButton, StatRow } from "../shared/ui";

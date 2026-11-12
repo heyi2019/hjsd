@@ -2,7 +2,8 @@
 
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { reportsApi, type MonthlyPnlReport, type MonthlyPnlRow } from "../../shared/api/catalog";
+import { reportsApi } from "../../shared/api/reports.api";
+import type { MonthlyPnlReport, MonthlyPnlRow } from "../../shared/api/types/reporting";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow } from "../../shared/ui";
 import { type ReportRange, useReport } from "./shared";

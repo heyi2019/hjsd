@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage } from "@/orders/OrdersPage";
 
-import * as catalog from "@/shared/api/catalog";
+import { installmentsApi } from "@/shared/api/installments.api";
+import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -12,30 +16,19 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-vi.mock("@/shared/api/catalog", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/shared/api/catalog")>();
-  const METHODS = [
-    "list", "get", "create", "update", "patch", "post", "postEvent", "cancel", "remove",
-    "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
-    "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search", "exportCsv", "exportXlsx",
-  ];
-  const mk = (api: Record<string, unknown>) => {
-    const o: Record<string, unknown> = { ...api };
-    for (const m of METHODS) {
-      if (m in o) o[m] = vi.fn();
-    }
-    return o;
-  };
-  const out: Record<string, unknown> = { ...actual };
-  for (const key of Object.keys(actual)) {
-    const v = (actual as Record<string, unknown>)[key];
-    if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v as object).some((x) => typeof x === "function")) {
-      out[key] = mk(v as Record<string, unknown>);
-    }
-  }
-  return out as unknown as typeof actual;
-});
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const orders = [
   {
@@ -64,15 +57,15 @@ const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_act
 
 beforeEach(() => {
   vi.clearAllMocks();
-  seedOptionSets(catalog);
-  seedOrderFormFields(catalog);
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
-  vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
-  vi.mocked(catalog.stocksApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+  seedOptionSets();
+  seedOrderFormFields();
+  vi.mocked(ordersApi.list).mockResolvedValue(orders);
+  vi.mocked(orderTypesApi.list).mockResolvedValue(types);
+  vi.mocked(stocksApi.list).mockResolvedValue([]);
+  vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);
-  vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
+  vi.mocked(installmentsApi.list).mockResolvedValue([]);
 });
 
 async function openLedger(user?: string) {
@@ -144,8 +137,8 @@ describe("OrdersPage：四类订单台账", () => {
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:ledger");
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
-    vi.mocked(catalog.ordersApi.exportCsv).mockResolvedValue(new Blob(["csv"]));
-    vi.mocked(catalog.ordersApi.exportXlsx).mockResolvedValue(new Blob(["xlsx"]));
+    vi.mocked(ordersApi.exportCsv).mockResolvedValue(new Blob(["csv"]));
+    vi.mocked(ordersApi.exportXlsx).mockResolvedValue(new Blob(["xlsx"]));
 
     renderLight(<OrdersPage initialTab="ledger" initialMine />);
     await screen.findAllByText("HS-2026-0001");
@@ -154,14 +147,14 @@ describe("OrdersPage：四类订单台账", () => {
     // antd Dropdown 会同时保留上一份隐藏菜单，同文案出现多次；取最新一份直接触发。
     const csvItem = await screen.findAllByText(/导出 CSV/);
     fireEvent.click(csvItem[csvItem.length - 1]);
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.exportCsv)).toHaveBeenCalledWith(
+    await waitFor(() => expect(vi.mocked(ordersApi.exportCsv)).toHaveBeenCalledWith(
       expect.objectContaining({ mine: true }),
     ));
 
     await ui.click(screen.getByRole("button", { name: /导出/ }));
     const xlsxItem = await screen.findAllByText(/导出 Excel/);
     fireEvent.click(xlsxItem[xlsxItem.length - 1]);
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.exportXlsx)).toHaveBeenCalledWith(
+    await waitFor(() => expect(vi.mocked(ordersApi.exportXlsx)).toHaveBeenCalledWith(
       expect.objectContaining({ mine: true }),
     ));
   });
@@ -208,14 +201,14 @@ describe("OrdersPage：四类订单台账", () => {
   it("业务中心重新激活时刷新库存列表", async () => {
     const { rerender } = renderLight(<OrdersPage active={false} />);
     await screen.findByRole("tab", { name: "库存中心" });
-    expect(vi.mocked(catalog.stocksApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(stocksApi.list)).not.toHaveBeenCalled();
 
     rerender(<OrdersPage active />);
-    await waitFor(() => expect(vi.mocked(catalog.stocksApi.list)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(stocksApi.list)).toHaveBeenCalled());
   });
 
   it("订单台账顶部展示当前筛选结果的订单统计卡", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+    vi.mocked(ordersApi.list).mockResolvedValue([
       ...orders,
       { id: 3, order_no: "DG-2026-0003", order_type: "DG", capital_type: "ZERO", trade_date: "2026-10-03", status: "CANCELLED" },
     ]);
@@ -237,7 +230,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("FE-253：订单台账加载未完成时统计卡不显示可信的零", async () => {
-    vi.mocked(catalog.ordersApi.list).mockImplementation(() => new Promise(() => undefined));
+    vi.mocked(ordersApi.list).mockImplementation(() => new Promise(() => undefined));
     renderLight(<OrdersPage initialTab="ledger" />);
     const ledger = await screen.findByRole("tabpanel", { name: "订单台账" });
     const card = within(ledger).getByText("订单总量").closest(".ui-stat") as HTMLElement;
@@ -246,7 +239,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("FE-257：台账有独立「订单状态」列，状态列仍只承载库存状态", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([{
+    vi.mocked(ordersApi.list).mockResolvedValue([{
       ...orders[0],
       status: "INSTALLMENT",
       installment_status: "SETTLED",
@@ -265,13 +258,13 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("业务中心仅保留业务作业页，不重复展示业务总览", async () => {
-    vi.mocked(catalog.stocksApi.list).mockResolvedValue([{
+    vi.mocked(stocksApi.list).mockResolvedValue([{
       id: 10,
       status: "WAITING",
       inventory_entry_at: "2026-09-01T00:00:00",
       cost_amount: "100.00",
     } as never]);
-    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{
+    vi.mocked(installmentsApi.list).mockResolvedValue([{
       id: 20,
       status: "OVERDUE",
       total_receivable: "1030.00",
@@ -287,7 +280,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("订单搜索包含订单备注，支持按批次标记筛选", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+    vi.mocked(ordersApi.list).mockResolvedValue([
       ...orders,
       {
         id: 3,
@@ -308,7 +301,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("订单台账提供游戏类型下拉筛选", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+    vi.mocked(ordersApi.list).mockResolvedValue([
       ...orders,
       {
         id: 3,
@@ -335,7 +328,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("订单台账提供库存状态下拉筛选", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+    vi.mocked(ordersApi.list).mockResolvedValue([
       { ...orders[0], account_status: "WAITING" },
       { ...orders[1], id: 3, order_no: "TH-2026-0003", account_status: "SOLD" },
     ]);
@@ -351,11 +344,11 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("行展开直接复用库存中心的订单详情", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+    vi.mocked(ordersApi.list).mockResolvedValue([
       { ...orders[0], account_id: 1 },
       orders[1],
     ]);
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
       account: {
         id: 1,
         stock_no: "KU_00001",
@@ -398,7 +391,7 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.getByText("资金明细")).toBeInTheDocument();
     expect(screen.getByText("操作明细")).toBeInTheDocument();
     expect(screen.getByText("参与方信息")).toBeInTheDocument();
-    expect(vi.mocked(catalog.stocksApi.executionDetail)).toHaveBeenCalledWith(1);
+    expect(vi.mocked(stocksApi.executionDetail)).toHaveBeenCalledWith(1);
   });
 
   it("同一账号有多张订单时，订单台账展开使用当前订单的详情上下文", async () => {
@@ -416,8 +409,8 @@ describe("OrdersPage：四类订单台账", () => {
       order_type: "TH",
       account_id: 1,
     };
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([olderOrder, selectedOrder]);
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(ordersApi.list).mockResolvedValue([olderOrder, selectedOrder]);
+    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
       account: {
         id: 1,
         stock_no: "KU_00001",
@@ -479,7 +472,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("待售代挂订单的操作入口显示下架而不是取消", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+    vi.mocked(ordersApi.list).mockResolvedValue([
       ...orders,
       {
         id: 3,
@@ -492,7 +485,7 @@ describe("OrdersPage：四类订单台账", () => {
         account_status: "WAITING",
       },
     ]);
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce({
+    vi.mocked(stocksApi.executionDetail).mockResolvedValueOnce({
       account: { id: 9, source_order_id: 3, source_order_no: "DG-2026-0003", inventory_type: "CONSIGNMENT", status: "WAITING", cost_amount: "0.00" },
       orders: [{
         order_id: 3,
@@ -526,14 +519,14 @@ describe("OrdersPage：四类订单台账", () => {
       account_id: 10,
       account_status: "SOLD",
     };
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([...orders, soldConsignment]);
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+    vi.mocked(ordersApi.list).mockResolvedValue([...orders, soldConsignment]);
+    vi.mocked(ordersApi.get).mockResolvedValue({
       ...soldConsignment,
       events: [{ id: 401, order_id: 4, event_no: "EV-401", event_type: "SELL", amount: "500.00", is_posted: true, cancellable_amount: "500.00" }],
     } as never);
     // 打开取消弹窗前会并行拉资金池与员工；未 mock 时 poolList 为 undefined，
     // openCancelTransaction 内部抛错被 catch 吞掉 → 弹窗不出现。
-    vi.mocked(catalog.poolsApi.list).mockResolvedValue([
+    vi.mocked(poolsApi.list).mockResolvedValue([
       { id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" },
     ] as never);
     await openLedger("admin");
@@ -553,7 +546,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("加载失败时展示错误条", async () => {
-    vi.mocked(catalog.ordersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(ordersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<OrdersPage />);
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
@@ -574,9 +567,9 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("订单操作通过取消按钮进入取消并提交原因", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({ ...orders[0], events: [] });
-    vi.mocked(catalog.ordersApi.cancel).mockResolvedValue({ ...orders[0], status: "CANCELLED" });
-    vi.mocked(catalog.poolsApi.list).mockResolvedValue([
+    vi.mocked(ordersApi.get).mockResolvedValue({ ...orders[0], events: [] });
+    vi.mocked(ordersApi.cancel).mockResolvedValue({ ...orders[0], status: "CANCELLED" });
+    vi.mocked(poolsApi.list).mockResolvedValue([
       { id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" },
     ] as never);
 
@@ -590,18 +583,18 @@ describe("OrdersPage：四类订单台账", () => {
     fireEvent.change(screen.getByLabelText("取消原因"), { target: { value: "客户取消" } });
     fireEvent.click(screen.getByRole("button", { name: /确认取消/ }));
 
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.cancel)).toHaveBeenCalledWith(
+    await waitFor(() => expect(vi.mocked(ordersApi.cancel)).toHaveBeenCalledWith(
       1,
       expect.objectContaining({ reason: "客户取消" }),
     ));
   });
 
   it("未售且有买入流水的取消复用库存中心的退款弹窗", async () => {
-    vi.mocked(catalog.ordersApi.get).mockResolvedValue({
+    vi.mocked(ordersApi.get).mockResolvedValue({
       ...orders[0],
       events: [{ id: 101, event_no: "EV-101", event_type: "BUY", amount: "100.00", pool_id: 3, is_posted: true, cancellable_amount: "100.00" }],
     } as never);
-    vi.mocked(catalog.poolsApi.list).mockResolvedValue([
+    vi.mocked(poolsApi.list).mockResolvedValue([
       { id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" },
     ] as never);
 

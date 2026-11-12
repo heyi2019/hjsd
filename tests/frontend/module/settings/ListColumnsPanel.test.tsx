@@ -3,14 +3,27 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as catalog from "@/shared/api/catalog";
+import { listColumnsApi } from "@/shared/api/orders.api";
+import type { ListColumnConfig, ListScopeConfig } from "@/shared/api/types/forms";
 
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 import { renderLight } from "@fixtures/render";
 import { ListColumnsPanel } from "@/field-definitions/panels/ListColumnsPanel";
 
-const ledger: catalog.ListScopeConfig = {
+const ledger: ListScopeConfig = {
   code: "LEDGER",
   label: "订单台账",
   columns: [
@@ -20,7 +33,7 @@ const ledger: catalog.ListScopeConfig = {
   ],
 };
 
-const inventory: catalog.ListScopeConfig = {
+const inventory: ListScopeConfig = {
   code: "INVENTORY",
   label: "库存中心",
   columns: [
@@ -29,7 +42,7 @@ const inventory: catalog.ListScopeConfig = {
   ],
 };
 
-const customColumn: catalog.ListColumnConfig = {
+const customColumn: ListColumnConfig = {
   key: "extra:vip_tag",
   label: "VIP 标签",
   locked: false,
@@ -40,16 +53,16 @@ const customColumn: catalog.ListColumnConfig = {
   value_labels: { A: "甲" },
 };
 
-const ledgerWithCustom: catalog.ListScopeConfig = {
+const ledgerWithCustom: ListScopeConfig = {
   ...ledger,
   columns: [...ledger.columns, customColumn],
 };
 
 describe("ListColumnsPanel", () => {
   beforeEach(() => {
-    vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([ledger, inventory]);
-    vi.mocked(catalog.listColumnsApi.reset).mockResolvedValue(ledger);
-    vi.mocked(catalog.listColumnsApi.customFields).mockResolvedValue([
+    vi.mocked(listColumnsApi.all).mockResolvedValue([ledger, inventory]);
+    vi.mocked(listColumnsApi.reset).mockResolvedValue(ledger);
+    vi.mocked(listColumnsApi.customFields).mockResolvedValue([
       {
         scope: "CUSTOMER",
         scope_label: "客户建档",
@@ -70,15 +83,15 @@ describe("ListColumnsPanel", () => {
         row_count: 311,
       },
     ]);
-    vi.mocked(catalog.listColumnsApi.addCustom).mockImplementation(async (scope, fieldKey, label) => ({
+    vi.mocked(listColumnsApi.addCustom).mockImplementation(async (scope, fieldKey, label) => ({
       ...(scope === "LEDGER" ? ledger : inventory),
       columns: [
         ...(scope === "LEDGER" ? ledger : inventory).columns,
         { ...customColumn, key: `extra:${fieldKey}`, label: label || "VIP 标签" },
       ],
     }));
-    vi.mocked(catalog.listColumnsApi.removeCustom).mockResolvedValue(ledger);
-    vi.mocked(catalog.listColumnsApi.save).mockImplementation(async (scope, items) => ({
+    vi.mocked(listColumnsApi.removeCustom).mockResolvedValue(ledger);
+    vi.mocked(listColumnsApi.save).mockImplementation(async (scope, items) => ({
       ...(scope === "LEDGER" ? ledger : inventory),
       columns: items.map((item, index) => ({
         key: item.key,
@@ -113,8 +126,8 @@ describe("ListColumnsPanel", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "显示_party" }));
 
-    await waitFor(() => expect(catalog.listColumnsApi.save).toHaveBeenCalled());
-    const [scope, items] = vi.mocked(catalog.listColumnsApi.save).mock.calls[0];
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalled());
+    const [scope, items] = vi.mocked(listColumnsApi.save).mock.calls[0];
     expect(scope).toBe("LEDGER");
     expect(items.find((item) => item.key === "party")?.is_visible).toBe(false);
     expect(items.map((item) => item.key)).toEqual(["order_no", "party", "actions"]);
@@ -126,8 +139,8 @@ describe("ListColumnsPanel", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "下移_party" }));
 
-    await waitFor(() => expect(catalog.listColumnsApi.save).toHaveBeenCalled());
-    const [, items] = vi.mocked(catalog.listColumnsApi.save).mock.calls[0];
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalled());
+    const [, items] = vi.mocked(listColumnsApi.save).mock.calls[0];
     expect(items.map((item) => item.key)).toEqual(["order_no", "actions", "party"]);
     expect(items.map((item) => item.sort_order)).toEqual([0, 10, 20]);
   });
@@ -152,11 +165,11 @@ describe("ListColumnsPanel", () => {
     await userEvent.clear(input);
     await userEvent.type(input, "180");
     // 打字过程中不打接口
-    expect(catalog.listColumnsApi.save).not.toHaveBeenCalled();
+    expect(listColumnsApi.save).not.toHaveBeenCalled();
 
     await userEvent.tab();
-    await waitFor(() => expect(catalog.listColumnsApi.save).toHaveBeenCalledTimes(1));
-    const [, items] = vi.mocked(catalog.listColumnsApi.save).mock.calls[0];
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(1));
+    const [, items] = vi.mocked(listColumnsApi.save).mock.calls[0];
     expect(items.find((item) => item.key === "party")?.width).toBe(180);
 
     // 越界值由组件夹到 40~800，避免提交必然 422 的请求
@@ -164,8 +177,8 @@ describe("ListColumnsPanel", () => {
     await userEvent.clear(again);
     await userEvent.type(again, "9999");
     await userEvent.tab();
-    await waitFor(() => expect(catalog.listColumnsApi.save).toHaveBeenCalledTimes(2));
-    const calls = vi.mocked(catalog.listColumnsApi.save).mock.calls;
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(2));
+    const calls = vi.mocked(listColumnsApi.save).mock.calls;
     const clamped = calls[calls.length - 1][1].find((item) => item.key === "party")?.width ?? 0;
     expect(clamped).toBeLessThanOrEqual(800);
     expect(clamped).toBeGreaterThanOrEqual(40);
@@ -179,12 +192,12 @@ describe("ListColumnsPanel", () => {
     await userEvent.clear(input);
     await userEvent.type(input, "200");
     await userEvent.tab();
-    await waitFor(() => expect(catalog.listColumnsApi.save).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(1));
 
     await userEvent.click(screen.getByRole("combobox", { name: "固定_party" }));
     await userEvent.click(await screen.findByTitle("固定左侧"));
-    await waitFor(() => expect(catalog.listColumnsApi.save).toHaveBeenCalledTimes(2));
-    const calls = vi.mocked(catalog.listColumnsApi.save).mock.calls;
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(2));
+    const calls = vi.mocked(listColumnsApi.save).mock.calls;
     const lastItems = calls[calls.length - 1][1];
     expect(lastItems.find((item) => item.key === "party")?.fixed).toBe("left");
     expect(lastItems.find((item) => item.key === "party")?.width).toBe(200);
@@ -195,11 +208,11 @@ describe("ListColumnsPanel", () => {
     await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "显示_party" }));
-    await waitFor(() => expect(catalog.listColumnsApi.save).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(1));
 
     await userEvent.click(screen.getByRole("button", { name: "显示全部列" }));
-    await waitFor(() => expect(catalog.listColumnsApi.save).toHaveBeenCalledTimes(2));
-    const calls = vi.mocked(catalog.listColumnsApi.save).mock.calls;
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(2));
+    const calls = vi.mocked(listColumnsApi.save).mock.calls;
     expect(calls[calls.length - 1][1].every((item) => item.is_visible)).toBe(true);
   });
 
@@ -210,7 +223,7 @@ describe("ListColumnsPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: "恢复默认列配置" }));
     await userEvent.click(await screen.findByText("确认恢复"));
 
-    await waitFor(() => expect(catalog.listColumnsApi.reset).toHaveBeenCalledWith("LEDGER"));
+    await waitFor(() => expect(listColumnsApi.reset).toHaveBeenCalledWith("LEDGER"));
     await waitFor(() => expect(screen.getByText("订单号")).toBeInTheDocument());
     expect(screen.getByText("对方 / 来源")).toBeInTheDocument();
   });
@@ -225,7 +238,7 @@ describe("ListColumnsPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: /确认新增/ }));
 
     await waitFor(() =>
-      expect(catalog.listColumnsApi.addCustom).toHaveBeenCalledWith("LEDGER", "vip_tag", ""),
+      expect(listColumnsApi.addCustom).toHaveBeenCalledWith("LEDGER", "vip_tag", ""),
     );
     await waitFor(() => expect(screen.getByText("VIP 标签")).toBeInTheDocument());
     expect(screen.getAllByText("自定义").length).toBeGreaterThan(0);
@@ -242,7 +255,7 @@ describe("ListColumnsPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: /确认新增/ }));
 
     await waitFor(() =>
-      expect(catalog.listColumnsApi.addCustom).toHaveBeenCalledWith("LEDGER", "vip_tag", "会员等级"),
+      expect(listColumnsApi.addCustom).toHaveBeenCalledWith("LEDGER", "vip_tag", "会员等级"),
     );
   });
 
@@ -260,12 +273,12 @@ describe("ListColumnsPanel", () => {
     await userEvent.click(option);
     await userEvent.click(screen.getByRole("button", { name: /确认新增/ }));
     await waitFor(() =>
-      expect(catalog.listColumnsApi.addCustom).toHaveBeenCalledWith("LEDGER", "qa500_note", ""),
+      expect(listColumnsApi.addCustom).toHaveBeenCalledWith("LEDGER", "qa500_note", ""),
     );
   });
 
   it("删除自定义列：二次确认后调用 removeCustom 并从列表移除", async () => {
-    vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([ledgerWithCustom, inventory]);
+    vi.mocked(listColumnsApi.all).mockResolvedValue([ledgerWithCustom, inventory]);
     renderLight(<ListColumnsPanel />);
     await waitFor(() => expect(screen.getByText("VIP 标签")).toBeInTheDocument());
 
@@ -273,7 +286,7 @@ describe("ListColumnsPanel", () => {
     await userEvent.click(await screen.findByText("确认删除"));
 
     await waitFor(() =>
-      expect(catalog.listColumnsApi.removeCustom).toHaveBeenCalledWith(
+      expect(listColumnsApi.removeCustom).toHaveBeenCalledWith(
         "LEDGER",
         "extra:vip_tag",
       ),
@@ -294,8 +307,8 @@ describe("ListColumnsPanel", () => {
     await userEvent.click(partyRow.querySelector('input[type="checkbox"]') as HTMLElement);
     await userEvent.click(screen.getByRole("button", { name: "隐藏所选列" }));
 
-    await waitFor(() => expect(catalog.listColumnsApi.save).toHaveBeenCalledTimes(1));
-    const [scope, items] = vi.mocked(catalog.listColumnsApi.save).mock.calls[0];
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(1));
+    const [scope, items] = vi.mocked(listColumnsApi.save).mock.calls[0];
     expect(scope).toBe("LEDGER");
     const party = (items as Array<{ key: string; is_visible: boolean }>).find(
       (item) => item.key === "party",
@@ -315,8 +328,8 @@ describe("ListColumnsPanel", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "隐藏所选列" }));
 
-    await waitFor(() => expect(catalog.listColumnsApi.save).toHaveBeenCalledTimes(1));
-    const [scope, items] = vi.mocked(catalog.listColumnsApi.save).mock.calls[0];
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(1));
+    const [scope, items] = vi.mocked(listColumnsApi.save).mock.calls[0];
     expect(scope).toBe("LEDGER");
     const orderNo = (items as Array<{ key: string; is_visible: boolean }>).find(
       (item) => item.key === "order_no",
@@ -338,8 +351,8 @@ describe("ListColumnsPanel", () => {
     fireEvent.dragStart(sourceRow);
     fireEvent.drop(targetRow);
 
-    await waitFor(() => expect(catalog.listColumnsApi.save).toHaveBeenCalledTimes(1));
-    const [, items] = vi.mocked(catalog.listColumnsApi.save).mock.calls[0];
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(1));
+    const [, items] = vi.mocked(listColumnsApi.save).mock.calls[0];
     const order = (items as Array<{ key: string }>).map((item) => item.key);
     expect(order[0]).toBe("actions");
     expect(order.indexOf("order_no")).toBe(1);

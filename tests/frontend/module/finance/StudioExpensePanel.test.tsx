@@ -4,36 +4,25 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { resolveMockOnce } from "@fixtures/mock-api";
-import * as catalog from "@/shared/api/catalog";
+import { cashflowsApi } from "@/shared/api/cashflows.api";
+import { optionSetsApi } from "@/shared/api/options.api";
 import { StudioExpensePanel } from "@/pools/StudioExpensePanel";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
-vi.mock("@/shared/api/catalog", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/shared/api/catalog")>();
-  const METHODS = [
-    "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
-    "setStatus", "setActive", "resolve", "release", "loss", "repair", "settle", "approve", "reject",
-    "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
-    "studioSummary",
-  ];
-  const mk = (api: Record<string, unknown>) => {
-    const o: Record<string, unknown> = { ...api };
-    for (const m of METHODS) {
-      if (m in o) o[m] = vi.fn();
-    }
-    return o;
-  };
-  const out: Record<string, unknown> = { ...actual };
-  for (const key of Object.keys(actual)) {
-    const v = (actual as Record<string, unknown>)[key];
-    if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v as object).some((x) => typeof x === "function")) {
-      out[key] = mk(v as Record<string, unknown>);
-    }
-  }
-  return out as unknown as typeof actual;
-});
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const pools = [
   { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
@@ -54,7 +43,7 @@ const expenseFlows = [
 ];
 
 function mockOptionSets() {
-  vi.mocked(catalog.optionSetsApi.get).mockImplementation(async (code: string) => {
+  vi.mocked(optionSetsApi.get).mockImplementation(async (code: string) => {
     if (code === "STUDIO_EXPENSE_ITEM") {
       return {
         id: 92, code, label: "工作室支出费用科目", group: "FUND", editable: true,
@@ -73,7 +62,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   // 明细与三项汇总一次取回；「什么算工作室收支」的口径在 backend
   // tests/v1/test_studio_cashflow_summary.py，这里只验展示。
-  vi.mocked(catalog.cashflowsApi.studioSummary).mockResolvedValue({
+  vi.mocked(cashflowsApi.studioSummary).mockResolvedValue({
     items: expenseFlows as never,
     approved_income: "0.00",
     approved_expense: "3000.00",
@@ -116,7 +105,7 @@ describe("StudioExpensePanel：工作室支出", () => {
 
     await togglePoolFilter(/押金池/);
     // 列表过滤在后端：取消押金池后请求只带 POOL-A
-    expect(vi.mocked(catalog.cashflowsApi.studioSummary)).toHaveBeenLastCalledWith(
+    expect(vi.mocked(cashflowsApi.studioSummary)).toHaveBeenLastCalledWith(
       expect.objectContaining({ pool_ids: "1" }),
     );
   });
@@ -208,19 +197,19 @@ describe("StudioExpensePanel：工作室支出", () => {
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     expect(await screen.findByText("房租")).toBeInTheDocument();
     // 默认勾选全部池
-    expect(vi.mocked(catalog.cashflowsApi.studioSummary)).toHaveBeenLastCalledWith(
+    expect(vi.mocked(cashflowsApi.studioSummary)).toHaveBeenLastCalledWith(
       expect.objectContaining({ pool_ids: "1,2" }),
     );
     await togglePoolFilter(/押金池/);
     // 取消押金池后只剩 POOL-A；「只显示这些池的流水」由后端按 pool_ids 筛
-    expect(vi.mocked(catalog.cashflowsApi.studioSummary)).toHaveBeenLastCalledWith(
+    expect(vi.mocked(cashflowsApi.studioSummary)).toHaveBeenLastCalledWith(
       expect.objectContaining({ pool_ids: "1" }),
     );
   });
 
   it("三个汇总数取服务端，不与当页明细相加", async () => {
     // 故意让后端汇总与两条明细（3000 + 100）对不上：卡片必须显示后端值。
-    vi.mocked(catalog.cashflowsApi.studioSummary).mockResolvedValue({
+    vi.mocked(cashflowsApi.studioSummary).mockResolvedValue({
       items: expenseFlows as never,
       approved_income: "888.88",
       approved_expense: "777.77",
@@ -262,7 +251,7 @@ describe("StudioExpensePanel：工作室支出", () => {
 
   it("登记支出：提交即入账（OUT / BUSINESS_OUT / OPERATING_EXPENSE）", async () => {
     mockOptionSets();
-    resolveMockOnce(vi.mocked(catalog.cashflowsApi.create), { id: 61 });
+    resolveMockOnce(vi.mocked(cashflowsApi.create), { id: 61 });
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     await screen.findByText("房租");
     await ui.click(await screen.findByRole("button", { name: /记一笔/ }));
@@ -273,8 +262,8 @@ describe("StudioExpensePanel：工作室支出", () => {
     await ui.type(modal.querySelector("#amount") ?? modal, "3000.00");
     await ui.type(modal.querySelector("#note") ?? modal, "10 月工作室房租");
     await ui.click(screen.getByRole("button", { name: /登记入账/ }));
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.create)).toHaveBeenCalled());
-    const payload = vi.mocked(catalog.cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>;
+    await waitFor(() => expect(vi.mocked(cashflowsApi.create)).toHaveBeenCalled());
+    const payload = vi.mocked(cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload).toMatchObject({
       pool_id: 1,
       direction: "OUT",
@@ -288,7 +277,7 @@ describe("StudioExpensePanel：工作室支出", () => {
 
   it("流水列表拉取失败时禁用记一笔入口并展示错误重试", async () => {
     mockOptionSets();
-    vi.mocked(catalog.cashflowsApi.studioSummary).mockRejectedValue(new Error("流水读取失败"));
+    vi.mocked(cashflowsApi.studioSummary).mockRejectedValue(new Error("流水读取失败"));
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     const recordBtn = await screen.findByRole("button", { name: /记一笔/ });
     await waitFor(() => expect(recordBtn).toBeDisabled());
@@ -297,7 +286,7 @@ describe("StudioExpensePanel：工作室支出", () => {
 
   it("登记收入：IN / BUSINESS_IN / SELF_REVENUE，同样自动入账", async () => {
     mockOptionSets();
-    resolveMockOnce(vi.mocked(catalog.cashflowsApi.create), { id: 62 });
+    resolveMockOnce(vi.mocked(cashflowsApi.create), { id: 62 });
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     await screen.findByText("房租");
     await ui.click(await screen.findByRole("button", { name: /记一笔/ }));
@@ -307,8 +296,8 @@ describe("StudioExpensePanel：工作室支出", () => {
     await pickSelect(modal, 1, /货款/);
     await ui.type(modal.querySelector("#amount") ?? modal, "800.00");
     await ui.click(screen.getByRole("button", { name: /登记入账/ }));
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.create)).toHaveBeenCalled());
-    const payload = vi.mocked(catalog.cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>;
+    await waitFor(() => expect(vi.mocked(cashflowsApi.create)).toHaveBeenCalled());
+    const payload = vi.mocked(cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload).toMatchObject({
       pool_id: 1,
       direction: "IN",

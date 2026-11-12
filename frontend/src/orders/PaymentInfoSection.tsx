@@ -1,6 +1,6 @@
 /** 通用付款信息区：回收、提号等需要付款资金记录的业务共用。 */
 import { Input } from "antd";
-import type { Pool } from "../shared/api/catalog";
+import type { Pool } from "../shared/api/types/finance";
 import { Select } from "../shared/ui";
 import { BusinessRegistrationGroup } from "../shared/ui";
 import { CfgItem } from "./ConfigurableField";

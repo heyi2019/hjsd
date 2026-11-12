@@ -1,6 +1,6 @@
 import { Input } from "antd";
 import { CustomFieldSection } from "../ConfigurableField";
-import type { EmployeeOption, GameTypeOption } from "../../shared/api/catalog";
+import type { EmployeeOption, GameTypeOption } from "../../shared/api/types/org";
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
 import { CfgItem, CfgNestedItem, sectionLabel } from "../ConfigurableField";
 import { CustomerSourceFields } from "../CustomerSourceInput";

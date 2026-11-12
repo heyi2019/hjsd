@@ -6,41 +6,33 @@ import { renderLight } from "@fixtures/render";
 import { FundsPage, deriveCashflowNature } from "@/pools/FundsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 
-import * as catalog from "@/shared/api/catalog";
+import { cashflowsApi } from "@/shared/api/cashflows.api";
+import { depositsApi } from "@/shared/api/installments.api";
+import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
+import { poolsApi, reconciliationsApi, transfersApi } from "@/shared/api/pools.api";
+import { rebatesApi } from "@/shared/api/rebates.api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
-  seedOrderFormFields(catalog);
-  seedOptionSets(catalog);
+  seedOrderFormFields();
+  seedOptionSets();
 });
 
-vi.mock("@/shared/api/catalog", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/shared/api/catalog")>();
-  const METHODS = [
-    "all",
-    "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
-    "setStatus", "setActive", "resolve", "release", "loss", "repair", "settle", "approve", "reject",
-    "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "balances", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
-  ];
-  const mk = (api: Record<string, unknown>) => {
-    const o: Record<string, unknown> = { ...api };
-    for (const m of METHODS) {
-      if (m in o) o[m] = vi.fn();
-    }
-    return o;
-  };
-  const out: Record<string, unknown> = { ...actual };
-  for (const key of Object.keys(actual)) {
-    const v = (actual as Record<string, unknown>)[key];
-    if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v as object).some((x) => typeof x === "function")) {
-      out[key] = mk(v as Record<string, unknown>);
-    }
-  }
-  return out as unknown as typeof actual;
-});
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const pools = [
   { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
@@ -64,20 +56,20 @@ const cashflows = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(catalog.listColumnsApi.all).mockResolvedValue([]);
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
+  vi.mocked(listColumnsApi.all).mockResolvedValue([]);
+  vi.mocked(poolsApi.list).mockResolvedValue(pools);
   // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
-  resolveMock(vi.mocked(catalog.poolsApi.balances), {
+  resolveMock(vi.mocked(poolsApi.balances), {
     items: pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
     totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
   });
-  resolveMock(vi.mocked(catalog.depositsApi.list), deposits);
+  resolveMock(vi.mocked(depositsApi.list), deposits);
   // 合计由服务端返回，桩里同步给出，避免卡片落回 0.00。
-  resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "1000.00" });
-  vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
+  resolveMock(vi.mocked(cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "1000.00" });
+  vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
+  vi.mocked(ordersApi.list).mockResolvedValue([]);
   // 内嵌 RebatesPanel 本套件不覆盖：同步抛错，与改造前「工厂未导出 rebatesApi」的行为一致
-  vi.mocked(catalog.rebatesApi.list).mockImplementation(() => {
+  vi.mocked(rebatesApi.list).mockImplementation(() => {
     throw new Error("rebatesApi 不在本套件覆盖范围");
   });
 });
@@ -96,7 +88,7 @@ function modalContent(): HTMLElement {
 
 describe("FundsPage：资金写路径深覆盖", () => {
   it("新增流水（本方经营 + 收入）→ nature=BUSINESS_IN", async () => {
-    resolveMockOnce(vi.mocked(catalog.cashflowsApi.create), { id: 100 });
+    resolveMockOnce(vi.mocked(cashflowsApi.create), { id: 100 });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
@@ -108,8 +100,8 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.type(modal.querySelector("#amount") ?? modal, "300.00");
     await ui.type(modal.querySelector("#note") ?? modal, "测试收入");
     await ui.click(screen.getByRole("button", { name: /提交/ }));
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.create)).toHaveBeenCalled());
-    const payload = vi.mocked(catalog.cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>;
+    await waitFor(() => expect(vi.mocked(cashflowsApi.create)).toHaveBeenCalled());
+    const payload = vi.mocked(cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload.nature).toBe("BUSINESS_IN");
     expect(payload.fund_nature).toBe("BUSINESS");
   });
@@ -142,7 +134,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.type(modal.querySelector("#amount") ?? modal, "300.00");
     await ui.type(modal.querySelector("#note") ?? modal, "内部调拨");
     await ui.click(screen.getByRole("button", { name: /提交/ }));
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.create)).not.toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(cashflowsApi.create)).not.toHaveBeenCalled());
     expect(await screen.findByText(/内部调拨请通过/)).toBeInTheDocument();
   });
 
@@ -152,7 +144,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
   it("已入账且无关联流水 → 冲销调用 cashflowsApi.reverse", async () => {
     const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
-    resolveMock(vi.mocked(catalog.cashflowsApi.list), { items: approved, total: approved.length, total_in: "0.00", total_out: "300.00" });
+    resolveMock(vi.mocked(cashflowsApi.list), { items: approved, total: approved.length, total_in: "0.00", total_out: "300.00" });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
@@ -161,8 +153,8 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.type(modal.querySelector("#reversed_on") ?? modal, "2026-10-18");
     await ui.type(modal.querySelector("#reason") ?? modal, "重复入账");
     await ui.click(screen.getByRole("button", { name: /确认冲销/ }));
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.reverse)).toHaveBeenCalled());
-    const [id, payload] = vi.mocked(catalog.cashflowsApi.reverse).mock.calls[0] as [number, Record<string, unknown>];
+    await waitFor(() => expect(vi.mocked(cashflowsApi.reverse)).toHaveBeenCalled());
+    const [id, payload] = vi.mocked(cashflowsApi.reverse).mock.calls[0] as [number, Record<string, unknown>];
     expect(id).toBe(7);
     expect(payload.reason).toBe("重复入账");
   });
@@ -171,14 +163,14 @@ describe("FundsPage：资金写路径深覆盖", () => {
     const approved = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
     const reversal = { ...approved, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", reversal_of_id: 7 };
     let mainListCalls = 0;
-    vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => {
+    vi.mocked(cashflowsApi.list).mockImplementation(async (params) => {
       if (params?.direction) return { items: [], total: 0, total_in: "0.00", total_out: "0.00" };
       mainListCalls += 1;
       return mainListCalls === 1
         ? { items: [approved], total: 1, total_in: "0.00", total_out: "300.00" }
         : { items: [approved, reversal], total: 2, total_in: "300.00", total_out: "300.00" };
     });
-    resolveMockOnce(vi.mocked(catalog.cashflowsApi.reverse), reversal);
+    resolveMockOnce(vi.mocked(cashflowsApi.reverse), reversal);
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
@@ -189,17 +181,17 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.type(modal.querySelector("#reason") ?? modal, "重复入账");
     await ui.click(screen.getByRole("button", { name: /确认冲销/ }));
 
-    await waitFor(() => expect(vi.mocked(catalog.cashflowsApi.reverse)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(cashflowsApi.reverse)).toHaveBeenCalled());
     await waitFor(() => expect(screen.queryByRole("button", { name: /^冲\s*销$/ })).toBeNull());
     expect(screen.getByText("CF-REV-08")).toBeInTheDocument();
   });
 
   it("冲销失败时保留弹窗和表单，并显示可重试错误", async () => {
     const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
-    vi.mocked(catalog.cashflowsApi.list).mockImplementation(async (params) => params?.direction
+    vi.mocked(cashflowsApi.list).mockImplementation(async (params) => params?.direction
       ? { items: [], total: 0, total_in: "0.00", total_out: "0.00" }
       : { items: approved, total: 1, total_in: "0.00", total_out: "300.00" });
-    vi.mocked(catalog.cashflowsApi.reverse).mockRejectedValueOnce(new Error("冲销接口暂时不可用"));
+    vi.mocked(cashflowsApi.reverse).mockRejectedValueOnce(new Error("冲销接口暂时不可用"));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
@@ -216,7 +208,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   });
 
   it("资金池划转提交调用 transfersApi.create", async () => {
-    resolveMockOnce(vi.mocked(catalog.transfersApi.create), { id: 200, transfer_id: "TRF-200" });
+    resolveMockOnce(vi.mocked(transfersApi.create), { id: 200, transfer_id: "TRF-200" });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(await screen.findByRole("button", { name: /资金池划转/ }));
@@ -226,8 +218,8 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.type(modal.querySelector("#amount") ?? modal, "100.00");
     await ui.type(modal.querySelector("#note") ?? modal, "调拨测试");
     await ui.click(screen.getByRole("button", { name: /确认划转/ }));
-    await waitFor(() => expect(vi.mocked(catalog.transfersApi.create)).toHaveBeenCalled());
-    const payload = vi.mocked(catalog.transfersApi.create).mock.calls[0][0] as Record<string, unknown>;
+    await waitFor(() => expect(vi.mocked(transfersApi.create)).toHaveBeenCalled());
+    const payload = vi.mocked(transfersApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload.source_pool_id).toBe(1);
     expect(payload.target_pool_id).toBe(2);
     expect(payload.amount).toBe("100.00");
@@ -245,11 +237,11 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
     await waitFor(() => expect(screen.getByText(/可用余额不足/)).toBeInTheDocument());
     expect(modal.querySelector("#amount")).toHaveValue("700.01");
-    expect(vi.mocked(catalog.transfersApi.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(transfersApi.create)).not.toHaveBeenCalled();
   });
 
   it("对账状态列显示未核销/已核销（对齐后端 ReconciliationStatus 语义）", async () => {
-    vi.mocked(catalog.reconciliationsApi.list).mockResolvedValue([
+    vi.mocked(reconciliationsApi.list).mockResolvedValue([
       { id: 31, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN" },
       { id: 32, pool_id: 1, reconciled_on: "2026-10-17", account_label: "经营账户", system_balance: "800.00", statement_balance: "800.00", difference: "0.00", status: "RESOLVED" },
     ]);
@@ -265,7 +257,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
 
   it("新增对账提交：未达流水 ID 按逗号解析为数组", async () => {
-    resolveMockOnce(vi.mocked(catalog.reconciliationsApi.create), { id: 210 });
+    resolveMockOnce(vi.mocked(reconciliationsApi.create), { id: 210 });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "对账" }));
@@ -279,15 +271,15 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.type(modal.querySelector("#unmatched_flow_ids") ?? modal, "1, 2");
     await ui.type(modal.querySelector("#note") ?? modal, "对账测试");
     await ui.click(screen.getByRole("button", { name: /提交对账/ }));
-    await waitFor(() => expect(vi.mocked(catalog.reconciliationsApi.create)).toHaveBeenCalled());
-    const payload = vi.mocked(catalog.reconciliationsApi.create).mock.calls[0][0] as Record<string, unknown>;
+    await waitFor(() => expect(vi.mocked(reconciliationsApi.create)).toHaveBeenCalled());
+    const payload = vi.mocked(reconciliationsApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload.unmatched_flow_ids).toEqual([1, 2]);
   });
 
   it("新增对账预检：命中唯一约束（池+账户+日期）时阻断提交并提示调整", async () => {
     const warningSpy = vi.spyOn(message, "warning").mockReturnValue(undefined as never);
     // 初始加载即带入一条「同池+同日期+同账户」记录，模拟重复对账场景。
-    vi.mocked(catalog.reconciliationsApi.list).mockResolvedValueOnce([
+    vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([
       { id: 30, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN" },
     ]);
     renderLight(<FundsPage />, { user: "admin" });
@@ -304,7 +296,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await waitFor(() =>
       expect(warningSpy).toHaveBeenCalledWith("同一资金池、对账账户和日期只能对账一次，请调整对账日期或账户"),
     );
-    expect(vi.mocked(catalog.reconciliationsApi.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(reconciliationsApi.create)).not.toHaveBeenCalled();
     warningSpy.mockRestore();
   });
 
@@ -319,11 +311,11 @@ describe("FundsPage：资金写路径深覆盖", () => {
     // 归属判定（OWNED 计入权益、CUSTODY/THIRD_PART 只计头寸）已在后端
     // pool_balance_summary 里完成，契约由 backend tests/v1/test_pool_balances_batch.py 守；
     // 这里只验前端确实展示服务端给的数，而不是自己挑池相加。
-    vi.mocked(catalog.poolsApi.list).mockResolvedValue([
+    vi.mocked(poolsApi.list).mockResolvedValue([
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "OWNED", status: "ACTIVE" },
       { id: 2, code: "POOL-B", name: "托管池", pool_type: "DEPOSIT", ownership: "CUSTODY", status: "ACTIVE" },
     ]);
-    resolveMock(vi.mocked(catalog.poolsApi.balances), {
+    resolveMock(vi.mocked(poolsApi.balances), {
       items: [
         { ...balance, pool_id: 1, pool_code: "POOL-A" },
         { ...balance, pool_id: 2, pool_code: "POOL-B" },
@@ -340,7 +332,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   });
 
   it("对账差异核销提交调用 reconciliationsApi.resolve", async () => {
-    vi.mocked(catalog.reconciliationsApi.list).mockResolvedValueOnce([{
+    vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([{
       id: 21, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN", unmatched_flow_ids: [1],
     }]);
     renderLight(<FundsPage />, { user: "admin" });
@@ -350,11 +342,11 @@ describe("FundsPage：资金写路径深覆盖", () => {
     const modal = modalContent();
     await ui.type(modal.querySelector("#reason") ?? modal, "已补录漏记流水");
     await ui.click(screen.getByRole("button", { name: /确认核销/ }));
-    await waitFor(() => expect(vi.mocked(catalog.reconciliationsApi.resolve)).toHaveBeenCalledWith(21, "已补录漏记流水"));
+    await waitFor(() => expect(vi.mocked(reconciliationsApi.resolve)).toHaveBeenCalledWith(21, "已补录漏记流水"));
   });
 
   it("押金释放提交调用 depositsApi.release", async () => {
-    resolveMockOnce(vi.mocked(catalog.depositsApi.release), { id: 11 });
+    resolveMockOnce(vi.mocked(depositsApi.release), { id: 11 });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
@@ -363,8 +355,8 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.type(modal.querySelector("#amount") ?? modal, "100.00");
     await ui.type(modal.querySelector("#released_on") ?? modal, "2026-10-19");
     await ui.click(screen.getByRole("button", { name: /确认释放/ }));
-    await waitFor(() => expect(vi.mocked(catalog.depositsApi.release)).toHaveBeenCalled());
-    const [id, payload] = vi.mocked(catalog.depositsApi.release).mock.calls[0] as [number, Record<string, unknown>];
+    await waitFor(() => expect(vi.mocked(depositsApi.release)).toHaveBeenCalled());
+    const [id, payload] = vi.mocked(depositsApi.release).mock.calls[0] as [number, Record<string, unknown>];
     expect(id).toBe(11);
     expect(payload.amount).toBe("100.00");
   });

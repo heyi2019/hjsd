@@ -1,4 +1,4 @@
-import type { Order } from "../../shared/api/catalog";
+import type { Order } from "../../shared/api/types/orders";
 import type { OrderPatchPayload } from "../../shared/api/orders.api";
 import type { Dayjs } from "dayjs";
 import { money } from "../../shared/lib/format";

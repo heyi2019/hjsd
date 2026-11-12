@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Order } from "@/shared/api/catalog";
+import type { Order } from "@/shared/api/types/orders";
 import {
   allocationAmountFromRate,
   allocationRateFromAmount,

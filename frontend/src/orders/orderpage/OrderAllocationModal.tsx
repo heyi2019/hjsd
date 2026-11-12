@@ -5,7 +5,7 @@ import { MoneyText, PermissionButton, Select, AdaptiveFormGrid, BusinessActionMo
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { money } from "../../shared/lib/format";
-import { policyApi } from "../../shared/api/catalog";
+import { policyApi } from "../../shared/api/policy.api";
 import { percentRules, moneyRules } from "../../shared/lib/validators";
 import { type OrdersPageController } from "./useOrdersPageController";
 

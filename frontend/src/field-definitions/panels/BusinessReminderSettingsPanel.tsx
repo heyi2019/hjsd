@@ -1,6 +1,6 @@
 import { Card, Form, InputNumber, Switch, Typography } from "antd";
 import { useCallback, useEffect, useState } from "react";
-import { optionSetsApi } from "../../shared/api/catalog";
+import { optionSetsApi } from "../../shared/api/options.api";
 import { normalizeError } from "../../shared/api/client";
 import {
   buildBusinessReminderOptions,

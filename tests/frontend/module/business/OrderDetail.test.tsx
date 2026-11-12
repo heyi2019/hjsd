@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { Account, AccountExecutionDetail } from "@/shared/api/catalog";
+import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";
+import type { Account } from "@/shared/api/types/accounts";
 import { OrderDetail } from "@/stocks/OrderDetail";
 import { renderApp } from "@fixtures/render";
 

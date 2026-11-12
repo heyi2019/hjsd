@@ -1,5 +1,7 @@
 import { Spin, Typography } from "antd";
-import type { Account, AccountExecutionDetail, AccountExecutionEvent, EmployeeOption } from "../shared/api/catalog";
+import type { AccountExecutionDetail, AccountExecutionEvent } from "../shared/api/types/account-execution";
+import type { Account } from "../shared/api/types/accounts";
+import type { EmployeeOption } from "../shared/api/types/org";
 import { executionActionLabel, money } from "../shared/lib/format";
 import {
   STATUS_LABEL,

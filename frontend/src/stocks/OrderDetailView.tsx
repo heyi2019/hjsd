@@ -1,6 +1,7 @@
 import { Space, Typography } from "antd";
 import dayjs from "dayjs";
-import type { Account, AccountExecutionDetail, AccountExecutionEvent } from "../shared/api/catalog";
+import type { AccountExecutionDetail, AccountExecutionEvent } from "../shared/api/types/account-execution";
+import type { Account } from "../shared/api/types/accounts";
 import { BusinessRegistrationForm, DateField, PermissionButton } from "../shared/ui";
 import { FieldConfigScope } from "../orders/ConfigurableField";
 import { OrderDetailDeliverySection } from "./OrderDetailDeliverySection";

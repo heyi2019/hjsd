@@ -7,35 +7,30 @@ import { InventoryRebateModal } from "@/stocks/InventoryRebateModal";
 import { InventoryConsignmentModal } from "@/stocks/InventoryConsignmentModal";
 import { OrderDetailDeliverySection } from "@/stocks/OrderDetailDeliverySection";
 
-import type { Account } from "@/shared/api/catalog";
-import * as catalog from "@/shared/api/catalog";
+import type { Account } from "@/shared/api/types/accounts";
+import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
+import { installmentsApi } from "@/shared/api/installments.api";
+import { orderFormFieldsApi, ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { rebatesApi } from "@/shared/api/rebates.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock } from "@fixtures/mock-api";
 import { seedOptionSets } from "@fixtures/formFieldsSeed";
 import { clearOptionSetsCache } from "@/shared/lib/optionSets";
-vi.mock("@/shared/api/catalog", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/shared/api/catalog")>();
-  const METHODS = [
-    "list", "get", "create", "update", "patch", "post", "postEvent", "remove",
-    "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
-    "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "inventoryStats", "updateProfile", "updateExecution", "merge", "search",
-  ];
-  const mk = (api: Record<string, unknown>) => {
-    const o: Record<string, unknown> = { ...api };
-    for (const m of METHODS) {
-      if (m in o) o[m] = vi.fn();
-    }
-    return o;
-  };
-  const out: Record<string, unknown> = { ...actual };
-  for (const key of Object.keys(actual)) {
-    const v = (actual as Record<string, unknown>)[key];
-    if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v as object).some((x) => typeof x === "function")) {
-      out[key] = mk(v as Record<string, unknown>);
-    }
-  }
-  return out as unknown as typeof actual;
-});
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const accounts = [
   { id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
@@ -45,16 +40,16 @@ const accounts = [
 beforeEach(() => {
   clearOptionSetsCache();
   vi.clearAllMocks();
-  seedOptionSets(catalog);
-  vi.mocked(catalog.stocksApi.list).mockResolvedValue(accounts);
-  vi.mocked(catalog.stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
-  resolveMock(vi.mocked(catalog.ordersApi.create), { id: 21 });
-  resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});
-  resolveMock(vi.mocked(catalog.customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
-  resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
-  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
-  resolveMock(vi.mocked(catalog.rebatesApi.create), { id: 31 });
-  vi.mocked(catalog.rebatesApi.list).mockResolvedValue([{
+  seedOptionSets();
+  vi.mocked(stocksApi.list).mockResolvedValue(accounts);
+  vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
+  resolveMock(vi.mocked(ordersApi.create), { id: 21 });
+  resolveMock(vi.mocked(ordersApi.postEvent), {});
+  resolveMock(vi.mocked(customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
+  vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
+  resolveMock(vi.mocked(rebatesApi.create), { id: 31 });
+  vi.mocked(rebatesApi.list).mockResolvedValue([{
     id: 41,
     rebate_no: "HS0001-RB01",
     source_order_id: 21,
@@ -66,8 +61,8 @@ beforeEach(() => {
     collected_on: "2026-10-17",
     operator: "何一",
   }] as never);
-  resolveMock(vi.mocked(catalog.installmentsApi.create), { id: 41 });
-  resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
+  resolveMock(vi.mocked(installmentsApi.create), { id: 41 });
+  resolveMock(vi.mocked(stocksApi.executionDetail), {
     account: accounts[0],
     orders: [{
       order_id: 21,
@@ -139,8 +134,8 @@ beforeEach(() => {
       }],
     }],
   });
-  resolveMock(vi.mocked(catalog.stocksApi.updateProfile), accounts[0]);
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([{ id: 1, username: "alice", display_name: "小明", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
+  resolveMock(vi.mocked(stocksApi.updateProfile), accounts[0]);
+  vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "alice", display_name: "小明", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 
 describe("InventoryPanel：写入与长路径", () => {
@@ -152,14 +147,14 @@ describe("InventoryPanel：写入与长路径", () => {
     const input = await screen.findByLabelText("编辑游戏账号/产品");
     fireEvent.change(input, { target: { value: "updated-account" } });
     fireEvent.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateProfile)).toHaveBeenCalledWith(1, expect.objectContaining({
+    await waitFor(() => expect(vi.mocked(stocksApi.updateProfile)).toHaveBeenCalledWith(1, expect.objectContaining({
       game_account: "updated-account",
     })));
   });
 
   it("FE-263：寄售上架复用现有库存账号，不重复创建库存实体", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce({
+    vi.mocked(stocksApi.executionDetail).mockResolvedValueOnce({
       account: accounts[0],
       orders: [],
     } as never);
@@ -172,7 +167,7 @@ describe("InventoryPanel：写入与长路径", () => {
     await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: "确认上架" }));
 
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
+    await waitFor(() => expect(vi.mocked(ordersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
       order_type: "DG",
       account_id: 1,
       form_extra_scope: "CONSIGN",
@@ -208,8 +203,8 @@ describe("InventoryPanel：写入与长路径", () => {
     await ui.click(screen.getByLabelText("卖号返点（对应售出）"));
     await ui.click(screen.getByRole("button", { name: "确认登记" }));
 
-    await waitFor(() => expect(vi.mocked(catalog.rebatesApi.create)).toHaveBeenCalled());
-    expect(vi.mocked(catalog.rebatesApi.create).mock.calls[0][0]).toMatchObject({
+    await waitFor(() => expect(vi.mocked(rebatesApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(rebatesApi.create).mock.calls[0][0]).toMatchObject({
       source_order_id: 23,
       rebate_type: "SELL",
       base_amount: "350.00",
@@ -236,7 +231,7 @@ describe("InventoryPanel：写入与长路径", () => {
 
   it("编辑返点明细后通知上层刷新订单详情与统计（#9）", async () => {
     const onCreated = vi.fn();
-    resolveMock(vi.mocked(catalog.rebatesApi.update), {
+    resolveMock(vi.mocked(rebatesApi.update), {
       id: 41, rebate_no: "HS0001-RB01", source_order_id: 21, rebate_type: "BUY",
       rate: "5.00", base_amount: "1200.00", status: "OPEN", collected_on: "2026-10-17", operator: "何一",
     });
@@ -251,7 +246,7 @@ describe("InventoryPanel：写入与长路径", () => {
     // 不依赖 MoneyInput 内部 id：自定义控件可能不转发 id，按 id 定位会拿到 null。
     await userEvent.click(within(editModal).getByRole("button", { name: "保存" }));
 
-    await waitFor(() => expect(catalog.rebatesApi.update).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(rebatesApi.update).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
   });
 
@@ -262,18 +257,18 @@ describe("InventoryPanel：写入与长路径", () => {
     // 返点明细行只保留「编辑」，不再有「删除」按钮。
     expect(screen.queryByRole("button", { name: "删除" })).not.toBeInTheDocument();
     // 注册接口不再暴露 remove（DELETE /rebates/{id} 已撤销）。
-    expect(catalog.rebatesApi).not.toHaveProperty("remove");
+    expect(rebatesApi).not.toHaveProperty("remove");
   });
 
   it("操作人接口失败时显示错误，不伪造空操作人列表", async () => {
-    vi.mocked(catalog.employeesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" } as unknown as never);
+    vi.mocked(employeesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" } as unknown as never);
     renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ui-error-banner")).toBeTruthy());
     expect(screen.getByLabelText("操作人")).toBeInTheDocument();
   });
 
   it("提号分销已登记 BUY 后可登记买号返点", async () => {
-    resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
+    resolveMock(vi.mocked(stocksApi.executionDetail), {
       account: accounts[1],
       orders: [{
         order_id: 22, order_no: "TH0002", order_type: "TH", trade_date: "2026-10-15", created_at: "2026-10-15T10:19:00", status: "ACTIVE",
@@ -303,7 +298,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
   }
 
   it("DG 订单已保存 consignment_platform 时，已上架记录展示平台名而非空", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
       account: { id: 1, status: "IN_STOCK" },
       orders: [
         {
@@ -328,7 +323,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
   });
 
   it("DG 订单无 consignment_platform 时，从 counterparties(PLATFORM) 兜底展示平台名，不再为空", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
       account: { id: 1, status: "IN_STOCK" },
       orders: [
         {
@@ -348,7 +343,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
   });
 
   it("账号处于 VOID 时，已上架记录为空且无旧平台残留", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
       account: { id: 1, status: "VOID" },
       orders: [
         {
@@ -374,7 +369,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
 // 订单详情「交付明细」区块：只读 props + 字段定义，无页面级挂载。
 describe("OrderDetailDeliverySection", () => {
   beforeEach(() => {
-    vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([]);
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
   });
   it("交付明细每行展示 6 个字段", async () => {
     const detail = {
@@ -576,8 +571,8 @@ describe("InventoryPanel：账号台账编辑态时间联动", () => {
       }],
       finance_summary: { cashflow_income: "0", rebate_income: "0", total_income: "0", total_expense: "100.00", net_amount: "-100.00" },
     };
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(detail as never);
-    resolveMock(vi.mocked(catalog.stocksApi.updateExecution), { ok: true });
+    vi.mocked(stocksApi.executionDetail).mockResolvedValue(detail as never);
+    resolveMock(vi.mocked(stocksApi.updateExecution), { ok: true });
 
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
@@ -605,7 +600,7 @@ describe("InventoryPanel：账号台账编辑态时间联动", () => {
     expect((screen.getByLabelText("编辑流水时间") as HTMLInputElement).value).toBe("2026-10-18 10:20");
 
     fireEvent.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(vi.mocked(catalog.stocksApi.updateExecution)).toHaveBeenCalledWith(1, expect.objectContaining({
+    await waitFor(() => expect(vi.mocked(stocksApi.updateExecution)).toHaveBeenCalledWith(1, expect.objectContaining({
       time_shift: { delta_minutes: 4320 },
     })));
   });

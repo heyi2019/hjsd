@@ -1,4 +1,4 @@
-import type { AccountExecutionOrder } from "../shared/api/catalog";
+import type { AccountExecutionOrder } from "../shared/api/types/account-execution";
 
 /** 返回实际寄售平台；没有平台的初始 DG 建单不是上架记录。 */
 export function consignmentPlatform(order: AccountExecutionOrder): string | null {

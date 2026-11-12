@@ -3,10 +3,22 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { AuditPanel } from "@/audit/AuditPanel";
-import * as catalog from "@/shared/api/catalog";
-import type { AuditLogRow } from "@/shared/api/catalog";
+import { auditApi } from "@/shared/api/reports.api";
+import type { AuditLogRow } from "@/shared/api/types/ops";
 
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const rows: AuditLogRow[] = [
   { id: 1, occurred_at: "2026-10-01", actor: "admin", action: "ORDER_CREATE", entity_type: "order", entity_id: "10", reason: null },
@@ -16,8 +28,8 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
-  vi.mocked(catalog.auditApi.list).mockResolvedValue({ items: rows, total: rows.length });
-  vi.mocked(catalog.auditApi.actions).mockResolvedValue(["ORDER_CREATE"]);
+  vi.mocked(auditApi.list).mockResolvedValue({ items: rows, total: rows.length });
+  vi.mocked(auditApi.actions).mockResolvedValue(["ORDER_CREATE"]);
 });
 
 async function pickSelectByIndex(index: number, optionLabel: string) {
@@ -27,31 +39,31 @@ async function pickSelectByIndex(index: number, optionLabel: string) {
 }
 
 function lastListArgs(): Record<string, unknown> {
-  const calls = vi.mocked(catalog.auditApi.list).mock.calls;
+  const calls = vi.mocked(auditApi.list).mock.calls;
   return calls[calls.length - 1][0] as Record<string, unknown>;
 }
 
 describe("AuditPanel.deep：筛选/重试/降级分支", () => {
   it("加载失败：错误横幅可点「重新加载」再次请求 list", async () => {
-    vi.mocked(catalog.auditApi.list).mockRejectedValue(new Error("audit down"));
+    vi.mocked(auditApi.list).mockRejectedValue(new Error("audit down"));
     renderLight(<AuditPanel />, { user: "admin" });
     expect((await screen.findAllByText(/audit down/)).length).toBeGreaterThan(0);
     await ui.click(screen.getByRole("button", { name: /重新加载/ }));
-    await waitFor(() => expect(vi.mocked(catalog.auditApi.list)).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(vi.mocked(auditApi.list)).toHaveBeenCalledTimes(2));
   });
 
   it("动作选项加载失败：降级为空、页面不崩、列表仍加载", async () => {
-    vi.mocked(catalog.auditApi.actions).mockRejectedValue(new Error("no actions"));
+    vi.mocked(auditApi.actions).mockRejectedValue(new Error("no actions"));
     renderLight(<AuditPanel />, { user: "admin" });
     // 列表本身加载成功（rows 可见）
     expect(await screen.findByText("admin")).toBeInTheDocument();
     // 动作下拉已降级为空数组，但 Select 仍可渲染（audit 面板标题存在即不崩）
     expect(screen.getByText("审计记录")).toBeInTheDocument();
-    expect(vi.mocked(catalog.auditApi.list)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(auditApi.list)).toHaveBeenCalledTimes(1);
   });
 
   it("空数据：展示 emptyText「暂无审计记录」", async () => {
-    vi.mocked(catalog.auditApi.list).mockResolvedValue({ items: [], total: 0 });
+    vi.mocked(auditApi.list).mockResolvedValue({ items: [], total: 0 });
     renderLight(<AuditPanel />, { user: "admin" });
     expect(await screen.findByText("暂无审计记录")).toBeInTheDocument();
   });

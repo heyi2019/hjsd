@@ -1,5 +1,6 @@
 import { api } from "./client";
-import type { AttachmentItem, DocumentSequence, GameTypeOption, NotificationItem } from "./types";
+import type { AttachmentItem, DocumentSequence, NotificationItem } from "./types/common";
+import type { GameTypeOption } from "./types/org";
 
 export const gameTypesApi = {
   list: (params?: { include_inactive?: boolean }) =>

@@ -1,6 +1,8 @@
 import { Descriptions } from "antd";
 import { useMemo, type ReactNode } from "react";
-import type { Account, AccountExecutionDetail, AccountExecutionOrder, EmployeeOption } from "../shared/api/catalog";
+import type { AccountExecutionDetail, AccountExecutionOrder } from "../shared/api/types/account-execution";
+import type { Account } from "../shared/api/types/accounts";
+import type { EmployeeOption } from "../shared/api/types/org";
 import { CustomFieldSection } from "../orders/ConfigurableField";
 import {
   buildFormExtraDisplay,

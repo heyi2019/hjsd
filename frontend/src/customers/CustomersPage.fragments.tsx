@@ -1,6 +1,6 @@
 import { DatePicker, Input, InputNumber, Switch } from "antd";
 import { Select } from "../shared/ui";
-import type { OrderFormField } from "../shared/api/catalog";
+import type { OrderFormField } from "../shared/api/types/forms";
 
 /** 订单客户角色兜底文案：词典 ORDER_CUSTOMER_ROLE 未加载/未配置时兜底。
  *  取值与后端 order_customer_roles.role 一致。 */

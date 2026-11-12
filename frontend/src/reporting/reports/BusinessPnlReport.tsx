@@ -2,7 +2,8 @@
 
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { reportsApi, type BusinessPnlReport, type BusinessPnlRow } from "../../shared/api/catalog";
+import { reportsApi } from "../../shared/api/reports.api";
+import type { BusinessPnlReport, BusinessPnlRow } from "../../shared/api/types/reporting";
 import { BUSINESS_MODE_LABEL, BUSINESS_TYPE_LABEL, ORDER_TYPE_LABEL } from "../../shared/lib/labels";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow } from "../../shared/ui";

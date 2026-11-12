@@ -1,6 +1,7 @@
 import { Dropdown, Space } from "antd";
 import { type ColumnsType } from "antd/es/table";
-import { type Account, type AccountExecutionDetail } from "../../shared/api/catalog";
+import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
+import type { Account } from "../../shared/api/types/accounts";
 import { formatDateTimeMinute } from "../../shared/lib/format";
 import { MoneyText, PermissionButton, StatusTag } from "../../shared/ui";
 import { BUSINESS_MODE_LABEL, INVENTORY_AGE_COLOR, INVENTORY_TYPE_LABEL, isEditableAccountType } from "../inventory-logic";

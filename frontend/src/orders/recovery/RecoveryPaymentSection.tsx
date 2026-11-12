@@ -1,4 +1,4 @@
-import type { Pool } from "../../shared/api/catalog";
+import type { Pool } from "../../shared/api/types/finance";
 import { PaymentInfoSection } from "../PaymentInfoSection";
 
 export function RecoveryPaymentSection(props: { pools: Pool[] }) {

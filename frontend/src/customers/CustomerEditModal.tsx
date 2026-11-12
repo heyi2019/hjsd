@@ -1,6 +1,7 @@
 import { Form, Input } from "antd";
 import type { FormInstance } from "antd";
-import type { Customer, OrderFormField } from "../shared/api/catalog";
+import type { Customer } from "../shared/api/types/customers";
+import type { OrderFormField } from "../shared/api/types/forms";
 import { BusinessActionModal, BusinessRegistrationForm, PermissionButton } from "../shared/ui";
 import { ExtraFieldControl } from "./CustomersPage.fragments";
 

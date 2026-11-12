@@ -2,7 +2,8 @@ import { appMessage } from "../shared/ui/appFeedback";
 /** 系统提醒：查看未读通知并标记已读（SYS-01-04）。 */
 import { Card, Checkbox, Space } from "antd";
 import { useCallback, useEffect, useState } from "react";
-import { notificationsApi, type NotificationItem } from "../shared/api/catalog";
+import { notificationsApi } from "../shared/api/misc.api";
+import type { NotificationItem } from "../shared/api/types/common";
 import { normalizeError } from "../shared/api/client";
 import { ENTITY_TYPE_LABEL } from "../shared/lib/labels";
 import { DataTable, ErrorBanner, PermissionButton, StatRow, StatusTag } from "../shared/ui";

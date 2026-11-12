@@ -1,6 +1,7 @@
 import { Descriptions, Input } from "antd";
 import { useMemo } from "react";
-import type { Account, AccountExecutionDetail } from "../shared/api/catalog";
+import type { AccountExecutionDetail } from "../shared/api/types/account-execution";
+import type { Account } from "../shared/api/types/accounts";
 import {
   InventorySectionHeading,
   findCreationOrder,

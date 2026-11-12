@@ -6,7 +6,10 @@ import { ReportsPage } from "@/reporting/ReportsPage";
 import { resolveMock } from "@fixtures/mock-api";
 import { appMessage } from "@/shared/ui/appFeedback";
 
-import * as catalog from "@/shared/api/catalog";
+import { ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { reportsApi } from "@/shared/api/reports.api";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -18,7 +21,19 @@ beforeEach(() => {
 // 必须在「每个用例」的 beforeEach 内（clearAllMocks 之后）重新挂桩：setup.ts 的 afterEach 会
 // resetAllMocks，清空 beforeAll 桩的 mockReturnValue；若是文件内后续用例（如「导出成功后」）
 // 会读到真实 jsdom Blob 而抛 "cannot read the bytes of a jsdom Blob"，误入错误分支。
-vi.mock("@/shared/api/catalog")
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");
 
 vi.mock("@/shared/ui", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -32,25 +47,25 @@ beforeEach(() => {
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
-  resolveMock(vi.mocked(catalog.reportsApi.monthlyPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(catalog.reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+  resolveMock(vi.mocked(reportsApi.monthlyPnl), { items: [], total: {} });
+  resolveMock(vi.mocked(reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
+  vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 7, username: "operator", display_name: "业务同事", is_active: true },
     { id: 8, username: "finance", display_name: "财务同事", is_active: true },
   ]);
-  resolveMock(vi.mocked(catalog.reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
-  resolveMock(vi.mocked(catalog.reportsApi.financeDimensions), { items: [], total_amount: "0", total_signed_amount: "0" });
-  resolveMock(vi.mocked(catalog.reportsApi.businessPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(catalog.reportsApi.orderProfit), { items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
-  resolveMock(vi.mocked(catalog.reportsApi.exportCsv), new Blob(["csv"]));
+  resolveMock(vi.mocked(reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
+  resolveMock(vi.mocked(reportsApi.financeDimensions), { items: [], total_amount: "0", total_signed_amount: "0" });
+  resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
+  resolveMock(vi.mocked(reportsApi.orderProfit), { items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
+  resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
+  vi.mocked(poolsApi.list).mockResolvedValue([]);
   // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
-  resolveMock(vi.mocked(catalog.poolsApi.balances), {
+  resolveMock(vi.mocked(poolsApi.balances), {
     items: [],
     totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
+  vi.mocked(ordersApi.list).mockResolvedValue([]);
 });
 
 async function gotoTab(label: string) {
@@ -61,12 +76,12 @@ describe("ReportsPage：经营中心报表", () => {
   it("初始只加载当前激活的月度损益报表，不提前加载隐藏 Tab", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "月度损益 R2" });
-    expect(vi.mocked(catalog.reportsApi.monthlyPnl)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(catalog.reportsApi.commission)).not.toHaveBeenCalled();
-    expect(vi.mocked(catalog.reportsApi.dailyFunds)).not.toHaveBeenCalled();
-    expect(vi.mocked(catalog.reportsApi.businessPnl)).not.toHaveBeenCalled();
-    expect(vi.mocked(catalog.reportsApi.orderProfit)).not.toHaveBeenCalled();
-    expect(vi.mocked(catalog.poolsApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(reportsApi.commission)).not.toHaveBeenCalled();
+    expect(vi.mocked(reportsApi.dailyFunds)).not.toHaveBeenCalled();
+    expect(vi.mocked(reportsApi.businessPnl)).not.toHaveBeenCalled();
+    expect(vi.mocked(reportsApi.orderProfit)).not.toHaveBeenCalled();
+    expect(vi.mocked(poolsApi.list)).not.toHaveBeenCalled();
   });
 
   it("我的收益只加载当前登录用户的分润记录", async () => {
@@ -74,8 +89,8 @@ describe("ReportsPage：经营中心报表", () => {
     const commissionTab = await screen.findByRole("tab", { name: "提成对账 R3" });
     expect(commissionTab).toHaveAttribute("aria-selected", "true");
     expect((await screen.findAllByText("我的收益")).length).toBeGreaterThan(0);
-    expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenCalledWith({ mine: true });
-    expect(vi.mocked(catalog.reportsApi.monthlyPnl)).not.toHaveBeenCalled();
+    expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith({ mine: true });
+    expect(vi.mocked(reportsApi.monthlyPnl)).not.toHaveBeenCalled();
   });
 
   it("我的收益导出带 mine=true，与列表同口径", async () => {
@@ -83,11 +98,11 @@ describe("ReportsPage：经营中心报表", () => {
     renderLight(<ReportsPage initialReportTab="my-earnings" />, { user: "admin" });
     await screen.findAllByText("我的收益");
     await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith(
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith(
       "commission",
       expect.objectContaining({ mine: true }),
     ));
-    expect(vi.mocked(catalog.reportsApi.exportCsv)).not.toHaveBeenCalledWith(
+    expect(vi.mocked(reportsApi.exportCsv)).not.toHaveBeenCalledWith(
       "commission",
       expect.objectContaining({ all_people: true }),
     );
@@ -96,27 +111,27 @@ describe("ReportsPage：经营中心报表", () => {
   it("FE-260：提成对账可以按人员筛选并传递 user_id", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await ui.click(screen.getByRole("tab", { name: "提成对账 R3" }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true }));
-    await waitFor(() => expect(vi.mocked(catalog.employeesApi.list)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true }));
+    await waitFor(() => expect(vi.mocked(employeesApi.list)).toHaveBeenCalled());
     const personComboboxes = await screen.findAllByRole("combobox");
     const personFilter = personComboboxes[personComboboxes.length - 1] as HTMLElement;
     await ui.click(personFilter);
     expect(await screen.findByText("全部", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
     await ui.click(await screen.findByText(/业务同事（operator）/, { selector: ".ant-select-item-option-content" }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
   });
 
   it("R3 指定员工导出带 user_id，与列表同口径", async () => {
     vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
     await ui.click(screen.getByRole("tab", { name: "提成对账 R3" }));
-    await waitFor(() => expect(vi.mocked(catalog.employeesApi.list)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(employeesApi.list)).toHaveBeenCalled());
     const personComboboxes = await screen.findAllByRole("combobox");
     await ui.click(personComboboxes[personComboboxes.length - 1] as HTMLElement);
     await ui.click(await screen.findByText(/业务同事（operator）/, { selector: ".ant-select-item-option-content" }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
     await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith(
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith(
       "commission",
       expect.objectContaining({ all_people: true, user_id: 7 }),
     ));
@@ -150,7 +165,7 @@ describe("ReportsPage：经营中心报表", () => {
     await ui.type(dateInputs[0], "2026-01-01");
     await ui.type(dateInputs[1], "2026-01-31");
     await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31" }));
   });
 
   it("R2 报表页内导出按钮无筛选也能导出并给出成功反馈", async () => {
@@ -158,7 +173,7 @@ describe("ReportsPage：经营中心报表", () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("月度损益 R2");
     await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith("已导出 monthly-pnl.csv"));
   });
 
@@ -172,6 +187,6 @@ describe("ReportsPage：经营中心报表", () => {
     await ui.type(dateInputs[1], "2026-01-01");
     await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
     await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("导出开始日期不能晚于结束日期"));
-    expect(vi.mocked(catalog.reportsApi.exportCsv)).not.toHaveBeenCalled();
+    expect(vi.mocked(reportsApi.exportCsv)).not.toHaveBeenCalled();
   });
 });

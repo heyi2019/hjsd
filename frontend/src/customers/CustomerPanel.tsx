@@ -1,6 +1,6 @@
 import { SearchOutlined } from "@ant-design/icons";
 import { Button, Card, Input, Space, Typography } from "antd";
-import type { Customer } from "../shared/api/catalog";
+import type { Customer } from "../shared/api/types/customers";
 import { markMobileHiddenColumns } from "../shared/lib/listColumns";
 import { DataTable, ErrorBanner, PermissionButton, Select, StatRow } from "../shared/ui";
 import { CustomerCreateModal } from "./CustomerCreateModal";

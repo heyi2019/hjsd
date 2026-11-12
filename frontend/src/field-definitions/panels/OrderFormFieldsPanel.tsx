@@ -3,7 +3,7 @@
  *  新增、删除、必填态（必填/条件必填/选填）、停用/启用。字段可配置必填态与启用态；
  *  仅自定义字段可删除（预置字段受保护）。 */
 import { Segmented, Space, Typography } from "antd";
-import { type OrderFormField } from "../../shared/api/catalog";
+import type { OrderFormField } from "../../shared/api/types/forms";
 import { DataTable, ErrorBanner, Select } from "../../shared/ui";
 import "./OrderFormFieldsPanel.css";
 import { useOrderFormFieldsPanelController } from "./useOrderFormFieldsPanelController";

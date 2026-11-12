@@ -5,10 +5,28 @@ import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
 import { InventorySaleModal, RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/stocks/InventorySaleModal";
 
-import * as catalog from "@/shared/api/catalog";
+import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
+import { installmentsApi } from "@/shared/api/installments.api";
+import { orderFormFieldsApi, ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { rebatesApi } from "@/shared/api/rebates.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
-vi.mock("@/shared/api/catalog")
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");
 
 const accounts = [
   { id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
@@ -17,20 +35,20 @@ const accounts = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  seedOrderFormFields(catalog);
-  seedOptionSets(catalog);
-  vi.mocked(catalog.stocksApi.list).mockResolvedValue(accounts);
-  vi.mocked(catalog.stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
-  resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});
-  resolveMock(vi.mocked(catalog.ordersApi.addCustomerRole), { id: 21 });
-  resolveMock(vi.mocked(catalog.customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
-  resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
-  resolveMock(vi.mocked(catalog.employeesApi.list), [{ id: 1, username: "admin", display_name: "管理员", is_active: true }]);
-  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
-  resolveMock(vi.mocked(catalog.rebatesApi.create), { id: 31 });
-  resolveMock(vi.mocked(catalog.installmentsApi.create), { id: 41 });
-  resolveMock(vi.mocked(catalog.installmentsApi.pay), { id: 51 });
-  resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
+  seedOrderFormFields();
+  seedOptionSets();
+  vi.mocked(stocksApi.list).mockResolvedValue(accounts);
+  vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
+  resolveMock(vi.mocked(ordersApi.postEvent), {});
+  resolveMock(vi.mocked(ordersApi.addCustomerRole), { id: 21 });
+  resolveMock(vi.mocked(customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(employeesApi.list), [{ id: 1, username: "admin", display_name: "管理员", is_active: true }]);
+  vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
+  resolveMock(vi.mocked(rebatesApi.create), { id: 31 });
+  resolveMock(vi.mocked(installmentsApi.create), { id: 41 });
+  resolveMock(vi.mocked(installmentsApi.pay), { id: 51 });
+  resolveMock(vi.mocked(stocksApi.executionDetail), {
     account: accounts[0],
     orders: [{
       order_id: 21,
@@ -102,15 +120,15 @@ beforeEach(() => {
       }],
     }],
   });
-  resolveMock(vi.mocked(catalog.stocksApi.updateProfile), accounts[0]);
+  resolveMock(vi.mocked(stocksApi.updateProfile), accounts[0]);
 });
 
 ;
 
 it("售出时把新买家关联到来源单而非新建订单", async () => {
   const ui = userEvent.setup({ pointerEventsCheck: 0 });
-  resolveMock(vi.mocked(catalog.customersApi.list), []);
-  resolveMock(vi.mocked(catalog.customersApi.create), {
+  resolveMock(vi.mocked(customersApi.list), []);
+  resolveMock(vi.mocked(customersApi.create), {
     customer: { id: 8, customer_no: "C0008", display_name: "新买家", status: "ACTIVE" },
     duplicate_candidates: [],
   });
@@ -124,15 +142,15 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
   await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
   fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
 
-  await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
+  await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
     display_name: "新买家",
   })));
-  expect(vi.mocked(catalog.ordersApi.create)).not.toHaveBeenCalled();
-  expect(vi.mocked(catalog.ordersApi.addCustomerRole)).toHaveBeenCalledWith(21, {
+  expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
+  expect(vi.mocked(ordersApi.addCustomerRole)).toHaveBeenCalledWith(21, {
     customer_id: 8,
     role: "BUYER",
   });
-  expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
+  expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
     event_type: "SELL",
     amount: "350",
     pool_id: 3,
@@ -152,7 +170,7 @@ it("库存售出：成功后立即从库存列表移除账号，即使列表重�
   await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
   await ui.click(screen.getByRole("button", { name: /确认售出/ }));
 
-  await waitFor(() => expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalled());
+  await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalled());
   await waitFor(() => expect(screen.queryByText("acc-1")).not.toBeInTheDocument());
 });
 
@@ -167,7 +185,7 @@ describe("InventoryPanel：写入与长路径", () => {
 
 it("代挂账号售出：全款收佣金入账、售出金额仅记录、不提供分期并挂寄售方", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    resolveMockOnce(vi.mocked(catalog.stocksApi.list), [
+    resolveMockOnce(vi.mocked(stocksApi.list), [
       { id: 5, source_order_id: 21, game_account: "acc-5", platform: "A平台", status: "WAITING", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
@@ -186,18 +204,18 @@ it("代挂账号售出：全款收佣金入账、售出金额仅记录、不提�
     await ui.click(screen.getByLabelText("资金账户"));
     await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalled());
-    expect(vi.mocked(catalog.ordersApi.create)).not.toHaveBeenCalled();
+    await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalled());
+    expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
     // 利润=代挂佣金入账；售出金额仅作记录留存于 form_extra，不参与利润。
-    expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
+    expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
       event_type: "SELL",
       amount: "200",
       pool_id: 3,
       portion: "PROFIT",
       form_extra: { sale_amount: "1000" },
     }));
-    expect(vi.mocked(catalog.ordersApi.addCustomerRole)).toHaveBeenCalledWith(21, { customer_id: 7, role: "CONSIGNOR" });
-    expect(vi.mocked(catalog.installmentsApi.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(ordersApi.addCustomerRole)).toHaveBeenCalledWith(21, { customer_id: 7, role: "CONSIGNOR" });
+    expect(vi.mocked(installmentsApi.create)).not.toHaveBeenCalled();
   });
 
 ;
@@ -206,7 +224,7 @@ it("代挂账号售出：全款收佣金入账、售出金额仅记录、不提�
 
 it("代挂售出复用买号交付信息块，交付负责人提交落库到来源单", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    resolveMockOnce(vi.mocked(catalog.stocksApi.list), [
+    resolveMockOnce(vi.mocked(stocksApi.list), [
       { id: 5, source_order_id: 21, game_account: "acc-5", platform: "A平台", status: "WAITING", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
@@ -225,16 +243,16 @@ it("代挂售出复用买号交付信息块，交付负责人提交落库到来�
     await ui.click(screen.getByLabelText("资金账户"));
     await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalled());
     // 售出表单中的交付字段（含交付负责人）随售出提交 merge 进来源单 form_extra，详情的卖号交付直接复用。
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.patch)).toHaveBeenCalledWith(21, expect.objectContaining({
+    await waitFor(() => expect(vi.mocked(ordersApi.patch)).toHaveBeenCalledWith(21, expect.objectContaining({
       form_extra: expect.objectContaining({ delivery_responsible_ids: [1], intermediary_platform: "盼之" }),
     })));
   });
 
 it("提号库存售出可选择分期出售，确立时收首付", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    resolveMockOnce(vi.mocked(catalog.stocksApi.list), [
+    resolveMockOnce(vi.mocked(stocksApi.list), [
       { id: 6, source_order_id: 21, game_account: "pickup-acc", platform: "B平台", status: "WAITING", cost_amount: "0.00", inventory_type: "PICKUP" },
     ]);
     renderLight(<InventoryPanel />, { user: "admin" });
@@ -257,20 +275,20 @@ it("提号库存售出可选择分期出售，确立时收首付", async () => {
     expect(screen.getByLabelText("第 2 期到期日")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
 
-    await waitFor(() => expect(vi.mocked(catalog.installmentsApi.create)).toHaveBeenCalledWith(expect.objectContaining({
+    await waitFor(() => expect(vi.mocked(installmentsApi.create)).toHaveBeenCalledWith(expect.objectContaining({
       order_id: 21,
       contract_type: "STOCK_SALE",
       principal: "1200",
       down_payment: "300",
     })));
     // 首付在分期计划确立时通过 pay(period_no:0) 入账，金额=首付、进所选资金账户。
-    await waitFor(() => expect(vi.mocked(catalog.installmentsApi.pay)).toHaveBeenCalledWith(
+    await waitFor(() => expect(vi.mocked(installmentsApi.pay)).toHaveBeenCalledWith(
       41,
       expect.objectContaining({ amount: "300", period_no: 0, pool_id: 3 }),
     ));
-    expect(vi.mocked(catalog.ordersApi.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
     // 分期出售先登记 SELL 业务事实；首付再走分期 pay 通道登记资金明细。
-    expect(vi.mocked(catalog.ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
+    expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
       event_type: "SELL",
       sale_mode: "INSTALLMENT",
       amount: "1200",
@@ -278,11 +296,11 @@ it("提号库存售出可选择分期出售，确立时收首付", async () => {
   });
 
 it("库存中心不为售出单提供取消入口", async () => {
-    resolveMockOnce(vi.mocked(catalog.stocksApi.list), [{ ...accounts[1], inventory_type: "PICKUP" }]);
+    resolveMockOnce(vi.mocked(stocksApi.list), [{ ...accounts[1], inventory_type: "PICKUP" }]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await waitFor(() => expect(screen.queryByText("acc-2")).toBeNull());
     expect(screen.getByText("暂无账号")).toBeInTheDocument();
-    expect(vi.mocked(catalog.ordersApi.postEvent)).not.toHaveBeenCalled();
+    expect(vi.mocked(ordersApi.postEvent)).not.toHaveBeenCalled();
   });
 });
 
@@ -350,25 +368,25 @@ describe("库存售出三表单分支", () => {
     ] as const;
 
     for (const [Modal, account, scope] of cases) {
-      vi.mocked(catalog.orderFormFieldsApi.list).mockClear();
-      vi.mocked(catalog.orderFormFieldsApi.listSectionLabels).mockClear();
+      vi.mocked(orderFormFieldsApi.list).mockClear();
+      vi.mocked(orderFormFieldsApi.listSectionLabels).mockClear();
       const { unmount } = renderLight(<Modal account={account} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-      await waitFor(() => expect(catalog.orderFormFieldsApi.list).toHaveBeenCalledWith(scope, true));
-      expect(vi.mocked(catalog.orderFormFieldsApi.list).mock.calls.every(([code]) => code === scope)).toBe(true);
-      expect(catalog.orderFormFieldsApi.listSectionLabels).toHaveBeenCalledWith(scope);
+      await waitFor(() => expect(orderFormFieldsApi.list).toHaveBeenCalledWith(scope, true));
+      expect(vi.mocked(orderFormFieldsApi.list).mock.calls.every(([code]) => code === scope)).toBe(true);
+      expect(orderFormFieldsApi.listSectionLabels).toHaveBeenCalledWith(scope);
       unmount();
     }
   });
   // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-042：已拉黑客户不能参与库存售出", async () => {
-    vi.mocked(catalog.customersApi.list).mockResolvedValueOnce([
+    vi.mocked(customersApi.list).mockResolvedValueOnce([
       { id: 7, display_name: "买家A", status: "DISABLED" },
     ] as never);
-    vi.mocked(catalog.poolsApi.list).mockResolvedValue([
+    vi.mocked(poolsApi.list).mockResolvedValue([
       { id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" },
     ] as never);
-    vi.mocked(catalog.employeesApi.list).mockResolvedValueOnce([
+    vi.mocked(employeesApi.list).mockResolvedValueOnce([
       { id: 1, username: "admin", display_name: "管理员", is_active: true },
     ] as never);
     renderLight(
@@ -388,7 +406,7 @@ describe("库存售出三表单分支", () => {
     await user.click(screen.getByRole("button", { name: /确认售出/ }));
 
     await waitFor(() => expect(screen.getByText(/客户已拉黑，不能作为售出买家/)).toBeInTheDocument());
-    expect(catalog.ordersApi.addCustomerRole).not.toHaveBeenCalled();
-    expect(catalog.ordersApi.postEvent).not.toHaveBeenCalled();
+    expect(ordersApi.addCustomerRole).not.toHaveBeenCalled();
+    expect(ordersApi.postEvent).not.toHaveBeenCalled();
   });
 });

@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { AdaptiveFormGrid, BusinessRegistrationGroup, MoneyInput, PermissionButton } from "../shared/ui";
 import { CfgNestedItem } from "./ConfigurableField";
 import "./AdditionalFeeFields.css";
-import type { Pool } from "../shared/api/catalog";
+import type { Pool } from "../shared/api/types/finance";
 import { Select } from "../shared/ui";
 
 /** 回收、提号共用的其他支出字段；业务自身的主金额和提交事件由上层处理。 */

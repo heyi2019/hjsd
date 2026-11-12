@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dayjs } from "dayjs";
-import { orderTypesApi, ordersApi, type Order, type OrderType } from "../../shared/api/catalog";
+import { orderTypesApi, ordersApi } from "../../shared/api/orders.api";
+import type { Order, OrderType } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import { downloadBlob } from "../../shared/api/download";
 import { ACCOUNT_STATUS_LABEL, today } from "../../shared/lib/format";

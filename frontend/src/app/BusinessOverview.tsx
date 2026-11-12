@@ -1,5 +1,5 @@
 import { Card, List, Typography } from "antd";
-import type { Order } from "../shared/api/catalog";
+import type { Order } from "../shared/api/types/orders";
 import { StatRow } from "../shared/ui";
 
 export function BusinessOverview({

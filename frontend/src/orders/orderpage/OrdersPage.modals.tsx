@@ -1,7 +1,7 @@
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
-import { ordersApi } from "../../shared/api/catalog";
+import { ordersApi } from "../../shared/api/orders.api";
 import { InventoryDeleteDialog } from "../../stocks/InventoryPanel/InventoryDeleteDialog";
 import { InventoryRebateModal } from "../../stocks/InventoryRebateModal";
 import { InventoryProfileModal } from "../../stocks/InventoryProfileModal";

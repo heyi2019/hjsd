@@ -1,13 +1,10 @@
 import { Form } from "antd";
 import { useState, type Dispatch, type SetStateAction } from "react";
-import {
-  stocksApi,
-  employeesApi,
-  type Account,
-  type AccountExecutionDetail,
-  type AccountExecutionEvent,
-  type EmployeeOption,
-} from "../../shared/api/catalog";
+import { employeesApi } from "../../shared/api/org.api";
+import { stocksApi } from "../../shared/api/stocks.api";
+import type { AccountExecutionDetail, AccountExecutionEvent } from "../../shared/api/types/account-execution";
+import type { Account } from "../../shared/api/types/accounts";
+import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
 

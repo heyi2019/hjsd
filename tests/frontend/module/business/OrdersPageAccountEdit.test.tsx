@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage } from "@/orders/OrdersPage";
 
-import * as catalog from "@/shared/api/catalog";
+import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 
 let ui: ReturnType<typeof userEvent.setup>;
@@ -13,30 +15,19 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-vi.mock("@/shared/api/catalog", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/shared/api/catalog")>();
-  const METHODS = [
-    "list", "get", "create", "update", "patch", "post", "postEvent", "cancel", "remove", "materializeAccount",
-    "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
-    "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "updateProfile", "updateExecution", "merge", "search",
-  ];
-  const mk = (api: Record<string, unknown>) => {
-    const o: Record<string, unknown> = { ...api };
-    for (const m of METHODS) {
-      if (m in o) o[m] = vi.fn();
-    }
-    return o;
-  };
-  const out: Record<string, unknown> = { ...actual };
-  for (const key of Object.keys(actual)) {
-    const v = (actual as Record<string, unknown>)[key];
-    if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v as object).some((x) => typeof x === "function")) {
-      out[key] = mk(v as Record<string, unknown>);
-    }
-  }
-  return out as unknown as typeof actual;
-});
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const orders = [
   {
@@ -66,15 +57,15 @@ const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_act
 
 beforeEach(() => {
   vi.clearAllMocks();
-  seedOptionSets(catalog);
-  seedOrderFormFields(catalog);
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders as never);
-  vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types as never);
-  vi.mocked(catalog.stocksApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+  seedOptionSets();
+  seedOrderFormFields();
+  vi.mocked(ordersApi.list).mockResolvedValue(orders as never);
+  vi.mocked(orderTypesApi.list).mockResolvedValue(types as never);
+  vi.mocked(stocksApi.list).mockResolvedValue([]);
+  vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);
-  vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+  vi.mocked(stocksApi.executionDetail).mockResolvedValue({
     account: {
       id: 99,
       stock_no: "KU_00001",
@@ -86,7 +77,7 @@ beforeEach(() => {
     orders: [],
     finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
   } as never);
-  vi.mocked(catalog.stocksApi.updateProfile).mockResolvedValue({ id: 99, game_account: "acc-99" } as never);
+  vi.mocked(stocksApi.updateProfile).mockResolvedValue({ id: 99, game_account: "acc-99" } as never);
 });
 
 describe("订单台账统一编辑入口（#15 需求1）", () => {
@@ -109,7 +100,7 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
 
   it("未关联库存账号的订单不显示「编辑账号」入口", async () => {
     // 本用例刻意去掉所有订单的 account_id，验证无关联账号时不出现「编辑账号」入口。
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+    vi.mocked(ordersApi.list).mockResolvedValue([
       { id: 1, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE", account_game_type: "原神", account_game_account: "seller-001", account_platform: "安卓", account_status: "WAITING" },
       { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
     ] as never);

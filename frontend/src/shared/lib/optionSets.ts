@@ -4,7 +4,8 @@
  * 一次性拉全量后在内存缓存，组件按 code 取用，避免每个筛选器各自请求。
  */
 import { useEffect, useState } from "react";
-import { optionSetsApi, type OptionItem } from "../api/catalog";
+import { optionSetsApi } from "../api/options.api";
+import type { OptionItem } from "../api/types/common";
 
 type OptionSetMap = Record<string, OptionItem[]>;
 

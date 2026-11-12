@@ -1,4 +1,4 @@
-import type { OptionItem } from "../shared/api/types";
+import type { OptionItem } from "../shared/api/types/common";
 
 export const BUSINESS_REMINDER_CONFIG_CODE = "BUSINESS_OVERVIEW_REMINDERS";
 

@@ -1,8 +1,8 @@
 import type { FormInstance } from "antd/es/form";
 import type { ReactNode } from "react";
 import { Input } from "antd";
-import type { Pool } from "../shared/api/catalog";
-import type { EmployeeOption } from "../shared/api/catalog";
+import type { Pool } from "../shared/api/types/finance";
+import type { EmployeeOption } from "../shared/api/types/org";
 import {
   AdaptiveFormGrid,
   BusinessActionModal,

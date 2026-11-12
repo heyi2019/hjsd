@@ -1,7 +1,9 @@
 import { appMessage } from "../../shared/ui/appFeedback";
 import { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { stocksApi, type Account, type AccountExecutionDetail, type InventoryStats } from "../../shared/api/catalog";
+import { stocksApi } from "../../shared/api/stocks.api";
+import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
+import type { Account, InventoryStats } from "../../shared/api/types/accounts";
 import { normalizeError } from "../../shared/api/client";
 import { downloadInventoryCsv } from "../inventory-export";
 import { useOptionSet } from "../../shared/lib/optionSets";

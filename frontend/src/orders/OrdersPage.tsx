@@ -5,7 +5,7 @@ import { InventoryPanel } from "../stocks/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
 import { ErrorBanner, PermissionButton } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
-import { installmentsApi } from "../shared/api/catalog";
+import { installmentsApi } from "../shared/api/installments.api";
 import type { BusinessOrderType } from "./CreateBusinessModal";
 import { BUSINESS_CREATE_ITEMS } from "./orderpage/helpers";
 import { OrdersLedgerPanel } from "./orderpage/OrdersLedgerPanel";

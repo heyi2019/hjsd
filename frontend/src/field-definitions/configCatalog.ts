@@ -8,18 +8,12 @@
  * 不要按模型名推断，必须照抄实际值，否则查不到改动记录。
  */
 
-import {
-  gameTypesApi,
-  importsApi,
-  listColumnsApi,
-  orderFormFieldsApi,
-  orderTypesApi,
-  policyApi,
-  poolsApi,
-  sequencesApi,
-  teamsApi,
-  usersApi,
-} from "../shared/api/catalog";
+import { gameTypesApi, sequencesApi } from "../shared/api/misc.api";
+import { listColumnsApi, orderFormFieldsApi, orderTypesApi } from "../shared/api/orders.api";
+import { teamsApi, usersApi } from "../shared/api/org.api";
+import { policyApi } from "../shared/api/policy.api";
+import { poolsApi } from "../shared/api/pools.api";
+import { importsApi } from "../shared/api/reports.api";
 
 export type ConfigGroupCode = "FIELD" | "MASTER" | "BUSINESS" | "SEQUENCE" | "POLICY" | "GOV" | "ORG" | "OPS";
 

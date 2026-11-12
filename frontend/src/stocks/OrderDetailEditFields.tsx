@@ -1,5 +1,5 @@
 import { Input } from "antd";
-import type { Account } from "../shared/api/catalog";
+import type { Account } from "../shared/api/types/accounts";
 import { Select } from "../shared/ui";
 
 /** 编辑态专属：折叠区里的账号补充资料表单。只读态这些字段以 Descriptions 展示（见 Profile 板块）。 */

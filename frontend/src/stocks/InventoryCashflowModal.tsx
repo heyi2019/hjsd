@@ -1,7 +1,9 @@
 import dayjs, { type Dayjs } from "dayjs";
 import { DatePicker, Form, Input, Select } from "antd";
 import { useEffect } from "react";
-import { cashflowsApi, type Account, type Pool } from "../shared/api/catalog";
+import { cashflowsApi } from "../shared/api/cashflows.api";
+import type { Account } from "../shared/api/types/accounts";
+import type { Pool } from "../shared/api/types/finance";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { appMessage } from "../shared/ui/appFeedback";

@@ -1,5 +1,12 @@
 import { beforeEach, vi } from "vitest";
-import * as catalog from "@/shared/api/catalog";
+import { cashflowsApi } from "@/shared/api/cashflows.api";
+import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
+import { installmentsApi } from "@/shared/api/installments.api";
+import { ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { rebatesApi } from "@/shared/api/rebates.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock } from "@fixtures/mock-api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 
@@ -19,24 +26,24 @@ export const stockNoAccounts = [
 
 export const resetInventoryPanelMocks = () => {
   vi.clearAllMocks();
-  vi.mocked(catalog.stocksApi.list).mockResolvedValue(accounts);
+  vi.mocked(stocksApi.list).mockResolvedValue(accounts);
   // 卡片指标由后端汇总（/stocks/inventory/stats），前端只渲染返回值。
-  vi.mocked(catalog.stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
+  vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
   // T19/T20：建单表单字段与选项词典改为从配置读取，测试需默认种子，否则下拉无选项。
-  seedOrderFormFields(catalog);
-  seedOptionSets(catalog);
-  resolveMock(vi.mocked(catalog.ordersApi.create), { id: 21 });
-  resolveMock(vi.mocked(catalog.ordersApi.postEvent), {});
-  resolveMock(vi.mocked(catalog.cashflowsApi.createForOrder), {});
-  resolveMock(vi.mocked(catalog.customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
-  resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
-  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
-  resolveMock(vi.mocked(catalog.rebatesApi.create), { id: 31 });
-  resolveMock(vi.mocked(catalog.installmentsApi.create), { id: 41 });
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+  seedOrderFormFields();
+  seedOptionSets();
+  resolveMock(vi.mocked(ordersApi.create), { id: 21 });
+  resolveMock(vi.mocked(ordersApi.postEvent), {});
+  resolveMock(vi.mocked(cashflowsApi.createForOrder), {});
+  resolveMock(vi.mocked(customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
+  vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
+  resolveMock(vi.mocked(rebatesApi.create), { id: 31 });
+  resolveMock(vi.mocked(installmentsApi.create), { id: 41 });
+  vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);
-  resolveMock(vi.mocked(catalog.stocksApi.executionDetail), {
+  resolveMock(vi.mocked(stocksApi.executionDetail), {
     account: accounts[0],
     // 财务汇总由后端下发（口径见 backend tests/v1/test_execution_finance_summary.py）：
     // 支出 100.00 = CF0001，收入 1350.00 = 回款 350.00 + 返点基数 1000.00。
@@ -120,7 +127,7 @@ export const resetInventoryPanelMocks = () => {
       }],
     }],
   });
-  resolveMock(vi.mocked(catalog.stocksApi.updateProfile), accounts[0]);
+  resolveMock(vi.mocked(stocksApi.updateProfile), accounts[0]);
 };
 
 export const setupInventoryPanelMocks = () => {

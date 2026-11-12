@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Cashflow } from "./types";
+import type { Cashflow } from "./types/finance";
 
 export const cashflowsApi = {
   create: (data: Record<string, unknown>) => api.post<Cashflow>("/cashflows", data).then(r => r.data),

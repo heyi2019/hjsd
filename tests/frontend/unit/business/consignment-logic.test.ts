@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AccountExecutionOrder } from "@/shared/api/catalog";
+import type { AccountExecutionOrder } from "@/shared/api/types/account-execution";
 import { consignmentPlatform, isActiveConsignmentListing, isConsignmentListing } from "@/stocks/consignment-logic";
 
 const order = (overrides: Partial<AccountExecutionOrder> = {}) => ({

@@ -2,13 +2,13 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { Form, Input, Radio, Space, Spin, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
-import { stocksApi,
-  rebatesApi,
-  employeesApi,
-  type Account,
-  type AccountExecutionDetail,
-  type EmployeeOption,
-  type Rebate, } from "../shared/api/catalog";
+import { employeesApi } from "../shared/api/org.api";
+import { rebatesApi } from "../shared/api/rebates.api";
+import { stocksApi } from "../shared/api/stocks.api";
+import type { AccountExecutionDetail } from "../shared/api/types/account-execution";
+import type { Account } from "../shared/api/types/accounts";
+import type { Rebate } from "../shared/api/types/finance";
+import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { moneyRules, percentRules } from "../shared/lib/validators";

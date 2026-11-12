@@ -8,7 +8,7 @@ import { Button, Form, type FormInstance } from "antd";
 import { renderLight } from "@fixtures/render";
 import { CustomerSourceFields } from "@/orders/CustomerSourceInput";
 import { AdditionalFeeFields } from "@/orders/AdditionalFeeFields";
-import type { Pool } from "@/shared/api/catalog";
+import type { Pool } from "@/shared/api/types/finance";
 
 describe("CustomerSourceFields：客户来源校验文案", () => {
   function Harness() {

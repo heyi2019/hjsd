@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { OptionSet, OptionSetList } from "./types";
+import type { OptionSet, OptionSetList } from "./types/common";
 
 export const optionSetsApi = {
   list: (params?: { group?: string; editable?: boolean }) =>

@@ -5,7 +5,9 @@ vi.mock("@/shared/api/client", () => ({
 }));
 
 import { api } from "@/shared/api/client";
-import { auditApi, installmentsApi, reportsApi, teamsApi, usersApi } from "@/shared/api/catalog";
+import { installmentsApi } from "@/shared/api/installments.api";
+import { teamsApi, usersApi } from "@/shared/api/org.api";
+import { auditApi, reportsApi } from "@/shared/api/reports.api";
 
 describe("auditApi：与后端审计查询契约一致", () => {
   beforeEach(() => {

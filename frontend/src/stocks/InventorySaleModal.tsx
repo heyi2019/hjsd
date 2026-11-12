@@ -3,14 +3,14 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { Form, Input, Radio } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { customersApi,
-  employeesApi,
-  ordersApi,
-  poolsApi,
-  type Account,
-  type Customer,
-  type EmployeeOption,
-  type Pool, } from "../shared/api/catalog";
+import { customersApi } from "../shared/api/customers.api";
+import { ordersApi } from "../shared/api/orders.api";
+import { employeesApi } from "../shared/api/org.api";
+import { poolsApi } from "../shared/api/pools.api";
+import type { Account } from "../shared/api/types/accounts";
+import type { Customer } from "../shared/api/types/customers";
+import type { Pool } from "../shared/api/types/finance";
+import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { AdaptiveFormGrid, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, MoneyInput, PermissionButton, Select } from "../shared/ui";

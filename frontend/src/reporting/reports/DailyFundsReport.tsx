@@ -3,7 +3,8 @@
 import { Card, Input } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useState } from "react";
-import { reportsApi, type DailyFundsReport, type DailyFundsRow } from "../../shared/api/catalog";
+import { reportsApi } from "../../shared/api/reports.api";
+import type { DailyFundsReport, DailyFundsRow } from "../../shared/api/types/reporting";
 import { today } from "../../shared/lib/format";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow } from "../../shared/ui";

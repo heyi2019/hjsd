@@ -1,17 +1,15 @@
 import { Form } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
-import {
-  employeesApi,
-  ordersApi,
-  policyApi,
-  poolsApi,
-  stocksApi,
-  type Account,
-  type AccountExecutionDetail,
-  type Order,
-  type Pool,
-} from "../../shared/api/catalog";
+import { ordersApi } from "../../shared/api/orders.api";
+import { employeesApi } from "../../shared/api/org.api";
+import { policyApi } from "../../shared/api/policy.api";
+import { poolsApi } from "../../shared/api/pools.api";
+import { stocksApi } from "../../shared/api/stocks.api";
+import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
+import type { Account } from "../../shared/api/types/accounts";
+import type { Pool } from "../../shared/api/types/finance";
+import type { Order } from "../../shared/api/types/orders";
 import { currentDevUser, currentUser, normalizeError } from "../../shared/api/client";
 import { money, today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";

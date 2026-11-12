@@ -1,7 +1,8 @@
 import { Descriptions, Drawer, Spin, Typography } from "antd";
 import type { ReactNode } from "react";
 import { buildFormExtraDisplay, formatExtraDisplayValue } from "../orders/ConfigurableField";
-import type { Customer, CustomerBusiness, CustomerDetail, CustomerInstallment, OrderFormField } from "../shared/api/catalog";
+import type { Customer, CustomerBusiness, CustomerDetail, CustomerInstallment } from "../shared/api/types/customers";
+import type { OrderFormField } from "../shared/api/types/forms";
 import { money } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";

@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { QualityIssue, QualityMetrics, QualitySummary } from "./types";
+import type { QualityIssue, QualityMetrics, QualitySummary } from "./types/ops";
 
 export const qualityApi = {
   summary: () => api.get<QualitySummary>("/quality/exceptions").then(r => r.data),

@@ -6,10 +6,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { CustomersPage } from "@/customers/CustomersPage";
 
-import * as catalog from "@/shared/api/catalog";
+import { counterpartiesApi, customersApi, leadsApi } from "@/shared/api/customers.api";
+import { orderFormFieldsApi } from "@/shared/api/orders.api";
+import type { OrderFormField } from "@/shared/api/types/forms";
 import { seedOptionSets } from "@fixtures/formFieldsSeed";
 import { resolveMockOnce } from "@fixtures/mock-api";
-vi.mock("@/shared/api/catalog")
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");
 vi.mock("@/customers/CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
 
 const customers = [
@@ -53,11 +67,11 @@ const counterparties = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  seedOptionSets(catalog);
-  vi.mocked(catalog.customersApi.list).mockResolvedValue(customers);
-  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.customersApi.detail).mockResolvedValue({
+  seedOptionSets();
+  vi.mocked(customersApi.list).mockResolvedValue(customers);
+  vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
+  vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
+  vi.mocked(customersApi.detail).mockResolvedValue({
     customer: customers[0],
     overview: {
       order_count: 1,
@@ -103,8 +117,8 @@ describe("CustomersPage：客户档案", () => {
   });
 
   it("从客户中心深链参数打开指定合作方卡片", async () => {
-    vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue(counterparties);
-    vi.mocked(catalog.counterpartiesApi.get).mockResolvedValue(counterparties[0]);
+    vi.mocked(counterpartiesApi.list).mockResolvedValue(counterparties);
+    vi.mocked(counterpartiesApi.get).mockResolvedValue(counterparties[0]);
     renderLight(<CustomersPage focusCounterpartyId={11} />);
     expect(await screen.findByText("合作方档案 · CP-0001")).toBeInTheDocument();
   });
@@ -127,13 +141,13 @@ describe("CustomersPage：客户档案", () => {
   });
 
   it("后端不可达时显示错误条而不是空白页", async () => {
-    vi.mocked(catalog.customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<CustomersPage />);
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
   it("FE-242：客户接口失败时统计显示不可用并保护依赖入口", async () => {
-    vi.mocked(catalog.customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "customers down" });
+    vi.mocked(customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "customers down" });
     renderLight(<CustomersPage />, { user: "admin" });
 
     expect(await screen.findByText("客户数据不可用，请点击重新加载")).toBeInTheDocument();
@@ -145,7 +159,7 @@ describe("CustomersPage：客户档案", () => {
   });
 
   it("业务错误码给出可执行的处置提示", async () => {
-    vi.mocked(catalog.customersApi.list).mockRejectedValueOnce({
+    vi.mocked(customersApi.list).mockRejectedValueOnce({
       isAxiosError: true,
       response: { data: { code: "PERMISSION_DENIED", message: "当前角色无此权限" } },
       message: "Request failed",
@@ -163,7 +177,7 @@ describe("CustomersPage：客户档案", () => {
 
   it("新建客户与合作方分别加载各自的表单字段配置", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(catalog.orderFormFieldsApi.list).mockImplementation(async (scope) => (
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => (
       scope === "CUSTOMER"
         ? [{ id: 101, order_type_code: "CUSTOMER", field_key: "display_name", label: "客户称呼", field_type: "TEXT", options: null, required: true, is_active: true, sort_order: 10, locked: false, is_custom: false, note: null }]
         : [{ id: 102, order_type_code: "COUNTERPARTY", field_key: "type", label: "合作类型", field_type: "SELECT", options: null, required: true, is_active: true, sort_order: 10, locked: false, is_custom: false, note: null }]
@@ -172,13 +186,13 @@ describe("CustomersPage：客户档案", () => {
     await screen.findByText("CUS-0001");
 
     await user.click(screen.getByRole("button", { name: /新建客户$/ }));
-    await waitFor(() => expect(catalog.orderFormFieldsApi.list).toHaveBeenCalledWith("CUSTOMER", true));
+    await waitFor(() => expect(orderFormFieldsApi.list).toHaveBeenCalledWith("CUSTOMER", true));
     expect(screen.getByLabelText("客户称呼")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Close" }));
     await user.click(screen.getByRole("tab", { name: /合作方/ }));
     await user.click((await screen.findByRole("button", { name: /新建合作方$/ })));
-    await waitFor(() => expect(catalog.orderFormFieldsApi.list).toHaveBeenCalledWith("COUNTERPARTY", true));
+    await waitFor(() => expect(orderFormFieldsApi.list).toHaveBeenCalledWith("COUNTERPARTY", true));
     expect(screen.getByLabelText("合作类型")).toBeInTheDocument();
   });
 
@@ -214,8 +228,8 @@ describe("CustomersPage：客户档案", () => {
 
   it("合作方复用客户的详情、编辑和拉黑操作", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue(counterparties);
-    vi.mocked(catalog.counterpartiesApi.get).mockResolvedValue(counterparties[0]);
+    vi.mocked(counterpartiesApi.list).mockResolvedValue(counterparties);
+    vi.mocked(counterpartiesApi.get).mockResolvedValue(counterparties[0]);
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
 
@@ -234,7 +248,7 @@ describe("CustomersPage：客户档案", () => {
 
   it("已合并（终态）客户行只保留详情，不暴露合并/拉黑/解除拉黑（L1595）", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(catalog.customersApi.list).mockResolvedValue([
+    vi.mocked(customersApi.list).mockResolvedValue([
       {
         id: 3,
         customer_no: "CUS-0010",
@@ -277,8 +291,8 @@ describe("CustomersPage：联系方式脱敏与按需查看", () => {
 
   it("脱敏行先显示打码值，点「查看」才向后端要明文并就地替换", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(catalog.customersApi.list).mockResolvedValue([masked]);
-    vi.mocked(catalog.customersApi.get).mockResolvedValue(revealedCustomer);
+    vi.mocked(customersApi.list).mockResolvedValue([masked]);
+    vi.mocked(customersApi.get).mockResolvedValue(revealedCustomer);
     renderLight(<CustomersPage />, { user: "admin" });
 
     expect(await screen.findByText("138****8888")).toBeInTheDocument();
@@ -287,7 +301,7 @@ describe("CustomersPage：联系方式脱敏与按需查看", () => {
 
     await user.click(screen.getAllByRole("button", { name: /查看/ })[0]);
 
-    await waitFor(() => expect(catalog.customersApi.get).toHaveBeenCalledWith(1, true));
+    await waitFor(() => expect(customersApi.get).toHaveBeenCalledWith(1, true));
     expect(await screen.findByText("13800008888")).toBeInTheDocument();
     // 三个联系字段一起放开
     expect(screen.getByText("zhangsan")).toBeInTheDocument();
@@ -296,8 +310,8 @@ describe("CustomersPage：联系方式脱敏与按需查看", () => {
 
   it("脱敏且未查看时，编辑保存不提交联系方式，避免打码值覆盖真实号码", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(catalog.customersApi.list).mockResolvedValue([masked]);
-    vi.mocked(catalog.customersApi.patch).mockResolvedValue(masked);
+    vi.mocked(customersApi.list).mockResolvedValue([masked]);
+    vi.mocked(customersApi.patch).mockResolvedValue(masked);
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("138****8888");
 
@@ -310,8 +324,8 @@ describe("CustomersPage：联系方式脱敏与按需查看", () => {
     await user.type(nameInput, "张三改");
     await user.click(screen.getByRole("button", { name: /保存/ }));
 
-    await waitFor(() => expect(catalog.customersApi.patch).toHaveBeenCalled());
-    const payload = vi.mocked(catalog.customersApi.patch).mock.calls[0][1] as Record<string, unknown>;
+    await waitFor(() => expect(customersApi.patch).toHaveBeenCalled());
+    const payload = vi.mocked(customersApi.patch).mock.calls[0][1] as Record<string, unknown>;
     expect(payload.display_name).toBe("张三改");
     expect(payload).not.toHaveProperty("phone");
     expect(payload).not.toHaveProperty("wechat");
@@ -335,7 +349,7 @@ describe("CustomersPage：行内动作", () => {
     { id: 2, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "credit_level", label: "信用评级", field_type: "SELECT", options: [{ value: "优质", label: "优质" }, { value: "一般", label: "一般" }, { value: "观察", label: "观察" }, { value: "黑名单", label: "黑名单" }], required: false, sort_order: 20, is_active: true },
     { id: 3, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "referrer", label: "转介绍人", field_type: "TEXT", options: null, required: false, sort_order: 30, is_active: true },
     { id: 4, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "legacy_note", label: "历史备注", field_type: "TEXT", options: null, required: false, sort_order: 40, is_active: false },
-  ] as unknown as import("@/shared/api/catalog").OrderFormField[];
+  ] as unknown as import("@/shared/api/types/forms").OrderFormField[];
 
   const customers = [
     { id: 1, customer_no: "CUS-0001", display_name: "张三", contact_name: "张", phone: "138", wechat: "z", qq: "1", status: "ACTIVE", note: "老客户", extra_values: { credit_level: "优质" } },
@@ -355,12 +369,12 @@ describe("CustomersPage：行内动作", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    seedOptionSets(catalog);
-    vi.mocked(catalog.customersApi.list).mockResolvedValue(customers as unknown as never);
-    vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue(counterparties as unknown as never);
-    vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue(fieldDefs as unknown as never);
-    vi.mocked(catalog.customersApi.detail).mockResolvedValue(detail as unknown as never);
-    vi.mocked(catalog.counterpartiesApi.get).mockResolvedValue(counterparties[0] as unknown as never);
+    seedOptionSets();
+    vi.mocked(customersApi.list).mockResolvedValue(customers as unknown as never);
+    vi.mocked(counterpartiesApi.list).mockResolvedValue(counterparties as unknown as never);
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue(fieldDefs as unknown as never);
+    vi.mocked(customersApi.detail).mockResolvedValue(detail as unknown as never);
+    vi.mocked(counterpartiesApi.get).mockResolvedValue(counterparties[0] as unknown as never);
   });
 
   describe("CustomersPage：客户与合作方操作流", () => {
@@ -370,7 +384,7 @@ describe("CustomersPage：行内动作", () => {
       await ui.click(screen.getAllByRole("button", { name: /拉\s*黑/ })[0]);
       const confirm = await screen.findByRole("button", { name: /确\s*定|确\s*认/ });
       await ui.click(confirm);
-      await waitFor(() => expect(vi.mocked(catalog.customersApi.setStatus)).toHaveBeenCalledWith(1, "DISABLED"));
+      await waitFor(() => expect(vi.mocked(customersApi.setStatus)).toHaveBeenCalledWith(1, "DISABLED"));
     });
 
     it("合并客户：选择目标与原因后提交调用 merge", async () => {
@@ -385,8 +399,8 @@ describe("CustomersPage：行内动作", () => {
       await ui.click(await within(current).findByText("CUS-0002 李四"));
       await ui.type(modal.querySelector("#reason") ?? modal, "重复建档合并");
       await ui.click(within(modal).getByRole("button", { name: /确认合并/ }));
-      await waitFor(() => expect(vi.mocked(catalog.customersApi.merge)).toHaveBeenCalled());
-      const [id, targetId, reason] = vi.mocked(catalog.customersApi.merge).mock.calls[0] as [number, number, string];
+      await waitFor(() => expect(vi.mocked(customersApi.merge)).toHaveBeenCalled());
+      const [id, targetId, reason] = vi.mocked(customersApi.merge).mock.calls[0] as [number, number, string];
       expect(id).toBe(1);
       expect(targetId).toBe(2);
       expect(reason).toBe("重复建档合并");
@@ -402,8 +416,8 @@ describe("CustomersPage：行内动作", () => {
       await ui.clear(screen.getByLabelText("名字"));
       await ui.type(screen.getByLabelText("名字"), "张三新");
       await ui.click(screen.getByRole("button", { name: /保\s*存/ }));
-      await waitFor(() => expect(vi.mocked(catalog.customersApi.patch)).toHaveBeenCalled());
-      const [id, payload] = vi.mocked(catalog.customersApi.patch).mock.calls[0] as [number, Record<string, unknown>];
+      await waitFor(() => expect(vi.mocked(customersApi.patch)).toHaveBeenCalled());
+      const [id, payload] = vi.mocked(customersApi.patch).mock.calls[0] as [number, Record<string, unknown>];
       expect(id).toBe(1);
       expect(payload.display_name).toBe("张三新");
     });
@@ -418,8 +432,8 @@ describe("CustomersPage：行内动作", () => {
       await ui.clear(screen.getByLabelText("名称"));
       await ui.type(screen.getByLabelText("名称"), "同行甲新");
       await ui.click(screen.getByRole("button", { name: /保\s*存/ }));
-      await waitFor(() => expect(vi.mocked(catalog.counterpartiesApi.patch)).toHaveBeenCalled());
-      const [id, payload] = vi.mocked(catalog.counterpartiesApi.patch).mock.calls[0] as [number, Record<string, unknown>];
+      await waitFor(() => expect(vi.mocked(counterpartiesApi.patch)).toHaveBeenCalled());
+      const [id, payload] = vi.mocked(counterpartiesApi.patch).mock.calls[0] as [number, Record<string, unknown>];
       expect(id).toBe(11);
       expect(payload.display_name).toBe("同行甲新");
     });
@@ -432,16 +446,16 @@ describe("CustomersPage：行内动作", () => {
       await ui.click(within(panel).getByRole("button", { name: /拉\s*黑/ }));
       const confirm = await screen.findByRole("button", { name: /确\s*定|确\s*认/ });
       await ui.click(confirm);
-      await waitFor(() => expect(vi.mocked(catalog.counterpartiesApi.setStatus)).toHaveBeenCalledWith(11, false));
+      await waitFor(() => expect(vi.mocked(counterpartiesApi.setStatus)).toHaveBeenCalledWith(11, false));
     });
   });
   // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("FE-194：客户 CSV 导出完成后给出成功反馈", async () => {
-    vi.mocked(catalog.customersApi.list).mockResolvedValueOnce([
+    vi.mocked(customersApi.list).mockResolvedValueOnce([
       { id: 1, customer_no: "CUS-0001", display_name: "测试客户", status: "ACTIVE" },
     ] as never);
-    vi.mocked(catalog.customersApi.exportCsv).mockResolvedValueOnce(new Blob(["csv"]) as never);
+    vi.mocked(customersApi.exportCsv).mockResolvedValueOnce(new Blob(["csv"]) as never);
     const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:customer");
     const revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
@@ -488,31 +502,31 @@ describe("CustomersPage：扩展字段（BAS-04）", () => {
       field_key: "legacy_note", label: "历史备注", field_type: "TEXT",
       options: null, required: false, sort_order: 40, is_active: false,
     },
-  ] as unknown as import("@/shared/api/catalog").OrderFormField[];
+  ] as unknown as import("@/shared/api/types/forms").OrderFormField[];
 
   beforeEach(() => {
     ui = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue(liveFieldDefs);
-    vi.mocked(catalog.leadsApi.list).mockResolvedValue([]);
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue(liveFieldDefs);
+    vi.mocked(leadsApi.list).mockResolvedValue([]);
   });
 
   it("列表按字段定义渲染扩展字段摘要列", async () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     expect(await screen.findByText(/信用评级：优质/)).toBeInTheDocument();
-    await waitFor(() => expect(vi.mocked(catalog.orderFormFieldsApi.list)).toHaveBeenCalledWith("CUSTOMER", true));
+    await waitFor(() => expect(vi.mocked(orderFormFieldsApi.list)).toHaveBeenCalledWith("CUSTOMER", true));
   });
 
   it("新建弹窗动态渲染扩展字段控件，提交时回传 extra_values", async () => {
-    resolveMockOnce(vi.mocked(catalog.customersApi.create), { customer: { id: 3 }, duplicate_candidates: [] });
+    resolveMockOnce(vi.mocked(customersApi.create), { customer: { id: 3 }, duplicate_candidates: [] });
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getByRole("button", { name: /新建/ }));
     await ui.type(await screen.findByLabelText("名字"), "王五");
     await ui.type(await screen.findByLabelText("转介绍人"), "老王");
     await ui.click(screen.getByRole("button", { name: /建\s*档/ }));
-    await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalled());
-    expect(vi.mocked(catalog.customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五", extra_values: { referrer: "老王" } });
+    await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五", extra_values: { referrer: "老王" } });
   });
 
   it("详情抽屉展示扩展字段值，停用字段标注保留历史值", async () => {
@@ -527,7 +541,7 @@ describe("CustomersPage：扩展字段（BAS-04）", () => {
   });
 
   it("扩展字段定义接口失败不阻断客户页渲染", async () => {
-    vi.mocked(catalog.orderFormFieldsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(orderFormFieldsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<CustomersPage />, { user: "admin" });
     expect(await screen.findByText("CUS-0001")).toBeInTheDocument();
   });

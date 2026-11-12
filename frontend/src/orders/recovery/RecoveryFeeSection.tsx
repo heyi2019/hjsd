@@ -1,6 +1,6 @@
 import { CfgItem, useFieldConfig, fieldLabel, sectionLabel } from "../ConfigurableField";
 import type { ReactNode } from "react";
-import type { Pool } from "../../shared/api/catalog";
+import type { Pool } from "../../shared/api/types/finance";
 import { BusinessRegistrationGroup, BusinessRegistrationSection, MoneyInput, Select } from "../../shared/ui";
 import { AdditionalFeeFields } from "../AdditionalFeeFields";
 import "./RecoveryFeeSection.css";

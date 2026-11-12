@@ -8,7 +8,7 @@ const apiMock = vi.hoisted(() => ({
 
 vi.mock("@/shared/api/client", () => ({ api: apiMock }));
 
-import { stocksApi } from "@/shared/api/catalog";
+import { stocksApi } from "@/shared/api/stocks.api";
 
 describe("stocksApi 路由", () => {
   beforeEach(() => {

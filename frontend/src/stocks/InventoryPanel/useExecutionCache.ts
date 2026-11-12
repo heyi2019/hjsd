@@ -1,5 +1,7 @@
 import { useLayoutEffect, useRef, useState, type Key, type Dispatch, type SetStateAction, type MutableRefObject } from "react";
-import { stocksApi, type Account, type AccountExecutionDetail } from "../../shared/api/catalog";
+import { stocksApi } from "../../shared/api/stocks.api";
+import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
+import type { Account } from "../../shared/api/types/accounts";
 import { normalizeError } from "../../shared/api/client";
 
 export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {

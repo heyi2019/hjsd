@@ -1,6 +1,6 @@
 import { Form } from "antd";
 import { useEffect, useMemo, useState } from "react";
-import type { EmployeeOption } from "../shared/api/catalog";
+import type { EmployeeOption } from "../shared/api/types/org";
 import { currentUser } from "../shared/api/client";
 import { useSession } from "../shared/state/session";
 import { Select } from "../shared/ui";

@@ -5,7 +5,10 @@ import { renderLight } from "@fixtures/render";
 import { RebatesPanel } from "@/rebates/RebatesPanel";
 import { resolveMockOnce } from "@fixtures/mock-api";
 
-import * as catalog from "@/shared/api/catalog";
+import { ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { rebatesApi } from "@/shared/api/rebates.api";
 import { seedOrderFormFields } from "@fixtures/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -13,7 +16,19 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-vi.mock("@/shared/api/catalog")
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");
 
 const rebates = [
   {
@@ -45,11 +60,11 @@ const pools = [{ id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERAT
 
 beforeEach(() => {
   vi.clearAllMocks();
-  seedOrderFormFields(catalog);
-  vi.mocked(catalog.rebatesApi.list).mockResolvedValue(rebates);
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
+  seedOrderFormFields();
+  vi.mocked(rebatesApi.list).mockResolvedValue(rebates);
+  vi.mocked(ordersApi.list).mockResolvedValue(orders);
+  vi.mocked(poolsApi.list).mockResolvedValue(pools);
+  vi.mocked(employeesApi.list).mockResolvedValue([]);
 });
 
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
@@ -78,20 +93,20 @@ describe("RebatesPanel：返点记录列表", () => {
   });
 
   it("后端不可达 → 错误条落地", async () => {
-    vi.mocked(catalog.rebatesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(rebatesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<RebatesPanel />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
   it("来源订单为空时禁用新增返点记录入口", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
+    vi.mocked(ordersApi.list).mockResolvedValue([]);
     renderLight(<RebatesPanel />, { user: "admin" });
     const addBtn = await screen.findByRole("button", { name: /新增返点记录/ });
     await waitFor(() => expect(addBtn).toBeDisabled());
   });
 
   it("FE-231：返点数据失败时统计不可用并禁用新增", async () => {
-    vi.mocked(catalog.rebatesApi.list).mockRejectedValueOnce(new Error("rebates down"));
+    vi.mocked(rebatesApi.list).mockRejectedValueOnce(new Error("rebates down"));
     renderLight(<RebatesPanel />, { user: "admin" });
     expect(await screen.findByText("返点明细")).toBeInTheDocument();
     expect(screen.getByText("返点记录数").closest(".ui-stat")).toHaveTextContent("不可用");
@@ -116,7 +131,7 @@ describe("RebatesPanel：新增返点记录 / 登记到账", () => {
   });
 
   it("新增返点记录提交后回传基数字符串与返点日期", async () => {
-    resolveMockOnce(vi.mocked(catalog.rebatesApi.create), { id: 3 });
+    resolveMockOnce(vi.mocked(rebatesApi.create), { id: 3 });
     renderLight(<RebatesPanel />, { user: "admin" });
     await screen.findByText("HS0001-RB01");
     await ui.click(screen.getByRole("button", { name: /新增返点记录/ }));
@@ -125,8 +140,8 @@ describe("RebatesPanel：新增返点记录 / 登记到账", () => {
     await pickSelect(modal, 0, /HS-2026-0010/);
     await ui.type(modal.querySelector("#base_amount") as Element, "1000.00");
     await ui.click(within(modal).getByRole("button", { name: /创\s*建/ }));
-    await waitFor(() => expect(vi.mocked(catalog.rebatesApi.create)).toHaveBeenCalled());
-    const payload = vi.mocked(catalog.rebatesApi.create).mock.calls[0][0] as Record<string, unknown>;
+    await waitFor(() => expect(vi.mocked(rebatesApi.create)).toHaveBeenCalled());
+    const payload = vi.mocked(rebatesApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload.source_order_id).toBe(10);
     expect(payload.base_amount).toBe("1000.00");
     expect(payload.collected_on).toMatch(/^\d{4}-\d{2}-\d{2}$/);

@@ -2,7 +2,8 @@
 
 import { Card, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { reportsApi, type OrderProfitReport, type OrderProfitRow } from "../../shared/api/catalog";
+import { reportsApi } from "../../shared/api/reports.api";
+import type { OrderProfitReport, OrderProfitRow } from "../../shared/api/types/reporting";
 import { ORDER_TYPE_LABEL } from "../../shared/lib/labels";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow, StatusTag } from "../../shared/ui";

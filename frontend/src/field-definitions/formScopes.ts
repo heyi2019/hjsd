@@ -1,7 +1,7 @@
 /** 表单作用域只来自后端注册表 GET /order-form-fields/scopes。 */
 
 import { useEffect, useState } from "react";
-import { orderFormFieldsApi } from "../shared/api/catalog";
+import { orderFormFieldsApi } from "../shared/api/orders.api";
 
 /** 作用域所属模块，设置面板按此分组展示。 */
 export const FORM_SCOPE_GROUP_LABEL: Record<string, string> = {

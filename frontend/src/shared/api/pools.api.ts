@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Pool, PoolBalance, PoolBalanceTotals, Reconciliation, TransferResult } from "./types";
+import type { Pool, PoolBalance, PoolBalanceTotals, Reconciliation, TransferResult } from "./types/finance";
 
 export const poolsApi = {
   update: (id: number, data: Partial<Pool>) => api.patch<Pool>(`/pools/${id}`, data).then(r => r.data),

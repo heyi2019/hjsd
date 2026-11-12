@@ -88,7 +88,7 @@ vi.mock("axios", () => {
 
 import axios from "axios";
 import { clearApiCache } from "@/shared/api/client";
-import { ordersApi } from "@/shared/api/catalog";
+import { ordersApi } from "@/shared/api/orders.api";
 
 function apiInstance() {
   return (axios as any).__instances[0];

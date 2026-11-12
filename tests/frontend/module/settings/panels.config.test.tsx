@@ -8,13 +8,27 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { seedOptionSets } from "@fixtures/formFieldsSeed";
-import * as catalog from "@/shared/api/catalog";
-import type { AuditLogRow } from "@/shared/api/catalog";
+import { sequencesApi } from "@/shared/api/misc.api";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { auditApi } from "@/shared/api/reports.api";
+import type { AuditLogRow } from "@/shared/api/types/ops";
 import { ConfigAuditPanel } from "@/field-definitions/panels/ConfigAuditPanel";
 import { SequencesPanel } from "@/field-definitions/panels/SequencesPanel";
 import { BusinessReminderSettingsPanel } from "@/field-definitions/panels/BusinessReminderSettingsPanel";
 
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const ROWS = [
   {
@@ -40,9 +54,9 @@ const ROWS = [
 describe("ConfigAuditPanel 配置改动追溯页", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    seedOptionSets(catalog);
-    vi.mocked(catalog.auditApi).list.mockResolvedValue({ items: ROWS, total: ROWS.length });
-    vi.mocked(catalog.auditApi).actions.mockResolvedValue(["ROUTE_UPDATE", "POOL_DISABLE"]);
+    seedOptionSets();
+    vi.mocked(auditApi).list.mockResolvedValue({ items: ROWS, total: ROWS.length });
+    vi.mocked(auditApi).actions.mockResolvedValue(["ROUTE_UPDATE", "POOL_DISABLE"]);
   });
 
   it("把 entity_type 翻成配置项名与对象类型，动作走审计动作中文表", async () => {
@@ -67,10 +81,10 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
     await screen.findByText("配置改动追溯");
 
     await waitFor(() =>
-      expect(vi.mocked(catalog.auditApi).list).toHaveBeenCalledWith(expect.objectContaining({ limit: 500 })),
+      expect(vi.mocked(auditApi).list).toHaveBeenCalledWith(expect.objectContaining({ limit: 500 })),
     );
     // 初始不传任何筛选
-    expect(vi.mocked(catalog.auditApi).list).not.toHaveBeenCalledWith(
+    expect(vi.mocked(auditApi).list).not.toHaveBeenCalledWith(
       expect.objectContaining({ entity_type: expect.any(String) }),
     );
   });
@@ -84,7 +98,7 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
   });
 
   it("展示新增审计动作的中文名称", async () => {
-    vi.mocked(catalog.auditApi).list.mockResolvedValue({
+    vi.mocked(auditApi).list.mockResolvedValue({
       items: [
         { ...ROWS[0], id: 3, action: "DEPOSIT_CANCEL" },
         { ...ROWS[0], id: 4, action: "REBATE_VOID" },
@@ -92,7 +106,7 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
       ],
       total: 3,
     });
-    vi.mocked(catalog.auditApi).actions.mockResolvedValue(["DEPOSIT_CANCEL", "REBATE_VOID", "IMPORT_REJECT"]);
+    vi.mocked(auditApi).actions.mockResolvedValue(["DEPOSIT_CANCEL", "REBATE_VOID", "IMPORT_REJECT"]);
     renderLight(<ConfigAuditPanel />, { user: "admin" });
 
     expect(await screen.findByText("取消押金")).toBeInTheDocument();
@@ -101,8 +115,8 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
   });
 
   it("加载失败时记录数标记为不可用并禁用筛选、提供重新加载（L346）", async () => {
-    vi.mocked(catalog.auditApi).list.mockRejectedValue(new Error("审计服务不可用"));
-    vi.mocked(catalog.auditApi).actions.mockResolvedValue(["ROUTE_UPDATE"]);
+    vi.mocked(auditApi).list.mockRejectedValue(new Error("审计服务不可用"));
+    vi.mocked(auditApi).actions.mockResolvedValue(["ROUTE_UPDATE"]);
     const { container } = renderLight(<ConfigAuditPanel />, { user: "admin" });
 
     // 失败态不再以“共 0 条”误导，记录数标记为不可用
@@ -120,7 +134,7 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
 
   it("FE-176：按动作筛选改动追溯并只保留匹配记录", async () => {
     const other = { ...ROWS[0], id: 9, actor: "finance", action: "POOL_DISABLE", entity_type: "Pool" } as AuditLogRow;
-    vi.mocked(catalog.auditApi).list.mockImplementation(async (params) =>
+    vi.mocked(auditApi).list.mockImplementation(async (params) =>
       params?.action === "ROUTE_UPDATE"
         ? { items: [ROWS[0]], total: 1 }
         : { items: [ROWS[0], other], total: 2 },
@@ -131,7 +145,7 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
     const actionSelect = document.querySelectorAll(".ui-filter-bar .ant-select")[1] as HTMLElement;
     await user.click(actionSelect.querySelector(".ant-select-selector") as HTMLElement);
     await user.click(await screen.findByText("更新资金路由", { selector: ".ant-select-item-option-content" }));
-    await waitFor(() => expect(vi.mocked(catalog.auditApi).list).toHaveBeenLastCalledWith(expect.objectContaining({ action: "ROUTE_UPDATE" })));
+    await waitFor(() => expect(vi.mocked(auditApi).list).toHaveBeenLastCalledWith(expect.objectContaining({ action: "ROUTE_UPDATE" })));
     expect(screen.getByText("admin")).toBeInTheDocument();
     expect(screen.queryByText("finance")).toBeNull();
   });
@@ -140,7 +154,7 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
 describe("SequencesPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(catalog.sequencesApi.list).mockResolvedValue([
+    vi.mocked(sequencesApi.list).mockResolvedValue([
       { sequence_key: "ORDER_HS", prefix: "HS", padding: 4, current_value: 128, next_number: "HS0129" },
       { sequence_key: "CASHFLOW_OUT", prefix: "ZC", padding: 5, current_value: 7, next_number: "ZC00008" },
     ]);
@@ -165,7 +179,7 @@ describe("SequencesPanel", () => {
   });
 
   it("分期合约号按业务订单号派生，不展示独立流水序列", async () => {
-    vi.mocked(catalog.sequencesApi.list).mockResolvedValue([
+    vi.mocked(sequencesApi.list).mockResolvedValue([
       { sequence_key: "INSTALLMENT", prefix: "FQ", padding: 4, current_value: 0, next_number: "FQ0001" },
     ]);
     renderLight(<SequencesPanel />, { user: "admin" });
@@ -177,7 +191,7 @@ describe("SequencesPanel", () => {
   });
 
   it("静态分组外的动态编号域落入「自定义编号域」兜底组（不静默丢失）", async () => {
-    vi.mocked(catalog.sequencesApi.list).mockResolvedValue([
+    vi.mocked(sequencesApi.list).mockResolvedValue([
       { sequence_key: "ORDER_HS", prefix: "HS", padding: 4, current_value: 128, next_number: "HS0129" },
       { sequence_key: "ORDER_QA5B", prefix: "QA5B", padding: 4, current_value: 0, next_number: "QA5B0001" },
     ]);
@@ -190,7 +204,7 @@ describe("SequencesPanel", () => {
   });
 
   it("加载失败时展示错误横幅（不静默）", async () => {
-    vi.mocked(catalog.sequencesApi.list).mockRejectedValueOnce({
+    vi.mocked(sequencesApi.list).mockRejectedValueOnce({
       isAxiosError: true,
       response: { data: { code: "INTERNAL", message: "编号序列加载失败" } },
       message: "Request failed",
@@ -202,7 +216,7 @@ describe("SequencesPanel", () => {
   // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-219：编号序列数据失败时不伪装成真实空列表", async () => {
-    vi.mocked(catalog.sequencesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "sequences down" });
+    vi.mocked(sequencesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "sequences down" });
     renderLight(<SequencesPanel />, { user: "admin" });
 
     expect(await screen.findByText("编号序列数据不可用，请点击重新加载")).toBeInTheDocument();
@@ -216,7 +230,7 @@ describe("BusinessReminderSettingsPanel", () => {
   });
 
   it("业务提醒读取失败时锁定保存按钮并提供重试入口（L1659）", async () => {
-    vi.mocked(catalog.optionSetsApi).get.mockRejectedValue(new Error("提醒配置读取失败"));
+    vi.mocked(optionSetsApi).get.mockRejectedValue(new Error("提醒配置读取失败"));
     renderLight(<BusinessReminderSettingsPanel />, { user: "admin" });
 
     // 错误态可见，不应误导用户为「已加载可编辑」
@@ -228,10 +242,10 @@ describe("BusinessReminderSettingsPanel", () => {
   });
 
   it("业务提醒正常加载后保存按钮可用（L1659 反向保障）", async () => {
-    vi.mocked(catalog.optionSetsApi).get.mockResolvedValue({
+    vi.mocked(optionSetsApi).get.mockResolvedValue({
       options: [{ value: "inventory_aging_days", label: "库存订单超过多少天提醒", value2: "7" }],
     } as never);
-    vi.mocked(catalog.optionSetsApi).update.mockResolvedValue(undefined as never);
+    vi.mocked(optionSetsApi).update.mockResolvedValue(undefined as never);
     renderLight(<BusinessReminderSettingsPanel />, { user: "admin" });
 
     await waitFor(() =>

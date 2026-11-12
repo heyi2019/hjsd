@@ -1,12 +1,8 @@
 import { Descriptions, Typography } from "antd";
 import type { ReactNode } from "react";
-import type {
-  Account,
-  AccountExecutionDetail,
-  AccountExecutionEvent,
-  AccountExecutionOrder,
-  EmployeeOption,
-} from "../shared/api/catalog";
+import type { AccountExecutionDetail, AccountExecutionEvent, AccountExecutionOrder } from "../shared/api/types/account-execution";
+import type { Account } from "../shared/api/types/accounts";
+import type { EmployeeOption } from "../shared/api/types/org";
 
 export type InventoryFinanceRow = {
   key: string;

@@ -3,17 +3,29 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
-import * as catalog from "@/shared/api/catalog";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { setupInventoryPanelMocks } from "@fixtures/InventoryPanel.test.fixtures";
 
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 setupInventoryPanelMocks();
 
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
-  vi.mocked(catalog.stocksApi.remove).mockResolvedValue(undefined);
+  vi.mocked(stocksApi.remove).mockResolvedValue(undefined);
 });
 
 describe("InventoryPanel：账号删除二次确认", () => {
@@ -33,16 +45,16 @@ describe("InventoryPanel：账号删除二次确认", () => {
     // 空原因：表单校验拦住，绝不发请求。
     await ui.click(confirm);
     expect(await within(dialog).findByText("请填写删除原因")).toBeInTheDocument();
-    expect(catalog.stocksApi.remove).not.toHaveBeenCalled();
+    expect(stocksApi.remove).not.toHaveBeenCalled();
 
     await ui.type(reasonInput, "重复录入，需清理");
     await ui.click(confirm);
     await waitFor(() => {
-      expect(catalog.stocksApi.remove).toHaveBeenCalledWith(1, "重复录入，需清理");
+      expect(stocksApi.remove).toHaveBeenCalledWith(1, "重复录入，需清理");
     });
     // 删除成功后重拉列表（首次渲染 + 删除后各一次）。
     await waitFor(() => {
-      expect(catalog.stocksApi.list).toHaveBeenCalledTimes(2);
+      expect(stocksApi.list).toHaveBeenCalledTimes(2);
     });
     // 不断言弹窗 DOM 是否消失：jsdom + antd Modal 在 open=false 后不移除节点，
     // 关闭行为须由真实浏览器验收（本仓既有结论，单测只锁请求与副作用）。
@@ -58,7 +70,7 @@ describe("InventoryPanel：账号删除二次确认", () => {
     await ui.click(within(dialog).getByRole("button", { name: "确认删除" }));
 
     expect(await within(dialog).findByText("删除原因不能为空")).toBeInTheDocument();
-    expect(catalog.stocksApi.remove).not.toHaveBeenCalled();
+    expect(stocksApi.remove).not.toHaveBeenCalled();
   });
 
   it("非管理员看不到删除键", async () => {
@@ -69,7 +81,7 @@ describe("InventoryPanel：账号删除二次确认", () => {
   });
 
   it("删除失败时弹窗保持打开，可改原因重试", async () => {
-    vi.mocked(catalog.stocksApi.remove).mockRejectedValue(new Error("该账号存在分期处置记录"));
+    vi.mocked(stocksApi.remove).mockRejectedValue(new Error("该账号存在分期处置记录"));
     renderLight(<InventoryPanel />, { user: "admin" });
 
     const deleteButtons = await screen.findAllByRole("button", { name: "删除账号" });
@@ -79,7 +91,7 @@ describe("InventoryPanel：账号删除二次确认", () => {
     await ui.click(within(dialog).getByRole("button", { name: "确认删除" }));
 
     await waitFor(() => {
-      expect(catalog.stocksApi.remove).toHaveBeenCalledTimes(1);
+      expect(stocksApi.remove).toHaveBeenCalledTimes(1);
     });
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });

@@ -1,4 +1,5 @@
-import type { Account, AccountExecutionDetail } from "../shared/api/catalog";
+import type { AccountExecutionDetail } from "../shared/api/types/account-execution";
+import type { Account } from "../shared/api/types/accounts";
 import { executionActionLabel } from "../shared/lib/format";
 import {
   BUSINESS_MODE_LABEL,

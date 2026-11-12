@@ -1,5 +1,5 @@
 import { Card, List } from "antd";
-import type { PolicyDefinition } from "../shared/api/catalog";
+import type { PolicyDefinition } from "../shared/api/types/policy";
 import { StatusTag } from "../shared/ui";
 
 interface PolicyMasterListProps {

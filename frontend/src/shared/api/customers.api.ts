@@ -1,5 +1,6 @@
 import { api } from "./client";
-import type { Counterparty, Customer, CustomerDetail, DuplicateCandidate, Lead, PageResponse } from "./types";
+import type { PageResponse } from "./types/common";
+import type { Counterparty, Customer, CustomerDetail, DuplicateCandidate, Lead } from "./types/customers";
 
 export const customersApi = {
   list: async (params?: { keyword?: string; status?: string; limit?: number; offset?: number }): Promise<Customer[]> => {

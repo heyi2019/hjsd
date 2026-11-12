@@ -1,5 +1,8 @@
 import { api } from "./client";
-import type { AuditEntityStat, AuditLogRow, BusinessPnlReport, CommissionReport, DailyFundsReport, FinanceDimensionReport, ImportBatch, ImportRow, MappingPreview, MonthlyPnlReport, OrderProfitReport, ReconciliationReport } from "./types";
+import type { FinanceDimensionReport } from "./types/finance";
+import type { ImportBatch, ImportRow, MappingPreview, ReconciliationReport } from "./types/imports";
+import type { AuditEntityStat, AuditLogRow } from "./types/ops";
+import type { BusinessPnlReport, CommissionReport, DailyFundsReport, MonthlyPnlReport, OrderProfitReport } from "./types/reporting";
 
 export const reportsApi = {
   financeDimensions: (params?: {from?: string; to?: string}) => api.get<FinanceDimensionReport>("/reports/finance-dimensions", {params}).then(r => r.data),

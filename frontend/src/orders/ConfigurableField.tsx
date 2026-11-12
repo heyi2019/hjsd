@@ -11,7 +11,8 @@ import { BusinessRegistrationField, Select } from "../shared/ui";
 import type { ReactElement, ReactNode } from "react";
 import { Children, cloneElement, createContext, isValidElement, useContext, useEffect, useState } from "react";
 import type { Rule } from "antd/es/form";
-import { orderFormFieldsApi, type OrderFormField, type RequiredWhen } from "../shared/api/catalog";
+import { orderFormFieldsApi } from "../shared/api/orders.api";
+import type { OrderFormField, RequiredWhen } from "../shared/api/types/forms";
 
 export type FieldConfigMap = Record<string, OrderFormField>;
 

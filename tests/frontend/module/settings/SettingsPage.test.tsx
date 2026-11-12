@@ -1,5 +1,23 @@
-import * as catalog from "@/shared/api/catalog";
-vi.mock("@/shared/api/catalog");
+import { gameTypesApi } from "@/shared/api/misc.api";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { orderFormFieldsApi, orderTypesApi } from "@/shared/api/orders.api";
+import { policyApi } from "@/shared/api/policy.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import type { Pool } from "@/shared/api/types/finance";
+import type { OrderType } from "@/shared/api/types/orders";
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 import * as client from "@/shared/api/client";
 vi.mock("@/shared/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/api/client")>()),
@@ -23,20 +41,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const orderTypes = [
   { id: 1, code: "HS", name: "回收", capital_type: "OWNED", is_active: true },
-] as unknown as import("@/shared/api/catalog").OrderType[];
+] as unknown as import("@/shared/api/types/orders").OrderType[];
 
 const pools = [
   { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
-] as unknown as import("@/shared/api/catalog").Pool[];
+] as unknown as import("@/shared/api/types/finance").Pool[];
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(orderTypes);
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
-  vi.mocked(catalog.optionSetsApi.list).mockResolvedValue({ items: [] });
-  vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(orderTypesApi.list).mockResolvedValue(orderTypes);
+  vi.mocked(poolsApi.list).mockResolvedValue(pools);
+  vi.mocked(optionSetsApi.list).mockResolvedValue({ items: [] });
+  vi.mocked(gameTypesApi.list).mockResolvedValue([]);
+  vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
+  vi.mocked(policyApi.list).mockResolvedValue({ items: [], total: 0 });
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
 });
 

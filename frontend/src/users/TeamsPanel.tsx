@@ -2,7 +2,8 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { Card, Form, Input } from "antd";
 import { useEffect, useState } from "react";
 import { normalizeError, type NormalizedError } from "../shared/api/client";
-import { teamsApi, type Team } from "../shared/api/catalog";
+import { teamsApi } from "../shared/api/org.api";
+import type { Team } from "../shared/api/types/org";
 import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton } from "../shared/ui";
 
 export function TeamsPanel() {

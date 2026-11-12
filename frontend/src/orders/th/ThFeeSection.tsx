@@ -1,5 +1,5 @@
 import { Form } from "antd";
-import type { Pool } from "../../shared/api/catalog";
+import type { Pool } from "../../shared/api/types/finance";
 import type { ReactNode } from "react";
 import { sumMoney } from "../../shared/lib/money";
 import { BusinessRegistrationGroup, BusinessRegistrationSection, MoneyInput, Select } from "../../shared/ui";

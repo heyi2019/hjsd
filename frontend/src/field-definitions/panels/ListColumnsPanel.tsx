@@ -17,12 +17,8 @@
 import { Input, InputNumber, Modal, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  listColumnsApi,
-  type ListColumnConfig,
-  type ListCustomFieldOption,
-  type ListScopeConfig,
-} from "../../shared/api/catalog";
+import { listColumnsApi } from "../../shared/api/orders.api";
+import type { ListColumnConfig, ListCustomFieldOption, ListScopeConfig } from "../../shared/api/types/forms";
 import { normalizeError } from "../../shared/api/client";
 import { refreshListColumns } from "../../shared/lib/listColumns";
 import {

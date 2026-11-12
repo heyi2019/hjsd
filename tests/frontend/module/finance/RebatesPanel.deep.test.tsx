@@ -5,7 +5,10 @@ import { renderLight } from "@fixtures/render";
 import { RebatesPanel } from "@/rebates/RebatesPanel";
 import { resolveMockOnce } from "@fixtures/mock-api";
 
-import * as catalog from "@/shared/api/catalog";
+import { ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { rebatesApi } from "@/shared/api/rebates.api";
 import { seedOrderFormFields } from "@fixtures/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -13,7 +16,19 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const orders = [
   { id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", status: "ACTIVE", account_business_mode: "SELF", account_game_type: "王者", account_game_account: "acc-x", party_name: "对手甲" },
@@ -28,11 +43,11 @@ const rebates = [
 ];
 beforeEach(() => {
   vi.clearAllMocks();
-  seedOrderFormFields(catalog);
-  vi.mocked(catalog.rebatesApi.list).mockResolvedValue(rebates as unknown as never);
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders as unknown as never);
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools as unknown as never);
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([] as unknown as never);
+  seedOrderFormFields();
+  vi.mocked(rebatesApi.list).mockResolvedValue(rebates as unknown as never);
+  vi.mocked(ordersApi.list).mockResolvedValue(orders as unknown as never);
+  vi.mocked(poolsApi.list).mockResolvedValue(pools as unknown as never);
+  vi.mocked(employeesApi.list).mockResolvedValue([] as unknown as never);
 });
 
 async function expandFirstRow() {
@@ -54,7 +69,7 @@ describe("RebatesPanel：返点明细 / 空态 / 错误重试", () => {
   });
 
   it("空列表：统计卡归零且表格空态", async () => {
-    vi.mocked(catalog.rebatesApi.list).mockResolvedValue([] as unknown as never);
+    vi.mocked(rebatesApi.list).mockResolvedValue([] as unknown as never);
     renderLight(<RebatesPanel />, { user: "admin" });
     expect(await screen.findByText("暂无返点记录")).toBeInTheDocument();
     // 返点页面不提供结算、冲销或取消状态。
@@ -62,7 +77,7 @@ describe("RebatesPanel：返点明细 / 空态 / 错误重试", () => {
   });
 
   it("加载失败显示错误条，点「重新加载」可重试成功", async () => {
-    vi.mocked(catalog.rebatesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" } as unknown as never);
+    vi.mocked(rebatesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" } as unknown as never);
     renderLight(<RebatesPanel />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ui-error-banner")).toBeTruthy());
     await ui.click(screen.getByRole("button", { name: /重新加载/ }));
@@ -70,7 +85,7 @@ describe("RebatesPanel：返点明细 / 空态 / 错误重试", () => {
   });
 
   it("操作人接口失败时按主列表错误处理，不伪造空操作人", async () => {
-    vi.mocked(catalog.employeesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" } as unknown as never);
+    vi.mocked(employeesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" } as unknown as never);
     renderLight(<RebatesPanel />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ui-error-banner")).toBeTruthy());
     expect(screen.queryByText("HS0001-RB01")).toBeNull();

@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { Form } from "antd";
 import type { ReactElement } from "react";
-import type { Pool, OrderFormField } from "@/shared/api/catalog";
+import type { Pool } from "@/shared/api/types/finance";
+import type { OrderFormField } from "@/shared/api/types/forms";
 import { renderLight } from "@fixtures/render";
 import { FieldConfigContext, type FieldConfigMap } from "@/orders/ConfigurableField";
 import { RecoveryFeeSection } from "@/orders/recovery/RecoveryFeeSection";

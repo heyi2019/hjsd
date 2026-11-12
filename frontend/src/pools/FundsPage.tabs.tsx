@@ -13,7 +13,7 @@ import {
   RECONCILIATION_STATUS_LABEL,
 } from "../shared/lib/labels";
 import type { FundsPageController } from "./useFundsPageController";
-import type { Cashflow, Deposit, Pool, Reconciliation } from "../shared/api/catalog";
+import type { Cashflow, Deposit, Pool, Reconciliation } from "../shared/api/types/finance";
 
 export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
   const { pools, balances, totalCash, totalAvailable, totalDeposit, totalOwned, transferForm, setTransferOpen, loading, fundsReady, error } = ctrl;

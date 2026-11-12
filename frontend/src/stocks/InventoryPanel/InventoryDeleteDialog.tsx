@@ -1,6 +1,6 @@
 import { Form, Input, Modal, Typography } from "antd";
 import { useEffect } from "react";
-import type { Account } from "../../shared/api/catalog";
+import type { Account } from "../../shared/api/types/accounts";
 
 /** 账号删除的二次确认框：点击行内「删除」不算数，必须在这里填写原因并再点「确认删除」。
  *

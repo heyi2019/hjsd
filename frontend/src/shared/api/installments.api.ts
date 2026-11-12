@@ -1,5 +1,6 @@
 import { api } from "./client";
-import type { Cashflow, Deposit, Installment, InstallmentCancelResult, InstallmentDisposition, InstallmentScheduleInput, Schedule } from "./types";
+import type { Cashflow, Deposit } from "./types/finance";
+import type { Installment, InstallmentCancelResult, InstallmentDisposition, InstallmentScheduleInput, Schedule } from "./types/installments";
 
 export const installmentsApi = {
   dispositions: (id: number) => api.get<InstallmentDisposition[]>(`/installments/${id}/dispositions`).then(r => r.data),

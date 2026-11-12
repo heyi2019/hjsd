@@ -1,7 +1,7 @@
 /** 报表页底部的单报表导出按钮：按当前页筛选导出该报表 CSV（替代原顶部统一导出卡）。 */
 
 import { useState } from "react";
-import { reportsApi } from "../../shared/api/catalog";
+import { reportsApi } from "../../shared/api/reports.api";
 import { normalizeError } from "../../shared/api/client";
 import { PermissionButton } from "../../shared/ui";
 import { appMessage } from "../../shared/ui/appFeedback";

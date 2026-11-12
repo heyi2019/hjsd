@@ -4,19 +4,14 @@ import { Form } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useRef, useState } from "react";
 import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection } from "./ConfigurableField";
-import {
-  counterpartiesApi,
-  customersApi,
-  gameTypesApi,
-  ordersApi,
-  poolsApi,
-  employeesApi,
-  type Counterparty,
-  type Customer,
-  type GameTypeOption,
-  type Pool,
-  type EmployeeOption,
-} from "../shared/api/catalog";
+import { counterpartiesApi, customersApi } from "../shared/api/customers.api";
+import { gameTypesApi } from "../shared/api/misc.api";
+import { ordersApi } from "../shared/api/orders.api";
+import { employeesApi } from "../shared/api/org.api";
+import { poolsApi } from "../shared/api/pools.api";
+import type { Counterparty, Customer } from "../shared/api/types/customers";
+import type { Pool } from "../shared/api/types/finance";
+import type { EmployeeOption, GameTypeOption } from "../shared/api/types/org";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { BusinessActionModal, BusinessRegistrationForm, ConfirmDialog, ErrorBanner, PermissionButton } from "../shared/ui";

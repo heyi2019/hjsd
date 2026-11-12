@@ -1,5 +1,9 @@
 import { api } from "./client";
-import type { EventPostResult, FormScope, ListColumnConfig, ListCustomFieldOption, ListScopeConfig, Order, OrderFormField, OrderLink, OrderType, OrderTypeRoute, PageResponse, RouteImpactPreview, SearchResult } from "./types";
+import type { PageResponse, SearchResult } from "./types/common";
+import type { FormScope, ListColumnConfig, ListCustomFieldOption, ListScopeConfig, OrderFormField } from "./types/forms";
+import type { EventPostResult, OrderLink } from "./types/order-events";
+import type { Order, OrderType, OrderTypeRoute } from "./types/orders";
+import type { RouteImpactPreview } from "./types/policy";
 
 export const orderTypesApi = {
   update: (id: number, data: Partial<OrderType>) => api.patch<OrderType>(`/order-types/${id}`, data).then(r => r.data),

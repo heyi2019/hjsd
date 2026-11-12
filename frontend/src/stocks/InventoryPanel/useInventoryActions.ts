@@ -1,7 +1,14 @@
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Form } from "antd";
 import { useState, type Key, type Dispatch, type SetStateAction } from "react";
-import { stocksApi, employeesApi, ordersApi, poolsApi, type Account, type AccountExecutionDetail, type EmployeeOption, type Pool } from "../../shared/api/catalog";
+import { ordersApi } from "../../shared/api/orders.api";
+import { employeesApi } from "../../shared/api/org.api";
+import { poolsApi } from "../../shared/api/pools.api";
+import { stocksApi } from "../../shared/api/stocks.api";
+import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
+import type { Account } from "../../shared/api/types/accounts";
+import type { Pool } from "../../shared/api/types/finance";
+import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { consignmentRecords, type ActiveConsignment } from "../InventoryPlatformOffsaleModal";

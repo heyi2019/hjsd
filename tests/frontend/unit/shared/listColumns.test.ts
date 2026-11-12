@@ -2,7 +2,7 @@
  *  口径：无配置原样返回；未知列视为可见并排末尾；隐藏列剔除。 */
 import { describe, expect, it } from "vitest";
 import { MOBILE_HIDE_CLASS, applyColumnConfig, columnKey, formatCustomValue, markMobileHiddenColumns, orderMobileFields, readCustomValue } from "@/shared/lib/listColumns";
-import type { ListScopeConfig } from "@/shared/api/catalog";
+import type { ListScopeConfig } from "@/shared/api/types/forms";
 
 const config: ListScopeConfig = {
   code: "LEDGER",

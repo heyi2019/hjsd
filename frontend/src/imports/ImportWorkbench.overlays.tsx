@@ -2,7 +2,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { useEffect } from "react";
 import { Form, Input, Typography, Upload } from "antd";
 
-import { importsApi } from "../shared/api/catalog";
+import { importsApi } from "../shared/api/reports.api";
 import { normalizeError } from "../shared/api/client";
 import { BusinessActionModal, BusinessRegistrationForm, FormDrawer, InlineError, PermissionButton, Select } from "../shared/ui";
 

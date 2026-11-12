@@ -1,15 +1,43 @@
+import { counterpartiesApi, customersApi, leadsApi } from "@/shared/api/customers.api";
+import { depositsApi, installmentsApi } from "@/shared/api/installments.api";
+import { attachmentsApi, gameTypesApi, notificationsApi, sequencesApi } from "@/shared/api/misc.api";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { listColumnsApi, orderFormFieldsApi, orderTypesApi, searchApi } from "@/shared/api/orders.api";
+import { employeesApi, teamsApi, usersApi } from "@/shared/api/org.api";
+import { policyApi } from "@/shared/api/policy.api";
+import { poolsApi, reconciliationsApi, transfersApi } from "@/shared/api/pools.api";
+import { qualityApi } from "@/shared/api/quality.api";
+import { rebatesApi } from "@/shared/api/rebates.api";
+import { auditApi, importsApi } from "@/shared/api/reports.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as catalog from "@/shared/api/catalog";
-vi.mock("@/shared/api/catalog");
+import { cashflowsApi } from "@/shared/api/cashflows.api";
+import { ordersApi } from "@/shared/api/orders.api";
+import { reportsApi } from "@/shared/api/reports.api";
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");
 import { renderApp } from "@fixtures/render";
 import { AppShell } from "@/app/AppShell";
 import { navigation } from "@/app/navigation";
 import { MemoryRouter } from "react-router-dom";
 
 let ui: ReturnType<typeof userEvent.setup>;
+
+const __allApi = { cashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, searchApi, employeesApi, teamsApi, usersApi, policyApi, poolsApi, reconciliationsApi, transfersApi, qualityApi, rebatesApi, auditApi, importsApi, reportsApi, stocksApi };
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
@@ -59,9 +87,9 @@ vi.mock("@/auth/UserCenterPage", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  for (const key of Object.keys(catalog)) {
+  for (const key of Object.keys(__allApi)) {
     if (!key.endsWith("Api")) continue;
-    const apiObj = (catalog as Record<string, unknown>)[key] as Record<string, unknown>;
+    const apiObj = (__allApi as Record<string, unknown>)[key] as Record<string, unknown>;
     if (!apiObj || typeof apiObj !== "object") continue;
     for (const method of Object.keys(apiObj)) {
       const fn = (apiObj as Record<string, unknown>)[method];
@@ -75,7 +103,7 @@ beforeEach(() => {
   }
   // 资金流水接口返回分页包裹体（items/total），与 Batch 2 后 FundsPage 的消费方式对齐；
   // 通用兜底只给 []，会导致 response.items 为 undefined 进而 .filter 崩溃。
-  vi.mocked(catalog.cashflowsApi.list).mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(cashflowsApi.list).mockResolvedValue({ items: [], total: 0 });
 });
 
 async function renderShell(options: { user?: string; initialPath?: string } = {}) {
@@ -186,13 +214,13 @@ describe("AppShell：角色展示与退出", () => {
 
     await ui.click(within(dashboard).getByRole("button", { name: /我的订单/ }));
     expect(await screen.findByRole("tab", { name: "订单台账" })).toHaveAttribute("aria-selected", "true");
-    expect(vi.mocked(catalog.ordersApi.list)).toHaveBeenCalledWith({ mine: true });
+    expect(vi.mocked(ordersApi.list)).toHaveBeenCalledWith({ mine: true });
 
     await ui.click(screen.getByRole("button", { name: "工作台" }));
     await ui.click(screen.getByRole("button", { name: /我的收益/ }));
     const commissionTab = await screen.findByRole("tab", { name: "提成对账 R3" });
     expect(commissionTab).toHaveAttribute("aria-selected", "true");
-    expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenCalledWith({ mine: true });
+    expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith({ mine: true });
   });
 
   it("顶栏用户中心入口可打开弹窗", async () => {

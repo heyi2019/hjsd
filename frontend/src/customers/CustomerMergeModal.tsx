@@ -1,6 +1,6 @@
 import { Form, Input } from "antd";
 import type { FormInstance } from "antd";
-import type { Customer } from "../shared/api/catalog";
+import type { Customer } from "../shared/api/types/customers";
 import { BusinessActionModal, BusinessRegistrationForm, CompactActions, PermissionButton, Select } from "../shared/ui";
 
 export function CustomerMergeModal({

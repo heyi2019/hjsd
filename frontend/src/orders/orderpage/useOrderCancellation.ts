@@ -1,14 +1,12 @@
 import { Form } from "antd";
 import { useState } from "react";
-import {
-  employeesApi,
-  installmentsApi,
-  ordersApi,
-  poolsApi,
-  type Installment,
-  type Order,
-  type Pool,
-} from "../../shared/api/catalog";
+import { installmentsApi } from "../../shared/api/installments.api";
+import { ordersApi } from "../../shared/api/orders.api";
+import { employeesApi } from "../../shared/api/org.api";
+import { poolsApi } from "../../shared/api/pools.api";
+import type { Pool } from "../../shared/api/types/finance";
+import type { Installment } from "../../shared/api/types/installments";
+import type { Order } from "../../shared/api/types/orders";
 import { currentDevUser, currentUser, normalizeError } from "../../shared/api/client";
 import { money, today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";

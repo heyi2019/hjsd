@@ -5,35 +5,30 @@ import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
 import { consignmentRecords } from "@/stocks/InventoryPlatformOffsaleModal";
-import * as catalog from "@/shared/api/catalog";
+import { installmentsApi } from "@/shared/api/installments.api";
+import { ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock } from "@fixtures/mock-api";
 import { seedOptionSets } from "@fixtures/formFieldsSeed";
-import type { Account, AccountExecutionDetail, Installment } from "@/shared/api/catalog";
+import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";
+import type { Account } from "@/shared/api/types/accounts";
+import type { Installment } from "@/shared/api/types/installments";
 
-vi.mock("@/shared/api/catalog", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/shared/api/catalog")>();
-  const METHODS = [
-    "list", "get", "create", "update", "patch", "post", "postEvent", "remove", "cancel", "skip", "markUnlinked",
-    "setStatus", "setActive", "resolve", "release", "settle", "approve", "reject",
-    "reverse", "close", "convert", "detail", "allocations", "setAllocations",
-    "balance", "executionDetail", "inventoryStats", "updateProfile", "updateExecution", "merge", "search",
-  ];
-  const mk = (api: Record<string, unknown>) => {
-    const o: Record<string, unknown> = { ...api };
-    for (const m of METHODS) {
-      if (m in o) o[m] = vi.fn();
-    }
-    return o;
-  };
-  const out: Record<string, unknown> = { ...actual };
-  for (const key of Object.keys(actual)) {
-    const v = (actual as Record<string, unknown>)[key];
-    if (v && typeof v === "object" && !Array.isArray(v) && Object.values(v as object).some((x) => typeof x === "function")) {
-      out[key] = mk(v as Record<string, unknown>);
-    }
-  }
-  return out as unknown as typeof actual;
-});
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -98,8 +93,8 @@ const consignmentDetail = {
 const contract = { id: 21, inst_no: "INS-21", order_id: 77, contract_type: "INSTALLMENT", status: "ACTIVE" } as unknown as Installment;
 
 async function openPanel(rows: Account[]) {
-  resolveMock(vi.mocked(catalog.stocksApi.list), rows);
-  vi.mocked(catalog.stocksApi.inventoryStats).mockResolvedValue({ account_count: rows.length, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
+  resolveMock(vi.mocked(stocksApi.list), rows);
+  vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: rows.length, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
   renderLight(<InventoryPanel />, { user: "admin" });
   await waitFor(() => expect(document.querySelector("tbody tr")).toBeTruthy());
 }
@@ -120,12 +115,12 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   URL.createObjectURL = vi.fn().mockReturnValue("blob:mock");
   URL.revokeObjectURL = vi.fn();
-  seedOptionSets(catalog);
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.installmentsApi.list).mockResolvedValue([contract]);
-  vi.mocked(catalog.installmentsApi.cancel).mockResolvedValue({} as never);
-  vi.mocked(catalog.ordersApi.postEvent).mockResolvedValue({} as never);
-  vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(sellDetail);
+  seedOptionSets();
+  vi.mocked(employeesApi.list).mockResolvedValue([]);
+  vi.mocked(installmentsApi.list).mockResolvedValue([contract]);
+  vi.mocked(installmentsApi.cancel).mockResolvedValue({} as never);
+  vi.mocked(ordersApi.postEvent).mockResolvedValue({} as never);
+  vi.mocked(stocksApi.executionDetail).mockResolvedValue(sellDetail);
   vi.spyOn(message, "success").mockImplementation((() => undefined) as never);
   vi.spyOn(message, "error").mockImplementation((() => undefined) as never);
   vi.spyOn(message, "warning").mockImplementation((() => undefined) as never);
@@ -155,7 +150,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
   });
 
   it("取消弹窗要求退回金额和收款账户，并按填写值冲销", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
       account: inStockRow,
       orders: [{
         order_id: 21,
@@ -164,7 +159,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
         events: [{ id: 31, event_type: "BUY", amount: "100.00", cancellable_amount: "100.00", portion: "PRINCIPAL", is_posted: true }],
       }],
     } as unknown as AccountExecutionDetail);
-    vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
+    vi.mocked(poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
     await openPanel([inStockRow]);
     const cancelRow = (await screen.findByText("acc-1")).closest("tr") as HTMLElement;
     await clickMore(cancelRow, "取消");
@@ -186,14 +181,14 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     await ui.type(within(modal).getByLabelText("取消原因"), "取消");
     await ui.click(within(modal).getByRole("button", { name: /确认下架/ }));
 
-    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
       21,
       expect.objectContaining({ amount: "80", pool_id: 3, event_type: "CANCEL" }),
     ));
   });
 
   it("FE-264：系统下架完整提交关闭弹窗并给出成功结果", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
       account: inStockRow,
       orders: [{
         order_id: 21,
@@ -202,7 +197,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
         events: [{ id: 31, event_type: "BUY", amount: "100.00", cancellable_amount: "100.00", portion: "PRINCIPAL", is_posted: true }],
       }],
     } as unknown as AccountExecutionDetail);
-    vi.mocked(catalog.poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
+    vi.mocked(poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
     await openPanel([inStockRow]);
     await clickMore(rowOf(1), "取消");
     const modal = await screen.findByRole("dialog");
@@ -213,12 +208,12 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     await ui.type(within(modal).getByLabelText("取消原因"), "系统下架回归");
     await ui.click(within(modal).getByRole("button", { name: /确认下架/ }));
 
-    await waitFor(() => expect(catalog.ordersApi.postEvent).toHaveBeenCalledWith(21, expect.objectContaining({ event_type: "CANCEL", amount: "80", pool_id: 3 })));
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(21, expect.objectContaining({ event_type: "CANCEL", amount: "80", pool_id: 3 })));
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("账号已下架"));
   });
 
   it("代挂下架平台选项包含本系统并显示入库时间", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(consignmentDetail);
+    vi.mocked(stocksApi.executionDetail).mockResolvedValue(consignmentDetail);
     await openPanel([consignmentRow]);
     await clickMore(rowOf(1), "下架");
 
@@ -242,8 +237,8 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
   });
 
   it("代挂选择本系统下架时直接取消代挂订单并退出库存中心", async () => {
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValue(consignmentDetail);
-    vi.mocked(catalog.ordersApi.cancel).mockResolvedValue({ status: "CANCELLED" } as never);
+    vi.mocked(stocksApi.executionDetail).mockResolvedValue(consignmentDetail);
+    vi.mocked(ordersApi.cancel).mockResolvedValue({ status: "CANCELLED" } as never);
     await openPanel([consignmentRow]);
     await clickMore(rowOf(1), "下架");
 
@@ -253,7 +248,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     await ui.type(screen.getByLabelText("下架原因"), "代挂结束");
     await ui.click(screen.getByRole("button", { name: "确认出库" }));
 
-    await waitFor(() => expect(catalog.ordersApi.cancel).toHaveBeenCalledWith(
+    await waitFor(() => expect(ordersApi.cancel).toHaveBeenCalledWith(
       88,
       expect.objectContaining({
         reason: "代挂结束",
@@ -267,23 +262,23 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
   it("导出：读取明细并提示失败条数", async () => {
     const secondInStockRow = { ...inStockRow, id: 4, game_account: "acc-4" } as unknown as Account;
     await openPanel([inStockRow, secondInStockRow]);
-    vi.mocked(catalog.stocksApi.executionDetail)
+    vi.mocked(stocksApi.executionDetail)
       .mockResolvedValueOnce(sellDetail)
       .mockRejectedValueOnce(new Error("detail down"));
     await ui.click(screen.getByRole("button", { name: /导出/ }));
-    await waitFor(() => expect(catalog.stocksApi.executionDetail).toHaveBeenCalled());
+    await waitFor(() => expect(stocksApi.executionDetail).toHaveBeenCalled());
     await waitFor(() => expect(message.warning).toHaveBeenCalledWith("1 条明细读取失败，已导出其余可用字段"));
   });
 
   it("导出成功后给出完成反馈", async () => {
     await openPanel([inStockRow]);
-    vi.mocked(catalog.stocksApi.executionDetail).mockResolvedValueOnce(sellDetail);
+    vi.mocked(stocksApi.executionDetail).mockResolvedValueOnce(sellDetail);
     await ui.click(screen.getByRole("button", { name: /导出/ }));
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("库存 CSV 已导出"));
   });
 
   it("FE-258：图片资料保存失败时保留弹窗并显示可重试错误态", async () => {
-    vi.mocked(catalog.stocksApi.updateProfile).mockRejectedValueOnce(new Error("image save timeout"));
+    vi.mocked(stocksApi.updateProfile).mockRejectedValueOnce(new Error("image save timeout"));
     await openPanel([inStockRow]);
     await clickMore(rowOf(1), "作图");
     await ui.click(screen.getByRole("button", { name: /保存/ }));

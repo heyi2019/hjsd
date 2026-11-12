@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { findCancelableBuy, findCancelableEvent, findCancelableSale } from "@/stocks/InventoryPanel";
-import type { AccountExecutionDetail } from "@/shared/api/catalog";
+import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";
 
 /**
  * 用最小结构拼装 execution detail，只覆盖被测函数实际读取的字段。

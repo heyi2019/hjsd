@@ -3,7 +3,9 @@
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useEffect, useState } from "react";
-import { employeesApi, reportsApi, type CommissionReport, type CommissionRow } from "../../shared/api/catalog";
+import { employeesApi } from "../../shared/api/org.api";
+import { reportsApi } from "../../shared/api/reports.api";
+import type { CommissionReport, CommissionRow } from "../../shared/api/types/reporting";
 import { normalizeError } from "../../shared/api/client";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, Select, StatRow } from "../../shared/ui";

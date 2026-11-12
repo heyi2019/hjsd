@@ -1,16 +1,10 @@
 import { useEffect, useState } from "react";
 import { Form } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
-import {
-  cashflowsApi,
-  depositsApi,
-  reconciliationsApi,
-  transfersApi,
-  type Cashflow,
-  type Deposit,
-  type PoolBalance,
-  type Reconciliation,
-} from "../shared/api/catalog";
+import { cashflowsApi } from "../shared/api/cashflows.api";
+import { depositsApi } from "../shared/api/installments.api";
+import { reconciliationsApi, transfersApi } from "../shared/api/pools.api";
+import type { Cashflow, Deposit, PoolBalance, Reconciliation } from "../shared/api/types/finance";
 import { ACCOUNTING_ATTRIBUTE_LABEL } from "../shared/lib/labels";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { ALLOWED_ATTRIBUTES_BY_FUND_NATURE, deriveCashflowNature } from "./FundsPage.fragments";

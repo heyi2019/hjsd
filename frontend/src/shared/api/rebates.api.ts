@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Rebate } from "./types";
+import type { Rebate } from "./types/finance";
 
 export const rebatesApi = {
   list: (params?: { source_order_id?: number }) =>

@@ -1,6 +1,6 @@
 import { Card, Descriptions, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { PolicyDefinition, PolicyVersion } from "../shared/api/catalog";
+import type { PolicyDefinition, PolicyVersion } from "../shared/api/types/policy";
 import { ConfirmButton, DataTable, PermissionButton, StatusTag } from "../shared/ui";
 import { describeConfig } from "./policyConfigSchema";
 

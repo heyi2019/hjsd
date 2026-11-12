@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { PolicyDefinition, PolicyVersion, ProfitAllocation } from "./types";
+import type { PolicyDefinition, PolicyVersion, ProfitAllocation } from "./types/policy";
 
 export const policyApi = {
   list: (params?: { status?: string; policy_code?: string }) =>

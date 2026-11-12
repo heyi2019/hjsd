@@ -5,7 +5,10 @@ import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 
-import * as catalog from "@/shared/api/catalog";
+import { ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { reportsApi } from "@/shared/api/reports.api";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -22,26 +25,38 @@ afterAll(() => {
   vi.restoreAllMocks();
 });
 
-vi.mock("@/shared/api/catalog")
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resolveMock(vi.mocked(catalog.reportsApi.monthlyPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(catalog.reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
-  resolveMock(vi.mocked(catalog.reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
-  resolveMock(vi.mocked(catalog.reportsApi.financeDimensions), { items: [], total_amount: "0", total_signed_amount: "0" });
-  resolveMock(vi.mocked(catalog.reportsApi.businessPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(catalog.reportsApi.orderProfit), { items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
-  resolveMock(vi.mocked(catalog.reportsApi.exportCsv), new Blob(["csv"]));
+  resolveMock(vi.mocked(reportsApi.monthlyPnl), { items: [], total: {} });
+  resolveMock(vi.mocked(reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
+  vi.mocked(employeesApi.list).mockResolvedValue([]);
+  resolveMock(vi.mocked(reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
+  resolveMock(vi.mocked(reportsApi.financeDimensions), { items: [], total_amount: "0", total_signed_amount: "0" });
+  resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
+  resolveMock(vi.mocked(reportsApi.orderProfit), { items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
+  resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
+  vi.mocked(poolsApi.list).mockResolvedValue([]);
   // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
-  resolveMock(vi.mocked(catalog.poolsApi.balances), {
+  resolveMock(vi.mocked(poolsApi.balances), {
     items: [],
     totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
+  vi.mocked(ordersApi.list).mockResolvedValue([]);
 });
 
 async function gotoTab(label: string) {
@@ -50,7 +65,7 @@ async function gotoTab(label: string) {
 
 describe("ReportsPage：各报表渲染与错误态", () => {
   it("R2 月度损益：渲染月份与销售收入", async () => {
-    resolveMockOnce(vi.mocked(catalog.reportsApi.monthlyPnl), {
+    resolveMockOnce(vi.mocked(reportsApi.monthlyPnl), {
       from: "2026-09",
       to: "2026-09",
       total: {},
@@ -72,7 +87,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
   });
 
   it("R5 业务损益：渲染业务与主营收入", async () => {
-    resolveMock(vi.mocked(catalog.reportsApi.businessPnl), {
+    resolveMock(vi.mocked(reportsApi.businessPnl), {
       items: [
         {
           order_type: "HS",
@@ -90,7 +105,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
   });
 
   it("订单利润：渲染订单号与净额", async () => {
-    resolveMockOnce(vi.mocked(catalog.reportsApi.orderProfit), {
+    resolveMockOnce(vi.mocked(reportsApi.orderProfit), {
       from: null,
       to: null,
       total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" },
@@ -113,7 +128,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
   });
 
   it("订单利润：单独展示账号采购成本", async () => {
-    resolveMockOnce(vi.mocked(catalog.reportsApi.orderProfit), {
+    resolveMockOnce(vi.mocked(reportsApi.orderProfit), {
       from: null,
       to: null,
       total: { income: "600.00", buy_amount: "400.00", direct_cost: "50.00", rebate: "10.00", net_profit: "160.00" },
@@ -137,7 +152,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
   // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-169：订单利润展示采购成本并给出可复算口径", async () => {
-    vi.mocked(catalog.reportsApi.orderProfit).mockResolvedValueOnce({
+    vi.mocked(reportsApi.orderProfit).mockResolvedValueOnce({
       items: [{
         order_id: 11,
         order_no: "HS-2026-0011",

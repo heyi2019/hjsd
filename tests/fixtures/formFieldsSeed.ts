@@ -5,7 +5,9 @@
  * 有 options 时才注入）。各测试文件在 beforeEach 调 seedOrderFormFields 即可零改动
  * 获得与原硬编码一致的选项集（功能开启后零行为变化）。
  */
-import type { OrderFormField } from "@/shared/api/catalog";
+import type { OrderFormField } from "@/shared/api/types/forms";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { orderFormFieldsApi } from "@/shared/api/orders.api";
 
 type SeedDef = {
   key: string;
@@ -124,11 +126,9 @@ export function allFormFields(): OrderFormField[] {
  * 把 orderFormFieldsApi.list 桩成返回完整种子（按 scope 过滤），让任意测试打开任意
  * 业务弹窗都能拿到与原硬编码一致的选项。includeInactive 在测试种子里忽略。
  */
-export function seedOrderFormFields(catalog: {
-  orderFormFieldsApi: { list: (scope: string, includeInactive?: boolean) => unknown };
-}): void {
+export function seedOrderFormFields(): void {
   const all = allFormFields();
-  (catalog.orderFormFieldsApi.list as unknown as { mockResolvedValue(value: unknown): void }).mockResolvedValue(all);
+  (orderFormFieldsApi.list as unknown as { mockResolvedValue(value: unknown): void }).mockResolvedValue(all);
 }
 
 /** T20：选项词典种子与当前 ORM 基线一致。 */
@@ -458,10 +458,8 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
 ];
 
 /** 桩 optionSetsApi.list 返回完整种子，供库存/资金筛选器测试拿到筛选项。 */
-export function seedOptionSets(catalog: {
-  optionSetsApi: { list: (params?: { group?: string; editable?: boolean }) => unknown };
-}): void {
+export function seedOptionSets(): void {
   const payload = { items: OPTION_SET_SEED.map((s) => ({ id: 1, ...s })) };
-  (catalog.optionSetsApi.list as unknown as { mockResolvedValue(value: unknown): void }).mockResolvedValue(payload);
+  (optionSetsApi.list as unknown as { mockResolvedValue(value: unknown): void }).mockResolvedValue(payload);
 }
 

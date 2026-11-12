@@ -1,4 +1,4 @@
-import type { Account } from "../shared/api/catalog";
+import type { Account } from "../shared/api/types/accounts";
 import "./InventoryAccountSummary.css";
 
 /** 库存账号操作弹窗共用的左侧紧凑业务摘要。 */

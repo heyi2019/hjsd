@@ -5,7 +5,8 @@
  * - 全款收款：在原入库订单上登记 SELL 事件，金额作为 PROFIT 份额入账（代挂无买入价，利润即售出金额）。
  * - 分期收款：建立库存分期出售合同（STOCK_SALE），买家分期支付。
  */
-import { installmentsApi, ordersApi } from "../shared/api/catalog";
+import { installmentsApi } from "../shared/api/installments.api";
+import { ordersApi } from "../shared/api/orders.api";
 import { today } from "../shared/lib/format";
 import { serializeInstallmentSchedule } from "../orders/InstallmentScheduleFields";
 

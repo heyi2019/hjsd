@@ -3,14 +3,12 @@ import { Card, Form, Input, Space, Typography } from "antd";
 import { appMessage } from "../shared/ui/appFeedback";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import {
-  ordersApi,
-  rebatesApi,
-  employeesApi,
-  type Order,
-  type EmployeeOption,
-  type Rebate,
-} from "../shared/api/catalog";
+import { ordersApi } from "../shared/api/orders.api";
+import { employeesApi } from "../shared/api/org.api";
+import { rebatesApi } from "../shared/api/rebates.api";
+import type { Rebate } from "../shared/api/types/finance";
+import type { Order } from "../shared/api/types/orders";
+import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { formatDateTimeMinute, today } from "../shared/lib/format";

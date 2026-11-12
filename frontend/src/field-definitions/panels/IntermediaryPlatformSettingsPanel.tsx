@@ -2,7 +2,8 @@ import { appMessage } from "../../shared/ui/appFeedback";
 import { Card, Form, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import { optionSetsApi, type OptionItem } from "../../shared/api/catalog";
+import { optionSetsApi } from "../../shared/api/options.api";
+import type { OptionItem } from "../../shared/api/types/common";
 import { normalizeError } from "../../shared/api/client";
 import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
 

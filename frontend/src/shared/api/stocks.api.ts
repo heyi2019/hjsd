@@ -1,5 +1,7 @@
 import { api } from "./client";
-import type { Account, AccountExecutionDetail, AccountInventoryRow, InventoryStats, PageResponse } from "./types";
+import type { AccountExecutionDetail } from "./types/account-execution";
+import type { Account, AccountInventoryRow, InventoryStats } from "./types/accounts";
+import type { PageResponse } from "./types/common";
 
 export const stocksApi = {
   list: async (params?: { status?: string; limit?: number; offset?: number }): Promise<Account[]> => {

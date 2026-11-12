@@ -1,14 +1,40 @@
+import { counterpartiesApi, customersApi, leadsApi } from "@/shared/api/customers.api";
+import { depositsApi, installmentsApi } from "@/shared/api/installments.api";
+import { attachmentsApi, gameTypesApi, notificationsApi, sequencesApi } from "@/shared/api/misc.api";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, searchApi } from "@/shared/api/orders.api";
+import { employeesApi, teamsApi, usersApi } from "@/shared/api/org.api";
+import { policyApi } from "@/shared/api/policy.api";
+import { poolsApi, reconciliationsApi, transfersApi } from "@/shared/api/pools.api";
+import { qualityApi } from "@/shared/api/quality.api";
+import { rebatesApi } from "@/shared/api/rebates.api";
+import { auditApi, importsApi, reportsApi } from "@/shared/api/reports.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { screen, waitFor, within, fireEvent, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { act } from "react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import * as catalog from "@/shared/api/catalog";
-vi.mock("@/shared/api/catalog");
+import { cashflowsApi } from "@/shared/api/cashflows.api";
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");
 import { renderApp } from "@fixtures/render";
 import { AppShell } from "@/app/AppShell";
 import { MemoryRouter } from "react-router-dom";
 
 let ui: ReturnType<typeof userEvent.setup>;
+
+const __allApi = { cashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, searchApi, employeesApi, teamsApi, usersApi, policyApi, poolsApi, reconciliationsApi, transfersApi, qualityApi, rebatesApi, auditApi, importsApi, reportsApi, stocksApi };
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
@@ -53,9 +79,9 @@ vi.mock("@/auth/UserCenterPage", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  for (const key of Object.keys(catalog)) {
+  for (const key of Object.keys(__allApi)) {
     if (!key.endsWith("Api")) continue;
-    const apiObj = (catalog as Record<string, unknown>)[key] as Record<string, unknown>;
+    const apiObj = (__allApi as Record<string, unknown>)[key] as Record<string, unknown>;
     if (!apiObj || typeof apiObj !== "object") continue;
     for (const method of Object.keys(apiObj)) {
       const fn = (apiObj as Record<string, unknown>)[method];
@@ -67,7 +93,7 @@ beforeEach(() => {
       }
     }
   }
-  vi.mocked(catalog.cashflowsApi.list).mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(cashflowsApi.list).mockResolvedValue({ items: [], total: 0 });
 });
 
 async function renderShell(options: { user?: string; initialPath?: string } = {}) {

@@ -13,7 +13,8 @@ import { appMessage } from "../shared/ui/appFeedback";
  */
 import { Card, Col, Empty, Row } from "antd";
 import { useCallback, useEffect, useState } from "react";
-import { policyApi, type PolicyDefinition, type PolicyVersion } from "../shared/api/catalog";
+import { policyApi } from "../shared/api/policy.api";
+import type { PolicyDefinition, PolicyVersion } from "../shared/api/types/policy";
 import { normalizeError } from "../shared/api/client";
 import { useSession } from "../shared/state/session";
 import { ErrorBanner, FormDrawer, PageHeader, StatRow } from "../shared/ui";

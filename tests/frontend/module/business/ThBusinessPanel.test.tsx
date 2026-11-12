@@ -6,10 +6,24 @@ import { ThBusinessPanel } from "@/orders/th/ThBusinessPanel";
 import { ThFeeSection } from "@/orders/th/ThFeeSection";
 import { Form } from "antd";
 import { FieldConfigContext, type FieldConfigMap } from "@/orders/ConfigurableField";
-import * as catalog from "@/shared/api/catalog";
-import type { Order, OrderFormField, Pool } from "@/shared/api/catalog";
+import { ordersApi } from "@/shared/api/orders.api";
+import type { Pool } from "@/shared/api/types/finance";
+import type { OrderFormField } from "@/shared/api/types/forms";
+import type { Order } from "@/shared/api/types/orders";
 
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const orders: Order[] = [
   { id: 1, order_no: "TH-001", order_type: "TH", trade_date: "2026-10-01", status: "ACTIVE", note: null } as unknown as Order,
@@ -20,7 +34,7 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue(orders);
+  vi.mocked(ordersApi.list).mockResolvedValue(orders);
 });
 
 describe("ThBusinessPanel：分销·提号", () => {
@@ -31,7 +45,7 @@ describe("ThBusinessPanel：分销·提号", () => {
   });
 
   it("加载失败展示错误横幅", async () => {
-    vi.mocked(catalog.ordersApi.list).mockRejectedValue(new Error("orders down"));
+    vi.mocked(ordersApi.list).mockRejectedValue(new Error("orders down"));
     renderLight(<ThBusinessPanel />, { user: "admin" });
     expect(await screen.findByText(/orders down/)).toBeInTheDocument();
   });

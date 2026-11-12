@@ -1,4 +1,4 @@
-import type { AccountExecutionDetail } from "../shared/api/catalog";
+import type { AccountExecutionDetail } from "../shared/api/types/account-execution";
 
 /** 状态 / 业务 / 类型的展示文案（用于表格、导出、报表渲染）。
  * ⚠️ 这些是渲染用的静态文案；筛选项的「可选项是哪些」由设置页「选项词典」配置（INVENTORY_STATUS / INVENTORY_BUSINESS / INVENTORY_TYPE）。 */

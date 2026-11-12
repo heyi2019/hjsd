@@ -4,10 +4,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { OrderTypesPanel } from "@/field-definitions/panels/OrderTypesPanel";
-import * as catalog from "@/shared/api/catalog";
-import type { OrderType, Pool, RouteImpactPreview } from "@/shared/api/catalog";
+import { orderTypesApi } from "@/shared/api/orders.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import type { Pool } from "@/shared/api/types/finance";
+import type { OrderType } from "@/shared/api/types/orders";
+import type { RouteImpactPreview } from "@/shared/api/types/policy";
 
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const rows: OrderType[] = [
   { id: 1, code: "HS", name: "回收", capital_type: "STOCK", is_active: true, description: null, sort_order: 1 },
@@ -37,11 +52,11 @@ async function pickSelect(modal: HTMLElement, label: string, optionText: string)
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
-  vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(rows);
-  vi.mocked(catalog.orderTypesApi.setActive).mockResolvedValue(rows[0]);
-  vi.mocked(catalog.orderTypesApi.update).mockResolvedValue(rows[0]);
-  vi.mocked(catalog.orderTypesApi.impactPreview).mockResolvedValue(previewResult);
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
+  vi.mocked(orderTypesApi.list).mockResolvedValue(rows);
+  vi.mocked(orderTypesApi.setActive).mockResolvedValue(rows[0]);
+  vi.mocked(orderTypesApi.update).mockResolvedValue(rows[0]);
+  vi.mocked(orderTypesApi.impactPreview).mockResolvedValue(previewResult);
+  vi.mocked(poolsApi.list).mockResolvedValue(pools);
   vi.spyOn(message, "success").mockImplementation((() => undefined) as never);
   vi.spyOn(message, "error").mockImplementation((() => undefined) as never);
 });
@@ -63,13 +78,13 @@ describe("OrderTypesPanel 业务类型主数据", () => {
   });
 
   it("空列表显示暂无业务类型", async () => {
-    vi.mocked(catalog.orderTypesApi.list).mockResolvedValue([]);
+    vi.mocked(orderTypesApi.list).mockResolvedValue([]);
     renderLight(<OrderTypesPanel />, { user: "admin" });
     expect(await screen.findByText("暂无业务类型")).toBeInTheDocument();
   });
 
   it("FE-211：业务类型主数据失败显示错误空态并禁用新建", async () => {
-    vi.mocked(catalog.orderTypesApi.list).mockRejectedValue(new Error("types down"));
+    vi.mocked(orderTypesApi.list).mockRejectedValue(new Error("types down"));
     renderLight(<OrderTypesPanel />, { user: "admin" });
     expect(await screen.findByText(/types down/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /新建类型/ })).toBeDisabled();
@@ -77,7 +92,7 @@ describe("OrderTypesPanel 业务类型主数据", () => {
   });
 
   it("资金池加载失败时静默降级为空，不显示错误", async () => {
-    vi.mocked(catalog.poolsApi.list).mockRejectedValue(new Error("pool down"));
+    vi.mocked(poolsApi.list).mockRejectedValue(new Error("pool down"));
     renderLight(<OrderTypesPanel />, { user: "admin" });
     await screen.findByText("HS");
     expect(screen.queryByText(/pool down/)).toBeNull();
@@ -89,12 +104,12 @@ describe("OrderTypesPanel 业务类型主数据", () => {
     await ui.click(within(row).getByRole("button", { name: /停用/ }));
     expect(await screen.findByText(/停用后无法新建该类型订单/)).toBeInTheDocument();
     await ui.click(await screen.findByRole("button", { name: /确认/ }));
-    await waitFor(() => expect(catalog.orderTypesApi.setActive).toHaveBeenCalledWith(1, false));
-    await waitFor(() => expect(catalog.orderTypesApi.list).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(orderTypesApi.setActive).toHaveBeenCalledWith(1, false));
+    await waitFor(() => expect(orderTypesApi.list).toHaveBeenCalledTimes(2));
   });
 
   it("停用失败显示错误横幅", async () => {
-    vi.mocked(catalog.orderTypesApi.setActive).mockRejectedValue(new Error("stop fail"));
+    vi.mocked(orderTypesApi.setActive).mockRejectedValue(new Error("stop fail"));
     renderLight(<OrderTypesPanel />, { user: "admin" });
     const row = await rowOf("HS");
     await ui.click(within(row).getByRole("button", { name: /停用/ }));
@@ -108,7 +123,7 @@ describe("OrderTypesPanel 业务类型主数据", () => {
     await ui.click(within(row).getByRole("button", { name: /启用/ }));
     expect(await screen.findByText(/启用后可重新新建该类型订单/)).toBeInTheDocument();
     await ui.click(await screen.findByRole("button", { name: /确认/ }));
-    await waitFor(() => expect(catalog.orderTypesApi.setActive).toHaveBeenCalledWith(2, true));
+    await waitFor(() => expect(orderTypesApi.setActive).toHaveBeenCalledWith(2, true));
   });
 
   it("编辑：打开弹窗改名称后保存调用 update", async () => {
@@ -121,13 +136,13 @@ describe("OrderTypesPanel 业务类型主数据", () => {
     await ui.type(nameInput, "回收2");
     await ui.click(within(modal).getByRole("button", { name: /保存/ }));
     await waitFor(() =>
-      expect(catalog.orderTypesApi.update).toHaveBeenCalledWith(1, expect.objectContaining({ name: "回收2" }))
+      expect(orderTypesApi.update).toHaveBeenCalledWith(1, expect.objectContaining({ name: "回收2" }))
     );
     expect(message.success).toHaveBeenCalled();
   });
 
   it("编辑保存失败显示错误横幅", async () => {
-    vi.mocked(catalog.orderTypesApi.update).mockRejectedValue(new Error("update fail"));
+    vi.mocked(orderTypesApi.update).mockRejectedValue(new Error("update fail"));
     renderLight(<OrderTypesPanel />, { user: "admin" });
     const row = await rowOf("HS");
     await ui.click(within(row).getByRole("button", { name: /编辑/ }));
@@ -145,14 +160,14 @@ describe("OrderTypesPanel 业务类型主数据", () => {
     await pickSelect(modal, "目标资金池", "主资金池（POOL-A）");
     await ui.click(within(modal).getByRole("button", { name: /生成预览/ }));
     await waitFor(() =>
-      expect(catalog.orderTypesApi.impactPreview).toHaveBeenCalledWith("HS", "PRINCIPAL", "POOL-A", undefined)
+      expect(orderTypesApi.impactPreview).toHaveBeenCalledWith("HS", "PRINCIPAL", "POOL-A", undefined)
     );
     expect(await within(modal).findByText(/将发生变化/)).toBeInTheDocument();
     expect(within(modal).getByText(/将影响未来 3 单/)).toBeInTheDocument();
   });
 
   it("影响预览失败显示错误横幅", async () => {
-    vi.mocked(catalog.orderTypesApi.impactPreview).mockRejectedValue(new Error("preview fail"));
+    vi.mocked(orderTypesApi.impactPreview).mockRejectedValue(new Error("preview fail"));
     renderLight(<OrderTypesPanel />, { user: "admin" });
     const row = await rowOf("HS");
     await ui.click(within(row).getByRole("button", { name: /影响预览/ }));
@@ -174,7 +189,7 @@ describe("OrderTypesPanel 业务类型主数据", () => {
   // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-238：业务类型主数据失败时锁定新建入口", async () => {
-    vi.mocked(catalog.orderTypesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "types down" });
+    vi.mocked(orderTypesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "types down" });
     renderLight(<OrderTypesPanel />, { user: "admin" });
     expect(await screen.findByText("业务类型数据不可用，请点击重新加载")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /新建类型/ })).toBeDisabled();

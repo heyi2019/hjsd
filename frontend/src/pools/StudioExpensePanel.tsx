@@ -13,11 +13,10 @@ import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { cashflowsApi,
-  optionSetsApi,
-  type Cashflow,
-  type OptionItem,
-  type Pool, } from "../shared/api/catalog";
+import { cashflowsApi } from "../shared/api/cashflows.api";
+import { optionSetsApi } from "../shared/api/options.api";
+import type { OptionItem } from "../shared/api/types/common";
+import type { Cashflow, Pool } from "../shared/api/types/finance";
 import { normalizeError, type NormalizedError } from "../shared/api/client";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { requiredMoneyRules } from "../shared/lib/validators";

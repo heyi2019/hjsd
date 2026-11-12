@@ -3,7 +3,12 @@
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import { ordersApi, poolsApi, reportsApi, type BusinessPnlReport, type Order, type Pool, type PoolBalance, type PoolBalanceTotals } from "../shared/api/catalog";
+import { ordersApi } from "../shared/api/orders.api";
+import { poolsApi } from "../shared/api/pools.api";
+import { reportsApi } from "../shared/api/reports.api";
+import type { Pool, PoolBalance, PoolBalanceTotals } from "../shared/api/types/finance";
+import type { Order } from "../shared/api/types/orders";
+import type { BusinessPnlReport } from "../shared/api/types/reporting";
 import { normalizeError } from "../shared/api/client";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";

@@ -2,7 +2,8 @@
 import { Card } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import type { ColumnsType } from "antd/es/table";
-import { ordersApi, type Order } from "../../shared/api/catalog";
+import { ordersApi } from "../../shared/api/orders.api";
+import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import {
   DataTable,

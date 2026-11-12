@@ -2,11 +2,8 @@ import { Form, Space } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { importsApi,
-  type ImportBatch,
-  type ImportRow,
-  type MappingPreview,
-  type ReconciliationReport, } from "../shared/api/catalog";
+import { importsApi } from "../shared/api/reports.api";
+import type { ImportBatch, ImportRow, MappingPreview, ReconciliationReport } from "../shared/api/types/imports";
 import { normalizeError } from "../shared/api/client";
 import { ConfirmButton, PermissionButton, Select, StatusTag } from "../shared/ui";
 import { useOptionSet } from "../shared/lib/optionSets";

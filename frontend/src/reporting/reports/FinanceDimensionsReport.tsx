@@ -2,7 +2,8 @@
 
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { reportsApi, type FinanceDimensionReport, type FinanceDimensionRow } from "../../shared/api/catalog";
+import { reportsApi } from "../../shared/api/reports.api";
+import type { FinanceDimensionReport, FinanceDimensionRow } from "../../shared/api/types/finance";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL } from "../../shared/lib/labels";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow } from "../../shared/ui";

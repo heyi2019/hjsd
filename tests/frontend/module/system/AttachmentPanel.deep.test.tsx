@@ -4,10 +4,22 @@ import { appMessage as message } from "@/shared/ui/appFeedback";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { AttachmentPanel } from "@/attachments/AttachmentPanel";
-import * as catalog from "@/shared/api/catalog";
-import type { AttachmentItem } from "@/shared/api/catalog";
+import { attachmentsApi } from "@/shared/api/misc.api";
+import type { AttachmentItem } from "@/shared/api/types/common";
 
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const items: AttachmentItem[] = [
   { id: 1, attachment_no: "ATT-1", file_name: "a.pdf", size_bytes: 1024, created_by: "admin" },
@@ -18,10 +30,10 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
-  vi.mocked(catalog.attachmentsApi.list).mockResolvedValue({ items });
-  vi.mocked(catalog.attachmentsApi.create).mockResolvedValue({} as never);
-  vi.mocked(catalog.attachmentsApi.download).mockResolvedValue(new Blob(["x"]));
-  vi.mocked(catalog.attachmentsApi.remove).mockResolvedValue(undefined);
+  vi.mocked(attachmentsApi.list).mockResolvedValue({ items });
+  vi.mocked(attachmentsApi.create).mockResolvedValue({} as never);
+  vi.mocked(attachmentsApi.download).mockResolvedValue(new Blob(["x"]));
+  vi.mocked(attachmentsApi.remove).mockResolvedValue(undefined);
   URL.createObjectURL = vi.fn().mockReturnValue("blob:x");
   URL.revokeObjectURL = vi.fn();
   vi.spyOn(message, "warning").mockImplementation((() => undefined) as never);
@@ -44,16 +56,16 @@ describe("AttachmentPanel.deep", () => {
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
     await userEvent.upload(input, new File(["x"], "b.pdf", { type: "application/pdf" }));
     await waitFor(() =>
-      expect(vi.mocked(catalog.attachmentsApi.create)).toHaveBeenCalledWith(
+      expect(vi.mocked(attachmentsApi.create)).toHaveBeenCalledWith(
         expect.objectContaining({ entity_type: "order", entity_id: "100", file_name: "b.pdf" }),
       ),
     );
     expect(message.success).toHaveBeenCalledWith("附件已上传");
-    await waitFor(() => expect(vi.mocked(catalog.attachmentsApi.list)).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(vi.mocked(attachmentsApi.list)).toHaveBeenCalledTimes(1));
   });
 
   it("上传失败：展示错误横幅", async () => {
-    vi.mocked(catalog.attachmentsApi.create).mockRejectedValue(new Error("create fail"));
+    vi.mocked(attachmentsApi.create).mockRejectedValue(new Error("create fail"));
     const { container } = renderLight(<AttachmentPanel />, { user: "admin" });
     await ui.type(screen.getByPlaceholderText("对象编号"), "100");
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
@@ -69,13 +81,13 @@ describe("AttachmentPanel.deep", () => {
       (b) => b.closest(".ant-popconfirm"),
     ) as HTMLButtonElement;
     await ui.click(okBtn);
-    await waitFor(() => expect(vi.mocked(catalog.attachmentsApi.remove)).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(vi.mocked(attachmentsApi.remove)).toHaveBeenCalledWith(1));
     expect(message.success).toHaveBeenCalledWith("附件已删除");
-    await waitFor(() => expect(vi.mocked(catalog.attachmentsApi.list)).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(vi.mocked(attachmentsApi.list)).toHaveBeenCalledTimes(2));
   });
 
   it("删除失败：提示错误", async () => {
-    vi.mocked(catalog.attachmentsApi.remove).mockRejectedValue(new Error("remove fail"));
+    vi.mocked(attachmentsApi.remove).mockRejectedValue(new Error("remove fail"));
     await loadItems();
     const row = (await screen.findByText("ATT-1")).closest("tr") as HTMLElement;
     await ui.click(within(row).getByRole("button", { name: /删除/ }));
@@ -88,7 +100,7 @@ describe("AttachmentPanel.deep", () => {
   });
 
   it("下载失败：展示错误横幅", async () => {
-    vi.mocked(catalog.attachmentsApi.download).mockRejectedValue(new Error("download fail"));
+    vi.mocked(attachmentsApi.download).mockRejectedValue(new Error("download fail"));
     await loadItems();
     await ui.click(screen.getByRole("button", { name: /下载/ }));
     expect(await screen.findByText(/download fail/)).toBeInTheDocument();
@@ -98,23 +110,23 @@ describe("AttachmentPanel.deep", () => {
     renderLight(<AttachmentPanel />, { user: "admin" });
     await ui.click(screen.getByRole("button", { name: /查询/ }));
     expect(message.warning).toHaveBeenCalledWith("请输入业务对象编号");
-    expect(catalog.attachmentsApi.list).not.toHaveBeenCalled();
+    expect(attachmentsApi.list).not.toHaveBeenCalled();
   });
 
   it("查询失败展示错误横幅，点重新加载再次请求", async () => {
-    vi.mocked(catalog.attachmentsApi.list).mockRejectedValueOnce(new Error("attach down"));
+    vi.mocked(attachmentsApi.list).mockRejectedValueOnce(new Error("attach down"));
     renderLight(<AttachmentPanel />, { user: "admin" });
     await ui.type(screen.getByPlaceholderText("对象编号"), "100");
     await ui.click(screen.getByRole("button", { name: /查询/ }));
     expect(await screen.findByText(/attach down/)).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /重新加载/ }));
-    await waitFor(() => expect(vi.mocked(catalog.attachmentsApi.list)).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(vi.mocked(attachmentsApi.list)).toHaveBeenCalledTimes(2));
   });
 
   it("在编号框按 Enter 触发查询", async () => {
     renderLight(<AttachmentPanel />, { user: "admin" });
     await ui.type(screen.getByPlaceholderText("对象编号"), "100{Enter}");
-    await waitFor(() => expect(vi.mocked(catalog.attachmentsApi.list)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(attachmentsApi.list)).toHaveBeenCalled());
   });
 
   it("未输入编号时上传入口 disabled", async () => {

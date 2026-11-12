@@ -2,7 +2,7 @@ import { Form, Input } from "antd";
 import { AdaptiveFormGrid, BusinessRegistrationGroup, Select } from "../shared/ui";
 import { CfgItem, sectionLabel } from "./ConfigurableField";
 import { useOptionSet } from "../shared/lib/optionSets";
-import type { EmployeeOption } from "../shared/api/catalog";
+import type { EmployeeOption } from "../shared/api/types/org";
 import { ResponsibleEmployeeSelect } from "./ResponsibleEmployeeSelect";
 import "./DeliveryInfoSection.css";
 

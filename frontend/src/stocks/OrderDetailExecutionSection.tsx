@@ -1,6 +1,6 @@
 import { Input, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { AccountAuditEntry, AccountExecutionEvent } from "../shared/api/catalog";
+import type { AccountAuditEntry, AccountExecutionEvent } from "../shared/api/types/account-execution";
 import { DataTable, MoneyInput, MoneyText, Select } from "../shared/ui";
 import { AUDIT_ACTION_LABEL } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";

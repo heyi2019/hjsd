@@ -10,7 +10,7 @@ import { configurableLabel } from "../shared/lib/optionSets";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL } from "../shared/lib/labels";
 import { ALLOWED_ATTRIBUTES_BY_FUND_NATURE } from "./FundsPage.fragments";
 import type { FundsPageController } from "./useFundsPageController";
-import type { Cashflow } from "../shared/api/catalog";
+import type { Cashflow } from "../shared/api/types/finance";
 
 const Modal = BusinessActionModal;
 

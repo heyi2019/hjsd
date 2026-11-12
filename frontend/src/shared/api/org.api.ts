@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { EmployeeOption, ManagedUser, Team } from "./types";
+import type { EmployeeOption, ManagedUser, Team } from "./types/org";
 
 export const employeesApi = {
   list: () => api.get<EmployeeOption[]>("/users/options").then((r) => r.data),

@@ -3,10 +3,22 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { InventoryProfileModal, type InventoryProfileTarget } from "@/stocks/InventoryProfileModal";
-import * as catalog from "@/shared/api/catalog";
-import type { Account } from "@/shared/api/catalog";
+import { stocksApi } from "@/shared/api/stocks.api";
+import type { Account } from "@/shared/api/types/accounts";
 
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -57,7 +69,7 @@ beforeEach(() => {
   onClose = vi.fn();
   onSaved = vi.fn();
   onError = vi.fn();
-  vi.mocked(catalog.stocksApi.updateProfile).mockResolvedValue(updated);
+  vi.mocked(stocksApi.updateProfile).mockResolvedValue(updated);
 });
 
 describe("InventoryProfileModal：三档模式与图片读取", () => {
@@ -74,8 +86,8 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     await ui.clear(area);
     await ui.type(area, "满级账号");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(catalog.stocksApi.updateProfile).toHaveBeenCalled());
-    expect(vi.mocked(catalog.stocksApi.updateProfile).mock.calls[0]).toEqual([
+    await waitFor(() => expect(stocksApi.updateProfile).toHaveBeenCalled());
+    expect(vi.mocked(stocksApi.updateProfile).mock.calls[0]).toEqual([
       7,
       { account_description: "满级账号" },
     ]);
@@ -88,8 +100,8 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     renderModal({ account: withImages, mode: "images" });
     expect(await screen.findByText("作图")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(catalog.stocksApi.updateProfile).toHaveBeenCalled());
-    expect(vi.mocked(catalog.stocksApi.updateProfile).mock.calls[0][1]).toEqual({
+    await waitFor(() => expect(stocksApi.updateProfile).toHaveBeenCalled());
+    expect(vi.mocked(stocksApi.updateProfile).mock.calls[0][1]).toEqual({
       account_images: ["https://cdn/1.png"],
     });
   });
@@ -99,7 +111,7 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     await screen.findByText("作图");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
 
-    expect(catalog.stocksApi.updateProfile).not.toHaveBeenCalled();
+    expect(stocksApi.updateProfile).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     expect(await screen.findByRole("alert")).toHaveTextContent("请至少添加一张图片");
   });
@@ -109,8 +121,8 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     await screen.findByText("作图");
     await attachImage("image-bytes", "shot.png");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(catalog.stocksApi.updateProfile).toHaveBeenCalled());
-    const images = (vi.mocked(catalog.stocksApi.updateProfile).mock.calls[0][1] as { account_images: string[] })
+    await waitFor(() => expect(stocksApi.updateProfile).toHaveBeenCalled());
+    const images = (vi.mocked(stocksApi.updateProfile).mock.calls[0][1] as { account_images: string[] })
       .account_images;
     expect(images).toHaveLength(1);
     expect(images[0]).toMatch(/^data:/);
@@ -125,8 +137,8 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     await ui.type(typeInput, "星穹铁道");
     await ui.type(screen.getByLabelText("绑定手机号"), "9");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(catalog.stocksApi.updateProfile).toHaveBeenCalled());
-    const [id, payload] = vi.mocked(catalog.stocksApi.updateProfile).mock.calls[0] as [
+    await waitFor(() => expect(stocksApi.updateProfile).toHaveBeenCalled());
+    const [id, payload] = vi.mocked(stocksApi.updateProfile).mock.calls[0] as [
       number,
       Record<string, unknown>,
     ];
@@ -144,8 +156,8 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
     await ui.click(modalEl().querySelector(".ant-select-selector") as HTMLElement);
     await ui.click(await screen.findByText("有二次", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(catalog.stocksApi.updateProfile).toHaveBeenCalled());
-    const payload = vi.mocked(catalog.stocksApi.updateProfile).mock.calls[0][1] as Record<string, unknown>;
+    await waitFor(() => expect(stocksApi.updateProfile).toHaveBeenCalled());
+    const payload = vi.mocked(stocksApi.updateProfile).mock.calls[0][1] as Record<string, unknown>;
     expect(payload.has_secondary).toBe(true);
   });
 
@@ -161,7 +173,7 @@ describe("InventoryProfileModal：三档模式与图片读取", () => {
   });
 
   it("保存失败时回调 onError 而非 onSaved", async () => {
-    vi.mocked(catalog.stocksApi.updateProfile).mockRejectedValue(new Error("save boom"));
+    vi.mocked(stocksApi.updateProfile).mockRejectedValue(new Error("save boom"));
     renderModal({ account, mode: "description" });
     await screen.findByText("描述");
     await ui.click(screen.getByRole("button", { name: /保存/ }));

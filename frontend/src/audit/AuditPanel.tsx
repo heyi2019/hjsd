@@ -2,7 +2,8 @@
 import { Card, Input } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
-import { auditApi, type AuditLogRow } from "../shared/api/catalog";
+import { auditApi } from "../shared/api/reports.api";
+import type { AuditLogRow } from "../shared/api/types/ops";
 import { normalizeError } from "../shared/api/client";
 import { AUDIT_ACTION_LABEL, ENTITY_TYPE_LABEL } from "../shared/lib/labels";
 import { formatDateTimeMinute } from "../shared/lib/format";

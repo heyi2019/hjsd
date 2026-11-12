@@ -8,12 +8,26 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { seedOptionSets } from "@fixtures/formFieldsSeed";
-import * as catalog from "@/shared/api/catalog";
-import type { OrderType, OrderTypeRoute, Pool } from "@/shared/api/catalog";
+import { orderTypesApi } from "@/shared/api/orders.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import type { Pool } from "@/shared/api/types/finance";
+import type { OrderType, OrderTypeRoute } from "@/shared/api/types/orders";
 import { OrderTypeRoutesPanel } from "@/field-definitions/panels/OrderTypeRoutesPanel";
 import { PoolsAndRoutesPanel } from "@/field-definitions/panels/PoolsAndRoutesPanel";
 
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const TYPES = [
   { id: 1, code: "HS", name: "回收", capital_type: "STOCK", is_active: true },
@@ -36,12 +50,12 @@ const ROUTES: Record<number, OrderTypeRoute[]> = {
 describe("OrderTypeRoutesPanel 资金路由页", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    seedOptionSets(catalog);
-    vi.mocked(catalog.orderTypesApi).list.mockResolvedValue(TYPES);
-    vi.mocked(catalog.orderTypesApi).routes.mockImplementation((id: number) =>
+    seedOptionSets();
+    vi.mocked(orderTypesApi).list.mockResolvedValue(TYPES);
+    vi.mocked(orderTypesApi).routes.mockImplementation((id: number) =>
       Promise.resolve(ROUTES[id] ?? []),
     );
-    vi.mocked(catalog.poolsApi).list.mockResolvedValue(POOLS);
+    vi.mocked(poolsApi).list.mockResolvedValue(POOLS);
   });
 
   it("跨业务类型摊平路由：两条路由与目标池同屏可见", async () => {
@@ -78,7 +92,7 @@ describe("OrderTypeRoutesPanel 资金路由页", () => {
   });
 
   it("FE-240：路由读取失败进入错误态并锁定覆盖保存", async () => {
-    vi.mocked(catalog.orderTypesApi).routes.mockImplementation((id: number) =>
+    vi.mocked(orderTypesApi).routes.mockImplementation((id: number) =>
       id === 1 ? Promise.reject(new Error("boom")) : Promise.resolve(ROUTES[id] ?? []),
     );
     renderLight(<OrderTypeRoutesPanel />, { user: "admin" });
@@ -97,13 +111,13 @@ describe("OrderTypeRoutesPanel 资金路由页", () => {
 describe("PoolsAndRoutesPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(catalog.poolsApi).list.mockResolvedValue([
+    vi.mocked(poolsApi).list.mockResolvedValue([
       { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
     ] as never);
-    vi.mocked(catalog.orderTypesApi).list.mockResolvedValue([
+    vi.mocked(orderTypesApi).list.mockResolvedValue([
       { id: 1, code: "HS", name: "回收", capital_type: "OWNED", is_active: true },
     ] as never);
-    vi.mocked(catalog.orderTypesApi).routes.mockResolvedValue([
+    vi.mocked(orderTypesApi).routes.mockResolvedValue([
       {
         order_type_code: "HS",
         portion: "PRINCIPAL",
@@ -120,7 +134,7 @@ describe("PoolsAndRoutesPanel", () => {
     renderLight(<PoolsAndRoutesPanel />, { user: "admin" });
 
     expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
-    expect(catalog.orderTypesApi.routes).not.toHaveBeenCalled();
+    expect(orderTypesApi.routes).not.toHaveBeenCalled();
   });
 
   it("切到过账路由视图才渲染路由表并请求路由数据", async () => {
@@ -131,7 +145,7 @@ describe("PoolsAndRoutesPanel", () => {
     await user.click(screen.getByText("过账路由"));
 
     expect(await screen.findByText("资金路由一览")).toBeInTheDocument();
-    await waitFor(() => expect(catalog.orderTypesApi.routes).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(orderTypesApi.routes).toHaveBeenCalledWith(1));
     // 切换后池定义视图卸载，避免两套表格同时存在。
     expect(screen.queryByText("资金池主数据")).toBeNull();
   });

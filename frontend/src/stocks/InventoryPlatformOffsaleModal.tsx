@@ -1,7 +1,9 @@
 import { DatePicker, Form, Input } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
-import { ordersApi, type Account, type AccountExecutionOrder } from "../shared/api/catalog";
+import { ordersApi } from "../shared/api/orders.api";
+import type { AccountExecutionOrder } from "../shared/api/types/account-execution";
+import type { Account } from "../shared/api/types/accounts";
 import { normalizeError } from "../shared/api/client";
 import { appMessage } from "../shared/ui/appFeedback";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";

@@ -8,8 +8,9 @@ import { ImportWorkbench } from "@/imports/ImportWorkbench";
 import { RowsTab } from "@/imports/ImportWorkbench.tabs";
 import { resolveMock } from "@fixtures/mock-api";
 
-import * as catalog from "@/shared/api/catalog";
-import type { ImportBatch, ImportRow, MappingPreview, ReconciliationReport } from "@/shared/api/catalog";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { importsApi } from "@/shared/api/reports.api";
+import type { ImportBatch, ImportRow, MappingPreview, ReconciliationReport } from "@/shared/api/types/imports";
 import { seedOptionSets } from "@fixtures/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -17,7 +18,19 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-vi.mock("@/shared/api/catalog")
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");
 
 const batch = {
   id: 1,
@@ -27,12 +40,12 @@ const batch = {
   status: "DRAFT",
   row_count: 2,
   unmapped_count: 0,
-} as unknown as import("@/shared/api/catalog").ImportBatch;
+} as unknown as import("@/shared/api/types/imports").ImportBatch;
 
 const importRows = [
   { id: 10, batch_id: 1, row_no: 1, raw: { 金额: "100" }, status: "PENDING", unlinked_transfer: false },
   { id: 11, batch_id: 1, row_no: 2, raw: { 金额: "200" }, status: "PENDING", unlinked_transfer: false },
-] as unknown as import("@/shared/api/catalog").ImportRow[];
+] as unknown as import("@/shared/api/types/imports").ImportRow[];
 
 const mappingPreview = {
   batch_id: 1,
@@ -44,7 +57,7 @@ const mappingPreview = {
   ],
   abnormal: { empty_value: 0, unmapped: 0 },
   blockers: [],
-} as unknown as import("@/shared/api/catalog").MappingPreview;
+} as unknown as import("@/shared/api/types/imports").MappingPreview;
 
 const recon = {
   batch_id: 1,
@@ -56,19 +69,19 @@ const recon = {
   amounts: { before: { 权益: "100.00" }, after: { 权益: "100.00" }, delta: { 权益: "0.00" } },
   funds: { cashflow_written: 0, linked_event_cashflow: 0, note: "不写现金流" },
   requires_adjudication: false,
-} as unknown as import("@/shared/api/catalog").ReconciliationReport;
+} as unknown as import("@/shared/api/types/imports").ReconciliationReport;
 
 beforeEach(() => {
-  seedOptionSets(catalog);
-  resolveMock(vi.mocked(catalog.importsApi.batches), { items: [batch], total: 1 });
-  resolveMock(vi.mocked(catalog.importsApi.rows), { items: importRows, total: importRows.length });
-  resolveMock(vi.mocked(catalog.importsApi.preview), mappingPreview);
-  resolveMock(vi.mocked(catalog.importsApi.reconciliation), recon);
-  resolveMock(vi.mocked(catalog.importsApi.map), {});
-  resolveMock(vi.mocked(catalog.importsApi.skip), {});
-  resolveMock(vi.mocked(catalog.importsApi.markUnlinked), {});
-  resolveMock(vi.mocked(catalog.importsApi.commit), { imported: 2, unmapped: 0 });
-  resolveMock(vi.mocked(catalog.importsApi.rollback), {});
+  seedOptionSets();
+  resolveMock(vi.mocked(importsApi.batches), { items: [batch], total: 1 });
+  resolveMock(vi.mocked(importsApi.rows), { items: importRows, total: importRows.length });
+  resolveMock(vi.mocked(importsApi.preview), mappingPreview);
+  resolveMock(vi.mocked(importsApi.reconciliation), recon);
+  resolveMock(vi.mocked(importsApi.map), {});
+  resolveMock(vi.mocked(importsApi.skip), {});
+  resolveMock(vi.mocked(importsApi.markUnlinked), {});
+  resolveMock(vi.mocked(importsApi.commit), { imported: 2, unmapped: 0 });
+  resolveMock(vi.mocked(importsApi.rollback), {});
 });
 
 it("渲染标题 + 默认批次加载列表 + 三个工作 Tab", async () => {
@@ -99,7 +112,7 @@ it("viewer 角色无 import.manage：看不到指派/确认批次/回滚按钮",
   expect(screen.queryByRole("button", { name: /回滚/ })).toBeNull();
 });
 
-it("人工指派：admin 点指派 → 填补录依据 → 确认指派 调用 vi.mocked(catalog.importsApi.map)（basis 必填）", async () => {
+it("人工指派：admin 点指派 → 填补录依据 → 确认指派 调用 vi.mocked(importsApi.map)（basis 必填）", async () => {
   renderLight(<ImportWorkbench />, { user: "admin" });
   await screen.findByText("金额=100"); // 行已加载
   const assignBtns = screen.getAllByRole("button", { name: /指派/ });
@@ -110,12 +123,12 @@ it("人工指派：admin 点指派 → 填补录依据 → 确认指派 调用 v
     "对账单 7 月第 9 行",
   );
   await ui.click(screen.getByRole("button", { name: /确认指派/ }));
-  await waitFor(() => expect(vi.mocked(catalog.importsApi.map)).toHaveBeenCalledTimes(1));
-  expect(vi.mocked(catalog.importsApi.map).mock.calls[0][0]).toBe(10); // 行 id
-  expect(vi.mocked(catalog.importsApi.map).mock.calls[0][1]).toMatchObject({ basis: "对账单 7 月第 9 行" });
+  await waitFor(() => expect(vi.mocked(importsApi.map)).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(importsApi.map).mock.calls[0][0]).toBe(10); // 行 id
+  expect(vi.mocked(importsApi.map).mock.calls[0][1]).toMatchObject({ basis: "对账单 7 月第 9 行" });
 });
 
-it("提交批次：DRAFT 状态可提交，admin 点确认批次 调用 vi.mocked(catalog.importsApi.commit)", async () => {
+it("提交批次：DRAFT 状态可提交，admin 点确认批次 调用 vi.mocked(importsApi.commit)", async () => {
   renderLight(<ImportWorkbench />, { user: "admin" });
   await screen.findByText("导入工作台");
   const commitBtn = screen.getByRole("button", { name: /确认批次/ });
@@ -123,14 +136,14 @@ it("提交批次：DRAFT 状态可提交，admin 点确认批次 调用 vi.mocke
   await ui.click(commitBtn);
   // 确认批次是显著不可逆动作，现已要求二次确认。
   await ui.click(await screen.findByRole("button", { name: /确认提交批次/ }));
-  await waitFor(() => expect(vi.mocked(catalog.importsApi.commit)).toHaveBeenCalledTimes(1));
-  expect(vi.mocked(catalog.importsApi.commit).mock.calls[0][0]).toBe(1); // batch id
+  await waitFor(() => expect(vi.mocked(importsApi.commit)).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(importsApi.commit).mock.calls[0][0]).toBe(1); // batch id
 });
 
 it("写操作触发刷新后保持当前批次，不被重置回第一个（#12）", async () => {
   const batch2 = { ...batch, id: 2, batch_no: "MIG-01-02", source_name: "8月对账单" } as ImportBatch;
-  resolveMock(vi.mocked(catalog.importsApi.batches), { items: [batch, batch2], total: 2 });
-  vi.mocked(catalog.importsApi.rows).mockImplementation(async (batchId: number) => ({
+  resolveMock(vi.mocked(importsApi.batches), { items: [batch, batch2], total: 2 });
+  vi.mocked(importsApi.rows).mockImplementation(async (batchId: number) => ({
     items: importRows.map((row) => ({ ...row, batch_id: batchId })),
     total: importRows.length,
   }));
@@ -140,15 +153,15 @@ it("写操作触发刷新后保持当前批次，不被重置回第一个（#12�
   // 切到第二个批次
   await ui.click(screen.getAllByRole("combobox")[0] as HTMLElement); // 批次下拉是页面唯一 combobox
   await ui.click(await screen.findByText(/8月对账单/, { selector: ".ant-select-item-option-content" }));
-  await waitFor(() => expect(vi.mocked(catalog.importsApi.rows).mock.calls.slice(-1)[0]?.[0]).toBe(2));
+  await waitFor(() => expect(vi.mocked(importsApi.rows).mock.calls.slice(-1)[0]?.[0]).toBe(2));
 
   // 写操作 → act() → refreshAll() → loadBatches()
   await ui.click(screen.getByRole("button", { name: /确认批次/ }));
   await ui.click(await screen.findByRole("button", { name: /确认提交批次/ }));
-  await waitFor(() => expect(vi.mocked(catalog.importsApi.commit)).toHaveBeenCalledWith(2));
+  await waitFor(() => expect(vi.mocked(importsApi.commit)).toHaveBeenCalledWith(2));
 
   // 修复前 loadBatches 闭包永久捕获首次 null，会把当前批次重置回第一个 → rows 以 batch 1 重载。
-  expect(vi.mocked(catalog.importsApi.rows).mock.calls.slice(-1)[0]?.[0]).toBe(2);
+  expect(vi.mocked(importsApi.rows).mock.calls.slice(-1)[0]?.[0]).toBe(2);
 });
 
 it("导入对账 Tab：切换后渲染对账 StatCard（源总行/已导入）", async () => {
@@ -242,17 +255,17 @@ describe("ImportWorkbench：动作流与写路径", () => {
     }) as unknown as ReconciliationReport;
 
   function setDefaults() {
-    resolveMock(vi.mocked(catalog.importsApi.batches), { items: [batch], total: 1 });
-    resolveMock(vi.mocked(catalog.importsApi.rows), { items: [makeRow()], total: 1 });
-    resolveMock(vi.mocked(catalog.importsApi.preview), preview());
-    resolveMock(vi.mocked(catalog.importsApi.reconciliation), recon());
-    resolveMock(vi.mocked(catalog.importsApi.map), {});
-    resolveMock(vi.mocked(catalog.importsApi.skip), {});
-    resolveMock(vi.mocked(catalog.importsApi.markUnlinked), {});
-    resolveMock(vi.mocked(catalog.importsApi.commit), {});
-    resolveMock(vi.mocked(catalog.importsApi.rollback), {});
-    resolveMock(vi.mocked(catalog.importsApi.reject), {});
-    resolveMock(vi.mocked(catalog.importsApi.createBatch), {
+    resolveMock(vi.mocked(importsApi.batches), { items: [batch], total: 1 });
+    resolveMock(vi.mocked(importsApi.rows), { items: [makeRow()], total: 1 });
+    resolveMock(vi.mocked(importsApi.preview), preview());
+    resolveMock(vi.mocked(importsApi.reconciliation), recon());
+    resolveMock(vi.mocked(importsApi.map), {});
+    resolveMock(vi.mocked(importsApi.skip), {});
+    resolveMock(vi.mocked(importsApi.markUnlinked), {});
+    resolveMock(vi.mocked(importsApi.commit), {});
+    resolveMock(vi.mocked(importsApi.rollback), {});
+    resolveMock(vi.mocked(importsApi.reject), {});
+    resolveMock(vi.mocked(importsApi.createBatch), {
       id: 2,
       batch_no: "MIG-01-02",
       status: "DRAFT",
@@ -263,7 +276,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
   }
 
   beforeEach(() => {
-    seedOptionSets(catalog);
+    seedOptionSets();
     ui = userEvent.setup({ pointerEventsCheck: 0 });
     URL.createObjectURL = vi.fn().mockReturnValue("blob:mock");
     URL.revokeObjectURL = vi.fn();
@@ -274,7 +287,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
 
   async function openWorkbench(rows: ImportRow[] = [makeRow()]) {
     if (rows.length) {
-      resolveMock(vi.mocked(catalog.importsApi.rows), { items: rows, total: rows.length });
+      resolveMock(vi.mocked(importsApi.rows), { items: rows, total: rows.length });
     }
     renderLight(<ImportWorkbench />, { user: "admin" });
     await screen.findByText("导入工作台");
@@ -341,7 +354,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
       await screen.findByText("标记单边划转 · 第 1 行");
       await ui.type(screen.getByLabelText("说明"), "对手方未明确");
       await ui.click(screen.getByRole("button", { name: /确认标记/ }));
-      await waitFor(() => expect(catalog.importsApi.markUnlinked).toHaveBeenCalledWith(10, "对手方未明确"));
+      await waitFor(() => expect(importsApi.markUnlinked).toHaveBeenCalledWith(10, "对手方未明确"));
     });
 
     it("跳过：填理由后调用 importsApi.skip", async () => {
@@ -351,7 +364,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
       await screen.findByText("跳过 · 第 1 行");
       await ui.type(screen.getByLabelText("跳过理由"), "重复数据");
       await ui.click(screen.getByRole("button", { name: /确认跳过/ }));
-      await waitFor(() => expect(catalog.importsApi.skip).toHaveBeenCalledWith(10, "重复数据"));
+      await waitFor(() => expect(importsApi.skip).toHaveBeenCalledWith(10, "重复数据"));
     });
 
     it("回滚批次：填理由后调用 importsApi.rollback", async () => {
@@ -360,7 +373,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
       await screen.findByText("回滚批次 · MIG-01-01");
       await ui.type(screen.getByLabelText("回滚理由"), "误导入");
       await ui.click(screen.getByRole("button", { name: /确认回滚/ }));
-      await waitFor(() => expect(catalog.importsApi.rollback).toHaveBeenCalledWith(1, "误导入"));
+      await waitFor(() => expect(importsApi.rollback).toHaveBeenCalledWith(1, "误导入"));
     });
 
     it("驳回批次：填理由后调用 importsApi.reject（终态，不再提交）", async () => {
@@ -370,7 +383,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
       await ui.type(screen.getByLabelText("驳回理由"), "源文件口径错误");
       await ui.click(screen.getByRole("button", { name: /确认驳回/ }));
       await waitFor(() =>
-        expect(catalog.importsApi.reject).toHaveBeenCalledWith(1, "源文件口径错误"),
+        expect(importsApi.reject).toHaveBeenCalledWith(1, "源文件口径错误"),
       );
     });
 
@@ -389,7 +402,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
     });
 
     it("批次无行时显示空态文案", async () => {
-      resolveMock(vi.mocked(catalog.importsApi.rows), { items: [], total: 0 });
+      resolveMock(vi.mocked(importsApi.rows), { items: [], total: 0 });
       renderLight(<ImportWorkbench />, { user: "admin" });
       expect(await screen.findByText("该批次暂无行")).toBeInTheDocument();
     });
@@ -405,7 +418,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
     });
 
     it("映射预览存在阻断列时显示阻断横幅", async () => {
-      resolveMock(vi.mocked(catalog.importsApi.preview), preview({ blockers: ["未知列"] }));
+      resolveMock(vi.mocked(importsApi.preview), preview({ blockers: ["未知列"] }));
       await openWorkbench();
       await switchTab("映射预览");
       expect(await screen.findByText(/阻断确认：未知列/)).toBeInTheDocument();
@@ -422,7 +435,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
     });
 
     it("对账需要裁决时显示未裁决横幅", async () => {
-      resolveMock(vi.mocked(catalog.importsApi.reconciliation), recon({ requires_adjudication: true }));
+      resolveMock(vi.mocked(importsApi.reconciliation), recon({ requires_adjudication: true }));
       await openWorkbench();
       await switchTab("导入对账");
       expect(await screen.findByText(/差异须裁决后方可上线/)).toBeInTheDocument();
@@ -441,7 +454,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
       const fileInput = await openImportModal();
       await attachFile(fileInput, makeFile(["not-a-table"], "account-image.png", { type: "image/png" }));
       expect(message.error).toHaveBeenCalledWith("只支持 JSON 或 CSV 文件");
-      expect(catalog.importsApi.createBatch).not.toHaveBeenCalled();
+      expect(importsApi.createBatch).not.toHaveBeenCalled();
     });
 
     it("新建导入：上传 CSV 后解析为原始行并创建批次", async () => {
@@ -450,8 +463,8 @@ describe("ImportWorkbench：动作流与写路径", () => {
       await fillImportBase("2026年10月订单");
       await attachFile(fileInput, makeFile(["订单日期,金额\n2026-01-31,100\n"], "orders.csv", { type: "text/csv" }));
       await ui.click(screen.getByRole("button", { name: /开始导入/ }));
-      await waitFor(() => expect(catalog.importsApi.createBatch).toHaveBeenCalled());
-      const payload = vi.mocked(catalog.importsApi.createBatch).mock.calls[0][0];
+      await waitFor(() => expect(importsApi.createBatch).toHaveBeenCalled());
+      const payload = vi.mocked(importsApi.createBatch).mock.calls[0][0];
       expect(payload.source_name).toBe("2026年10月订单");
       expect(payload.rows).toEqual([{ 订单日期: "2026-01-31", 金额: "100" }]);
       expect(message.success).toHaveBeenCalledWith("已导入 1 行数据");
@@ -465,8 +478,8 @@ describe("ImportWorkbench：动作流与写路径", () => {
       await ui.click(await screen.findByText("需求"));
       await attachFile(fileInput, makeFile(["客户ID,需求内容\n1,求购账号\n"], "leads.csv", { type: "text/csv" }));
       await ui.click(screen.getByRole("button", { name: /开始导入/ }));
-      await waitFor(() => expect(catalog.importsApi.createBatch).toHaveBeenCalled());
-      expect(vi.mocked(catalog.importsApi.createBatch).mock.calls[0][0].source_kind).toBe("STANDARD_LEAD");
+      await waitFor(() => expect(importsApi.createBatch).toHaveBeenCalled());
+      expect(vi.mocked(importsApi.createBatch).mock.calls[0][0].source_kind).toBe("STANDARD_LEAD");
     });
 
     it("新建导入：上传 JSON 数组走 JSON 解析分支", async () => {
@@ -475,8 +488,8 @@ describe("ImportWorkbench：动作流与写路径", () => {
       await fillImportBase("JSON 批次");
       await attachFile(fileInput, makeFile(['[{"金额":"100"}]'], "rows.json", { type: "application/json" }));
       await ui.click(screen.getByRole("button", { name: /开始导入/ }));
-      await waitFor(() => expect(catalog.importsApi.createBatch).toHaveBeenCalled());
-      expect(vi.mocked(catalog.importsApi.createBatch).mock.calls[0][0].rows).toEqual([{ 金额: "100" }]);
+      await waitFor(() => expect(importsApi.createBatch).toHaveBeenCalled());
+      expect(vi.mocked(importsApi.createBatch).mock.calls[0][0].rows).toEqual([{ 金额: "100" }]);
     });
 
     it("新建导入：非对象数组的 JSON 给出解析错误", async () => {
@@ -501,7 +514,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
     });
 
     it("批次列表加载失败显示错误横幅", async () => {
-      vi.mocked(catalog.importsApi.batches).mockRejectedValue(new Error("batches down"));
+      vi.mocked(importsApi.batches).mockRejectedValue(new Error("batches down"));
       renderLight(<ImportWorkbench />, { user: "admin" });
       expect(await screen.findByText(/batches down/)).toBeInTheDocument();
     });
@@ -519,7 +532,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
       // 会被 normalizeError 改写成「后端不可达」兜底文案，使消息断言随用例顺序漂移
       // （2026-11-05 首次 CI 实测：仅本例红，本地单跑恒绿）。带 v1 响应体后走
       // data.message 分支，与全局连接态解耦。
-      vi.mocked(catalog.importsApi.batches).mockRejectedValueOnce({
+      vi.mocked(importsApi.batches).mockRejectedValueOnce({
         isAxiosError: true,
         message: "batches down",
         response: { status: 400, data: { message: "batches down" } },
@@ -531,8 +544,8 @@ describe("ImportWorkbench：动作流与写路径", () => {
     });
 
     it("P1/FE-220：导入数据类型字典失败时仍保持完整可选项", async () => {
-      vi.mocked(catalog.importsApi.batches).mockResolvedValueOnce({ items: [], total: 0 } as never);
-      vi.mocked(catalog.optionSetsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "option sets down" });
+      vi.mocked(importsApi.batches).mockResolvedValueOnce({ items: [], total: 0 } as never);
+      vi.mocked(optionSetsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "option sets down" });
       clearOptionSetsCache();
       renderLight(<ImportWorkbench />, { user: "admin" });
 
@@ -560,7 +573,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
         raw: { 行号: `行-${index + 1}` },
         status: "PENDING",
         unlinked_transfer: false,
-      })) as unknown as import("@/shared/api/catalog").ImportRow[];
+      })) as unknown as import("@/shared/api/types/imports").ImportRow[];
       renderLight(
         <RowsTab
           columns={[{ title: "行号", dataIndex: "row_no" }, { title: "原始内容", dataIndex: ["raw", "行号"] }]}

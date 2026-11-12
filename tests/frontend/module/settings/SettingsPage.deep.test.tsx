@@ -1,8 +1,25 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as catalog from "@/shared/api/catalog";
-vi.mock("@/shared/api/catalog");
+import { gameTypesApi } from "@/shared/api/misc.api";
+import { orderTypesApi } from "@/shared/api/orders.api";
+import { policyApi } from "@/shared/api/policy.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import type { Pool } from "@/shared/api/types/finance";
+import type { OrderType } from "@/shared/api/types/orders";
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 import * as client from "@/shared/api/client";
 import { renderLight, renderApp } from "@fixtures/render";
 import { SettingsPage } from "@/field-definitions/SettingsPage";
@@ -11,11 +28,11 @@ let ui: ReturnType<typeof userEvent.setup>;
 
 const orderTypes = [
   { id: 1, code: "HS", name: "回收", capital_type: "OWNED", is_active: true },
-] as unknown as import("@/shared/api/catalog").OrderType[];
+] as unknown as import("@/shared/api/types/orders").OrderType[];
 
 const pools = [
   { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
-] as unknown as import("@/shared/api/catalog").Pool[];
+] as unknown as import("@/shared/api/types/finance").Pool[];
 
 // 复用现有 SettingsPage.test 的 client 桩，避免挂载面板时真实网络请求。
 vi.mock("@/shared/api/client", async (importOriginal) => ({
@@ -31,10 +48,10 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
-  vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(orderTypes);
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue(pools);
-  vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.policyApi.list).mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(orderTypesApi.list).mockResolvedValue(orderTypes);
+  vi.mocked(poolsApi.list).mockResolvedValue(pools);
+  vi.mocked(gameTypesApi.list).mockResolvedValue([]);
+  vi.mocked(policyApi.list).mockResolvedValue({ items: [], total: 0 });
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
   // 默认非紧凑：matchMedia 对任何查询返回 matches=false（与 setup.ts afterEach 一致）。
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
@@ -113,7 +130,7 @@ describe("SettingsPage.deep", () => {
     // 惰性挂载的证据是「面板内容不在 DOM」。
     expect(screen.queryByText("托管池")).toBeNull();
     await ui.click(screen.getByTestId("center-nav-pools"));
-    await waitFor(() => expect(vi.mocked(catalog.poolsApi.list)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(poolsApi.list)).toHaveBeenCalled());
     // 资金池内容可见（托管池）
     expect(await screen.findByText("托管池")).toBeInTheDocument();
   });
@@ -128,11 +145,11 @@ describe("SettingsPage.deep", () => {
     expect(await screen.findByText("HS")).toBeInTheDocument();
 
     await ui.click(screen.getByTestId("center-nav-game-types"));
-    await waitFor(() => expect(vi.mocked(catalog.gameTypesApi.list)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(gameTypesApi.list)).toHaveBeenCalled());
 
     // 回到设置页主 Tab（非业务配置类仍独立存在）
     await ui.click(screen.getByRole("tab", { name: "经营规则" }));
-    await waitFor(() => expect(vi.mocked(catalog.policyApi.list)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(policyApi.list)).toHaveBeenCalled());
 
     await ui.click(screen.getByRole("tab", { name: "外观" }));
     expect(await screen.findByText("玻璃材质透明度")).toBeInTheDocument();

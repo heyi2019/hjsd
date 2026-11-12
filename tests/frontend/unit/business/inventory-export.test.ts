@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Account } from "@/shared/api/catalog";
+import type { Account } from "@/shared/api/types/accounts";
 import { buildInventoryCsv } from "@/stocks/inventory-export";
 
 const account = {

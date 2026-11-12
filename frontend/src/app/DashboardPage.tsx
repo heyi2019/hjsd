@@ -1,7 +1,13 @@
 /** 工作台：优先动作 + 当前登录用户的轻量关注卡片。
  * 经营中心保留全局经营总览与人员筛选，工作台只展示当前用户自己的订单/收益。 */
 import { useEffect, useRef, useState } from "react";
-import { installmentsApi, notificationsApi, optionSetsApi, ordersApi, reportsApi, stocksApi, type Order } from "../shared/api/catalog";
+import { installmentsApi } from "../shared/api/installments.api";
+import { notificationsApi } from "../shared/api/misc.api";
+import { optionSetsApi } from "../shared/api/options.api";
+import { ordersApi } from "../shared/api/orders.api";
+import { reportsApi } from "../shared/api/reports.api";
+import { stocksApi } from "../shared/api/stocks.api";
+import type { Order } from "../shared/api/types/orders";
 import { normalizeError } from "../shared/api/client";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
 import { CreateBusinessModal, type BusinessOrderType } from "../orders/CreateBusinessModal";

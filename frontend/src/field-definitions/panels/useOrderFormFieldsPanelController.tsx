@@ -3,7 +3,10 @@ import { Form, Input, InputNumber, Space, Switch, Tooltip, Typography } from "an
 import type { InputRef } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { gameTypesApi, optionSetsApi, orderFormFieldsApi, type OrderFormField } from "../../shared/api/catalog";
+import { gameTypesApi } from "../../shared/api/misc.api";
+import { optionSetsApi } from "../../shared/api/options.api";
+import { orderFormFieldsApi } from "../../shared/api/orders.api";
+import type { OrderFormField } from "../../shared/api/types/forms";
 import { normalizeError } from "../../shared/api/client";
 import { FIELD_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";

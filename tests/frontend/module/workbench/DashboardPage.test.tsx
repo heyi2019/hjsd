@@ -5,22 +5,39 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
 
-import * as catalog from "@/shared/api/catalog";
+import { installmentsApi } from "@/shared/api/installments.api";
+import { notificationsApi } from "@/shared/api/misc.api";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { ordersApi } from "@/shared/api/orders.api";
+import { reportsApi } from "@/shared/api/reports.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { seedOrderFormFields } from "@fixtures/formFieldsSeed";
 /** 2026-10-13：工作台数据总览（资金池/统计/入口卡）已迁至「经营中心 · 数据中心」
  *  （用例见 reporting/DataCenterPanel.test.tsx）。本文件只覆盖瘦身后的工作台：
  *  纯动作入口——新建业务卡 + 登记弹窗，以及「数据已迁走」的回归断言。 */
 
-vi.mock("@/shared/api/catalog")
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");
 
 beforeEach(() => {
   vi.clearAllMocks();
-  seedOrderFormFields(catalog);
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.stocksApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.installmentsApi.list).mockResolvedValue([]);
-  vi.mocked(catalog.notificationsApi.list).mockResolvedValue({ items: [], total: 0, unread_total: 0 });
-  vi.mocked(catalog.reportsApi.commission).mockResolvedValue({
+  seedOrderFormFields();
+  vi.mocked(ordersApi.list).mockResolvedValue([]);
+  vi.mocked(stocksApi.list).mockResolvedValue([]);
+  vi.mocked(installmentsApi.list).mockResolvedValue([]);
+  vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], total: 0, unread_total: 0 });
+  vi.mocked(reportsApi.commission).mockResolvedValue({
     items: [],
     total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },
   });
@@ -28,12 +45,12 @@ beforeEach(() => {
 
 describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
 it("工作台展示业务总览指标和业务提醒", async () => {
-    vi.mocked(catalog.ordersApi.list).mockResolvedValue([
+    vi.mocked(ordersApi.list).mockResolvedValue([
       { id: 1, status: "ACTIVE" },
       { id: 2, status: "COMPLETED" },
     ] as never);
     // 库龄天数与档位由后端下发（AccountOut），工作台只比较/展示，不再做日期差。
-    vi.mocked(catalog.stocksApi.list).mockResolvedValue([{
+    vi.mocked(stocksApi.list).mockResolvedValue([{
       id: 10,
       status: "WAITING",
       inventory_entry_at: "2026-09-01T00:00:00",
@@ -41,8 +58,8 @@ it("工作台展示业务总览指标和业务提醒", async () => {
       inventory_age_level: "OVERDUE",
       cost_amount: "100.00",
     } as never]);
-    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{ id: 20, status: "OVERDUE" } as never]);
-    vi.mocked(catalog.notificationsApi.list).mockResolvedValue({
+    vi.mocked(installmentsApi.list).mockResolvedValue([{ id: 20, status: "OVERDUE" } as never]);
+    vi.mocked(notificationsApi.list).mockResolvedValue({
       items: [{ id: 30, title: "新的分润通知", message: "订单 HS0001 已生成分润", notification_type: "PROFIT_ALLOCATION_SET" } as never],
       total: 1,
       unread_total: 1,
@@ -70,7 +87,7 @@ it("工作台展示业务总览指标和业务提醒", async () => {
 
 it("工作台按业务提醒配置计算库存阈值并控制提醒开关", async () => {
     // 天数写死为 14：配置阈值为 14 天，「超 7 天」不触发（不再依赖跑测试那天的日期）。
-    vi.mocked(catalog.stocksApi.list).mockResolvedValue([{
+    vi.mocked(stocksApi.list).mockResolvedValue([{
       id: 10,
       status: "WAITING",
       inventory_entry_at: "2026-10-20T00:00:00",
@@ -78,13 +95,13 @@ it("工作台按业务提醒配置计算库存阈值并控制提醒开关", asyn
       inventory_age_level: "WARNING",
       cost_amount: "100.00",
     } as never]);
-    vi.mocked(catalog.installmentsApi.list).mockResolvedValue([{ id: 20, status: "OVERDUE" } as never]);
-    vi.mocked(catalog.notificationsApi.list).mockResolvedValue({
+    vi.mocked(installmentsApi.list).mockResolvedValue([{ id: 20, status: "OVERDUE" } as never]);
+    vi.mocked(notificationsApi.list).mockResolvedValue({
       items: [{ id: 30, title: "新的分润通知", message: "订单 HS0001 已生成分润" } as never],
       total: 1,
       unread_total: 1,
     });
-    vi.mocked(catalog.optionSetsApi.get).mockResolvedValue({
+    vi.mocked(optionSetsApi.get).mockResolvedValue({
       options: [
         { value: "inventory_aging_days", label: "14" },
         { value: "profit_notifications_enabled", label: "0" },
@@ -96,7 +113,7 @@ it("工作台按业务提醒配置计算库存阈值并控制提醒开关", asyn
 
     const alerts = await screen.findByRole("region", { name: "我的消息" });
     expect(within(alerts).getByText("暂无异常事项")).toBeInTheDocument();
-    expect(vi.mocked(catalog.optionSetsApi.get)).toHaveBeenCalledWith("BUSINESS_OVERVIEW_REMINDERS");
+    expect(vi.mocked(optionSetsApi.get)).toHaveBeenCalledWith("BUSINESS_OVERVIEW_REMINDERS");
   });
 
 it("admin 渲染业务入口卡", async () => {
@@ -211,7 +228,7 @@ it("数据总览已迁走：不再渲染资金池表格/统计/订单入口卡",
 
 it("订单请求完成时不产生未包裹 act 的异步更新警告", async () => {
     let resolveOrders!: (value: never[]) => void;
-    vi.mocked(catalog.ordersApi.list).mockReturnValueOnce(new Promise<never[]>((resolve) => {
+    vi.mocked(ordersApi.list).mockReturnValueOnce(new Promise<never[]>((resolve) => {
       resolveOrders = resolve;
     }));
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);

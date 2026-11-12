@@ -3,33 +3,50 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { CreateBusinessModal } from "@/orders/CreateBusinessModal";
-import * as catalog from "@/shared/api/catalog";
+import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
+import { gameTypesApi } from "@/shared/api/misc.api";
+import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { seedOrderFormFields } from "@fixtures/formFieldsSeed";
 
 // 自动 mock：所有导出（含嵌套 ordersApi / orderTypesApi / ...）均为 vi.fn()
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
-  seedOrderFormFields(catalog);
-  vi.mocked(catalog.orderTypesApi.list).mockResolvedValue([{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }]);
-  vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
-  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", status: "ACTIVE" }]);
-  resolveMock(vi.mocked(catalog.stocksApi.list), [
+  seedOrderFormFields();
+  vi.mocked(orderTypesApi.list).mockResolvedValue([{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }]);
+  vi.mocked(customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
+  vi.mocked(counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(stocksApi.list), [
     { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "0.00" },
   ]);
-  resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
-  vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([
+  resolveMock(vi.mocked(poolsApi.list), [{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
+  vi.mocked(gameTypesApi.list).mockResolvedValue([
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
   ]);
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+  vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "系统管理员", is_active: true },
   ]);
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
+  vi.mocked(ordersApi.list).mockResolvedValue([]);
 });
 
 // antd Modal（含 ConfirmDialog）渲染在 document.body 下，testing-library 的 cleanup 不覆盖，
@@ -52,7 +69,7 @@ async function openTypedModal(orderType: string, onClose = vi.fn(), onCreated = 
 
 describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", () => {
   it("业务数据加载失败展示错误横幅（弹窗内无重试入口）", async () => {
-    vi.mocked(catalog.customersApi.list).mockRejectedValue(new Error("load fail"));
+    vi.mocked(customersApi.list).mockRejectedValue(new Error("load fail"));
     await openTypedModal("HS");
     expect((await screen.findAllByText(/load fail/)).length).toBeGreaterThan(0);
     // 组件未给 ErrorBanner 传 onRetry，故弹窗内无「重新加载」按钮；load 的 catch 分支已覆盖
@@ -75,15 +92,15 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
   it("脱敏客户列表不允许拿掩码比明文：填联系方式后交给后端判重，命中候选复用已有 id", async () => {
     // 无 customer.contact.read 时列表联系方式是掩码（contact_masked=true）。
     // 若前端仍拿掩码与用户输入的明文做等值比较，会漏匹配→重复建档（#6）。
-    vi.mocked(catalog.customersApi.list).mockResolvedValue([
+    vi.mocked(customersApi.list).mockResolvedValue([
       { id: 1, customer_no: "CUS-0001", display_name: "张三", phone: "138****8888", contact_masked: true, status: "ACTIVE" },
     ] as never);
     // 用户输入了明文手机 → 本地不复用；建档后后端用明文精确判重返回同名候选 → 复用 id=1。
-    resolveMockOnce(vi.mocked(catalog.customersApi.create), {
+    resolveMockOnce(vi.mocked(customersApi.create), {
       customer: { id: 99, customer_no: "CUS-0099", display_name: "张三" },
       duplicate_candidates: [{ customer_id: 1, customer_no: "CUS-0001", display_name: "张三", matched_on: ["phone"] }],
     });
-    resolveMockOnce(vi.mocked(catalog.ordersApi.create), { id: 31, order_no: "HS-2026-0031", status: "ACTIVE" });
+    resolveMockOnce(vi.mocked(ordersApi.create), { id: 31, order_no: "HS-2026-0031", status: "ACTIVE" });
 
     await openTypedModal("HS");
     await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
@@ -102,12 +119,12 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
     await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
 
-    await waitFor(() => expect(vi.mocked(catalog.customersApi.create)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalled());
     // 输入的手机号必须是明文传给后端判重，而不是掩码。
-    expect(vi.mocked(catalog.customersApi.create).mock.calls[0][0]).toMatchObject({ phone: "13800008888" });
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(customersApi.create).mock.calls[0][0]).toMatchObject({ phone: "13800008888" });
+    await waitFor(() => expect(vi.mocked(ordersApi.create)).toHaveBeenCalled());
     // 订单关联到后端判重命中的已有客户 id=1，而非新建的 id=99（避免重复建档）。
-    const payload = vi.mocked(catalog.ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
+    const payload = vi.mocked(ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload.customer_roles).toEqual([{ customer_id: 1, role: "SELLER" }]);
   });
 

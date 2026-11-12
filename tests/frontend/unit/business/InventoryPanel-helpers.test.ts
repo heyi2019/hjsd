@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 import { describe, expect, it } from "vitest";
-import type { Account } from "@/shared/api/catalog";
+import type { Account } from "@/shared/api/types/accounts";
 import { filterInventoryRows } from "@/stocks/InventoryPanel/helpers";
 
 const row = (overrides: Partial<Account> = {}) => ({

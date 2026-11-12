@@ -9,7 +9,8 @@
  *  - 设置页保存后通过订阅即时刷新已挂载的列表，不需要重新进入页面。
  */
 import { useEffect, useState } from "react";
-import { listColumnsApi, type ListScopeConfig } from "../api/catalog";
+import { listColumnsApi } from "../api/orders.api";
+import type { ListScopeConfig } from "../api/types/forms";
 
 type Listener = () => void;
 

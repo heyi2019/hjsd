@@ -1,4 +1,5 @@
-import type { EmployeeOption, GameTypeOption, Pool } from "../../shared/api/catalog";
+import type { Pool } from "../../shared/api/types/finance";
+import type { EmployeeOption, GameTypeOption } from "../../shared/api/types/org";
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
 import { ThFeeSection } from "./ThFeeSection";
 import { ThSupplierSection } from "./ThSupplierSection";

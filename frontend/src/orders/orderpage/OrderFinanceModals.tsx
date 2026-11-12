@@ -6,7 +6,7 @@ import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
-import { cashflowsApi } from "../../shared/api/catalog";
+import { cashflowsApi } from "../../shared/api/cashflows.api";
 import { requiredMoneyRules } from "../../shared/lib/validators";
 import { type OrdersPageController } from "./useOrdersPageController";
 

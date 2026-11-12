@@ -6,7 +6,13 @@ import { CreateBusinessModal } from "@/orders/CreateBusinessModal";
 import { DgOrderSection } from "@/orders/dg/DgOrderSection";
 import { FieldConfigContext } from "@/orders/ConfigurableField";
 import { Form } from "antd";
-import * as catalog from "@/shared/api/catalog";
+import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
+import { gameTypesApi } from "@/shared/api/misc.api";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { allFormFields, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 import { clearOptionSetsCache, loadOptionSets } from "@/shared/lib/optionSets";
@@ -30,33 +36,45 @@ async function pickMainPool() {
 // 自动 mock：所有导出（含嵌套 ordersApi / orderTypesApi / ...）均为 vi.fn()，
 // 跨文件在 isolate:false 下复用同一份 mock 实例，配合 setup.ts 的 resetAllMocks
 // 与各文件 beforeEach 重新设定返回值，避免闭包捕获的 vi.fn() 在共享模块图下串扰。
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
 
 beforeEach(() => {
   vi.clearAllMocks();
   clearOptionSetsCache();
-  seedOrderFormFields(catalog);
-  vi.mocked(catalog.orderTypesApi.list).mockResolvedValue(types);
-  vi.mocked(catalog.customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
-  vi.mocked(catalog.counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", status: "ACTIVE" }]);
-  resolveMock(vi.mocked(catalog.stocksApi.list), [
+  seedOrderFormFields();
+  vi.mocked(orderTypesApi.list).mockResolvedValue(types);
+  vi.mocked(customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
+  vi.mocked(counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(stocksApi.list), [
     { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "0.00" },
     { id: 10, game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "WAITING", cost_amount: "0.00" },
     { id: 11, game_account: "pickup-account", business_mode: "DISTRIBUTION", inventory_type: "PICKUP", status: "WAITING", cost_amount: "0.00" },
   ]);
-  resolveMock(vi.mocked(catalog.poolsApi.list), [{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([
+  resolveMock(vi.mocked(poolsApi.list), [{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
+  vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "系统管理员", is_active: true },
     { id: 2, username: "operator", display_name: "业务员", is_active: true },
   ]);
-  vi.mocked(catalog.gameTypesApi.list).mockResolvedValue([
+  vi.mocked(gameTypesApi.list).mockResolvedValue([
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
     { id: 2, name: "原神", sort_order: 20, is_active: true, is_default: false },
   ]);
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
-  resolveMock(vi.mocked(catalog.ordersApi.postEvent), { event: { id: 1 }, cashflow_no: "FLOW-0001" });
+  vi.mocked(ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
+  resolveMock(vi.mocked(ordersApi.postEvent), { event: { id: 1 }, cashflow_no: "FLOW-0001" });
 });
 
 /** 打开弹窗，返回弹窗容器与 onCreated 探针。
@@ -67,7 +85,7 @@ async function openModal(user = "admin") {
 
 it("设置面板改板块名后，建单同步显示后端覆盖标题", async () => {
   // 复刻「设置里把『资金明细』改名为『资金明细改名』→ 后端落库 → 建单读配置即时同步」
-  vi.mocked(catalog.orderFormFieldsApi).listSectionLabels.mockResolvedValue({ FINANCE: "资金明细改名" });
+  vi.mocked(orderFormFieldsApi).listSectionLabels.mockResolvedValue({ FINANCE: "资金明细改名" });
   await openTypedModal("HS");
   // 未覆盖前的硬编码 fallback 不再出现，取而代之的是后端配置的新名
   expect(await screen.findByText("资金明细改名")).toBeInTheDocument();
@@ -162,23 +180,23 @@ it("回收入口内联填写游戏账号信息，不加载库存账号", async (
 
     expect(await screen.findByLabelText("游戏账号")).toBeInTheDocument();
     expect(screen.queryByLabelText("库存编号")).toBeNull();
-    expect(vi.mocked(catalog.stocksApi.list)).not.toHaveBeenCalled();
-    expect(vi.mocked(catalog.ordersApi.list)).not.toHaveBeenCalled();
-    expect(vi.mocked(catalog.orderTypesApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(stocksApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(ordersApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(orderTypesApi.list)).not.toHaveBeenCalled();
   });
 
 it("打开回收入口后只加载订单所需的业务数据", async () => {
     const { container } = await openModal();
     expect(await screen.findByLabelText("游戏账号")).toBeInTheDocument();
     expect(screen.queryByLabelText("库存编号")).toBeNull();
-    expect(vi.mocked(catalog.orderTypesApi.list)).not.toHaveBeenCalled();
-    expect(vi.mocked(catalog.stocksApi.list)).not.toHaveBeenCalled();
-    expect(vi.mocked(catalog.ordersApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(orderTypesApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(stocksApi.list)).not.toHaveBeenCalled();
+    expect(vi.mocked(ordersApi.list)).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("关联账号（必填）");
   });
 
 it("回收订单渲染已启用的其他补充字段", async () => {
-  vi.mocked(catalog.orderFormFieldsApi.list).mockResolvedValue([
+  vi.mocked(orderFormFieldsApi.list).mockResolvedValue([
     ...allFormFields(),
     {
       id: 9901,
@@ -206,11 +224,11 @@ it("回收订单渲染已启用的其他补充字段", async () => {
 it("必填校验：未选业务类型不给提交", async () => {
     await openModal();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).not.toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled());
   });
 
 it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () => {
-    vi.mocked(catalog.ordersApi.create).mockRejectedValueOnce({
+    vi.mocked(ordersApi.create).mockRejectedValueOnce({
       isAxiosError: true,
       response: { data: { code: "POOL_ROUTE_MISSING", message: "缺少资金池路由" } },
       message: "Request failed",
@@ -233,7 +251,7 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
 
 it("FE-023：未售出的相同游戏账号由后端拒绝并保留表单", async () => {
     // 判重已后移到后端：前端不再拉库存台账比对，只呈现后端错误。
-    vi.mocked(catalog.ordersApi.create).mockRejectedValueOnce({
+    vi.mocked(ordersApi.create).mockRejectedValueOnce({
       isAxiosError: true,
       response: {
         data: {
@@ -259,13 +277,13 @@ it("FE-023：未售出的相同游戏账号由后端拒绝并保留表单", asyn
     // 未售出属硬阻止：只出错误提示，不应弹复购确认框（ConfirmDialog）。
     expect(screen.queryByText("检测到重复游戏账号")).not.toBeInTheDocument();
     // 请求已经发出，由后端判定；前端不自带判重。
-    expect(catalog.ordersApi.create).toHaveBeenCalledWith(
+    expect(ordersApi.create).toHaveBeenCalledWith(
       expect.objectContaining({ confirm_repurchase: false }),
     );
   });
 
 it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单", async () => {
-    vi.mocked(catalog.ordersApi.create)
+    vi.mocked(ordersApi.create)
       .mockRejectedValueOnce({
         isAxiosError: true,
         response: {
@@ -290,18 +308,18 @@ it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单"
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     // 后端要求确认复购：复购确认框出现，未确认前不再次提交。
     expect(await screen.findByText("检测到重复游戏账号")).toBeInTheDocument();
-    expect(catalog.ordersApi.create).toHaveBeenCalledTimes(1);
+    expect(ordersApi.create).toHaveBeenCalledTimes(1);
     // 复购确认用 ConfirmDialog（Modal 级）：按可访问名精确点击，兼作 loading 图标污染的回归护栏。
     await ui.click(screen.getByRole("button", { name: "是，继续建单" }));
-    await waitFor(() => expect(catalog.ordersApi.create).toHaveBeenCalledTimes(2));
-    expect(catalog.ordersApi.create).toHaveBeenLastCalledWith(
+    await waitFor(() => expect(ordersApi.create).toHaveBeenCalledTimes(2));
+    expect(ordersApi.create).toHaveBeenLastCalledWith(
       expect.objectContaining({ confirm_repurchase: true }),
     );
   });
 
 it("FE-123：原建单测试入口的提号来源默认值跟随主数据", async () => {
     clearOptionSetsCache();
-    vi.mocked(catalog.optionSetsApi.list).mockResolvedValueOnce({
+    vi.mocked(optionSetsApi.list).mockResolvedValueOnce({
       items: [{ code: "SUPPLIER_SOURCE", options: [{ value: "自营", label: "自营" }, { value: "其他", label: "其他" }] }],
     } as never);
     await loadOptionSets();
@@ -311,7 +329,7 @@ it("FE-123：原建单测试入口的提号来源默认值跟随主数据", asyn
   });
 
 it("订单已创建后不等待列表刷新，提交按钮立即结束 loading", async () => {
-    resolveMockOnce(vi.mocked(catalog.ordersApi.create), { id: 31, order_no: "TH-2026-0031", status: "ACTIVE" });
+    resolveMockOnce(vi.mocked(ordersApi.create), { id: 31, order_no: "TH-2026-0031", status: "ACTIVE" });
     let resolveRefresh!: () => void;
     const refresh = new Promise<void>((resolve) => { resolveRefresh = resolve; });
     const onClose = vi.fn();
@@ -332,7 +350,7 @@ it("订单已创建后不等待列表刷新，提交按钮立即结束 loading",
     await ui.type(amounts[1], "1200");
     await pickMainPool();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(ordersApi.create)).toHaveBeenCalled());
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const button = screen.getByRole("button", { name: /创建订单/ });
     expect(button.className).not.toContain("ant-btn-loading");
@@ -356,7 +374,7 @@ it("viewer 无 order.create → 提交按钮不渲染（入口由页面层 Permi
 
 it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async () => {
     clearOptionSetsCache();
-    vi.mocked(catalog.optionSetsApi.list).mockResolvedValueOnce({
+    vi.mocked(optionSetsApi.list).mockResolvedValueOnce({
       items: [
         { code: "INTERMEDIARY_PLATFORM", options: [{ value: "盼之", label: "盼之" }] },
         { code: "INTERMEDIARY_TYPE", options: [{ value: "包赔", label: "包赔" }] },
@@ -365,7 +383,7 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     } as never);
     await loadOptionSets();
 
-    resolveMockOnce(vi.mocked(catalog.ordersApi.create), { id: 31, order_no: "HS-2026-0031", status: "ACTIVE" });
+    resolveMockOnce(vi.mocked(ordersApi.create), { id: 31, order_no: "HS-2026-0031", status: "ACTIVE" });
     const onClose = vi.fn();
     await openTypedModal("HS", "admin");
     await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
@@ -384,8 +402,8 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     await ui.click(screen.getByLabelText("包赔类型").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
     await ui.click(await screen.findByText("首保", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
-    await waitFor(() => expect(vi.mocked(catalog.ordersApi.create)).toHaveBeenCalled());
-    const payload = vi.mocked(catalog.ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
+    await waitFor(() => expect(vi.mocked(ordersApi.create)).toHaveBeenCalled());
+    const payload = vi.mocked(ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
     const formExtra = (payload.form_extra ?? {}) as Record<string, unknown>;
     expect(formExtra.intermediary_platform).toBe("盼之");
     expect(formExtra.intermediary_type).toBe("包赔");

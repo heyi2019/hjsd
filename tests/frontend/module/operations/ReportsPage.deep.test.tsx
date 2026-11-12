@@ -6,7 +6,10 @@ import { ReportsPage } from "@/reporting/ReportsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { appMessage } from "@/shared/ui/appFeedback";
 
-import * as catalog from "@/shared/api/catalog";
+import { ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { reportsApi } from "@/shared/api/reports.api";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -14,7 +17,19 @@ beforeEach(() => {
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
 });
 
-vi.mock("@/shared/api/catalog");
+vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/installments.api");
+vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/options.api");
+vi.mock("@/shared/api/orders.api");
+vi.mock("@/shared/api/org.api");
+vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/quality.api");
+vi.mock("@/shared/api/rebates.api");
+vi.mock("@/shared/api/reports.api");
+vi.mock("@/shared/api/stocks.api");;
 
 // 报表 DataTable 重型，替换为轻量实现（与 ReportsPage.test.tsx 一致），
 // MoneyText / StatusTag / StatRow / ErrorBanner 仍用真实组件。
@@ -27,32 +42,32 @@ vi.mock("@/shared/ui", async (importOriginal) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resolveMock(vi.mocked(catalog.reportsApi.monthlyPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(catalog.reportsApi.commission), {
+  resolveMock(vi.mocked(reportsApi.monthlyPnl), { items: [], total: {} });
+  resolveMock(vi.mocked(reportsApi.commission), {
     items: [],
     total: { order_count: 0, payable: "0", paid: "0", difference: "0" },
   });
-  vi.mocked(catalog.employeesApi.list).mockResolvedValue([]);
-  resolveMock(vi.mocked(catalog.reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
-  resolveMock(vi.mocked(catalog.reportsApi.financeDimensions), {
+  vi.mocked(employeesApi.list).mockResolvedValue([]);
+  resolveMock(vi.mocked(reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
+  resolveMock(vi.mocked(reportsApi.financeDimensions), {
     items: [],
     total_amount: "0",
     total_signed_amount: "0",
   });
-  resolveMock(vi.mocked(catalog.reportsApi.businessPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(catalog.reportsApi.orderProfit), {
+  resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
+  resolveMock(vi.mocked(reportsApi.orderProfit), {
     items: [],
     total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" },
   });
-  resolveMock(vi.mocked(catalog.reportsApi.exportCsv), new Blob(["csv"]));
+  resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
-  vi.mocked(catalog.poolsApi.list).mockResolvedValue([]);
+  vi.mocked(poolsApi.list).mockResolvedValue([]);
   // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
-  resolveMock(vi.mocked(catalog.poolsApi.balances), {
+  resolveMock(vi.mocked(poolsApi.balances), {
     items: [],
     totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
-  vi.mocked(catalog.ordersApi.list).mockResolvedValue([]);
+  vi.mocked(ordersApi.list).mockResolvedValue([]);
 });
 
 async function gotoTab(label: string) {
@@ -61,7 +76,7 @@ async function gotoTab(label: string) {
 
 describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   it("R3 提成对账：渲染人员/订单/费率/应付与差异统计", async () => {
-    resolveMockOnce(vi.mocked(catalog.reportsApi.commission), {
+    resolveMockOnce(vi.mocked(reportsApi.commission), {
       items: [
         { user_id: 1, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10", payable: "10.00", paid: "5.00", difference: "5.00" },
       ],
@@ -76,7 +91,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   });
 
   it("R4 资金日报：渲染资金池/期初/收支/余额与标题日期", async () => {
-    resolveMockOnce(vi.mocked(catalog.reportsApi.dailyFunds), {
+    resolveMockOnce(vi.mocked(reportsApi.dailyFunds), {
       date: "2026-10-08",
       total: { cash_balance: "80.00", deposit_held: "10.00", available: "70.00" },
       items: [
@@ -92,13 +107,13 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   });
 
   it("R4 资金日报：切换日期带 on 参数重新拉取（#56）", async () => {
-    vi.mocked(catalog.reportsApi.dailyFunds).mockClear();
+    vi.mocked(reportsApi.dailyFunds).mockClear();
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("资金日报 R4");
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.dailyFunds)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenCalled());
     const dateInput = screen.getByLabelText("资金日报日期");
     fireEvent.change(dateInput, { target: { value: "2026-10-08" } });
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-08" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-08" }));
   });
 
   it("FE-051：共享日期区间传递到 R2/R3/R5、资金属性和订单利润", async () => {
@@ -109,19 +124,19 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
       fireEvent.change(pane.querySelector<HTMLInputElement>(".ui-control-width-date")!, { target: { value: "2026-10-01" } });
     };
     await setFrom(/R2/);
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
+    await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
     await setFrom(/R3/);
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", all_people: true }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", all_people: true }));
     await setFrom(/R5/);
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
+    await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
     await setFrom(/资金属性/);
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.financeDimensions)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
+    await waitFor(() => expect(vi.mocked(reportsApi.financeDimensions)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
     await setFrom(/订单利润/);
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
+    await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
   });
 
   it("资金属性分析：渲染资金池 / 方向 / 净方向金额", async () => {
-    resolveMockOnce(vi.mocked(catalog.reportsApi.financeDimensions), {
+    resolveMockOnce(vi.mocked(reportsApi.financeDimensions), {
       items: [
         {
           pool_name: "POOL-A",
@@ -153,7 +168,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("月度损益 R2");
     await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
     expect(createUrl).toHaveBeenCalled();
     expect(revokeUrl).toHaveBeenCalled();
     expect(successSpy).toHaveBeenCalledWith("已导出 monthly-pnl.csv");
@@ -171,7 +186,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await ui.type(dateInputs[1], "2026-10-01");
     await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
     await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("导出开始日期不能晚于结束日期"));
-    expect(vi.mocked(catalog.reportsApi.exportCsv)).not.toHaveBeenCalled();
+    expect(vi.mocked(reportsApi.exportCsv)).not.toHaveBeenCalled();
   });
 
   it("统计周期变更触发报表重新请求（R2 月度损益）", async () => {
@@ -184,18 +199,18 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await ui.type(dateInputs[0], "2026-01-01");
     // 区间变化 → monthlyPnl 重新请求（deps 含 params.from）
     await waitFor(() =>
-      expect(vi.mocked(catalog.reportsApi.monthlyPnl)).toHaveBeenCalledWith({ from: "2026-01-01", to: undefined }),
+      expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledWith({ from: "2026-01-01", to: undefined }),
     );
   });
 
   it("FE-270：R2 和 R5 历史空区间清空旧明细", async () => {
-    vi.mocked(catalog.reportsApi.monthlyPnl).mockImplementation((params) => Promise.resolve(
+    vi.mocked(reportsApi.monthlyPnl).mockImplementation((params) => Promise.resolve(
       params?.from ? { items: [], total: { sales_income: "0", operating_profit: "0" } } : {
         items: [{ month: "2026-11", sales_income: "100", account_direct_cost: "50", operating_expense: "0", rebate_income: "0", operating_profit: "50" }],
         total: { sales_income: "100", operating_profit: "50" },
       },
     ) as never);
-    vi.mocked(catalog.reportsApi.businessPnl).mockImplementation((params) => Promise.resolve(
+    vi.mocked(reportsApi.businessPnl).mockImplementation((params) => Promise.resolve(
       params?.from ? { items: [], total: { main_profit: "0" } } : {
         items: [{ order_type: "HS", business_mode: "SELF", main_income: "100", main_cost: "50", main_profit: "50" }],
         total: { main_profit: "50" },
@@ -209,15 +224,15 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     const r2Dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
     fireEvent.change(r2Dates[0], { target: { value: "2026-10-01" } });
     fireEvent.change(r2Dates[1], { target: { value: "2026-10-31" } });
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
     await waitFor(() => expect(screen.queryByText("2026-11")).not.toBeInTheDocument());
 
     await gotoTab("业务损益 R5");
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
   });
 
   it("FE-271：资金属性分析历史空区间清空旧汇总", async () => {
-    vi.mocked(catalog.reportsApi.financeDimensions).mockImplementation((params) => Promise.resolve(
+    vi.mocked(reportsApi.financeDimensions).mockImplementation((params) => Promise.resolve(
       params?.from ? { items: [], total_amount: "0", total_signed_amount: "0" } : {
         items: [{ pool_name: "POOL-FE271", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE", direction: "IN", flow_count: 1, amount: "10", signed_amount: "10" }],
         total_amount: "10",
@@ -231,12 +246,12 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     const dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
     fireEvent.change(dates[0], { target: { value: "2026-10-01" } });
     fireEvent.change(dates[1], { target: { value: "2026-10-31" } });
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.financeDimensions)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.financeDimensions)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
     await waitFor(() => expect(screen.queryByText("POOL-FE271")).not.toBeInTheDocument());
   });
 
   it("FE-272：订单利润历史空区间清空收入成本和净利明细", async () => {
-    vi.mocked(catalog.reportsApi.orderProfit).mockImplementation((params) => Promise.resolve(
+    vi.mocked(reportsApi.orderProfit).mockImplementation((params) => Promise.resolve(
       params?.from ? { items: [], total: { income: "0", buy_amount: "0", direct_cost: "0", rebate: "0", net_profit: "0" } } : {
         items: [{ order_no: "HS-FE272", order_type: "HS", trade_date: "2026-11-01", status: "DONE", income: "100", buy_amount: "50", direct_cost: "10", rebate: "0", net_profit: "40" }],
         total: { income: "100", buy_amount: "50", direct_cost: "10", rebate: "0", net_profit: "40" },
@@ -249,18 +264,18 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     const dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
     fireEvent.change(dates[0], { target: { value: "2026-10-01" } });
     fireEvent.change(dates[1], { target: { value: "2026-10-31" } });
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
     await waitFor(() => expect(screen.queryByText("HS-FE272")).not.toBeInTheDocument());
   });
 
   it("FE-273：R3 和 R4 日期筛选切换到历史空态", async () => {
-    vi.mocked(catalog.reportsApi.commission).mockImplementation((params) => Promise.resolve(
+    vi.mocked(reportsApi.commission).mockImplementation((params) => Promise.resolve(
       params?.from ? { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } } : {
         items: [{ user_id: 1, order_no: "HS-FE273", profit_base: "10", rate: "0.1", payable: "1", paid: "0", difference: "1" }],
         total: { order_count: 1, payable: "1", paid: "0", difference: "1" },
       },
     ) as never);
-    vi.mocked(catalog.reportsApi.dailyFunds).mockImplementation((params) => Promise.resolve(
+    vi.mocked(reportsApi.dailyFunds).mockImplementation((params) => Promise.resolve(
       params?.on === "2026-10-01" ? { date: "2026-10-01", total: {}, items: [] } : {
         date: "2026-11-01",
         total: { cash_balance: "10", deposit_held: "0", available: "10" },
@@ -275,18 +290,18 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     const r3Dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
     fireEvent.change(r3Dates[0], { target: { value: "2026-10-01" } });
     fireEvent.change(r3Dates[1], { target: { value: "2026-10-31" } });
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
     await waitFor(() => expect(screen.queryByText("HS-FE273")).not.toBeInTheDocument());
 
     await gotoTab("资金日报 R4");
     await screen.findByLabelText("资金日报日期");
     fireEvent.change(screen.getByLabelText("资金日报日期"), { target: { value: "2026-10-01" } });
-    await waitFor(() => expect(vi.mocked(catalog.reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-01" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-01" }));
     await waitFor(() => expect(screen.queryByText("POOL-FE273")).not.toBeInTheDocument());
   });
 
   it("R3 加载失败显示错误条，点「重新加载」可重试成功", async () => {
-    vi.mocked(catalog.reportsApi.commission).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" } as unknown as never);
+    vi.mocked(reportsApi.commission).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" } as unknown as never);
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("提成对账 R3");
     await waitFor(() => expect(document.querySelector(".ui-error-banner")).toBeTruthy());

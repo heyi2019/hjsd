@@ -6,7 +6,8 @@
 import { configurableLabel } from "../../shared/lib/optionSets";
 import { Card, Descriptions, Typography } from "antd";
 import { useCallback, useEffect, useState } from "react";
-import { sequencesApi, type DocumentSequence } from "../../shared/api/catalog";
+import { sequencesApi } from "../../shared/api/misc.api";
+import type { DocumentSequence } from "../../shared/api/types/common";
 import { normalizeError } from "../../shared/api/client";
 import { ErrorBanner } from "../../shared/ui";
 

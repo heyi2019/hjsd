@@ -41,24 +41,25 @@ export function useLedgerColumns(params: {
   } = params;
   const { arrange: arrangeLedgerColumns } = useListViewColumns("LEDGER");
   const ledgerColumns: ColumnsType<Order> = [
-    { title: "订单号", dataIndex: "order_no", width: 110, ellipsis: true },
-    { title: "游戏/产品类型", dataIndex: "account_game_type", width: 140, ellipsis: true, render: (v: string | null) => v || "-" },
-    { title: "游戏账号/产品", dataIndex: "account_game_account", width: 140, ellipsis: true, render: (v: string | null) => v || "-" },
-    { title: "入库负责人", dataIndex: "inventory_operator", width: 110, ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "库存编号", dataIndex: "stock_no", width: "var(--col-w-86)", ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "订单号", dataIndex: "order_no", width: "var(--col-w-80)", ellipsis: true },
+    { title: "游戏/产品类型", dataIndex: "account_game_type", width: "var(--col-w-80)", ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "游戏账号/产品", dataIndex: "account_game_account", width: "var(--col-w-120)", ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "入库负责人", dataIndex: "inventory_operator", width: "var(--col-w-100)", ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "入库时间", dataIndex: "inventory_entry_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
-    { title: "售卖负责人", dataIndex: "sale_operator", width: 110, ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "售卖负责人", dataIndex: "sale_operator", width: "var(--col-w-100)", ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "售卖时间", dataIndex: "sale_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
-    { title: "在手时间", key: "in_hand_time", width: 120, ellipsis: true, render: (_v, order) => order.in_hand_time ?? formatElapsedTime(order.inventory_entry_at, order.sale_at) },
-    { title: "金额", dataIndex: "event_total", width: 126, ellipsis: true, render: (_v: string | null, order) => formatOrderAmount(order) },
-    { title: "订单状态", dataIndex: "status", width: 96, ellipsis: true, render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
-    { title: "库存状态", dataIndex: "account_status", width: 102, ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
-    { title: "成本", dataIndex: "cost_amount", width: 110, ellipsis: true, render: (_v: string | null, order) => order.account_status === "SOLD" && order.cost_amount != null ? `¥${money(order.cost_amount)}` : "-" },
-    { title: "利润", dataIndex: "profit_base", width: 110, ellipsis: true, render: (_v: string | null, order) => order.account_status === "SOLD" && order.profit_base != null ? `¥${money(order.profit_base)}` : "-" },
-    { title: "日期", dataIndex: "trade_date", width: 144, ellipsis: true },
+    { title: "在手时间", key: "in_hand_time", width: "var(--col-w-80)", ellipsis: true, render: (_v, order) => order.in_hand_time ?? formatElapsedTime(order.inventory_entry_at, order.sale_at) },
+    { title: "金额", dataIndex: "event_total", width: "var(--col-w-90)", ellipsis: true, render: (_v: string | null, order) => formatOrderAmount(order) },
+    { title: "订单状态", dataIndex: "status", width: "var(--col-w-80)", ellipsis: true, render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
+    { title: "库存状态", dataIndex: "account_status", width: "var(--col-w-80)", ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
+    { title: "成本", dataIndex: "cost_amount", width: "var(--col-w-90)", ellipsis: true, render: (_v: string | null, order) => order.account_status === "SOLD" && order.cost_amount != null ? `¥${money(order.cost_amount)}` : "-" },
+    { title: "利润", dataIndex: "profit_base", width: "var(--col-w-90)", ellipsis: true, render: (_v: string | null, order) => order.account_status === "SOLD" && order.profit_base != null ? `¥${money(order.profit_base)}` : "-" },
+    { title: "日期", dataIndex: "trade_date", width: "var(--col-w-132)", ellipsis: true },
     {
       title: "操作",
       key: "actions",
-      width: 470,
+      width: "var(--col-w-420)",
       ellipsis: true,
       render: (_, order) => {
         const canOffsaleConsignment = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
@@ -67,7 +68,7 @@ export function useLedgerColumns(params: {
           || Boolean(order.sale_at)
           || (order.events ?? []).some((event) => event.event_type === "SELL");
         return (
-          <Space size={2}>
+          <Space size={2} className="orders-ledger-actions">
           {order.account_id || ["ACTIVE", "INSTALLMENT"].includes(order.status) ? (
             <PermissionButton
               permission="order.update"

@@ -1,0 +1,43 @@
+/* 订单台账与库存中心共用同一套列表密度：筛选区、表格文字和行内操作不另起字号。 */
+.orders-ledger-panel .orders-ledger-filters {
+  align-items: center;
+}
+
+.orders-ledger-panel .orders-ledger-filter-label {
+  font: var(--font-table-header);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.orders-ledger-panel .orders-ledger-card .ant-input,
+.orders-ledger-panel .orders-ledger-card .ant-picker,
+.orders-ledger-panel .orders-ledger-card .ant-select-selector,
+.orders-ledger-panel .orders-ledger-card .ant-segmented,
+.orders-ledger-panel .orders-ledger-card .ant-btn {
+  font-size: var(--fs-footnote);
+}
+
+.orders-ledger-panel .orders-ledger .ant-table-thead > tr > th {
+  font: var(--font-table-header);
+}
+
+.orders-ledger-panel .orders-ledger .ant-table-tbody > tr > td {
+  font: var(--font-body-s);
+}
+
+.orders-ledger-actions {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.orders-ledger-actions .ant-btn-link {
+  min-height: var(--sz-30);
+  padding-inline: var(--space-1);
+  color: var(--primary-ink);
+  font-size: var(--fs-caption-2);
+}
+
+.orders-ledger-actions .ant-btn-link:hover {
+  background: var(--soft);
+  border-radius: var(--radius-compact);
+}

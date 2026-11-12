@@ -380,6 +380,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "created_at": order.created_at,
             # HS / TH / DG 从库存实体展示安全的业务字段，
             # 不把快照中的 game_password 原样带入列表响应。
+            "stock_no": account.stock_no if account else None,
             "account_game_type": (account.game_type if account else None) or snapshot.get("game_type"),
             "account_game_account": (account.game_account if account else None) or snapshot.get("game_account"),
             "account_channel_region": (account.channel_region if account else None) or snapshot.get("channel_region"),

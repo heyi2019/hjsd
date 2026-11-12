@@ -198,6 +198,7 @@ class OrderListOut(OrderOut):
     """工作台列表摘要：主订单之外只带列表需要的可读业务信息。"""
 
     account_game_type: str | None = None
+    stock_no: str | None = None
     account_game_account: str | None = None
     account_channel_region: str | None = None
     account_business_mode: str | None = None

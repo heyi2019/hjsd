@@ -36,6 +36,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="LEDGER",
         label="订单台账",
         columns=(
+            ListColumn("stock_no", "库存编号"),
             ListColumn("order_no", "订单号"),
             ListColumn("account_game_type", "游戏/产品类型"),
             ListColumn("account_game_account", "游戏账号/产品"),

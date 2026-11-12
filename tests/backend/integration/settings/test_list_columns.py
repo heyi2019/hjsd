@@ -36,7 +36,7 @@ def test_list_scopes_match_registry(seeded_client, headers):
     payload = response.json()
     assert {item["code"] for item in payload} == {scope.code for scope in LIST_SCOPES}
     ledger = next(item for item in payload if item["code"] == "LEDGER")
-    assert [column["key"] for column in ledger["columns"][:2]] == ["order_no", "account_game_type"]
+    assert [column["key"] for column in ledger["columns"][:2]] == ["stock_no", "order_no"]
     assert next(column for column in ledger["columns"] if column["key"] == "account_status")["label"] == "库存状态"
     # 缺行默认可见（不播种也能用）
     assert all(column["is_visible"] for column in ledger["columns"])
@@ -150,8 +150,8 @@ def test_save_width_and_fixed(seeded_client, headers):
     assert reloaded["order_no"]["fixed"] == "left"
 
     # 取消覆盖：传 null 后回到默认
-    items[1]["width"] = None
-    items[0]["fixed"] = None
+    next(item for item in items if item["column_key"] == "account_game_type")["width"] = None
+    next(item for item in items if item["column_key"] == "order_no")["fixed"] = None
     cleared = _save(seeded_client, headers, "LEDGER", items)
     assert cleared.status_code == 200, cleared.text
     cleared_by_key = {column["key"]: column for column in cleared.json()["columns"]}

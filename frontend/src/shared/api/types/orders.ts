@@ -36,6 +36,7 @@ export interface Order {
   value_added_service?: string | null;
   trade_date: string;
   account_id?: number | null;
+  stock_no?: string | null;
   status: string;
   note?: string | null;
   account_game_type?: string | null;

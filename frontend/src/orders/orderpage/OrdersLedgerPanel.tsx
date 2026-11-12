@@ -7,6 +7,7 @@ import { countBusinessOrders } from "./helpers";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 import type { OrdersPageController } from "./useOrdersPageController";
 import { markMobileHiddenColumns } from "../../shared/lib/listColumns";
+import "./OrdersLedgerPanel.css";
 
 /** ≤640px 隐藏列：原规则写 nth-child(4)，但表格有展开列占位，实测命中的是
  *  「游戏账号/产品」而非入库负责人。本次保持默认隐藏目标不变，只把序号换成稳定 key，
@@ -74,15 +75,15 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
   const typeCount = (key: BusinessFilterKey) => countBusinessOrders(typeCountBase, key, businessModeFilter);
 
   return (
-    <section className="ui-stack">
+    <section className="ui-stack orders-ledger-panel">
       <StatRow items={[
         { label: "订单总量", kind: "count", amount: statValue(filteredOrders.length) },
         { label: "进行中订单", kind: "count", amount: statValue(filteredOrders.filter((order) => ["ACTIVE", "INSTALLMENT"].includes(order.status)).length) },
         { label: "完成订单量", kind: "count", amount: statValue(filteredOrders.filter((order) => order.status === "COMPLETED").length) },
         { label: "已取消订单", kind: "count", amount: statValue(filteredOrders.filter((order) => order.status === "CANCELLED").length) },
       ]} />
-      <Card className="glass">
-        <Space wrap className="ui-filter-bar ui-filter-bar--spaced">
+      <Card className="glass orders-ledger-card">
+        <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters orders-ledger-filters">
           <Input
             allowClear
             value={keyword}
@@ -100,11 +101,11 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
             value={dateRange}
             onChange={(value) => { setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null); setPage(1); }}
           />
-          <Typography.Text strong>游戏类型筛选</Typography.Text>
+          <Typography.Text strong className="orders-ledger-filter-label">游戏类型筛选</Typography.Text>
           <Select aria-label="游戏类型筛选" className="ui-filter-select" value={gameTypeFilter} options={gameTypeOptions} onChange={(value) => { setGameTypeFilter(value); setPage(1); }} />
-          <Typography.Text strong>库存状态筛选</Typography.Text>
+          <Typography.Text strong className="orders-ledger-filter-label">库存状态筛选</Typography.Text>
           <Select aria-label="库存状态筛选" className="ui-filter-select" value={inventoryStatusFilter} options={inventoryStatusOptions} onChange={(value) => { setInventoryStatusFilter(value); setPage(1); }} />
-          <Typography.Text strong>类型筛选</Typography.Text>
+          <Typography.Text strong className="orders-ledger-filter-label">类型筛选</Typography.Text>
           <Segmented
             value={orderTypeFilter}
             options={[
@@ -113,13 +114,13 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
             ]}
             onChange={(value) => { setOrderTypeFilter(value as BusinessFilterKey); setPage(1); }}
           />
-          <Typography.Text strong>业务筛选</Typography.Text>
+          <Typography.Text strong className="orders-ledger-filter-label">业务筛选</Typography.Text>
           <Segmented
             value={businessModeFilter}
             options={[{ value: "all", label: "全部业务" }, ...orderBusinessModeOptions.map((item) => ({ value: item.value, label: item.label }))]}
             onChange={(value) => { setBusinessModeFilter(value as BusinessModeFilterKey); setPage(1); }}
           />
-          <Typography.Text strong>排序</Typography.Text>
+          <Typography.Text strong className="orders-ledger-filter-label">排序</Typography.Text>
           <Segmented
             aria-label="台账排序"
             value={ledgerSortDesc ? "desc" : "asc"}
@@ -153,7 +154,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
           pageSize={pageSize}
           total={filteredOrders.length}
           emptyText="暂无业务订单"
-          className="orders-ledger"
+          className="inventory-table orders-ledger"
           expandable={{
             expandedRowKeys: expandedOrderIds,
             onExpand: handleLedgerExpand,

@@ -57,12 +57,12 @@ export function useOrderActionModals({
   const [profitShareForm] = Form.useForm();
   const [orderRebateTarget, setOrderRebateTarget] = useState<Account | null>(null);
   const [orderSaleTarget, setOrderSaleTarget] = useState<Account | null>(null);
-  const [orderConsignmentTarget, setOrderConsignmentTarget] = useState<Account | null>(null);
+  const [orderConsignmentTarget, setOrderConsignmentTarget] = useState<{ account: Account; orderId: number } | null>(null);
   const [orderDeleteTarget, setOrderDeleteTarget] = useState<Account | null>(null);
+  const [orderDeleteSubmitting, setOrderDeleteSubmitting] = useState(false);
   const [deliveryTarget, setDeliveryTarget] = useState<OrderDeliveryTarget | null>(null);
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
   const [orderOffsaleTarget, setOrderOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
-  const [orderDeleteSubmitting, setOrderDeleteSubmitting] = useState(false);
   /** 订单总利润（后端 order_amounts 口径），负数即亏损单；分润弹窗顶部展示并作为金额分润上限。 */
   const [allocationProfit, setAllocationProfit] = useState<string>("0");
   /** 分润口径：按操作四项（买号/售出/运营/公司）或按人自由分配。默认按操作。 */
@@ -243,7 +243,7 @@ export function useOrderActionModals({
   const openOrderConsignment = async (sourceOrder: Order) => {
     try {
       const account = await loadOrderAccount(sourceOrder);
-      if (account) setOrderConsignmentTarget(account);
+      if (account) setOrderConsignmentTarget({ account, orderId: sourceOrder.id });
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
@@ -322,13 +322,14 @@ export function useOrderActionModals({
     if (!target) return;
     try {
       await unlistAndCancelConsignmentOrders({
-        orderIds: target.records.map((record) => record.orderId),
+        records: target.records,
+        cancelOrderIds: target.records.map((record) => record.orderId),
         note: `系统下架：${payload.reason}`,
         reason: payload.reason,
         occurredOn: today(),
         formExtra: payload.form_extra,
       });
-      appMessage.success("代挂订单已取消，账号已出库");
+      appMessage.success("寄售记录已下架，账号已出库");
       setOrderOffsaleTarget(null);
       await load();
     } catch (error) {

@@ -99,7 +99,8 @@ export function OrderAccountActionModals({ controller }: { controller: OrdersPag
           ? <PickupSaleModal {...saleCommon} />
           : <RecoverySaleModal {...saleCommon} />}
       <InventoryConsignmentModal
-        account={consignment}
+        account={consignment?.account ?? null}
+        orderId={consignment?.orderId}
         onClose={() => controller.setOrderConsignmentTarget(null)}
         onCreated={async () => {
           controller.setOrderConsignmentTarget(null);

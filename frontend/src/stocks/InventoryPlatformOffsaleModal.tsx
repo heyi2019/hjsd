@@ -8,27 +8,15 @@ import { normalizeError } from "../shared/api/client";
 import { appMessage } from "../shared/ui/appFeedback";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
-import { consignmentPlatform, isActiveConsignmentListing } from "./consignment-logic";
+import { consignmentListings, type ConsignmentListing } from "./consignment-logic";
 import { formatDateTimeMinute } from "../shared/lib/format";
 
-export type ActiveConsignment = {
-  orderId: number;
-  orderNo: string;
-  platform: string;
-  listedAt: string;
-};
+export type ActiveConsignment = ConsignmentListing;
 
 type DisplayConsignment = Omit<ActiveConsignment, "orderId"> & { orderId: number | "SYSTEM" };
 
 export function consignmentRecords(orders: AccountExecutionOrder[]): ActiveConsignment[] {
-  return orders
-    .filter(isActiveConsignmentListing)
-    .map((order) => ({
-      orderId: order.order_id,
-      orderNo: order.order_no,
-      platform: consignmentPlatform(order) ?? "-",
-      listedAt: formatDateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? "")),
-    }));
+  return consignmentListings(orders);
 }
 
 export function InventoryPlatformOffsaleModal(props: {
@@ -48,6 +36,7 @@ export function InventoryPlatformOffsaleModal(props: {
       orderId: "SYSTEM",
       orderNo: "ERP",
       platform: "本系统",
+      price: null,
       listedAt: formatDateTimeMinute(String(props.account.created_at ?? props.account.buy_date ?? "")),
     }
     : null;
@@ -88,15 +77,8 @@ export function InventoryPlatformOffsaleModal(props: {
         form_extra_scope: "INVOID",
         form_extra: {
           ...values.form_extra,
-          platform_unlisted_at: unlistedAt.format("YYYY-MM-DDTHH:mm"),
-          platform_unlist_scope: "PLATFORM",
-        },
-      });
-      await ordersApi.cancel(selected.orderId, {
-        reason: values.reason.trim(),
-        form_extra_scope: "INVOID",
-        form_extra: {
-          ...values.form_extra,
+          ...(selected.eventId == null ? {} : { consignment_event_id: selected.eventId }),
+          consignment_platform: selected.platform,
           platform_unlisted_at: unlistedAt.format("YYYY-MM-DDTHH:mm"),
           platform_unlist_scope: "PLATFORM",
         },

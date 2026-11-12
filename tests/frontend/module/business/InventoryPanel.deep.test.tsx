@@ -85,8 +85,12 @@ const consignmentDetail = {
     status: "ACTIVE",
     created_at: "2026-10-29T03:54:00",
     trade_date: "2026-10-29",
-    extra_values: { consignment_platform: "千寻", listed_at: "2026-10-29T03:54" },
-    events: [],
+    events: [{
+      id: 801,
+      event_type: "OPERATE",
+      operation_type: "CONSIGNMENT",
+      form_extra: { consignment_platform: "千寻", listed_at: "2026-10-29T03:54" },
+    }],
   }],
 } as unknown as AccountExecutionDetail;
 

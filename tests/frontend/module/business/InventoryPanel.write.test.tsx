@@ -152,11 +152,18 @@ describe("InventoryPanel：写入与长路径", () => {
     })));
   });
 
-  it("FE-263：寄售上架复用现有库存账号，不重复创建库存实体", async () => {
+  it("寄售登记到来源订单，不创建 DG 代挂订单", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(stocksApi.executionDetail).mockResolvedValueOnce({
       account: accounts[0],
-      orders: [],
+      orders: [{
+        order_id: 21,
+        order_no: "HS0001",
+        order_type: "HS",
+        trade_date: "2026-10-15",
+        status: "ACTIVE",
+        events: [],
+      }],
     } as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
@@ -167,11 +174,12 @@ describe("InventoryPanel：写入与长路径", () => {
     await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: "确认上架" }));
 
-    await waitFor(() => expect(vi.mocked(ordersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
-      order_type: "DG",
-      account_id: 1,
+    await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
+      event_type: "OPERATE",
+      operation_type: "CONSIGNMENT",
       form_extra_scope: "CONSIGN",
     })));
+    expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
   });
 
   it("寄售展示中介平台配置和精确到分钟的上架时间", async () => {
@@ -297,17 +305,22 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
     );
   }
 
-  it("DG 订单已保存 consignment_platform 时，已上架记录展示平台名而非空", async () => {
+  it("原订单寄售事件的已上架记录展示平台名", async () => {
     vi.mocked(stocksApi.executionDetail).mockResolvedValue({
       account: { id: 1, status: "IN_STOCK" },
       orders: [
         {
           order_id: 22,
-          order_type: "DG",
+          order_type: "HS",
           status: "ACTIVE",
           trade_date: "2026-10-12",
           created_at: "2026-10-12T09:10:00",
-          extra_values: { consignment_platform: "盼之", listed_at: "2026-10-12T09:10:00" },
+          events: [{
+            id: 901,
+            event_type: "OPERATE",
+            operation_type: "CONSIGNMENT",
+            form_extra: { consignment_platform: "盼之", listed_at: "2026-10-12T09:10:00" },
+          }],
         },
       ],
     } as never);
@@ -322,17 +335,22 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
     expect(table).toHaveTextContent("上架时间");
   });
 
-  it("DG 订单无 consignment_platform 时，从 counterparties(PLATFORM) 兜底展示平台名，不再为空", async () => {
+  it("寄售平台从原订单寄售事件读取", async () => {
     vi.mocked(stocksApi.executionDetail).mockResolvedValue({
       account: { id: 1, status: "IN_STOCK" },
       orders: [
         {
           order_id: 22,
-          order_type: "DG",
+          order_type: "HS",
           status: "ACTIVE",
           trade_date: "2026-10-12",
           created_at: "2026-10-12T09:10:00",
-          counterparties: [{ id: 11, display_name: "寄售平台A", role: "PLATFORM" }],
+          events: [{
+            id: 902,
+            event_type: "OPERATE",
+            operation_type: "CONSIGNMENT",
+            form_extra: { consignment_platform: "寄售平台A", listed_at: "2026-10-12T09:10:00" },
+          }],
         },
       ],
     } as never);

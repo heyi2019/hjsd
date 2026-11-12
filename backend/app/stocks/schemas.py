@@ -204,6 +204,7 @@ class ExecutionEventOut(BaseModel):
     is_posted: bool
     reason: str | None = None
     note: str | None = None
+    form_extra: dict[str, object] = Field(default_factory=dict)
     cashflow: ExecutionCashflowOut | None = None
     operator: str
     operator_user_ids: list[int] | None = None

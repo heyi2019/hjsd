@@ -1,6 +1,7 @@
 import type { Dayjs } from "dayjs";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
+import { isActiveConsignmentListing } from "../consignment-logic";
 
 export type InventoryFilterOptions = {
   businessMode?: string;
@@ -40,7 +41,7 @@ export function inventoryCellValue(value: string | null | undefined) {
 export function moreMenuItems(row: Account, detail?: AccountExecutionDetail) {
   const canPlatformOffsale = row.status !== "SOLD" && row.status !== "VOID";
   const canSystemOffsale = row.inventory_type === "CONSIGNMENT" && canPlatformOffsale;
-  const hasActiveConsignment = Boolean(detail?.orders.some((order) => order.order_type === "DG" && order.status !== "CANCELLED"));
+  const hasActiveConsignment = Boolean(detail?.orders.some(isActiveConsignmentListing));
   const items = [] as Array<{ key: string; label: string; danger?: boolean }>;
   if (canPlatformOffsale && (hasActiveConsignment || canSystemOffsale)) items.push({ key: "offsale", label: "下架" });
   if (canPlatformOffsale) items.push({ key: "void", label: "取消", danger: true });

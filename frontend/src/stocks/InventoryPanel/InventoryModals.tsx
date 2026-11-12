@@ -166,13 +166,14 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           if (!target || target.records.length === 0) return;
           try {
             await unlistAndCancelConsignmentOrders({
-              orderIds: target.records.map((record) => record.orderId),
+              records: target.records,
+              cancelOrderIds: target.records.map((record) => record.orderId),
               note: `系统下架：${reason}`,
               reason,
               occurredOn: new Date().toISOString().slice(0, 10),
               formExtra: form_extra,
             });
-            appMessage.success("代挂订单已取消，账号已出库");
+            appMessage.success("寄售记录已下架，账号已出库");
             await load();
             refreshExecution(target.account);
             onOrdersChanged?.();

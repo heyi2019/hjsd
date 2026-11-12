@@ -205,13 +205,12 @@ export function useInventoryActions(params: {
     if (!voidTarget) return;
     setVoiding(true);
     try {
-      // 系统下架会同步取消该账号所有仍在寄售平台上的 DG 上架单；
-      // 先完成平台记录取消，再冲销买入，避免出现 ERP 已下架但平台记录仍有效的中间结果。
+      // 系统下架先在原订单上登记所有寄售记录的 UNLIST，再冲销买入，
+      // 避免出现 ERP 已下架但平台记录仍有效的中间结果。
       const detail = executionDetails[voidTarget.account.id] ?? await stocksApi.executionDetail(voidTarget.account.id);
+      const records = consignmentRecords(detail.orders);
       await unlistAndCancelConsignmentOrders({
-        orderIds: detail.orders
-          .filter((order) => order.order_type === "DG" && order.status !== "CANCELLED")
-          .map((order) => order.order_id),
+        records,
         note: "系统下架同步取消寄售平台上架",
         reason: "系统下架同步取消寄售平台上架",
         occurredOn: today(),

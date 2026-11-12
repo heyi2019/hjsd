@@ -21,7 +21,7 @@ import {
   type InventoryExecutionRow,
   type InventoryFinanceRow,
 } from "./OrderDetail.shared";
-import { consignmentPlatform, isConsignmentListing, isActiveConsignmentListing } from "./consignment-logic";
+import { activeConsignmentListings, consignmentPlatform, hasUnlistedConsignment, isConsignmentListing, isActiveConsignmentListing } from "./consignment-logic";
 
 function eventDate(detail: AccountExecutionDetail | undefined, eventType: string): string {
   const event = detail?.orders.flatMap((order) => order.events).find((item) => item.event_type === eventType);
@@ -35,16 +35,11 @@ function eventPlatform(detail: AccountExecutionDetail | undefined, eventType: st
 
 function consignmentSummary(detail: AccountExecutionDetail | undefined, accountStatus?: string): string {
   if (accountStatus === "VOID") return "-";
-  const records = detail?.orders
-    .filter((order) => isConsignmentListing(order) && order.status !== "CANCELLED")
-    .map((order) => {
-      const platform = consignmentPlatform(order) ?? "-";
-      const listedAt = formatDateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? ""));
-      // 寄售价格随该次上架记录保存；未填时不占位，避免出现「¥-」。
-      const price = order.extra_values?.consignment_price as string | number | null | undefined;
-      const priceText = price == null || price === "" ? "" : ` / ¥${money(price)}`;
-      return `${platform} / ${listedAt}${priceText}`;
-    }) ?? [];
+  const records = detail?.orders.flatMap((order) => activeConsignmentListings(order)).map((record) => {
+    // 寄售价格随该次上架记录保存；未填时不占位，避免出现「¥-」。
+    const priceText = record.price == null || record.price === "" ? "" : ` / ¥${money(record.price)}`;
+    return `${record.platform} / ${record.listedAt}${priceText}`;
+  }) ?? [];
   return records.length ? records.join("\n") : "-";
 }
 
@@ -68,6 +63,12 @@ function eventPlatformLabel(
   order: AccountExecutionDetail["orders"][number],
   eventType: string,
 ): string {
+  if (eventType === "OPERATE") {
+    const operationEvent = order.events.find((event) => event.event_type === "OPERATE" && event.operation_type && event.form_extra?.consignment_platform);
+    return typeof operationEvent?.form_extra?.consignment_platform === "string"
+      ? operationEvent.form_extra.consignment_platform
+      : order.account_platform || "-";
+  }
   if (eventType !== "CANCEL") return order.account_platform || "-";
   const scope = order.extra_values?.platform_unlist_scope;
   if (scope === "SYSTEM") return "本系统";
@@ -265,11 +266,10 @@ export function OrderDetail({
 
   const consignmentOrders = (detail?.orders ?? []).filter(isConsignmentListing);
   const hasActiveConsignment = consignmentOrders.some(isActiveConsignmentListing);
-  const hasUnlistedConsignment = consignmentOrders.some((order) => {
-    const unlisted = order.extra_values?.platform_unlisted_at || order.extra_values?.platform_unlist_scope;
-    return order.status !== "CANCELLED" && Boolean(unlisted);
+  const hasUnlistedHistory = consignmentOrders.some((order) => {
+    return order.status !== "CANCELLED" && hasUnlistedConsignment(order);
   });
-  const operationStatusLabel = resolveOperationStatus(row.status, hasActiveConsignment, hasUnlistedConsignment);
+  const operationStatusLabel = resolveOperationStatus(row.status, hasActiveConsignment, hasUnlistedHistory);
 
   const meta: OrderDetailMeta = {
     inventoryNo: row.stock_no ?? "-",

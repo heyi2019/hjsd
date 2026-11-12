@@ -522,6 +522,7 @@ def execution_detail(
                 is_posted=event.is_posted,
                 reason=event.reason,
                 note=event.note,
+                form_extra=dict(event.form_extra or {}),
                 cashflow=flow_by_event.get(event.id),
                 operator=event.created_by,
                 operator_user_ids=event.operator_user_ids,

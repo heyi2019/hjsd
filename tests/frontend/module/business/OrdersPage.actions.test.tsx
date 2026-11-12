@@ -502,7 +502,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     ));
   });
 
-  it("订单台账：操作中同时提供返点和删除账号", async () => {
+  it("订单台账：删除账号复用库存中心入口", async () => {
     await openLedger();
     const row = tableRow("HS-2026-0001");
     expect(within(row).getByRole("button", { name: "返点" })).toBeInTheDocument();

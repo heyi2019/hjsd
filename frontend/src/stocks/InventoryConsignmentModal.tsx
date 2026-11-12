@@ -5,38 +5,27 @@ import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { ordersApi } from "../shared/api/orders.api";
 import { stocksApi } from "../shared/api/stocks.api";
-import type { AccountExecutionDetail } from "../shared/api/types/account-execution";
 import type { Account } from "../shared/api/types/accounts";
 import { normalizeError } from "../shared/api/client";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { formatDateTimeMinute } from "../shared/lib/format";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, MoneyText, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
-import { consignmentPlatform, isActiveConsignmentListing } from "./consignment-logic";
+import { activeConsignmentListings } from "./consignment-logic";
 import "./InventoryConsignmentModal.css";
 
 type ListedPlatform = { key: number; platform: string; price: number | string | null; listedAt: string };
 
-function listedPlatforms(detail: AccountExecutionDetail): ListedPlatform[] {
-  return detail.orders
-    .filter(isActiveConsignmentListing)
-    .map((order) => ({
-      key: order.order_id,
-      platform: consignmentPlatform(order) ?? "-",
-      price: (order.extra_values?.consignment_price as number | string | undefined) ?? null,
-      listedAt: formatDateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? "")),
-    }));
-}
-
 export function InventoryConsignmentModal(props: {
   account: Account | null;
+  orderId?: number | null;
   onClose: () => void;
   onCreated: () => void | Promise<void>;
 }) {
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [listed, setListed] = useState<ListedPlatform[]>([]);
+  const [sourceOrderId, setSourceOrderId] = useState<number | null>(props.orderId ?? props.account?.source_order_id ?? null);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
   const { config } = useOrderFormConfig(open ? "CONSIGN" : undefined);
@@ -44,12 +33,22 @@ export function InventoryConsignmentModal(props: {
 
   const refreshListed = async (accountId: number) => {
     const detail = await stocksApi.executionDetail(accountId);
-    setListed(detail.account.status === "VOID" ? [] : listedPlatforms(detail));
+    const sourceOrder = detail.orders.find((order) => order.order_id === (props.orderId ?? props.account?.source_order_id))
+      ?? detail.orders.find((order) => order.order_type !== "DG")
+      ?? detail.orders[0];
+    setSourceOrderId(sourceOrder?.order_id ?? null);
+    setListed(detail.account.status === "VOID" ? [] : detail.orders.flatMap((order) => activeConsignmentListings(order).map((item) => ({
+      key: item.eventId ?? item.orderId,
+      platform: item.platform,
+      price: item.price,
+      listedAt: item.listedAt,
+    }))));
   };
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setSourceOrderId(props.orderId ?? props.account?.source_order_id ?? null);
     form.setFieldsValue({ listed_at: dayjs().second(0).millisecond(0) });
     if (props.account) void refreshListed(props.account.id).catch((cause) => setError(normalizeError(cause)));
   }, [form, open, props.account]);
@@ -58,23 +57,14 @@ export function InventoryConsignmentModal(props: {
     if (!props.account) return;
     const listedAt = values.listed_at ?? dayjs();
     if (!values.platform) return;
+    if (!sourceOrderId) {
+      setError({ message: "当前账号没有可关联的来源订单，无法登记寄售" });
+      return;
+    }
     const price = typeof values.consignment_price === "number" ? values.consignment_price : undefined;
     setSubmitting(true);
     try {
-      const created = await ordersApi.create({
-        order_type: "DG",
-        trade_date: listedAt.format("YYYY-MM-DD"),
-        account_id: props.account.id,
-        note: `寄售平台：${values.platform}`,
-        form_extra: {
-          ...values.form_extra,
-          consignment_platform: values.platform,
-          ...(price === undefined ? {} : { consignment_price: price }),
-          listed_at: listedAt.format("YYYY-MM-DDTHH:mm"),
-        },
-        form_extra_scope: "CONSIGN",
-      });
-      await ordersApi.postEvent(created.id, {
+      await ordersApi.postEvent(sourceOrderId, {
         event_type: "OPERATE",
         operation_type: "CONSIGNMENT",
         occurred_on: listedAt.format("YYYY-MM-DD"),

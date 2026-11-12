@@ -316,8 +316,12 @@ describe("OrderDetail", () => {
         status: "ACTIVE",
         created_at: "2026-11-02T10:00:00",
         trade_date: "2026-11-02",
-        events: [],
-        extra_values: { consignment_platform: "盼之", listed_at: "2026-11-02T10:05" },
+        events: [{
+          id: 1301,
+          event_type: "OPERATE",
+          operation_type: "CONSIGNMENT",
+          form_extra: { consignment_platform: "盼之", listed_at: "2026-11-02T10:05" },
+        }],
       }],
     } as unknown as AccountExecutionDetail;
 

@@ -12,7 +12,7 @@ import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { consignmentRecords, type ActiveConsignment } from "../InventoryPlatformOffsaleModal";
-import { type InventoryPartyLink } from "../OrderDetailView";
+import { type InventoryPartyLink } from "../OrderDetail.shared";
 import { type InventoryProfileTarget } from "../InventoryProfileModal";
 import { type InventoryCancellationValues } from "../InventoryCancellationDialog";
 import { type BusinessCenterEntryTab } from "../../orders/businessCenter";

@@ -12,16 +12,14 @@ import {
   financeTypeLabel,
   rebateTypeLabel,
 } from "./inventory-logic";
-import {
-  OrderDetailView,
-  type InventoryPartyLink,
-  type InventoryExecutionRow,
-  type InventoryFinanceRow,
-} from "./OrderDetailView";
+import { OrderDetailView } from "./OrderDetailView";
 import {
   classifyEventCategory,
   type InventoryEventDraft,
   type OrderDetailMeta,
+  type InventoryPartyLink,
+  type InventoryExecutionRow,
+  type InventoryFinanceRow,
 } from "./OrderDetail.shared";
 import { consignmentPlatform, isConsignmentListing, isActiveConsignmentListing } from "./consignment-logic";
 

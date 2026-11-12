@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  formatCents,
   lastPeriodAmount,
   perPeriodServiceFee,
   saleInstallmentMismatch,
   saleInstallmentPlan,
-  toCents,
 } from "@/stocks/sale-plan";
+import { fromCents as formatCents, toCents } from "@/shared/lib/money";
 
 describe("sale-plan：售卖分期金额规划（整数分运算）", () => {
   it("整除时每期与末期相等", () => {

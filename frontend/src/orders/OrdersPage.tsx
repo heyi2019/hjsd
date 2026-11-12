@@ -13,9 +13,6 @@ import { OrderModals } from "./orderpage/OrdersPage.modals";
 import { useOrdersPageController } from "./orderpage/useOrdersPageController";
 import type { BusinessCenterEntryTab, BusinessCenterTab } from "./businessCenter";
 
-export { validateAllocations } from "./orderpage/helpers";
-export type { AllocationItem, AllocationValidation } from "./orderpage/helpers";
-
 export function OrdersPage({ initialTab, initialMine = false, active = true, onNavigate }: {
   initialTab?: BusinessCenterEntryTab;
   initialMine?: boolean;

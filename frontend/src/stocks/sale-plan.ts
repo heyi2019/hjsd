@@ -30,9 +30,6 @@ export interface SaleInstallmentPlan {
   lastPeriod: string;
 }
 
-// 分换算统一由 shared/lib/money 提供；此处仅按原名字导出，避免调用方改动。
-export { fromCents as formatCents, toCents } from "../shared/lib/money";
-
 export function saleInstallmentPlan(input: {
   saleAmount: unknown;
   downPayment?: unknown;

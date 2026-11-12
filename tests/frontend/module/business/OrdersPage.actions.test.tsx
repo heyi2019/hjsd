@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
-import { OrdersPage, validateAllocations } from "@/orders/OrdersPage";
+import { OrdersPage } from "@/orders/OrdersPage";
+import { validateAllocations } from "@/orders/orderpage/helpers";
 import { buildOrderPatchPayload, pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";

@@ -2,7 +2,7 @@ import { Card, DatePicker, Dropdown, Input, Segmented, Space, Spin, Typography }
 import type { BusinessCenterEntryTab } from "../businessCenter";
 import { DataTable, PermissionButton, Select, StatRow } from "../../shared/ui";
 import { OrderDetail } from "../../stocks/OrderDetail";
-import type { InventoryPartyLink } from "../../stocks/OrderDetailView";
+import type { InventoryPartyLink } from "../../stocks/OrderDetail.shared";
 import { countBusinessOrders } from "./helpers";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 import type { OrdersPageController } from "./useOrdersPageController";

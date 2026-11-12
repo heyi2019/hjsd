@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findCancelableBuy, findCancelableEvent, findCancelableSale } from "@/stocks/InventoryPanel";
+import { findCancelableBuy, findCancelableEvent, findCancelableSale } from "@/stocks/InventoryPanel/helpers";
 import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";
 
 /**

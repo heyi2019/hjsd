@@ -20,9 +20,6 @@ import type {
 } from "./OrderDetail.shared";
 import "./OrderDetail.css";
 
-// 兼容既有引用路径：外部仍从本文件取这三个行类型。
-export type { InventoryExecutionRow, InventoryFinanceRow, InventoryPartyLink } from "./OrderDetail.shared";
-
 /** 编辑态时间联动：三个锚点都能改，任一改动按天数差平移整条时间轴，另两项即时预览。
  *  台账显示的这三个值分别是 Order.created_at / SELL 事件 posted_at / Cashflow.created_at，
  *  后端按同一个 delta 平移账期与展示时间戳，保证界面与报表归属不脱节。 */

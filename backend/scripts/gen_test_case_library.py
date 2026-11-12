@@ -656,11 +656,6 @@ def _assert_unique(label: str, values: list) -> None:
     )
 
 
-def _unit_files() -> set:
-    from test_catalog import UNIT_FILES
-    return UNIT_FILES
-
-
 def _stage(ttype, func, rel, tname, doc, body, fname, primary, related, flow) -> dict:
     is_fe = is_frontend_test(rel)
     # 合格标准按「源码语言」分流，不按目录：E2E 同样是 TS/JS，断言写的是 expect(...)。

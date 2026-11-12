@@ -95,17 +95,6 @@ POOL_MAP: dict[str, str] = {
     "利润荷包（利润）": "HJ_PROFIT",
 }
 
-# 源「类别」→ (cashflow.nature, cashflow.category 是否沿用原值)
-# 类别值逐字保留（含「房租/日用」的斜杠），不做归一化。
-CASHFLOW_CATEGORY_NATURE: dict[str, str] = {
-    "投资款": "EXTERNAL_IN",
-    "账号回收": "BUSINESS_IN",
-    "运营": "BUSINESS_OUT",
-    "办公用品": "BUSINESS_OUT",
-    "员工薪资": "BUSINESS_OUT",
-    "房租/日用": "BUSINESS_OUT",
-}
-
 ACTOR = "map_import"
 
 

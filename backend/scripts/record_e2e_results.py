@@ -54,14 +54,6 @@ _STATUS = {
     "flaky": "PASS",
     "skipped": "SKIP",
 }
-# 结果级状态：timedOut / interrupted 都属执行异常，先归 ERROR 交由 report 区分
-_RESULT_STATUS = {
-    "passed": "PASS",
-    "failed": "FAIL",
-    "timedOut": "FAIL",
-    "interrupted": "ERROR",
-    "skipped": "SKIP",
-}
 
 
 def _skip_expr(text: str, i: int) -> int:

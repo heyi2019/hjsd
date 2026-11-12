@@ -24,8 +24,6 @@ LEDGER = REPO / "docs" / "testing" / "测试元数据台账.csv"
 
 # 承诺 ID：两段式，域字母 2-12 位 + 两位序号（MONEY-01 / INSTALLMENT-02）
 PROMISE_RE = re.compile(r"(?<![A-Z0-9-])([A-Z]{2,12}-\d{2})(?![0-9])")
-# 历史功能码：A01 / SYS12 形态（合并台账 FEATURE 记录）
-FUNC_RE = re.compile(r"(?<![A-Za-z0-9])([A-FS][0-9]{2}|SYS[0-9]{2})(?![0-9])")
 
 HEADER_LINES = 6
 

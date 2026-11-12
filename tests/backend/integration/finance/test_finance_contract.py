@@ -19,10 +19,17 @@ from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, RebateRecord, Reconciliation
-from app.finance import service
-from app.orders import service as orders_service
+from app.finance.cashflows import create_cashflow, list_cashflows, reverse_cashflow
+from app.finance.deposits import create_deposit, deposit_held_total, list_deposits, lose_deposit, return_deposit
+from app.finance.rebates import create_rebate, list_rebates
+from app.finance.reconciliation import create_reconciliation, resolve_reconciliation
+from app.finance.transfers import create_transfer, repair_transfer
+from app.orders.create import create_order
+from app.orders.events import post_event
+from app.orders.pools import pool_balance
 from app.parties import service as parties_service
-from app.reporting import service as reporting_service
+from app.reporting.funds import daily_funds_report
+from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 
 TODAY = date(2026, 10, 4)
 
@@ -41,14 +48,14 @@ def _active_order(seeded_db) -> int:
         inventory_type="RECOVERY",
         actor="pytest",
     )
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=TODAY,
         actor="pytest",
         account_id=account.id,
     )
-    orders_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("500"),
         occurred_on=TODAY, actor="pytest",
     )
@@ -78,7 +85,7 @@ class TestRebateValidation:
 class TestDepositQueries:
     def test_deposit_returned_and_lost_amount_cannot_exceed_paid_amount(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
-        deposit = service.create_deposit(
+        deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY,
             actor="pytest",
         )
@@ -151,7 +158,7 @@ class TestDepositQueries:
         invest = _pool(seeded_db, "HJ_INVEST")
 
         with pytest.raises(NotFound, match="来源订单"):
-            service.create_deposit(
+            create_deposit(
                 seeded_db,
                 pool_id=invest.id,
                 amount=Decimal("100"),
@@ -162,7 +169,7 @@ class TestDepositQueries:
 
     def test_cashflow_list_filters_accounting_dimensions(self, seeded_client, seeded_db, headers):
         invest = _pool(seeded_db, "HJ_INVEST")
-        first = service.create_cashflow(
+        first = create_cashflow(
             seeded_db,
             pool_id=invest.id,
             occurred_on=TODAY,
@@ -173,7 +180,7 @@ class TestDepositQueries:
             note="第一笔",
             actor="pytest",
         )
-        second = service.create_cashflow(
+        second = create_cashflow(
             seeded_db,
             pool_id=invest.id,
             occurred_on=TODAY,
@@ -199,7 +206,7 @@ class TestDepositQueries:
     def test_positive_amounts_are_business_errors_in_service(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         with pytest.raises(Validation, match="必须大于 0"):
-            service.create_deposit(
+            create_deposit(
                 seeded_db,
                 pool_id=invest.id,
                 amount=Decimal("0"),
@@ -210,7 +217,7 @@ class TestDepositQueries:
     def test_text_inputs_are_business_errors_in_service(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         with pytest.raises(Validation, match="category 必须为文本"):
-            service.create_cashflow(
+            create_cashflow(
                 seeded_db,
                 pool_id=invest.id,
                 occurred_on=TODAY,
@@ -221,12 +228,12 @@ class TestDepositQueries:
                 actor="finance",
             )
 
-        deposit = service.create_deposit(
+        deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY,
             actor="pytest",
         )
         with pytest.raises(Validation, match="押金损失必须填写原因"):
-            service.lose_deposit(
+            lose_deposit(
                 seeded_db,
                 deposit.id,
                 amount=Decimal("1"),
@@ -237,7 +244,7 @@ class TestDepositQueries:
             )
 
         with pytest.raises(Validation, match="对账账户必须为文本"):
-            service.create_reconciliation(
+            create_reconciliation(
                 seeded_db,
                 pool_id=invest.id,
                 reconciled_on=TODAY,
@@ -249,7 +256,7 @@ class TestDepositQueries:
     def test_deposit_counterparty_must_exist(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         with pytest.raises(NotFound, match="合作方"):
-            service.create_deposit(
+            create_deposit(
                 seeded_db,
                 pool_id=invest.id,
                 amount=Decimal("100"),
@@ -271,7 +278,7 @@ class TestDepositQueries:
         )
 
         with pytest.raises(Validation, match="已停用"):
-            service.create_deposit(
+            create_deposit(
                 seeded_db,
                 pool_id=invest.id,
                 amount=Decimal("100"),
@@ -282,46 +289,46 @@ class TestDepositQueries:
 
     def test_return_deposit_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            service.return_deposit(
+            return_deposit(
                 seeded_db, 999999, amount=Decimal("10"), released_on=TODAY, actor="pytest"
             )
 
     def test_list_deposits_filters_by_pool(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         profit = _pool(seeded_db, "HJ_PROFIT")
-        service.create_deposit(
+        create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY,
             actor="pytest",
         )
-        service.create_deposit(
+        create_deposit(
             seeded_db, pool_id=profit.id, amount=Decimal("500"), paid_on=TODAY,
             actor="pytest",
         )
-        by_pool = service.list_deposits(seeded_db, pool_id=profit.id)
+        by_pool = list_deposits(seeded_db, pool_id=profit.id)
         assert [item.pool_id for item in by_pool] == [profit.id]
-        assert len(service.list_deposits(seeded_db)) == 2
+        assert len(list_deposits(seeded_db)) == 2
 
     def test_deposit_held_total_by_pool_and_overall(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         profit = _pool(seeded_db, "HJ_PROFIT")
-        first = service.create_deposit(
+        first = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY,
             actor="pytest",
         )
-        service.create_deposit(
+        create_deposit(
             seeded_db, pool_id=profit.id, amount=Decimal("500"), paid_on=TODAY,
             actor="pytest",
         )
-        assert service.deposit_held_total(seeded_db, pool_id=invest.id) == Decimal(
+        assert deposit_held_total(seeded_db, pool_id=invest.id) == Decimal(
             "1000.00"
         )
-        assert service.deposit_held_total(seeded_db) == Decimal("1500.00")
+        assert deposit_held_total(seeded_db) == Decimal("1500.00")
 
-        service.return_deposit(
+        return_deposit(
             seeded_db, first.id, amount=Decimal("400"), released_on=TODAY, actor="pytest"
         )
         # 持有合计按「已付 - 已退」计算，退还后即时下降
-        assert service.deposit_held_total(seeded_db, pool_id=invest.id) == Decimal(
+        assert deposit_held_total(seeded_db, pool_id=invest.id) == Decimal(
             "600.00"
         )
 
@@ -329,7 +336,7 @@ class TestDepositQueries:
         self, seeded_db
     ):
         invest = _pool(seeded_db, "HJ_INVEST")
-        deposit = service.create_deposit(
+        deposit = create_deposit(
             seeded_db,
             pool_id=invest.id,
             amount=Decimal("1000"),
@@ -337,7 +344,7 @@ class TestDepositQueries:
             actor="pytest",
         )
 
-        lost = service.lose_deposit(
+        lost = lose_deposit(
             seeded_db,
             deposit.id,
             amount=Decimal("300"),
@@ -351,11 +358,11 @@ class TestDepositQueries:
         assert lost.direction == "OUT"
         assert deposit.lost_amount == Decimal("300.00")
         assert deposit.status == "PAID"
-        assert service.deposit_held_total(seeded_db, pool_id=invest.id) == Decimal(
+        assert deposit_held_total(seeded_db, pool_id=invest.id) == Decimal(
             "700.00"
         )
 
-        service.lose_deposit(
+        lose_deposit(
             seeded_db,
             deposit.id,
             amount=Decimal("700"),
@@ -366,18 +373,18 @@ class TestDepositQueries:
         )
         seeded_db.refresh(deposit)
         assert deposit.status == "LOST"
-        assert service.deposit_held_total(seeded_db, pool_id=invest.id) == Decimal("0.00")
+        assert deposit_held_total(seeded_db, pool_id=invest.id) == Decimal("0.00")
 
-        pnl = reporting_service.r2_monthly_pnl(seeded_db)
+        pnl = r2_monthly_pnl(seeded_db)
         assert pnl["items"][0]["operating_expense"] == Decimal("1000.00")
 
     def test_deposit_loss_cannot_exceed_unreleased_balance(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
-        deposit = service.create_deposit(
+        deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
         )
         with pytest.raises(Validation, match="未释放余额"):
-            service.lose_deposit(
+            lose_deposit(
                 seeded_db,
                 deposit.id,
                 amount=Decimal("101"),
@@ -393,7 +400,7 @@ class TestRebateGuards:
         order_id = _active_order(seeded_db)
 
         with pytest.raises(Validation, match="返点类型必须为"):
-            service.create_rebate(
+            create_rebate(
                 seeded_db,
                 source_order_id=order_id,
                 rebate_type="UNSPECIFIED",
@@ -403,14 +410,14 @@ class TestRebateGuards:
             )
 
     def test_rebate_type_uses_created_source_order(self, seeded_db):
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="DG",
             trade_date=TODAY,
             actor="pytest",
         )
 
-        record = service.create_rebate(
+        record = create_rebate(
             seeded_db,
             source_order_id=order.id,
             rebate_type="SELL",
@@ -423,7 +430,7 @@ class TestRebateGuards:
     def test_sell_rebate_accepts_recovery_order(self, seeded_db):
         """2026-10-28 口径：卖号返点不再限 DG，回收单有 SELL 事件即可登记。"""
         order_id = _active_order(seeded_db)
-        orders_service.post_event(
+        post_event(
             seeded_db,
             order_id,
             event_type="SELL",
@@ -432,7 +439,7 @@ class TestRebateGuards:
             actor="pytest",
         )
 
-        record = service.create_rebate(
+        record = create_rebate(
             seeded_db,
             source_order_id=order_id,
             rebate_type="SELL",
@@ -445,7 +452,7 @@ class TestRebateGuards:
 
     def test_rebate_rate_cannot_exceed_one_hundred_in_database(self, seeded_db):
         order_id = _active_order(seeded_db)
-        record = service.create_rebate(
+        record = create_rebate(
             seeded_db,
             source_order_id=order_id,
             rebate_type="BUY",
@@ -461,7 +468,7 @@ class TestRebateGuards:
 
     def test_source_order_notfound(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            service.create_rebate(
+            create_rebate(
                 seeded_db, source_order_id=999999, base_amount=Decimal("100"),
                 collected_on=TODAY, actor="pytest",
             )
@@ -471,25 +478,25 @@ class TestRebateGuards:
     def test_list_rebates_filters_by_source_order(self, seeded_db):
         first = _active_order(seeded_db)
         second = _active_order(seeded_db)
-        service.create_rebate(
+        create_rebate(
             seeded_db, source_order_id=first, rebate_type="BUY", base_amount=Decimal("100"),
             collected_on=TODAY, actor="pytest",
         )
-        service.create_rebate(
+        create_rebate(
             seeded_db, source_order_id=second, rebate_type="BUY", base_amount=Decimal("200"),
             collected_on=TODAY, actor="pytest",
         )
-        by_order = service.list_rebates(seeded_db, source_order_id=second)
+        by_order = list_rebates(seeded_db, source_order_id=second)
         assert [item.base_amount for item in by_order] == [Decimal("200.00")]
-        assert len(service.list_rebates(seeded_db)) == 2
+        assert len(list_rebates(seeded_db)) == 2
 
 
 class TestCashflowLifecycle:
     def test_manual_cashflow_counts_into_balance_immediately(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
-        before = orders_service.pool_balance(seeded_db, invest.id)
+        before = pool_balance(seeded_db, invest.id)
 
-        flow = service.create_cashflow(
+        flow = create_cashflow(
             seeded_db,
             pool_id=invest.id,
             occurred_on=TODAY,
@@ -501,13 +508,13 @@ class TestCashflowLifecycle:
             note="平台运营费",
         )
         assert flow.status == "APPROVED"
-        after = orders_service.pool_balance(seeded_db, invest.id)
+        after = pool_balance(seeded_db, invest.id)
         assert after["expense"] == before["expense"] + Decimal("120.00")
         assert after["cash_balance"] == before["cash_balance"] - Decimal("120.00")
 
     def test_approved_manual_cashflow_can_be_reversed_once(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
-        flow = service.create_cashflow(
+        flow = create_cashflow(
             seeded_db,
             pool_id=invest.id,
             occurred_on=TODAY,
@@ -518,19 +525,19 @@ class TestCashflowLifecycle:
             actor="pytest",
             note="可冲销费用",
         )
-        reversal = service.reverse_cashflow(
+        reversal = reverse_cashflow(
             seeded_db, flow.id, reversed_on=TODAY, actor="finance", reason="重复付款"
         )
         assert reversal.reversal_of_id == flow.id
         assert reversal.status == "APPROVED"
-        assert orders_service.pool_balance(seeded_db, invest.id)["cash_balance"] == 0
+        assert pool_balance(seeded_db, invest.id)["cash_balance"] == 0
 
         with pytest.raises(Validation, match="已冲销"):
-            service.reverse_cashflow(
+            reverse_cashflow(
                 seeded_db, flow.id, reversed_on=TODAY, actor="finance", reason="再次冲销"
             )
 
-        monthly = reporting_service.r2_monthly_pnl(seeded_db)
+        monthly = r2_monthly_pnl(seeded_db)
         assert monthly["items"] == []
 
     def test_business_event_cashflow_must_be_reversed_by_event(self, seeded_db):
@@ -540,7 +547,7 @@ class TestCashflowLifecycle:
         )
         assert event is not None
         with pytest.raises(Validation, match="业务事件"):
-            service.reverse_cashflow(
+            reverse_cashflow(
                 seeded_db, event.id, reversed_on=TODAY, actor="finance", reason="错误冲销"
             )
 
@@ -553,7 +560,7 @@ class TestReconciliation:
         invest = _pool(seeded_db, "HJ_INVEST")
 
         with pytest.raises(Validation, match="正整数"):
-            service.create_reconciliation(
+            create_reconciliation(
                 seeded_db,
                 pool_id=invest.id,
                 reconciled_on=TODAY,
@@ -580,7 +587,7 @@ class TestReconciliation:
         seeded_db.add(flow)
         seeded_db.flush()
 
-        item = service.create_reconciliation(
+        item = create_reconciliation(
             seeded_db,
             pool_id=invest.id,
             reconciled_on=TODAY,
@@ -596,21 +603,21 @@ class TestReconciliation:
         assert item.unmatched_flow_ids == [flow.id]
         assert item.status == "OPEN"
 
-        resolved = service.resolve_reconciliation(
+        resolved = resolve_reconciliation(
             seeded_db, item.id, actor="finance", reason="已完成银行核对"
         )
         assert resolved.status == "RESOLVED"
         assert resolved.resolved_by == "finance"
 
         with pytest.raises(Validation, match="已核销"):
-            service.resolve_reconciliation(
+            resolve_reconciliation(
                 seeded_db, item.id, actor="finance", reason="重复核销"
             )
 
     def test_reconciliation_requires_reason_for_difference(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         with pytest.raises(Validation, match="差异原因"):
-            service.create_reconciliation(
+            create_reconciliation(
                 seeded_db,
                 pool_id=invest.id,
                 reconciled_on=TODAY,
@@ -775,10 +782,10 @@ class TestFinanceApi:
 
         scoped_headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
 
-        service.create_deposit(
+        create_deposit(
             seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
         )
-        service.create_deposit(
+        create_deposit(
             seeded_db, pool_id=2, amount=Decimal("20"), paid_on=TODAY, actor="pytest"
         )
         own_account = stocks_service.create_account(
@@ -788,7 +795,7 @@ class TestFinanceApi:
             inventory_type="RECOVERY",
             actor="scoped-finance",
         )
-        own_order = orders_service.create_order(
+        own_order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
@@ -803,7 +810,7 @@ class TestFinanceApi:
             inventory_type="RECOVERY",
             actor="other",
         )
-        other_order = orders_service.create_order(
+        other_order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
@@ -811,19 +818,19 @@ class TestFinanceApi:
             owner_id=8,
             account_id=other_account.id,
         )
-        orders_service.post_event(
+        post_event(
             seeded_db, own_order.id, event_type="BUY", amount=Decimal("10"),
             occurred_on=TODAY, actor="pytest",
         )
-        orders_service.post_event(
+        post_event(
             seeded_db, other_order.id, event_type="BUY", amount=Decimal("20"),
             occurred_on=TODAY, actor="pytest",
         )
-        service.create_rebate(
+        create_rebate(
             seeded_db, source_order_id=own_order.id, rebate_type="BUY", base_amount=Decimal("10"),
             collected_on=TODAY, actor="pytest"
         )
-        service.create_rebate(
+        create_rebate(
             seeded_db, source_order_id=other_order.id, rebate_type="BUY", base_amount=Decimal("20"),
             collected_on=TODAY, actor="pytest"
         )
@@ -853,15 +860,15 @@ class TestFinanceApi:
             owner_scope="SELF",
             pool_ids=frozenset({1}),
         )
-        service.create_deposit(
+        create_deposit(
             seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
         )
-        service.create_deposit(
+        create_deposit(
             seeded_db, pool_id=2, amount=Decimal("20"), paid_on=TODAY, actor="pytest"
         )
 
-        deposits = service.list_deposits(seeded_db, user=scoped)
-        cashflows, _ = service.list_cashflows(seeded_db, user=scoped)
+        deposits = list_deposits(seeded_db, user=scoped)
+        cashflows, _ = list_cashflows(seeded_db, user=scoped)
 
         assert deposits
         assert {item.pool_id for item in deposits} == {1}
@@ -976,14 +983,14 @@ class TestFinanceApi:
             pool_ids=frozenset({1}),
         )
         headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
-        own_order = orders_service.create_order(
+        own_order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
             actor="scoped-finance",
             owner_id=9,
         )
-        foreign_order = orders_service.create_order(
+        foreign_order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
@@ -1043,7 +1050,7 @@ class TestFinanceApi:
             id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
         )
         headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
-        other_order = orders_service.create_order(
+        other_order = create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="other", owner_id=8
         )
 
@@ -1065,11 +1072,11 @@ class TestFinanceApi:
         scoped = CurrentUser.build(
             id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
         )
-        foreign_order = orders_service.create_order(
+        foreign_order = create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="other", owner_id=8
         )
         with pytest.raises(NotFound):
-            service.create_rebate(
+            create_rebate(
                 seeded_db,
                 source_order_id=foreign_order.id,
                 base_amount=Decimal("10"),
@@ -1089,7 +1096,7 @@ class TestFinanceApi:
             pool_ids=frozenset({1}),
         )
         headers = {"Authorization": f"Bearer {build_access_token(scoped)}"}
-        foreign_order = orders_service.create_order(
+        foreign_order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
@@ -1138,8 +1145,8 @@ class TestFinanceApi:
         assert {row["nature"] for row in payload["cashflows"]} == {"INTERNAL"}
         assert {row["direction"] for row in payload["cashflows"]} == {"IN", "OUT"}
         assert len({row["transfer_id"] for row in payload["cashflows"]}) == 1
-        source_balance = orders_service.pool_balance(seeded_db, invest.id)
-        target_balance = orders_service.pool_balance(seeded_db, profit.id)
+        source_balance = pool_balance(seeded_db, invest.id)
+        target_balance = pool_balance(seeded_db, profit.id)
         assert source_balance["cash_balance"] == Decimal("-125.50")
         assert target_balance["cash_balance"] == Decimal("125.50")
         assert source_balance["transfer_in"] == Decimal("0.00")
@@ -1148,7 +1155,7 @@ class TestFinanceApi:
         assert target_balance["transfer_out"] == Decimal("0.00")
         assert source_balance["cash_balance"] + target_balance["cash_balance"] == Decimal("0.00")
 
-        report = reporting_service.daily_funds_report(seeded_db, on=TODAY)
+        report = daily_funds_report(seeded_db, on=TODAY)
         by_code = {item["pool_code"]: item for item in report["items"]}
         # 内部划转并入收入/支出两方向：划出账户记支出、划入账户记收入，日报不再单列划转列。
         assert by_code["HJ_INVEST"]["expense"] >= Decimal("125.50")
@@ -1166,7 +1173,7 @@ class TestFinanceApi:
             pool_ids=frozenset({1}),
         )
         with pytest.raises(NotFound, match="资金池不存在"):
-            service.create_transfer(
+            create_transfer(
                 seeded_db,
                 source_pool_id=2,
                 target_pool_id=1,
@@ -1197,7 +1204,7 @@ class TestFinanceApi:
         )
         seeded_db.flush()
 
-        result = service.repair_transfer(
+        result = repair_transfer(
             seeded_db,
             "TR-REPAIR",
             counterpart_pool_id=profit.id,
@@ -1214,7 +1221,7 @@ class TestFinanceApi:
         assert {row.amount for row in rows} == {Decimal("80.00")}
 
         with pytest.raises(Validation, match="已完整"):
-            service.repair_transfer(
+            repair_transfer(
                 seeded_db,
                 "TR-REPAIR",
                 counterpart_pool_id=profit.id,
@@ -1256,7 +1263,7 @@ class TestFinanceApi:
     def test_list_deposits_endpoint(self, seeded_client, seeded_db, headers):
         invest = _pool(seeded_db, "HJ_INVEST")
         order_id = _active_order(seeded_db)
-        service.create_deposit(
+        create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY,
             actor="pytest", source_order_id=order_id,
             expected_release_on=TODAY.replace(day=20), note="押金业务备注",
@@ -1275,7 +1282,7 @@ class TestFinanceApi:
         self, seeded_client, seeded_db, headers
     ):
         invest = _pool(seeded_db, "HJ_INVEST")
-        deposit = service.create_deposit(
+        deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
         )
         response = seeded_client.post(
@@ -1294,7 +1301,7 @@ class TestFinanceApi:
 
     def test_list_rebates_endpoint(self, seeded_client, seeded_db, headers):
         order_id = _active_order(seeded_db)
-        service.create_rebate(
+        create_rebate(
             seeded_db, source_order_id=order_id, rebate_type="BUY", base_amount=Decimal("100"),
             collected_on=TODAY, actor="pytest", channel="买号返点",
             note="回收买号返点",

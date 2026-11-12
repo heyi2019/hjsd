@@ -8,7 +8,8 @@ import pytest
 
 from app.core.security import CurrentUser, build_access_token
 from app.domain.trade import Account, Cashflow, OrderEvent, RebateRecord
-from app.orders import service as orders_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.quality import service
 
 
@@ -29,7 +30,7 @@ TODAY = date(2026, 10, 17)
 
 
 def _order(db, *, order_type="TH", owner_id=None):
-    return orders_service.create_order(
+    return create_order(
         db, order_type=order_type, trade_date=TODAY, actor="pytest", owner_id=owner_id
     )
 
@@ -83,7 +84,7 @@ class TestQualityScan:
 
     def test_th_purchase_does_not_create_removed_advance_issue(self, seeded_db):
         order = _order(seeded_db)
-        orders_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("500"),
             occurred_on=TODAY, actor="pytest",
         )
@@ -184,12 +185,12 @@ class TestQualityScan:
 
     def test_quality_endpoint_respects_order_scope(self, seeded_client, seeded_db):
         mine = _order(seeded_db, owner_id=9)
-        orders_service.post_event(
+        post_event(
             seeded_db, mine.id, event_type="BUY", amount=Decimal("100"),
             occurred_on=TODAY, actor="pytest",
         )
         other = _order(seeded_db, owner_id=8)
-        orders_service.post_event(
+        post_event(
             seeded_db, other.id, event_type="BUY", amount=Decimal("200"),
             occurred_on=TODAY, actor="pytest",
         )

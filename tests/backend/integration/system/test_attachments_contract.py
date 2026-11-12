@@ -4,13 +4,13 @@ from __future__ import annotations
 import base64
 from datetime import date
 
-from app.orders import service as order_service
+from app.orders.create import create_order
 
 
 def test_order_attachment_can_be_uploaded_listed_downloaded_and_deleted(
     seeded_client, seeded_db, headers
 ):
-    order = order_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=date(2026, 10, 17), actor="pytest"
     )
     seeded_db.commit()

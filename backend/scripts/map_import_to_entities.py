@@ -71,7 +71,7 @@ from app.domain.enums import (  # noqa: E402
     LinkStatus,
     Portion,
 )
-from app.orders import service as order_service  # noqa: E402
+from app.orders.create import create_order  # noqa: E402
 
 # 源「订单类型」→ v1 order_type_defs.code
 ORDER_TYPE_MAP: dict[str, str] = {
@@ -218,7 +218,7 @@ def map_orders(session: Any, *, dry_run: bool) -> dict[str, Any]:
             report["profit_sum"] += to_money(_num(raw.get("利润")))
             continue
 
-        order = order_service.create_order(
+        order = create_order(
             session,
             order_type=target,
             trade_date=trade_date,

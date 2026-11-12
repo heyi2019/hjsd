@@ -34,8 +34,9 @@ from app.domain.users import User
 from app.value_added_services import service as installment_service
 from app.value_added_services import router as installments_router
 from app.value_added_services import schemas
-from app.orders import service as orders_service
-from app.reporting import service as reporting_service
+from app.orders.create import create_order
+from app.orders.events import post_event
+from app.reporting.profit import order_profit_detail
 
 TODAY = date(2026, 10, 12)
 PAST = date(2026, 9, 1)
@@ -60,13 +61,13 @@ def _account(seeded_db, game_account: str):
     )
 
 def _order(seeded_db, *, order_type="TH", account_id=None, owner_id=None, trade_date=TODAY):
-    return orders_service.create_order(
+    return create_order(
         seeded_db, order_type=order_type, trade_date=trade_date, actor="pytest",
         account_id=account_id, owner_id=owner_id,
     )
 
 def _buy(seeded_db, order_id: int, amount="800"):
-    orders_service.post_event(
+    post_event(
         seeded_db, order_id, event_type="BUY", amount=Decimal(amount),
         occurred_on=TODAY, actor="pytest",
     )
@@ -102,7 +103,7 @@ def _contract(
 class TestCreateInstallmentValidation:
     @pytest.mark.parametrize(("order_type", "inventory_type"), [("TH", "PICKUP")])
     def test_inventory_accounts_use_stock_sale_for_th(self, seeded_db, order_type, inventory_type):
-        source = orders_service.create_order(
+        source = create_order(
             seeded_db,
             order_type=order_type,
             trade_date=TODAY,
@@ -115,7 +116,7 @@ class TestCreateInstallmentValidation:
         if order_type == "TH":
             _buy(seeded_db, source.id)
 
-        sale = orders_service.create_order(
+        sale = create_order(
             seeded_db,
             order_type=order_type,
             trade_date=TODAY,
@@ -173,10 +174,10 @@ class TestCreateInstallmentValidation:
 
     def test_installment_sale_binds_buyer_and_seller_across_orders(self, seeded_db):
         from app.policy import service as policy_service
-        from app.orders import service as order_service
+        from app.orders.events import post_event
         account = _account(seeded_db, "inst-sale-actors")
         purchase = _order(seeded_db, order_type="HS", account_id=account.id)
-        order_service.post_event(seeded_db, purchase.id, event_type="BUY", amount="800", occurred_on=TODAY, actor="seeduser1")
+        post_event(seeded_db, purchase.id, event_type="BUY", amount="800", occurred_on=TODAY, actor="seeduser1")
         sale = _order(seeded_db, order_type="HS", account_id=account.id)
         items = [{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 25} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")]
         policy_service.set_allocations(seeded_db, sale.id, items=items)
@@ -1378,7 +1379,7 @@ class TestInstallmentsApi:
         )
 
         sale_order = _order(seeded_db, order_type="HS", account_id=account.id)
-        orders_service.post_event(
+        post_event(
             seeded_db,
             sale_order.id,
             event_type="SELL",
@@ -1398,7 +1399,7 @@ class TestInstallmentsApi:
         assert resale is not None
         assert resale.related_order_id == sale_order.id
 
-        profit = reporting_service.order_profit_detail(seeded_db)
+        profit = order_profit_detail(seeded_db)
         # 资金走向只有收入 / 支出（11-05 裁决）：分期坏账=支出，虽不生成
         # 资金流水也必须计入。收入 1200 − 买号 800 − 坏账 1000 = -600。
         assert profit["total"]["direct_cost"] == Decimal("1000.00")
@@ -1423,7 +1424,7 @@ class TestInstallmentsApi:
             actor="recovery-operator", note="客户逾期回收",
         )
         resale_order = _order(seeded_db, order_type="HS", account_id=account.id)
-        orders_service.post_event(
+        post_event(
             seeded_db, resale_order.id, event_type="SELL", amount=Decimal("1200"),
             occurred_on=TODAY, actor="resale-operator",
         )
@@ -1583,7 +1584,7 @@ def test_resale_endpoint_records_sale(seeded_client, seeded_db, headers):
         headers=headers,
     )
     resale_order = _order(seeded_db, order_type="HS", account_id=account.id)
-    orders_service.post_event(
+    post_event(
         seeded_db, resale_order.id, event_type="SELL", amount=Decimal("800"),
         occurred_on=TODAY, actor="pytest",
     )

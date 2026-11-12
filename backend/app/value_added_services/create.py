@@ -17,7 +17,7 @@ from app.core.security import owner_scope_filter
 from app.domain.users import User
 from app.foundation import service as foundation_service
 from app.value_added_services.schemas import ScheduleCreate
-from app.orders import service as orders_service
+from app.orders._shared import get_order
 from app.orders.amounts import order_amounts
 from app.parties import service as parties_service
 from app.policy import service as policy_service
@@ -240,7 +240,7 @@ def create_installment(
             details={"contract_type": contract_type},
         ) from exc
 
-    order = orders_service.get_order(session, order_id, user)
+    order = get_order(session, order_id, user)
     existing = session.scalar(
         select(Installment).where(Installment.order_id == order.id)
     )

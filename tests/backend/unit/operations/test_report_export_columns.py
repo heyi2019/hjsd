@@ -20,7 +20,7 @@ from sqlalchemy import select
 from app.domain.foundation import Pool
 from app.domain.options import OptionSet
 from app.lists import service as lists_service
-from app.reporting.service import report_csv
+from app.reporting.export import report_csv
 
 
 def _header(csv_text: str) -> list[str]:

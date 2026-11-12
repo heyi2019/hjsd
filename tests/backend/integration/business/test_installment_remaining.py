@@ -16,14 +16,14 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.trade import Installment
-from app.orders import service as orders_service
+from app.orders.create import create_order
 from app.value_added_services import service as installment_service
 
 TODAY = date(2026, 10, 12)
 
 
 def _contract(seeded_db, *, principal="1200.00", down_payment="200.00", periods=2, per_period="500.00"):
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="TH",
         trade_date=TODAY,

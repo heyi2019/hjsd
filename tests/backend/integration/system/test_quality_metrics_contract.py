@@ -7,17 +7,18 @@ from app.core.money import to_money
 from app.domain.attachments import Attachment
 from app.domain.enums import ReconciliationStatus
 from app.domain.trade import Reconciliation
-from app.orders import service as order_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 
 
 def test_quality_metrics_expose_definitions_and_monthly_trend(
     seeded_client, seeded_db, headers
 ):
     trade_day = date(2026, 10, 17)
-    th_order = order_service.create_order(
+    th_order = create_order(
         seeded_db, order_type="TH", trade_date=trade_day, actor="pytest"
     )
-    order_service.post_event(
+    post_event(
         seeded_db,
         th_order.id,
         event_type="BUY",

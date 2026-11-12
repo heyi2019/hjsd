@@ -25,9 +25,14 @@ from app.domain.enums import (
 from app.domain.foundation import Pool
 from app.domain.trade import RebateRecord
 from app.finance.cashflows import create_cashflow
-from app.orders import service as order_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.policy import service as policy_service
-from app.reporting import service as reporting_service
+from app.reporting.export import finance_dimension_report
+from app.reporting.profit import order_profit_detail
+from app.reporting.r2_monthly_pnl import r2_monthly_pnl
+from app.reporting.r3_commission import r3_commission_reconciliation
+from app.reporting.r5_business_pnl import r5_business_pnl
 
 
 def test_reporting_read_routes_publish_typed_response_models(app):
@@ -86,7 +91,7 @@ def test_finance_dimension_report_groups_fund_and_accounting_attributes(
             note="资金属性分析测试",
         )
 
-    report = reporting_service.finance_dimension_report(
+    report = finance_dimension_report(
         seeded_db, from_date=date(2026, 10, 17), to_date=date(2026, 10, 17)
     )
     assert len(report["items"]) == 2
@@ -126,7 +131,7 @@ def _order(seeded_db, *, trade_date: date = D, account_id: int | None = None):
             inventory_type="RECOVERY",
             actor="pytest",
         ).id
-    return order_service.create_order(
+    return create_order(
         seeded_db, order_type="HS", trade_date=trade_date, actor="pytest",
         account_id=account_id,
     )
@@ -161,7 +166,7 @@ def _direct_cost(seeded_db, order_id: int, amount: str, occurred_on: date) -> No
 class TestR2MonthlyPnl:
     def test_rejects_reversed_date_range(self, seeded_db):
         with pytest.raises(Validation, match="开始日期不能晚于结束日期"):
-            reporting_service.r2_monthly_pnl(
+            r2_monthly_pnl(
                 seeded_db,
                 from_date=date(2026, 10, 31),
                 to_date=date(2026, 10, 1),
@@ -169,36 +174,36 @@ class TestR2MonthlyPnl:
 
     def test_sell_revenue_and_event_date_filters(self, seeded_db):
         order = _order(seeded_db)
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount="1000.00",
             occurred_on=D, actor="pytest",
         )
         _direct_cost(seeded_db, order.id, "200.00", EARLY)
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount="1300.00",
             occurred_on=D, actor="pytest",
         )
 
-        full = reporting_service.r2_monthly_pnl(seeded_db)
+        full = r2_monthly_pnl(seeded_db)
         oct_item = _month_item(full, "2026-10")
         assert oct_item["sales_income"] == 1300
         assert oct_item["account_direct_cost"] == 1000
         assert _month_item(full, "2026-09")["account_direct_cost"] == 200
 
         # from 过滤：9 月事件被 continue
-        gated = reporting_service.r2_monthly_pnl(seeded_db, from_date=MID_GATE)
+        gated = r2_monthly_pnl(seeded_db, from_date=MID_GATE)
         assert [i["month"] for i in gated["items"]] == ["2026-10"]
         assert gated["total"]["sales_income"] == 1300
         assert gated["total"]["operating_profit"] == 300
         # to 过滤：10 月事件被 continue
-        early_only = reporting_service.r2_monthly_pnl(
+        early_only = r2_monthly_pnl(
             seeded_db, to_date=date(2026, 9, 30)
         )
         assert [i["month"] for i in early_only["items"]] == ["2026-09"]
 
     def test_cancelled_sell_is_reversed_in_reports(self, seeded_db):
         order = _order(seeded_db)
-        order_service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -206,7 +211,7 @@ class TestR2MonthlyPnl:
             occurred_on=D,
             actor="pytest",
         )
-        sell, _ = order_service.post_event(
+        sell, _ = post_event(
             seeded_db,
             order.id,
             event_type="SELL",
@@ -214,7 +219,7 @@ class TestR2MonthlyPnl:
             occurred_on=D,
             actor="pytest",
         )
-        order_service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="CANCEL",
@@ -225,7 +230,7 @@ class TestR2MonthlyPnl:
             reason="售出撤销",
         )
 
-        monthly = reporting_service.r2_monthly_pnl(seeded_db)
+        monthly = r2_monthly_pnl(seeded_db)
         oct_item = _month_item(monthly, "2026-10")
         # 资金明细口径（11-05 裁决）：撤销售出产生一笔反向资金流水，
         # 收入列仍是已入账的 800，冲销的 800 计入支出；净利仍为 -500。
@@ -233,7 +238,7 @@ class TestR2MonthlyPnl:
         assert oct_item["account_direct_cost"] == 1300
         assert oct_item["operating_profit"] == -500
 
-        detail = reporting_service.order_profit_detail(seeded_db)["items"][0]
+        detail = order_profit_detail(seeded_db)["items"][0]
         assert detail["income"] == 800
         assert detail["buy_amount"] == 500
         assert detail["direct_cost"] == 800
@@ -243,7 +248,7 @@ class TestR2MonthlyPnl:
 # --------------------------------------------------------------------- R3 提成
 class TestR3Commission:
     def test_my_commission_only_returns_the_logged_in_users_allocations(self, seeded_db):
-        order = order_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=D,
@@ -251,11 +256,11 @@ class TestR3Commission:
             owner_id=7,
             account_snapshot={"game_account": "my-commission-account"},
         )
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount="1000.00",
             occurred_on=D, actor="seeduser7",
         )
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount="1300.00",
             occurred_on=D, actor="seeduser7",
         )
@@ -275,7 +280,7 @@ class TestR3Commission:
             roles=["ADMIN"],
             display_name="种子用户7",
         )
-        data = reporting_service.r3_commission_reconciliation(
+        data = r3_commission_reconciliation(
             seeded_db, user=user, mine=True
         )
 
@@ -285,11 +290,11 @@ class TestR3Commission:
 
     def test_all_people_commission_can_be_filtered_back_to_one_person(self, seeded_db):
         order = _order(seeded_db)
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount="1000.00",
             occurred_on=D, actor="seeduser1",
         )
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount="1300.00",
             occurred_on=D, actor="seeduser1",
         )
@@ -306,23 +311,23 @@ class TestR3Commission:
             id=7, username="seeduser7", roles=["VIEWER"], owner_scope="SELF"
         )
 
-        all_people = reporting_service.r3_commission_reconciliation(
+        all_people = r3_commission_reconciliation(
             seeded_db, user=scoped_user, all_people=True
         )
         assert {item["user_id"] for item in all_people["items"]} == {7, 8}
 
-        one_person = reporting_service.r3_commission_reconciliation(
+        one_person = r3_commission_reconciliation(
             seeded_db, user=scoped_user, all_people=True, user_id=8
         )
         assert {item["user_id"] for item in one_person["items"]} == {8}
 
     def test_allocations_drill_down_and_date_filters(self, seeded_db):
         order = _order(seeded_db)
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount="1000.00",
             occurred_on=D, actor="seeduser1",
         )
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount="1300.00",
             occurred_on=D, actor="seeduser1",
         )
@@ -332,7 +337,7 @@ class TestR3Commission:
             actor="pytest",
         )
 
-        data = reporting_service.r3_commission_reconciliation(seeded_db)
+        data = r3_commission_reconciliation(seeded_db)
         assert data["total"]["order_count"] == 4
         assert len(data["items"]) == 4
         assert any(item["user_id"] == 7 for item in data["items"])
@@ -345,11 +350,11 @@ class TestR3Commission:
 
         # 已完成订单与进行中订单都属于有效提成对账范围。
         completed = _order(seeded_db)
-        order_service.post_event(
+        post_event(
             seeded_db, completed.id, event_type="BUY", amount="500.00",
             occurred_on=D, actor="seeduser1",
         )
-        order_service.post_event(
+        post_event(
             seeded_db, completed.id, event_type="SELL", amount="800.00",
             occurred_on=D, actor="seeduser1",
         )
@@ -360,7 +365,7 @@ class TestR3Commission:
             actor="pytest",
         )
 
-        data = reporting_service.r3_commission_reconciliation(seeded_db)
+        data = r3_commission_reconciliation(seeded_db)
         person = next(group for group in data["groups"] if group["user_id"] == 7)
         assert person["order_count"] == 2
         assert {item["order_id"] for item in person["orders"]} == {
@@ -370,13 +375,13 @@ class TestR3Commission:
 
         # 日期过滤：交易日在区间外 → continue，无数据
         assert (
-            reporting_service.r3_commission_reconciliation(
+            r3_commission_reconciliation(
                 seeded_db, to_date=date(2026, 10, 1)
             )["items"]
             == []
         )
         assert (
-            reporting_service.r3_commission_reconciliation(
+            r3_commission_reconciliation(
                 seeded_db, from_date=date(2026, 10, 10)
             )["items"]
             == []
@@ -388,11 +393,11 @@ class TestR3Commission:
         import io
 
         order = _order(seeded_db)
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount="1000.00",
             occurred_on=D, actor="pytest",
         )
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount="1300.00",
             occurred_on=D, actor="pytest",
         )
@@ -432,12 +437,12 @@ class TestR3Commission:
 class TestReportsApiDateParams:
     def test_from_to_query_aliases(self, seeded_client, seeded_db, headers):
         order = _order(seeded_db)
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount="1000.00",
             occurred_on=D, actor="pytest",
         )
         _direct_cost(seeded_db, order.id, "200.00", EARLY)
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount="1300.00",
             occurred_on=D, actor="pytest",
         )
@@ -464,7 +469,7 @@ class TestReportsApiDateParams:
         other.owner_id = 8
         seeded_db.flush()
         for order, amount in ((mine, "100"), (other, "200")):
-            order_service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="BUY", amount=amount,
                 occurred_on=D, actor="pytest",
             )
@@ -535,5 +540,5 @@ class TestReportsApiDateParams:
             id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
         )
 
-        data = reporting_service.r5_business_pnl(seeded_db, user=scoped)
+        data = r5_business_pnl(seeded_db, user=scoped)
         assert all(row["order_type"] != foreign_order.order_type for row in data["items"])

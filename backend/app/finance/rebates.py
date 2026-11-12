@@ -27,7 +27,8 @@ from app.domain.enums import (
 from app.domain.trade import Cashflow, OrderEvent, RebateRecord
 from app.domain.users import User
 from app.foundation import service as foundation_service
-from app.orders import service as orders_service
+from app.orders._shared import get_order
+from app.orders.events import post_event
 from app.orders.form_fields import validate_form_extra
 from app.orders.amounts import order_amounts
 from app.policy import service as policy_service
@@ -55,7 +56,7 @@ def create_rebate(
     base_amount 省略时按 REBATE 规则的 config.base 从订单事件派生（与报表同口径）。
     """
     try:
-        order = orders_service.get_order(session, source_order_id, user)
+        order = get_order(session, source_order_id, user)
     except NotFound as exc:
         if user is not None:
             raise
@@ -135,7 +136,7 @@ def create_rebate(
     session.flush()
     # 返点是业务动作，同时形成一笔收入资金明细；两者共享订单与发生日，
     # 资金明细通过 order_event_id 回指动作，避免返点只停留在附属表里。
-    event, _ = orders_service.post_event(
+    event, _ = post_event(
         session,
         order.id,
         event_type="REBATE",

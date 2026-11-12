@@ -14,7 +14,8 @@ from app.core.money import to_money
 from app.domain.enums import PolicyStatus, PolicyType
 from app.domain.parties import PolicyVersion
 from app.domain.trade import OrderEvent, OrderProfitAllocation
-from app.orders import service as order_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.policy import service as policy_service
 
 
@@ -300,7 +301,7 @@ class TestSnapshotRedline:
     def test_new_order_captures_snapshot(self, seeded_db):
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"})
-        order = order_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
         assert order.policy_version_id is not None
@@ -311,7 +312,7 @@ class TestSnapshotRedline:
         """本轮最关键的一条：改未来费率后，历史订单快照必须原样不动。"""
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1), to=date(2026, 7, 1), config={"rate": "5"})
-        old_order = order_service.create_order(
+        old_order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
         old_version_id = old_order.policy_version_id
@@ -326,7 +327,7 @@ class TestSnapshotRedline:
         assert old_order.policy_snapshot[PolicyType.REBATE.value]["config"] == {"rate": "5"}
 
         # 新订单用新规则
-        new_order = order_service.create_order(
+        new_order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 8, 1), actor="pytest"
         )
         assert new_order.policy_snapshot[PolicyType.REBATE.value]["config"] == {"rate": "8"}
@@ -336,7 +337,7 @@ class TestSnapshotRedline:
         """快照必须是深拷贝：调用方改内存 dict 不能影响已固化数据。"""
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"})
-        order = order_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
         order.policy_snapshot[PolicyType.REBATE.value]["config"]["rate"] = "999"
@@ -345,7 +346,7 @@ class TestSnapshotRedline:
 
     def test_no_policy_yields_no_snapshot(self, seeded_db):
         """没有配置规则时不应报错，快照留空。"""
-        order = order_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
         assert order.policy_version_id is None
@@ -354,7 +355,7 @@ class TestSnapshotRedline:
     def test_snapshot_for_lookup(self, seeded_db):
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"})
-        order = order_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
         found = policy_service.snapshot_for(seeded_db, order.id)
@@ -449,7 +450,7 @@ class TestProfitAllocation:
 
     @staticmethod
     def _order(seeded_db):
-        return order_service.create_order(
+        return create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
 
@@ -622,10 +623,10 @@ class TestProfitAllocation:
         assert by_type["SELL"]["user_id"] == 3
 
     def test_sale_click_binds_seller_after_allocation(self, seeded_db):
-        order = order_service.create_order(seeded_db, order_type="DG", trade_date=date(2026, 6, 1), actor="seeduser1")
+        order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 6, 1), actor="seeduser1")
         items = [{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 25} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")]
         policy_service.set_allocations(seeded_db, order.id, items=items)
-        order_service.post_event(seeded_db, order.id, event_type="SELL", amount="100", portion="PROFIT", occurred_on=date(2026, 6, 1), actor="seeduser2")
+        post_event(seeded_db, order.id, event_type="SELL", amount="100", portion="PROFIT", occurred_on=date(2026, 6, 1), actor="seeduser2")
         by_type = {item["allocation_type"]: item for item in policy_service.list_allocations(seeded_db, order.id)}
         assert by_type["SELL"]["user_id"] == 2
 

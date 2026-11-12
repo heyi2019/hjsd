@@ -34,7 +34,8 @@ from app.domain.trade import (
     RebateRecord,
 )
 from app.domain.users import User
-from app.orders import schemas, service
+from app.orders import schemas
+from app.orders.links import list_order_links
 from app.orders.amounts import ZERO, event_totals, order_cashflow_profit_by_order
 
 def _actor(user: CurrentUser) -> str:
@@ -191,7 +192,7 @@ def _order_detail_output(
     output.events = [_event_output(event, operator_names, cancellable) for event in events]
     output.links = [
         schemas.OrderLinkOut.model_validate(item)
-        for item in service.list_order_links(db, order.id, user)
+        for item in list_order_links(db, order.id, user)
     ]
     if user.has(PERM_FINANCE_READ):
         cashflows = db.scalars(

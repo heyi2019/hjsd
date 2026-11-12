@@ -24,7 +24,9 @@ from app.domain.trade import (
 )
 from app.domain.users import User
 from app.orders import form_fields as ff
-from app.orders import service as order_service
+from app.orders.create import add_customer_role, create_order
+from app.orders.events import post_event
+from app.orders.queries import count_orders, list_orders
 from app.parties import service as parties_service
 
 TODAY = date(2026, 10, 4)
@@ -48,7 +50,7 @@ def _account(seeded_db, *, game_account: str = "b4-acc", status: str = "WAITING"
 
 
 def _hs_order(seeded_db, *, account: Account | None = None) -> Order:
-    return order_service.create_order(
+    return create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
         account_id=account.id if account is not None else None,
     )
@@ -56,7 +58,7 @@ def _hs_order(seeded_db, *, account: Account | None = None) -> Order:
 
 def _buy(seeded_db, order: Order, *, amount: str = "500", occurred: date = TODAY,
          pool_id: int | None = None):
-    return order_service.post_event(
+    return post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal(amount),
         occurred_on=occurred, actor="pytest", pool_id=pool_id,
     )
@@ -68,7 +70,7 @@ def _sell(seeded_db, order: Order, *, amount: str = "800", occurred: date = TODA
     if pool_id2 is not None:
         kw["pool_id2"] = pool_id2
         kw["amount2"] = Decimal(amount2 or "300")
-    return order_service.post_event(
+    return post_event(
         seeded_db, order.id, event_type="SELL", amount=Decimal(amount),
         occurred_on=occurred, actor="pytest", pool_id=pool_id, **kw,
     )
@@ -77,11 +79,11 @@ def _sell(seeded_db, order: Order, *, amount: str = "800", occurred: date = TODA
 # ---------------------------------------------------------------- #11 角色护栏
 def test_add_customer_role_rejects_role_outside_order_type_whitelist(seeded_db):
     """TH 订单仅允许 BUYER，追挂 SELLER 必须被白名单拦截（原实现三元组去重放行）。"""
-    th = order_service.create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")
+    th = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")
     cust = parties_service.create_customer(seeded_db, display_name="追挂甲", actor="pytest")
     seeded_db.commit()
     with pytest.raises(Validation, match="不允许客户角色"):
-        order_service.add_customer_role(seeded_db, th.id, cust.id, "SELLER", actor="pytest")
+        add_customer_role(seeded_db, th.id, cust.id, "SELLER", actor="pytest")
 
 
 def test_add_customer_role_rejects_invalid_role(seeded_db):
@@ -89,7 +91,7 @@ def test_add_customer_role_rejects_invalid_role(seeded_db):
     cust = parties_service.create_customer(seeded_db, display_name="追挂乙", actor="pytest")
     seeded_db.commit()
     with pytest.raises(Validation, match="客户角色必须为"):
-        order_service.add_customer_role(seeded_db, order.id, cust.id, "NOT_A_ROLE", actor="pytest")
+        add_customer_role(seeded_db, order.id, cust.id, "NOT_A_ROLE", actor="pytest")
 
 
 def test_add_customer_role_rejects_disabled_customer(seeded_db):
@@ -99,14 +101,14 @@ def test_add_customer_role_rejects_disabled_customer(seeded_db):
     parties_service.set_customer_status(seeded_db, cust.id, "DISABLED", actor="pytest")
     seeded_db.commit()
     with pytest.raises(Validation, match="不可作为新订单参与方"):
-        order_service.add_customer_role(seeded_db, order.id, cust.id, "BUYER", actor="pytest")
+        add_customer_role(seeded_db, order.id, cust.id, "BUYER", actor="pytest")
 
 
 def test_add_customer_role_allows_valid_buyer(seeded_db):
     order = _hs_order(seeded_db)
     cust = parties_service.create_customer(seeded_db, display_name="正常买家", actor="pytest")
     seeded_db.commit()
-    result = order_service.add_customer_role(seeded_db, order.id, cust.id, "BUYER", actor="pytest")
+    result = add_customer_role(seeded_db, order.id, cust.id, "BUYER", actor="pytest")
     row = seeded_db.scalar(
         select(OrderCustomerRole).where(
             OrderCustomerRole.order_id == order.id,
@@ -168,7 +170,7 @@ def test_sell_event_backfills_single_unbound_allocation(seeded_db):
     seeded_db.commit()
     # actor 需对应种子里的真实用户（seeduser1），events.py 以 username 反查 id 回填。
     actor_id = seeded_db.scalar(select(User.id).where(User.username == "seeduser1"))
-    order_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="SELL", amount=Decimal("800"),
         occurred_on=TODAY2, actor="seeduser1",
     )
@@ -203,9 +205,9 @@ def test_pool_filter_matches_secondary_split_pool(seeded_db):
     ).all()
     assert secondary, "售出拆分第二池流水应落在 profit 池"
 
-    by_second = {r.id for r in order_service.list_orders(seeded_db, pool_id=profit.id)}
+    by_second = {r.id for r in list_orders(seeded_db, pool_id=profit.id)}
     assert order.id in by_second, "按第二池筛选必须命中该订单"
-    assert order_service.count_orders(seeded_db, pool_id=profit.id) >= 1
+    assert count_orders(seeded_db, pool_id=profit.id) >= 1
 
 
 # ---------------------------------------------------------------- #15 账号状态机
@@ -221,7 +223,7 @@ def test_deliver_sell_rejects_void_account(seeded_db):
     acc.status = "VOID"
     seeded_db.commit()
     with pytest.raises(Validation, match="已作废"):
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY2,
             actor="pytest", delivery_mode="PLATFORM_OPERATOR", note="换绑凭证",
         )
@@ -237,7 +239,7 @@ def test_deliver_sell_uses_state_machine_for_non_sold_account(seeded_db):
     # 模拟账号状态未随 SELL 同步的异常数据。
     acc.status = "WAITING"
     seeded_db.commit()
-    order_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY2,
         actor="pytest", delivery_mode="PLATFORM_OPERATOR", note="换绑凭证",
     )
@@ -257,7 +259,7 @@ def test_reopen_buy_allows_second_sell_closed_loop(seeded_db):
     assert order.status == "COMPLETED"
 
     # 重开 BUY：COMPLETED → ACTIVE，账号 SOLD → WAITING。
-    order_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("450"),
         occurred_on=date(2026, 10, 20), actor="pytest",
     )
@@ -267,7 +269,7 @@ def test_reopen_buy_allows_second_sell_closed_loop(seeded_db):
     assert acc.status == "WAITING"
 
     # 再次 SELL：应放行并回到 COMPLETED。
-    order_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="SELL", amount=Decimal("700"),
         occurred_on=date(2026, 10, 22), actor="pytest", portion="PROFIT",
     )
@@ -296,7 +298,7 @@ def test_second_sell_without_reopen_buy_still_rejected(seeded_db):
     acc.status = "WAITING"
     seeded_db.commit()
     with pytest.raises(Validation, match="重开 BUY"):
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("700"),
             occurred_on=date(2026, 10, 22), actor="pytest", portion="PROFIT",
         )

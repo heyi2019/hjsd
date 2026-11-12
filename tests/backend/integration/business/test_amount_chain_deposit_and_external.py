@@ -28,9 +28,10 @@ from app.core.money import to_money
 from app.domain.enums import Nature
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
-from app.finance import service as finance_service
-from app.orders import service as orders_service
-from app.reporting import service as reporting_service
+from app.finance.deposits import create_deposit, lose_deposit, return_deposit
+from app.orders.pools import pool_balance
+from app.reporting.funds import daily_funds_report
+from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from sqlalchemy import select
 
 TODAY = date(2026, 10, 17)
@@ -72,12 +73,12 @@ def _assert_reconciles(item):
 def test_deposit_hold_in_expense_release_in_income(seeded_db):
     """押金占用=支出、释放=收入；现金头寸 / 押金占用 / 可用余额口径不变。"""
     invest = _pool(seeded_db, "HJ_INVEST")
-    before = orders_service.pool_balance(seeded_db, invest.id)
-    deposit = finance_service.create_deposit(
+    before = pool_balance(seeded_db, invest.id)
+    deposit = create_deposit(
         seeded_db, pool_id=invest.id, amount=Decimal("2000"), paid_on=TODAY, actor="pytest"
     )
     seeded_db.expire_all()
-    after_hold = orders_service.pool_balance(seeded_db, invest.id)
+    after_hold = pool_balance(seeded_db, invest.id)
     # 现金头寸含押金流出；押金占用 +2000；押金占用进资金中心支出。
     assert after_hold["cash_balance"] == before["cash_balance"] - Decimal("2000")
     assert after_hold["deposit_held"] == Decimal("2000.00")
@@ -89,11 +90,11 @@ def test_deposit_hold_in_expense_release_in_income(seeded_db):
     assert after_hold["income"] == before["income"]
 
     # 部分释放：现金回流 +1200，押金释放进资金中心收入。
-    finance_service.return_deposit(
+    return_deposit(
         seeded_db, deposit.id, amount=Decimal("1200"), released_on=TODAY, actor="pytest"
     )
     seeded_db.expire_all()
-    after_release = orders_service.pool_balance(seeded_db, invest.id)
+    after_release = pool_balance(seeded_db, invest.id)
     assert after_release["cash_balance"] == after_hold["cash_balance"] + Decimal("1200")
     assert after_release["income"] == before["income"] + Decimal("1200"), (
         f"[BUG] 押金释放未计入资金中心收入: {before['income']}->{after_release['income']}"
@@ -104,16 +105,16 @@ def test_deposit_hold_in_expense_release_in_income(seeded_db):
 def test_deposit_linked_to_order_in_r2_direct_cost_same_source_as_profit(seeded_db):
     """用户裁决 C：挂单押金占用进 R2 直接成本、释放进收入；损失按「收入−支出」
     净额体现、不另记第二次现金流；R2 订单贡献与订单利润逐笔同源。"""
-    from app.orders import service as order_service
+    from app.orders.create import create_order
     from app.orders.amounts import order_cashflow_profit_by_order
 
-    order = order_service.create_order(
+    order = create_order(
         seeded_db, order_type="TH", owner_id=1, trade_date=TODAY, actor="pytest"
     )
     invest = _pool(seeded_db, "HJ_INVEST")
 
     def r2_oct():
-        data = reporting_service.r2_monthly_pnl(seeded_db)
+        data = r2_monthly_pnl(seeded_db)
         item = next((r for r in data["items"] if r["month"] == "2026-10"), None)
         return (
             item["account_direct_cost"] if item else Decimal("0.00"),
@@ -127,7 +128,7 @@ def test_deposit_linked_to_order_in_r2_direct_cost_same_source_as_profit(seeded_
     )
 
     # 占用 2000：进 R2 直接成本、进订单利润支出侧。
-    dep = finance_service.create_deposit(
+    dep = create_deposit(
         seeded_db, pool_id=invest.id, amount=Decimal("2000"), paid_on=TODAY,
         source_order_id=order.id, actor="pytest",
     )
@@ -143,7 +144,7 @@ def test_deposit_linked_to_order_in_r2_direct_cost_same_source_as_profit(seeded_
     )
 
     # 损失 500：不是第二次现金流出——R2 直接成本、订单利润都不再减。
-    finance_service.lose_deposit(
+    lose_deposit(
         seeded_db, dep.id, amount=Decimal("500"), lost_on=TODAY,
         category="OPERATING_COST", reason="对方违约", actor="finance",
     )
@@ -156,7 +157,7 @@ def test_deposit_linked_to_order_in_r2_direct_cost_same_source_as_profit(seeded_
     )
 
     # 退回 1500：进 R2 收入；净额 = 收入1500 − 支出2000 = −500 = 损失。
-    finance_service.return_deposit(
+    return_deposit(
         seeded_db, dep.id, amount=Decimal("1500"), released_on=TODAY, actor="pytest",
     )
     seeded_db.expire_all()
@@ -174,19 +175,19 @@ def test_deposit_linked_to_order_in_r2_direct_cost_same_source_as_profit(seeded_
 
 def test_order_linked_normal_expense_still_in_r2_direct_cost(seeded_db):
     """守卫：挂订单的普通经营支出（非押金）仍进 R2 直接成本（NULL 属性不被误删）。"""
-    from app.orders import service as order_service
-    order = order_service.create_order(
+    from app.orders.create import create_order
+    order = create_order(
         seeded_db, order_type="TH", owner_id=1, trade_date=TODAY, actor="pytest"
     )
     invest = _pool(seeded_db, "HJ_INVEST")
-    base = reporting_service.r2_monthly_pnl(seeded_db)
+    base = r2_monthly_pnl(seeded_db)
     oct_before = next((r for r in base["items"] if r["month"] == "2026-10"), None)
     before_cost = oct_before["account_direct_cost"] if oct_before else Decimal("0.00")
 
     # accounting_attribute=None 的挂单支出，验证 != DEPOSIT 的 NULL 放行
     _flow(seeded_db, pool_id=invest.id, direction="OUT", nature="BUSINESS_OUT",
           amount="300", attribute=None, order_id=order.id)
-    after = reporting_service.r2_monthly_pnl(seeded_db)
+    after = r2_monthly_pnl(seeded_db)
     oct_item = next(r for r in after["items"] if r["month"] == "2026-10")
     assert oct_item["account_direct_cost"] == before_cost + Decimal("300.00")
 
@@ -198,7 +199,7 @@ def test_external_in_merged_into_income_and_reconciles(seeded_db):
     _flow(seeded_db, pool_id=invest.id, direction="IN",
           nature=Nature.EXTERNAL_IN.value, amount="5000")
 
-    report = reporting_service.daily_funds_report(seeded_db, on=TODAY)
+    report = daily_funds_report(seeded_db, on=TODAY)
     item = next(r for r in report["items"] if r["pool_code"] == invest.code)
     assert "external_in" not in item, "[BUG] external_in 独立列未删除，与 income 重复"
     assert item["income"] == Decimal("5000.00"), (
@@ -217,13 +218,13 @@ def test_sale_and_rebate_are_income_subtypes_not_separate_columns(seeded_db):
     售出见 orders/events.py:50（IN/BUSINESS_IN/"SELL"）。
     """
     invest = _pool(seeded_db, "HJ_INVEST")
-    before = orders_service.pool_balance(seeded_db, invest.id)
+    before = pool_balance(seeded_db, invest.id)
     _flow(seeded_db, pool_id=invest.id, direction="IN", nature="BUSINESS_IN",
           amount="8000", category="SELL")
     _flow(seeded_db, pool_id=invest.id, direction="IN", nature="BUSINESS_IN",
           amount="500", category="REBATE")
 
-    report = reporting_service.daily_funds_report(seeded_db, on=TODAY)
+    report = daily_funds_report(seeded_db, on=TODAY)
     item = next(r for r in report["items"] if r["pool_code"] == invest.code)
     assert item["income"] == Decimal("8500.00"), (
         f"[BUG] 售出/返点未合并进收入: income={item['income']}"
@@ -232,7 +233,7 @@ def test_sale_and_rebate_are_income_subtypes_not_separate_columns(seeded_db):
         assert key not in item, f"[BUG] 资金中心为收入子类型 {key} 另立单列"
     _assert_reconciles(item)
 
-    after = orders_service.pool_balance(seeded_db, invest.id)
+    after = pool_balance(seeded_db, invest.id)
     assert after["income"] == before["income"] + Decimal("8500.00")
 
 
@@ -243,13 +244,13 @@ def test_buy_amounts_are_expense_subtypes_not_separate_columns(seeded_db):
     BUY 源头见 orders/events.py:49（OUT/BUSINESS_OUT/"BUY"）。
     """
     invest = _pool(seeded_db, "HJ_INVEST")
-    before = orders_service.pool_balance(seeded_db, invest.id)
+    before = pool_balance(seeded_db, invest.id)
     _flow(seeded_db, pool_id=invest.id, direction="OUT", nature="BUSINESS_OUT",
           amount="3000", category="BUY")
     _flow(seeded_db, pool_id=invest.id, direction="OUT", nature="BUSINESS_OUT",
           amount="2000", category="BUY")
 
-    report = reporting_service.daily_funds_report(seeded_db, on=TODAY)
+    report = daily_funds_report(seeded_db, on=TODAY)
     item = next(r for r in report["items"] if r["pool_code"] == invest.code)
     assert item["expense"] == Decimal("5000.00"), (
         f"[BUG] 回收/提号买入未合并进支出: expense={item['expense']}"
@@ -258,7 +259,7 @@ def test_buy_amounts_are_expense_subtypes_not_separate_columns(seeded_db):
         assert key not in item, f"[BUG] 资金中心为支出子类型 {key} 另立单列"
     _assert_reconciles(item)
 
-    after = orders_service.pool_balance(seeded_db, invest.id)
+    after = pool_balance(seeded_db, invest.id)
     assert after["expense"] == before["expense"] + Decimal("5000.00")
 
 
@@ -267,9 +268,9 @@ def test_internal_transfer_is_expense_of_source_income_of_target(seeded_db):
     """同一笔划转：划出池 expense +、划入池 income +；资金日报无独立划转方向列。"""
     invest = _pool(seeded_db, "HJ_INVEST")
     profit = _pool(seeded_db, "HJ_PROFIT")
-    before_src = orders_service.pool_balance(seeded_db, invest.id)
-    before_tgt = orders_service.pool_balance(seeded_db, profit.id)
-    before_report = reporting_service.daily_funds_report(seeded_db, on=TODAY)
+    before_src = pool_balance(seeded_db, invest.id)
+    before_tgt = pool_balance(seeded_db, profit.id)
+    before_report = daily_funds_report(seeded_db, on=TODAY)
     before_src_day = next(r for r in before_report["items"] if r["pool_code"] == invest.code)
     before_tgt_day = next(r for r in before_report["items"] if r["pool_code"] == profit.code)
 
@@ -280,14 +281,14 @@ def test_internal_transfer_is_expense_of_source_income_of_target(seeded_db):
           amount="300", category="TRANSFER", transfer_id=tid)
     seeded_db.expire_all()
 
-    after_src = orders_service.pool_balance(seeded_db, invest.id)
-    after_tgt = orders_service.pool_balance(seeded_db, profit.id)
+    after_src = pool_balance(seeded_db, invest.id)
+    after_tgt = pool_balance(seeded_db, profit.id)
     assert after_src["expense"] == before_src["expense"] + Decimal("300.00")
     assert after_src["income"] == before_src["income"], "划出账户不应因此增加收入"
     assert after_tgt["income"] == before_tgt["income"] + Decimal("300.00")
     assert after_tgt["expense"] == before_tgt["expense"], "划入账户不应因此增加支出"
 
-    report = reporting_service.daily_funds_report(seeded_db, on=TODAY)
+    report = daily_funds_report(seeded_db, on=TODAY)
     src_item = next(r for r in report["items"] if r["pool_code"] == invest.code)
     tgt_item = next(r for r in report["items"] if r["pool_code"] == profit.code)
     for key in ("transfer_in", "transfer_out"):
@@ -303,34 +304,34 @@ def test_deposit_loss_not_double_counted_in_funds_and_profit(seeded_db):
     """缴1000→损300→退700：资金中心支出只1000、收入700、净额−300（利润=−300，
     损失=−利润=300，不另记第二次 OUT）；订单利润同口径；报表侧 cashflow_totals_by_order
     与利润明细同源。"""
-    from app.orders import service as order_service
+    from app.orders.create import create_order
     from app.orders.amounts import order_cashflow_profit_by_order
     from app.reporting._shared import cashflow_totals_by_order
 
-    order = order_service.create_order(
+    order = create_order(
         seeded_db, order_type="TH", owner_id=1, trade_date=TODAY, actor="pytest"
     )
     invest = _pool(seeded_db, "HJ_INVEST")
-    before = orders_service.pool_balance(seeded_db, invest.id)
+    before = pool_balance(seeded_db, invest.id)
     profit0 = order_cashflow_profit_by_order(seeded_db, order_ids=[order.id]).get(order.id, Decimal("0"))
 
-    dep = finance_service.create_deposit(
+    dep = create_deposit(
         seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY,
         source_order_id=order.id, actor="pytest",
     )
     seeded_db.expire_all()
-    after_hold = orders_service.pool_balance(seeded_db, invest.id)
+    after_hold = pool_balance(seeded_db, invest.id)
     # 交押金 = 支出，进资金中心 expense；订单利润 −1000
     assert after_hold["expense"] == before["expense"] + Decimal("1000")
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == profit0 - Decimal("1000")
 
     # 损失 300：不是第二次现金流出——资金中心 expense / cash_balance 不再变
-    finance_service.lose_deposit(
+    lose_deposit(
         seeded_db, dep.id, amount=Decimal("300"), lost_on=TODAY,
         category="OPERATING_COST", reason="对方违约", actor="finance",
     )
     seeded_db.expire_all()
-    after_loss = orders_service.pool_balance(seeded_db, invest.id)
+    after_loss = pool_balance(seeded_db, invest.id)
     assert after_loss["expense"] == after_hold["expense"], (
         f"[BUG] 押金损失被当成第二次现金流出，虚增 expense: {after_hold['expense']}->{after_loss['expense']}"
     )
@@ -342,11 +343,11 @@ def test_deposit_loss_not_double_counted_in_funds_and_profit(seeded_db):
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == profit0 - Decimal("1000")
 
     # 押金回来 700 = 收入
-    finance_service.return_deposit(
+    return_deposit(
         seeded_db, dep.id, amount=Decimal("700"), released_on=TODAY, actor="pytest",
     )
     seeded_db.expire_all()
-    after_ret = orders_service.pool_balance(seeded_db, invest.id)
+    after_ret = pool_balance(seeded_db, invest.id)
     assert after_ret["income"] == before["income"] + Decimal("700")
     assert after_ret["expense"] == after_hold["expense"], "退回不改变支出侧"
     # 现金净流出 = 支出1000 − 收入700 = 300 = 押金线净损失
@@ -371,13 +372,13 @@ def test_deposit_hold_available_not_deducted_twice(seeded_db):
     （缴 1000：cash −1000、available −1000，合计只影响一次）。
     """
     invest = _pool(seeded_db, "HJ_INVEST")
-    before = orders_service.pool_balance(seeded_db, invest.id)
-    finance_service.create_deposit(
+    before = pool_balance(seeded_db, invest.id)
+    create_deposit(
         seeded_db, pool_id=invest.id, amount=Decimal("1000"),
         paid_on=TODAY, actor="pytest",
     )
     seeded_db.expire_all()
-    after = orders_service.pool_balance(seeded_db, invest.id)
+    after = pool_balance(seeded_db, invest.id)
     assert after["cash_balance"] == before["cash_balance"] - Decimal("1000")
     assert after["deposit_held"] == Decimal("1000.00")
     # 关键守卫：available 等于现金余额，不再二次减 deposit_held
@@ -387,20 +388,20 @@ def test_deposit_hold_available_not_deducted_twice(seeded_db):
 
 def test_deposit_loss_null_attribute_other_flows_not_dropped(seeded_db):
     """守卫 SQL 三值逻辑：business_cashflow_filter 不得误删 accounting_attribute=NULL 的普通流水。"""
-    from app.orders import service as order_service
+    from app.orders.create import create_order
     from app.orders.amounts import order_cashflow_profit_by_order
-    order = order_service.create_order(
+    order = create_order(
         seeded_db, order_type="TH", owner_id=1, trade_date=TODAY, actor="pytest"
     )
     invest = _pool(seeded_db, "HJ_INVEST")
-    before = orders_service.pool_balance(seeded_db, invest.id)
+    before = pool_balance(seeded_db, invest.id)
     # 无属性的挂单支出（普通经营流水）：accounting_attribute=NULL
     # SQL 中 NULL != 'DEPOSIT' 为假，若过滤写成 != 会误删本行——正向条件须放行 NULL。
     _flow(seeded_db, pool_id=invest.id, direction="OUT", nature="BUSINESS_OUT",
           amount="250", attribute=None, order_id=order.id)
     seeded_db.expire_all()
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == Decimal("-250.00")
-    after = orders_service.pool_balance(seeded_db, invest.id)
+    after = pool_balance(seeded_db, invest.id)
     assert after["expense"] == before["expense"] + Decimal("250.00"), (
         "[BUG] accounting_attribute=NULL 的普通流水被 business_cashflow_filter 误删"
     )

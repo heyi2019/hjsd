@@ -32,11 +32,15 @@ from app.domain.trade import (
     OrderEvent,
     RebateRecord,
 )
-from app.orders import service as order_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.orders.amounts import event_totals, order_amounts
 from app.orders.router_output import _order_list_payload
 from app.policy import service as policy_service
-from app.reporting import service as reporting_service
+from app.reporting.profit import order_profit_detail
+from app.reporting.r2_monthly_pnl import r2_monthly_pnl
+from app.reporting.r3_commission import r3_commission_reconciliation
+from app.reporting.r5_business_pnl import r5_business_pnl
 from app.stocks import service as account_service
 from sqlalchemy import select
 
@@ -51,7 +55,7 @@ def _order_with_events(seeded_db, *, buy: str = "1000", sell: str = "1500") -> i
         inventory_type="RECOVERY",
         actor="pytest",
     )
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         owner_id=1,
@@ -59,11 +63,11 @@ def _order_with_events(seeded_db, *, buy: str = "1000", sell: str = "1500") -> i
         actor="pytest",
         account_id=account.id,
     )
-    order_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal(buy),
         occurred_on=D, actor="pytest", pool_id=1,
     )
-    order_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="SELL", amount=Decimal(sell),
         occurred_on=D, actor="pytest", pool_id=1,
     )
@@ -188,7 +192,7 @@ def test_order_ledger_profit_includes_rebate_and_bad_debt(seeded_db):
 
 def test_profit_counts_all_income_and_expense(seeded_db):
     """独立收入同样计入；收支相等为 0，只有支出为负。"""
-    order = order_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", owner_id=1, trade_date=D, actor="pytest"
     )
     assert order_amounts(seeded_db, order.id)["PROFIT"] == Decimal("0.00")
@@ -233,7 +237,7 @@ def test_r3_rate_allocation_uses_cashflow_profit(seeded_db):
         ],
     )
 
-    report = reporting_service.r3_commission_reconciliation(seeded_db)
+    report = r3_commission_reconciliation(seeded_db)
     entries = [row for group in report["groups"] for row in group.get("orders", [])]
     assert sorted(row["profit_base"] for row in entries) == [
         Decimal("150.00"), Decimal("150.00"),
@@ -282,7 +286,7 @@ def test_reports_follow_rebate_and_bad_debt(seeded_db):
     _add_rebate(seeded_db, order_id, "100")
     _add_bad_debt(seeded_db, order_id, "400")
 
-    detail = reporting_service.order_profit_detail(seeded_db)
+    detail = order_profit_detail(seeded_db)
     item = next(row for row in detail["items"] if row["order_id"] == order_id)
     assert item["income"] == Decimal("1600.00")  # 1500 售出 + 100 返点
     assert item["direct_cost"] == Decimal("400.00")  # 坏账计入支出侧
@@ -290,10 +294,10 @@ def test_reports_follow_rebate_and_bad_debt(seeded_db):
     assert item["net_profit"] == Decimal("200.00")
 
     # 跨报表一致性契约仍成立（既有红线）。
-    r5 = reporting_service.r5_business_pnl(seeded_db)
+    r5 = r5_business_pnl(seeded_db)
     assert r5["total"]["main_profit"] == detail["total"]["net_profit"]
 
-    monthly = reporting_service.r2_monthly_pnl(seeded_db)
+    monthly = r2_monthly_pnl(seeded_db)
     oct_item = next(row for row in monthly["items"] if row["month"] == "2026-10")
     assert oct_item["rebate_income"] == Decimal("100.00")
     # 返点已含在销售收入里，不重复加回经营利润。
@@ -311,24 +315,24 @@ def test_r2_rebate_column_counts_action_model_rebate_like_profit_detail(seeded_d
     而后者对「已生成资金流水的新模型返点」continue 防重复，连带把其中项展示也跳过，
     导致同一笔新模型返点在 R2 列=0、利润明细列=base_amount 口径打架（2026-11-12 修）。
     """
-    from app.finance import service as finance_service
+    from app.finance.rebates import create_rebate
 
     order_id = _order_with_events(seeded_db)  # HS，BUY+SELL，D=2026-10-17
     # 新模型返点：create_rebate 同时生成 IN 资金流水（base_amount 计入 sales_income）
-    finance_service.create_rebate(
+    create_rebate(
         seeded_db, source_order_id=order_id, rebate_type="SELL",
         base_amount=Decimal("250"), rate=Decimal("5"),
         collected_on=D, actor="pytest",
     )
 
     # 利润明细「其中返点」列 = 250
-    detail = reporting_service.order_profit_detail(seeded_db)
+    detail = order_profit_detail(seeded_db)
     ditem = next(row for row in detail["items"] if row["order_id"] == order_id)
     assert ditem["rebate"] == Decimal("250.00")
     assert ditem["income"] >= Decimal("250.00")  # 已含在收入大类
 
     # R2「其中返点」列必须与利润明细同源 = 250（改动前这里是 0）
-    monthly = reporting_service.r2_monthly_pnl(seeded_db)
+    monthly = r2_monthly_pnl(seeded_db)
     oct_item = next(row for row in monthly["items"] if row["month"] == "2026-10")
     assert oct_item["rebate_income"] == ditem["rebate"] == Decimal("250.00")
     # 其中项只作展示，不重复加回经营利润
@@ -352,7 +356,7 @@ def test_r3_allocation_includes_rebate_and_bad_debt(seeded_db):
         ],
     )
 
-    report = reporting_service.r3_commission_reconciliation(seeded_db)
+    report = r3_commission_reconciliation(seeded_db)
     entries = [
         row
         for group in report["groups"]

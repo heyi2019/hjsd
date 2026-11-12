@@ -22,7 +22,7 @@ from app.core.security import (
 from app.domain.attachments import Attachment
 from app.domain.quality import QualityIssue
 from app.domain.trade import Cashflow, Installment, OrderEvent
-from app.orders import service as order_service
+from app.orders.create import create_order
 
 
 D = date(2026, 10, 17)
@@ -51,7 +51,7 @@ ADMIN = CurrentUser(
 
 
 def _order(seeded_db, owner_id=2):
-    order = order_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=D, actor="pytest"
     )
     order.owner_id = owner_id

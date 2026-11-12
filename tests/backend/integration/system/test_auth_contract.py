@@ -605,9 +605,9 @@ def test_user_service_rejects_non_boolean_active_state(seeded_db):
 
 
 def test_user_deactivation_with_active_orders_requires_handover_or_retention_note(seeded_db):
-    from app.orders import service as orders_service
+    from app.orders.create import create_order
 
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=date.today(),
         owner_id=1, actor="pytest",
     )
@@ -624,9 +624,9 @@ def test_user_deactivation_with_active_orders_requires_handover_or_retention_not
 
 
 def test_user_deactivation_handover_moves_active_orders_and_records_audit(seeded_db):
-    from app.orders import service as orders_service
+    from app.orders.create import create_order
 
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=date.today(), owner_id=1, actor="pytest",
     )
     updated = service.update_user(
@@ -648,12 +648,12 @@ def test_user_deactivation_handover_moves_active_orders_and_records_audit(seeded
 
 
 def test_user_deactivation_rejects_inactive_handover_target(seeded_db):
-    from app.orders import service as orders_service
+    from app.orders.create import create_order
 
     target = seeded_db.get(User, 2)
     target.is_active = False
     seeded_db.flush()
-    orders_service.create_order(
+    create_order(
         seeded_db, order_type="HS", trade_date=date.today(), owner_id=1, actor="pytest",
     )
 

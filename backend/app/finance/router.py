@@ -23,11 +23,40 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.finance import schemas, service
+from app.finance import schemas
+from app.finance.cashflows import (
+    cashflow_totals,
+    create_cashflow as finance_create_cashflow,
+    list_cashflows as finance_list_cashflows,
+    reverse_cashflow as finance_reverse_cashflow,
+    studio_summary as finance_studio_summary,
+)
+from app.finance.deposits import (
+    cancel_deposit as finance_cancel_deposit,
+    create_deposit as finance_create_deposit,
+    list_deposits as finance_list_deposits,
+    lose_deposit as finance_lose_deposit,
+    return_deposit as finance_return_deposit,
+)
+from app.finance.rebates import (
+    create_rebate as finance_create_rebate,
+    get_rebate as finance_get_rebate,
+    list_rebates as finance_list_rebates,
+    update_rebate as finance_update_rebate,
+)
+from app.finance.reconciliation import (
+    create_reconciliation as finance_create_reconciliation,
+    list_reconciliations as finance_list_reconciliations,
+    resolve_reconciliation as finance_resolve_reconciliation,
+)
+from app.finance.transfers import (
+    create_transfer as finance_create_transfer,
+    repair_transfer as finance_repair_transfer,
+)
 from app.domain.enums import AuditAction
 from app.domain.trade import Deposit
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
-from app.orders import service as orders_service
+from app.orders._shared import get_order
 
 from .router_output import (
     _actor,
@@ -61,7 +90,7 @@ def studio_summary(
 ) -> schemas.StudioSummaryOut:
     """工作室收支面板：一次返回明细与已入账汇总。
 
-    「哪些流水算工作室收支」的口径在 `service.studio_summary` 里，前端不再自己过滤、
+    「哪些流水算工作室收支」的口径在 `finance_studio_summary` 里，前端不再自己过滤、
     也不再对当页求和（原先收入/支出各拉一次，再 reduce 出两个合计和一个净额）。
     """
     parsed: list[int] | None = None
@@ -73,7 +102,7 @@ def studio_summary(
                 "pool_ids 必须是逗号分隔的整数",
                 details={"field": "pool_ids", "value": pool_ids},
             ) from exc
-    result = service.studio_summary(
+    result = finance_studio_summary(
         db,
         pool_ids=parsed,
         occurred_from=occurred_from,
@@ -139,9 +168,9 @@ def list_cashflows(
         "keyword": keyword,
         "user": user,
     }
-    items, total = service.list_cashflows(db, limit=limit, offset=offset, **filters)
+    items, total = finance_list_cashflows(db, limit=limit, offset=offset, **filters)
     # 合计与明细同条件、同源：前端不再对当页求和，超 limit 也不会少算。
-    total_in, total_out = service.cashflow_totals(db, **filters)
+    total_in, total_out = cashflow_totals(db, **filters)
     return schemas.CashflowListOut(
         items=[_cashflow_out(db, item) for item in items],
         total=total,
@@ -206,7 +235,7 @@ def create_cashflow(
     db: Session = Depends(get_db),
     user: CurrentUser = post_deposit,
 ) -> schemas.CashflowOut:
-    flow = service.create_cashflow(
+    flow = finance_create_cashflow(
         db,
         pool_id=payload.pool_id,
         occurred_on=payload.occurred_on,
@@ -244,7 +273,7 @@ def create_order_cashflow(
             "资金明细关联订单与路径订单不一致",
             details={"field": "order_id", "order_id": order_id},
         )
-    flow = service.create_cashflow(
+    flow = finance_create_cashflow(
         db,
         pool_id=payload.pool_id,
         occurred_on=payload.occurred_on,
@@ -276,7 +305,7 @@ def reverse_cashflow(
     db: Session = Depends(get_db),
     user: CurrentUser = post_deposit,
 ) -> schemas.CashflowOut:
-    flow = service.reverse_cashflow(
+    flow = finance_reverse_cashflow(
         db,
         cashflow_id,
         reversed_on=payload.reversed_on,
@@ -297,7 +326,7 @@ def list_reconciliations(
 ) -> list[schemas.ReconciliationOut]:
     if pool_id is not None and not user.can_see_pool(pool_id):
         return []
-    items = service.list_reconciliations(
+    items = finance_list_reconciliations(
         db,
         pool_id=pool_id,
         pool_ids=None
@@ -316,7 +345,7 @@ def create_reconciliation(
 ) -> schemas.ReconciliationOut:
     if not user.can_see_pool(payload.pool_id):
         raise NotFound("资金池不存在", details={"pool_id": payload.pool_id})
-    item = service.create_reconciliation(
+    item = finance_create_reconciliation(
         db,
         pool_id=payload.pool_id,
         reconciled_on=payload.reconciled_on,
@@ -342,7 +371,7 @@ def resolve_reconciliation(
     db: Session = Depends(get_db),
     user: CurrentUser = post_deposit,
 ) -> schemas.ReconciliationOut:
-    item = service.resolve_reconciliation(
+    item = finance_resolve_reconciliation(
         db,
         reconciliation_id,
         actor=_actor(user),
@@ -361,7 +390,7 @@ def create_transfer(
 ) -> schemas.TransferOut:
     if not user.can_see_pool(payload.source_pool_id) or not user.can_see_pool(payload.target_pool_id):
         raise NotFound("资金池不存在", details={"pool_id": payload.source_pool_id})
-    result = service.create_transfer(
+    result = finance_create_transfer(
         db,
         source_pool_id=payload.source_pool_id,
         target_pool_id=payload.target_pool_id,
@@ -387,7 +416,7 @@ def repair_transfer(
 ) -> schemas.TransferOut:
     if not user.can_see_pool(payload.counterpart_pool_id):
         raise NotFound("资金池不存在", details={"pool_id": payload.counterpart_pool_id})
-    result = service.repair_transfer(
+    result = finance_repair_transfer(
         db,
         transfer_id,
         counterpart_pool_id=payload.counterpart_pool_id,
@@ -408,7 +437,7 @@ def list_deposits(
 ) -> list[schemas.DepositOut]:
     if pool_id is not None and not user.can_see_pool(pool_id):
         return []
-    items = service.list_deposits(
+    items = finance_list_deposits(
         db,
         pool_id=pool_id,
         pool_ids=None
@@ -427,7 +456,7 @@ def create_deposit(
 ) -> schemas.DepositOut:
     if not user.can_see_pool(payload.pool_id):
         raise NotFound("资金池不存在", details={"pool_id": payload.pool_id})
-    item = service.create_deposit(
+    item = finance_create_deposit(
         db,
         pool_id=payload.pool_id,
         amount=payload.amount,
@@ -453,7 +482,7 @@ def return_deposit(
     deposit = db.get(Deposit, deposit_id)
     if deposit is None or not user.can_see_pool(deposit.pool_id):
         raise NotFound("押金不存在", details={"deposit_id": deposit_id})
-    item = service.return_deposit(
+    item = finance_return_deposit(
         db,
         deposit_id,
         amount=payload.amount,
@@ -476,7 +505,7 @@ def cancel_deposit(
     deposit = db.get(Deposit, deposit_id)
     if deposit is None or not user.can_see_pool(deposit.pool_id):
         raise NotFound("押金不存在", details={"deposit_id": deposit_id})
-    item = service.cancel_deposit(
+    item = finance_cancel_deposit(
         db,
         deposit_id,
         cancelled_on=payload.cancelled_on,
@@ -498,7 +527,7 @@ def lose_deposit(
     deposit = db.get(Deposit, deposit_id)
     if deposit is None or not user.can_see_pool(deposit.pool_id):
         raise NotFound("押金不存在", details={"deposit_id": deposit_id})
-    flow = service.lose_deposit(
+    flow = finance_lose_deposit(
         db,
         deposit_id,
         amount=payload.amount,
@@ -519,7 +548,7 @@ def list_rebates(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> list[schemas.RebateOut]:
-    items = service.list_rebates(db, source_order_id=source_order_id, user=_user)
+    items = finance_list_rebates(db, source_order_id=source_order_id, user=_user)
     return [_rebate_out(item) for item in items]
 
 
@@ -550,7 +579,7 @@ def get_rebate(
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
 ) -> schemas.RebateOut:
-    return _rebate_out(service.get_rebate(db, rebate_id, user=user))
+    return _rebate_out(finance_get_rebate(db, rebate_id, user=user))
 
 
 @router.post("/rebates", response_model=schemas.RebateOut, status_code=201)
@@ -559,8 +588,8 @@ def create_rebate(
     db: Session = Depends(get_db),
     user: CurrentUser = post_rebate,
 ) -> schemas.RebateOut:
-    orders_service.get_order(db, payload.source_order_id, user)
-    item = service.create_rebate(
+    get_order(db, payload.source_order_id, user)
+    item = finance_create_rebate(
         db,
         source_order_id=payload.source_order_id,
         rebate_type=payload.rebate_type,
@@ -584,7 +613,7 @@ def update_rebate(
     db: Session = Depends(get_db),
     user: CurrentUser = post_rebate,
 ) -> schemas.RebateOut:
-    item = service.update_rebate(db, rebate_id, actor=_actor(user), user=user, **payload.model_dump(exclude_unset=True))
+    item = finance_update_rebate(db, rebate_id, actor=_actor(user), user=user, **payload.model_dump(exclude_unset=True))
     return _rebate_out(item)
 
 

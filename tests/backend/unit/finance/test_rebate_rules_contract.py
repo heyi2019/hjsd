@@ -4,9 +4,10 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from app.finance import service as finance_service
+from app.finance.rebates import create_rebate
 from app.stocks import service as account_service
-from app.orders import service as order_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.policy import service as policy_service
 
 
@@ -21,7 +22,7 @@ def _order_with_buy(seeded_db) -> int:
         inventory_type="RECOVERY",
         actor="pytest",
     )
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         owner_id=1,
@@ -29,7 +30,7 @@ def _order_with_buy(seeded_db) -> int:
         actor="pytest",
         account_id=account.id,
     )
-    order_service.post_event(
+    post_event(
         seeded_db,
         order.id,
         event_type="BUY",
@@ -57,7 +58,7 @@ def test_rebate_uses_active_rule_rate_when_rate_is_omitted(seeded_db):
         actor="pytest",
     )
 
-    record = finance_service.create_rebate(
+    record = create_rebate(
         seeded_db,
         source_order_id=_order_with_buy(seeded_db),
         rebate_type="BUY",
@@ -86,7 +87,10 @@ def test_rebate_legacy_action_routes_removed(app):
 
 def test_rebate_delete_service_removed():
     """返点作废服务移除；退回走资金中心录入 OUT 支出，不再 reverse_cashflow+VOID。"""
-    from app.finance import rebates, service
+    import importlib.util
+
+    from app.finance import rebates
 
     assert not hasattr(rebates, "delete_rebate")
-    assert not hasattr(service, "delete_rebate")
+    # 2026-11-12 去兼容：finance.service 再导出门面已删除
+    assert importlib.util.find_spec("app.finance.service") is None

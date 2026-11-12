@@ -15,13 +15,13 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.trade import Deposit
-from app.finance import service as finance_service
+from app.finance.deposits import create_deposit
 
 TODAY = date(2026, 10, 4)
 
 
 def _deposit(seeded_db, amount: str = "500.00") -> Deposit:
-    return finance_service.create_deposit(
+    return create_deposit(
         seeded_db, pool_id=1, amount=Decimal(amount), paid_on=TODAY, actor="pytest"
     )
 

@@ -18,7 +18,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.foundation import Pool
-from app.finance import service
+from app.finance.cashflows import create_cashflow
 
 TODAY = date(2026, 10, 4)
 
@@ -39,7 +39,7 @@ def _flow(
     note: str = "memo",
 ):
     """手工登记一笔工作室收支：nature 与方向对齐，属性由调用方指定。"""
-    return service.create_cashflow(
+    return create_cashflow(
         seeded_db,
         pool_id=_pool(seeded_db).id,
         occurred_on=TODAY,
@@ -110,7 +110,8 @@ def test_summary_ignores_item_limit(seeded_client, seeded_db, headers):
 
 
 def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
-    from app.orders import service as orders_service
+    from app.orders.create import create_order
+    from app.orders.events import post_event
     from app.stocks import service as stocks_service
 
     account = stocks_service.create_account(
@@ -121,11 +122,11 @@ def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
         business_mode="SELF",
         inventory_type="RECOVERY",
     )
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
     )
     # 订单事件派生的 BUY 流水挂在 order_event_id 上，source 是 ORDER_EVENT。
-    orders_service.post_event(
+    post_event(
         seeded_db,
         order.id,
         event_type="BUY",
@@ -143,7 +144,7 @@ def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
 
 def test_summary_excludes_order_plain_cashflows(seeded_client, seeded_db, headers):
     """订单普通资金流水（挂 order_id 但无事件/押金/划转）属性命中也不算工作室收支。"""
-    from app.orders import service as orders_service
+    from app.orders.create import create_order
     from app.stocks import service as stocks_service
 
     account = stocks_service.create_account(
@@ -154,10 +155,10 @@ def test_summary_excludes_order_plain_cashflows(seeded_client, seeded_db, header
         business_mode="SELF",
         inventory_type="RECOVERY",
     )
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
     )
-    service.create_cashflow(
+    create_cashflow(
         seeded_db,
         pool_id=_pool(seeded_db).id,
         occurred_on=TODAY,
@@ -196,7 +197,7 @@ def test_pool_ids_filter(seeded_client, seeded_db, headers):
     seeded_db.commit()
 
     mine = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="100")
-    service.create_cashflow(
+    create_cashflow(
         seeded_db,
         pool_id=other.id,
         occurred_on=TODAY,

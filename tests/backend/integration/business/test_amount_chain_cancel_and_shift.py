@@ -47,9 +47,10 @@ from app.domain.trade import (
     RebateRecord,
     Reconciliation,
 )
-from app.orders import service as order_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.orders.mutations import update_order
-from app.reporting import service as reporting_service
+from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from app.stocks import service as account_service
 
 D1 = date(2026, 9, 10)
@@ -64,7 +65,7 @@ def _recovery_order(seeded_db, *, trade_date: date = D1) -> tuple[Order, Account
         inventory_type="RECOVERY",
         actor="pytest",
     )
-    order = order_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", owner_id=1, trade_date=trade_date,
         actor="pytest", account_id=account.id,
     )
@@ -97,15 +98,15 @@ def _posted_flow(seeded_db, *, occurred_on, direction, nature, pool_id=1, order_
 def test_cancel_sell_flow_is_out_business_out(seeded_db):
     """冲销 SELL：direction 反转为 OUT，nature 必须同步为 BUSINESS_OUT。"""
     order, _account = _recovery_order(seeded_db)
-    order_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=D1, actor="pytest", pool_id=1,
     )
-    sell_event, sell_flow = order_service.post_event(
+    sell_event, sell_flow = post_event(
         seeded_db, order.id, event_type="SELL", amount=Decimal("200"),
         occurred_on=D1, actor="pytest", pool_id=1,
     )
-    cancel_event, cancel_flow = order_service.post_event(
+    cancel_event, cancel_flow = post_event(
         seeded_db, order.id, event_type="CANCEL", amount=Decimal("200"),
         occurred_on=D1, actor="pytest", pool_id=1,
         offset_event_id=sell_event.id, reason="冲销售出",
@@ -115,7 +116,7 @@ def test_cancel_sell_flow_is_out_business_out(seeded_db):
         f"[BUG] 冲销 SELL 的流水 nature={cancel_flow.nature}，OUT 却标 BUSINESS_IN"
     )
     # 资金池收支卡片：OUT/BUSINESS_OUT 计入 expense，账与余额自洽。
-    from app.orders.service import pool_balances
+    from app.orders.pools import pool_balances
     balances = pool_balances(seeded_db, [1])
     # 主 SELL(IN 200) + BUY(OUT 100) + CANCEL(OUT 200) → expense 应含 BUY 100 + CANCEL 200
     assert balances[1]["expense"] >= Decimal("300.00")
@@ -124,11 +125,11 @@ def test_cancel_sell_flow_is_out_business_out(seeded_db):
 def test_cancel_buy_flow_stays_in_business_in(seeded_db):
     """守卫：冲销 BUY 生成 IN/BUSINESS_IN，修复不应影响它。"""
     order, _account = _recovery_order(seeded_db)
-    buy_event, _buy_flow = order_service.post_event(
+    buy_event, _buy_flow = post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=D1, actor="pytest", pool_id=1,
     )
-    _ce, cancel_flow = order_service.post_event(
+    _ce, cancel_flow = post_event(
         seeded_db, order.id, event_type="CANCEL", amount=Decimal("100"),
         occurred_on=D1, actor="pytest", pool_id=1,
         offset_event_id=buy_event.id, reason="冲销买入",
@@ -141,7 +142,7 @@ def test_cancel_buy_flow_stays_in_business_in(seeded_db):
 def test_shift_moves_bad_debt_rebate_and_buy_date(seeded_db):
     """改成交日期：事件/流水/坏账处置/旧模型返点/账号买号日同步平移。"""
     order, account = _recovery_order(seeded_db, trade_date=D1)
-    buy_event, _ = order_service.post_event(
+    buy_event, _ = post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
         occurred_on=D1, actor="pytest", pool_id=1,
     )
@@ -187,7 +188,7 @@ def test_shift_moves_bad_debt_rebate_and_buy_date(seeded_db):
     assert disp.occurred_on == D2
 
     # 报表归月随之迁移：9 月归零，10 月含返点收入 200 + 坏账支出 300
-    oct_item = next(r for r in reporting_service.r2_monthly_pnl(seeded_db)["items"] if r["month"] == "2026-10")
+    oct_item = next(r for r in r2_monthly_pnl(seeded_db)["items"] if r["month"] == "2026-10")
     assert oct_item["rebate_income"] == Decimal("200.00")
     assert oct_item["account_direct_cost"] >= Decimal("300.00")
 
@@ -195,18 +196,18 @@ def test_shift_moves_bad_debt_rebate_and_buy_date(seeded_db):
 def test_shift_buy_date_untouched_for_sell_order(seeded_db):
     """守卫：同一账号的 SELL 单平移不应改动账号买入日期。"""
     order, account = _recovery_order(seeded_db, trade_date=D1)
-    order_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=D1, actor="pytest", pool_id=1,
     )
     # 构造一个「共用同账号、仅 SELL 事件」的独立订单（模拟跨单售出）。
     # 用同一账号的 HS 单：先登记 BUY 让账号进入 WAITING，才能 SELL；
     # 关键点是该 SELL 单自身无 BUY 事件，平移它不应改动账号 buy_date。
-    sell_order = order_service.create_order(
+    sell_order = create_order(
         seeded_db, order_type="HS", owner_id=1, trade_date=D1,
         actor="pytest", account_id=account.id,
     )
-    order_service.post_event(
+    post_event(
         seeded_db, sell_order.id, event_type="SELL", amount=Decimal("150"),
         occurred_on=D1, actor="pytest", pool_id=1,
     )
@@ -220,7 +221,7 @@ def test_shift_buy_date_untouched_for_sell_order(seeded_db):
 def test_shift_rejected_when_crossing_reconciled_period(seeded_db):
     """平移流水跨越资金池已对账日期时拒绝，保护已固化余额快照。"""
     order, _account = _recovery_order(seeded_db, trade_date=D1)
-    order_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=D1, actor="pytest", pool_id=1,
     )

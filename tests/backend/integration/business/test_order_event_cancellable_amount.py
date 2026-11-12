@@ -18,7 +18,8 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.foundation import Pool
-from app.orders import service as orders_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 
 TODAY = date(2026, 10, 4)
 
@@ -26,7 +27,7 @@ TODAY = date(2026, 10, 4)
 def _order_with_buy(seeded_db, *, amount: str):
     pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
     assert pool is not None
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=TODAY,
@@ -34,7 +35,7 @@ def _order_with_buy(seeded_db, *, amount: str):
         # HS 买入必须能定位到游戏账号：快照带 game_account 才会自动建库存账号。
         account_snapshot={"game_account": f"evt-{amount}", "platform": "王者"},
     )
-    buy, _flow = orders_service.post_event(
+    buy, _flow = post_event(
         seeded_db,
         order.id,
         event_type="BUY",
@@ -47,7 +48,7 @@ def _order_with_buy(seeded_db, *, amount: str):
 
 
 def _cancel(seeded_db, order, *, offset_event_id: int, amount: str):
-    event, _flow = orders_service.post_event(
+    event, _flow = post_event(
         seeded_db,
         order.id,
         event_type="CANCEL",

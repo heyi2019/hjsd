@@ -10,7 +10,9 @@ from datetime import date
 import pytest
 
 from app.core.errors import ErrorCode, Validation
-from app.orders import service as order_service
+from app.orders.cancellation_model import cancel_order
+from app.orders.create import create_order
+from app.orders.events import post_event
 
 D = date(2026, 11, 1)
 
@@ -20,7 +22,7 @@ def _snapshot(game_account: str, game_type: str = "王者荣耀") -> dict[str, s
 
 
 def _create(session, game_account: str, order_type: str = "HS", **kwargs):
-    return order_service.create_order(
+    return create_order(
         session,
         order_type=order_type,
         trade_date=D,
@@ -32,11 +34,11 @@ def _create(session, game_account: str, order_type: str = "HS", **kwargs):
 
 def _sell(session, order) -> None:
     """售出前必须先有采购入库记录，否则事件规则会拦下。"""
-    order_service.post_event(
+    post_event(
         session, order.id, event_type="BUY", amount="100",
         occurred_on=D, actor="pytest",
     )
-    order_service.post_event(
+    post_event(
         session, order.id, event_type="SELL", amount="150",
         occurred_on=D, actor="pytest",
     )
@@ -80,7 +82,7 @@ def test_confirmed_repurchase_is_allowed(seeded_db):
 def test_voided_account_does_not_block(seeded_db):
     """已取消（VOID）的账号不参与判重，同账号可立即重新建单。"""
     order = _create(seeded_db, "dup-voided")
-    order_service.cancel_order(seeded_db, order.id, actor="pytest", reason="客户撤单")
+    cancel_order(seeded_db, order.id, actor="pytest", reason="客户撤单")
 
     reborn = _create(seeded_db, "dup-voided")
 
@@ -91,7 +93,7 @@ def test_different_game_type_is_not_a_duplicate(seeded_db):
     """判重按「游戏账号 + 游戏类型」双键，不同游戏类型不算重复。"""
     _create(seeded_db, "dup-cross-game")
 
-    other = order_service.create_order(
+    other = create_order(
         seeded_db,
         order_type="HS",
         trade_date=D,
@@ -106,7 +108,7 @@ def test_referenced_account_creation_skips_duplicate_check(seeded_db):
     """引用已有库存账号建单（如库存寄售上架）不判重，否则会拦下自己。"""
     source = _create(seeded_db, "dup-referenced", order_type="TH")
 
-    borrowed = order_service.create_order(
+    borrowed = create_order(
         seeded_db,
         order_type="TH",
         trade_date=D,

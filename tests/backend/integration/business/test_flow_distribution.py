@@ -23,7 +23,7 @@ from app.domain.foundation import Pool
 from app.domain.trade import Account, Order
 from app.domain.trade_models.cashflow import Cashflow
 from app.orders import events
-from app.orders import service as orders_service
+from app.orders.create import create_order
 
 TODAY = date(2026, 10, 6)
 
@@ -35,7 +35,7 @@ def _first_active_pool(session) -> Pool:
 def test_flow_c_th_distribution_fund_settlement(seeded_db):
     """BIZ-FLOW-DIST-001：TH 分销（提号）BUY+SELL 资金结算与核算属性区分。"""
     # TH 不在本单内联库存账号（采购事实记在历史来源单），只记 BUY 成本 + SELL 收入。
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
     )
     assert order.order_type == "TH"
@@ -73,7 +73,7 @@ def test_flow_c_th_distribution_fund_settlement(seeded_db):
 
 def test_flow_c_dg_consignment_sell_and_buy_rejected(seeded_db):
     """BIZ-FLOW-DIST-002：DG 代挂仅全款——拒 BUY；SELLE 必须显式 pool_id。"""
-    dg = orders_service.create_order(
+    dg = create_order(
         seeded_db, order_type="DG", trade_date=TODAY, actor="pytest",
         account_snapshot={"game_account": "flow-c-dg-001", "game_type": "王者荣耀"},
     )

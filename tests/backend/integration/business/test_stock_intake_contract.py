@@ -28,7 +28,7 @@ from sqlalchemy import func, select
 from app.core.errors import ErrorCode
 from app.domain.enums import AccountStatus
 from app.domain.trade import Account
-from app.orders import service as orders_service
+from app.orders.create import create_order
 
 TODAY = date(2026, 10, 4)
 
@@ -199,7 +199,7 @@ def test_unknown_order_type_rejected(seeded_client, headers):
 
 def test_inline_intake_sets_entry_at_equal_to_order_created(seeded_db):
     """BIZ-INV-INTAKE-001 白盒：内联建库写入的入库时间等于订单建档时间。"""
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=TODAY,
@@ -229,7 +229,7 @@ def test_referencing_existing_account_does_not_create_new_row(seeded_db):
     before = _count_accounts(seeded_db, "ref-existing-001")
     assert before == 1
 
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=TODAY,

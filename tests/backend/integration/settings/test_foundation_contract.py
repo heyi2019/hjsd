@@ -18,7 +18,7 @@ from app.core.errors import NotFound, Validation
 from app.domain.enums import CapitalType, PoolOwnership, PoolStatus, Portion
 from app.domain.foundation import OrderTypeDef, OrderTypePool
 from app.foundation import seeds, service
-from app.orders import service as order_service
+from app.orders.create import create_order
 
 
 def _pool(seeded_db, code: str, **kwargs):
@@ -444,7 +444,7 @@ class TestFoundationApi:
     def test_route_impact_preview_does_not_change_history(
         self, seeded_client, seeded_db, headers
     ):
-        order_service.create_order(
+        create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 10, 17), actor="pytest"
         )
         response = seeded_client.get(

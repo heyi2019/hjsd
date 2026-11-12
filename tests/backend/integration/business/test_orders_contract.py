@@ -29,13 +29,21 @@ from app.domain.enums import (
 )
 from app.stocks import service as stocks_service
 from app.value_added_services import service as installments_service
-from app.finance import service as finance_service
+from app.finance.rebates import create_rebate
 from app.parties import service as parties_service
 from app.domain.foundation import AuditLog
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
 from app.domain.users import User
 from app.foundation import service as foundation_service
-from app.orders import schemas, service as order_service
+from app.orders import schemas
+from app.orders._shared import get_order
+from app.orders.cancellation_model import cancel_order
+from app.orders.create import create_order
+from app.orders.events import _apply_account_effect, _opposite_direction, post_event
+from app.orders.links import create_order_link, delete_order_link, list_order_links
+from app.orders.mutations import materialize_inventory_account, update_order
+from app.orders.pools import pool_balance
+from app.orders.queries import list_orders
 from app.orders.router_output import _order_list_payload
 
 D = date(2026, 10, 4)
@@ -64,7 +72,7 @@ def test_order_create_validates_active_custom_field_values(seeded_db):
     seeded_db.flush()
 
     with pytest.raises(Validation, match="必须为数字"):
-        order_service.create_order(
+        create_order(
             seeded_db,
             order_type="HS",
             trade_date=D,
@@ -88,7 +96,7 @@ def test_account_product_custom_values_follow_inline_inventory_account(seeded_db
     seeded_db.add(field)
     seeded_db.flush()
 
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=D,
@@ -152,7 +160,7 @@ def test_order_success_time_is_inventory_entry_time(seeded_db):
     account.inventory_entry_at = datetime(2026, 1, 1, 8, 0)
     seeded_db.flush()
 
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=D,
@@ -164,7 +172,7 @@ def test_order_success_time_is_inventory_entry_time(seeded_db):
 
 
 def test_materialize_unlinked_active_order_creates_inventory_account(seeded_db):
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="DG",
         trade_date=D,
@@ -182,7 +190,7 @@ def test_materialize_unlinked_active_order_creates_inventory_account(seeded_db):
     order.account_id = None
     seeded_db.flush()
 
-    restored = order_service.materialize_inventory_account(
+    restored = materialize_inventory_account(
         seeded_db,
         order.id,
         actor="pytest",
@@ -198,7 +206,7 @@ def test_materialize_unlinked_active_order_creates_inventory_account(seeded_db):
 
 
 def test_materialize_unlinked_completed_order_is_rejected(seeded_db):
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=D,
@@ -210,7 +218,7 @@ def test_materialize_unlinked_completed_order_is_rejected(seeded_db):
     seeded_db.flush()
 
     with pytest.raises(Validation, match="只有进行中的订单"):
-        order_service.materialize_inventory_account(seeded_db, order.id, actor="pytest")
+        materialize_inventory_account(seeded_db, order.id, actor="pytest")
 
 
 def test_order_list_payload_includes_inventory_and_sale_responsibility_timestamps(seeded_db):
@@ -221,7 +229,7 @@ def test_order_list_payload_includes_inventory_and_sale_responsibility_timestamp
     account.created_by = "inventory-user"
     seeded_db.flush()
 
-    order_service.post_event(
+    post_event(
         seeded_db,
         order.id,
         event_type="BUY",
@@ -230,7 +238,7 @@ def test_order_list_payload_includes_inventory_and_sale_responsibility_timestamp
         actor="inventory-user",
         pool_id=1,
     )
-    sale, _ = order_service.post_event(
+    sale, _ = post_event(
         seeded_db,
         order.id,
         event_type="SELL",
@@ -290,7 +298,7 @@ def _order(
             inventory_type="RECOVERY",
             actor="pytest",
         ).id
-    return order_service.create_order(
+    return create_order(
         seeded_db, order_type=order_type, trade_date=trade_date, actor="pytest",
         account_id=account_id, owner_id=owner_id,
         form_extra=form_extra, form_extra_scope=form_extra_scope,
@@ -348,7 +356,7 @@ def test_sell_completes_non_installment_orders(seeded_db, order_type):
     order = _order(seeded_db, order_type=order_type, account_id=account.id)
 
     if order_type in {"HS", "TH"}:
-        order_service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -358,7 +366,7 @@ def test_sell_completes_non_installment_orders(seeded_db, order_type):
             pool_id=1,
         )
 
-    order_service.post_event(
+    post_event(
         seeded_db,
         order.id,
         event_type="SELL",
@@ -379,7 +387,7 @@ class TestCreateOrderValidation:
         seeded_db.flush()
 
         with pytest.raises(Validation, match="订单负责人必须是启用用户"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=D,
@@ -391,7 +399,7 @@ class TestCreateOrderValidation:
         source = _order(seeded_db, order_type="HS")
         follow_up = _order(seeded_db, order_type="HS")
 
-        link = order_service.create_order_link(
+        link = create_order_link(
             seeded_db,
             follow_up.id,
             related_order_id=source.id,
@@ -404,13 +412,13 @@ class TestCreateOrderValidation:
 
         assert link.source_order_id == source.id
         assert link.target_order_id == follow_up.id
-        listed = order_service.list_order_links(seeded_db, follow_up.id)
+        listed = list_order_links(seeded_db, follow_up.id)
         assert listed[0]["direction"] == "SOURCE"
         assert listed[0]["source_order_no"] == source.order_no
         assert listed[0]["split_ratio"] == Decimal("50.00")
 
         with pytest.raises(Validation, match="订单关联已存在"):
-            order_service.create_order_link(
+            create_order_link(
                 seeded_db,
                 source.id,
                 related_order_id=follow_up.id,
@@ -421,7 +429,7 @@ class TestCreateOrderValidation:
     def test_order_link_rejects_self_and_invalid_relation(self, seeded_db):
         order = _order(seeded_db, order_type="HS")
         with pytest.raises(Validation, match="不能关联自身"):
-            order_service.create_order_link(
+            create_order_link(
                 seeded_db,
                 order.id,
                 related_order_id=order.id,
@@ -429,7 +437,7 @@ class TestCreateOrderValidation:
                 actor="pytest",
             )
         with pytest.raises(Validation, match="关联方向无效"):
-            order_service.create_order_link(
+            create_order_link(
                 seeded_db,
                 order.id,
                 related_order_id=999999,
@@ -440,7 +448,7 @@ class TestCreateOrderValidation:
     def test_order_link_delete_removes_link_and_writes_audit(self, seeded_db):
         source = _order(seeded_db, order_type="HS")
         follow_up = _order(seeded_db, order_type="HS")
-        link = order_service.create_order_link(
+        link = create_order_link(
             seeded_db,
             follow_up.id,
             related_order_id=source.id,
@@ -451,11 +459,11 @@ class TestCreateOrderValidation:
             actor="pytest",
         )
 
-        order_service.delete_order_link(seeded_db, follow_up.id, link.id, actor="pytest")
+        delete_order_link(seeded_db, follow_up.id, link.id, actor="pytest")
 
         assert seeded_db.scalar(select(OrderLink).where(OrderLink.id == link.id)) is None
-        assert order_service.list_order_links(seeded_db, follow_up.id) == []
-        assert order_service.list_order_links(seeded_db, source.id) == []
+        assert list_order_links(seeded_db, follow_up.id) == []
+        assert list_order_links(seeded_db, source.id) == []
         audit = seeded_db.scalar(
             select(AuditLog)
             .where(
@@ -470,7 +478,7 @@ class TestCreateOrderValidation:
         # 删除后同一对订单可重新建立关联（唯一约束不阻挡重建）。
         # 注意：SQLite rowid 是 max+1 复用语义（AUTOINCREMENT 关键字未生成），
         # 删掉最大行后重建可能拿回同一 id —— 这是 DB 固有语义，不是缺陷。
-        again = order_service.create_order_link(
+        again = create_order_link(
             seeded_db,
             follow_up.id,
             related_order_id=source.id,
@@ -478,14 +486,14 @@ class TestCreateOrderValidation:
             actor="pytest",
         )
         assert again.id is not None
-        relisted = order_service.list_order_links(seeded_db, follow_up.id)
+        relisted = list_order_links(seeded_db, follow_up.id)
         assert [item["id"] for item in relisted] == [again.id]
 
     def test_order_link_delete_rejects_foreign_and_missing(self, seeded_db):
         source = _order(seeded_db, order_type="HS")
         follow_up = _order(seeded_db, order_type="HS")
         bystander = _order(seeded_db, order_type="HS")
-        link = order_service.create_order_link(
+        link = create_order_link(
             seeded_db,
             follow_up.id,
             related_order_id=source.id,
@@ -494,19 +502,19 @@ class TestCreateOrderValidation:
         )
         # 无关订单视角删除 → 404（不泄露关联存在性）
         with pytest.raises(NotFound, match="不存在"):
-            order_service.delete_order_link(seeded_db, bystander.id, link.id, actor="pytest")
+            delete_order_link(seeded_db, bystander.id, link.id, actor="pytest")
         assert seeded_db.scalar(select(OrderLink).where(OrderLink.id == link.id)) is not None
         # 对端（source 方）视角允许删除
-        order_service.delete_order_link(seeded_db, source.id, link.id, actor="pytest")
+        delete_order_link(seeded_db, source.id, link.id, actor="pytest")
         assert seeded_db.scalar(select(OrderLink).where(OrderLink.id == link.id)) is None
         # 重复删除 → 404
         with pytest.raises(NotFound, match="不存在"):
-            order_service.delete_order_link(seeded_db, follow_up.id, link.id, actor="pytest")
+            delete_order_link(seeded_db, follow_up.id, link.id, actor="pytest")
 
     def test_installment_gate_flags_must_be_boolean_in_service(self, seeded_db):
         order = _order(seeded_db, order_type="HS")
         with pytest.raises(Validation, match="allow_installment_delivery 必须为布尔值"):
-            order_service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="BUY",
@@ -530,7 +538,7 @@ class TestCreateOrderValidation:
             inventory_type="RECOVERY",
             actor="pytest",
         )
-        order = order_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=D,
@@ -564,7 +572,7 @@ class TestCreateOrderValidation:
         assert sell.status_code == 201, sell.text
 
     def test_order_api_rejects_removed_event(self, seeded_client, seeded_db, headers):
-        order = order_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=D,
@@ -594,7 +602,7 @@ class TestCreateOrderValidation:
         )
 
         with pytest.raises(Validation, match="不可作为新订单参与方"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=D,
@@ -621,12 +629,12 @@ class TestCreateOrderValidation:
         assert response.status_code == 422, response.text
 
     def test_hs_buy_requires_inventory_account(self, seeded_db):
-        order = order_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=D, actor="pytest"
         )
 
         with pytest.raises(Validation, match="库存账号"):
-            order_service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="BUY",
@@ -678,14 +686,14 @@ class TestCreateOrderValidation:
 
     def test_unknown_order_type_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
-            order_service.create_order(
+            create_order(
                 seeded_db, order_type="ZZ", trade_date=D, actor="pytest"
             )
         assert "不存在" in str(exc.value)
 
     def test_invalid_capital_type_rejected_before_database_constraint(self, seeded_db):
         with pytest.raises(Validation, match="capital_type"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=D,
@@ -693,7 +701,7 @@ class TestCreateOrderValidation:
                 capital_type="NOT_A_CAPITAL_TYPE",
             )
         with pytest.raises(Validation, match="capital_type"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=D,
@@ -704,7 +712,7 @@ class TestCreateOrderValidation:
     def test_invalid_order_amounts_are_business_errors_in_service(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation, match="必须大于 0"):
-            order_service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="PROFIT_SHARE",
@@ -733,7 +741,7 @@ class TestCreateOrderValidation:
         kwargs[field] = values[field]
 
         with pytest.raises(Validation) as exc:
-            order_service.post_event(seeded_db, order.id, **kwargs)
+            post_event(seeded_db, order.id, **kwargs)
         assert exc.value.details["field"] == field
 
     def test_duplicate_participant_role_rejected_before_unique_constraint(
@@ -743,7 +751,7 @@ class TestCreateOrderValidation:
             seeded_db, display_name="重复角色客户", actor="pytest"
         )
         with pytest.raises(Validation, match="不可重复"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=D,
@@ -763,7 +771,7 @@ class TestCreateOrderValidation:
         )
 
         with pytest.raises(Validation, match="TH 不允许客户角色 SELLER"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="TH",
                 trade_date=D,
@@ -772,7 +780,7 @@ class TestCreateOrderValidation:
             )
 
         with pytest.raises(Validation, match="TH 不允许合作方角色 SUPPLIER"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="TH",
                 trade_date=D,
@@ -782,7 +790,7 @@ class TestCreateOrderValidation:
 
     def test_participant_id_shape_is_rejected_before_database_flush(self, seeded_db):
         with pytest.raises(Validation, match="参与方 ID"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=D,
@@ -861,7 +869,7 @@ class TestCreateOrderValidation:
         seeded_db.flush()
 
         with pytest.raises(NotFound):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=D,
@@ -879,7 +887,7 @@ class TestCreateOrderValidation:
         )
 
         with pytest.raises(NotFound):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=D,
@@ -891,7 +899,7 @@ class TestCreateOrderValidation:
     def test_scoped_user_cannot_assign_order_to_other_owner_in_service(
         self, seeded_db
     ):
-        order = order_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=D,
@@ -910,7 +918,7 @@ class TestCreateOrderValidation:
 
         入参小写也要归一成大写，否则会被 `order_commission_mode_valid` 拒绝。
         """
-        order = order_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="DG",
             trade_date=D,
@@ -925,7 +933,7 @@ class TestCreateOrderValidation:
 
     def test_commission_terms_reject_incomplete_pair(self, seeded_db):
         with pytest.raises(Validation, match="同时填写或同时留空"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="DG",
                 trade_date=D,
@@ -935,7 +943,7 @@ class TestCreateOrderValidation:
 
     def test_commission_terms_reject_unknown_value(self, seeded_db):
         with pytest.raises(Validation, match="commission_mode"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="DG",
                 trade_date=D,
@@ -946,7 +954,7 @@ class TestCreateOrderValidation:
 
     def test_commission_terms_reject_non_dg_order_type(self, seeded_db):
         with pytest.raises(Validation, match="只有 DG 代挂订单"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=D,
@@ -964,7 +972,7 @@ class TestCreateOrderValidation:
             actor="pytest",
         )
 
-        order = order_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="TH",
             trade_date=D,
@@ -977,7 +985,7 @@ class TestCreateOrderValidation:
 
     def test_th_accepts_order_account_snapshot_and_creates_inline_account(self, seeded_db):
         """2026-10-28 口径：account_snapshot 四类业务通用，TH 快照建单即建号。"""
-        order = order_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="TH",
             trade_date=D,
@@ -994,7 +1002,7 @@ class TestCreateOrderValidation:
 
     def test_account_snapshot_rejects_removed_legacy_account_fields(self, seeded_db):
         with pytest.raises(Validation, match="订单账号快照字段校验失败"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=D,
@@ -1007,7 +1015,7 @@ class TestCreateOrderValidation:
 
     def test_account_snapshot_does_not_accept_inventory_media_fields(self, seeded_db):
         with pytest.raises(Validation, match="订单账号快照字段校验失败"):
-            order_service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=D,
@@ -1023,11 +1031,11 @@ class TestCreateOrderValidation:
 class TestGetAndListOrders:
     def test_get_order_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            order_service.get_order(seeded_db, 999999)
+            get_order(seeded_db, 999999)
 
     def test_active_order_can_update_note_before_posting(self, seeded_db):
         order = _order(seeded_db)
-        updated = order_service.update_order(
+        updated = update_order(
             seeded_db, order.id, actor="operator", note="补充客户备注"
         )
         assert updated.note == "补充客户备注"
@@ -1035,14 +1043,14 @@ class TestGetAndListOrders:
     def test_order_trade_date_cannot_be_cleared(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation, match="订单日期不能清空"):
-            order_service.update_order(
+            update_order(
                 seeded_db, order.id, actor="operator", trade_date=None
             )
 
     def test_posted_order_can_shift_trade_date_and_accounting_dates(self, seeded_db):
         """成交日期放开后：有登记事件的订单也能改日期，事件/资金流水按天数差平移。"""
         order = _order(seeded_db, order_type="DG")
-        order_service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="SELL",
@@ -1066,7 +1074,7 @@ class TestGetAndListOrders:
         seeded_db.flush()
         new_date = D + timedelta(days=5)
 
-        updated = order_service.update_order(
+        updated = update_order(
             seeded_db, order.id, actor="operator", trade_date=new_date
         )
         assert updated.trade_date == new_date
@@ -1083,7 +1091,7 @@ class TestGetAndListOrders:
         assert all(f.occurred_on == new_date for f in flows)
 
         # 只改备注不传日期时不触发平移，日期保持新值。
-        unchanged = order_service.update_order(
+        unchanged = update_order(
             seeded_db, order.id, actor="operator", note="仅改备注"
         )
         assert unchanged.note == "仅改备注"
@@ -1091,23 +1099,23 @@ class TestGetAndListOrders:
 
     def test_order_cancel_requires_no_posted_events(self, seeded_db):
         order = _order(seeded_db)
-        cancelled = order_service.cancel_order(
+        cancelled = cancel_order(
             seeded_db, order.id, actor="operator", reason="客户撤单"
         )
         assert cancelled.status == "CANCELLED"
 
         posted = _order(seeded_db)
-        order_service.post_event(
+        post_event(
             seeded_db, posted.id, event_type="BUY", amount=Decimal("100"),
             occurred_on=D, actor="pytest"
         )
         with pytest.raises(Validation, match="登记事件"):
-            order_service.cancel_order(
+            cancel_order(
                 seeded_db, posted.id, actor="operator", reason="不能直接取消"
             )
 
     def test_system_offsale_cancels_dg_order_and_removes_account_from_inventory(self, seeded_db):
-        order = order_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="DG",
             trade_date=D,
@@ -1118,7 +1126,7 @@ class TestGetAndListOrders:
         assert account is not None
         assert account.status == AccountStatus.WAITING.value
 
-        cancelled = order_service.cancel_order(
+        cancelled = cancel_order(
             seeded_db,
             order.id,
             actor="operator",
@@ -1134,12 +1142,12 @@ class TestGetAndListOrders:
         # 他人 owner 的订单对 SELF 作用域用户同样 404（不泄露存在性）
         order = _order(seeded_db, owner_id=1)
         with pytest.raises(NotFound):
-            order_service.get_order(seeded_db, order.id, _scoped_user())
+            get_order(seeded_db, order.id, _scoped_user())
 
     def test_scoped_user_cannot_post_event_to_foreign_order(self, seeded_db):
         order = _order(seeded_db, owner_id=1)
         with pytest.raises(NotFound):
-            order_service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="BUY",
@@ -1159,7 +1167,7 @@ class TestGetAndListOrders:
             pool_ids=frozenset({2}),
         )
         with pytest.raises(NotFound):
-            order_service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="BUY",
@@ -1173,32 +1181,32 @@ class TestGetAndListOrders:
     def test_list_orders_filters_and_scope(self, seeded_db):
         mine = _order(seeded_db, owner_id=9)
         _order(seeded_db, order_type="TH", owner_id=1)
-        order_service.post_event(
+        post_event(
             seeded_db, mine.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="pytest",
         )
 
-        by_type = order_service.list_orders(seeded_db, order_type="HS")
+        by_type = list_orders(seeded_db, order_type="HS")
         assert [o.id for o in by_type] == [mine.id]
-        by_status = order_service.list_orders(seeded_db, status="ACTIVE")
+        by_status = list_orders(seeded_db, status="ACTIVE")
         assert mine.id in [o.id for o in by_status]  # 创建即 ACTIVE，登记不翻转状态
 
-        scoped = order_service.list_orders(seeded_db, user=_scoped_user())
+        scoped = list_orders(seeded_db, user=_scoped_user())
         assert [o.id for o in scoped] == [mine.id]
         # 无 user 不过滤：两张单都可见
-        assert len(order_service.list_orders(seeded_db)) == 2
+        assert len(list_orders(seeded_db)) == 2
 
     def test_list_orders_mine_includes_created_owner_and_sold_orders(self, seeded_db):
-        created_by_me = order_service.create_order(
+        created_by_me = create_order(
             seeded_db, order_type="HS", trade_date=D, actor="operator", owner_id=1,
         )
         owned_by_me = _order(seeded_db, owner_id=9)
         sold_by_me = _order(seeded_db, owner_id=1)
-        order_service.post_event(
+        post_event(
             seeded_db, sold_by_me.id, event_type="BUY", amount="50.00",
             occurred_on=D, actor="pytest",
         )
-        order_service.post_event(
+        post_event(
             seeded_db, sold_by_me.id, event_type="SELL", amount="100.00",
             occurred_on=D, actor="operator",
         )
@@ -1207,7 +1215,7 @@ class TestGetAndListOrders:
         operator = CurrentUser.build(
             id=9, username="operator", roles=["ADMIN"], owner_scope="ALL"
         )
-        personal = order_service.list_orders(seeded_db, user=operator, mine=True)
+        personal = list_orders(seeded_db, user=operator, mine=True)
         personal_ids = {order.id for order in personal}
         assert {created_by_me.id, owned_by_me.id, sold_by_me.id}.issubset(personal_ids)
         assert foreign.id not in personal_ids
@@ -1225,17 +1233,17 @@ class TestGetAndListOrders:
         me, other = users[0], users[1]
 
         buy_by_me = _order(seeded_db, owner_id=other.id)
-        order_service.post_event(
+        post_event(
             seeded_db, buy_by_me.id, event_type="BUY", amount="80.00",
             occurred_on=D, actor=me.username,
         )
         assigned_as_operator = _order(seeded_db, owner_id=other.id)
-        order_service.post_event(
+        post_event(
             seeded_db, assigned_as_operator.id, event_type="BUY", amount="90.00",
             occurred_on=D, actor="pytest", operator_user_ids=[me.id],
         )
         foreign = _order(seeded_db, owner_id=other.id)
-        order_service.post_event(
+        post_event(
             seeded_db, foreign.id, event_type="BUY", amount="70.00",
             occurred_on=D, actor="pytest",
         )
@@ -1244,7 +1252,7 @@ class TestGetAndListOrders:
             id=me.id, username=me.username, roles=["OPERATOR"], owner_scope="ALL"
         )
         personal_ids = {
-            order.id for order in order_service.list_orders(seeded_db, user=operator, mine=True)
+            order.id for order in list_orders(seeded_db, user=operator, mine=True)
         }
         assert buy_by_me.id in personal_ids
         assert assigned_as_operator.id in personal_ids
@@ -1320,7 +1328,7 @@ class TestPostEventValidation:
         order = _order(seeded_db)
 
         with pytest.raises(Validation, match="portion"):
-            order_service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="BUY",
@@ -1337,7 +1345,7 @@ class TestPostEventValidation:
     def test_invalid_event_type_rejected(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation) as exc:
-            order_service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="BOGUS", amount="1.00",
                 occurred_on=D, actor="pytest",
             )
@@ -1347,7 +1355,7 @@ class TestPostEventValidation:
         """划转已从 EventType 移除：不再是「可枚举但不可登记」，而是非法事件类型。"""
         order = _order(seeded_db)
         with pytest.raises(Validation) as exc:
-            order_service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="TRANSFER", amount="1.00",
                 occurred_on=D, actor="pytest",
             )
@@ -1356,13 +1364,13 @@ class TestPostEventValidation:
     def test_deliver_requires_note(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation) as exc:
-            order_service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="DELIVER",
                 occurred_on=D, actor="pytest", delivery_mode="CUSTOMER_SELF",
             )
         assert "凭证" in str(exc.value)
         with pytest.raises(Validation, match="凭证"):
-            order_service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="DELIVER",
                 occurred_on=D, actor="pytest", delivery_mode="CUSTOMER_SELF",
                 note=123,
@@ -1371,7 +1379,7 @@ class TestPostEventValidation:
     def test_post_event_to_inactive_pool_rejected(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(NotFound):
-            order_service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="BUY", amount="1.00",
                 occurred_on=D, actor="pytest", pool_id=999999,
             )
@@ -1386,11 +1394,11 @@ class TestCancelOffsetDirection:
 
         # 分支一：offset 指向 BUY → 方向取反为 IN（每分支独立建单）
         order_a = _order(seeded_db)
-        buy_a, _ = order_service.post_event(
+        buy_a, _ = post_event(
             seeded_db, order_a.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="pytest",
         )
-        cancel_a, _ = order_service.post_event(
+        cancel_a, _ = post_event(
             seeded_db, order_a.id, event_type="CANCEL", amount="100.00",
             occurred_on=D, actor="pytest", offset_event_id=buy_a.id,
             reason="撤回全部买入款",
@@ -1399,15 +1407,15 @@ class TestCancelOffsetDirection:
 
         # 分支二：offset 指向 SELL → 方向取反为 OUT
         order_b = _order(seeded_db, order_type="TH")
-        buy_event, _ = order_service.post_event(
+        buy_event, _ = post_event(
             seeded_db, order_b.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="pytest",
         )
-        sell_event, _ = order_service.post_event(
+        sell_event, _ = post_event(
             seeded_db, order_b.id, event_type="SELL", amount="150.00",
             occurred_on=D, actor="pytest", offset_event_id=buy_event.id,
         )
-        cancel_b, _ = order_service.post_event(
+        cancel_b, _ = post_event(
             seeded_db, order_b.id, event_type="CANCEL", amount="10.00",
             occurred_on=D, actor="pytest", offset_event_id=sell_event.id,
             reason="买家部分退款",
@@ -1416,7 +1424,7 @@ class TestCancelOffsetDirection:
         # 分支三：offset 指向不存在的事件 → NotFound。FK 全局强制使经 post_event
         # 不可达（INSERT order_events 即失败，校验在 flush 之后），直调私有函数覆盖
         with pytest.raises(NotFound):
-            order_service._opposite_direction(999999, seeded_db)
+            _opposite_direction(999999, seeded_db)
 
         flows = {
             row.id: row
@@ -1427,30 +1435,30 @@ class TestCancelOffsetDirection:
 
     def test_cancel_requires_reason_and_th_offset(self, seeded_db):
         hs = _order(seeded_db)
-        _hs_buy, _ = order_service.post_event(
+        _hs_buy, _ = post_event(
             seeded_db, hs.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="pytest",
         )
         with pytest.raises(Validation) as missing_reason:
-            order_service.post_event(
+            post_event(
                 seeded_db, hs.id, event_type="CANCEL", amount="10.00",
                 occurred_on=D, actor="pytest",
             )
         assert "原因" in str(missing_reason.value)
 
         with pytest.raises(Validation, match="offset_event_id"):
-            order_service.post_event(
+            post_event(
                 seeded_db, hs.id, event_type="CANCEL", amount="10.00",
                 occurred_on=D, actor="pytest", reason="回收退回",
             )
 
         th = _order(seeded_db, order_type="TH")
-        order_service.post_event(
+        post_event(
             seeded_db, th.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="pytest",
         )
         with pytest.raises(Validation) as missing_offset:
-            order_service.post_event(
+            post_event(
                 seeded_db, th.id, event_type="CANCEL", amount="10.00",
                 occurred_on=D, actor="pytest", reason="同行未付成功",
             )
@@ -1459,43 +1467,43 @@ class TestCancelOffsetDirection:
     def test_cancel_reasons_require_text_values(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Validation, match="取消必须填写原因"):
-            order_service.cancel_order(
+            cancel_order(
                 seeded_db, order.id, actor="pytest", reason=123
             )
 
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="pytest",
         )
         with pytest.raises(Validation, match="CANCEL 必须填写冲销原因"):
-            order_service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="CANCEL", amount="10.00",
                 occurred_on=D, actor="pytest", reason=123,
             )
 
     def test_cancel_cannot_exceed_offset_remaining_or_change_pool(self, seeded_db):
         order = _order(seeded_db, order_type="TH")
-        buy, _ = order_service.post_event(
+        buy, _ = post_event(
             seeded_db, order.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="pytest", pool_id=1,
         )
 
         with pytest.raises(Validation) as wrong_pool:
-            order_service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="CANCEL", amount="10.00",
                 occurred_on=D, actor="pytest", offset_event_id=buy.id,
                 pool_id=2, reason="资金池更正",
             )
         assert "资金池" in str(wrong_pool.value)
 
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="CANCEL", amount="60.00",
             occurred_on=D, actor="pytest", offset_event_id=buy.id,
             reason="部分退款",
         )
         assert order.status == OrderStatus.ACTIVE.value
         with pytest.raises(Validation) as over_cancel:
-            order_service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="CANCEL", amount="50.00",
                 occurred_on=D, actor="pytest", offset_event_id=buy.id,
                 reason="再次退款",
@@ -1505,7 +1513,7 @@ class TestCancelOffsetDirection:
     def test_cancel_offset_must_belong_to_the_same_order(self, seeded_db):
         first = _order(seeded_db)
         second = _order(seeded_db, order_type="TH")
-        buy_event, _ = order_service.post_event(
+        buy_event, _ = post_event(
             seeded_db,
             second.id,
             event_type="BUY",
@@ -1513,7 +1521,7 @@ class TestCancelOffsetDirection:
             occurred_on=D,
             actor="pytest",
         )
-        order_event, _ = order_service.post_event(
+        order_event, _ = post_event(
             seeded_db,
             second.id,
             event_type="SELL",
@@ -1524,7 +1532,7 @@ class TestCancelOffsetDirection:
         )
 
         with pytest.raises(Validation) as exc:
-            order_service.post_event(
+            post_event(
                 seeded_db,
                 first.id,
                 event_type="CANCEL",
@@ -1553,7 +1561,7 @@ class TestAccountEffect:
         seeded_db.flush()
         order = _order(seeded_db, account_id=account.id)
 
-        order_service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -1576,14 +1584,14 @@ class TestAccountEffect:
         seeded_db.add(account)
         seeded_db.flush()
         order = _order(seeded_db, account_id=account.id)
-        buy, _ = order_service.post_event(
+        buy, _ = post_event(
             seeded_db, order.id, event_type="BUY", amount="500.00",
             occurred_on=D, actor="pytest",
         )
         assert account.cost_amount == 500
         assert account.status == AccountStatus.WAITING.value
 
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="CANCEL", amount="500.00",
             occurred_on=D, actor="pytest", offset_event_id=buy.id,
             reason="回收退回",
@@ -1603,12 +1611,12 @@ class TestAccountEffect:
         seeded_db.add(account)
         seeded_db.flush()
         order = _order(seeded_db, account_id=account.id)
-        buy, _ = order_service.post_event(
+        buy, _ = post_event(
             seeded_db, order.id, event_type="BUY", amount="500.00",
             occurred_on=D, actor="pytest",
         )
 
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="CANCEL", amount="100.00",
             occurred_on=D, actor="pytest", offset_event_id=buy.id,
             reason="部分退回",
@@ -1629,17 +1637,17 @@ class TestAccountEffect:
         seeded_db.add(account)
         seeded_db.flush()
         order = _order(seeded_db, order_type="HS", account_id=account.id)
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount="500.00",
             occurred_on=D, actor="pytest",
         )
-        sell, _ = order_service.post_event(
+        sell, _ = post_event(
             seeded_db, order.id, event_type="SELL", amount="800.00",
             occurred_on=D, actor="pytest",
         )
         assert account.status == AccountStatus.SOLD.value
 
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="CANCEL", amount="800.00",
             occurred_on=D, actor="pytest", offset_event_id=sell.id,
             reason="售出撤销",
@@ -1660,16 +1668,16 @@ class TestAccountEffect:
         seeded_db.add(account)
         seeded_db.flush()
         order = _order(seeded_db, order_type="TH", account_id=account.id)
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount="1.00",
             occurred_on=D, actor="pytest", pool_id=1,
         )
-        sell, _ = order_service.post_event(
+        sell, _ = post_event(
             seeded_db, order.id, event_type="SELL", amount="800.00",
             occurred_on=D, actor="pytest", pool_id=2,
         )
 
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="CANCEL", amount="800.00",
             occurred_on=D, actor="pytest", offset_event_id=sell.id,
             reason="提号售出撤销",
@@ -1680,7 +1688,7 @@ class TestAccountEffect:
     def test_removed_payment_event_is_rejected(self, seeded_db):
         order = _order(seeded_db, order_type="TH")
         with pytest.raises(Validation, match="事件类型必须为"):
-            order_service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="PAYMENT",
@@ -1701,7 +1709,7 @@ class TestAccountEffect:
             created_by="pytest",
             updated_by="pytest",
         )
-        assert order_service._apply_account_effect(
+        assert _apply_account_effect(
             seeded_db, ghost, "BUY", Decimal("100")
         ) is None
 
@@ -1717,11 +1725,11 @@ class TestPoolBalance:
         )
 
         with pytest.raises(NotFound):
-            order_service.pool_balance(seeded_db, 2, user=scoped)
+            pool_balance(seeded_db, 2, user=scoped)
 
     def test_pool_balance_notfound(self, seeded_db):
         with pytest.raises(NotFound):
-            order_service.pool_balance(seeded_db, 999999)
+            pool_balance(seeded_db, 999999)
 
 # ------------------------------------------------------------------ 路由层
 class TestOrdersApi:
@@ -1937,7 +1945,7 @@ class TestOrdersApi:
 
     def test_list_and_get_endpoints(self, seeded_client, seeded_db, headers):
         order = _order(seeded_db)
-        order_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="pytest",
         )
@@ -1962,7 +1970,7 @@ class TestOrdersApi:
         self, seeded_client, seeded_db, headers
     ):
         order = _order(seeded_db)
-        order_service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -1990,7 +1998,7 @@ class TestOrdersApi:
             actor="pytest",
             request_id=request_id,
         )
-        order_service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -1998,7 +2006,7 @@ class TestOrdersApi:
             occurred_on=D,
             actor="pytest",
         )
-        rebate = finance_service.create_rebate(
+        rebate = create_rebate(
             seeded_db,
             source_order_id=order.id,
             rebate_type="BUY",

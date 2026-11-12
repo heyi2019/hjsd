@@ -18,7 +18,7 @@ from decimal import Decimal
 
 from app.finance.cashflows import list_cashflows
 from app.orders import events
-from app.orders import service as orders_service
+from app.orders.create import create_order
 
 TODAY = date(2026, 10, 17)
 
@@ -29,7 +29,7 @@ def test_duplicate_buy_posts_duplicate_cashflows(seeded_db):
     业务含义：网关/webhook 重试、前端重复提交都会触发重复记账。
     当前实现无幂等键，这是资金域最高优先级待修复项之一。
     """
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
     )
     events.post_event(

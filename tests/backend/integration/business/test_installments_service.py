@@ -50,7 +50,8 @@ from app.domain.enums import (
 )
 from app.domain.trade import Cashflow, InstallmentSchedule, OrderEvent
 from app.value_added_services import service as installment_service
-from app.orders import service as orders_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 
 TODAY = date(2026, 10, 12)
 FUTURE = date(2026, 11, 30)
@@ -74,7 +75,7 @@ def _account(
     )
 
 def _order(seeded_db, *, order_type="TH", account_id=None, trade_date=TODAY):
-    return orders_service.create_order(
+    return create_order(
         seeded_db,
         order_type=order_type,
         trade_date=trade_date,
@@ -83,7 +84,7 @@ def _order(seeded_db, *, order_type="TH", account_id=None, trade_date=TODAY):
     )
 
 def _buy(seeded_db, order_id: int, amount="800"):
-    orders_service.post_event(
+    post_event(
         seeded_db,
         order_id,
         event_type="BUY",
@@ -126,7 +127,7 @@ def test_installment_sale_posts_sell_attribute_without_sale_cashflow(seeded_db):
     order = _order(seeded_db, order_type="HS", account_id=account.id)
     _buy(seeded_db, order.id)
 
-    event, flow = orders_service.post_event(
+    event, flow = post_event(
         seeded_db,
         order.id,
         event_type=EventType.SELL.value,

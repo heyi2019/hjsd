@@ -8,14 +8,15 @@ from sqlalchemy import select
 
 from app.domain.trade import Cashflow
 from app.orders import events
-from app.orders import service as orders_service
+from app.orders.create import create_order
+from app.orders.events import _opposite_direction, post_event
 
 
 TODAY = date(2026, 10, 17)
 
 
 def test_events_module_posts_event_without_using_facade(seeded_db):
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="TH",
         trade_date=TODAY,
@@ -38,12 +39,12 @@ def test_events_module_posts_event_without_using_facade(seeded_db):
 
 
 def test_order_facade_re_exports_event_service():
-    assert orders_service.post_event is events.post_event
-    assert orders_service._opposite_direction is events._opposite_direction
+    assert post_event is events.post_event
+    assert _opposite_direction is events._opposite_direction
 
 
 def test_operate_event_records_business_action_without_cashflow(seeded_db):
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="TH",
         trade_date=TODAY,
@@ -69,7 +70,7 @@ def test_operate_event_records_business_action_without_cashflow(seeded_db):
 
 
 def test_profit_share_event_records_out_cashflow(seeded_db):
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="TH",
         trade_date=TODAY,

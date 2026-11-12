@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -26,7 +26,7 @@ from app.domain.enums import (
 )
 from app.domain.trade import Cashflow, Deposit
 from app.foundation import service as foundation_service
-from app.orders import service as orders_service
+from app.orders._shared import get_order
 from app.orders.form_fields import validate_form_extra
 from app.parties import service as parties_service
 
@@ -55,7 +55,7 @@ def create_deposit(
         parties_service.assert_counterparty_usable(session, counterparty_id)
     if source_order_id is not None:
         try:
-            orders_service.get_order(session, source_order_id, user)
+            get_order(session, source_order_id, user)
         except NotFound as exc:
             raise NotFound(
                 f"来源订单 {source_order_id} 不存在",
@@ -364,3 +364,22 @@ def list_deposits(
     elif user is not None and not (user.is_admin or user.owner_scope == "ALL"):
         stmt = stmt.where(Deposit.pool_id.in_(sorted(user.pool_ids)))
     return list(session.scalars(stmt.order_by(Deposit.id)).all())
+
+
+def deposit_held_total(
+    session: Session, pool_id: int | None = None
+) -> Decimal:
+    """在押押金合计 = Σ(实缴 − 已退 − 已损失)，可按池过滤。
+
+    与 `PoolBalanceOut.deposit_held` 信息列同源；占用已进资金池 OUT，
+    此值仅作台账展示，不参与可用余额二次扣减。
+    """
+    stmt = select(
+        func.coalesce(
+            func.sum(Deposit.paid_amount - Deposit.returned_amount - Deposit.lost_amount),
+            0,
+        )
+    )
+    if pool_id:
+        stmt = stmt.where(Deposit.pool_id == pool_id)
+    return to_money(session.scalar(stmt) or 0)

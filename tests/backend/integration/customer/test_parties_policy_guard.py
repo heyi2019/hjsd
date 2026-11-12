@@ -19,7 +19,7 @@ from app.domain.parties import (
 )
 from app.domain.trade import Order, OrderEvent
 from app.domain.users import User
-from app.orders import service as order_service
+from app.orders.create import create_order
 from app.parties import service as parties_service
 from app.policy import service as policy_service
 
@@ -60,7 +60,7 @@ def _scoped_user(user: User) -> CurrentUser:
 
 
 def _order(session):
-    return order_service.create_order(
+    return create_order(
         session, order_type="HS", trade_date=date.today(), actor="pytest"
     )
 

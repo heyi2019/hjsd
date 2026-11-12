@@ -103,7 +103,7 @@ def post_event(
     allow_installment_delivery: bool = False,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
-    from .service import _create_inline_inventory_account, get_order
+    from ._shared import _create_inline_inventory_account, get_order
 
     allow_installment_delivery = _required_bool(
         allow_installment_delivery, field="allow_installment_delivery"

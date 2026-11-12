@@ -16,7 +16,7 @@ from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import PolicyScopeType, PolicyStatus
 from app.domain.parties import PolicyDefinition
-from app.orders import service as order_service
+from app.orders.create import create_order
 from app.policy import service as policy_service
 
 D = date(2026, 10, 4)
@@ -266,7 +266,7 @@ class TestPolicyVersions:
 class TestSnapshotAndAllocations:
     def test_snapshot_for_order_with_and_without_policy(self, seeded_db):
         # 无生效规则的订单：快照为 None
-        plain = order_service.create_order(
+        plain = create_order(
             seeded_db, order_type="HS", trade_date=D, actor="pytest"
         )
         assert policy_service.snapshot_for(seeded_db, plain.id) is None
@@ -274,7 +274,7 @@ class TestSnapshotAndAllocations:
         # 发布 REBATE 规则后再建单：快照固化
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1))
-        snapshotted = order_service.create_order(
+        snapshotted = create_order(
             seeded_db, order_type="HS", trade_date=D, actor="pytest"
         )
         snapshot = policy_service.snapshot_for(seeded_db, snapshotted.id)
@@ -289,7 +289,7 @@ class TestSnapshotAndAllocations:
                 items=[{"user_id": 1, "role": "SALES", "allocation_rate": 100}],
                 actor="pytest",
             )
-        order = order_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=D, actor="pytest"
         )
         with pytest.raises(Validation) as exc:
@@ -340,7 +340,7 @@ class TestPolicyApi:
         assert patched.status_code in (400, 422), patched.text
 
     def test_profit_allocations_endpoints(self, seeded_client, seeded_db, json_headers):
-        order = order_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=D, actor="pytest"
         )
         put = seeded_client.put(
@@ -373,7 +373,7 @@ class TestPolicyApi:
     def test_policy_snapshot_endpoint(self, seeded_client, seeded_db, json_headers):
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1))
-        order = order_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=D, actor="pytest"
         )
         found = seeded_client.get(
@@ -384,7 +384,7 @@ class TestPolicyApi:
         assert found.json()["snapshot"]["policy_snapshot"]
 
         # 无快照订单：found=False
-        plain = order_service.create_order(
+        plain = create_order(
             seeded_db, order_type="TH", trade_date=date(2025, 1, 1), actor="pytest"
         )
         none = seeded_client.get(
@@ -397,7 +397,7 @@ class TestPolicyApi:
     def test_scoped_user_cannot_read_foreign_order_policy_data(
         self, seeded_client, seeded_db
     ):
-        foreign = order_service.create_order(
+        foreign = create_order(
             seeded_db,
             order_type="HS",
             trade_date=D,

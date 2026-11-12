@@ -18,7 +18,8 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.foundation import Pool
-from app.orders import service as orders_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.stocks import service
 
 TODAY = date(2026, 10, 4)
@@ -38,10 +39,10 @@ def _account(seeded_db, game_account: str):
 def _buy(seeded_db, account, *, amount: str):
     pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
     assert pool is not None
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
     )
-    event, _flow = orders_service.post_event(
+    event, _flow = post_event(
         seeded_db,
         order.id,
         event_type="BUY",
@@ -54,7 +55,7 @@ def _buy(seeded_db, account, *, amount: str):
 
 
 def _cancel(seeded_db, order, *, offset_event_id: int, amount: str):
-    event, _flow = orders_service.post_event(
+    event, _flow = post_event(
         seeded_db,
         order.id,
         event_type="CANCEL",

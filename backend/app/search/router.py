@@ -18,8 +18,8 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.finance import service as finance_service
-from app.orders import service as orders_service
+from app.finance.rebates import list_rebates
+from app.orders.queries import list_orders
 from app.parties import service as parties_service
 
 router = APIRouter(tags=["SYS-01 通用能力"])
@@ -63,7 +63,7 @@ def global_search(
         raise Validation("搜索关键词不能为空", details={"field": "q"})
 
     results: list[SearchResult] = []
-    for order in orders_service.list_orders(db, user=user):
+    for order in list_orders(db, user=user):
         if _matches(order.order_no, query):
             results.append(
                 SearchResult(
@@ -129,7 +129,7 @@ def global_search(
                 )
 
     if user.has(PERM_FINANCE_READ):
-        for rebate in finance_service.list_rebates(db, user=user):
+        for rebate in list_rebates(db, user=user):
             if any(
                 _matches(value, query)
                 for value in (rebate.rebate_no, rebate.channel)

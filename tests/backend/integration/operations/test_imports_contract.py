@@ -153,10 +153,10 @@ class TestAssignMappingGuards:
             )
 
     def test_imported_row_cannot_be_remapped(self, seeded_db):
-        from app.orders import service as orders_service
+        from app.orders.create import create_order
         from datetime import date
 
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest"
         )
         batch = _batch(seeded_db)
@@ -231,9 +231,9 @@ class TestSkipRow:
     def test_imported_row_cannot_be_skipped_and_skip_is_audited(self, seeded_db):
         from datetime import date
 
-        from app.orders import service as orders_service
+        from app.orders.create import create_order
 
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest"
         )
         batch = _batch(seeded_db, rows=[{"订单号": order.order_no}])
@@ -289,10 +289,10 @@ class TestCommitGuards:
             service.commit_batch(seeded_db, batch["id"], actor="pytest")
 
     def test_skipped_rows_are_not_imported(self, seeded_db):
-        from app.orders import service as orders_service
+        from app.orders.create import create_order
         from datetime import date
 
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest"
         )
         batch = _batch(seeded_db)

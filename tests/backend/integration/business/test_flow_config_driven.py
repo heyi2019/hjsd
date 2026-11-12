@@ -14,7 +14,7 @@ from datetime import date
 import pytest
 
 from app.core.errors import Validation
-from app.orders import service as orders_service
+from app.orders.create import create_order
 from app.orders.form_field_admin import (
     create_order_form_field,
     update_order_form_field,
@@ -25,7 +25,7 @@ TODAY = date(2026, 10, 8)
 
 def _hs_order(seeded_db, *, game_account, with_field=None):
     form_extra = {"extra_flow_e_memo": with_field} if with_field is not None else None
-    return orders_service.create_order(
+    return create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
         account_snapshot={"game_account": game_account, "game_type": "王者荣耀"},
         form_extra=form_extra,

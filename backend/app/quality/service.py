@@ -37,7 +37,7 @@ from app.domain.trade import (
 )
 from app.domain.quality import QualityIssue
 from app.foundation import service as foundation_service
-from app.orders import service as orders_service
+from app.orders.pools import pool_balances
 
 from .issues import (
     batch_close_issues,
@@ -250,7 +250,7 @@ def scan(session: Session, *, user: CurrentUser | None = None) -> list[dict[str,
         if user is None or user.can_see_pool(pool.id)
     ]
     balances = (
-        orders_service.pool_balances(session, [pool.id for pool in pools], user=user)
+        pool_balances(session, [pool.id for pool in pools], user=user)
         if pools
         else {}
     )

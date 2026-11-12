@@ -13,7 +13,8 @@ from app.core.security import CurrentUser
 from app.finance import rebates
 from app.finance import cashflows
 from app.finance.rebates import _rebate_rate_from_snapshot
-from app.orders import service as orders_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.domain.trade import Cashflow, OrderEvent
 
 
@@ -57,14 +58,14 @@ def _order_with_buy(seeded_db, order_type: str = "HS") -> int:
         inventory_type=inventory_type,
         actor="pytest",
     )
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db,
         order_type=order_type,
         trade_date=TODAY,
         actor="pytest",
         account_id=account.id,
     )
-    orders_service.post_event(
+    post_event(
         seeded_db,
         order.id,
         event_type="BUY",
@@ -85,7 +86,7 @@ def _order_with_sell(seeded_db, order_type: str = "DG") -> int:
         inventory_type=inventory_type,
         actor="pytest",
     )
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db,
         order_type=order_type,
         trade_date=TODAY,
@@ -94,11 +95,11 @@ def _order_with_sell(seeded_db, order_type: str = "DG") -> int:
     )
     if order_type == "HS":
         # 回收单 SELL 前必须有采购入库（BUY）事件。
-        orders_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY",
             amount=Decimal("1000"), occurred_on=TODAY, actor="pytest", pool_id=1,
         )
-    orders_service.post_event(
+    post_event(
         seeded_db,
         order.id,
         event_type="SELL",

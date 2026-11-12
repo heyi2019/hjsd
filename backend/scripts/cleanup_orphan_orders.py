@@ -32,7 +32,7 @@ from sqlalchemy import select  # noqa: E402
 
 from app.core.database import get_session_factory  # noqa: E402
 from app.domain.trade import Order, OrderEvent  # noqa: E402
-from app.orders import service as orders_service  # noqa: E402
+from app.orders.cancellation_model import cancel_order  # noqa: E402
 
 REASON = "售出登记失败的孤儿订单，批量清理取消"
 
@@ -82,7 +82,7 @@ def main() -> int:
     done = failed = 0
     for order in orphans:
         try:
-            orders_service.cancel_order(session, order.id, actor="cleanup", reason=REASON)
+            cancel_order(session, order.id, actor="cleanup", reason=REASON)
             session.commit()
             done += 1
             print(f"  已取消 #{order.id} {order.order_no}")

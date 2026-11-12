@@ -26,7 +26,8 @@ from app.domain.trade import (
     Order,
     OrderEvent,
 )
-from app.orders import service as orders_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.stocks import service as stocks_service
 
 D = date(2026, 10, 20)
@@ -40,10 +41,10 @@ def _account_with_order(seeded_db, name: str = "delete-target") -> tuple[int, in
         inventory_type="RECOVERY",
         actor="pytest",
     )
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=D, actor="pytest", account_id=account.id
     )
-    orders_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=D, actor="pytest",
     )

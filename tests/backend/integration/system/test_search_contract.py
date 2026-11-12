@@ -5,7 +5,7 @@ from datetime import date
 
 from app.stocks import service as stocks_service
 from app.core.security import CurrentUser, build_access_token
-from app.orders import service as orders_service
+from app.orders.create import create_order
 from app.parties import service as parties_service
 
 
@@ -31,7 +31,7 @@ def test_global_search_covers_order_inventory_customer_and_counterparty(
         inventory_type="RECOVERY",
         actor="pytest",
     )
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=date(2026, 10, 17),

@@ -11,7 +11,7 @@ from typing import Any
 from app.core.audit import record_audit
 from app.core.security import CurrentUser
 from app.core.security import owner_scope_filter
-from app.orders import service as orders_service
+from app.orders.events import post_event
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import (
@@ -255,7 +255,7 @@ def deliver(
             details={"field": "note"},
         )
 
-    orders_service.post_event(
+    post_event(
         session,
         installment.order_id,
         event_type=EventType.DELIVER.value,

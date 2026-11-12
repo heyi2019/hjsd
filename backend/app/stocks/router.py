@@ -41,7 +41,7 @@ from app.domain.trade import (
 )
 from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, PermissionDenied, Validation
-from app.orders import service as orders_service
+from app.orders._shared import get_order
 from app.orders.amounts import is_deposit_loss_flow, order_profit_flow_by_order
 # 复用订单台账「成交日期」的账期平移口径（事件/流水 occurred_on + 规则快照重取）。
 from app.orders.mutations import _shift_accounting_dates
@@ -129,7 +129,7 @@ def update_execution_detail(
     cost_delta = Decimal("0")
     for item in payload.events:
         event = db.scalar(select(OrderEvent).where(OrderEvent.id == item.id).with_for_update())
-        order = orders_service.get_order(db, event.order_id, user) if event else None
+        order = get_order(db, event.order_id, user) if event else None
         if event is None or order is None or order.account_id != account_id or not event.is_posted:
             raise NotFound("执行记录不存在")
         if Decimal(str(event.amount)) != item.expected_amount:

@@ -13,7 +13,9 @@ import pytest
 from app.core.errors import Validation
 from app.domain.enums import AccountStatus
 from app.domain.trade import Account
-from app.orders import service as order_service
+from app.orders.cancellation_model import cancel_order
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.stocks import inventory as inventory_service
 
 D = date(2026, 11, 1)
@@ -29,7 +31,7 @@ def _inventory_ids(session) -> set[int]:
 
 def test_hs_plain_cancel_voids_inline_account_and_exits_inventory(seeded_db):
     """内联建库的回收单无流水取消后，账号退出库存，不再可被误卖。"""
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=D,
@@ -41,7 +43,7 @@ def test_hs_plain_cancel_voids_inline_account_and_exits_inventory(seeded_db):
     assert (account.status, account.inventory_status) == ("WAITING", "IN_STOCK")
     assert account.id in _inventory_ids(seeded_db)
 
-    order_service.cancel_order(seeded_db, order.id, actor="pytest", reason="客户撤单")
+    cancel_order(seeded_db, order.id, actor="pytest", reason="客户撤单")
     seeded_db.refresh(account)
 
     assert account.status == AccountStatus.VOID.value
@@ -53,16 +55,16 @@ def test_hs_plain_cancel_voids_inline_account_and_exits_inventory(seeded_db):
 
 def test_cancelled_inline_account_allows_same_game_account_rebuy(seeded_db):
     """取消后同一游戏账号可以重新建单，不被「已有未售出库存账号」挡下。"""
-    first = order_service.create_order(
+    first = create_order(
         seeded_db,
         order_type="HS",
         trade_date=D,
         actor="pytest",
         account_snapshot=_snapshot("cancel-then-rebuy"),
     )
-    order_service.cancel_order(seeded_db, first.id, actor="pytest", reason="客户撤单")
+    cancel_order(seeded_db, first.id, actor="pytest", reason="客户撤单")
 
-    second = order_service.create_order(
+    second = create_order(
         seeded_db,
         order_type="HS",
         trade_date=D,
@@ -79,7 +81,7 @@ def test_cancelled_inline_account_allows_same_game_account_rebuy(seeded_db):
 
 def test_referenced_account_keeps_status_on_plain_cancel(seeded_db):
     """引用已有库存账号的单取消后，共享账号保持原状，不被连带作废。"""
-    source = order_service.create_order(
+    source = create_order(
         seeded_db,
         order_type="TH",
         trade_date=D,
@@ -89,14 +91,14 @@ def test_referenced_account_keeps_status_on_plain_cancel(seeded_db):
     account = seeded_db.get(Account, source.account_id)
     assert account.status == AccountStatus.WAITING.value
 
-    borrower = order_service.create_order(
+    borrower = create_order(
         seeded_db,
         order_type="TH",
         trade_date=D,
         actor="pytest",
         account_id=account.id,
     )
-    order_service.cancel_order(seeded_db, borrower.id, actor="pytest", reason="客户撤单")
+    cancel_order(seeded_db, borrower.id, actor="pytest", reason="客户撤单")
     seeded_db.refresh(account)
 
     # 账号仍被回收单引用，取消提号单不应让它退出库存。
@@ -106,7 +108,7 @@ def test_referenced_account_keeps_status_on_plain_cancel(seeded_db):
 
 def test_plain_cancel_with_posted_event_is_blocked_and_account_untouched(seeded_db):
     """有已登记事件时仍拦下要求先冲销，且不擅自改账号状态。"""
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=D,
@@ -114,7 +116,7 @@ def test_plain_cancel_with_posted_event_is_blocked_and_account_untouched(seeded_
         account_snapshot=_snapshot("cancel-with-event"),
     )
     account = seeded_db.get(Account, order.account_id)
-    order_service.post_event(
+    post_event(
         seeded_db,
         order.id,
         event_type="BUY",
@@ -125,7 +127,7 @@ def test_plain_cancel_with_posted_event_is_blocked_and_account_untouched(seeded_
     before = (account.status, account.inventory_status)
 
     with pytest.raises(Validation, match="登记事件"):
-        order_service.cancel_order(seeded_db, order.id, actor="pytest", reason="不能直接取消")
+        cancel_order(seeded_db, order.id, actor="pytest", reason="不能直接取消")
 
     seeded_db.refresh(account)
     assert (account.status, account.inventory_status) == before
@@ -133,7 +135,7 @@ def test_plain_cancel_with_posted_event_is_blocked_and_account_untouched(seeded_
 
 def test_dg_platform_offsale_keeps_account_in_stock(seeded_db):
     """代挂「平台下架」只终止本系统订单，账号仍在平台挂出，不退出库存。"""
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="DG",
         trade_date=D,
@@ -142,7 +144,7 @@ def test_dg_platform_offsale_keeps_account_in_stock(seeded_db):
     )
     account = seeded_db.get(Account, order.account_id)
 
-    order_service.cancel_order(
+    cancel_order(
         seeded_db,
         order.id,
         actor="pytest",

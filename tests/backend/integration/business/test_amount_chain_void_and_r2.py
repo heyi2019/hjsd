@@ -28,15 +28,16 @@ from app.domain.enums import (
 )
 from app.domain.trade import Cashflow, RebateRecord
 from app.finance.cashflows import create_cashflow, reverse_cashflow
-from app.orders import service as order_service
+from app.orders.create import create_order
 from app.orders.amounts import order_amounts, order_profit_flow_by_order
-from app.reporting import service as reporting_service
+from app.reporting.profit import order_profit_detail
+from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 
 D = date(2026, 10, 17)
 
 
 def _bare_order(seeded_db) -> int:
-    order = order_service.create_order(
+    order = create_order(
         seeded_db, order_type="TH", owner_id=1, trade_date=D, actor="pytest"
     )
     return order.id
@@ -110,7 +111,7 @@ def test_profit_detail_rebate_column_excludes_void(seeded_db):
     _add_rebate(seeded_db, order_id, "100", RebateStatus.SETTLED.value)
     _add_rebate(seeded_db, order_id, "300", RebateStatus.VOID.value)
 
-    detail = reporting_service.order_profit_detail(seeded_db)
+    detail = order_profit_detail(seeded_db)
     item = next(row for row in detail["items"] if row["order_id"] == order_id)
     assert item["rebate"] == Decimal("100.00")
     assert item["income"] == Decimal("100.00")
@@ -124,7 +125,7 @@ def test_r2_reversal_of_business_income_not_counted_as_operating(seeded_db):
     原经营收入（IN/BUSINESS_IN 独立流水）+ 其冲销（反向 OUT，accounting=REVERSAL），
     两者都不属于 OPERATING_EXPENSE/OPERATING_COST 类；R2 运营费用应保持 0。
     """
-    start = reporting_service.r2_monthly_pnl(seeded_db)
+    start = r2_monthly_pnl(seeded_db)
     before = next((r for r in start["items"] if r["month"] == "2026-10"), None)
     before_op = before["operating_expense"] if before else Decimal("0.00")
 
@@ -137,7 +138,7 @@ def test_r2_reversal_of_business_income_not_counted_as_operating(seeded_db):
         seeded_db, income.id, reversed_on=D, actor="pytest", reason="误收冲销",
     )
 
-    after = reporting_service.r2_monthly_pnl(seeded_db)
+    after = r2_monthly_pnl(seeded_db)
     oct_item = next((r for r in after["items"] if r["month"] == "2026-10"), None)
     after_op = oct_item["operating_expense"] if oct_item else Decimal("0.00")
     assert after_op == before_op, (
@@ -149,7 +150,7 @@ def test_r2_reversal_of_business_income_not_counted_as_operating(seeded_db):
 def test_r2_order_linked_operating_expense_not_double_counted(seeded_db):
     """挂订单的运营费用流水只进订单支出大类（R2 直接成本），不在运营费用重复计。"""
     order_id = _bare_order(seeded_db)
-    start = reporting_service.r2_monthly_pnl(seeded_db)
+    start = r2_monthly_pnl(seeded_db)
     before = next((r for r in start["items"] if r["month"] == "2026-10"), None)
     before_cost = before["account_direct_cost"] if before else Decimal("0.00")
     before_op = before["operating_expense"] if before else Decimal("0.00")
@@ -160,7 +161,7 @@ def test_r2_order_linked_operating_expense_not_double_counted(seeded_db):
         order_id=order_id,
     )
 
-    after = reporting_service.r2_monthly_pnl(seeded_db)
+    after = r2_monthly_pnl(seeded_db)
     oct_item = next(r for r in after["items"] if r["month"] == "2026-10")
     # 直接成本 +300（挂单支出归该单支出大类），运营费用不变（不重复计）。
     assert oct_item["account_direct_cost"] == before_cost + Decimal("300.00")
@@ -170,7 +171,7 @@ def test_r2_order_linked_operating_expense_not_double_counted(seeded_db):
 # --------------------------------------------------------------- #8 独立运营费仍计运营费用（守卫）
 def test_r2_standalone_operating_expense_still_counted(seeded_db):
     """守卫：不挂订单的独立运营费用仍进运营费用列（order_id is None 不过滤掉）。"""
-    start = reporting_service.r2_monthly_pnl(seeded_db)
+    start = r2_monthly_pnl(seeded_db)
     before = next((r for r in start["items"] if r["month"] == "2026-10"), None)
     before_op = before["operating_expense"] if before else Decimal("0.00")
 
@@ -180,6 +181,6 @@ def test_r2_standalone_operating_expense_still_counted(seeded_db):
         order_id=None,
     )
 
-    after = reporting_service.r2_monthly_pnl(seeded_db)
+    after = r2_monthly_pnl(seeded_db)
     oct_item = next(r for r in after["items"] if r["month"] == "2026-10")
     assert oct_item["operating_expense"] == before_op + Decimal("250.00")

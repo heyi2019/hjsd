@@ -28,21 +28,12 @@ from app.finance.attributes import (
     validate_fund_accounting_attribute,
 )
 from app.foundation import service as foundation_service
-from app.orders import service as orders_service
+from app.orders._shared import get_order
 from app.orders.form_fields import validate_form_extra
 from app.parties import service as parties_service
 
 from ._common import _positive, _text
 
-
-# 兼容层：押金服务迁至 deposits.py，此处保留原路径导出
-from .deposits import (
-    cancel_deposit,
-    create_deposit,
-    list_deposits,
-    lose_deposit,
-    return_deposit,
-)
 
 def _get_cashflow(
     session: Session, cashflow_id: int, user: CurrentUser | None = None
@@ -57,7 +48,7 @@ def _get_cashflow(
             f"资金流水 {cashflow_id} 不存在", details={"cashflow_id": cashflow_id}
         )
     if user is not None and flow.order_id is not None:
-        orders_service.get_order(session, flow.order_id, user)
+        get_order(session, flow.order_id, user)
     return flow
 
 
@@ -129,7 +120,7 @@ def create_cashflow(
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
     pool = foundation_service.assert_pool_usable(session, pool_id)
     if order_id is not None:
-        orders_service.get_order(session, order_id, user)
+        get_order(session, order_id, user)
     if order_event_id is not None:
         from app.domain.trade import OrderEvent
 
@@ -631,14 +622,9 @@ def studio_summary(
 __all__ = [
     "STUDIO_EXPENSE_ATTRIBUTE",
     "STUDIO_INCOME_ATTRIBUTE",
-    "cancel_deposit",
     "cashflow_totals",
     "create_cashflow",
-    "create_deposit",
     "list_cashflows",
-    "list_deposits",
-    "lose_deposit",
-    "return_deposit",
     "reverse_cashflow",
     "studio_summary",
 ]

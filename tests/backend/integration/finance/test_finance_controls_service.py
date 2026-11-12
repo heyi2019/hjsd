@@ -7,7 +7,9 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.foundation import Pool
-from app.finance import reconciliation, service as finance_service, transfers
+from app.finance import reconciliation, transfers
+from app.finance.reconciliation import create_reconciliation
+from app.finance.transfers import create_transfer, repair_transfer
 
 
 TODAY = date(2026, 10, 17)
@@ -44,6 +46,6 @@ def test_transfer_module_creates_symmetric_cashflows(seeded_db):
 
 
 def test_finance_facade_re_exports_control_entries():
-    assert finance_service.create_reconciliation is reconciliation.create_reconciliation
-    assert finance_service.create_transfer is transfers.create_transfer
-    assert finance_service.repair_transfer is transfers.repair_transfer
+    assert create_reconciliation is reconciliation.create_reconciliation
+    assert create_transfer is transfers.create_transfer
+    assert repair_transfer is transfers.repair_transfer

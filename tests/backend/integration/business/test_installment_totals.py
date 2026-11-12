@@ -13,7 +13,8 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from app.orders import service as orders_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.value_added_services import service as installment_service
 
 D1 = date(2026, 9, 1)
@@ -35,16 +36,16 @@ def _contract(seeded_db, *, trade_date: date, paid: str = "0", down: str = "200.
             inventory_type="RECOVERY",
             actor="pytest",
         )
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=trade_date, actor="pytest",
             account_id=account.id,
         )
-        orders_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount="1200.00",
             occurred_on=trade_date, actor="pytest", pool_id=1,
         )
     else:
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="TH", trade_date=trade_date, actor="pytest"
         )
     contract = installment_service.create_installment(

@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
@@ -27,19 +26,14 @@ from sqlalchemy.orm import (
 from app.domain.enums import (
     Direction,
     EventType,
-    InstallmentDispositionAction,
 )
 from app.domain.trade import (
     Cashflow,
-    Installment,
-    InstallmentDisposition,
     Order,
     OrderEvent,
 )
 from app.orders.amounts import (
     business_cashflow_filter,
-    event_contribution as order_event_contribution,
-    event_totals as order_event_totals,
     order_profit_flow_by_order,
 )
 
@@ -72,24 +66,6 @@ def _sum_report_field(items: list[dict[str, Any]], field: str) -> Decimal:
 
 def _money(value: Any) -> Decimal:
     return to_money(value or 0)
-
-
-def _event_contribution(
-    event: OrderEvent, event_types: dict[int, str]
-) -> tuple[Decimal, Decimal, Decimal]:
-    """单个事件的 (income, buy_amount, direct_cost)。
-
-    实现已下沉到 app/orders/amounts.py：报表与规则派生（返点基数 / 分期服务费基数）
-    必须共用同一口径，避免复制后漂移。保留本名以兼容既有测试与内部调用。
-    """
-    return order_event_contribution(event, event_types)
-
-
-def _event_totals(
-    events: list[OrderEvent], *, from_date: date | None = None, to_date: date | None = None
-) -> tuple[Decimal, Decimal, Decimal]:
-    """事件汇总；实现见 app/orders/amounts.py。"""
-    return order_event_totals(events, from_date=from_date, to_date=to_date)
 
 
 def cashflow_totals_by_order(
@@ -156,46 +132,6 @@ def cashflow_totals_by_order(
         row[0] += rebate_income
         row[1] += bad_debt_expense
     return {key: tuple(value) for key, value in totals.items()}
-
-
-def _bad_debt_rows(
-    session: Session,
-    *,
-    user: CurrentUser | None = None,
-) -> list[tuple[int, Decimal, date]]:
-    """Return (order_id, recognized_loss, recognized_on) for recovered contracts."""
-    stmt = (
-        select(
-            Installment.order_id,
-            Installment.bad_debt_amount,
-            InstallmentDisposition.occurred_on,
-        )
-        .join(
-            InstallmentDisposition,
-            InstallmentDisposition.installment_id == Installment.id,
-        )
-        .join(Order, Order.id == Installment.order_id)
-        .where(
-            InstallmentDisposition.action == InstallmentDispositionAction.RECOVER.value,
-            Installment.bad_debt_amount > 0,
-        )
-    )
-    stmt = _apply_order_scope(stmt, user, session)
-    return [
-        (order_id, _money(amount), occurred_on)
-        for order_id, amount, occurred_on in session.execute(stmt).all()
-    ]
-
-
-def _bad_debt_by_order(
-    session: Session,
-    *,
-    user: CurrentUser | None = None,
-) -> dict[int, Decimal]:
-    totals: dict[int, Decimal] = defaultdict(lambda: ZERO)
-    for order_id, amount, _occurred_on in _bad_debt_rows(session, user=user):
-        totals[order_id] += amount
-    return totals
 
 
 def _month_key(value: date) -> str:

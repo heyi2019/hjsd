@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal
 
 from app.orders import events
-from app.orders import service as orders_service
+from app.orders.create import create_order
 from app.reporting.profit import order_profit_detail
 from app.reporting.r5_business_pnl import r5_business_pnl
 
@@ -19,7 +19,7 @@ TODAY = date(2026, 10, 17)
 
 def test_r5_and_order_profit_detail_agree_on_profit(seeded_db):
     # TH 售出单：先 BUY（成本）再 SELL（收入），无返点 / 坏账，口径干净。
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
     )
     events.post_event(

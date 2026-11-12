@@ -11,9 +11,10 @@ from app.stocks import service as account_service
 import pytest
 
 from app.core.money import to_money
-from app.finance import service as finance_service
+from app.finance.deposits import create_deposit, return_deposit
 from app.value_added_services import service as installment_service
-from app.orders import service as order_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.parties import service as party_service
 
 D = date(2026, 10, 4)
@@ -28,7 +29,7 @@ def _order(seeded_db, order_type: str = "HS", **kw):
             actor="hunt",
         )
         kw["account_id"] = account.id
-    return order_service.create_order(
+    return create_order(
         seeded_db, order_type=order_type, trade_date=D, actor="hunt", **kw
     )
 
@@ -50,7 +51,7 @@ class TestMoneyEdge:
     def test_float_never_leaks_binary_tail(self, seeded_db):
         """float 输入先经 str() 再 Decimal：不得出现二进制尾差。"""
         order = _order(seeded_db)
-        event, _flow = order_service.post_event(
+        event, _flow = post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -64,11 +65,11 @@ class TestMoneyEdge:
 class TestOrderStateMachine:
     def test_cannot_post_to_cancelled_order(self, seeded_db):
         order = _order(seeded_db, order_type="TH")
-        buy, _ = order_service.post_event(
+        buy, _ = post_event(
             seeded_db, order.id, event_type="BUY", amount="100.00",
             occurred_on=D, actor="hunt",
         )
-        order_service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="CANCEL",
@@ -79,14 +80,14 @@ class TestOrderStateMachine:
             reason="同行未付成功",
         )
         with pytest.raises(Exception):
-            order_service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="BUY", amount="100", occurred_on=D, actor="hunt"
             )
 
     def test_negative_amount_is_rejected(self, seeded_db):
         order = _order(seeded_db)
         with pytest.raises(Exception):
-            order_service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="BUY",
@@ -99,7 +100,7 @@ class TestOrderStateMachine:
         # 方案 C：提号号价设为选填留空时前端以 0 兜底，BUY 初始买入金额允许为 0。
         # 负数仍被拒绝（见 test_negative_amount_is_rejected）。
         order = _order(seeded_db)
-        event, _ = order_service.post_event(
+        event, _ = post_event(
             seeded_db, order.id, event_type="BUY", amount="0", occurred_on=D, actor="hunt"
         )
         assert event.amount == 0
@@ -107,7 +108,7 @@ class TestOrderStateMachine:
     def test_same_event_cannot_derive_two_cashflows(self, seeded_db):
         """事件→现金流必须一对一：重复登记同一事件不允许。"""
         order = _order(seeded_db)
-        event, flow = order_service.post_event(
+        event, flow = post_event(
             seeded_db, order.id, event_type="BUY", amount="500", occurred_on=D, actor="hunt"
         )
         assert flow is not None
@@ -124,7 +125,7 @@ class TestOrderStateMachine:
         """DELIVER 必须记录 delivery_mode（M2 硬性要求）。"""
         order = _order(seeded_db)
         with pytest.raises(Exception):
-            order_service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="DELIVER",
@@ -151,17 +152,17 @@ class TestPickupSale:
 
     def test_sale_order_sells_without_own_buy(self, seeded_db):
         account = self._pickup_account(seeded_db)
-        stock_in = order_service.create_order(
+        stock_in = create_order(
             seeded_db, order_type="TH", trade_date=D, actor="hunt", account_id=account.id,
         )
-        order_service.post_event(
+        post_event(
             seeded_db, stock_in.id, event_type="BUY", amount="800",
             occurred_on=D, actor="hunt", pool_id=1,
         )
-        sale = order_service.create_order(
+        sale = create_order(
             seeded_db, order_type="TH", trade_date=D, actor="hunt", account_id=account.id,
         )
-        event, flow = order_service.post_event(
+        event, flow = post_event(
             seeded_db, sale.id, event_type="SELL", amount="1200",
             occurred_on=D, actor="hunt", pool_id=1,
         )
@@ -171,11 +172,11 @@ class TestPickupSale:
     def test_sale_rejected_when_account_never_bought(self, seeded_db):
         """账号从未采购入库时，售出仍必须被拦截。"""
         account = self._pickup_account(seeded_db)
-        sale = order_service.create_order(
+        sale = create_order(
             seeded_db, order_type="TH", trade_date=D, actor="hunt", account_id=account.id,
         )
         with pytest.raises(Exception, match="BUY"):
-            order_service.post_event(
+            post_event(
                 seeded_db, sale.id, event_type="SELL", amount="1200",
                 occurred_on=D, actor="hunt", pool_id=1,
             )
@@ -195,7 +196,7 @@ class TestInstallment:
             actor="hunt",
         )
         order = _order(seeded_db, order_type="HS", account_id=account.id)
-        order_service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -232,17 +233,17 @@ class TestInstallment:
 # ------------------------------------------------------------------ 押金 / 返点
 class TestDepositAndRebate:
     def test_release_more_than_held_is_rejected(self, seeded_db):
-        deposit = finance_service.create_deposit(
+        deposit = create_deposit(
             seeded_db, pool_id=1, amount="1000.00", paid_on=D, actor="hunt"
         )
         with pytest.raises(Exception):
-            finance_service.return_deposit(
+            return_deposit(
                 seeded_db, deposit.id, amount="2000.00", released_on=D, actor="hunt"
             )
 
     def test_negative_deposit_is_rejected(self, seeded_db):
         with pytest.raises(Exception):
-            finance_service.create_deposit(
+            create_deposit(
                 seeded_db, pool_id=1, amount="-100", paid_on=D, actor="hunt"
             )
 
@@ -254,7 +255,7 @@ class TestMasterData:
         foundation_service.set_pool_status(seeded_db, 1, "DISABLED", actor="hunt")
         order = _order(seeded_db)
         with pytest.raises(Exception):
-            order_service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="BUY",

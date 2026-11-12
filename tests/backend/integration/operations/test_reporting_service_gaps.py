@@ -5,8 +5,8 @@
 - service.py:92/94/96/100/104  report_for_export 分发到 R1/R2/R3/R5/日报
 - service.py:123   report_csv 空报表时扩展 columns 到 items/total
 - service.py:190   finance_dimension_report 受限用户走池过滤分支
-- service.py:246/248/250  _event_contribution 的 CANCEL 偏移 BUY/COST/未知
-- service.py:262   _event_totals 跳过未过账事件
+- orders/amounts.py  event_contribution 的 CANCEL 偏移 BUY/COST/未知
+- orders/amounts.py  event_totals 跳过未过账事件
 - service.py:454-458  R2 坏账行日期过滤（区内加、区外 continue）
 - service.py:584   R3 坏账计入 per_order_profit
 - service.py:669-675  R5 坏账行日期过滤（区内按 order_type 加成本）
@@ -33,13 +33,16 @@ from app.domain.trade import (
     InstallmentDisposition,
     OrderEvent,
 )
-from app.orders import service as order_service
-from app.reporting import service as reporting_service
-from app.reporting.service import (
+from app.orders.amounts import (
     ZERO,
-    _event_contribution,
-    _event_totals,
+    event_contribution,
+    event_totals,
 )
+from app.orders.create import create_order
+from app.reporting.export import finance_dimension_report, report_csv, report_for_export
+from app.reporting.r2_monthly_pnl import r2_monthly_pnl
+from app.reporting.r3_commission import r3_commission_reconciliation
+from app.reporting.r5_business_pnl import r5_business_pnl
 
 
 def _make_bad_debt(seeded_db, *, occurred_on: date, with_event: bool = False) -> int:
@@ -51,7 +54,7 @@ def _make_bad_debt(seeded_db, *, occurred_on: date, with_event: bool = False) ->
         business_mode="DISTRIBUTION",
         inventory_type="PICKUP",
     )
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="TH",
         trade_date=occurred_on,
@@ -105,7 +108,7 @@ def _make_bad_debt(seeded_db, *, occurred_on: date, with_event: bool = False) ->
 # ----------------------------------------------------------- report_for_export 分发
 def test_report_for_export_unsupported_raises(seeded_db):
     with pytest.raises(Validation):
-        reporting_service.report_for_export(seeded_db, "bogus")  # 87
+        report_for_export(seeded_db, "bogus")  # 87
 
 
 @pytest.mark.parametrize(
@@ -113,14 +116,14 @@ def test_report_for_export_unsupported_raises(seeded_db):
     ["monthly-pnl", "commission", "business-pnl", "daily-funds"],
 )
 def test_report_for_export_dispatches(seeded_db, name):
-    result = reporting_service.report_for_export(seeded_db, name)
+    result = report_for_export(seeded_db, name)
     assert isinstance(result, dict)
     assert "items" in result  # 92/94/96/100/104
 
 
 # ----------------------------------------------------------- report_csv 空列扩展
 def test_report_csv_empty_items_extends_columns():
-    csv_text = reporting_service.report_csv({"items": [], "total": None})
+    csv_text = report_csv({"items": [], "total": None})
     assert csv_text.startswith("\ufeff")
     # 空报表只有 row_type 一列 → 扩展到 items/total（service.py:123）
     assert "items" in csv_text and "total" in csv_text
@@ -136,7 +139,7 @@ def test_finance_dimension_report_scoped_pool_ids(seeded_db):
         owner_scope="SELF",
         pool_ids=frozenset({1}),
     )
-    result = reporting_service.finance_dimension_report(seeded_db, user=user)  # 190
+    result = finance_dimension_report(seeded_db, user=user)  # 190
     assert isinstance(result, dict)
 
 
@@ -153,23 +156,23 @@ class _FakeEvent:
 
 def test_event_contribution_cancel_offset_buy():
     ev = _FakeEvent(EventType.CANCEL.value, 1, Decimal("10"))
-    assert _event_contribution(ev, {1: EventType.BUY.value}) == (
+    assert event_contribution(ev, {1: EventType.BUY.value}) == (
         ZERO,
         -to_money("10"),
         ZERO,
-    )  # 246
+    )
 
 
 def test_event_contribution_cancel_offset_unknown():
     ev = _FakeEvent(EventType.CANCEL.value, 1, Decimal("10"))
-    assert _event_contribution(ev, {}) == (ZERO, ZERO, ZERO)  # 250
+    assert event_contribution(ev, {}) == (ZERO, ZERO, ZERO)
 
 
-# ----------------------------------------------------------- _event_totals 未过账
+# ----------------------------------------------------------- event_totals 未过账
 def test_event_totals_skips_unposted():
     ev = _FakeEvent(EventType.SELL.value, None, Decimal("100"))
     ev.is_posted = False
-    assert _event_totals([ev]) == (ZERO, ZERO, ZERO)  # 262
+    assert event_totals([ev]) == (ZERO, ZERO, ZERO)
 
 
 # ----------------------------------------------------------- R2 坏账日期过滤
@@ -177,7 +180,7 @@ def test_r2_monthly_pnl_bad_debt_date_filters(seeded_db):
     _make_bad_debt(seeded_db, occurred_on=date(2026, 3, 15))  # 区内
     _make_bad_debt(seeded_db, occurred_on=date(2026, 1, 15))  # 区前
     _make_bad_debt(seeded_db, occurred_on=date(2026, 7, 15))  # 区后
-    result = reporting_service.r2_monthly_pnl(
+    result = r2_monthly_pnl(
         seeded_db, from_date=date(2026, 2, 1), to_date=date(2026, 5, 1)
     )
     assert isinstance(result, dict)  # 454-458
@@ -186,7 +189,7 @@ def test_r2_monthly_pnl_bad_debt_date_filters(seeded_db):
 # ----------------------------------------------------------- R3 坏账计入
 def test_r3_commission_includes_bad_debt(seeded_db):
     _make_bad_debt(seeded_db, occurred_on=date(2026, 4, 10))
-    result = reporting_service.r3_commission_reconciliation(seeded_db)
+    result = r3_commission_reconciliation(seeded_db)
     assert isinstance(result, dict)  # 584
 
 
@@ -195,7 +198,7 @@ def test_r5_business_pnl_bad_debt_date_filters(seeded_db):
     _make_bad_debt(seeded_db, occurred_on=date(2026, 3, 15), with_event=True)  # 区内带事件
     _make_bad_debt(seeded_db, occurred_on=date(2026, 1, 15))  # 区前
     _make_bad_debt(seeded_db, occurred_on=date(2026, 7, 15))  # 区后
-    result = reporting_service.r5_business_pnl(
+    result = r5_business_pnl(
         seeded_db, from_date=date(2026, 2, 1), to_date=date(2026, 5, 1)
     )
     assert isinstance(result, dict)  # 669-675

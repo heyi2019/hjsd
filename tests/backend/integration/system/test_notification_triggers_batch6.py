@@ -18,7 +18,8 @@ from app.domain.notifications import Notification
 from app.domain.trade import Account, Order, OrderEvent
 from app.domain.users import User
 from app.notifications import triggers
-from app.orders import service as order_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.policy import service as policy_service
 
 TODAY = date(2026, 10, 4)
@@ -48,7 +49,7 @@ def _account(seeded_db, suffix: str) -> Account:
 
 
 def _order(seeded_db, suffix: str) -> Order:
-    return order_service.create_order(
+    return create_order(
         seeded_db,
         order_type="HS",
         trade_date=TODAY,
@@ -58,7 +59,7 @@ def _order(seeded_db, suffix: str) -> Order:
 
 
 def _buy(seeded_db, order: Order) -> None:
-    order_service.post_event(
+    post_event(
         seeded_db,
         order.id,
         event_type="BUY",
@@ -69,7 +70,7 @@ def _buy(seeded_db, order: Order) -> None:
 
 
 def _sell(seeded_db, order: Order, *, operator_ids=None, actor: str = "seeduser1") -> None:
-    order_service.post_event(
+    post_event(
         seeded_db,
         order.id,
         event_type="SELL",

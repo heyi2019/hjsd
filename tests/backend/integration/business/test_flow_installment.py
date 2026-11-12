@@ -22,7 +22,7 @@ from app.domain.foundation import Pool
 from app.domain.trade import Account, Order
 from app.domain.trade_models.cashflow import Cashflow
 from app.orders import events
-from app.orders import service as orders_service
+from app.orders.create import create_order
 from app.value_added_services.create import create_installment
 from app.value_added_services.recovery import deliver
 from app.value_added_services.repayment import pay
@@ -36,7 +36,7 @@ def _first_active_pool(session) -> Pool:
 
 def test_flow_d_installment_full_lifecycle(seeded_db):
     """BIZ-FLOW-INSTALLMENT-001：分期全链路，状态机 + 资金同源一致。"""
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
         account_snapshot={"game_account": "flow-d-001", "game_type": "王者荣耀"},
     )
@@ -93,7 +93,7 @@ def test_flow_d_installment_full_lifecycle(seeded_db):
 
 def test_flow_d_dg_not_allowed_installment(seeded_db):
     """BIZ-FLOW-INSTALLMENT-002：DG/代挂不允许分期（仅全款），建合约即拒。"""
-    dg = orders_service.create_order(
+    dg = create_order(
         seeded_db, order_type="DG", trade_date=TODAY, actor="pytest",
         account_snapshot={"game_account": "flow-d-dg-001", "game_type": "王者荣耀"},
     )

@@ -20,7 +20,7 @@ from app.domain.enums import (
     PolicyStatus,
 )
 from app.domain.trade import Cashflow, Deposit
-from app.finance import service as finance_service
+from app.finance.deposits import cancel_deposit, create_deposit, return_deposit
 from app.imports import service as imports_service
 from app.policy import service as policy_service
 
@@ -169,7 +169,7 @@ def _make_deposit(seeded_db, *, code: str) -> Deposit:
         name=f"押金取消测试池 {code}",
         actor="pytest",
     )
-    return finance_service.create_deposit(
+    return create_deposit(
         seeded_db,
         pool_id=pool.id,
         amount="300",
@@ -184,7 +184,7 @@ def _make_deposit(seeded_db, *, code: str) -> Deposit:
 
 def test_cancel_paid_deposit_writes_reversal(seeded_db):
     deposit = _make_deposit(seeded_db, code="c1")
-    out = finance_service.cancel_deposit(
+    out = cancel_deposit(
         seeded_db,
         deposit.id,
         cancelled_on=date(2026, 10, 5),
@@ -203,7 +203,7 @@ def test_cancel_paid_deposit_writes_reversal(seeded_db):
 
 def test_cancel_returned_deposit_rejected(seeded_db):
     deposit = _make_deposit(seeded_db, code="c2")
-    finance_service.return_deposit(
+    return_deposit(
         seeded_db,
         deposit.id,
         amount="100",
@@ -214,7 +214,7 @@ def test_cancel_returned_deposit_rejected(seeded_db):
     from app.core.errors import Validation
 
     with pytest.raises(Validation):
-        finance_service.cancel_deposit(
+        cancel_deposit(
             seeded_db,
             deposit.id,
             cancelled_on=date(2026, 10, 5),

@@ -21,9 +21,10 @@ from app.stocks import service as account_service
 from app.core.errors import Validation
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
-from app.orders import service as order_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.policy import service as policy_service
-from app.reporting import service as reporting_service
+from app.reporting.r3_commission import r3_commission_reconciliation
 
 D = date(2026, 10, 17)
 
@@ -37,7 +38,7 @@ def _order_with_profit(seeded_db, *, buy: str = "1000", sell: str = "1500") -> i
         inventory_type="RECOVERY",
         actor="pytest",
     )
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         owner_id=1,
@@ -45,11 +46,11 @@ def _order_with_profit(seeded_db, *, buy: str = "1000", sell: str = "1500") -> i
         actor="pytest",
         account_id=account.id,
     )
-    order_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal(buy),
         occurred_on=D, actor="pytest", pool_id=1,
     )
-    order_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="SELL", amount=Decimal(sell),
         occurred_on=D, actor="pytest", pool_id=1,
     )
@@ -155,7 +156,7 @@ def test_person_mode_amount_cannot_exceed_order_profit(seeded_db):
 
 def test_person_mode_amount_requires_positive_profit(seeded_db):
     """没有过账事件的订单没有利润，按金额分润应显式报错而不是记账 0。"""
-    order = order_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", owner_id=1, trade_date=D, actor="pytest"
     )
 
@@ -243,7 +244,7 @@ def test_commission_report_uses_amount_as_payable_base(seeded_db):
         items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "120"}],
     )
 
-    report = reporting_service.r3_commission_reconciliation(seeded_db)
+    report = r3_commission_reconciliation(seeded_db)
     rows = [row for group in report["groups"] for row in group.get("orders", [])]
 
     assert [row["profit_base"] for row in rows] == [Decimal("120.00")]
@@ -267,7 +268,7 @@ def test_person_mode_allows_negative_amount_on_loss_order(seeded_db):
     assert [row["allocation_amount"] for row in rows] == ["-300.00"]
     assert all(row["allocation_rate"] == "0.00" for row in rows)
 
-    report = reporting_service.r3_commission_reconciliation(seeded_db)
+    report = r3_commission_reconciliation(seeded_db)
     entries = [row for group in report["groups"] for row in group.get("orders", [])]
     assert [row["profit_base"] for row in entries] == [Decimal("-300.00")]
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.orders import service as orders_service
+from app.orders.create import create_order
 from app.parties import service as parties_service
 
 
@@ -44,7 +44,7 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
     assert updated.status_code == 200, updated.text
     assert updated.json()["budget"] == "2500.00"
 
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=date(2026, 10, 17), actor="pytest"
     )
     converted = seeded_client.post(

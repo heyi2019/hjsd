@@ -19,7 +19,7 @@ from app.domain.enums import AccountingAttribute, Direction
 from app.domain.foundation import Pool
 from app.finance.cashflows import create_cashflow, reverse_cashflow
 from app.orders import events
-from app.orders import service as orders_service
+from app.orders.create import create_order
 
 TODAY = date(2026, 10, 17)
 
@@ -88,7 +88,7 @@ def test_reverse_rejects_already_reversed(seeded_db):
 
 def test_reverse_rejects_business_event_flow(seeded_db):
     """业务事件派生流水必须走业务事件冲销，不能用独立冲销入口。"""
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
     )
     _event, flow = events.post_event(

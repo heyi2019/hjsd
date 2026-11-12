@@ -21,9 +21,10 @@ import pytest
 
 from app.stocks import service as account_service
 from app.core.errors import Validation
-from app.finance import service as finance_service
+from app.finance.rebates import create_rebate
 from app.value_added_services import service as installment_service
-from app.orders import service as order_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.policy import service as policy_service
 
 D = date(2026, 10, 17)
@@ -54,7 +55,7 @@ def _order_with_buy(seeded_db, *, game_account: str) -> int:
         inventory_type="RECOVERY",
         actor="pytest",
     )
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         owner_id=1,
@@ -62,7 +63,7 @@ def _order_with_buy(seeded_db, *, game_account: str) -> int:
         actor="pytest",
         account_id=account.id,
     )
-    order_service.post_event(
+    post_event(
         seeded_db,
         order.id,
         event_type="BUY",
@@ -77,7 +78,7 @@ def _order_with_buy(seeded_db, *, game_account: str) -> int:
 # ---------------------------------------------------------------- 返点基数
 def test_rebate_base_derived_from_rule_principal(seeded_db):
     _publish(seeded_db, "REBATE", {"base": "PRINCIPAL", "rate": "5"})
-    record = finance_service.create_rebate(
+    record = create_rebate(
         seeded_db,
         source_order_id=_order_with_buy(seeded_db, game_account="rule-base-principal"),
         rebate_type="BUY",
@@ -93,7 +94,7 @@ def test_rebate_base_gross_without_sell_is_rejected(seeded_db):
     """GROSS 取卖出收入；未卖出时为 0，必须报错而不是静默记 0 元返点。"""
     _publish(seeded_db, "REBATE", {"base": "GROSS", "rate": "5"})
     with pytest.raises(Validation):
-        finance_service.create_rebate(
+        create_rebate(
             seeded_db,
             source_order_id=_order_with_buy(seeded_db, game_account="rule-base-gross"),
             rebate_type="BUY",
@@ -105,7 +106,7 @@ def test_rebate_base_gross_without_sell_is_rejected(seeded_db):
 def test_rebate_base_requires_explicit_or_rule_when_no_base_configured(seeded_db):
     _publish(seeded_db, "REBATE", {"rate": "5"})
     with pytest.raises(Validation):
-        finance_service.create_rebate(
+        create_rebate(
             seeded_db,
             source_order_id=_order_with_buy(seeded_db, game_account="rule-base-none"),
             rebate_type="BUY",
@@ -116,7 +117,7 @@ def test_rebate_base_requires_explicit_or_rule_when_no_base_configured(seeded_db
 
 def test_explicit_rebate_base_wins_over_rule(seeded_db):
     _publish(seeded_db, "REBATE", {"base": "PRINCIPAL", "rate": "5"})
-    record = finance_service.create_rebate(
+    record = create_rebate(
         seeded_db,
         source_order_id=_order_with_buy(seeded_db, game_account="rule-base-explicit"),
         rebate_type="BUY",
@@ -137,7 +138,7 @@ def _pickup_order(seeded_db, *, game_account: str) -> int:
         inventory_type="PICKUP",
         actor="pytest",
     )
-    order = order_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="TH",
         trade_date=D,

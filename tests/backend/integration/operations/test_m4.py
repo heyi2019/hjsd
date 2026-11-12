@@ -17,8 +17,13 @@ from app.domain.foundation import Pool
 from app.domain.imports import ImportBatch, ImportRow
 from app.finance.cashflows import create_cashflow
 from app.imports import service as import_service
-from app.orders import service as order_service
-from app.reporting import service as reporting_service
+from app.orders.create import create_order
+from app.orders.events import post_event
+from app.reporting.funds import daily_funds_report
+from app.reporting.profit import order_profit_detail
+from app.reporting.r2_monthly_pnl import r2_monthly_pnl
+from app.reporting.r3_commission import r3_commission_reconciliation
+from app.reporting.r5_business_pnl import r5_business_pnl
 
 REPORTS = "/api/v1/reports"
 
@@ -36,14 +41,14 @@ class TestReports:
             inventory_type="RECOVERY",
             actor="pytest",
         )
-        order = order_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=date(2026, 10, 4),
             actor="pytest",
             account_id=account.id,
         )
-        order_service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -66,7 +71,7 @@ class TestReports:
             order_id=order.id,
             note="账号直接支出",
         )
-        data = reporting_service.r2_monthly_pnl(seeded_db)
+        data = r2_monthly_pnl(seeded_db)
         month = [i for i in data["items"] if i["month"] == "2026-10"]
         assert month
         assert month[0]["account_direct_cost"] == 1300
@@ -74,7 +79,7 @@ class TestReports:
 
     def test_r5_legacy_rebate_columns_are_removed(self, seeded_db):
         """11-05 二次裁决：结算展示列下线，返点金额全站只认 base_amount。"""
-        data = reporting_service.r5_business_pnl(seeded_db)
+        data = r5_business_pnl(seeded_db)
         for item in data["items"]:
             assert {"main_income", "main_cost", "main_profit"} <= set(item)
             for key in ("settled_rebate", "uncollected_rebate", "full_income"):
@@ -85,14 +90,14 @@ class TestReports:
     def test_daily_funds_matches_pool_balance(self, seeded_db):
         from datetime import date
 
-        report = reporting_service.daily_funds_report(seeded_db, on=date(2026, 10, 4))
+        report = daily_funds_report(seeded_db, on=date(2026, 10, 4))
         assert report["items"]
         for item in report["items"]:
             assert "available" in item and "th_advance" not in item
         assert report["total"]["available"] == sum(item["available"] for item in report["items"])
 
     def test_order_profit_totals_are_consistent(self, seeded_db):
-        data = reporting_service.order_profit_detail(seeded_db)
+        data = order_profit_detail(seeded_db)
         for item in data["items"]:
             # 净利 = 资金明细所有收入 − 所有支出（11-05 裁决）；
             # 返点独立成列、不进净利。
@@ -101,7 +106,7 @@ class TestReports:
             )
 
     def test_r3_drills_down_to_orders(self, seeded_db):
-        data = reporting_service.r3_commission_reconciliation(seeded_db)
+        data = r3_commission_reconciliation(seeded_db)
         for person in data["groups"]:
             assert person["orders"]
             assert sum(o["profit_base"] for o in person["orders"]) == person["profit_base"]
@@ -156,7 +161,7 @@ class TestImport:
     def test_manual_mapping_then_commit(self, seeded_db):
         from datetime import date
 
-        order = order_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest"
         )
         batch = import_service.create_batch(
@@ -320,14 +325,14 @@ class TestImportClosure:
             inventory_type="RECOVERY",
             actor="pytest",
         )
-        order = order_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=date(2026, 10, 4),
             actor="pytest",
             account_id=account.id,
         )
-        order_service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="BUY",

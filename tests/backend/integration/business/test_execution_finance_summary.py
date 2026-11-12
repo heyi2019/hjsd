@@ -17,8 +17,10 @@ from sqlalchemy import select
 
 from app.domain.foundation import Pool
 from app.domain.trade import RebateRecord
-from app.finance import service as finance_service
-from app.orders import service as orders_service
+from app.finance.cashflows import create_cashflow
+from app.finance.deposits import create_deposit, lose_deposit, return_deposit
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.stocks import service
 
 TODAY = date(2026, 10, 4)
@@ -42,10 +44,10 @@ def _invest_pool(seeded_db) -> Pool:
 
 
 def _buy(seeded_db, account, *, amount: str, pool_id: int | None = None):
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
     )
-    orders_service.post_event(
+    post_event(
         seeded_db,
         order.id,
         event_type="BUY",
@@ -105,7 +107,7 @@ def test_summary_splits_cashflow_and_rebate_income(seeded_client, seeded_db, hea
     pool = _invest_pool(seeded_db)
     order = _buy(seeded_db, account, amount="300", pool_id=pool.id)
     # 订单关联的独立流水（没有 order_event_id），走 orders[].cashflows 分支。
-    finance_service.create_cashflow(
+    create_cashflow(
         seeded_db,
         pool_id=pool.id,
         occurred_on=TODAY,
@@ -134,7 +136,7 @@ def test_summary_equals_manual_sum_over_detail_rows(seeded_client, seeded_db, he
     account = _account(seeded_db, "summary-reconcile")
     pool = _invest_pool(seeded_db)
     order = _buy(seeded_db, account, amount="300", pool_id=pool.id)
-    finance_service.create_cashflow(
+    create_cashflow(
         seeded_db,
         pool_id=pool.id,
         occurred_on=TODAY,
@@ -145,7 +147,7 @@ def test_summary_equals_manual_sum_over_detail_rows(seeded_client, seeded_db, he
         order_id=order.id,
         actor="pytest",
     )
-    finance_service.create_cashflow(
+    create_cashflow(
         seeded_db,
         pool_id=pool.id,
         occurred_on=TODAY,
@@ -211,15 +213,15 @@ def test_deposit_loss_visible_in_detail_but_excluded_from_summary(seeded_client,
     pool = _invest_pool(seeded_db)
     order = _buy(seeded_db, account, amount="300", pool_id=pool.id)
 
-    dep = finance_service.create_deposit(
+    dep = create_deposit(
         seeded_db, pool_id=pool.id, amount=Decimal("1000"), paid_on=TODAY,
         source_order_id=order.id, actor="pytest",
     )
-    finance_service.lose_deposit(
+    lose_deposit(
         seeded_db, dep.id, amount=Decimal("300"), lost_on=TODAY,
         category="OPERATING_COST", reason="违约", actor="pytest",
     )
-    finance_service.return_deposit(
+    return_deposit(
         seeded_db, dep.id, amount=Decimal("700"), released_on=TODAY, actor="pytest",
     )
     seeded_db.flush()

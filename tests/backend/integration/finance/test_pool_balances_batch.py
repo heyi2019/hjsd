@@ -15,14 +15,14 @@ from datetime import date
 from decimal import Decimal
 
 from app.domain.enums import Direction, Nature, PoolOwnership
-from app.finance import service as finance_service
+from app.finance.cashflows import create_cashflow
 from app.foundation import service as foundation_service
 
 TODAY = date(2026, 10, 4)
 
 
 def _flow(seeded_db, pool_id: int, *, direction: str, amount: str, note: str):
-    return finance_service.create_cashflow(
+    return create_cashflow(
         seeded_db,
         pool_id=pool_id,
         occurred_on=TODAY,

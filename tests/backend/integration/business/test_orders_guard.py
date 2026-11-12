@@ -19,7 +19,13 @@ from app.domain.enums import Direction
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Installment, Order, OrderEvent
 from app.value_added_services import service as installment_service
-from app.orders import events, service
+from app.orders import events
+from app.orders._shared import _audit_value
+from app.orders.create import create_order
+from app.orders.events import post_event
+from app.orders.links import create_order_link
+from app.orders.mutations import update_order
+from app.orders.queries import list_orders
 from app.parties import service as parties_service
 
 TODAY = date(2026, 10, 4)
@@ -47,10 +53,10 @@ def _customer(seeded_db, name: str = "甲"):
 
 def _settled_hs_installment(seeded_db):
     account = _new_account(seeded_db, game_account="guard-delivery-account")
-    order = service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
     )
-    service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("500"),
         occurred_on=TODAY, actor="pytest",
     )
@@ -90,26 +96,26 @@ def _delivered_hs_order(seeded_db):
 
 # --------------------------------------------------------------------- events.py
 def test_removed_cost_event_is_rejected(seeded_db):
-    order = service.create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")
+    order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
     with pytest.raises(Validation, match="事件类型必须为"):
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="COST", amount=Decimal("10"),
             occurred_on=TODAY, actor="pytest",
         )
 
 
 def test_refund_is_not_an_order_event(seeded_db):
-    order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     with pytest.raises(Validation, match="事件类型必须为"):
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="REFUND", amount=Decimal("10"),
             occurred_on=TODAY, actor="pytest",
         )
 
 
 def test_post_event_rejects_pool_out_of_user_scope(seeded_db):
-    order = service.create_order(
+    order = create_order(
         seeded_db, order_type="TH", trade_date=TODAY, actor="pytest", owner_id=9
     )
     seeded_db.commit()
@@ -118,7 +124,7 @@ def test_post_event_rejects_pool_out_of_user_scope(seeded_db):
         pool_ids=frozenset(), owner_scope="SELF",
     )
     with pytest.raises(NotFound):
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("10"),
             occurred_on=TODAY, actor="pytest", user=restricted,
         )
@@ -126,11 +132,11 @@ def test_post_event_rejects_pool_out_of_user_scope(seeded_db):
 
 def test_hs_sell_blocked_when_installment_exists(seeded_db):
     account = _new_account(seeded_db)
-    order = service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
     )
     seeded_db.commit()
-    service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=TODAY, actor="pytest",
     )
@@ -141,17 +147,17 @@ def test_hs_sell_blocked_when_installment_exists(seeded_db):
     )
     seeded_db.commit()
     with pytest.raises(Validation, match="已建立分期合约"):
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("100"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
 
 
 def test_hs_sell_requires_recovered_account(seeded_db):
-    order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
     with pytest.raises(Validation, match="自营账号售出必须关联已回收账号"):
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("100"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
@@ -161,22 +167,22 @@ def test_hs_sell_requires_account_in_stock(seeded_db):
     account = _new_account(seeded_db)
     account.status = "SOLD"
     seeded_db.commit()
-    order = service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
     )
     seeded_db.commit()
     with pytest.raises(Validation, match="账号必须先完成回收并进入库存"):
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("100"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
 
 
 def test_hs_removed_cost_event_does_not_require_account(seeded_db):
-    order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
     with pytest.raises(Validation, match="事件类型必须为"):
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="COST", amount=Decimal("10"),
             occurred_on=TODAY, actor="pytest",
         )
@@ -188,12 +194,12 @@ def test_th_sell_blocked_when_installment_exists(seeded_db):
     )
     buyer = _customer(seeded_db)
     seeded_db.commit()
-    order = service.create_order(
+    order = create_order(
         seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
         customer_roles=[(buyer.id, "BUYER")], counterparty_roles=[(peer.id, "PEER")],
     )
     seeded_db.commit()
-    service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=TODAY, actor="pytest",
     )
@@ -206,17 +212,17 @@ def test_th_sell_blocked_when_installment_exists(seeded_db):
     )
     seeded_db.commit()
     with pytest.raises(Validation, match="已建立分期合约，只能通过分期收款"):
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("100"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
 
 
 def test_deliver_requires_prior_business_event(seeded_db):
-    order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
     with pytest.raises(Validation, match="登记卖号交付前必须先登记售出"):
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY, actor="pytest",
             delivery_mode="PLATFORM_OPERATOR", note="voucher",
         )
@@ -224,11 +230,11 @@ def test_deliver_requires_prior_business_event(seeded_db):
 
 def test_deliver_requires_settled_installment(seeded_db):
     account = _new_account(seeded_db)
-    order = service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
     )
     seeded_db.commit()
-    service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=TODAY, actor="pytest",
     )
@@ -239,7 +245,7 @@ def test_deliver_requires_settled_installment(seeded_db):
     )
     seeded_db.commit()
     with pytest.raises(Validation, match="未结清"):
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY, actor="pytest",
             delivery_mode="PLATFORM_OPERATOR", note="voucher",
         )
@@ -262,7 +268,7 @@ def test_opposite_direction_returns_in_for_none(seeded_db):
 
 
 def test_get_offset_event_rejects_unposted(seeded_db):
-    order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
     unposted = OrderEvent(
         order_id=order.id, event_type="BUY", event_no="EV-GUARD-02", is_posted=False,
@@ -276,7 +282,7 @@ def test_get_offset_event_rejects_unposted(seeded_db):
 
 
 def test_get_offset_event_rejects_non_money_event(seeded_db):
-    order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
     deliver_ev = OrderEvent(
         order_id=order.id, event_type="DELIVER", event_no="EV-GUARD-03", is_posted=True,
@@ -299,23 +305,23 @@ def test_resolve_pool_rejects_unrouted_type(seeded_db):
 
 # --------------------------------------------------------------------- service.py
 def test_audit_value_serializes_list(seeded_db):
-    assert service._audit_value([Decimal("1.00"), TODAY]) == ["1.00", TODAY.isoformat()]
+    assert _audit_value([Decimal("1.00"), TODAY]) == ["1.00", TODAY.isoformat()]
 
 
 def test_update_order_records_date_change(seeded_db):
-    order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
-    updated = service.update_order(
+    updated = update_order(
         seeded_db, order.id, actor="pytest", trade_date=TODAY2, note="x", user=None
     )
     assert updated.trade_date == TODAY2
 
 
 def test_update_order_rejects_account_snapshot(seeded_db):
-    order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
     with pytest.raises(Validation, match="订单账号快照当前不支持"):
-        service.update_order(
+        update_order(
             seeded_db, order.id, actor="pytest",
             account_snapshot={"game_account": "x"}, user=None,
         )
@@ -327,7 +333,7 @@ def test_create_order_rejects_invalid_counterparty_role(seeded_db):
     )
     seeded_db.commit()
     with pytest.raises(Validation):
-        service.create_order(
+        create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
             counterparty_roles=[(peer.id, "INVALID_ROLE")],
         )
@@ -335,7 +341,7 @@ def test_create_order_rejects_invalid_counterparty_role(seeded_db):
 
 def test_create_order_rejects_non_positive_counterparty_id(seeded_db):
     with pytest.raises(Validation):
-        service.create_order(
+        create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
             counterparty_roles=[(-1, "PEER")],
         )
@@ -347,7 +353,7 @@ def test_create_order_rejects_duplicate_counterparty(seeded_db):
     )
     seeded_db.commit()
     with pytest.raises(Validation):
-        service.create_order(
+        create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
             counterparty_roles=[(peer.id, "PEER"), (peer.id, "PEER")],
         )
@@ -355,18 +361,18 @@ def test_create_order_rejects_duplicate_counterparty(seeded_db):
 
 def test_create_order_rejects_invalid_owner_id(seeded_db):
     with pytest.raises(Validation):
-        service.create_order(
+        create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
             owner_id=-1, user=None,
         )
 
 
 def test_create_order_link_rejects_split_ratio_over_100(seeded_db):
-    o1 = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
-    o2 = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
+    o1 = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
+    o2 = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
     with pytest.raises(Validation):
-        service.create_order_link(
+        create_order_link(
             seeded_db, o1.id, related_order_id=o2.id, relation_type="SOURCE",
             split_ratio=Decimal("150"), actor="pytest",
         )
@@ -374,15 +380,15 @@ def test_create_order_link_rejects_split_ratio_over_100(seeded_db):
 
 def test_list_orders_filters_by_owner(seeded_db):
     """owner_id 必须真落到 SQL：只返回该负责人的单，别人的单与空值单都不得混入。"""
-    mine = service.create_order(
+    mine = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", owner_id=1
     )
-    other = service.create_order(
+    other = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", owner_id=2
     )
     seeded_db.commit()
 
-    rows = service.list_orders(seeded_db, owner_id=1)
+    rows = list_orders(seeded_db, owner_id=1)
 
     ids = {row.id for row in rows}
     assert mine.id in ids
@@ -399,24 +405,24 @@ def test_list_orders_filters_by_pool(seeded_db):
 
     acc_hit = _new_account(seeded_db, game_account="guard-pool-hit")
     acc_miss = _new_account(seeded_db, game_account="guard-pool-miss")
-    hit = service.create_order(
+    hit = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
         account_id=acc_hit.id,
     )
-    miss = service.create_order(
+    miss = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
         account_id=acc_miss.id,
     )
-    service.post_event(
+    post_event(
         seeded_db, hit.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=TODAY, actor="pytest", pool_id=invest.id,
     )
-    service.post_event(
+    post_event(
         seeded_db, miss.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=TODAY, actor="pytest", pool_id=profit.id,
     )
 
-    rows = service.list_orders(seeded_db, pool_id=invest.id)
+    rows = list_orders(seeded_db, pool_id=invest.id)
 
     ids = {row.id for row in rows}
     assert hit.id in ids
@@ -425,9 +431,9 @@ def test_list_orders_filters_by_pool(seeded_db):
 
 def test_update_order_applies_extra_values_when_provided(seeded_db):
     # 触发 update_order 的 extra_values 分支（685-691 行）；空字典仍进入分支并调用 set_extra_values
-    order = service.create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
-    updated = service.update_order(
+    updated = update_order(
         seeded_db, order.id, actor="pytest", extra_values={}, user=None
     )
     assert updated.id == order.id

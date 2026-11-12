@@ -19,8 +19,11 @@ from app.domain.enums import AccountStatus, AuditAction
 from app.domain.foundation import AuditLog, Pool
 from app.domain.trade import Account
 from app.stocks import service
-from app.finance import service as finance_service
-from app.orders import service as orders_service
+from app.finance.cashflows import create_cashflow
+from app.finance.rebates import create_rebate
+from app.orders.cancellation_model import cancel_order
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.parties import service as parties_service
 
 TODAY = date(2026, 10, 4)
@@ -42,11 +45,11 @@ def _invest_pool(seeded_db) -> Pool:
     return pool
 
 def _buy(seeded_db, account, amount="500"):
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
         account_id=account.id,
     )
-    orders_service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal(amount),
         occurred_on=TODAY, actor="pytest",
     )
@@ -210,7 +213,7 @@ class TestCreateAccountGuards:
     def test_sold_account_profile_remains_editable(self, seeded_db):
         account = _account(seeded_db, "sold-editable")
         order = _buy(seeded_db, account, amount="500")
-        orders_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("800"),
             occurred_on=TODAY, actor="pytest",
         )
@@ -374,7 +377,7 @@ class TestAccountsApi:
         self, seeded_client, seeded_db
     ):
         mine = _account(seeded_db, "scoped-mine")
-        mine_order = orders_service.create_order(
+        mine_order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
@@ -382,13 +385,13 @@ class TestAccountsApi:
             account_id=mine.id,
             owner_id=9,
         )
-        orders_service.post_event(
+        post_event(
             seeded_db, mine_order.id, event_type="BUY", amount="300",
             occurred_on=TODAY, actor="operator",
         )
 
         other = _account(seeded_db, "scoped-other")
-        other_order = orders_service.create_order(
+        other_order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
@@ -396,7 +399,7 @@ class TestAccountsApi:
             account_id=other.id,
             owner_id=8,
         )
-        orders_service.post_event(
+        post_event(
             seeded_db, other_order.id, event_type="BUY", amount="400",
             occurred_on=TODAY, actor="other",
         )
@@ -438,7 +441,7 @@ class TestAccountsApi:
             inventory_type="RECOVERY",
             actor="operator",
         )
-        foreign_order = orders_service.create_order(
+        foreign_order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
@@ -446,7 +449,7 @@ class TestAccountsApi:
             account_id=account.id,
             owner_id=8,
         )
-        orders_service.post_event(
+        post_event(
             seeded_db,
             foreign_order.id,
             event_type="BUY",
@@ -569,7 +572,7 @@ class TestAccountsApi:
             business_mode="DISTRIBUTION",
             inventory_type="CONSIGNMENT",
         )
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="DG",
             trade_date=TODAY,
@@ -585,14 +588,14 @@ class TestAccountsApi:
 
     def test_list_accounts_keeps_cancelled_source_order_number(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "cancelled-source")
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
             actor="pytest",
             account_id=account.id,
         )
-        orders_service.cancel_order(seeded_db, order.id, actor="pytest", reason="测试取消")
+        cancel_order(seeded_db, order.id, actor="pytest", reason="测试取消")
 
         response = seeded_client.get("/api/v1/stocks", headers=headers)
 
@@ -607,14 +610,14 @@ class TestAccountsApi:
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
         )
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="TH",
             trade_date=TODAY,
             actor="pytest",
             account_id=account.id,
         )
-        orders_service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -658,7 +661,7 @@ class TestAccountsApi:
         account = _account(seeded_db, "detail-standalone-flow-acc")
         order = _buy(seeded_db, account, amount="300")
         pool = _invest_pool(seeded_db)
-        flow = finance_service.create_cashflow(
+        flow = create_cashflow(
             seeded_db,
             pool_id=pool.id,
             occurred_on=TODAY,
@@ -696,14 +699,14 @@ class TestAccountsApi:
 
     def test_execution_detail_includes_minute_timestamps(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-time-acc")
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
             actor="pytest",
             account_id=account.id,
         )
-        event, _ = orders_service.post_event(
+        event, _ = post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -740,7 +743,7 @@ class TestAccountsApi:
         platform = parties_service.create_counterparty(
             seeded_db, display_name="寄售平台A", type="PLATFORM", actor="pytest"
         )
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="DG",
             trade_date=TODAY,
@@ -763,7 +766,7 @@ class TestAccountsApi:
         account = _account(seeded_db, "detail-customer-party-acc")
         customer = parties_service.create_customer(seeded_db, display_name="买家A", actor="pytest")
         seller = parties_service.create_customer(seeded_db, display_name="卖家B", actor="pytest")
-        orders_service.create_order(
+        create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
@@ -785,7 +788,7 @@ class TestAccountsApi:
     def test_execution_detail_includes_rebate_amount(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-rebate-acc")
         order = _buy(seeded_db, account, amount="300")
-        rebate = finance_service.create_rebate(
+        rebate = create_rebate(
             seeded_db,
             source_order_id=order.id,
             base_amount=Decimal("300"),

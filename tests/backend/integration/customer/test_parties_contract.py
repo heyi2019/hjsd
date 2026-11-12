@@ -32,7 +32,7 @@ from app.domain.parties import (
 )
 from app.domain.trade import InstallmentSchedule, OrderFormField
 from app.value_added_services import service as installment_service
-from app.orders import service as orders_service
+from app.orders.create import create_order
 from app.parties import service
 from app.parties import router as parties_router
 from app.parties import schemas
@@ -218,7 +218,7 @@ class TestListAndGetCustomers:
 
     def test_customer_list_activity_summary_comes_from_order_relations(self, seeded_db):
         customer = _customer(seeded_db, "列表汇总客户", owner_id=9)
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=date(2026, 10, 12),
@@ -254,14 +254,14 @@ class TestListAndGetCustomers:
             actor="pytest",
             request_id=request_id,
         )
-        dg_order = orders_service.create_order(
+        dg_order = create_order(
             seeded_db,
             order_type="DG",
             trade_date=date(2026, 10, 10),
             customer_roles=[(customer.id, "CONSIGNOR")],
             actor="pytest",
         )
-        th = orders_service.create_order(
+        th = create_order(
             seeded_db,
             order_type="TH",
             trade_date=date(2026, 10, 11),
@@ -307,7 +307,7 @@ class TestListAndGetCustomers:
 
     def test_customer_detail_applies_order_owner_scope(self, seeded_db):
         customer = _customer(seeded_db, "范围客户", owner_id=9)
-        mine = orders_service.create_order(
+        mine = create_order(
             seeded_db,
             order_type="HS",
             trade_date=date(2026, 10, 10),
@@ -315,7 +315,7 @@ class TestListAndGetCustomers:
             customer_roles=[(customer.id, "BUYER")],
             actor="pytest",
         )
-        foreign = orders_service.create_order(
+        foreign = create_order(
             seeded_db,
             order_type="TH",
             trade_date=date(2026, 10, 11),
@@ -518,7 +518,7 @@ class TestMergeGuards:
         assert "来源客户已合并" in str(exc.value)
 
     def test_duplicate_role_is_dropped_on_merge(self, seeded_db):
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest"
         )
         source = _customer(seeded_db, "源")
@@ -587,7 +587,7 @@ class TestMergeGuards:
 # ------------------------------------------------------------------ 合作方
 class TestCounterpartyGuards:
     def test_order_counterparty_role_is_constrained_in_database(self, seeded_db):
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="TH", trade_date=date(2026, 10, 4), actor="pytest"
         )
         counterparty = service.create_counterparty(
@@ -695,7 +695,7 @@ class TestPartiesApi:
 
     def test_customer_detail_endpoint_returns_four_tabs(self, seeded_client, seeded_db, headers):
         customer = _customer(seeded_db, "详情接口客户", owner_id=9)
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="TH",
             trade_date=date(2026, 10, 12),

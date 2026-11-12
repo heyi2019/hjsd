@@ -14,7 +14,8 @@ from app.core.errors import NotFound, PermissionDenied, Validation
 from app.core.security import CurrentUser
 from app.domain.trade import Account
 from app.domain.enums import AccountStatus
-from app.orders import router, schemas, service
+from app.orders import router, schemas
+from app.orders.create import create_order
 from app.parties import service as parties_service
 
 TODAY = date(2026, 10, 4)
@@ -104,7 +105,7 @@ def test_create_order_hs_initial_cost_requires_event_perm(seeded_db):
 # ---- _order_output：非管理员剥离 game_password（64-67） ----
 
 def test_order_output_strips_game_password_for_non_admin(seeded_db):
-    order = service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=TODAY,
@@ -122,7 +123,7 @@ def test_order_output_strips_game_password_for_non_admin(seeded_db):
 def test_order_list_payload_includes_customer_role(seeded_db):
     account = _new_account(seeded_db)
     customer = parties_service.create_customer(seeded_db, display_name="甲", actor="pytest")
-    order = service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=TODAY,
@@ -146,7 +147,7 @@ def test_order_list_payload_includes_counterparty_role(seeded_db):
     cp = parties_service.create_counterparty(
         seeded_db, display_name="同行乙", type="PEER", actor="pytest"
     )
-    order = service.create_order(
+    order = create_order(
         seeded_db,
         order_type="TH",
         trade_date=TODAY,

@@ -13,7 +13,8 @@ from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderS
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.value_added_services import service as installment_service
-from app.orders import service
+from app.orders.create import create_order
+from app.orders.events import post_event
 from app.parties import service as parties_service
 
 TODAY = date(2026, 10, 4)
@@ -62,10 +63,10 @@ def _flows(seeded_db, pool_id: int) -> list[Cashflow]:
 
 def _settled_hs_installment(seeded_db):
     account = _new_account(seeded_db, game_account="delivery-account")
-    order = service.create_order(
+    order = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
     )
-    service.post_event(
+    post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("500"),
         occurred_on=TODAY, actor="pytest",
     )
@@ -93,7 +94,7 @@ def _settled_hs_installment(seeded_db):
 class TestA01HsStock:
     def test_sell_requires_recovered_account(self, seeded_db):
         account = _new_account(seeded_db, game_account="pending-only")
-        order = service.create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
@@ -101,7 +102,7 @@ class TestA01HsStock:
             account_id=account.id,
         )
         with pytest.raises(Exception) as exc:
-            service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="SELL",
@@ -118,7 +119,7 @@ class TestA01HsStock:
         buyer = _customer(seeded_db, "买家乙")
         seeded_db.commit()
 
-        order = service.create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
@@ -130,11 +131,11 @@ class TestA01HsStock:
         assert order.order_no == "HS0001"
         assert order.status == OrderStatus.ACTIVE.value  # 创建即 ACTIVE（草稿态已移除）
 
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
             occurred_on=TODAY, actor="pytest",
         )
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("1400"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
@@ -175,20 +176,20 @@ class TestA01HsStock:
         buyer = _customer(seeded_db, "买家乙")
         seeded_db.commit()
 
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
             account_id=account.id,
             customer_roles=[(seller.id, "SELLER"), (buyer.id, "BUYER")],
         )
         seeded_db.commit()
 
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
             occurred_on=TODAY, actor="pytest",
         )
         profit = _pool(seeded_db, "HJ_PROFIT")
         invest = _pool(seeded_db, "HJ_INVEST")
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("1000"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
             pool_id=profit.id, amount2=Decimal("400"), pool_id2=invest.id,
@@ -224,31 +225,31 @@ class TestA01HsStock:
         seller = _customer(seeded_db, "卖家甲")
         buyer = _customer(seeded_db, "买家乙")
         seeded_db.commit()
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
             account_id=account.id,
             customer_roles=[(seller.id, "SELLER"), (buyer.id, "BUYER")],
         )
         seeded_db.commit()
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
             occurred_on=TODAY, actor="pytest",
         )
         profit = _pool(seeded_db, "HJ_PROFIT")
         invest = _pool(seeded_db, "HJ_INVEST")
         with pytest.raises(Validation, match="售出金额2 必须为正数"):
-            service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="SELL", amount=Decimal("1000"),
                 occurred_on=TODAY, actor="pytest", portion="PROFIT",
                 pool_id=profit.id, pool_id2=invest.id, amount2=Decimal("0"),
             )
 
     def test_cost_event_is_removed(self, seeded_db):
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest"
         )
         with pytest.raises(Validation, match="事件类型必须为"):
-            service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="COST", amount=Decimal("50"),
                 occurred_on=TODAY, actor="pytest",
             )
@@ -268,7 +269,7 @@ class TestA01HsStock:
         seeded_db.commit()
         assert seeded_db.get(Order, order.id).status == OrderStatus.COMPLETED.value
         with pytest.raises(Exception) as exc:
-            service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="SELL", amount=Decimal("100"),
                 occurred_on=TODAY, actor="pytest",
             )
@@ -277,14 +278,14 @@ class TestA01HsStock:
 class TestA02ThStock:
     def test_th_order_keeps_inventory_link_without_snapshot(self, seeded_db):
         account = _new_account(seeded_db, game_account="th-stock-acc")
-        order = service.create_order(
+        order = create_order(
             seeded_db,
             order_type="TH",
             trade_date=TODAY,
             actor="pytest",
             account_id=account.id,
         )
-        service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -303,7 +304,7 @@ class TestA02ThStock:
         )
         buyer = _customer(seeded_db)
         seeded_db.commit()
-        order = service.create_order(
+        order = create_order(
             seeded_db,
             order_type="TH",
             trade_date=TODAY,
@@ -313,12 +314,12 @@ class TestA02ThStock:
         )
         seeded_db.commit()
 
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
             occurred_on=TODAY, actor="pytest",
         )
         seeded_db.commit()
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("1100"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
@@ -330,7 +331,7 @@ class TestA03DgZeroCapital:
     def test_service_income_routes_to_profit_pool(self, seeded_db):
         consignor = _customer(seeded_db, "委托方")
         seeded_db.commit()
-        order = service.create_order(
+        order = create_order(
             seeded_db,
             order_type="DG",
             trade_date=TODAY,
@@ -340,7 +341,7 @@ class TestA03DgZeroCapital:
         seeded_db.commit()
         assert seeded_db.get(Order, order.id).capital_type == "ZERO"
 
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("200"),
             occurred_on=TODAY, actor="pytest", portion="GROSS",
         )
@@ -355,7 +356,7 @@ class TestEventRules:
     @pytest.mark.parametrize(("order_type", "inventory_type"), [("HS", "RECOVERY"), ("TH", "PICKUP")])
     def test_inline_purchase_creates_inventory(self, seeded_db, order_type, inventory_type):
         """2026-10-28 口径：建单成功即内联建库存账号（编号已发放），BUY 只累计成本。"""
-        order = service.create_order(
+        order = create_order(
             seeded_db,
             order_type=order_type,
             trade_date=TODAY,
@@ -371,7 +372,7 @@ class TestEventRules:
         assert account.status == "WAITING"
         assert account.cost_amount == Decimal("0.00")
 
-        event, _ = service.post_event(
+        event, _ = post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -386,7 +387,7 @@ class TestEventRules:
         assert account.status == "WAITING"
 
     def test_inline_consignment_creates_inventory(self, seeded_db):
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="DG", trade_date=TODAY, actor="pytest",
             account_snapshot={"game_account": "inline-consignment-account"},
         )
@@ -397,12 +398,12 @@ class TestEventRules:
         assert account.cost_amount == Decimal("0.00")
 
     def test_dg_cannot_post_buy(self, seeded_db):
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
         )
 
         with pytest.raises(Validation, match="代挂业务不允许 BUY"):
-            service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="BUY",
@@ -412,12 +413,12 @@ class TestEventRules:
             )
 
     def test_cost_is_not_a_th_event(self, seeded_db):
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
 
         with pytest.raises(Validation, match="事件类型必须为"):
-            service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="COST",
@@ -428,14 +429,14 @@ class TestEventRules:
 
     def test_hs_cannot_add_removed_cost_event_after_account_is_sold(self, seeded_db):
         account = _new_account(seeded_db, game_account="sold-cost-guard")
-        order = service.create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
             actor="pytest",
             account_id=account.id,
         )
-        service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -443,7 +444,7 @@ class TestEventRules:
             occurred_on=TODAY,
             actor="pytest",
         )
-        service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="SELL",
@@ -453,7 +454,7 @@ class TestEventRules:
         )
 
         with pytest.raises(Validation, match="事件类型必须为"):
-            service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="COST",
@@ -463,12 +464,12 @@ class TestEventRules:
             )
 
     def test_th_sell_requires_a_buy(self, seeded_db):
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
 
         with pytest.raises(Validation) as exc:
-            service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="SELL",
@@ -480,10 +481,10 @@ class TestEventRules:
         assert "BUY" in str(exc.value)
 
     def test_th_order_accepts_only_one_sell_event(self, seeded_db):
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
-        buy, _ = service.post_event(
+        buy, _ = post_event(
             seeded_db,
             order.id,
             event_type="BUY",
@@ -491,7 +492,7 @@ class TestEventRules:
             occurred_on=TODAY,
             actor="pytest",
         )
-        service.post_event(
+        post_event(
             seeded_db,
             order.id,
             event_type="SELL",
@@ -501,7 +502,7 @@ class TestEventRules:
         )
 
         with pytest.raises(Validation, match="只能登记一次 SELL"):
-            service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="SELL",
@@ -512,12 +513,12 @@ class TestEventRules:
             )
 
     def test_payment_event_is_removed(self, seeded_db):
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest"
         )
 
         with pytest.raises(Validation, match="事件类型必须为"):
-            service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type="PAYMENT",
@@ -528,7 +529,7 @@ class TestEventRules:
 
     def test_unknown_account_is_rejected_before_database_flush(self, seeded_db):
         with pytest.raises(NotFound) as exc:
-            service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=TODAY,
@@ -541,7 +542,7 @@ class TestEventRules:
     def test_invalid_participant_roles_are_rejected_before_database_flush(self, seeded_db):
         customer = _customer(seeded_db)
         with pytest.raises(Validation) as exc:
-            service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=TODAY,
@@ -584,18 +585,18 @@ class TestEventRules:
 
     def test_full_sale_can_record_sell_delivery_without_cashflow(self, seeded_db):
         account = _new_account(seeded_db, game_account="full-sale-delivery")
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
         )
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
             occurred_on=TODAY, actor="pytest",
         )
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("200"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
-        event, flow = service.post_event(
+        event, flow = post_event(
             seeded_db,
             order.id,
             event_type="DELIVER",
@@ -613,14 +614,14 @@ class TestEventRules:
         ) is None
 
     def test_dg_sale_can_record_sell_delivery_without_buy(self, seeded_db):
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
         )
-        service.post_event(
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("200"),
             occurred_on=TODAY, actor="pytest", portion="GROSS",
         )
-        event, flow = service.post_event(
+        event, flow = post_event(
             seeded_db,
             order.id,
             event_type="DELIVER",
@@ -636,7 +637,7 @@ class TestEventRules:
     def test_direct_deliver_event_cannot_bypass_installment_service(self, seeded_db):
         order = _settled_hs_installment(seeded_db)
         with pytest.raises(Exception, match="分期交付流程"):
-            service.post_event(
+            post_event(
                 seeded_db,
                 order.id,
                 event_type=EventType.DELIVER.value,
@@ -647,24 +648,24 @@ class TestEventRules:
             )
 
     def test_deliver_requires_mode_and_voucher(self, seeded_db):
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
-            service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY, actor="pytest"
             )
         assert exc.value.code == ErrorCode.DELIVERY_CONDITION_UNMET
 
     def test_missing_route_blocks_posting(self, seeded_db):
-        order = service.create_order(
+        order = create_order(
             seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
         # DG 是零本金业务，业务事件组合先于资金路由校验拦截 BUY。
         with pytest.raises(Exception) as exc:
-            service.post_event(
+            post_event(
                 seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
                 occurred_on=TODAY, actor="pytest", portion="PRINCIPAL",
             )
@@ -676,7 +677,7 @@ class TestEventRules:
         parties_service.set_customer_status(seeded_db, customer.id, "DISABLED", actor="pytest")
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
-            service.create_order(
+            create_order(
                 seeded_db,
                 order_type="HS",
                 trade_date=TODAY,

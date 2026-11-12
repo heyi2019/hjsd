@@ -17,7 +17,12 @@ from app.core.security import (
 )
 from app.lists.export import build_list_csv, csv_file_response
 from app.lists.scopes import report_scope
-from app.reporting import service
+from app.reporting.export import finance_dimension_report, report_csv, report_for_export
+from app.reporting.funds import daily_funds_report
+from app.reporting.profit import order_profit_detail
+from app.reporting.r2_monthly_pnl import r2_monthly_pnl
+from app.reporting.r3_commission import r3_commission_reconciliation
+from app.reporting.r5_business_pnl import r5_business_pnl
 from app.reporting.schemas import (
     BusinessPnlOut,
     FinanceDimensionOut,
@@ -40,7 +45,7 @@ def monthly_pnl(
     to_date: date | None = Query(default=None, alias="to"),
 ) -> MonthlyPnlOut:
     """R2 月度经营损益（账号直接支出不进运营费用）。"""
-    return service.r2_monthly_pnl(db, from_date=from_date, to_date=to_date, user=user)
+    return r2_monthly_pnl(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/reports/commission", response_model=CommissionOut)
@@ -54,7 +59,7 @@ def commission(
     user_id: int | None = Query(default=None, gt=0),
 ) -> CommissionOut:
     """R3 提成对账：默认按权限范围汇总；经营中心可显式查看全员并按人员筛选。"""
-    return service.r3_commission_reconciliation(
+    return r3_commission_reconciliation(
         db, from_date=from_date, to_date=to_date, user=user, mine=mine, all_people=all_people, user_id=user_id
     )
 
@@ -67,7 +72,7 @@ def business_pnl(
     to_date: date | None = Query(default=None, alias="to"),
 ) -> BusinessPnlOut:
     """R5 业务级损益：主营收入 / 成本 / 毛利均按订单资金明细收支差。"""
-    return service.r5_business_pnl(db, from_date=from_date, to_date=to_date, user=user)
+    return r5_business_pnl(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/reports/finance-dimensions", response_model=FinanceDimensionOut)
@@ -78,7 +83,7 @@ def finance_dimensions(
     to_date: date | None = Query(default=None, alias="to"),
 ) -> FinanceDimensionOut:
     """按资金池、资金性质、核算属性和现金方向聚合已审核流水。"""
-    return service.finance_dimension_report(db, from_date=from_date, to_date=to_date, user=user)
+    return finance_dimension_report(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/reports/daily-funds", response_model=DailyFundsOut)
@@ -88,7 +93,7 @@ def daily_funds(
     on: date | None = Query(default=None),
 ) -> DailyFundsOut:
     """资金日报：与 FIN-01 同日口径一致。"""
-    return service.daily_funds_report(db, on=on, user=user)
+    return daily_funds_report(db, on=on, user=user)
 
 
 @router.get("/reports/order-profit", response_model=OrderProfitOut)
@@ -99,7 +104,7 @@ def order_profit(
     to_date: date | None = Query(default=None, alias="to"),
 ) -> OrderProfitOut:
     """订单利润明细：合计与 R5 对应维度一致。"""
-    return service.order_profit_detail(db, from_date=from_date, to_date=to_date, user=user)
+    return order_profit_detail(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/reports/{report_name}/export.csv")
@@ -117,7 +122,7 @@ def export_report(
     """导出当前权限范围内的报表；导出动作写入审计日志。
     mine/all_people/user_id 仅作用于 R3，与 /reports/commission 列表同口径。
     """
-    report = service.report_for_export(
+    report = report_for_export(
         db,
         report_name,
         from_date=from_date,
@@ -137,7 +142,7 @@ def export_report(
             db, scope.code, report.get("items") or [], total=total
         )
     else:
-        csv_text = service.report_csv(report)
+        csv_text = report_csv(report)
         export_meta = {"column_count": None, "translated_columns": []}
     record_audit(
         db,

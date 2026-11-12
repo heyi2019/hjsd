@@ -19,7 +19,7 @@ from fastapi import Response
 from sqlalchemy.orm import Session
 
 from app.lists import service as list_columns_service
-from app.reporting.service import report_csv
+from app.reporting.export import report_csv
 
 UI_ONLY_KEYS = frozenset({"actions"})
 # 导出行数上限：主列表导出一次性拉全量，防误操作拖垮库；超过时按列表接口同口径截断。

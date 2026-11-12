@@ -13,11 +13,12 @@ import pytest
 from app.stocks import service as stocks_service
 from app.core.errors import NotFound
 from app.core.security import CurrentUser
-from app.finance import cashflows
+from app.finance import deposits
 from app.finance import rebates
 from app.finance import router as finance_router
 from app.finance import schemas
-from app.orders import service as orders_service
+from app.orders.create import create_order
+from app.orders.events import post_event
 
 
 TODAY = date(2026, 10, 17)
@@ -52,14 +53,14 @@ def _order_with_buy(seeded_db) -> int:
         inventory_type="RECOVERY",
         actor="pytest",
     )
-    order = orders_service.create_order(
+    order = create_order(
         seeded_db,
         order_type="HS",
         trade_date=TODAY,
         actor="pytest",
         account_id=account.id,
     )
-    orders_service.post_event(
+    post_event(
         seeded_db,
         order.id,
         event_type="BUY",
@@ -127,7 +128,7 @@ def test_router_return_deposit_not_found(seeded_db):
 
 
 def test_router_return_deposit_not_visible(seeded_db):
-    deposit = cashflows.create_deposit(
+    deposit = deposits.create_deposit(
         seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
     )
     with pytest.raises(NotFound):
@@ -152,7 +153,7 @@ def test_router_lose_deposit_not_found(seeded_db):
 
 
 def test_router_lose_deposit_not_visible(seeded_db):
-    deposit = cashflows.create_deposit(
+    deposit = deposits.create_deposit(
         seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
     )
     with pytest.raises(NotFound):

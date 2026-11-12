@@ -46,7 +46,19 @@ from app.lists.export import (
     inject_custom_columns,
 )
 from app.lists.xlsx import new_workbook, write_sheet, xlsx_bytes, xlsx_file_response
-from app.orders import schemas, service
+from app.orders import schemas
+from app.orders._shared import get_order as orders_get_order
+from app.orders.cancellation_model import cancel_order as orders_cancel_order
+from app.orders.create import add_customer_role, create_order as orders_create_order
+from app.orders.events import post_event as orders_post_event
+from app.orders.links import (
+    create_order_link as orders_create_order_link,
+    delete_order_link as orders_delete_order_link,
+    list_order_links as orders_list_order_links,
+)
+from app.orders.mutations import materialize_inventory_account, update_order as orders_update_order
+from app.orders.pools import pool_balance as orders_pool_balance, pool_balance_summary
+from app.orders.queries import count_orders, list_orders as orders_list_orders
 
 from .router_output import (
     _actor,
@@ -407,7 +419,7 @@ def list_orders(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
 ) -> list[schemas.OrderListOut]:
-    orders = service.list_orders(
+    orders = orders_list_orders(
         db,
         order_type=order_type,
         status=status,
@@ -423,7 +435,7 @@ def list_orders(
     )
     return PageOut(
         items=[schemas.OrderListOut.model_validate(item) for item in _order_list_payload(db, orders)],
-        total=service.count_orders(
+        total=count_orders(
             db, order_type=order_type, status=status, trade_date_from=trade_date_from,
             trade_date_to=trade_date_to, owner_id=owner_id, pool_id=pool_id,
             keyword=keyword, user=_user, mine=mine,
@@ -448,7 +460,7 @@ def export_orders_csv(
 ) -> Response:
     """订单台账按「设置 → 列表字段」的可见列导出 CSV：同 /orders 筛选口径，全量不分页。
     mine=true 时与「我的订单」视图一致，只导出我负责/我执行的订单。"""
-    orders = service.list_orders(
+    orders = orders_list_orders(
         db,
         order_type=order_type,
         status=status,
@@ -507,7 +519,7 @@ def export_orders_xlsx(
     与 /orders/export.csv 同筛选口径、同全量不分页上限；两个 sheet 靠「订单号」关联，
     故详情 sheet 首列固定带订单号。详情 sheet 用两级表头，一级板块为真合并单元格。
     """
-    orders = service.list_orders(
+    orders = orders_list_orders(
         db,
         order_type=order_type,
         status=status,
@@ -681,7 +693,7 @@ def create_order(
         if user.is_admin or user.owner_scope == "ALL"
         else user.id
     )
-    order = service.create_order(
+    order = orders_create_order(
         db,
         order_type=normalized_order_type,
         trade_date=payload.trade_date,
@@ -737,7 +749,7 @@ def create_order(
             user=user,
         )
     if payload.initial_buy is not None:
-        service.post_event(
+        orders_post_event(
             db,
             order.id,
             event_type="BUY",
@@ -766,9 +778,9 @@ def create_order(
                     details={"order_type": order.order_type, "portion": cost.portion},
                 )
             pool_id = pool.id
-        from app.finance import service as finance_service
+        from app.finance.cashflows import create_cashflow
 
-        finance_service.create_cashflow(
+        create_cashflow(
             db,
             pool_id=pool_id,
             occurred_on=cost.occurred_on,
@@ -800,7 +812,7 @@ def get_order(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
 ) -> schemas.OrderDetailOut:
-    return _order_detail_output(db, service.get_order(db, order_id, _user), _user)
+    return _order_detail_output(db, orders_get_order(db, order_id, _user), _user)
 
 
 @router.get("/orders/{order_id}/links", response_model=list[schemas.OrderLinkOut])
@@ -811,7 +823,7 @@ def list_order_links(
 ) -> list[schemas.OrderLinkOut]:
     return [
         schemas.OrderLinkOut.model_validate(item)
-        for item in service.list_order_links(db, order_id, user)
+        for item in orders_list_order_links(db, order_id, user)
     ]
 
 
@@ -826,7 +838,7 @@ def create_order_link(
     db: Session = Depends(get_db),
     user: CurrentUser = update_orders,
 ) -> schemas.OrderLinkOut:
-    link = service.create_order_link(
+    link = orders_create_order_link(
         db,
         order_id,
         related_order_id=payload.related_order_id,
@@ -839,7 +851,7 @@ def create_order_link(
         user=user,
     )
     item = next(
-        item for item in service.list_order_links(db, order_id, user) if item["id"] == link.id
+        item for item in orders_list_order_links(db, order_id, user) if item["id"] == link.id
     )
     return schemas.OrderLinkOut.model_validate(item)
 
@@ -851,7 +863,7 @@ def delete_order_link(
     db: Session = Depends(get_db),
     user: CurrentUser = update_orders,
 ) -> None:
-    service.delete_order_link(db, order_id, link_id, actor=_actor(user), user=user)
+    orders_delete_order_link(db, order_id, link_id, actor=_actor(user), user=user)
 
 
 @router.patch("/orders/{order_id}", response_model=schemas.OrderOut)
@@ -867,7 +879,7 @@ def update_order(
     }
     if "account_snapshot" in changes and changes["account_snapshot"] is not None:
         changes["account_snapshot"] = changes["account_snapshot"].model_dump()
-    order = service.update_order(
+    order = orders_update_order(
         db, order_id, actor=_actor(user), user=user, **changes
     )
     return _order_output(db, order, user)
@@ -879,7 +891,7 @@ def materialize_order_account(
     db: Session = Depends(get_db),
     user: CurrentUser = update_orders,
 ) -> schemas.OrderOut:
-    order = service.materialize_inventory_account(
+    order = materialize_inventory_account(
         db, order_id, actor=_actor(user), user=user
     )
     return _order_output(db, order, user)
@@ -892,7 +904,7 @@ def cancel_order(
     db: Session = Depends(get_db),
     user: CurrentUser = update_orders,
 ) -> schemas.OrderOut:
-    order = service.cancel_order(
+    order = orders_cancel_order(
         db,
         order_id,
         actor=_actor(user),
@@ -911,7 +923,7 @@ def post_event(
     db: Session = Depends(get_db),
     user: CurrentUser = post_events,
 ) -> schemas.EventPostResult:
-    service.get_order(db, order_id, user)
+    orders_get_order(db, order_id, user)
     event_type = payload.event_type.strip().upper()
     if user.has(PERM_FINANCE_ORDER_EVENT_POST) and not user.has(PERM_ORDER_EVENT_POST):
         if event_type not in {"BUY", "SELL"}:
@@ -919,7 +931,7 @@ def post_event(
                 "财务只能登记买号或售出事件",
                 details={"allowed_event_types": ["BUY", "SELL"], "event_type": event_type},
             )
-    event, flow = service.post_event(
+    event, flow = orders_post_event(
         db,
         order_id,
         event_type=event_type,
@@ -964,11 +976,11 @@ def add_order_customer_role(
     user: CurrentUser = update_orders,
 ) -> schemas.OrderOut:
     """向已有订单追加客户角色（如库存售出时把买家挂到来源单）。"""
-    service.add_customer_role(
+    add_customer_role(
         db, order_id, payload.customer_id, payload.role,
         actor=_actor(user), user=user,
     )
-    order = service.get_order(db, order_id, user)
+    order = orders_get_order(db, order_id, user)
     return _order_output(db, order, user)
 
 
@@ -978,7 +990,7 @@ def pool_balances_summary(
     _user: CurrentUser = read_finance,
 ) -> schemas.PoolBalanceListOut:
     """全部可见资金池的余额卡片 + 汇总（一次请求，替代前端逐池 N+1 与本地累加）。"""
-    items, totals = service.pool_balance_summary(db, user=_user)
+    items, totals = pool_balance_summary(db, user=_user)
     return schemas.PoolBalanceListOut(
         items=[schemas.PoolBalanceOut.model_validate(item) for item in items],
         totals=schemas.PoolBalanceTotalsOut.model_validate(totals),
@@ -995,7 +1007,7 @@ def pool_balance(
         from app.core.errors import NotFound
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
     return schemas.PoolBalanceOut.model_validate(
-        service.pool_balance(db, pool_id, user=_user)
+        orders_pool_balance(db, pool_id, user=_user)
     )
 
 

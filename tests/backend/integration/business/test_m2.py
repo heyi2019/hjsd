@@ -19,9 +19,12 @@ from app.domain.enums import (
 )
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order
-from app.finance import service as finance_service
+from app.finance.deposits import create_deposit, return_deposit
+from app.finance.rebates import create_rebate
 from app.value_added_services import service as installment_service
-from app.orders import service as orders_service
+from app.orders.create import create_order
+from app.orders.events import post_event
+from app.orders.pools import pool_balance
 from app.parties import service as parties_service
 
 TODAY = date(2026, 10, 4)
@@ -54,7 +57,7 @@ class TestA04DistributionInstallmentSale:
         customer = parties_service.create_customer(seeded_db, display_name="分期客户", actor="pytest")
         seeded_db.commit()
 
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db,
             order_type="TH",
             trade_date=TODAY,
@@ -117,7 +120,7 @@ class TestA04DistributionInstallmentSale:
 
     def test_unsettled_contract_cannot_deliver(self, seeded_db):
         seeded_db.commit()
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
@@ -142,7 +145,7 @@ class TestA04DistributionInstallmentSale:
 
     def test_payment_cannot_exceed_receivable(self, seeded_db):
         seeded_db.commit()
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
@@ -169,11 +172,11 @@ class TestA05HsStockSale:
     def test_stock_sale_contract_adds_no_new_buy(self, seeded_db):
         account = _account(seeded_db, "hs-acc")
         seeded_db.commit()
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
         )
         seeded_db.commit()
-        orders_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("800"),
             occurred_on=TODAY, actor="pytest",
         )
@@ -246,7 +249,7 @@ class TestA05HsStockSale:
             actor="pytest",
         )
         seeded_db.commit()
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
         )
         seeded_db.commit()
@@ -265,11 +268,11 @@ class TestA05HsStockSale:
     def test_overdue_marking(self, seeded_db):
         account = _account(seeded_db, "hs-acc2")
         seeded_db.commit()
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
         )
         seeded_db.commit()
-        orders_service.post_event(
+        post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("500"),
             occurred_on=TODAY, actor="pytest",
         )
@@ -299,12 +302,12 @@ class TestA05HsStockSale:
 class TestA08Deposit:
     def test_deposit_holds_available_balance_without_profit_impact(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
-        before = orders_service.pool_balance(seeded_db, invest.id)
-        deposit = finance_service.create_deposit(
+        before = pool_balance(seeded_db, invest.id)
+        deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("2000"), paid_on=TODAY, actor="pytest"
         )
         seeded_db.commit()
-        after = orders_service.pool_balance(seeded_db, invest.id)
+        after = pool_balance(seeded_db, invest.id)
 
         assert deposit.status == DepositStatus.PAID.value
         # 押金流出使现金余额下降；available=现金余额，不再二次扣押金占用
@@ -313,24 +316,24 @@ class TestA08Deposit:
         assert after["available"] == after["cash_balance"]
 
         # 部分退回
-        finance_service.return_deposit(
+        return_deposit(
             seeded_db, deposit.id, amount=Decimal("1200"), released_on=TODAY, actor="pytest"
         )
         seeded_db.commit()
         deposit = seeded_db.get(type(deposit), deposit.id)
         assert deposit.status == DepositStatus.PARTIALLY_RETURNED.value
         assert deposit.returned_amount == Decimal("1200.00")
-        balance = orders_service.pool_balance(seeded_db, invest.id)
+        balance = pool_balance(seeded_db, invest.id)
         assert balance["deposit_held"] == Decimal("800.00")
 
     def test_return_cannot_exceed_outstanding(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
-        deposit = finance_service.create_deposit(
+        deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY, actor="pytest"
         )
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
-            finance_service.return_deposit(
+            return_deposit(
                 seeded_db, deposit.id, amount=Decimal("1500"), released_on=TODAY, actor="pytest"
             )
         assert exc.value.code == ErrorCode.PAYMENT_EXCEEDS_RECEIVABLE
@@ -338,14 +341,14 @@ class TestA08Deposit:
 class TestA06Rebate:
 
     def test_rebate_requires_active_source_order(self, seeded_db):
-        order = orders_service.create_order(
+        order = create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest"
         )
         # 新规则：订单创建即 ACTIVE；用取消态验证返利仍拒绝非活动来源单。
         order.status = "CANCELLED"
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
-            finance_service.create_rebate(
+            create_rebate(
                 seeded_db,
                 source_order_id=order.id,
                 base_amount=Decimal("100"),

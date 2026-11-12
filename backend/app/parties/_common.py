@@ -1,7 +1,6 @@
 """parties 领域共用的字段规则和客户输出转换。"""
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -14,8 +13,6 @@ from app.domain.parties import (
 )
 from app.domain.users import User
 
-FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
-ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
 CONTACT_FIELDS: tuple[str, ...] = ("contact_name", "phone", "wechat", "qq", "note")
 _UNSET = object()
 

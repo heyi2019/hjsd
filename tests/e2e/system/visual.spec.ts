@@ -73,7 +73,8 @@ test.describe("UI visual regression", () => {
     await expect(page).toHaveScreenshot("dashboard-desktop.png", {
       animations: "disabled",
       caret: "hide",
-      fullPage: true,
+      // 只截视口（默认 720 高）：全页模式会把文档流后段（业务总览/我的消息）一并拍入，
+      // 叠加 fixed 底部导航成像成「导航之下还有内容」的怪异基线；锁布局的目的在入口卡与导航。
       // 「今日关注」两个计数取自真实库数据，别的 spec 写订单后数字会变（47px 抖动）。
       // 遮掉动态数值，只锁布局与排版。
       // 「我的消息」条目（如「新的分润通知 N 条」）同样随库数据变化（59px 抖动），一并遮掉。
@@ -93,7 +94,7 @@ test.describe("UI visual regression", () => {
     await expect(page).toHaveScreenshot("dashboard-mobile.png", {
       animations: "disabled",
       caret: "hide",
-      fullPage: true,
+      // 同 desktop：只截视口，避免全页把折叠线下的总览/消息区拍入。
       // 同 desktop：遮掉随库数据变化的计数。
       // 「我的消息」条目（如「新的分润通知 N 条」）同样随库数据变化（59px 抖动），一并遮掉。
       // maskColor 用中性灰：默认 magenta 会在基线图里留大片刺眼品红（实为遮罩色，非页面渲染缺陷）。

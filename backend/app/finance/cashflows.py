@@ -386,6 +386,14 @@ def _attach_extra_values(session: Session, rows: list[dict[str, Any]]) -> None:
         row["extra_values"] = extras.get(row["id"], {})
 
 
+def _direction_sums(session: Session, stmt: Select) -> dict[str, Decimal]:
+    """按资金方向汇总金额；明细合计与工作室面板共用同一兜底口径。"""
+    return {
+        direction_value: to_money(amount or 0)
+        for direction_value, amount in session.execute(stmt).all()
+    }
+
+
 def list_cashflows(
     session: Session,
     *,
@@ -492,10 +500,7 @@ def cashflow_totals(
         keyword=keyword,
         user=user,
     ).group_by(Cashflow.direction)
-    sums = {
-        direction_value: to_money(amount or 0)
-        for direction_value, amount in session.execute(stmt).all()
-    }
+    sums = _direction_sums(session, stmt)
     return sums.get(Direction.IN.value, Decimal("0")), sums.get(Direction.OUT.value, Decimal("0"))
 
 
@@ -601,10 +606,7 @@ def studio_summary(
         ),
         **common,
     ).where(_studio_scope(), Cashflow.status == CashflowStatus.APPROVED.value).group_by(Cashflow.direction)
-    sums = {
-        direction_value: to_money(amount or 0)
-        for direction_value, amount in session.execute(totals_stmt).all()
-    }
+    sums = _direction_sums(session, totals_stmt)
     income = sums.get(Direction.IN.value, Decimal("0.00"))
     expense = sums.get(Direction.OUT.value, Decimal("0.00"))
 

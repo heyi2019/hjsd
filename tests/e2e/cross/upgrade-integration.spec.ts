@@ -30,19 +30,36 @@ test("已交付分期订单可从页面登记退款", async ({ page, request }) 
   await page.getByRole("tab", { name: "订单台账" }).click();
   await page.getByLabel("搜索订单").fill(order.order_no);
   const row = page.getByRole("row").filter({ hasText: order.order_no }).first();
-  // 订单台账行内动作现为**直接按钮**（编辑 / 分润 / 资金收支 / 取消），不再有「更多⌄」下拉。
+  // 订单台账行内动作现为**直接按钮**（编辑 / 分润配置 / 分润 / 资金收支 / 取消），不再有「更多⌄」下拉。
   await row.getByRole("button", { name: "资金收支", exact: true }).click();
   const modal = page.getByRole("dialog", { name: /资金收支/ });
-  // 资金收支表单字段口径（0057 迁移：订单退款表单调整为资金支出表单）：
-  // 金额（placeholder 请输入退款金额）、收支备注（placeholder 请输入收支备注）、发生日期、操作人。
+  // 资金收支表单口径（2026-11-12 迁移：退款并入订单资金明细，不再产生 REFUND 业务事件）：
+  // 资金流向默认支出、资金原因默认其他支出；金额（placeholder 请输入退款金额）、
+  // 收支备注（placeholder 请输入收支备注）、资金账户为必填下拉。
   await modal.getByPlaceholder("请输入退款金额").fill("30");
   await modal.getByPlaceholder("请输入收支备注").fill("联调退款");
-  const response = page.waitForResponse(r => r.url().endsWith(`/orders/${order.id}/events`) && r.request().method() === "POST");
+  // 资金账户（pool_id）必填：用 CSS 选择器定位表单项的 .ant-select-selector，
+  // 等「恰好 1 个下拉可见」再点选项，规避关闭动画期间的残留下拉。
+  await modal
+    .locator('.ant-form-item:has(.ant-form-item-label:has-text("资金账户"))')
+    .locator(".ant-select-selector")
+    .click();
+  const poolDropdown = page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)");
+  await expect(poolDropdown).toHaveCount(1, { timeout: 5000 });
+  await poolDropdown.first().locator(".ant-select-item-option", { hasText: "投资款荷包（HJ_INVEST）" }).first().click();
+  // 提交走订单资金明细接口（POST /orders/{id}/cashflows），不再 POST /orders/{id}/events。
+  const response = page.waitForResponse(r => r.url().endsWith(`/orders/${order.id}/cashflows`) && r.request().method() === "POST");
   await modal.getByRole("button", { name: /确\s*定/ }).click();
   expect((await response).status()).toBe(201);
-  const detail = await request.get(`${base}/orders/${order.id}`, { headers });
-  const body = await detail.json();
-  expect(body.events.some((event: { event_type: string; amount: string }) => event.event_type === "REFUND" && Number(event.amount) === 30)).toBe(true);
+  // 断言口径：订单下新增一笔支出（OUT）资金明细，金额 30、原因 OTHER（响应为 { items } 信封）。
+  const flows = (await (await request.get(`${base}/cashflows?order_id=${order.id}`, { headers })).json()) as {
+    items: Array<{ direction: string; amount: string; category: string; note?: string | null }>;
+  };
+  const refundFlow = flows.items.find(
+    (flow) => flow.direction === "OUT" && Number(flow.amount) === 30 && flow.category === "OTHER",
+  );
+  expect(refundFlow, "订单下应有一笔 30 元支出资金明细").toBeTruthy();
+  expect(refundFlow!.note).toBe("联调退款");
 });
 
 test("分润弹窗默认按操作模型保存四项比例", async ({ page, request }) => {
@@ -82,12 +99,13 @@ test("分润弹窗默认按操作模型保存四项比例", async ({ page, reque
   // 「搜索订单」只在「订单台账」面板内，必须先切 Tab。
   await page.getByRole("tab", { name: "订单台账" }).click();
   await page.getByLabel("搜索订单").fill(order.order_no);
-  // 订单台账行内动作现为**直接按钮**（编辑 / 分润 / 资金收支 / 取消），不再有「更多⌄」下拉。
+  // 订单台账行内动作现为**直接按钮**（编辑 / 分润配置 / 分润 / 资金收支 / 取消），不再有「更多⌄」下拉。
+  // 「分润配置」打开按操作四项分配弹窗（标题 分润 · 单号）；「分润」是支出登记动作（登记分润弹窗），勿点错。
   await page
     .getByRole("row")
     .filter({ hasText: order.order_no })
     .first()
-    .getByRole("button", { name: "分润", exact: true })
+    .getByRole("button", { name: "分润配置", exact: true })
     .click();
   const dialog = page.getByRole("dialog", { name: /分润/ });
   // 新单无存量分润 → 分润弹窗默认「按操作」模型：买号/售出/运营/公司 四项固定结构，

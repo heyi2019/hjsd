@@ -71,14 +71,8 @@ test("返点弹窗的内层编辑弹窗可关闭，且不连带关闭外层", as
   await expect(edit).toBeHidden({ timeout: 5000 });
   await expect(outer).toBeVisible();
 
-  // 3) 明细行的「删除」确认气泡打开时按 Esc：先关气泡，弹窗保留
-  //    （确认气泡属于内嵌浮层，弹窗不应越过它自己关掉）
-  await outer.getByRole("button", { name: "删除" }).first().click();
-  const popconfirm = page.locator(".ant-popconfirm").last();
-  await expect(popconfirm).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(popconfirm).toBeHidden({ timeout: 5000 });
-  await expect(outer).toBeVisible();
+  // 3) 原「明细行删除确认气泡」步骤已随「返点无作废/删除」口径下线（明细行不再有删除按钮），
+  //    内嵌浮层 Esc 不连带关弹窗的行为由第 2 步（内层编辑弹窗 Esc）继续覆盖。
 
   // 4) 焦点停在弹窗容器（未点任何字段）时，Esc 也要能关掉这一层
   await page.keyboard.press("Escape");

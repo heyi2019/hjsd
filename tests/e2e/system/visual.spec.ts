@@ -76,7 +76,11 @@ test.describe("UI visual regression", () => {
       fullPage: true,
       // 「今日关注」两个计数取自真实库数据，别的 spec 写订单后数字会变（47px 抖动）。
       // 遮掉动态数值，只锁布局与排版。
-      mask: [page.locator(".dashboard-summary .ui-stat__value")],
+      // 「我的消息」条目（如「新的分润通知 N 条」）同样随库数据变化（59px 抖动），一并遮掉。
+      mask: [
+        page.locator(".dashboard-summary .ui-stat__value"),
+        page.locator('section[aria-label="我的消息"]'),
+      ],
     });
   });
 
@@ -89,7 +93,11 @@ test.describe("UI visual regression", () => {
       caret: "hide",
       fullPage: true,
       // 同 desktop：遮掉随库数据变化的计数。
-      mask: [page.locator(".dashboard-summary .ui-stat__value")],
+      // 「我的消息」条目（如「新的分润通知 N 条」）同样随库数据变化（59px 抖动），一并遮掉。
+      mask: [
+        page.locator(".dashboard-summary .ui-stat__value"),
+        page.locator('section[aria-label="我的消息"]'),
+      ],
     });
   });
 

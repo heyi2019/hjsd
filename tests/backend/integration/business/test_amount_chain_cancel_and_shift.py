@@ -1,4 +1,4 @@
-"""金额链路回归（批次二）：CANCEL 冲销 nature 自洽 + 成交日期平移归期同源。
+"""REVERSAL-01 金额链路回归（批次二）：CANCEL 冲销 nature 自洽 + 成交日期平移归期同源。
 
 口径锚点：资金走向只有收入/支出两个大类；冲销流水必须 direction/nature 自洽，
 否则余额按方向变了、资金池收支卡片与资金日报发生额列按 (direction, nature)

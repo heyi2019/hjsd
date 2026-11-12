@@ -93,3 +93,4 @@ PROMISE,,,,,,,,TESTING-06,L2,双端,磁盘上的测试文件集合、区域归�
 PROMISE,,,,,,,,INVENTORY-03,L1,后端,账号删除仅管理员可执行且原因必填：物理删账号行，订单/事件/流水/返点全部保留并显式解绑，账号快照与原因写入审计；有分期处置记录（RESTRICT）必须 409 拒绝,关联单据被连带删除或留下悬空 account_id，历史核算与对账不可逆失真,test_account_delete.py,已覆盖,,2026-11-05 裁决
 PROMISE,,,,,,,,AUTH-02,L2,双端,免密登录准入=users.phone 已配置且在职，不开放注册；验证码票据绑定手机号与用途不可跨号复用；微信未绑定只发 bind_ticket 不发 access_token；token 带 amr 且伪造一律 401,绕过密码拿到他人会话，属账号接管级漏洞,test_passwordless_login.py,已覆盖,,2026-11-05 裁决；生产 1.0.3 显式关闭两条链路
 PROMISE,,,,,,,,PROFIT-02,L0,后端,分润基数=该订单所有收入−所有支出，可正可负可 0；收入含返点记录金额、支出含分期坏账金额，二者不生成 cashflow 也不得排除；不得按 SELL−BUY−COST 推导,利润虚高/虚低，分润与报表同源代码不同数，经营数据失真,test_profit_cashflow_basis.py,已覆盖,,2026-11-05 用户裁决；唯一权威 orders/amounts.py::order_cashflow_profit
+PROMISE,,,,,,,,NOTIFY-01,L2,后端,分润两段式通知闭环：售出完成通知本次SELL执行人去录分润；分润保存完成通知利润接收人，两次均须幂等去重,分润无人认领或重复提醒导致执行链断裂,test_notification_triggers_batch6.py,已覆盖,,2026-11-12 用户裁决

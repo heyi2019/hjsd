@@ -184,6 +184,15 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_stock_intake_contract.py": "B04",
     "test_studio_cashflow_summary.py": "D05",
     "test_unreachable_status_paths.py": "B02",
+    # 2026-11-12 金额链路/裁决批次：8 个测试文件的功能归属（首字母须与所在区域目录一致）。
+    "test_rebate_return.py": "D04",                       # finance — 返点退回挂单 OUT
+    "test_amount_chain_cancel_and_shift.py": "B03",       # business — 冲销 nature + 归期平移
+    "test_amount_chain_deposit_and_external.py": "B10",   # business — 资金两方向 + 押金口径
+    "test_amount_chain_void_and_r2.py": "B03",            # business — VOID 排除 + R2 不串列
+    "test_order_domain_logic_batch4.py": "B01",           # business — 订单域逻辑缺陷批次四
+    "test_auth_permission_batch5.py": "SYS01",            # system — 认证权限批次五
+    "test_data_infra_batch6.py": "SYS10",                 # system — 数据基础设施批次六
+    "test_notification_triggers_batch6.py": "SYS08",      # system — 分润两段式通知
 }
 
 # ---------------------------------------------------------------------------

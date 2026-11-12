@@ -236,6 +236,9 @@ GROUPS = {
         "tests/backend/integration/business/test_order_duplicate_account.py",
         "tests/backend/integration/business/test_order_event_cancellable_amount.py",
         "tests/backend/integration/business/test_profit_cashflow_basis.py",
+        # 2026-11-12 金额链路批次二 / 订单域逻辑批次四
+        "tests/backend/integration/business/test_amount_chain_cancel_and_shift.py",
+        "tests/backend/integration/business/test_order_domain_logic_batch4.py",
     ],
     "installments": [
         "tests/backend/integration/business/test_installments_contract.py",
@@ -266,6 +269,10 @@ GROUPS = {
         "tests/backend/integration/finance/test_cashflow_totals.py",
         "tests/backend/integration/finance/test_pool_balances_batch.py",
         "tests/backend/integration/finance/test_studio_cashflow_summary.py",
+        # 2026-11-12 金额链路/裁决批次（返点退回、资金两方向、金额大类口径）
+        "tests/backend/integration/finance/test_rebate_return.py",
+        "tests/backend/integration/business/test_amount_chain_deposit_and_external.py",
+        "tests/backend/integration/business/test_amount_chain_void_and_r2.py",
     ],
     "parties": [
         "tests/backend/integration/customer/test_parties.py",
@@ -298,6 +305,8 @@ GROUPS = {
         "tests/backend/integration/system/test_attachments_service.py",
         "tests/backend/integration/system/test_notifications_service.py",
         "tests/backend/integration/system/test_quality_guard.py",
+        # 2026-11-12 通知接入批次六（分润两段式）
+        "tests/backend/integration/system/test_notification_triggers_batch6.py",
     ],
     "imports": [
         "tests/backend/unit/operations/test_import_landing.py",
@@ -312,6 +321,8 @@ GROUPS = {
         "tests/backend/integration/operations/test_list_export_csv.py",
         "tests/backend/unit/system/test_deploy_script_contract.py",
         "tests/backend/unit/system/test_backup_scripts.py",
+        # 2026-11-12 数据与基础设施批次六
+        "tests/backend/integration/system/test_data_infra_batch6.py",
     ],
     "auth": [
         "tests/backend/integration/system/test_auth_contract.py",
@@ -320,6 +331,8 @@ GROUPS = {
         "tests/backend/unit/system/test_public_release_security.py",
         "tests/backend/integration/system/test_ratelimit.py",
         "tests/backend/integration/system/test_passwordless_login.py",
+        # 2026-11-12 认证权限逻辑缺陷批次五
+        "tests/backend/integration/system/test_auth_permission_batch5.py",
     ],
 }
 

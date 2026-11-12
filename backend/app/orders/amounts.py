@@ -32,7 +32,7 @@ from decimal import Decimal
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.core.money import to_money
+from app.core.money import to_money, to_money_or_zero
 from app.domain.enums import (
     AccountingAttribute,
     Direction,
@@ -96,10 +96,6 @@ def is_deposit_loss_flow(
     )
 
 
-def _money(value: object) -> Decimal:
-    return to_money(value or 0)
-
-
 def event_contribution(
     event: OrderEvent, event_types: dict[int, str]
 ) -> tuple[Decimal, Decimal, Decimal]:
@@ -107,7 +103,7 @@ def event_contribution(
 
     注意：本函数不判断 is_posted，由调用方过滤（与既有行为保持一致）。
     """
-    amount = _money(event.amount)
+    amount = to_money_or_zero(event.amount)
     if event.event_type == EventType.SELL.value:
         return amount, ZERO, ZERO
     if event.event_type == EventType.BUY.value:
@@ -190,7 +186,7 @@ def _profit_flow_rows(
     for rebate_id, order_id, occurred_on, amount in session.execute(rebate_stmt).all():
         if rebate_id in action_model_rebate_ids:
             continue
-        rows.append((int(order_id), occurred_on, _money(amount), ZERO))
+        rows.append((int(order_id), occurred_on, to_money_or_zero(amount), ZERO))
 
     bad_debt_stmt = (
         select(
@@ -214,7 +210,7 @@ def _profit_flow_rows(
     if to_date is not None:
         bad_debt_stmt = bad_debt_stmt.where(InstallmentDisposition.occurred_on <= to_date)
     for order_id, occurred_on, amount in session.execute(bad_debt_stmt).all():
-        rows.append((int(order_id), occurred_on, ZERO, _money(amount)))
+        rows.append((int(order_id), occurred_on, ZERO, to_money_or_zero(amount)))
 
     return rows
 
@@ -275,9 +271,9 @@ def order_cashflow_profit_by_order(
     for order_id, direction, total in session.execute(stmt).all():
         bucket = totals[int(order_id)]
         if direction == Direction.IN.value:
-            bucket[0] += _money(total)
+            bucket[0] += to_money_or_zero(total)
         else:
-            bucket[1] += _money(total)
+            bucket[1] += to_money_or_zero(total)
 
     for order_id, (rebate_income, bad_debt_expense) in order_profit_flow_by_order(
         session, order_ids=ids

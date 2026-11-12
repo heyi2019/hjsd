@@ -37,10 +37,10 @@ from app.domain.trade import (
 )
 from app.orders.amounts import business_cashflow_filter, order_profit_flow_by_date
 
+from app.core.money import to_money_or_zero
 from ._shared import (
     ZERO,
     _apply_order_scope,
-    _money,
     _month_key,
     _sum_report_field,
     _validate_date_range,
@@ -85,8 +85,8 @@ def r2_monthly_pnl(
     cf_stmt = _apply_order_scope(cf_stmt, user, session)
     for occurred_on, income, expense in session.execute(cf_stmt).all():
         key = _month_key(occurred_on)
-        revenue[key] += _money(income)
-        direct_cost[key] += _money(expense)
+        revenue[key] += to_money_or_zero(income)
+        direct_cost[key] += to_money_or_zero(expense)
 
     # 不生成资金流水、但有明确资金走向的事实：返点记录=收入，分期坏账=支出。
     # 与订单利润明细同源，按各自发生日归月；返点收益列只作「其中项」展示。
@@ -124,7 +124,7 @@ def r2_monthly_pnl(
                 continue
             if to_date and occurred_on > to_date:
                 continue
-            rebate_income[_month_key(occurred_on)] += _money(amount)
+            rebate_income[_month_key(occurred_on)] += to_money_or_zero(amount)
 
     # 运营费用只认资金属性，避免依赖自由填写的流水类别。
     op_stmt = select(Cashflow).where(
@@ -150,7 +150,7 @@ def r2_monthly_pnl(
             continue
         if to_date and occurred_on > to_date:
             continue
-        amount = _money(flow.amount)
+        amount = to_money_or_zero(flow.amount)
         if flow.reversal_of_id is not None:
             # 冲销流水先按「被冲销的原流水」归类，不能看冲销流水自身的方向 / 性质：
             # 冲销经营收入会生成 OUT/BUSINESS_OUT，按自身方向判断会被误记成运营费用。

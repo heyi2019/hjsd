@@ -16,10 +16,10 @@ from app.domain.trade import (
     OrderProfitAllocation,
 )
 
+from app.core.money import to_money_or_zero
 from ._shared import (
     ZERO,
     _apply_order_scope,
-    _money,
     _sum_report_field,
     _validate_date_range,
     cashflow_totals_by_order,
@@ -64,7 +64,7 @@ def r3_commission_reconciliation(
         for order_id, (income, expense, _buy) in cashflow_totals_by_order(
             session, order_ids=scoped_order_ids
         ).items():
-            per_order_profit[order_id] = _money(income - expense)
+            per_order_profit[order_id] = to_money_or_zero(income - expense)
 
     grouped: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for allocation, order in rows:
@@ -73,8 +73,8 @@ def r3_commission_reconciliation(
         if to_date and order.trade_date > to_date:
             continue
         profit = per_order_profit[order.id]
-        rate = _money(allocation.allocation_rate)
-        amount = _money(allocation.allocation_amount)
+        rate = to_money_or_zero(allocation.allocation_rate)
+        amount = to_money_or_zero(allocation.allocation_amount)
         # 分润支持「按比例」与「按金额」两种录入口径：填了金额就直接作为应付基数，
         # 否则按 利润 × 比例 计算。二者由录入校验保证不会同时出现。
         # 判据必须是 `!= 0` 而非 `> 0`：亏损单的金额本身就是负数（填 -300 表示分担 300 亏损），

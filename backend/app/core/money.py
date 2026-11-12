@@ -41,6 +41,14 @@ def to_money(value: Any, *, field: str = "amount") -> Decimal:
     return quantized
 
 
+def to_money_or_zero(value: Any) -> Decimal:
+    """金额兜底：None/空值按 0 处理，其余走 to_money 的 2 位量化。
+
+    订单金额口径与报表共用同一入口，避免两处各写一份 `value or 0`。
+    """
+    return to_money(value or 0)
+
+
 def require_positive(value: Any, *, field: str = "amount") -> Decimal:
     """V3：金额为 0 不得入库。"""
     amount = to_money(value, field=field)

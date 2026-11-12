@@ -23,9 +23,9 @@ from app.domain.enums import (
 )
 from app.domain.trade import Cashflow
 
+from app.core.money import to_money_or_zero
 from ._shared import (
     REPORT_NAMES,
-    _money,
     _sum_report_field,
     _validate_date_range,
     _visible_pool_ids,
@@ -224,8 +224,8 @@ def finance_dimension_report(
             "accounting_attribute": row["accounting_attribute"],
             "direction": row["direction"],
             "flow_count": int(row["flow_count"] or 0),
-            "amount": _money(row["amount"]),
-            "signed_amount": _money(row["signed_amount"]),
+            "amount": to_money_or_zero(row["amount"]),
+            "signed_amount": to_money_or_zero(row["signed_amount"]),
         }
         for row in rows
     ]

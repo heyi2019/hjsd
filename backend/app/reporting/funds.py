@@ -24,9 +24,9 @@ from app.domain.trade import (
 )
 from app.orders.amounts import business_cashflow_filter
 
+from app.core.money import to_money_or_zero
 from ._shared import (
     ZERO,
-    _money,
     _sum_report_field,
     _visible_pool_ids,
 )
@@ -80,7 +80,7 @@ def daily_funds_report(
             )
             .group_by(Cashflow.pool_id)
         ):
-            opening_by_pool[pool_id] = _money(amount)
+            opening_by_pool[pool_id] = to_money_or_zero(amount)
         for pool_id, direction, nature, amount in session.execute(
             select(
                 Cashflow.pool_id,
@@ -96,13 +96,13 @@ def daily_funds_report(
             )
             .group_by(Cashflow.pool_id, Cashflow.direction, Cashflow.nature)
         ):
-            day_cells.setdefault(pool_id, {})[(direction, nature)] = _money(amount)
+            day_cells.setdefault(pool_id, {})[(direction, nature)] = to_money_or_zero(amount)
         for pool_id, amount in session.execute(
             select(Deposit.pool_id, func.coalesce(func.sum(Deposit.paid_amount), 0))
             .where(Deposit.pool_id.in_(ids), Deposit.paid_on == target)
             .group_by(Deposit.pool_id)
         ):
-            deposit_paid_by_pool[pool_id] = _money(amount)
+            deposit_paid_by_pool[pool_id] = to_money_or_zero(amount)
 
     # 池可见性已由上面的 pool_stmt 收敛，这里不再重复做 can_see_pool 校验，
     # 与改动前 pool_balance(session, pool.id) 不传 user 的行为一致。

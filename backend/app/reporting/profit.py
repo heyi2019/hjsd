@@ -26,10 +26,10 @@ from app.domain.trade import (
     RebateRecord,
 )
 
+from app.core.money import to_money_or_zero
 from ._shared import (
     ZERO,
     _apply_order_scope,
-    _money,
     _sum_report_field,
     _validate_date_range,
     cashflow_totals_by_order,
@@ -74,7 +74,7 @@ def order_profit_detail(
             .group_by(RebateRecord.source_order_id)
         )
         for source_order_id, amount in rebate_rows:
-            rebate_by_order[int(source_order_id)] = _money(amount)
+            rebate_by_order[int(source_order_id)] = to_money_or_zero(amount)
     no_totals = (ZERO, ZERO, ZERO)
     items = []
     for order in orders:

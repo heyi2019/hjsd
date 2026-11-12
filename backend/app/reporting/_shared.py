@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 from app.core.errors import Validation
-from app.core.money import to_money
+from app.core.money import to_money_or_zero
 from app.core.security import CurrentUser
 from app.core.security import owner_scope_filter
 from sqlalchemy import (
@@ -62,10 +62,6 @@ def _validate_date_range(
 # ----------------------------------------------- 坏账 / 期间 / 范围过滤
 def _sum_report_field(items: list[dict[str, Any]], field: str) -> Decimal:
     return sum((item[field] for item in items), ZERO)
-
-
-def _money(value: Any) -> Decimal:
-    return to_money(value or 0)
 
 
 def cashflow_totals_by_order(
@@ -122,7 +118,7 @@ def cashflow_totals_by_order(
     if to_date is not None:
         stmt = stmt.where(Cashflow.occurred_on <= to_date)
     totals: dict[int, list[Decimal]] = {
-        int(order_id): [_money(income), _money(expense), _money(buy)]
+        int(order_id): [to_money_or_zero(income), to_money_or_zero(expense), to_money_or_zero(buy)]
         for order_id, income, expense, buy in session.execute(stmt).all()
     }
     for order_id, (rebate_income, bad_debt_expense) in order_profit_flow_by_order(

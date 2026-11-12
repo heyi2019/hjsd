@@ -1,93 +1,23 @@
-"""parties 领域共用的字段规则、实体映射和客户输出转换。"""
+"""parties 领域共用的字段规则和客户输出转换。"""
 from __future__ import annotations
 
 import re
 from collections.abc import Mapping
 from typing import Any
 
-from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
-from app.domain.enums import EntityType
 from app.domain.parties import (
     Counterparty,
     Customer,
-    CustomerLead,
 )
-from app.domain.foundation import Pool
-from app.domain.trade import Account, Cashflow, Installment, Order
 from app.domain.users import User
 
 FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
 CONTACT_FIELDS: tuple[str, ...] = ("contact_name", "phone", "wechat", "qq", "note")
 _UNSET = object()
-
-_EXTRA_ENTITY_MODELS: dict[str, type] = {
-    EntityType.ORDER.value: Order,
-    EntityType.ACCOUNT.value: Account,
-    EntityType.CUSTOMER.value: Customer,
-    EntityType.INSTALLMENT.value: Installment,
-    EntityType.POOL.value: Pool,
-    EntityType.CASHFLOW.value: Cashflow,
-    EntityType.LEAD.value: CustomerLead,
-    EntityType.COUNTERPARTY.value: Counterparty,
-}
-
-# These fields are assembled by routers rather than persisted on the entity
-# row.  A live field with one of these keys would be silently overwritten in
-# the response, so it is reserved just like a real model column.
-_FIXED_OUTPUT_FIELDS: dict[str, set[str]] = {
-    EntityType.ORDER.value: {
-        "events",
-        "links",
-        "cashflows",
-        "rebates",
-        "installment",
-        "installment_schedule",
-        "audit",
-        "attachments",
-        "account_game_type",
-        "account_game_account",
-        "account_channel_region",
-        "account_business_mode",
-        "account_platform",
-        "account_status",
-        "party_name",
-        "party_role",
-        "party_source",
-        "party_created_by",
-        "party_created_at",
-        "event_total",
-        "last_event_type",
-        "last_event_amount",
-        "last_event_on",
-        "installment_principal",
-        "installment_paid",
-        "installment_periods",
-        "installment_status",
-    },
-    EntityType.ACCOUNT.value: {"source_order_no"},
-    EntityType.CUSTOMER.value: {
-        "contact_masked",
-        "order_roles",
-        "active_order_count",
-        "last_interaction_at",
-    },
-    EntityType.CASHFLOW.value: {"order_no", "source", "occurred_at", "operator"},
-}
-
-
-def _fixed_entity_fields(entity_type: str) -> set[str]:
-    """Return persisted/API-reserved names that a live field cannot shadow."""
-    model = _EXTRA_ENTITY_MODELS[entity_type]
-    return (
-        {column.key for column in inspect(model).mapper.column_attrs}
-        | {"extra_values"}
-        | _FIXED_OUTPUT_FIELDS.get(entity_type, set())
-    )
-
 
 def _required_text(value: Any, *, message: str, field: str) -> str:
     if not isinstance(value, str) or not value.strip():

@@ -159,8 +159,8 @@ def main() -> int:
                 cur["reason"] = v["reason"]
 
     now = datetime.now()
-    run_id = f"{now.strftime('%Y%m%d-%H%M%S')}-{git_commit(REPO)}-fe"
     commit = git_commit(REPO)
+    run_id = f"{now.strftime('%Y%m%d-%H%M%S')}-{commit}-fe"
     env = "ci" if (os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS")) else "local"
     evidence = str(report_path.name)
 

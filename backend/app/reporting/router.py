@@ -15,7 +15,8 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.lists.export import build_list_csv, csv_file_response
+from app.lists.export import build_list_csv
+from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.lists.scopes import report_scope
 from app.reporting.export import finance_dimension_report, report_csv, report_for_export
 from app.reporting.funds import daily_funds_report
@@ -164,7 +165,7 @@ def export_report(
         },
     )
     filename = f"{report_name}-{date.today().isoformat()}.csv"
-    return csv_file_response(csv_text, filename)
+    return file_response(csv_text, filename, CSV_MEDIA_TYPE)
 
 
 __all__ = ["router"]

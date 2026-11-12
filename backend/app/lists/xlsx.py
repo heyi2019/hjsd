@@ -14,9 +14,7 @@ import json
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
-from urllib.parse import quote
 
-from fastapi import Response
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
@@ -233,16 +231,3 @@ def xlsx_bytes(workbook: Workbook) -> bytes:
     buffer = io.BytesIO()
     workbook.save(buffer)
     return buffer.getvalue()
-
-
-def xlsx_file_response(content: bytes, filename: str) -> Response:
-    """统一的 xlsx 下载响应；中文文件名走 RFC 5987 `filename*`（HTTP 头只允许 latin-1）。"""
-    if filename.isascii():
-        disposition = f'attachment; filename="{filename}"'
-    else:
-        disposition = f"attachment; filename*=UTF-8''{quote(filename)}"
-    return Response(
-        content=content,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": disposition},
-    )

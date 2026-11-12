@@ -27,7 +27,8 @@ from app.value_added_services import recovery as inst_recovery
 from app.value_added_services import repayment as inst_repayment
 from app.value_added_services import settlement as inst_settlement
 from app.lists import service as list_columns_service
-from app.lists.export import build_list_csv, csv_file_response, detail_json
+from app.lists.export import build_list_csv, detail_json
+from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.parties.fields import get_extra_values, get_extra_values_bulk
 
 router = APIRouter(tags=["HS-01 分期合约"])
@@ -175,7 +176,7 @@ def export_installments_csv(
         actor=_user.username,
         after={"rows": len(rows), "column_count": meta["column_count"]},
     )
-    return csv_file_response(csv_text, f"分期与回款-{date.today().isoformat()}.csv")
+    return file_response(csv_text, f"分期与回款-{date.today().isoformat()}.csv", CSV_MEDIA_TYPE)
 
 
 @router.post("/installments", response_model=schemas.InstallmentOut, status_code=201)

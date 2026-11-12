@@ -57,7 +57,8 @@ from app.finance.transfers import (
 )
 from app.domain.enums import AuditAction
 from app.domain.trade import Deposit
-from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
+from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
+from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.orders._shared import get_order
 
 from .router_output import (
@@ -228,7 +229,7 @@ def export_cashflows_csv(
         actor=user.username,
         after={"rows": len(rows), "column_count": meta["column_count"]},
     )
-    return csv_file_response(csv_text, f"资金流水-{date.today().isoformat()}.csv")
+    return file_response(csv_text, f"资金流水-{date.today().isoformat()}.csv", CSV_MEDIA_TYPE)
 
 
 @router.post("/cashflows", response_model=schemas.CashflowOut, status_code=201)
@@ -574,7 +575,7 @@ def export_rebates_csv(
         actor=_user.username,
         after={"rows": len(rows), "column_count": meta["column_count"]},
     )
-    return csv_file_response(csv_text, f"返点-{date.today().isoformat()}.csv")
+    return file_response(csv_text, f"返点-{date.today().isoformat()}.csv", CSV_MEDIA_TYPE)
 
 
 @router.get("/rebates/{rebate_id}", response_model=schemas.RebateOut)

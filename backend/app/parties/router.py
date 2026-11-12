@@ -26,7 +26,8 @@ from app.core.security import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
-from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv, csv_file_response
+from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
+from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.parties import schemas
 from app.parties._common import to_counterparty_out, to_customer_out
 from app.parties.counterparties import (
@@ -185,7 +186,7 @@ def export_customers_csv(
             "truncated": meta["truncated"],
         },
     )
-    return csv_file_response(csv_text, f"客户-{date.today().isoformat()}.csv")
+    return file_response(csv_text, f"客户-{date.today().isoformat()}.csv", CSV_MEDIA_TYPE)
 
 
 @router.post(

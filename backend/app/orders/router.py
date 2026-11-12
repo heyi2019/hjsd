@@ -38,10 +38,10 @@ from app.lists.export import (
     EXPORT_ROW_LIMIT,
     UI_ONLY_KEYS,
     build_list_csv,
-    csv_file_response,
     inject_custom_columns,
 )
-from app.lists.xlsx import new_workbook, write_sheet, xlsx_bytes, xlsx_file_response
+from app.lists.file_response import CSV_MEDIA_TYPE, XLSX_MEDIA_TYPE, file_response
+from app.lists.xlsx import new_workbook, write_sheet, xlsx_bytes
 from app.orders import schemas
 from app.orders._shared import get_order as orders_get_order
 from app.orders.cancellation_model import cancel_order as orders_cancel_order
@@ -189,7 +189,7 @@ def export_orders_csv(
         actor=_user.username,
         after={"rows": len(rows), "column_count": meta["column_count"]},
     )
-    return csv_file_response(csv_text, f"订单台账-{date.today().isoformat()}.csv")
+    return file_response(csv_text, f"订单台账-{date.today().isoformat()}.csv", CSV_MEDIA_TYPE)
 
 
 @router.get("/orders/export.xlsx")
@@ -347,7 +347,7 @@ def export_orders_xlsx(
             },
         },
     )
-    return xlsx_file_response(content, f"订单台账-{date.today().isoformat()}.xlsx")
+    return file_response(content, f"订单台账-{date.today().isoformat()}.xlsx", XLSX_MEDIA_TYPE)
 
 
 @router.post("/orders", response_model=schemas.OrderOut, status_code=201)

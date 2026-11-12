@@ -13,9 +13,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from urllib.parse import quote
 
-from fastapi import Response
 from sqlalchemy.orm import Session
 
 from app.lists import service as list_columns_service
@@ -124,16 +122,3 @@ def build_list_csv(
         "row_count": len(items),
         "truncated": truncated,
     }
-
-
-def csv_file_response(csv_text: str, filename: str) -> Response:
-    """统一的 CSV 下载响应；中文文件名走 RFC 5987 `filename*`（HTTP 头只允许 latin-1）。"""
-    if filename.isascii():
-        disposition = f'attachment; filename="{filename}"'
-    else:
-        disposition = f"attachment; filename*=UTF-8''{quote(filename)}"
-    return Response(
-        content=csv_text,
-        media_type="text/csv",
-        headers={"Content-Disposition": disposition},
-    )

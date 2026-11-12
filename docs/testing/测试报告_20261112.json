@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-11-12 17:23 UTC",
-  "last_run_id": "20261113-011653-9bd038e2-87999",
-  "run_batches": 240,
+  "generated_at": "2026-11-12 18:01 UTC",
+  "last_run_id": "20261113-020143-f4be23c8-e2e",
+  "run_batches": 241,
   "cases_total": 2822,
   "module_def": {
     "A": 22,
@@ -19,7 +19,7 @@
   },
   "cross_flow_cases": 8,
   "no_execution": 0,
-  "fail_error": 7,
+  "fail_error": 0,
   "skip": 0,
   "retired_cases": 451,
   "pending_criteria": 0,

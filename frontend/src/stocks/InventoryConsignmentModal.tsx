@@ -25,7 +25,7 @@ function listedPlatforms(detail: AccountExecutionDetail): ListedPlatform[] {
       key: order.order_id,
       platform: consignmentPlatform(order) ?? "-",
       price: (order.extra_values?.consignment_price as number | string | undefined) ?? null,
-      listedAt: formatDateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date)),
+      listedAt: formatDateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? "")),
     }));
 }
 

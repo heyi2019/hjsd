@@ -27,7 +27,7 @@ export function consignmentRecords(orders: AccountExecutionOrder[]): ActiveConsi
       orderId: order.order_id,
       orderNo: order.order_no,
       platform: consignmentPlatform(order) ?? "-",
-      listedAt: formatDateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date)),
+      listedAt: formatDateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? "")),
     }));
 }
 
@@ -48,7 +48,7 @@ export function InventoryPlatformOffsaleModal(props: {
       orderId: "SYSTEM",
       orderNo: "ERP",
       platform: "本系统",
-      listedAt: formatDateTimeMinute(String(props.account.created_at ?? props.account.buy_date)),
+      listedAt: formatDateTimeMinute(String(props.account.created_at ?? props.account.buy_date ?? "")),
     }
     : null;
   const displayRecords: DisplayConsignment[] = systemRecord ? [...props.records, systemRecord] : props.records;

@@ -1,8 +1,8 @@
-"""INVENTORY-03 账号台账删除（2026-11-05 裁决）回归锁。
+"""INVENTORY-03 库存全量删除（2026-11-13 裁决）回归锁。
 
-口径：物理删除账号行，**订单/事件/资金流水/返点全部保留并解绑**；
+口径：物理删除库存行，**关联订单/事件/资金流水/返点全部删除**；
 仅系统管理员可删，删除原因必填且写入审计日志；
-有分期处置记录（RESTRICT 外键）时必须显式拒绝，不能漏成 500。
+审计日志与客户、合作方等主数据保留。
 """
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ def _delete(seeded_client, account_id: int, *, headers: dict[str, str], reason: 
     )
 
 
-def test_delete_account_keeps_orders_and_audit_reason(seeded_client, seeded_db, headers):
+def test_delete_inventory_removes_orders_and_keeps_audit_reason(seeded_client, seeded_db, headers):
     account_id, order_id = _account_with_order(seeded_db)
     stock_no = seeded_db.get(Account, account_id).stock_no
     response = _delete(seeded_client, account_id, headers=headers, reason="重复录入，需清理")
@@ -67,10 +67,9 @@ def test_delete_account_keeps_orders_and_audit_reason(seeded_client, seeded_db, 
     seeded_db.expire_all()
 
     assert seeded_db.get(Account, account_id) is None
-    order = seeded_db.get(Order, order_id)
-    assert order is not None and order.account_id is None, "订单必须保留并解绑账号"
-    assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order_id)) is not None
-    assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.order_id == order_id)) is not None
+    assert seeded_db.get(Order, order_id) is None
+    assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order_id)) is None
+    assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.order_id == order_id)) is None
 
     audit = seeded_db.scalar(
         select(AuditLog).where(
@@ -81,7 +80,7 @@ def test_delete_account_keeps_orders_and_audit_reason(seeded_client, seeded_db, 
     assert audit is not None and audit.reason == "重复录入，需清理"
     assert audit.before_json["stock_no"] == stock_no
     assert audit.before_json["game_account"] == "delete-target"
-    assert audit.after_json["unlinked_orders"][0]["order_no"] == order.order_no
+    assert audit.after_json["deleted_orders"][0]["id"] == order_id
 
     listed = seeded_client.get("/api/v1/stocks", headers=headers)
     assert listed.status_code == 200
@@ -100,7 +99,7 @@ def test_delete_requires_non_blank_reason(seeded_client, seeded_db, headers):
     ) is None
 
 
-def test_non_admin_cannot_delete_account(seeded_client, seeded_db, operator_headers):
+def test_non_admin_cannot_delete_inventory(seeded_client, seeded_db, operator_headers):
     account_id, _ = _account_with_order(seeded_db, "operator-target")
     response = _delete(seeded_client, account_id, headers=operator_headers)
     assert response.status_code == 403, response.text
@@ -108,7 +107,7 @@ def test_non_admin_cannot_delete_account(seeded_client, seeded_db, operator_head
     assert seeded_db.get(Account, account_id) is not None
 
 
-def test_installment_disposition_blocks_delete(seeded_client, seeded_db, headers):
+def test_installment_disposition_is_removed_with_inventory(seeded_client, seeded_db, headers):
     account_id, order_id = _account_with_order(seeded_db, "disposition-target")
     inst = Installment(
         inst_no="DEL-DISP-001",
@@ -141,10 +140,13 @@ def test_installment_disposition_blocks_delete(seeded_client, seeded_db, headers
     seeded_db.commit()
 
     response = _delete(seeded_client, account_id, headers=headers)
-    assert response.status_code == 409, response.text
+    assert response.status_code == 204, response.text
     seeded_db.expire_all()
-    assert seeded_db.get(Account, account_id) is not None
-    assert seeded_db.get(Order, order_id).account_id == account_id
+    assert seeded_db.get(Account, account_id) is None
+    assert seeded_db.get(Order, order_id) is None
+    assert seeded_db.scalar(
+        select(InstallmentDisposition.id).where(InstallmentDisposition.account_id == account_id)
+    ) is None
 
 
 def test_delete_unknown_account_returns_404(seeded_client, headers):

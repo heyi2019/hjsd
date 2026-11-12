@@ -31,10 +31,10 @@ from app.stocks.inventory import (
     list_accounts as stocks_list_accounts,
 )
 from app.stocks.profile import (
-    delete_account as stocks_delete_account,
     get_account,
     update_account_profile as stocks_update_account_profile,
 )
+from app.stocks.deletion import delete_inventory as stocks_delete_inventory
 from app.parties.fields import get_extra_values
 from app.domain.foundation import AuditLog, Pool
 from app.domain.parties import Customer, Counterparty, OrderCounterpartyRole, OrderCustomerRole
@@ -297,25 +297,25 @@ def update_account_profile(
 
 
 def _require_admin(user: CurrentUser) -> None:
-    """账号删除不可逆：权限收紧到系统管理员，operator/finance 即使有建单权也不可删。"""
+    """删除库存不可逆：权限收紧到系统管理员，operator/finance 即使有建单权也不可删。"""
     if not user.is_admin:
-        raise PermissionDenied("仅系统管理员可删除账号")
+        raise PermissionDenied("仅系统管理员可删除库存")
 
 
 @router.delete("/stocks/{account_id}", status_code=204, response_model=None)
-def delete_account(
+def delete_inventory(
     account_id: int,
     payload: AccountDeleteRequest,
     db: Session = Depends(get_db),
     user: CurrentUser = manage,
 ) -> Response:
-    """删除库存账号（仅管理员）。
+    """删除库存及其全部订单从属数据（仅管理员）。
 
-    请求体必带删除原因（空白一律 422）；账号行物理删除，订单/事件/流水/返点
-    全部保留并解绑，账号快照与原因写入审计日志，操作不可恢复。
+    请求体必带删除原因（空白一律 422）；库存及其订单/事件/流水/返点等从属数据
+    全部物理删除，库存快照与原因写入审计日志，操作不可恢复。
     """
     _require_admin(user)
-    stocks_delete_account(db, account_id, actor=_actor(user), reason=payload.reason, user=user)
+    stocks_delete_inventory(db, account_id, actor=_actor(user), reason=payload.reason, user=user)
     return Response(status_code=204)
 
 

@@ -181,7 +181,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   LEAD_CLOSE: "关闭需求",
   ACCOUNT_CREATE: "新建账号",
   ACCOUNT_UPDATE: "编辑账号",
-  ACCOUNT_DELETE: "删除账号",
+  ACCOUNT_DELETE: "删除库存",
   ORDER_CREATE: "新建订单",
   ORDER_UPDATE: "编辑订单",
   ORDER_CANCEL: "取消",

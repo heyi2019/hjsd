@@ -202,7 +202,7 @@ describe("OrderDetail", () => {
 
     expect(screen.getByText("新建订单")).toBeInTheDocument();
     expect(screen.getByText("新建账号")).toBeInTheDocument();
-    expect(screen.getByText("删除账号")).toBeInTheDocument();
+    expect(screen.getByText("删除库存")).toBeInTheDocument();
     expect(screen.getByText("变更订单表单字段")).toBeInTheDocument();
     expect(screen.queryByText("ORDER_CREATE")).not.toBeInTheDocument();
     expect(screen.queryByText("ACCOUNT_CREATE")).not.toBeInTheDocument();

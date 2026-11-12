@@ -90,5 +90,8 @@ export function configurableLabel(
   fallbackLabels?: Record<string, string>,
 ): string {
   if (!value) return "-";
+  // AUDIT_ACTION 是后端只读字典，前端 fallback 是产品固定口径；已知动作不能被旧库中的
+  // 历史文案覆盖，否则本地 dev 数据未重播种时会继续展示旧名称。
+  if (code === "AUDIT_ACTION" && fallbackLabels?.[value]) return fallbackLabels[value];
   return optionLabelSync(code, value) ?? fallbackLabels?.[value] ?? value;
 }

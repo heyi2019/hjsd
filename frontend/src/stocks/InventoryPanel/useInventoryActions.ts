@@ -216,7 +216,7 @@ export function useInventoryActions(params: {
       setVoiding(false);
     }
   }
-  /** 删除账号成功后重拉台账：订单已解绑，上层订单/分期视图也要同步刷新。 */
+  /** 删除库存成功后重拉台账：关联订单已清理，上层订单/分期视图也要同步刷新。 */
   async function submitDelete(reason: string) {
     if (!deleteTarget) return;
     const target = deleteTarget;
@@ -227,7 +227,7 @@ export function useInventoryActions(params: {
       dropExecutionCache(target.id);
       if (inlineEditId === target.id) cancelInlineEdit();
       expandTo(expandedAccountIds.filter((key) => String(key) !== String(target.id)));
-      appMessage.success("账号已删除");
+      appMessage.success("库存已删除");
       await load();
       onOrdersChanged?.();
     } catch (cause) {

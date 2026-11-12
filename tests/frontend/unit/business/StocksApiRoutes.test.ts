@@ -30,7 +30,7 @@ describe("stocksApi 路由", () => {
     expect(apiMock.patch).toHaveBeenNthCalledWith(2, "/stocks/7/execution-edit", { profile: {}, events: [] });
   });
 
-  it("删除账号走 DELETE /stocks/{id} 且请求体带删除原因", async () => {
+  it("删除库存走 DELETE /stocks/{id} 且请求体带删除原因", async () => {
     await stocksApi.remove(7, "重复录入");
 
     expect(apiMock.delete).toHaveBeenCalledWith("/stocks/7", { data: { reason: "重复录入" } });

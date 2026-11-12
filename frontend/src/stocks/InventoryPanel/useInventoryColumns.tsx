@@ -176,13 +176,13 @@ export function useInventoryColumns(params: {
             type="link"
             size="small"
             danger
-            aria-label="删除账号"
+            aria-label="删除库存"
             onClick={(event) => {
               event.stopPropagation();
               setDeleteTarget(row);
             }}
           >
-            删除
+            删除库存
           </PermissionButton> : null}
         </Space>
       ),

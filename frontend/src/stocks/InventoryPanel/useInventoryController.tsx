@@ -7,7 +7,7 @@ import { useInventoryActions } from "./useInventoryActions";
 import { useInventoryColumns } from "./useInventoryColumns";
 
 export function useInventoryController({ refreshKey = 0, active = true, onOrdersChanged, onNavigate }: { refreshKey?: number; active?: boolean; onOrdersChanged?: () => void; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
-  // 账号删除不可逆：按钮按系统角色显隐，后端仍做管理员二次鉴权。
+  // 删除库存不可逆：按钮按系统角色显隐，后端仍做管理员二次鉴权。
   const { role } = useSession();
   const canDelete = role === "admin";
 

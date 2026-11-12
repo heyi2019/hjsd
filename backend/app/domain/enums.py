@@ -476,7 +476,7 @@ class AuditAction(StrEnum):
     LEAD_CLOSE = "LEAD_CLOSE"
     ACCOUNT_CREATE = "ACCOUNT_CREATE"
     ACCOUNT_UPDATE = "ACCOUNT_UPDATE"
-    # 账号删除：物理删账号行但保留订单/流水/返点，审计必须带删除原因与账号快照。
+    # 删除库存：物理删库存及其关联订单从属数据，审计必须带删除原因与库存快照。
     ACCOUNT_DELETE = "ACCOUNT_DELETE"
     ORDER_CREATE = "ORDER_CREATE"
     ORDER_UPDATE = "ORDER_UPDATE"

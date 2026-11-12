@@ -30,7 +30,7 @@ export const stocksApi = {
     api
       .post<InventoryStats>("/stocks/inventory/stats", { account_ids: accountIds })
       .then((r) => r.data),
-  /** 删除账号不可恢复：原因必填，由后端写入审计日志（仅管理员可调用）。 */
+  /** 删除库存不可恢复：原因必填，由后端写入审计日志（仅管理员可调用）。 */
   remove: (id: number, reason: string) =>
     api.delete<void>(`/stocks/${id}`, { data: { reason } }).then(() => undefined),
   executionDetail: (id: number) =>

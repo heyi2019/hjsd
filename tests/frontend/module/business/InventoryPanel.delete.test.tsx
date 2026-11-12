@@ -28,16 +28,16 @@ beforeEach(() => {
   vi.mocked(stocksApi.remove).mockResolvedValue(undefined);
 });
 
-describe("InventoryPanel：账号删除二次确认", () => {
+describe("InventoryPanel：删除库存二次确认", () => {
   it("管理员可删除，原因必填，确认后才调用删除接口并刷新台账", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
 
-    const deleteButtons = await screen.findAllByRole("button", { name: "删除账号" });
+    const deleteButtons = await screen.findAllByRole("button", { name: "删除库存" });
     expect(deleteButtons.length).toBeGreaterThan(0);
     await ui.click(deleteButtons[0]);
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("删除账号")).toBeInTheDocument();
+    expect(within(dialog).getByText("删除库存")).toBeInTheDocument();
     expect(within(dialog).getByText(/此操作不可恢复，请二次确认/)).toBeInTheDocument();
     const reasonInput = within(dialog).getByRole("textbox", { name: "删除原因" });
     const confirm = within(dialog).getByRole("button", { name: "确认删除" });
@@ -63,7 +63,7 @@ describe("InventoryPanel：账号删除二次确认", () => {
   it("纯空白原因同样被拦下", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
 
-    const deleteButtons = await screen.findAllByRole("button", { name: "删除账号" });
+    const deleteButtons = await screen.findAllByRole("button", { name: "删除库存" });
     await ui.click(deleteButtons[0]);
     const dialog = await screen.findByRole("dialog");
     await ui.type(within(dialog).getByRole("textbox", { name: "删除原因" }), "   ");
@@ -77,14 +77,14 @@ describe("InventoryPanel：账号删除二次确认", () => {
     renderLight(<InventoryPanel />, { user: "operator" });
 
     await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
-    expect(screen.queryByRole("button", { name: "删除账号" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "删除库存" })).toBeNull();
   });
 
   it("删除失败时弹窗保持打开，可改原因重试", async () => {
     vi.mocked(stocksApi.remove).mockRejectedValue(new Error("该账号存在分期处置记录"));
     renderLight(<InventoryPanel />, { user: "admin" });
 
-    const deleteButtons = await screen.findAllByRole("button", { name: "删除账号" });
+    const deleteButtons = await screen.findAllByRole("button", { name: "删除库存" });
     await ui.click(deleteButtons[0]);
     const dialog = await screen.findByRole("dialog");
     await ui.type(within(dialog).getByRole("textbox", { name: "删除原因" }), "尝试删除");

@@ -196,7 +196,7 @@ _ORDER_EVENT_OPTIONS = [
     {"value": "REBATE", "label": "返点"},
 ]
 _AUDIT_ACTION_ADDITIONS = {
-    "ACCOUNT_DELETE": "删除账号",
+    "ACCOUNT_DELETE": "删除库存",
     "LIST_COLUMNS_UPDATE": "列表列显示配置变更",
     "LIST_COLUMNS_RESET": "列表列配置恢复默认",
     "LIST_COLUMN_ADD": "列表新增自定义列",
@@ -231,7 +231,13 @@ def seed_catalog(session: Session, *, actor: str = "system") -> None:
     data = json.loads(zlib.decompress(base64.b64decode(_CATALOG_BLOB)))
     for raw_values in data["option_sets"]:
         values = _normalized_option_set(raw_values)
-        if session.scalar(select(OptionSet).where(OptionSet.code == values["code"])):
+        existing = session.scalar(select(OptionSet).where(OptionSet.code == values["code"]))
+        if existing:
+            # 审计动作是只读系统字典，产品文案变更时要修正已有 dev/本地库，
+            # 不能只在首次建库时写入，否则旧库会持续覆盖前端固定口径。
+            if values["code"] == "AUDIT_ACTION" and existing.options != values["options"]:
+                existing.options = values["options"]
+                existing.updated_by = actor
             continue
         values = {**values, "created_by": actor, "updated_by": actor}
         session.add(OptionSet(**values))

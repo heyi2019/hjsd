@@ -158,6 +158,19 @@ def get_config(session: Session, scope_code: str) -> dict[str, Any]:
     )
 
 
+def _config_snapshot(rows: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """列显示配置的审计前值快照（四字段口径）。"""
+    return {
+        key: {
+            "is_visible": row.is_visible,
+            "sort_order": row.sort_order,
+            "width": row.width,
+            "fixed": row.fixed,
+        }
+        for key, row in rows.items()
+    }
+
+
 def reset_config(session: Session, scope_code: str, *, actor: str) -> dict[str, Any]:
     """恢复默认：清空该列表的全部**显示配置行**，回到注册表 + 自定义列定义的默认顺序。
 
@@ -171,15 +184,7 @@ def reset_config(session: Session, scope_code: str, *, actor: str) -> dict[str, 
     rows = _rows_for_scope(session, scope_code)
     customs = _custom_rows_for_scope(session, scope_code)
     if rows:
-        before = {
-            key: {
-                "is_visible": row.is_visible,
-                "sort_order": row.sort_order,
-                "width": row.width,
-                "fixed": row.fixed,
-            }
-            for key, row in rows.items()
-        }
+        before = _config_snapshot(rows)
         for row in rows.values():
             session.delete(row)
         session.flush()
@@ -226,15 +231,7 @@ def save_config(
         seen.add(key)
 
     rows = _rows_for_scope(session, scope_code)
-    before = {
-        key: {
-            "is_visible": row.is_visible,
-            "sort_order": row.sort_order,
-            "width": row.width,
-            "fixed": row.fixed,
-        }
-        for key, row in rows.items()
-    }
+    before = _config_snapshot(rows)
     changed = False
     for index, item in enumerate(items):
         key = item["column_key"]

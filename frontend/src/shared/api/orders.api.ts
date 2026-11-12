@@ -96,6 +96,8 @@ export const ordersApi = {
     api.delete<void>(`/orders/${orderId}/links/${linkId}`).then((r) => r.data),
   cancel: (orderId: number, payload: { reason: string; form_extra?: Record<string, unknown>; form_extra_scope?: string }) =>
     api.post<Order>(`/orders/${orderId}/cancel`, payload).then((r) => r.data),
+  deleteOrder: (orderId: number, reason: string) =>
+    api.delete<void>(`/orders/${orderId}`, { data: { reason } }).then((r) => r.data),
   create: (payload: {
     order_type: string;
     trade_date: string;

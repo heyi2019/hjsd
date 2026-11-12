@@ -486,15 +486,6 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("运营员（operator）")).toBeInTheDocument();
   });
 
-  it("订单台账：删除账号复用库存中心入口", async () => {
-    await openLedger();
-    const row = tableRow("HS-2026-0001");
-    expect(within(row).getByRole("button", { name: "返点" })).toBeInTheDocument();
-    expect(within(row).getByRole("button", { name: "售出" })).toBeInTheDocument();
-    expect(within(row).getByRole("button", { name: "寄售" })).toBeInTheDocument();
-    expect(within(row).getByRole("button", { name: "删除账号" })).toBeInTheDocument();
-  });
-
   it("分润：按人分配点「增加一行」时姓名默认当前登录人", async () => {
     // 存量按人（无 allocation_type）走 PERSON 口径；新增行过去只默认 role=OWNER、姓名留空。
     vi.mocked(policyApi.allocations).mockResolvedValue({

@@ -165,6 +165,12 @@ class OrderCancelIn(BaseModel):
     form_extra_scope: str | None = Field(default=None, min_length=2, max_length=16)
 
 
+class OrderDeleteIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(min_length=1, max_length=500)
+
+
 class OrderOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -437,6 +443,7 @@ __all__ = [
     "OrderAccountSnapshot",
     "OrderCreate",
     "OrderCancelIn",
+    "OrderDeleteIn",
     "OrderInstallmentCreate",
     "OrderLinkCreate",
     "OrderInstallmentScheduleCreate",

@@ -12,7 +12,7 @@ import { formatOrderAmount } from "./helpers";
  * 本模块只描述列的展示与点击转发，不持有任何状态、不发任何请求。
  */
 export function useLedgerColumns(params: {
-  canDeleteAccount: boolean;
+  canDeleteOrder: boolean;
   openLedgerEditor: (order: Order) => void;
   openAllocations: (order: Order) => void;
   openRefund: (order: Order) => void;
@@ -26,7 +26,7 @@ export function useLedgerColumns(params: {
   openOrderDelete: (order: Order) => void;
 }) {
   const {
-    canDeleteAccount,
+    canDeleteOrder,
     openLedgerEditor,
     openAllocations,
     openRefund,
@@ -147,15 +147,14 @@ export function useLedgerColumns(params: {
               }}
             >{canOffsaleConsignment ? "下架" : "取消"}</PermissionButton>
           </PermissionGate>
-          {canDeleteAccount ? (
+          {canDeleteOrder ? (
             <PermissionButton
-              permission="order.create"
+              permission="order.update"
               type="link"
               size="small"
               danger
-              disabled={!order.account_id}
               onClick={() => void openOrderDelete(order)}
-            >删除账号</PermissionButton>
+            >删除订单</PermissionButton>
           ) : null}
         </Space>
         );

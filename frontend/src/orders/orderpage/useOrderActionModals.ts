@@ -53,7 +53,7 @@ export function useOrderActionModals({
   const [orderRebateTarget, setOrderRebateTarget] = useState<Account | null>(null);
   const [orderSaleTarget, setOrderSaleTarget] = useState<Account | null>(null);
   const [orderConsignmentTarget, setOrderConsignmentTarget] = useState<{ account: Account; orderId: number } | null>(null);
-  const [orderDeleteTarget, setOrderDeleteTarget] = useState<Account | null>(null);
+  const [orderDeleteTarget, setOrderDeleteTarget] = useState<Order | null>(null);
   const [orderDeleteSubmitting, setOrderDeleteSubmitting] = useState(false);
   const [deliveryTarget, setDeliveryTarget] = useState<OrderDeliveryTarget | null>(null);
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
@@ -191,13 +191,8 @@ export function useOrderActionModals({
     }
   };
 
-  const openOrderDelete = async (sourceOrder: Order) => {
-    try {
-      const account = await loadOrderAccount(sourceOrder);
-      if (account) setOrderDeleteTarget(account);
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    }
+  const openOrderDelete = (sourceOrder: Order) => {
+    setOrderDeleteTarget(sourceOrder);
   };
 
   const openOrderDelivery = async (sourceOrder: Order) => {
@@ -288,8 +283,8 @@ export function useOrderActionModals({
     if (!orderDeleteTarget) return;
     setOrderDeleteSubmitting(true);
     try {
-      await stocksApi.remove(orderDeleteTarget.id, reason);
-      appMessage.success("账号已删除，订单和资金明细已保留");
+      await ordersApi.deleteOrder(orderDeleteTarget.id, reason);
+      appMessage.success("订单及关联数据已删除");
       setOrderDeleteTarget(null);
       await load();
     } catch (error) {

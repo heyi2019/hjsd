@@ -8,9 +8,9 @@ import { DEFAULT_BUSINESS_CENTER_TAB, type BusinessCenterEntryTab, type Business
 import { useLedgerList } from "./useLedgerList";
 import { useLedgerColumns } from "./useLedgerColumns";
 import { useOrderCancellation } from "./useOrderCancellation";
-import { useSession } from "../../shared/state/session";
 import { useOrderActionModals } from "./useOrderActionModals";
 import { useLedgerInlineEdit } from "./useLedgerInlineEdit";
+import { useSession } from "../../shared/state/session";
 
 export function useOrdersPageController(params: {
   active?: boolean;
@@ -21,7 +21,7 @@ export function useOrdersPageController(params: {
   const { active = true, initialTab, initialMine = false, onNavigate } = params;
   const currentOperator = currentDevUser();
   const { role } = useSession();
-  const canDeleteAccount = role === "admin";
+  const canDeleteOrder = role === "admin";
 
   // —— 列表域：加载 / 筛选 / 分页 / 排序 / 导出 / 选项词典 / 派生 filteredOrders ——
   const list = useLedgerList({ active, initialMine });
@@ -92,7 +92,7 @@ export function useOrdersPageController(params: {
 
   // —— 台账列定义域：纯展示配置 + 点击转发 ——
   const { arrangeLedgerColumns, visibleLedgerColumns } = useLedgerColumns({
-    canDeleteAccount,
+    canDeleteOrder,
     openLedgerEditor,
     openAllocations,
     openRefund,

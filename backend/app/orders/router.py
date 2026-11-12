@@ -45,6 +45,7 @@ from app.lists.xlsx import new_workbook, write_sheet, xlsx_bytes
 from app.orders import schemas
 from app.orders._shared import get_order as orders_get_order
 from app.orders.cancellation_model import cancel_order as orders_cancel_order
+from app.orders.deletion import delete_order as orders_delete_order
 from app.orders.create import add_customer_role, create_order as orders_create_order
 from app.orders.events import post_event as orders_post_event
 from app.orders.links import (
@@ -573,6 +574,26 @@ def update_order(
         db, order_id, actor=_actor(user), user=user, **changes
     )
     return _order_output(db, order, user)
+
+
+@router.delete("/orders/{order_id}", status_code=204, response_model=None)
+def delete_order(
+    order_id: int,
+    payload: schemas.OrderDeleteIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = update_orders,
+) -> Response:
+    """管理员物理删除订单及全部订单从属数据，并删除仅被本单使用的库存账号。"""
+    if not user.is_admin:
+        raise PermissionDenied("仅系统管理员可删除订单")
+    orders_delete_order(
+        db,
+        order_id,
+        actor=_actor(user),
+        reason=payload.reason,
+        user=user,
+    )
+    return Response(status_code=204)
 
 
 @router.post("/orders/{order_id}/materialize-account", response_model=schemas.OrderOut)

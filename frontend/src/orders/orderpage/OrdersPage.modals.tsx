@@ -2,11 +2,11 @@ import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { ordersApi } from "../../shared/api/orders.api";
-import { InventoryDeleteDialog } from "../../stocks/InventoryPanel/InventoryDeleteDialog";
 import { InventoryRebateModal } from "../../stocks/InventoryRebateModal";
 import { InventoryProfileModal } from "../../stocks/InventoryProfileModal";
 import { InventoryPlatformOffsaleModal } from "../../stocks/InventoryPlatformOffsaleModal";
 import { OrderDeliveryModal } from "../OrderDeliveryModal";
+import { OrderDeleteDialog } from "../OrderDeleteDialog";
 import { type OrdersPageController } from "./useOrdersPageController";
 import { SharedCancellationDialog, CancelTransactionModal } from "./OrderCancellationModals";
 import { AllocationModal } from "./OrderAllocationModal";
@@ -21,6 +21,12 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
       <EditOrderModal controller={controller} />
       <AllocationModal controller={controller} />
       <RefundModal controller={controller} />
+      <OrderDeleteDialog
+        order={controller.orderDeleteTarget}
+        submitting={controller.orderDeleteSubmitting}
+        onCancel={() => controller.setOrderDeleteTarget(null)}
+        onConfirm={controller.submitOrderDelete}
+      />
       <OrderDeliveryModal
         target={controller.deliveryTarget}
         employees={controller.users}
@@ -67,12 +73,6 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
           controller.setOrderRebateTarget(null);
           await controller.load();
         }}
-      />
-      <InventoryDeleteDialog
-        account={controller.orderDeleteTarget}
-        submitting={controller.orderDeleteSubmitting}
-        onCancel={() => controller.setOrderDeleteTarget(null)}
-        onConfirm={controller.submitOrderDelete}
       />
       <OrderAccountActionModals controller={controller} />
       <CreateBusinessModalWrapper controller={controller} />

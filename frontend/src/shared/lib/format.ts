@@ -24,7 +24,7 @@ export function today(): string {
 export function formatDateTimeMinute(value: string | null | undefined): string {
   if (!value) return "-";
   const normalized = value.replace("T", " ");
-  return normalized.length >= 16 ? normalized.slice(0, 16) : normalized;
+  return normalized.length >= 16 ? normalized.slice(0, 16) : `${normalized.slice(0, 10)} 00:00`;
 }
 
 /** 计算入库到出库的实际在手时长，按分钟展示。 */

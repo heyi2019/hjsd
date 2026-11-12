@@ -529,11 +529,3 @@ export function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mo
     && orderMatchesBusinessMode(order, mode)
   )).length;
 }
-
-export const SCHEDULE_STATUS_LABEL: Record<string, string> = {
-  PENDING: "待收",
-  PARTIAL: "部分收取",
-  PAID: "已付清",
-  OVERDUE: "逾期",
-  WAIVED: "已减免",
-};

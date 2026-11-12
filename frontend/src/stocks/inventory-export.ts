@@ -1,6 +1,6 @@
 import type { AccountExecutionDetail } from "../shared/api/types/account-execution";
 import type { Account } from "../shared/api/types/accounts";
-import { executionActionLabel } from "../shared/lib/format";
+import { executionActionLabel, formatDateTimeMinute } from "../shared/lib/format";
 import {
   BUSINESS_MODE_LABEL,
   INVENTORY_TYPE_LABEL,
@@ -43,14 +43,14 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
   const sourceOrder = orders[0];
 
   return {
-    registrationAt: dateTimeMinute(sourceOrder?.created_at ?? sourceOrder?.trade_date),
+    registrationAt: formatDateTimeMinute(sourceOrder?.created_at ?? sourceOrder?.trade_date),
     soldAt: eventDate(detail, "SELL"),
     removedAt: eventDate(detail, "CANCEL"),
     consignmentAt: platformListingDate(detail),
     consignmentPlatforms: consignmentPlatforms(detail),
     execution: orders.flatMap((order) => order.events.map((event) => [
       `${event.event_no} · ${executionActionLabel(event.event_type, order.order_type, event.delivery_direction)}`,
-      dateTimeMinute(event.occurred_at ?? event.occurred_on),
+      formatDateTimeMinute(event.occurred_at ?? event.occurred_on),
       event.amount,
       event.note || "-",
       event.operator || "-",
@@ -62,7 +62,7 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
         cashflow.flow_no,
         cashflow.direction === "OUT" ? "支出" : "收入",
         cashflow.amount,
-        dateTimeMinute(cashflow.occurred_at ?? cashflow.occurred_on),
+        formatDateTimeMinute(cashflow.occurred_at ?? cashflow.occurred_on),
         cashflow.pool_name || "未分配资金池",
       ].join(" / ")),
       ...rebateItems.map(({ order, rebate }) => [
@@ -72,7 +72,7 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
         "已登记",
         rebate.base_amount,
         `${rebate.rate}%`,
-        dateTimeMinute(rebate.collected_at ?? rebate.collected_on),
+        formatDateTimeMinute(rebate.collected_at ?? rebate.collected_on),
       ].join(" / ")),
     ].join("；"),
     expenseCount: expenseFlows.length,
@@ -137,22 +137,16 @@ export function downloadInventoryCsv(rows: Account[], details: Partial<Record<nu
   URL.revokeObjectURL(url);
 }
 
-function dateTimeMinute(value: string | null | undefined): string {
-  if (!value) return "-";
-  const normalized = value.replace("T", " ");
-  return normalized.length >= 16 ? normalized.slice(0, 16) : `${normalized.slice(0, 10)} 00:00`;
-}
-
 function eventDate(detail: AccountExecutionDetail | undefined, eventType: string): string {
   const event = detail?.orders.flatMap((order) => order.events)
     .find((item) => item.event_type === eventType);
-  return dateTimeMinute(event?.occurred_at ?? event?.occurred_on);
+  return formatDateTimeMinute(event?.occurred_at ?? event?.occurred_on);
 }
 
 function platformListingDate(detail: AccountExecutionDetail | undefined): string {
   const dates = detail?.orders
     .filter((item) => item.order_type === "DG")
-    .map((order) => dateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? ""))) ?? [];
+    .map((order) => formatDateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? ""))) ?? [];
   return dates.length ? dates.join("\n") : "-";
 }
 

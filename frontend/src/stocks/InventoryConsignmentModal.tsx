@@ -9,6 +9,7 @@ import type { AccountExecutionDetail } from "../shared/api/types/account-executi
 import type { Account } from "../shared/api/types/accounts";
 import { normalizeError } from "../shared/api/client";
 import { useOptionSet } from "../shared/lib/optionSets";
+import { formatDateTimeMinute } from "../shared/lib/format";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, MoneyText, PermissionButton, Select } from "../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
 import { InventoryAccountSummary } from "./InventoryAccountSummary";
@@ -17,11 +18,6 @@ import "./InventoryConsignmentModal.css";
 
 type ListedPlatform = { key: number; platform: string; price: number | string | null; listedAt: string };
 
-function dateTimeMinute(value: string): string {
-  const normalized = value.replace("T", " ");
-  return normalized.length >= 16 ? normalized.slice(0, 16) : `${normalized.slice(0, 10)} 00:00`;
-}
-
 function listedPlatforms(detail: AccountExecutionDetail): ListedPlatform[] {
   return detail.orders
     .filter(isActiveConsignmentListing)
@@ -29,7 +25,7 @@ function listedPlatforms(detail: AccountExecutionDetail): ListedPlatform[] {
       key: order.order_id,
       platform: consignmentPlatform(order) ?? "-",
       price: (order.extra_values?.consignment_price as number | string | undefined) ?? null,
-      listedAt: dateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date)),
+      listedAt: formatDateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date)),
     }));
 }
 

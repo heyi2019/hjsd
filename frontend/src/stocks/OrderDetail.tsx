@@ -2,7 +2,7 @@ import { Spin, Typography } from "antd";
 import type { AccountExecutionDetail, AccountExecutionEvent } from "../shared/api/types/account-execution";
 import type { Account } from "../shared/api/types/accounts";
 import type { EmployeeOption } from "../shared/api/types/org";
-import { executionActionLabel, money } from "../shared/lib/format";
+import { executionActionLabel, money, formatDateTimeMinute } from "../shared/lib/format";
 import {
   STATUS_LABEL,
   BUSINESS_MODE_LABEL,
@@ -23,15 +23,9 @@ import {
 } from "./OrderDetail.shared";
 import { consignmentPlatform, isConsignmentListing, isActiveConsignmentListing } from "./consignment-logic";
 
-function dateTimeMinute(value: string | null | undefined): string {
-  if (!value) return "-";
-  const normalized = value.replace("T", " ");
-  return normalized.length >= 16 ? normalized.slice(0, 16) : `${normalized.slice(0, 10)} 00:00`;
-}
-
 function eventDate(detail: AccountExecutionDetail | undefined, eventType: string): string {
   const event = detail?.orders.flatMap((order) => order.events).find((item) => item.event_type === eventType);
-  return dateTimeMinute(event?.occurred_at ?? event?.occurred_on);
+  return formatDateTimeMinute(event?.occurred_at ?? event?.occurred_on);
 }
 
 function eventPlatform(detail: AccountExecutionDetail | undefined, eventType: string): string {
@@ -45,7 +39,7 @@ function consignmentSummary(detail: AccountExecutionDetail | undefined, accountS
     .filter((order) => isConsignmentListing(order) && order.status !== "CANCELLED")
     .map((order) => {
       const platform = consignmentPlatform(order) ?? "-";
-      const listedAt = dateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? ""));
+      const listedAt = formatDateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? ""));
       // 寄售价格随该次上架记录保存；未填时不占位，避免出现「¥-」。
       const price = order.extra_values?.consignment_price as string | number | null | undefined;
       const priceText = price == null || price === "" ? "" : ` / ¥${money(price)}`;
@@ -237,7 +231,7 @@ export function OrderDetail({
       direction: cashflow.direction === "OUT" ? "支出" as const : "收入" as const,
       amount: cashflow.amount,
       rate: "-",
-      occurredAt: dateTimeMinute(cashflow.occurred_at ?? cashflow.occurred_on),
+      occurredAt: formatDateTimeMinute(cashflow.occurred_at ?? cashflow.occurred_on),
       poolName: cashflow.pool_name || "未分配资金池",
       operator: cashflow.operator || event?.operator_names?.join("、") || event?.operator || "-",
       event,
@@ -249,7 +243,7 @@ export function OrderDetail({
       direction: "收入" as const,
       amount: rebate.base_amount,
       rate: `${rebate.rate}%`,
-      occurredAt: dateTimeMinute(rebate.collected_at ?? rebate.collected_on),
+      occurredAt: formatDateTimeMinute(rebate.collected_at ?? rebate.collected_on),
       poolName: "-",
       operator: "-",
     })),
@@ -260,7 +254,7 @@ export function OrderDetail({
       key: `${order.order_id}-${event.id}`,
       category: classifyEventCategory(event.event_type),
       action: executionActionLabel(event.event_type, order.order_type, event.delivery_direction),
-      occurredAt: dateTimeMinute(event.occurred_at ?? event.occurred_on),
+      occurredAt: formatDateTimeMinute(event.occurred_at ?? event.occurred_on),
       amount: event.amount,
       operator: event.operator_names?.length ? event.operator_names.join("、") : event.operator || "-",
       note: event.note || "-",
@@ -292,7 +286,7 @@ export function OrderDetail({
     orderNo: contextOrder?.order_no ?? detail?.orders[0]?.order_no ?? row.source_order_no ?? "-",
     sourceOrderNo: sourceOrderNo ?? null,
     createdBy: row.created_by || "-",
-    registeredAt: dateTimeMinute(contextOrder?.created_at ?? contextOrder?.trade_date ?? detail?.orders[0]?.created_at ?? detail?.orders[0]?.trade_date ?? row.created_at),
+    registeredAt: formatDateTimeMinute(contextOrder?.created_at ?? contextOrder?.trade_date ?? detail?.orders[0]?.created_at ?? detail?.orders[0]?.trade_date ?? row.created_at),
     soldAt: eventDate(detail, "SELL"),
     removedAt: eventDate(detail, "CANCEL"),
     removedPlatform: eventPlatform(detail, "CANCEL"),

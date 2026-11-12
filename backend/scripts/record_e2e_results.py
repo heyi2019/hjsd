@@ -33,10 +33,11 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+
+from _git import git_commit
 
 REPO = Path(__file__).resolve().parents[2]
 FRONTEND = REPO / "frontend"
@@ -61,17 +62,6 @@ _RESULT_STATUS = {
     "interrupted": "ERROR",
     "skipped": "SKIP",
 }
-
-
-def _git_commit() -> str:
-    try:
-        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO,
-                             capture_output=True, text=True, check=False)
-        if out.returncode == 0 and out.stdout.strip():
-            return out.stdout.strip()
-    except Exception:
-        pass
-    return "unknown"
 
 
 def _skip_expr(text: str, i: int) -> int:
@@ -246,7 +236,7 @@ def main() -> int:
                 cur["flaky"] = True
 
     now = datetime.now()
-    commit = _git_commit()
+    commit = git_commit(REPO)
     run_id = f"{now.strftime('%Y%m%d-%H%M%S')}-{commit}-e2e"
     env = "ci" if (os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS")) else "local"
     evidence = str(report_path.relative_to(FRONTEND)) if report_path.is_relative_to(FRONTEND) \

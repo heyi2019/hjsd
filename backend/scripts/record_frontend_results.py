@@ -22,10 +22,11 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+
+from _git import git_commit
 
 REPO = Path(__file__).resolve().parents[2]
 FRONTEND = REPO / "frontend"
@@ -34,17 +35,6 @@ CASE_INDEX = REPO / "tests" / "backend" / "_report" / "case_index.json"
 RESULTS = REPO / "docs" / "testing" / "测试结果库" / "results.jsonl"
 
 _RANK = {"PASS": 0, "SKIP": 1, "FAIL": 2, "ERROR": 3}
-
-
-def _git_commit() -> str:
-    try:
-        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO,
-                             capture_output=True, text=True, check=False)
-        if out.returncode == 0 and out.stdout.strip():
-            return out.stdout.strip()
-    except Exception:
-        pass
-    return "unknown"
 
 
 def _status(raw: str) -> str:
@@ -169,8 +159,8 @@ def main() -> int:
                 cur["reason"] = v["reason"]
 
     now = datetime.now()
-    run_id = f"{now.strftime('%Y%m%d-%H%M%S')}-{_git_commit()}-fe"
-    commit = _git_commit()
+    run_id = f"{now.strftime('%Y%m%d-%H%M%S')}-{git_commit(REPO)}-fe"
+    commit = git_commit(REPO)
     env = "ci" if (os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS")) else "local"
     evidence = str(report_path.name)
 

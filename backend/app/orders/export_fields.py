@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 
 from app.core.money import to_money
 from app.domain.foundation import Pool
-from app.domain.options import OptionSet
 from app.lists.export import detail_json
 
 ORDER_DETAIL_EXPORT_COLUMNS = [
@@ -177,21 +176,6 @@ def _money_or_none(value: object) -> Decimal | None:
         return None
 
 
-def _option_value_labels(db: Session, codes: tuple[str, ...]) -> dict[str, dict[str, str]]:
-    """按字典 code 批量取 {代码值: 中文}；字典缺失或选项为空时该组为空，导出保留原值。"""
-    labels: dict[str, dict[str, str]] = {}
-    for row in db.scalars(select(OptionSet).where(OptionSet.code.in_(codes))).all():
-        options = row.options if isinstance(row.options, list) else []
-        labels[row.code] = {
-            str(item["value"]): str(item["label"])
-            for item in options
-            if isinstance(item, dict)
-            and item.get("value") is not None
-            and item.get("label") is not None
-        }
-    return labels
-
-
 def _pool_name_map(db: Session) -> dict[int, str]:
     return {pool.id: pool.name for pool in db.scalars(select(Pool)).all()}
 
@@ -348,7 +332,6 @@ __all__ = [
     "REBATE_EXPORT_COLUMNS",
     "DETAIL_COLUMNS_MOVED_TO_SHEETS",
     "_REBATE_STATUS_LABELS",
-    "_option_value_labels",
     "_pool_name_map",
     "_event_platform",
     "_order_event_export_rows",

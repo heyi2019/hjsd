@@ -76,7 +76,6 @@ from .export_fields import (
     REBATE_EXPORT_COLUMNS,
     _REBATE_STATUS_LABELS,
     _cashflow_export_rows,
-    _option_value_labels,
     _order_detail_export_fields,
     _order_event_export_rows,
     _pool_name_map,
@@ -286,7 +285,7 @@ def export_orders_xlsx(
     )
 
     # 三类明细各占一个 sheet：一单多行，列即字段，便于筛选与求和
-    option_labels = _option_value_labels(
+    option_labels = list_columns_service.option_labels_by_code(
         db,
         (
             "ORDER_EVENT_TYPE",

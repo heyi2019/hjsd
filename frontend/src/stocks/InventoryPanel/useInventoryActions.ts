@@ -2,6 +2,7 @@ import { appMessage } from "../../shared/ui/appFeedback";
 import { Form } from "antd";
 import { useState, type Key, type Dispatch, type SetStateAction } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
+import { unlistAndCancelConsignmentOrders } from "../../orders/systemOffsale";
 import { employeesApi } from "../../shared/api/org.api";
 import { poolsApi } from "../../shared/api/pools.api";
 import { stocksApi } from "../../shared/api/stocks.api";
@@ -207,25 +208,14 @@ export function useInventoryActions(params: {
       // 系统下架会同步取消该账号所有仍在寄售平台上的 DG 上架单；
       // 先完成平台记录取消，再冲销买入，避免出现 ERP 已下架但平台记录仍有效的中间结果。
       const detail = executionDetails[voidTarget.account.id] ?? await stocksApi.executionDetail(voidTarget.account.id);
-      await Promise.all(
-        detail.orders
+      await unlistAndCancelConsignmentOrders({
+        orderIds: detail.orders
           .filter((order) => order.order_type === "DG" && order.status !== "CANCELLED")
-          .map(async (order) => {
-            await ordersApi.postEvent(order.order_id, {
-              event_type: "OPERATE",
-              operation_type: "UNLIST",
-              occurred_on: today(),
-              note: "系统下架同步取消寄售平台上架",
-              form_extra_scope: "INVOID",
-              form_extra: { platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
-            });
-            return ordersApi.cancel(order.order_id, {
-              reason: "系统下架同步取消寄售平台上架",
-              form_extra_scope: "INVOID",
-              form_extra: { platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
-            });
-          }),
-      );
+          .map((order) => order.order_id),
+        note: "系统下架同步取消寄售平台上架",
+        reason: "系统下架同步取消寄售平台上架",
+        occurredOn: today(),
+      });
       await ordersApi.postEvent(voidTarget.orderId, {
         event_type: "CANCEL",
         amount: values.amount,

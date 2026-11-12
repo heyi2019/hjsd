@@ -3,6 +3,7 @@ import { money, today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { ordersApi } from "../../shared/api/orders.api";
+import { unlistAndCancelConsignmentOrders } from "../../orders/systemOffsale";
 import { stocksApi } from "../../shared/api/stocks.api";
 import { InventoryCancellationDialog } from "../InventoryCancellationDialog";
 import { InventoryDeleteDialog } from "./InventoryDeleteDialog";
@@ -164,22 +165,13 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           setPlatformOffsaleTarget(null);
           if (!target || target.records.length === 0) return;
           try {
-            const occurredOn = new Date().toISOString().slice(0, 10);
-            await Promise.all(target.records.map(async (record) => {
-              await ordersApi.postEvent(record.orderId, {
-                event_type: "OPERATE",
-                operation_type: "UNLIST",
-                occurred_on: occurredOn,
-                note: `系统下架：${reason}`,
-                form_extra_scope: "INVOID",
-                form_extra: { ...form_extra, platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
-              });
-              return ordersApi.cancel(record.orderId, {
-                reason,
-                form_extra_scope: "INVOID",
-                form_extra: { ...form_extra, platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
-              });
-            }));
+            await unlistAndCancelConsignmentOrders({
+              orderIds: target.records.map((record) => record.orderId),
+              note: `系统下架：${reason}`,
+              reason,
+              occurredOn: new Date().toISOString().slice(0, 10),
+              formExtra: form_extra,
+            });
             appMessage.success("代挂订单已取消，账号已出库");
             await load();
             refreshExecution(target.account);

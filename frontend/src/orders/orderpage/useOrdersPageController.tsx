@@ -2,6 +2,7 @@ import { Form } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
+import { unlistAndCancelConsignmentOrders } from "../systemOffsale";
 import { employeesApi } from "../../shared/api/org.api";
 import { policyApi } from "../../shared/api/policy.api";
 import { poolsApi } from "../../shared/api/pools.api";
@@ -390,21 +391,13 @@ export function useOrdersPageController(params: {
     const target = orderOffsaleTarget;
     if (!target) return;
     try {
-      await Promise.all(target.records.map(async (record) => {
-        await ordersApi.postEvent(record.orderId, {
-          event_type: "OPERATE",
-          operation_type: "UNLIST",
-          occurred_on: today(),
-          note: `系统下架：${payload.reason}`,
-          form_extra_scope: "INVOID",
-          form_extra: { ...payload.form_extra, platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
-        });
-        return ordersApi.cancel(record.orderId, {
-          reason: payload.reason,
-          form_extra_scope: "INVOID",
-          form_extra: { ...payload.form_extra, platform_unlist_scope: "SYSTEM", platform_unlisted_at: new Date().toISOString().slice(0, 16) },
-        });
-      }));
+      await unlistAndCancelConsignmentOrders({
+        orderIds: target.records.map((record) => record.orderId),
+        note: `系统下架：${payload.reason}`,
+        reason: payload.reason,
+        occurredOn: today(),
+        formExtra: payload.form_extra,
+      });
       appMessage.success("代挂订单已取消，账号已出库");
       setOrderOffsaleTarget(null);
       await load();

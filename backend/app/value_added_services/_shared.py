@@ -7,7 +7,7 @@ from calendar import monthrange
 from collections.abc import Mapping
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import Any, Protocol
 from app.core.security import CurrentUser
 from app.core.security import owner_scope_filter
 from app.orders.form_fields import validate_form_extra
@@ -72,7 +72,22 @@ def _add_months(base: date, months: int) -> date:
     return date(year, month, min(base.day, monthrange(year, month)[1]))
 
 
-def total_receivable(installment: Installment) -> Decimal:
+class ReceivableLike(Protocol):
+    """总应收公式依赖的最小字段集：ORM 实体与 Pydantic 输出模型都满足。"""
+
+    down_payment: Any
+    per_period: Any
+    periods: int
+    final_period_adjustment: Any
+    waived_amount: Any
+
+
+def total_receivable(installment: ReceivableLike) -> Decimal:
+    """总应收 = 首付 + 每期 × 期数 + 末期调整 − 减免（全站唯一口径）。
+
+    调用方既可以是 `Installment` ORM 实体，也可以是 `InstallmentOut` 输出模型；
+    两侧不得再各自复制公式，避免口径漂移。
+    """
     return (
         to_money(installment.down_payment)
         + to_money(installment.per_period) * int(installment.periods)

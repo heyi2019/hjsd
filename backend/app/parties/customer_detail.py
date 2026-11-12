@@ -14,6 +14,7 @@ from app.domain.enums import OrderStatus, ScheduleStatus
 from app.domain.foundation import AuditLog
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Installment, InstallmentSchedule, Order, OrderEvent
+from app.value_added_services import _shared as inst_shared
 
 from .customers import get_customer
 
@@ -147,12 +148,7 @@ def get_customer_detail(
     receivable_total = Decimal("0.00")
     overdue_period_count = 0
     for item in installments:
-        receivable = (
-            to_money(item.down_payment)
-            + to_money(item.per_period) * int(item.periods)
-            + to_money(item.final_period_adjustment or 0)
-            - to_money(item.waived_amount)
-        )
+        receivable = inst_shared.total_receivable(item)
         paid = to_money(item.paid_amount)
         remaining = receivable - paid
         overdue_periods = overdue_by_installment.get(item.id, 0)

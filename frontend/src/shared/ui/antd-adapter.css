@@ -543,7 +543,7 @@
  * 做法：仅覆盖 animation-duration + timing-function，保留 ui-spring-in keyframes
  *   （避免重写整套弹簧动画），作用域限定在
  *   - .adaptive-business-modal（建单弹窗，Modal wrapClassName 已带此标识）
- *   - .heijin-fast-confirm（二次确认框，由 appModal.confirm({className}) 注入）
+ *   - .heijin-fast-confirm（二次确认框，由 ConfirmDialog / InventoryDeleteDialog 的 className 注入）
  *   不影响抽屉/下拉/tooltip/message 等其它弹层。
  * 量化：入场 500ms → 50ms（降 90%）。 */
 @media (prefers-reduced-motion: no-preference) {

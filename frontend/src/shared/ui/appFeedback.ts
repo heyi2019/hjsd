@@ -1,8 +1,7 @@
 import { App } from "antd";
-import { message as staticMessage, Modal as StaticModal } from "antd";
+import { message as staticMessage } from "antd";
 
 type Msg = typeof staticMessage;
-type Mod = typeof StaticModal;
 
 let ctx: ReturnType<typeof App.useApp> | null = null;
 
@@ -19,9 +18,6 @@ export function AppFeedbackBridge(): null {
 function resolveMsg(): Msg {
   return (ctx?.message ?? staticMessage) as Msg;
 }
-function resolveMod(): Mod {
-  return (ctx?.modal ?? StaticModal) as Mod;
-}
 
 interface MsgFacade {
   success: Msg["success"];
@@ -31,13 +27,6 @@ interface MsgFacade {
   open: Msg["open"];
   destroy: Msg["destroy"];
 }
-interface ModFacade {
-  confirm: Mod["confirm"];
-  info: Mod["info"];
-  success: Mod["success"];
-  warning: Mod["warning"];
-  error: Mod["error"];
-}
 
 export const appMessage: MsgFacade = {
   success: ((...a: any[]) => (resolveMsg() as any).success(...a)) as Msg["success"],
@@ -46,12 +35,4 @@ export const appMessage: MsgFacade = {
   info: ((...a: any[]) => (resolveMsg() as any).info(...a)) as Msg["info"],
   open: ((...a: any[]) => (resolveMsg() as any).open(...a)) as Msg["open"],
   destroy: ((...a: any[]) => (resolveMsg() as any).destroy(...a)) as Msg["destroy"],
-};
-
-export const appModal: ModFacade = {
-  confirm: ((...a: any[]) => (resolveMod() as any).confirm(...a)) as Mod["confirm"],
-  info: ((...a: any[]) => (resolveMod() as any).info(...a)) as Mod["info"],
-  success: ((...a: any[]) => (resolveMod() as any).success(...a)) as Mod["success"],
-  warning: ((...a: any[]) => (resolveMod() as any).warning(...a)) as Mod["warning"],
-  error: ((...a: any[]) => (resolveMod() as any).error(...a)) as Mod["error"],
 };

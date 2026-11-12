@@ -19,18 +19,11 @@ from sqlalchemy import (
     func,
     select,
 )
-from sqlalchemy.orm import (
-    Session,
-    aliased,
-)
-from app.domain.enums import (
-    Direction,
-    EventType,
-)
+from sqlalchemy.orm import Session
+from app.domain.enums import Direction
 from app.domain.trade import (
     Cashflow,
     Order,
-    OrderEvent,
 )
 from app.orders.amounts import (
     business_cashflow_filter,
@@ -145,40 +138,3 @@ def _visible_pool_ids(user: CurrentUser | None) -> set[int] | None:
     if user is None or user.is_admin or user.owner_scope == "ALL":
         return None
     return set(user.pool_ids)
-
-
-# --------------------------------------------------- 事件增益与冲抵配对
-def _event_gain_cases(amount):
-    """事件损益的三个条件求和分支（income / buy / cost）。
-
-    口径与 order_event_totals 一致：SELL=收入 / BUY=买入成本；直接支出由资金明细汇总；
-    CANCEL 仅当显式 offset 且被冲销事件与本单同单时才冲销（跨单 offset 视同
-    无冲销——同单约束由外连接的 ON 条件保证，与 Python 侧按本单事件表解析
-    offset 类型行为一致）。
-    """
-    offset = aliased(OrderEvent)
-    return offset, [
-        case(
-            (OrderEvent.event_type == EventType.SELL.value, amount),
-            (and_(
-                OrderEvent.event_type == EventType.CANCEL.value,
-                offset.event_type == EventType.SELL.value,
-            ), -amount),
-            else_=0,
-        ),
-        case(
-            (OrderEvent.event_type == EventType.BUY.value, amount),
-            (and_(
-                OrderEvent.event_type == EventType.CANCEL.value,
-                offset.event_type == EventType.BUY.value,
-            ), -amount),
-            else_=0,
-        ),
-    ]
-
-
-def _event_offset_join(offset):
-    return and_(
-        offset.id == OrderEvent.offset_event_id,
-        offset.order_id == OrderEvent.order_id,
-    )

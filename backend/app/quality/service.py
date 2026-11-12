@@ -6,14 +6,12 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from calendar import monthrange
 from datetime import date
 from typing import Any
 
-from sqlalchemy import case, false, func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.core.errors import Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, owner_scope_filter
 from app.core.sql_functions import year_month
@@ -47,6 +45,17 @@ from .issues import (
     list_issues,
     update_issue,
 )
+from . import metric_helpers as _metric_helpers
+from .metric_helpers import (
+    _metric_months,
+    _month_end,
+    _percentage,
+    _pool_column_filter,
+)
+
+# 测试与用例库按 quality_service._month_start / _next_month 访问，保留模块属性。
+_month_start = _metric_helpers._month_start
+_next_month = _metric_helpers._next_month
 
 
 MONEY_EVENT_TYPES = frozenset(
@@ -396,50 +405,6 @@ def scan_and_record(
             )
         )
     return created
-
-
-def _month_start(value: date) -> date:
-    return value.replace(day=1)
-
-
-def _month_end(value: date) -> date:
-    return value.replace(day=monthrange(value.year, value.month)[1])
-
-
-def _next_month(value: date) -> date:
-    if value.month == 12:
-        return date(value.year + 1, 1, 1)
-    return date(value.year, value.month + 1, 1)
-
-
-def _metric_months(
-    from_date: date | None,
-    to_date: date | None,
-) -> list[date]:
-    if from_date is not None and to_date is not None and from_date > to_date:
-        raise Validation(
-            "开始日期不能晚于结束日期",
-            details={"from": from_date.isoformat(), "to": to_date.isoformat()},
-        )
-    start = _month_start(from_date or to_date or date.today())
-    end = _month_start(to_date or from_date or date.today())
-    result: list[date] = []
-    cursor = start
-    while cursor <= end:
-        result.append(cursor)
-        cursor = _next_month(cursor)
-    return result
-
-
-def _percentage(numerator: int, denominator: int) -> float | None:
-    if denominator == 0:
-        return None
-    return round(numerator * 100 / denominator, 2)
-
-
-def _pool_column_filter(column: Any, pool_ids: tuple[int, ...]) -> Any:
-    """池可见性过滤；空授权集合视为不可见任何池。"""
-    return column.in_(pool_ids) if pool_ids else false()
 
 
 def metrics(

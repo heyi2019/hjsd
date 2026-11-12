@@ -29,7 +29,7 @@ it("FE-207：修改密码请求未返回时仍可关闭真实用户中心弹窗"
   await waitFor(() => expect(client.changePassword).toHaveBeenCalledWith("wrong-old-pass", "new-pass-12345"));
   expect(within(dialog).getByRole("button", { name: /修改密码/ })).toHaveClass("ant-btn-loading");
   await act(async () => {
-    fireEvent.click(within(dialog).getByRole("button", { name: "关闭" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
   });
 
   await waitFor(() => expect(screen.getByRole("button", { name: "用户中心" })).toHaveAttribute("data-user-center-open", "false"));

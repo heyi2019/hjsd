@@ -249,16 +249,6 @@ export const cloudAdapter: AxiosAdapter = async (config) => {
   }
   if (path === "/auth/me") return ok(config, PREVIEW_USER);
   if (path === "/auth/logout") return ok(config, {});
-  // 云端预览没有短信通道与微信通道，也没有可写的账号体系：一律如实报「未启用」，
-  // 让登录页不点亮这三个入口，而不是点了之后拿到一个必然失败的 404。
-  if (path === "/auth/login-methods") {
-    return ok(config, {
-      password: { enabled: true },
-      phone_code: { enabled: false, dev_code_visible: false },
-      wechat: { enabled: false, configured: false, provider: "disabled", verify_mode: "sms", reason: "云端预览为只读快照，不支持免密登录" },
-    });
-  }
-
   // 库存库龄/占用成本：云端按同一份库存数据现算，避免卡片出现 undefined。
   if (path === "/stocks/inventory/stats") {
     try {

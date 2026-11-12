@@ -210,7 +210,7 @@ export function AppShell() {
                   aria-checked={mode === "light"}
                   onClick={() => setMode("light")}
                 >
-                  浅色（默认）
+                  浅色
                 </button>
                 <button
                   type="button"
@@ -293,11 +293,7 @@ export function AppShell() {
       <Modal
         open={userCenterOpen}
         title="用户中心"
-        footer={
-          <button type="button" className="ant-btn" onClick={() => setUserCenterOpen(false)}>
-            关闭
-          </button>
-        }
+        footer={null}
         destroyOnHidden
         onCancel={() => setUserCenterOpen(false)}
         className="user-center-modal"

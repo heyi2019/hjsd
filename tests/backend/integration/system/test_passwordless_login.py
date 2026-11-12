@@ -14,6 +14,9 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 from fastapi.testclient import TestClient
 
+
+pytestmark = pytest.mark.skip(reason="手机号验证码和微信登录接口已移除")
+
 from app.core.ratelimit import login_limiter
 from app.core.settings import get_settings
 

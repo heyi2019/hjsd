@@ -21,7 +21,7 @@ export function AppearancePanel() {
       <Card className="glass" title="界面主题">
         <div role="radiogroup" aria-label="界面主题">
           <Radio.Group value={mode} onChange={(event) => setMode(event.target.value)}>
-            <Radio value="light">浅色（默认）</Radio>
+            <Radio value="light">浅色</Radio>
             <Radio value="system">跟随系统</Radio>
             <Radio value="dark">深色</Radio>
           </Radio.Group>

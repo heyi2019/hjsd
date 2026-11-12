@@ -35,7 +35,6 @@ from app.orders.form_fields_router import router as order_form_fields_router
 from app.parties.router import router as parties_router
 from app.search.router import router as search_router
 from app.auth.router import router as auth_router, admin_router as users_router, teams_router
-from app.auth.wechat_router import router as passwordless_auth_router
 from app.attachments.router import router as attachments_router
 from app.options.router import router as options_router
 from app.lists.router import router as lists_router
@@ -163,7 +162,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(imports_router, prefix=settings.api_prefix)
     app.include_router(audit_router, prefix=settings.api_prefix)
     app.include_router(auth_router, prefix=settings.api_prefix)
-    app.include_router(passwordless_auth_router, prefix=settings.api_prefix)
     app.include_router(users_router, prefix=settings.api_prefix)
     app.include_router(teams_router, prefix=settings.api_prefix)
     app.include_router(attachments_router, prefix=settings.api_prefix)

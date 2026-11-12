@@ -136,7 +136,7 @@ describe("AppShell：主题三态切换", () => {
 
     expect(screen.getByRole("radiogroup", { name: "主题切换" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "系统" })).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByRole("radio", { name: "浅色（默认）" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "浅色" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("radio", { name: "深色" })).toHaveAttribute("aria-checked", "false");
   });
 });

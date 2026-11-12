@@ -50,7 +50,7 @@ describe("AppearancePanel：默认浅色主题", () => {
     renderApp(<AppearancePanel />);
 
     expect(screen.getByRole("radiogroup", { name: "界面主题" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "浅色（默认）" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "浅色" })).toBeChecked();
   });
 
   it("在外观设置中切换主题并持久化选择", () => {
@@ -59,7 +59,7 @@ describe("AppearancePanel：默认浅色主题", () => {
     fireEvent.click(screen.getByRole("radio", { name: "深色" }));
     expect(localStorage.getItem("heijin-theme-mode")).toBe("dark");
 
-    fireEvent.click(screen.getByRole("radio", { name: "浅色（默认）" }));
+    fireEvent.click(screen.getByRole("radio", { name: "浅色" }));
     expect(localStorage.getItem("heijin-theme-mode")).toBe("light");
   });
 });

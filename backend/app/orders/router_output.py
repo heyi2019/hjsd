@@ -43,9 +43,8 @@ def _actor(user: CurrentUser) -> str:
     return user.username
 
 
-def _order_output(db: Session, order, user: CurrentUser) -> schemas.OrderOut:
-    """按订单权限输出详情，避免财务/查看权限读取游戏密码。"""
-    output = schemas.OrderOut.model_validate(order)
+def _apply_common_output(output, order, user: CurrentUser):
+    """回显表单扩展值，并按建单权限脱敏账号快照里的游戏密码。"""
     # 表单字段自定义值落订单 form_extra 列，读取直接回显（BAS-04-03 历史值可查）。
     output.extra_values = dict(order.form_extra or {})
     if not user.has(PERM_ORDER_CREATE) and output.account_snapshot:
@@ -54,6 +53,12 @@ def _order_output(db: Session, order, user: CurrentUser) -> schemas.OrderOut:
             snapshot["game_password"] = None
         output.account_snapshot = snapshot
     return output
+
+
+def _order_output(db: Session, order, user: CurrentUser) -> schemas.OrderOut:
+    """按订单权限输出详情，避免财务/查看权限读取游戏密码。"""
+    output = schemas.OrderOut.model_validate(order)
+    return _apply_common_output(output, order, user)
 
 
 def _operator_names(db: Session, events: list[OrderEvent]) -> dict[int, str]:
@@ -127,13 +132,7 @@ def _order_detail_output(
 ) -> schemas.OrderDetailOut:
     """订单详情统一返回主字段和执行事件，避免前端再拼接隐式查询。"""
     output = schemas.OrderDetailOut.model_validate(order)
-    # 表单字段自定义值落订单 form_extra 列，读取直接回显（BAS-04-03 历史值可查）。
-    output.extra_values = dict(order.form_extra or {})
-    if not user.has(PERM_ORDER_CREATE) and output.account_snapshot:
-        snapshot = dict(output.account_snapshot)
-        if "game_password" in snapshot:
-            snapshot["game_password"] = None
-        output.account_snapshot = snapshot
+    _apply_common_output(output, order, user)
     events = db.scalars(
         select(OrderEvent)
         .where(OrderEvent.order_id == order.id)

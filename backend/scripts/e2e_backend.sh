@@ -24,6 +24,11 @@ if [[ -z "$E2E_URL" && -f .env ]]; then
   # 从 .env 取业务库地址，仅替换库名为 heijin_erp_e2e（绝不手动拼凭据）。
   BASE_URL="$(grep -E '^DATABASE_URL=' .env | head -1 | cut -d= -f2-)"
   E2E_URL="${BASE_URL%/*}/heijin_erp_e2e"
+elif [[ -z "$E2E_URL" && -f ../.env ]]; then
+  # 2026-11-13：backend/.env 已删（配置唯一源=仓库根 .env），加根 .env 回退，
+  # 否则 playwright webServer 拉起时直接报「无法解析 E2E 库地址」。
+  BASE_URL="$(grep -E '^DATABASE_URL=' ../.env | head -1 | cut -d= -f2-)"
+  E2E_URL="${BASE_URL%/*}/heijin_erp_e2e"
 fi
 if [[ -z "$E2E_URL" ]]; then
   echo "[e2e-backend] 无法解析 E2E 库地址（E2E_DATABASE_URL 未设且 .env 无 DATABASE_URL）" >&2

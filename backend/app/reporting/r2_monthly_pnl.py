@@ -4,7 +4,9 @@
 「所有收入 − 所有支出」取数，与订单利润明细、R5、分润基数同源。
 资金走向只有收入 / 支出两种：返点记录是收入、分期坏账是支出，即使不生成
 资金流水也按各自发生日归月计入。返点收益列是「其中返点」的展示项，
-已含在销售收入里，不重复加进经营利润；运营费用仍是期间调整项，独立成列。
+已含在销售收入里，不重复加进经营利润；该列独立聚合 RebateRecord
+（与利润明细同源），不复用会跳过新模型返点的 order_profit_flow_by_date。
+运营费用仍是期间调整项，独立成列。
 """
 
 from __future__ import annotations
@@ -26,10 +28,12 @@ from app.domain.enums import (
     CashflowStatus,
     Direction,
     Nature,
+    RebateStatus,
 )
 from app.domain.trade import (
     Cashflow,
     Order,
+    RebateRecord,
 )
 from app.orders.amounts import business_cashflow_filter, order_profit_flow_by_date
 
@@ -89,7 +93,8 @@ def r2_monthly_pnl(
     scoped_order_ids = list(
         session.scalars(_apply_order_scope(select(Order.id), user, session)).all()
     )
-    rebate_income: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    # 收入/支出大类继续走 order_profit_flow_by_date：新模型返点在这条线的收入
+    # 已由资金流水计入 revenue，坏账计入 direct_cost，口径不变。
     for occurred_on, (extra_income, extra_expense) in order_profit_flow_by_date(
         session,
         order_ids=scoped_order_ids,
@@ -99,7 +104,27 @@ def r2_monthly_pnl(
         key = _month_key(occurred_on)
         revenue[key] += extra_income
         direct_cost[key] += extra_expense
-        rebate_income[key] += extra_income
+
+    # 「其中返点」列独立聚合 RebateRecord（与利润明细 profit.py 同源）：
+    # 不能复用 order_profit_flow_by_date 的 extra_income——那个函数对「已生成资金流水
+    # 的新模型返点」做了 continue 防重复计收入，连带把它的「其中项展示」也跳过了，
+    # 导致同一笔新模型返点在 R2 列=0、利润明细列=base_amount 的口径打架。
+    # 本列只作展示、不参与经营利润（operating_profit 不含它），故独立 sum 不会重复加回。
+    rebate_income: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    if scoped_order_ids:
+        rebate_rows = session.execute(
+            select(RebateRecord.collected_on, RebateRecord.base_amount)
+            .where(
+                RebateRecord.source_order_id.in_(scoped_order_ids),
+                RebateRecord.status != RebateStatus.VOID.value,
+            )
+        ).all()
+        for occurred_on, amount in rebate_rows:
+            if from_date and occurred_on < from_date:
+                continue
+            if to_date and occurred_on > to_date:
+                continue
+            rebate_income[_month_key(occurred_on)] += _money(amount)
 
     # 运营费用只认资金属性，避免依赖自由填写的流水类别。
     op_stmt = select(Cashflow).where(

@@ -304,6 +304,41 @@ def test_reports_follow_rebate_and_bad_debt(seeded_db):
     )
 
 
+def test_r2_rebate_column_counts_action_model_rebate_like_profit_detail(seeded_db):
+    """R2「其中返点」列与利润明细同源：新模型返点(自动生成IN流水)也必须进列。
+
+    回归：旧口径 R2 的 rebate_income 复用 order_profit_flow_by_date 的 extra_income，
+    而后者对「已生成资金流水的新模型返点」continue 防重复，连带把其中项展示也跳过，
+    导致同一笔新模型返点在 R2 列=0、利润明细列=base_amount 口径打架（2026-11-12 修）。
+    """
+    from app.finance import service as finance_service
+
+    order_id = _order_with_events(seeded_db)  # HS，BUY+SELL，D=2026-10-17
+    # 新模型返点：create_rebate 同时生成 IN 资金流水（base_amount 计入 sales_income）
+    finance_service.create_rebate(
+        seeded_db, source_order_id=order_id, rebate_type="SELL",
+        base_amount=Decimal("250"), rate=Decimal("5"),
+        collected_on=D, actor="pytest",
+    )
+
+    # 利润明细「其中返点」列 = 250
+    detail = reporting_service.order_profit_detail(seeded_db)
+    ditem = next(row for row in detail["items"] if row["order_id"] == order_id)
+    assert ditem["rebate"] == Decimal("250.00")
+    assert ditem["income"] >= Decimal("250.00")  # 已含在收入大类
+
+    # R2「其中返点」列必须与利润明细同源 = 250（改动前这里是 0）
+    monthly = reporting_service.r2_monthly_pnl(seeded_db)
+    oct_item = next(row for row in monthly["items"] if row["month"] == "2026-10")
+    assert oct_item["rebate_income"] == ditem["rebate"] == Decimal("250.00")
+    # 其中项只作展示，不重复加回经营利润
+    assert oct_item["operating_profit"] == (
+        oct_item["sales_income"]
+        - oct_item["account_direct_cost"]
+        - oct_item["operating_expense"]
+    )
+
+
 def test_r3_allocation_includes_rebate_and_bad_debt(seeded_db):
     """R3 提成基数 = 200（含返点收入、坏账支出），50% 分成为 100。"""
     order_id = _order_with_events(seeded_db)

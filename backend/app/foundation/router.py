@@ -49,8 +49,9 @@ from app.foundation.pools import (
     update_pool as foundation_update_pool,
 )
 from app.foundation.sequences import list_sequences as foundation_list_sequences
-from app.foundation.classification import classification_for_order_type
-from app.parties.fields import get_extra_values, get_extra_values_bulk
+from app.parties.fields import get_extra_values_bulk
+
+from .router_output import _actor, _order_type_output, _pool_output
 
 router = APIRouter(tags=["BAS-02/03 业务与资金主数据"])
 
@@ -58,28 +59,6 @@ read_access = require_permissions(PERM_FINANCE_READ, PERM_POOL_MANAGE, require_a
 manage_pools = require_permissions(PERM_POOL_MANAGE)
 manage_order_types = require_permissions(PERM_ORDER_TYPE_MANAGE)
 manage_game_types = require_permissions(PERM_ORDER_TYPE_MANAGE)
-
-
-def _actor(user: CurrentUser) -> str:
-    return user.username
-
-
-def _pool_output(db: Session, pool) -> schemas.PoolOut:
-    output = schemas.PoolOut.model_validate(pool)
-    output.extra_values = get_extra_values(
-        db, entity_type="pool", entity_id=pool.id
-    )
-    return output
-
-
-def _order_type_output(order_type) -> schemas.OrderTypeOut:
-    payload = schemas.OrderTypeOut.model_validate(order_type)
-    classification = classification_for_order_type(order_type.code)
-    if classification:
-        payload.business_mode = classification["business_mode"]
-        payload.business_type = classification["business_type"]
-        payload.value_added_service = classification["value_added_service"]
-    return payload
 
 
 # ------------------------------------------------------------------- 游戏类型标准

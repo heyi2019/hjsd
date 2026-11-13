@@ -36,19 +36,18 @@ function renderTh(cfg: FieldConfigMap) {
 }
 
 describe("ThFeeSection：费用卡片标题", () => {
-  it("TH 费用卡片：提号金额/预计收买家标题跟随配置改名", () => {
+  it("TH 费用卡片：提号金额标题跟随配置改名且移除预计收买家", () => {
     renderTh({
       th_purchase_amount: makeField({ field_key: "th_purchase_amount", label: "提号成本", field_type: "NUMBER", required: true }),
-      th_receive_amount: makeField({ field_key: "th_receive_amount", label: "预计收买价", field_type: "NUMBER", required: true }),
     });
     expect(screen.getByText("提号成本")).toBeInTheDocument();
-    expect(screen.getByText("预计收买价")).toBeInTheDocument();
+    expect(screen.queryByText("预计收买家")).toBeNull();
   });
 
   it("TH 费用卡片：无配置时降级显示原硬编码标题", () => {
     renderTh({});
     expect(screen.getByText("提号金额")).toBeInTheDocument();
-    expect(screen.getByText("预计收买家")).toBeInTheDocument();
+    expect(screen.queryByText("预计收买家")).toBeNull();
   });
 
   it("TH 费用卡片：资金账户标题使用系统统一术语，不受配置旧文案影响", () => {
@@ -57,4 +56,5 @@ describe("ThFeeSection：费用卡片标题", () => {
     });
     expect(screen.getByText("资金账户")).toBeInTheDocument();
   });
+
 });

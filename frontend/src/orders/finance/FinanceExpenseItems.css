@@ -1,0 +1,85 @@
+.finance-expense-items {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--glass) 60%, transparent);
+}
+
+.finance-expense-items--embedded {
+  position: static;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.finance-expense-items__action {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-2);
+}
+
+.finance-expense-items--embedded .finance-expense-items__action {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-4);
+  z-index: 1;
+  margin-bottom: 0;
+}
+
+.finance-expense-items__list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.finance-expense-items__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+
+.finance-expense-items__row .ant-form-item {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+}
+
+.finance-expense-items__row .ant-form-item-row {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.finance-expense-items__row .ant-form-item-label {
+  flex: 0 0 auto;
+  padding: 0 var(--space-2) 0 0;
+}
+
+.finance-expense-items__row .ant-form-item-control {
+  min-width: 0;
+}
+
+.finance-expense-items__row .ant-btn {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+@container (max-width: 640px) {
+  .finance-expense-items__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-2);
+  }
+
+  .finance-expense-items__row .ant-form-item {
+    width: 100%;
+  }
+
+  .finance-expense-items__row .ant-btn {
+    justify-self: start;
+    margin-left: 0;
+  }
+}

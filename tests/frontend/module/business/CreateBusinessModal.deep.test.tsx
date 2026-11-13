@@ -111,11 +111,9 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
     // CfgNestedItem 把客户手机号嵌在客户信息区，label 会被 antd 组合前缀；按字段 id 精确定位。
     await ui.type(document.querySelector("#customer_phone") as Element, "13800008888");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
-    // 选中主资金账户（回收有主资金账户下拉）
-    const poolPlaceholder = screen
-      .getAllByText("请选择资金账户", { exact: true })
-      .find((el) => !el.closest(".additional-fee-fields"));
-    await ui.click(poolPlaceholder!.closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
+    // 选中回收资金账户
+    const poolPlaceholder = screen.getByText("请选择资金账户", { exact: true });
+    await ui.click(poolPlaceholder.closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
     await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
 

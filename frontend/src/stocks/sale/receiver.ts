@@ -36,15 +36,12 @@ export async function collectFullPayment(input: CollectPaymentInput): Promise<vo
     note: values.cashflow_note as string | undefined,
     bound_phone: values.bound_phone as string | undefined,
     bound_phone_owner: values.bound_phone_owner as string | undefined,
-    ...(values.amount2 != null && String(values.amount2) !== ""
-      ? { amount2: String(values.amount2), pool_id2: values.pool_id2 as number }
-      : {}),
     ...consignmentExtra,
   });
 }
 
 /** 分期收款：建立库存分期出售合同（STOCK_SALE），并在确立时收首付（期次 0）。 */
-export async function collectInstallmentPayment(input: CollectPaymentInput): Promise<void> {
+export async function collectInstallmentPayment(input: Omit<CollectPaymentInput, "isConsignment">): Promise<void> {
   const { sourceOrderId, values } = input;
   const schedule = serializeInstallmentSchedule(
     values.installment_schedule as Array<{ due_on?: unknown }> | undefined,

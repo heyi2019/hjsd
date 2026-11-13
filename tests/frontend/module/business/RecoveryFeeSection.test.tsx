@@ -46,3 +46,11 @@ it("HS 费用卡片：无配置时降级显示原硬编码标题", () => {
   renderHs({});
   expect(screen.getByText("回收金额")).toBeInTheDocument();
 });
+
+it("HS 费用卡片：保留主金额、资金账户和支出入口", () => {
+  renderHs({});
+  expect(screen.getByRole("button", { name: /增加支出/ })).toBeInTheDocument();
+  expect(screen.queryByText("其他支出", { exact: true })).toBeNull();
+  expect(screen.queryByText("中介费", { exact: true })).toBeNull();
+  expect(screen.getByText("资金账户", { exact: true })).toBeInTheDocument();
+});

@@ -23,13 +23,9 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
 
-/** 选中主资金账户。支出明细区的中介费账户与主资金账户同名同占位（资金账户），
- *  故排除支出明细区后再定位（回收走 payment-info-section、提号走 th-fee-primary）。 */
+/** 选中建单的主资金账户。 */
 async function pickMainPool() {
-  const placeholder = screen
-    .getAllByText("请选择资金账户", { exact: true })
-    .find((el) => !el.closest(".additional-fee-fields"));
-  if (!placeholder) throw new Error("未找到主资金账户下拉");
+  const placeholder = screen.getByText("请选择资金账户", { exact: true });
   await ui.click(placeholder.closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
   await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
 }
@@ -357,7 +353,7 @@ it("订单已创建后不等待列表刷新，提交按钮立即结束 loading",
     resolveRefresh();
   });
 
-it("支出明细只保留中介费", async () => {
+it("支出明细只保留金额和备注", async () => {
     await openModal();
     expect(screen.queryByLabelText("设计费")).toBeNull();
   expect(screen.queryByLabelText("收款对象")).toBeNull();

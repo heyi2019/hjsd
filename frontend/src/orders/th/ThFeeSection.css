@@ -1,4 +1,0 @@
-.th-fee-primary {
-  border-color: color-mix(in srgb, var(--color-primary) 32%, var(--glass-border));
-  background: color-mix(in srgb, var(--color-primary) 7%, var(--glass));
-}

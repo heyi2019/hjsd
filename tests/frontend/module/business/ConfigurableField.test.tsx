@@ -358,11 +358,11 @@ describe("isConditionActive：条件命中判定", () => {
   });
 
   it("filled：依赖字段有值即命中（空串/空数组/null 不算）", () => {
-    const cond = { field: "intermediary_fee", op: "filled" as const };
-    expect(isConditionActive(cond, { intermediary_fee: "100" })).toBe(true);
-    expect(isConditionActive(cond, { intermediary_fee: "" })).toBe(false);
-    expect(isConditionActive(cond, { intermediary_fee: null })).toBe(false);
-    expect(isConditionActive(cond, { intermediary_fee: [] })).toBe(false);
+    const cond = { field: "price", op: "filled" as const };
+    expect(isConditionActive(cond, { price: "100" })).toBe(true);
+    expect(isConditionActive(cond, { price: "" })).toBe(false);
+    expect(isConditionActive(cond, { price: null })).toBe(false);
+    expect(isConditionActive(cond, { price: [] })).toBe(false);
     expect(isConditionActive(cond, {})).toBe(false);
   });
 

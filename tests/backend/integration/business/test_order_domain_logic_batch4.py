@@ -1,7 +1,7 @@
-"""ROBUST-01 批次四：订单域 7 条逻辑缺陷回归（#11/#12/#13/#15/#16/#17/#19）。
+"""ROBUST-01 批次四：订单域 6 条逻辑缺陷回归（#11/#12/#15/#16/#17/#19）。
 
 口径锚点（用户 11-12 裁决）：利润 = 收入大类 − 支出大类；本文件覆盖参与方护栏、
-分润绑定、资金池筛选、账号状态机、重开 BUY 闭环、表单依赖与作用域注册。
+分润绑定、账号状态机、重开 BUY 闭环、表单依赖与作用域注册。
 """
 from __future__ import annotations
 
@@ -12,11 +12,9 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import Validation
-from app.domain.foundation import Pool
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import (
     Account,
-    Cashflow,
     Order,
     OrderEvent,
     OrderFormField,
@@ -26,7 +24,6 @@ from app.domain.users import User
 from app.orders import form_fields as ff
 from app.orders.create import add_customer_role, create_order
 from app.orders.events import post_event
-from app.orders.queries import count_orders, list_orders
 from app.parties.customers import create_customer, set_customer_status
 
 TODAY = date(2026, 10, 4)
@@ -65,14 +62,10 @@ def _buy(seeded_db, order: Order, *, amount: str = "500", occurred: date = TODAY
 
 
 def _sell(seeded_db, order: Order, *, amount: str = "800", occurred: date = TODAY2,
-          pool_id: int | None = None, pool_id2: int | None = None, amount2: str | None = None):
-    kw = {}
-    if pool_id2 is not None:
-        kw["pool_id2"] = pool_id2
-        kw["amount2"] = Decimal(amount2 or "300")
+          pool_id: int | None = None):
     return post_event(
         seeded_db, order.id, event_type="SELL", amount=Decimal(amount),
-        occurred_on=occurred, actor="pytest", pool_id=pool_id, **kw,
+        occurred_on=occurred, actor="pytest", pool_id=pool_id,
     )
 
 
@@ -181,33 +174,6 @@ def test_sell_event_backfills_single_unbound_allocation(seeded_db):
         )
     )
     assert row.user_id == actor_id
-
-
-# ---------------------------------------------------------------- #13 资金池筛选
-def test_pool_filter_matches_secondary_split_pool(seeded_db):
-    """售出拆分第二池的流水挂在 Cashflow.pool_id，按第二池筛订单/计数必须命中。"""
-    invest = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
-    profit = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_PROFIT"))
-    assert invest is not None and profit is not None
-
-    acc = _account(seeded_db, game_account="b4-split")
-    order = _hs_order(seeded_db, account=acc)
-    seeded_db.commit()
-    _buy(seeded_db, order, pool_id=invest.id)
-    # 主池进 invest，第二池进 profit；OrderEvent 只记主池。
-    _sell(seeded_db, order, pool_id=invest.id, pool_id2=profit.id, amount2="300")
-
-    secondary = seeded_db.scalars(
-        select(Cashflow).where(
-            Cashflow.order_id == order.id, Cashflow.pool_id == profit.id,
-            Cashflow.order_event_id.is_not(None),
-        )
-    ).all()
-    assert secondary, "售出拆分第二池流水应落在 profit 池"
-
-    by_second = {r.id for r in list_orders(seeded_db, pool_id=profit.id)}
-    assert order.id in by_second, "按第二池筛选必须命中该订单"
-    assert count_orders(seeded_db, pool_id=profit.id) >= 1
 
 
 # ---------------------------------------------------------------- #15 账号状态机

@@ -81,9 +81,6 @@ def _order_list_stmt(
     if owner_id is not None:
         stmt = stmt.where(Order.owner_id == owner_id)
     if pool_id is not None:
-        # 售出拆分会把金额2 派生为同一 SELL 事件下的第二笔流水，进入
-        # 资金账户2（Cashflow.pool_id），但 OrderEvent 只记主池。按池筛订单
-        # 必须同时看事件主池与派生流水池，否则第二池的订单在台账/导出里漏掉。
         stmt = stmt.where(
             or_(
                 exists(

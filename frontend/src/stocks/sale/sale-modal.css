@@ -1,6 +1,7 @@
-/* 资金流水卡片容器：内部字段由 AdaptiveFormGrid 负责多列布局（与交付信息一致）。
+/* 资金明细卡片容器：内部字段由 AdaptiveFormGrid 负责多列布局（与交付信息一致）。
    设 container-type 后，内部 AdaptiveFormGrid 的 @container 断点才会随卡片宽度生效。 */
 .inventory-sale-cashflow {
+  position: relative;
   margin-top: var(--space-4);
   padding: var(--space-4);
   border: var(--border-w) solid var(--glass-border);
@@ -8,7 +9,7 @@
   background: color-mix(in srgb, var(--glass) 66%, transparent);
   container-type: inline-size;
 }
-/* 资金流水是售出表单的完整分区，不能被多列表单当成单个字段挤到一列。 */
+/* 资金明细是售出表单的完整分区，不能被多列表单当成单个字段挤到一列。 */
 .inventory-sale-cashflow--full-width {
   grid-column: 1 / -1;
 }
@@ -41,7 +42,7 @@
   }
 }
 
-/* 分期计划卡片：把逐期到期日容器做成带标题的独立区块，与资金流水卡片视觉一致。 */
+/* 分期计划卡片：把逐期到期日容器做成带标题的独立区块，与资金明细卡片视觉一致。 */
 .inventory-sale-plan {
   grid-column: 1 / -1;
   margin-top: var(--space-3);

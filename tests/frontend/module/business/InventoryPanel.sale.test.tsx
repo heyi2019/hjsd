@@ -135,7 +135,7 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
   renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
 
   expect(await screen.findByText("买家信息")).toBeInTheDocument();
-  expect(screen.getByText("资金流水")).toBeInTheDocument();
+  expect(screen.getByText("资金明细")).toBeInTheDocument();
   await ui.type(screen.getByLabelText("客户昵称"), "新买家");
   await ui.type(screen.getByLabelText("售出金额"), "350");
   await ui.click(screen.getByLabelText("资金账户"));
@@ -311,10 +311,12 @@ describe("库存售出三表单分支", () => {
     expect(screen.getByText("买家信息")).toBeInTheDocument();
   });
 
-  it("售出表单的资金流水区占满表单宽度", async () => {
+  it("售出表单统一使用资金明细且不增加支出", async () => {
     renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-    const cashflow = await screen.findByText("资金流水");
-    expect(cashflow.closest(".inventory-sale-cashflow")).toHaveClass("inventory-sale-cashflow--full-width");
+    expect(await screen.findByText("资金明细")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /增加支出/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("售出金额2")).not.toBeInTheDocument();
+    expect(screen.queryByText("资金账户2")).not.toBeInTheDocument();
   });
 
   it("回收、提号、代挂三种售出表单都展示统一的交付信息", async () => {

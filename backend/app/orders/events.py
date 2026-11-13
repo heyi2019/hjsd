@@ -79,8 +79,6 @@ def post_event(
     occurred_on: date,
     actor: str,
     pool_id: int | None = None,
-    pool_id2: int | None = None,
-    amount2: Any = 0,
     portion: str = "PRINCIPAL",
     delivery_mode: str | None = None,
     delivery_direction: str | None = None,
@@ -276,15 +274,10 @@ def post_event(
 
     has_cashflow = event_type in EVENT_FLOW_MAP and not installment_sale
     if not has_cashflow and event_type != EventType.DELIVER.value:
-        if pool_id is not None or pool_id2 is not None:
+        if pool_id is not None:
             raise Validation(
                 f"{event_type} 业务动作不直接选择资金账户",
                 details={"field": "pool_id", "event_type": event_type},
-            )
-        if amount2 is not None and _non_negative_money(amount2, field="amount2") > 0:
-            raise Validation(
-                f"{event_type} 业务动作不支持第二笔金额",
-                details={"field": "amount2", "event_type": event_type},
             )
     direction, nature, category = EVENT_FLOW_MAP.get(event_type, (None, None, None))
     # 初始买入(BUY)对应的号价/成本允许为 0：提号表单将该字段设为选填时前端以 0 兜底，
@@ -295,14 +288,7 @@ def post_event(
         money = _non_negative_money(amount, field="amount")
     else:
         money = _positive_money(amount, field="amount")
-    if installment_sale and (
-        pool_id is not None
-        or pool_id2 is not None
-        or (
-            amount2 is not None
-            and _non_negative_money(amount2, field="amount2") > 0
-        )
-    ):
+    if installment_sale and pool_id is not None:
         raise Validation(
             "分期售出只登记 SELL 业务事实，资金账户与金额应在分期收款时填写",
             details={"field": "pool_id"},
@@ -353,21 +339,6 @@ def post_event(
         if user is not None and not user.can_see_pool(resolved_pool_id):
             raise NotFound("资金池不存在", details={"pool_id": resolved_pool_id})
         _assert_pool_active(session, resolved_pool_id)
-    # 售出拆分：同一笔 SELL 可同时进入两个资金池（资金账户1 + 资金账户2）。
-    # 仅当显式传入 pool_id2 时启用；金额2 必须为正，且二者须成对出现。
-    secondary_money: Decimal = Decimal("0")
-    resolved_pool_id2: int | None = None
-    if pool_id2 is not None and has_cashflow:
-        secondary_money = _non_negative_money(amount2, field="amount2")
-        if secondary_money <= 0:
-            raise Validation("售出金额2 必须为正数", details={"field": "amount2"})
-        resolved_pool_id2 = pool_id2
-        if user is not None and not user.can_see_pool(resolved_pool_id2):
-            raise NotFound("资金池不存在", details={"pool_id": resolved_pool_id2})
-        _assert_pool_active(session, resolved_pool_id2)
-    elif amount2 is not None and has_cashflow:
-        if _non_negative_money(amount2, field="amount2") > 0:
-            raise Validation("填写了售出金额2 必须选择资金账户2", details={"field": "pool_id2"})
     cancel_direction = Direction.IN.value
     if event_type == EventType.CANCEL.value:
         cancel_direction = _opposite_direction(offset_event_id, session, order_id=order.id)
@@ -418,7 +389,7 @@ def post_event(
         ),
         order_id=order.id,
         event_type=event_type,
-        amount=money + secondary_money,
+        amount=money,
         portion=portion,
         occurred_on=occurred_on,
         pool_id=resolved_pool_id,
@@ -468,30 +439,6 @@ def post_event(
             updated_by=actor,
         )
         session.add(flow)
-        # 先落库主流水，确保拆分流水编号（count+1）能正确递增、不与主流水冲突。
-        session.flush()
-
-        # 售出拆分：将金额2 派生为同一 SELL 事件下的第二笔资金流水，进入资金账户2。
-        if resolved_pool_id2 is not None:
-            secondary_flow = Cashflow(
-                flow_no=next_cashflow_no(
-                    session, order_no=order.order_no, order_id=order.id, category=category
-                ),
-                pool_id=resolved_pool_id2,
-                occurred_on=occurred_on,
-                nature=nature,
-                fund_nature=fund_nature,
-                accounting_attribute=accounting_attribute,
-                category=category,
-                direction=direction,
-                amount=secondary_money,
-                order_id=order.id,
-                order_event_id=event.id,
-                note=note,
-                created_by=actor,
-                updated_by=actor,
-            )
-            session.add(secondary_flow)
 
     if event_type in {
         EventType.BUY.value,

@@ -1,5 +1,4 @@
-/** 订单表单小组件：客户来源（L258）与支出明细（中介费/支出行）字段路径。
- *  两文件原本各自一套 Form + renderLight，无 vi.mock，合并后只省一次文件级固定成本。 */
+/** 订单表单小组件：客户来源与支出明细字段路径。 */
 import { useState } from "react";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -7,8 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { Button, Form, type FormInstance } from "antd";
 import { renderLight } from "@fixtures/render";
 import { CustomerSourceFields } from "@/orders/CustomerSourceInput";
-import { AdditionalFeeFields } from "@/orders/AdditionalFeeFields";
-import type { Pool } from "@/shared/api/types/finance";
+import { FinanceExpenseItems } from "@/orders/finance/FinanceExpenseItems";
 
 describe("CustomerSourceFields：客户来源校验文案", () => {
   function Harness() {
@@ -47,14 +45,7 @@ describe("CustomerSourceFields：客户来源校验文案", () => {
   });
 });
 
-const pools: Pool[] = [
-  { id: 1, code: "MAIN", name: "主账户", pool_type: "CASH", ownership: "OWNED", status: "ACTIVE" },
-];
-
-/** 回归锁：中介费 / 资金账户是顶层表单字段，绝不能放进 Form.List 内部，
- *  否则 antd 会强制给 name 加 expense_items. 前缀，导致值写入
- *  expense_items.intermediary_fee、污染数组并让 Form.List 重渲染崩溃（点击即报错）。 */
-describe("AdditionalFeeFields：中介费字段路径", () => {
+describe("FinanceExpenseItems：支出明细字段", () => {
   let ui: ReturnType<typeof userEvent.setup>;
 
   function renderFeeForm() {
@@ -64,7 +55,7 @@ describe("AdditionalFeeFields：中介费字段路径", () => {
       formRef = form;
       return (
         <Form form={form}>
-          <AdditionalFeeFields pools={pools} />
+        <FinanceExpenseItems />
         </Form>
       );
     }
@@ -76,51 +67,16 @@ describe("AdditionalFeeFields：中介费字段路径", () => {
     ui = userEvent.setup({ pointerEventsCheck: 0 });
   });
 
-  it("中介费写入顶层字段，不污染 expense_items 数组", async () => {
-    const { getForm } = renderFeeForm();
-    const feeInput = screen.getByPlaceholderText("金额");
-    await ui.type(feeInput, "500");
-
-    // 顶层字段能读到（修复前此处为 undefined，因为值被塞进了 expense_items.intermediary_fee）
-    expect(getForm().getFieldValue("intermediary_fee")).toBe("500");
-
-    // 数组字段不得被混入对象属性而变成混合结构
-    const expenseItems = getForm().getFieldValue("expense_items");
-    expect(expenseItems == null || Array.isArray(expenseItems)).toBe(true);
-    expect({}.hasOwnProperty.call(expenseItems ?? {}, "intermediary_fee")).toBe(false);
-  });
-
-  it("点击增加支出向 expense_items 追加一项且不污染中介费", async () => {
+  it("点击增加支出只追加金额和备注字段", async () => {
     const { getForm } = renderFeeForm();
     await ui.click(screen.getByText("+ 增加支出"));
     const list = getForm().getFieldValue("expense_items");
     expect(Array.isArray(list) && list.length === 1).toBe(true);
-    expect(getForm().getFieldValue("intermediary_fee")).toBeUndefined();
-  });
-
-  it("将增加支出放在支出明细容器的右上方标题区", () => {
-    const { container } = renderFeeForm();
-    const addButton = screen.getByText("+ 增加支出").closest("button");
-    const card = container.querySelector(".additional-fee-fields");
-
-    if (!addButton) throw new Error("增加支出按钮未渲染");
-    expect(card).toBeInTheDocument();
-    expect(addButton.closest(".business-registration-group__header")).toBeInTheDocument();
-    expect(addButton.closest(".additional-fee-fields")).toBe(card);
-  });
-
-  it("新增支出行只保留金额、资金账户和支出备注", async () => {
-    renderFeeForm();
-    await ui.click(screen.getByText("+ 增加支出"));
-
-    expect(screen.queryByText("支出名称")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("金额")).toBeInTheDocument();
     expect(screen.getByText("支出备注")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("可选填")).toBeInTheDocument();
-    // 账户统一术语：中介费账户与每笔支出的账户都叫「资金账户」
-    const accountLabels = Array.from(
-      document.querySelectorAll(".form-field__label, .ant-form-item-label > label"),
-    ).map((el) => el.textContent ?? "");
-    expect(accountLabels.filter((text) => text.includes("资金账户")).length).toBe(2);
-    expect(accountLabels.filter((text) => text.includes("支出账户")).length).toBe(0);
+    expect(screen.queryByText("中介费")).toBeNull();
+    expect(screen.queryByText("资金账户")).toBeNull();
+    expect(screen.queryByText("支出名称")).not.toBeInTheDocument();
   });
 });

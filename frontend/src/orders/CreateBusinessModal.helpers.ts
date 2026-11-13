@@ -45,7 +45,7 @@ export function resolveCustomerSource(values: Values, isDg: boolean): string | u
   return selected === "其他" ? values[customerSourceOtherField] as string : selected;
 }
 
-/** 订单备注：HS/DG 汇总客户来源，TH 汇总供货方与预期收款，其余取原备注。 */
+/** 订单备注：HS/DG 汇总客户来源，TH 汇总供货方，其余取原备注。 */
 export function buildOrderNote(
   values: Values,
   kind: { isRecovery: boolean; isTh: boolean; isDg: boolean },
@@ -60,7 +60,6 @@ export function buildOrderNote(
       values.th_account_note as string,
       values.supplier_source ? `供货方来源：${String(values.supplier_source === "其他" ? values.supplier_source_other : values.supplier_source)}` : "",
       values.supplier_note as string,
-      values.th_receive_amount ? `预期收买家：${String(values.th_receive_amount)}` : "",
     ].filter(Boolean).join("｜") || undefined;
   }
   return values.note as string;
@@ -143,21 +142,16 @@ export async function resolveCounterpartyId(args: {
   return counterparty.id;
 }
 
-/** 建单时的随单成本（中介费 + 自定义支出项），仅 HS/TH 有。 */
+/** 建单时的随单成本（自定义支出项），仅 HS/TH 有。 */
 export function buildInitialCosts(values: Values, isRecovery: boolean, isTh: boolean) {
   if (!isRecovery && !isTh) return [];
   return [
-    ...(Number(values.intermediary_fee) > 0 ? [{
-      amount: String(values.intermediary_fee), occurred_on: today(), portion: "PRINCIPAL",
-      pool_id: (values.intermediary_pool_id ?? values.payment_pool_id) as number, flow_category: "FEE",
-      note: `${isTh ? "提号中介费" : "中介费"}｜平台：${String(values.intermediary_platform ?? "")}｜类型：${String(values.intermediary_type ?? "")}${values.compensation_type ? `｜${String(values.compensation_type)}` : ""}`,
-    }] : []),
-    ...((values.expense_items as Array<{ name?: unknown; amount?: unknown; pool_id?: unknown; note?: unknown }> | undefined) ?? [])
+    ...((values.expense_items as Array<{ amount?: unknown; note?: unknown }> | undefined) ?? [])
       .filter((item) => Number(item.amount) > 0)
       .map((item) => ({
         amount: String(item.amount), occurred_on: today(), portion: "PRINCIPAL",
-        pool_id: (item.pool_id ?? values.payment_pool_id) as number, flow_category: "OTHER",
-        note: [String(item.name || "其他支出"), item.note ? String(item.note) : ""].filter(Boolean).join("｜"),
+        pool_id: values.payment_pool_id as number, flow_category: "OTHER",
+        note: String(item.note ?? "") || "支出",
       })),
   ];
 }

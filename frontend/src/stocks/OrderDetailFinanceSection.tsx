@@ -1,5 +1,6 @@
 import { Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { CustomFieldSection } from "../orders/ConfigurableField";
 import { DataTable, MoneyText } from "../shared/ui";
 import {
   InventoryExtraFieldsGroup,
@@ -65,6 +66,7 @@ export function OrderDetailFinanceSection({
         <Typography.Text type="secondary">{flowCount} 笔</Typography.Text>
       </div>
       <div className="inventory-detail__meta">
+        {editing ? <CustomFieldSection section="FINANCE" testIdSuffix="inv-edit-finance" /> : null}
         <InventoryExtraFieldsGroup section="FINANCE" fields={extraFields} />
         <div className="inventory-finance-summary">
           <div className="inventory-finance-summary__item inventory-finance-summary__item--expense"><span>支出</span><strong>{expenseCount} 笔</strong></div>

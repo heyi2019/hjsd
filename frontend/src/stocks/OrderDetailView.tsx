@@ -96,8 +96,8 @@ type OrderDetailViewProps = {
 };
 
 /** 详情容器：只负责「板块怎么摆」，板块内部各自独立成文件（见 OrderDetail*.tsx）。
- *  - 编辑态（行展开内联 / 移动端详情弹窗，无 Tab）：5 板块上下堆叠，1/2/3 字段可编辑、4/5 流水只读，底部附保存/取消。
- *  - 只读态（行展开 / 库存详情弹窗）：5 板块分栏，默认落在游戏账号信息。 */
+ *  - 编辑态（行展开内联 / 移动端详情弹窗，无 Tab）：字段板块上下堆叠，操作明细最后展示，底部附保存/取消。
+ *  - 只读态（行展开 / 库存详情弹窗）：字段板块分栏，操作明细最后展示。 */
 export function OrderDetailView({
   meta,
   detail,
@@ -146,14 +146,6 @@ export function OrderDetailView({
             <OrderDetailOperationSection meta={meta} editing />
           </FieldConfigScope>
         </BusinessRegistrationForm>
-        <OrderDetailExecutionSection
-          rows={executionRows}
-          audit={detail?.audit}
-          editing
-          eventDrafts={eventDrafts}
-          onEventEdit={onEventEdit}
-          employees={employees}
-        />
         <OrderDetailFinanceSection
           rows={financeRows}
           extraFields={extraFieldsBySection("FINANCE")}
@@ -164,7 +156,14 @@ export function OrderDetailView({
           flowCount={flowCount}
           editing
         />
-        <OrderDetailPartySection meta={meta} />
+        <OrderDetailPartySection meta={meta} editing />
+        <OrderDetailExecutionSection
+          rows={executionRows}
+          editing
+          eventDrafts={eventDrafts}
+          onEventEdit={onEventEdit}
+          employees={employees}
+        />
         <div className="inventory-detail__footer">
           <Space>
             <PermissionButton permission="order.create" type="primary" loading={saving} onClick={() => onSave?.()}>保存修改</PermissionButton>
@@ -189,8 +188,8 @@ export function OrderDetailView({
         totalIncome={totalIncome}
         flowCount={flowCount}
       />
-      <OrderDetailExecutionSection rows={executionRows} audit={detail?.audit} employees={employees} />
       <OrderDetailPartySection meta={meta} />
+      <OrderDetailExecutionSection rows={executionRows} employees={employees} />
     </div>
   );
 }

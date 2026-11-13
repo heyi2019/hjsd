@@ -1,6 +1,6 @@
 import { useSession } from "../../shared/state/session";
 import { type BusinessCenterEntryTab } from "../../orders/businessCenter";
-import { useAccountExecutionEditor } from "./useAccountExecutionEditor";
+import { useAccountExecutionEditor } from "../account-edit/use-account-execution-editor";
 import { useInventoryList } from "./useInventoryList";
 import { useExecutionCache } from "./useExecutionCache";
 import { useInventoryActions } from "./useInventoryActions";

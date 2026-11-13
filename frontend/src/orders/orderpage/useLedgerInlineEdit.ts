@@ -6,7 +6,7 @@ import type { Account } from "../../shared/api/types/accounts";
 import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { useAccountExecutionEditor } from "../../stocks/InventoryPanel/useAccountExecutionEditor";
+import { useAccountExecutionEditor } from "../../stocks/account-edit/use-account-execution-editor";
 
 /**
  * 台账表格的展开详情缓存与账号内联编辑枢纽。

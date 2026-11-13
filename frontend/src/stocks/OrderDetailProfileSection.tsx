@@ -8,7 +8,7 @@ import {
   type OrderDetailField,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
-import { OrderDetailEditFields } from "./OrderDetailEditFields";
+import { OrderDetailEditFields } from "./account-edit/edit-fields";
 import {
   buildFormExtraDisplay,
   fieldLabel,
@@ -115,6 +115,7 @@ export function OrderDetailProfileSection({
               </Descriptions>
             </div>
           ) : null}
+          {account ? <OrderDetailEditFields editing={account} onEdit={onEdit} /> : null}
         </div>
       </div>
     );

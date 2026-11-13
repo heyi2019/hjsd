@@ -1,4 +1,5 @@
 import { Descriptions } from "antd";
+import { CustomFieldSection } from "../orders/ConfigurableField";
 import {
   InventorySectionHeading,
   type OrderDetailField,
@@ -6,7 +7,7 @@ import {
 } from "./OrderDetail.shared";
 
 /** 板块6：参与方信息 = 参与方链接（客户 / 合作方）+ PARTICIPANT 自定义字段。复用既有渲染（meta.orderParties 与 orderExtras）。 */
-export function OrderDetailPartySection({ meta }: { meta: OrderDetailMeta }) {
+export function OrderDetailPartySection({ meta, editing = false }: { meta: OrderDetailMeta; editing?: boolean }) {
   const participantFields: OrderDetailField[] = [
     ...(meta.orderParties !== "-" ? [{ key: "orderParties", label: "参与方", value: meta.orderParties, className: "inventory-detail__multiline" }] : []),
     ...meta.orderExtras
@@ -17,6 +18,7 @@ export function OrderDetailPartySection({ meta }: { meta: OrderDetailMeta }) {
   return (
     <div className="inventory-detail__section inventory-detail__section--party">
       <InventorySectionHeading title="参与方信息" />
+      {editing ? <CustomFieldSection section="PARTICIPANT" testIdSuffix="inv-edit-participant" /> : null}
       {participantFields.length ? (
         <div className="inventory-detail__meta">
           <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>

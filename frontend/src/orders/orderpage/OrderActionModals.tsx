@@ -2,7 +2,7 @@ import { Input, Typography } from "antd";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import { CreateBusinessModal } from "../CreateBusinessModal";
 import { DateField, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
-import { InventoryConsignmentModal } from "../../stocks/InventoryConsignmentModal";
+import { InventoryConsignmentModal } from "../../stocks/operations";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../../stocks/InventorySaleModal";
 import { type OrdersPageController } from "./useOrdersPageController";
 

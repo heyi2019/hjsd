@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
 import { InventoryRebateModal } from "@/stocks/InventoryRebateModal";
-import { InventoryConsignmentModal } from "@/stocks/InventoryConsignmentModal";
+import { InventoryConsignmentModal } from "@/stocks/operations/consignment";
 import { OrderDetailDeliverySection } from "@/stocks/OrderDetailDeliverySection";
 
 import type { Account } from "@/shared/api/types/accounts";

@@ -21,7 +21,7 @@ import {
   type InventoryExecutionRow,
   type InventoryFinanceRow,
 } from "./OrderDetail.shared";
-import { activeConsignmentListings, consignmentPlatform, hasUnlistedConsignment, isConsignmentListing, isActiveConsignmentListing } from "./consignment-logic";
+import { activeConsignmentListings, consignmentPlatform, hasUnlistedConsignment, isConsignmentListing, isActiveConsignmentListing } from "./operations/consignment-logic";
 
 function eventDate(detail: AccountExecutionDetail | undefined, eventType: string): string {
   const event = detail?.orders.flatMap((order) => order.events).find((item) => item.event_type === eventType);

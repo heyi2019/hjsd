@@ -17,4 +17,10 @@ export function inventoryOperationItems(context: InventoryOperationContext): Inv
     .filter((item): item is InventoryOperationItem => item !== null);
 }
 
+export { InventoryConsignmentModal } from "./consignment";
+export { InventoryPlatformOffsaleModal, consignmentRecords } from "./offsale";
+export { InventoryProfileModal } from "./profile-modal";
+export { unlistAndCancelConsignmentOrders } from "./offsale-service";
+export type { ActiveConsignment } from "./offsale";
+export type { InventoryProfileTarget } from "./profile-modal";
 export type { InventoryOperationContext, InventoryOperationItem, InventoryOperationKey } from "./types";

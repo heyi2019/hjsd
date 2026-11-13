@@ -1,5 +1,5 @@
-import type { AccountExecutionEvent, AccountExecutionOrder } from "../shared/api/types/account-execution";
-import { formatDateTimeMinute } from "../shared/lib/format";
+import type { AccountExecutionEvent, AccountExecutionOrder } from "../../shared/api/types/account-execution";
+import { formatDateTimeMinute } from "../../shared/lib/format";
 
 /** 寄售记录：寄售是原订单上的 OPERATE 事件，不是单独的 DG 订单。 */
 export type ConsignmentListing = {

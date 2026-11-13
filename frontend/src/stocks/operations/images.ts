@@ -8,3 +8,6 @@ export const IMAGES_OPERATION: InventoryOperationItem = {
 export function imagesOperation(context: InventoryOperationContext): InventoryOperationItem | null {
   return context.row.status === "SOLD" ? null : IMAGES_OPERATION;
 }
+
+export { InventoryProfileModal } from "./profile-modal";
+export type { InventoryProfileTarget } from "./profile-modal";

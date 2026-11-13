@@ -1,4 +1,4 @@
-import { isActiveConsignmentListing } from "../consignment-logic";
+import { isActiveConsignmentListing } from "./consignment-logic";
 import type { InventoryOperationContext, InventoryOperationItem } from "./types";
 
 export const OFFSALE_OPERATION: InventoryOperationItem = {
@@ -12,3 +12,6 @@ export function offsaleOperation(context: InventoryOperationContext): InventoryO
   const hasActiveConsignment = Boolean(context.detail?.orders.some(isActiveConsignmentListing));
   return canOffsale && (hasActiveConsignment || canSystemOffsale) ? OFFSALE_OPERATION : null;
 }
+
+export { InventoryPlatformOffsaleModal, consignmentRecords } from "./offsale-modal";
+export type { ActiveConsignment } from "./offsale-modal";

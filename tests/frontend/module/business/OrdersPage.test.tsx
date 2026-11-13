@@ -493,8 +493,12 @@ describe("OrdersPage：四类订单台账", () => {
         order_type: "DG",
         trade_date: "2026-10-03",
         status: "ACTIVE",
-        extra_values: { consignment_platform: "寄售平台A", listed_at: "2026-10-03T10:00" },
-        events: [],
+        events: [{
+          id: 301,
+          event_type: "OPERATE",
+          operation_type: "CONSIGNMENT",
+          form_extra: { consignment_platform: "寄售平台A", listed_at: "2026-10-03T10:00" },
+        }],
       }],
     } as never);
     await openLedger("admin");

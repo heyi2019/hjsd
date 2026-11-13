@@ -11,10 +11,9 @@ import type { Order } from "../../shared/api/types/orders";
 import { currentUser, normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { consignmentRecords, type ActiveConsignment } from "../../stocks/InventoryPlatformOffsaleModal";
-import { unlistAndCancelConsignmentOrders } from "../systemOffsale";
+import { consignmentRecords, type ActiveConsignment, unlistAndCancelConsignmentOrders } from "../../stocks/operations";
 import type { OrderDeliveryTarget } from "../OrderDeliveryModal";
-import type { InventoryProfileTarget } from "../../stocks/InventoryProfileModal";
+import type { InventoryProfileTarget } from "../../stocks/operations";
 import {
   buildActionAllocationCandidates,
   buildActionAllocationRows,

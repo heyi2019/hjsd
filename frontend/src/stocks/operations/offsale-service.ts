@@ -1,5 +1,5 @@
-import { ordersApi } from "../shared/api/orders.api";
-import type { ActiveConsignment } from "../stocks/InventoryPlatformOffsaleModal";
+import { ordersApi } from "../../shared/api/orders.api";
+import type { ActiveConsignment } from "./offsale";
 
 interface SystemOffsaleCancellation {
   /** 需要同步登记下架的当前寄售记录。 */

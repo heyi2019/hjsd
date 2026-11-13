@@ -1,11 +1,11 @@
-import { appMessage } from "../shared/ui/appFeedback";
+import { appMessage } from "../../shared/ui/appFeedback";
 import { Input, Space, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useState } from "react";
-import { stocksApi } from "../shared/api/stocks.api";
-import type { Account } from "../shared/api/types/accounts";
-import { BusinessActionModal, InlineError } from "../shared/ui";
-import "./InventoryProfileModal.css";
+import { stocksApi } from "../../shared/api/stocks.api";
+import type { Account } from "../../shared/api/types/accounts";
+import { BusinessActionModal, InlineError } from "../../shared/ui";
+import "./profile-modal.css";
 
 export type InventoryProfileTarget = {
   account: Account;

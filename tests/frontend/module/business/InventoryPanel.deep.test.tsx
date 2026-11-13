@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
-import { consignmentRecords } from "@/stocks/InventoryPlatformOffsaleModal";
+import { consignmentRecords } from "@/stocks/operations/offsale";
 import { installmentsApi } from "@/shared/api/installments.api";
 import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";

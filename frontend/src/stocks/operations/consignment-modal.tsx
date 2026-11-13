@@ -1,18 +1,18 @@
-import { appMessage } from "../shared/ui/appFeedback";
+import { appMessage } from "../../shared/ui/appFeedback";
 /** 库存账号寄售：每次只登记一个中介平台及其实际上架时间。 */
 import { DatePicker, Form, InputNumber } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
-import { ordersApi } from "../shared/api/orders.api";
-import { stocksApi } from "../shared/api/stocks.api";
-import type { Account } from "../shared/api/types/accounts";
-import { normalizeError } from "../shared/api/client";
-import { useOptionSet } from "../shared/lib/optionSets";
-import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, MoneyText, PermissionButton, Select } from "../shared/ui";
-import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../orders/ConfigurableField";
-import { InventoryAccountSummary } from "./InventoryAccountSummary";
+import { ordersApi } from "../../shared/api/orders.api";
+import { stocksApi } from "../../shared/api/stocks.api";
+import type { Account } from "../../shared/api/types/accounts";
+import { normalizeError } from "../../shared/api/client";
+import { useOptionSet } from "../../shared/lib/optionSets";
+import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, MoneyText, PermissionButton, Select } from "../../shared/ui";
+import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../../orders/ConfigurableField";
+import { InventoryAccountSummary } from "../InventoryAccountSummary";
 import { activeConsignmentListings } from "./consignment-logic";
-import "./InventoryConsignmentModal.css";
+import "./consignment-modal.css";
 
 type ListedPlatform = { key: number; platform: string; price: number | string | null; listedAt: string };
 

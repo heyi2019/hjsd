@@ -8,3 +8,5 @@ export const CONSIGNMENT_OPERATION: InventoryOperationItem = {
 export function consignmentOperation(context: InventoryOperationContext): InventoryOperationItem | null {
   return context.row.status === "SOLD" ? null : CONSIGNMENT_OPERATION;
 }
+
+export { InventoryConsignmentModal } from "./consignment-modal";

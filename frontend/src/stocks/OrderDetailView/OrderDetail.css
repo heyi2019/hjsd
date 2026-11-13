@@ -13,9 +13,9 @@
 .inventory-row-actions .ant-space-item:first-child .ant-btn-link { font-weight: 650; color: var(--color-primary-text); }
 .inventory-row-actions .ant-btn-link:hover { background: var(--soft); border-radius: var(--radius-compact); }
 .inventory-detail {
-  width: fit-content;
+  width: min(100%, 640px);
   min-width: min(560px, calc(100% - var(--space-6) * 2));
-  max-width: calc(100% - var(--space-6) * 2);
+  max-width: min(calc(100% - var(--space-6) * 2), 640px);
   max-height: 36rem;
   overflow-y: auto;
   scrollbar-gutter: stable;
@@ -32,8 +32,8 @@
 }
 .inventory-table .ant-table-tbody > tr.ant-table-expanded-row .inventory-detail {
   /* 展开详情保留独立卡片边界，不再跟随主表铺满。 */
-  width: fit-content;
-  max-width: calc(100% - var(--space-6) * 2);
+  width: min(100%, 640px);
+  max-width: min(calc(100% - var(--space-6) * 2), 640px);
   margin-inline: 0;
 }
 .inventory-detail__meta {
@@ -59,15 +59,89 @@
 }
 .inventory-detail__meta-group + .inventory-detail__meta-group { margin-top: var(--space-3); }
 .inventory-detail__meta-group-title { padding: var(--space-2) var(--space-3); color: var(--color-text-secondary); background: var(--soft); font: var(--font-caption-2); font-weight: 650; }
-.inventory-detail__meta-table { width: auto; max-width: none; margin: var(--space-3); }
+.inventory-detail__meta-table {
+  width: calc(100% - var(--space-3) * 2);
+  max-width: none;
+  margin: var(--space-3);
+  box-sizing: border-box;
+}
+.inventory-detail__data-table {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  font-size: var(--fs-caption-2);
+}
+.inventory-detail__data-table,
+.inventory-detail__data-table .ant-table-wrapper,
+.inventory-detail__data-table .ant-spin-nested-loading,
+.inventory-detail__data-table .ant-spin-container {
+  margin-inline: 0 !important;
+  padding-inline: 0 !important;
+}
+.inventory-detail__data-table .ant-table,
+.inventory-detail__data-table .ant-table-container,
+.inventory-detail__data-table .ant-table-content,
+.inventory-detail__data-table .ant-table-content > table {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin-inline: 0 !important;
+  table-layout: fixed !important;
+}
+.inventory-detail__data-table .ant-table-container { border: 0; border-radius: 0; padding-inline: 0 !important; }
+.inventory-detail__data-table .ant-table-content { overflow-x: hidden !important; }
+.inventory-detail__data-table .ant-table-thead > tr > th,
+.inventory-detail__data-table .ant-table-tbody > tr > td {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-caption-2);
+  line-height: 1.45;
+}
+.inventory-detail__data-table .ant-table-thead > tr > th {
+  background: color-mix(in srgb, var(--soft) 68%, transparent);
+  color: var(--color-text-secondary);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.inventory-detail__data-table .ant-table-tbody > tr > td {
+  background: color-mix(in srgb, var(--glass) 84%, transparent);
+  overflow-wrap: anywhere;
+}
+.inventory-detail__copy-value {
+  position: relative;
+  display: block;
+  min-height: 1.5em;
+  padding-inline-end: calc(var(--space-4) + 2px);
+  overflow-wrap: anywhere;
+}
+.inventory-detail__copy-button {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-end: 0;
+  display: grid;
+  width: var(--sz-20);
+  height: var(--sz-20);
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-compact);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: var(--fs-caption-2);
+}
+.inventory-detail__copy-button:hover,
+.inventory-detail__copy-button:focus-visible { color: var(--color-primary); background: var(--soft); }
 .inventory-detail .ui-table-wrap,
 .inventory-detail .ant-table-wrapper {
   width: 100%;
   max-width: none;
-  /* 窄窗下允许横向滚动而非裁切右侧列（L202） */
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: clip;
 }
+.inventory-detail .inventory-detail__data-table { overflow-x: hidden; }
 .inventory-detail__section > .ui-table-wrap {
   justify-self: stretch;
   margin-inline: 0;
@@ -75,12 +149,6 @@
   max-width: 100%;
   box-sizing: border-box;
   transform: none;
-}
-.inventory-detail__section > .ui-table-wrap.ui-datatable--inline {
-  margin-inline: 0 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  transform: none !important;
 }
 .inventory-detail .ui-table-wrap .ant-table,
 .inventory-detail .ant-table-wrapper .ant-table { min-width: 100%; }
@@ -122,81 +190,41 @@
 .inventory-detail__section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--sz-24); padding-inline-start: var(--space-3); border-inline-start: var(--border-w-3) solid var(--color-primary); }
 .inventory-detail__section-heading .ant-typography { color: var(--color-text-primary); font-weight: 700; }
 .inventory-execution-list { display: grid; gap: var(--space-3); margin-top: 0; }
-.inventory-execution-table {
-  box-sizing: border-box;
-  border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
-  border-radius: var(--radius-sm);
-  /* 窄窗下允许横向滚动而非裁切右侧列（L202） */
-  overflow-x: auto;
-  overflow-y: auto;
-}
+.inventory-execution-table { overflow-x: hidden; overflow-y: hidden; }
 .inventory-execution-table .ant-table,
-.inventory-finance-table .ant-table {
-  width: 100% !important;
-  table-layout: fixed;
-}
-.inventory-execution-table .ant-table-content,
-.inventory-finance-table .ant-table-content { overflow-x: auto !important; }
-.inventory-execution-table th,
-.inventory-execution-table td,
-.inventory-finance-table th,
-.inventory-finance-table td { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.inventory-execution-table .ant-table-container { border: 0; border-radius: 0; overflow: hidden; }
 .inventory-execution-table .ant-table-container,
-.inventory-finance-table .ant-table-container { margin-inline-start: calc(var(--space-5) * -2); width: calc(100% + var(--space-5) * 2); }
-.inventory-execution-table .ant-table-thead > tr > th { background: color-mix(in srgb, var(--soft) 68%, transparent); color: var(--color-text-secondary); font-weight: 650; white-space: nowrap; }
-.inventory-execution-table .ant-table-tbody > tr > td { background: color-mix(in srgb, var(--glass) 84%, transparent); white-space: nowrap; }
-.inventory-execution-table .ant-table-thead > tr > th.ant-table-cell-fix-left,
-.inventory-execution-table .ant-table-tbody > tr > td.ant-table-cell-fix-left { background: color-mix(in srgb, var(--glass) 84%, transparent); }
-.inventory-execution-table .ant-table-thead > tr > th.ant-table-cell-fix-left { background: color-mix(in srgb, var(--soft) 68%, transparent); }
-.inventory-execution-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
-/* 内联表视觉统一收进 .ui-datatable--inline（shared/styles/ui-components/tables.css）。
-   此处只保留详情页独有的布局补偿：抵消卡片内边距，让表格贴到卡片左右边缘。
-   注：详情页的金额表/执行表因 L202（窄窗横向滚动）仍使用 .inventory-finance-table /
-   .inventory-execution-table 自有规则，不套用 .ui-datatable--inline 的 clip 布局。 */
-.inventory-detail__section .ui-datatable--inline .ant-table-container {
-  margin-inline-start: calc(var(--space-5) * -2);
-  width: calc(100% + var(--space-5) * 2);
+.inventory-execution-table .ant-table-content,
+.inventory-execution-table .ant-table-content > table {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  table-layout: fixed !important;
 }
+.inventory-execution-table .ant-table-content { overflow-x: hidden !important; }
+.inventory-execution-table .ant-table-tbody > tr > td { white-space: normal; overflow-wrap: anywhere; }
+.inventory-detail__data-table .ant-table-cell-fix-left,
+.inventory-detail__data-table .ant-table-cell-fix-right { background: var(--glass); }
+.inventory-detail__data-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
 .inventory-finance-list { display: grid; gap: var(--space-3); margin-top: 0; }
 .inventory-finance-list > .inventory-detail__meta {
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
+  box-sizing: border-box;
   padding: var(--space-3);
   display: grid;
   gap: var(--space-3);
-  overflow-x: auto;
+  overflow-x: hidden;
 }
-.inventory-execution-list > .inventory-detail__meta { padding: var(--space-3); }
 .inventory-finance-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
-.inventory-finance-summary { width: fit-content; display: grid; grid-template-columns: repeat(4, minmax(140px, max-content)); gap: var(--space-2); }
-.inventory-finance-summary__item { display: grid; gap: 2px; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text-secondary); font: var(--font-caption-2); }
+.inventory-finance-summary { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+.inventory-finance-summary__item { display: grid; min-width: 0; gap: 2px; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text-secondary); font: var(--font-caption-2); }
 .inventory-finance-summary__item--expense { border-inline-start: var(--border-w-3) solid var(--color-error); }
 .inventory-finance-summary__item--income { border-inline-start: var(--border-w-3) solid var(--color-success); }
 .inventory-finance-summary__item strong, .inventory-finance-summary__item--amount .ui-money { color: var(--color-text-primary); font-size: var(--fs-body); font-weight: 700; font-variant-numeric: tabular-nums; }
-.inventory-finance-table {
-  margin-top: 0;
-  box-sizing: border-box;
-  border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
-  border-radius: var(--radius-sm);
-  /* 窄窗下允许横向滚动而非裁切右侧列（L202） */
-  overflow-x: auto;
-  overflow-y: auto;
-}
-.inventory-finance-table .ant-table-container { border: 0; border-radius: 0; overflow: hidden; }
-.inventory-finance-table .ant-table-thead > tr > th { background: color-mix(in srgb, var(--soft) 68%, transparent); color: var(--color-text-secondary); font-weight: 650; white-space: nowrap; }
-.inventory-finance-table .ant-table-tbody > tr > td { background: color-mix(in srgb, var(--glass) 84%, transparent); white-space: nowrap; }
-.inventory-finance-table .ant-table-thead > tr > th.ant-table-cell-fix-left,
-.inventory-finance-table .ant-table-tbody > tr > td.ant-table-cell-fix-left { background: color-mix(in srgb, var(--glass) 84%, transparent); }
-.inventory-finance-table .ant-table-thead > tr > th.ant-table-cell-fix-left { background: color-mix(in srgb, var(--soft) 68%, transparent); }
-.inventory-finance-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
 /* 金额单元格：右对齐 + 等宽数字，与上方汇总卡数值列对齐。 */
-.inventory-detail__cell-amount { display: grid; justify-items: end; gap: 2px; min-width: 100px; font-variant-numeric: tabular-nums; }
+.inventory-detail__cell-amount { display: grid; min-width: 0; justify-items: end; gap: 2px; font-variant-numeric: tabular-nums; }
 .inventory-detail__cell-amount .ui-money { font-weight: 700; }
-/* 流水表字号对齐运营信息「作图」标签（--font-caption-2，12px）。 */
-.inventory-finance-table .ant-table-thead > tr > th,
-.inventory-finance-table .ant-table-tbody > tr > td { font-size: var(--fs-caption-2); }
-@media (--bp-sm) { .inventory-finance-summary { grid-template-columns: repeat(2, minmax(140px, max-content)); } }
+@media (--bp-sm) { .inventory-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (--bp-sm) {
   .inventory-table .ant-table-tbody > tr.ant-table-expanded-row > td { padding: var(--space-2) var(--space-3) !important; }
   .inventory-detail {
@@ -218,17 +246,17 @@
     min-width: 0 !important;
     table-layout: auto !important;
   }
-  .inventory-detail .ui-table-wrap .ant-table,
-  .inventory-detail .ant-table-wrapper .ant-table,
-  .inventory-execution-table .ant-table,
-  .inventory-finance-table .ant-table {
-    width: max-content !important;
-    min-width: max-content !important;
-    table-layout: auto !important;
-  }
 }
 /* 编辑态「时间联动」：订单创建 / 售出 / 流水三个锚点并排，窄屏单列。 */
 .inventory-time-shift__fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2) var(--space-3); }
 .inventory-time-shift__field { display: grid; gap: var(--space-1); min-width: 0; }
 .inventory-time-shift__field > span { font-size: var(--fs-caption-2); color: var(--color-text-secondary); }
 @media (--bp-sm) { .inventory-time-shift__fields { grid-template-columns: 1fr; } }
+
+.inventory-operation-table .inventory-operation-content {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  vertical-align: top;
+  line-height: 1.5;
+}

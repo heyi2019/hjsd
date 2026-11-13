@@ -66,14 +66,11 @@ def _account_output(
     account: Account,
     source_order: Order | None = None,
     *,
-    include_credentials: bool = False,
     extra_values: dict[str, object] | None = None,
     inventory_operator: str | None = None,
 ) -> AccountOut:
     """统一补齐库存来源订单；业务与类型以标准导入的账号字段为准。"""
     output = AccountOut.model_validate(account)
-    if not include_credentials:
-        output.game_password = None
     output.extra_values = extra_values or {}
     if source_order is not None:
         output.source_order_id = source_order.id
@@ -87,8 +84,6 @@ def _account_outputs(
     db: Session,
     accounts: list[Account],
     user: CurrentUser | None = None,
-    *,
-    include_credentials: bool = False,
 ) -> list[AccountOut]:
     """批量补齐库存来源订单，避免列表逐账号查询。"""
     source_orders = _source_orders(db, [account.id for account in accounts], user)
@@ -109,7 +104,6 @@ def _account_outputs(
         _account_output(
             account,
             source_orders.get(account.id),
-            include_credentials=include_credentials,
             extra_values=extra_values.get(account.id),
             inventory_operator=(
                 "、".join(

@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validat
 from app.core.schemas import PageOut, RequestModel
 
 from ._common import INVENTORY_STATUSES, inventory_age_days as age_days, inventory_age_level as age_level
+from .order_detail_view.schemas import OrderDetailViewOut
 
 class AccountOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -281,6 +282,7 @@ class AccountExecutionDetailOut(BaseModel):
     account: AccountOut
     orders: list[AccountExecutionOrderOut]
     finance_summary: ExecutionFinanceSummaryOut
+    detail_view: OrderDetailViewOut
     audit: list[AccountAuditOut] = Field(default_factory=list)
 
 __all__ = [
@@ -301,4 +303,5 @@ __all__ = [
     "AccountAuditOut",
     "AccountExecutionDetailOut",
     "ExecutionFinanceSummaryOut",
+    "OrderDetailViewOut",
 ]

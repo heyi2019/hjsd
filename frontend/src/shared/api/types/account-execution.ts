@@ -85,6 +85,53 @@ export interface AccountExecutionOrder {
   operator: string;
 }
 
+export interface OrderDetailExecutionRow {
+  key: string;
+  category: "INBOUND" | "OPERATING" | "OUTBOUND";
+  action: string;
+  occurred_at?: string | null;
+  amount?: string | null;
+  operator: string;
+  note: string;
+  platform: string;
+  event_id?: number | null;
+}
+
+export interface OrderDetailFinanceRow {
+  key: string;
+  type: string;
+  direction: string;
+  amount: string;
+  occurred_at?: string | null;
+  pool_name: string;
+  operator: string;
+  event_id?: number | null;
+}
+
+export interface OrderDetailOperationRow {
+  key: string;
+  action: string;
+  content: string;
+  occurred_at?: string | null;
+  operator: string;
+}
+
+export interface OrderDetailView {
+  execution_rows: OrderDetailExecutionRow[];
+  finance_rows: OrderDetailFinanceRow[];
+  operation_rows: OrderDetailOperationRow[];
+  lifecycle: {
+    sold_at?: string | null;
+    removed_at?: string | null;
+    removed_platform: string;
+    recovery_platform: string;
+    sale_platform: string;
+  };
+  order_notes: string;
+  parties: Array<{ id: number; display_name: string; role: string; entity_type: string }>;
+  extras: Array<{ key: string; label: string; value: string; section: string }>;
+}
+
 export interface AccountAuditEntry {
   id: number;
   action: string;
@@ -113,5 +160,6 @@ export interface AccountExecutionDetail {
   orders: AccountExecutionOrder[];
   /** 账号维度财务汇总：由后端按同一份明细算好下发，前端不再自行累加。 */
   finance_summary: ExecutionFinanceSummary;
+  detail_view: OrderDetailView;
   audit?: AccountAuditEntry[];
 }

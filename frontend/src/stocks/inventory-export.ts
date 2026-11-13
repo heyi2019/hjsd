@@ -1,13 +1,10 @@
 import type { AccountExecutionDetail } from "../shared/api/types/account-execution";
 import type { Account } from "../shared/api/types/accounts";
-import { executionActionLabel, formatDateTimeMinute } from "../shared/lib/format";
+import { formatDateTimeMinute } from "../shared/lib/format";
 import {
   BUSINESS_MODE_LABEL,
   INVENTORY_TYPE_LABEL,
-  accountFinancialFlows,
-  financeTypeLabel,
   inventoryStatusLabel,
-  rebateTypeLabel,
 } from "./inventory-logic";
 
 const INVENTORY_EXPORT_HEADERS = [
@@ -34,49 +31,44 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
   totalIncome: string;
 } {
   const orders = detail?.orders ?? [];
-  const financialFlows = accountFinancialFlows(detail);
-  const rebateItems = orders.flatMap((order) => (
-    (order.rebates ?? []).map((rebate) => ({ order, rebate }))
-  ));
-  const expenseFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "OUT");
-  const incomeFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "IN");
+  const detailView = detail?.detail_view;
+  const financeRows = detailView?.finance_rows ?? [];
+  const expenseRows = financeRows.filter((row) => row.direction === "支出");
+  const incomeRows = financeRows.filter((row) => row.direction === "收入");
+  const eventById = new Map(orders.flatMap((order) => order.events.map((event) => [event.id, { event, order }] as const)));
   const sourceOrder = orders[0];
 
   return {
     registrationAt: formatDateTimeMinute(sourceOrder?.created_at ?? sourceOrder?.trade_date),
-    soldAt: eventDate(detail, "SELL"),
-    removedAt: eventDate(detail, "CANCEL"),
-    consignmentAt: platformListingDate(detail),
-    consignmentPlatforms: consignmentPlatforms(detail),
-    execution: orders.flatMap((order) => order.events.map((event) => [
-      `${event.event_no} · ${executionActionLabel(event.event_type, order.order_type, event.delivery_direction)}`,
-      formatDateTimeMinute(event.occurred_at ?? event.occurred_on),
-      event.amount,
-      event.note || "-",
-      event.operator || "-",
-    ].join(" / "))).join("；"),
-    finance: [
-      ...financialFlows.map(({ order, event, cashflow }) => [
-        financeTypeLabel(event?.event_type ?? "", cashflow.direction, cashflow.category),
-        order.order_no,
-        cashflow.flow_no,
-        cashflow.direction === "OUT" ? "支出" : "收入",
-        cashflow.amount,
-        formatDateTimeMinute(cashflow.occurred_at ?? cashflow.occurred_on),
-        cashflow.pool_name || "未分配资金池",
-      ].join(" / ")),
-      ...rebateItems.map(({ order, rebate }) => [
-        rebateTypeLabel(rebate.rebate_type, rebate.channel),
-        order.order_no,
-        rebate.rebate_no,
-        "已登记",
-        rebate.base_amount,
-        `${rebate.rate}%`,
-        formatDateTimeMinute(rebate.collected_at ?? rebate.collected_on),
-      ].join(" / ")),
-    ].join("；"),
-    expenseCount: expenseFlows.length,
-    incomeCount: incomeFlows.length + rebateItems.length,
+    soldAt: formatDateTimeMinute(detailView?.lifecycle.sold_at),
+    removedAt: formatDateTimeMinute(detailView?.lifecycle.removed_at),
+    consignmentAt: formatDateTimeMinute(detailView?.operation_rows.find((row) => row.key === "consignment")?.occurred_at),
+    consignmentPlatforms: detailView?.operation_rows.find((row) => row.key === "consignment")?.content ?? "-",
+    execution: (detailView?.execution_rows ?? []).map((row) => {
+      const linked = row.event_id == null ? undefined : eventById.get(row.event_id);
+      const event = linked?.event;
+      return [
+        event ? `${event.event_no} · ${row.action}` : row.action,
+        formatDateTimeMinute(row.occurred_at),
+        row.amount ?? "-",
+        row.note,
+        row.operator,
+      ].join(" / ");
+    }).join("；"),
+    finance: financeRows.map((row) => {
+      const linked = row.event_id == null ? undefined : eventById.get(row.event_id);
+      return [
+        row.type,
+        linked?.order.order_no ?? "",
+        linked?.event.event_no ?? row.key,
+        row.direction,
+        row.amount,
+        formatDateTimeMinute(row.occurred_at),
+        row.pool_name,
+      ].join(" / ");
+    }).join("；"),
+    expenseCount: expenseRows.length,
+    incomeCount: incomeRows.length,
     // 合计取后端 finance_summary；条数仍按明细计数（条数是行数，不是金额）。
     totalExpense: detail?.finance_summary?.total_expense ?? "0.00",
     totalIncome: detail?.finance_summary?.total_income ?? "0.00",
@@ -136,33 +128,3 @@ export function downloadInventoryCsv(rows: Account[], details: Partial<Record<nu
   anchor.click();
   URL.revokeObjectURL(url);
 }
-
-function eventDate(detail: AccountExecutionDetail | undefined, eventType: string): string {
-  const event = detail?.orders.flatMap((order) => order.events)
-    .find((item) => item.event_type === eventType);
-  return formatDateTimeMinute(event?.occurred_at ?? event?.occurred_on);
-}
-
-function platformListingDate(detail: AccountExecutionDetail | undefined): string {
-  const dates = detail?.orders
-    .filter((item) => item.order_type === "DG")
-    .map((order) => formatDateTimeMinute(String(order.extra_values?.listed_at ?? order.created_at ?? order.trade_date ?? ""))) ?? [];
-  return dates.length ? dates.join("\n") : "-";
-}
-
-function consignmentPlatforms(detail: AccountExecutionDetail | undefined): string {
-  const names = detail?.orders
-    .filter((order) => order.order_type === "DG")
-    .flatMap((order) => {
-      const configuredPlatform = order.extra_values?.consignment_platform;
-      return configuredPlatform
-        ? [String(configuredPlatform)]
-        : (order.counterparties ?? [])
-          .filter((counterparty) => counterparty.role === "PLATFORM")
-          .map((counterparty) => counterparty.display_name);
-    });
-  return names?.length ? names.join("\n") : "-";
-}
-
-
-

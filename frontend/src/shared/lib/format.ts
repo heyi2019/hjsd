@@ -1,5 +1,4 @@
 /** 金额与日期展示：后端以字符串传金额（DECIMAL），前端不做浮点运算。 */
-import { configurableLabel } from "./optionSets";
 
 export function money(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === "") return "-";
@@ -75,25 +74,17 @@ export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
   VOID: "失效",
 };
 
-export const EVENT_TYPE_LABEL: Record<string, string> = {
-  BUY: "买号",
-  SELL: "售出",
+const EXECUTION_ACTION_LABEL: Record<string, string> = {
   DELIVER: "交付",
   CANCEL: "取消",
   OPERATE: "运营",
   REBATE: "返点",
 };
 
-/**
- * 执行动作统一文案：底层事件编码保持稳定，页面不再直接暴露 BUY/SELL/DELIVER。
- */
-const EXECUTION_ACTION_LABEL: Record<string, string> = {
-  BUY: "买号",
-  SELL: "售出",
-  DELIVER: "交付",
-  CANCEL: "取消",
-  OPERATE: "运营",
-  REBATE: "返点",
+const INVENTORY_ENTRY_ACTION_LABEL: Record<string, string> = {
+  HS: "回收入库",
+  TH: "提号入库",
+  DG: "代挂入库",
 };
 
 export function executionActionLabel(
@@ -102,11 +93,12 @@ export function executionActionLabel(
   deliveryDirection?: "BUY" | "SELL" | null,
 ): string {
   if (!eventType) return "-";
+  if (eventType === "BUY") return INVENTORY_ENTRY_ACTION_LABEL[orderType ?? ""] ?? "账号入库";
+  if (eventType === "SELL") return "账号售出";
   if (eventType === "DELIVER") {
     return deliveryDirection === "BUY" ? "买号交付" : "卖号交付";
   }
-  // 词典未加载时回落模块常量，保证零行为变化。
-  return configurableLabel("ORDER_EVENT_TYPE", eventType, EXECUTION_ACTION_LABEL);
+  return EXECUTION_ACTION_LABEL[eventType] ?? "运营";
 }
 
 /** 状态 → antd Tag 颜色；不使用颜色单独承载紧急程度。 */

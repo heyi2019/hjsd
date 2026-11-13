@@ -118,7 +118,6 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
         <PermissionButton permission="report.read" aria-label="导出" size="small" loading={exporting} onClick={() => void handleExport()}>导出</PermissionButton>
       </Space>
       <DataTable
-        key={`order-ledger-${expandedOrderIds.join("|")}`}
         className="inventory-table"
         columns={arrangeColumns(columns)}
         rows={orderedRows}
@@ -133,7 +132,6 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
               row={row.account}
               detail={orderExecutionDetails[row.id]}
               contextOrderId={row.id}
-              contextOrderNo={row.order_no}
               loading={Boolean(orderExecutionLoading[row.id])}
               onPartyClick={openPartyCard}
               editing={inlineEditId === row.account.id ? editingAccount : undefined}

@@ -1,33 +1,36 @@
 import { Descriptions } from "antd";
-import { useMemo, type ReactNode } from "react";
-import type { AccountExecutionDetail, AccountExecutionOrder } from "../shared/api/types/account-execution";
-import type { Account } from "../shared/api/types/accounts";
-import type { EmployeeOption } from "../shared/api/types/org";
-import { CustomFieldSection } from "../orders/ConfigurableField";
+import { type ReactNode } from "react";
+import { useMemo } from "react";
+import type { AccountExecutionDetail, AccountExecutionOrder } from "../../shared/api/types/account-execution";
+import type { Account } from "../../shared/api/types/accounts";
+import type { EmployeeOption } from "../../shared/api/types/org";
+import { CustomFieldSection } from "../../orders/ConfigurableField";
 import {
   buildFormExtraDisplay,
   fieldLabel,
   formatExtraDisplayValue,
   isFieldActive,
   useOrderFormConfig,
-} from "../orders/ConfigurableField";
+} from "../../orders/ConfigurableField";
 import {
   InventorySectionHeading,
-  findCreationOrder,
-  findSellOrder,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
 
 /** 交付主字段（与建单 DeliveryInfoSection 对齐）。值：bound_phone / bound_phone_owner 来自账号（买号交接），
  *  其余来自订单 extra_values。显隐与标签由 OrderFormField 配置驱动。 */
-const DELIVERY_FIELD_MAP: Record<string, { fallback: string }> = {
-  bound_phone: { fallback: "换绑手机号" },
-  bound_phone_owner: { fallback: "手机号绑定人" },
-  intermediary_platform: { fallback: "交易平台" },
-  intermediary_type: { fallback: "中介类型" },
-  compensation_type: { fallback: "包赔类型" },
-  delivery_responsible_ids: { fallback: "交付负责人" },
-};
+const DELIVERY_FIELDS = [
+  { key: "bound_phone", fallback: "换绑手机号" },
+  { key: "bound_phone_owner", fallback: "手机号绑定人" },
+  { key: "intermediary_platform", fallback: "交易平台" },
+  { key: "intermediary_type", fallback: "中介类型" },
+  { key: "compensation_type", fallback: "包赔类型" },
+  { key: "delivery_responsible_ids", fallback: "交付负责人" },
+] as const;
+
+function textValue(value: unknown): string {
+  return typeof value === "string" && value.trim() ? value : "-";
+}
 
 /** 单个交付子块（买号交付 / 卖号交付）：按对应订单类型配置驱动渲染主交付字段 + DELIVER 自定义字段。
  * 两个交付方向都保留字段表格，便于详情查看、编辑和补录。 */
@@ -45,17 +48,24 @@ function DeliverySubSection({
   employees?: EmployeeOption[];
 }) {
   const { config } = useOrderFormConfig(orderType ?? undefined);
-  const extraValues = order?.extra_values ?? {};
-  const mainFields = Object.entries(DELIVERY_FIELD_MAP).map(([key, { fallback }]) => {
+  const extraValues = order?.extra_values;
+  const employeeNames = useMemo(
+    () => new Map((employees ?? []).map((employee) => [employee.id, employee.display_name])),
+    [employees],
+  );
+  const mainFields = useMemo(() => DELIVERY_FIELDS.map(({ key, fallback }) => {
     let value: ReactNode = "-";
-    if (key === "bound_phone" || key === "bound_phone_owner") {
-      value = (account?.[key as keyof Account] as string) || (extraValues[key] as string) || "-";
+    const values = extraValues ?? {};
+    if (key === "bound_phone") {
+      value = account?.bound_phone || textValue(values[key]);
+    } else if (key === "bound_phone_owner") {
+      value = account?.bound_phone_owner || textValue(values[key]);
     } else {
-      const raw = extraValues[key];
+      const raw = values[key];
       if (raw == null || raw === "") {
         value = "-";
       } else if (key === "delivery_responsible_ids" && Array.isArray(raw) && employees?.length) {
-        value = raw.map((id) => employees.find((emp) => emp.id === id)?.display_name ?? "未知负责人").join("、") || "-";
+        value = raw.map((id) => employeeNames.get(id) ?? "未知负责人").join("、") || "-";
       } else if (key === "delivery_responsible_ids" && Array.isArray(raw)) {
         value = raw.length ? "负责人信息加载中" : "-";
       } else {
@@ -63,9 +73,12 @@ function DeliverySubSection({
       }
     }
     return { key, fallback, value };
-  });
-  const deliveryItems = buildFormExtraDisplay(extraValues, Object.values(config)).filter(
-    (item) => (config[item.key]?.section ?? "EXTRA") === "DELIVER",
+  }), [account, employees, employeeNames, extraValues]);
+  const deliveryItems = useMemo(
+    () => buildFormExtraDisplay(extraValues ?? {}, Object.values(config)).filter(
+      (item) => (config[item.key]?.section ?? "EXTRA") === "DELIVER",
+    ),
+    [config, extraValues],
   );
   return (
     <div className="inventory-detail__meta-group">
@@ -104,8 +117,16 @@ export function OrderDetailDeliverySection({
   account?: Account | null;
   employees?: EmployeeOption[];
 }) {
-  const creationOrder = useMemo(() => findCreationOrder(detail, meta.sourceOrderNo), [detail, meta.sourceOrderNo]);
-  const sellOrder = useMemo(() => findSellOrder(detail, creationOrder), [detail, creationOrder]);
+  const creationOrder = useMemo(
+    () => detail?.orders.find((order) => order.order_no === meta.sourceOrderNo),
+    [detail, meta.sourceOrderNo],
+  );
+  const sellOrder = useMemo(
+    () => detail?.orders.find(
+      (order) => order.order_id !== creationOrder?.order_id && order.events.some((event) => event.event_type === "SELL"),
+    ),
+    [creationOrder, detail],
+  );
 
   if (editing) {
     return (

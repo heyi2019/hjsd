@@ -193,6 +193,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
             const detail = current[updated.id];
             return detail ? { ...current, [updated.id]: { ...detail, account: { ...detail.account, ...updated } } } : current;
           });
+          refreshExecution(updated, profileTarget?.orderId ?? updated.source_order_id);
         }}
         onError={(error) => controller.setError(normalizeError(error))}
         onOperation={async (operationType) => {
@@ -209,7 +210,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
             operation_type: operationType,
             occurred_on: today(),
             note: operationType === "IMAGE" ? "库存中心登记作图" : "库存中心登记描述",
-            form_extra_scope: "OPERATION",
           });
         }}
       />

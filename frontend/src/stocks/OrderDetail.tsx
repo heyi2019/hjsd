@@ -1,116 +1,24 @@
 import { Spin, Typography } from "antd";
+import type { FormInstance } from "antd";
+import { useMemo } from "react";
 import type { AccountExecutionDetail, AccountExecutionEvent } from "../shared/api/types/account-execution";
 import type { Account } from "../shared/api/types/accounts";
 import type { EmployeeOption } from "../shared/api/types/org";
-import { executionActionLabel, money, formatDateTimeMinute } from "../shared/lib/format";
+import { formatDateTimeMinute } from "../shared/lib/format";
 import {
   STATUS_LABEL,
   BUSINESS_MODE_LABEL,
   INVENTORY_TYPE_LABEL,
   VALUE_ADDED_SERVICE_LABEL,
-  accountFinancialFlows,
-  financeTypeLabel,
-  rebateTypeLabel,
 } from "./inventory-logic";
-import { OrderDetailView } from "./OrderDetailView";
+import { OrderDetailView } from "./OrderDetailView/OrderDetailView";
 import {
-  classifyEventCategory,
   type InventoryEventDraft,
   type OrderDetailMeta,
   type InventoryPartyLink,
-  type InventoryExecutionRow,
   type InventoryFinanceRow,
-} from "./OrderDetail.shared";
-import { activeConsignmentListings, consignmentPlatform, hasUnlistedConsignment, isConsignmentListing, isActiveConsignmentListing } from "./operations/consignment-logic";
-
-function eventDate(detail: AccountExecutionDetail | undefined, eventType: string): string {
-  const event = detail?.orders.flatMap((order) => order.events).find((item) => item.event_type === eventType);
-  return formatDateTimeMinute(event?.occurred_at ?? event?.occurred_on);
-}
-
-function eventPlatform(detail: AccountExecutionDetail | undefined, eventType: string): string {
-  const order = detail?.orders.find((item) => item.events.some((event) => event.event_type === eventType));
-  return order?.account_platform ?? "-";
-}
-
-function consignmentSummary(detail: AccountExecutionDetail | undefined, accountStatus?: string): string {
-  if (accountStatus === "VOID") return "-";
-  const records = detail?.orders.flatMap((order) => activeConsignmentListings(order)).map((record) => {
-    // 寄售价格随该次上架记录保存；未填时不占位，避免出现「¥-」。
-    const priceText = record.price == null || record.price === "" ? "" : ` / ¥${money(record.price)}`;
-    return `${record.platform} / ${record.listedAt}${priceText}`;
-  }) ?? [];
-  return records.length ? records.join("\n") : "-";
-}
-
-function orderPlatformValues(order: AccountExecutionDetail["orders"][number]): string[] {
-  return [
-    order.account_platform,
-    ...(order.counterparties ?? [])
-      .filter((counterparty) => counterparty.role === "PLATFORM")
-      .map((counterparty) => counterparty.display_name),
-  ].filter((platform): platform is string => Boolean(platform));
-}
-
-/** 下架分两类：平台下架（PLATFORM）只取消指定平台的上架记录；系统下架（SYSTEM）按 ERP 出库、账号退出库存。
- *  操作明细「平台」列据此取值：平台下架显示具体平台，系统下架显示「本系统」。 */
-function consignmentPlatformOf(order: AccountExecutionDetail["orders"][number]): string {
-  return consignmentPlatform(order) ?? "-";
-}
-
-function eventPlatformLabel(
-  detail: AccountExecutionDetail | undefined,
-  order: AccountExecutionDetail["orders"][number],
-  eventType: string,
-): string {
-  if (eventType === "OPERATE") {
-    const operationEvent = order.events.find((event) => event.event_type === "OPERATE" && event.operation_type && event.form_extra?.consignment_platform);
-    return typeof operationEvent?.form_extra?.consignment_platform === "string"
-      ? operationEvent.form_extra.consignment_platform
-      : order.account_platform || "-";
-  }
-  if (eventType !== "CANCEL") return order.account_platform || "-";
-  const scope = order.extra_values?.platform_unlist_scope;
-  if (scope === "SYSTEM") return "本系统";
-  if (scope === "PLATFORM") return consignmentPlatformOf(order);
-  // 系统下架会把该账号仍在架的 DG 单统一标记为 SYSTEM；其 CANCEL 事件可能落在被冲销的源单上，
-  // 此时以账号内是否存在 SYSTEM 下架记录判定，避免把源单的买入平台误当作下架平台。
-  const systemUnlisted = (detail?.orders ?? []).some(
-    (item) => item.order_type === "DG" && item.extra_values?.platform_unlist_scope === "SYSTEM",
-  );
-  return systemUnlisted ? "本系统" : consignmentPlatformOf(order);
-}
-
-function transactionPlatforms(detail: AccountExecutionDetail | undefined, kinds: Set<string>, includeSellEvent = false): string {
-  const platforms = detail?.orders
-    .filter((order) => kinds.has(order.order_type) || (includeSellEvent && order.events.some((event) => event.event_type === "SELL")))
-    .flatMap(orderPlatformValues);
-  return platforms?.length ? [...new Set(platforms)].join("、") : "-";
-}
-
-const PARTY_ROLE_LABEL: Record<string, string> = {
-  SELLER: "卖家",
-  BUYER: "买家",
-  CONSIGNOR: "寄售方",
-  PEER: "同行",
-  SUPPLIER: "供货方",
-  PLATFORM: "平台",
-  INSTALLMENT_CUSTOMER: "分期客户",
-};
-
-function orderParties(detail: AccountExecutionDetail | undefined): InventoryPartyLink[] {
-  const parties = detail?.orders.flatMap((order) => [
-    ...(order.customers ?? []).map((party) => ({ ...party, entityType: "customer" as const })),
-    ...(order.counterparties ?? []).map((party) => ({ ...party, entityType: "counterparty" as const })),
-  ]) ?? [];
-  const seen = new Set<string>();
-  return parties.filter((party) => {
-    const key = `${party.entityType}:${party.id}:${party.role}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
+  PARTY_ROLE_LABEL,
+} from "./OrderDetailView/OrderDetail.shared";
 
 function renderOrderParties(
   parties: InventoryPartyLink[],
@@ -133,50 +41,10 @@ function renderOrderParties(
   ))}</span>;
 }
 
-function orderNotes(detail: AccountExecutionDetail | undefined): string {
-  // 详情只展示主订单备注；关联 DG 寄售单的系统备注已单独展示在寄售信息中。
-  const order = detail?.orders.find((item) => item.order_type !== "DG" && item.note)
-    ?? detail?.orders.find((item) => item.note && !item.note.startsWith("寄售平台："));
-  return order?.note?.trim() || "-";
-}
-
-const INTERNAL_CONSIGNMENT_EXTRA_KEYS = new Set([
-  "consignment_platform",
-  "listed_at",
-  "platform_unlisted_at",
-  "platform_unlist_scope",
-]);
-
-function orderExtraValues(detail: AccountExecutionDetail | undefined): Array<{ key: string; label: string; value: string; section: string }> {
-  const values = detail?.orders.flatMap((order) => {
-    const fields = order.extra_fields?.length
-      ? order.extra_fields.map((field) => ({ key: `${order.order_no}-${field.key}`, label: field.label, value: field.value, section: field.section }))
-      : Object.entries(order.extra_values ?? {}).map(([key, value]) => ({ key: `${order.order_no}-${key}`, label: key, value, section: "EXTRA" }));
-    return fields
-      .filter((field) => ![...INTERNAL_CONSIGNMENT_EXTRA_KEYS].some((key) => field.key === key || field.key.endsWith(`-${key}`)))
-      .filter((field) => field.value !== null && field.value !== undefined && String(field.value).trim() !== "")
-      .map((field) => ({ ...field, value: String(field.value) }));
-  }) ?? [];
-  return values;
-}
-
-/** 账号周期：已售 > 寄售中 > 已下架 > 待售；分期进度由分期管理展示。 */
-function resolveOperationStatus(
-  accountStatus: string,
-  hasActiveConsignment: boolean,
-  hasUnlistedConsignment: boolean,
-): string {
-  if (accountStatus === "SOLD") return "已售";
-  if (hasActiveConsignment) return "寄售中";
-  if (accountStatus === "VOID" || hasUnlistedConsignment) return "已下架";
-  return "待售";
-}
-
 export function OrderDetail({
   row,
   detail,
   contextOrderId,
-  contextOrderNo,
   loading,
   editing,
   eventDrafts,
@@ -194,15 +62,13 @@ export function OrderDetail({
   detail?: AccountExecutionDetail;
   /** 详情展开的订单主键；传入后所有操作、资金、分润只取这一单。 */
   contextOrderId?: number | null;
-  /** 订单台账从订单行展开时，优先使用当前订单作为详情上下文；库存中心不传则沿用账号来源单。 */
-  contextOrderNo?: string | null;
   loading: boolean;
   editing?: Account | null;
   eventDrafts?: Record<number, InventoryEventDraft>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
   employees?: EmployeeOption[];
   onPartyClick?: (party: InventoryPartyLink) => void;
-  extraForm?: unknown;
+  extraForm?: FormInstance;
   onSave?: () => void;
   onCancel?: () => void;
   saving?: boolean;
@@ -210,75 +76,64 @@ export function OrderDetail({
   timeShiftMinutes?: number;
   onTimeShift?: (days: number) => void;
 }) {
-  if (loading && !detail) return <Spin size="small" />;
-
   // 展开详情是订单级：即便调用方误传了账号聚合快照，这里也再次按订单主键收口，
   // 防止同一账号的寄售/回收/提号订单串入当前订单的资金、分润和操作明细。
-  const scopedDetail = detail && contextOrderId != null
-    ? { ...detail, orders: detail.orders.filter((order) => order.order_id === contextOrderId) }
-    : detail;
-  const contextOrder = scopedDetail?.orders.find((order) => order.order_id === contextOrderId)
-    ?? scopedDetail?.orders.find((order) => order.order_no === contextOrderNo);
-  const sourceOrderNo = contextOrder?.order_no ?? contextOrderNo ?? row.source_order_no;
+  const scopedDetail = useMemo(
+    () => detail && contextOrderId != null
+      ? { ...detail, orders: detail.orders.filter((order) => order.order_id === contextOrderId) }
+      : detail,
+    [detail, contextOrderId],
+  );
+  const contextOrder = useMemo(
+    () => scopedDetail?.orders.find((order) => order.order_id === contextOrderId) ?? scopedDetail?.orders[0],
+    [scopedDetail, contextOrderId],
+  );
+  const sourceOrderNo = contextOrder?.order_no ?? row.source_order_no;
 
-  const financialFlows = accountFinancialFlows(scopedDetail);
-  const rebateItems = scopedDetail?.orders.flatMap((order) => (
-    (order.rebates ?? []).map((rebate) => ({ rebate }))
-  )) ?? [];
-  const expenseFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "OUT");
-  const incomeFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "IN");
+  const detailView = scopedDetail?.detail_view;
+  const eventById = useMemo(
+    () => new Map((scopedDetail?.orders ?? []).flatMap((order) => order.events).map((event) => [event.id, event] as const)),
+    [scopedDetail],
+  );
+  const expenseFlows = useMemo(
+    () => detailView?.finance_rows.filter((row) => row.direction === "支出") ?? [],
+    [detailView],
+  );
+  const incomeFlows = useMemo(
+    () => detailView?.finance_rows.filter((row) => row.direction === "收入") ?? [],
+    [detailView],
+  );
   // 合计一律取后端 finance_summary（与上面明细同源），前端只数条数、不再累加金额。
   const summary = scopedDetail?.finance_summary;
   const totalExpense = summary?.total_expense ?? "0.00";
   const totalIncome = summary?.total_income ?? "0.00";
 
-  const financeRows: InventoryFinanceRow[] = [
-    ...financialFlows.map(({ event, cashflow }) => ({
-      key: `flow-${cashflow.flow_no}`,
-      type: financeTypeLabel(event?.event_type ?? "", cashflow.direction, cashflow.category),
-      direction: cashflow.direction === "OUT" ? "支出" as const : "收入" as const,
-      amount: cashflow.amount,
-      rate: "-",
-      occurredAt: formatDateTimeMinute(cashflow.occurred_at ?? cashflow.occurred_on),
-      poolName: cashflow.pool_name || "未分配资金池",
-      operator: cashflow.operator || event?.operator_names?.join("、") || event?.operator || "-",
-      event,
-    })),
-    ...rebateItems.map(({ rebate }) => ({
-      key: `rebate-${rebate.id}`,
-      type: rebateTypeLabel(rebate.rebate_type, rebate.channel),
-      // 返点登记即完成收入记录，不再区分待结算/已结算。
-      direction: "收入" as const,
-      amount: rebate.base_amount,
-      rate: `${rebate.rate}%`,
-      occurredAt: formatDateTimeMinute(rebate.collected_at ?? rebate.collected_on),
-      poolName: "-",
-      operator: "-",
-    })),
-  ];
+  const financeRows = useMemo<InventoryFinanceRow[]>(() => (detailView?.finance_rows ?? []).map((row) => ({
+    key: row.key,
+    type: row.type,
+    direction: row.direction === "支出" ? "支出" : "收入",
+    amount: row.amount,
+    occurredAt: formatDateTimeMinute(row.occurred_at),
+    poolName: row.pool_name,
+    operator: row.operator,
+    event: row.event_id == null ? undefined : eventById.get(row.event_id),
+  })), [detailView, eventById]);
 
-  const executionRows: InventoryExecutionRow[] = scopedDetail?.orders.flatMap((order) => (
-    order.events.map((event) => ({
-      key: `${order.order_id}-${event.id}`,
-      category: classifyEventCategory(event.event_type),
-      action: executionActionLabel(event.event_type, order.order_type, event.delivery_direction),
-      occurredAt: formatDateTimeMinute(event.occurred_at ?? event.occurred_on),
-      amount: event.amount,
-      operator: event.operator_names?.length ? event.operator_names.join("、") : event.operator || "-",
-      note: event.note || "-",
-      platform: eventPlatformLabel(scopedDetail, order, event.event_type),
-      event,
-    }))
-  )) ?? [];
+  const executionRows = useMemo(() => (detailView?.execution_rows ?? []).map((row) => ({
+    key: row.key,
+    category: row.category,
+    action: row.action,
+    occurredAt: formatDateTimeMinute(row.occurred_at),
+    amount: row.amount ?? "-",
+    operator: row.operator,
+    note: row.note,
+    platform: row.platform,
+    event: row.event_id == null ? undefined : eventById.get(row.event_id),
+  })), [detailView, eventById]);
+  const operationRows = detailView?.operation_rows ?? [];
+  const operationRow = (key: string) => operationRows.find((item) => item.key === key);
 
-  const consignmentOrders = (scopedDetail?.orders ?? []).filter(isConsignmentListing);
-  const hasActiveConsignment = consignmentOrders.some(isActiveConsignmentListing);
-  const hasUnlistedHistory = consignmentOrders.some((order) => {
-    return order.status !== "CANCELLED" && hasUnlistedConsignment(order);
-  });
-  const operationStatusLabel = resolveOperationStatus(row.status, hasActiveConsignment, hasUnlistedHistory);
-
-  const meta: OrderDetailMeta = {
+  const meta = useMemo<OrderDetailMeta>(() => ({
     inventoryNo: row.stock_no ?? "-",
     status: row.status,
     statusLabel: STATUS_LABEL[row.status] ?? row.status,
@@ -294,12 +149,21 @@ export function OrderDetail({
     sourceOrderNo: sourceOrderNo ?? null,
     createdBy: row.created_by || "-",
     registeredAt: formatDateTimeMinute(contextOrder?.created_at ?? contextOrder?.trade_date ?? scopedDetail?.orders[0]?.created_at ?? scopedDetail?.orders[0]?.trade_date ?? row.created_at),
-    soldAt: eventDate(scopedDetail, "SELL"),
-    removedAt: eventDate(scopedDetail, "CANCEL"),
-    removedPlatform: eventPlatform(scopedDetail, "CANCEL"),
-    recoveryPlatform: transactionPlatforms(scopedDetail, new Set(["HS", "TH"])),
-    salePlatform: transactionPlatforms(scopedDetail, new Set(["DG"]), true),
-    consignmentSummary: consignmentSummary(scopedDetail, row.status),
+    soldAt: formatDateTimeMinute(detailView?.lifecycle.sold_at),
+    removedAt: formatDateTimeMinute(detailView?.lifecycle.removed_at),
+    removedPlatform: detailView?.lifecycle.removed_platform ?? "-",
+    recoveryPlatform: detailView?.lifecycle.recovery_platform ?? "-",
+    salePlatform: detailView?.lifecycle.sale_platform ?? "-",
+    listedPlatform: operationRow("consignment")?.content ?? "-",
+    listedAt: formatDateTimeMinute(operationRow("consignment")?.occurred_at),
+    listedOperator: operationRow("consignment")?.operator ?? "-",
+    unlistedPlatform: operationRow("unlist")?.content ?? "-",
+    unlistedAt: formatDateTimeMinute(operationRow("unlist")?.occurred_at),
+    unlistedOperator: operationRow("unlist")?.operator ?? "-",
+    descriptionAt: formatDateTimeMinute(operationRow("description")?.occurred_at),
+    descriptionOperator: operationRow("description")?.operator ?? "-",
+    imagesAt: formatDateTimeMinute(operationRow("images")?.occurred_at),
+    imagesOperator: operationRow("images")?.operator ?? "-",
     password: row.game_password || "-",
     channelRegion: [row.platform, row.channel_region].filter(Boolean).join(" / ") || "-",
     boundPhone: row.bound_phone || "-",
@@ -310,12 +174,12 @@ export function OrderDetail({
     accountImages: row.account_images ?? [],
     secondaryImages: row.secondary_images ?? [],
     note: row.note || "-",
-    orderNotes: orderNotes(scopedDetail),
-    orderParties: renderOrderParties(orderParties(scopedDetail), onPartyClick),
-    orderExtras: orderExtraValues(scopedDetail),
-    operationStatusLabel,
-    hasActiveConsignment,
-  };
+    orderNotes: detailView?.order_notes ?? "-",
+    orderParties: renderOrderParties((detailView?.parties ?? []).map((party) => ({ ...party, entityType: party.entity_type === "customer" ? "customer" as const : "counterparty" as const })), onPartyClick),
+    orderExtras: detailView?.extras ?? [],
+  }), [row, scopedDetail, detailView, contextOrder, sourceOrderNo, onPartyClick, operationRows]);
+
+  if (loading && !detail) return <Spin size="small" />;
 
   return (
     <OrderDetailView
@@ -329,10 +193,9 @@ export function OrderDetail({
       executionRows={executionRows}
       financeRows={financeRows}
       expenseCount={expenseFlows.length}
-      incomeCount={incomeFlows.length + rebateItems.length}
+      incomeCount={incomeFlows.length}
       totalExpense={totalExpense}
       totalIncome={totalIncome}
-      flowCount={financialFlows.length + rebateItems.length}
       extraForm={extraForm}
       onSave={onSave}
       onCancel={onCancel}

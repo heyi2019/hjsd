@@ -1,10 +1,10 @@
-import { Descriptions } from "antd";
+import { CopyOutlined } from "@ant-design/icons";
+import { Descriptions, Tooltip } from "antd";
 import { useMemo } from "react";
-import type { AccountExecutionDetail } from "../shared/api/types/account-execution";
-import type { Account } from "../shared/api/types/accounts";
+import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
+import type { Account } from "../../shared/api/types/accounts";
 import {
   InventorySectionHeading,
-  findCreationOrder,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
 import { OrderDetailImageGallery } from "./OrderDetailImageGallery";
@@ -15,7 +15,8 @@ import {
   isFieldActive,
   useOrderFormConfig,
   useOrderFormSectionLabels,
-} from "../orders/ConfigurableField";
+} from "../../orders/ConfigurableField";
+import { appMessage } from "../../shared/ui/appFeedback";
 
 type AccountProfileKey =
   | "gameType"
@@ -51,6 +52,43 @@ function channelRegionValue({ meta, account }: AccountProfileValueSource) {
   return [account?.platform, account?.channel_region].filter(Boolean).join(" / ") || fallbackValue(meta.channelRegion);
 }
 
+const COPYABLE_PROFILE_KEYS = new Set<AccountProfileKey>(["gameAccount", "campAccount", "password"]);
+
+function CopyableProfileValue({ label, value }: { label: string; value: string }) {
+  const canCopy = value !== "-" && value.trim().length > 0;
+
+  const copy = async () => {
+    if (!canCopy || !navigator.clipboard?.writeText) {
+      appMessage.error("当前环境不支持复制");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      appMessage.success(`${label}已复制`);
+    } catch {
+      appMessage.error(`复制${label}失败`);
+    }
+  };
+
+  return (
+    <span className="inventory-detail__copy-value">
+      <span>{value}</span>
+      {canCopy ? (
+        <Tooltip title={`复制${label}`}>
+          <button
+            type="button"
+            className="inventory-detail__copy-button"
+            aria-label={`复制${label}`}
+            onClick={() => void copy()}
+          >
+            <CopyOutlined />
+          </button>
+        </Tooltip>
+      ) : null}
+    </span>
+  );
+}
+
 const ACCOUNT_PROFILE_FIELD_DEFINITIONS: AccountProfileFieldDefinition[] = [
   { key: "gameType", cfgKey: "game_type", fallback: "游戏 / 产品类型", getValue: ({ meta, account }) => fallbackValue(account?.game_type, meta.gameType ?? undefined) },
   { key: "gameAccount", cfgKey: "game_account", fallback: "游戏账号 / 产品", getValue: ({ meta, account }) => fallbackValue(account?.game_account, meta.gameAccount ?? undefined) },
@@ -59,7 +97,7 @@ const ACCOUNT_PROFILE_FIELD_DEFINITIONS: AccountProfileFieldDefinition[] = [
     key: "password",
     cfgKey: "game_password",
     fallback: "账号密码",
-    getValue: ({ meta, account }) => (fallbackValue(account?.game_password, meta.password) === "-" ? "-" : "已隐藏"),
+    getValue: ({ meta, account }) => fallbackValue(account?.game_password, meta.password),
   },
   { key: "channelRegion", cfgKey: "channel_region", fallback: "渠道 / 区服", getValue: channelRegionValue },
   {
@@ -96,13 +134,20 @@ export function OrderDetailProfileSection({
   account?: Account | null;
   detail?: AccountExecutionDetail | null;
 }) {
-  const creationOrder = useMemo(() => findCreationOrder(detail, meta.sourceOrderNo), [detail, meta.sourceOrderNo]);
+  const creationOrder = useMemo(
+    () => detail?.orders.find((order) => order.order_no === meta.sourceOrderNo),
+    [detail, meta.sourceOrderNo],
+  );
   const creationOrderType = creationOrder?.order_type ?? undefined;
   const { config: creationConfig } = useOrderFormConfig(creationOrderType);
   const { labels: sectionLabels } = useOrderFormSectionLabels(creationOrderType);
   const profileAccount = detail?.account ?? account;
   const profileSource = useMemo(() => ({ meta, account: profileAccount }), [meta, profileAccount]);
   const accountProfileFields = useMemo(() => buildAccountProfileFields(profileSource), [profileSource]);
+  const visibleAccountProfileFields = useMemo(
+    () => accountProfileFields.filter((field) => isFieldActive(creationConfig, field.cfgKey)),
+    [accountProfileFields, creationConfig],
+  );
   const images = useMemo(() => accountImages(profileAccount, meta), [profileAccount, meta]);
 
   const accountExtraItems = useMemo(() => {
@@ -122,11 +167,11 @@ export function OrderDetailProfileSection({
         <div className="inventory-detail__meta-group">
           <div className="inventory-detail__meta-group-title">账号资料</div>
           <Descriptions className="inventory-detail__meta-table" size="small" bordered column={3}>
-            {accountProfileFields
-              .filter((field) => isFieldActive(creationConfig, field.cfgKey))
-              .map((field) => (
+            {visibleAccountProfileFields.map((field) => (
                 <Descriptions.Item key={field.key} label={fieldLabel(creationConfig, field.cfgKey, field.fallback)}>
-                  {field.value}
+                  {COPYABLE_PROFILE_KEYS.has(field.key) ? (
+                    <CopyableProfileValue label={field.fallback} value={field.value} />
+                  ) : field.value}
                 </Descriptions.Item>
               ))}
           </Descriptions>

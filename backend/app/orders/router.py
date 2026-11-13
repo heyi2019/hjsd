@@ -495,7 +495,7 @@ def create_order(
         if account is not None:
             account.cost_amount = to_money(account.cost_amount) + to_money(cost.amount)
             account.updated_by = _actor(user)
-    return _order_output(db, order, user)
+    return _order_output(order)
 
 
 @router.get("/orders/{order_id}", response_model=schemas.OrderDetailOut)
@@ -574,7 +574,7 @@ def update_order(
     order = orders_update_order(
         db, order_id, actor=_actor(user), user=user, **changes
     )
-    return _order_output(db, order, user)
+    return _order_output(order)
 
 
 @router.delete("/orders/{order_id}", status_code=204, response_model=None)
@@ -606,7 +606,7 @@ def materialize_order_account(
     order = materialize_inventory_account(
         db, order_id, actor=_actor(user), user=user
     )
-    return _order_output(db, order, user)
+    return _order_output(order)
 
 
 @router.post("/orders/{order_id}/cancel", response_model=schemas.OrderOut)
@@ -625,7 +625,7 @@ def cancel_order(
         form_extra_scope=payload.form_extra_scope,
         user=user,
     )
-    return _order_output(db, order, user)
+    return _order_output(order)
 
 
 @router.post("/orders/{order_id}/events", response_model=schemas.EventPostResult, status_code=201)
@@ -705,7 +705,7 @@ def add_order_customer_role(
         actor=_actor(user), user=user,
     )
     order = orders_get_order(db, order_id, user)
-    return _order_output(db, order, user)
+    return _order_output(order)
 
 
 @router.get("/pools/balances", response_model=schemas.PoolBalanceListOut)

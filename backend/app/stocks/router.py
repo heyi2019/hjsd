@@ -21,7 +21,7 @@ from app.core.security import (
     owner_scope_filter,
     require_permissions,
 )
-from app.domain.enums import AuditAction, EventType
+from app.domain.enums import AuditAction
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.stocks.inventory import (
@@ -36,26 +36,21 @@ from app.stocks.profile import (
 )
 from app.stocks.deletion import delete_inventory as stocks_delete_inventory
 from app.parties.fields import get_extra_values
-from app.domain.foundation import AuditLog, Pool
-from app.domain.parties import Customer, Counterparty, OrderCounterpartyRole, OrderCustomerRole
+from app.domain.foundation import AuditLog
 from app.domain.users import User
 from app.domain.trade import (
     Account,
     Cashflow,
     Order,
     OrderEvent,
-    OrderFormField,
-    RebateRecord,
     Installment,
     Reconciliation,
 )
 from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, PermissionDenied, Validation
 from app.orders._shared import get_order
-from app.orders.amounts import is_deposit_loss_flow, order_profit_flow_by_order
 # 复用订单台账「成交日期」的账期平移口径（事件/流水 occurred_on + 规则快照重取）。
 from app.orders.mutations import _shift_accounting_dates
-from app.orders.router_output import cancellable_by_event
 
 from .schemas import (
     AccountOut,
@@ -66,15 +61,9 @@ from .schemas import (
     InventoryResponseOut,
     InventoryStatsOut,
     InventoryStatsQuery,
-    ExecutionCashflowOut,
-    ExecutionEventOut,
-    ExecutionCounterpartyOut,
-    ExecutionCustomerOut,
-    ExecutionRebateOut,
     AccountExecutionOrderOut,
     AccountAuditOut,
     AccountExecutionDetailOut,
-    ExecutionFinanceSummaryOut,
 )
 
 from .router_output import (
@@ -82,6 +71,11 @@ from .router_output import (
     _account_output,
     _account_outputs,
 )
+from .order_detail_view import build_detail_view
+from .order_detail_view.assembler import build_order_outputs
+from .order_detail_view.finance import build_finance_summary
+from .order_detail_view.events import load_event_context
+from .order_detail_view.relations import load_relations
 
 router = APIRouter(tags=["ACC-01 账号台账"])
 
@@ -225,7 +219,6 @@ def list_accounts(
             db,
             items,
             _user,
-            include_credentials=_user.has(PERM_ORDER_CREATE),
         ),
         total=count_accounts(db, status=status, user=_user),
         limit=limit,
@@ -247,7 +240,6 @@ def export_accounts_csv(
         db,
         accounts,
         _user,
-        include_credentials=_user.has(PERM_ORDER_CREATE),
     )
     # 「未售时长」列的注册键是 inventory_age，而响应字段叫 inventory_age_days，
     # 不补别名整列会导出成空（列在、值没有）。格式与前端本地导出保持一致：`N天`。
@@ -293,7 +285,7 @@ def update_account_profile(
         db, account_id, actor=_actor(user), user=user, **changes
     )
     extras = get_extra_values(db, entity_type="account", entity_id=item.id)
-    return _account_output(item, include_credentials=True, extra_values=extras)
+    return _account_output(item, extra_values=extras)
 
 
 def _require_admin(user: CurrentUser) -> None:
@@ -362,175 +354,17 @@ def execution_detail(
         order_stmt = order_stmt.where(order_scope)
     orders = list(db.scalars(order_stmt.order_by(Order.id)).all())
     order_ids = [item.id for item in orders]
-    # 建单自定义字段写入订单 form_extra；parties_service 的扩展字段读取仅适用于客户实体。
-    order_extra_values = {
-        order.id: dict(order.form_extra or {})
-        for order in orders
-    }
-    field_defs = list(db.scalars(select(OrderFormField).where(OrderFormField.order_type_code.in_({order.order_type for order in orders}), OrderFormField.is_active.is_(True))).all()) if orders else []
-    field_defs_by_type = {}
-    for definition in field_defs:
-        field_defs_by_type.setdefault(definition.order_type_code, {})[definition.field_key] = definition
-    counterparties_by_order: dict[int, list[ExecutionCounterpartyOut]] = {}
-    customers_by_order: dict[int, list[ExecutionCustomerOut]] = {}
-    if order_ids:
-        for role, customer in db.execute(
-            select(OrderCustomerRole, Customer)
-            .join(Customer, Customer.id == OrderCustomerRole.customer_id)
-            .where(OrderCustomerRole.order_id.in_(order_ids))
-            .order_by(OrderCustomerRole.id)
-        ).all():
-            customers_by_order.setdefault(role.order_id, []).append(
-                ExecutionCustomerOut(
-                    id=customer.id,
-                    display_name=customer.display_name,
-                    role=role.role,
-                )
-            )
-        for role, counterparty in db.execute(
-            select(OrderCounterpartyRole, Counterparty)
-            .join(Counterparty, Counterparty.id == OrderCounterpartyRole.counterparty_id)
-            .where(OrderCounterpartyRole.order_id.in_(order_ids))
-            .order_by(OrderCounterpartyRole.id)
-        ).all():
-            counterparties_by_order.setdefault(role.order_id, []).append(
-                ExecutionCounterpartyOut(
-                    id=counterparty.id,
-                    display_name=counterparty.display_name,
-                    role=role.role,
-                )
-            )
-    rebates_by_order: dict[int, list[ExecutionRebateOut]] = {}
-    if order_ids:
-        rebates = list(db.scalars(
-            select(RebateRecord)
-            .where(RebateRecord.source_order_id.in_(order_ids))
-            .order_by(RebateRecord.id)
-        ).all())
-        for rebate in rebates:
-            rebates_by_order.setdefault(rebate.source_order_id, []).append(
-                ExecutionRebateOut(
-                    id=rebate.id,
-                    rebate_no=rebate.rebate_no,
-                    rebate_type=rebate.rebate_type,
-                    channel=rebate.channel,
-                    rate=rebate.rate,
-                    base_amount=rebate.base_amount,
-                    status=rebate.status,
-                    collected_on=rebate.collected_on,
-                    collected_at=rebate.created_at,
-                )
-            )
-    events = list(
-        db.scalars(
-            select(OrderEvent)
-            .where(OrderEvent.order_id.in_(order_ids), OrderEvent.is_posted.is_(True))
-            .order_by(OrderEvent.occurred_on, OrderEvent.id)
-        ).all()
-    ) if order_ids else []
-    action_model_rebate_ids = {
-        int((event.form_extra or {}).get("rebate_record_id"))
-        for event in events
-        if event.event_type == EventType.REBATE.value
-        and str((event.form_extra or {}).get("rebate_record_id", "")).isdigit()
-    }
-    event_ids = [item.id for item in events]
-    flow_by_event: dict[int, ExecutionCashflowOut] = {}
-    # 押金损失（DEPOSIT + OUT + 非 DEPOSIT_HOLD）是已占用押金的定性转换、非第二次
-    # 现金流出。明细列表仍展示该流水作台账，但财务汇总须按业务口径排除它，与订单
-    # 利润 / 资金中心 / R2 同源（is_deposit_loss_flow 与 SQL 谓词 business_cashflow_filter 同源）。
-    deposit_loss_flow_nos: set[str] = set()
-    if event_ids:
-        for flow, pool in db.execute(
-            select(Cashflow, Pool)
-            .join(Pool, Pool.id == Cashflow.pool_id)
-            .where(Cashflow.order_event_id.in_(event_ids))
-        ).all():
-            if is_deposit_loss_flow(
-                accounting_attribute=flow.accounting_attribute,
-                direction=flow.direction,
-                category=flow.category,
-            ):
-                deposit_loss_flow_nos.add(flow.flow_no)
-            flow_by_event[flow.order_event_id] = ExecutionCashflowOut(
-                flow_no=flow.flow_no,
-                pool_name=pool.name,
-                occurred_on=flow.occurred_on,
-                occurred_at=flow.created_at,
-                direction=flow.direction,
-                nature=flow.nature,
-                category=flow.category,
-                amount=flow.amount,
-                note=flow.note,
-                operator=flow.created_by,
-            )
-    cashflows_by_order: dict[int, list[ExecutionCashflowOut]] = {}
-    if order_ids:
-        for flow, pool in db.execute(
-            select(Cashflow, Pool)
-            .join(Pool, Pool.id == Cashflow.pool_id)
-            .where(
-                Cashflow.order_id.in_(order_ids),
-                Cashflow.order_event_id.is_(None),
-            )
-            .order_by(Cashflow.occurred_on, Cashflow.id)
-        ).all():
-            if is_deposit_loss_flow(
-                accounting_attribute=flow.accounting_attribute,
-                direction=flow.direction,
-                category=flow.category,
-            ):
-                deposit_loss_flow_nos.add(flow.flow_no)
-            cashflows_by_order.setdefault(flow.order_id, []).append(
-                ExecutionCashflowOut(
-                    flow_no=flow.flow_no,
-                    pool_name=pool.name,
-                    occurred_on=flow.occurred_on,
-                    occurred_at=flow.created_at,
-                    direction=flow.direction,
-                    nature=flow.nature,
-                    category=flow.category,
-                    amount=flow.amount,
-                    note=flow.note,
-                    operator=flow.created_by,
-                )
-            )
-    operator_ids = {uid for event in events for uid in (event.operator_user_ids or [])}
-    operator_names = {user.id: user.display_name for user in db.scalars(select(User).where(User.id.in_(operator_ids))).all()} if operator_ids else {}
-    # 可冲销余额：口径与 post_event 的校验同源（CANCEL 金额累加后从被冲销事件里扣），
-    # 复用订单台账的 cancellable_by_event，避免两处各算一份。
-    cancellable_amounts = cancellable_by_event(events)
-    events_by_order: dict[int, list[ExecutionEventOut]] = {}
-    for event in events:
-        cancellable = cancellable_amounts[event.id]
-        events_by_order.setdefault(event.order_id, []).append(
-            ExecutionEventOut(
-                id=event.id,
-                event_no=event.event_no,
-                event_type=event.event_type,
-                operation_type=(event.form_extra or {}).get("operation_type"),
-                rebate_type=(event.form_extra or {}).get("rebate_type"),
-                amount=event.amount,
-                cancellable_amount=cancellable,
-                occurred_on=event.occurred_on,
-                occurred_at=event.posted_at or event.created_at,
-                created_at=event.created_at,
-                posted_at=event.posted_at,
-                pool_id=event.pool_id,
-                offset_event_id=event.offset_event_id,
-                portion=event.portion,
-                delivery_mode=event.delivery_mode,
-                delivery_direction=(event.form_extra or {}).get("delivery_direction"),
-                is_posted=event.is_posted,
-                reason=event.reason,
-                note=event.note,
-                form_extra=dict(event.form_extra or {}),
-                cashflow=flow_by_event.get(event.id),
-                operator=event.created_by,
-                operator_user_ids=event.operator_user_ids,
-                operator_names=[operator_names.get(uid, f"用户 {uid}") for uid in (event.operator_user_ids or [])],
-            )
-        )
+    relations = load_relations(db, orders)
+    order_extra_values = relations.order_extra_values
+    field_defs_by_type = relations.field_defs_by_type
+    customers_by_order = relations.customers_by_order
+    counterparties_by_order = relations.counterparties_by_order
+    rebates_by_order = relations.rebates_by_order
+    event_context = load_event_context(db, order_ids)
+    events_by_order = event_context.events_by_order
+    event_ids = [event.id for events in events_by_order.values() for event in events]
+    flow_by_event = event_context.event_cashflows
+    cashflows_by_order = event_context.order_cashflows
     audit_rows: list[AccountAuditOut] = []
     if _user.has(PERM_AUDIT_READ):
         audit_filters = [
@@ -552,91 +386,34 @@ def execution_detail(
             )
             for row in db.scalars(select(AuditLog).where(or_(*audit_filters)).order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())).all()
         ]
-    # 财务汇总与上面组装出的明细同源：事件流水 + 订单独立流水 + 返点收入。
-    # 资金走向只有收入 / 支出两种：返点登记即收入确认、分期坏账是回收时确认
-    # 的支出，两者都不生成资金流水，但都计入总收入 / 总支出；净额=收入−支出，
-    # 正为利润、负为损失（损失=−利润），一套逻辑到底，不另立「损失」第二笔。
-    # 财务汇总取业务口径：押金损失那笔 OUT 是已占用押金的定性转换，不是第二次现金
-    # 流出，按 flow_no 跳过（明细列表仍完整展示该流水作台账）。扣减后 net_amount 与
-    # 订单利润 order_cashflow_profit_by_order 逐笔同源。
-    zero = Decimal("0.00")
-    cashflow_income = zero
-    total_expense = zero
-    for flow in flow_by_event.values():
-        if flow.flow_no in deposit_loss_flow_nos:
-            continue
-        if flow.direction == "IN":
-            cashflow_income += flow.amount
-        else:
-            total_expense += flow.amount
-    for order_flows in cashflows_by_order.values():
-        for flow in order_flows:
-            if flow.flow_no in deposit_loss_flow_nos:
-                continue
-            if flow.direction == "IN":
-                cashflow_income += flow.amount
-            else:
-                total_expense += flow.amount
-    rebate_income = zero
-    for order_rebates in rebates_by_order.values():
-        for rebate in order_rebates:
-            if rebate.id not in action_model_rebate_ids:
-                rebate_income += rebate.base_amount
-    # 坏账是支出，与订单利润同源；它不占「资金明细」流水行，但必须扣减净额。
-    bad_debt_expense = zero
-    if order_ids:
-        bad_debt_expense = sum(
-            (
-                expense
-                for _rebate_income, expense in order_profit_flow_by_order(
-                    db, order_ids=order_ids
-                ).values()
-            ),
-            zero,
-        )
-    total_expense += bad_debt_expense
-    finance_summary = ExecutionFinanceSummaryOut(
-        cashflow_income=cashflow_income,
-        rebate_income=rebate_income,
-        total_income=cashflow_income + rebate_income,
-        total_expense=total_expense,
-        net_amount=cashflow_income + rebate_income - total_expense,
+    finance_summary = build_finance_summary(
+        db,
+        order_ids=order_ids,
+        event_cashflows=flow_by_event,
+        order_cashflows=cashflows_by_order,
+        order_rebates=rebates_by_order,
+        action_model_rebate_ids=action_model_rebate_ids,
+        deposit_loss_flow_nos=deposit_loss_flow_nos,
+    )
+    order_outputs = build_order_outputs(
+        orders,
+        order_extra_values=order_extra_values,
+        field_defs_by_type=field_defs_by_type,
+        cashflows_by_order=cashflows_by_order,
+        customers_by_order=customers_by_order,
+        counterparties_by_order=counterparties_by_order,
+        rebates_by_order=rebates_by_order,
+        events_by_order=events_by_order,
     )
     return AccountExecutionDetailOut(
         account=_account_outputs(
             db,
             [account],
             _user,
-            include_credentials=_user.has(PERM_ORDER_CREATE),
         )[0],
         finance_summary=finance_summary,
-        orders=[
-            AccountExecutionOrderOut(
-                order_id=order.id,
-                order_no=order.order_no,
-                order_type=order.order_type,
-                trade_date=order.trade_date,
-                created_at=order.created_at,
-                status=order.status,
-                account_platform=(order.account_snapshot or {}).get("platform"),
-                note=order.note,
-                extra_values=order_extra_values.get(order.id, {}),
-                extra_fields=[
-                    {"key": key, "label": field_defs_by_type.get(order.order_type, {}).get(key).label if field_defs_by_type.get(order.order_type, {}).get(key) else key,
-                     "section": field_defs_by_type.get(order.order_type, {}).get(key).section if field_defs_by_type.get(order.order_type, {}).get(key) else "EXTRA",
-                     "value": value}
-                    for key, value in order_extra_values.get(order.id, {}).items()
-                    if value not in (None, "", [])
-                ],
-                cashflows=cashflows_by_order.get(order.id, []),
-                customers=customers_by_order.get(order.id, []),
-                counterparties=counterparties_by_order.get(order.id, []),
-                rebates=rebates_by_order.get(order.id, []),
-                events=events_by_order.get(order.id, []),
-                operator=order.created_by,
-            )
-            for order in orders
-        ],
+        orders=order_outputs,
+        detail_view=build_detail_view(order_outputs),
         audit=audit_rows,
     )
 

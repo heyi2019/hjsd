@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ACCOUNT_STATUS_LABEL,
-  EVENT_TYPE_LABEL,
   executionActionLabel,
   formatDateTimeMinute,
   formatElapsedTime,
@@ -104,16 +103,13 @@ describe("状态枚举标签：与后端枚举一一对应", () => {
     expect(ACCOUNT_STATUS_LABEL.WAITING).toBe("在库");
   });
 
-  it("事件类型覆盖后端 EventType", () => {
-    expect(Object.keys(EVENT_TYPE_LABEL).sort()).toEqual(
-      ["BUY", "CANCEL", "DELIVER", "OPERATE", "REBATE", "SELL"].sort(),
-    );
-  });
-
   it("交付动作文案：按交付方向区分买号交付与卖号交付", () => {
     expect(executionActionLabel("DELIVER", "HS")).toBe("卖号交付");
     expect(executionActionLabel("DELIVER", "DG", "BUY")).toBe("买号交付");
-    expect(executionActionLabel("BUY", "HS")).toBe("买号");
+    expect(executionActionLabel("BUY", "HS")).toBe("回收入库");
+    expect(executionActionLabel("BUY", "TH")).toBe("提号入库");
+    expect(executionActionLabel("BUY", "DG")).toBe("代挂入库");
+    expect(executionActionLabel("SELL", "DG")).toBe("账号售出");
     expect(executionActionLabel("OPERATE", "DG")).toBe("运营");
     expect(executionActionLabel("REBATE", "HS")).toBe("返点");
   });

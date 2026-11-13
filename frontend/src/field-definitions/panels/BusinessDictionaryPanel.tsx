@@ -74,8 +74,8 @@ export function BusinessDictionaryPanel() {
           <div className="business-dictionary__action-table">
           <EntryGroup title="账号流转" stacked>
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
-              <span className="business-dictionary__tertiary"><strong>买号入库</strong></span>
-              <span className="business-dictionary__action-detail">回收、提号、代挂的账号创建订单后进库存中心。</span>
+              <span className="business-dictionary__tertiary"><strong>账号入库</strong></span>
+              <span className="business-dictionary__action-detail">回收入库、提号入库、代挂入库后进入库存中心。</span>
             </div>
             <ActionLine category="买号交付" action="账号交付" desc="采购方把账号交给本方；按实际记录换绑手机号、手机号绑定人、交易平台或中介信息，并记录交付登记审计事件。" />
             <ActionLine category="账号运营" action="平台上架" desc="库存中心账号可到平台寄售，记录实际上架时间与平台信息；不改变账号库存状态。" />
@@ -84,7 +84,7 @@ export function BusinessDictionaryPanel() {
             <ActionLine category="" action="描述" desc="描述库存账号的等级、资源、限制等说明，不改变账号业务状态或资金事实。" mergeCategory />
             <ActionLine category="" action="作图" desc="作库存账号图片资料，不改变账号业务状态或资金事实。" mergeCategory />
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
-              <span className="business-dictionary__tertiary"><strong>卖号出库</strong></span>
+              <span className="business-dictionary__tertiary"><strong>账号出库</strong></span>
               <span className="business-dictionary__action-detail">账号售卖，库存状态改为出库。</span>
             </div>
             <ActionLine category="卖号交付" action="账号交付" desc="售出完成后登记账号交接；全款、分期结清和代挂售出统一记录，换绑手机号及手机号绑定人作为交付字段。" />

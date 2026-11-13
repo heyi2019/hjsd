@@ -157,8 +157,8 @@ _REBATE_STATUS_LABELS = {
     "VOID": "失效",
 }
 
-# 操作分类与前端执行明细同规则：BUY 买号入库 / SELL 卖号出库 / 其余账号运营。
-_OPERATION_CATEGORY_BY_EVENT = {"BUY": "买号入库", "SELL": "卖号出库"}
+# 操作分类与前端执行明细同规则：BUY 账号入库 / SELL 账号出库 / 其余账号运营。
+_OPERATION_CATEGORY_BY_EVENT = {"BUY": "账号入库", "SELL": "账号出库"}
 _OPERATION_CATEGORY_FALLBACK = "账号运营"
 
 

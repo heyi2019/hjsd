@@ -1,6 +1,6 @@
 import { buildActionAllocationCandidates, buildActionAllocationRows } from "@/orders/orderpage/helpers";
 import { describe, expect, it, vi } from "vitest";
-import { accountFinancialFlows, INVENTORY_AGE_COLOR, rebateTypeLabel, INVENTORY_TYPE_LABEL } from "@/stocks/inventory-logic";
+import { INVENTORY_AGE_COLOR, INVENTORY_TYPE_LABEL } from "@/stocks/inventory-logic";
 import { applyOffsetEventSelection } from "@/stocks/InventoryCancellationDialog";
 
 describe("库存纯逻辑", () => {
@@ -17,21 +17,6 @@ describe("库存纯逻辑", () => {
     expect(Object.keys(INVENTORY_AGE_COLOR)).toHaveLength(3);
   });
 
-  it("返点类型优先使用业务类型", () => {
-    expect(rebateTypeLabel("BUY", "卖号返点")).toBe("买号返点");
-    expect(rebateTypeLabel(null, "卖号返点")).toBe("卖号返点");
-  });
-
-  it("资金明细同时归集动作流水和订单附加流水", () => {
-    const detail = {
-      orders: [{
-        order_no: "HS0001",
-        events: [{ event_no: "EV1", cashflow: { flow_no: "CF1" } }],
-        cashflows: [{ flow_no: "CF2" }],
-      }],
-    } as never;
-    expect(accountFinancialFlows(detail)).toHaveLength(2);
-  });
   // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定", () => {

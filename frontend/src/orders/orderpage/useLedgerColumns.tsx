@@ -6,13 +6,8 @@ import { ACCOUNT_STATUS_LABEL, formatDateTimeMinute, formatElapsedTime, money } 
 import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
 import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 import { inventoryOperationMenuItems } from "../../stocks/operations";
+import { inventoryTypeOfOrder } from "../../stocks/InventoryPanel/types";
 import { formatOrderAmount } from "./helpers";
-
-const INVENTORY_TYPE_BY_ORDER_TYPE: Record<string, string> = {
-  HS: "RECOVERY",
-  TH: "PICKUP",
-  DG: "CONSIGNMENT",
-};
 
 /**
  * 订单台账列定义域：15 列的渲染配置 + 配置中心列排序 + 移动端隐藏编排。
@@ -83,7 +78,7 @@ export function useLedgerColumns(params: {
             row: canOperateAccount
               ? {
                   status: order.account_status ?? "VOID",
-                  inventory_type: INVENTORY_TYPE_BY_ORDER_TYPE[order.order_type] ?? null,
+                  inventory_type: inventoryTypeOfOrder(order),
                 }
               : { status: "VOID", inventory_type: null },
             detail: order.account_id ? ledgerDetails[order.account_id] : undefined,

@@ -68,14 +68,7 @@ export function useOrdersPageController(params: {
     openOrderRebate, openOrderSale, openOrderConsignment, openOrderOffsale, openOrderDelete,
   } = actionModals;
 
-  const legacyInitialTab = initialTab as string | undefined;
-  const normalizedInitialTab: BusinessCenterTab = initialTab && ["inventory", "ledger", "collections"].includes(initialTab)
-    ? initialTab
-    : legacyInitialTab === "overview"
-      ? "inventory"
-      : initialTab
-        ? "ledger"
-        : DEFAULT_BUSINESS_CENTER_TAB;
+  const normalizedInitialTab: BusinessCenterTab = initialTab ?? DEFAULT_BUSINESS_CENTER_TAB;
   const [activeTab, setActiveTab] = useState<BusinessCenterTab>(
     normalizedInitialTab,
   );
@@ -106,8 +99,6 @@ export function useOrdersPageController(params: {
   return {
     ...exposedActionModals,
     ...inlineEdit,
-    ...exposedActionModals,
-    active: active,
     activeTab: activeTab,
     arrangeLedgerColumns: arrangeLedgerColumns,
     businessModeFilter: businessModeFilter,
@@ -123,13 +114,10 @@ export function useOrdersPageController(params: {
     createType: createType,
     currentOperator: currentOperator,
     dateRange: dateRange,
-    exportLedger: exportLedger,
-    exportLedgerXlsx: exportLedgerXlsx,
     filteredOrders: filteredOrders,
     gameTypeFilter: gameTypeFilter,
     gameTypeOptions: gameTypeOptions,
     hasSharedCancellation: hasSharedCancellation,
-    initialTab: initialTab,
     installmentRefreshKey: installmentRefreshKey,
     inventoryRefreshKey: inventoryRefreshKey,
     inventoryStatusFilter: inventoryStatusFilter,
@@ -143,7 +131,6 @@ export function useOrdersPageController(params: {
     loading: loading,
     onExportLedger: exportLedger,
     onExportLedgerXlsx: exportLedgerXlsx,
-    onNavigate: onNavigate,
     openCancelTransaction: openCancelTransaction,
     orderBusinessModeOptions: orderBusinessModeOptions,
     orderBusinessOptions: orderBusinessOptions,

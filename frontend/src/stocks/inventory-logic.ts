@@ -1,5 +1,3 @@
-import type { AccountExecutionDetail } from "../shared/api/types/account-execution";
-
 /** 状态 / 业务 / 类型的展示文案（用于表格、导出、报表渲染）。
  * ⚠️ 这些是渲染用的静态文案；筛选项的「可选项是哪些」由设置页「选项词典」配置（INVENTORY_STATUS / INVENTORY_BUSINESS / INVENTORY_TYPE）。 */
 export const STATUS_LABEL: Record<string, string> = {
@@ -23,42 +21,6 @@ export function isEditableAccountType(inventoryType?: string | null): boolean {
 
 export function inventoryStatusLabel(value: string): string {
   return STATUS_LABEL[value] ?? value;
-}
-
-export function financeTypeLabel(eventType: string, direction: string, category?: string | null): string {
-  const labels: Record<string, string> = {
-    BUY: "买号支出",
-    SELL: "售出收入",
-    SALE: "售出收入",
-    INSTALLMENT_PAYMENT: "分期回款",
-    REBATE: "返点收入",
-    REFUND: "退款支出",
-    CANCEL: "取消冲销",
-    SELF_DIRECT_COST: "自营直接成本",
-    TH_DIRECT_COST: "提号/代挂直接成本",
-    TH_REVENUE: "提号/代挂收入",
-    SELF_REVENUE: "自营收入",
-    OPERATING_EXPENSE: "运营费用",
-    ADDITIONAL_INCOME: "附加收入",
-    ADDITIONAL_EXPENSE: "附加支出",
-    REVERSAL: "冲销",
-  };
-  return labels[eventType] ?? labels[category ?? ""] ?? (direction === "IN" ? "其他收入" : "其他支出");
-}
-
-export function accountFinancialFlows(detail: AccountExecutionDetail | undefined) {
-  return detail?.orders.flatMap((order) => [
-    ...order.events.flatMap((event) => event.cashflow ? [{ order, event, cashflow: event.cashflow }] : []),
-    ...(order.cashflows ?? []).map((cashflow) => ({ order, event: null, cashflow })),
-  ]) ?? [];
-}
-
-export function rebateTypeLabel(rebateType?: string | null, channel?: string | null): string {
-  if (rebateType === "BUY") return "买号返点";
-  if (rebateType === "SELL") return "卖号返点";
-  if (channel === "买号返点") return "买号返点";
-  if (channel === "卖号返点") return "卖号返点";
-  return "其他返点";
 }
 
 /** 库龄档位 → 标签色：阈值（7/30 天）与天数都由后端下发，此处只做展示映射。 */

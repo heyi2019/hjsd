@@ -56,7 +56,6 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
             operation_type: operationType,
             occurred_on: today(),
             note: operationType === "IMAGE" ? "订单台账登记作图" : "订单台账登记描述",
-            form_extra_scope: "OPERATION",
           });
         }}
       />

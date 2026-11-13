@@ -3,7 +3,7 @@ import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
 import type { BusinessCenterEntryTab } from "../businessCenter";
 import { DataTable, PermissionButton, Select, StatRow } from "../../shared/ui";
 import { OrderDetail } from "../../stocks/OrderDetail";
-import type { InventoryPartyLink } from "../../stocks/OrderDetail.shared";
+import type { InventoryPartyLink } from "../../stocks/OrderDetailView/OrderDetail.shared";
 import { countBusinessOrders } from "./helpers";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 import type { OrdersPageController } from "./useOrdersPageController";
@@ -178,7 +178,6 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
                   row={detail.account}
                   detail={detail}
                   contextOrderId={order.id}
-                  contextOrderNo={order.order_no}
                   loading={Boolean(ledgerOrderDetailLoading[order.id])}
                   onPartyClick={(party: InventoryPartyLink) => onNavigate?.(party.entityType === "customer" ? `customers?customer_id=${party.id}` : `customers?counterparty_id=${party.id}`)}
                   editing={inlineEditId === detail.account.id ? editingAccount : undefined}

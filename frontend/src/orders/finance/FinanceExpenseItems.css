@@ -21,6 +21,11 @@
   background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
 }
 
+/* 宽屏时只给右上角操作入口预留横向空间，资金账户仍保持完整一行。 */
+.finance-card-with-expense-action--reserved > .business-registration-group__fields {
+  padding-inline-end: 12rem;
+}
+
 .finance-expense-items__action {
   grid-column: 1 / -1;
   display: flex;
@@ -34,6 +39,14 @@
   right: var(--space-4);
   z-index: 1;
   margin-bottom: 0;
+}
+
+@container (max-width: 999px) {
+  /* 窄屏改为预留一行纵向空间，避免操作入口覆盖字段。 */
+  .finance-card-with-expense-action--reserved > .business-registration-group__fields {
+    padding-inline-end: 0;
+    padding-block-start: calc(var(--ui-control-height-lg) + var(--space-2));
+  }
 }
 
 .finance-expense-items__list {

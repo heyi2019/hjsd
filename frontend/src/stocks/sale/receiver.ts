@@ -1,14 +1,14 @@
 /**
  * 库存售出的收款逻辑：全款收款与分期收款两段后端调用。
- * 从 InventorySaleModal 抽出，便于复用与单测。
+ * 从售出弹窗抽出，便于复用与单测。
  *
  * - 全款收款：在原入库订单上登记 SELL 事件，金额作为 PROFIT 份额入账（代挂无买入价，利润即售出金额）。
  * - 分期收款：建立库存分期出售合同（STOCK_SALE），买家分期支付。
  */
-import { installmentsApi } from "../shared/api/installments.api";
-import { ordersApi } from "../shared/api/orders.api";
-import { today } from "../shared/lib/format";
-import { serializeInstallmentSchedule } from "../orders/InstallmentScheduleFields";
+import { installmentsApi } from "../../shared/api/installments.api";
+import { ordersApi } from "../../shared/api/orders.api";
+import { today } from "../../shared/lib/format";
+import { serializeInstallmentSchedule } from "../../orders/InstallmentScheduleFields";
 
 export interface CollectPaymentInput {
   /** 关联入库订单 ID（售出事件/分期合同登记在其上）。 */

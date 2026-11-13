@@ -3,7 +3,7 @@ import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableFi
 import { CreateBusinessModal } from "../CreateBusinessModal";
 import { DateField, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
 import { InventoryConsignmentModal } from "../../stocks/operations";
-import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../../stocks/InventorySaleModal";
+import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../../stocks/sale";
 import { type OrdersPageController } from "./useOrdersPageController";
 
 export function EditOrderModal({ controller }: { controller: OrdersPageController }) {

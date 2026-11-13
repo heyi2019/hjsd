@@ -4,7 +4,7 @@ import {
   perPeriodServiceFee,
   saleInstallmentMismatch,
   saleInstallmentPlan,
-} from "@/stocks/sale-plan";
+} from "@/stocks/sale";
 import { fromCents as formatCents, toCents } from "@/shared/lib/money";
 
 describe("sale-plan：售卖分期金额规划（整数分运算）", () => {

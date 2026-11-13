@@ -30,7 +30,7 @@ export function MonthlyPnl({ range }: { range: ReportRange }) {
     },
   ];
   return (
-    <Card className="glass" title="月度经营损益 R2">
+    <Card className="glass" title="月度经营损益">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
       <StatRow

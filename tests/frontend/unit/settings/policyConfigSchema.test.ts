@@ -32,14 +32,14 @@ describe("policyConfigSchema", () => {
     // 未知编码仍视为不可配置（防御未来新增但未定义字段的规则）
     expect(policyConfigFields("NOT_EXISTS")).toEqual([]);
     expect(policyHasConfig("NOT_EXISTS")).toBe(false);
-    // 关键字段必须在：提成按动作拆分的比例表 / 服务费率 / 跌价比例 / 期数
+    // 关键字段必须在：分润按动作拆分的比例表 / 服务费率 / 跌价比例 / 期数
     expect(policyConfigFields("COMMISSION").map((f) => f.key)).toEqual(["split"]);
     expect(policyConfigFields("INSTALLMENT").map((f) => f.key)).toContain("service_fee_rate");
     expect(policyConfigFields("WRITE_DOWN")[0].kind).toBe("rate-table");
     expect(policyConfigFields("WRITE_DOWN")[0].rows).toHaveLength(3);
   });
 
-  it("提成按动作拆分：买入/卖出/运营/公司四行，默认 30/30/0/40 且合计必须 100", () => {
+  it("分润按动作拆分：买入/卖出/运营/公司四行，默认 30/30/0/40 且合计必须 100", () => {
     const [split] = policyConfigFields("COMMISSION");
     expect(split.kind).toBe("rate-table");
     expect(split.rows?.map((r) => r.key)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
@@ -104,9 +104,9 @@ describe("policyConfigSchema", () => {
     expect(describeConfig(null)).toBe("（无参数）");
   });
 
-  it("生效标识：仅返点费率标 calc，提成分润模板与其余规则按 snapshot 留痕", () => {
+  it("生效标识：仅返点费率标 calc，分润模板与其余规则按 snapshot 留痕", () => {
     // 后端消费点：app/finance/rebates.py:167 读 rates/rate。
-    // 提成模板暂未接进分润弹窗（用户口径：暂时都填 0），故不得标 calc。
+    // 分润模板暂未接进分润弹窗（用户口径：暂时都填 0），故不得标 calc。
     expect(policyConfigFields("REBATE").filter((f) => f.effective === "calc").map((f) => f.key)).toEqual([
       "rates",
       "rate",

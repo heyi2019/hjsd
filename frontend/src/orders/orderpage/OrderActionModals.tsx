@@ -33,7 +33,7 @@ export function EditOrderModal({ controller }: { controller: OrdersPageControlle
           wrapperCol={{ flex: "auto" }} scope="ORDEREDIT" form={editForm} onFinish={submitEditOrder}>
           <FieldConfigScope scope="ORDEREDIT" active={editOpen}>
           <Typography.Paragraph type="secondary">
-            订单编号、业务类型、账号关联与状态不可编辑；修改成交日期会同步平移本单事件与资金流水日期，并重取返点/提成规则快照。
+            订单编号、业务类型、账号关联与状态不可编辑；修改成交日期会同步平移本单事件与资金流水日期，并重取返点/分润规则快照。
           </Typography.Paragraph>
           <CfgItem
             name="trade_date"

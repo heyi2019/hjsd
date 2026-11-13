@@ -36,7 +36,7 @@ export function DailyFunds() {
   return (
     <Card
       className="glass"
-      title={`资金日报 R4 · ${data?.date ?? ""}`}
+      title={`资金日报 · ${data?.date ?? ""}`}
       extra={<Input type="date" aria-label="资金日报日期" value={reportOn} onChange={(event) => setReportOn(event.target.value)} className="ui-control-width-date" />}
     >
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />

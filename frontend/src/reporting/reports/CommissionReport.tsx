@@ -58,7 +58,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
     },
   ];
   return (
-    <Card className="glass" title={mine ? "我的收益" : "提成对账 R3"}>
+    <Card className="glass" title={mine ? "我的收益" : "分润对账"}>
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">
         {!mine ? (
@@ -92,7 +92,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
          page={1}
          pageSize={10}
          total={data?.items.length ?? 0}
-         emptyText="所选区间无提成记录"
+         emptyText="所选区间无分润记录"
          onPageChange={() => undefined}
       />
       {/* 复用与列表完全相同的筛选对象，确保「我的收益/指定员工」导出与页面同口径（#8）。 */}

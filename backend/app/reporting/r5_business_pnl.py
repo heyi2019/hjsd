@@ -1,4 +1,4 @@
-"""reporting.r5_business_pnl：R5 业务级损益。
+"""业务级损益。
 
 主营利润口径（2026-11-05 用户裁决）：按业务类型汇总各订单
 「所有收入 − 所有支出」，与订单利润明细 / 分润基数同源。
@@ -35,7 +35,7 @@ def r5_business_pnl(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
-    """R5 业务级损益：先按权限取订单，再一次性按订单汇总资金明细收支差。"""
+    """业务级损益：先按权限取订单，再一次性按订单汇总资金明细收支差。"""
     _validate_date_range(from_date, to_date)
     orders_stmt = _apply_order_scope(
         select(Order.id, Order.order_type), user, session

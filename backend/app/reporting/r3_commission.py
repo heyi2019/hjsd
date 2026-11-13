@@ -1,4 +1,4 @@
-"""reporting.r3_commission：R3 提成对账（应付 / 已付 / 差异）。
+"""分润对账（应付 / 已付 / 差异）。
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ def r3_commission_reconciliation(
     user: CurrentUser | None = None, mine: bool = False, all_people: bool = False,
     user_id: int | None = None,
 ) -> dict[str, Any]:
-    """R3 提成对账：按人员钻取到单；无规则版本时提成率为 0（不臆造）。"""
+    """分润对账：按人员钻取到单；无规则版本时分润率为 0（不臆造）。"""
     _validate_date_range(from_date, to_date)
     order_scope = None if all_people else user
     rows = session.execute(
@@ -127,4 +127,4 @@ def r3_commission_reconciliation(
     }
 
 
-# --------------------------------------------------------------------- R5 业务
+# --------------------------------------------------------------------- 业务损益

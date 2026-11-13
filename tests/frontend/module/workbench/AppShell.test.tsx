@@ -218,7 +218,7 @@ describe("AppShell：角色展示与退出", () => {
 
     await ui.click(screen.getByRole("button", { name: "工作台" }));
     await ui.click(screen.getByRole("button", { name: /我的收益/ }));
-    const commissionTab = await screen.findByRole("tab", { name: "提成对账 R3" });
+    const commissionTab = await screen.findByRole("tab", { name: "分润对账" });
     expect(commissionTab).toHaveAttribute("aria-selected", "true");
     expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith({ mine: true });
   });

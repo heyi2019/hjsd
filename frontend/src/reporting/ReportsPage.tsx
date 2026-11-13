@@ -1,4 +1,4 @@
-/** 经营中心：月度损益 R2 / 提成对账 R3 / 资金日报 R4 / 业务损益 R5 / 数据中心（RPT-01）。
+/** 经营中心：月度损益 / 分润对账 / 资金日报 / 业务损益 / 数据中心（RPT-01）。
  * 各报表视图拆到 ./reports/*.tsx（导出按钮在各自页内），本文件只留 Tab 壳。 */
 import { Input, Space, Tabs } from "antd";
 import { useEffect, useState } from "react";
@@ -24,7 +24,7 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
   const [reportTo, setReportTo] = useState("");
   useEffect(() => {
     // keep-alive 下离开经营中心时保留个人视图，避免隐藏页在切换期间改请求口径；
-    // 重新激活后再按 URL 入口决定是「我的收益」还是完整提成对账。
+    // 重新激活后再按 URL 入口决定是「我的收益」还是完整分润对账。
     if (!active) return;
     setMyEarnings(initialReportTab === "my-earnings");
     if (initialReportTab === "commission" || initialReportTab === "my-earnings") setActiveTab("r3");
@@ -40,10 +40,10 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
     ),
   };
   const tabItems = [
-    { key: "r2", label: "月度损益 R2", render: () => <MonthlyPnl range={reportRange} /> },
-    { key: "r3", label: "提成对账 R3", render: () => <Commission range={reportRange} mine={myEarnings} /> },
-    { key: "r4", label: "资金日报 R4", render: () => <DailyFunds /> },
-    { key: "r5", label: "业务损益 R5", render: () => <BusinessPnl range={reportRange} /> },
+    { key: "r2", label: "月度损益", render: () => <MonthlyPnl range={reportRange} /> },
+    { key: "r3", label: "分润对账", render: () => <Commission range={reportRange} mine={myEarnings} /> },
+    { key: "r4", label: "资金日报", render: () => <DailyFunds /> },
+    { key: "r5", label: "业务损益", render: () => <BusinessPnl range={reportRange} /> },
     { key: "finance-dimensions", label: "资金属性分析", render: () => <FinanceDimensions range={reportRange} /> },
     { key: "profit", label: "订单利润", render: () => <OrderProfit range={reportRange} /> },
     { key: "data-center", label: "数据中心", render: () => <DataCenterPanel onNavigate={onNavigate} /> },

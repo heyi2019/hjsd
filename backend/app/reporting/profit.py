@@ -39,7 +39,7 @@ def order_profit_detail(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
-    """订单利润明细：合计与 R5 对应维度一致，可导出但不改原始数据。
+    """订单利润明细：合计与业务级损益对应维度一致，可导出但不改原始数据。
 
     订单范围先按权限过滤，再一次性按订单汇总资金流水，避免逐单查询。
     """

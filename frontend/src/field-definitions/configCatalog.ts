@@ -107,7 +107,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   {
     key: "policies",
     label: "经营规则",
-    summary: "返点/提成/分期/折让/退款规则版本与参数，写进订单快照参与计算",
+    summary: "返点/分润/分期/折让/退款规则版本与参数，写进订单快照参与计算",
     group: "POLICY",
     entityTypes: ["policy_definition", "policy_version"],
     count: async () => (await policyApi.list()).total,
@@ -124,7 +124,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   {
     key: "teams",
     label: "团队管理",
-    summary: "团队划分，用于业绩归属与提成分摊",
+    summary: "团队划分，用于业绩归属与分润分摊",
     group: "ORG",
     permission: "user.manage",
     entityTypes: [],

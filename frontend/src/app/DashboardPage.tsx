@@ -64,7 +64,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
       setSummaryError(normalizeError(ordersResult.reason));
     }
     if (earningsResult.status === "fulfilled") {
-      // payable 才是「我这份」提成；profit_base 是整单利润基数，不是个人收益。
+      // payable 才是「我这份」分润；profit_base 是整单利润基数，不是个人收益。
       setPersonalEarnings(earningsResult.value.total.payable);
       setEarningsError(null);
     } else {
@@ -102,7 +102,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
     }
     if (notificationResult[0].status === "fulfilled") {
       setNewProfitNotificationCount(notificationResult[0].value.items.filter((item) =>
-        [item.notification_type ?? "", item.title, item.message].some((value) => /分润|利润|提成/.test(value)),
+        [item.notification_type ?? "", item.title, item.message].some((value) => /分润|利润/.test(value)),
       ).length);
     } else {
       setNewProfitNotificationCount(null);

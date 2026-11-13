@@ -75,7 +75,7 @@ async function gotoTab(label: string) {
 describe("ReportsPage：经营中心报表", () => {
   it("初始只加载当前激活的月度损益报表，不提前加载隐藏 Tab", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "月度损益 R2" });
+    await screen.findByRole("tab", { name: "月度损益" });
     expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(reportsApi.commission)).not.toHaveBeenCalled();
     expect(vi.mocked(reportsApi.dailyFunds)).not.toHaveBeenCalled();
@@ -86,7 +86,7 @@ describe("ReportsPage：经营中心报表", () => {
 
   it("我的收益只加载当前登录用户的分润记录", async () => {
     renderLight(<ReportsPage initialReportTab="my-earnings" />, { user: "admin" });
-    const commissionTab = await screen.findByRole("tab", { name: "提成对账 R3" });
+    const commissionTab = await screen.findByRole("tab", { name: "分润对账" });
     expect(commissionTab).toHaveAttribute("aria-selected", "true");
     expect((await screen.findAllByText("我的收益")).length).toBeGreaterThan(0);
     expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith({ mine: true });
@@ -108,9 +108,9 @@ describe("ReportsPage：经营中心报表", () => {
     );
   });
 
-  it("FE-260：提成对账可以按人员筛选并传递 user_id", async () => {
+  it("FE-260：分润对账可以按人员筛选并传递 user_id", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await ui.click(screen.getByRole("tab", { name: "提成对账 R3" }));
+    await ui.click(screen.getByRole("tab", { name: "分润对账" }));
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true }));
     await waitFor(() => expect(vi.mocked(employeesApi.list)).toHaveBeenCalled());
     const personComboboxes = await screen.findAllByRole("combobox");
@@ -121,10 +121,10 @@ describe("ReportsPage：经营中心报表", () => {
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
   });
 
-  it("R3 指定员工导出带 user_id，与列表同口径", async () => {
+  it("指定员工导出带 user_id，与列表同口径", async () => {
     vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await ui.click(screen.getByRole("tab", { name: "提成对账 R3" }));
+    await ui.click(screen.getByRole("tab", { name: "分润对账" }));
     await waitFor(() => expect(vi.mocked(employeesApi.list)).toHaveBeenCalled());
     const personComboboxes = await screen.findAllByRole("combobox");
     await ui.click(personComboboxes[personComboboxes.length - 1] as HTMLElement);
@@ -137,10 +137,10 @@ describe("ReportsPage：经营中心报表", () => {
     ));
   });
 
-  it("六个 Tab 齐全（R2-R5 + 订单利润 + 数据中心）", async () => {
+  it("六个 Tab 齐全（四类经营报表 + 订单利润 + 数据中心）", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "月度损益 R2" });
-    for (const label of ["月度损益 R2", "提成对账 R3", "资金日报 R4", "业务损益 R5", "订单利润", "数据中心"]) {
+    await screen.findByRole("tab", { name: "月度损益" });
+    for (const label of ["月度损益", "分润对账", "资金日报", "业务损益", "订单利润", "数据中心"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
     expect(screen.queryByRole("tab", { name: "库存 R1" })).not.toBeInTheDocument();
@@ -168,10 +168,10 @@ describe("ReportsPage：经营中心报表", () => {
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31" }));
   });
 
-  it("R2 报表页内导出按钮无筛选也能导出并给出成功反馈", async () => {
+  it("报表页内导出按钮无筛选也能导出并给出成功反馈", async () => {
     const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("月度损益 R2");
+    await gotoTab("月度损益");
     await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith("已导出 monthly-pnl.csv"));

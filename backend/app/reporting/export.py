@@ -50,7 +50,7 @@ def report_for_export(
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """统一执行可导出的报表，所有分支复用既有数据权限和口径。
-    mine/all_people/user_id 仅作用于 R3，使导出与「我的收益/指定员工」页面视图同口径。
+    mine/all_people/user_id 仅作用于分润对账，使导出与「我的收益/指定员工」页面视图同口径。
     """
     name = report_name.strip().lower()
     if name not in REPORT_NAMES:

@@ -214,7 +214,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
     ),
     ListScope(
         code="RPT_COMMISSION",
-        label="报表·提成对账",
+        label="报表·分润对账",
         columns=(
             ListColumn("user_id", "人员 ID"),
             ListColumn("order_no", "订单号"),

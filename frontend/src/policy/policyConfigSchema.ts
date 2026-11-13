@@ -11,7 +11,7 @@
  * - 后端引擎消费规则的有两处：
  *   ① REBATE：app/finance/rebates.py:167 先读 `config.rates[rebate_type]`，
  *      读不到回退 `config.rate`，且仅在调用方未显式传 rate 时生效；
- *   ② COMMISSION：不是「提成率」而是**按动作拆分的分润模板**
+ *   ② COMMISSION：不是「分润率」而是**按动作拆分的分润模板**
  *      （买入动作 / 卖出动作 / 运营动作 / 公司），当前仅作口径留痕；
  *      订单分润弹窗仍手工录入，未取此模板（2026-10-26 用户口径：暂时都填 0）。
  *   其余四类（分期 service_fee_rate / 跌价 / 退款 / DG）后端取接口入参或专用字段，
@@ -47,9 +47,9 @@ export interface PolicyFieldDef {
   /** number / percent 的取值范围。 */
   min?: number;
   max?: number;
-  /** rate-table 各行的默认值：仅当该字段整体未配置时启用（如提成 30/30/0/40）。 */
+  /** rate-table 各行的默认值：仅当该字段整体未配置时启用（如分润 30/30/0/40）。 */
   rowDefaults?: Record<string, string>;
-  /** rate-table 合计必须等于该值（提成四项比例必须为 100）。 */
+  /** rate-table 合计必须等于该值（分润四项比例必须为 100）。 */
   sumTo?: number;
 }
 
@@ -75,7 +75,7 @@ export const ALLOCATION_ROWS = [
   { key: "COMPANY", label: "公司" },
 ];
 
-/** 提成默认口径：买入动作 30% / 卖出动作 30% / 公司 40%（合计 100%）。
+/** 分润默认口径：买入动作 30% / 卖出动作 30% / 公司 40%（合计 100%）。
  *  这是业务既定比例，不是猜值；规则版本存在时以版本为准。 */
 export const DEFAULT_COMMISSION_SPLIT: Record<string, string> = {
   BUY: "30",
@@ -119,7 +119,7 @@ export const POLICY_CONFIG_SCHEMA: Record<string, PolicyFieldDef[]> = {
   COMMISSION: [
     {
       key: "split",
-      label: "提成分配比例",
+      label: "分润分配比例",
       kind: "rate-table",
       rows: ALLOCATION_ROWS,
       sumTo: 100,
@@ -192,7 +192,7 @@ export const policyConfigFields = (code: string): PolicyFieldDef[] => POLICY_CON
 export const policyHasConfig = (code: string): boolean => policyConfigFields(code).length > 0;
 
 /** 把后端 config（JSON 对象）摊平成表单值；rate-table 摊成嵌套对象。
- *  该字段整体未配置时才用 rowDefaults 兜默认模板（提成 30/30/0/40）。 */
+ *  该字段整体未配置时才用 rowDefaults 兜默认模板（分润 30/30/0/40）。 */
 export function configToFields(code: string, config: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const f of policyConfigFields(code)) {

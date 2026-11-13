@@ -40,7 +40,7 @@ export function BusinessOverview({
     <section aria-label="我的业务总览" className="ui-stack">
       <StatRow className="ui-stat-row--overview" items={[
         ...(personalOrders !== undefined ? [{ label: "我的订单", kind: "count" as const, amount: personalOrdersError ? null : String(personalOrders), hint: "创建 / 售出订单", onClick: onPersonalOrdersClick }] : []),
-        ...(personalEarnings !== undefined ? [{ label: "我的收益", amount: personalEarningsError ? null : personalEarnings, hint: "本月至今 · 本人应付提成", onClick: onPersonalEarningsClick }] : []),
+        ...(personalEarnings !== undefined ? [{ label: "我的收益", amount: personalEarningsError ? null : personalEarnings, hint: "本月至今 · 本人应付分润", onClick: onPersonalEarningsClick }] : []),
         { label: "在库账号", kind: "count", amount: amount(inventoryCount) },
         { label: "订单总量", kind: "count", amount: ordersError ? null : amount(orders.length) },
         { label: "完成订单量", kind: "count", amount: ordersError ? null : amount(orders.filter((order) => order.status === "COMPLETED").length) },

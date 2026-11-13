@@ -34,7 +34,7 @@ export function BusinessPnl({ range }: { range: ReportRange }) {
     },
   ];
   return (
-    <Card className="glass" title="业务级损益 R5">
+    <Card className="glass" title="业务级损益">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar">{picker}</Space>
       <StatRow

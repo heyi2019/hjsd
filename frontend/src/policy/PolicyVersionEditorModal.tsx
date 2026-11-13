@@ -99,7 +99,7 @@ export function PolicyVersionEditorModal({
 
   const onFinish = (values: Record<string, unknown>) => {
     const { effective_from, effective_to, note, ...rest } = values;
-    // 合计型费率表（提成四项比例）：合计不为 100 直接拦，避免存下无法执行的模板。
+    // 合计型费率表（分润四项比例）：合计不为 100 直接拦，避免存下无法执行的模板。
     for (const field of fields) {
       if (field.kind !== "rate-table" || field.sumTo == null) continue;
       const total = rateTableTotal(rest[field.key] as Record<string, unknown> | undefined, field.rows);
@@ -193,7 +193,7 @@ export function PolicyVersionEditorModal({
 
         <Typography.Paragraph type="secondary">
           参数随版本固化，历史单据按建单时的快照计算。目前只有<strong>返点费率</strong>被后端读取
-          （仅在登记返点时未手填费率的情况下生效）；<strong>提成分配比例</strong>按动作留存口径，
+          （仅在登记返点时未手填费率的情况下生效）；<strong>分润分配比例</strong>按动作留存口径，
           订单「分润」仍按单录入；分期、跌价、退款的参数仅作口径留痕，接入计算前不改变金额。
         </Typography.Paragraph>
       </BusinessRegistrationForm>

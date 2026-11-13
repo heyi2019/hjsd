@@ -1,4 +1,4 @@
-"""reporting.router：R2/R3/R5、资金日报与订单利润（RPT-01）。"""
+"""经营报表路由：月度损益、分润对账、业务损益、资金日报与订单利润。"""
 from __future__ import annotations
 
 from datetime import date
@@ -45,7 +45,7 @@ def monthly_pnl(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
 ) -> MonthlyPnlOut:
-    """R2 月度经营损益（账号直接支出不进运营费用）。"""
+    """月度经营损益（账号直接支出不进运营费用）。"""
     return r2_monthly_pnl(db, from_date=from_date, to_date=to_date, user=user)
 
 
@@ -59,7 +59,7 @@ def commission(
     all_people: bool = Query(default=False),
     user_id: int | None = Query(default=None, gt=0),
 ) -> CommissionOut:
-    """R3 提成对账：默认按权限范围汇总；经营中心可显式查看全员并按人员筛选。"""
+    """分润对账：默认按权限范围汇总；经营中心可显式查看全员并按人员筛选。"""
     return r3_commission_reconciliation(
         db, from_date=from_date, to_date=to_date, user=user, mine=mine, all_people=all_people, user_id=user_id
     )
@@ -72,7 +72,7 @@ def business_pnl(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
 ) -> BusinessPnlOut:
-    """R5 业务级损益：主营收入 / 成本 / 毛利均按订单资金明细收支差。"""
+    """业务级损益：主营收入 / 成本 / 毛利均按订单资金明细收支差。"""
     return r5_business_pnl(db, from_date=from_date, to_date=to_date, user=user)
 
 
@@ -104,7 +104,7 @@ def order_profit(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
 ) -> OrderProfitOut:
-    """订单利润明细：合计与 R5 对应维度一致。"""
+    """订单利润明细：合计与业务级损益对应维度一致。"""
     return order_profit_detail(db, from_date=from_date, to_date=to_date, user=user)
 
 
@@ -121,7 +121,7 @@ def export_report(
     user_id: int | None = Query(default=None, gt=0),
 ) -> Response:
     """导出当前权限范围内的报表；导出动作写入审计日志。
-    mine/all_people/user_id 仅作用于 R3，与 /reports/commission 列表同口径。
+    mine/all_people/user_id 仅作用于分润对账，与 /reports/commission 列表同口径。
     """
     report = report_for_export(
         db,

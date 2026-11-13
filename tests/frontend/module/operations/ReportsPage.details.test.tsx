@@ -64,7 +64,7 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：各报表渲染与错误态", () => {
-  it("R2 月度损益：渲染月份与销售收入", async () => {
+  it("月度损益：渲染月份与销售收入", async () => {
     resolveMockOnce(vi.mocked(reportsApi.monthlyPnl), {
       from: "2026-09",
       to: "2026-09",
@@ -81,12 +81,12 @@ describe("ReportsPage：各报表渲染与错误态", () => {
       ],
     });
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("月度损益 R2");
+    await gotoTab("月度损益");
     expect(await screen.findByText("2026-09")).toBeInTheDocument();
     expect(screen.getAllByText("2,000.00").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("R5 业务损益：渲染业务与主营收入", async () => {
+  it("业务损益：渲染业务与主营收入", async () => {
     resolveMock(vi.mocked(reportsApi.businessPnl), {
       items: [
         {
@@ -99,7 +99,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
       total: {},
     });
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("业务损益 R5");
+    await gotoTab("业务损益");
     expect(await screen.findByText(/HS/)).toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
   });

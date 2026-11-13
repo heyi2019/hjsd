@@ -1,7 +1,7 @@
-"""reporting.r2_monthly_pnl：R2 月度经营损益。
+"""月度经营损益。
 
 订单贡献口径（2026-11-05 用户裁决）：销售收入 / 直接成本按各订单
-「所有收入 − 所有支出」取数，与订单利润明细、R5、分润基数同源。
+「所有收入 − 所有支出」取数，与订单利润明细、业务级损益、分润基数同源。
 资金走向只有收入 / 支出两种：返点记录是收入、分期坏账是支出，即使不生成
 资金流水也按各自发生日归月计入。返点收益列是「其中返点」的展示项，
 已含在销售收入里，不重复加进经营利润；该列独立聚合 RebateRecord
@@ -51,7 +51,7 @@ def r2_monthly_pnl(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
-    """R2 月度经营损益：订单收支按资金明细，期间费用/返点单列。"""
+    """月度经营损益：订单收支按资金明细，期间费用/返点单列。"""
     _validate_date_range(from_date, to_date)
     revenue: dict[str, Decimal] = defaultdict(lambda: ZERO)
     direct_cost: dict[str, Decimal] = defaultdict(lambda: ZERO)
@@ -70,7 +70,7 @@ def r2_monthly_pnl(
             func.coalesce(func.sum(expense_case), 0),
         )
         .join(Order, Order.id == Cashflow.order_id)
-        # 2026-11-12 用户裁决 C：押金完整走业务口径，R2 与订单利润逐笔同源。
+        # 2026-11-12 用户裁决 C：押金完整走业务口径，与订单利润逐笔同源。
         # 套用 business_cashflow_filter：押金占用(OUT/DEPOSIT_HOLD)计入该单直接
         # 成本、释放/取消(IN)计入收入；押金损失(OUT/DEPOSIT+非HOLD)是已占用押金
         # 的定性转换、非第二次现金流出，被排除；押金线只有一套逻辑：净额=收入−支出，
@@ -108,7 +108,7 @@ def r2_monthly_pnl(
     # 「其中返点」列独立聚合 RebateRecord（与利润明细 profit.py 同源）：
     # 不能复用 order_profit_flow_by_date 的 extra_income——那个函数对「已生成资金流水
     # 的新模型返点」做了 continue 防重复计收入，连带把它的「其中项展示」也跳过了，
-    # 导致同一笔新模型返点在 R2 列=0、利润明细列=base_amount 的口径打架。
+    # 导致同一笔新模型返点在月度损益列=0、利润明细列=base_amount 的口径打架。
     # 本列只作展示、不参与经营利润（operating_profit 不含它），故独立 sum 不会重复加回。
     rebate_income: dict[str, Decimal] = defaultdict(lambda: ZERO)
     if scoped_order_ids:
@@ -201,4 +201,4 @@ def r2_monthly_pnl(
     }
 
 
-# --------------------------------------------------------------------- R3 提成
+# --------------------------------------------------------------------- 运营费用

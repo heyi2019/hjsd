@@ -9,7 +9,7 @@ import { appMessage } from "../../shared/ui/appFeedback";
 type ReportExportParams = {
   from?: string;
   to?: string;
-  /** R3 专用：与 /reports/commission 列表同口径，避免「我的收益/指定员工」导出成默认全员。 */
+  /** 分润对账专用：与 /reports/commission 列表同口径，避免「我的收益/指定员工」导出成默认全员。 */
   mine?: boolean;
   all_people?: boolean;
   user_id?: number;
@@ -25,7 +25,7 @@ export function ReportExportButton({ name, params }: { name: string; params?: Re
       appMessage.error("导出开始日期不能晚于结束日期");
       return;
     }
-    // 条件展开：R2/R5/订单利润等报表无视图筛选，不把 undefined 键塞进请求（保持既有导出契约）。
+    // 条件展开：月度损益、业务损益、订单利润等报表无视图筛选，不把 undefined 键塞进请求。
     const exportParams: ReportExportParams = {
       from,
       to,

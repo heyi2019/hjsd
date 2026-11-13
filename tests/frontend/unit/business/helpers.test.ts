@@ -48,9 +48,9 @@ describe("OrdersPage helpers", () => {
     ], "HS", "SELF", "原神", "原神", "WAITING")).toHaveLength(1);
   });
 
-  it("格式化订单金额并保留分期口径", () => {
-    expect(formatOrderAmount(order())).toBe("¥1,234.00");
-    expect(formatOrderAmount(order({ installment_principal: "12000.00", installment_paid: "3000.00", installment_periods: 6 }))).toContain("¥3000.00/12000.00");
+  it("格式化订单售出金额，不把买入金额混进来", () => {
+    expect(formatOrderAmount(order({ event_total: "2500.00", sale_amount: "1500.00" }))).toBe("¥1,500.00");
+    expect(formatOrderAmount(order({ event_total: "1000.00", sale_amount: null }))).toBe("-");
   });
 
   it("校验比例分润并归一化公司归属", () => {

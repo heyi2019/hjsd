@@ -45,6 +45,7 @@ const orders = [
     party_name: "卖家甲",
     party_source: "同行推荐",
     event_total: "1234.00",
+    sale_amount: "1234.00",
     last_event_type: "BUY",
     inventory_operator: "入库员",
     inventory_entry_at: "2026-10-01T09:30:00",
@@ -189,7 +190,7 @@ describe("OrdersPage：四类订单台账", () => {
     expect(within(dutyRow).getByText("16天7小时15分")).toBeInTheDocument();
 
     // 默认视图下的核心识别列与取值（完整列清单属配置能力，不在前端锁死）
-    for (const label of ["订单号", "金额", "库存状态", "日期", "操作"]) {
+    for (const label of ["订单号", "售出金额", "库存状态", "日期", "操作"]) {
       expect(screen.getAllByRole("columnheader", { name: label }).length).toBeGreaterThan(0);
     }
     expect(document.querySelector(".orders-ledger .ant-table-content > table")).toHaveStyle({ tableLayout: "fixed" });

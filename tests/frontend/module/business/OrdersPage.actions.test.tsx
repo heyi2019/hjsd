@@ -129,6 +129,7 @@ const order1: Order = {
   party_name: "卖家甲",
   party_source: "同行推荐",
   event_total: "1234.00",
+  sale_amount: "1234.00",
   last_event_type: "BUY",
   sale_at: "2026-10-02T16:45:00",
   account_id: 5,
@@ -149,6 +150,7 @@ const order3: Order = {
   capital_type: "CREDIT",
   trade_date: "2026-10-03",
   status: "ACTIVE",
+  sale_amount: "12000.00",
   installment_principal: "12000.00",
   installment_paid: "3000.00",
   installment_periods: 6,
@@ -283,10 +285,10 @@ async function clickModalOk(modal: HTMLElement) {
 }
 
 describe("OrdersPage：操作与筛选分支", () => {
-  it("分期订单金额展示为 已付/本金 · 期数", async () => {
+  it("分期订单展示售出金额而不是买入金额合计", async () => {
     vi.mocked(ordersApi.list).mockResolvedValue([order3]);
     await openLedger();
-    expect(screen.getAllByText("¥3000.00/12000.00 · 6期").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("¥12,000.00").length).toBeGreaterThan(0);
   });
 
   it("类型筛选：切换 Segmented 后仅保留该类型订单", async () => {

@@ -178,6 +178,16 @@ def test_order_ledger_profit_uses_cashflow_basis(seeded_db):
     assert row["profit_base"] == Decimal("300.00")
 
 
+def test_order_ledger_sale_amount_uses_sell_events_only(seeded_db):
+    """台账售出金额只取 SELL，不把 BUY 事件合进展示金额。"""
+    order_id = _order_with_events(seeded_db, buy="1000", sell="1500")
+
+    order = seeded_db.get(Order, order_id)
+    row = _order_list_payload(seeded_db, [order])[0]
+
+    assert row["sale_amount"] == Decimal("1500.00")
+
+
 def test_order_ledger_profit_includes_rebate_and_bad_debt(seeded_db):
     """台账利润也必须包含不生成资金流水的返点收入与分期坏账。"""
     order_id = _order_with_events(seeded_db)

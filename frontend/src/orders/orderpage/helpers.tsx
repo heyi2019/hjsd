@@ -483,10 +483,7 @@ export function buildOrderPatchPayload(params: {
 }
 
 export function formatOrderAmount(order: Order): string {
-  if (order.installment_principal) {
-    return `¥${order.installment_paid ?? "0.00"}/${order.installment_principal} · ${order.installment_periods ?? 0}期`;
-  }
-  return order.event_total ? `¥${money(order.event_total)}` : "-";
+  return order.sale_amount ? `¥${money(order.sale_amount)}` : "-";
 }
 
 export function orderSearchText(order: Order): string {

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from decimal import Decimal
 
-from app.core.money import to_money
+from app.core.money import to_money, to_money_or_zero
 from app.core.security import (
     CurrentUser,
     PERM_AUDIT_READ,
@@ -65,6 +65,22 @@ def _operator_names(db: Session, events: list[OrderEvent]) -> dict[int, str]:
         return {}
     users = db.scalars(select(User).where(User.id.in_(ids))).all()
     return {user.id: user.display_name or user.username for user in users}
+
+
+def _sale_amount(order_type: str, events: list[OrderEvent]) -> Decimal | None:
+    """列表展示的售出金额：只取 SELL，不把 BUY 成本合进来。"""
+    sell_events = [event for event in events if event.event_type == "SELL"]
+    if not sell_events:
+        return None
+    if order_type == "DG":
+        recorded = [
+            to_money_or_zero((event.form_extra or {}).get("sale_amount"))
+            for event in sell_events
+            if (event.form_extra or {}).get("sale_amount") not in (None, "")
+        ]
+        if recorded:
+            return sum(recorded, ZERO)
+    return sum((to_money(event.amount) for event in sell_events), ZERO)
 
 
 def cancellable_by_event(events: list[OrderEvent]) -> dict[int, Decimal]:
@@ -405,6 +421,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "sale_operator": sale_operator,
             "in_hand_time": _elapsed_label(inventory_entry_at, sale_at),
             "event_total": sum((event.amount for event in events), 0),
+            "sale_amount": _sale_amount(order.order_type, events),
             "cost_amount": total_cost,
             # 台账利润与利润分配、报表共用现金流口径：所有收入 − 所有支出，
             # 收入含返点，支出含分期坏账；不能再用 SELL/BUY/COST 事件推导。

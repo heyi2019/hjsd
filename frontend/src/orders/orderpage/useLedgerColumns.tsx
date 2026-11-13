@@ -60,7 +60,7 @@ export function useLedgerColumns(params: {
     { title: "售卖负责人", dataIndex: "sale_operator", width: "var(--col-w-100)", ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "售卖时间", dataIndex: "sale_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
     { title: "在手时间", key: "in_hand_time", width: "var(--col-w-80)", ellipsis: true, render: (_v, order) => order.in_hand_time ?? formatElapsedTime(order.inventory_entry_at, order.sale_at) },
-    { title: "金额", dataIndex: "event_total", width: "var(--col-w-90)", ellipsis: true, render: (_v: string | null, order) => formatOrderAmount(order) },
+    { title: "售出金额", dataIndex: "sale_amount", width: "var(--col-w-90)", ellipsis: true, render: (_v: string | null, order) => formatOrderAmount(order) },
     { title: "订单状态", dataIndex: "status", width: "var(--col-w-80)", ellipsis: true, render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
     { title: "库存状态", dataIndex: "account_status", width: "var(--col-w-80)", ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
     { title: "成本", dataIndex: "cost_amount", width: "var(--col-w-90)", ellipsis: true, render: (_v: string | null, order) => order.account_status === "SOLD" && order.cost_amount != null ? `¥${money(order.cost_amount)}` : "-" },

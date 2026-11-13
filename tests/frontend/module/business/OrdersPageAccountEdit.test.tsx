@@ -45,6 +45,7 @@ const orders = [
     party_name: "卖家甲",
     party_source: "同行推荐",
     event_total: "1234.00",
+    sale_amount: "1234.00",
     last_event_type: "BUY",
     inventory_operator: "入库员",
     inventory_entry_at: "2026-10-01T09:30:00",

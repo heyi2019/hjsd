@@ -1,5 +1,6 @@
 import { Form } from "antd";
 import { useState } from "react";
+import type { CashflowTarget } from "../../finance/cashflow";
 import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
 import { policyApi } from "../../shared/api/policy.api";
@@ -7,6 +8,7 @@ import { poolsApi } from "../../shared/api/pools.api";
 import { stocksApi } from "../../shared/api/stocks.api";
 import type { Account } from "../../shared/api/types/accounts";
 import type { Pool } from "../../shared/api/types/finance";
+import type { EmployeeOption } from "../../shared/api/types/org";
 import type { Order } from "../../shared/api/types/orders";
 import { currentUser, normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
@@ -28,24 +30,19 @@ interface OrderActionModalsDeps {
   selectedOrder: Order | null;
   setSelectedOrder: (order: Order | null) => void;
   load: () => Promise<void> | void;
-  setCancelPools: (pools: Pool[]) => void;
   loadLedgerDetail: (accountId: number, force?: boolean) => void;
 }
 
 /**
- * 订单台账的动作弹窗域：退款 / 分润配置 / 交付 / 下架 / 账号动作 / 订单编辑。
+ * 订单台账的动作弹窗域：资金收支 / 分润配置 / 交付 / 下架 / 账号动作 / 订单编辑。
  * 逐字切片自 useOrdersPageController，返回值与主 hook 的 spread 并集契约逐字段一致。
  */
 export function useOrderActionModals({
   selectedOrder,
   setSelectedOrder,
   load,
-  setCancelPools,
   loadLedgerDetail,
 }: OrderActionModalsDeps) {
-  const [refundOpen, setRefundOpen] = useState(false);
-  const [refundSubmitting, setRefundSubmitting] = useState(false);
-  const [refundForm] = Form.useForm();
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [allocationSubmitting, setAllocationSubmitting] = useState(false);
   const [allocationForm] = Form.useForm();
@@ -55,6 +52,9 @@ export function useOrderActionModals({
   const [orderDeleteTarget, setOrderDeleteTarget] = useState<Order | null>(null);
   const [orderDeleteSubmitting, setOrderDeleteSubmitting] = useState(false);
   const [deliveryTarget, setDeliveryTarget] = useState<OrderDeliveryTarget | null>(null);
+  const [cashflowTarget, setCashflowTarget] = useState<CashflowTarget | null>(null);
+  const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
+  const [cashflowUsers, setCashflowUsers] = useState<EmployeeOption[]>([]);
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
   const [orderOffsaleTarget, setOrderOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
   /** 订单总利润（后端 order_amounts 口径），负数即亏损单；分润弹窗顶部展示并作为金额分润上限。 */
@@ -137,18 +137,17 @@ export function useOrderActionModals({
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
       if (!order) return;
       const [employeeList, poolList] = await Promise.all([employeesApi.list(), poolsApi.list()]);
-      setUsers(employeeList.filter((employee) => employee.is_active));
+      const activeEmployees = employeeList.filter((employee) => employee.is_active);
+      setUsers(activeEmployees);
+      setCashflowUsers(activeEmployees);
       const activePools = poolList.filter((pool) => pool.status === "ACTIVE");
       // 资金收支必须指认资金账户：带上可用池并默认选中第一个，用户仍可改。
-      setCancelPools(activePools);
-      setActionOrder(order);
-      refundForm.resetFields();
-      refundForm.setFieldsValue({
-        direction: "OUT",
-        category: "OTHER",
-        pool_id: activePools[0]?.id,
+      setCashflowPools(activePools);
+      setCashflowTarget({
+        orderId: order.id,
+        orderNo: order.order_no,
+        cashflows: order.cashflows,
       });
-      setRefundOpen(true);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
@@ -358,6 +357,10 @@ export function useOrderActionModals({
     setAllocationProfit,
     setAllocationSubmitting,
     currentEmployeeId,
+    cashflowPools,
+    cashflowTarget,
+    cashflowUsers,
+    setCashflowTarget,
     deliveryTarget,
     setDeliveryTarget,
     editForm,
@@ -392,11 +395,6 @@ export function useOrderActionModals({
     setOrderSaleTarget,
     profileTarget,
     setProfileTarget,
-    refundForm,
-    refundOpen,
-    refundSubmitting,
-    setRefundOpen,
-    setRefundSubmitting,
     submitEditOrder,
     submitOrderDelete,
     openOrderProfile,

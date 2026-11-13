@@ -7,8 +7,8 @@ import { stocksApi } from "../../shared/api/stocks.api";
 import { InventoryCancellationDialog } from "../InventoryCancellationDialog";
 import { InventoryDeleteDialog } from "./InventoryDeleteDialog";
 import { InventoryConsignmentModal, InventoryPlatformOffsaleModal, InventoryProfileModal, unlistAndCancelConsignmentOrders } from "../operations";
-import { InventoryRebateModal } from "../InventoryRebateModal";
-import { InventoryCashflowModal } from "../InventoryCashflowModal";
+import { InventoryRebateModal } from "../rebate";
+import { CashflowModal } from "../../finance/cashflow";
 import { OrderDeliveryModal } from "../../orders/OrderDeliveryModal";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../sale";
 import { OrderDetail } from "../OrderDetail";
@@ -100,7 +100,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           onOrdersChanged?.();
         }}
       />
-      <InventoryCashflowModal
+      <CashflowModal
         target={cashflowTarget}
         pools={cashflowPools}
         onClose={() => setCashflowTarget(null)}

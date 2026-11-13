@@ -18,7 +18,7 @@ import { type InventoryProfileTarget } from "../operations";
 import { type InventoryCancellationValues } from "../InventoryCancellationDialog";
 import { type BusinessCenterEntryTab } from "../../orders/businessCenter";
 import { findCancelableBuy } from "./helpers";
-import { type InventoryCashflowTarget } from "../InventoryCashflowModal";
+import type { CashflowTarget } from "../../finance/cashflow";
 import { type OrderDeliveryTarget } from "../../orders/OrderDeliveryModal";
 
 export function useInventoryActions(params: {
@@ -53,7 +53,7 @@ export function useInventoryActions(params: {
   const [saleTarget, setSaleTarget] = useState<Account | null>(null);
   const [consignmentTarget, setConsignmentTarget] = useState<Account | null>(null);
   const [rebateTarget, setRebateTarget] = useState<Account | null>(null);
-  const [cashflowTarget, setCashflowTarget] = useState<InventoryCashflowTarget | null>(null);
+  const [cashflowTarget, setCashflowTarget] = useState<CashflowTarget | null>(null);
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
   const [deliveryTarget, setDeliveryTarget] = useState<OrderDeliveryTarget | null>(null);
   const [deliveryEmployees, setDeliveryEmployees] = useState<EmployeeOption[]>([]);

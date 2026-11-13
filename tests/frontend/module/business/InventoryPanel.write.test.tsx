@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
-import { InventoryRebateModal } from "@/stocks/InventoryRebateModal";
+import { InventoryRebateModal } from "@/stocks/rebate";
 import { InventoryConsignmentModal } from "@/stocks/operations/consignment";
 import { OrderDetailDeliverySection } from "@/stocks/OrderDetailDeliverySection";
 

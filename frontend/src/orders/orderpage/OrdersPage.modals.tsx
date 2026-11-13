@@ -2,14 +2,14 @@ import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { ordersApi } from "../../shared/api/orders.api";
-import { InventoryRebateModal } from "../../stocks/InventoryRebateModal";
+import { CashflowModal } from "../../finance/cashflow";
+import { InventoryRebateModal } from "../../stocks/rebate";
 import { InventoryProfileModal, InventoryPlatformOffsaleModal } from "../../stocks/operations";
 import { OrderDeliveryModal } from "../OrderDeliveryModal";
 import { OrderDeleteDialog } from "../OrderDeleteDialog";
 import { type OrdersPageController } from "./useOrdersPageController";
 import { SharedCancellationDialog, CancelTransactionModal } from "./OrderCancellationModals";
 import { AllocationModal } from "./OrderAllocationModal";
-import { RefundModal } from "./OrderFinanceModals";
 import { EditOrderModal, CreateBusinessModalWrapper, OrderAccountActionModals } from "./OrderActionModals";
 
 export function OrderModals({ controller }: { controller: OrdersPageController }) {
@@ -19,7 +19,20 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
       <CancelTransactionModal controller={controller} />
       <EditOrderModal controller={controller} />
       <AllocationModal controller={controller} />
-      <RefundModal controller={controller} />
+      <CashflowModal
+        target={controller.cashflowTarget}
+        pools={controller.cashflowPools}
+        users={controller.cashflowUsers}
+        scope="REFUND"
+        showOperator
+        showDetails
+        currentOperator={controller.currentOperator}
+        onClose={() => controller.setCashflowTarget(null)}
+        onCreated={async () => {
+          controller.setCashflowTarget(null);
+          await controller.load();
+        }}
+      />
       <OrderDeleteDialog
         order={controller.orderDeleteTarget}
         submitting={controller.orderDeleteSubmitting}

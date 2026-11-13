@@ -136,6 +136,11 @@ def create_order(
             code=ErrorCode.ORDER_TYPE_DISABLED,
             details={"order_type": order_type},
         )
+    if (form_extra_scope or "").strip().upper() == "CONSIGN":
+        raise Validation(
+            "寄售是原订单上的运营动作，不能通过建单接口新建订单",
+            details={"field": "form_extra_scope", "value": "CONSIGN"},
+        )
     # 账号资料的唯一输入是 account_snapshot；库存账号引用只传 account_id。
     if account_snapshot is not None and definition.code not in {"HS", "TH", "DG"}:
         raise Validation(f"业务类型 {definition.code} 不支持订单账号快照")
@@ -210,7 +215,6 @@ def create_order(
         _validate_existing_account_context(
             definition.code,
             account,
-            allow_consign_listing=(form_extra_scope or "").strip().upper() == "CONSIGN",
         )
 
     _validate_participant_roles(
@@ -297,7 +301,7 @@ def create_order(
         wallet_realname_images = snap.get("wallet_realname_images")
         account_note = snap.get("note")
 
-    # 建单判重：只在新建库存账号时判，引用已有账号（如库存寄售上架）不判。
+    # 建单判重：只在新建库存账号时判，引用已有账号不判。
     if account_id is None and game_account:
         _assert_no_duplicate_inventory_account(
             session,

@@ -823,7 +823,7 @@ class TestCreateOrderValidation:
         with pytest.raises(Validation, match="库存账号业务类型与订单类型不匹配"):
             _order(seeded_db, order_type="HS", account_id=account.id)
 
-    def test_consign_listing_can_link_an_existing_business_account(self, seeded_db):
+    def test_consign_listing_cannot_create_an_order(self, seeded_db):
         account = Account(
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
@@ -835,15 +835,14 @@ class TestCreateOrderValidation:
         seeded_db.add(account)
         seeded_db.flush()
 
-        order = _order(
-            seeded_db,
-            order_type="DG",
-            account_id=account.id,
-            form_extra_scope="CONSIGN",
-            form_extra={"consignment_platform": "盼之", "listed_at": "2026-10-29T03:52"},
-        )
-
-        assert order.account_id == account.id
+        with pytest.raises(Validation, match="寄售是原订单上的运营动作"):
+            _order(
+                seeded_db,
+                order_type="DG",
+                account_id=account.id,
+                form_extra_scope="CONSIGN",
+                form_extra={"consignment_platform": "盼之", "listed_at": "2026-10-29T03:52"},
+            )
 
     def test_scoped_user_cannot_attach_foreign_account(self, seeded_db):
         account = Account(

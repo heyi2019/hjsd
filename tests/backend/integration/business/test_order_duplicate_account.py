@@ -105,7 +105,7 @@ def test_different_game_type_is_not_a_duplicate(seeded_db):
 
 
 def test_referenced_account_creation_skips_duplicate_check(seeded_db):
-    """引用已有库存账号建单（如库存寄售上架）不判重，否则会拦下自己。"""
+    """同类型订单引用已有库存账号时不重复创建库存，也不触发判重。"""
     source = _create(seeded_db, "dup-referenced", order_type="TH")
 
     borrowed = create_order(

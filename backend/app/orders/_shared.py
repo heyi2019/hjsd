@@ -46,12 +46,8 @@ def _audit_value(value: Any) -> Any:
 def _validate_existing_account_context(
     order_type: str,
     account: Account,
-    *,
-    allow_consign_listing: bool = False,
 ) -> None:
-    """普通业务订单必须匹配账号类型；库存寄售上架是已建单账号的独立操作。"""
-    if allow_consign_listing and order_type == "DG":
-        return
+    """新建订单必须与已引用库存账号的业务类型匹配。"""
     expected = {
         "HS": (BusinessMode.SELF.value, InventoryType.RECOVERY.value),
         "TH": (BusinessMode.DISTRIBUTION.value, InventoryType.PICKUP.value),

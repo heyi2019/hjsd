@@ -26,30 +26,37 @@
   min-width: 0;
 }
 
-/* 负责人标签按选择顺序向右延展，不能折成上下两行。 */
+/* 负责人选择器服从所在列宽，多选人员在控件内部处理，不能撑破表单卡片。 */
 .responsible-employee-select .ant-form-item-row {
   align-items: center;
 }
 
 .responsible-employee-select .ant-select-selector {
   min-height: 32px;
-  min-width: 180px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .responsible-employee-select .ant-select,
 .responsible-employee-select .ant-form-item-control-input {
-  width: max-content !important;
-  max-width: none;
+  width: 100% !important;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .responsible-employee-select .ant-select-selection-overflow {
-  flex-wrap: nowrap;
-  min-width: max-content;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .responsible-employee-select .ant-form-item-control {
-  flex: 0 0 auto;
-  overflow: visible;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 @container (max-width: 640px) {

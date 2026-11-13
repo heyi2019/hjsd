@@ -2,7 +2,6 @@ import { Form } from "antd";
 import type { SelectProps } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import type { EmployeeOption } from "../shared/api/types/org";
-import { currentUser } from "../shared/api/client";
 import { useSession } from "../shared/state/session";
 import { Select } from "../shared/ui";
 import { CfgItem } from "./ConfigurableField";
@@ -28,15 +27,10 @@ export function ResponsibleEmployeeSelect(props: { name: string; label: string; 
   // 按人匹配必须用 username（users.username），不能用 role（ADMIN/OPERATOR 这类系统角色）：
   // 拿角色去比 username 在生产环境恒不命中，默认值只能靠 /auth/me 那一路兜。
   const { username } = useSession();
-  const [currentEmployeeId, setCurrentEmployeeId] = useState<number>();
   const defaultEmployeeId = useMemo(
-    () => currentEmployeeId ?? props.employees.find((employee) => employee.username === username)?.id,
-    [currentEmployeeId, props.employees, username],
+    () => props.employees.find((employee) => employee.username === username)?.id,
+    [props.employees, username],
   );
-
-  useEffect(() => {
-    void currentUser().then((current) => setCurrentEmployeeId(current.id)).catch(() => undefined);
-  }, []);
   useEffect(() => {
     if (defaultEmployeeId !== undefined && form.getFieldValue(props.name) == null) {
       form.setFieldValue(props.name, [defaultEmployeeId]);

@@ -1,7 +1,6 @@
 import { appMessage } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form } from "antd";
-import dayjs from "dayjs";
 import { useEffect, useRef, useState } from "react";
 import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection } from "./ConfigurableField";
 import { counterpartiesApi, customersApi } from "../shared/api/customers.api";
@@ -18,9 +17,7 @@ import { BusinessActionModal, BusinessRegistrationForm, ConfirmDialog, ErrorBann
 import { RecoveryAccountSection } from "./recovery/RecoveryAccountSection";
 import { RecoveryCustomerSection } from "./recovery/RecoveryCustomerSection";
 import { RecoveryFeeSection } from "./recovery/RecoveryFeeSection";
-import { useRecoveryFormState } from "./recovery/useRecoveryFormState";
 import { ThOrderSection } from "./th/ThOrderSection";
-import { resizeInstallmentSchedule, serializeInstallmentSchedule } from "./InstallmentScheduleFields";
 import { DgOrderSection } from "./dg/DgOrderSection";
 import {
   buildAccountSnapshot,
@@ -40,14 +37,6 @@ const MODAL_TITLES: Record<string, string> = {
   TH: "新建提号订单",
   DG: "新建代挂订单",
 };
-
-function toDateString(value: unknown) {
-  if (typeof value === "string" && value) return value;
-  if (value && typeof value === "object" && "format" in value && typeof value.format === "function") {
-    return value.format("YYYY-MM-DD");
-  }
-  return today();
-}
 
 export function CreateBusinessModal(props: {
   open: boolean;
@@ -74,7 +63,6 @@ export function CreateBusinessModal(props: {
   const [repurchasePrompt, setRepurchasePrompt] = useState<{ values: Record<string, unknown>; gameAccount: string } | null>(null);
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
   const initialValuesRef = useRef<Record<string, unknown>>({});
-  const { totalRecoveryCost } = useRecoveryFormState(form);
   const formId = "business-order-form";
   // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
   // 不同业务类型通过 orderType 变化自动切换配置（get/post 走已落地的 GET 缓存层）。
@@ -250,7 +238,7 @@ export function CreateBusinessModal(props: {
         <FieldConfigContext.Provider value={config}>
           <SectionLabelsContext.Provider value={labels}>
             {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes} employees={employees} businessResponsibleLabel="回收负责人" showIntermediaryDelivery accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
-              <RecoveryFeeSection totalRecoveryCost={totalRecoveryCost} pools={pools} financeExtras={<CustomFieldSection section="FINANCE" testIdSuffix="finance" />} />
+              <RecoveryFeeSection pools={pools} financeExtras={<CustomFieldSection section="FINANCE" testIdSuffix="finance" />} />
             </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} employees={employees} /> : <DgOrderSection gameTypes={gameTypes} employees={employees} />}
             {isRecovery ? <RecoveryCustomerSection customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
             <CustomFieldSection section="EXTRA" testIdSuffix="extra" />

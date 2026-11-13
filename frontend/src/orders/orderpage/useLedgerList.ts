@@ -71,7 +71,6 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
   // 业务类型、业务模式、责任方和关联关系均来自后端选项词典。
   const orderBusinessOptions: Opt[] = filterRetiredOrderTypeOptions(useOptionSet("ORDER_BUSINESS") ?? []);
   const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];
-  const profitRoleOptions: Opt[] = useOptionSet("PROFIT_ROLE") ?? [];
   const inventoryStatusOptions: Opt[] = [
     { value: "all", label: "全部库存状态" },
     ...(["WAITING", "SOLD", "VOID"] as const).map((value) => ({ value, label: ACCOUNT_STATUS_LABEL[value] })),
@@ -109,10 +108,13 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
 
   const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
   // 先按业务筛选，再按日期，最后一次排序；避免渲染层重复计算同一批订单。
-  const filteredOrders = filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter)
-    .filter((order) => withinTradeDateRange(order, dateRange))
-    .slice()
-    .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id));
+  const filteredOrders = useMemo(
+    () => filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter)
+      .filter((order) => withinTradeDateRange(order, dateRange))
+      .slice()
+      .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id)),
+    [orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter, dateRange, ledgerSortDesc],
+  );
 
   // 类型 Segmented 计数基线：应用除「类型」外的全部筛选（关键词/日期/游戏类型/库存状态/业务模式），
   // 保证各类型计数之和恒等于「订单总量」卡片；否则输入关键词后会出现「全部 627 / 订单总量 12」的自相矛盾。
@@ -155,7 +157,6 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
     setKeyword,
     orderBusinessOptions,
     orderBusinessModeOptions,
-    profitRoleOptions,
     inventoryStatusOptions,
     gameTypeOptions,
     typeNames,

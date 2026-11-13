@@ -33,7 +33,7 @@ export function useOrdersPageController(params: {
     orderTypeFilter, setOrderTypeFilter, businessModeFilter, setBusinessModeFilter,
     gameTypeFilter, setGameTypeFilter, inventoryStatusFilter, setInventoryStatusFilter,
     dateRange, setDateRange, keyword, setKeyword,
-    orderBusinessOptions, orderBusinessModeOptions, profitRoleOptions, inventoryStatusOptions,
+    orderBusinessOptions, orderBusinessModeOptions, inventoryStatusOptions,
     gameTypeOptions, typeNames, filteredOrders, typeCountBase, load,
   } = list;
 
@@ -156,7 +156,6 @@ export function useOrdersPageController(params: {
     orders: orders,
     page: page,
     pageSize: pageSize,
-    profitRoleOptions: profitRoleOptions,
     reversibleEvents: reversibleEvents,
     selectedOrder: selectedOrder,
     setActiveTab: setActiveTab,

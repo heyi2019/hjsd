@@ -15,9 +15,6 @@ export const BUSINESS_CREATE_ITEMS = [
 
 export type AllocationType = "BUY" | "SELL" | "OPERATION" | "COMPANY";
 
-/** 分润录入口径：按人自由分配，或按操作四项（买号/售出/运营/公司）。 */
-export type AllocationMode = "PERSON" | "ACTION";
-
 export const ALLOCATION_TYPE_LABEL: Record<AllocationType, string> = {
   BUY: "买号",
   SELL: "售出",
@@ -174,136 +171,87 @@ export function allocationRateFromAmount(orderProfit: string, amount: string): s
 export function validateAllocations(
   rows: AllocationFormRow[],
   orderProfit: string,
-  mode: AllocationMode = "PERSON",
 ): AllocationValidation {
-  const items: AllocationItem[] = [];
-  let rateTotal = 0;
-  let amountTotal = 0;
-
-  if (mode === "ACTION") {
-    const order: AllocationType[] = ["BUY", "SELL", "OPERATION", "COMPANY"];
-    const groups = new Map<AllocationType, AllocationFormRow[]>();
-    for (const row of rows) {
-      const kind = (row.allocation_type ?? "") as AllocationType;
-      if (!order.includes(kind)) {
-        return { ok: false, error: "按操作分配只允许买号、售出、运营、公司四项" };
-      }
-      groups.set(kind, [...(groups.get(kind) ?? []), row]);
+  const order: AllocationType[] = ["BUY", "SELL", "OPERATION", "COMPANY"];
+  const groups = new Map<AllocationType, AllocationFormRow[]>();
+  for (const row of rows) {
+    const kind = (row.allocation_type ?? "") as AllocationType;
+    if (!order.includes(kind)) {
+      return { ok: false, error: "分润配置只允许买号、售出、运营、公司四项" };
     }
-    if (order.some((kind) => !(groups.get(kind)?.length))) {
-      return { ok: false, error: "按操作分配必须包含买号、售出、运营、公司四项" };
-    }
-    if (order.some((kind) => (groups.get(kind)?.length ?? 0) !== 1)) {
-      return { ok: false, error: "按操作分配每项只能有一行" };
-    }
-
-    type Expanded = { kind: AllocationType; employee?: number | "COMPANY"; role?: string; rate: number; amount: number; hasRate: boolean; hasAmount: boolean };
-    const expanded: Expanded[] = [];
-    for (const kind of order) {
-      const row = groups.get(kind)?.[0] as AllocationFormRow;
-      const rateText = String(row.allocation_rate ?? "").trim();
-      const amountText = String(row.allocation_amount ?? "").trim();
-      const rate = rateText === "" ? 0 : Number(rateText);
-      const amount = amountText === "" ? 0 : Number(amountText);
-      const hasRate = rateText !== "" && Number.isFinite(rate);
-      const hasAmount = amountText !== "" && Number.isFinite(amount);
-      if (!hasRate && !hasAmount) {
-        return { ok: false, error: `${ALLOCATION_TYPE_LABEL[kind]} 请填写比例或金额` };
-      }
-      if (hasRate && rate < 0) {
-        return { ok: false, error: `${ALLOCATION_TYPE_LABEL[kind]} 比例不能为负数` };
-      }
-      const employees = kind === "COMPANY"
-        ? ["COMPANY" as const]
-        : (row.employee_ids?.length ? row.employee_ids : [undefined]);
-      const rates = hasRate ? splitEven(rate, employees.length) : [];
-      const amounts = hasAmount ? splitEven(amount, employees.length) : [];
-      employees.forEach((employee, index) => {
-        expanded.push({
-          kind,
-          employee,
-          role: row.role || ALLOCATION_TYPE_ROLE[kind],
-          rate: rates[index] ?? 0,
-          amount: amounts[index] ?? 0,
-          hasRate,
-          hasAmount,
-        });
-      });
-    }
-
-    // 一行可以同时填比例和金额（提交时按全局口径只取一个），
-    // 但不能「有的行只填比例、有的行只填金额」——那样合计口径自相矛盾。
-    const onlyRate = expanded.some((row) => row.hasRate && !row.hasAmount);
-    const onlyAmount = expanded.some((row) => row.hasAmount && !row.hasRate);
-    if (onlyRate && onlyAmount) {
-      return { ok: false, error: "同一单的四项要么都按比例、要么都按金额，不能混填" };
-    }
-    const rateTotal = expanded.reduce((sum, row) => sum + row.rate, 0);
-    const amountTotal = expanded.reduce((sum, row) => sum + row.amount, 0);
-    const useRate = Math.abs(rateTotal - 100) <= 0.001 || amountTotal === 0;
-    if (useRate) {
-      if (Math.abs(rateTotal - 100) > 0.001) {
-        return { ok: false, error: `四项比例合计必须为 100%，当前 ${Number(rateTotal.toFixed(2))}%` };
-      }
-    } else {
-      const profit = Number(orderProfit);
-      if (profit > 0 && amountTotal < 0) return { ok: false, error: "该单为盈利单，分润金额不能为负数" };
-      if (profit < 0 && amountTotal > 0) return { ok: false, error: "该单为亏损单，分润金额必须填负数（亏损分担额）" };
-      if (profit === 0) return { ok: false, error: "该单利润为 0，按金额分润只能填 0，请改用比例" };
-      if (Math.abs(amountTotal) > Math.abs(profit)) {
-        return { ok: false, error: `分润金额合计不能超过订单总利润 ${money(orderProfit)}` };
-      }
-    }
-    const items: AllocationItem[] = expanded.map((row) => ({
-      user_id: row.kind === "COMPANY" || row.employee == null || row.employee === "COMPANY" ? null : Number(row.employee),
-      role: row.role || ALLOCATION_TYPE_ROLE[row.kind],
-      allocation_type: row.kind,
-      allocation_rate: useRate ? String(row.rate) : "0",
-      allocation_amount: useRate ? "0" : String(row.amount),
-    }));
-    return { ok: true, items };
+    groups.set(kind, [...(groups.get(kind) ?? []), row]);
+  }
+  if (order.some((kind) => !(groups.get(kind)?.length))) {
+    return { ok: false, error: "分润配置必须包含买号、售出、运营、公司四项" };
+  }
+  if (order.some((kind) => (groups.get(kind)?.length ?? 0) !== 1)) {
+    return { ok: false, error: "分润配置每项只能有一行" };
   }
 
-  for (const row of rows) {
-    const rate = String(row.allocation_rate ?? "").trim();
-    const amount = String(row.allocation_amount ?? "").trim();
-    const hasRate = Number(rate) > 0;
-    // 亏损单的金额是负数（-300 = 分担 300 亏损），故不能用 `> 0` 判定「填了金额」。
-    const hasAmount = amount !== "" && Number(amount) !== 0;
-    if (!hasRate && !hasAmount) return { ok: false, error: "每行至少填比例或金额之一" };
-    if (hasRate && hasAmount && Number.isFinite(Number(rate)) && Number.isFinite(Number(amount)) && Number(orderProfit) !== 0) {
-      const expectedAmount = Number(orderProfit) * Number(rate) / 100;
-      if (Math.abs(expectedAmount - Number(amount)) > 0.01) return { ok: false, error: "比例和金额换算不一致" };
+  type Expanded = { kind: AllocationType; employee?: number | "COMPANY"; role?: string; rate: number; amount: number; hasRate: boolean; hasAmount: boolean };
+  const expanded: Expanded[] = [];
+  for (const kind of order) {
+    const row = groups.get(kind)?.[0] as AllocationFormRow;
+    const rateText = String(row.allocation_rate ?? "").trim();
+    const amountText = String(row.allocation_amount ?? "").trim();
+    const rate = rateText === "" ? 0 : Number(rateText);
+    const amount = amountText === "" ? 0 : Number(amountText);
+    const hasRate = rateText !== "" && Number.isFinite(rate);
+    const hasAmount = amountText !== "" && Number.isFinite(amount);
+    if (!hasRate && !hasAmount) {
+      return { ok: false, error: `${ALLOCATION_TYPE_LABEL[kind]} 请填写比例或金额` };
     }
-    if (hasRate) rateTotal += Number(rate);
-    if (hasAmount) amountTotal += Number(amount);
-    items.push({
-      user_id: row.employee === "COMPANY" ? null : Number(row.employee),
-      role: row.role || "OWNER",
-      allocation_rate: "0",
-      allocation_amount: "0",
+    if (hasRate && rate < 0) {
+      return { ok: false, error: `${ALLOCATION_TYPE_LABEL[kind]} 比例不能为负数` };
+    }
+    const employees = kind === "COMPANY"
+      ? ["COMPANY" as const]
+      : (row.employee_ids?.length ? row.employee_ids : [undefined]);
+    const rates = hasRate ? splitEven(rate, employees.length) : [];
+    const amounts = hasAmount ? splitEven(amount, employees.length) : [];
+    employees.forEach((employee, index) => {
+      expanded.push({
+        kind,
+        employee,
+        role: row.role || ALLOCATION_TYPE_ROLE[kind],
+        rate: rates[index] ?? 0,
+        amount: amounts[index] ?? 0,
+        hasRate,
+        hasAmount,
+      });
     });
   }
-  const useRate = Math.abs(rateTotal - 100) <= 0.001 || amountTotal === 0;
-  if (useRate && amountTotal === 0 && Math.abs(rateTotal - 100) > 0.001) {
-    return { ok: false, error: "按比例分润时合计必须为 100%（也可改用金额）" };
+
+  // 一行可以同时填比例和金额（提交时按全局口径只取一个），
+  // 但不能「有的行只填比例、有的行只填金额」——那样合计口径自相矛盾。
+  const onlyRate = expanded.some((row) => row.hasRate && !row.hasAmount);
+  const onlyAmount = expanded.some((row) => row.hasAmount && !row.hasRate);
+  if (onlyRate && onlyAmount) {
+    return { ok: false, error: "同一单的四项要么都按比例、要么都按金额，不能混填" };
   }
-  if (!useRate && amountTotal !== 0) {
+  const rateTotal = expanded.reduce((sum, row) => sum + row.rate, 0);
+  const amountTotal = expanded.reduce((sum, row) => sum + row.amount, 0);
+  const useRate = Math.abs(rateTotal - 100) <= 0.001 || amountTotal === 0;
+  if (useRate) {
+    if (Math.abs(rateTotal - 100) > 0.001) {
+      return { ok: false, error: `四项比例合计必须为 100%，当前 ${Number(rateTotal.toFixed(2))}%` };
+    }
+  } else {
     const profit = Number(orderProfit);
     if (profit > 0 && amountTotal < 0) return { ok: false, error: "该单为盈利单，分润金额不能为负数" };
     if (profit < 0 && amountTotal > 0) return { ok: false, error: "该单为亏损单，分润金额必须填负数（亏损分担额）" };
     if (profit === 0) return { ok: false, error: "该单利润为 0，按金额分润只能填 0，请改用比例" };
-    // 亏损单按绝对值比较：profit=-1000 时下限即 -1000（不得超额分担亏损）。
     if (Math.abs(amountTotal) > Math.abs(profit)) {
       return { ok: false, error: `分润金额合计不能超过订单总利润 ${money(orderProfit)}` };
     }
   }
-  items.forEach((item, index) => {
-    const row = rows[index];
-    item.allocation_rate = useRate ? String(row.allocation_rate ?? "0") : "0";
-    item.allocation_amount = useRate ? "0" : String(row.allocation_amount ?? "0");
-  });
-  return { ok: true, items };
+  return { ok: true, items: expanded.map((row) => ({
+    user_id: row.kind === "COMPANY" || row.employee == null || row.employee === "COMPANY" ? null : Number(row.employee),
+    role: row.role || ALLOCATION_TYPE_ROLE[row.kind],
+    allocation_type: row.kind,
+    allocation_rate: useRate ? String(row.rate) : "0",
+    allocation_amount: useRate ? "0" : String(row.amount),
+  })) };
 }
 
 export type CancelFormScope = "ORDERCANC" | "INVREFUND";

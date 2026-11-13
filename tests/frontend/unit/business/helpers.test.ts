@@ -53,13 +53,6 @@ describe("OrdersPage helpers", () => {
     expect(formatOrderAmount(order({ event_total: "1000.00", sale_amount: null }))).toBe("-");
   });
 
-  it("校验比例分润并归一化公司归属", () => {
-    expect(validateAllocations([{ employee: "COMPANY", allocation_rate: "100" }], "5000.00")).toEqual({
-      ok: true,
-      items: [{ user_id: null, role: "OWNER", allocation_rate: "100", allocation_amount: "0" }],
-    });
-  });
-
   it("按操作分润把同一动作的份额按人数均分（3 人 100% → 33.33/33.33/33.34）", () => {
     // 每个动作只有一行，买号人员多选后填写动作合计；保存时拆成人均份额。
     const result = validateAllocations([
@@ -67,7 +60,7 @@ describe("OrdersPage helpers", () => {
       { allocation_type: "SELL", role: "SALES", allocation_rate: "0" },
       { allocation_type: "OPERATION", employee: 4, role: "SERVICE", allocation_rate: "0" },
       { allocation_type: "COMPANY", employee: "COMPANY", role: "OWNER", allocation_rate: "0" },
-    ], "5000.00", "ACTION");
+    ], "5000.00");
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -85,7 +78,7 @@ describe("OrdersPage helpers", () => {
       { allocation_type: "SELL", allocation_rate: "10", allocation_amount: "100" },
       { allocation_type: "OPERATION", allocation_rate: "10", allocation_amount: "100" },
       { allocation_type: "COMPANY", employee: "COMPANY", allocation_rate: "50", allocation_amount: "500" },
-    ], "1000.00", "ACTION")).toEqual({
+    ], "1000.00")).toEqual({
       ok: true,
       items: [
         { user_id: 1, role: "BUYER", allocation_type: "BUY", allocation_rate: "0", allocation_amount: "200" },
@@ -122,7 +115,7 @@ describe("OrdersPage helpers", () => {
       { allocation_type: "COMPANY", user_id: null, role: "OWNER", allocation_rate: "", allocation_amount: "0" },
     ], { BUY: [1, 2, 3], SELL: [4], OPERATION: [5], COMPANY: [] });
 
-    const result = validateAllocations(rows, "30.00", "ACTION");
+    const result = validateAllocations(rows, "30.00");
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const buyRows = result.items.filter((item) => item.allocation_type === "BUY");

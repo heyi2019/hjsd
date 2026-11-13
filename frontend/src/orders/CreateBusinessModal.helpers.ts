@@ -57,7 +57,7 @@ export function buildOrderNote(
   }
   if (kind.isTh) {
     return [
-      values.th_account_note as string,
+      values.game_account_note as string,
       values.supplier_note as string,
     ].filter(Boolean).join("｜") || undefined;
   }

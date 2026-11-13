@@ -10,7 +10,7 @@ import type { Account } from "../../shared/api/types/accounts";
 import type { Pool } from "../../shared/api/types/finance";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import type { Order } from "../../shared/api/types/orders";
-import { currentUser, normalizeError } from "../../shared/api/client";
+import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { consignmentRecords, type ActiveConsignment, unlistAndCancelConsignmentOrders } from "../../stocks/operations";
@@ -21,7 +21,6 @@ import {
   buildOrderPatchPayload,
   type ActionAllocationCandidates,
   type AllocationFormRow,
-  type AllocationMode,
 } from "./helpers";
 
 /** 由主 controller 注入的跨域共享枢纽；子 hook 不自行持有这些状态。 */
@@ -57,12 +56,8 @@ export function useOrderActionModals({
   const [orderOffsaleTarget, setOrderOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
   /** 订单总利润（后端 order_amounts 口径），负数即亏损单；分润弹窗顶部展示并作为金额分润上限。 */
   const [allocationProfit, setAllocationProfit] = useState<string>("0");
-  /** 分润口径：按操作四项（买号/售出/运营/公司）或按人自由分配。默认按操作。 */
-  const [allocationMode, setAllocationMode] = useState<AllocationMode>("ACTION");
   /** 按操作分配时的动作执行人候选，来自建单/售出负责人和运营信息中的操作人。 */
   const [allocationCandidates, setAllocationCandidates] = useState<ActionAllocationCandidates>({ BUY: [], SELL: [], OPERATION: [], COMPANY: [] });
-  /** 当前登录人在员工花名册中的 ID：分润各行姓名默认取他，而不是默认某个角色。 */
-  const [currentEmployeeId, setCurrentEmployeeId] = useState<number | undefined>(undefined);
   const [actionOrder, setActionOrder] = useState<Order | null>(null);
   const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
   // 员工花名册 = 在职用户；另加「公司归属」用来表达留给公司、不绑定人的那部分。
@@ -88,37 +83,11 @@ export function useOrderActionModals({
         employeesApi.list(),
       ]);
       const candidates = buildActionAllocationCandidates(order);
-      // 分润的「姓名」只能落在用户（users 表）上，选项取自 /users/options。
-      // 不能用 session.role（ADMIN/OPERATOR 这类系统角色）。
-      let currentId: number | undefined;
-      try {
-        const current = await currentUser();
-        currentId = userResult.find(
-          (item) => item.is_active && (item.id === current.id || item.username === current.username),
-        )?.id;
-      } catch {
-        // 会话解析失败不阻断分润：姓名留空，由必填规则提示，绝不猜人。
-      }
-      setCurrentEmployeeId(currentId);
-      const typed = result.items.filter((item) => item.allocation_type);
-      const mode: AllocationMode = typed.length > 0 || result.items.length === 0 ? "ACTION" : "PERSON";
       setActionOrder(order);
       setUsers(userResult.filter((item) => item.is_active));
       setAllocationCandidates(candidates);
-      setAllocationMode(mode);
       setAllocationProfit(result.order_profit ?? "0");
-      // 分润两种录入口径：按操作四项（买号/售出/运营/公司）或按人头自由分配。
-      // 存量行带 allocation_type 说明是按操作口径，原样回显；否则按人。
-      // 角色必须原样带回表单：不回填就会在保存时被默认值 OWNER 覆盖掉。
-      const rows: AllocationFormRow[] =
-        mode === "ACTION"
-          ? buildActionAllocationRows(result.items, candidates)
-          : result.items.map((item) => ({
-              employee: (item.user_id ?? "COMPANY") as number | "COMPANY",
-              role: item.role || "OWNER",
-              allocation_rate: item.allocation_rate,
-              allocation_amount: item.allocation_amount ?? "",
-            }));
+      const rows: AllocationFormRow[] = buildActionAllocationRows(result.items, candidates);
       // 弹窗是复用的：先清空上次打开残留的字段（含 form_extra 自定义字段），再回填本单数据。
       allocationForm.resetFields();
       allocationForm.setFieldsValue({
@@ -315,14 +284,12 @@ export function useOrderActionModals({
     allocationCandidates,
     allocationForm,
     allocationIsLoss,
-    allocationMode,
     allocationOpen,
     allocationProfit,
     allocationSubmitting,
     setAllocationOpen,
     setAllocationProfit,
     setAllocationSubmitting,
-    currentEmployeeId,
     cashflowPools,
     cashflowTarget,
     cashflowUsers,

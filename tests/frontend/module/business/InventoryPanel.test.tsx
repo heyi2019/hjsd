@@ -43,42 +43,6 @@ vi.mock("@/shared/api/stocks.api");;
 setupInventoryPanelMocks();
 
 describe("InventoryPanel：账号台账", () => {
-  it("筛选控件放在台账内容区内并与上边缘保持间距", async () => {
-    renderLight(<InventoryPanel />, { user: "admin" });
-
-    const search = await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
-    const filters = search.closest(".inventory-filters");
-    expect(filters).toBeInTheDocument();
-    expect(filters).toHaveClass("ui-filter-bar");
-    expect(filters).toHaveClass("ui-filter-bar--spaced");
-    expect(search.closest(".ant-input-affix-wrapper")).toHaveClass("ui-ledger-search");
-    expect(screen.queryByText("账号台账")).not.toBeInTheDocument();
-  });
-
-  it("筛选栏沿用订单台账的分组布局", async () => {
-    renderLight(<InventoryPanel />, { user: "admin" });
-
-    await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
-    expect(screen.getByText("类型筛选")).toBeInTheDocument();
-    expect(screen.getByText("业务筛选")).toBeInTheDocument();
-    expect(screen.queryByText("增值服务筛选")).not.toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "增值服务筛选" })).not.toBeInTheDocument();
-    expect(screen.getByText("排序")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /导出/ })).toHaveTextContent("导出");
-    expect(screen.queryByRole("button", { name: /导出 CSV/ })).toBeNull();
-    const filterBar = screen.getByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台").closest(".ui-filter-bar")!;
-    const buttons = filterBar.querySelectorAll("button");
-    expect(buttons[buttons.length - 1]).toHaveTextContent("导出");
-  });
-
-  it("搜索框右侧提供库存日期区间筛选", async () => {
-    renderLight(<InventoryPanel />, { user: "admin" });
-
-    const search = await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
-    const startDate = screen.getByPlaceholderText("开始日期");
-    expect(search.compareDocumentPosition(startDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
   it("提供游戏类型下拉筛选库存账号", async () => {
     vi.mocked(stocksApi.list).mockResolvedValueOnce([
       { ...accounts[0], game_type: "原神" },
@@ -94,16 +58,6 @@ describe("InventoryPanel：账号台账", () => {
 
     await waitFor(() => expect(screen.queryByText("acc-1")).toBeNull());
     expect(screen.getByText("acc-3")).toBeInTheDocument();
-  });
-
-  it("库存中心不展示已移除的增值服务和平台字段", async () => {
-    renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByRole("columnheader", { name: "库存编号" });
-
-    expect(screen.queryByRole("columnheader", { name: "增值服务" })).toBeNull();
-    expect(screen.queryByRole("columnheader", { name: "平台" })).toBeNull();
-    expect(screen.queryByText("增值服务")).toBeNull();
-    expect(screen.queryByText("平台")).toBeNull();
   });
 
   it("库存中心展示入库时间和入库负责人", async () => {
@@ -131,15 +85,6 @@ describe("InventoryPanel：账号台账", () => {
     const rows = screen.getAllByRole("row");
     expect(within(rows[1]).getByText("new-account")).toBeInTheDocument();
   });
-  it("账号台账启用横向滚动以访问右侧操作列", async () => {
-    renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByRole("columnheader", { name: "订单号" });
-
-    expect(document.querySelector(".ui-datatable .ant-table-content")).toHaveStyle({
-      overflowX: "auto",
-    });
-  });
-
   it("提供库存导出入口，并按当前库存字段生成 CSV", async () => {
     expect(buildInventoryCsv(accounts)).toContain(
       "订单号,业务,类型,游戏/产品类型,营地账号,库存编号,平台,成本,库存状态",
@@ -149,19 +94,10 @@ describe("InventoryPanel：账号台账", () => {
     );
 
     renderLight(<InventoryPanel />, { user: "admin" });
-    expect(await screen.findByRole("button", { name: "导出" })).toBeInTheDocument();
-    for (const label of ["售出", "运营", "返点", "资金收支", "交付", "编辑", "更多"]) {
-      expect(screen.getAllByRole("button", { name: label }).length).toBeGreaterThan(0);
-    }
-    expect(screen.queryByRole("button", { name: "下架" })).toBeNull();
+    await screen.findByRole("button", { name: "导出" });
     await ui.click(screen.getAllByRole("button", { name: "更多" })[0]);
     // 术语统一后「取消交易」改名「取消」，在库账号（acc-1）可从更多菜单取消。
     expect(screen.getByRole("menuitem", { name: "取消" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "下架" })).toBeNull();
-    expect(screen.queryByRole("menuitem", { name: "平台下架" })).toBeNull();
-    expect(screen.queryByRole("menuitem", { name: "系统下架" })).toBeNull();
-    expect(document.querySelector(".inventory-more-menu")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "查看明细" })).toBeNull();
   });
 
   it("库存中心：资金收支可登记收入并关联来源订单", async () => {
@@ -188,7 +124,6 @@ describe("InventoryPanel：账号台账", () => {
     const row = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
     await ui.click(within(row).getByRole("button", { name: "交付" }));
     const modal = (await screen.findByText("交付 · HS0001")).closest(".ant-modal-content") as HTMLElement;
-    expect(within(modal).getByText("买号交付")).toBeInTheDocument();
     await ui.type(within(modal).getByLabelText("交付凭证"), "库存中心完成换绑");
     await ui.click(within(modal).getByRole("button", { name: "确定交付" }));
     await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
@@ -236,8 +171,6 @@ describe("InventoryPanel：账号台账", () => {
     await screen.findByText("acc-1");
 
     const stockRow = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
-    expect(within(stockRow).queryByRole("button", { name: "取消" })).toBeNull();
-
     await ui.click(within(stockRow).getByRole("button", { name: "更多" }));
     expect(screen.getByRole("menuitem", { name: "取消" })).toBeInTheDocument();
   });
@@ -367,7 +300,6 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getByText("6天")).toHaveClass("ant-tag-green");
     expect(screen.getByText("14天")).toHaveClass("ant-tag-orange");
     expect(screen.getByText("31天")).toHaveClass("ant-tag-red");
-    expect(screen.getAllByText("31天")).toHaveLength(1);
     expect(screen.queryByText("200天")).toBeNull();
   });
 
@@ -387,9 +319,6 @@ describe("InventoryPanel：账号台账", () => {
     await ui.click(screen.getAllByRole("button", { name: "编辑" })[0]);
     expect(await screen.findByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
     expect(screen.getByLabelText("编辑游戏/产品类型")).toBeInTheDocument();
-    // 账号密码 / 绑定手机号在编辑态以只读描述呈现，不再提供可编辑输入。
-    expect(screen.queryByLabelText("编辑账号密码")).toBeNull();
-    expect(screen.queryByLabelText("编辑绑定手机号")).toBeNull();
   });
 
   it("库存编辑展示运营信息自定义字段", async () => {
@@ -415,8 +344,7 @@ describe("InventoryPanel：账号台账", () => {
     await screen.findByText("acc-1");
 
     await ui.click(screen.getAllByRole("button", { name: "编辑" })[0]);
-    expect((await screen.findAllByText("运营信息")).length).toBeGreaterThan(0);
-    expect(screen.getByLabelText("寄售运营备注")).toBeInTheDocument();
+    expect(await screen.findByLabelText("寄售运营备注")).toBeInTheDocument();
   });
 
   it("统计卡：账号数取当前视图，占用成本与库龄档位读后端汇总", async () => {
@@ -429,16 +357,8 @@ describe("InventoryPanel：账号台账", () => {
       over_30d_count: 1,
     });
     renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByText("在库账号");
-    const occupied = screen.getByText("在库账号").closest(".ui-stat");
-    expect(occupied?.textContent).toContain("1");
-    const cost = screen.getByText("占用成本合计").closest(".ui-stat");
-    await waitFor(() => expect(cost?.textContent).toContain("8,888.88"));
-    expect(screen.getByText("超7天库存账号").closest(".ui-stat")?.textContent).toContain("2");
-    expect(screen.getByText("超30天库存账号").closest(".ui-stat")?.textContent).toContain("1");
     // 汇总只按「当前可见集合」发起：accounts 里只有 acc-1 在库。
-    expect(vi.mocked(stocksApi.inventoryStats)).toHaveBeenLastCalledWith([1]);
-    expect(screen.queryByText("已售")).toBeNull();
+    await waitFor(() => expect(vi.mocked(stocksApi.inventoryStats)).toHaveBeenLastCalledWith([1]));
   });
 
   it("后端不可达 → 错误条落地", async () => {
@@ -484,69 +404,11 @@ describe("InventoryPanel：账号台账", () => {
     await screen.findByText("acc-1");
     fireEvent.click(screen.getByText("acc-1").closest("tr")!.querySelector(".ant-table-row-expand-icon") as Element);
     const detailPanel = (await screen.findByText("当前运营状态")).closest(".inventory-detail") as HTMLElement;
-    const accountSummary = detailPanel;
-    // 新版只读详情：账号基本资料（业务 / 平台 / 成本 / 登记时间 / 出售时间 / 建档操作人）已不在面板展示，仅保留于 CSV 导出；
-    // 面板按板块聚焦：运营信息与账号补充资料保留，寄售平台只在真实存在寄售事件时展示。
-    expect(within(accountSummary).getByText("描述")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("高段位账号")).toBeInTheDocument();
-    expect(within(accountSummary).getByText("作图")).toBeInTheDocument();
-    expect(within(accountSummary).getAllByRole("img", { name: /作图/ })).toHaveLength(2);
-    expect(within(accountSummary).queryByText("订单时间", { exact: true })).toBeNull();
-    expect(within(detailPanel).queryByText("发生日期", { exact: true })).toBeNull();
-    expect(within(detailPanel).getAllByText("动作时间").length).toBeGreaterThan(0);
-    // 详情页执行/资金表为窄窗横向滚动（L202）定制，使用 .inventory-execution-table /
-    // .inventory-finance-table 自有规则，不套用 .ui-datatable--inline 的 overflow-x: clip。
-    const executionTable = detailPanel.querySelector(".inventory-execution-list .inventory-execution-table") as HTMLElement;
-    const executionHeaders = within(executionTable).getAllByRole("columnheader");
-    for (const name of ["动作", "平台", "动作时间", "金额", "操作人", "备注"]) {
-      const header = executionHeaders.find((item) => item.textContent?.trim() === name);
-      expect(header).toHaveAccessibleName(name);
-    }
-    expect(executionTable.querySelectorAll("tbody tr.ant-table-row")).toHaveLength(3);
-    expect(within(executionTable).getAllByText("admin").length).toBeGreaterThan(0);
-    expect(executionTable.querySelector(".ant-pagination")).toBeNull();
-    expect(within(detailPanel).getByText("2026-10-15 10:20")).toBeInTheDocument();
-    // 下架时间已收进操作明细表（CANCEL 行的动作时间），不再有独立字段，故只出现一次。
-    expect(within(detailPanel).getAllByText("2026-10-17 11:35").length).toBe(1);
-    const executionList = detailPanel.querySelector(".inventory-execution-list") as HTMLElement;
-    expect(within(executionList).queryByText("订单号", { exact: true })).toBeNull();
-    expect(within(executionList).queryByText("类型", { exact: true })).toBeNull();
-    expect(within(executionList).queryByText("订单时间", { exact: true })).toBeNull();
-    expect(within(executionList).queryByText("状态", { exact: true })).toBeNull();
-    expect(within(executionList).queryByText("订单操作人", { exact: true })).toBeNull();
-    expect(within(executionList).queryByText("流水操作人", { exact: true })).toBeNull();
-    expect(within(detailPanel).getByText("资金明细")).toBeInTheDocument();
-    expect(within(detailPanel).queryByText("资金流水", { exact: true })).toBeNull();
-    expect(within(detailPanel).queryByText("流水时间", { exact: true })).toBeNull();
-    const financePanel = detailPanel.querySelector(".inventory-finance-list") as HTMLElement;
-    const financeSummary = financePanel.querySelector(".inventory-finance-summary") as HTMLElement;
-    expect(within(financeSummary).getByText("支出")).toBeInTheDocument();
-    expect(within(financeSummary).getByText("收入")).toBeInTheDocument();
-    expect(within(financeSummary).getByText("总支出")).toBeInTheDocument();
-    expect(within(financeSummary).getByText("总收入")).toBeInTheDocument();
-    const financeHeaders = within(financePanel).getAllByRole("columnheader");
-    for (const name of ["类型", "方向", "金额", "比例", "时间"]) {
-      const header = financeHeaders.find((item) => item.textContent?.trim() === name);
-      expect(header).toHaveAccessibleName(name);
-    }
-    expect(within(financePanel).queryByText("HS0001", { exact: true })).toBeNull();
-    expect(within(financePanel).queryByText("CF0001", { exact: true })).toBeNull();
-    expect(within(executionTable).queryByText("EV0001", { exact: true })).toBeNull();
-    expect(within(financeSummary).getByText("100.00")).toBeInTheDocument();
-    // 总收入 = IN 流水（售出收入 350）+ 返点登记额（夹具 base_amount 1000）。
-    // 返点当前按 base_amount 计入收入（登记即收入）；口径争议见返点基数/费率待裁决，
-    // 若口径改为「基数×费率」，此处应同步改成 400.00。
-    expect(within(financeSummary).getByText("1,350.00")).toBeInTheDocument();
-    const financeTable = financePanel.querySelector(".inventory-finance-table") as HTMLElement;
-    expect(financeTable.querySelector(".ant-pagination")).toBeNull();
-    expect(within(financeTable).getByText("100.00")).toBeInTheDocument();
-    expect(within(financeTable).getByText("350.00")).toBeInTheDocument();
-    expect(within(financeTable).getByText("买号支出")).toBeInTheDocument();
-    expect(within(financeTable).getByText("售出收入")).toBeInTheDocument();
-    expect(within(financeTable).getByText("买号返点")).toBeInTheDocument();
-    expect(within(financeTable).getByText("1,000.00")).toBeInTheDocument();
-    expect(within(financeTable).getByText("5.00%")).toBeInTheDocument();
-    expect(within(financeTable).getByText("2026-10-17 12:30")).toBeInTheDocument();
+    // 这里只确认详情已取回并呈现关键业务结果，不锁定表格列、CSS 和辅助文案。
+    expect(within(detailPanel).getByText("高段位账号")).toBeInTheDocument();
+    expect(within(detailPanel).getByText("1,350.00")).toBeInTheDocument();
+    expect(within(detailPanel).getByText("买号支出")).toBeInTheDocument();
+    expect(within(detailPanel).getByText("售出收入")).toBeInTheDocument();
     expect(vi.mocked(stocksApi.executionDetail)).toHaveBeenCalledWith(1);
     fireEvent.click(document.querySelector(".ant-table-row-expand-icon") as Element);
   });

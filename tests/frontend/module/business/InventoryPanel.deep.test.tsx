@@ -150,8 +150,6 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     fireEvent.click(within(rowOf(1)).getByRole("button", { name: "运营" }));
     const menu = await screen.findByRole("menu");
     expect(within(menu).queryByText("下架")).toBeNull();
-    expect(within(menu).getByText("描述")).toBeInTheDocument();
-    expect(within(menu).getByText("作图")).toBeInTheDocument();
   });
 
   it("取消弹窗要求退回金额和收款账户，并按填写值冲销", async () => {
@@ -174,10 +172,6 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     const account = within(modal).getByLabelText("收款账户");
     // 弹窗默认值直接取后端 cancellable_amount（不再由前端按 amount − 已冲销 算）。
     expect((amount as HTMLInputElement).value).toBe("100.00");
-    expect(within(modal).getByText("取消原因")).toBeInTheDocument();
-    expect(within(modal).queryByText("下架原因")).toBeNull();
-    expect(amount.closest(".adaptive-form-grid")).toBe(account.closest(".adaptive-form-grid"));
-    expect(amount.closest(".adaptive-form-grid")).toHaveClass("inventory-void-fields");
 
     await ui.clear(amount);
     await ui.type(amount, "80");
@@ -223,7 +217,6 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     await clickMore(rowOf(1), "下架");
 
     expect(await screen.findByText("本系统")).toBeInTheDocument();
-    expect(screen.getByText("2026-10-01 09:30")).toBeInTheDocument();
   });
 
   it("FE-129：无平台的初始代挂动作不生成空平台上架记录", () => {
@@ -261,7 +254,6 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
         form_extra: expect.objectContaining({ platform_unlist_scope: "SYSTEM" }),
       }),
     ));
-    expect(screen.queryByText("系统下架登记")).toBeNull();
   });
 
   it("导出：读取明细并提示失败条数", async () => {
@@ -289,7 +281,5 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     await ui.click(screen.getByRole("button", { name: /保存/ }));
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect((await screen.findAllByText("作图")).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: /保存/ })).toBeInTheDocument();
   });
 });

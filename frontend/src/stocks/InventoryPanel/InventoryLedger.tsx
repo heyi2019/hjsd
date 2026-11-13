@@ -13,7 +13,9 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     dateRange,
     executionDetails,
     executionLoading,
-    expandedAccountIds,
+    orderExecutionDetails,
+    orderExecutionLoading,
+    expandedOrderIds,
     gameTypeFilter,
     gameTypeOptions,
     handleExpand,
@@ -105,7 +107,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
         <PermissionButton permission="report.read" aria-label="导出" size="small" loading={exporting} onClick={() => void handleExport()}>导出</PermissionButton>
       </Space>
       <DataTable
-        key={`account-ledger-${expandedAccountIds.join("|")}`}
+        key={`order-ledger-${expandedOrderIds.join("|")}`}
         className="inventory-table"
         columns={arrangeColumns(columns)}
         rows={orderedRows}
@@ -114,14 +116,16 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
         total={controller.visibleRows.length}
         controlledPaging
         expandable={{
-          expandedRowKeys: expandedAccountIds,
+          expandedRowKeys: expandedOrderIds,
           expandedRowRender: (row) => (
             <OrderDetail
-              row={row}
-              detail={executionDetails[row.id]}
-              loading={Boolean(executionLoading[row.id])}
+              row={row.account}
+              detail={orderExecutionDetails[row.id]}
+              contextOrderId={row.id}
+              contextOrderNo={row.order_no}
+              loading={Boolean(orderExecutionLoading[row.id])}
               onPartyClick={openPartyCard}
-              editing={inlineEditId === row.id ? editingAccount : undefined}
+              editing={inlineEditId === row.account.id ? editingAccount : undefined}
               onEdit={controller.setEditingAccount}
               eventDrafts={eventDrafts}
               onEventEdit={updateEventDraft}

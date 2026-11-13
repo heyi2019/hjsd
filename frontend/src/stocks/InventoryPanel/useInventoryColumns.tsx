@@ -7,6 +7,7 @@ import { MoneyText, PermissionButton, StatusTag } from "../../shared/ui";
 import { BUSINESS_MODE_LABEL, INVENTORY_AGE_COLOR, INVENTORY_TYPE_LABEL, isEditableAccountType } from "../inventory-logic";
 import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
 import { inventoryCellValue, operationMenuItems, type InventoryActionKey } from "./helpers";
+import type { InventoryOrderRow } from "./types";
 import { type Dispatch, type SetStateAction } from "react";
 
 export function useInventoryColumns(params: {
@@ -20,7 +21,7 @@ export function useInventoryColumns(params: {
   setDeleteTarget: Dispatch<SetStateAction<Account | null>>;
   openCashflow: (account: Account) => Promise<void>;
   openPlatformOffsale: (account: Account) => Promise<void>;
-  openEditor: (account: Account) => Promise<void>;
+  openEditor: (account: Account, orderId?: number) => Promise<void>;
   handleInventoryAction: (key: InventoryActionKey, row: Account) => void;
 }) {
   const {
@@ -29,15 +30,15 @@ export function useInventoryColumns(params: {
     openCashflow, openPlatformOffsale, openEditor, handleInventoryAction,
   } = params;
   const { arrange: arrangeColumns } = useListViewColumns("INVENTORY");
-  const columns: ColumnsType<Account> = [
-    { title: "库存编号", dataIndex: "stock_no", width: 86, ellipsis: true },
-    { title: "订单号", dataIndex: "source_order_no", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
-    { title: "游戏/产品类型", dataIndex: "game_type", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v)},
-    { title: "游戏账号/产品", dataIndex: "game_account", width: 120, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
-    { title: "营地账号", dataIndex: "camp_account", width: 120, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
+  const columns: ColumnsType<InventoryOrderRow> = [
+    { title: "库存编号", key: "stock_no", width: 86, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account.stock_no) },
+    { title: "订单号", dataIndex: "order_no", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
+    { title: "游戏/产品类型", key: "account_game_type", width: 80, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account_game_type) },
+    { title: "游戏账号/产品", key: "account_game_account", width: 120, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account_game_account) },
+    { title: "营地账号", key: "camp_account", width: 120, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account.camp_account) },
     { title: "入库时间", dataIndex: "inventory_entry_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
-    { title: "入库负责人", dataIndex: "inventory_operator", width: 100, ellipsis: true, render: (v: string | null, row) => inventoryCellValue(v || row.created_by) },
-    { title: "业务", dataIndex: "business_mode", width: 56, ellipsis: true, render: (v: string | null) => v ? BUSINESS_MODE_LABEL[v] ?? v : inventoryCellValue(v)},
+    { title: "入库负责人", dataIndex: "inventory_operator", width: 100, ellipsis: true, render: (v: string | null, row) => inventoryCellValue(v || row.account.created_by) },
+    { title: "业务", key: "business_mode", width: 56, ellipsis: true, render: (_v, row) => row.account_business_mode ? BUSINESS_MODE_LABEL[row.account_business_mode] ?? row.account_business_mode : inventoryCellValue(null)},
     { title: "业务类型", dataIndex: "inventory_type", width: 68, ellipsis: true, render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : inventoryCellValue(v) },
     {
       title: "未售时长",
@@ -49,18 +50,18 @@ export function useInventoryColumns(params: {
       // 天数与档位都由后端下发（AccountOut.inventory_age_days / _level），
       // 此处不做任何日期减法，也不再按 7/30 天判色。
       render: (_value, row) => (
-        row.inventory_age_days == null
+        row.account.inventory_age_days == null
           ? inventoryCellValue(null)
           : (
             <StatusTag
-              status={row.status}
-              color={row.inventory_age_level ? INVENTORY_AGE_COLOR[row.inventory_age_level] : undefined}
-              label={`${row.inventory_age_days}天`}
+              status={row.account.status}
+              color={row.account.inventory_age_level ? INVENTORY_AGE_COLOR[row.account.inventory_age_level] : undefined}
+              label={`${row.account.inventory_age_days}天`}
             />
           )
       ),
     },
-    { title: "状态", key: "status", dataIndex: "inventory_status", width: 68, render: (v: string | undefined, row) => <StatusTag status={v ?? (row.status === "WAITING" ? "IN_STOCK" : "OUT_OF_STOCK")} optionSet="INVENTORY_STATUS" /> },
+    { title: "状态", key: "status", dataIndex: "account_status", width: 68, render: (_v: string | undefined, row) => <StatusTag status={row.account.status === "WAITING" ? "IN_STOCK" : "OUT_OF_STOCK"} optionSet="INVENTORY_STATUS" /> },
     {
       title: "成本",
       dataIndex: "cost_amount",
@@ -73,7 +74,8 @@ export function useInventoryColumns(params: {
       key: "actions",
       width: 420,
       render: (_value, row) => {
-        const operationItems = operationMenuItems(row, executionDetails[row.id]);
+        const account = row.account;
+        const operationItems = operationMenuItems(row, executionDetails[account.id]);
         return (
         <Space className="inventory-row-actions" size={4}>
           <PermissionButton
@@ -81,10 +83,10 @@ export function useInventoryColumns(params: {
             type="link"
             size="small"
             aria-label="售出"
-            disabled={row.status !== 'WAITING'}
+            disabled={row.account_status !== 'WAITING'}
             onClick={(event) => {
               event.stopPropagation();
-              setSaleTarget(row);
+              setSaleTarget(account);
             }}
           >
             售出
@@ -92,14 +94,14 @@ export function useInventoryColumns(params: {
           <Dropdown
             trigger={["click"]}
             placement="bottomLeft"
-            onOpenChange={(open) => { if (open) void loadExecution(row); }}
+            onOpenChange={(open) => { if (open) void loadExecution(account); }}
             menu={{
               className: "inventory-operation-menu",
               items: operationItems,
               onClick: ({ key }) => {
-                if (key === "consignment") setConsignmentTarget(row);
-                if (key === "offsale") void openPlatformOffsale(row);
-                if (key === "description" || key === "images") handleInventoryAction(key, row);
+                if (key === "consignment") setConsignmentTarget(account);
+                if (key === "offsale") void openPlatformOffsale(account);
+                if (key === "description" || key === "images") handleInventoryAction(key, account);
               },
             }}
             disabled={operationItems.length === 0}
@@ -121,7 +123,7 @@ export function useInventoryColumns(params: {
             aria-label="返点"
             onClick={(event) => {
               event.stopPropagation();
-              setRebateTarget(row);
+              setRebateTarget(account);
             }}
           >
             返点
@@ -133,7 +135,7 @@ export function useInventoryColumns(params: {
             aria-label="资金收支"
             onClick={(event) => {
               event.stopPropagation();
-              void openCashflow(row);
+              void openCashflow(account);
             }}
           >
             资金收支
@@ -147,7 +149,7 @@ export function useInventoryColumns(params: {
               disabled={editingAccount !== null}
               onClick={(event) => {
                 event.stopPropagation();
-                openEditor(row);
+                void openEditor(account, row.id);
               }}
             >
               编辑
@@ -158,10 +160,10 @@ export function useInventoryColumns(params: {
               size="small"
               danger
               aria-label="取消"
-              disabled={row.status === "SOLD" || row.status === "VOID"}
+              disabled={account.status === "SOLD" || account.status === "VOID"}
               onClick={(event) => {
                 event.stopPropagation();
-                handleInventoryAction("void", row);
+                handleInventoryAction("void", account);
               }}
             >
               取消
@@ -175,7 +177,7 @@ export function useInventoryColumns(params: {
             aria-label="删除"
             onClick={(event) => {
               event.stopPropagation();
-              setDeleteTarget(row);
+              setDeleteTarget(account);
             }}
           >
             删除

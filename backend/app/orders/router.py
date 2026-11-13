@@ -584,9 +584,9 @@ def delete_order(
     db: Session = Depends(get_db),
     user: CurrentUser = update_orders,
 ) -> Response:
-    """管理员物理删除订单及全部订单从属数据，并删除仅被本单使用的库存账号。"""
+    """管理员物理删除绑定业务及全部从属数据。"""
     if not user.is_admin:
-        raise PermissionDenied("仅系统管理员可删除订单")
+        raise PermissionDenied("仅系统管理员可执行删除")
     orders_delete_order(
         db,
         order_id,

@@ -2,7 +2,7 @@ import { Form, Input, Modal, Typography } from "antd";
 import { useEffect } from "react";
 import type { Order } from "../shared/api/types/orders";
 
-/** 订单物理删除二次确认：订单及其从属业务数据全部清除，删除原因写入审计日志。 */
+/** 物理删除二次确认：订单、绑定库存及其从属业务数据全部清除，删除原因写入审计日志。 */
 export function OrderDeleteDialog({ order, submitting, onCancel, onConfirm }: {
   order: Order | null;
   submitting: boolean;
@@ -18,7 +18,7 @@ export function OrderDeleteDialog({ order, submitting, onCancel, onConfirm }: {
   return (
     <Modal
       open={Boolean(order)}
-      title="删除订单"
+      title="删除"
       okText="确认删除"
       cancelText="取消"
       okButtonProps={{ danger: true, loading: submitting }}
@@ -30,7 +30,7 @@ export function OrderDeleteDialog({ order, submitting, onCancel, onConfirm }: {
       className="heijin-fast-confirm"
     >
       <Typography.Paragraph>
-        即将删除订单 <strong>{order?.order_no ?? ""}</strong> 及其关联的库存账号。
+        即将删除 <strong>{order?.order_no ?? ""}</strong> 及其关联的库存账号。
         此操作不可恢复，请二次确认。
       </Typography.Paragraph>
       <Typography.Paragraph type="secondary">

@@ -196,7 +196,8 @@ _ORDER_EVENT_OPTIONS = [
     {"value": "REBATE", "label": "返点"},
 ]
 _AUDIT_ACTION_ADDITIONS = {
-    "ACCOUNT_DELETE": "删除库存",
+    "ACCOUNT_DELETE": "删除",
+    "ORDER_DELETE": "删除",
     "LIST_COLUMNS_UPDATE": "列表列显示配置变更",
     "LIST_COLUMNS_RESET": "列表列配置恢复默认",
     "LIST_COLUMN_ADD": "列表新增自定义列",

@@ -33,7 +33,7 @@ vi.mock("@/shared/api/stocks.api");;
 let ui: ReturnType<typeof userEvent.setup>;
 
 const inStockRow = {
-  id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "安卓",
+  id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "安卓",
   status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01",
   created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "初始描述",
 } as unknown as Account;
@@ -98,6 +98,16 @@ const contract = { id: 21, inst_no: "INS-21", order_id: 77, contract_type: "INST
 
 async function openPanel(rows: Account[]) {
   resolveMock(vi.mocked(stocksApi.list), rows);
+  vi.mocked(ordersApi.list).mockResolvedValueOnce(rows.map((row) => ({
+    id: row.source_order_id ?? row.id,
+    order_no: row.source_order_no ?? `HS-${row.id}`,
+    order_type: row.inventory_type === "CONSIGNMENT" ? "DG" : "HS",
+    capital_type: "SELF",
+    trade_date: "2026-10-15",
+    account_id: row.id,
+    account_status: "WAITING",
+    status: "ACTIVE",
+  })) as never);
   vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: rows.length, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
   renderLight(<InventoryPanel />, { user: "admin" });
   await waitFor(() => expect(document.querySelector("tbody tr")).toBeTruthy());

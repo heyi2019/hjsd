@@ -16,22 +16,23 @@ import { type InventoryProfileTarget } from "../operations";
 import { type InventoryCancellationValues } from "../InventoryCancellationDialog";
 import { type BusinessCenterEntryTab } from "../../orders/businessCenter";
 import { findCancelableBuy, type InventoryActionKey } from "./helpers";
+import type { InventoryOrderRow } from "./types";
 import type { CashflowTarget } from "../../finance/cashflow";
 
 export function useInventoryActions(params: {
   // list 域注入
   load: () => Promise<void>;
-  setRows: Dispatch<SetStateAction<Account[]>>;
+  setRows: Dispatch<SetStateAction<InventoryOrderRow[]>>;
   setError: Dispatch<SetStateAction<{ message: string; code?: string } | null>>;
   // cache 域注入
   executionDetails: Record<number, AccountExecutionDetail>;
   setExecutionDetails: Dispatch<SetStateAction<Record<number, AccountExecutionDetail>>>;
   loadExecution: (row: Account, force?: boolean) => Promise<void>;
+  loadOrderExecution: (orderId: number, force?: boolean) => Promise<void>;
   dropExecutionCache: (accountId: number) => void;
   expandTo: (ids: Key[]) => void;
-  expandedAccountIds: Key[];
-  setExpandedAccountIds: Dispatch<SetStateAction<Key[]>>;
-  removeFromInventory: (accountId: number) => void;
+  expandedOrderIds: Key[];
+  removeFromInventory: (accountId: number, orderId?: number) => void;
   // editor 域注入（本地 openEditor/cancelInlineEdit 会再包装一层）
   editorOpenEditor: (account: Account) => Promise<void>;
   editorCancelInlineEdit: () => void;
@@ -42,8 +43,8 @@ export function useInventoryActions(params: {
 }) {
   const {
     load, setRows, setError,
-    executionDetails, setExecutionDetails, loadExecution, dropExecutionCache,
-    expandTo, expandedAccountIds, setExpandedAccountIds, removeFromInventory,
+    executionDetails, setExecutionDetails, loadExecution, loadOrderExecution, dropExecutionCache,
+    expandTo, expandedOrderIds, removeFromInventory,
     editorOpenEditor, editorCancelInlineEdit, inlineEditId,
     onOrdersChanged, onNavigate,
   } = params;
@@ -65,11 +66,12 @@ export function useInventoryActions(params: {
   function openProfile(account: Account, mode: InventoryProfileTarget["mode"]) {
     setProfileTarget({ account, mode });
   }
-  async function openEditor(account: Account) {
+  async function openEditor(account: Account, orderId = account.source_order_id ?? account.id) {
     await loadExecution(account);
+    await loadOrderExecution(orderId);
     await editorOpenEditor(account);
     // 就地展开该行进入内联编辑（不弹窗）。
-    expandTo([String(account.id)]);
+    expandTo([String(orderId)]);
   }
   function cancelInlineEdit() {
     editorCancelInlineEdit();
@@ -173,7 +175,7 @@ export function useInventoryActions(params: {
       setVoiding(false);
     }
   }
-  /** 删除库存成功后重拉台账：关联订单已清理，上层订单/分期视图也要同步刷新。 */
+  /** 删除成功后重拉台账：关联订单已清理，上层订单/分期视图也要同步刷新。 */
   async function submitDelete(reason: string) {
     if (!deleteTarget) return;
     const target = deleteTarget;
@@ -183,7 +185,8 @@ export function useInventoryActions(params: {
       setDeleteTarget(null);
       dropExecutionCache(target.id);
       if (inlineEditId === target.id) cancelInlineEdit();
-      expandTo(expandedAccountIds.filter((key) => String(key) !== String(target.id)));
+      const targetOrderId = target.source_order_id ?? target.id;
+      expandTo(expandedOrderIds.filter((key) => String(key) !== String(targetOrderId)));
       appMessage.success("库存已删除");
       await load();
       onOrdersChanged?.();
@@ -205,11 +208,11 @@ export function useInventoryActions(params: {
     }
     if (key === "images") openProfile(row, "images");
   }
-  async function handleExpand(expanded: boolean, row: Account) {
-    // 手风琴：一次只展开一行。多行同时展开会各自挂载一份完整明细（3 张子表 + 图片组），DOM 与页面长度随之翻倍。
-    if (!expanded && inlineEditId === row.id) cancelInlineEdit();
+  async function handleExpand(expanded: boolean, row: InventoryOrderRow) {
+    // 手风琴：一次只展开一行。展开详情严格按订单 ID 请求；账号仅用于资料编辑和动作适配。
+    if (!expanded && inlineEditId === row.account.id) cancelInlineEdit();
     expandTo(expanded ? [String(row.id)] : []);
-    if (expanded) await loadExecution(row);
+    if (expanded) await loadOrderExecution(row.id);
   }
   function openPartyCard(party: InventoryPartyLink) {
     const param = party.entityType === "customer" ? `customer_id=${party.id}` : `counterparty_id=${party.id}`;

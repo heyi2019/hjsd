@@ -28,7 +28,7 @@ beforeEach(() => {
   vi.mocked(stocksApi.remove).mockResolvedValue(undefined);
 });
 
-describe("InventoryPanel：删除库存二次确认", () => {
+describe("InventoryPanel：删除二次确认", () => {
   it("管理员可删除，原因必填，确认后才调用删除接口并刷新台账", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
 
@@ -37,7 +37,7 @@ describe("InventoryPanel：删除库存二次确认", () => {
     await ui.click(deleteButtons[0]);
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("删除库存")).toBeInTheDocument();
+    expect(within(dialog).getByText("删除")).toBeInTheDocument();
     expect(within(dialog).getByText(/此操作不可恢复，请二次确认/)).toBeInTheDocument();
     const reasonInput = within(dialog).getByRole("textbox", { name: "删除原因" });
     const confirm = within(dialog).getByRole("button", { name: "确认删除" });

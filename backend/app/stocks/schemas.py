@@ -86,7 +86,7 @@ class AccountProfileUpdate(RequestModel):
 
 
 class AccountDeleteRequest(RequestModel):
-    """删除库存的二次确认载荷：原因必填，只进审计日志，不落业务表。"""
+    """删除的二次确认载荷：原因必填，只进审计日志，不落业务表。"""
     model_config = ConfigDict(str_strip_whitespace=True)
 
     reason: str = Field(min_length=1, max_length=200)

@@ -16,6 +16,8 @@ export function useLedgerInlineEdit({ setOrders }: { setOrders: Dispatch<SetStat
   const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
   const [ledgerDetails, setLedgerDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [ledgerDetailLoading, setLedgerDetailLoading] = useState<Record<number, boolean>>({});
+  const [ledgerOrderDetails, setLedgerOrderDetails] = useState<Record<number, AccountExecutionDetail>>({});
+  const [ledgerOrderDetailLoading, setLedgerOrderDetailLoading] = useState<Record<number, boolean>>({});
   const loadLedgerDetail = async (accountId: number, force = false) => {
     if (!force && (ledgerDetails[accountId] || ledgerDetailLoading[accountId])) return;
     setLedgerDetailLoading((current) => ({ ...current, [accountId]: true }));
@@ -26,6 +28,18 @@ export function useLedgerInlineEdit({ setOrders }: { setOrders: Dispatch<SetStat
       appMessage.error(normalizeError(error).message);
     } finally {
       setLedgerDetailLoading((current) => ({ ...current, [accountId]: false }));
+    }
+  };
+  const loadLedgerOrderDetail = async (orderId: number, force = false) => {
+    if (!force && (ledgerOrderDetails[orderId] || ledgerOrderDetailLoading[orderId])) return;
+    setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: true }));
+    try {
+      const detail = await ordersApi.executionDetail(orderId);
+      setLedgerOrderDetails((current) => ({ ...current, [orderId]: detail }));
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    } finally {
+      setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: false }));
     }
   };
   const accountEditor = useAccountExecutionEditor({
@@ -63,7 +77,7 @@ export function useLedgerInlineEdit({ setOrders }: { setOrders: Dispatch<SetStat
   const handleLedgerExpand = (expanded: boolean, record: Order) => {
     // 手风琴：一次只展开一行，避免多行展开同时挂载多份详情导致 DOM 与页面长度翻倍。
     setExpandedOrderIds(expanded ? [String(record.id)] : []);
-    if (expanded && record.account_id) void loadLedgerDetail(record.account_id);
+    if (expanded) void loadLedgerOrderDetail(record.id);
   };
 
   // accountEditor 还持有 openEditor（仅本 hook 内部使用），对外只暴露原契约中的 12 个键。
@@ -73,6 +87,9 @@ export function useLedgerInlineEdit({ setOrders }: { setOrders: Dispatch<SetStat
     ledgerDetails,
     ledgerDetailLoading,
     loadLedgerDetail,
+    ledgerOrderDetails,
+    ledgerOrderDetailLoading,
+    loadLedgerOrderDetail,
     openLedgerAccountEditor,
     openLedgerEditor,
     handleLedgerExpand,

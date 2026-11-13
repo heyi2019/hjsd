@@ -1,4 +1,4 @@
-import { Input, Typography } from "antd";
+import { Descriptions, Input } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { AccountExecutionEvent } from "../shared/api/types/account-execution";
 import { DataTable, MoneyInput, MoneyText, Select } from "../shared/ui";
@@ -84,7 +84,13 @@ export function OrderDetailExecutionSection({
       <div className="inventory-detail__section inventory-detail__section--execution inventory-execution-list">
         <InventorySectionHeading title="操作明细" />
         <div className="inventory-detail__meta">
-          {sortedRows.length ? <DataTable className="inventory-execution-table" columns={columns} rows={sortedRows} page={1} pageSize={10} total={sortedRows.length} onPageChange={() => undefined} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" /> : <Typography.Text type="secondary">暂无已执行事件</Typography.Text>}
+          {sortedRows.length ? (
+            <DataTable className="inventory-execution-table" columns={columns} rows={sortedRows} page={1} pageSize={10} total={sortedRows.length} onPageChange={() => undefined} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" />
+          ) : (
+            <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
+              <Descriptions.Item label="操作记录">-</Descriptions.Item>
+            </Descriptions>
+          )}
         </div>
       </div>
     </>

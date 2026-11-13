@@ -12,6 +12,7 @@ import { CashflowModal } from "../../finance/cashflow";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../sale";
 import { OrderDetail } from "../OrderDetail";
 import type { InventoryController } from "./useInventoryController";
+import { mergeInventoryAccount } from "./types";
 
 export function InventoryModals({ controller }: { controller: InventoryController }) {
   const {
@@ -64,7 +65,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         const onCreated = async () => {
           const account = saleTarget;
           setSaleTarget(null);
-          if (account) removeFromInventory(account.id);
+          if (account) removeFromInventory(account.id, account.source_order_id ?? account.id);
           await load();
           if (account) controller.dropExecutionCache(account.id);
           onOrdersChanged?.();
@@ -188,7 +189,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         target={profileTarget}
         onClose={() => setProfileTarget(null)}
         onSaved={(updated) => {
-          controller.setRows((current) => current.map((row) => row.id === updated.id ? { ...row, ...updated } : row));
+          controller.setRows((current) => current.map((row) => row.account.id === updated.id ? mergeInventoryAccount(row, updated) : row));
           setExecutionDetails((current) => {
             const detail = current[updated.id];
             return detail ? { ...current, [updated.id]: { ...detail, account: { ...detail.account, ...updated } } } : current;

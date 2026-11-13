@@ -14,18 +14,19 @@ export function OrderDetailPartySection({ meta, editing = false }: { meta: Order
       .filter((field) => field.section === "PARTICIPANT")
       .map((field) => ({ key: `order-extra-${field.key}`, label: field.label, value: field.value })),
   ];
+  const displayFields = participantFields.length
+    ? participantFields
+    : [{ key: "empty-participant", label: "参与方", value: "-" }];
 
   return (
     <div className="inventory-detail__section inventory-detail__section--party">
       <InventorySectionHeading title="参与方信息" />
       {editing ? <CustomFieldSection section="PARTICIPANT" testIdSuffix="inv-edit-participant" /> : null}
-      {participantFields.length ? (
-        <div className="inventory-detail__meta">
-          <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
-            {participantFields.map((field) => <Descriptions.Item key={field.key} className={field.className} label={field.label}>{field.value}</Descriptions.Item>)}
-          </Descriptions>
-        </div>
-      ) : <span className="inventory-detail__empty">暂无参与方信息</span>}
+      <div className="inventory-detail__meta">
+        <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
+          {displayFields.map((field) => <Descriptions.Item key={field.key} className={field.className} label={field.label}>{field.value}</Descriptions.Item>)}
+        </Descriptions>
+      </div>
     </div>
   );
 }

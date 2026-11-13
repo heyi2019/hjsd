@@ -1,8 +1,8 @@
 """订单删除服务。
 
 订单删除是管理员专属的不可恢复动作，与订单编辑、取消等普通变更隔离。
-本模块只负责订单及其从属数据；库存删除由 ``stocks.deletion`` 负责，
-两者通过显式参数联动，避免循环删除和部分清理。
+订单与库存编号强绑定：删除任一侧时同步清理另一侧；库存侧由
+``stocks.deletion`` 负责反向清理仍关联的订单，避免留下孤立编号。
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from ._shared import get_order
 
 @dataclass(frozen=True)
 class _OrderDependencies:
-    """删除订单前收集的从属主键，用于清理和审计快照共用。"""
+    """删除前收集的从属主键，用于清理和审计快照共用。"""
 
     event_ids: set[int]
     installment_ids: set[int]
@@ -53,18 +53,16 @@ def delete_order(
     user: CurrentUser | None = None,
     delete_inventory_after: bool = True,
 ) -> None:
-    """删除订单及其全部从属数据，并按需删除关联库存。
+    """删除绑定业务及其全部从属数据，并同步删除绑定库存。
 
     订单删除会清理事件、资金流水、分润、分期、返点、押金、订单关系和导入映射。
-    默认同步删除仅被本单使用的库存；库存中心批量删除订单时关闭该分支，
-    待所有关联订单清理完后再由库存服务统一删除库存。
+    若历史数据仍有多张订单挂在同一库存，删除其中任一张订单时也继续清理
+    该库存下的剩余业务，最终清理库存，不留下库存编号或订单编号孤儿记录。
+    库存服务回调本函数时关闭反向分支，由库存服务统一清理库存主档。
     """
     order = get_order(session, order_id, user)
     cleaned_reason = _clean_reason(reason)
     inventory_id = order.account_id
-    if inventory_id is not None and delete_inventory_after:
-        _ensure_inventory_not_shared(session, order.id, inventory_id)
-
     dependencies = _collect_dependencies(session, order.id)
     _delete_order_dependents(session, order.id, dependencies)
 
@@ -100,19 +98,6 @@ def _clean_reason(reason: str) -> str:
     if not cleaned:
         raise Validation("删除原因不能为空", details={"field": "reason"})
     return cleaned
-
-
-def _ensure_inventory_not_shared(session: Session, order_id: int, inventory_id: int) -> None:
-    shared_order = session.scalar(
-        select(Order.id)
-        .where(Order.account_id == inventory_id, Order.id != order_id)
-        .limit(1)
-    )
-    if shared_order is not None:
-        raise Validation(
-            "该库存仍被其他订单使用，不能随订单一起删除",
-            details={"account_id": inventory_id, "other_order_id": shared_order},
-        )
 
 
 def _collect_dependencies(session: Session, order_id: int) -> _OrderDependencies:
@@ -175,7 +160,7 @@ def _delete_order_dependents(
     order_id: int,
     dependencies: _OrderDependencies,
 ) -> None:
-    """按 RESTRICT 外键顺序删除订单从属数据。"""
+    """按 RESTRICT 外键顺序删除业务从属数据。"""
     if dependencies.cashflow_ids:
         session.query(Cashflow).filter(
             Cashflow.id.in_(dependencies.cashflow_ids)

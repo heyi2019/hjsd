@@ -5,9 +5,10 @@ import { useInventoryList } from "./useInventoryList";
 import { useExecutionCache } from "./useExecutionCache";
 import { useInventoryActions } from "./useInventoryActions";
 import { useInventoryColumns } from "./useInventoryColumns";
+import { mergeInventoryAccount } from "./types";
 
 export function useInventoryController({ refreshKey = 0, active = true, onOrdersChanged, onNavigate }: { refreshKey?: number; active?: boolean; onOrdersChanged?: () => void; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
-  // 删除库存不可逆：按钮按系统角色显隐，后端仍做管理员二次鉴权。
+  // 删除不可逆：按钮按系统角色显隐，后端仍做管理员二次鉴权。
   const { role } = useSession();
   const canDelete = role === "admin";
 
@@ -50,15 +51,17 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   // —— 详情缓存域：明细缓存 + 展开滚动记忆（注入列表的 setRows/setError / 本地移除集合）——
   const cache = useExecutionCache({ setRows, setError, locallyRemovedIdsRef });
   const {
-  expandedAccountIds,
+  expandedOrderIds,
   loadExecution,
+  loadOrderExecution,
   executionDetails,
   setExecutionDetails,
   executionLoading,
+  orderExecutionDetails,
+  orderExecutionLoading,
   dropExecutionCache,
   removeFromInventory,
   refreshExecution,
-  setExpandedAccountIds,
   expandTo,
   } = cache;
 
@@ -67,7 +70,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     getExecutionDetail: (accountId) => executionDetails[accountId],
     onSaved: (accountId, detail) => {
       setExecutionDetails((current) => ({ ...current, [accountId]: detail }));
-      setRows((current) => current.map((row) => row.id === accountId ? { ...row, ...detail.account } : row));
+      setRows((current) => current.map((row) => row.account.id === accountId ? mergeInventoryAccount(row, detail.account) : row));
     },
   });
   const {
@@ -87,8 +90,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   // —— 业务动作域：open* / submit* / 删除下架 / 运营动作 ——
   const actions = useInventoryActions({
     load, setRows, setError,
-    executionDetails, setExecutionDetails, loadExecution, dropExecutionCache,
-    expandTo, expandedAccountIds, setExpandedAccountIds, removeFromInventory,
+    executionDetails, setExecutionDetails, loadExecution, loadOrderExecution, dropExecutionCache,
+    expandTo, expandedOrderIds, removeFromInventory,
     editorOpenEditor: accountEditor.openEditor,
     editorCancelInlineEdit: accountEditor.cancelInlineEdit,
     inlineEditId,
@@ -162,7 +165,9 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     eventDrafts,
     executionDetails,
     executionLoading,
-    expandedAccountIds,
+    orderExecutionDetails,
+    orderExecutionLoading,
+    expandedOrderIds,
     exporting,
     gameTypeFilter,
     gameTypeOptions,
@@ -176,6 +181,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     keyword,
     load,
     loadExecution,
+    loadOrderExecution,
     mobileFieldOrder,
     onNavigate,
     onOrdersChanged,

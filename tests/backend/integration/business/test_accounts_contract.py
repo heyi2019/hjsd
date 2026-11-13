@@ -657,6 +657,24 @@ class TestAccountsApi:
         assert response.status_code == 200, response.text
         assert response.json()["account"]["source_order_no"] == order.order_no
 
+    def test_order_execution_detail_is_scoped_to_current_order(
+        self, seeded_client, seeded_db, headers
+    ):
+        account = _account(seeded_db, "detail-order-scope")
+        first = _buy(seeded_db, account, amount="100")
+        second = _buy(seeded_db, account, amount="200")
+
+        response = seeded_client.get(
+            f"/api/v1/orders/{second.id}/execution-detail", headers=headers
+        )
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert [item["order_id"] for item in payload["orders"]] == [second.id]
+        assert payload["orders"][0]["order_no"] == second.order_no
+        assert payload["finance_summary"]["total_expense"] == "200.00"
+        assert first.order_no not in {item["order_no"] for item in payload["orders"]}
+
     def test_execution_detail_includes_order_linked_standalone_cashflows(
         self, seeded_client, seeded_db, headers
     ):

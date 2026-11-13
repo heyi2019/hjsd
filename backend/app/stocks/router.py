@@ -297,9 +297,9 @@ def update_account_profile(
 
 
 def _require_admin(user: CurrentUser) -> None:
-    """删除库存不可逆：权限收紧到系统管理员，operator/finance 即使有建单权也不可删。"""
+    """删除不可逆：权限收紧到系统管理员，operator/finance 即使有建单权也不可删。"""
     if not user.is_admin:
-        raise PermissionDenied("仅系统管理员可删除库存")
+        raise PermissionDenied("仅系统管理员可执行删除")
 
 
 @router.delete("/stocks/{account_id}", status_code=204, response_model=None)
@@ -309,7 +309,7 @@ def delete_inventory(
     db: Session = Depends(get_db),
     user: CurrentUser = manage,
 ) -> Response:
-    """删除库存及其全部订单从属数据（仅管理员）。
+    """删除及其全部订单从属数据（仅管理员）。
 
     请求体必带删除原因（空白一律 422）；库存及其订单/事件/流水/返点等从属数据
     全部物理删除，库存快照与原因写入审计日志，操作不可恢复。
@@ -350,10 +350,13 @@ def execution_detail(
     account_id: int,
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
+    order_id: int | None = None,
 ) -> AccountExecutionDetailOut:
-    """查询库存账号关联的全部订单、已登记事件和资金流水。"""
+    """查询库存账号关联的订单详情；传 order_id 时严格限定为当前订单。"""
     account = get_account(db, account_id, _user)
     order_stmt = select(Order).where(Order.account_id == account_id)
+    if order_id is not None:
+        order_stmt = order_stmt.where(Order.id == order_id)
     order_scope = owner_scope_filter(Order.owner_id, _user, db)
     if order_scope is not None:
         order_stmt = order_stmt.where(order_scope)
@@ -635,6 +638,24 @@ def execution_detail(
             for order in orders
         ],
         audit=audit_rows,
+    )
+
+
+@router.get("/orders/{order_id}/execution-detail", response_model=AccountExecutionDetailOut)
+def order_execution_detail(
+    order_id: int,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> AccountExecutionDetailOut:
+    """查询单个订单的执行详情，财务/分润/操作明细均只属于该订单。"""
+    order = get_order(db, order_id, _user)
+    if order.account_id is None:
+        raise NotFound("订单未关联库存账号")
+    return execution_detail(
+        account_id=order.account_id,
+        db=db,
+        _user=_user,
+        order_id=order_id,
     )
 
 

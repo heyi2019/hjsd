@@ -98,7 +98,7 @@ export function useLedgerColumns(params: {
               type="link"
               size="small"
               disabled={order.account_status !== "WAITING" || !order.account_id}
-              onClick={() => void openOrderSale(order)}
+              onClick={(event) => { event.stopPropagation(); void openOrderSale(order); }}
             >售出</PermissionButton>
           </PermissionGate>
           {order.account_id || ["ACTIVE", "INSTALLMENT"].includes(order.status) ? (
@@ -107,7 +107,7 @@ export function useLedgerColumns(params: {
               type="link"
               size="small"
               title={order.account_id ? undefined : "未关联库存时会先生成库存编号"}
-              onClick={() => void openLedgerEditor(order)}
+              onClick={(event) => { event.stopPropagation(); void openLedgerEditor(order); }}
             >编辑</PermissionButton>
           ) : null}
           <PermissionGate permission="order.event.post">
@@ -117,14 +117,14 @@ export function useLedgerColumns(params: {
               size="small"
               disabled={!hasSold || !['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
               title={hasSold ? undefined : "订单售出后才能配置分润"}
-              onClick={() => void openAllocations(order)}
+              onClick={(event) => { event.stopPropagation(); void openAllocations(order); }}
             >分润配置</PermissionButton>
             <PermissionButton
               permission="order.event.post"
               type="link"
               size="small"
               disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
-              onClick={() => void openRefund(order)}
+              onClick={(event) => { event.stopPropagation(); void openRefund(order); }}
             >资金收支</PermissionButton>
             <Dropdown
               trigger={["click"]}
@@ -135,7 +135,8 @@ export function useLedgerColumns(params: {
               menu={{
                 className: "orders-ledger-operation-menu",
                 items: operationItems,
-                onClick: ({ key }) => {
+                onClick: ({ key, domEvent }) => {
+                  domEvent.stopPropagation();
                   if (key === "consignment") void openOrderConsignment(order);
                   if (key === "offsale") void openOrderOffsale(order);
                   if (key === "description") void openOrderProfile(order, "description");
@@ -156,7 +157,7 @@ export function useLedgerColumns(params: {
               type="link"
               size="small"
               disabled={!order.account_id}
-              onClick={() => void openOrderRebate(order)}
+              onClick={(event) => { event.stopPropagation(); void openOrderRebate(order); }}
             >返点</PermissionButton>
             {!canSystemOffsale ? <PermissionButton
               permission="order.event.post"
@@ -164,7 +165,7 @@ export function useLedgerColumns(params: {
               size="small"
               danger
               disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
-              onClick={() => void openCancelTransaction(order)}
+              onClick={(event) => { event.stopPropagation(); void openCancelTransaction(order); }}
             >取消</PermissionButton> : null}
           </PermissionGate>
           {canDeleteOrder ? (
@@ -173,7 +174,7 @@ export function useLedgerColumns(params: {
               type="link"
               size="small"
               danger
-              onClick={() => void openOrderDelete(order)}
+              onClick={(event) => { event.stopPropagation(); void openOrderDelete(order); }}
             >删除</PermissionButton>
           ) : null}
         </Space>

@@ -29,7 +29,8 @@ const DELIVERY_FIELD_MAP: Record<string, { fallback: string }> = {
   delivery_responsible_ids: { fallback: "交付负责人" },
 };
 
-/** 单个交付子块（买号交付 / 卖号交付）：按对应订单类型配置驱动渲染主交付字段 + DELIVER 自定义字段。 */
+/** 单个交付子块（买号交付 / 卖号交付）：按对应订单类型配置驱动渲染主交付字段 + DELIVER 自定义字段。
+ * 两个交付方向都保留字段表格，便于详情查看、编辑和补录。 */
 function DeliverySubSection({
   title,
   orderType,
@@ -44,15 +45,7 @@ function DeliverySubSection({
   employees?: EmployeeOption[];
 }) {
   const { config } = useOrderFormConfig(orderType ?? undefined);
-  if (!order) {
-    return (
-      <div className="inventory-detail__meta-group">
-        <div className="inventory-detail__meta-group-title">{title}</div>
-        <span className="inventory-detail__empty">暂无{title}</span>
-      </div>
-    );
-  }
-  const extraValues = order.extra_values ?? {};
+  const extraValues = order?.extra_values ?? {};
   const mainFields = Object.entries(DELIVERY_FIELD_MAP).map(([key, { fallback }]) => {
     let value: ReactNode = "-";
     if (key === "bound_phone" || key === "bound_phone_owner") {
@@ -97,7 +90,7 @@ function DeliverySubSection({
   );
 }
 
-/** 板块2：交付信息（买号交付、卖号交付）。只读态拆为两个配置驱动子块；编辑态沿用 DELIVER 自定义字段表单。 */
+/** 板块2：交付信息（买号交付、卖号交付）。两侧统一呈现字段表格；编辑态沿用 DELIVER 自定义字段表单。 */
 export function OrderDetailDeliverySection({
   meta,
   editing,
@@ -128,7 +121,12 @@ export function OrderDetailDeliverySection({
       <InventorySectionHeading title="交付信息" />
       <div className="inventory-detail__meta">
         <DeliverySubSection title="买号交付" orderType={creationOrder?.order_type} order={creationOrder} account={account} employees={employees} />
-        <DeliverySubSection title="卖号交付" orderType={sellOrder?.order_type} order={sellOrder} employees={employees} />
+        <DeliverySubSection
+          title="卖号交付"
+          orderType={sellOrder?.order_type ?? creationOrder?.order_type}
+          order={sellOrder}
+          employees={employees}
+        />
       </div>
     </div>
   );

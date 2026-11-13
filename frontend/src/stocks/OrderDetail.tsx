@@ -175,6 +175,7 @@ function resolveOperationStatus(
 export function OrderDetail({
   row,
   detail,
+  contextOrderId,
   contextOrderNo,
   loading,
   editing,
@@ -192,6 +193,8 @@ export function OrderDetail({
 }: {
   row: Account;
   detail?: AccountExecutionDetail;
+  /** 详情展开的订单主键；传入后所有操作、资金、分润只取这一单。 */
+  contextOrderId?: number | null;
   /** 订单台账从订单行展开时，优先使用当前订单作为详情上下文；库存中心不传则沿用账号来源单。 */
   contextOrderNo?: string | null;
   loading: boolean;
@@ -211,17 +214,23 @@ export function OrderDetail({
 }) {
   if (loading && !detail) return <Spin size="small" />;
 
-  const sourceOrderNo = contextOrderNo ?? row.source_order_no;
-  const contextOrder = detail?.orders.find((order) => order.order_no === sourceOrderNo);
+  // 展开详情是订单级：即便调用方误传了账号聚合快照，这里也再次按订单主键收口，
+  // 防止同一账号的寄售/回收/提号订单串入当前订单的资金、分润和操作明细。
+  const scopedDetail = detail && contextOrderId != null
+    ? { ...detail, orders: detail.orders.filter((order) => order.order_id === contextOrderId) }
+    : detail;
+  const contextOrder = scopedDetail?.orders.find((order) => order.order_id === contextOrderId)
+    ?? scopedDetail?.orders.find((order) => order.order_no === contextOrderNo);
+  const sourceOrderNo = contextOrder?.order_no ?? contextOrderNo ?? row.source_order_no;
 
-  const financialFlows = accountFinancialFlows(detail);
-  const rebateItems = detail?.orders.flatMap((order) => (
+  const financialFlows = accountFinancialFlows(scopedDetail);
+  const rebateItems = scopedDetail?.orders.flatMap((order) => (
     (order.rebates ?? []).map((rebate) => ({ rebate }))
   )) ?? [];
   const expenseFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "OUT");
   const incomeFlows = financialFlows.filter(({ cashflow }) => cashflow.direction === "IN");
   // 合计一律取后端 finance_summary（与上面明细同源），前端只数条数、不再累加金额。
-  const summary = detail?.finance_summary;
+  const summary = scopedDetail?.finance_summary;
   const totalExpense = summary?.total_expense ?? "0.00";
   const totalIncome = summary?.total_income ?? "0.00";
 
@@ -250,7 +259,7 @@ export function OrderDetail({
     })),
   ];
 
-  const executionRows: InventoryExecutionRow[] = detail?.orders.flatMap((order) => (
+  const executionRows: InventoryExecutionRow[] = scopedDetail?.orders.flatMap((order) => (
     order.events.map((event) => ({
       key: `${order.order_id}-${event.id}`,
       category: classifyEventCategory(event.event_type),
@@ -259,12 +268,12 @@ export function OrderDetail({
       amount: event.amount,
       operator: event.operator_names?.length ? event.operator_names.join("、") : event.operator || "-",
       note: event.note || "-",
-      platform: eventPlatformLabel(detail, order, event.event_type),
+      platform: eventPlatformLabel(scopedDetail, order, event.event_type),
       event,
     }))
   )) ?? [];
 
-  const consignmentOrders = (detail?.orders ?? []).filter(isConsignmentListing);
+  const consignmentOrders = (scopedDetail?.orders ?? []).filter(isConsignmentListing);
   const hasActiveConsignment = consignmentOrders.some(isActiveConsignmentListing);
   const hasUnlistedHistory = consignmentOrders.some((order) => {
     return order.status !== "CANCELLED" && hasUnlistedConsignment(order);
@@ -283,16 +292,16 @@ export function OrderDetail({
     businessMode: row.business_mode ? (BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode) : null,
     inventoryType: row.inventory_type ? (INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type) : null,
     valueAddedService: row.value_added_service ? (VALUE_ADDED_SERVICE_LABEL[row.value_added_service] ?? row.value_added_service) : null,
-    orderNo: contextOrder?.order_no ?? detail?.orders[0]?.order_no ?? row.source_order_no ?? "-",
+    orderNo: contextOrder?.order_no ?? scopedDetail?.orders[0]?.order_no ?? row.source_order_no ?? "-",
     sourceOrderNo: sourceOrderNo ?? null,
     createdBy: row.created_by || "-",
-    registeredAt: formatDateTimeMinute(contextOrder?.created_at ?? contextOrder?.trade_date ?? detail?.orders[0]?.created_at ?? detail?.orders[0]?.trade_date ?? row.created_at),
-    soldAt: eventDate(detail, "SELL"),
-    removedAt: eventDate(detail, "CANCEL"),
-    removedPlatform: eventPlatform(detail, "CANCEL"),
-    recoveryPlatform: transactionPlatforms(detail, new Set(["HS", "TH"])),
-    salePlatform: transactionPlatforms(detail, new Set(["DG"]), true),
-    consignmentSummary: consignmentSummary(detail, row.status),
+    registeredAt: formatDateTimeMinute(contextOrder?.created_at ?? contextOrder?.trade_date ?? scopedDetail?.orders[0]?.created_at ?? scopedDetail?.orders[0]?.trade_date ?? row.created_at),
+    soldAt: eventDate(scopedDetail, "SELL"),
+    removedAt: eventDate(scopedDetail, "CANCEL"),
+    removedPlatform: eventPlatform(scopedDetail, "CANCEL"),
+    recoveryPlatform: transactionPlatforms(scopedDetail, new Set(["HS", "TH"])),
+    salePlatform: transactionPlatforms(scopedDetail, new Set(["DG"]), true),
+    consignmentSummary: consignmentSummary(scopedDetail, row.status),
     password: row.game_password || "-",
     channelRegion: [row.platform, row.channel_region].filter(Boolean).join(" / ") || "-",
     boundPhone: row.bound_phone || "-",
@@ -303,9 +312,9 @@ export function OrderDetail({
     accountImages: row.account_images ?? [],
     secondaryImages: row.secondary_images ?? [],
     note: row.note || "-",
-    orderNotes: orderNotes(detail),
-    orderParties: renderOrderParties(orderParties(detail), onPartyClick),
-    orderExtras: orderExtraValues(detail),
+    orderNotes: orderNotes(scopedDetail),
+    orderParties: renderOrderParties(orderParties(scopedDetail), onPartyClick),
+    orderExtras: orderExtraValues(scopedDetail),
     operationStatusLabel,
     hasActiveConsignment,
   };
@@ -313,7 +322,7 @@ export function OrderDetail({
   return (
     <OrderDetailView
       meta={meta}
-      detail={detail}
+      detail={scopedDetail}
       account={row}
       editing={editing}
       onEdit={onEdit}

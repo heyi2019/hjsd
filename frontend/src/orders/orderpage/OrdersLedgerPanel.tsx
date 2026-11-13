@@ -31,8 +31,8 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     inventoryStatusOptions,
     keyword,
     ledgerColumns,
-    ledgerDetailLoading,
-    ledgerDetails,
+    ledgerOrderDetailLoading,
+    ledgerOrderDetails,
     ledgerExporting,
     ledgerSortDesc,
     loadError,
@@ -157,18 +157,20 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
           className="inventory-table orders-ledger"
           expandable={{
             expandedRowKeys: expandedOrderIds,
+            expandRowByClick: true,
             onExpand: handleLedgerExpand,
             expandedRowRender: (order) => {
               const accountId = order.account_id ?? null;
               if (accountId === null) return <Typography.Text type="secondary">该订单未关联库存账号，暂无库存详情。</Typography.Text>;
-              const detail = ledgerDetails[accountId];
+              const detail = ledgerOrderDetails[order.id];
               if (!detail) return <Spin size="small" />;
               return (
                 <OrderDetail
                   row={detail.account}
                   detail={detail}
+                  contextOrderId={order.id}
                   contextOrderNo={order.order_no}
-                  loading={Boolean(ledgerDetailLoading[accountId])}
+                  loading={Boolean(ledgerOrderDetailLoading[order.id])}
                   onPartyClick={(party: InventoryPartyLink) => onNavigate?.(party.entityType === "customer" ? `customers?customer_id=${party.id}` : `customers?counterparty_id=${party.id}`)}
                   editing={inlineEditId === detail.account.id ? editingAccount : undefined}
                   onEdit={openLedgerAccountEditor}

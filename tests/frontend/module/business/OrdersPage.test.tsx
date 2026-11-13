@@ -348,7 +348,7 @@ describe("OrdersPage：四类订单台账", () => {
       { ...orders[0], account_id: 1 },
       orders[1],
     ]);
-    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: {
         id: 1,
         stock_no: "KU_00001",
@@ -391,7 +391,7 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.getByText("资金明细")).toBeInTheDocument();
     expect(screen.getByText("操作明细")).toBeInTheDocument();
     expect(screen.getByText("参与方信息")).toBeInTheDocument();
-    expect(vi.mocked(stocksApi.executionDetail)).toHaveBeenCalledWith(1);
+    expect(vi.mocked(ordersApi.executionDetail)).toHaveBeenCalledWith(1);
   });
 
   it("同一账号有多张订单时，订单台账展开使用当前订单的详情上下文", async () => {
@@ -410,7 +410,7 @@ describe("OrdersPage：四类订单台账", () => {
       account_id: 1,
     };
     vi.mocked(ordersApi.list).mockResolvedValue([olderOrder, selectedOrder]);
-    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: {
         id: 1,
         stock_no: "KU_00001",

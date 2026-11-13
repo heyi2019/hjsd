@@ -11,22 +11,50 @@ import { resolveMock } from "@fixtures/mock-api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 
 export const accounts = [
-  { id: 1, source_order_no: "HS-2026-0001", stock_no: "KU_00001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
-  { id: 2, source_order_no: "TH-2026-0002", stock_no: "KU_00002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
+  { id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", stock_no: "KU_00001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
+  { id: 2, source_order_id: 22, source_order_no: "TH-2026-0002", stock_no: "KU_00002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
 ];
 
 // 库存编号（KU 编码）专项 fixture：含 DG 代挂衍生账号，供 InventoryPanel.stockNo 测试覆盖多业务类型。
 // 与共享 `accounts` 解耦，避免影响台账统计类断言（在库/已售计数依赖 accounts 条数）。
 export const stockNoAccounts = [
-  { id: 1, source_order_no: "HS-2026-0001", stock_no: "KU_00001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00" },
-  { id: 2, source_order_no: "TH-2026-0002", stock_no: "KU_00002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
-  { id: 3, source_order_no: "DG-2026-0003", stock_no: "KU_00003", game_account: "acc-3", platform: "C平台", status: "WAITING", inventory_type: "CONSIGNMENT", cost_amount: "300.00", buy_date: "2026-10-03", created_by: "admin", created_at: "2026-10-03T09:30:00" },
-  { id: 4, source_order_no: "TH-2026-0004", stock_no: "KU_00004", game_account: "acc-4", platform: "D平台", status: "WAITING", inventory_type: "PICKUP", cost_amount: "400.00", buy_date: "2026-10-04", created_by: "admin", created_at: "2026-10-04T09:30:00" },
+  { id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", stock_no: "KU_00001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00" },
+  { id: 2, source_order_id: 22, source_order_no: "TH-2026-0002", stock_no: "KU_00002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
+  { id: 3, source_order_id: 23, source_order_no: "DG-2026-0003", stock_no: "KU_00003", game_account: "acc-3", platform: "C平台", status: "WAITING", inventory_type: "CONSIGNMENT", cost_amount: "300.00", buy_date: "2026-10-03", created_by: "admin", created_at: "2026-10-03T09:30:00" },
+  { id: 4, source_order_id: 24, source_order_no: "TH-2026-0004", stock_no: "KU_00004", game_account: "acc-4", platform: "D平台", status: "WAITING", inventory_type: "PICKUP", cost_amount: "400.00", buy_date: "2026-10-04", created_by: "admin", created_at: "2026-10-04T09:30:00" },
 ];
 
 export const resetInventoryPanelMocks = () => {
   vi.clearAllMocks();
   vi.mocked(stocksApi.list).mockResolvedValue(accounts);
+  vi.mocked(ordersApi.list).mockResolvedValue([{
+    id: 21,
+    order_no: "HS-2026-0001",
+    order_type: "HS",
+    capital_type: "SELF",
+    trade_date: "2026-10-15",
+    account_id: 1,
+    account_status: "WAITING",
+    status: "ACTIVE",
+  }, {
+    id: 23,
+    order_no: "TH0003",
+    order_type: "TH",
+    capital_type: "PEER",
+    trade_date: "2026-10-16",
+    account_id: 3,
+    account_status: "WAITING",
+    status: "ACTIVE",
+  }, {
+    id: 24,
+    order_no: "TH0004",
+    order_type: "TH",
+    capital_type: "PEER",
+    trade_date: "2026-10-17",
+    account_id: 4,
+    account_status: "WAITING",
+    status: "ACTIVE",
+  }] as never);
   // 卡片指标由后端汇总（/stocks/inventory/stats），前端只渲染返回值。
   vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
   // T19/T20：建单表单字段与选项词典改为从配置读取，测试需默认种子，否则下拉无选项。
@@ -126,6 +154,30 @@ export const resetInventoryPanelMocks = () => {
         cashflow: { flow_no: "CF0002", pool_name: "利润池", occurred_on: "2026-10-16", direction: "IN", nature: "BUSINESS_IN", category: "SELL", amount: "350.00" },
       }],
     }],
+  });
+  // 展开详情走订单级接口；测试夹具复用同一份明细快照，但不改变生产端的请求路径。
+  vi.mocked(ordersApi.executionDetail).mockImplementation(async (orderId) => {
+    const detail = await vi.mocked(stocksApi.executionDetail)(1) as any;
+    const order = detail?.orders?.find((item: { order_id: number }) => item.order_id === orderId);
+    if (!order) return detail as never;
+    const flows = [
+      ...(order.events ?? []).flatMap((event: { cashflow?: { direction: string; amount: string } | null }) => event.cashflow ? [event.cashflow] : []),
+      ...(order.cashflows ?? []),
+    ];
+    const cashflowIncome = flows.filter((flow: { direction: string }) => flow.direction === "IN").reduce((sum: number, flow: { amount: string }) => sum + Number(flow.amount), 0);
+    const totalExpense = flows.filter((flow: { direction: string }) => flow.direction === "OUT").reduce((sum: number, flow: { amount: string }) => sum + Number(flow.amount), 0);
+    const rebateIncome = (order.rebates ?? []).reduce((sum: number, rebate: { base_amount: string }) => sum + Number(rebate.base_amount), 0);
+    return {
+      ...detail,
+      orders: [order],
+      finance_summary: {
+        cashflow_income: cashflowIncome.toFixed(2),
+        rebate_income: rebateIncome.toFixed(2),
+        total_income: (cashflowIncome + rebateIncome).toFixed(2),
+        total_expense: totalExpense.toFixed(2),
+        net_amount: (cashflowIncome + rebateIncome - totalExpense).toFixed(2),
+      },
+    } as never;
   });
   resolveMock(vi.mocked(stocksApi.updateProfile), accounts[0]);
 };

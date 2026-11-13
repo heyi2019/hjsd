@@ -4,6 +4,7 @@ import type { FormScope, ListColumnConfig, ListCustomFieldOption, ListScopeConfi
 import type { EventPostResult, OrderLink } from "./types/order-events";
 import type { Order, OrderType, OrderTypeRoute } from "./types/orders";
 import type { RouteImpactPreview } from "./types/policy";
+import type { AccountExecutionDetail } from "./types/account-execution";
 
 export const orderTypesApi = {
   update: (id: number, data: Partial<OrderType>) => api.patch<OrderType>(`/order-types/${id}`, data).then(r => r.data),
@@ -79,6 +80,8 @@ export const ordersApi = {
       .then((r) => r.data),
   get: (orderId: number) =>
     api.get<Order>(`/orders/${orderId}`).then((r) => r.data),
+  executionDetail: (orderId: number) =>
+    api.get<AccountExecutionDetail>(`/orders/${orderId}/execution-detail`).then((r) => r.data),
   links: (orderId: number) =>
     api.get<OrderLink[]>(`/orders/${orderId}/links`).then((r) => r.data),
   createLink: (

@@ -34,8 +34,10 @@ export function OrderDetailFinanceSection({
       title: "方向",
       dataIndex: "direction",
       key: "direction",
-      render: (value: InventoryFinanceRow["direction"]) => (
-        <Typography.Text type={value === "收入" ? "success" : value === "支出" ? "danger" : "secondary"}>{value}</Typography.Text>
+      render: (value: InventoryFinanceRow["direction"], row) => (
+        <Typography.Text type={row.key === "empty-finance" ? "secondary" : value === "收入" ? "success" : value === "支出" ? "danger" : "secondary"}>
+          {row.key === "empty-finance" ? "-" : value}
+        </Typography.Text>
       ),
     },
     {
@@ -58,6 +60,16 @@ export function OrderDetailFinanceSection({
       render: (_value, financeRow) => financeRow.poolName,
     },
   ];
+  const displayRows: InventoryFinanceRow[] = rows.length ? rows : [{
+    key: "empty-finance",
+    type: "-",
+    direction: "支出",
+    amount: "-",
+    rate: "-",
+    occurredAt: "-",
+    poolName: "-",
+    operator: "-",
+  }];
 
   return (
     <div className="inventory-detail__section inventory-detail__section--finance inventory-finance-list">
@@ -74,8 +86,7 @@ export function OrderDetailFinanceSection({
           <div className="inventory-finance-summary__item inventory-finance-summary__item--amount"><span>总支出</span><MoneyText value={totalExpense} /></div>
           <div className="inventory-finance-summary__item inventory-finance-summary__item--amount"><span>总收入</span><MoneyText value={totalIncome} /></div>
         </div>
-        {rows.length ? <DataTable className="inventory-finance-table" columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" /> : null}
-        {!rows.length ? <Typography.Text type="secondary">暂无资金明细</Typography.Text> : null}
+        <DataTable className="inventory-finance-table" columns={columns} rows={displayRows} page={1} pageSize={10} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" />
       </div>
     </div>
   );

@@ -33,7 +33,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
 const accounts = [
-  { id: 1, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
+  { id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
   { id: 2, source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
 ];
 
@@ -42,6 +42,16 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOptionSets();
   vi.mocked(stocksApi.list).mockResolvedValue(accounts);
+  vi.mocked(ordersApi.list).mockResolvedValue([{
+    id: 21,
+    order_no: "HS-2026-0001",
+    order_type: "HS",
+    capital_type: "SELF",
+    trade_date: "2026-10-15",
+    account_id: 1,
+    account_status: "WAITING",
+    status: "ACTIVE",
+  }] as never);
   vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
   resolveMock(vi.mocked(ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(ordersApi.postEvent), {});
@@ -508,6 +518,17 @@ describe("InventoryPanel：账号台账编辑态时间联动", () => {
       finance_summary: { cashflow_income: "0", rebate_income: "0", total_income: "0", total_expense: "100.00", net_amount: "-100.00" },
     };
     vi.mocked(stocksApi.executionDetail).mockResolvedValue(detail as never);
+    vi.mocked(ordersApi.list).mockResolvedValue([{
+      id: 21,
+      order_no: "HS0001",
+      order_type: "HS",
+      capital_type: "SELF",
+      trade_date: "2026-10-15",
+      account_id: 1,
+      account_status: "WAITING",
+      status: "ACTIVE",
+    }] as never);
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(detail as never);
     resolveMock(vi.mocked(stocksApi.updateExecution), { ok: true });
 
     renderLight(<InventoryPanel />, { user: "admin" });

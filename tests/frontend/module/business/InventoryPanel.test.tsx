@@ -78,8 +78,30 @@ describe("InventoryPanel：账号台账", () => {
   it("建单后刷新库存并把新账号放在第一页", async () => {
     const { rerender } = renderLight(<InventoryPanel refreshKey={0} />, { user: "admin" });
     await screen.findByText("acc-1");
-    const newer = { ...accounts[0], id: 99, game_account: "new-account", source_order_no: "HS-NEW" };
+    const newer = { ...accounts[0], id: 99, source_order_id: 99, game_account: "new-account", source_order_no: "HS-NEW" };
     vi.mocked(stocksApi.list).mockResolvedValue([...accounts, newer]);
+    vi.mocked(ordersApi.list).mockResolvedValueOnce([
+      {
+        id: 21,
+        order_no: "HS-2026-0001",
+        order_type: "HS",
+        capital_type: "SELF",
+        trade_date: "2026-10-15",
+        account_id: 1,
+        account_status: "WAITING",
+        status: "ACTIVE",
+      },
+      {
+        id: 99,
+        order_no: "HS-NEW",
+        order_type: "HS",
+        capital_type: "SELF",
+        trade_date: "2026-10-20",
+        account_id: 99,
+        account_status: "WAITING",
+        status: "ACTIVE",
+      },
+    ] as never);
     rerender(<InventoryPanel refreshKey={1} />);
     await screen.findByText("new-account");
     const rows = screen.getAllByRole("row");
@@ -283,6 +305,18 @@ describe("InventoryPanel：账号台账", () => {
       // 已售账号不进库存中心：即便后端给了档位也不渲染，故「31天」只出现一次。
       { ...accounts[1], ...stale, id: 14, game_account: "sold-account", inventory_age_days: 31, inventory_age_level: "OVERDUE" },
     ]);
+    vi.mocked(ordersApi.list).mockResolvedValueOnce([
+      11, 12, 13,
+    ].map((id) => ({
+      id,
+      order_no: `HS-${id}`,
+      order_type: "HS",
+      capital_type: "SELF",
+      trade_date: "2026-10-15",
+      account_id: id,
+      account_status: "WAITING",
+      status: "ACTIVE",
+    })) as never);
 
     renderLight(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByText("green-account")).toBeInTheDocument();
@@ -395,10 +429,10 @@ describe("InventoryPanel：账号台账", () => {
     const detailPanel = (await screen.findByText("当前运营状态")).closest(".inventory-detail") as HTMLElement;
     // 这里只确认详情已取回并呈现关键业务结果，不锁定表格列、CSS 和辅助文案。
     expect(within(detailPanel).getByText("高段位账号")).toBeInTheDocument();
-    expect(within(detailPanel).getByText("1,350.00")).toBeInTheDocument();
+    expect(within(detailPanel).getAllByText("1,000.00").length).toBeGreaterThan(0);
     expect(within(detailPanel).getByText("买号支出")).toBeInTheDocument();
-    expect(within(detailPanel).getByText("售出收入")).toBeInTheDocument();
-    expect(vi.mocked(stocksApi.executionDetail)).toHaveBeenCalledWith(1);
+    expect(within(detailPanel).queryByText("售出收入")).toBeNull();
+    expect(vi.mocked(ordersApi.executionDetail)).toHaveBeenCalledWith(21);
     fireEvent.click(document.querySelector(".ant-table-row-expand-icon") as Element);
   });
 
@@ -410,9 +444,9 @@ describe("InventoryPanel：账号台账", () => {
         code: "INVENTORY",
         columns: [
           { key: "stock_no", is_visible: true, sort_order: 0 },
-          { key: "game_type", is_visible: true, sort_order: 10 },
-          { key: "game_account", is_visible: true, sort_order: 20 },
-          { key: "source_order_no", is_visible: true, sort_order: 30 },
+          { key: "account_game_type", is_visible: true, sort_order: 10 },
+          { key: "account_game_account", is_visible: true, sort_order: 20 },
+          { key: "order_no", is_visible: true, sort_order: 30 },
           { key: "business_mode", is_visible: true, sort_order: 40 },
           { key: "inventory_type", is_visible: true, sort_order: 50 },
           { key: "inventory_age", is_visible: false, sort_order: 60 },
@@ -463,12 +497,47 @@ describe("InventoryPanel：展开行与写路径联动", () => {
 
   /** 账号台账「展开」的两条约束：同时只展开一行；写操作后执行明细必须重拉，不能停在写前快照。 */
   describe("InventoryPanel：账号台账展开", () => {
+    it("按关联订单作为库存中心的行上下文，而不是直接使用账号来源订单快照", async () => {
+      vi.mocked(stocksApi.list).mockResolvedValueOnce([{
+        ...accounts[0],
+        source_order_no: "库存旧来源号",
+        source_order_id: 21,
+      }]);
+      vi.mocked(ordersApi.list).mockResolvedValueOnce([{
+        id: 21,
+        order_no: "HS-订单上下文-0021",
+        order_type: "HS",
+        capital_type: "SELF",
+        trade_date: "2026-10-15",
+        account_id: 1,
+        account_status: "WAITING",
+        status: "ACTIVE",
+      }] as never);
+
+      renderLight(<InventoryPanel />, { user: "admin" });
+
+      expect(await screen.findByText("HS-订单上下文-0021")).toBeInTheDocument();
+      expect(screen.queryByText("库存旧来源号")).toBeNull();
+    });
+
     it("一次只展开一行：展开另一行时前一行自动收起", async () => {
       // 默认 fixture 只有 1 条在库账号，这里补到 2 条才能验证互斥。
       vi.mocked(stocksApi.list).mockResolvedValue([
         { ...accounts[0], id: 11, game_account: "acc-11" },
         { ...accounts[0], id: 12, game_account: "acc-12" },
       ]);
+      vi.mocked(ordersApi.list).mockResolvedValueOnce([
+        11, 12,
+      ].map((id) => ({
+        id,
+        order_no: `HS-${id}`,
+        order_type: "HS",
+        capital_type: "SELF",
+        trade_date: "2026-10-15",
+        account_id: id,
+        account_status: "WAITING",
+        status: "ACTIVE",
+      })) as never);
       renderLight(<InventoryPanel />, { user: "admin" });
       await screen.findByText("acc-11");
 
@@ -497,7 +566,7 @@ describe("InventoryPanel：展开行与写路径联动", () => {
 
       await ui.click(document.querySelector(".ant-table-row-expand-icon-collapsed") as HTMLElement);
       await screen.findByText("当前运营状态");
-      const callsBeforeWrite = vi.mocked(stocksApi.executionDetail).mock.calls.length;
+      const callsBeforeWrite = vi.mocked(ordersApi.executionDetail).mock.calls.length;
       expect(callsBeforeWrite).toBeGreaterThan(0);
 
       // 展开后「acc-1」同时出现在主表行与展开详情里，改用全局唯一的「返点」按钮，避免 getByText 多匹配。
@@ -508,9 +577,9 @@ describe("InventoryPanel：展开行与写路径联动", () => {
       await ui.click(screen.getByRole("button", { name: "确认登记" }));
 
       await waitFor(() => expect(vi.mocked(rebatesApi.create)).toHaveBeenCalled());
-      // 缓存若未失效，executionDetail 不会再被调用，展开区会停在写之前的快照。
+      // 订单级详情缓存若未失效，展开区会停在写之前的快照。
       await waitFor(() =>
-        expect(vi.mocked(stocksApi.executionDetail).mock.calls.length).toBeGreaterThan(callsBeforeWrite),
+        expect(vi.mocked(ordersApi.executionDetail).mock.calls.length).toBeGreaterThan(callsBeforeWrite),
       );
     });
 
@@ -520,14 +589,14 @@ describe("InventoryPanel：展开行与写路径联动", () => {
 
       await ui.click(document.querySelector(".ant-table-row-expand-icon-collapsed") as HTMLElement);
       await screen.findByText("当前运营状态");
-      const callsAfterFirstExpand = vi.mocked(stocksApi.executionDetail).mock.calls.length;
+      const callsAfterFirstExpand = vi.mocked(ordersApi.executionDetail).mock.calls.length;
 
       await ui.click(document.querySelector(".ant-table-row-expand-icon-expanded") as HTMLElement);
       await waitFor(() => expect(document.querySelector(".inventory-detail")).toBeNull());
 
       await ui.click(document.querySelector(".ant-table-row-expand-icon-collapsed") as HTMLElement);
       await screen.findByText("当前运营状态");
-      expect(vi.mocked(stocksApi.executionDetail).mock.calls.length).toBe(callsAfterFirstExpand);
+      expect(vi.mocked(ordersApi.executionDetail).mock.calls.length).toBe(callsAfterFirstExpand);
     });
   });
 });

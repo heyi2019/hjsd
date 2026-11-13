@@ -59,9 +59,11 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         label="库存中心",
         columns=(
             ListColumn("stock_no", "库存编号"),
-            ListColumn("source_order_no", "订单号"),
-            ListColumn("game_type", "游戏/产品类型"),
-            ListColumn("game_account", "游戏账号/产品"),
+            # 库存中心以订单为列表行；键名必须与 InventoryPanel 的订单级列一致，
+            # 否则服务端配置加载后这三列会被当作未知列排到末尾。
+            ListColumn("order_no", "订单号"),
+            ListColumn("account_game_type", "游戏/产品类型"),
+            ListColumn("account_game_account", "游戏账号/产品"),
             ListColumn("camp_account", "营地账号"),
             ListColumn("inventory_entry_at", "入库时间"),
             ListColumn("inventory_operator", "入库负责人"),

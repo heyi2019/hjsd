@@ -431,8 +431,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     // 一行 = 一位员工（李四 40%），不再固定四个动作位
     expect(within(modal).getAllByLabelText("比例")).toHaveLength(1);
     expect(within(modal).getByDisplayValue("40")).toBeInTheDocument();
-    // 姓名下拉（顶部多选 + 行内单选）都显示李四
-    expect(within(modal).getAllByText("李四（lisi）").length).toBeGreaterThan(0);
+    // 姓名下拉只显示李四，不再展示 username。
+    expect(within(modal).getAllByText("李四").length).toBeGreaterThan(0);
     // 总利润直接取后端 order_profit，不在前端重算
     expect(within(modal).getByText(/订单总利润/)).toBeInTheDocument();
     expect(within(modal).getByText("5,000.00")).toBeInTheDocument();
@@ -483,8 +483,8 @@ describe("OrdersPage：操作与筛选分支", () => {
       expect(within(modal).getByText(label)).toBeInTheDocument();
     }
     // 买号取建单负责人，售出取卖出表单负责人，运营取运营信息中的动作负责人，均自动带出。
-    expect(within(modal).getByText("回收员（recovery）")).toBeInTheDocument();
-    expect(within(modal).getByText("售出员（seller）")).toBeInTheDocument();
+    expect(within(modal).getByText("回收员")).toBeInTheDocument();
+    expect(within(modal).getByText("售出员")).toBeInTheDocument();
     expect(within(modal).getByText("运营员")).toBeInTheDocument();
   });
 
@@ -498,10 +498,10 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
-    expect(within(modal).getByText("回收员（recovery）")).toBeInTheDocument();
+    expect(within(modal).getByText("回收员")).toBeInTheDocument();
     await ui.click(within(modal).getByRole("button", { name: /增加一行/ }));
     // 新行姓名直接带出当前登录人（李四/lisi），角色仍按业绩归属人兜底。
-    const selects = within(modal).getAllByText("李四（lisi）");
+    const selects = within(modal).getAllByText("李四");
     expect(selects.length).toBeGreaterThan(0);
     expect(within(modal).getAllByLabelText("比例")).toHaveLength(2);
   });
@@ -566,21 +566,16 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
 
-    // 买号两人 → 展开两行：首行写字号合计，第二行只读显示人均值。
-    expect(within(modal).getByText("买号（2 人均分）")).toBeInTheDocument();
-    const totalRates = within(modal).getAllByLabelText("比例合计");
-    expect(totalRates).toHaveLength(1);
-    fireEvent.change(totalRates[0], { target: { value: "30" } });
-    // 另一人的比例是只读的人均值：30 ÷ 2 = 15%
-    expect(within(modal).getByText("15%")).toBeInTheDocument();
-    expect(within(modal).queryByLabelText("比例（人均）")).toBeNull();
+    // 买号两人只占一行，人员多选后填写动作合计。
+    expect(within(modal).getByText("买号")).toBeInTheDocument();
+    const rates = within(modal).getAllByLabelText("比例");
+    expect(rates).toHaveLength(4);
+    fireEvent.change(rates[0], { target: { value: "30" } });
 
     // 售出 40、运营 20、公司 10，四项合计 100
-    const plainRates = within(modal).getAllByLabelText("比例");
-    expect(plainRates).toHaveLength(3);
-    fireEvent.change(plainRates[0], { target: { value: "40" } });
-    fireEvent.change(plainRates[1], { target: { value: "20" } });
-    fireEvent.change(plainRates[2], { target: { value: "10" } });
+    fireEvent.change(rates[1], { target: { value: "40" } });
+    fireEvent.change(rates[2], { target: { value: "20" } });
+    fireEvent.change(rates[3], { target: { value: "10" } });
 
     await clickModalOk(modal);
     await waitFor(() => expect(policyApi.setAllocations).toHaveBeenCalled());

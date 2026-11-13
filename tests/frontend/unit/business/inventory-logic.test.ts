@@ -49,7 +49,7 @@ describe("库存纯逻辑", () => {
     const rows = buildActionAllocationRows([], candidates);
 
     expect(candidates).toMatchObject({ BUY: [11], SELL: [22], OPERATION: [33], COMPANY: [] });
-    expect(rows.map((row) => row.employee)).toEqual([11, 22, 33, "COMPANY"]);
+    expect(rows.map((row) => row.employee_ids ?? row.employee)).toEqual([[11], [22], [33], "COMPANY"]);
     expect(rows.map((row) => row.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
   });
 

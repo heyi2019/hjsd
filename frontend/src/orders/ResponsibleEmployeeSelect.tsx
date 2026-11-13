@@ -1,10 +1,26 @@
 import { Form } from "antd";
+import type { SelectProps } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import type { EmployeeOption } from "../shared/api/types/org";
 import { currentUser } from "../shared/api/client";
 import { useSession } from "../shared/state/session";
 import { Select } from "../shared/ui";
 import { CfgItem } from "./ConfigurableField";
+import "./ResponsibleEmployeeSelect.css";
+
+type EmployeeSelectControlProps = Omit<SelectProps, "options"> & {
+  employees?: EmployeeOption[];
+  options?: SelectProps["options"];
+};
+
+/** 统一人员选项与下拉控件；建单负责人、交付负责人、分润配置共用此入口。 */
+export function EmployeeSelectControl({ employees, options, ...props }: EmployeeSelectControlProps) {
+  const employeeOptions = options ?? employees?.filter((employee) => employee.is_active).map((employee) => ({
+    value: employee.id,
+    label: employee.display_name,
+  })) ?? [];
+  return <Select {...props} options={employeeOptions} />;
+}
 
 /** 多人负责人：优先用当前会话员工默认值，仍允许补充其他在职员工。 */
 export function ResponsibleEmployeeSelect(props: { name: string; label: string; employees: EmployeeOption[]; className?: string }) {
@@ -29,7 +45,7 @@ export function ResponsibleEmployeeSelect(props: { name: string; label: string; 
 
   return (
     <CfgItem alwaysActive className={["responsible-employee-select", props.className].filter(Boolean).join(" ")} name={props.name} label={props.label}>
-      <Select mode="multiple" placeholder="默认当前员工，可多选" options={props.employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.display_name }))} />
+      <EmployeeSelectControl mode="multiple" placeholder="默认当前员工，可多选" employees={props.employees} />
     </CfgItem>
   );
 }

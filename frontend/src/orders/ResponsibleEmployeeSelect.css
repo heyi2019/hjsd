@@ -1,0 +1,31 @@
+.responsible-employee-select .ant-form-item-row {
+  align-items: center;
+}
+
+.responsible-employee-select .ant-select-selector {
+  min-height: 32px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.responsible-employee-select .ant-select,
+.responsible-employee-select .ant-form-item-control-input {
+  width: 100% !important;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.responsible-employee-select .ant-select-selection-overflow {
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.responsible-employee-select .ant-form-item-control {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}

@@ -18,7 +18,6 @@ export type EventDraft = {
 
 export interface AccountExecutionEditor {
   editingAccount: Account | null;
-  setEditingAccount: Dispatch<SetStateAction<Account | null>>;
   inlineEditId: number | null;
   eventDrafts: Record<number, EventDraft>;
   updateEventDraft: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
@@ -169,7 +168,6 @@ export function useAccountExecutionEditor(params: {
 
   return {
     editingAccount,
-    setEditingAccount,
     inlineEditId,
     eventDrafts,
     updateEventDraft,

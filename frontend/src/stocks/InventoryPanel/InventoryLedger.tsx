@@ -1,4 +1,5 @@
-import { Card, DatePicker, Input, Segmented, Space, Typography } from "antd";
+import { Button, Card, DatePicker, Input, Segmented, Space, Typography } from "antd";
+import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
 import { DataTable, PermissionButton, Select } from "../../shared/ui";
 import { OrderDetail } from "../OrderDetail";
 import type { InventoryController } from "./useInventoryController";
@@ -65,6 +66,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
           placeholder={["开始日期", "结束日期"]}
           format="YYYY-MM-DD"
           size="small"
+          placement="bottomLeft"
           classNames={{ popup: { root: "compact-date-range-picker" } }}
           value={dateRange}
           onChange={(value) => {
@@ -72,7 +74,6 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
             setPage(1);
           }}
         />
-        <Typography.Text strong>游戏类型筛选</Typography.Text>
         <Select
           aria-label="游戏类型筛选"
           className="ui-filter-select"
@@ -80,7 +81,6 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
           options={[{ value: "all", label: "全部游戏类型" }, ...gameTypeOptions]}
           onChange={(value) => { setGameTypeFilter(value === "all" ? undefined : value); setPage(1); }}
         />
-        <Typography.Text strong>类型筛选</Typography.Text>
         <Segmented
           aria-label="库存类型筛选"
           value={inventoryType ?? "all"}
@@ -90,7 +90,6 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
           ]}
           onChange={(value) => { setInventoryType(value === "all" ? undefined : String(value)); setPage(1); }}
         />
-        <Typography.Text strong>业务筛选</Typography.Text>
         <Segmented
           aria-label="库存业务筛选"
           value={businessMode ?? "all"}
@@ -98,12 +97,24 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
           onChange={(value) => { setBusinessMode(value === "all" ? undefined : String(value)); setPage(1); }}
         />
         <Typography.Text strong>排序</Typography.Text>
-        <Segmented
-          aria-label="库存排序"
-          value={sortDesc ? "desc" : "asc"}
-          options={[{ value: "desc", label: "最新在前" }, { value: "asc", label: "最旧在前" }]}
-          onChange={(value) => { setSortDesc(value === "desc"); setPage(1); }}
-        />
+        <Space.Compact className="ledger-sort-actions" aria-label="库存排序">
+          <Button
+            size="small"
+            type="text"
+            icon={<ArrowDownOutlined />}
+            aria-label="最新在前"
+            title="最新在前"
+            onClick={() => { setSortDesc(true); setPage(1); }}
+          />
+          <Button
+            size="small"
+            type="text"
+            icon={<ArrowUpOutlined />}
+            aria-label="最旧在前"
+            title="最旧在前"
+            onClick={() => { setSortDesc(false); setPage(1); }}
+          />
+        </Space.Compact>
         <PermissionButton permission="report.read" aria-label="导出" size="small" loading={exporting} onClick={() => void handleExport()}>导出</PermissionButton>
       </Space>
       <DataTable
@@ -126,7 +137,6 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
               loading={Boolean(orderExecutionLoading[row.id])}
               onPartyClick={openPartyCard}
               editing={inlineEditId === row.account.id ? editingAccount : undefined}
-              onEdit={controller.setEditingAccount}
               eventDrafts={eventDrafts}
               onEventEdit={updateEventDraft}
               employees={employees}

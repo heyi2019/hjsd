@@ -179,7 +179,6 @@ export function OrderDetail({
   contextOrderNo,
   loading,
   editing,
-  onEdit,
   eventDrafts,
   onEventEdit,
   onPartyClick,
@@ -199,7 +198,6 @@ export function OrderDetail({
   contextOrderNo?: string | null;
   loading: boolean;
   editing?: Account | null;
-  onEdit?: (account: Account) => void;
   eventDrafts?: Record<number, InventoryEventDraft>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
   employees?: EmployeeOption[];
@@ -286,7 +284,6 @@ export function OrderDetail({
     statusLabel: STATUS_LABEL[row.status] ?? row.status,
     gameType: row.game_type ?? null,
     gameAccount: row.game_account ?? null,
-    campAccount: row.camp_account ?? null,
     platform: row.platform ?? null,
     cost: row.cost_amount ?? null,
     businessMode: row.business_mode ? (BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode) : null,
@@ -325,7 +322,6 @@ export function OrderDetail({
       detail={scopedDetail}
       account={row}
       editing={editing}
-      onEdit={onEdit}
       eventDrafts={eventDrafts}
       onEventEdit={onEventEdit}
       employees={employees}

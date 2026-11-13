@@ -1,4 +1,5 @@
-import { Card, DatePicker, Dropdown, Input, Segmented, Space, Spin, Typography } from "antd";
+import { Button, Card, DatePicker, Dropdown, Input, Segmented, Space, Spin, Typography } from "antd";
+import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
 import type { BusinessCenterEntryTab } from "../businessCenter";
 import { DataTable, PermissionButton, Select, StatRow } from "../../shared/ui";
 import { OrderDetail } from "../../stocks/OrderDetail";
@@ -65,7 +66,6 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     savingAccount,
     cancelInlineEdit,
     saveInline,
-    openLedgerAccountEditor,
     openLedgerEditor,
   } = controller;
 
@@ -97,15 +97,13 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
             placeholder={["开始日期", "结束日期"]}
             format="YYYY-MM-DD"
             size="small"
+            placement="bottomLeft"
             classNames={{ popup: { root: "compact-date-range-picker" } }}
             value={dateRange}
             onChange={(value) => { setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null); setPage(1); }}
           />
-          <Typography.Text strong className="orders-ledger-filter-label">游戏类型筛选</Typography.Text>
           <Select aria-label="游戏类型筛选" className="ui-filter-select" value={gameTypeFilter} options={gameTypeOptions} onChange={(value) => { setGameTypeFilter(value); setPage(1); }} />
-          <Typography.Text strong className="orders-ledger-filter-label">库存状态筛选</Typography.Text>
           <Select aria-label="库存状态筛选" className="ui-filter-select" value={inventoryStatusFilter} options={inventoryStatusOptions} onChange={(value) => { setInventoryStatusFilter(value); setPage(1); }} />
-          <Typography.Text strong className="orders-ledger-filter-label">类型筛选</Typography.Text>
           <Segmented
             value={orderTypeFilter}
             options={[
@@ -114,19 +112,30 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
             ]}
             onChange={(value) => { setOrderTypeFilter(value as BusinessFilterKey); setPage(1); }}
           />
-          <Typography.Text strong className="orders-ledger-filter-label">业务筛选</Typography.Text>
           <Segmented
             value={businessModeFilter}
             options={[{ value: "all", label: "全部业务" }, ...orderBusinessModeOptions.map((item) => ({ value: item.value, label: item.label }))]}
             onChange={(value) => { setBusinessModeFilter(value as BusinessModeFilterKey); setPage(1); }}
           />
           <Typography.Text strong className="orders-ledger-filter-label">排序</Typography.Text>
-          <Segmented
-            aria-label="台账排序"
-            value={ledgerSortDesc ? "desc" : "asc"}
-            options={[{ value: "desc", label: "最新在前" }, { value: "asc", label: "最旧在前" }]}
-            onChange={(value) => { setLedgerSortDesc(value === "desc"); setPage(1); }}
-          />
+          <Space.Compact className="ledger-sort-actions" aria-label="台账排序">
+            <Button
+              size="small"
+              type="text"
+              icon={<ArrowDownOutlined />}
+              aria-label="最新在前"
+              title="最新在前"
+              onClick={() => { setLedgerSortDesc(true); setPage(1); }}
+            />
+            <Button
+              size="small"
+              type="text"
+              icon={<ArrowUpOutlined />}
+              aria-label="最旧在前"
+              title="最旧在前"
+              onClick={() => { setLedgerSortDesc(false); setPage(1); }}
+            />
+          </Space.Compact>
           {/* 导出格式靠下拉选择，触发按钮保持「导出」两字：UI 规范要求筛选栏文案简短 */}
           <Dropdown
             disabled={ledgerExporting}
@@ -173,7 +182,6 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
                   loading={Boolean(ledgerOrderDetailLoading[order.id])}
                   onPartyClick={(party: InventoryPartyLink) => onNavigate?.(party.entityType === "customer" ? `customers?customer_id=${party.id}` : `customers?counterparty_id=${party.id}`)}
                   editing={inlineEditId === detail.account.id ? editingAccount : undefined}
-                  onEdit={openLedgerAccountEditor}
                   eventDrafts={eventDrafts}
                   onEventEdit={updateEventDraft}
                   employees={employees}

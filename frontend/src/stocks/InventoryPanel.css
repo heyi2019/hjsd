@@ -2,6 +2,32 @@
   align-items: center;
 }
 
+.ledger-sort-actions .ant-btn {
+  min-width: var(--sz-24);
+  width: var(--sz-24);
+  height: var(--sz-24);
+  padding-inline: 0;
+  font-size: var(--fs-caption-2);
+  color: var(--color-text-primary);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.ledger-sort-actions .ant-btn:hover,
+.ledger-sort-actions .ant-btn:focus-visible {
+  color: var(--color-text-primary);
+  background: transparent;
+  border-color: transparent;
+}
+
+/* 桌面端列按自身语义宽度排布，不把剩余空间平均摊进每个字段；内容超出时由表格横向滚动承载。 */
+@media (min-width: 768px) {
+  .inventory-table .ant-table {
+    width: max-content;
+    min-width: max-content;
+  }
+}
+
 /* 取消交易的金额和收款账户始终保持同一行，避免紧凑弹窗误触发窄屏规则。 */
 .adaptive-form-grid.inventory-void-fields {
   grid-template-columns: repeat(2, minmax(0, 1fr));

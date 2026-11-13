@@ -333,15 +333,16 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.getByText("暂无账号")).toBeInTheDocument();
   });
 
-  it("编辑账号时可编辑核心资料（游戏账号/产品、游戏/产品类型）", async () => {
+  it("编辑时直接展开详情，账户资料保持只读", async () => {
     vi.mocked(employeesApi.list).mockResolvedValue([]);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
 
     // 内联编辑：点「编辑」直接就地展开该行进入编辑态，不再弹窗。
     await ui.click(screen.getAllByRole("button", { name: "编辑" })[0]);
-    expect(await screen.findByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
-    expect(screen.getByLabelText("编辑游戏/产品类型")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "保存修改" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("编辑游戏账号/产品")).toBeNull();
+    expect(screen.queryByLabelText("编辑游戏/产品类型")).toBeNull();
   });
 
   it("库存编辑展示运营信息自定义字段", async () => {

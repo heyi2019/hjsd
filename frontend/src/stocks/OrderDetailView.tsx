@@ -81,7 +81,6 @@ type OrderDetailViewProps = {
   totalIncome: string;
   flowCount: number;
   editing?: Account | null;
-  onEdit?: (account: Account) => void;
   eventDrafts?: Record<number, InventoryEventDraft>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
   employees: InventoryEmployeeOption[];
@@ -103,7 +102,6 @@ export function OrderDetailView({
   detail,
   account,
   editing,
-  onEdit,
   eventDrafts,
   onEventEdit,
   employees,
@@ -128,7 +126,7 @@ export function OrderDetailView({
   if (editing) {
     return (
       <div className="inventory-detail inventory-detail--editing">
-        <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onEdit={onEdit} />
+        <OrderDetailProfileSection meta={meta} detail={detail} account={account ?? editing} />
         <TimeShiftFields
           registeredAt={meta.registeredAt}
           soldAt={meta.soldAt}

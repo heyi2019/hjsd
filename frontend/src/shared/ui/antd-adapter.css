@@ -298,8 +298,8 @@
 
 /* 业务列表日期区间：筛选弹层保持紧凑，避免双月日历占满工作区。 */
 .compact-date-range-picker .ant-picker-panel-container {
-  transform: translateX(12%) scale(0.72);
-  transform-origin: top right;
+  transform: scale(0.72);
+  transform-origin: top left;
 }
 
 

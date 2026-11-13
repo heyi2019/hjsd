@@ -163,7 +163,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
       />
       <BusinessActionModal
         className="inventory-detail-modal"
-        title={inlineEditId === detailTarget?.id ? "编辑账号" : "库存详情"}
+        title={inlineEditId === detailTarget?.id ? "编辑详情" : "库存详情"}
         open={Boolean(detailTarget)}
         footer={null}
         width="min(1200px, calc(100vw - 24px))"
@@ -175,7 +175,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           loading={Boolean(executionLoading[detailTarget.id])}
           onPartyClick={controller.openPartyCard}
           editing={inlineEditId === detailTarget.id ? editingAccount : undefined}
-          onEdit={controller.setEditingAccount}
           eventDrafts={eventDrafts}
           onEventEdit={updateEventDraft}
           employees={employees}

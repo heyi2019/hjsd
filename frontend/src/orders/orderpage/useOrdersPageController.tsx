@@ -58,11 +58,9 @@ export function useOrdersPageController(params: {
     sharedCancellationEvent, hasSharedCancellation,
   } = cancellation;
 
-  // —— 订单动作弹窗域：退款 / 分润配置 / 交付 / 下架 / 账号动作 / 订单编辑 ——
+  // —— 订单动作弹窗域：退款 / 分润配置 / 交付 / 下架 / 账号动作 ——
   // 子 hook 内部持有全部弹窗状态；主 hook 用 spread 并集保持对外返回契约不变。
-  const actionModals = useOrderActionModals({
-    selectedOrder, setSelectedOrder, load, loadLedgerDetail,
-  });
+  const actionModals = useOrderActionModals({ selectedOrder, load });
   // openOrderProfile 仅供台账列定义内部点击转发，原本不在对外 return 契约中。
   const { openOrderProfile, ...exposedActionModals } = actionModals;
   const {
@@ -70,8 +68,6 @@ export function useOrdersPageController(params: {
     openOrderRebate, openOrderSale, openOrderConsignment, openOrderOffsale, openOrderDelete,
   } = actionModals;
 
-  // 后端 update_order 规则：已有登记事件的订单只能改备注（orders/service.py）。
-  const orderHasPostedEvents = (selectedOrder?.events ?? []).some((event) => event.is_posted);
   const legacyInitialTab = initialTab as string | undefined;
   const normalizedInitialTab: BusinessCenterTab = initialTab && ["inventory", "ledger", "collections"].includes(initialTab)
     ? initialTab
@@ -151,7 +147,6 @@ export function useOrdersPageController(params: {
     openCancelTransaction: openCancelTransaction,
     orderBusinessModeOptions: orderBusinessModeOptions,
     orderBusinessOptions: orderBusinessOptions,
-    orderHasPostedEvents: orderHasPostedEvents,
     orderTypeFilter: orderTypeFilter,
     orders: orders,
     page: page,

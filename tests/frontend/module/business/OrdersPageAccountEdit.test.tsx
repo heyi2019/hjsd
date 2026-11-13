@@ -77,6 +77,11 @@ beforeEach(() => {
     orders: [],
     finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
   } as never);
+  vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+    account: { id: 99, stock_no: "KU_00001", game_account: "acc-99", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
+    orders: [{ order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE", events: [] }],
+    finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
+  } as never);
   vi.mocked(stocksApi.updateProfile).mockResolvedValue({ id: 99, game_account: "acc-99" } as never);
 });
 
@@ -93,7 +98,8 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
     const editBtn = within(row as HTMLElement).getByRole("button", { name: "编辑" });
     await ui.click(editBtn);
 
-    expect(await screen.findByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "保存修改" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("编辑游戏账号/产品")).toBeNull();
     expect(screen.getByRole("button", { name: "保存修改" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "编辑账号" })).toBeNull();
   });

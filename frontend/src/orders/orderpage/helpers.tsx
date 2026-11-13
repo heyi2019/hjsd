@@ -1,5 +1,4 @@
 import type { Order } from "../../shared/api/types/orders";
-import type { OrderPatchPayload } from "../../shared/api/orders.api";
 import type { Dayjs } from "dayjs";
 import { money } from "../../shared/lib/format";
 import { toCents, fromCents, toBasisPoints, amountByBasisPoints, basisPointsByAmount, fromBasisPoints } from "../../shared/lib/money";
@@ -287,44 +286,6 @@ export function resolveCancelAmount(params: {
     return { ok: false, error: `冲销金额不能超过该动作剩余可冲金额 ¥${remaining}` };
   }
   return { ok: true, amount };
-}
-
-/**
- * 订单编辑 PATCH 入参组装（原本内联在 submitEditOrder 里）。
- * 三条规则都由后端契约决定，抽出来才可免挂载覆盖：
- *  1. 成交日期始终回写：后端按天数差平移本单事件/资金流水日期并重取规则快照；
- *  2. 快照密码被后端隐去（无 order.create 权限）→ 完全不带 account_snapshot，
- *     避免把隐藏密码覆盖成空；
- *  3. 快照是整体替换：表单里没有的控件（钱包实名 / 营地账号）沿用原快照值，
- *     否则编辑一次订单就把钱包实名抹掉。
- */
-export function buildOrderPatchPayload(params: {
-  values: Record<string, unknown>;
-  snapshot: Order["account_snapshot"];
-  hasPosted: boolean;
-}): OrderPatchPayload {
-  const { values, snapshot, hasPosted } = params;
-  const payload: OrderPatchPayload = {};
-  // 成交日期始终回写；hasPosted 只影响账号快照（后端对有登记事件的单也拒收快照）。
-  payload.trade_date = values.trade_date as string;
-  const note = (values.note as string | undefined)?.trim();
-  payload.note = note ? note : null;
-  payload.form_extra = (values.form_extra as Record<string, unknown> | undefined) ?? undefined;
-  if (!hasPosted && snapshot && snapshot.game_password) {
-    payload.account_snapshot = {
-      game_account: (values.snap_game_account as string) ?? snapshot.game_account,
-      game_type: (values.snap_game_type as string) || null,
-      game_password: (values.snap_game_password as string) || null,
-      channel_region: (values.snap_channel_region as string) || null,
-      bound_phone: (values.snap_bound_phone as string) || null,
-      wallet_realname: (values.snap_wallet_realname as string) || snapshot.wallet_realname || null,
-      camp_account: (values.snap_camp_account as string) || snapshot.camp_account || null,
-      platform: (values.snap_platform as string) || null,
-      purchase_price: (values.snap_purchase_price as string) || null,
-      note: (values.snap_note as string) || null,
-    };
-  }
-  return payload;
 }
 
 export function formatOrderAmount(order: Order): string {

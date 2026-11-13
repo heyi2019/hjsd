@@ -1,4 +1,4 @@
-import { Descriptions, Input } from "antd";
+import { Descriptions } from "antd";
 import { useMemo } from "react";
 import type { AccountExecutionDetail } from "../shared/api/types/account-execution";
 import type { Account } from "../shared/api/types/accounts";
@@ -8,7 +8,6 @@ import {
   type OrderDetailField,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
-import { OrderDetailEditFields } from "./account-edit/edit-fields";
 import {
   buildFormExtraDisplay,
   fieldLabel,
@@ -23,7 +22,6 @@ import {
 const ACCOUNT_FIELD_MAP: Record<string, { cfgKey: string; fallback: string }> = {
   gameType: { cfgKey: "game_type", fallback: "游戏 / 产品类型" },
   gameAccount: { cfgKey: "game_account", fallback: "游戏账号 / 产品" },
-  campAccount: { cfgKey: "camp_account", fallback: "营地账号" },
   password: { cfgKey: "game_password", fallback: "账号密码" },
   channelRegion: { cfgKey: "channel_region", fallback: "渠道 / 区服" },
   secondary: { cfgKey: "has_secondary", fallback: "有无二次" },
@@ -31,21 +29,15 @@ const ACCOUNT_FIELD_MAP: Record<string, { cfgKey: string; fallback: string }> = 
   note: { cfgKey: "game_account_note", fallback: "账号备注" },
 };
 
-const EDITABLE_BASIC_KEYS = new Set(["gameAccount", "gameType"]);
-
 /** 板块1：游戏账号信息。账号资料 + ACCOUNT_PRODUCT 自定义字段走建单配置驱动；
  *  主订单信息（业务/订单级，含平台/成本/业务/业务类型/增值服务）保持现状，不接字典/配置。 */
 export function OrderDetailProfileSection({
   meta,
-  editing,
   account,
-  onEdit,
   detail,
 }: {
   meta: OrderDetailMeta;
-  editing?: boolean;
   account?: Account | null;
-  onEdit?: (account: Account) => void;
   detail?: AccountExecutionDetail | null;
 }) {
   const creationOrder = useMemo(() => findCreationOrder(detail, meta.sourceOrderNo), [detail, meta.sourceOrderNo]);
@@ -57,7 +49,6 @@ export function OrderDetailProfileSection({
   const accountProfileFields: OrderDetailField[] = [
     { key: "gameType", label: ACCOUNT_FIELD_MAP.gameType.fallback, value: meta.gameType || "-" },
     { key: "gameAccount", label: ACCOUNT_FIELD_MAP.gameAccount.fallback, value: meta.gameAccount || "-" },
-    { key: "campAccount", label: ACCOUNT_FIELD_MAP.campAccount.fallback, value: meta.campAccount || "-" },
     {
       key: "password",
       label: ACCOUNT_FIELD_MAP.password.fallback,
@@ -77,49 +68,6 @@ export function OrderDetailProfileSection({
       (item) => (creationConfig[item.key]?.section ?? "EXTRA") === "ACCOUNT_PRODUCT",
     );
   }, [creationOrder, account, creationConfig]);
-
-  if (editing) {
-    const editable = accountProfileFields.filter((field) => EDITABLE_BASIC_KEYS.has(field.key));
-    const readOnly = accountProfileFields.filter((field) => !EDITABLE_BASIC_KEYS.has(field.key));
-    return (
-      <div className="inventory-detail__section inventory-detail__section--profile">
-        <InventorySectionHeading title={accountTitle} />
-        <div className="inventory-detail__meta">
-          <div className="inventory-detail__edit-grid">
-            {editable.map((field) => {
-              const prop = field.key === "gameAccount" ? "game_account" : field.key === "gameType" ? "game_type" : "platform";
-              return (
-                <label key={field.key}>
-                  <span>{field.label}</span>
-                  <Input
-                    aria-label={field.key === "gameAccount" ? "编辑游戏账号/产品" : field.key === "gameType" ? "编辑游戏/产品类型" : "编辑平台"}
-                    value={account ? String(account[prop] ?? "") : ""}
-                    onChange={(event) => { if (account) onEdit?.({ ...account, [prop]: event.target.value }); }}
-                  />
-                </label>
-              );
-            })}
-          </div>
-          <Descriptions className="inventory-detail__meta-table" size="small" bordered column={6}>
-            {readOnly.map((field) => <Descriptions.Item key={field.key} className={field.className} label={field.label}>{field.value}</Descriptions.Item>)}
-          </Descriptions>
-          {accountExtraItems.length ? (
-            <div className="inventory-detail__meta-group">
-              <div className="inventory-detail__meta-group-title">{sectionLabels["ACCOUNT_PRODUCT"] ?? "账号 / 产品补充信息"}</div>
-              <Descriptions className="inventory-detail__meta-table" size="small" bordered column={6}>
-                {accountExtraItems.map((item) => (
-                  <Descriptions.Item key={item.key} label={`${item.label}${item.status === "deleted" ? "（已删除）" : item.status === "inactive" ? "（已停用）" : ""}`}>
-                    {formatExtraDisplayValue(item.value) || "-"}
-                  </Descriptions.Item>
-                ))}
-              </Descriptions>
-            </div>
-          ) : null}
-          {account ? <OrderDetailEditFields editing={account} onEdit={onEdit} /> : null}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="inventory-detail__section inventory-detail__section--profile">

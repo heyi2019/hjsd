@@ -166,6 +166,13 @@ describe("OrderDetail", () => {
     expect(document.querySelector(".inventory-edit-operator")).toBeTruthy();
   });
 
+  it("详情编辑态保留账户资料只读，不再展示账户资料编辑控件", () => {
+    renderApp(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} editing={account} employees={[]} />);
+    const profile = document.querySelector(".inventory-detail__section--profile") as HTMLElement;
+    expect(within(profile).queryByLabelText("编辑游戏账号/产品")).toBeNull();
+    expect(within(profile).getByText("acc-1")).toBeInTheDocument();
+  });
+
   it("FE-269：返点进入收入笔数，总收入取服务端 finance_summary", () => {
     const detail = {
       orders: [{

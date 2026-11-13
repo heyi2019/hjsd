@@ -2,7 +2,6 @@ import { useState, type Dispatch, type SetStateAction } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
 import { stocksApi } from "../../shared/api/stocks.api";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
-import type { Account } from "../../shared/api/types/accounts";
 import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
@@ -47,10 +46,6 @@ export function useLedgerInlineEdit({ setOrders }: { setOrders: Dispatch<SetStat
     onSaved: (id, detail) => setLedgerDetails((current) => ({ ...current, [id]: detail })),
   });
 
-  const openLedgerAccountEditor = async (account: Account) => {
-    await accountEditor.openEditor(account);
-  };
-
   const openLedgerEditor = async (order: Order) => {
     try {
       let accountId = order.account_id;
@@ -67,8 +62,10 @@ export function useLedgerInlineEdit({ setOrders }: { setOrders: Dispatch<SetStat
       }
       const detail = ledgerDetails[accountId] ?? await stocksApi.executionDetail(accountId);
       setLedgerDetails((current) => ({ ...current, [accountId]: detail }));
+      const orderDetail = ledgerOrderDetails[order.id] ?? await ordersApi.executionDetail(order.id);
+      setLedgerOrderDetails((current) => ({ ...current, [order.id]: orderDetail }));
       setExpandedOrderIds([String(order.id)]);
-      await openLedgerAccountEditor(detail.account);
+      await accountEditor.openEditor(detail.account);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
@@ -90,7 +87,6 @@ export function useLedgerInlineEdit({ setOrders }: { setOrders: Dispatch<SetStat
     ledgerOrderDetails,
     ledgerOrderDetailLoading,
     loadLedgerOrderDetail,
-    openLedgerAccountEditor,
     openLedgerEditor,
     handleLedgerExpand,
     cancelInlineEdit: accountEditor.cancelInlineEdit,
@@ -101,7 +97,6 @@ export function useLedgerInlineEdit({ setOrders }: { setOrders: Dispatch<SetStat
     invEditExtraForm: accountEditor.invEditExtraForm,
     saveInline: accountEditor.saveInline,
     savingAccount: accountEditor.savingAccount,
-    setEditingAccount: accountEditor.setEditingAccount,
     setTimeShiftDays: accountEditor.setTimeShiftDays,
     timeShiftMinutes: accountEditor.timeShiftMinutes,
     updateEventDraft: accountEditor.updateEventDraft,

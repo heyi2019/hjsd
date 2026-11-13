@@ -75,7 +75,6 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   });
   const {
     editingAccount,
-    setEditingAccount,
     inlineEditId,
     eventDrafts,
     updateEventDraft,
@@ -209,7 +208,6 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     setDateRange,
     setDeleteTarget,
     setDetailTarget,
-    setEditingAccount,
     setError,
     setExecutionDetails,
     setGameTypeFilter,

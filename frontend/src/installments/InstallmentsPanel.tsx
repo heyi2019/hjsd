@@ -86,6 +86,7 @@ function ContractTable({
               placeholder={["开始日期", "结束日期"]}
               format="YYYY-MM-DD"
               size="small"
+              placement="bottomLeft"
               classNames={{ popup: { root: "compact-date-range-picker" } }}
               value={dateRange}
               onChange={(value) => setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null)}

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage } from "@/orders/OrdersPage";
-import { buildOrderPatchPayload, pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
+import { pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { installmentsApi } from "@/shared/api/installments.api";
@@ -46,7 +46,6 @@ vi.mock("@/shared/api/client", async (importOriginal) => {
     currentUser: vi.fn(),
   };
 });
-
 // 这两行曾写作 "../../stocks/InventoryPanel"、"../../installments/InstallmentsPanel"，
 // 从 src/orders/ 解析到根本不存在的 frontend/stocks/，mock 从未命中——测试一直在渲染真面板，
 // 且断言恰恰依赖真面板（切到「分期与回款」会真发请求）。2026-11-04 修正路径后立刻红了，
@@ -223,6 +222,11 @@ beforeEach(() => {
     orders: [],
     finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
   } as never);
+  vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+    account: { id: order1.account_id, stock_no: "KU_00001", game_account: "seller-001", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
+    orders: [{ order_id: order1.id, order_no: order1.order_no, order_type: order1.order_type, trade_date: order1.trade_date, status: order1.status, events: [] }],
+    finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
+  } as never);
   vi.mocked(ordersApi.links).mockResolvedValue([link1]);
   vi.mocked(ordersApi.deleteLink).mockResolvedValue(undefined);
   vi.mocked(ordersApi.cancel).mockResolvedValue({ ...order1, status: "CANCELLED" });
@@ -354,10 +358,11 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("当前无新增逾期合约"));
   });
 
-  it("编辑订单：行操作列打开统一库存详情编辑并保存账号资料", async () => {
+  it("编辑订单：行操作列直接打开详情编辑", async () => {
     await openLedger();
     await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
-    expect(await screen.findByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "保存修改" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("编辑游戏账号/产品")).toBeNull();
     expect(screen.getByRole("button", { name: "保存修改" })).toBeInTheDocument();
   });
 
@@ -377,7 +382,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     ]);
     await openLedger();
     await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
-    expect(await screen.findByLabelText("编辑游戏账号/产品")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "保存修改" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("编辑游戏账号/产品")).toBeNull();
   });
 
   // 原两条（按姓名预填 / 展示订单总利润）同一份夹具、同一入口、纯只读，合并为一次挂载。
@@ -798,68 +804,5 @@ describe("resolveCancelAmount / pickCancelableEvent 纯函数", () => {
     // 不存在的 id → 回落到第一条，而不是抛错
     expect(pickCancelableEvent(list, 999)?.event.id).toBe(102);
     expect(pickCancelableEvent([], 101)).toBeUndefined();
-  });
-});
-
-// —— 编辑订单 PATCH 组装：三条规则原本内联在 submitEditOrder 内，UI 用例只覆盖
-// 「有事件改备注」一条；快照整体替换的两条兜底（钱包实名 / 营地账号）此前零覆盖。
-describe("buildOrderPatchPayload 纯函数", () => {
-  const snapshot = {
-    game_account: "acc-1",
-    game_type: "原神",
-    game_password: "pwd-1",
-    channel_region: "天空岛",
-    bound_phone: "13800000000",
-    wallet_realname: "何一",
-    camp_account: "camp-1",
-    platform: "安卓",
-    purchase_price: "800.00",
-    note: "建单备注",
-  };
-
-  it("无登记事件：带上成交日期与整体快照", () => {
-    const payload = buildOrderPatchPayload({
-      values: { trade_date: "2026-11-02", note: " 改备注 ", snap_game_type: "星穹铁道" },
-      snapshot,
-      hasPosted: false,
-    });
-    expect(payload.trade_date).toBe("2026-11-02");
-    expect(payload.note).toBe("改备注");
-    expect(payload.account_snapshot).toMatchObject({ game_account: "acc-1", game_type: "星穹铁道" });
-  });
-
-  it("已有登记事件：仍带成交日期（后端联动平移账期），但不带账号快照", () => {
-    const payload = buildOrderPatchPayload({
-      values: { trade_date: "2026-11-02", note: "补充说明" },
-      snapshot,
-      hasPosted: true,
-    });
-    expect(payload).toEqual({ trade_date: "2026-11-02", note: "补充说明", form_extra: undefined });
-  });
-
-  it("快照密码被隐去（无 order.create）：不带 account_snapshot，避免覆盖成空", () => {
-    const payload = buildOrderPatchPayload({
-      values: { note: "x", snap_game_account: "acc-9" },
-      snapshot: { ...snapshot, game_password: null },
-      hasPosted: false,
-    });
-    expect(payload.account_snapshot).toBeUndefined();
-  });
-
-  it("表单缺钱包实名/营地账号控件时沿用快照原值（不抹掉）", () => {
-    const payload = buildOrderPatchPayload({
-      values: { note: "x", snap_game_type: "原神", snap_game_password: "pwd-1" },
-      snapshot,
-      hasPosted: false,
-    });
-    expect(payload.account_snapshot).toMatchObject({
-      wallet_realname: "何一",
-      camp_account: "camp-1",
-    });
-  });
-
-  it("备注留空 → note 显式 null（清空），不是空串", () => {
-    const payload = buildOrderPatchPayload({ values: { note: "   " }, snapshot: null, hasPosted: false });
-    expect(payload.note).toBeNull();
   });
 });

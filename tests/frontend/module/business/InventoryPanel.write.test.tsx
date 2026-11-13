@@ -144,22 +144,39 @@ beforeEach(() => {
       }],
     }],
   });
-  resolveMock(vi.mocked(stocksApi.updateProfile), accounts[0]);
+  vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+    account: accounts[0],
+    orders: [{
+      order_id: 21,
+      order_no: "HS0001",
+      order_type: "HS",
+      trade_date: "2026-10-15",
+      status: "ACTIVE",
+      events: [{
+        id: 31,
+        event_no: "EV0001",
+        event_type: "BUY",
+        amount: "100.00",
+        occurred_on: "2026-10-15",
+        occurred_at: "2026-10-15T10:20:00",
+        portion: "PRINCIPAL",
+        is_posted: true,
+        operator: "admin",
+        note: "回收登记",
+        cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", nature: "BUSINESS_OUT", category: "BUY", amount: "100.00" },
+      }],
+    }],
+  } as never);
   vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "alice", display_name: "小明", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 
 describe("InventoryPanel：写入与长路径", () => {
-  it("库存编辑通过弹窗保存账号资料", async () => {
+  it("库存编辑直接展开详情，账户资料保持只读", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     fireEvent.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
-    // 内联编辑：点「编辑」就地展开该行进入编辑态（无弹窗），核心字段可直接改。
-    const input = await screen.findByLabelText("编辑游戏账号/产品");
-    fireEvent.change(input, { target: { value: "updated-account" } });
-    fireEvent.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(vi.mocked(stocksApi.updateProfile)).toHaveBeenCalledWith(1, expect.objectContaining({
-      game_account: "updated-account",
-    })));
+    expect(await screen.findByRole("button", { name: "保存修改" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("编辑游戏账号/产品")).toBeNull();
   });
 
   it("寄售登记到来源订单，不创建 DG 代挂订单", async () => {

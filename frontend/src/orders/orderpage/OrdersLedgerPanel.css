@@ -3,6 +3,32 @@
   align-items: center;
 }
 
+.ledger-sort-actions .ant-btn {
+  min-width: var(--sz-24);
+  width: var(--sz-24);
+  height: var(--sz-24);
+  padding-inline: 0;
+  font-size: var(--fs-caption-2);
+  color: var(--color-text-primary);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.ledger-sort-actions .ant-btn:hover,
+.ledger-sort-actions .ant-btn:focus-visible {
+  color: var(--color-text-primary);
+  background: transparent;
+  border-color: transparent;
+}
+
+/* 订单台账与库存中心保持同一列密度，避免宽屏把字段拉得过松。 */
+@media (min-width: 768px) {
+  .orders-ledger .ant-table {
+    width: max-content;
+    min-width: max-content;
+  }
+}
+
 .orders-ledger-panel .orders-ledger-filter-label {
   font: var(--font-table-header);
   color: var(--color-text-primary);

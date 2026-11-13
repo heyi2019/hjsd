@@ -18,7 +18,6 @@ import type { InventoryProfileTarget } from "../../stocks/operations";
 import {
   buildActionAllocationCandidates,
   buildActionAllocationRows,
-  buildOrderPatchPayload,
   type ActionAllocationCandidates,
   type AllocationFormRow,
 } from "./helpers";
@@ -26,20 +25,16 @@ import {
 /** 由主 controller 注入的跨域共享枢纽；子 hook 不自行持有这些状态。 */
 interface OrderActionModalsDeps {
   selectedOrder: Order | null;
-  setSelectedOrder: (order: Order | null) => void;
   load: () => Promise<void> | void;
-  loadLedgerDetail: (accountId: number, force?: boolean) => void;
 }
 
 /**
- * 订单台账的动作弹窗域：资金收支 / 分润配置 / 交付 / 下架 / 账号动作 / 订单编辑。
+ * 订单台账的动作弹窗域：资金收支 / 分润配置 / 交付 / 下架 / 账号动作。
  * 逐字切片自 useOrdersPageController，返回值与主 hook 的 spread 并集契约逐字段一致。
  */
 export function useOrderActionModals({
   selectedOrder,
-  setSelectedOrder,
   load,
-  loadLedgerDetail,
 }: OrderActionModalsDeps) {
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [allocationSubmitting, setAllocationSubmitting] = useState(false);
@@ -70,10 +65,6 @@ export function useOrderActionModals({
   ];
   /** 亏损单（总利润 < 0）：顶部提示改口径，金额分润后端也会拒绝。 */
   const allocationIsLoss = Number(allocationProfit) < 0;
-  const [editOpen, setEditOpen] = useState(false);
-  const [editSubmitting, setEditSubmitting] = useState(false);
-  const [editForm] = Form.useForm();
-
   const openAllocations = async (sourceOrder?: Order) => {
     try {
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
@@ -227,57 +218,6 @@ export function useOrderActionModals({
     }
   };
 
-  /** 编辑订单：后端限制——已有登记事件的订单只能改备注；账号快照仅特定业务可维护，
-   *  且密码被后端隐去（无 order.create 权限）时不允许整体回写快照，避免覆盖隐藏密码。 */
-  const openEditOrder = (order: Order) => {
-    setSelectedOrder(order);
-    const snapshot = order.account_snapshot;
-    // 弹窗复用：CustomFieldSection 的 name 为 form_extra.<key> 且无 initialValue，
-    // 不 reset 会把上个订单的自定义字段值带到本单（提交时随 form_extra 回写 → 串单污染）。
-    editForm.resetFields();
-    editForm.setFieldsValue({
-      trade_date: order.trade_date,
-      note: order.note ?? undefined,
-      snap_game_account: snapshot?.game_account,
-      snap_game_type: snapshot?.game_type ?? undefined,
-      snap_game_password: snapshot?.game_password ?? undefined,
-      snap_channel_region: snapshot?.channel_region ?? undefined,
-      snap_bound_phone: snapshot?.bound_phone ?? undefined,
-      snap_wallet_realname: snapshot?.wallet_realname ?? undefined,
-      snap_camp_account: snapshot?.camp_account ?? undefined,
-      snap_platform: snapshot?.platform ?? undefined,
-      snap_purchase_price: snapshot?.purchase_price ?? undefined,
-      snap_note: snapshot?.note ?? undefined,
-      // 顺带按本单回填历史自定义字段：reset 后不能让编辑态只剩空框（旧值原本就没有回填）。
-      form_extra: order.form_extra ?? {},
-    });
-    setEditOpen(true);
-  };
-
-  const submitEditOrder = async (values: Record<string, unknown>) => {
-    if (!selectedOrder) return;
-    // 成交日期现在也可改（后端联动平移账期）；hasPosted 仅用于决定账号快照是否回写。
-    const orderHasPosted = (selectedOrder.events ?? []).some((event) => event.is_posted);
-    setEditSubmitting(true);
-    try {
-      const payload = buildOrderPatchPayload({
-        values,
-        snapshot: selectedOrder.account_snapshot,
-        hasPosted: orderHasPosted,
-      });
-      await ordersApi.patch(selectedOrder.id, payload);
-      // 成交日期放开后，有登记事件的订单也能改主字段，统一提示「订单已更新」。
-      appMessage.success("订单已更新");
-      setEditOpen(false);
-      setSelectedOrder(await ordersApi.get(selectedOrder.id));
-      await load();
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    } finally {
-      setEditSubmitting(false);
-    }
-  };
-
   return {
     actionOrder,
     setActionOrder,
@@ -294,18 +234,12 @@ export function useOrderActionModals({
     cashflowTarget,
     cashflowUsers,
     setCashflowTarget,
-    editForm,
-    editOpen,
-    editSubmitting,
-    setEditOpen,
-    setEditSubmitting,
     employeeOptions,
     users,
     setUsers,
     handleOrderOffsaleChanged,
     handleOrderSystemOffsale,
     openAllocations,
-    openEditOrder,
     openOrderConsignment,
     openOrderDelete,
     openOrderOffsale,
@@ -325,7 +259,6 @@ export function useOrderActionModals({
     setOrderSaleTarget,
     profileTarget,
     setProfileTarget,
-    submitEditOrder,
     submitOrderDelete,
     openOrderProfile,
   };

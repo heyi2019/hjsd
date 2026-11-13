@@ -9,14 +9,13 @@ import { OrderDeleteDialog } from "../OrderDeleteDialog";
 import { type OrdersPageController } from "./useOrdersPageController";
 import { SharedCancellationDialog, CancelTransactionModal } from "./OrderCancellationModals";
 import { AllocationModal } from "./OrderAllocationModal";
-import { EditOrderModal, CreateBusinessModalWrapper, OrderAccountActionModals } from "./OrderActionModals";
+import { CreateBusinessModalWrapper, OrderAccountActionModals } from "./OrderActionModals";
 
 export function OrderModals({ controller }: { controller: OrdersPageController }) {
   return (
     <>
       <SharedCancellationDialog controller={controller} />
       <CancelTransactionModal controller={controller} />
-      <EditOrderModal controller={controller} />
       <AllocationModal controller={controller} />
       <CashflowModal
         target={controller.cashflowTarget}

@@ -42,7 +42,9 @@ export function OrderDetailOperationSection({
               <StatusTag status={meta.operationStatusLabel} color={meta.hasActiveConsignment ? "processing" : meta.operationStatusLabel === "已下架" ? "default" : "success"} label={meta.operationStatusLabel} />
             </Descriptions.Item>
             <Descriptions.Item label="运营操作人">{meta.operationOperators ?? "-"}</Descriptions.Item>
-            <Descriptions.Item label="寄售平台 / 寄售时间" className="inventory-detail__datetime inventory-detail__multiline">{meta.consignmentSummary || "-"}</Descriptions.Item>
+            {meta.consignmentSummary && meta.consignmentSummary !== "-" ? (
+              <Descriptions.Item label="寄售平台 / 寄售时间" className="inventory-detail__datetime inventory-detail__multiline">{meta.consignmentSummary}</Descriptions.Item>
+            ) : null}
           </Descriptions>
         </div>
         <InventoryExtraFieldsGroup section="BUSINESS" fields={extraFieldsBySection("BUSINESS")} />

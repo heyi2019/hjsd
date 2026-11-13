@@ -3,13 +3,11 @@ import { Form } from "antd";
 import { useState, type Key, type Dispatch, type SetStateAction } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
 import { unlistAndCancelConsignmentOrders } from "../operations";
-import { employeesApi } from "../../shared/api/org.api";
 import { poolsApi } from "../../shared/api/pools.api";
 import { stocksApi } from "../../shared/api/stocks.api";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
 import type { Pool } from "../../shared/api/types/finance";
-import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { consignmentRecords, type ActiveConsignment } from "../operations";
@@ -19,7 +17,6 @@ import { type InventoryCancellationValues } from "../InventoryCancellationDialog
 import { type BusinessCenterEntryTab } from "../../orders/businessCenter";
 import { findCancelableBuy } from "./helpers";
 import type { CashflowTarget } from "../../finance/cashflow";
-import { type OrderDeliveryTarget } from "../../orders/OrderDeliveryModal";
 
 export function useInventoryActions(params: {
   // list 域注入
@@ -55,8 +52,6 @@ export function useInventoryActions(params: {
   const [rebateTarget, setRebateTarget] = useState<Account | null>(null);
   const [cashflowTarget, setCashflowTarget] = useState<CashflowTarget | null>(null);
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
-  const [deliveryTarget, setDeliveryTarget] = useState<OrderDeliveryTarget | null>(null);
-  const [deliveryEmployees, setDeliveryEmployees] = useState<EmployeeOption[]>([]);
   const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
   const [detailTarget, setDetailTarget] = useState<Account | null>(null);
   const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
@@ -100,44 +95,6 @@ export function useInventoryActions(params: {
       }
       setCashflowPools(poolList.filter((pool) => pool.status === "ACTIVE"));
       setCashflowTarget({ account, orderId: sourceOrder.order_id, orderNo: sourceOrder.order_no });
-    } catch (cause) {
-      setError(normalizeError(cause));
-    }
-  }
-  async function openDelivery(account: Account) {
-    try {
-      const [detail, employeeList] = await Promise.all([
-        executionDetails[account.id] ?? stocksApi.executionDetail(account.id),
-        employeesApi.list(),
-      ]);
-      setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
-      const sourceOrder = detail.orders.find((order) => order.order_id === account.source_order_id)
-        ?? detail.orders.find((order) => order.order_type !== "DG")
-        ?? detail.orders[0];
-      if (!sourceOrder) {
-        appMessage.warning("当前账号没有可关联的业务订单");
-        return;
-      }
-      const direction: "BUY" | "SELL" = sourceOrder.order_type === "DG"
-        || sourceOrder.events.some((event) => event.event_type === "SELL")
-        ? "SELL"
-        : "BUY";
-      const alreadyDelivered = sourceOrder.events.some(
-        (event) => event.event_type === "DELIVER"
-          && event.delivery_direction === direction,
-      );
-      if (alreadyDelivered) {
-        appMessage.warning(`${direction === "BUY" ? "买号" : "卖号"}交付已经登记`);
-        return;
-      }
-      setDeliveryEmployees(employeeList.filter((employee) => employee.is_active));
-      setDeliveryTarget({
-        orderId: sourceOrder.order_id,
-        orderNo: sourceOrder.order_no,
-        direction,
-        boundPhone: detail.account.bound_phone,
-        boundPhoneOwner: detail.account.bound_phone_owner,
-      });
     } catch (cause) {
       setError(normalizeError(cause));
     }
@@ -269,9 +226,6 @@ export function useInventoryActions(params: {
     cashflowTarget,
     setCashflowTarget,
     cashflowPools,
-    deliveryTarget,
-    setDeliveryTarget,
-    deliveryEmployees,
     profileTarget,
     setProfileTarget,
     detailTarget,
@@ -292,7 +246,6 @@ export function useInventoryActions(params: {
     openEditor,
     cancelInlineEdit,
     openDetail,
-    openDelivery,
     openVoid,
     openPlatformOffsale,
     handleMoreAction,

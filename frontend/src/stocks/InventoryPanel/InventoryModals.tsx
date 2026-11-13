@@ -9,7 +9,6 @@ import { InventoryDeleteDialog } from "./InventoryDeleteDialog";
 import { InventoryConsignmentModal, InventoryPlatformOffsaleModal, InventoryProfileModal, unlistAndCancelConsignmentOrders } from "../operations";
 import { InventoryRebateModal } from "../rebate";
 import { CashflowModal } from "../../finance/cashflow";
-import { OrderDeliveryModal } from "../../orders/OrderDeliveryModal";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../sale";
 import { OrderDetail } from "../OrderDetail";
 import type { InventoryController } from "./useInventoryController";
@@ -37,8 +36,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     removeFromInventory,
     cashflowPools,
     cashflowTarget,
-    deliveryEmployees,
-    deliveryTarget,
     refreshExecution,
     saleTarget,
     saveInline,
@@ -51,7 +48,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     setProfileTarget,
     setRebateTarget,
     setCashflowTarget,
-    setDeliveryTarget,
     setSaleTarget,
     submitDelete,
     submitVoid,
@@ -109,16 +105,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           setCashflowTarget(null);
           await load();
           if (account) refreshExecution(account);
-          onOrdersChanged?.();
-        }}
-      />
-      <OrderDeliveryModal
-        target={deliveryTarget}
-        employees={deliveryEmployees}
-        onClose={() => setDeliveryTarget(null)}
-        onCreated={async () => {
-          setDeliveryTarget(null);
-          await load();
           onOrdersChanged?.();
         }}
       />

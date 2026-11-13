@@ -5,7 +5,6 @@ import { ordersApi } from "../../shared/api/orders.api";
 import { CashflowModal } from "../../finance/cashflow";
 import { InventoryRebateModal } from "../../stocks/rebate";
 import { InventoryProfileModal, InventoryPlatformOffsaleModal } from "../../stocks/operations";
-import { OrderDeliveryModal } from "../OrderDeliveryModal";
 import { OrderDeleteDialog } from "../OrderDeleteDialog";
 import { type OrdersPageController } from "./useOrdersPageController";
 import { SharedCancellationDialog, CancelTransactionModal } from "./OrderCancellationModals";
@@ -38,15 +37,6 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
         submitting={controller.orderDeleteSubmitting}
         onCancel={() => controller.setOrderDeleteTarget(null)}
         onConfirm={controller.submitOrderDelete}
-      />
-      <OrderDeliveryModal
-        target={controller.deliveryTarget}
-        employees={controller.users}
-        onClose={() => controller.setDeliveryTarget(null)}
-        onCreated={async () => {
-          controller.setDeliveryTarget(null);
-          await controller.load();
-        }}
       />
       <InventoryProfileModal
         target={controller.profileTarget}

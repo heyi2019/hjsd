@@ -14,7 +14,6 @@ import { currentUser, normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { consignmentRecords, type ActiveConsignment, unlistAndCancelConsignmentOrders } from "../../stocks/operations";
-import type { OrderDeliveryTarget } from "../OrderDeliveryModal";
 import type { InventoryProfileTarget } from "../../stocks/operations";
 import {
   buildActionAllocationCandidates,
@@ -51,7 +50,6 @@ export function useOrderActionModals({
   const [orderConsignmentTarget, setOrderConsignmentTarget] = useState<{ account: Account; orderId: number } | null>(null);
   const [orderDeleteTarget, setOrderDeleteTarget] = useState<Order | null>(null);
   const [orderDeleteSubmitting, setOrderDeleteSubmitting] = useState(false);
-  const [deliveryTarget, setDeliveryTarget] = useState<OrderDeliveryTarget | null>(null);
   const [cashflowTarget, setCashflowTarget] = useState<CashflowTarget | null>(null);
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
   const [cashflowUsers, setCashflowUsers] = useState<EmployeeOption[]>([]);
@@ -193,38 +191,6 @@ export function useOrderActionModals({
     setOrderDeleteTarget(sourceOrder);
   };
 
-  const openOrderDelivery = async (sourceOrder: Order) => {
-    try {
-      const order = await ordersApi.get(sourceOrder.id);
-      const events = order.events ?? [];
-      const direction: "BUY" | "SELL" =
-        order.order_type === "DG" ||
-        events.some((event) => event.event_type === "SELL") ||
-        order.last_event_type === "SELL"
-          ? "SELL"
-          : "BUY";
-      const alreadyDelivered = events.some(
-        (event) => event.event_type === "DELIVER"
-          && (event.delivery_direction ?? event.form_extra?.delivery_direction) === direction,
-      );
-      if (alreadyDelivered) {
-        appMessage.warning(`${direction === "BUY" ? "买号" : "卖号"}交付已经登记`);
-        return;
-      }
-      const employeeList = await employeesApi.list();
-      setUsers(employeeList.filter((employee) => employee.is_active));
-      setDeliveryTarget({
-        orderId: order.id,
-        orderNo: order.order_no,
-        direction,
-        boundPhone: order.account_snapshot?.bound_phone,
-        boundPhoneOwner: order.account_snapshot?.bound_phone_owner,
-      });
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    }
-  };
-
   const openOrderProfile = async (sourceOrder: Order, mode: "description" | "images") => {
     try {
       const account = await loadOrderAccount(sourceOrder);
@@ -361,8 +327,6 @@ export function useOrderActionModals({
     cashflowTarget,
     cashflowUsers,
     setCashflowTarget,
-    deliveryTarget,
-    setDeliveryTarget,
     editForm,
     editOpen,
     editSubmitting,
@@ -377,7 +341,6 @@ export function useOrderActionModals({
     openEditOrder,
     openOrderConsignment,
     openOrderDelete,
-    openOrderDelivery,
     openOrderOffsale,
     openOrderRebate,
     openOrderSale,

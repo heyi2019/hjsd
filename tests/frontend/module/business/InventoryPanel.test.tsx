@@ -118,23 +118,11 @@ describe("InventoryPanel：账号台账", () => {
     ));
   });
 
-  it("库存中心：与订单台账共用交付登记入口", async () => {
+  it("库存中心不提供交付操作入口", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     const row = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
-    await ui.click(within(row).getByRole("button", { name: "交付" }));
-    const modal = (await screen.findByText("交付 · HS0001")).closest(".ant-modal-content") as HTMLElement;
-    await ui.type(within(modal).getByLabelText("交付凭证"), "库存中心完成换绑");
-    await ui.click(within(modal).getByRole("button", { name: "确定交付" }));
-    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
-      21,
-      expect.objectContaining({
-        event_type: "DELIVER",
-        delivery_direction: "BUY",
-        delivery_mode: "CUSTOMER_SELF",
-        note: "库存中心完成换绑",
-      }),
-    ));
+    expect(within(row).queryByRole("button", { name: "交付" })).toBeNull();
   });
 
   it("运营菜单收纳寄售、描述和作图", async () => {

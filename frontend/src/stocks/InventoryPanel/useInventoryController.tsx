@@ -127,7 +127,6 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   openEditor,
   cancelInlineEdit,
   openDetail,
-  openDelivery,
   openVoid,
   openPlatformOffsale,
   handleMoreAction,
@@ -140,7 +139,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const { columns, mobileFieldOrder, arrangeColumns } = useInventoryColumns({
     canDelete, editingAccount, executionDetails, loadExecution,
     setSaleTarget, setConsignmentTarget, setRebateTarget, setDeleteTarget,
-    openCashflow, openDelivery, openPlatformOffsale, openEditor, handleMoreAction,
+    openCashflow, openPlatformOffsale, openEditor, handleMoreAction,
   });
 
   return {
@@ -186,7 +185,6 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     mobileFieldOrder,
     onNavigate,
     onOrdersChanged,
-    openDelivery,
     openDetail,
     openEditor,
     openPartyCard,

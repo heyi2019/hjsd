@@ -66,7 +66,7 @@ export function useOrdersPageController(params: {
   // openOrderProfile 仅供台账列定义内部点击转发，原本不在对外 return 契约中。
   const { openOrderProfile, ...exposedActionModals } = actionModals;
   const {
-    openAllocations, openRefund, openOrderDelivery,
+    openAllocations, openRefund,
     openOrderRebate, openOrderSale, openOrderConsignment, openOrderOffsale, openOrderDelete,
   } = actionModals;
 
@@ -96,7 +96,6 @@ export function useOrdersPageController(params: {
     openLedgerEditor,
     openAllocations,
     openRefund,
-    openOrderDelivery,
     openOrderProfile,
     openOrderRebate,
     openOrderSale,

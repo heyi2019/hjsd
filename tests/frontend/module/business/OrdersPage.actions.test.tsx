@@ -777,35 +777,9 @@ describe("OrdersPage：操作与筛选分支", () => {
     ));
   });
 
-  it("交付：订单台账可登记买号交付并记录 DELIVER 事件", async () => {
-    vi.mocked(ordersApi.get).mockResolvedValueOnce({
-      ...order1,
-      events: [{
-        id: 1,
-        event_no: "EV-BUY",
-        order_id: 1,
-        event_type: "BUY",
-        amount: "1000.00",
-        occurred_on: "2026-10-01",
-        is_posted: true,
-        cancellable_amount: "1000.00",
-      }],
-    });
+  it("订单台账不提供交付操作入口", async () => {
     await openLedger();
-    await openRowMenu("HS-2026-0001", "交付");
-    const modal = await modalOf(/交付 · HS-2026-0001/);
-    expect(within(modal).getByText("买号交付")).toBeInTheDocument();
-    await ui.type(within(modal).getByLabelText("交付凭证"), "卖家已完成换绑");
-    await clickModalOk(modal);
-    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
-      1,
-      expect.objectContaining({
-        event_type: "DELIVER",
-        delivery_direction: "BUY",
-        delivery_mode: "CUSTOMER_SELF",
-        note: "卖家已完成换绑",
-      }),
-    ));
+    expect(within(tableRow("HS-2026-0001")).queryByRole("button", { name: "交付" })).toBeNull();
   });
 
   it("运营：订单台账提供描述快捷入口并登记 DESCRIPTION 业务事件", async () => {

@@ -16,7 +16,6 @@ export function useLedgerColumns(params: {
   openLedgerEditor: (order: Order) => void;
   openAllocations: (order: Order) => void;
   openRefund: (order: Order) => void;
-  openOrderDelivery: (order: Order) => void;
   openOrderProfile: (order: Order, mode: "description" | "images") => void;
   openOrderRebate: (order: Order) => void;
   openOrderSale: (order: Order) => void;
@@ -30,7 +29,6 @@ export function useLedgerColumns(params: {
     openLedgerEditor,
     openAllocations,
     openRefund,
-    openOrderDelivery,
     openOrderProfile,
     openOrderRebate,
     openOrderSale,
@@ -94,13 +92,6 @@ export function useLedgerColumns(params: {
               disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
               onClick={() => void openRefund(order)}
             >资金收支</PermissionButton>
-            <PermissionButton
-              permission="order.event.post"
-              type="link"
-              size="small"
-              disabled={order.status === "CANCELLED"}
-              onClick={() => void openOrderDelivery(order)}
-            >交付</PermissionButton>
             <PermissionButton
               permission="order.create"
               type="link"

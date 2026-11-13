@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
-import type { AccountExecutionOrder } from "@/shared/api/types/account-execution";
+import type { AccountExecutionEvent, AccountExecutionOrder } from "@/shared/api/types/account-execution";
 import { consignmentPlatform, isActiveConsignmentListing, isConsignmentListing } from "@/stocks/operations/consignment-logic";
+
+const event = (overrides: Partial<AccountExecutionEvent>): AccountExecutionEvent => ({
+  id: 1,
+  event_no: "EV-1",
+  event_type: "OPERATE",
+  amount: "0.00",
+  cancellable_amount: "0.00",
+  occurred_on: "2026-11-02",
+  portion: "NONE",
+  is_posted: true,
+  operator: "pytest",
+  ...overrides,
+});
 
 const order = (overrides: Partial<AccountExecutionOrder> = {}) => ({
   order_id: 1,
@@ -23,10 +36,7 @@ describe("代挂寄售记录口径", () => {
     const listed = order({
       order_type: "HS",
       events: [{
-        id: 7,
-        event_type: "OPERATE",
-        operation_type: "CONSIGNMENT",
-        form_extra: { consignment_platform: "盼之", listed_at: "2026-11-02T10:05" },
+        ...event({ id: 7, operation_type: "CONSIGNMENT", form_extra: { consignment_platform: "盼之", listed_at: "2026-11-02T10:05" } }),
       }],
     });
     expect(consignmentPlatform(listed)).toBe("盼之");
@@ -38,15 +48,9 @@ describe("代挂寄售记录口径", () => {
     const unlisted = order({
       order_type: "HS",
       events: [{
-        id: 7,
-        event_type: "OPERATE",
-        operation_type: "CONSIGNMENT",
-        form_extra: { consignment_platform: "盼之", listed_at: "2026-11-02T10:05" },
+        ...event({ id: 7, operation_type: "CONSIGNMENT", form_extra: { consignment_platform: "盼之", listed_at: "2026-11-02T10:05" } }),
       }, {
-        id: 8,
-        event_type: "OPERATE",
-        operation_type: "UNLIST",
-        form_extra: { consignment_event_id: 7, platform_unlist_scope: "PLATFORM" },
+        ...event({ id: 8, operation_type: "UNLIST", form_extra: { consignment_event_id: 7, platform_unlist_scope: "PLATFORM" } }),
       }],
     });
     expect(isConsignmentListing(unlisted)).toBe(true);

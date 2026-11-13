@@ -44,7 +44,6 @@ const orders = [
     account_status: "WAITING",
     party_name: "卖家甲",
     party_source: "同行推荐",
-    event_total: "1234.00",
     sale_amount: "1234.00",
     last_event_type: "BUY",
     inventory_operator: "入库员",

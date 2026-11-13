@@ -33,11 +33,18 @@ export function useInventoryColumns(params: {
   const columns: ColumnsType<InventoryOrderRow> = [
     { title: "库存编号", key: "stock_no", width: 86, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account.stock_no) },
     { title: "订单号", dataIndex: "order_no", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
+    { title: "入库时间", dataIndex: "inventory_entry_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
+    { title: "入库负责人", dataIndex: "inventory_operator", width: 100, ellipsis: true, render: (v: string | null, row) => inventoryCellValue(v || row.account.created_by) },
+    {
+      title: "成本",
+      dataIndex: "cost_amount",
+      width: 90,
+      align: "right",
+      render: (v: string) => <MoneyText value={v} />,
+    },
     { title: "游戏/产品类型", key: "account_game_type", width: 80, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account_game_type) },
     { title: "游戏账号/产品", key: "account_game_account", width: 120, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account_game_account) },
     { title: "营地账号", key: "camp_account", width: 120, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account.camp_account) },
-    { title: "入库时间", dataIndex: "inventory_entry_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
-    { title: "入库负责人", dataIndex: "inventory_operator", width: 100, ellipsis: true, render: (v: string | null, row) => inventoryCellValue(v || row.account.created_by) },
     { title: "业务", key: "business_mode", width: 56, ellipsis: true, render: (_v, row) => row.account_business_mode ? BUSINESS_MODE_LABEL[row.account_business_mode] ?? row.account_business_mode : inventoryCellValue(null)},
     { title: "业务类型", dataIndex: "inventory_type", width: 68, ellipsis: true, render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : inventoryCellValue(v) },
     {
@@ -62,13 +69,6 @@ export function useInventoryColumns(params: {
       ),
     },
     { title: "状态", key: "status", dataIndex: "account_status", width: 68, render: (_v: string | undefined, row) => <StatusTag status={row.account.status === "WAITING" ? "IN_STOCK" : "OUT_OF_STOCK"} optionSet="INVENTORY_STATUS" /> },
-    {
-      title: "成本",
-      dataIndex: "cost_amount",
-      width: 90,
-      align: "right",
-      render: (v: string) => <MoneyText value={v} />,
-    },
     {
       title: "操作",
       key: "actions",

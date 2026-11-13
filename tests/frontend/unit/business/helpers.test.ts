@@ -17,7 +17,6 @@ const order = (overrides: Partial<Order> = {}): Order => ({
   trade_date: "2026-10-01",
   status: "ACTIVE",
   business_mode: "SELF",
-  event_total: "1234.00",
   ...overrides,
 });
 
@@ -49,8 +48,8 @@ describe("OrdersPage helpers", () => {
   });
 
   it("格式化订单售出金额，不把买入金额混进来", () => {
-    expect(formatOrderAmount(order({ event_total: "2500.00", sale_amount: "1500.00" }))).toBe("¥1,500.00");
-    expect(formatOrderAmount(order({ event_total: "1000.00", sale_amount: null }))).toBe("-");
+    expect(formatOrderAmount(order({ sale_amount: "1500.00" }))).toBe("¥1,500.00");
+    expect(formatOrderAmount(order({ sale_amount: null }))).toBe("-");
   });
 
   it("按操作分润把同一动作的份额按人数均分（3 人 100% → 33.33/33.33/33.34）", () => {

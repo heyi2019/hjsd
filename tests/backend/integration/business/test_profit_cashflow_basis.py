@@ -186,6 +186,7 @@ def test_order_ledger_sale_amount_uses_sell_events_only(seeded_db):
     row = _order_list_payload(seeded_db, [order])[0]
 
     assert row["sale_amount"] == Decimal("1500.00")
+    assert "event_total" not in row
 
 
 def test_order_ledger_profit_includes_rebate_and_bad_debt(seeded_db):

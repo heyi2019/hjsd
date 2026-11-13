@@ -127,7 +127,6 @@ const order1: Order = {
   account_status: "WAITING",
   party_name: "卖家甲",
   party_source: "同行推荐",
-  event_total: "1234.00",
   sale_amount: "1234.00",
   last_event_type: "BUY",
   sale_at: "2026-10-02T16:45:00",

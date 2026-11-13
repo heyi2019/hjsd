@@ -55,7 +55,6 @@ export interface Order {
   sale_at?: string | null;
   sale_operator?: string | null;
   in_hand_time?: string | null;
-  event_total?: string | null;
   sale_amount?: string | null;
   cost_amount?: string | null;
   profit_base?: string | null;

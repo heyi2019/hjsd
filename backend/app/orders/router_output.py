@@ -420,7 +420,6 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "sale_at": sale_at,
             "sale_operator": sale_operator,
             "in_hand_time": _elapsed_label(inventory_entry_at, sale_at),
-            "event_total": sum((event.amount for event in events), 0),
             "sale_amount": _sale_amount(order.order_type, events),
             "cost_amount": total_cost,
             # 台账利润与利润分配、报表共用现金流口径：所有收入 − 所有支出，

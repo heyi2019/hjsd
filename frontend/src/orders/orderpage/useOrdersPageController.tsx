@@ -93,6 +93,8 @@ export function useOrdersPageController(params: {
   // —— 台账列定义域：纯展示配置 + 点击转发 ——
   const { arrangeLedgerColumns, visibleLedgerColumns } = useLedgerColumns({
     canDeleteOrder,
+    ledgerDetails: inlineEdit.ledgerDetails,
+    loadLedgerDetail,
     openLedgerEditor,
     openAllocations,
     openRefund,

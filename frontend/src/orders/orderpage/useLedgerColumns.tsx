@@ -1,10 +1,18 @@
-import { Space } from "antd";
+import { Dropdown, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Order } from "../../shared/api/types/orders";
 import { ACCOUNT_STATUS_LABEL, formatDateTimeMinute, formatElapsedTime, money } from "../../shared/lib/format";
 import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
 import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { inventoryOperationMenuItems } from "../../stocks/operations";
 import { formatOrderAmount } from "./helpers";
+
+const INVENTORY_TYPE_BY_ORDER_TYPE: Record<string, string> = {
+  HS: "RECOVERY",
+  TH: "PICKUP",
+  DG: "CONSIGNMENT",
+};
 
 /**
  * 订单台账列定义域：15 列的渲染配置 + 配置中心列排序 + 移动端隐藏编排。
@@ -13,6 +21,8 @@ import { formatOrderAmount } from "./helpers";
  */
 export function useLedgerColumns(params: {
   canDeleteOrder: boolean;
+  ledgerDetails: Record<number, AccountExecutionDetail>;
+  loadLedgerDetail: (accountId: number, force?: boolean) => Promise<void>;
   openLedgerEditor: (order: Order) => void;
   openAllocations: (order: Order) => void;
   openRefund: (order: Order) => void;
@@ -26,6 +36,8 @@ export function useLedgerColumns(params: {
 }) {
   const {
     canDeleteOrder,
+    ledgerDetails,
+    loadLedgerDetail,
     openLedgerEditor,
     openAllocations,
     openRefund,
@@ -60,13 +72,35 @@ export function useLedgerColumns(params: {
       width: "var(--col-w-420)",
       ellipsis: true,
       render: (_, order) => {
-        const canOffsaleConsignment = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
+        const canSystemOffsale = order.order_type === "DG" && order.status === "ACTIVE" && order.account_status === "WAITING";
         const hasSold = order.status === "COMPLETED"
           || order.last_event_type === "SELL"
           || Boolean(order.sale_at)
           || (order.events ?? []).some((event) => event.event_type === "SELL");
+        const canOperateAccount = Boolean(order.account_id) && order.status !== "CANCELLED";
+        const operationItems = inventoryOperationMenuItems(
+          {
+            row: canOperateAccount
+              ? {
+                  status: order.account_status ?? "VOID",
+                  inventory_type: INVENTORY_TYPE_BY_ORDER_TYPE[order.order_type] ?? null,
+                }
+              : { status: "VOID", inventory_type: null },
+            detail: order.account_id ? ledgerDetails[order.account_id] : undefined,
+          },
+          { allowProfileAfterSold: canOperateAccount },
+        );
         return (
-          <Space size={2} className="orders-ledger-actions">
+          <Space size={4} className="orders-ledger-actions">
+          <PermissionGate permission="order.event.post">
+            <PermissionButton
+              permission="order.create"
+              type="link"
+              size="small"
+              disabled={order.account_status !== "WAITING" || !order.account_id}
+              onClick={() => void openOrderSale(order)}
+            >售出</PermissionButton>
+          </PermissionGate>
           {order.account_id || ["ACTIVE", "INSTALLMENT"].includes(order.status) ? (
             <PermissionButton
               permission="order.update"
@@ -92,20 +126,31 @@ export function useLedgerColumns(params: {
               disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
               onClick={() => void openRefund(order)}
             >资金收支</PermissionButton>
-            <PermissionButton
-              permission="order.create"
-              type="link"
-              size="small"
-              disabled={!order.account_id || order.status === "CANCELLED"}
-              onClick={() => void openOrderProfile(order, "description")}
-            >描述</PermissionButton>
-            <PermissionButton
-              permission="order.create"
-              type="link"
-              size="small"
-              disabled={!order.account_id || order.status === "CANCELLED"}
-              onClick={() => void openOrderProfile(order, "images")}
-            >作图</PermissionButton>
+            <Dropdown
+              trigger={["click"]}
+              placement="bottomLeft"
+              onOpenChange={(open) => {
+                if (open && order.account_id) void loadLedgerDetail(order.account_id);
+              }}
+              menu={{
+                className: "orders-ledger-operation-menu",
+                items: operationItems,
+                onClick: ({ key }) => {
+                  if (key === "consignment") void openOrderConsignment(order);
+                  if (key === "offsale") void openOrderOffsale(order);
+                  if (key === "description") void openOrderProfile(order, "description");
+                  if (key === "images") void openOrderProfile(order, "images");
+                },
+              }}
+            >
+              <PermissionButton
+                permission="order.create"
+                type="link"
+                size="small"
+                aria-label="运营"
+                onClick={(event) => event.stopPropagation()}
+              >运营</PermissionButton>
+            </Dropdown>
             <PermissionButton
               permission="order.event.post"
               type="link"
@@ -113,31 +158,14 @@ export function useLedgerColumns(params: {
               disabled={!order.account_id}
               onClick={() => void openOrderRebate(order)}
             >返点</PermissionButton>
-            <PermissionButton
-              permission="order.create"
-              type="link"
-              size="small"
-              disabled={order.account_status !== "WAITING" || !order.account_id}
-              onClick={() => void openOrderSale(order)}
-            >售出</PermissionButton>
-            <PermissionButton
-              permission="order.create"
-              type="link"
-              size="small"
-              disabled={order.account_status !== "WAITING" || !order.account_id}
-              onClick={() => void openOrderConsignment(order)}
-            >寄售</PermissionButton>
-            <PermissionButton
+            {!canSystemOffsale ? <PermissionButton
               permission="order.event.post"
               type="link"
               size="small"
               danger
               disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
-              onClick={() => {
-                if (canOffsaleConsignment) void openOrderOffsale(order);
-                else void openCancelTransaction(order);
-              }}
-            >{canOffsaleConsignment ? "下架" : "取消"}</PermissionButton>
+              onClick={() => void openCancelTransaction(order)}
+            >取消</PermissionButton> : null}
           </PermissionGate>
           {canDeleteOrder ? (
             <PermissionButton
@@ -146,7 +174,7 @@ export function useLedgerColumns(params: {
               size="small"
               danger
               onClick={() => void openOrderDelete(order)}
-            >删除订单</PermissionButton>
+            >删除</PermissionButton>
           ) : null}
         </Space>
         );

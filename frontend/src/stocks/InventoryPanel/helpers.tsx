@@ -11,6 +11,8 @@ export type InventoryFilterOptions = {
   dateRange?: [Dayjs, Dayjs] | null;
 };
 
+export type InventoryActionKey = "void" | "description" | "images";
+
 /** 库存筛选的单一事实源：先排除非在库，再套用维度条件，避免渲染层重复遍历。 */
 export function filterInventoryRows(rows: Account[], options: InventoryFilterOptions = {}) {
   const keyword = options.keyword?.trim().toLowerCase() ?? "";
@@ -40,14 +42,6 @@ export function inventoryCellValue(value: string | null | undefined) {
 /** 运营菜单统一承载寄售上架、下架、描述和作图四个动作。 */
 export function operationMenuItems(row: Account, detail?: AccountExecutionDetail) {
   return inventoryOperationItems({ row, detail });
-}
-
-/** 更多菜单只暴露当前能完成的非寄售动作，避免入口重复。 */
-export function moreMenuItems(row: Account) {
-  const canPlatformOffsale = row.status !== "SOLD" && row.status !== "VOID";
-  const items = [] as Array<{ key: string; label: string; danger?: boolean }>;
-  if (canPlatformOffsale) items.push({ key: "void", label: "取消", danger: true });
-  return items;
 }
 
 /** 从后往前找最近一条后端标记为「仍可冲销」的 BUY/SELL；金额直接用后端下发的余额，不本地相减。 */

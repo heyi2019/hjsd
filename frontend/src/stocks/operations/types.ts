@@ -9,6 +9,6 @@ export type InventoryOperationItem = {
 };
 
 export type InventoryOperationContext = {
-  row: Account;
+  row: Pick<Account, "status" | "inventory_type">;
   detail?: AccountExecutionDetail;
 };

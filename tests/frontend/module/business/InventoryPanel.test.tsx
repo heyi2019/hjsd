@@ -95,9 +95,10 @@ describe("InventoryPanel：账号台账", () => {
 
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByRole("button", { name: "导出" });
-    await ui.click(screen.getAllByRole("button", { name: "更多" })[0]);
-    // 术语统一后「取消交易」改名「取消」，在库账号（acc-1）可从更多菜单取消。
-    expect(screen.getByRole("menuitem", { name: "取消" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "更多" })).toBeNull();
+    // 术语统一后「取消交易」改名「取消」，在库账号（acc-1）直接展示取消入口。
+    const stockRow = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
+    expect(within(stockRow).getByRole("button", { name: "取消" })).toBeInTheDocument();
   });
 
   it("库存中心：资金收支可登记收入并关联来源订单", async () => {
@@ -154,13 +155,13 @@ describe("InventoryPanel：账号台账", () => {
     ));
   });
 
-  it("将取消放进更多菜单，不在行内单独展示", async () => {
+  it("取消直接展示在行内，不再放进更多菜单", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
 
     const stockRow = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
-    await ui.click(within(stockRow).getByRole("button", { name: "更多" }));
-    expect(screen.getByRole("menuitem", { name: "取消" })).toBeInTheDocument();
+    expect(within(stockRow).getByRole("button", { name: "取消" })).toBeInTheDocument();
+    expect(within(stockRow).queryByRole("button", { name: "更多" })).toBeNull();
   });
 
   it("系统下架只对代挂账号开放，平台下架对在库账号开放", async () => {

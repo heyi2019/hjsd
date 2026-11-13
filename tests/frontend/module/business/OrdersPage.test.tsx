@@ -463,11 +463,20 @@ describe("OrdersPage：四类订单台账", () => {
 
     // 不再有「更多」收纳入口
     expect(screen.queryAllByRole("button", { name: "更多" })).toHaveLength(0);
-    for (const label of ["编辑", "分润配置", "资金收支", "取消"]) {
+    for (const label of ["编辑", "分润配置", "资金收支", "运营", "取消"]) {
       const buttons = screen.getAllByRole("button", { name: label });
       expect(buttons).toHaveLength(label === "编辑" ? 1 : 2);
       expect(buttons.every((button) => button.classList.contains("ant-btn-sm"))).toBe(true);
       expect(buttons[0]).toBeInTheDocument();
+    }
+    const firstRow = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))!.closest("tr")!;
+    const actionLabels = Array.from(firstRow.querySelectorAll(".orders-ledger-actions button")).map((button) => button.textContent?.trim());
+    expect(actionLabels[0]).toBe("售出");
+    expect(actionLabels[1]).toBe("编辑");
+    expect(actionLabels.indexOf("运营")).toBeLessThan(actionLabels.indexOf("返点"));
+    fireEvent.click(within(firstRow).getByRole("button", { name: "运营" }));
+    for (const label of ["寄售（上架）", "下架", "描述", "作图"]) {
+      expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
     }
   });
 
@@ -485,7 +494,7 @@ describe("OrdersPage：四类订单台账", () => {
         account_status: "WAITING",
       },
     ]);
-    vi.mocked(stocksApi.executionDetail).mockResolvedValueOnce({
+    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
       account: { id: 9, source_order_id: 3, source_order_no: "DG-2026-0003", inventory_type: "CONSIGNMENT", status: "WAITING", cost_amount: "0.00" },
       orders: [{
         order_id: 3,
@@ -505,7 +514,8 @@ describe("OrdersPage：四类订单台账", () => {
 
     const row = screen.getAllByText("DG-2026-0003").find((element) => element.closest("tr"))?.closest("tr");
     expect(row).not.toBeNull();
-    fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "下架" }));
+    fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "运营" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "下架" }));
     expect(await screen.findByText("下架")).toBeInTheDocument();
     expect(await screen.findByText("寄售平台A")).toBeInTheDocument();
     // 只断言这一行不提供「取消」入口；页面上其它行/库存中心自带「取消」按钮，不能全局查。

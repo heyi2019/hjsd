@@ -32,7 +32,7 @@ describe("InventoryPanel：删除库存二次确认", () => {
   it("管理员可删除，原因必填，确认后才调用删除接口并刷新台账", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
 
-    const deleteButtons = await screen.findAllByRole("button", { name: "删除库存" });
+    const deleteButtons = await screen.findAllByRole("button", { name: "删除" });
     expect(deleteButtons.length).toBeGreaterThan(0);
     await ui.click(deleteButtons[0]);
 
@@ -63,7 +63,7 @@ describe("InventoryPanel：删除库存二次确认", () => {
   it("纯空白原因同样被拦下", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
 
-    const deleteButtons = await screen.findAllByRole("button", { name: "删除库存" });
+    const deleteButtons = await screen.findAllByRole("button", { name: "删除" });
     await ui.click(deleteButtons[0]);
     const dialog = await screen.findByRole("dialog");
     await ui.type(within(dialog).getByRole("textbox", { name: "删除原因" }), "   ");
@@ -77,14 +77,14 @@ describe("InventoryPanel：删除库存二次确认", () => {
     renderLight(<InventoryPanel />, { user: "operator" });
 
     await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 平台");
-    expect(screen.queryByRole("button", { name: "删除库存" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "删除" })).toBeNull();
   });
 
   it("删除失败时弹窗保持打开，可改原因重试", async () => {
     vi.mocked(stocksApi.remove).mockRejectedValue(new Error("该账号存在分期处置记录"));
     renderLight(<InventoryPanel />, { user: "admin" });
 
-    const deleteButtons = await screen.findAllByRole("button", { name: "删除库存" });
+    const deleteButtons = await screen.findAllByRole("button", { name: "删除" });
     await ui.click(deleteButtons[0]);
     const dialog = await screen.findByRole("dialog");
     await ui.type(within(dialog).getByRole("textbox", { name: "删除原因" }), "尝试删除");

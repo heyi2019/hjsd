@@ -791,7 +791,8 @@ describe("OrdersPage：操作与筛选分支", () => {
       id: 5, source_order_id: 1, source_order_no: "HS-2026-0001", game_account: "seller-001", status: "WAITING", cost_amount: "100.00",
     } as never);
     await openLedger();
-    await openRowMenu("HS-2026-0001", "描述");
+    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "运营" }));
+    await ui.click(screen.getByRole("menuitem", { name: "描述" }));
     const descriptionInput = await screen.findByPlaceholderText("补充账号等级、资源、限制等信息");
     const modal = descriptionInput.closest(".ant-modal-content") as HTMLElement;
     await ui.type(descriptionInput, "台账补充描述");

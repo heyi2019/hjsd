@@ -15,7 +15,7 @@ import { type InventoryPartyLink } from "../OrderDetail.shared";
 import { type InventoryProfileTarget } from "../operations";
 import { type InventoryCancellationValues } from "../InventoryCancellationDialog";
 import { type BusinessCenterEntryTab } from "../../orders/businessCenter";
-import { findCancelableBuy } from "./helpers";
+import { findCancelableBuy, type InventoryActionKey } from "./helpers";
 import type { CashflowTarget } from "../../finance/cashflow";
 
 export function useInventoryActions(params: {
@@ -194,7 +194,7 @@ export function useInventoryActions(params: {
       setDeleting(false);
     }
   }
-  function handleMoreAction(key: string, row: Account) {
+  function handleInventoryAction(key: InventoryActionKey, row: Account) {
     if (key === "void") {
       void openVoid(row);
       return;
@@ -248,7 +248,7 @@ export function useInventoryActions(params: {
     openDetail,
     openVoid,
     openPlatformOffsale,
-    handleMoreAction,
+    handleInventoryAction,
     handleExpand,
     openPartyCard,
     openCashflow,

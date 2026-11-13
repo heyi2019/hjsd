@@ -6,7 +6,7 @@ import { formatDateTimeMinute } from "../../shared/lib/format";
 import { MoneyText, PermissionButton, StatusTag } from "../../shared/ui";
 import { BUSINESS_MODE_LABEL, INVENTORY_AGE_COLOR, INVENTORY_TYPE_LABEL, isEditableAccountType } from "../inventory-logic";
 import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
-import { inventoryCellValue, moreMenuItems, operationMenuItems } from "./helpers";
+import { inventoryCellValue, operationMenuItems, type InventoryActionKey } from "./helpers";
 import { type Dispatch, type SetStateAction } from "react";
 
 export function useInventoryColumns(params: {
@@ -21,12 +21,12 @@ export function useInventoryColumns(params: {
   openCashflow: (account: Account) => Promise<void>;
   openPlatformOffsale: (account: Account) => Promise<void>;
   openEditor: (account: Account) => Promise<void>;
-  handleMoreAction: (key: string, row: Account) => void;
+  handleInventoryAction: (key: InventoryActionKey, row: Account) => void;
 }) {
   const {
     canDelete, editingAccount, executionDetails, loadExecution,
     setSaleTarget, setConsignmentTarget, setRebateTarget, setDeleteTarget,
-    openCashflow, openPlatformOffsale, openEditor, handleMoreAction,
+    openCashflow, openPlatformOffsale, openEditor, handleInventoryAction,
   } = params;
   const { arrange: arrangeColumns } = useListViewColumns("INVENTORY");
   const columns: ColumnsType<Account> = [
@@ -72,7 +72,9 @@ export function useInventoryColumns(params: {
       title: "操作",
       key: "actions",
       width: 420,
-      render: (_value, row) => (
+      render: (_value, row) => {
+        const operationItems = operationMenuItems(row, executionDetails[row.id]);
+        return (
         <Space className="inventory-row-actions" size={4}>
           <PermissionButton
             permission="order.create"
@@ -93,14 +95,14 @@ export function useInventoryColumns(params: {
             onOpenChange={(open) => { if (open) void loadExecution(row); }}
             menu={{
               className: "inventory-operation-menu",
-              items: operationMenuItems(row, executionDetails[row.id]),
+              items: operationItems,
               onClick: ({ key }) => {
                 if (key === "consignment") setConsignmentTarget(row);
                 if (key === "offsale") void openPlatformOffsale(row);
-                if (key === "description" || key === "images") handleMoreAction(key, row);
+                if (key === "description" || key === "images") handleInventoryAction(key, row);
               },
             }}
-            disabled={operationMenuItems(row, executionDetails[row.id]).length === 0}
+            disabled={operationItems.length === 0}
           >
             <PermissionButton
               permission="order.create"
@@ -150,42 +152,37 @@ export function useInventoryColumns(params: {
             >
               编辑
             </PermissionButton>
-            <Dropdown
-              trigger={["click"]}
-              placement="bottomRight"
-              onOpenChange={(open) => { if (open) void loadExecution(row); }}
-              menu={{
-                className: "inventory-more-menu",
-                items: moreMenuItems(row),
-                onClick: ({ key }) => handleMoreAction(key, row),
+            <PermissionButton
+              permission="order.create"
+              type="link"
+              size="small"
+              danger
+              aria-label="取消"
+              disabled={row.status === "SOLD" || row.status === "VOID"}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleInventoryAction("void", row);
               }}
             >
-              <PermissionButton
-                permission="order.create"
-                type="link"
-                size="small"
-                aria-label="更多"
-                onClick={(event) => event.stopPropagation()}
-              >
-                更多
-              </PermissionButton>
-            </Dropdown>
+              取消
+            </PermissionButton>
           </> : null}
           {canDelete ? <PermissionButton
             permission="order.create"
             type="link"
             size="small"
             danger
-            aria-label="删除库存"
+            aria-label="删除"
             onClick={(event) => {
               event.stopPropagation();
               setDeleteTarget(row);
             }}
           >
-            删除库存
+            删除
           </PermissionButton> : null}
         </Space>
-      ),
+        );
+      },
     },
   ];
   const mobileFieldOrder = arrangeColumns(columns).map(columnKey);

@@ -109,9 +109,12 @@ function rowOf(id: number): HTMLElement {
   return row as HTMLElement;
 }
 
-async function clickMore(row: HTMLElement, item: string) {
-  const menuButton = ["下架", "描述", "作图"].includes(item) ? "运营" : "更多";
-  fireEvent.click(within(row).getByRole("button", { name: menuButton }));
+async function clickOperation(row: HTMLElement, item: string) {
+  if (item === "取消") {
+    fireEvent.click(within(row).getByRole("button", { name: "取消" }));
+    return;
+  }
+  fireEvent.click(within(row).getByRole("button", { name: "运营" }));
   // 菜单项文本可能与行内按钮/弹窗标题重名，必须限定在 role=menu 内点击
   fireEvent.click(within(await screen.findByRole("menu")).getByText(item));
 }
@@ -132,16 +135,16 @@ beforeEach(() => {
   vi.spyOn(message, "info").mockImplementation((() => undefined) as never);
 });
 
-describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
-  it("更多菜单 → 描述：打开描述编辑弹窗", async () => {
+describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
+  it("运营 → 描述：打开描述编辑弹窗", async () => {
     await openPanel([inStockRow]);
-    await clickMore(rowOf(1), "描述");
+    await clickOperation(rowOf(1), "描述");
     expect((await screen.findAllByText("描述")).length).toBeGreaterThan(0);
   });
 
-  it("更多菜单 → 作图：打开图片编辑弹窗", async () => {
+  it("运营 → 作图：打开图片编辑弹窗", async () => {
     await openPanel([inStockRow]);
-    await clickMore(rowOf(1), "作图");
+    await clickOperation(rowOf(1), "作图");
     expect((await screen.findAllByText("作图")).length).toBeGreaterThan(0);
   });
 
@@ -165,7 +168,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     vi.mocked(poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
     await openPanel([inStockRow]);
     const cancelRow = (await screen.findByText("acc-1")).closest("tr") as HTMLElement;
-    await clickMore(cancelRow, "取消");
+    await clickOperation(cancelRow, "取消");
 
     const modal = await screen.findByRole("dialog");
     const amount = within(modal).getByLabelText("退回金额");
@@ -198,7 +201,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     } as unknown as AccountExecutionDetail);
     vi.mocked(poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
     await openPanel([inStockRow]);
-    await clickMore(rowOf(1), "取消");
+    await clickOperation(rowOf(1), "取消");
     const modal = await screen.findByRole("dialog");
     await ui.clear(within(modal).getByLabelText("退回金额"));
     await ui.type(within(modal).getByLabelText("退回金额"), "80");
@@ -214,7 +217,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
   it("代挂下架平台选项包含本系统并显示入库时间", async () => {
     vi.mocked(stocksApi.executionDetail).mockResolvedValue(consignmentDetail);
     await openPanel([consignmentRow]);
-    await clickMore(rowOf(1), "下架");
+    await clickOperation(rowOf(1), "下架");
 
     expect(await screen.findByText("本系统")).toBeInTheDocument();
   });
@@ -238,7 +241,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
     vi.mocked(stocksApi.executionDetail).mockResolvedValue(consignmentDetail);
     vi.mocked(ordersApi.cancel).mockResolvedValue({ status: "CANCELLED" } as never);
     await openPanel([consignmentRow]);
-    await clickMore(rowOf(1), "下架");
+    await clickOperation(rowOf(1), "下架");
 
     const modal = await screen.findByRole("dialog");
     await ui.click(modal.querySelector(".ant-select-selector") as HTMLElement);
@@ -277,7 +280,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
   it("FE-258：图片资料保存失败时保留弹窗并显示可重试错误态", async () => {
     vi.mocked(stocksApi.updateProfile).mockRejectedValueOnce(new Error("image save timeout"));
     await openPanel([inStockRow]);
-    await clickMore(rowOf(1), "作图");
+    await clickOperation(rowOf(1), "作图");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();

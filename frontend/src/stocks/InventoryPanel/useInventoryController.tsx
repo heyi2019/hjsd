@@ -84,7 +84,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   } = accountEditor;
   const saveInline = accountEditor.saveInline;
 
-  // —— 业务动作域：open* / submit* / 删除下架 / 更多菜单 ——
+  // —— 业务动作域：open* / submit* / 删除下架 / 运营动作 ——
   const actions = useInventoryActions({
     load, setRows, setError,
     executionDetails, setExecutionDetails, loadExecution, dropExecutionCache,
@@ -126,7 +126,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   openDetail,
   openVoid,
   openPlatformOffsale,
-  handleMoreAction,
+  handleInventoryAction,
   handleExpand,
   openPartyCard,
   openCashflow,
@@ -136,7 +136,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const { columns, mobileFieldOrder, arrangeColumns } = useInventoryColumns({
     canDelete, editingAccount, executionDetails, loadExecution,
     setSaleTarget, setConsignmentTarget, setRebateTarget, setDeleteTarget,
-    openCashflow, openPlatformOffsale, openEditor, handleMoreAction,
+    openCashflow, openPlatformOffsale, openEditor, handleInventoryAction,
   });
 
   return {
@@ -168,7 +168,6 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     gameTypeOptions,
     handleExpand,
     handleExport,
-    handleMoreAction,
     inlineEditId,
     invEditExtraForm,
     inventoryStats,

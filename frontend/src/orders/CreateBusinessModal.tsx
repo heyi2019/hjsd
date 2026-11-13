@@ -235,9 +235,6 @@ export function CreateBusinessModal(props: {
         onFinish={submit}
         onValuesChange={(changed) => {
           const clear: Record<string, undefined> = {};
-          for (const [source, other] of [["supplier_source", "supplier_source_other"]]) {
-            if (source in changed && changed[source] !== "其他") clear[other] = undefined;
-          }
           if ("intermediary_type" in changed && changed.intermediary_type !== "包赔") {
             clear.compensation_type = undefined;
           }

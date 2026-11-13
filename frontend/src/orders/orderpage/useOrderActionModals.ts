@@ -69,7 +69,7 @@ export function useOrderActionModals({
   const employeeOptions = [
     ...users.map((item) => ({
       value: item.id as number | "COMPANY",
-      label: `${item.display_name}（${item.username}）`,
+      label: item.display_name,
     })),
     { value: "COMPANY" as number | "COMPANY", label: "公司（不绑定人员）" },
   ];

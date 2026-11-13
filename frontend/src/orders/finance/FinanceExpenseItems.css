@@ -14,6 +14,13 @@
   background: transparent;
 }
 
+/* 主金额与资金账户是同一张可识别的蓝色信息卡；支出入口相对它定位。 */
+.finance-card-with-expense-action {
+  position: relative;
+  border-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+}
+
 .finance-expense-items__action {
   grid-column: 1 / -1;
   display: flex;

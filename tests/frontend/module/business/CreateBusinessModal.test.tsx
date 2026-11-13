@@ -96,6 +96,21 @@ async function openTypedModal(orderType: string, user = "admin") {
 }
 
 describe("CreateBusinessModal：新建业务写路径", () => {
+it("TH 建单的供货方昵称为选填", async () => {
+  await openTypedModal("TH");
+  const field = screen.getByLabelText("供货方昵称");
+  expect(field.closest(".ant-form-item")?.querySelector(".ant-form-item-required")).toBeNull();
+});
+
+it("HS 建单客户备注复用账号备注的整行输入样式", async () => {
+  await openTypedModal("HS");
+  const accountNote = screen.getByLabelText("账号备注");
+  const customerNote = screen.getByLabelText("客户备注");
+  expect(customerNote.tagName).toBe("INPUT");
+  expect(customerNote.closest(".ant-form-item")).toHaveClass("account-note");
+  expect(accountNote.closest(".ant-form-item")).toHaveClass("account-note");
+});
+
 it.each(["HS", "TH", "DG"])("%s 建单提供换绑手机号字段", async (orderType) => {
   await openTypedModal(orderType);
   expect(screen.getByLabelText("换绑手机号")).toBeInTheDocument();
@@ -135,8 +150,8 @@ it("交付信息默认勾选当前员工，并允许追加多位交付负责人"
   expect(responsible).toBeInTheDocument();
   await waitFor(() => expect(within(deliverySection).getByText(/系统管理员/)).toBeInTheDocument());
   await ui.click(responsible.closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
-  await ui.click(await screen.findByText(/业务员（operator）/, { selector: ".ant-select-item-option-content" }));
-  expect(within(deliverySection).getByText(/业务员（operator）/)).toBeInTheDocument();
+  await ui.click(await screen.findByText("业务员", { selector: ".ant-select-item-option-content" }));
+  expect(within(deliverySection).getByText("业务员")).toBeInTheDocument();
 });
 
 it("回收建单在资金信息后展示交付信息", async () => {
@@ -235,11 +250,8 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
     await ui.type(screen.getByLabelText("游戏账号"), "pickup-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
     await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
-    await ui.click(screen.getByLabelText("供货方来源").closest(".ant-form-item")?.querySelector(".ant-select-selector") as Element);
-    await ui.click(await screen.findByText("氪金联盟", { selector: ".ant-select-item-option-content" }));
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
-    await ui.type(amounts[1], "1200");
     await pickMainPool();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     expect(await screen.findByText(/设置 → 主数据/)).toBeInTheDocument();
@@ -265,7 +277,6 @@ it("FE-023：未售出的相同游戏账号由后端拒绝并保留表单", asyn
     await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
-    await ui.type(amounts[1], "1200");
     await pickMainPool();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     await waitFor(() => expect(screen.getByText(/请先售出后再建单/)).toBeInTheDocument());
@@ -299,7 +310,6 @@ it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单"
     await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
-    await ui.type(amounts[1], "1200");
     await pickMainPool();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     // 后端要求确认复购：复购确认框出现，未确认前不再次提交。
@@ -311,17 +321,6 @@ it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单"
     expect(ordersApi.create).toHaveBeenLastCalledWith(
       expect.objectContaining({ confirm_repurchase: true }),
     );
-  });
-
-it("FE-123：原建单测试入口的提号来源默认值跟随主数据", async () => {
-    clearOptionSetsCache();
-    vi.mocked(optionSetsApi.list).mockResolvedValueOnce({
-      items: [{ code: "SUPPLIER_SOURCE", options: [{ value: "自营", label: "自营" }, { value: "其他", label: "其他" }] }],
-    } as never);
-    await loadOptionSets();
-    renderLight(<CreateBusinessModal open onClose={() => undefined} onCreated={() => undefined} initialOrderType="TH" />, { user: "admin" });
-    const field = await screen.findByLabelText("供货方来源");
-    await waitFor(() => expect(field.closest(".ant-select")?.querySelector(".ant-select-selection-item")).toHaveTextContent("自营"));
   });
 
 it("订单已创建后不等待列表刷新，提交按钮立即结束 loading", async () => {
@@ -339,11 +338,8 @@ it("订单已创建后不等待列表刷新，提交按钮立即结束 loading",
     await ui.type(screen.getByLabelText("账号密码"), "secret");
     await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
     await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
-    await ui.click(screen.getByLabelText("供货方来源").closest(".ant-form-item")?.querySelector(".ant-select-selector") as Element);
-    await ui.click(await screen.findByText("氪金联盟", { selector: ".ant-select-item-option-content" }));
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
-    await ui.type(amounts[1], "1200");
     await pickMainPool();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
     await waitFor(() => expect(vi.mocked(ordersApi.create)).toHaveBeenCalled());

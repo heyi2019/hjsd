@@ -6,10 +6,6 @@ import { CfgItem } from "./ConfigurableField";
 export const PARTY_SOURCE_FALLBACK_OPTIONS = ["自营", "微博", "小红书", "闲鱼", "同行推荐", "其他"]
   .map((value) => ({ value, label: value }));
 
-/** 提号订单的供货方来源与客户来源口径独立维护；未加载主数据时仍保留旧业务默认项。 */
-export const SUPPLIER_SOURCE_FALLBACK_OPTIONS = ["氪金联盟", "同行", "其他"]
-  .map((value) => ({ value, label: value }));
-
 /** 客户来源只允许选择预设值；「其他」时再收集具体渠道，避免自由输入导致来源口径分散。 */
 export function CustomerSourceFields(props: { name: string; otherName: string }) {
   const source = Form.useWatch(props.name);

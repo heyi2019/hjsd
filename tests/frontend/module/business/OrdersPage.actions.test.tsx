@@ -485,7 +485,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     // 买号取建单负责人，售出取卖出表单负责人，运营取运营信息中的动作负责人，均自动带出。
     expect(within(modal).getByText("回收员（recovery）")).toBeInTheDocument();
     expect(within(modal).getByText("售出员（seller）")).toBeInTheDocument();
-    expect(within(modal).getByText("运营员（operator）")).toBeInTheDocument();
+    expect(within(modal).getByText("运营员")).toBeInTheDocument();
   });
 
   it("分润：按人分配点「增加一行」时姓名默认当前登录人", async () => {

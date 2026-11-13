@@ -1,3 +1,9 @@
 .customer-section {
   min-width: 0;
 }
+
+.customer-section .account-note,
+.dg-customer-section .account-note,
+.th-supplier-section .account-note {
+  grid-column: 1 / -1;
+}

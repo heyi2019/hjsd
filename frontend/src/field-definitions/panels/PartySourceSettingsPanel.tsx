@@ -6,18 +6,13 @@ export function PartySourceSettingsPanel() {
   return (
     <Card className="glass" title="参与方来源">
       <Typography.Paragraph type="secondary">
-        客户来源供回收、代挂表单联动；供货方来源供提号表单联动。修改后会同步到对应建单表单。
+        客户来源供回收、代挂表单联动，修改后会同步到对应建单表单。
       </Typography.Paragraph>
       <div className="ui-stack">
         <OptionDictionarySection
           code="CUSTOMER_SOURCE"
           title="客户来源主数据"
           description="维护回收、代挂使用的客户来源。"
-        />
-        <OptionDictionarySection
-          code="SUPPLIER_SOURCE"
-          title="供货方来源主数据"
-          description="维护提号表单使用的供货方来源。"
         />
       </div>
     </Card>

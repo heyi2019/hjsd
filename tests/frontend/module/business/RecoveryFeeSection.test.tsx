@@ -54,3 +54,11 @@ it("HS 费用卡片：保留主金额、资金账户和支出入口", () => {
   expect(screen.queryByText("中介费", { exact: true })).toBeNull();
   expect(screen.getByText("资金账户", { exact: true })).toBeInTheDocument();
 });
+
+it("HS 费用卡片：增加支出入口锚定在蓝色主金额卡片内", () => {
+  renderHs({});
+  const card = document.querySelector(".finance-card-with-expense-action");
+  expect(card).not.toBeNull();
+  expect(card).toContainElement(screen.getByRole("button", { name: /增加支出/ }));
+  expect(card).toHaveClass("finance-card-with-expense-action");
+});

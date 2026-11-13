@@ -50,7 +50,6 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
   TH: [
     { key: "has_secondary", label: "有无二次", type: "SELECT", options: [{ value: "有", label: "有" }, { value: "无", label: "无" }] },
     { key: "customer_source", label: "客户来源", type: "SELECT", options: SRC },
-    { key: "supplier_source", label: "供货方来源", type: "SELECT", options: [{ value: "氪金联盟", label: "氪金联盟" }, { value: "同行", label: "同行" }, { value: "其他", label: "其他" }] },
     { key: "intermediary_platform", label: "交易平台", type: "SELECT", options: PLAT },
     { key: "intermediary_type", label: "中介类型", type: "SELECT", options: [{ value: "普中", label: "普中" }, { value: "包赔", label: "包赔" }] },
     { key: "compensation_type", label: "包赔类型", type: "SELECT", options: [{ value: "首保", label: "首保" }, { value: "续保", label: "续保" }] },

@@ -6,16 +6,14 @@
   grid-column: 1 / -1;
 }
 
-/* 二次图片跟在「有无二次」右侧：多列布局占两格，单列布局回落一格。 */
+/* 图片佐证单独占满整行，避免字段标签与上传卡片在窄列中互相遮挡。 */
 .account-section .account-secondary-images {
-  grid-column: span 2;
+  grid-column: 1 / -1;
   min-width: 0;
 }
 
-@media (max-width: 900px) {
-  .account-section .account-secondary-images {
-    grid-column: span 1;
-  }
+.account-section .account-secondary-images .ant-form-item-row {
+  grid-template-columns: max-content minmax(0, 1fr) !important;
 }
 
 .account-section .business-registration-group {

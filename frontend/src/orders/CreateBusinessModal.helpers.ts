@@ -45,7 +45,7 @@ export function resolveCustomerSource(values: Values, isDg: boolean): string | u
   return selected === "其他" ? values[customerSourceOtherField] as string : selected;
 }
 
-/** 订单备注：HS/DG 汇总客户来源，TH 汇总供货方，其余取原备注。 */
+/** 订单备注：HS/DG 汇总客户来源，TH 汇总供货方备注，其余取原备注。 */
 export function buildOrderNote(
   values: Values,
   kind: { isRecovery: boolean; isTh: boolean; isDg: boolean },
@@ -58,7 +58,6 @@ export function buildOrderNote(
   if (kind.isTh) {
     return [
       values.th_account_note as string,
-      values.supplier_source ? `供货方来源：${String(values.supplier_source === "其他" ? values.supplier_source_other : values.supplier_source)}` : "",
       values.supplier_note as string,
     ].filter(Boolean).join("｜") || undefined;
   }
@@ -134,7 +133,6 @@ export async function resolveCounterpartyId(args: {
     phone: values.supplier_phone as string,
     wechat: values.supplier_wechat as string,
     qq: values.supplier_qq as string,
-    source: (values.supplier_source === "其他" ? values.supplier_source_other : values.supplier_source) as string,
     note: [
       values.supplier_note as string,
     ].filter(Boolean).join("｜") || undefined,

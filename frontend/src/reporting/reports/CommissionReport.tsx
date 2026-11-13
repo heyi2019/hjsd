@@ -67,7 +67,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
             onChange={(value) => setSelectedUserId((value as number) || 0)}
             options={[
               { value: 0, label: "全部" },
-              ...employees.map((employee) => ({ value: employee.id, label: `${employee.display_name}（${employee.username}）` })),
+              ...employees.map((employee) => ({ value: employee.id, label: employee.display_name })),
             ]}
             className="ui-control-width-import"
           />

@@ -29,7 +29,7 @@ export function ResponsibleEmployeeSelect(props: { name: string; label: string; 
 
   return (
     <CfgItem alwaysActive className={["responsible-employee-select", props.className].filter(Boolean).join(" ")} name={props.name} label={props.label}>
-      <Select mode="multiple" placeholder="默认当前员工，可多选" options={props.employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: `${employee.display_name}（${employee.username}）` }))} />
+      <Select mode="multiple" placeholder="默认当前员工，可多选" options={props.employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.display_name }))} />
     </CfgItem>
   );
 }

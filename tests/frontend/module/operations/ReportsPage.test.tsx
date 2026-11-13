@@ -117,7 +117,7 @@ describe("ReportsPage：经营中心报表", () => {
     const personFilter = personComboboxes[personComboboxes.length - 1] as HTMLElement;
     await ui.click(personFilter);
     expect(await screen.findByText("全部", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
-    await ui.click(await screen.findByText(/业务同事（operator）/, { selector: ".ant-select-item-option-content" }));
+    await ui.click(await screen.findByText("业务同事", { selector: ".ant-select-item-option-content" }));
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
   });
 
@@ -128,7 +128,7 @@ describe("ReportsPage：经营中心报表", () => {
     await waitFor(() => expect(vi.mocked(employeesApi.list)).toHaveBeenCalled());
     const personComboboxes = await screen.findAllByRole("combobox");
     await ui.click(personComboboxes[personComboboxes.length - 1] as HTMLElement);
-    await ui.click(await screen.findByText(/业务同事（operator）/, { selector: ".ant-select-item-option-content" }));
+    await ui.click(await screen.findByText("业务同事", { selector: ".ant-select-item-option-content" }));
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
     await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith(

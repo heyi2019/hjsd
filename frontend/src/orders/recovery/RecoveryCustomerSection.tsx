@@ -18,8 +18,8 @@ export function RecoveryCustomerSection(props: { customerExtras?: ReactNode; tit
         <CfgNestedItem name="customer_wechat" label="微信号"><Input placeholder="可选填" /></CfgNestedItem>
         <CfgNestedItem name="customer_qq" label="QQ"><Input placeholder="可选填" /></CfgNestedItem>
       </BusinessRegistrationGroup>
-      <CfgItem className="customer-note" name="note" label="客户备注">
-        <Input.TextArea rows={2} placeholder="可填写账号来源、特殊说明等" />
+      <CfgItem className="account-note" name="note" label="客户备注">
+        <Input placeholder="可选填" />
       </CfgItem>
       {props.customerExtras}
     </BusinessRegistrationSection>

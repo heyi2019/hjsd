@@ -238,10 +238,6 @@ export function useInventoryActions(params: {
     }
   }
   function handleMoreAction(key: string, row: Account) {
-    if (key === "offsale") {
-      void openPlatformOffsale(row);
-      return;
-    }
     if (key === "void") {
       void openVoid(row);
       return;

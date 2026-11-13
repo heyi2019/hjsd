@@ -1,7 +1,7 @@
 """取消模型。
 
 取消分为两类：
-- 无已登记资金事件：直接将订单置为已取消；
+- 无已登记资金事件，或仅有 DG 寄售运营事件：直接将订单置为已取消；
 - 有已登记资金事件：以 ``CANCEL`` 反向冲销原事件，并派生反向资金流水。
 
 本模块集中保存取消的校验、资金方向和账号状态规则，避免散落在订单编辑、
@@ -41,6 +41,20 @@ _CANCELLABLE_EVENT_TYPES = frozenset({
     EventType.BUY.value,
     EventType.SELL.value,
 })
+
+
+def _is_consignment_operation(event: OrderEvent) -> bool:
+    return (
+        event.event_type == EventType.OPERATE.value
+        and (event.form_extra or {}).get("operation_type") in {"CONSIGNMENT", "UNLIST"}
+    )
+
+
+def _can_cancel_after_consignment(order: Order, events: list[OrderEvent]) -> bool:
+    """系统下架允许 DG 在寄售/下架运营事件后完成普通取消。"""
+    return order.order_type == "DG" and bool(events) and all(
+        _is_consignment_operation(event) for event in events
+    )
 
 
 def cancellation_direction_for_offset_type(event_type: str) -> str:
@@ -211,13 +225,15 @@ def cancel_order(
     """取消没有已登记业务/资金事件的订单。"""
     reason = _required_text(reason, field="reason", message="取消必须填写原因")
     order = get_order(session, order_id, user)
-    posted = session.scalar(
-        select(OrderEvent.id).where(
-            OrderEvent.order_id == order.id,
-            OrderEvent.is_posted.is_(True),
-        )
+    posted_events = list(
+        session.scalars(
+            select(OrderEvent).where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.is_posted.is_(True),
+            )
+        ).all()
     )
-    if posted is not None:
+    if posted_events and not _can_cancel_after_consignment(order, posted_events):
         raise Validation("订单已有登记事件，不能直接取消，请先冲销")
     order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
     _retire_account_on_plain_cancel(session, order, form_extra=form_extra, actor=actor)

@@ -110,7 +110,8 @@ function rowOf(id: number): HTMLElement {
 }
 
 async function clickMore(row: HTMLElement, item: string) {
-  fireEvent.click(within(row).getByRole("button", { name: /更多/ }));
+  const menuButton = ["下架", "描述", "作图"].includes(item) ? "运营" : "更多";
+  fireEvent.click(within(row).getByRole("button", { name: menuButton }));
   // 菜单项文本可能与行内按钮/弹窗标题重名，必须限定在 role=menu 内点击
   fireEvent.click(within(await screen.findByRole("menu")).getByText(item));
 }
@@ -146,7 +147,7 @@ describe("InventoryPanel：更多菜单 / 退款取消 / 导出", () => {
 
   it("非代挂在库账号不展示下架入口", async () => {
     await openPanel([inStockRow]);
-    fireEvent.click(within(rowOf(1)).getByRole("button", { name: /更多/ }));
+    fireEvent.click(within(rowOf(1)).getByRole("button", { name: "运营" }));
     const menu = await screen.findByRole("menu");
     expect(within(menu).queryByText("下架")).toBeNull();
     expect(within(menu).getByText("描述")).toBeInTheDocument();

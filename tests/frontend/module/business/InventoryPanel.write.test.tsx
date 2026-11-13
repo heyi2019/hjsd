@@ -167,7 +167,8 @@ describe("InventoryPanel：写入与长路径", () => {
     } as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
-    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "寄售" }));
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "运营" }));
+    await ui.click(screen.getByRole("menuitem", { name: "寄售（上架）" }));
     expect(await screen.findByText("登记寄售")).toBeInTheDocument();
 
     await ui.click(screen.getAllByRole("combobox", { name: "寄售平台" })[0]);
@@ -186,7 +187,8 @@ describe("InventoryPanel：写入与长路径", () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
-    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "寄售" }));
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "运营" }));
+    await ui.click(screen.getByRole("menuitem", { name: "寄售（上架）" }));
     expect(await screen.findByText("登记寄售")).toBeInTheDocument();
     expect(screen.getByLabelText("上架时间").getAttribute("value")).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
     expect(screen.getByText(/每次确认只登记一个平台/)).toBeInTheDocument();

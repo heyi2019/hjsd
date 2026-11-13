@@ -45,6 +45,7 @@ from app.lists.xlsx import new_workbook, write_sheet, xlsx_bytes
 from app.orders import schemas
 from app.orders._shared import get_order as orders_get_order
 from app.orders.cancellation_model import cancel_order as orders_cancel_order
+from app.orders.consignment import post_consignment_operation
 from app.orders.deletion import delete_order as orders_delete_order
 from app.orders.create import add_customer_role, create_order as orders_create_order
 from app.orders.events import post_event as orders_post_event
@@ -642,32 +643,47 @@ def post_event(
                 "财务只能登记买号或售出事件",
                 details={"allowed_event_types": ["BUY", "SELL"], "event_type": event_type},
             )
-    event, flow = orders_post_event(
-        db,
-        order_id,
-        event_type=event_type,
-        sale_mode=payload.sale_mode,
-        operation_type=payload.operation_type,
-        rebate_type=payload.rebate_type,
-        amount=payload.amount,
-        occurred_on=payload.occurred_on,
-        actor=_actor(user),
-        pool_id=payload.pool_id,
-        pool_id2=payload.pool_id2,
-        amount2=payload.amount2,
-        portion=payload.portion,
-        delivery_mode=payload.delivery_mode,
-        delivery_direction=payload.delivery_direction,
-        offset_event_id=payload.offset_event_id,
-        reason=payload.reason,
-        operator_user_ids=payload.operator_user_ids,
-        note=payload.note,
-        bound_phone=payload.bound_phone,
-        bound_phone_owner=payload.bound_phone_owner,
-        form_extra_scope=payload.form_extra_scope,
-        form_extra=payload.form_extra,
-        user=user,
-    )
+    operation_type = (payload.operation_type or "").strip().upper()
+    if event_type == "OPERATE" and operation_type in {"CONSIGNMENT", "UNLIST"}:
+        event, flow = post_consignment_operation(
+            db,
+            order_id,
+            operation_type=operation_type,
+            occurred_on=payload.occurred_on,
+            actor=_actor(user),
+            note=payload.note,
+            operator_user_ids=payload.operator_user_ids,
+            form_extra=payload.form_extra,
+            form_extra_scope=payload.form_extra_scope,
+            user=user,
+        )
+    else:
+        event, flow = orders_post_event(
+            db,
+            order_id,
+            event_type=event_type,
+            sale_mode=payload.sale_mode,
+            operation_type=payload.operation_type,
+            rebate_type=payload.rebate_type,
+            amount=payload.amount,
+            occurred_on=payload.occurred_on,
+            actor=_actor(user),
+            pool_id=payload.pool_id,
+            pool_id2=payload.pool_id2,
+            amount2=payload.amount2,
+            portion=payload.portion,
+            delivery_mode=payload.delivery_mode,
+            delivery_direction=payload.delivery_direction,
+            offset_event_id=payload.offset_event_id,
+            reason=payload.reason,
+            operator_user_ids=payload.operator_user_ids,
+            note=payload.note,
+            bound_phone=payload.bound_phone,
+            bound_phone_owner=payload.bound_phone_owner,
+            form_extra_scope=payload.form_extra_scope,
+            form_extra=payload.form_extra,
+            user=user,
+        )
     # 刚提交的事件要能立刻显示「还能冲多少」：把同订单事件一并取出算余额。
     order_events = list(
         db.scalars(select(OrderEvent).where(OrderEvent.order_id == event.order_id)).all()

@@ -150,14 +150,14 @@ describe("InventoryPanel：账号台账", () => {
 
     renderLight(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByRole("button", { name: "导出" })).toBeInTheDocument();
-    for (const label of ["售出", "寄售", "返点", "资金收支", "交付", "编辑", "更多"]) {
+    for (const label of ["售出", "运营", "返点", "资金收支", "交付", "编辑", "更多"]) {
       expect(screen.getAllByRole("button", { name: label }).length).toBeGreaterThan(0);
     }
     expect(screen.queryByRole("button", { name: "下架" })).toBeNull();
     await ui.click(screen.getAllByRole("button", { name: "更多" })[0]);
     // 术语统一后「取消交易」改名「取消」，在库账号（acc-1）可从更多菜单取消。
     expect(screen.getByRole("menuitem", { name: "取消" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "下架" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "下架" })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: "平台下架" })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: "系统下架" })).toBeNull();
     expect(document.querySelector(".inventory-more-menu")).toBeInTheDocument();
@@ -202,15 +202,15 @@ describe("InventoryPanel：账号台账", () => {
     ));
   });
 
-  it("更多菜单收纳下架、取消、描述和作图", async () => {
+  it("运营菜单收纳寄售、描述和作图", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
 
     const stockRow = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
-    await ui.click(within(stockRow).getByRole("button", { name: "更多" }));
+    await ui.click(within(stockRow).getByRole("button", { name: "运营" }));
 
-    for (const label of ["描述", "作图"]) {
-      expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
+    for (const label of ["寄售（上架）", "描述", "作图"]) {
+      expect(await screen.findByRole("menuitem", { name: label })).toBeInTheDocument();
     }
   });
 
@@ -218,7 +218,7 @@ describe("InventoryPanel：账号台账", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     const stockRow = screen.getAllByRole("row").find((item) => within(item).queryByText("acc-1") !== null)!;
-    await ui.click(within(stockRow).getByRole("button", { name: "更多" }));
+    await ui.click(within(stockRow).getByRole("button", { name: "运营" }));
     await ui.click(screen.getByRole("menuitem", { name: "描述" }));
     const descriptionLabels = await screen.findAllByText("描述");
     const modalTitle = descriptionLabels[descriptionLabels.length - 1]!;
@@ -249,7 +249,7 @@ describe("InventoryPanel：账号台账", () => {
       const rows = screen.getAllByRole("row");
       return rows.find((item) => within(item).queryByText("acc-3") !== null)!;
     });
-    await ui.click(within(row).getByRole("button", { name: "更多" }));
+    await ui.click(within(row).getByRole("button", { name: "运营" }));
     expect(await screen.findByRole("menuitem", { name: "下架" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "系统下架" })).toBeNull();
   });
@@ -486,16 +486,12 @@ describe("InventoryPanel：账号台账", () => {
     const detailPanel = (await screen.findByText("当前运营状态")).closest(".inventory-detail") as HTMLElement;
     const accountSummary = detailPanel;
     // 新版只读详情：账号基本资料（业务 / 平台 / 成本 / 登记时间 / 出售时间 / 建档操作人）已不在面板展示，仅保留于 CSV 导出；
-    // 面板按板块聚焦：运营信息含「寄售平台 / 寄售时间」与「账号补充资料（描述 / 作图）」，游戏账号信息含 ACCOUNT_PRODUCT 扩展（高段位账号）。
-    expect(within(accountSummary).getByText("寄售平台 / 寄售时间")).toBeInTheDocument();
+    // 面板按板块聚焦：运营信息与账号补充资料保留，寄售平台只在真实存在寄售事件时展示。
     expect(within(accountSummary).getByText("描述")).toBeInTheDocument();
     expect(within(accountSummary).getByText("高段位账号")).toBeInTheDocument();
     expect(within(accountSummary).getByText("作图")).toBeInTheDocument();
     expect(within(accountSummary).getAllByRole("img", { name: /作图/ })).toHaveLength(2);
     expect(within(accountSummary).queryByText("订单时间", { exact: true })).toBeNull();
-    expect(within(accountSummary).getByText("寄售平台A / 2026-10-12 09:10")).toBeInTheDocument();
-    // 回收(RECOVERY)类型的账号同样可寄售，寄售记录以 DG 单承载，与账号 inventory_type 无关。
-    expect(within(accountSummary).getAllByText(/寄售平台A/).length).toBeGreaterThan(0);
     expect(within(detailPanel).queryByText("发生日期", { exact: true })).toBeNull();
     expect(within(detailPanel).getAllByText("动作时间").length).toBeGreaterThan(0);
     // 详情页执行/资金表为窄窗横向滚动（L202）定制，使用 .inventory-execution-table /

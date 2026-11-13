@@ -6,7 +6,7 @@ import { formatDateTimeMinute } from "../../shared/lib/format";
 import { MoneyText, PermissionButton, StatusTag } from "../../shared/ui";
 import { BUSINESS_MODE_LABEL, INVENTORY_AGE_COLOR, INVENTORY_TYPE_LABEL, isEditableAccountType } from "../inventory-logic";
 import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
-import { inventoryCellValue, moreMenuItems } from "./helpers";
+import { inventoryCellValue, moreMenuItems, operationMenuItems } from "./helpers";
 import { type Dispatch, type SetStateAction } from "react";
 
 export function useInventoryColumns(params: {
@@ -20,13 +20,14 @@ export function useInventoryColumns(params: {
   setDeleteTarget: Dispatch<SetStateAction<Account | null>>;
   openCashflow: (account: Account) => Promise<void>;
   openDelivery: (account: Account) => Promise<void>;
+  openPlatformOffsale: (account: Account) => Promise<void>;
   openEditor: (account: Account) => Promise<void>;
   handleMoreAction: (key: string, row: Account) => void;
 }) {
   const {
     canDelete, editingAccount, executionDetails, loadExecution,
     setSaleTarget, setConsignmentTarget, setRebateTarget, setDeleteTarget,
-    openCashflow, openDelivery, openEditor, handleMoreAction,
+    openCashflow, openDelivery, openPlatformOffsale, openEditor, handleMoreAction,
   } = params;
   const { arrange: arrangeColumns } = useListViewColumns("INVENTORY");
   const columns: ColumnsType<Account> = [
@@ -87,19 +88,31 @@ export function useInventoryColumns(params: {
           >
             售出
           </PermissionButton>
-          <PermissionButton
-            permission="order.create"
-            type="link"
-            size="small"
-            aria-label="寄售"
-            disabled={row.status === "SOLD"}
-            onClick={(event) => {
-              event.stopPropagation();
-              setConsignmentTarget(row);
+          <Dropdown
+            trigger={["click"]}
+            placement="bottomLeft"
+            onOpenChange={(open) => { if (open) void loadExecution(row); }}
+            menu={{
+              className: "inventory-operation-menu",
+              items: operationMenuItems(row, executionDetails[row.id]),
+              onClick: ({ key }) => {
+                if (key === "consignment") setConsignmentTarget(row);
+                if (key === "offsale") void openPlatformOffsale(row);
+                if (key === "description" || key === "images") handleMoreAction(key, row);
+              },
             }}
+            disabled={operationMenuItems(row, executionDetails[row.id]).length === 0}
           >
-            寄售
-          </PermissionButton>
+            <PermissionButton
+              permission="order.create"
+              type="link"
+              size="small"
+              aria-label="运营"
+              onClick={(event) => event.stopPropagation()}
+            >
+              运营
+            </PermissionButton>
+          </Dropdown>
           <PermissionButton
             permission="order.event.post"
             type="link"
@@ -156,7 +169,7 @@ export function useInventoryColumns(params: {
               onOpenChange={(open) => { if (open) void loadExecution(row); }}
               menu={{
                 className: "inventory-more-menu",
-                items: moreMenuItems(row, executionDetails[row.id]),
+                items: moreMenuItems(row),
                 onClick: ({ key }) => handleMoreAction(key, row),
               }}
             >

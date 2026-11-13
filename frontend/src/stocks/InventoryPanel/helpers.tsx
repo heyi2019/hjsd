@@ -1,7 +1,7 @@
 import type { Dayjs } from "dayjs";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
-import { isActiveConsignmentListing } from "../consignment-logic";
+import { inventoryOperationItems } from "../operations";
 
 export type InventoryFilterOptions = {
   businessMode?: string;
@@ -37,15 +37,16 @@ export function inventoryCellValue(value: string | null | undefined) {
   return value ? value : <span className="inventory-empty-cell">-</span>;
 }
 
-/** 更多菜单只暴露当前能完成的动作，避免用户看到无效入口。 */
-export function moreMenuItems(row: Account, detail?: AccountExecutionDetail) {
+/** 运营菜单统一承载寄售上架、下架、描述和作图四个动作。 */
+export function operationMenuItems(row: Account, detail?: AccountExecutionDetail) {
+  return inventoryOperationItems({ row, detail });
+}
+
+/** 更多菜单只暴露当前能完成的非寄售动作，避免入口重复。 */
+export function moreMenuItems(row: Account) {
   const canPlatformOffsale = row.status !== "SOLD" && row.status !== "VOID";
-  const canSystemOffsale = row.inventory_type === "CONSIGNMENT" && canPlatformOffsale;
-  const hasActiveConsignment = Boolean(detail?.orders.some(isActiveConsignmentListing));
   const items = [] as Array<{ key: string; label: string; danger?: boolean }>;
-  if (canPlatformOffsale && (hasActiveConsignment || canSystemOffsale)) items.push({ key: "offsale", label: "下架" });
   if (canPlatformOffsale) items.push({ key: "void", label: "取消", danger: true });
-  if (row.status !== "SOLD") items.push({ key: "description", label: "描述" }, { key: "images", label: "作图" });
   return items;
 }
 

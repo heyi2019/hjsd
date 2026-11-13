@@ -7,6 +7,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.trade import Cashflow
+from app.orders.consignment import register_consignment
 from app.orders import events
 from app.orders.create import create_order
 from app.orders.events import _opposite_direction, post_event
@@ -51,11 +52,9 @@ def test_operate_event_records_business_action_without_cashflow(seeded_db):
         actor="pytest",
     )
 
-    event, flow = events.post_event(
+    event, flow = register_consignment(
         seeded_db,
         order.id,
-        event_type="OPERATE",
-        operation_type="CONSIGNMENT",
         occurred_on=TODAY,
         actor="pytest",
         note="寄售上架",

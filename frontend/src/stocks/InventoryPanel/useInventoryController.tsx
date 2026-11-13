@@ -140,7 +140,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const { columns, mobileFieldOrder, arrangeColumns } = useInventoryColumns({
     canDelete, editingAccount, executionDetails, loadExecution,
     setSaleTarget, setConsignmentTarget, setRebateTarget, setDeleteTarget,
-    openCashflow, openDelivery, openEditor, handleMoreAction,
+    openCashflow, openDelivery, openPlatformOffsale, openEditor, handleMoreAction,
   });
 
   return {

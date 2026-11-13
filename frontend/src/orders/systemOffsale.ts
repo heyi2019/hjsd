@@ -18,7 +18,7 @@ interface SystemOffsaleCancellation {
 
 /**
  * 系统下架时同步登记原订单的 UNLIST 操作事件；只有真正执行 ERP 出库时，
- * 调用方才传入 cancelOrderIds 取消主业务订单。寄售本身不再创建或取消 DG 订单。
+ * 调用方才传入 cancelOrderIds 取消主业务订单；平台下架不传该参数，系统下架才传入。
  *
  * 三处入口（库存 Void 下架、库存平台下架弹窗、订单页系统下架）的文案、日期来源与
  * form_extra 内容各不相同，故全部由调用点传入，本函数只固化共用的请求骨架。

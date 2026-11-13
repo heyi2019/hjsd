@@ -284,6 +284,7 @@ export function OrderDetail({
     statusLabel: STATUS_LABEL[row.status] ?? row.status,
     gameType: row.game_type ?? null,
     gameAccount: row.game_account ?? null,
+    campAccount: row.camp_account ?? null,
     platform: row.platform ?? null,
     cost: row.cost_amount ?? null,
     businessMode: row.business_mode ? (BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode) : null,

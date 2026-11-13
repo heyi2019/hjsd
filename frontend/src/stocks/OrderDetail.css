@@ -13,34 +13,53 @@
 .inventory-row-actions .ant-space-item:first-child .ant-btn-link { font-weight: 650; color: var(--color-primary-text); }
 .inventory-row-actions .ant-btn-link:hover { background: var(--soft); border-radius: var(--radius-compact); }
 .inventory-detail {
-  width: 100%;
+  width: fit-content;
+  min-width: min(560px, calc(100% - var(--space-6) * 2));
+  max-width: calc(100% - var(--space-6) * 2);
   max-height: 36rem;
   overflow-y: auto;
   scrollbar-gutter: stable;
   box-sizing: border-box;
-  margin: 0;
-  padding: var(--space-4) 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  margin: var(--space-2) 0;
+  padding: var(--space-4);
+  border: var(--border-w) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
 }
 .inventory-table .ant-table-tbody > tr.ant-table-expanded-row .inventory-detail {
-  /* 展开详情与弹窗跟随父容器铺满，板块框直接对齐到面板最右边界。 */
-  width: 100%;
+  /* 展开详情保留独立卡片边界，不再跟随主表铺满。 */
+  width: fit-content;
+  max-width: calc(100% - var(--space-6) * 2);
   margin-inline: 0;
 }
 .inventory-detail__meta {
+  width: 100%;
+  max-width: none;
   overflow: hidden;
   box-sizing: border-box;
   border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
   border-radius: var(--radius-sm);
   background: var(--color-surface);
 }
-.inventory-detail__meta .ant-descriptions-view { overflow: hidden; }
+.inventory-detail__meta-group {
+  width: 100%;
+  max-width: none;
+}
+.inventory-detail__meta .ant-descriptions-view {
+  display: block;
+  width: 100%;
+  max-width: none;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  vertical-align: top;
+}
 .inventory-detail__meta-group + .inventory-detail__meta-group { margin-top: var(--space-3); }
 .inventory-detail__meta-group-title { padding: var(--space-2) var(--space-3); color: var(--color-text-secondary); background: var(--soft); font: var(--font-caption-2); font-weight: 650; }
-.inventory-detail__meta-table { margin: var(--space-3); }
+.inventory-detail__meta-table { width: auto; max-width: none; margin: var(--space-3); }
 .inventory-detail .ui-table-wrap,
 .inventory-detail .ant-table-wrapper {
   width: 100%;
@@ -66,13 +85,21 @@
 .inventory-detail .ui-table-wrap .ant-table,
 .inventory-detail .ant-table-wrapper .ant-table { min-width: 100%; }
 .inventory-detail__meta .ant-descriptions-item-label,
-.inventory-detail__meta .ant-descriptions-item-content { min-width: 0; padding: var(--space-1) var(--space-2) !important; }
+.inventory-detail__meta .ant-descriptions-item-content { min-width: 0; padding: var(--space-2) var(--space-3) !important; }
 .inventory-detail .ant-descriptions-item-label { white-space: nowrap; color: var(--color-text-secondary); font: var(--font-caption-2); }
 .inventory-detail .ant-descriptions-item-content { max-width: 280px; color: var(--color-text-primary); font: var(--font-caption); white-space: normal; overflow-wrap: anywhere; }
-.inventory-detail__meta .ant-descriptions-item-label { width: 96px; }
-.inventory-detail__meta .ant-descriptions-item-content { width: auto; max-width: none; }
+.inventory-detail__meta .ant-descriptions-item-label { width: 76px; }
+.inventory-detail__meta .ant-descriptions-item-content { width: auto; min-width: 60px; max-width: 180px; }
 .inventory-detail .ant-descriptions-item-content .ant-typography { overflow-wrap: anywhere; }
-.inventory-detail .ant-descriptions-view > table { width: 100% !important; margin-inline-end: 0; table-layout: fixed !important; }
+.inventory-detail .ant-descriptions-view > table {
+  display: table !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin-inline-end: 0;
+  table-layout: auto !important;
+  vertical-align: top;
+}
 .inventory-detail .ant-descriptions-view > table col { width: auto !important; }
 .inventory-detail .ant-descriptions-item-label.inventory-detail__datetime,
 .inventory-detail .ant-descriptions-item-content.inventory-detail__datetime { width: auto; max-width: none; }
@@ -86,7 +113,7 @@
 .inventory-detail--editing { margin-top: var(--space-4); }
 .inventory-detail--editing .inventory-execution-list, .inventory-detail--editing .inventory-finance-list { margin-top: var(--space-4); }
 .inventory-edit-operator { min-width: var(--col-w-190); }
-.inventory-detail__section { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
+.inventory-detail__section { display: grid; gap: var(--space-3); margin-top: 0; }
 .inventory-detail__section--profile { margin-top: 0; }
 /* 只读态按板块分栏后，每个 Tab 面板内只有一个板块，原本用于「板块堆叠」的上外边距不再需要。 */
 .inventory-detail__tabs .inventory-detail__section,
@@ -94,7 +121,7 @@
 .inventory-detail__tabs .inventory-finance-list { margin-top: 0; }
 .inventory-detail__section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--sz-24); padding-inline-start: var(--space-3); border-inline-start: var(--border-w-3) solid var(--color-primary); }
 .inventory-detail__section-heading .ant-typography { color: var(--color-text-primary); font-weight: 700; }
-.inventory-execution-list { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
+.inventory-execution-list { display: grid; gap: var(--space-3); margin-top: 0; }
 .inventory-execution-table {
   box-sizing: border-box;
   border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
@@ -131,11 +158,18 @@
   margin-inline-start: calc(var(--space-5) * -2);
   width: calc(100% + var(--space-5) * 2);
 }
-.inventory-finance-list { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
-.inventory-finance-list > .inventory-detail__meta { padding: var(--space-3); display: grid; gap: var(--space-3); }
+.inventory-finance-list { display: grid; gap: var(--space-3); margin-top: 0; }
+.inventory-finance-list > .inventory-detail__meta {
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+  overflow-x: auto;
+}
 .inventory-execution-list > .inventory-detail__meta { padding: var(--space-3); }
 .inventory-finance-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
-.inventory-finance-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+.inventory-finance-summary { width: fit-content; display: grid; grid-template-columns: repeat(4, minmax(140px, max-content)); gap: var(--space-2); }
 .inventory-finance-summary__item { display: grid; gap: 2px; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text-secondary); font: var(--font-caption-2); }
 .inventory-finance-summary__item--expense { border-inline-start: var(--border-w-3) solid var(--color-error); }
 .inventory-finance-summary__item--income { border-inline-start: var(--border-w-3) solid var(--color-success); }
@@ -162,17 +196,25 @@
 /* 流水表字号对齐运营信息「作图」标签（--font-caption-2，12px）。 */
 .inventory-finance-table .ant-table-thead > tr > th,
 .inventory-finance-table .ant-table-tbody > tr > td { font-size: var(--fs-caption-2); }
-@media (--bp-sm) { .inventory-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (--bp-sm) { .inventory-finance-summary { grid-template-columns: repeat(2, minmax(140px, max-content)); } }
 @media (--bp-sm) {
   .inventory-table .ant-table-tbody > tr.ant-table-expanded-row > td { padding: var(--space-2) var(--space-3) !important; }
-  .inventory-detail { max-height: 28rem; padding: var(--space-3) 0; }
+  .inventory-detail {
+    width: calc(100% - var(--space-3) * 2);
+    min-width: 0;
+    max-width: calc(100% - var(--space-3) * 2);
+    max-height: 28rem;
+    padding: var(--space-3);
+  }
 }
 
-/* 桌面端展开详情也按字段内容收紧，避免描述表、资金明细和操作明细被面板宽度拉散。 */
+/* 展开详情按字段内容收紧，避免描述表被面板宽度拉散。 */
 @media (min-width: 768px) {
-  .inventory-detail__meta { overflow-x: auto; }
+  .inventory-detail__meta { overflow-x: hidden; }
+  .inventory-detail__meta .ant-descriptions-view { overflow-x: hidden; }
   .inventory-detail__meta .ant-descriptions-view > table {
-    width: max-content !important;
+    display: table !important;
+    width: 100% !important;
     min-width: 0 !important;
     table-layout: auto !important;
   }

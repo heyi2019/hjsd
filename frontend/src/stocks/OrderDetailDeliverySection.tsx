@@ -70,7 +70,7 @@ function DeliverySubSection({
   return (
     <div className="inventory-detail__meta-group">
       <div className="inventory-detail__meta-group-title">{title}</div>
-      <Descriptions className="inventory-detail__meta-table" size="small" bordered column={6}>
+      <Descriptions className="inventory-detail__meta-table" size="small" bordered column={3}>
         {mainFields
           .filter((field) => isFieldActive(config, field.key))
           .map((field) => (
@@ -78,7 +78,7 @@ function DeliverySubSection({
           ))}
       </Descriptions>
       {deliveryItems.length ? (
-        <Descriptions className="inventory-detail__meta-table" size="small" bordered column={6}>
+        <Descriptions className="inventory-detail__meta-table" size="small" bordered column={3}>
           {deliveryItems.map((item) => (
             <Descriptions.Item key={item.key} label={`${item.label}${item.status === "deleted" ? "（已删除）" : item.status === "inactive" ? "（已停用）" : ""}`}>
               {formatExtraDisplayValue(item.value) || "-"}

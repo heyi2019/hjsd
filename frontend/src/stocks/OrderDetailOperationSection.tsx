@@ -1,6 +1,7 @@
-import { Descriptions, Image, Space, Typography } from "antd";
+import { Descriptions, Typography } from "antd";
 import { StatusTag } from "../shared/ui";
 import { CustomFieldSection } from "../orders/ConfigurableField";
+import { OrderDetailImageGallery } from "./OrderDetailImageGallery";
 import {
   InventoryExtraFieldsGroup,
   InventorySectionHeading,
@@ -53,38 +54,8 @@ export function OrderDetailOperationSection({
           <div className="inventory-detail__meta-group-title">账号补充资料</div>
           <Descriptions className="inventory-detail__meta-table inventory-detail__long-meta" size="small" bordered column={4}>
             <Descriptions.Item label="描述" span={4}>{meta.accountDescription}</Descriptions.Item>
-            {meta.secondaryImages.length ? (
-              <Descriptions.Item label="二次图片" span={4}>
-                <Image.PreviewGroup>
-                  <Space wrap>
-                    {meta.secondaryImages.slice(0, 3).map((src, index) => (
-                      <Image key={`secondary-${src}-${index}`} src={src} alt={`二次图片 ${index + 1}`} width={64} height={64} preview />
-                    ))}
-                  </Space>
-                </Image.PreviewGroup>
-              </Descriptions.Item>
-            ) : null}
-            {meta.walletRealnameImages.length ? (
-              <Descriptions.Item label="钱包实名图片" span={4}>
-                <Image.PreviewGroup>
-                  <Space wrap>
-                    {meta.walletRealnameImages.slice(0, 3).map((src, index) => (
-                      <Image key={`wallet-${src}-${index}`} src={src} alt={`钱包实名图片 ${index + 1}`} width={64} height={64} preview />
-                    ))}
-                  </Space>
-                </Image.PreviewGroup>
-              </Descriptions.Item>
-            ) : null}
             <Descriptions.Item label="作图" span={4}>
-              {meta.accountImages.length ? (
-                <Image.PreviewGroup>
-                  <Space wrap>
-                    {meta.accountImages.slice(0, 9).map((src, index) => (
-                      <Image key={`${src}-${index}`} src={src} alt={`作图 ${index + 1}`} width={64} height={64} preview />
-                    ))}
-                  </Space>
-                </Image.PreviewGroup>
-              ) : "-"}
+              <OrderDetailImageGallery images={meta.accountImages} altPrefix="作图" limit={9} />
             </Descriptions.Item>
           </Descriptions>
         </div>

@@ -188,6 +188,8 @@ export function CreateBusinessModal(props: {
     }
   };
 
+  if (!props.open) return null;
+
   return (
     <>
     <BusinessActionModal

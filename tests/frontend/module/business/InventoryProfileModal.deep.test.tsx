@@ -2,8 +2,8 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { InventoryProfileModal, type InventoryProfileTarget } from "@/orders/operations";
-import { stocksApi } from "@/shared/api/stocks.api";
+import { OrderProfileModal, type OrderProfileTarget } from "@/orders/operations";
+import { ordersApi } from "@/shared/api/orders.api";
 import type { Account } from "@/shared/api/types/accounts";
 
 vi.mock("@/shared/api/cashflows.api");
@@ -18,12 +18,13 @@ vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/quality.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
-vi.mock("@/shared/api/stocks.api");;
 
 let ui: ReturnType<typeof userEvent.setup>;
 
 const account = {
   id: 7,
+  source_order_id: 71,
+  source_order_no: "HS0071",
   game_account: "acc-001",
   game_type: "原神",
   game_password: "pwd",
@@ -36,15 +37,13 @@ const account = {
   note: "",
 } as unknown as Account;
 
-const updated = { ...account, account_description: "已更新" } as unknown as Account;
-
 let onClose: () => void;
 let onSaved: (account: Account) => void;
 let onError: (error: unknown) => void;
 
-function renderModal(target: InventoryProfileTarget) {
+function renderModal(target: OrderProfileTarget) {
   return renderLight(
-    <InventoryProfileModal target={target} onClose={onClose} onSaved={onSaved} onError={onError} />,
+    <OrderProfileModal target={target} onClose={onClose} onSaved={onSaved} onError={onError} />,
     { user: "admin" },
   );
 }
@@ -65,15 +64,15 @@ beforeEach(() => {
   onClose = vi.fn();
   onSaved = vi.fn();
   onError = vi.fn();
-  vi.mocked(stocksApi.updateProfile).mockResolvedValue(updated);
+  vi.mocked(ordersApi.updateExecution).mockResolvedValue({ ok: true });
 });
 
-describe("InventoryProfileModal：描述与图片读取", () => {
-  it("description 模式：输入描述后保存只提交 account_description", async () => {
+describe("OrderProfileModal：描述与图片读取", () => {
+  it("description 模式：输入描述后通过订单执行接口保存账号资料", async () => {
     renderModal({ account, mode: "description" });
     expect(await screen.findByText("描述")).toBeInTheDocument();
     const area = screen.getByPlaceholderText("补充账号等级、资源、限制等信息");
-    // 只读标识区与输入框约束（原 InventoryProfileModal.test.tsx 的独有断言，已并入本用例）
+    // 只读标识区与输入框约束
     for (const label of ["订单编号", "游戏类型", "游戏账号"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
@@ -82,12 +81,12 @@ describe("InventoryProfileModal：描述与图片读取", () => {
     await ui.clear(area);
     await ui.type(area, "满级账号");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(stocksApi.updateProfile).toHaveBeenCalled());
-    expect(vi.mocked(stocksApi.updateProfile).mock.calls[0]).toEqual([
-      7,
-      { account_description: "满级账号" },
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalled());
+    expect(vi.mocked(ordersApi.updateExecution).mock.calls[0]).toEqual([
+      71,
+      { profile: { account_description: "满级账号" }, events: [] },
     ]);
-    expect(onSaved).toHaveBeenCalledWith(updated);
+    expect(onSaved).toHaveBeenCalledWith({ ...account, account_description: "满级账号" });
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -96,9 +95,9 @@ describe("InventoryProfileModal：描述与图片读取", () => {
     renderModal({ account: withImages, mode: "images" });
     expect(await screen.findByText("作图")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(stocksApi.updateProfile).toHaveBeenCalled());
-    expect(vi.mocked(stocksApi.updateProfile).mock.calls[0][1]).toEqual({
-      account_images: ["https://cdn/1.png"],
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalled());
+    expect(vi.mocked(ordersApi.updateExecution).mock.calls[0][1]).toEqual({
+      profile: { account_images: ["https://cdn/1.png"] }, events: [],
     });
   });
 
@@ -107,7 +106,7 @@ describe("InventoryProfileModal：描述与图片读取", () => {
     await screen.findByText("作图");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
 
-    expect(stocksApi.updateProfile).not.toHaveBeenCalled();
+    expect(ordersApi.updateExecution).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     expect(await screen.findByRole("alert")).toHaveTextContent("请至少添加一张图片");
   });
@@ -117,15 +116,16 @@ describe("InventoryProfileModal：描述与图片读取", () => {
     await screen.findByText("作图");
     await attachImage("image-bytes", "shot.png");
     await ui.click(screen.getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(stocksApi.updateProfile).toHaveBeenCalled());
-    const images = (vi.mocked(stocksApi.updateProfile).mock.calls[0][1] as { account_images: string[] })
-      .account_images;
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalled());
+    const images = (vi.mocked(ordersApi.updateExecution).mock.calls[0][1] as {
+      profile: { account_images: string[] };
+    }).profile.account_images;
     expect(images).toHaveLength(1);
     expect(images[0]).toMatch(/^data:/);
   });
 
   it("保存失败时回调 onError 而非 onSaved", async () => {
-    vi.mocked(stocksApi.updateProfile).mockRejectedValue(new Error("save boom"));
+    vi.mocked(ordersApi.updateExecution).mockRejectedValue(new Error("save boom"));
     renderModal({ account, mode: "description" });
     await screen.findByText("描述");
     await ui.click(screen.getByRole("button", { name: /保存/ }));

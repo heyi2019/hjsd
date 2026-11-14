@@ -4,7 +4,7 @@ import { today } from "../../shared/lib/format";
 import { ordersApi } from "../../shared/api/orders.api";
 import { CashflowModal } from "../../finance/cashflow";
 import { InventoryRebateModal } from "../../stocks/rebate";
-import { InventoryProfileModal, InventoryPlatformOffsaleModal } from "../operations";
+import { OrderProfileModal, OrderPlatformOffsaleModal } from "../operations";
 import { OrderDeleteDialog } from "../OrderDeleteDialog";
 import { type OrdersPageController } from "./useOrdersPageController";
 import { SharedCancellationDialog, CancelTransactionModal } from "./OrderCancellationModals";
@@ -37,7 +37,7 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
         onCancel={() => controller.setOrderDeleteTarget(null)}
         onConfirm={controller.submitOrderDelete}
       />
-      <InventoryProfileModal
+      <OrderProfileModal
         target={controller.profileTarget}
         onClose={() => controller.setProfileTarget(null)}
         onSaved={(updated) => {
@@ -61,7 +61,7 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
           });
         }}
       />
-      <InventoryPlatformOffsaleModal
+      <OrderPlatformOffsaleModal
         account={controller.orderOffsaleTarget?.account ?? null}
         records={controller.orderOffsaleTarget?.records ?? []}
         onClose={() => controller.setOrderOffsaleTarget(null)}

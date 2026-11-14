@@ -1,6 +1,6 @@
 import type { Dayjs } from "dayjs";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
-import { inventoryOperationItems } from "../../orders/operations";
+import { orderOperationItems } from "../../orders/operations";
 import type { InventoryOrderRow } from "./types";
 
 export type InventoryFilterOptions = {
@@ -41,7 +41,7 @@ export function inventoryCellValue(value: string | null | undefined) {
 
 /** 运营菜单统一承载寄售上架、下架、描述和作图四个动作。 */
 export function operationMenuItems(row: InventoryOrderRow, detail?: AccountExecutionDetail) {
-  return inventoryOperationItems({ row: row.account, detail });
+  return orderOperationItems({ row: row.account, detail });
 }
 
 /** 从后往前找最近一条后端标记为「仍可冲销」的 BUY/SELL；金额直接用后端下发的余额，不本地相减。 */

@@ -12,10 +12,10 @@ import { OrderDetailProfileSection } from "./OrderDetailProfileSection";
 import { OrderDetailPartySection } from "./OrderDetailPartySection";
 import type {
   OrderDetailMeta,
-  InventoryEmployeeOption,
-  InventoryEventDraft,
-  InventoryExecutionRow,
-  InventoryFinanceRow,
+  OrderEmployeeOption,
+  OrderEventDraft,
+  OrderExecutionRow,
+  OrderFinanceRow,
 } from "./OrderDetail.shared";
 import type { FinanceDraft } from "./editing/use-account-execution-editor";
 import type { OrderDraft } from "./editing/use-account-execution-editor";
@@ -26,15 +26,15 @@ type OrderDetailViewProps = {
   meta: OrderDetailMeta;
   detail?: AccountExecutionDetail | null;
   account?: Account | null;
-  executionRows: InventoryExecutionRow[];
+  executionRows: OrderExecutionRow[];
   operationEvents?: Record<string, AccountExecutionEvent | undefined>;
-  financeRows: InventoryFinanceRow[];
+  financeRows: OrderFinanceRow[];
   expenseCount: number;
   incomeCount: number;
   totalExpense: string;
   totalIncome: string;
   editing?: Account | null;
-  eventDrafts?: Record<number, InventoryEventDraft>;
+  eventDrafts?: Record<number, OrderEventDraft>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
   financeDrafts?: Record<string, FinanceDraft>;
   onFinanceEdit?: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
@@ -43,7 +43,7 @@ type OrderDetailViewProps = {
   onOrderEdit?: (orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) => void;
   onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
   onPartyEdit?: (orderId: number, addition: PartyAddition) => void;
-  employees: InventoryEmployeeOption[];
+  employees: OrderEmployeeOption[];
   extraForm?: FormInstance;
   /** 编辑态底部操作：保存 / 取消。不传则编辑态不渲染底部按钮（纯展示用）。 */
   onSave?: () => void;
@@ -83,7 +83,7 @@ export function OrderDetailView({
 }: OrderDetailViewProps) {
   if (editing) {
     return (
-      <div className="inventory-detail inventory-detail--editing">
+      <div className="order-detail order-detail--editing">
         <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onProfileChange={onProfileChange} />
         <BusinessRegistrationForm
           layout="horizontal"
@@ -125,7 +125,7 @@ export function OrderDetailView({
           onOrderEdit={onOrderEdit}
           employees={employees}
         />
-        <div className="inventory-detail__footer">
+        <div className="order-detail__footer">
           <Space>
             <PermissionButton permission="order.create" type="primary" loading={saving} onClick={() => onSave?.()}>保存修改</PermissionButton>
             <PermissionButton permission="order.create" onClick={() => onCancel?.()}>取消</PermissionButton>
@@ -136,7 +136,7 @@ export function OrderDetailView({
   }
 
   return (
-    <div className="inventory-detail">
+    <div className="order-detail">
       <OrderDetailProfileSection meta={meta} detail={detail} account={account} />
       <OrderDetailDeliverySection meta={meta} detail={detail} account={account} employees={employees} />
         <OrderDetailOperationSection meta={meta} account={account} operationEvents={operationEvents} />

@@ -19,7 +19,7 @@ export function consignmentRecords(orders: AccountExecutionOrder[]): ActiveConsi
   return consignmentListings(orders);
 }
 
-export function InventoryPlatformOffsaleModal(props: {
+export function OrderPlatformOffsaleModal(props: {
   account: Account | null;
   records: ActiveConsignment[];
   onClose: () => void;

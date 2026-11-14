@@ -11,8 +11,8 @@ import type { Pool } from "../../shared/api/types/finance";
 import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { consignmentRecords, type ActiveConsignment } from "../../orders/operations";
-import { type InventoryPartyLink } from "../../orders/OrderDetailView/OrderDetail.shared";
-import { type InventoryProfileTarget } from "../../orders/operations";
+import { type OrderPartyLink } from "../../orders/OrderDetailView/OrderDetail.shared";
+import { type OrderProfileTarget } from "../../orders/operations";
 import { type InventoryCancellationValues } from "../InventoryCancellationDialog";
 import { type BusinessCenterEntryTab } from "../../orders/businessCenter";
 import { findCancelableBuy, type InventoryActionKey } from "./helpers";
@@ -53,7 +53,7 @@ export function useInventoryActions(params: {
   const [rebateTarget, setRebateTarget] = useState<Account | null>(null);
   const [cashflowTarget, setCashflowTarget] = useState<CashflowTarget | null>(null);
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
-  const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
+  const [profileTarget, setProfileTarget] = useState<OrderProfileTarget | null>(null);
   const [detailTarget, setDetailTarget] = useState<Account | null>(null);
   const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
   const [voidPools, setVoidPools] = useState<Pool[]>([]);
@@ -63,7 +63,7 @@ export function useInventoryActions(params: {
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [voidForm] = Form.useForm<InventoryCancellationValues>();
-  function openProfile(account: Account, mode: InventoryProfileTarget["mode"]) {
+  function openProfile(account: Account, mode: OrderProfileTarget["mode"]) {
     setProfileTarget({ account, mode });
   }
   async function openEditor(account: Account, orderId?: number) {
@@ -228,7 +228,7 @@ export function useInventoryActions(params: {
     expandTo(expanded ? [String(row.id)] : []);
     if (expanded) await loadOrderExecution(row.id);
   }
-  function openPartyCard(party: InventoryPartyLink) {
+  function openPartyCard(party: OrderPartyLink) {
     const param = party.entityType === "customer" ? `customer_id=${party.id}` : `counterparty_id=${party.id}`;
     onNavigate?.(`customers?${param}`);
   }

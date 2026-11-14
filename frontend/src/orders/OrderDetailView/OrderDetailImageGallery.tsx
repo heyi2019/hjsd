@@ -32,14 +32,14 @@ export function OrderDetailImageGallery({ images, altPrefix, limit = 3, editing 
         onVisibleChange: setPreviewVisible,
       }}
     >
-      <Space wrap className="inventory-detail__image-gallery">
+      <Space wrap className="order-detail__image-gallery">
         {visibleImages.map((src, index) => (
-          <span key={`${altPrefix}-${src}-${index}`} className="inventory-detail__image-card">
+          <span key={`${altPrefix}-${src}-${index}`} className="order-detail__image-card">
             <Image src={src} alt={`${altPrefix} ${index + 1}`} preview={false} />
-            <span className="inventory-detail__image-actions">
+            <span className="order-detail__image-actions">
               <button
                 type="button"
-                className="inventory-detail__image-action"
+                className="order-detail__image-action"
                 aria-label={`预览${altPrefix} ${index + 1}`}
                 onClick={() => { setPreviewIndex(index); setPreviewVisible(true); }}
               >
@@ -48,7 +48,7 @@ export function OrderDetailImageGallery({ images, altPrefix, limit = 3, editing 
               {editing ? (
                 <button
                   type="button"
-                  className="inventory-detail__image-action"
+                  className="order-detail__image-action"
                   aria-label={`删除${altPrefix} ${index + 1}`}
                   onClick={() => onChange?.(images.filter((_, imageIndex) => imageIndex !== index))}
                 >
@@ -73,13 +73,13 @@ export function OrderDetailImageGallery({ images, altPrefix, limit = 3, editing 
               return Upload.LIST_IGNORE;
             }}
           >
-            <button type="button" className="inventory-detail__image-upload" aria-label={`上传${altPrefix}`}>
+            <button type="button" className="order-detail__image-upload" aria-label={`上传${altPrefix}`}>
               <PlusOutlined />
               <span>上传图片</span>
             </button>
           </Upload>
         ) : null}
-        {editing && !visibleImages.length ? <span className="inventory-detail__image-empty">暂无图片</span> : null}
+        {editing && !visibleImages.length ? <span className="order-detail__image-empty">暂无图片</span> : null}
       </Space>
     </Image.PreviewGroup>
   );

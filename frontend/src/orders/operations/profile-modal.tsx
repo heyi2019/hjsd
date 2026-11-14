@@ -2,12 +2,12 @@ import { appMessage } from "../../shared/ui/appFeedback";
 import { Input, Space, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useState } from "react";
-import { stocksApi } from "../../shared/api/stocks.api";
+import { ordersApi } from "../../shared/api/orders.api";
 import type { Account } from "../../shared/api/types/accounts";
 import { BusinessActionModal, InlineError } from "../../shared/ui";
 import "./profile-modal.css";
 
-export type InventoryProfileTarget = {
+export type OrderProfileTarget = {
   account: Account;
   mode: "description" | "images";
   /** 订单台账入口明确指定的业务订单；库存入口使用账号绑定的来源订单。 */
@@ -25,22 +25,22 @@ function readImageData(file: Blob): Promise<string> {
 
 function ProfileContext({ account }: { account: Account }) {
   return (
-    <div className="inventory-profile-context" aria-label="账号上下文">
-      <div className="inventory-profile-context__item"><span>订单编号</span><strong>{account.source_order_no ?? "-"}</strong></div>
-      <div className="inventory-profile-context__item"><span>游戏类型</span><strong>{account.game_type ?? "-"}</strong></div>
-      <div className="inventory-profile-context__item"><span>游戏账号</span><strong>{account.game_account ?? "-"}</strong></div>
+    <div className="order-profile-context" aria-label="账号上下文">
+      <div className="order-profile-context__item"><span>订单编号</span><strong>{account.source_order_no ?? "-"}</strong></div>
+      <div className="order-profile-context__item"><span>游戏类型</span><strong>{account.game_type ?? "-"}</strong></div>
+      <div className="order-profile-context__item"><span>游戏账号</span><strong>{account.game_account ?? "-"}</strong></div>
     </div>
   );
 }
 
-export function InventoryProfileModal({
+export function OrderProfileModal({
   target,
   onClose,
   onSaved,
   onError,
   onOperation,
 }: {
-  target: InventoryProfileTarget | null;
+  target: OrderProfileTarget | null;
   onClose: () => void;
   onSaved: (account: Account) => void;
   onError: (error: unknown) => void;
@@ -84,11 +84,16 @@ export function InventoryProfileModal({
       const payload = target.mode === "description"
         ? { account_description: description }
         : { account_images: imagePayload ?? [] };
-      const updated = await stocksApi.updateProfile(target.account.id, payload);
+      const orderId = target.orderId ?? target.account.source_order_id;
+      if (!orderId) {
+        setValidationError({ message: "当前账号没有来源订单，无法保存运营资料" });
+        return;
+      }
+      await ordersApi.updateExecution(orderId, { profile: payload, events: [] });
       if (onOperation) {
         await onOperation(target.mode === "images" ? "IMAGE" : "DESCRIPTION");
       }
-      onSaved(updated);
+      onSaved({ ...target.account, ...payload });
       onClose();
       appMessage.success("账号资料已保存");
     } catch (error) {
@@ -112,7 +117,7 @@ export function InventoryProfileModal({
     >
       <InlineError error={validationError} />
       {target.mode === "images" ? (
-        <Space className="inventory-profile-description-editor" direction="vertical" size="middle">
+        <Space className="order-profile-description-editor" direction="vertical" size="middle">
           <ProfileContext account={target.account} />
           <Upload
             listType="picture-card"
@@ -127,7 +132,7 @@ export function InventoryProfileModal({
           </Upload>
         </Space>
       ) : (
-        <Space className="inventory-profile-description-editor" direction="vertical" size="middle">
+        <Space className="order-profile-description-editor" direction="vertical" size="middle">
           <ProfileContext account={target.account} />
           <Input.TextArea
             rows={8}

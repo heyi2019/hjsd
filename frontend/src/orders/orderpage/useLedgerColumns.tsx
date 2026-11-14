@@ -5,7 +5,7 @@ import type { Order } from "../../shared/api/types/orders";
 import { ACCOUNT_STATUS_LABEL, formatDateTimeMinute, formatElapsedTime, money } from "../../shared/lib/format";
 import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
 import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
-import { inventoryOperationMenuItems } from "../operations";
+import { orderOperationMenuItems } from "../operations";
 import { inventoryTypeOfOrder } from "../../stocks/InventoryPanel/types";
 import { formatOrderAmount } from "./helpers";
 
@@ -73,7 +73,7 @@ export function useLedgerColumns(params: {
           || Boolean(order.sale_at)
           || (order.events ?? []).some((event) => event.event_type === "SELL");
         const canOperateAccount = Boolean(order.account_id) && order.status !== "CANCELLED";
-        const operationItems = inventoryOperationMenuItems(
+        const operationItems = orderOperationMenuItems(
           {
             row: canOperateAccount
               ? {

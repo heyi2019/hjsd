@@ -1,14 +1,14 @@
-.inventory-profile-description-editor {
+.order-profile-description-editor {
   width: 100%;
 }
 
 /* 描述是长文本内容，按表单辅助输入字号呈现，避免和弹窗标题/账号上下文抢层级。 */
-.inventory-profile-description-editor textarea.ant-input {
+.order-profile-description-editor textarea.ant-input {
   font-size: var(--fs-14) !important;
   line-height: 1.55;
 }
 
-.inventory-profile-context {
+.order-profile-context {
   display: flex;
   align-items: baseline;
   flex-wrap: nowrap;
@@ -17,7 +17,7 @@
   padding-block: var(--space-1);
 }
 
-.inventory-profile-context__item {
+.order-profile-context__item {
   display: inline-flex;
   align-items: baseline;
   gap: var(--space-2);
@@ -27,7 +27,7 @@
   white-space: nowrap;
 }
 
-.inventory-profile-context__item strong {
+.order-profile-context__item strong {
   overflow: hidden;
   color: var(--color-text-primary);
   font-size: var(--fs-14);
@@ -36,13 +36,13 @@
 }
 
 @media (max-width: 640px) {
-  .inventory-profile-context {
+  .order-profile-context {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2);
   }
 
-  .inventory-profile-context__item {
+  .order-profile-context__item {
     min-width: 0;
   }
 }

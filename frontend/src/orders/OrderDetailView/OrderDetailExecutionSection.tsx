@@ -6,17 +6,17 @@ import type { AccountExecutionEvent } from "../../shared/api/types/account-execu
 import type { OrderDraft } from "./editing/use-account-execution-editor";
 import { DataTable, DateField, MoneyInput, MoneyText, Select } from "../../shared/ui";
 import {
-  InventorySectionHeading,
+  OrderSectionHeading,
   OPERATION_CATEGORY_LABEL,
   isEditableCashflowEvent,
   resolveExecutionPlatform,
-  type InventoryEmployeeOption,
-  type InventoryEventDraft,
-  type InventoryExecutionCategory,
-  type InventoryExecutionRow,
+  type OrderEmployeeOption,
+  type OrderEventDraft,
+  type OrderExecutionCategory,
+  type OrderExecutionRow,
 } from "./OrderDetail.shared";
 
-const CATEGORY_RANK: Record<InventoryExecutionCategory, number> = {
+const CATEGORY_RANK: Record<OrderExecutionCategory, number> = {
   INBOUND: 0,
   OPERATING: 1,
   OUTBOUND: 2,
@@ -32,13 +32,13 @@ export function OrderDetailExecutionSection({
   onOrderEdit,
   employees,
 }: {
-  rows: InventoryExecutionRow[];
+  rows: OrderExecutionRow[];
   editing?: boolean;
-  eventDrafts?: Record<number, InventoryEventDraft>;
+  eventDrafts?: Record<number, OrderEventDraft>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
   orderDrafts?: Record<number, OrderDraft>;
   onOrderEdit?: (orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) => void;
-  employees: InventoryEmployeeOption[];
+  employees: OrderEmployeeOption[];
 }) {
   const sortedRows = useMemo(
     () => [...rows].sort((a, b) => CATEGORY_RANK[a.category] - CATEGORY_RANK[b.category]),
@@ -48,12 +48,12 @@ export function OrderDetailExecutionSection({
     () => employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active })),
     [employees],
   );
-  const columns = useMemo<ColumnsType<InventoryExecutionRow>>(() => [
+  const columns = useMemo<ColumnsType<OrderExecutionRow>>(() => [
     {
       title: "操作分类",
       dataIndex: "category",
       key: "category",
-      render: (value: InventoryExecutionCategory) => OPERATION_CATEGORY_LABEL[value],
+      render: (value: OrderExecutionCategory) => OPERATION_CATEGORY_LABEL[value],
     },
     { title: "动作", dataIndex: "action", key: "action" },
     {
@@ -147,9 +147,9 @@ export function OrderDetailExecutionSection({
   ], [editing, eventDrafts, employeeOptions, employees, onEventEdit, onOrderEdit, orderDrafts]);
 
   return (
-    <div className="inventory-detail__section inventory-detail__section--execution inventory-execution-list">
-      <InventorySectionHeading title="操作明细" />
-      <DataTable className="inventory-detail__data-table inventory-execution-table" columns={columns} rows={sortedRows} page={1} pageSize={10} total={sortedRows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
+    <div className="order-detail__section order-detail__section--execution inventory-execution-list">
+      <OrderSectionHeading title="操作明细" />
+      <DataTable className="order-detail__data-table inventory-execution-table" columns={columns} rows={sortedRows} page={1} pageSize={10} total={sortedRows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
     </div>
   );
 }

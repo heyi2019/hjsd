@@ -158,3 +158,14 @@ def test_order_inline_customer_creates_a_profile_when_phone_differs(
         select(Customer).where(Customer.display_name == "同名客户").order_by(Customer.id)
     ).all()
     assert [customer.phone for customer in customers] == ["13800000000", "13900000000"]
+
+
+def test_order_rejects_snapshot_and_existing_account_together(seeded_client, headers):
+    """建单的账号来源必须唯一，不能既引用库存又提交新账号快照。"""
+    payload = _base_payload("HS")
+    payload["account_id"] = 999999
+
+    response = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+
+    assert response.status_code == 422
+    assert "账号快照与库存账号不能同时提交" in response.text

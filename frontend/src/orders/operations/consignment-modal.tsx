@@ -15,7 +15,7 @@ import "./consignment-modal.css";
 
 type ListedPlatform = { key: number; platform: string; price: number | string | null; listedAt: string };
 
-export function InventoryConsignmentModal(props: {
+export function OrderConsignmentModal(props: {
   account: Account | null;
   orderId?: number | null;
   onClose: () => void;

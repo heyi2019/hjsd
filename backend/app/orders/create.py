@@ -142,6 +142,11 @@ def create_order(
             details={"field": "form_extra_scope", "value": "CONSIGN"},
         )
     # 账号资料的唯一输入是 account_snapshot；库存账号引用只传 account_id。
+    if account_snapshot is not None and account_id is not None:
+        raise Validation(
+            "账号快照与库存账号不能同时提交",
+            details={"account_snapshot": True, "account_id": account_id},
+        )
     if account_snapshot is not None and definition.code not in {"HS", "TH", "DG"}:
         raise Validation(f"业务类型 {definition.code} 不支持订单账号快照")
     if account_snapshot is not None:

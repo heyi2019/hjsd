@@ -13,7 +13,7 @@ export const PARTY_ROLE_LABEL: Record<string, string> = {
   INSTALLMENT_CUSTOMER: "分期客户",
 };
 
-export type InventoryFinanceRow = {
+export type OrderFinanceRow = {
   key: string;
   flowNo: string;
   type: string;
@@ -26,7 +26,7 @@ export type InventoryFinanceRow = {
   event?: AccountExecutionEvent | null;
 };
 
-export type InventoryOperationRow = {
+export type OrderOperationRow = {
   key: string;
   action: string;
   content: ReactNode;
@@ -35,25 +35,25 @@ export type InventoryOperationRow = {
   event?: AccountExecutionEvent;
 };
 
-export type InventoryExecutionCategory = "INBOUND" | "OPERATING" | "OUTBOUND";
+export type OrderExecutionCategory = "INBOUND" | "OPERATING" | "OUTBOUND";
 
-export const OPERATION_CATEGORY_LABEL: Record<InventoryExecutionCategory, string> = {
+export const OPERATION_CATEGORY_LABEL: Record<OrderExecutionCategory, string> = {
   INBOUND: "账号入库",
   OPERATING: "账号运营",
   OUTBOUND: "账号出库",
 };
 
 /** 操作明细按账号生命周期归类：入库 / 运营 / 出库。 */
-export function classifyEventCategory(eventType: string | null | undefined): InventoryExecutionCategory {
+export function classifyEventCategory(eventType: string | null | undefined): OrderExecutionCategory {
   if (eventType === "BUY") return "INBOUND";
   if (eventType === "SELL") return "OUTBOUND";
   return "OPERATING";
 }
 
-export type InventoryExecutionRow = {
+export type OrderExecutionRow = {
   key: string;
   orderId: number;
-  category: InventoryExecutionCategory;
+  category: OrderExecutionCategory;
   action: string;
   occurredAt: string;
   operator: string;
@@ -68,7 +68,7 @@ export type InventoryExecutionRow = {
 export function resolveExecutionPlatform(
   fallback: string,
   event: Pick<AccountExecutionEvent, "event_type" | "operation_type" | "form_extra"> | null | undefined,
-  draft?: Pick<InventoryEventDraft, "form_extra">,
+  draft?: Pick<OrderEventDraft, "form_extra">,
 ): string {
   if (!event || event.event_type !== "OPERATE") return fallback || "-";
 
@@ -84,7 +84,7 @@ export function resolveExecutionPlatform(
   return hasDraftExtra ? "-" : fallback || "-";
 }
 
-export type InventoryPartyLink = {
+export type OrderPartyLink = {
   id: number;
   display_name: string;
   role: string;
@@ -145,14 +145,14 @@ export type OrderDetailMeta = {
 };
 
 /** 编辑态下单个事件的草稿值，由上层 InventoryPanel 持有。 */
-export type InventoryEventDraft = {
+export type OrderEventDraft = {
   amount: string;
   note: string | null;
   occurred_at: string;
   form_extra?: Record<string, unknown>;
   operator_user_ids?: number[];
 };
-export type InventoryEmployeeOption = EmployeeOption;
+export type OrderEmployeeOption = EmployeeOption;
 
 const EDITABLE_CASHFLOW_EVENTS = new Set(["BUY", "SELL"]);
 
@@ -161,7 +161,7 @@ export function isEditableCashflowEvent(event: AccountExecutionEvent): boolean {
 }
 
 /** 编辑态才出现的板块内标题。只读态标题由 Tab 标签承载，板块内不重复。 */
-export function InventorySectionHeading({ title }: { title: ReactNode }) {
-  return <div className="inventory-detail__section-heading"><Typography.Text strong>{title}</Typography.Text></div>;
+export function OrderSectionHeading({ title }: { title: ReactNode }) {
+  return <div className="order-detail__section-heading"><Typography.Text strong>{title}</Typography.Text></div>;
 }
 

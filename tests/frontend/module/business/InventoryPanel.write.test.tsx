@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
 import { InventoryRebateModal } from "@/stocks/rebate";
-import { InventoryConsignmentModal } from "@/orders/operations/consignment";
+import { OrderConsignmentModal } from "@/orders/operations/consignment";
 import { OrderDetailDeliverySection } from "@/orders/OrderDetailView/OrderDetailDeliverySection";
 
 import type { Account } from "@/shared/api/types/accounts";
@@ -308,7 +308,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
 
   function renderConsignment() {
     return renderLight(
-      <InventoryConsignmentModal account={consignAccount} onClose={vi.fn()} onCreated={vi.fn()} />,
+      <OrderConsignmentModal account={consignAccount} onClose={vi.fn()} onCreated={vi.fn()} />,
       { user: "admin" },
     );
   }

@@ -1,5 +1,5 @@
 import { CreateBusinessModal } from "../CreateBusinessModal";
-import { InventoryConsignmentModal } from "../operations";
+import { OrderConsignmentModal } from "../operations";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../../stocks/sale";
 import { type OrdersPageController } from "./useOrdersPageController";
 
@@ -45,7 +45,7 @@ export function OrderAccountActionModals({ controller }: { controller: OrdersPag
         : sale?.inventory_type === "PICKUP"
           ? <PickupSaleModal {...saleCommon} />
           : <RecoverySaleModal {...saleCommon} />}
-      <InventoryConsignmentModal
+      <OrderConsignmentModal
         account={consignment?.account ?? null}
         orderId={consignment?.orderId}
         onClose={() => controller.setOrderConsignmentTarget(null)}

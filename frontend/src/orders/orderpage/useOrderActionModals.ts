@@ -13,7 +13,7 @@ import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { consignmentRecords, type ActiveConsignment, unlistAndCancelConsignmentOrders } from "../operations";
-import type { InventoryProfileTarget } from "../operations";
+import type { OrderProfileTarget } from "../operations";
 import {
   buildActionAllocationCandidates,
   buildActionAllocationRows,
@@ -46,7 +46,7 @@ export function useOrderActionModals({
   const [cashflowTarget, setCashflowTarget] = useState<CashflowTarget | null>(null);
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
   const [cashflowUsers, setCashflowUsers] = useState<EmployeeOption[]>([]);
-  const [profileTarget, setProfileTarget] = useState<InventoryProfileTarget | null>(null);
+  const [profileTarget, setProfileTarget] = useState<OrderProfileTarget | null>(null);
   const [orderOffsaleTarget, setOrderOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
   /** 订单总利润（后端 order_amounts 口径），负数即亏损单；分润弹窗顶部展示并作为金额分润上限。 */
   const [allocationProfit, setAllocationProfit] = useState<string>("0");

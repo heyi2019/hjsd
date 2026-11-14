@@ -1,13 +1,13 @@
-import type { InventoryOperationContext, InventoryOperationItem } from "./types";
+import type { OrderOperationContext, OrderOperationItem } from "./types";
 
-export const DESCRIPTION_OPERATION: InventoryOperationItem = {
+export const DESCRIPTION_OPERATION: OrderOperationItem = {
   key: "description",
   label: "描述",
 };
 
-export function descriptionOperation(context: InventoryOperationContext): InventoryOperationItem | null {
+export function descriptionOperation(context: OrderOperationContext): OrderOperationItem | null {
   return context.row.status === "SOLD" ? null : DESCRIPTION_OPERATION;
 }
 
-export { InventoryProfileModal } from "./profile-modal";
-export type { InventoryProfileTarget } from "./profile-modal";
+export { OrderProfileModal } from "./profile-modal";
+export type { OrderProfileTarget } from "./profile-modal";

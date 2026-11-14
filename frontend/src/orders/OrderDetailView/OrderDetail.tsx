@@ -13,10 +13,10 @@ import {
 } from "../../shared/lib/labels";
 import { OrderDetailView } from "./OrderDetailView";
 import {
-  type InventoryEventDraft,
+  type OrderEventDraft,
   type OrderDetailMeta,
-  type InventoryPartyLink,
-  type InventoryFinanceRow,
+  type OrderPartyLink,
+  type OrderFinanceRow,
   PARTY_ROLE_LABEL,
 } from "./OrderDetail.shared";
 import type { FinanceDraft } from "./editing/use-account-execution-editor";
@@ -24,8 +24,8 @@ import type { OrderDraft } from "./editing/use-account-execution-editor";
 import type { PartyAddition } from "./editing/use-account-execution-editor";
 
 function renderOrderParties(
-  parties: InventoryPartyLink[],
-  onPartyClick?: (party: InventoryPartyLink) => void,
+  parties: OrderPartyLink[],
+  onPartyClick?: (party: OrderPartyLink) => void,
 ): React.ReactNode {
   if (!parties.length) return "-";
   return <span>{parties.map((party, index) => (
@@ -72,7 +72,7 @@ export function OrderDetail({
   contextOrderId?: number | null;
   loading: boolean;
   editing?: Account | null;
-  eventDrafts?: Record<number, InventoryEventDraft>;
+  eventDrafts?: Record<number, OrderEventDraft>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
   financeDrafts?: Record<string, FinanceDraft>;
   onFinanceEdit?: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
@@ -82,7 +82,7 @@ export function OrderDetail({
   onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
   onPartyEdit?: (orderId: number, addition: PartyAddition) => void;
   employees?: EmployeeOption[];
-  onPartyClick?: (party: InventoryPartyLink) => void;
+  onPartyClick?: (party: OrderPartyLink) => void;
   extraForm?: FormInstance;
   onSave?: () => void;
   onCancel?: () => void;
@@ -121,7 +121,7 @@ export function OrderDetail({
   const totalExpense = summary?.total_expense ?? "0.00";
   const totalIncome = summary?.total_income ?? "0.00";
 
-  const financeRows = useMemo<InventoryFinanceRow[]>(() => (detailView?.finance_rows ?? []).map((row) => ({
+  const financeRows = useMemo<OrderFinanceRow[]>(() => (detailView?.finance_rows ?? []).map((row) => ({
     key: row.key,
     flowNo: row.flow_no,
     type: row.type,

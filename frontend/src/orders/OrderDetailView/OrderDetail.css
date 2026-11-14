@@ -12,7 +12,7 @@
 .inventory-row-actions .ant-btn-link { min-height: var(--sz-30); padding-inline: var(--space-1); color: var(--primary-ink); font-size: var(--fs-caption-2); }
 .inventory-row-actions .ant-space-item:first-child .ant-btn-link { font-weight: 650; color: var(--color-primary-text); }
 .inventory-row-actions .ant-btn-link:hover { background: var(--soft); border-radius: var(--radius-compact); }
-.inventory-detail {
+.order-detail {
   width: min(100%, 1000px);
   min-width: min(680px, calc(100% - var(--space-6) * 2));
   max-width: min(calc(100% - var(--space-6) * 2), 1000px);
@@ -30,13 +30,13 @@
   gap: var(--space-4);
   align-content: start;
 }
-.inventory-table .ant-table-tbody > tr.ant-table-expanded-row .inventory-detail {
+.inventory-table .ant-table-tbody > tr.ant-table-expanded-row .order-detail {
   /* 展开详情保留独立卡片边界，在展开行内提供更充足的编辑宽度。 */
   width: min(100%, 1000px);
   max-width: min(calc(100% - var(--space-6) * 2), 1000px);
   margin-inline: 0;
 }
-.inventory-detail__meta {
+.order-detail__meta {
   width: 100%;
   max-width: none;
   overflow: hidden;
@@ -45,11 +45,11 @@
   border-radius: var(--radius-sm);
   background: var(--color-surface);
 }
-.inventory-detail__meta-group {
+.order-detail__meta-group {
   width: 100%;
   max-width: none;
 }
-.inventory-detail__meta .ant-descriptions-view {
+.order-detail__meta .ant-descriptions-view {
   display: block;
   width: 100%;
   max-width: none;
@@ -57,15 +57,15 @@
   overflow-y: hidden;
   vertical-align: top;
 }
-.inventory-detail__meta-group + .inventory-detail__meta-group { margin-top: var(--space-3); }
-.inventory-detail__meta-group-title { padding: var(--space-2) var(--space-3); color: var(--color-text-secondary); background: var(--soft); font: var(--font-caption-2); font-weight: 650; }
-.inventory-detail__meta-table {
+.order-detail__meta-group + .order-detail__meta-group { margin-top: var(--space-3); }
+.order-detail__meta-group-title { padding: var(--space-2) var(--space-3); color: var(--color-text-secondary); background: var(--soft); font: var(--font-caption-2); font-weight: 650; }
+.order-detail__meta-table {
   width: calc(100% - var(--space-3) * 2);
   max-width: none;
   margin: var(--space-3);
   box-sizing: border-box;
 }
-.inventory-detail__data-table {
+.order-detail__data-table {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -74,49 +74,49 @@
   overflow: hidden;
   font-size: var(--fs-caption-2);
 }
-.inventory-detail__data-table,
-.inventory-detail__data-table .ant-table-wrapper,
-.inventory-detail__data-table .ant-spin-nested-loading,
-.inventory-detail__data-table .ant-spin-container {
+.order-detail__data-table,
+.order-detail__data-table .ant-table-wrapper,
+.order-detail__data-table .ant-spin-nested-loading,
+.order-detail__data-table .ant-spin-container {
   margin-inline: 0 !important;
   padding-inline: 0 !important;
 }
-.inventory-detail__data-table .ant-table,
-.inventory-detail__data-table .ant-table-container,
-.inventory-detail__data-table .ant-table-content,
-.inventory-detail__data-table .ant-table-content > table {
+.order-detail__data-table .ant-table,
+.order-detail__data-table .ant-table-container,
+.order-detail__data-table .ant-table-content,
+.order-detail__data-table .ant-table-content > table {
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
   margin-inline: 0 !important;
   table-layout: fixed !important;
 }
-.inventory-detail__data-table .ant-table-container { border: 0; border-radius: 0; padding-inline: 0 !important; }
-.inventory-detail__data-table .ant-table-content { overflow-x: hidden !important; }
-.inventory-detail__data-table .ant-table-thead > tr > th,
-.inventory-detail__data-table .ant-table-tbody > tr > td {
+.order-detail__data-table .ant-table-container { border: 0; border-radius: 0; padding-inline: 0 !important; }
+.order-detail__data-table .ant-table-content { overflow-x: hidden !important; }
+.order-detail__data-table .ant-table-thead > tr > th,
+.order-detail__data-table .ant-table-tbody > tr > td {
   padding: var(--space-2) var(--space-3);
   font-size: var(--fs-caption-2);
   line-height: 1.45;
 }
-.inventory-detail__data-table .ant-table-thead > tr > th {
+.order-detail__data-table .ant-table-thead > tr > th {
   background: color-mix(in srgb, var(--soft) 68%, transparent);
   color: var(--color-text-secondary);
   font-weight: 650;
   white-space: nowrap;
 }
-.inventory-detail__data-table .ant-table-tbody > tr > td {
+.order-detail__data-table .ant-table-tbody > tr > td {
   background: color-mix(in srgb, var(--glass) 84%, transparent);
   overflow-wrap: anywhere;
 }
-.inventory-detail__copy-value {
+.order-detail__copy-value {
   position: relative;
   display: block;
   min-height: 1.5em;
   padding-inline-end: calc(var(--space-4) + 2px);
   overflow-wrap: anywhere;
 }
-.inventory-detail__copy-button {
+.order-detail__copy-button {
   position: absolute;
   inset-inline-end: 0;
   inset-block-end: 0;
@@ -132,17 +132,17 @@
   cursor: pointer;
   font-size: var(--fs-caption-2);
 }
-.inventory-detail__copy-button:hover,
-.inventory-detail__copy-button:focus-visible { color: var(--color-primary); background: var(--soft); }
-.inventory-detail .ui-table-wrap,
-.inventory-detail .ant-table-wrapper {
+.order-detail__copy-button:hover,
+.order-detail__copy-button:focus-visible { color: var(--color-primary); background: var(--soft); }
+.order-detail .ui-table-wrap,
+.order-detail .ant-table-wrapper {
   width: 100%;
   max-width: none;
   overflow-x: hidden;
   overflow-y: clip;
 }
-.inventory-detail .inventory-detail__data-table { overflow-x: hidden; }
-.inventory-detail__section > .ui-table-wrap {
+.order-detail .order-detail__data-table { overflow-x: hidden; }
+.order-detail__section > .ui-table-wrap {
   justify-self: stretch;
   margin-inline: 0;
   width: 100%;
@@ -150,16 +150,16 @@
   box-sizing: border-box;
   transform: none;
 }
-.inventory-detail .ui-table-wrap .ant-table,
-.inventory-detail .ant-table-wrapper .ant-table { min-width: 100%; }
-.inventory-detail__meta .ant-descriptions-item-label,
-.inventory-detail__meta .ant-descriptions-item-content { min-width: 0; padding: var(--space-2) var(--space-3) !important; }
-.inventory-detail .ant-descriptions-item-label { white-space: nowrap; color: var(--color-text-secondary); font: var(--font-caption-2); }
-.inventory-detail .ant-descriptions-item-content { max-width: 280px; color: var(--color-text-primary); font: var(--font-caption); white-space: normal; overflow-wrap: anywhere; }
-.inventory-detail__meta .ant-descriptions-item-label { width: 76px; }
-.inventory-detail__meta .ant-descriptions-item-content { width: auto; min-width: 60px; max-width: 180px; }
-.inventory-detail .ant-descriptions-item-content .ant-typography { overflow-wrap: anywhere; }
-.inventory-detail .ant-descriptions-view > table {
+.order-detail .ui-table-wrap .ant-table,
+.order-detail .ant-table-wrapper .ant-table { min-width: 100%; }
+.order-detail__meta .ant-descriptions-item-label,
+.order-detail__meta .ant-descriptions-item-content { min-width: 0; padding: var(--space-2) var(--space-3) !important; }
+.order-detail .ant-descriptions-item-label { white-space: nowrap; color: var(--color-text-secondary); font: var(--font-caption-2); }
+.order-detail .ant-descriptions-item-content { max-width: 280px; color: var(--color-text-primary); font: var(--font-caption); white-space: normal; overflow-wrap: anywhere; }
+.order-detail__meta .ant-descriptions-item-label { width: 76px; }
+.order-detail__meta .ant-descriptions-item-content { width: auto; min-width: 60px; max-width: 180px; }
+.order-detail .ant-descriptions-item-content .ant-typography { overflow-wrap: anywhere; }
+.order-detail .ant-descriptions-view > table {
   display: table !important;
   width: 100% !important;
   min-width: 0 !important;
@@ -168,27 +168,27 @@
   table-layout: auto !important;
   vertical-align: top;
 }
-.inventory-detail .ant-descriptions-view > table col { width: auto !important; }
-.inventory-detail .ant-descriptions-item-label.inventory-detail__datetime,
-.inventory-detail .ant-descriptions-item-content.inventory-detail__datetime { width: auto; max-width: none; }
-.inventory-detail .ant-descriptions-item-label.inventory-detail__multiline,
-.inventory-detail .ant-descriptions-item-content.inventory-detail__multiline { white-space: pre-line; }
-.inventory-detail .ant-descriptions-bordered .ant-descriptions-item-label { background: var(--soft); }
-.inventory-detail .ant-descriptions-bordered .ant-descriptions-row { border-color: var(--color-border); }
-.inventory-detail .ant-descriptions-bordered .ant-descriptions-item-label,
-.inventory-detail .ant-descriptions-bordered .ant-descriptions-item-content { border-color: var(--color-border); }
-.inventory-detail__footer { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) 0 var(--space-1); border-top: 1px solid var(--color-border); margin-top: var(--space-4); }
-.inventory-detail--editing { margin-top: var(--space-4); }
-.inventory-detail--editing .inventory-execution-list, .inventory-detail--editing .inventory-finance-list { margin-top: var(--space-4); }
+.order-detail .ant-descriptions-view > table col { width: auto !important; }
+.order-detail .ant-descriptions-item-label.order-detail__datetime,
+.order-detail .ant-descriptions-item-content.order-detail__datetime { width: auto; max-width: none; }
+.order-detail .ant-descriptions-item-label.order-detail__multiline,
+.order-detail .ant-descriptions-item-content.order-detail__multiline { white-space: pre-line; }
+.order-detail .ant-descriptions-bordered .ant-descriptions-item-label { background: var(--soft); }
+.order-detail .ant-descriptions-bordered .ant-descriptions-row { border-color: var(--color-border); }
+.order-detail .ant-descriptions-bordered .ant-descriptions-item-label,
+.order-detail .ant-descriptions-bordered .ant-descriptions-item-content { border-color: var(--color-border); }
+.order-detail__footer { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) 0 var(--space-1); border-top: 1px solid var(--color-border); margin-top: var(--space-4); }
+.order-detail--editing { margin-top: var(--space-4); }
+.order-detail--editing .inventory-execution-list, .order-detail--editing .order-finance-list { margin-top: var(--space-4); }
 .inventory-edit-operator { min-width: var(--col-w-190); }
-.inventory-detail__section { display: grid; gap: var(--space-3); margin-top: 0; }
-.inventory-detail__section--profile { margin-top: 0; }
+.order-detail__section { display: grid; gap: var(--space-3); margin-top: 0; }
+.order-detail__section--profile { margin-top: 0; }
 /* 只读态按板块分栏后，每个 Tab 面板内只有一个板块，原本用于「板块堆叠」的上外边距不再需要。 */
-.inventory-detail__tabs .inventory-detail__section,
-.inventory-detail__tabs .inventory-execution-list,
-.inventory-detail__tabs .inventory-finance-list { margin-top: 0; }
-.inventory-detail__section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--sz-24); padding-inline-start: var(--space-3); border-inline-start: var(--border-w-3) solid var(--color-primary); }
-.inventory-detail__section-heading .ant-typography { color: var(--color-text-primary); font-weight: 700; }
+.order-detail__tabs .order-detail__section,
+.order-detail__tabs .inventory-execution-list,
+.order-detail__tabs .order-finance-list { margin-top: 0; }
+.order-detail__section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--sz-24); padding-inline-start: var(--space-3); border-inline-start: var(--border-w-3) solid var(--color-primary); }
+.order-detail__section-heading .ant-typography { color: var(--color-text-primary); font-weight: 700; }
 .inventory-execution-list { display: grid; gap: var(--space-3); margin-top: 0; }
 .inventory-execution-table { overflow-x: hidden; overflow-y: hidden; }
 .inventory-execution-table .ant-table,
@@ -202,9 +202,9 @@
 }
 .inventory-execution-table .ant-table-content { overflow-x: hidden !important; }
 .inventory-execution-table .ant-table-tbody > tr > td { white-space: normal; overflow-wrap: anywhere; }
-.inventory-detail__data-table .ant-table-cell-fix-left,
-.inventory-detail__data-table .ant-table-cell-fix-right { background: var(--glass); }
-.inventory-detail__data-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
+.order-detail__data-table .ant-table-cell-fix-left,
+.order-detail__data-table .ant-table-cell-fix-right { background: var(--glass); }
+.order-detail__data-table .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
 .inventory-execution-table .ant-table-thead > tr > th:nth-child(1),
 .inventory-execution-table .ant-table-tbody > tr > td:nth-child(1) { width: 13%; }
 .inventory-execution-table .ant-table-thead > tr > th:nth-child(2),
@@ -219,8 +219,8 @@
 .inventory-execution-table .ant-table-tbody > tr > td:nth-child(6) { width: 9%; }
 .inventory-execution-table .ant-table-thead > tr > th:nth-child(7),
 .inventory-execution-table .ant-table-tbody > tr > td:nth-child(7) { width: 24%; }
-.inventory-finance-list { display: grid; gap: var(--space-3); margin-top: 0; }
-.inventory-finance-list > .inventory-detail__meta {
+.order-finance-list { display: grid; gap: var(--space-3); margin-top: 0; }
+.order-finance-list > .order-detail__meta {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -229,19 +229,19 @@
   gap: var(--space-3);
   overflow-x: hidden;
 }
-.inventory-finance-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
-.inventory-finance-summary { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
-.inventory-finance-summary__item { display: grid; min-width: 0; gap: 2px; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text-secondary); font: var(--font-caption-2); }
-.inventory-finance-summary__item--expense { border-inline-start: var(--border-w-3) solid var(--color-error); }
-.inventory-finance-summary__item--income { border-inline-start: var(--border-w-3) solid var(--color-success); }
-.inventory-finance-summary__item strong, .inventory-finance-summary__item--amount .ui-money { color: var(--color-text-primary); font-size: var(--fs-body); font-weight: 700; font-variant-numeric: tabular-nums; }
+.order-finance-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.order-finance-summary { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+.order-finance-summary__item { display: grid; min-width: 0; gap: 2px; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text-secondary); font: var(--font-caption-2); }
+.order-finance-summary__item--expense { border-inline-start: var(--border-w-3) solid var(--color-error); }
+.order-finance-summary__item--income { border-inline-start: var(--border-w-3) solid var(--color-success); }
+.order-finance-summary__item strong, .order-finance-summary__item--amount .ui-money { color: var(--color-text-primary); font-size: var(--fs-body); font-weight: 700; font-variant-numeric: tabular-nums; }
 /* 金额单元格：右对齐 + 等宽数字，与上方汇总卡数值列对齐。 */
-.inventory-detail__cell-amount { display: grid; min-width: 0; justify-items: end; gap: 2px; font-variant-numeric: tabular-nums; }
-.inventory-detail__cell-amount .ui-money { font-weight: 700; }
-@media (--bp-sm) { .inventory-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.order-detail__cell-amount { display: grid; min-width: 0; justify-items: end; gap: 2px; font-variant-numeric: tabular-nums; }
+.order-detail__cell-amount .ui-money { font-weight: 700; }
+@media (--bp-sm) { .order-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (--bp-sm) {
   .inventory-table .ant-table-tbody > tr.ant-table-expanded-row > td { padding: var(--space-2) var(--space-3) !important; }
-  .inventory-detail {
+  .order-detail {
     width: calc(100% - var(--space-3) * 2);
     min-width: 0;
     max-width: calc(100% - var(--space-3) * 2);
@@ -252,16 +252,16 @@
 
 /* 展开详情按字段内容收紧，避免描述表被面板宽度拉散。 */
 @media (min-width: 768px) {
-  .inventory-detail__meta { overflow-x: hidden; }
-  .inventory-detail__meta .ant-descriptions-view { overflow-x: hidden; }
-  .inventory-detail__meta .ant-descriptions-view > table {
+  .order-detail__meta { overflow-x: hidden; }
+  .order-detail__meta .ant-descriptions-view { overflow-x: hidden; }
+  .order-detail__meta .ant-descriptions-view > table {
     display: table !important;
     width: 100% !important;
     min-width: 0 !important;
     table-layout: auto !important;
   }
 }
-.inventory-operation-table .inventory-operation-content {
+.order-operation-table .order-operation-content {
   white-space: normal !important;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -269,9 +269,9 @@
   line-height: 1.5;
 }
 
-.inventory-detail__image-gallery { align-items: flex-start; }
-.inventory-detail__image-card,
-.inventory-detail__image-upload {
+.order-detail__image-gallery { align-items: flex-start; }
+.order-detail__image-card,
+.order-detail__image-upload {
   position: relative;
   display: inline-flex;
   width: 10rem;
@@ -283,16 +283,16 @@
   border-radius: 1.25rem;
   background: var(--color-surface);
 }
-.inventory-detail__image-card > .ant-image {
+.order-detail__image-card > .ant-image {
   width: 8.5rem;
   height: 8.5rem;
 }
-.inventory-detail__image-card > .ant-image img {
+.order-detail__image-card > .ant-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.inventory-detail__image-actions {
+.order-detail__image-actions {
   position: absolute;
   inset: 0;
   display: flex;
@@ -301,7 +301,7 @@
   gap: var(--space-2);
   pointer-events: none;
 }
-.inventory-detail__image-action {
+.order-detail__image-action {
   display: inline-flex;
   width: 2.25rem;
   height: 2.25rem;
@@ -314,8 +314,8 @@
   cursor: pointer;
   pointer-events: auto;
 }
-.inventory-detail__image-action:hover { background: rgb(0 0 0 / 62%); }
-.inventory-detail__image-upload {
+.order-detail__image-action:hover { background: rgb(0 0 0 / 62%); }
+.order-detail__image-upload {
   flex-direction: column;
   gap: var(--space-1);
   border-style: dashed;
@@ -323,11 +323,11 @@
   background: transparent;
   cursor: pointer;
 }
-.inventory-detail__image-upload:hover { color: var(--color-primary); border-color: var(--color-primary); }
-.inventory-detail__image-upload > .anticon { font-size: 1.5rem; }
-.inventory-detail__image-empty { align-self: center; color: var(--color-text-secondary); }
+.order-detail__image-upload:hover { color: var(--color-primary); border-color: var(--color-primary); }
+.order-detail__image-upload > .anticon { font-size: 1.5rem; }
+.order-detail__image-empty { align-self: center; color: var(--color-text-secondary); }
 @media (--bp-sm) {
-  .inventory-detail__image-card,
-  .inventory-detail__image-upload { width: 8.5rem; height: 8.5rem; }
-  .inventory-detail__image-card > .ant-image { width: 7rem; height: 7rem; }
+  .order-detail__image-card,
+  .order-detail__image-upload { width: 8.5rem; height: 8.5rem; }
+  .order-detail__image-card > .ant-image { width: 7rem; height: 7rem; }
 }

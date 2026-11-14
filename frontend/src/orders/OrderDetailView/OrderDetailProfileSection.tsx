@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
 import {
-  InventorySectionHeading,
+  OrderSectionHeading,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
 import { OrderDetailImageGallery } from "./OrderDetailImageGallery";
@@ -71,13 +71,13 @@ function CopyableProfileValue({ label, value }: { label: string; value: string }
   };
 
   return (
-    <span className="inventory-detail__copy-value">
+    <span className="order-detail__copy-value">
       <span>{value}</span>
       {canCopy ? (
         <Tooltip title={`复制${label}`}>
           <button
             type="button"
-            className="inventory-detail__copy-button"
+            className="order-detail__copy-button"
             aria-label={`复制${label}`}
             onClick={() => void copy()}
           >
@@ -172,12 +172,12 @@ export function OrderDetailProfileSection({
   }, [creationConfig, profileAccount]);
 
   return (
-    <div className="inventory-detail__section inventory-detail__section--profile">
-      <InventorySectionHeading title={sectionLabels["ACCOUNT_PRODUCT"] ?? "游戏账号信息"} />
-      <div className="inventory-detail__meta">
-        <div className="inventory-detail__meta-group">
-          <div className="inventory-detail__meta-group-title">账号资料</div>
-          <Descriptions className="inventory-detail__meta-table" size="small" bordered column={3}>
+    <div className="order-detail__section order-detail__section--profile">
+      <OrderSectionHeading title={sectionLabels["ACCOUNT_PRODUCT"] ?? "游戏账号信息"} />
+      <div className="order-detail__meta">
+        <div className="order-detail__meta-group">
+          <div className="order-detail__meta-group-title">账号资料</div>
+          <Descriptions className="order-detail__meta-table" size="small" bordered column={3}>
             {visibleAccountProfileFields.map((field) => (
                 <Descriptions.Item key={field.key} label={fieldLabel(creationConfig, field.cfgKey, field.fallback)}>
                   {editing ? (
@@ -188,7 +188,7 @@ export function OrderDetailProfileSection({
                 </Descriptions.Item>
               ))}
           </Descriptions>
-          <Descriptions className="inventory-detail__meta-table" size="small" bordered column={2}>
+          <Descriptions className="order-detail__meta-table" size="small" bordered column={2}>
             <Descriptions.Item label="二次图片（选填）">
               <OrderDetailImageGallery images={images.secondary} altPrefix="二次图片" />
             </Descriptions.Item>
@@ -198,9 +198,9 @@ export function OrderDetailProfileSection({
           </Descriptions>
         </div>
         {accountExtraItems.length ? (
-          <div className="inventory-detail__meta-group">
-            <div className="inventory-detail__meta-group-title">{sectionLabels["ACCOUNT_PRODUCT"] ?? "账号 / 产品补充信息"}</div>
-            <Descriptions className="inventory-detail__meta-table" size="small" bordered column={3}>
+          <div className="order-detail__meta-group">
+            <div className="order-detail__meta-group-title">{sectionLabels["ACCOUNT_PRODUCT"] ?? "账号 / 产品补充信息"}</div>
+            <Descriptions className="order-detail__meta-table" size="small" bordered column={3}>
               {accountExtraItems.map((item) => (
                 <Descriptions.Item key={item.key} label={`${item.label}${item.status === "deleted" ? "（已删除）" : item.status === "inactive" ? "（已停用）" : ""}`}>
                   {editing ? (

@@ -14,7 +14,7 @@ import {
   useOrderFormConfig,
 } from "../ConfigurableField";
 import {
-  InventorySectionHeading,
+  OrderSectionHeading,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
 
@@ -100,9 +100,9 @@ function DeliverySubSection({
     return [...existing, ...configured];
   }, [config, editableValues]);
   return (
-    <div className="inventory-detail__meta-group">
-      <div className="inventory-detail__meta-group-title">{title}</div>
-      <Descriptions className="inventory-detail__meta-table" size="small" bordered column={3}>
+    <div className="order-detail__meta-group">
+      <div className="order-detail__meta-group-title">{title}</div>
+      <Descriptions className="order-detail__meta-table" size="small" bordered column={3}>
         {mainFields
           .filter((field) => isFieldActive(config, field.key))
           .map((field) => (
@@ -129,7 +129,7 @@ function DeliverySubSection({
           ))}
       </Descriptions>
       {deliveryItems.length ? (
-        <Descriptions className="inventory-detail__meta-table" size="small" bordered column={3}>
+        <Descriptions className="order-detail__meta-table" size="small" bordered column={3}>
           {deliveryItems.map((item) => (
             <Descriptions.Item key={item.key} label={`${item.label}${item.status === "deleted" ? "（已删除）" : item.status === "inactive" ? "（已停用）" : ""}`}>
               {editing ? (
@@ -180,9 +180,9 @@ export function OrderDetailDeliverySection({
 
   if (editing) {
     return (
-      <div className="inventory-detail__section inventory-detail__section--delivery">
-        <InventorySectionHeading title="交付信息" />
-        <div className="inventory-detail__meta">
+      <div className="order-detail__section order-detail__section--delivery">
+        <OrderSectionHeading title="交付信息" />
+        <div className="order-detail__meta">
           <DeliverySubSection title="买号交付" orderType={creationOrder?.order_type} order={creationOrder} account={account} employees={employees} editing draft={creationOrder ? orderDrafts?.[creationOrder.order_id] : undefined} onProfileChange={onProfileChange} onExtraChange={(key, value) => creationOrder && onOrderExtraChange?.(creationOrder.order_id, key, value)} />
           {sellOrder ? <DeliverySubSection title="卖号交付" orderType={sellOrder.order_type} order={sellOrder} account={account} employees={employees} editing draft={orderDrafts?.[sellOrder.order_id]} onProfileChange={onProfileChange} onExtraChange={(key, value) => onOrderExtraChange?.(sellOrder.order_id, key, value)} /> : null}
         </div>
@@ -191,9 +191,9 @@ export function OrderDetailDeliverySection({
   }
 
   return (
-    <div className="inventory-detail__section inventory-detail__section--delivery">
-      <InventorySectionHeading title="交付信息" />
-      <div className="inventory-detail__meta">
+    <div className="order-detail__section order-detail__section--delivery">
+      <OrderSectionHeading title="交付信息" />
+      <div className="order-detail__meta">
         <DeliverySubSection title="买号交付" orderType={creationOrder?.order_type} order={creationOrder} account={account} employees={employees} />
         <DeliverySubSection
           title="卖号交付"

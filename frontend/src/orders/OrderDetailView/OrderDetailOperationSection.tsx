@@ -6,23 +6,23 @@ import { DataTable, DateField, Select } from "../../shared/ui";
 import type { AccountExecutionEvent } from "../../shared/api/types/account-execution";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import type { Account } from "../../shared/api/types/accounts";
-import type { InventoryEventDraft } from "./OrderDetail.shared";
+import type { OrderEventDraft } from "./OrderDetail.shared";
 import { OrderDetailImageGallery } from "./OrderDetailImageGallery";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import {
-  InventorySectionHeading,
+  OrderSectionHeading,
   type OrderDetailMeta,
-  type InventoryOperationRow,
+  type OrderOperationRow,
 } from "./OrderDetail.shared";
 
-const OPERATION_COLUMNS: ColumnsType<InventoryOperationRow> = [
+const OPERATION_COLUMNS: ColumnsType<OrderOperationRow> = [
   { title: "动作", dataIndex: "action", key: "action", width: 88 },
   {
     title: "内容",
     dataIndex: "content",
     key: "content",
-    onCell: () => ({ className: "inventory-operation-content" }),
-    render: (value: InventoryOperationRow["content"]) => value || "-",
+    onCell: () => ({ className: "order-operation-content" }),
+    render: (value: OrderOperationRow["content"]) => value || "-",
   },
   { title: "时间", dataIndex: "occurredAt", key: "occurredAt", width: 142 },
   { title: "操作人", dataIndex: "operator", key: "operator", width: 82 },
@@ -42,14 +42,14 @@ export function OrderDetailOperationSection({
   meta: OrderDetailMeta;
   editing?: boolean;
   account?: Account | null;
-  eventDrafts?: Record<number, InventoryEventDraft>;
+  eventDrafts?: Record<number, OrderEventDraft>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
   onProfileChange?: (changes: Partial<Account>) => void;
   employees?: EmployeeOption[];
   operationEvents?: Record<string, AccountExecutionEvent | undefined>;
 }) {
   const platformOptions = useOptionSet("INTERMEDIARY_PLATFORM") ?? [];
-  const rows = useMemo<InventoryOperationRow[]>(() => [
+  const rows = useMemo<OrderOperationRow[]>(() => [
     { key: "consignment", action: "上架平台", content: meta.listedPlatform, occurredAt: meta.listedAt, operator: meta.listedOperator, event: operationEvents?.consignment },
     { key: "unlist", action: "下架平台", content: meta.unlistedPlatform, occurredAt: meta.unlistedAt, operator: meta.unlistedOperator, event: operationEvents?.unlist },
     { key: "description", action: "描述", content: meta.accountDescription, occurredAt: meta.descriptionAt, operator: meta.descriptionOperator, event: operationEvents?.description },
@@ -58,10 +58,10 @@ export function OrderDetailOperationSection({
 
   if (editing) {
     return (
-      <div className="inventory-detail__section inventory-detail__section--operation">
-        <InventorySectionHeading title="运营信息" />
+      <div className="order-detail__section order-detail__section--operation">
+        <OrderSectionHeading title="运营信息" />
         <DataTable
-          className="inventory-detail__data-table inventory-operation-table"
+          className="order-detail__data-table order-operation-table"
           columns={editableOperationColumns(account, eventDrafts, onEventEdit, onProfileChange, employees, platformOptions)}
           rows={rows}
           page={1}
@@ -77,10 +77,10 @@ export function OrderDetailOperationSection({
   }
 
   return (
-    <div className="inventory-detail__section inventory-detail__section--operation">
-      <div className="inventory-detail__section-heading"><Typography.Text strong>运营信息</Typography.Text></div>
+    <div className="order-detail__section order-detail__section--operation">
+      <div className="order-detail__section-heading"><Typography.Text strong>运营信息</Typography.Text></div>
       <DataTable
-        className="inventory-detail__data-table inventory-operation-table"
+        className="order-detail__data-table order-operation-table"
         columns={OPERATION_COLUMNS}
         rows={rows}
         page={1}
@@ -97,12 +97,12 @@ export function OrderDetailOperationSection({
 
 function editableOperationColumns(
   account: Account | null | undefined,
-  drafts: Record<number, InventoryEventDraft> | undefined,
+  drafts: Record<number, OrderEventDraft> | undefined,
   onEventEdit: ((event: AccountExecutionEvent, changes: { occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void) | undefined,
   onProfileChange: ((changes: Partial<Account>) => void) | undefined,
   employees: EmployeeOption[],
   platformOptions: Array<{ value: string; label: string }>,
-): ColumnsType<InventoryOperationRow> {
+): ColumnsType<OrderOperationRow> {
   const platformOptionValues = (current: string[], includeSystem = false) => {
     const options = [...platformOptions];
     if (includeSystem && !options.some((option) => option.value === "__SYSTEM__")) {
@@ -118,7 +118,7 @@ function editableOperationColumns(
       ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
       : [];
   };
-  const eventExtra = (row: InventoryOperationRow, draft?: InventoryEventDraft) => (
+  const eventExtra = (row: OrderOperationRow, draft?: OrderEventDraft) => (
     draft?.form_extra !== undefined ? (draft.form_extra ?? {}) : (row.event?.form_extra ?? {})
   );
   const updateExtra = (event: AccountExecutionEvent, extra: Record<string, unknown>) => {
@@ -130,8 +130,8 @@ function editableOperationColumns(
       title: "内容",
       dataIndex: "content",
       key: "content",
-      onCell: () => ({ className: "inventory-operation-content" }),
-      render: (_value: InventoryOperationRow["content"], row: InventoryOperationRow) => {
+      onCell: () => ({ className: "order-operation-content" }),
+      render: (_value: OrderOperationRow["content"], row: OrderOperationRow) => {
         if (row.key === "description") {
           return <Input aria-label="编辑运营描述" value={account?.account_description ?? ""} onChange={(event) => onProfileChange?.({ account_description: event.target.value })} />;
         }
@@ -155,7 +155,7 @@ function editableOperationColumns(
             ? undefined
             : Number(extra.consignment_price);
           return (
-            <div className="inventory-operation-edit-fields">
+            <div className="order-operation-edit-fields">
               <Select
                 aria-label="编辑上架平台"
                 allowClear
@@ -226,7 +226,7 @@ function editableOperationColumns(
       dataIndex: "occurredAt",
       key: "occurredAt",
       width: 142,
-      render: (value: string, row: InventoryOperationRow) => {
+      render: (value: string, row: OrderOperationRow) => {
         if (!row.event) return value;
         const draft = drafts?.[row.event.id];
         const current = draft?.occurred_at ?? row.event.occurred_at ?? "";
@@ -238,7 +238,7 @@ function editableOperationColumns(
       dataIndex: "operator",
       key: "operator",
       width: 120,
-      render: (value: string, row: InventoryOperationRow) => {
+      render: (value: string, row: OrderOperationRow) => {
         if (!row.event) return value;
         return <Select mode="multiple" aria-label={`编辑${row.action}操作人`} value={drafts?.[row.event.id]?.operator_user_ids ?? row.event.operator_user_ids ?? []} options={employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))} onChange={(ids) => onEventEdit?.(row.event!, { operator_user_ids: ids })} />;
       },

@@ -8,7 +8,7 @@ import { customersApi, counterpartiesApi } from "../../shared/api/customers.api"
 import { appMessage } from "../../shared/ui/appFeedback";
 import { PermissionButton, Select } from "../../shared/ui";
 import {
-  InventorySectionHeading,
+  OrderSectionHeading,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
 
@@ -83,7 +83,7 @@ export function OrderDetailPartySection({
   };
   const displayFields = useMemo(() => {
     const participantFields = [
-      ...(meta.orderParties !== "-" ? [{ key: "orderParties", label: "参与方", value: meta.orderParties, className: "inventory-detail__multiline" }] : []),
+      ...(meta.orderParties !== "-" ? [{ key: "orderParties", label: "参与方", value: meta.orderParties, className: "order-detail__multiline" }] : []),
       ...meta.orderExtras
         .filter((field) => field.section === "PARTICIPANT")
         .map((field) => ({ key: `order-extra-${field.key}`, label: field.label, value: field.value, className: undefined })),
@@ -94,10 +94,10 @@ export function OrderDetailPartySection({
   }, [meta.orderExtras, meta.orderParties]);
 
   return (
-    <div className="inventory-detail__section inventory-detail__section--party">
-      <InventorySectionHeading title="参与方信息" />
-      <div className="inventory-detail__meta">
-        <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
+    <div className="order-detail__section order-detail__section--party">
+      <OrderSectionHeading title="参与方信息" />
+      <div className="order-detail__meta">
+        <Descriptions className="order-detail__meta-table" size="small" bordered column={4}>
           {displayFields.map((field) => <Descriptions.Item key={field.key} className={field.className} label={field.label}>
             {editing && field.key.startsWith("order-extra-") ? (
               <Input
@@ -109,7 +109,7 @@ export function OrderDetailPartySection({
           </Descriptions.Item>)}
         </Descriptions>
         {editing && meta.orderId != null ? (
-          <Space direction="vertical" className="inventory-detail__party-editor">
+          <Space direction="vertical" className="order-detail__party-editor">
             <Space.Compact block>
               <Select
                 mode="multiple"

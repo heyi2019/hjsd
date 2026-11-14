@@ -5,7 +5,7 @@ import { normalizeError } from "../../shared/api/client";
 import { ordersApi } from "../../shared/api/orders.api";
 import { InventoryCancellationDialog } from "../InventoryCancellationDialog";
 import { InventoryDeleteDialog } from "./InventoryDeleteDialog";
-import { InventoryConsignmentModal, InventoryPlatformOffsaleModal, InventoryProfileModal, unlistAndCancelConsignmentOrders } from "../../orders/operations";
+import { OrderConsignmentModal, OrderPlatformOffsaleModal, OrderProfileModal, unlistAndCancelConsignmentOrders } from "../../orders/operations";
 import { InventoryRebateModal } from "../rebate";
 import { CashflowModal } from "../../finance/cashflow";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../sale";
@@ -80,7 +80,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         if (saleTarget.inventory_type === "PICKUP") return <PickupSaleModal {...common} />;
         return <RecoverySaleModal {...common} />;
       })() : null}
-      <InventoryConsignmentModal
+      <OrderConsignmentModal
         account={consignmentTarget}
         onClose={() => setConsignmentTarget(null)}
         onCreated={async () => {
@@ -130,7 +130,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           这是 ERP 系统下架，不影响已登记的寄售平台历史记录。下架不可撤销，历史轨迹保留。
         </p> : null}
       />
-      <InventoryPlatformOffsaleModal
+      <OrderPlatformOffsaleModal
         account={platformOffsaleTarget?.account ?? null}
         records={platformOffsaleTarget?.records ?? []}
         onClose={() => setPlatformOffsaleTarget(null)}
@@ -196,7 +196,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           saving={savingAccount}
         /> : null}
       </BusinessActionModal>
-      <InventoryProfileModal
+      <OrderProfileModal
         target={profileTarget}
         onClose={() => setProfileTarget(null)}
         onSaved={(updated) => {

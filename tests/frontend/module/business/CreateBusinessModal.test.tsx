@@ -6,13 +6,11 @@ import { CreateBusinessModal } from "@/orders/CreateBusinessModal";
 import { DgOrderSection } from "@/orders/dg/DgOrderSection";
 import { FieldConfigContext } from "@/orders/ConfigurableField";
 import { Form } from "antd";
-import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
 import { gameTypesApi } from "@/shared/api/misc.api";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
-import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { allFormFields, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 import { clearOptionSetsCache, loadOptionSets } from "@/shared/lib/optionSets";
@@ -33,7 +31,6 @@ async function pickMainPool() {
 // 跨文件在 isolate:false 下复用同一份 mock 实例，配合 setup.ts 的 resetAllMocks
 // 与各文件 beforeEach 重新设定返回值，避免闭包捕获的 vi.fn() 在共享模块图下串扰。
 vi.mock("@/shared/api/cashflows.api");
-vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");
 vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
@@ -44,7 +41,6 @@ vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/quality.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
-vi.mock("@/shared/api/stocks.api");;
 
 const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
 
@@ -53,13 +49,6 @@ beforeEach(() => {
   clearOptionSetsCache();
   seedOrderFormFields();
   vi.mocked(orderTypesApi.list).mockResolvedValue(types);
-  vi.mocked(customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
-  vi.mocked(counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", status: "ACTIVE" }]);
-  resolveMock(vi.mocked(stocksApi.list), [
-    { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "0.00" },
-    { id: 10, game_account: "consignment-account", business_mode: "DISTRIBUTION", inventory_type: "CONSIGNMENT", status: "WAITING", cost_amount: "0.00" },
-    { id: 11, game_account: "pickup-account", business_mode: "DISTRIBUTION", inventory_type: "PICKUP", status: "WAITING", cost_amount: "0.00" },
-  ]);
   resolveMock(vi.mocked(poolsApi.list), [{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "系统管理员", is_active: true },
@@ -69,7 +58,6 @@ beforeEach(() => {
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
     { id: 2, name: "原神", sort_order: 20, is_active: true, is_default: false },
   ]);
-  vi.mocked(ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HJ-HS-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", status: "ACTIVE", account_id: 9 }]);
   resolveMock(vi.mocked(ordersApi.postEvent), { event: { id: 1 }, cashflow_no: "FLOW-0001" });
 });
 
@@ -191,8 +179,6 @@ it("回收入口内联填写游戏账号信息，不加载库存账号", async (
 
     expect(await screen.findByLabelText("游戏账号")).toBeInTheDocument();
     expect(screen.queryByLabelText("库存编号")).toBeNull();
-    expect(vi.mocked(stocksApi.list)).not.toHaveBeenCalled();
-    expect(vi.mocked(ordersApi.list)).not.toHaveBeenCalled();
     expect(vi.mocked(orderTypesApi.list)).not.toHaveBeenCalled();
   });
 
@@ -201,8 +187,6 @@ it("打开回收入口后只加载订单所需的业务数据", async () => {
     expect(await screen.findByLabelText("游戏账号")).toBeInTheDocument();
     expect(screen.queryByLabelText("库存编号")).toBeNull();
     expect(vi.mocked(orderTypesApi.list)).not.toHaveBeenCalled();
-    expect(vi.mocked(stocksApi.list)).not.toHaveBeenCalled();
-    expect(vi.mocked(ordersApi.list)).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("关联账号（必填）");
   });
 

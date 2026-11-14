@@ -8,8 +8,8 @@ import type { Account } from "../../shared/api/types/accounts";
 import { normalizeError } from "../../shared/api/client";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, MoneyText, PermissionButton, Select } from "../../shared/ui";
-import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../../orders/ConfigurableField";
-import { InventoryAccountSummary } from "../InventoryAccountSummary";
+import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../ConfigurableField";
+import { InventoryAccountSummary } from "../../stocks/InventoryAccountSummary";
 import { activeConsignmentListings } from "./consignment-logic";
 import "./consignment-modal.css";
 

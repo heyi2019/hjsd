@@ -29,6 +29,36 @@ class CounterpartyRoleInput(BaseModel):
     role: str = Field(min_length=1, max_length=64)
 
 
+class CustomerDraftInput(BaseModel):
+    """建单时内联输入的客户；后端在同一事务内复用或建档。"""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    display_name: str = Field(min_length=1, max_length=128)
+    role: str = Field(min_length=1, max_length=64)
+    contact_name: str | None = Field(default=None, max_length=64)
+    phone: str | None = Field(default=None, max_length=64)
+    wechat: str | None = Field(default=None, max_length=128)
+    qq: str | None = Field(default=None, max_length=64)
+    source: str | None = Field(default=None, max_length=128)
+    note: str | None = None
+
+
+class CounterpartyDraftInput(BaseModel):
+    """建单时内联输入的供货方；后端在同一事务内复用或建档。"""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    display_name: str = Field(min_length=1, max_length=128)
+    type: str = Field(min_length=1, max_length=32)
+    role: str = Field(min_length=1, max_length=64)
+    contact_name: str | None = Field(default=None, max_length=64)
+    phone: str | None = Field(default=None, max_length=64)
+    wechat: str | None = Field(default=None, max_length=128)
+    qq: str | None = Field(default=None, max_length=64)
+    note: str | None = None
+
+
 class OrderAccountSnapshot(BaseModel):
     """订单中的产品快照：游戏账号是单一交易实体，游戏类型是产品类型。"""
 
@@ -125,6 +155,8 @@ class OrderCreate(BaseModel):
     form_extra_scope: str | None = Field(default=None, min_length=2, max_length=16)
     customer_roles: list[CustomerRoleInput] = Field(default_factory=list)
     counterparty_roles: list[CounterpartyRoleInput] = Field(default_factory=list)
+    customer_input: CustomerDraftInput | None = None
+    counterparty_input: CounterpartyDraftInput | None = None
     initial_buy: InitialBuyCreate | None = None
     initial_costs: list[InitialCostCreate] = Field(default_factory=list)
     installment: OrderInstallmentCreate | None = None

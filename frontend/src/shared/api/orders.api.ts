@@ -143,6 +143,28 @@ export const ordersApi = {
     form_extra_scope?: string;
     customer_roles?: { customer_id: number; role: string }[];
     counterparty_roles?: { counterparty_id: number; role: string }[];
+    /** 建单客户草稿：后端在订单事务内按昵称和联系方式复用或新建。 */
+    customer_input?: {
+      display_name: string;
+      role: string;
+      contact_name?: string;
+      phone?: string;
+      wechat?: string;
+      qq?: string;
+      source?: string;
+      note?: string;
+    };
+    /** 建单供货方草稿：后端在订单事务内按昵称和类型复用或新建。 */
+    counterparty_input?: {
+      display_name: string;
+      type: string;
+      role: string;
+      contact_name?: string;
+      phone?: string;
+      wechat?: string;
+      qq?: string;
+      note?: string;
+    };
     initial_buy?: {
       amount: string;
       occurred_on: string;

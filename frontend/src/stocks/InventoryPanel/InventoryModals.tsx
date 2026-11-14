@@ -5,7 +5,7 @@ import { normalizeError } from "../../shared/api/client";
 import { ordersApi } from "../../shared/api/orders.api";
 import { InventoryCancellationDialog } from "../InventoryCancellationDialog";
 import { InventoryDeleteDialog } from "./InventoryDeleteDialog";
-import { InventoryConsignmentModal, InventoryPlatformOffsaleModal, InventoryProfileModal, unlistAndCancelConsignmentOrders } from "../operations";
+import { InventoryConsignmentModal, InventoryPlatformOffsaleModal, InventoryProfileModal, unlistAndCancelConsignmentOrders } from "../../orders/operations";
 import { InventoryRebateModal } from "../rebate";
 import { CashflowModal } from "../../finance/cashflow";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../sale";

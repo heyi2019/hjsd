@@ -5,7 +5,7 @@ import type { Order } from "../../shared/api/types/orders";
 import { ACCOUNT_STATUS_LABEL, formatDateTimeMinute, formatElapsedTime, money } from "../../shared/lib/format";
 import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
 import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
-import { inventoryOperationMenuItems } from "../../stocks/operations";
+import { inventoryOperationMenuItems } from "../operations";
 import { inventoryTypeOfOrder } from "../../stocks/InventoryPanel/types";
 import { formatOrderAmount } from "./helpers";
 

@@ -3,13 +3,11 @@ import { screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { CreateBusinessModal } from "@/orders/CreateBusinessModal";
-import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
 import { gameTypesApi } from "@/shared/api/misc.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 
-vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
@@ -50,8 +48,6 @@ vi.mock("@/shared/ui", async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   const pending = () => new Promise<never>(() => undefined);
-  vi.mocked(customersApi.list).mockImplementation(pending);
-  vi.mocked(counterpartiesApi.list).mockImplementation(pending);
   vi.mocked(gameTypesApi.list).mockImplementation(pending);
   vi.mocked(orderFormFieldsApi.list).mockImplementation(pending);
   vi.mocked(orderFormFieldsApi.listSectionLabels).mockImplementation(pending);

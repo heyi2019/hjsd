@@ -4,7 +4,7 @@ import { today } from "../../shared/lib/format";
 import { ordersApi } from "../../shared/api/orders.api";
 import { CashflowModal } from "../../finance/cashflow";
 import { InventoryRebateModal } from "../../stocks/rebate";
-import { InventoryProfileModal, InventoryPlatformOffsaleModal } from "../../stocks/operations";
+import { InventoryProfileModal, InventoryPlatformOffsaleModal } from "../operations";
 import { OrderDeleteDialog } from "../OrderDeleteDialog";
 import { type OrdersPageController } from "./useOrdersPageController";
 import { SharedCancellationDialog, CancelTransactionModal } from "./OrderCancellationModals";

@@ -12,8 +12,8 @@ import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { consignmentRecords, type ActiveConsignment, unlistAndCancelConsignmentOrders } from "../../stocks/operations";
-import type { InventoryProfileTarget } from "../../stocks/operations";
+import { consignmentRecords, type ActiveConsignment, unlistAndCancelConsignmentOrders } from "../operations";
+import type { InventoryProfileTarget } from "../operations";
 import {
   buildActionAllocationCandidates,
   buildActionAllocationRows,

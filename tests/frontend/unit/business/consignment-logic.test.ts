@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AccountExecutionEvent, AccountExecutionOrder } from "@/shared/api/types/account-execution";
-import { consignmentPlatform, isActiveConsignmentListing, isConsignmentListing } from "@/stocks/operations/consignment-logic";
+import { consignmentPlatform, isActiveConsignmentListing, isConsignmentListing } from "@/orders/operations/consignment-logic";
 
 const event = (overrides: Partial<AccountExecutionEvent>): AccountExecutionEvent => ({
   id: 1,

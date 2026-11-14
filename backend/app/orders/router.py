@@ -49,6 +49,7 @@ from app.orders.consignment import post_consignment_operation
 from app.orders.deletion import delete_order as orders_delete_order
 from app.orders.create import add_customer_role, create_order as orders_create_order
 from app.orders.events import post_event as orders_post_event
+from app.orders.participants import resolve_counterparty_role, resolve_customer_role
 from app.orders.order_detail.editing import edit_execution_detail
 from app.orders.order_detail.editing.schemas import ExecutionEditRequest
 from app.orders.links import (
@@ -403,6 +404,16 @@ def create_order(
         if user.is_admin or user.owner_scope == "ALL"
         else user.id
     )
+    customer_roles = [(role.customer_id, role.role) for role in payload.customer_roles]
+    counterparty_roles = [
+        (role.counterparty_id, role.role) for role in payload.counterparty_roles
+    ]
+    customer_role = resolve_customer_role(db, payload.customer_input, user)
+    counterparty_role = resolve_counterparty_role(db, payload.counterparty_input, user)
+    if customer_role is not None:
+        customer_roles.append(customer_role)
+    if counterparty_role is not None:
+        counterparty_roles.append(counterparty_role)
     order = orders_create_order(
         db,
         order_type=normalized_order_type,
@@ -420,16 +431,8 @@ def create_order(
         note=payload.note,
         commission_mode=payload.commission_mode,
         commission_payer=payload.commission_payer,
-        customer_roles=[
-            (role.customer_id, role.role)
-            for role in payload.customer_roles
-            if role.customer_id is not None
-        ],
-        counterparty_roles=[
-            (role.counterparty_id, role.role)
-            for role in payload.counterparty_roles
-            if role.counterparty_id is not None
-        ],
+        customer_roles=customer_roles,
+        counterparty_roles=counterparty_roles,
         extra_values=payload.extra_values,
         form_extra=payload.form_extra,
         form_extra_scope=payload.form_extra_scope,

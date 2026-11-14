@@ -1,5 +1,5 @@
 import { CreateBusinessModal } from "../CreateBusinessModal";
-import { InventoryConsignmentModal } from "../../stocks/operations";
+import { InventoryConsignmentModal } from "../operations";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../../stocks/sale";
 import { type OrdersPageController } from "./useOrdersPageController";
 

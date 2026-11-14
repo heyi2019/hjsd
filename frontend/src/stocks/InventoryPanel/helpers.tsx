@@ -1,6 +1,6 @@
 import type { Dayjs } from "dayjs";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
-import { inventoryOperationItems } from "../operations";
+import { inventoryOperationItems } from "../../orders/operations";
 import type { InventoryOrderRow } from "./types";
 
 export type InventoryFilterOptions = {

@@ -15,7 +15,9 @@ from datetime import date
 
 from sqlalchemy import select
 
+from app.domain.parties import Customer
 from app.domain.trade import Account, Order
+from app.parties.customers import create_customer
 
 D = date(2026, 10, 4)
 
@@ -130,3 +132,29 @@ def test_four_order_types_all_persist_distinct_rows(seeded_client, seeded_db, he
 
     db_rows = seeded_db.scalars(select(Order).where(Order.order_no.in_([no for _, no in created]))).all()
     assert len(db_rows) == 3
+
+
+def test_order_inline_customer_creates_a_profile_when_phone_differs(
+    seeded_client, seeded_db, headers
+):
+    """建单内联客户以昵称和明确联系方式复用；手机号不同则建新档案。"""
+    create_customer(
+        seeded_db,
+        display_name="同名客户",
+        phone="13800000000",
+        actor="pytest",
+    )
+    payload = _base_payload("HS")
+    payload["customer_input"] = {
+        "display_name": "同名客户",
+        "role": "SELLER",
+        "phone": "13900000000",
+    }
+
+    response = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+
+    assert response.status_code == 201, response.text
+    customers = seeded_db.scalars(
+        select(Customer).where(Customer.display_name == "同名客户").order_by(Customer.id)
+    ).all()
+    assert [customer.phone for customer in customers] == ["13800000000", "13900000000"]

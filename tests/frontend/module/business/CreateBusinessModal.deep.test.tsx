@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { CreateBusinessModal } from "@/orders/CreateBusinessModal";
-import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
 import { gameTypesApi } from "@/shared/api/misc.api";
 import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
@@ -34,8 +33,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
   vi.mocked(orderTypesApi.list).mockResolvedValue([{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }]);
-  vi.mocked(customersApi.list).mockResolvedValue([{ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" }]);
-  vi.mocked(counterpartiesApi.list).mockResolvedValue([{ id: 2, counterparty_no: "CP-0001", display_name: "同行甲", type: "PEER", status: "ACTIVE" }]);
   resolveMock(vi.mocked(stocksApi.list), [
     { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "0.00" },
   ]);
@@ -69,7 +66,7 @@ async function openTypedModal(orderType: string, onClose = vi.fn(), onCreated = 
 
 describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", () => {
   it("业务数据加载失败展示错误横幅（弹窗内无重试入口）", async () => {
-    vi.mocked(customersApi.list).mockRejectedValue(new Error("load fail"));
+    vi.mocked(poolsApi.list).mockRejectedValue(new Error("load fail"));
     await openTypedModal("HS");
     expect((await screen.findAllByText(/load fail/)).length).toBeGreaterThan(0);
     // 组件未给 ErrorBanner 传 onRetry，故弹窗内无「重新加载」按钮；load 的 catch 分支已覆盖
@@ -89,17 +86,7 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
-  it("脱敏客户列表不允许拿掩码比明文：填联系方式后交给后端判重，命中候选复用已有 id", async () => {
-    // 无 customer.contact.read 时列表联系方式是掩码（contact_masked=true）。
-    // 若前端仍拿掩码与用户输入的明文做等值比较，会漏匹配→重复建档（#6）。
-    vi.mocked(customersApi.list).mockResolvedValue([
-      { id: 1, customer_no: "CUS-0001", display_name: "张三", phone: "138****8888", contact_masked: true, status: "ACTIVE" },
-    ] as never);
-    // 用户输入了明文手机 → 本地不复用；建档后后端用明文精确判重返回同名候选 → 复用 id=1。
-    resolveMockOnce(vi.mocked(customersApi.create), {
-      customer: { id: 99, customer_no: "CUS-0099", display_name: "张三" },
-      duplicate_candidates: [{ customer_id: 1, customer_no: "CUS-0001", display_name: "张三", matched_on: ["phone"] }],
-    });
+  it("提交客户草稿给订单接口，由后端在同一事务中解析档案", async () => {
     resolveMockOnce(vi.mocked(ordersApi.create), { id: 31, order_no: "HS-2026-0031", status: "ACTIVE" });
 
     await openTypedModal("HS");
@@ -117,13 +104,11 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
     await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
 
-    await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalled());
-    // 输入的手机号必须是明文传给后端判重，而不是掩码。
-    expect(vi.mocked(customersApi.create).mock.calls[0][0]).toMatchObject({ phone: "13800008888" });
     await waitFor(() => expect(vi.mocked(ordersApi.create)).toHaveBeenCalled());
-    // 订单关联到后端判重命中的已有客户 id=1，而非新建的 id=99（避免重复建档）。
     const payload = vi.mocked(ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
-    expect(payload.customer_roles).toEqual([{ customer_id: 1, role: "SELLER" }]);
+    expect(payload.customer_input).toMatchObject({
+      display_name: "张三", phone: "13800008888", role: "SELLER",
+    });
   });
 
   it("客户来源只能从预置选项选择，选择其他后填写具体来源", async () => {

@@ -1,8 +1,5 @@
-import { appMessage } from "../shared/ui/appFeedback";
-import { counterpartiesApi, customersApi } from "../shared/api/customers.api";
-import type { Counterparty, Customer } from "../shared/api/types/customers";
-import { today } from "../shared/lib/format";
-import type { FieldConfigMap } from "./ConfigurableField";
+import { today } from "../../shared/lib/format";
+import type { FieldConfigMap } from "../ConfigurableField";
 
 /** 建单表单值。字段由后端表单配置驱动，故保持 Record 形态。 */
 type Values = Record<string, unknown>;
@@ -64,71 +61,40 @@ export function buildOrderNote(
   return values.note as string;
 }
 
-/**
- * 客户解析/建档：仅 HS/DG 且填写了客户昵称时生效。
- * 客户列表默认脱敏，掩码联系方式不可与用户输入的明文做等值比较，故脱敏客户只在
- * 「昵称相同且未填联系方式」时本地复用；填了联系方式交给后端明文判重兜底。
- * 返回 undefined 表示不需要写 values.customer_id。
- */
-export async function resolveCustomerId(args: {
+/** 建单客户草稿：由订单接口在同一事务内复用已有客户或新建档案。 */
+export function buildCustomerInput(args: {
   values: Values;
-  customers: Customer[];
   isRecovery: boolean;
   isDg: boolean;
   resolvedCustomerSource: string | undefined;
-}): Promise<number | undefined> {
-  const { values, customers, isRecovery, isDg, resolvedCustomerSource } = args;
+}) {
+  const { values, isRecovery, isDg, resolvedCustomerSource } = args;
   const customerPrefix = isDg ? "dg_" : "";
   const customerNickname = values[`${customerPrefix}customer_nickname`];
   if (!(isRecovery || isDg) || !customerNickname) return undefined;
-  const inputPhone = values[`${customerPrefix}customer_phone`] as string | undefined;
-  const inputWechat = values[`${customerPrefix}customer_wechat`] as string | undefined;
-  const existingCustomer = customers.find((customer) => {
-    if (customer.display_name !== customerNickname) return false;
-    if (customer.contact_masked) return !inputPhone && !inputWechat;
-    return (inputPhone && customer.phone === inputPhone)
-      || (inputWechat && customer.wechat === inputWechat)
-      || (!inputPhone && !inputWechat);
-  });
-  if (existingCustomer) return existingCustomer.id;
-  const created = await customersApi.create({
-    display_name: customerNickname as string,
-    contact_name: values[isDg ? "dg_customer_contact" : "customer_contact_name"] as string,
-    phone: inputPhone,
-    wechat: inputWechat,
-    qq: values[`${customerPrefix}customer_qq`] as string,
-    source: resolvedCustomerSource as string,
-    note: (isDg ? values.dg_note : values.note) as string,
-  });
-  const sameContact = (created.duplicate_candidates ?? []).find(
-    (candidate) => candidate.display_name === customerNickname
-      || candidate.matched_on?.length,
-  );
-  if (sameContact) {
-    // 后端用明文联系方式命中了已有客户：复用它，避免同一客户被拆成两条档案。
-    appMessage.info(`已关联到同名/同联系方式的已有客户 ${sameContact.customer_no}`);
-    return sameContact.customer_id;
-  }
-  return created.customer.id;
+  return {
+    display_name: String(customerNickname),
+    role: isRecovery ? "SELLER" : "CONSIGNOR",
+    contact_name: values[isDg ? "dg_customer_contact" : "customer_contact_name"] as string | undefined,
+    phone: values[`${customerPrefix}customer_phone`] as string | undefined,
+    wechat: values[`${customerPrefix}customer_wechat`] as string | undefined,
+    qq: values[`${customerPrefix}customer_qq`] as string | undefined,
+    source: resolvedCustomerSource,
+    note: (isDg ? values.dg_note : values.note) as string | undefined,
+  };
 }
 
-/** 供货方解析/建档：仅 TH 且填写供货方昵称时生效；TH 的参与方角色恒为 PEER。 */
-export async function resolveCounterpartyId(args: {
+/** 建单供货方草稿：由订单接口在同一事务内复用已有合作方或新建档案。 */
+export function buildCounterpartyInput(args: {
   values: Values;
-  counterparties: Counterparty[];
   isTh: boolean;
-}): Promise<number | undefined> {
-  const { values, counterparties, isTh } = args;
-  if (!isTh || !values.supplier_nickname) return values.counterparty_id as number | undefined;
-  // TH 的业务角色是同行（PEER）；页面仍以"供货方"展示业务称呼。
-  // 后端按订单参与方契约校验 TH 只能使用 PEER。
-  const role = "PEER";
-  const existing = counterparties.find((item) =>
-    item.display_name === values.supplier_nickname && item.type === role,
-  );
-  const counterparty = existing ?? await counterpartiesApi.create({
-    display_name: values.supplier_nickname as string,
-    type: role,
+}) {
+  const { values, isTh } = args;
+  if (!isTh || !values.supplier_nickname) return undefined;
+  return {
+    display_name: String(values.supplier_nickname),
+    type: "PEER",
+    role: "PEER",
     contact_name: values.supplier_contact_name as string,
     phone: values.supplier_phone as string,
     wechat: values.supplier_wechat as string,
@@ -136,8 +102,7 @@ export async function resolveCounterpartyId(args: {
     note: [
       values.supplier_note as string,
     ].filter(Boolean).join("｜") || undefined,
-  });
-  return counterparty.id;
+  };
 }
 
 /** 建单时的随单成本（自定义支出项），仅 HS/TH 有。 */

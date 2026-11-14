@@ -3,14 +3,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { Form } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection } from "./ConfigurableField";
-import { counterpartiesApi, customersApi } from "../shared/api/customers.api";
-import { gameTypesApi } from "../shared/api/misc.api";
 import { ordersApi } from "../shared/api/orders.api";
-import { employeesApi } from "../shared/api/org.api";
-import { poolsApi } from "../shared/api/pools.api";
-import type { Counterparty, Customer } from "../shared/api/types/customers";
-import type { Pool } from "../shared/api/types/finance";
-import type { EmployeeOption, GameTypeOption } from "../shared/api/types/org";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
 import { BusinessActionModal, BusinessRegistrationForm, ConfirmDialog, ErrorBanner, PermissionButton } from "../shared/ui";
@@ -21,14 +14,15 @@ import { ThOrderSection } from "./th/ThOrderSection";
 import { DgOrderSection } from "./dg/DgOrderSection";
 import {
   buildAccountSnapshot,
+  buildCounterpartyInput,
+  buildCustomerInput,
   buildInitialBuy,
   buildInitialCosts,
   buildOrderNote,
-  resolveCounterpartyId,
-  resolveCustomerId,
   resolveCustomerSource,
   splitFormExtra,
-} from "./CreateBusinessModal.helpers";
+} from "./create/submit-helpers";
+import { useCreateBusinessLookups } from "./create/useCreateBusinessLookups";
 
 export type BusinessOrderType = "HS" | "TH" | "DG";
 
@@ -51,12 +45,13 @@ export function CreateBusinessModal(props: {
   const isRecovery = orderType === "HS";
   const isTh = orderType === "TH";
   const isDg = orderType === "DG";
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
-  const [pools, setPools] = useState<Pool[]>([]);
-  const [gameTypes, setGameTypes] = useState<GameTypeOption[]>([]);
-  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
-  const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
+  const {
+    pools,
+    gameTypes,
+    employees,
+    loadError,
+    setLoadError,
+  } = useCreateBusinessLookups();
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const repurchaseConfirmedFor = useRef<string | null>(null);
@@ -76,33 +71,6 @@ export function CreateBusinessModal(props: {
       repurchaseConfirmedFor.current = null;
     }
   }, [props.open, form]);
-
-  // 基础数据随页面挂载即预热并常驻内存：后续每次打开弹窗直接读 state，不再发网络请求。
-  // 仅成功初始化一次；失败不置位，下次打开可重试。
-  const didInitLookup = useRef(false);
-  useEffect(() => {
-    if (didInitLookup.current) return;
-    void (async () => {
-      try {
-        const [customerList, cpList, poolList, gameTypeList, employeeList] = await Promise.all([
-          customersApi.list(),
-          counterpartiesApi.list(),
-          poolsApi.list(),
-          gameTypesApi.list({ include_inactive: false }),
-          employeesApi.list(),
-        ]);
-        setCustomers(Array.isArray(customerList) ? customerList : []);
-        setCounterparties(Array.isArray(cpList) ? cpList : []);
-        setPools((Array.isArray(poolList) ? poolList : []).filter((pool) => pool.status === "ACTIVE"));
-        setGameTypes(Array.isArray(gameTypeList) ? gameTypeList : []);
-        setEmployees((Array.isArray(employeeList) ? employeeList : []).filter((employee) => employee.is_active));
-        setLoadError(null);
-        didInitLookup.current = true;
-      } catch (error) {
-        setLoadError(normalizeError(error));
-      }
-    })();
-  }, []);
 
   useEffect(() => {
     if (!props.open || !orderType) return;
@@ -132,15 +100,7 @@ export function CreateBusinessModal(props: {
       // 由确认弹窗决定是否按复购回流继续。前端不再拉库存台账自行比对。
       const { accountExtraValues, orderFormExtra } = splitFormExtra(values, config);
       const resolvedCustomerSource = resolveCustomerSource(values, isDg);
-      const customerId = await resolveCustomerId({ values, customers, isRecovery, isDg, resolvedCustomerSource });
-      if (customerId !== undefined) values.customer_id = customerId;
       const note = buildOrderNote(values, { isRecovery, isTh, isDg }, resolvedCustomerSource);
-      const counterpartyId = await resolveCounterpartyId({ values, counterparties, isTh });
-      const customerRole = isRecovery ? "SELLER" : isDg ? "CONSIGNOR" : String(values.customer_role ?? "BUYER");
-      const counterpartyRole = isTh ? "PEER" : String(values.counterparty_role ?? "PEER");
-      const customerRoles = values.customer_id
-        ? [{ customer_id: values.customer_id as number, role: customerRole }]
-        : [];
       const initialCosts = buildInitialCosts(values, isRecovery, isTh);
       await ordersApi.create({
         order_type: props.initialOrderType,
@@ -152,15 +112,8 @@ export function CreateBusinessModal(props: {
         // 后端判重：仅当用户已确认复购回流时，同一「已售出」账号才放行。
         confirm_repurchase: repurchaseConfirmedFor.current === gameAccount,
         note,
-        customer_roles: customerRoles,
-        counterparty_roles: counterpartyId
-          ? [
-              {
-                counterparty_id: counterpartyId,
-                role: counterpartyRole,
-              },
-            ]
-          : [],
+        customer_input: buildCustomerInput({ values, isRecovery, isDg, resolvedCustomerSource }),
+        counterparty_input: buildCounterpartyInput({ values, isTh }),
         initial_buy: buildInitialBuy(values, isRecovery, isTh),
         initial_costs: initialCosts,
         form_extra: Object.keys(orderFormExtra).length ? orderFormExtra : undefined,

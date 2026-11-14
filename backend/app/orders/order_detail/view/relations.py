@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.domain.parties import Customer, Counterparty, OrderCounterpartyRole, OrderCustomerRole
 from app.domain.trade import Order, OrderFormField, RebateRecord
 
-from app.stocks.schemas import ExecutionCounterpartyOut, ExecutionCustomerOut, ExecutionRebateOut
+from .execution_schemas import ExecutionCounterpartyOut, ExecutionCustomerOut, ExecutionRebateOut
 
 
 @dataclass(frozen=True)

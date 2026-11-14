@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validat
 from app.core.schemas import PageOut, RequestModel
 
 from ._common import INVENTORY_STATUSES, inventory_age_days as age_days, inventory_age_level as age_level
-from app.orders.order_detail.view.schemas import OrderDetailViewOut
 
 class AccountOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -144,121 +143,6 @@ class InventoryStatsOut(BaseModel):
     over_30d_count: int
 
 
-class ExecutionCashflowOut(BaseModel):
-    flow_no: str
-    pool_name: str | None = None
-    occurred_on: date
-    occurred_at: datetime
-    direction: str
-    nature: str
-    category: str
-    amount: Decimal
-    note: str | None = None
-    operator: str
-
-
-class ExecutionEventOut(BaseModel):
-    id: int
-    event_no: str
-    event_type: str
-    operation_type: str | None = None
-    rebate_type: str | None = None
-    amount: Decimal
-    # 该事件仍可被冲销的余额 = amount − 已冲销合计（夹底 0）；CANCEL 自身恒为 0。
-    # 口径与下单/冲销校验（`orders.events.post_event`）同源，前端不再自行相减。
-    cancellable_amount: Decimal = Decimal("0")
-    occurred_on: date
-    occurred_at: datetime
-    created_at: datetime
-    posted_at: datetime | None = None
-    pool_id: int | None = None
-    offset_event_id: int | None = None
-    portion: str
-    delivery_mode: str | None = None
-    delivery_direction: str | None = None
-    is_posted: bool
-    reason: str | None = None
-    note: str | None = None
-    form_extra: dict[str, object] = Field(default_factory=dict)
-    cashflow: ExecutionCashflowOut | None = None
-    operator: str
-    operator_user_ids: list[int] | None = None
-    operator_names: list[str] = Field(default_factory=list)
-
-
-class ExecutionCounterpartyOut(BaseModel):
-    id: int
-    display_name: str
-    role: str
-
-
-class ExecutionCustomerOut(BaseModel):
-    id: int
-    display_name: str
-    role: str
-
-
-class ExecutionRebateOut(BaseModel):
-    id: int
-    rebate_no: str
-    rebate_type: str
-    channel: str | None = None
-    rate: Decimal
-    base_amount: Decimal
-    status: str
-    collected_on: date
-    collected_at: datetime
-
-
-class AccountExecutionOrderOut(BaseModel):
-    order_id: int
-    order_no: str
-    order_type: str
-    trade_date: date
-    created_at: datetime
-    status: str
-    account_platform: str | None = None
-    note: str | None = None
-    extra_values: dict[str, object] = Field(default_factory=dict)
-    extra_fields: list[dict[str, object]] = Field(default_factory=list)
-    cashflows: list[ExecutionCashflowOut] = Field(default_factory=list)
-    customers: list[ExecutionCustomerOut] = Field(default_factory=list)
-    counterparties: list[ExecutionCounterpartyOut] = Field(default_factory=list)
-    rebates: list[ExecutionRebateOut] = Field(default_factory=list)
-    events: list[ExecutionEventOut]
-    operator: str
-
-
-class AccountAuditOut(BaseModel):
-    id: int
-    action: str
-    entity_type: str
-    entity_id: str
-    actor: str
-    reason: str | None = None
-    occurred_at: datetime
-
-
-class ExecutionFinanceSummaryOut(BaseModel):
-    """账号维度的财务汇总：明细在前端拼装，合计一律由后端给。
-
-    口径与本接口的 orders 完全一致（事件流水 + 订单独立流水 + 返点收入），
-    另含分期坏账支出（损失计提，不占资金明细流水行）；前端不再对详情数据做第二遍累加。
-    """
-
-    cashflow_income: Decimal
-    rebate_income: Decimal
-    total_income: Decimal
-    total_expense: Decimal
-    net_amount: Decimal
-
-
-class AccountExecutionDetailOut(BaseModel):
-    account: AccountOut
-    orders: list[AccountExecutionOrderOut]
-    finance_summary: ExecutionFinanceSummaryOut
-    detail_view: OrderDetailViewOut
-    audit: list[AccountAuditOut] = Field(default_factory=list)
 
 __all__ = [
     "AccountOut",
@@ -267,14 +151,4 @@ __all__ = [
     "AccountDeleteRequest",
     "AccountInventoryOut",
     "InventoryResponseOut",
-    "ExecutionCashflowOut",
-    "ExecutionEventOut",
-    "ExecutionCounterpartyOut",
-    "ExecutionCustomerOut",
-    "ExecutionRebateOut",
-    "AccountExecutionOrderOut",
-    "AccountAuditOut",
-    "AccountExecutionDetailOut",
-    "ExecutionFinanceSummaryOut",
-    "OrderDetailViewOut",
 ]

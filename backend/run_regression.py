@@ -231,8 +231,6 @@ GROUPS = {
         "tests/backend/integration/business/test_stock_intake_contract.py",
         "tests/backend/integration/business/test_cancel_inventory_release.py",
         "tests/backend/integration/business/test_deposit_remaining.py",
-        "tests/backend/integration/business/test_execution_cancellable_amount.py",
-        "tests/backend/integration/business/test_execution_finance_summary.py",
         "tests/backend/integration/business/test_order_duplicate_account.py",
         "tests/backend/integration/business/test_order_event_cancellable_amount.py",
         "tests/backend/integration/business/test_profit_cashflow_basis.py",

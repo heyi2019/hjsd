@@ -7,17 +7,14 @@ from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Response
-from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import (
-    PERM_AUDIT_READ,
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
     PERM_ORDER_UPDATE,
     CurrentUser,
-    owner_scope_filter,
     require_permissions,
 )
 from app.domain.enums import AuditAction
@@ -35,11 +32,8 @@ from app.stocks.profile import (
 )
 from app.stocks.deletion import delete_inventory as stocks_delete_inventory
 from app.parties.fields import get_extra_values
-from app.domain.foundation import AuditLog
-from app.domain.trade import Order
 from app.core.audit import record_audit
-from app.core.errors import NotFound, PermissionDenied
-from app.orders._shared import get_order
+from app.core.errors import PermissionDenied
 
 from .schemas import (
     AccountOut,
@@ -49,9 +43,6 @@ from .schemas import (
     InventoryResponseOut,
     InventoryStatsOut,
     InventoryStatsQuery,
-    AccountExecutionOrderOut,
-    AccountAuditOut,
-    AccountExecutionDetailOut,
 )
 
 from .router_output import (
@@ -59,11 +50,6 @@ from .router_output import (
     _account_output,
     _account_outputs,
 )
-from app.orders.order_detail.view import build_detail_view
-from app.orders.order_detail.view.assembler import build_order_outputs
-from app.orders.order_detail.view.finance import build_finance_summary
-from app.orders.order_detail.view.events import load_event_context
-from app.orders.order_detail.view.relations import load_relations
 
 router = APIRouter(tags=["ACC-01 账号台账"])
 
@@ -201,104 +187,6 @@ def inventory_stats(
     return InventoryStatsOut(**stats)
 
 
-def _order_execution_detail(
-    account_id: int,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = read_access,
-    order_id: int | None = None,
-) -> AccountExecutionDetailOut:
-    """构建单个订单关联账号的执行详情。"""
-    account = get_account(db, account_id, _user)
-    order_stmt = select(Order).where(Order.account_id == account_id)
-    if order_id is not None:
-        order_stmt = order_stmt.where(Order.id == order_id)
-    order_scope = owner_scope_filter(Order.owner_id, _user, db)
-    if order_scope is not None:
-        order_stmt = order_stmt.where(order_scope)
-    orders = list(db.scalars(order_stmt.order_by(Order.id)).all())
-    order_ids = [item.id for item in orders]
-    relations = load_relations(db, orders)
-    order_extra_values = relations.order_extra_values
-    field_defs_by_type = relations.field_defs_by_type
-    customers_by_order = relations.customers_by_order
-    counterparties_by_order = relations.counterparties_by_order
-    rebates_by_order = relations.rebates_by_order
-    event_context = load_event_context(db, order_ids)
-    events_by_order = event_context.events_by_order
-    event_ids = [event.id for events in events_by_order.values() for event in events]
-    flow_by_event = event_context.event_cashflows
-    cashflows_by_order = event_context.order_cashflows
-    action_model_rebate_ids = event_context.action_model_rebate_ids
-    deposit_loss_flow_nos = event_context.deposit_loss_flow_nos
-    audit_rows: list[AccountAuditOut] = []
-    if _user.has(PERM_AUDIT_READ):
-        audit_filters = [
-            (AuditLog.entity_type == "account") & (AuditLog.entity_id == str(account.id)),
-        ]
-        if order_ids:
-            audit_filters.append((AuditLog.entity_type == "order") & AuditLog.entity_id.in_([order.order_no for order in orders]))
-        if event_ids:
-            audit_filters.append((AuditLog.entity_type == "inventory_event_edit") & AuditLog.entity_id.in_([str(event_id) for event_id in event_ids]))
-        audit_rows = [
-            AccountAuditOut(
-                id=row.id,
-                action=row.action,
-                entity_type=row.entity_type,
-                entity_id=row.entity_id,
-                actor=row.actor,
-                reason=row.reason,
-                occurred_at=row.occurred_at,
-            )
-            for row in db.scalars(select(AuditLog).where(or_(*audit_filters)).order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())).all()
-        ]
-    finance_summary = build_finance_summary(
-        db,
-        order_ids=order_ids,
-        event_cashflows=flow_by_event,
-        order_cashflows=cashflows_by_order,
-        order_rebates=rebates_by_order,
-        action_model_rebate_ids=action_model_rebate_ids,
-        deposit_loss_flow_nos=deposit_loss_flow_nos,
-    )
-    order_outputs = build_order_outputs(
-        orders,
-        order_extra_values=order_extra_values,
-        field_defs_by_type=field_defs_by_type,
-        cashflows_by_order=cashflows_by_order,
-        customers_by_order=customers_by_order,
-        counterparties_by_order=counterparties_by_order,
-        rebates_by_order=rebates_by_order,
-        events_by_order=events_by_order,
-    )
-    return AccountExecutionDetailOut(
-        account=_account_outputs(
-            db,
-            [account],
-            _user,
-        )[0],
-        finance_summary=finance_summary,
-        orders=order_outputs,
-        detail_view=build_detail_view(order_outputs),
-        audit=audit_rows,
-    )
-
-
-@router.get("/orders/{order_id}/execution-detail", response_model=AccountExecutionDetailOut)
-def order_execution_detail(
-    order_id: int,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = read_access,
-) -> AccountExecutionDetailOut:
-    """查询单个订单的执行详情，财务/分润/操作明细均只属于该订单。"""
-    order = get_order(db, order_id, _user)
-    if order.account_id is None:
-        raise NotFound("订单未关联库存账号")
-    return _order_execution_detail(
-        account_id=order.account_id,
-        db=db,
-        _user=_user,
-        order_id=order_id,
-    )
 
 
 __all__ = ["router"]

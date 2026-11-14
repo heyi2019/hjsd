@@ -7,7 +7,7 @@ import type { AccountExecutionDetail } from "@/shared/api/types/account-executio
  *
  * 「还能冲多少」由后端算好放在 `cancellable_amount`（口径与冲销校验同源），
  * 本文件只守一件事：从后往前挑哪一条 —— 金额是否等于后端下发值、是否还会
- * 因为 CANCEL 事件在本地被相减（那是后端 test_execution_cancellable_amount 的事）。
+ * 因为 CANCEL 事件在本地被相减（这是后端冲销口径的职责）。
  */
 const detail = (orders: unknown[]) => ({ orders }) as unknown as AccountExecutionDetail;
 

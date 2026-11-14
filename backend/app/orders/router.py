@@ -52,6 +52,8 @@ from app.orders.events import post_event as orders_post_event
 from app.orders.participants import resolve_counterparty_role, resolve_customer_role
 from app.orders.order_detail.editing import edit_execution_detail
 from app.orders.order_detail.editing.schemas import ExecutionEditRequest
+from app.orders.order_detail.view.execution import load_order_execution_detail
+from app.orders.order_detail.view.execution_schemas import AccountExecutionDetailOut
 from app.orders.links import (
     create_order_link as orders_create_order_link,
     delete_order_link as orders_delete_order_link,
@@ -98,6 +100,16 @@ post_events = require_permissions(
 update_orders = require_permissions(PERM_ORDER_UPDATE)
 edit_order_detail = require_permissions(PERM_ORDER_UPDATE, PERM_FINANCE_ORDER_EVENT_POST)
 read_finance = require_permissions(PERM_FINANCE_READ)
+
+
+@router.get("/orders/{order_id}/execution-detail", response_model=AccountExecutionDetailOut)
+def order_execution_detail(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_orders,
+) -> AccountExecutionDetailOut:
+    """查询一个订单及其强绑定账号的执行详情。"""
+    return load_order_execution_detail(db, order_id, user)
 
 
 @router.patch("/orders/{order_id}/execution-edit")

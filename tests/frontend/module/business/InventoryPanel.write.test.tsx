@@ -72,78 +72,6 @@ beforeEach(() => {
     operator: "何一",
   }] as never);
   resolveMock(vi.mocked(installmentsApi.create), { id: 41 });
-  resolveMock(vi.mocked(stocksApi.executionDetail), {
-    account: accounts[0],
-    orders: [{
-      order_id: 21,
-      order_no: "HS0001",
-      order_type: "HS",
-      trade_date: "2026-10-15",
-      created_at: "2026-10-15T10:19:00",
-      status: "ACTIVE",
-      events: [{
-        id: 31,
-        event_no: "EV0001",
-        event_type: "BUY",
-        amount: "100.00",
-        occurred_on: "2026-10-15",
-        occurred_at: "2026-10-15T10:20:00",
-        portion: "PRINCIPAL",
-        is_posted: true,
-        operator: "admin",
-        cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", nature: "BUSINESS_OUT", category: "BUY", amount: "100.00" },
-      }, {
-        id: 33,
-        event_no: "EV0003",
-        event_type: "CANCEL",
-        amount: "0.00",
-        occurred_on: "2026-10-17",
-        occurred_at: "2026-10-17T11:35:00",
-        portion: "GROSS",
-        is_posted: true,
-        operator: "admin",
-      }],
-      rebates: [{
-        id: 41,
-        rebate_no: "HS0001-RB01",
-        rebate_type: "BUY",
-        channel: "买号返点",
-        rate: "5.00",
-        base_amount: "1000.00",
-        status: "OPEN",
-        collected_on: "2026-10-17",
-        collected_at: "2026-10-17T12:30:00",
-      }],
-    }, {
-      order_id: 22,
-      order_no: "DG0001",
-      order_type: "DG",
-      trade_date: "2026-10-12",
-      created_at: "2026-10-12T09:10:00",
-      status: "ACTIVE",
-      counterparties: [{ id: 11, display_name: "寄售平台A", role: "PLATFORM" }],
-      events: [],
-    }, {
-      order_id: 23,
-      order_no: "HS0002",
-      order_type: "HS",
-      trade_date: "2026-10-16",
-      created_at: "2026-10-16T16:44:00",
-      status: "ACTIVE",
-      events: [{
-        id: 34,
-        event_no: "EV0004",
-        event_type: "SELL",
-        amount: "350.00",
-        occurred_on: "2026-10-16",
-        occurred_at: "2026-10-16T16:45:00",
-        portion: "PROFIT",
-        is_posted: true,
-        operator: "admin",
-        cashflow: { flow_no: "CF0002", pool_name: "利润池", occurred_on: "2026-10-16", direction: "IN", nature: "BUSINESS_IN", category: "SELL", amount: "350.00" },
-      }],
-    }],
-  });
   vi.mocked(ordersApi.executionDetail).mockResolvedValue({
     account: accounts[0],
     orders: [{
@@ -201,17 +129,6 @@ describe("InventoryPanel：写入与长路径", () => {
 
   it("寄售登记到来源订单，不创建 DG 代挂订单", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(stocksApi.executionDetail).mockResolvedValueOnce({
-      account: accounts[0],
-      orders: [{
-        order_id: 21,
-        order_no: "HS0001",
-        order_type: "HS",
-        trade_date: "2026-10-15",
-        status: "ACTIVE",
-        events: [],
-      }],
-    } as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "运营" }));

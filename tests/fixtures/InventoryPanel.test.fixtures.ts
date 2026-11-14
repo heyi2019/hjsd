@@ -72,7 +72,7 @@ export const resetInventoryPanelMocks = () => {
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);
-  resolveMock(vi.mocked(stocksApi.executionDetail), {
+  const executionDetail = {
     account: accounts[0],
     // 财务汇总由后端下发（口径见 backend tests/v1/test_execution_finance_summary.py）：
     // 支出 100.00 = CF0001，收入 1350.00 = 回款 350.00 + 返点基数 1000.00。
@@ -155,10 +155,10 @@ export const resetInventoryPanelMocks = () => {
         cashflow: { flow_no: "CF0002", pool_name: "利润池", occurred_on: "2026-10-16", direction: "IN", nature: "BUSINESS_IN", category: "SELL", amount: "350.00" },
       }],
     }],
-  });
+  };
   // 展开详情走订单级接口；测试夹具复用同一份明细快照，但不改变生产端的请求路径。
   vi.mocked(ordersApi.executionDetail).mockImplementation(async (orderId) => {
-    const detail = await vi.mocked(stocksApi.executionDetail)(1) as any;
+    const detail = executionDetail as any;
     const order = detail?.orders?.find((item: { order_id: number }) => item.order_id === orderId);
     if (!order) return detail as never;
     const flows = [

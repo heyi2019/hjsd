@@ -38,6 +38,16 @@ beforeEach(() => {
   seedOrderFormFields();
   seedOptionSets();
   vi.mocked(stocksApi.list).mockResolvedValue(accounts);
+  vi.mocked(ordersApi.list).mockResolvedValue([{
+    id: 21,
+    order_no: "HS-2026-0001",
+    order_type: "HS",
+    capital_type: "SELF",
+    trade_date: "2026-10-01",
+    account_id: 1,
+    account_status: "WAITING",
+    status: "ACTIVE",
+  }] as never);
   vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
   resolveMock(vi.mocked(ordersApi.postEvent), {});
   resolveMock(vi.mocked(ordersApi.addCustomerRole), { id: 21 });
@@ -48,82 +58,8 @@ beforeEach(() => {
   resolveMock(vi.mocked(rebatesApi.create), { id: 31 });
   resolveMock(vi.mocked(installmentsApi.create), { id: 41 });
   resolveMock(vi.mocked(installmentsApi.pay), { id: 51 });
-  resolveMock(vi.mocked(stocksApi.executionDetail), {
-    account: accounts[0],
-    orders: [{
-      order_id: 21,
-      order_no: "HS0001",
-      order_type: "HS",
-      trade_date: "2026-10-15",
-      created_at: "2026-10-15T10:19:00",
-      status: "ACTIVE",
-      events: [{
-        id: 31,
-        event_no: "EV0001",
-        event_type: "BUY",
-        amount: "100.00",
-        occurred_on: "2026-10-15",
-        occurred_at: "2026-10-15T10:20:00",
-        portion: "PRINCIPAL",
-        is_posted: true,
-        operator: "admin",
-        cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", nature: "BUSINESS_OUT", category: "BUY", amount: "100.00" },
-      }, {
-        id: 33,
-        event_no: "EV0003",
-        event_type: "CANCEL",
-        amount: "0.00",
-        occurred_on: "2026-10-17",
-        occurred_at: "2026-10-17T11:35:00",
-        portion: "GROSS",
-        is_posted: true,
-        operator: "admin",
-      }],
-      rebates: [{
-        id: 41,
-        rebate_no: "HS0001-RB01",
-        rebate_type: "BUY",
-        channel: "买号返点",
-        rate: "5.00",
-        base_amount: "1000.00",
-        status: "OPEN",
-        collected_on: "2026-10-17",
-        collected_at: "2026-10-17T12:30:00",
-      }],
-    }, {
-      order_id: 22,
-      order_no: "DG0001",
-      order_type: "DG",
-      trade_date: "2026-10-12",
-      created_at: "2026-10-12T09:10:00",
-      status: "ACTIVE",
-      counterparties: [{ id: 11, display_name: "寄售平台A", role: "PLATFORM" }],
-      events: [],
-    }, {
-      order_id: 23,
-      order_no: "HS0002",
-      order_type: "HS",
-      trade_date: "2026-10-16",
-      created_at: "2026-10-16T16:44:00",
-      status: "ACTIVE",
-      events: [{
-        id: 34,
-        event_no: "EV0004",
-        event_type: "SELL",
-        amount: "350.00",
-        occurred_on: "2026-10-16",
-        occurred_at: "2026-10-16T16:45:00",
-        portion: "PROFIT",
-        is_posted: true,
-        operator: "admin",
-        cashflow: { flow_no: "CF0002", pool_name: "利润池", occurred_on: "2026-10-16", direction: "IN", nature: "BUSINESS_IN", category: "SELL", amount: "350.00" },
-      }],
-    }],
-  });
   resolveMock(vi.mocked(stocksApi.updateProfile), accounts[0]);
 });
-
-;
 
 it("售出时把新买家关联到来源单而非新建订单", async () => {
   const ui = userEvent.setup({ pointerEventsCheck: 0 });
@@ -174,20 +110,13 @@ it("库存售出：成功后立即从库存列表移除账号，即使列表重�
   await waitFor(() => expect(screen.queryByText("acc-1")).not.toBeInTheDocument());
 });
 
-;
-
-;
-
-;
-
 describe("InventoryPanel：写入与长路径", () => {
-;
-
 it("代挂账号售出：全款收佣金入账、售出金额仅记录、不提供分期并挂寄售方", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     resolveMockOnce(vi.mocked(stocksApi.list), [
       { id: 5, source_order_id: 21, game_account: "acc-5", platform: "A平台", status: "WAITING", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
     ]);
+    vi.mocked(ordersApi.list).mockResolvedValueOnce([{ id: 21, order_no: "DG-2026-0001", order_type: "DG", capital_type: "SELF", trade_date: "2026-10-01", account_id: 5, account_status: "WAITING", status: "ACTIVE" }] as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-5");
     fireEvent.click(screen.getByRole("button", { name: /售出/ }));
@@ -218,15 +147,12 @@ it("代挂账号售出：全款收佣金入账、售出金额仅记录、不提�
     expect(vi.mocked(installmentsApi.create)).not.toHaveBeenCalled();
   });
 
-;
-
-;
-
 it("代挂售出复用买号交付信息块，交付负责人提交落库到来源单", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     resolveMockOnce(vi.mocked(stocksApi.list), [
       { id: 5, source_order_id: 21, game_account: "acc-5", platform: "A平台", status: "WAITING", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
     ]);
+    vi.mocked(ordersApi.list).mockResolvedValueOnce([{ id: 21, order_no: "DG-2026-0001", order_type: "DG", capital_type: "SELF", trade_date: "2026-10-01", account_id: 5, account_status: "WAITING", status: "ACTIVE" }] as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-5");
     fireEvent.click(screen.getByRole("button", { name: /售出/ }));
@@ -255,6 +181,7 @@ it("提号库存售出可选择分期出售，确立时收首付", async () => {
     resolveMockOnce(vi.mocked(stocksApi.list), [
       { id: 6, source_order_id: 21, game_account: "pickup-acc", platform: "B平台", status: "WAITING", cost_amount: "0.00", inventory_type: "PICKUP" },
     ]);
+    vi.mocked(ordersApi.list).mockResolvedValueOnce([{ id: 21, order_no: "TH-2026-0001", order_type: "TH", capital_type: "SELF", trade_date: "2026-10-01", account_id: 6, account_status: "WAITING", status: "ACTIVE" }] as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("pickup-acc");
     fireEvent.click(screen.getByRole("button", { name: /售出/ }));

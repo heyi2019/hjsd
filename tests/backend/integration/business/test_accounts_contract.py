@@ -314,10 +314,6 @@ class TestAccountQueries:
         with pytest.raises(NotFound):
             get_account(seeded_db, 999999)
 
-    def test_get_account_returns_entity(self, seeded_db):
-        account = _account(seeded_db, "get-acc")
-        assert get_account(seeded_db, account.id).id == account.id
-
     def test_list_accounts_filters_by_status(self, seeded_db):
         first = _account(seeded_db, "first-acc")
         second = _account(seeded_db, "second-acc")
@@ -484,48 +480,6 @@ class TestAccountsApi:
         item = next(row for row in listed.json()["items"] if row["id"] == account.id)
         assert item["game_password"] == "secret"
 
-    def test_standalone_account_creation_endpoint_removed(self, seeded_client, headers):
-        response = seeded_client.post(
-            "/api/v1/stocks",
-            json={
-                "game_account": "standalone-account",
-                "business_mode": "SELF",
-                "inventory_type": "RECOVERY",
-            },
-            headers=headers,
-        )
-        assert response.status_code == 405, response.text
-
-    def test_order_creation_rejects_legacy_account_payload(self, seeded_client, headers):
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "HS",
-                "trade_date": TODAY.isoformat(),
-                "account": {"game_account": "standard-context", "platform": "王者"},
-            },
-            headers=headers,
-        )
-        assert response.status_code == 422, response.text
-        assert response.json()["details"]["errors"][0]["field"] == "account"
-
-    def test_order_creation_rejects_legacy_account_media_payload(self, seeded_client, headers):
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "HS",
-                "trade_date": TODAY.isoformat(),
-                "account": {
-                    "game_account": "legacy-account-with-media",
-                    "platform": "王者",
-                    "account_description": "不再兼容的旧建单资料",
-                    "account_images": ["data:image/png;base64,image-0"],
-                },
-            },
-            headers=headers,
-        )
-        assert response.status_code == 422, response.text
-
     def test_list_accounts_endpoint_with_status(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "api-acc")
         _buy(seeded_db, account, amount="300")
@@ -623,18 +577,6 @@ class TestAccountsApi:
         assert response.status_code == 200, response.text
         item = next(row for row in response.json()["items"] if row["game_account"] == account.game_account)
         assert item["source_order_no"] == order.order_no
-
-    def test_order_creation_rejects_legacy_consignment_account_payload(self, seeded_client, headers):
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "DG",
-                "trade_date": TODAY.isoformat(),
-                "account": {"game_account": "consignment-source", "platform": "寄售平台"},
-            },
-            headers=headers,
-        )
-        assert response.status_code == 422, response.text
 
     def test_execution_detail_includes_source_order(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-acc")

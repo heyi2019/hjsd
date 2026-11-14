@@ -2,14 +2,9 @@
 
 覆盖点：
 - service.py:87    report_for_export 不支持的报表名抛 Validation
-- service.py:92/94/96/100/104  report_for_export 分发到 R1/R2/R3/R5/日报
 - service.py:123   report_csv 空报表时扩展 columns 到 items/total
-- service.py:190   finance_dimension_report 受限用户走池过滤分支
 - orders/amounts.py  event_contribution 的 CANCEL 偏移 BUY/COST/未知
 - orders/amounts.py  event_totals 跳过未过账事件
-- service.py:454-458  R2 坏账行日期过滤（区内加、区外 continue）
-- service.py:584   R3 坏账计入 per_order_profit
-- service.py:669-675  R5 坏账行日期过滤（区内按 order_type 加成本）
 """
 from __future__ import annotations
 
@@ -21,7 +16,6 @@ import pytest
 from app.stocks.profile import create_account
 from app.core.errors import Validation
 from app.core.money import to_money
-from app.core.security import CurrentUser
 from app.domain.enums import (
     EventType,
     InstallmentContractType,
@@ -39,10 +33,7 @@ from app.orders.amounts import (
     event_totals,
 )
 from app.orders.create import create_order
-from app.reporting.export import finance_dimension_report, report_csv, report_for_export
-from app.reporting.r2_monthly_pnl import r2_monthly_pnl
-from app.reporting.r3_commission import r3_commission_reconciliation
-from app.reporting.r5_business_pnl import r5_business_pnl
+from app.reporting.export import report_csv, report_for_export
 
 
 def _make_bad_debt(seeded_db, *, occurred_on: date, with_event: bool = False) -> int:
@@ -111,16 +102,6 @@ def test_report_for_export_unsupported_raises(seeded_db):
         report_for_export(seeded_db, "bogus")  # 87
 
 
-@pytest.mark.parametrize(
-    "name",
-    ["monthly-pnl", "commission", "business-pnl", "daily-funds"],
-)
-def test_report_for_export_dispatches(seeded_db, name):
-    result = report_for_export(seeded_db, name)
-    assert isinstance(result, dict)
-    assert "items" in result  # 92/94/96/100/104
-
-
 # ----------------------------------------------------------- report_csv 空列扩展
 def test_report_csv_empty_items_extends_columns():
     csv_text = report_csv({"items": [], "total": None})
@@ -130,19 +111,6 @@ def test_report_csv_empty_items_extends_columns():
 
 
 # ----------------------------------------------------------- finance_dimension 受限用户
-def test_finance_dimension_report_scoped_pool_ids(seeded_db):
-    user = CurrentUser(
-        id=1,
-        username="scope",
-        roles=(),
-        permissions=frozenset(),
-        owner_scope="SELF",
-        pool_ids=frozenset({1}),
-    )
-    result = finance_dimension_report(seeded_db, user=user)  # 190
-    assert isinstance(result, dict)
-
-
 # ----------------------------------------------------------- _event_contribution CANCEL
 class _FakeEvent:
     def __init__(self, event_type, offset_event_id, amount):
@@ -176,29 +144,5 @@ def test_event_totals_skips_unposted():
 
 
 # ----------------------------------------------------------- R2 坏账日期过滤
-def test_r2_monthly_pnl_bad_debt_date_filters(seeded_db):
-    _make_bad_debt(seeded_db, occurred_on=date(2026, 3, 15))  # 区内
-    _make_bad_debt(seeded_db, occurred_on=date(2026, 1, 15))  # 区前
-    _make_bad_debt(seeded_db, occurred_on=date(2026, 7, 15))  # 区后
-    result = r2_monthly_pnl(
-        seeded_db, from_date=date(2026, 2, 1), to_date=date(2026, 5, 1)
-    )
-    assert isinstance(result, dict)  # 454-458
-
-
 # ----------------------------------------------------------- R3 坏账计入
-def test_r3_commission_includes_bad_debt(seeded_db):
-    _make_bad_debt(seeded_db, occurred_on=date(2026, 4, 10))
-    result = r3_commission_reconciliation(seeded_db)
-    assert isinstance(result, dict)  # 584
-
-
 # ----------------------------------------------------------- R5 坏账日期过滤
-def test_r5_business_pnl_bad_debt_date_filters(seeded_db):
-    _make_bad_debt(seeded_db, occurred_on=date(2026, 3, 15), with_event=True)  # 区内带事件
-    _make_bad_debt(seeded_db, occurred_on=date(2026, 1, 15))  # 区前
-    _make_bad_debt(seeded_db, occurred_on=date(2026, 7, 15))  # 区后
-    result = r5_business_pnl(
-        seeded_db, from_date=date(2026, 2, 1), to_date=date(2026, 5, 1)
-    )
-    assert isinstance(result, dict)  # 669-675

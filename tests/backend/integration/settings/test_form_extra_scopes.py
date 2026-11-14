@@ -174,6 +174,8 @@ def test_patch_order_merges_form_extra(seeded_client, seeded_db, headers):
 
 def test_profit_allocations_merge_form_extra(seeded_client, seeded_db, headers):
     order = _create_order(seeded_client, headers)
+    seeded_db.get(Order, order["id"]).status = "COMPLETED"
+    seeded_db.flush()
     response = seeded_client.put(
         f"/api/v1/orders/{order['id']}/profit-allocations",
         json={

@@ -67,7 +67,7 @@ def notify_seller_to_allocate(
 def notify_profit_recipients(session: Session, order: Order, *, actor: str) -> int:
     """段②：分润配置保存后通知利润接收人（排除公司归属），返回新建条数。
 
-    仅在订单已 COMPLETED 时发；订单未完成时先只落分润，待 SELL 闭环补发通知。
+    仅在订单已 COMPLETED 时发送；分润配置入口本身也只接受已售订单。
     """
     if order.status != OrderStatus.COMPLETED.value:
         return 0
@@ -92,27 +92,9 @@ def notify_profit_recipients(session: Session, order: Order, *, actor: str) -> i
     return created
 
 
-def notify_on_sell_completed(
-    session: Session, order: Order, event: OrderEvent, *, actor: str
-) -> int:
-    """售出闭环统一入口：已有分润行则通知接收人（段②），否则提醒售出人去配置（段①）。
-
-    避免「已经分完润还提醒去分润」；先分润后卖号顺序下由本函数在 SELL 时补发段②。
-    """
-    has_allocations = session.scalar(
-        select(OrderProfitAllocation.id)
-        .where(OrderProfitAllocation.order_id == order.id)
-        .limit(1)
-    )
-    if has_allocations is not None:
-        return notify_profit_recipients(session, order, actor=actor)
-    return notify_seller_to_allocate(session, order, event, actor=actor)
-
-
 __all__ = [
     "PROFIT_ALLOCATED",
     "PROFIT_PENDING",
-    "notify_on_sell_completed",
     "notify_profit_recipients",
     "notify_seller_to_allocate",
 ]

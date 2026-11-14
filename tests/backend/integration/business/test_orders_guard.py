@@ -430,13 +430,3 @@ def test_list_orders_filters_by_pool(seeded_db):
     ids = {row.id for row in rows}
     assert hit.id in ids
     assert miss.id not in ids
-
-
-def test_update_order_applies_extra_values_when_provided(seeded_db):
-    # 触发 update_order 的 extra_values 分支（685-691 行）；空字典仍进入分支并调用 set_extra_values
-    order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
-    seeded_db.commit()
-    updated = update_order(
-        seeded_db, order.id, actor="pytest", extra_values={}, user=None
-    )
-    assert updated.id == order.id

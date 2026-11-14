@@ -10,6 +10,7 @@ from datetime import date
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from app.core.errors import Validation
 from app.core.money import to_money
 from app.domain.enums import PolicyStatus, PolicyType
 from app.domain.parties import PolicyVersion
@@ -386,7 +387,7 @@ class TestProfitAllocation:
 
     def test_allocation_splits_one_action_across_multiple_executors(self, seeded_db):
         """一个动作多人：买号 2 人各占一半份额（30% → 15% / 15%），允许 5 行落库。"""
-        order = self._order(seeded_db)
+        order = self._sold_order(seeded_db)
         # 买号动作登记了 2 位业务负责人 → 分润按 2 行均分。
         order.form_extra = {**(order.form_extra or {}), "business_responsible_ids": [1, 7]}
         seeded_db.flush()
@@ -456,6 +457,13 @@ class TestProfitAllocation:
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
 
+    @staticmethod
+    def _sold_order(seeded_db):
+        order = TestProfitAllocation._order(seeded_db)
+        order.status = "COMPLETED"
+        seeded_db.flush()
+        return order
+
     def test_allocation_rate_cannot_exceed_one_hundred_in_database(self, seeded_db):
         order = self._order(seeded_db)
         seeded_db.add(
@@ -483,7 +491,7 @@ class TestProfitAllocation:
         seeded_db.rollback()
 
     def test_invalid_allocation_role_rejected_by_service(self, seeded_db):
-        order = self._order(seeded_db)
+        order = self._sold_order(seeded_db)
         with pytest.raises(Exception) as exc:
             policy_allocations.set_allocations(
                 seeded_db,
@@ -494,7 +502,7 @@ class TestProfitAllocation:
         assert "角色" in str(exc.value)
 
     def test_unknown_allocation_field_rejected_by_service(self, seeded_db):
-        order = self._order(seeded_db)
+        order = self._sold_order(seeded_db)
         with pytest.raises(Exception) as exc:
             policy_allocations.set_allocations(
                 seeded_db,
@@ -512,7 +520,7 @@ class TestProfitAllocation:
         assert "字段" in str(exc.value) or "校验" in str(exc.value)
 
     def test_allocation_user_must_exist(self, seeded_db):
-        order = self._order(seeded_db)
+        order = self._sold_order(seeded_db)
         with pytest.raises(Exception) as exc:
             policy_allocations.set_allocations(
                 seeded_db,
@@ -523,7 +531,7 @@ class TestProfitAllocation:
         assert "人员不存在" in str(exc.value)
 
     def test_fifty_fifty(self, seeded_db):
-        order = self._order(seeded_db)
+        order = self._sold_order(seeded_db)
         items = policy_allocations.set_allocations(
             seeded_db,
             order.id,
@@ -534,7 +542,7 @@ class TestProfitAllocation:
         assert to_money(items[0]["total_rate"]) == to_money("100")
 
     def test_typed_allocation_requires_four_income_categories(self, seeded_db):
-        order = self._order(seeded_db)
+        order = self._sold_order(seeded_db)
         items = policy_allocations.set_allocations(
             seeded_db,
             order.id,
@@ -550,7 +558,7 @@ class TestProfitAllocation:
         assert to_money(items[0]["total_rate"]) == to_money("100")
 
     def test_buy_sell_recipient_is_bound_to_action_actor(self, seeded_db):
-        order = self._order(seeded_db)
+        order = self._sold_order(seeded_db)
         seeded_db.add(
             OrderEvent(
                 event_no="EVT-TEST-BUY",
@@ -580,7 +588,7 @@ class TestProfitAllocation:
         assert by_type["SELL"]["user_id"] is None
 
     def test_action_allocations_use_order_and_sale_responsibles(self, seeded_db):
-        order = self._order(seeded_db)
+        order = self._sold_order(seeded_db)
         order.form_extra = {
             "business_responsible_ids": [3],
             "delivery_responsible_ids": [3],
@@ -624,17 +632,19 @@ class TestProfitAllocation:
         assert by_type["BUY"]["user_id"] == 3
         assert by_type["SELL"]["user_id"] == 3
 
-    def test_sale_click_binds_seller_after_allocation(self, seeded_db):
+    def test_sale_completion_binds_seller_for_allocation(self, seeded_db):
         order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 6, 1), actor="seeduser1")
         items = [{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": 25} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")]
-        policy_allocations.set_allocations(seeded_db, order.id, items=items)
+        with pytest.raises(Exception, match="订单售出完成后才能配置分润"):
+            policy_allocations.set_allocations(seeded_db, order.id, items=items)
         post_event(seeded_db, order.id, event_type="SELL", amount="100", portion="PROFIT", occurred_on=date(2026, 6, 1), actor="seeduser2")
+        policy_allocations.set_allocations(seeded_db, order.id, items=items)
         by_type = {item["allocation_type"]: item for item in policy_allocations.list_allocations(seeded_db, order.id)}
         assert by_type["SELL"]["user_id"] == 2
 
     def test_total_must_be_100(self, seeded_db):
-        order = self._order(seeded_db)
-        with pytest.raises(Exception):
+        order = self._sold_order(seeded_db)
+        with pytest.raises(Validation, match="有效分配比例合计必须为 100%"):
             policy_allocations.set_allocations(
                 seeded_db,
                 order.id,
@@ -643,8 +653,8 @@ class TestProfitAllocation:
             )
 
     def test_sum_99_rejected(self, seeded_db):
-        order = self._order(seeded_db)
-        with pytest.raises(Exception):
+        order = self._sold_order(seeded_db)
+        with pytest.raises(Validation, match="有效分配比例合计必须为 100%"):
             policy_allocations.set_allocations(
                 seeded_db,
                 order.id,
@@ -656,8 +666,8 @@ class TestProfitAllocation:
             )
 
     def test_negative_rate_rejected(self, seeded_db):
-        order = self._order(seeded_db)
-        with pytest.raises(Exception):
+        order = self._sold_order(seeded_db)
+        with pytest.raises(Validation, match="分配比例/金额必须是数值"):
             policy_allocations.set_allocations(
                 seeded_db,
                 order.id,
@@ -669,8 +679,8 @@ class TestProfitAllocation:
             )
 
     def test_duplicate_user_role_rejected(self, seeded_db):
-        order = self._order(seeded_db)
-        with pytest.raises(Exception):
+        order = self._sold_order(seeded_db)
+        with pytest.raises(Validation, match="同一人员在同一角色下不可重复分润"):
             policy_allocations.set_allocations(
                 seeded_db,
                 order.id,
@@ -682,13 +692,13 @@ class TestProfitAllocation:
             )
 
     def test_empty_items_rejected(self, seeded_db):
-        order = self._order(seeded_db)
-        with pytest.raises(Exception):
+        order = self._sold_order(seeded_db)
+        with pytest.raises(Validation, match="分润不能为空"):
             policy_allocations.set_allocations(seeded_db, order.id, items=[], actor="pytest")
 
     def test_reset_replaces_old_rows(self, seeded_db):
         """整单重设不应留下旧比例残留。"""
-        order = self._order(seeded_db)
+        order = self._sold_order(seeded_db)
         policy_allocations.set_allocations(
             seeded_db,
             order.id,
@@ -708,7 +718,7 @@ class TestProfitAllocation:
     def test_allocation_inherits_order_policy_version(self, seeded_db):
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"})
-        order = self._order(seeded_db)
+        order = self._sold_order(seeded_db)
         items = policy_allocations.set_allocations(
             seeded_db,
             order.id,

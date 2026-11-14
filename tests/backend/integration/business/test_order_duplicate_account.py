@@ -10,6 +10,7 @@ from datetime import date
 import pytest
 
 from app.core.errors import ErrorCode, Validation
+from app.domain.trade import Account
 from app.orders.cancellation_model import cancel_order
 from app.orders.create import create_order
 from app.orders.events import post_event
@@ -101,19 +102,4 @@ def test_different_game_type_is_not_a_duplicate(seeded_db):
         account_snapshot=_snapshot("dup-cross-game", game_type="和平精英"),
     )
 
-    assert other.id
-
-
-def test_referenced_account_creation_skips_duplicate_check(seeded_db):
-    """同类型订单引用已有库存账号时不重复创建库存，也不触发判重。"""
-    source = _create(seeded_db, "dup-referenced", order_type="TH")
-
-    borrowed = create_order(
-        seeded_db,
-        order_type="TH",
-        trade_date=D,
-        actor="pytest",
-        account_id=source.account_id,
-    )
-
-    assert borrowed.account_id == source.account_id
+    assert seeded_db.get(Account, other.account_id).game_type == "和平精英"

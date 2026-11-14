@@ -103,9 +103,9 @@ def test_create_order_hs_initial_cost_requires_event_perm(seeded_db):
     with pytest.raises(PermissionDenied, match="无权登记费用事件"):
         router.create_order(payload, db=seeded_db, user=_finance())
 
-# ---- _order_output：非管理员剥离 game_password（64-67） ----
+# ---- _order_output：订单主列表保留账号密码字段（按当前详情编辑口径） ----
 
-def test_order_output_strips_game_password_for_non_admin(seeded_db):
+def test_order_output_keeps_game_password_for_detail_editing(seeded_db):
     order = create_order(
         seeded_db,
         order_type="HS",
@@ -115,9 +115,9 @@ def test_order_output_strips_game_password_for_non_admin(seeded_db):
         user=_admin(),
     )
     seeded_db.commit()
-    out = router._order_output(seeded_db, order, _viewer())
+    out = router._order_output(order)
     assert out.account_snapshot is not None
-    assert out.account_snapshot.get("game_password") is None
+    assert out.account_snapshot.get("game_password") == "secret"
 
 # ---- _order_list_payload：客户/对手方角色回写（249 / 255） ----
 

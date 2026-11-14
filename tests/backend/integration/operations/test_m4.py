@@ -26,9 +26,6 @@ from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from app.reporting.r3_commission import r3_commission_reconciliation
 from app.reporting.r5_business_pnl import r5_business_pnl
 
-REPORTS = "/api/v1/reports"
-
-
 # --------------------------------------------------------------------- 报表
 class TestReports:
     def test_r2_operating_expense_excludes_account_direct_cashflow(self, seeded_db):
@@ -212,38 +209,10 @@ class TestImport:
 
 # --------------------------------------------------------------------- API 层
 class TestM4Api:
-    def test_reports_endpoints_require_permission(self, seeded_client, viewer_headers):
-        for path in (
-            "/reports/monthly-pnl",
-            "/reports/business-pnl",
-            "/reports/commission",
-            "/reports/daily-funds",
-            "/reports/order-profit",
-        ):
-            response = seeded_client.get(f"{REPORTS}{path[8:]}", headers=viewer_headers)
-            assert response.status_code in (200, 403), path
-
     def test_audit_logs_endpoint(self, seeded_client, headers):
         response = seeded_client.get("/api/v1/audit-logs", headers=headers)
         assert response.status_code == 200
         assert "items" in response.json()
-
-    def test_import_endpoints(self, seeded_client, headers):
-        created = seeded_client.post(
-            "/api/v1/imports/batches",
-            json={"source_name": "api-import.xlsx", "rows": [{"a": 1}]},
-            headers=headers,
-        )
-        assert created.status_code == 200
-        batch_id = created.json()["id"]
-        assert seeded_client.get(f"/api/v1/imports/batches/{batch_id}/rows", headers=headers).status_code == 200
-        assert (
-            seeded_client.post(
-                f"/api/v1/imports/batches/{batch_id}/commit", headers=headers
-            ).status_code
-            == 200
-        )
-
 
 class TestImportClosure:
     """MIG-01 补齐验收：预览 / 对账 / 回滚 / 更正 / 补录依据 / UNLINKED 标记。

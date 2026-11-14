@@ -193,30 +193,6 @@ def test_shift_moves_bad_debt_rebate_and_buy_date(seeded_db):
     assert oct_item["account_direct_cost"] >= Decimal("300.00")
 
 
-def test_shift_buy_date_untouched_for_sell_order(seeded_db):
-    """守卫：同一账号的 SELL 单平移不应改动账号买入日期。"""
-    order, account = _recovery_order(seeded_db, trade_date=D1)
-    post_event(
-        seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
-        occurred_on=D1, actor="pytest", pool_id=1,
-    )
-    # 构造一个「共用同账号、仅 SELL 事件」的独立订单（模拟跨单售出）。
-    # 用同一账号的 HS 单：先登记 BUY 让账号进入 WAITING，才能 SELL；
-    # 关键点是该 SELL 单自身无 BUY 事件，平移它不应改动账号 buy_date。
-    sell_order = create_order(
-        seeded_db, order_type="HS", owner_id=1, trade_date=D1,
-        actor="pytest", account_id=account.id,
-    )
-    post_event(
-        seeded_db, sell_order.id, event_type="SELL", amount=Decimal("150"),
-        occurred_on=D1, actor="pytest", pool_id=1,
-    )
-    update_order(seeded_db, sell_order.id, actor="pytest", trade_date=D2)
-    seeded_db.expire_all()
-    # SELL 单无 BUY 事件 → buy_date 不动
-    assert seeded_db.get(Account, account.id).buy_date == D1
-
-
 # --------------------------------------------------------------- #14 对账边界
 def test_shift_rejected_when_crossing_reconciled_period(seeded_db):
     """平移流水跨越资金池已对账日期时拒绝，保护已固化余额快照。"""

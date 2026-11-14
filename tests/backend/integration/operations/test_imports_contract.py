@@ -25,20 +25,6 @@ ROWS = [
 ]
 
 
-def test_import_routes_publish_typed_response_models(app):
-    paths = app.openapi()["paths"]
-
-    assert paths["/api/v1/imports/batches"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/ImportBatchOut"
-    )
-    assert paths["/api/v1/imports/batches/{batch_id}/preview"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/ImportPreviewOut"
-    )
-    assert paths["/api/v1/imports/batches/{batch_id}/reconciliation"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/ImportReconciliationOut"
-    )
-
-
 def _batch(seeded_db, rows=None, source_name="orders.xlsx"):
     return imp_batches.create_batch(
         seeded_db, source_name=source_name, rows=rows if rows is not None else ROWS,

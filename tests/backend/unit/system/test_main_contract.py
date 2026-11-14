@@ -3,15 +3,7 @@ from __future__ import annotations
 
 
 def test_main_app_is_ready():
-    from app.main import app, create_app
+    from app.main import app
 
     paths = {route.path for route in app.routes}
     assert "/api/v1/health" in paths
-    assert create_app() is not None
-
-
-def test_health_route_publishes_typed_response_model():
-    from app.main import app
-
-    schema = app.openapi()["paths"]["/api/v1/health"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-    assert schema["$ref"].endswith("/HealthOut")

@@ -447,13 +447,12 @@ def post_event(
         )
     session.flush()
 
-    # 售出闭环通知（用户 11-12 裁决）：该单已有分润行（先分润后卖号）→ 直接通知
-    # 利润接收人；否则提醒本次 SELL 执行人去配置分润。两段都靠 ensure_notification
-    # 按 recipient+type+entity 幂等去重，重复售出/重复保存不重复打扰。
+    # 售出完成后提醒本次 SELL 执行人配置分润；通知通过
+    # recipient+type+entity 幂等去重，重复售出不重复打扰。
     if event_type == EventType.SELL.value and not installment_sale:
-        from app.notifications.triggers import notify_on_sell_completed
+        from app.notifications.triggers import notify_seller_to_allocate
 
-        notify_on_sell_completed(session, order, event, actor=actor)
+        notify_seller_to_allocate(session, order, event, actor=actor)
 
     record_audit(
         session,

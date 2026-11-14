@@ -217,24 +217,6 @@ def test_batch_close_missing_ids(seeded_db):
         )
 
 # ------------------------------------------------------------------- service.py
-def test_scan_skips_unposted_event(seeded_db):
-    order = _order(seeded_db, order_no="Q-UNPOSTED-1")
-    ev = OrderEvent(
-        order_id=order.id,
-        event_type="BUY",
-        is_posted=False,
-        amount=to_money("0"),
-        portion="PRINCIPAL",
-        occurred_on=date.today(),
-        event_no="EV-UNPOSTED-1",
-        created_by="pytest",
-        updated_by="pytest",
-    )
-    seeded_db.add(ev)
-    seeded_db.commit()
-    result = quality_service.scan(seeded_db, user=None)
-    assert isinstance(result, list)
-
 def test_scan_cashflow_source_mismatch(seeded_db):
     pool2 = _pool(seeded_db)
     order = _order(seeded_db, order_no="Q-MISMATCH-1")

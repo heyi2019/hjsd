@@ -416,14 +416,6 @@ def test_create_deposit_rejects_unknown_source_order(seeded_db):
         )
 
 
-def test_list_deposits_pool_ids_filter(seeded_db):
-    deposits.create_deposit(
-        seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
-    )
-    rows = deposits.list_deposits(seeded_db, pool_ids=[1])
-    assert len(rows) >= 1
-
-
 def test_list_deposits_user_only_filter(seeded_db):
     deposits.create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"

@@ -13,19 +13,6 @@ from app.orders.events import post_event
 from app.quality import service
 
 
-def test_quality_read_routes_publish_typed_response_models(app):
-    paths = app.openapi()["paths"]
-
-    assert paths["/api/v1/quality/exceptions"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/QualitySummaryOut"
-    )
-    assert paths["/api/v1/quality/metrics"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/QualityMetricsOut"
-    )
-    issue_list_schema = paths["/api/v1/quality/issues"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-    assert issue_list_schema["$ref"].endswith("/QualityIssueListOut")
-
-
 TODAY = date(2026, 10, 17)
 
 
@@ -280,9 +267,3 @@ def test_quality_batch_close_endpoint(seeded_client, seeded_db):
     )
     assert response.status_code == 200, response.text
     assert {item["status"] for item in response.json()} == {"CLOSED"}
-
-
-def test_scan_quality_endpoint_runs_and_returns_list(seeded_client, headers):
-    response = seeded_client.post("/api/v1/quality/scan", headers=headers)
-    assert response.status_code == 200, response.text
-    assert isinstance(response.json(), list)

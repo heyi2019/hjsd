@@ -17,6 +17,7 @@ from app.core.errors import Validation
 from app.domain.enums import (
     AllocationRole,
     AuditAction,
+    OrderStatus,
 )
 from app.domain.trade import (
     Installment,
@@ -53,7 +54,7 @@ def set_allocations(
     form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> list[dict[str, Any]]:
-    """整单重设分润。
+    """整单重设已售订单的分润。
 
     两种录入口径，整单只能选其一：
 
@@ -64,45 +65,47 @@ def set_allocations(
       纯比例时合计仍须 100%；一旦出现金额，改为校验金额合计不超过订单利润，
       因为此时「剩余未分配」默认留在公司，强行凑 100% 会逼用户编数字。
     """
-    # 按动作分配时，负责人来源和分润配置必须一次提交、一次生效。
-    # 先合并订单来源字段，后续动作负责人校验才能使用本次刚编辑的人员名单。
-    if form_extra:
-        order = _scoped_order(session, order_id, user)
-        order.form_extra = {**(order.form_extra or {}), **dict(form_extra)}
-        session.flush()
+    order = _scoped_order(session, order_id, user)
+    if order.status != OrderStatus.COMPLETED.value:
+        raise Validation("订单售出完成后才能配置分润", details={"order_id": order_id})
 
-    normalized_items = [_normalize_allocation_item(item) for item in items]
-    typed = [item for item in normalized_items if item.get("allocation_type")]
-    if typed and len(typed) != len(normalized_items):
-        raise Validation("按动作分润与按人分润不能混用，请统一为其中一种")
-    if typed:
-        result = _set_action_allocations(
-            session, order_id, items=items, actor=actor, user=user
-        )
-    else:
-        result = _set_person_allocations(
-            session, order_id, items=normalized_items, actor=actor, user=user
-        )
-    # 分润配置保存完成且订单已闭环 → 通知利润接收人（幂等，重复保存不重复打扰）。
-    # 订单尚未完成时先只落分润，待 SELL 闭环由 notify_on_sell_completed 补发通知。
+    original_form_extra = order.form_extra
+    if form_extra:
+        order.form_extra = {**(order.form_extra or {}), **dict(form_extra)}
+    try:
+        normalized_items = [_normalize_allocation_item(item) for item in items]
+        typed = [item for item in normalized_items if item.get("allocation_type")]
+        if typed and len(typed) != len(normalized_items):
+            raise Validation("按动作分润与按人分润不能混用，请统一为其中一种")
+        if typed:
+            result = _set_action_allocations(
+                session, order, items=normalized_items, actor=actor
+            )
+        else:
+            result = _set_person_allocations(
+                session, order, items=normalized_items, actor=actor
+            )
+    except Exception:
+        if form_extra:
+            order.form_extra = original_form_extra
+        raise
+    # 分润配置保存完成 → 通知利润接收人（幂等，重复保存不重复打扰）。
     from app.notifications.triggers import notify_profit_recipients
 
-    notify_profit_recipients(session, _scoped_order(session, order_id, user), actor=actor)
+    notify_profit_recipients(session, order, actor=actor)
     return result
 
 
 def _set_person_allocations(
     session: Session,
-    order_id: int,
+    order: Order,
     *,
     items: list[dict[str, Any]],
     actor: str,
-    user: CurrentUser | None,
 ) -> list[dict[str, Any]]:
     """按人分润：姓名 + 比例或金额（二者都选填，同一行不可同时填）。"""
     from app.orders.amounts import order_amounts
 
-    order = _scoped_order(session, order_id, user)
     if not items:
         raise Validation("分润不能为空", details={"field": "items"})
 
@@ -155,7 +158,7 @@ def _set_person_allocations(
         )
 
     if total_amount != 0:
-        profit = order_amounts(session, order_id)["PROFIT"]
+        profit = order_amounts(session, order.id)["PROFIT"]
         # 金额方向必须与订单盈亏一致：盈利单填正数、亏损单填负数（负数=该人分担的亏损额）。
         # 方向反了等于把亏损记成收益，故直接拒绝而不是取绝对值。
         if profit > 0 and total_amount < 0:
@@ -191,7 +194,7 @@ def _set_person_allocations(
         )
 
     for old in session.scalars(
-        select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order_id)
+        select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order.id)
     ).all():
         session.delete(old)
     session.flush()
@@ -199,7 +202,7 @@ def _set_person_allocations(
     created = []
     for item in items:
         row = OrderProfitAllocation(
-            order_id=order_id,
+            order_id=order.id,
             user_id=int(item["user_id"]) if item.get("user_id") is not None else None,
             role=str(item.get("role") or "OWNER").upper(),
             allocation_type=None,
@@ -214,7 +217,7 @@ def _set_person_allocations(
         session,
         action=AuditAction.PROFIT_ALLOCATION_SET,
         entity_type="order",
-        entity_id=order_id,
+        entity_id=order.id,
         actor=actor,
         after={
             "allocations": [
@@ -229,23 +232,21 @@ def _set_person_allocations(
             ]
         },
     )
-    return list_allocations(session, order_id, user=user)
+    return _list_allocations(session, order)
 
 
 def _set_action_allocations(
     session: Session,
-    order_id: int,
+    order: Order,
     *,
     items: list[dict[str, Any]],
     actor: str = "system",
-    user: CurrentUser | None = None,
 ) -> list[dict[str, Any]]:
     """整单重设利润分配。**有效比例合计必须为 100%**（BAS-06-03）。"""
-    order = _scoped_order(session, order_id, user)
     if not items:
         raise Validation("利润分配不能为空", details={"field": "items"})
 
-    normalized_items = [_normalize_allocation_item(item) for item in items]
+    normalized_items = items
     total = Decimal("0")
     user_ids: set[int] = set()
     allocation_types: set[str] = set()
@@ -263,77 +264,80 @@ def _set_action_allocations(
     present_types = {str(item["allocation_type"]).upper() for item in normalized_items}
     if present_types != {"BUY", "SELL", "OPERATION", "COMPANY"}:
         raise Validation("利润分配必须包含买号、售出、运营和公司归属四项")
-    has_typed_items = True
     # 动作执行人候选：建单/卖出表单中的业务负责人是业务事实来源；
     # 没有表单负责人时，再回退到事件 operator_user_ids / created_by。
     action_actor_ids: dict[str, list[int]] = {}
     action_person_keys: set[tuple[str, int | None]] = set()
-    if has_typed_items:
-        for action_type in ("BUY", "SELL"):
-            configured_key = {
-                "BUY": "business_responsible_ids",
-                "SELL": "delivery_responsible_ids",
-            }[action_type]
-            configured = [
-                int(uid)
-                for uid in ((order.form_extra or {}).get(configured_key) or [])
-                if isinstance(uid, int) and not isinstance(uid, bool) and uid > 0
-            ]
-            if configured:
-                active_ids = set(
-                    session.scalars(
-                        select(User.id).where(User.id.in_(configured), User.is_active.is_(True))
-                    ).all()
-                )
-                if active_ids != set(configured):
-                    raise Validation(
-                        f"{action_type} 动作负责人不存在或已停用，无法绑定收益人",
-                        details={"field": configured_key, "user_ids": configured},
-                    )
-                action_actor_ids[action_type] = list(dict.fromkeys(configured))
-                continue
-            action = session.scalar(
-                select(OrderEvent)
-                .where(
-                    OrderEvent.order_id == order.id,
-                    OrderEvent.event_type == action_type,
-                    OrderEvent.is_posted.is_(True),
-                )
-                .order_by(OrderEvent.id.desc())
+    for action_type in ("BUY", "SELL"):
+        configured_key = {
+            "BUY": "business_responsible_ids",
+            "SELL": "delivery_responsible_ids",
+        }[action_type]
+        configured = [
+            int(uid)
+            for uid in ((order.form_extra or {}).get(configured_key) or [])
+            if isinstance(uid, int) and not isinstance(uid, bool) and uid > 0
+        ]
+        if configured:
+            active_ids = set(
+                session.scalars(
+                    select(User.id).where(User.id.in_(configured), User.is_active.is_(True))
+                ).all()
             )
-            if action is not None:
-                candidates = [
-                    int(uid) for uid in (action.operator_user_ids or []) if uid is not None
-                ]
-                if candidates:
-                    existing = set(
-                        session.scalars(select(User.id).where(User.id.in_(candidates))).all()
+            if active_ids != set(configured):
+                raise Validation(
+                    f"{action_type} 动作负责人不存在或已停用，无法绑定收益人",
+                    details={"field": configured_key, "user_ids": configured},
+                )
+            action_actor_ids[action_type] = list(dict.fromkeys(configured))
+            continue
+        action = session.scalar(
+            select(OrderEvent)
+            .where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.event_type == action_type,
+                OrderEvent.is_posted.is_(True),
+            )
+            .order_by(OrderEvent.id.desc())
+        )
+        if action is not None:
+            candidates = [
+                int(uid) for uid in (action.operator_user_ids or []) if uid is not None
+            ]
+            if candidates:
+                existing = set(
+                    session.scalars(select(User.id).where(User.id.in_(candidates))).all()
+                )
+                candidates = [uid for uid in candidates if uid in existing]
+            if not candidates:
+                actor_id = session.scalar(
+                    select(User.id).where(User.username == action.created_by)
+                )
+                if actor_id is None:
+                    raise Validation(
+                        f"{action_type} 动作执行人不存在，无法绑定收益人",
+                        details={"event_id": action.id, "actor": action.created_by},
                     )
-                    candidates = [uid for uid in candidates if uid in existing]
-                if not candidates:
-                    actor_id = session.scalar(
-                        select(User.id).where(User.username == action.created_by)
-                    )
-                    if actor_id is None:
-                        raise Validation(
-                            f"{action_type} 动作执行人不存在，无法绑定收益人",
-                            details={"event_id": action.id, "actor": action.created_by},
-                        )
-                    candidates = [int(actor_id)]
-                action_actor_ids[action_type] = candidates
-            elif action_type == "SELL":
-                contract = session.scalar(select(Installment).where(Installment.order_id == order.id, Installment.contract_type == "STOCK_SALE"))
-                if contract is not None:
-                    actor_id = session.scalar(select(User.id).where(User.username == contract.created_by))
-                    if actor_id is None:
-                        raise Validation("售出动作执行人不存在，无法绑定收益人")
-                    action_actor_ids[action_type] = [int(actor_id)]
-            elif action_type == "BUY" and order.order_type in {"HS", "TH", "DG"}:
-                # 回收、提号、代挂都属于买号业务动作；DG 沿用标准 SELL
-                # 资金事件，因此其买号收益人取建单操作人员。
-                creator_id = session.scalar(select(User.id).where(User.username == order.created_by))
-                if creator_id is not None:
-                    action_actor_ids[action_type] = [int(creator_id)]
+                candidates = [int(actor_id)]
+            action_actor_ids[action_type] = candidates
+        elif action_type == "SELL":
+            contract = session.scalar(
+                select(Installment).where(
+                    Installment.order_id == order.id,
+                    Installment.contract_type == "STOCK_SALE",
+                )
+            )
+            if contract is not None:
+                actor_id = session.scalar(select(User.id).where(User.username == contract.created_by))
+                if actor_id is None:
+                    raise Validation("售出动作执行人不存在，无法绑定收益人")
+                action_actor_ids[action_type] = [int(actor_id)]
+        elif action_type == "BUY" and order.order_type in {"HS", "TH", "DG"}:
+            # 回收、提号、代挂都属于买号业务动作；DG 沿用标准 SELL
+            # 资金事件，因此其买号收益人取建单操作人员。
+            creator_id = session.scalar(select(User.id).where(User.username == order.created_by))
+            if creator_id is not None:
+                action_actor_ids[action_type] = [int(creator_id)]
     for item in normalized_items:
         rate = to_money(item.get("allocation_rate"))
         role = str(item.get("role") or "").upper()
@@ -406,7 +410,7 @@ def _set_action_allocations(
 
     # 整单重设：先清后写，避免残留旧比例
     for old in session.scalars(
-        select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order_id)
+        select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order.id)
     ).all():
         session.delete(old)
     session.flush()
@@ -415,7 +419,7 @@ def _set_action_allocations(
     for item in normalized_items:
         allocation_type = str(item["allocation_type"]).upper() if item.get("allocation_type") else None
         row = OrderProfitAllocation(
-            order_id=order_id,
+            order_id=order.id,
             # 收益人已在上面归一化：单一执行人自动填、多人由人工指定。
             user_id=int(item["user_id"]) if item.get("user_id") is not None else None,
             role=str(item["role"]).upper(),
@@ -431,7 +435,7 @@ def _set_action_allocations(
         session,
         action=AuditAction.PROFIT_ALLOCATION_SET,
         entity_type="order",
-        entity_id=order_id,
+        entity_id=order.id,
         actor=actor,
         after={
             "allocations": [
@@ -440,16 +444,20 @@ def _set_action_allocations(
             ]
         },
     )
-    return list_allocations(session, order_id, user=user)
+    return _list_allocations(session, order)
 
 
 def list_allocations(
     session: Session, order_id: int, user: CurrentUser | None = None
 ) -> list[dict[str, Any]]:
-    _scoped_order(session, order_id, user)
+    order = _scoped_order(session, order_id, user)
+    return _list_allocations(session, order)
+
+
+def _list_allocations(session: Session, order: Order) -> list[dict[str, Any]]:
     rows = session.scalars(
         select(OrderProfitAllocation)
-        .where(OrderProfitAllocation.order_id == order_id)
+        .where(OrderProfitAllocation.order_id == order.id)
         .order_by(OrderProfitAllocation.id)
     ).all()
     total = Decimal("0")

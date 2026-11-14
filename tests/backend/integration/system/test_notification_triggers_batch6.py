@@ -126,7 +126,7 @@ def test_sell_pending_notification_is_idempotent(seeded_db):
             OrderEvent.event_type == "SELL",
         )
     )
-    triggers.notify_on_sell_completed(seeded_db, order, sell_event, actor="pytest")
+    triggers.notify_seller_to_allocate(seeded_db, order, sell_event, actor="pytest")
     assert len(_notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)) == 1
 
 
@@ -193,40 +193,6 @@ def test_company_allocation_is_not_notified(seeded_db):
     )
     assert len(allocated) == 1
     assert allocated[0].recipient_user_id == recipient_id
-
-
-# ---------------------------------------------------------------- 顺序与延迟
-def test_set_allocations_before_completion_defers_notification(seeded_db):
-    """订单未完成时先分润不发结果通知；待 SELL 闭环由段①入口补发。"""
-    seller_id = _uid(seeded_db, "seeduser1")
-    recipient_id = _uid(seeded_db, "seeduser2")
-    order = _order(seeded_db, "o1")
-    _buy(seeded_db, order)
-    _set_person_allocations(
-        seeded_db,
-        order,
-        [{"user_id": recipient_id, "role": "OWNER", "allocation_rate": "100"}],
-    )
-    assert not _notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)
-
-    _sell(seeded_db, order, operator_ids=[seller_id])
-    assert len(_notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)) == 1
-    # 已有分润行 → 不再提醒售出人「去分润」
-    assert not _notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)
-
-
-def test_order_not_completed_never_notifies(seeded_db):
-    """仅 BUY 未 SELL：任何通知都不应产生（未闭环）。"""
-    recipient_id = _uid(seeded_db, "seeduser2")
-    order = _order(seeded_db, "o2")
-    _buy(seeded_db, order)
-    _set_person_allocations(
-        seeded_db,
-        order,
-        [{"user_id": recipient_id, "role": "OWNER", "allocation_rate": "100"}],
-    )
-    assert not _notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)
-    assert not list(seeded_db.scalars(select(Notification)).all())
 
 
 # ---------------------------------------------------------------- API 端到端

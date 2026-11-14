@@ -1,8 +1,8 @@
-"""INSTALLMENT-02 installments/service.py 业务层守卫与「回收账号出售登记」全分支覆盖。
+"""INSTALLMENT-02 installments/service.py 业务层守卫与分期处置覆盖。
 
 既有 test_installments_contract.py 偏路由/契约层：create_installment 的
 合约类型与计划校验、waive/extend/settle_early 的守卫、recover_account 的
-处置守卫、以及 record_sale 整段（L1128-1190）从未被直接调用。本文件补齐。
+处置守卫。本文件只保留当前订单一一绑定模型仍支持的分期路径。
 
 末尾一组用例专门覆盖「外键 / 精度保证不可达」的 6 行防御分支：
 - L315 / L676 / L739 / L1061 / L1068：依赖外键（orders.account_id → accounts.id
@@ -44,7 +44,6 @@ from app.core.errors import Conflict, NotFound, Validation
 from app.domain.enums import (
     EventType,
     InstallmentContractType,
-    InstallmentDispositionAction,
     InstallmentStatus,
     ScheduleStatus,
 )
@@ -535,170 +534,6 @@ def _recovered(seeded_db, game_account: str):
     seeded_db.refresh(contract)
     return order, contract
 
-def _sale_order(seeded_db, account_id: int, *, with_sell=True):
-    sale = _order(seeded_db, order_type="HS")
-    sale.account_id = account_id
-    seeded_db.flush()
-    if with_sell:
-        _posted_event(seeded_db, sale.id, event_type=EventType.SELL.value, amount="900")
-    return sale
-
-def test_record_sale_requires_note(seeded_db):
-    order, contract = _recovered(seeded_db, "resale-need-note")
-    sale = _sale_order(seeded_db, order.account_id)
-    with pytest.raises(Validation, match="出售必须填写说明"):
-        inst_recovery.record_sale(
-            seeded_db,
-            contract.id,
-            sale_order_id=sale.id,
-            occurred_on=TODAY,
-            actor="pytest",
-            note="   ",
-        )  # 1128
-
-def test_record_sale_rejects_contract_not_closable(seeded_db):
-    order = _order(seeded_db, order_type="TH")
-    contract = _contract(seeded_db, order.id)
-    sale = _order(seeded_db, order_type="HS")
-    with pytest.raises(Validation, match="只有已关闭、逾期或违约合约可以登记出售"):
-        inst_recovery.record_sale(
-            seeded_db,
-            contract.id,
-            sale_order_id=sale.id,
-            occurred_on=TODAY,
-            actor="pytest",
-            note="出售",
-        )  # 1130-1135
-
-def test_record_sale_rejects_order_without_account(seeded_db):
-    order = _order(seeded_db, order_type="TH")
-    contract = _contract(seeded_db, order.id)
-    contract.status = InstallmentStatus.CLOSED.value
-    seeded_db.flush()
-    sale = _order(seeded_db, order_type="HS")
-    with pytest.raises(Validation, match="分期合约没有可出售的账号"):
-        inst_recovery.record_sale(
-            seeded_db,
-            contract.id,
-            sale_order_id=sale.id,
-            occurred_on=TODAY,
-            actor="pytest",
-            note="出售",
-        )  # 1136-1139
-
-def test_record_sale_rejects_unknown_sale_order(seeded_db):
-    order, contract = _recovered(seeded_db, "resale-unknown-order")
-    with pytest.raises(Validation, match="出售必须关联新的售出订单"):
-        inst_recovery.record_sale(
-            seeded_db,
-            contract.id,
-            sale_order_id=999999,
-            occurred_on=TODAY,
-            actor="pytest",
-            note="出售",
-        )  # 1137-1141
-
-def test_record_sale_rejects_same_order(seeded_db):
-    order, contract = _recovered(seeded_db, "resale-same-order")
-    with pytest.raises(Validation, match="出售必须关联新的售出订单"):
-        inst_recovery.record_sale(
-            seeded_db,
-            contract.id,
-            sale_order_id=order.id,
-            occurred_on=TODAY,
-            actor="pytest",
-            note="出售",
-        )  # 1140-1141
-
-def test_record_sale_rejects_different_account(seeded_db):
-    order, contract = _recovered(seeded_db, "resale-diff-account")
-    other = _account(seeded_db, "resale-other-account")
-    sale = _sale_order(seeded_db, other.id)
-    with pytest.raises(Validation, match="出售订单必须关联同一个账号"):
-        inst_recovery.record_sale(
-            seeded_db,
-            contract.id,
-            sale_order_id=sale.id,
-            occurred_on=TODAY,
-            actor="pytest",
-            note="出售",
-        )  # 1142-1143
-
-def test_record_sale_requires_prior_recovery(seeded_db):
-    """有库存账号但从未登记回收 → 不能出售。"""
-    account = _account(
-        seeded_db,
-        "resale-no-recover",
-        business_mode="DISTRIBUTION",
-        inventory_type="PICKUP",
-    )
-    order = _order(seeded_db, order_type="TH")
-    order.account_id = account.id
-    seeded_db.flush()
-    contract = _contract(seeded_db, order.id)
-    contract.status = InstallmentStatus.CLOSED.value
-    seeded_db.flush()
-    sale = _sale_order(seeded_db, order.account_id)
-    with pytest.raises(Validation, match="出售前必须先登记回收"):
-        inst_recovery.record_sale(
-            seeded_db,
-            contract.id,
-            sale_order_id=sale.id,
-            occurred_on=TODAY,
-            actor="pytest",
-            note="出售",
-        )  # 1144-1151
-
-def test_record_sale_requires_posted_sell(seeded_db):
-    order, contract = _recovered(seeded_db, "resale-no-sell")
-    sale = _sale_order(seeded_db, order.account_id, with_sell=False)
-    with pytest.raises(Validation, match="出售订单必须先登记 SELL 事件"):
-        inst_recovery.record_sale(
-            seeded_db,
-            contract.id,
-            sale_order_id=sale.id,
-            occurred_on=TODAY,
-            actor="pytest",
-            note="出售",
-        )  # 1152-1160
-
-def test_record_sale_rejects_duplicate(seeded_db):
-    order, contract = _recovered(seeded_db, "resale-duplicate")
-    sale = _sale_order(seeded_db, order.account_id)
-    inst_recovery.record_sale(
-        seeded_db,
-        contract.id,
-        sale_order_id=sale.id,
-        occurred_on=TODAY,
-        actor="pytest",
-        note="出售",
-    )
-    with pytest.raises(Conflict, match="该分期合约已登记出售"):
-        inst_recovery.record_sale(
-            seeded_db,
-            contract.id,
-            sale_order_id=sale.id,
-            occurred_on=TODAY,
-            actor="pytest",
-            note="再卖一次",
-        )  # 1161-1168
-
-def test_record_sale_success(seeded_db):
-    order, contract = _recovered(seeded_db, "resale-success")
-    sale = _sale_order(seeded_db, order.account_id)
-    disposition = inst_recovery.record_sale(
-        seeded_db,
-        contract.id,
-        sale_order_id=sale.id,
-        occurred_on=TODAY,
-        actor="pytest",
-        note="  出售给新客户  ",
-    )
-    assert disposition.action == InstallmentDispositionAction.RESELL.value  # 1169-1190
-    assert disposition.account_id == order.account_id
-    assert disposition.related_order_id == sale.id
-    assert disposition.note == "出售给新客户"  # _required_text 去空白
-
 # ------------------------------------------------- 外键 / 精度保证的不可达防御
 def _raw_sql(seeded_db, sql: str, params=()):
     """在主会话的连接上执行 DML，绕过外键约束造脏数据。
@@ -904,7 +739,6 @@ def test_recover_rejects_dangling_order(seeded_db):
         inst_recovery.recover_account(
             seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="脏数据"
         )
-
 def test_recover_rejects_dangling_account(seeded_db):
     """orders.account_id 悬空 → 回收账号报「关联账号不存在」（L1068）。"""
     account = _account(
@@ -922,7 +756,3 @@ def test_recover_rejects_dangling_account(seeded_db):
         inst_recovery.recover_account(
             seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="脏数据"
         )
-
-def test_record_sale_is_the_only_installment_resale_entrypoint():
-    # record_sale 归属 recovery 模块；确认不存在旧别名 record_resale。
-    assert not hasattr(inst_recovery, "record_resale")

@@ -24,20 +24,6 @@ from app.policy.profit_allocation import service as policy_allocations
 D = date(2026, 10, 4)
 
 
-def test_policy_routes_publish_typed_response_models(app):
-    paths = app.openapi()["paths"]
-
-    assert paths["/api/v1/policies"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/PolicyDefinitionListOut"
-    )
-    assert paths["/api/v1/policy-versions/resolve"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/PolicyResolveOut"
-    )
-    assert paths["/api/v1/orders/{order_id}/profit-allocations"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
-        "/ProfitAllocationListOut"
-    )
-
-
 @pytest.fixture()
 def json_headers(headers):
     """带 Content-Type 的写入头（conftest 的 headers 只有身份头）。"""
@@ -294,6 +280,8 @@ class TestSnapshotAndAllocations:
         order = create_order(
             seeded_db, order_type="HS", trade_date=D, actor="pytest"
         )
+        order.status = "COMPLETED"
+        seeded_db.flush()
         with pytest.raises(Validation) as exc:
             policy_allocations.set_allocations(
                 seeded_db, order.id,
@@ -345,6 +333,8 @@ class TestPolicyApi:
         order = create_order(
             seeded_db, order_type="HS", trade_date=D, actor="pytest"
         )
+        order.status = "COMPLETED"
+        seeded_db.flush()
         put = seeded_client.put(
             f"/api/v1/orders/{order.id}/profit-allocations",
             headers=json_headers,

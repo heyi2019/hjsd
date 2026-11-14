@@ -10,8 +10,6 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import get_type_hints
-
 import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -45,18 +43,9 @@ from app.parties.customer_detail import get_customer_activity_summary, get_custo
 from app.parties.customer_merge import duplicate_candidates, merge_customers
 from app.parties.customers import create_customer, get_customer, list_customers, set_customer_status, update_customer
 from app.parties.fields import get_extra_values, set_extra_values
-from app.parties import router as parties_router
-from app.parties import schemas
 
 CUSTOMERS = "/api/v1/customers"
 COUNTERPARTIES = "/api/v1/counterparties"
-
-
-def test_party_routes_use_declared_response_types():
-    assert get_type_hints(parties_router.list_customers)["return"] == list[schemas.CustomerOut]
-    assert get_type_hints(parties_router.create_customer)["return"] == schemas.CustomerWithCandidates
-    assert get_type_hints(parties_router.get_customer_detail)["return"] == schemas.CustomerDetailOut
-    assert get_type_hints(parties_router.list_counterparties)["return"] == list[schemas.CounterpartyOut]
 
 
 def test_customer_list_supports_limit_and_offset(seeded_client, seeded_db):

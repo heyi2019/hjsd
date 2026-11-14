@@ -70,6 +70,13 @@ def _order(session):
     )
 
 
+def _sold_order(session):
+    order = _order(session)
+    order.status = "COMPLETED"
+    session.flush()
+    return order
+
+
 def _add_buy_event(session, order, *, created_by="seeduser1"):
     session.add(
         OrderEvent(
@@ -205,13 +212,6 @@ class TestPartiesLeadGuards:
         seeded_db.commit()
         rows = list_leads(seeded_db, keyword="守门专用")
         assert any("守门专用" in r.target for r in rows)
-
-    def test_list_leads_scope(self, seeded_db):
-        # 801: 非管理员用户触发范围过滤
-        user = _non_admin_user(seeded_db)
-        scoped = _scoped_user(user)
-        rows = list_leads(seeded_db, user=scoped)
-        assert isinstance(rows, list)
 
     def test_update_lead_not_open(self, seeded_db):
         # 816: 非 OPEN 需求不可编辑 -> Conflict
@@ -366,7 +366,7 @@ class TestPolicyResolveVersionGuards:
 class TestPolicyAllocationGuards:
     def test_buy_actor_not_found(self, seeded_db):
         # 543: BUY 动作执行人不是用户 -> 无法绑定收益人
-        order = _order(seeded_db)
+        order = _sold_order(seeded_db)
         _add_buy_event(seeded_db, order, created_by="ghostuser")
         seeded_db.commit()
         items = [
@@ -382,7 +382,7 @@ class TestPolicyAllocationGuards:
         # 553: 售出动作执行人不是用户 -> 无法绑定收益人
         from app.domain.trade import Installment
 
-        order = _order(seeded_db)
+        order = _sold_order(seeded_db)
         seeded_db.add(
             Installment(
                 inst_no="INST-GUARD1", order_id=order.id, contract_type="STOCK_SALE",
@@ -406,7 +406,7 @@ class TestPolicyAllocationGuards:
 
     def test_invalid_allocation_type(self, seeded_db):
         # 581: 分配项类型非法
-        order = _order(seeded_db)
+        order = _sold_order(seeded_db)
         items = [
             {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
             {"allocation_type": "SELL", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
@@ -420,7 +420,7 @@ class TestPolicyAllocationGuards:
         # 583 → 2026-11-05 新口径：一个动作多人时按人数各录一行、份额均分，
         # 「项类型」允许重复；判重改为 (allocation_type, user_id)，同一动作同一人员不可重复。
         # 构造四类齐全 + BUY 两行，但两行的 user_id 都为空 → 应命中按人判重。
-        order = _order(seeded_db)
+        order = _sold_order(seeded_db)
         items = [
             {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "20"},
             {"allocation_type": "BUY", "user_id": None, "role": "SALES", "allocation_rate": "20"},
@@ -433,7 +433,7 @@ class TestPolicyAllocationGuards:
 
     def test_company_with_user_rejected(self, seeded_db):
         # 586: 公司收益不绑定人员
-        order = _order(seeded_db)
+        order = _sold_order(seeded_db)
         items = [
             {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
             {"allocation_type": "SELL", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
@@ -445,7 +445,7 @@ class TestPolicyAllocationGuards:
 
     def test_operation_without_user_rejected(self, seeded_db):
         # 588: 人员收益必须绑定人员
-        order = _order(seeded_db)
+        order = _sold_order(seeded_db)
         items = [
             {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
             {"allocation_type": "SELL", "user_id": None, "role": "OWNER", "allocation_rate": "25"},
@@ -457,7 +457,7 @@ class TestPolicyAllocationGuards:
 
     def test_buy_recipient_mismatch(self, seeded_db):
         # 594: 买号收益人必须绑定对应动作执行人
-        order = _order(seeded_db)
+        order = _sold_order(seeded_db)
         _add_buy_event(seeded_db, order, created_by="seeduser1")  # 执行人 = 用户 1
         seeded_db.commit()
         items = [
@@ -471,7 +471,7 @@ class TestPolicyAllocationGuards:
 
     def test_total_must_be_100(self, seeded_db):
         # 624: 有效分配比例合计必须为 100%
-        order = _order(seeded_db)
+        order = _sold_order(seeded_db)
         items = [
             {"allocation_type": "BUY", "user_id": None, "role": "OWNER", "allocation_rate": "30"},
             {"allocation_type": "SELL", "user_id": None, "role": "OWNER", "allocation_rate": "30"},

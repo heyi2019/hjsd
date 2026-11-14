@@ -3,7 +3,7 @@
 与 test_orders.py / test_bughunt.py / test_m2.py 的分工：既有文件已覆盖四类业务建单、
 BUY/SELL/DELIVER/CANCEL/OPERATE(无 offset) 登记、状态机、路由缺失等主路径；
 本文件补NotFound/越权/过滤/非法入参分支、`_opposite_direction` 三分支、
-`_apply_account_effect` 防御与 CANCEL 分支、以及 3 个未测路由端点。
+`_opposite_direction` 防御与 CANCEL 分支、以及 3 个未测路由端点。
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ from app.orders import schemas
 from app.orders._shared import get_order
 from app.orders.cancellation_model import cancel_order
 from app.orders.create import create_order
-from app.orders.events import _apply_account_effect, _opposite_direction, post_event
+from app.orders.events import _opposite_direction, post_event
 from app.orders.links import create_order_link, delete_order_link, list_order_links
 from app.orders.mutations import update_order
 from app.orders.pools import pool_balance
@@ -566,18 +566,6 @@ class TestCreateOrderValidation:
         assert seeded_db.scalar(
             select(Order.id).where(Order.note == "atomic-participant-validation")
         ) is None
-
-    def test_order_api_rejects_inline_account_creation(self, seeded_client, headers):
-        response = seeded_client.post(
-            "/api/v1/orders",
-            headers=headers,
-            json={
-                "order_type": "HS",
-                "trade_date": "2026-10-04",
-                "account": {"game_account": "inline-account-must-be-rejected"},
-            },
-        )
-        assert response.status_code == 422, response.text
 
     def test_hs_buy_requires_inventory_account(self, seeded_db):
         order = create_order(
@@ -1634,22 +1622,6 @@ class TestAccountEffect:
                 actor="pytest",
             )
 
-    def test_account_none_branch_is_defensive(self, seeded_db):
-        # FK 全局强制使 ORM 路径不可达（账号删除是 SET NULL）；直调私有函数覆盖防御分支
-        ghost = Order(
-            order_no="HS-GHOST",
-            order_type="HS",
-            capital_type=CapitalType.STOCK.value,
-            trade_date=D,
-            status=OrderStatus.ACTIVE.value,
-            account_id=999999,
-            created_by="pytest",
-            updated_by="pytest",
-        )
-        assert _apply_account_effect(
-            seeded_db, ghost, "BUY", Decimal("100")
-        ) is None
-
 # ------------------------------------------------------------------ 池余额
 class TestPoolBalance:
     def test_pool_balance_service_enforces_pool_visibility(self, seeded_db):
@@ -1670,20 +1642,6 @@ class TestPoolBalance:
 
 # ------------------------------------------------------------------ 路由层
 class TestOrdersApi:
-
-    def test_order_request_rejects_removed_or_unknown_fields(
-        self, seeded_client, headers
-    ):
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "HS",
-                "trade_date": D.isoformat(),
-                "risk_level": "HIGH",
-            },
-            headers=headers,
-        )
-        assert response.status_code == 422, response.text
 
     def test_order_role_payload_requires_the_matching_participant_id(
         self, seeded_client, headers
@@ -1791,31 +1749,6 @@ class TestOrdersApi:
 
         assert response.status_code == 201, response.text
         assert response.json()["owner_id"] == DEV_USERS["admin"].id
-
-    def test_order_creation_rejects_embedded_inventory_account(
-        self, seeded_client, headers
-    ):
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "HS",
-                "trade_date": D.isoformat(),
-                "account": {
-                    "game_account": "embedded-account",
-                    "game_type": "王者荣耀",
-                    "game_password": "secret",
-                    "channel_region": "安卓一区",
-                    "bound_phone": "13800000000",
-                    "has_secondary": True,
-                    "account_description": "订单内建档",
-                    "account_images": ["data:image/png;base64,one"],
-                    "note": "随订单创建",
-                },
-            },
-            headers=headers,
-        )
-
-        assert response.status_code == 422, response.text
 
     def test_dg_creation_rejects_legacy_settlement_terms(
         self, seeded_client, seeded_db, headers

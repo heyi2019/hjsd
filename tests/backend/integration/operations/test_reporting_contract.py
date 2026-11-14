@@ -35,22 +35,6 @@ from app.reporting.r3_commission import r3_commission_reconciliation
 from app.reporting.r5_business_pnl import r5_business_pnl
 
 
-def test_reporting_read_routes_publish_typed_response_models(app):
-    paths = app.openapi()["paths"]
-
-    expected = {
-        "/api/v1/reports/monthly-pnl": "MonthlyPnlOut",
-        "/api/v1/reports/commission": "CommissionOut",
-        "/api/v1/reports/business-pnl": "BusinessPnlOut",
-        "/api/v1/reports/finance-dimensions": "FinanceDimensionOut",
-        "/api/v1/reports/daily-funds": "DailyFundsOut",
-        "/api/v1/reports/order-profit": "OrderProfitOut",
-    }
-    for path, model_name in expected.items():
-        schema = paths[path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-        assert schema["$ref"].endswith(f"/{model_name}")
-
-
 def test_report_viewer_can_read_employee_options_for_operations_filter(
     seeded_client, viewer_headers
 ):

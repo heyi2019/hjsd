@@ -129,7 +129,7 @@ class TestStockNoAtOrderCreation:
 
         order = service_create_order(seeded_db)
         assert order.account_id is None
-        with pytest.raises(Validation, match="回收订单买入必须填写游戏账号"):
+        with pytest.raises(Validation, match="回收订单建单时必须填写游戏账号并绑定库存账号"):
             order_events.post_event(
                 seeded_db, order.id, event_type="BUY",
                 amount=Decimal("300"), occurred_on=order.trade_date, actor="pytest",

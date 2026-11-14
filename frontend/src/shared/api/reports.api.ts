@@ -1,11 +1,9 @@
 import { api } from "./client";
-import type { FinanceDimensionReport } from "./types/finance";
 import type { ImportBatch, ImportRow, MappingPreview, ReconciliationReport } from "./types/imports";
 import type { AuditEntityStat, AuditLogRow } from "./types/ops";
 import type { BusinessPnlReport, CommissionReport, DailyFundsReport, MonthlyPnlReport, OrderProfitReport } from "./types/reporting";
 
 export const reportsApi = {
-  financeDimensions: (params?: {from?: string; to?: string}) => api.get<FinanceDimensionReport>("/reports/finance-dimensions", {params}).then(r => r.data),
   exportCsv: (name: string, params?: {from?: string; to?: string; mine?: boolean; all_people?: boolean; user_id?: number}) => api.get<Blob>(`/reports/${name}/export.csv`, {params, responseType: "blob"}).then(r => r.data),
   monthlyPnl: (params?: { from?: string; to?: string }) =>
     api.get<MonthlyPnlReport>("/reports/monthly-pnl", { params }).then((r) => r.data),

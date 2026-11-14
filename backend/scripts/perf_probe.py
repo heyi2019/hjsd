@@ -59,7 +59,6 @@ _ID_SOURCES = {
     "account_id": "select id from stocks order by id desc limit 1",
     "installment_id": "select id from installments order by id desc limit 1",
     "rebate_id": "select id from rebate_records order by id desc limit 1",
-    "issue_id": "select id from quality_issues order by id desc limit 1",
     "pool_id": "select id from pools order by id limit 1",
     "lead_id": "select id from customer_leads order by id desc limit 1",
     "batch_id": "select id from import_batches order by id desc limit 1",

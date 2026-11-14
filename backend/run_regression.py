@@ -292,17 +292,11 @@ GROUPS = {
         "tests/backend/integration/settings/test_policy_rule_consumption.py",
     ],
     "governance": [
-        "tests/backend/integration/system/test_quality_contract.py",
-        "tests/backend/integration/system/test_quality_issue_contract.py",
-        "tests/backend/unit/system/test_quality_issues_service.py",
-        "tests/backend/integration/system/test_quality_metrics_contract.py",
         "tests/backend/unit/system/test_notifications_contract.py",
-        "tests/backend/integration/system/test_search_contract.py",
         "tests/backend/integration/system/test_attachments_contract.py",
         "tests/backend/integration/system/test_audit_contract.py",
         "tests/backend/integration/system/test_attachments_service.py",
         "tests/backend/integration/system/test_notifications_service.py",
-        "tests/backend/integration/system/test_quality_guard.py",
         # 2026-11-12 通知接入批次六（分润两段式）
         "tests/backend/integration/system/test_notification_triggers_batch6.py",
     ],
@@ -386,7 +380,7 @@ def _groups_for_source_path(path: str) -> set[str]:
         selected.add("reporting")
     if "policy" in path:
         selected.add("policy")
-    if any(t in path for t in ("quality", "notifications", "search", "attachments", "audit")):
+    if any(t in path for t in ("notifications", "attachments", "audit")):
         selected.add("governance")
     if any(t in path for t in ("import", "migration", "history")):
         selected.add("imports")

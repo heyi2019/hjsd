@@ -56,7 +56,6 @@ def _initial_markers_for_file(filename: str) -> set[str]:
             "test_orders_router_guard.py",
             "test_orders_guard.py",
             "test_parties_policy_guard.py",
-            "test_quality_guard.py",
             "test_report_export_columns.py",
             "test_list_columns.py",
             "test_list_custom_columns.py",
@@ -81,7 +80,6 @@ def _initial_markers_for_file(filename: str) -> set[str]:
             "migration",
             "notifications_",
             "attachments_",
-            "quality_",
             "search_",
             "settings",
         )
@@ -242,7 +240,7 @@ from app.api_v1 import create_app  # noqa: E402
 from app.core.database import Base, get_db  # noqa: E402
 from app.core.security import CurrentUser, DEV_USERS, build_access_token  # noqa: E402
 from app.core.settings import get_settings  # noqa: E402
-from app.domain import attachments, foundation, imports, notifications, options, parties, quality, trade, users  # noqa: E402,F401  注册全部 v1 表
+from app.domain import attachments, foundation, imports, notifications, options, parties, trade, users  # noqa: E402,F401  注册全部 v1 表
 from app.foundation.seeds import seed_foundation  # noqa: E402
 
 

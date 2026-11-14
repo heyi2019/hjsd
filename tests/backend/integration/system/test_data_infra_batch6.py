@@ -2,8 +2,6 @@
 
 #26 导出限流：主列表导出统一受 EXPORT_ROW_LIMIT 约束，查询层不再 limit=None 全量拉库；
 #27 编号器幂等：ensure_sequence 并发冲突不 500，且幂等返回既有行、不覆盖既有配置；
-#30 质量工单状态机：仅 OPEN → IN_PROGRESS 单向，禁止 IN_PROGRESS → OPEN 枚举内回退。
-
 注：#29 客户判重按 owner 隔离属既定隐私设计（IT-C01-046 测试锁定，
 管理员 owner_scope=ALL 时本就全库判重），不在本批修改。
 """
@@ -13,12 +11,9 @@ import pytest
 from sqlalchemy import func, select
 
 from app.core import numbering
-from app.core.errors import Validation
-from app.domain.enums import QualityIssueStatus
 from app.domain.foundation import AuditLog, DocumentSequence
 from app.lists import export as export_module
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
-from app.quality import issues
 
 
 # ---------------------------------------------------------------- #26 导出限流
@@ -131,83 +126,6 @@ def test_allocate_number_after_ensure_sequence(seeded_db):
     numbering.ensure_sequence(seeded_db, "B6_SEQ_ALLOC", "BA", padding=4)
     assert numbering.allocate_number(seeded_db, "B6_SEQ_ALLOC") == "BA0001"
     assert numbering.allocate_number(seeded_db, "B6_SEQ_ALLOC") == "BA0002"
-
-
-# ---------------------------------------------------------------- #30 质量工单状态机
-def _open_issue(db, *, entity_id: str = "B6-E1"):
-    return issues.create_issue(
-        db,
-        code="B6-STATE",
-        severity="HIGH",
-        title="批次六状态机回归",
-        entity_type="order",
-        entity_id=entity_id,
-        message="m",
-        actor="pytest",
-    )
-
-
-def test_quality_issue_open_to_in_progress_allowed(seeded_db):
-    issue = _open_issue(seeded_db)
-    updated = issues.update_issue(
-        seeded_db,
-        issue.id,
-        status=QualityIssueStatus.IN_PROGRESS.value,
-        actor="pytest",
-    )
-    assert updated.status == QualityIssueStatus.IN_PROGRESS.value
-
-
-def test_quality_issue_in_progress_to_open_rejected(seeded_db):
-    issue = _open_issue(seeded_db, entity_id="B6-E2")
-    issues.update_issue(
-        seeded_db,
-        issue.id,
-        status=QualityIssueStatus.IN_PROGRESS.value,
-        actor="pytest",
-    )
-    with pytest.raises(Validation, match="不允许执行 OPEN"):
-        issues.update_issue(
-            seeded_db,
-            issue.id,
-            status=QualityIssueStatus.OPEN.value,
-            actor="pytest",
-        )
-
-
-def test_quality_issue_repeat_in_progress_rejected(seeded_db):
-    issue = _open_issue(seeded_db, entity_id="B6-E3")
-    issues.update_issue(
-        seeded_db,
-        issue.id,
-        status=QualityIssueStatus.IN_PROGRESS.value,
-        actor="pytest",
-    )
-    with pytest.raises(Validation, match="不允许执行 IN_PROGRESS"):
-        issues.update_issue(
-            seeded_db,
-            issue.id,
-            status=QualityIssueStatus.IN_PROGRESS.value,
-            actor="pytest",
-        )
-
-
-def test_quality_patch_rejects_backward_status_via_api(
-    seeded_client, headers, seeded_db
-):
-    issue = _open_issue(seeded_db, entity_id="B6-E4")
-    first = seeded_client.patch(
-        f"/api/v1/quality/issues/{issue.id}",
-        json={"status": "IN_PROGRESS"},
-        headers=headers,
-    )
-    assert first.status_code == 200, first.text
-    back = seeded_client.patch(
-        f"/api/v1/quality/issues/{issue.id}",
-        json={"status": "OPEN"},
-        headers=headers,
-    )
-    assert back.status_code == 422, back.text
 
 
 # ---------------------------------------------------------------- #26 延伸：分期导出参数透传

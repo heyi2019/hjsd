@@ -45,14 +45,11 @@ PANEL_SOURCES: dict[str, str] = {
     "TRANSFER_ANOMALIES": "pools/FundsPage.tabs.tsx",
     "POOL_BALANCE": "reporting/DataCenterPanel.tsx",
     "AUDIT_LOG": "audit/AuditPanel.tsx",
-    "QUALITY_METRIC": "quality/QualityPanel.tsx",
-    "QUALITY_ISSUE": "quality/QualityPanel.tsx",
     # 报表视图已从 ReportsPage.tsx 拆到 ./reports/*.tsx（壳文件只剩 Tab 与批量导出），
     # 列定义在各子文件里，映射必须落到子文件，否则这条守卫对 7 张报表形同不存在。
     "RPT_MONTHLY_PNL": "reporting/reports/MonthlyPnlReport.tsx",
     "RPT_COMMISSION": "reporting/reports/CommissionReport.tsx",
     "RPT_DAILY_FUNDS": "reporting/reports/DailyFundsReport.tsx",
-    "RPT_FINANCE_DIM": "reporting/reports/FinanceDimensionsReport.tsx",
     "RPT_BUSINESS_PNL": "reporting/reports/BusinessPnlReport.tsx",
     "RPT_ORDER_PROFIT": "reporting/reports/OrderProfitReport.tsx",
 }

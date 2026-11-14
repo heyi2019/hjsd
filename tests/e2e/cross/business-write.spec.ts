@@ -150,33 +150,6 @@ test("资金闭环：独立流水审核冲销、资金池划转与日对账", as
   expect((await resolved.json()).status).toBe("RESOLVED");
 });
 
-test("质量中心：异常工单创建、列表与关闭", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
-  const headers = { "X-Dev-User": "admin" };
-  const created = await request.post(`${apiBase}/quality/issues`, {
-    headers,
-    data: {
-      code: "E2E_QUALITY",
-      severity: "HIGH",
-      title: "E2E 质量异常",
-      entity_type: "order",
-      entity_id: "E2E-ORDER",
-      message: "E2E 质量中心验收",
-    },
-  });
-  expect(created.status()).toBe(201);
-  const issue = await created.json();
-  const listed = await request.get(`${apiBase}/quality/issues?status=OPEN`, { headers });
-  expect(listed.ok()).toBe(true);
-  expect((await listed.json()).items.some((item: { id: number }) => item.id === issue.id)).toBe(true);
-  const closed = await request.post(`${apiBase}/quality/issues/${issue.id}/close`, {
-    headers,
-    data: { resolution: "E2E 已处理", evidence: "E2E 验收记录" },
-  });
-  expect(closed.status()).toBe(200);
-  expect((await closed.json()).status).toBe("CLOSED");
-});
-
 test("客户需求池：新建、查询与转单", async ({ request }) => {
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
   const headers = { "X-Dev-User": "admin" };
@@ -211,14 +184,6 @@ test("系统通知：查询当前用户的未读通知", async ({ request }) => 
   const body = await listed.json();
   expect(Array.isArray(body.items)).toBe(true);
   expect(typeof body.unread_total).toBe("number");
-});
-
-test("全局搜索：按权限返回客户摘要", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
-  const response = await request.get(`${apiBase}/search`, { headers: { "X-Dev-User": "admin" }, params: { q: "E2E 需求客户" } });
-  expect(response.status()).toBe(200);
-  const body = await response.json();
-  expect(body.items.some((item: { type: string; title: string }) => item.type === "CUSTOMER" && item.title === "E2E 需求客户")).toBe(true);
 });
 
 test("治理能力：报表导出与订单附件闭环", async ({ request }) => {

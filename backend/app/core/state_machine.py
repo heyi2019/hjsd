@@ -39,15 +39,6 @@ ACCOUNT_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
     "VOID": {},
 }
 
-# 质量工单状态机（QLT-02）：仅 OPEN → IN_PROGRESS 单向。
-# IN_PROGRESS 为处理中状态，禁止回退到 OPEN；关闭统一走 close 接口，不在此机内。
-QUALITY_ISSUE_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
-    "OPEN": {"IN_PROGRESS": "IN_PROGRESS"},
-    "IN_PROGRESS": {},
-    "CLOSED": {},
-}
-
-
 INSTALLMENT_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
     "PENDING": {
         "INSTALLMENT_PAYMENT": "ACTIVE",
@@ -93,6 +84,5 @@ __all__ = [
     "ACCOUNT_TRANSITIONS",
     "INSTALLMENT_TRANSITIONS",
     "ORDER_TRANSITIONS",
-    "QUALITY_ISSUE_TRANSITIONS",
     "transition",
 ]

@@ -41,14 +41,9 @@ const CENTERS: Array<{ nav: string; tabs?: string[]; dynamic?: boolean }> = [
       "提成对账 R3",
       "资金日报 R4",
       "业务损益 R5",
-      "资金属性分析",
       "订单利润",
       "数据中心",
-      "质量中心",
-      "系统提醒",
-      "全局搜索",
       "审计记录",
-      "附件中心",
     ],
   },
   {
@@ -70,8 +65,8 @@ function tabByName(page: Page, label: string) {
 /**
  * 点击某个 Tab 并确认选中，自动处理 antd 的**溢出收纳**与高负载下的点击丢失。
  *
- * 坑 1（溢出收纳）：经营中心 12 个 Tab 在 1280 视口下总宽超限，antd 把尾部 Tab
- * （如「质量中心」，实测 x=1286 已超出视口）收进「更多 ⌄」下拉——nav 里残留的
+ * 坑 1（溢出收纳）：经营中心 7 个 Tab 在 1280 视口下总宽超限时，antd 把尾部 Tab
+ * 收进「更多 ⌄」下拉——nav 里残留的
  * 元素点击不生效（aria-selected 恒 false）。判定用几何位置：tab 右缘越过视口
  * 右侧预留区（-80px 给 more 按钮留位）即走「更多 → 下拉项」路径。
  *
@@ -150,7 +145,7 @@ async function readSettingsTabs(page: Page): Promise<string[]> {
 
 for (const center of CENTERS) {
   test(`全叶子走查：${center.nav}（${center.dynamic ? "动态读取" : `${center.tabs!.length} 个`} Tab）`, async ({ page }) => {
-    // 本用例逐 Tab 依次切换并各做两次断言，耗时随 Tab 数线性增长（经营中心 12 个）。
+    // 本用例逐 Tab 依次切换并各做两次断言，耗时随 Tab 数线性增长。
     // 正常负载下约 8s，但全量串行跑 + 机器有其它负载（同机并行 vite/build 进程）时会
     // 明显变慢，曾出现顶到预算超时、单独跑却秒过 的 flaky。这里按 Tab 数给足预算
     // （15s/Tab，约实测上限 2x 余量；下限 60s），不放松任何断言——超时只用来区分

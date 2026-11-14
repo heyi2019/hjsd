@@ -1,4 +1,4 @@
-"""SYS-01-03 统一附件中心接口。"""
+"""SYS-01-03 订单详情附件接口。"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
@@ -9,7 +9,7 @@ from app.attachments import schemas, service
 from app.core.database import get_db
 from app.core.security import CurrentUser, get_current_user
 
-router = APIRouter(tags=["SYS-01-03 附件中心"])
+router = APIRouter(tags=["SYS-01-03 订单详情附件"])
 
 
 @router.get("/attachments", response_model=schemas.AttachmentListOut)

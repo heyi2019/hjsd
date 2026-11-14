@@ -20,7 +20,6 @@ from app.core.security import (
     ROLE_ADMIN,
 )
 from app.domain.attachments import Attachment
-from app.domain.quality import QualityIssue
 from app.domain.trade import Cashflow, Installment, OrderEvent
 from app.orders.create import create_order
 
@@ -157,22 +156,6 @@ def test_load_target_installment_success(seeded_db):
     assert target.order is not None
 
 
-def test_load_target_quality_issue_not_found(seeded_db):
-    with pytest.raises(NotFound, match="附件关联的质量异常不存在"):
-        svc._load_target(seeded_db, "quality_issue", "NOPE-ISSUE")
-
-
-def test_load_target_quality_issue_success(seeded_db):
-    issue = QualityIssue(
-        issue_no="QI-TEST-1", code="TEST", severity="LOW", title="t",
-        entity_type="order", entity_id="1", message="m",
-    )
-    seeded_db.add(issue)
-    seeded_db.flush()
-    target = svc._load_target(seeded_db, "quality_issue", issue.issue_no)
-    assert target.entity_type == "quality_issue"
-
-
 # ---- _assert_permission 非 admin 各分支 ----
 
 def test_assert_permission_cashflow_requires_finance_read(seeded_db):
@@ -197,16 +180,6 @@ def test_assert_permission_read_requires_create_or_event_post(seeded_db):
 
 
 # ---- _assert_visible 各分支 ----
-
-def test_assert_visible_quality_issue_always_ok(seeded_db):
-    """quality_issue 类型的附件不做归属校验，任何用户都必须可见。
-
-    对照组是订单/资金池分支——同样的 user 与归属会抛 NotFound；这里不抛才说明
-    `entity_type == "quality_issue"` 的提前返回真的生效，而不是恰好命中了 null 分支。
-    """
-    target = svc._Target("quality_issue", "x", order=_order(seeded_db, owner_id=2), pool_id=1)
-    assert svc._assert_visible(seeded_db, _user(uid=9, pool_ids=()), target) is None
-
 
 def test_assert_visible_order_owner_match_and_mismatch(seeded_db):
     order = _order(seeded_db, owner_id=2)

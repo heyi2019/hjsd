@@ -2,11 +2,10 @@ import { counterpartiesApi, customersApi, leadsApi } from "@/shared/api/customer
 import { depositsApi, installmentsApi } from "@/shared/api/installments.api";
 import { attachmentsApi, gameTypesApi, notificationsApi, sequencesApi } from "@/shared/api/misc.api";
 import { optionSetsApi } from "@/shared/api/options.api";
-import { listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, searchApi } from "@/shared/api/orders.api";
+import { listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi, teamsApi, usersApi } from "@/shared/api/org.api";
 import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi, reconciliationsApi, transfersApi } from "@/shared/api/pools.api";
-import { qualityApi } from "@/shared/api/quality.api";
 import { rebatesApi } from "@/shared/api/rebates.api";
 import { auditApi, importsApi, reportsApi } from "@/shared/api/reports.api";
 import { stocksApi } from "@/shared/api/stocks.api";
@@ -24,7 +23,6 @@ vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
 vi.mock("@/shared/api/policy.api");
 vi.mock("@/shared/api/pools.api");
-vi.mock("@/shared/api/quality.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");
@@ -34,7 +32,7 @@ import { MemoryRouter } from "react-router-dom";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
-const __allApi = { cashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, searchApi, employeesApi, teamsApi, usersApi, policyApi, poolsApi, reconciliationsApi, transfersApi, qualityApi, rebatesApi, auditApi, importsApi, reportsApi, stocksApi };
+const __allApi = { cashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, employeesApi, teamsApi, usersApi, policyApi, poolsApi, reconciliationsApi, transfersApi, rebatesApi, auditApi, importsApi, reportsApi, stocksApi };
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });

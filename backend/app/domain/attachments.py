@@ -1,4 +1,4 @@
-"""附件中心模型（SYS-01-03 / FIN-02-06）。"""
+"""业务附件模型（订单详情图片等）。"""
 from __future__ import annotations
 
 from datetime import datetime

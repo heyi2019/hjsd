@@ -29,7 +29,6 @@ def test_seeded_order_event_dictionary_excludes_retired_cost(seeded_client, seed
 def test_read_requires_login(client):
     """2026-10-27 鉴权缺口回归守卫：读端点此前误用裸函数默认值，匿名可读（200）。"""
     assert client.get(OPTION_SETS).status_code == 401
-    assert client.get(f"{OPTION_SETS}/QUALITY_SEVERITY").status_code == 401
 
 
 def test_create_and_list_editable_set(client, headers):

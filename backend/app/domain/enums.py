@@ -70,7 +70,6 @@ class SequenceKey(StrEnum):
     CUSTOMER = "CUSTOMER"
     COUNTERPARTY = "COUNTERPARTY"
     LEAD = "LEAD"
-    QUALITY_ISSUE = "QUALITY_ISSUE"
     NOTIFICATION = "NOTIFICATION"
     # 资金流水按方向独立递增（用户口径 2026-10-28）：支出 ZC+五位流水、收入 SR+五位流水。
     CASHFLOW_OUT = "CASHFLOW_OUT"
@@ -110,12 +109,6 @@ class LeadType(StrEnum):
 class LeadStatus(StrEnum):
     OPEN = "OPEN"
     CONVERTED = "CONVERTED"
-    CLOSED = "CLOSED"
-
-
-class QualityIssueStatus(StrEnum):
-    OPEN = "OPEN"
-    IN_PROGRESS = "IN_PROGRESS"
     CLOSED = "CLOSED"
 
 
@@ -519,9 +512,6 @@ class AuditAction(StrEnum):
     REBATE_RETURN = "REBATE_RETURN"
     RECONCILIATION_CREATE = "RECONCILIATION_CREATE"
     RECONCILIATION_RESOLVE = "RECONCILIATION_RESOLVE"
-    QUALITY_ISSUE_CREATE = "QUALITY_ISSUE_CREATE"
-    QUALITY_ISSUE_UPDATE = "QUALITY_ISSUE_UPDATE"
-    QUALITY_ISSUE_CLOSE = "QUALITY_ISSUE_CLOSE"
     CASHFLOW_CREATE = "CASHFLOW_CREATE"
     CASHFLOW_REVERSE = "CASHFLOW_REVERSE"
     TRANSFER_CREATE = "TRANSFER_CREATE"
@@ -598,7 +588,6 @@ __all__ = [
     "PoolStatus",
     "PoolType",
     "Portion",
-    "QualityIssueStatus",
     "RebateStatus",
     "RebateType",
     "ReconciliationStatus",

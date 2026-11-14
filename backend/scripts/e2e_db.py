@@ -60,7 +60,6 @@ from app.domain import (  # noqa: E402
     notifications,
     options,
     parties,
-    quality,
     trade,
     users,
 )
@@ -69,7 +68,7 @@ from app.foundation.catalog_seed import seed_catalog  # noqa: E402
 
 __all__ = [
     "attachments", "foundation", "imports", "lists", "notifications",
-    "options", "parties", "quality", "trade", "users",
+    "options", "parties", "trade", "users",
 ]
 
 # E2E 库名必须含此标记；dev/release/prod/test 业务库一律拒绝，避免误清真实数据。

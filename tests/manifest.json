@@ -23,35 +23,35 @@
       ],
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
-        "files": 121,
-        "cases": 1742,
+        "files": 115,
+        "cases": 1689,
         "kinds": {
           "unit": {
-            "files": 31,
-            "cases": 300,
+            "files": 30,
+            "cases": 290,
             "byArea": {
               "business": 5,
               "customer": 1,
               "finance": 3,
               "operations": 2,
               "settings": 2,
-              "system": 18
+              "system": 17
             }
           },
           "integration": {
-            "files": 90,
-            "cases": 1442,
+            "files": 85,
+            "cases": 1399,
             "byArea": {
               "business": 32,
               "customer": 6,
               "finance": 15,
               "operations": 7,
               "settings": 13,
-              "system": 17
+              "system": 12
             }
           }
         },
-        "_baseline_note": "低价值断言与已下线手机号验证码/微信登录测试清理后，后端全量收集基线为 1742 例；清单按当前磁盘实际文件与用例数维护。"
+        "_baseline_note": "五个独立能力下线后，后端专项测试与清单同步收敛；清单按当前磁盘实际文件与用例数维护。"
       },
       "budgets": {
         "fast": 60,
@@ -64,23 +64,23 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 95,
+        "files": 90,
         "layers": {
           "fast": 14,
           "quick": 8,
-          "react": 58,
-          "deep": 15
+          "react": 55,
+          "deep": 13
         },
         "cases": {
-          "fast": 98,
+          "fast": 103,
           "quick": 88,
-          "react": 708,
-          "deep": 119
+          "react": 654,
+          "deep": 97
         },
         "byArea": {
           "unit": {
             "workbench": 1,
-            "business": 8,
+            "business": 9,
             "settings": 2,
             "shared": 9,
             "system": 4
@@ -90,13 +90,13 @@
             "business": 19,
             "customer": 3,
             "finance": 5,
-            "operations": 7,
+            "operations": 5,
             "settings": 15,
             "shared": 7,
-            "system": 9
+            "system": 5
           }
         },
-        "_baseline_note": "93 是搬迁前基线；94 = 93 + 新增 manifest-parity.test.ts（6 条用例）。2026-11-04 前端测试整体迁入 tests/frontend/{unit,module}/<区域>/。当前磁盘实际为 95 个测试文件、react 58 个、module.business 19 个；新增文件按守卫实测对齐，cases 的历史基线另行刷新。",
+        "_baseline_note": "面板下线同步删除对应前端专项测试后，当前磁盘实际为 90 个测试文件、react 55 个、deep 13 个；tests/frontend/{unit,module}/<区域>/ 为唯一前端测试根。",
         "root_layout": "tests/frontend/<unit|module>/<区域>/",
         "baseline": {
           "_doc": "2026-11-04 搬迁后实测（同机同代码）。cpu = user+sys，跨会话可比；wall 受并发会话干扰。",
@@ -111,13 +111,13 @@
             "wall": 27.2
           },
           "react": {
-            "files": 56,
+            "files": 55,
             "cases": 756,
             "wall": 119.7,
             "cpu": 462.0
           },
           "deep": {
-            "files": 16,
+            "files": 13,
             "cases": 124,
             "wall": 45.8
           },
@@ -151,7 +151,7 @@
       "config": "frontend/playwright.config.ts",
       "expected": {
         "files": 15,
-        "cases": 62,
+        "cases": 60,
         "byArea": {
           "system": 7,
           "business": 1,

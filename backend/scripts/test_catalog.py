@@ -69,7 +69,7 @@ RUN_REG = os.path.join(BACKEND, "run_regression.py")
 MODULES = ["A", "B", "C", "D", "E", "F", "SYS"]
 
 # ---------------------------------------------------------------------------
-# 后端测试文件 -> 功能编号（按真实代码盘点；122 个文件逐一映射）
+# 后端测试文件 -> 功能编号（按真实代码盘点；当前文件逐一映射）
 # ---------------------------------------------------------------------------
 BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_account_delete.py": "B04",
@@ -162,11 +162,6 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_product_alias_compat.py": "F04",
     "test_profit_allocation_modes.py": "B10",
     "test_public_release_security.py": "SYS01",
-    "test_quality_contract.py": "SYS08",
-    "test_quality_guard.py": "SYS08",
-    "test_quality_issue_contract.py": "SYS08",
-    "test_quality_issues_service.py": "SYS08",
-    "test_quality_metrics_contract.py": "SYS08",
     "test_ratelimit.py": "SYS01",
     "test_rebate_current_contract.py": "D04",
     "test_rebate_rules_contract.py": "D04",
@@ -175,7 +170,6 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_reporting_r_consistency.py": "E01",
     "test_reporting_service_gaps.py": "E01",
     "test_request_schema_contract.py": "SYS07",
-    "test_search_contract.py": "SYS08",
     "test_settings.py": "SYS06",
     "test_state_machine.py": "SYS04",
     "test_stock_intake_contract.py": "B04",
@@ -227,7 +221,7 @@ E2E_FILE_TO_FUNC: dict[str, str] = {
 
 # E2E 的跨模块文件：一个 spec 覆盖多个业务模块时登记，仅影响「关联模块」列。
 E2E_CROSS_MODULE: dict[str, set[str]] = {
-    # 五类业务写入 + 资金闭环 + 质量中心 + 需求池 + 通知/搜索 + 报表导出 + 审计 + 数据范围
+    # 五类业务写入 + 资金闭环 + 需求池 + 通知 + 报表导出 + 审计 + 数据范围
     "business-write.spec.ts": {"B", "C", "D", "E", "SYS"},
     "finance-write-ui.spec.ts": {"B", "D"},   # 分期收款同时动订单与资金
     "upgrade-integration.spec.ts": {"B", "D"},
@@ -257,7 +251,7 @@ CROSS_FLOW_LABEL = {
 }
 
 
-# 前端测试文件 -> 功能编号（94 个文件逐一登记，与后端 BACKEND_FILE_TO_FUNC 同构）。
+# 前端测试文件 -> 功能编号（当前文件逐一登记，与后端 BACKEND_FILE_TO_FUNC 同构）。
 # 只登记**文件名**：搬目录、拆区域都不影响编号，这正是历史 1091 条前端用例零漂移的前提。
 FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "DashboardPage.deep.test.tsx":         "A01",
@@ -341,12 +335,6 @@ FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "client.test.ts":                      "SYS07",
     "ui.atoms.test.tsx":                   "SYS07",
     "ui.containers.test.tsx":              "SYS07",
-    "AttachmentPanel.deep.test.tsx":       "SYS08",
-    "AttachmentPanel.test.tsx":            "SYS08",
-    "NotificationsPanel.test.tsx":         "SYS08",
-    "QualityPanel.deep.test.tsx":          "SYS08",
-    "QualityPanel.test.tsx":               "SYS08",
-    "SearchPanel.test.tsx":                "SYS08",
     "fixtures.test.ts":                    "SYS10",
     "vite.config.test.ts":                 "SYS10",
     "P0P1Round20261101.test.tsx":          "SYS11",

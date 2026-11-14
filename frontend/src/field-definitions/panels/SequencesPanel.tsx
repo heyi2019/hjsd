@@ -19,7 +19,6 @@ const SEQUENCE_KEY_LABEL: Record<string, string> = {
   CUSTOMER: "客户",
   COUNTERPARTY: "合作方",
   LEAD: "需求",
-  QUALITY_ISSUE: "质量工单",
   NOTIFICATION: "通知",
   CASHFLOW_OUT: "支出流水",
   CASHFLOW_IN: "收入流水",
@@ -47,7 +46,7 @@ const SEQUENCE_GROUPS: Array<{ label: string; keys: string[]; desc?: string }> =
   { label: "业务订单", keys: ["ORDER_HS", "ORDER_TH", "ORDER_DG"] },
   { label: "增值服务", keys: ["INSTALLMENT"] },
   { label: "档案编号", keys: ["CUSTOMER", "COUNTERPARTY"] },
-  { label: "运营工单", keys: ["LEAD", "QUALITY_ISSUE", "NOTIFICATION"] },
+  { label: "运营工单", keys: ["LEAD", "NOTIFICATION"] },
   { label: "资金与系统", keys: ["CASHFLOW_OUT", "CASHFLOW_IN", "IMPORT", "ATTACHMENT"] },
 ];
 

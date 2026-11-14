@@ -248,9 +248,6 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
         assert "region" not in account_columns
         assert "channels" not in account_columns
 
-        quality_columns = _column_names(engine, "quality_issues")
-        assert "assignee_id" not in quality_columns
-
         route_columns = _column_names(engine, "order_type_pools")
         assert "fund_nature" in route_columns
 

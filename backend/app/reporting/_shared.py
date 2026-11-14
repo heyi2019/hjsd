@@ -38,7 +38,6 @@ REPORT_NAMES = frozenset(
         "business-pnl",
         "daily-funds",
         "order-profit",
-        "finance-dimensions",
     }
 )
 

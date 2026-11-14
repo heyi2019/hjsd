@@ -70,7 +70,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     key: "list-columns",
     label: "列表字段",
     // 读开放（各列表页要用它决定显示哪些列），写需 field-definition.manage，故与表单字段不同不设 permission 门控。
-    summary: "台账 / 库存 / 分期 / 客户 / 返点 / 资金流水 / 报表 / 审计 / 质量的列显示、顺序、列宽与固定列，可新增自定义列，改动即时生效",
+    summary: "台账 / 库存 / 分期 / 客户 / 返点 / 资金流水 / 报表 / 审计的列显示、顺序、列宽与固定列，可新增自定义列，改动即时生效",
     group: "FIELD",
     entityTypes: ["list_column_config"],
     count: async () => (await listColumnsApi.all()).length,

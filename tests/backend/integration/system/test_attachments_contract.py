@@ -1,4 +1,4 @@
-"""API-01 SYS-01-03 附件中心契约测试。"""
+"""API-01 SYS-01-03 订单详情附件契约测试。"""
 from __future__ import annotations
 
 import base64
@@ -68,9 +68,7 @@ def test_order_attachment_can_be_uploaded_listed_downloaded_and_deleted(
     assert listed_after_delete.json()["total"] == 0
 
 
-def test_attachment_requires_existing_entity_and_read_permission(
-    seeded_client, headers, viewer_headers
-):
+def test_attachment_requires_existing_entity_and_read_permission(seeded_client, headers):
     missing = seeded_client.post(
         "/api/v1/attachments",
         json={
@@ -89,30 +87,3 @@ def test_attachment_requires_existing_entity_and_read_permission(
         params={"entity_type": "order", "entity_id": "HS9999"},
     )
     assert no_auth.status_code == 401, no_auth.text
-
-    issue = seeded_client.post(
-        "/api/v1/quality/issues",
-        json={
-            "code": "TEST_ATTACHMENT_PERMISSION",
-            "severity": "LOW",
-            "title": "附件权限测试",
-            "entity_type": "order",
-            "entity_id": "HS9999",
-            "message": "测试附件权限",
-        },
-        headers=headers,
-    )
-    assert issue.status_code == 201, issue.text
-
-    viewer_upload = seeded_client.post(
-        "/api/v1/attachments",
-        json={
-            "entity_type": "quality_issue",
-            "entity_id": issue.json()["issue_no"],
-            "file_name": "x.txt",
-            "content_type": "text/plain",
-            "content_base64": base64.b64encode(b"x").decode(),
-        },
-        headers=viewer_headers,
-    )
-    assert viewer_upload.status_code == 403, viewer_upload.text

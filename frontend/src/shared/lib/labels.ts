@@ -152,7 +152,7 @@ export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
 };
 
 /** 日对账快照状态（ReconciliationStatus）：OPEN=差异待处理（未核销）、RESOLVED=差异已处理（已核销）。
- *  注意 OPEN/RESOLVED 与质量域共用，不能改 StatusTag 全局映射，只能在对账调用点显式传 label。 */
+ *  注意 OPEN/RESOLVED 与对账域共用，不能改 StatusTag 全局映射，只能在对账调用点显式传 label。 */
 export const RECONCILIATION_STATUS_LABEL: Record<string, string> = {
   OPEN: "未核销",
   RESOLVED: "已核销",
@@ -222,9 +222,6 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   REBATE_VOID: "取消返点",
   RECONCILIATION_CREATE: "登记对账",
   RECONCILIATION_RESOLVE: "处置对账差异",
-  QUALITY_ISSUE_CREATE: "新建质量工单",
-  QUALITY_ISSUE_UPDATE: "更新质量工单",
-  QUALITY_ISSUE_CLOSE: "关闭质量工单",
   CASHFLOW_CREATE: "登记资金流水",
   CASHFLOW_REVERSE: "冲销流水",
   TRANSFER_CREATE: "发起资金划转",

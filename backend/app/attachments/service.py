@@ -1,4 +1,4 @@
-"""附件中心服务：统一文件索引、权限、软删除与审计。"""
+"""订单详情附件服务：统一文件索引、权限、软删除与审计。"""
 from __future__ import annotations
 
 import base64
@@ -30,12 +30,11 @@ from app.core.settings import get_settings
 from app.core.numbering import allocate_number
 from app.domain.attachments import Attachment
 from app.domain.enums import AuditAction, SequenceKey
-from app.domain.quality import QualityIssue
 from app.domain.trade import Cashflow, Installment, Order, OrderEvent
 
 
 MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
-ENTITY_TYPES = frozenset({"order", "order_event", "cashflow", "installment", "quality_issue"})
+ENTITY_TYPES = frozenset({"order", "order_event", "cashflow", "installment"})
 _SAFE_FILENAME = re.compile(r"^[^/\\]+$")
 
 
@@ -91,18 +90,13 @@ def _load_target(session: Session, entity_type: str, entity_id: str) -> _Target:
             raise NotFound("附件关联的分期合约不存在", details={"inst_no": identifier})
         return _Target(entity_type, identifier, order=session.get(Order, installment.order_id))
 
-    issue = session.scalar(select(QualityIssue).where(QualityIssue.issue_no == identifier))
-    if issue is None:
-        raise NotFound("附件关联的质量异常不存在", details={"issue_no": identifier})
-    return _Target(entity_type, identifier)
+    raise Validation("附件关联对象类型无效", details={"field": "entity_type", "value": entity_type})
 
 
 def _assert_permission(user: CurrentUser, target: _Target, *, write: bool) -> None:
     if user.is_admin:
         return
-    if target.entity_type == "quality_issue":
-        allowed = user.has(PERM_ORDER_UPDATE if write else PERM_REPORT_READ)
-    elif target.entity_type == "cashflow":
+    if target.entity_type == "cashflow":
         # 资金流水附件「写」不得只凭读权限放行：须持任一资金写权限，
         # 否则 finance.read 的只读角色也能给流水挂/改附件（越权）。
         if write:
@@ -121,8 +115,6 @@ def _assert_permission(user: CurrentUser, target: _Target, *, write: bool) -> No
 
 def _assert_visible(session: Session, user: CurrentUser, target: _Target) -> None:
     if user.is_admin:
-        return
-    if target.entity_type == "quality_issue":
         return
     if target.order is not None:
         scope = owner_scope_filter(Order.owner_id, user, session)

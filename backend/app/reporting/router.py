@@ -18,7 +18,7 @@ from app.core.security import (
 from app.lists.export import build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.lists.scopes import report_scope
-from app.reporting.export import finance_dimension_report, report_csv, report_for_export
+from app.reporting.export import report_csv, report_for_export
 from app.reporting.funds import daily_funds_report
 from app.reporting.profit import order_profit_detail
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
@@ -26,7 +26,6 @@ from app.reporting.r3_commission import r3_commission_reconciliation
 from app.reporting.r5_business_pnl import r5_business_pnl
 from app.reporting.schemas import (
     BusinessPnlOut,
-    FinanceDimensionOut,
     CommissionOut,
     DailyFundsOut,
     MonthlyPnlOut,
@@ -74,17 +73,6 @@ def business_pnl(
 ) -> BusinessPnlOut:
     """业务级损益：主营收入 / 成本 / 毛利均按订单资金明细收支差。"""
     return r5_business_pnl(db, from_date=from_date, to_date=to_date, user=user)
-
-
-@router.get("/reports/finance-dimensions", response_model=FinanceDimensionOut)
-def finance_dimensions(
-    db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = read_access,
-    from_date: date | None = Query(default=None, alias="from"),
-    to_date: date | None = Query(default=None, alias="to"),
-) -> FinanceDimensionOut:
-    """按资金池、资金性质、核算属性和现金方向聚合已审核流水。"""
-    return finance_dimension_report(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/reports/daily-funds", response_model=DailyFundsOut)

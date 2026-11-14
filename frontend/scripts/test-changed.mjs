@@ -65,7 +65,6 @@ const SRC_DOMAIN_TO_REGION = {
   rebates: "finance",
   reporting: "operations",
   imports: "operations",
-  quality: "operations",
   "field-definitions": "settings",
   users: "settings",
   policy: "settings",
@@ -73,7 +72,6 @@ const SRC_DOMAIN_TO_REGION = {
   auth: "system",
   audit: "system",
   attachments: "system",
-  search: "system",
   notifications: "system",
   regression: "system",
 };

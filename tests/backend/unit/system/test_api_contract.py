@@ -55,7 +55,7 @@ def test_every_json_api_route_declares_response_model(app):
     # DELETE /list-columns/{scope}/custom/{column_key}）。返点结算/冲销/取消旧入口已移除。
     # → 176（主列表导出 +6：/orders /stocks /customers /installments /rebates /cashflows）。
     # → 174（删除资金流水审核/驳回端点：POST /cashflows/{id}/approve、POST /cashflows/{id}/reject，
-    # 资金流水改为创建即入账；下游 reporting/orders/quality 仍按 ==APPROVED 过滤，不受影响）。
+    # 资金流水改为创建即入账；下游 reporting/orders 仍按 ==APPROVED 过滤，不受影响）。
     # order-types 路由配置的两个端点已包含在 174 的当前实际基线中，
     # 不再重复叠加计数：GET /order-types/{order_type_id}/routes、
     # GET /order-types/{code}/routes/impact-preview。
@@ -68,6 +68,7 @@ def test_every_json_api_route_declares_response_model(app):
     #        注释停在 191 但从未同步断言，属既有漂移，本次据实校正）
     # → 189（2026-11-12 裁决：删除 DELETE /rebates/{id}（返点不可作废），-1）。
     # → 190（2026-11-12 裁决：返点退回改走真实 OUT，新增 POST /rebates/{id}/return，+1）。
-    # → 181（移除手机号验证码 / 微信登录公开接口，-9）。
+    # → 181（移除手机号验证码 / 微信登录公开接口，-9）→ 170（下线质量分析、全局搜索、
+    # 附件中心、系统提醒和资金属性分析独立入口及其后端路由）。
     # 注：public_routes 在豁免判断之前 +1，故豁免路由（含已删的 DELETE /rebates）也计数。
-    assert public_routes == 181
+    assert public_routes == 170

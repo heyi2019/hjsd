@@ -240,19 +240,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         ),
     ),
     ListScope(
-        code="RPT_FINANCE_DIM",
-        label="报表·资金属性分析",
-        columns=(
-            ListColumn("pool_name", "资金池"),
-            ListColumn("fund_nature", "资金性质", value_set="FUND_FLOW_FUND_NATURE"),
-            ListColumn("accounting_attribute", "核算属性", value_set="FUND_FLOW_ACCOUNTING_ATTRIBUTE"),
-            ListColumn("direction", "现金方向", value_set="FUND_FLOW_DIRECTION"),
-            ListColumn("flow_count", "笔数"),
-            ListColumn("amount", "发生额"),
-            ListColumn("signed_amount", "净方向金额"),
-        ),
-    ),
-    ListScope(
         code="RPT_BUSINESS_PNL",
         label="报表·业务损益",
         columns=(
@@ -301,29 +288,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("reason", "原因"),
         ),
     ),
-    ListScope(
-        code="QUALITY_METRIC",
-        label="质量·月度指标",
-        columns=(
-            ListColumn("month", "月份"),
-            ListColumn("reconciliation_completion_rate", "对账完成率"),
-            ListColumn("overdue_rate", "分期逾期率"),
-            ListColumn("missing_attachment_rate", "缺附件率"),
-        ),
-    ),
-    ListScope(
-        code="QUALITY_ISSUE",
-        label="质量·问题工单",
-        columns=(
-            ListColumn("issue_no", "工单号"),
-            ListColumn("severity", "级别"),
-            ListColumn("title", "标题"),
-            ListColumn("target", "对象"),
-            ListColumn("status", "状态"),
-            ListColumn("message", "问题"),
-            ListColumn("actions", "操作"),
-        ),
-    ),
 )
 
 SCOPE_MAP: dict[str, ListScope] = {scope.code: scope for scope in LIST_SCOPES}
@@ -340,7 +304,6 @@ REPORT_COLUMN_SCOPES: dict[str, str] = {
     "monthly-pnl": "RPT_MONTHLY_PNL",
     "commission": "RPT_COMMISSION",
     "daily-funds": "RPT_DAILY_FUNDS",
-    "finance-dimensions": "RPT_FINANCE_DIM",
     "business-pnl": "RPT_BUSINESS_PNL",
     "order-profit": "RPT_ORDER_PROFIT",
 }

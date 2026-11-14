@@ -1,4 +1,4 @@
-"""reporting.export：报表统一导出（JSON / CSV）与财务维度汇总。
+"""reporting.export：报表统一导出（JSON / CSV）。
 """
 
 from __future__ import annotations
@@ -10,26 +10,8 @@ from datetime import date
 from typing import Any
 from app.core.errors import Validation
 from app.core.security import CurrentUser
-from app.domain.foundation import Pool
-from sqlalchemy import (
-    case,
-    func,
-    select,
-)
 from sqlalchemy.orm import Session
-from app.domain.enums import (
-    CashflowStatus,
-    Direction,
-)
-from app.domain.trade import Cashflow
-
-from app.core.money import to_money_or_zero
-from ._shared import (
-    REPORT_NAMES,
-    _sum_report_field,
-    _validate_date_range,
-    _visible_pool_ids,
-)
+from ._shared import REPORT_NAMES
 
 from .funds import daily_funds_report
 from .profit import order_profit_detail
@@ -67,8 +49,6 @@ def report_for_export(
         )
     if name == "business-pnl":
         return r5_business_pnl(session, from_date=from_date, to_date=to_date, user=user)
-    if name == "finance-dimensions":
-        return finance_dimension_report(session, from_date=from_date, to_date=to_date, user=user)
     if name == "daily-funds":
         return daily_funds_report(session, on=on, user=user)
     return order_profit_detail(session, from_date=from_date, to_date=to_date, user=user)
@@ -170,69 +150,3 @@ def report_csv(
     for row in rows:
         writer.writerow({key: cell(key, row.get(key)) for key in fieldnames})
     return "\ufeff" + stream.getvalue()
-
-
-def finance_dimension_report(
-    session: Session,
-    *,
-    from_date: date | None = None,
-    to_date: date | None = None,
-    user: CurrentUser | None = None,
-) -> dict[str, Any]:
-    """按资金性质、核算属性、方向和账户聚合已审核流水。"""
-    _validate_date_range(from_date, to_date)
-    stmt = (
-        select(
-            Pool.id.label("pool_id"),
-            Pool.code.label("pool_code"),
-            Pool.name.label("pool_name"),
-            Cashflow.fund_nature,
-            Cashflow.accounting_attribute,
-            Cashflow.direction,
-            func.count(Cashflow.id).label("flow_count"),
-            func.sum(Cashflow.amount).label("amount"),
-            func.sum(
-                case(
-                    (Cashflow.direction == Direction.IN.value, Cashflow.amount),
-                    else_=-Cashflow.amount,
-                )
-            ).label("signed_amount"),
-        )
-        .join(Pool, Pool.id == Cashflow.pool_id)
-        .where(Cashflow.status == CashflowStatus.APPROVED.value)
-        .group_by(
-            Pool.id, Pool.code, Pool.name,
-            Cashflow.fund_nature,
-            Cashflow.accounting_attribute, Cashflow.direction,
-        )
-        .order_by(Pool.code, Cashflow.fund_nature, Cashflow.accounting_attribute, Cashflow.direction)
-    )
-    if from_date is not None:
-        stmt = stmt.where(Cashflow.occurred_on >= from_date)
-    if to_date is not None:
-        stmt = stmt.where(Cashflow.occurred_on <= to_date)
-    visible_pool_ids = _visible_pool_ids(user)
-    if visible_pool_ids is not None:
-        stmt = stmt.where(Cashflow.pool_id.in_(visible_pool_ids))
-    rows = session.execute(stmt).mappings().all()
-    items = [
-        {
-            "pool_id": row["pool_id"],
-            "pool_code": row["pool_code"],
-            "pool_name": row["pool_name"],
-            "fund_nature": row["fund_nature"],
-            "accounting_attribute": row["accounting_attribute"],
-            "direction": row["direction"],
-            "flow_count": int(row["flow_count"] or 0),
-            "amount": to_money_or_zero(row["amount"]),
-            "signed_amount": to_money_or_zero(row["signed_amount"]),
-        }
-        for row in rows
-    ]
-    return {
-        "from_date": from_date.isoformat() if from_date else None,
-        "to_date": to_date.isoformat() if to_date else None,
-        "items": items,
-        "total_amount": _sum_report_field(items, "amount"),
-        "total_signed_amount": _sum_report_field(items, "signed_amount"),
-    }

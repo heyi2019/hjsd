@@ -25,7 +25,6 @@ from app.stocks.router import router as stocks_router
 from app.audit.router import router as audit_router
 from app.imports.router import router as imports_router
 from app.policy.router import router as policy_router
-from app.quality.router import router as quality_router
 from app.notifications.router import router as notifications_router
 from app.reporting.router import router as reporting_router
 from app.finance.router import router as finance_router
@@ -33,7 +32,6 @@ from app.value_added_services.router import router as installments_router
 from app.orders.router import router as orders_router
 from app.orders.form_fields_router import router as order_form_fields_router
 from app.parties.router import router as parties_router
-from app.search.router import router as search_router
 from app.auth.router import router as auth_router, admin_router as users_router, teams_router
 from app.attachments.router import router as attachments_router
 from app.options.router import router as options_router
@@ -149,7 +147,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(foundation_router, prefix=settings.api_prefix)
     app.include_router(parties_router, prefix=settings.api_prefix)
-    app.include_router(search_router, prefix=settings.api_prefix)
     app.include_router(orders_router, prefix=settings.api_prefix)
     app.include_router(order_form_fields_router, prefix=settings.api_prefix)
     app.include_router(installments_router, prefix=settings.api_prefix)
@@ -157,7 +154,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(stocks_router, prefix=settings.api_prefix)
     app.include_router(reporting_router, prefix=settings.api_prefix)
     app.include_router(policy_router, prefix=settings.api_prefix)
-    app.include_router(quality_router, prefix=settings.api_prefix)
     app.include_router(notifications_router, prefix=settings.api_prefix)
     app.include_router(imports_router, prefix=settings.api_prefix)
     app.include_router(audit_router, prefix=settings.api_prefix)

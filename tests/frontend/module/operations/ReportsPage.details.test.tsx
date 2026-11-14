@@ -34,7 +34,6 @@ vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
 vi.mock("@/shared/api/policy.api");
 vi.mock("@/shared/api/pools.api");
-vi.mock("@/shared/api/quality.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");

@@ -113,7 +113,3 @@ export interface RebateReturnResult {
 }
 
 export interface Reconciliation { id: number; pool_id: number; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string; reason?: string | null; unmatched_flow_ids?: number[]; note?: string | null }
-
-export interface FinanceDimensionRow { pool_id: number; pool_code: string; pool_name: string; fund_nature: string; accounting_attribute: string; direction: string; flow_count: number; amount: string; signed_amount: string }
-
-export interface FinanceDimensionReport { items: FinanceDimensionRow[]; total_amount: string; total_signed_amount: string }

@@ -9,5 +9,4 @@ tests/backend/conftest.py :: 'app.domain.imports' imported but unused
 tests/backend/conftest.py :: 'app.domain.notifications' imported but unused
 tests/backend/conftest.py :: 'app.domain.options' imported but unused
 tests/backend/conftest.py :: 'app.domain.parties' imported but unused
-tests/backend/conftest.py :: 'app.domain.quality' imported but unused
 tests/backend/conftest.py :: 'app.domain.trade' imported but unused

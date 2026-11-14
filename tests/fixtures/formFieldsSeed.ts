@@ -220,12 +220,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "POLICY_SCOPE_TYPE", label: "规则适用范围", group: "POLICY", editable: false, options: [
     { value: "GLOBAL", label: "全局" }, { value: "ORDER_TYPE", label: "按业务类型" }, { value: "USER", label: "按人员" }, { value: "POOL", label: "按资金池" },
   ] },
-  { code: "QUALITY_STATUS", label: "质量问题状态", group: "QUALITY", editable: false, options: [
-    { value: "OPEN", label: "待处理" }, { value: "IN_PROGRESS", label: "处理中" }, { value: "CLOSED", label: "已关闭" },
-  ] },
-  { code: "QUALITY_SEVERITY", label: "质量问题严重程度", group: "QUALITY", editable: true, options: [
-    { value: "LOW", label: "低" }, { value: "MEDIUM", label: "中" }, { value: "HIGH", label: "高" }, { value: "CRITICAL", label: "严重" },
-  ] },
   { code: "RECONCILIATION_STATUS", label: "日对账状态", group: "FUND", editable: false, options: [
     { value: "OPEN", label: "未核销" }, { value: "RESOLVED", label: "已核销" },
   ] },
@@ -285,7 +279,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "user", label: "用户" },
     { value: "attachment", label: "附件" },
     { value: "reconciliation", label: "日对账" },
-    { value: "quality_issue", label: "质量工单" },
     { value: "lead", label: "客户需求" },
     { value: "order_form_field", label: "订单表单字段" },
     { value: "OrderTypePool", label: "资金路由" },
@@ -359,9 +352,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "REBATE_VOID", label: "取消返点" },
     { value: "RECONCILIATION_CREATE", label: "登记对账" },
     { value: "RECONCILIATION_RESOLVE", label: "处置对账差异" },
-    { value: "QUALITY_ISSUE_CREATE", label: "新建质量工单" },
-    { value: "QUALITY_ISSUE_UPDATE", label: "更新质量工单" },
-    { value: "QUALITY_ISSUE_CLOSE", label: "关闭质量工单" },
     { value: "CASHFLOW_CREATE", label: "登记资金流水" },
     { value: "CASHFLOW_REVERSE", label: "冲销流水" },
     { value: "TRANSFER_CREATE", label: "发起资金划转" },
@@ -425,7 +415,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "CUSTOMER", label: "客户" },
     { value: "COUNTERPARTY", label: "合作方" },
     { value: "LEAD", label: "需求" },
-    { value: "QUALITY_ISSUE", label: "质量工单" },
     { value: "NOTIFICATION", label: "通知" },
     { value: "CASHFLOW_OUT", label: "支出流水" },
     { value: "CASHFLOW_IN", label: "收入流水" },
@@ -451,7 +440,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "commission", label: "提成对账" },
     { value: "daily-funds", label: "资金日报" },
     { value: "business-pnl", label: "业务损益" },
-    { value: "finance-dimensions", label: "资金属性" },
     { value: "order-profit", label: "订单利润" },
   ] },
 ];

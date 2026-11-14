@@ -91,26 +91,6 @@ class BusinessPnlOut(ReportModel):
     total: BusinessPnlTotalOut
 
 
-class FinanceDimensionItemOut(ReportModel):
-    pool_id: int
-    pool_code: str
-    pool_name: str
-    fund_nature: str
-    accounting_attribute: str
-    direction: str
-    flow_count: int
-    amount: Decimal
-    signed_amount: Decimal
-
-
-class FinanceDimensionOut(ReportModel):
-    from_date: str | None = None
-    to_date: str | None = None
-    items: list[FinanceDimensionItemOut]
-    total_amount: Decimal
-    total_signed_amount: Decimal
-
-
 class DailyFundsItemOut(ReportModel):
     pool_code: str
     pool_name: str
@@ -168,7 +148,6 @@ class OrderProfitOut(ReportModel):
 
 __all__ = [
     "BusinessPnlOut",
-    "FinanceDimensionOut",
     "CommissionOut",
     "DailyFundsOut",
     "MonthlyPnlOut",

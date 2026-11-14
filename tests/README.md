@@ -262,7 +262,7 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 | ~~13 个后端测试文件未进任何分组~~ | **已解决**：全部登记，`test_group_coverage.py` 拦截复发 |
 | ~~33 个文件头写的功能码尚未登记进承诺清单~~ | **已解决**：112/112 全部自带承诺码，历史回退机制已封存 |
 | ~~后端测试扁平存放，没有分层~~ | **已解决**：`unit/integration` × 区域两层（2026-11-04），`test_manifest_parity.py` 守着分布 |
-| ~~前端测试散在包内 `src/` 与 `frontend/tests/`~~ | **已解决**：94 个文件全部迁入 `tests/frontend/{unit,module}/<区域>/`；包内扫描为空的断言在 `manifest-parity.test.ts` |
+| ~~前端测试散在包内 `src/` 与 `frontend/tests/`~~ | **已解决**：当前前端测试文件全部迁入 `tests/frontend/{unit,module}/<区域>/`；包内扫描为空的断言在 `manifest-parity.test.ts` |
 | ~~`vi.mock` 用相对路径，测试文件搬迁后静默失效~~ | **已解决**：`@`/`@fixtures` 别名 + `mock-specifier.test.ts`，74 处存量已清零（基线为空） |
 | ~~E2E 规格散在包内 `frontend/e2e/`~~ | **已解决**：15 个 spec 迁入 `tests/e2e/<区域>/`，快照目录随 `visual.spec.ts` 走 |
 | ~~前端测试只能整层跑，改一个板块要跑全部~~ | **已解决**：`test:panel <区域>` 与 `test:changed`（按 git 变更推断区域） |

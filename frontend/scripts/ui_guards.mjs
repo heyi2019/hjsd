@@ -320,7 +320,6 @@ if (mainSource.includes("responsive-overrides.css")) {
 const CONFIG_MODULE_RE = /from\s+"[^"]*ConfigurableField"/;
 const WIRED_RE = /FieldConfigScope|useOrderFormConfig/;
 const FORM_SCOPE_WHITELIST = new Map([
-  ["src/quality/QualityPanel.tsx", "质量工单 2 弹窗未接入（2026-10-27 盘点明确暂缓，补接时移出本清单）"],
   ["src/auth/LoginPage.tsx", "登录表单，非业务数据录入"],
   ["src/auth/ChangePasswordPage.tsx", "改密表单，非业务数据录入"],
   ["src/auth/UserCenterPage.tsx", "用户中心，非业务数据录入"],
@@ -334,7 +333,6 @@ const FORM_SCOPE_WHITELIST = new Map([
   ["src/field-definitions/panels/PoolsPanel.tsx", "资金池配置界面本身"],
   ["src/policy/PolicyResolveModal.tsx", "政策试算弹窗，非业务数据录入"],
   ["src/policy/PolicyVersionEditorModal.tsx", "政策版本编辑，配置管理"],
-  ["src/search/SearchPanel.tsx", "查询表单，非数据录入"],
   ["src/users/TeamsPanel.tsx", "团队管理，系统表单"],
   ["src/users/UsersPanel.tsx", "用户管理，系统表单"],
   ["src/stocks/InventoryPanel/InventoryDeleteDialog.tsx", "账号删除二次确认：删除原因只写审计日志、不落业务字段，属系统级确认输入，不开放表单字段配置"],

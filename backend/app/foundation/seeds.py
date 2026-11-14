@@ -68,7 +68,6 @@ SEED_SEQUENCES: tuple[tuple[str, str, int], ...] = (
     (SequenceKey.CUSTOMER.value, "CUS", 4),
     (SequenceKey.COUNTERPARTY.value, "CP", 4),
     (SequenceKey.LEAD.value, "REQ", 4),
-    (SequenceKey.QUALITY_ISSUE.value, "QI", 4),
     (SequenceKey.NOTIFICATION.value, "NTF", 4),
     # 资金流水按方向独立递增（2026-10-28 口径）：支出 ZC+五位、收入 SR+五位。
     (SequenceKey.CASHFLOW_OUT.value, "ZC", 5),

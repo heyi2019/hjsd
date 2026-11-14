@@ -2,16 +2,11 @@
  * 各报表视图拆到 ./reports/*.tsx（导出按钮在各自页内），本文件只留 Tab 壳。 */
 import { Input, Space, Tabs } from "antd";
 import { useEffect, useState } from "react";
-import { AttachmentPanel } from "../attachments/AttachmentPanel";
 import { AuditPanel } from "../audit/AuditPanel";
-import { NotificationsPanel } from "../notifications/NotificationsPanel";
-import { QualityPanel } from "../quality/QualityPanel";
-import { SearchPanel } from "../search/SearchPanel";
 import { DataCenterPanel } from "./DataCenterPanel";
 import { BusinessPnl } from "./reports/BusinessPnlReport";
 import { Commission } from "./reports/CommissionReport";
 import { DailyFunds } from "./reports/DailyFundsReport";
-import { FinanceDimensions } from "./reports/FinanceDimensionsReport";
 import { MonthlyPnl } from "./reports/MonthlyPnlReport";
 import { OrderProfit } from "./reports/OrderProfitReport";
 import { type ReportRange, ReportsActiveContext } from "./reports/shared";
@@ -44,14 +39,9 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
     { key: "r3", label: "分润对账", render: () => <Commission range={reportRange} mine={myEarnings} /> },
     { key: "r4", label: "资金日报", render: () => <DailyFunds /> },
     { key: "r5", label: "业务损益", render: () => <BusinessPnl range={reportRange} /> },
-    { key: "finance-dimensions", label: "资金属性分析", render: () => <FinanceDimensions range={reportRange} /> },
     { key: "profit", label: "订单利润", render: () => <OrderProfit range={reportRange} /> },
     { key: "data-center", label: "数据中心", render: () => <DataCenterPanel onNavigate={onNavigate} /> },
-    { key: "quality", label: "质量中心", render: () => <QualityPanel /> },
-    { key: "notifications", label: "系统提醒", render: () => <NotificationsPanel /> },
-    { key: "search", label: "全局搜索", render: () => <SearchPanel /> },
     { key: "audit", label: "审计记录", render: () => <AuditPanel /> },
-    { key: "attachments", label: "附件中心", render: () => <AttachmentPanel /> },
   ];
 
   return (

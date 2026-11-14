@@ -54,7 +54,6 @@ beforeEach(() => {
     { id: 8, username: "finance", display_name: "财务同事", is_active: true },
   ]);
   resolveMock(vi.mocked(reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
-  resolveMock(vi.mocked(reportsApi.financeDimensions), { items: [], total_amount: "0", total_signed_amount: "0" });
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
   resolveMock(vi.mocked(reportsApi.orderProfit), { items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
   resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
@@ -144,6 +143,14 @@ describe("ReportsPage：经营中心报表", () => {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
     expect(screen.queryByRole("tab", { name: "库存 R1" })).not.toBeInTheDocument();
+  });
+
+  it("经营中心不展示系统级工具页签", async () => {
+    renderLight(<ReportsPage />, { user: "admin" });
+    await screen.findByRole("tab", { name: "月度损益" });
+    for (const label of ["质量中心", "全局搜索", "系统提醒", "附件中心", "资金属性分析"]) {
+      expect(screen.queryByRole("tab", { name: label })).not.toBeInTheDocument();
+    }
   });
 
   it("数据中心 Tab：渲染资金统计与订单入口卡，点击入口卡跳业务中心", async () => {

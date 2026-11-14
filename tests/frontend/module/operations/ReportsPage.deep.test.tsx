@@ -49,11 +49,6 @@ beforeEach(() => {
   });
   vi.mocked(employeesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
-  resolveMock(vi.mocked(reportsApi.financeDimensions), {
-    items: [],
-    total_amount: "0",
-    total_signed_amount: "0",
-  });
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
   resolveMock(vi.mocked(reportsApi.orderProfit), {
     items: [],
@@ -116,14 +111,13 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-08" }));
   });
 
-  it("FE-051：共享日期区间传递到经营报表、资金属性和订单利润", async () => {
+  it("FE-051：共享日期区间传递到经营报表和订单利润", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    const setFrom = async (report: "monthly" | "commission" | "business" | "finance" | "profit") => {
+    const setFrom = async (report: "monthly" | "commission" | "business" | "profit") => {
       const labels = {
         monthly: "月度损益",
         commission: "分润对账",
         business: "业务损益",
-        finance: "资金属性分析",
         profit: "订单利润",
       } as const;
       await gotoTab(labels[report]);
@@ -136,36 +130,8 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", all_people: true }));
     await setFrom("business");
     await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
-    await setFrom("finance");
-    await waitFor(() => expect(vi.mocked(reportsApi.financeDimensions)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
     await setFrom("profit");
     await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
-  });
-
-  it("资金属性分析：渲染资金池 / 方向 / 净方向金额", async () => {
-    resolveMockOnce(vi.mocked(reportsApi.financeDimensions), {
-      items: [
-        {
-          pool_name: "POOL-A",
-          fund_nature: "BUSINESS",
-          accounting_attribute: "SELF_REVENUE",
-          direction: "IN",
-          flow_count: 3,
-          amount: "100.00",
-          signed_amount: "100.00",
-        },
-      ],
-      total_amount: "100.00",
-      total_signed_amount: "100.00",
-    });
-    renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金属性分析");
-    await screen.findByText("POOL-A");
-    expect(screen.queryByText("资金账户")).toBeNull();
-    expect(screen.getByText("收入")).toBeInTheDocument(); // direction === IN
-    expect(screen.getByText("本方经营")).toBeInTheDocument(); // fund_nature 中文映射（#60）
-    expect(screen.getByText("自营收入")).toBeInTheDocument(); // accounting_attribute 中文映射（#60）
-    expect(screen.getAllByText("净方向金额").length).toBeGreaterThanOrEqual(1);
   });
 
   it("FE-053：页内导出成功后创建下载锚点并显示结果反馈", async () => {
@@ -236,25 +202,6 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
     await gotoTab("业务损益");
     await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
-  });
-
-  it("FE-271：资金属性分析历史空区间清空旧汇总", async () => {
-    vi.mocked(reportsApi.financeDimensions).mockImplementation((params) => Promise.resolve(
-      params?.from ? { items: [], total_amount: "0", total_signed_amount: "0" } : {
-        items: [{ pool_name: "POOL-FE271", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE", direction: "IN", flow_count: 1, amount: "10", signed_amount: "10" }],
-        total_amount: "10",
-        total_signed_amount: "10",
-      },
-    ) as never);
-    renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金属性分析");
-    await screen.findByText("POOL-FE271");
-    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-    const dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    fireEvent.change(dates[0], { target: { value: "2026-10-01" } });
-    fireEvent.change(dates[1], { target: { value: "2026-10-31" } });
-    await waitFor(() => expect(vi.mocked(reportsApi.financeDimensions)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
-    await waitFor(() => expect(screen.queryByText("POOL-FE271")).not.toBeInTheDocument());
   });
 
   it("FE-272：订单利润历史空区间清空收入成本和净利明细", async () => {

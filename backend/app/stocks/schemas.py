@@ -101,31 +101,6 @@ class AccountDeleteRequest(RequestModel):
         return value.strip()
 
 
-class ExecutionEditItem(RequestModel):
-    id: int = Field(gt=0)
-    expected_amount: Decimal = Field(ge=0, max_digits=18, decimal_places=2)
-    amount: Decimal = Field(ge=0, max_digits=18, decimal_places=2)
-    note: str | None = None
-    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
-
-
-class ExecutionTimeShift(RequestModel):
-    """账号台账时间联动：任一时间锚点改 N 分钟，整单时间轴平移 N 分钟（保留相对关系）。
-
-    与订单台账「成交日期」同源口径：trade_date、事件/流水 occurred_on 同步平移，
-    另外把台账展示用的 created_at / posted_at 时间戳一并平移，避免界面值不动。
-    分期 first_due_on / 期次 due_on 属客户还款计划，不随之平移。
-    """
-
-    delta_minutes: int = Field(ge=-5256000, le=5256000)
-
-
-class ExecutionEditRequest(RequestModel):
-    events: list[ExecutionEditItem] = Field(max_length=100)
-    profile: AccountProfileUpdate | None = None
-    time_shift: ExecutionTimeShift | None = None
-
-
 class AccountInventoryOut(BaseModel):
     """库存中心在库台账接口的单行契约；与账号台账共享同一业务字段语义。"""
 
@@ -290,8 +265,6 @@ __all__ = [
     "AccountListOut",
     "AccountProfileUpdate",
     "AccountDeleteRequest",
-    "ExecutionEditItem",
-    "ExecutionEditRequest",
     "AccountInventoryOut",
     "InventoryResponseOut",
     "ExecutionCashflowOut",

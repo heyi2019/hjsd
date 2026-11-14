@@ -60,8 +60,6 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     eventDrafts,
     updateEventDraft,
     employees,
-    timeShiftMinutes,
-    setTimeShiftDays,
     invEditExtraForm,
     savingAccount,
     cancelInlineEdit,
@@ -183,13 +181,18 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
                   editing={inlineEditId === detail.account.id ? editingAccount : undefined}
                   eventDrafts={eventDrafts}
                   onEventEdit={updateEventDraft}
+                  financeDrafts={controller.financeDrafts}
+                  onFinanceEdit={controller.updateFinanceDraft}
+                  onProfileChange={controller.updateEditingAccount}
+                  orderDrafts={controller.orderDrafts}
+                  onOrderEdit={controller.updateOrderDraft}
+                  onOrderExtraChange={(orderId, key, value) => controller.updateOrderDraft(orderId, { form_extra: { [key]: value } })}
+                  onPartyEdit={controller.updatePartyDraft}
                   employees={employees}
                   extraForm={invEditExtraForm}
                   onSave={saveInline}
                   onCancel={cancelInlineEdit}
                   saving={savingAccount}
-                  timeShiftMinutes={timeShiftMinutes}
-                  onTimeShift={setTimeShiftDays}
                 />
               );
             },

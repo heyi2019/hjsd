@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 INVENTORY_ORDER_TYPES = frozenset({"HS", "TH", "DG"})
 INTERNAL_EXTRA_KEYS = frozenset({
-    "consignment_platform",
+    "consignment_platforms",
     "listed_at",
     "platform_unlisted_at",
     "platform_unlist_scope",
@@ -40,8 +40,12 @@ EVENT_ACTION = {
     "OPERATE": "运营",
     "REBATE": "返点",
 }
-def _text(value: Any) -> str:
-    return str(value).strip() if value is not None else ""
+def _platforms(value: Any) -> list[str]:
+    return [item.strip() for item in value if isinstance(item, str) and item.strip()] if isinstance(value, list) else []
+
+
+def _platform_text(extra: dict[str, Any]) -> str:
+    return "、".join(_platforms(extra.get("consignment_platforms")))
 
 
 def _operator(event: Any) -> str:
@@ -70,7 +74,7 @@ def _platform_values(order: AccountExecutionOrderOut) -> list[str]:
 def _consignment_platform(order: AccountExecutionOrderOut) -> str:
     for event in order.events:
         if event.event_type == "OPERATE" and event.operation_type == "CONSIGNMENT":
-            platform = _text(event.form_extra.get("consignment_platform"))
+            platform = _platform_text(event.form_extra)
             if platform:
                 return platform
     return "-"
@@ -78,7 +82,7 @@ def _consignment_platform(order: AccountExecutionOrderOut) -> str:
 
 def _event_platform(order: AccountExecutionOrderOut, event: Any, has_system_unlisted: bool) -> str:
     if event.event_type == "OPERATE":
-        platform = _text(event.form_extra.get("consignment_platform"))
+        platform = _platform_text(event.form_extra)
         return platform or order.account_platform or "-"
     if event.event_type != "CANCEL":
         return order.account_platform or "-"
@@ -118,17 +122,17 @@ def _operation_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailOperat
     unlist = _latest_operation(orders, "UNLIST")
     description = _latest_operation(orders, "DESCRIPTION")
     image = _latest_operation(orders, "IMAGE")
-    consignment_platform = _text(consignment.form_extra.get("consignment_platform")) if consignment else ""
+    consignment_platform = _platform_text(consignment.form_extra) if consignment else ""
     price = consignment.form_extra.get("consignment_price") if consignment else None
     listed_content = consignment_platform
     if price not in (None, ""):
         listed_content = f"{listed_content} / 寄售价 ¥{to_money(price):,.2f}" if listed_content else f"寄售价 ¥{to_money(price):,.2f}"
-    unlisted_content = "本系统" if unlist and unlist.form_extra.get("platform_unlist_scope") == "SYSTEM" else (_text(unlist.form_extra.get("consignment_platform")) if unlist else "")
+    unlisted_content = "本系统" if unlist and unlist.form_extra.get("platform_unlist_scope") == "SYSTEM" else (_platform_text(unlist.form_extra) if unlist else "")
     return [
-        DetailOperationRowOut(key="consignment", action="上架平台", content=listed_content or "-", occurred_at=_operation_timestamp(consignment), operator=_operator(consignment) if consignment else "-"),
-        DetailOperationRowOut(key="unlist", action="下架平台", content=unlisted_content or "-", occurred_at=_operation_timestamp(unlist), operator=_operator(unlist) if unlist else "-"),
-        DetailOperationRowOut(key="description", action="描述", content="-", occurred_at=_operation_timestamp(description), operator=_operator(description) if description else "-"),
-        DetailOperationRowOut(key="images", action="作图", content="-", occurred_at=_operation_timestamp(image), operator=_operator(image) if image else "-"),
+        DetailOperationRowOut(key="consignment", action="上架平台", content=listed_content or "-", occurred_at=_operation_timestamp(consignment), operator=_operator(consignment) if consignment else "-", event_id=consignment.id if consignment else None),
+        DetailOperationRowOut(key="unlist", action="下架平台", content=unlisted_content or "-", occurred_at=_operation_timestamp(unlist), operator=_operator(unlist) if unlist else "-", event_id=unlist.id if unlist else None),
+        DetailOperationRowOut(key="description", action="描述", content="-", occurred_at=_operation_timestamp(description), operator=_operator(description) if description else "-", event_id=description.id if description else None),
+        DetailOperationRowOut(key="images", action="作图", content="-", occurred_at=_operation_timestamp(image), operator=_operator(image) if image else "-", event_id=image.id if image else None),
     ]
 
 
@@ -142,6 +146,7 @@ def _execution_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailExecut
         if order.order_type in INVENTORY_ORDER_TYPES and not any(event.event_type == "BUY" for event in order.events):
             rows.append(DetailExecutionRowOut(
                 key=f"{order.order_id}-inventory-entry",
+                order_id=order.order_id,
                 category="INBOUND",
                 action=ENTRY_ACTION.get(order.order_type, "账号入库"),
                 occurred_at=order.created_at,
@@ -153,6 +158,7 @@ def _execution_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailExecut
         rows.extend(
             DetailExecutionRowOut(
                 key=f"{order.order_id}-{event.id}",
+                order_id=order.order_id,
                 category="INBOUND" if event.event_type == "BUY" else "OUTBOUND" if event.event_type == "SELL" else "OPERATING",
                 action=_event_action(event, order.order_type),
                 occurred_at=event.occurred_at,
@@ -190,21 +196,22 @@ def _finance_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailFinanceR
             if event.cashflow:
                 flow = event.cashflow
                 rows.append(DetailFinanceRowOut(
-                    key=f"flow-{flow.flow_no}", type=_finance_type(event.event_type, flow.direction, flow.category),
+                    key=f"flow-{flow.flow_no}", flow_no=flow.flow_no, type=_finance_type(event.event_type, flow.direction, flow.category),
                     direction="支出" if flow.direction == "OUT" else "收入", amount=flow.amount,
-                    occurred_at=flow.occurred_at, pool_name=flow.pool_name or "未分配资金池",
+                    occurred_at=flow.occurred_at, pool_name=flow.pool_name or "未分配资金池", note=flow.note or "",
                     operator=flow.operator or _operator(event), event_id=event.id,
                 ))
         for flow in order.cashflows:
             rows.append(DetailFinanceRowOut(
-                key=f"flow-{flow.flow_no}", type=_finance_type("", flow.direction, flow.category),
+                key=f"flow-{flow.flow_no}", flow_no=flow.flow_no, type=_finance_type("", flow.direction, flow.category),
                 direction="支出" if flow.direction == "OUT" else "收入", amount=flow.amount,
-                occurred_at=flow.occurred_at, pool_name=flow.pool_name or "未分配资金池", operator=flow.operator or "-",
+                occurred_at=flow.occurred_at, pool_name=flow.pool_name or "未分配资金池", note=flow.note or "", operator=flow.operator or "-",
             ))
         for rebate in order.rebates:
             rows.append(DetailFinanceRowOut(
-                key=f"rebate-{rebate.id}", type=_rebate_type(rebate), direction="收入", amount=rebate.base_amount,
-                occurred_at=rebate.collected_at, pool_name="-", operator="-",
+                key=f"rebate-{rebate.id}", flow_no=rebate.rebate_no, type=_rebate_type(rebate),
+                direction="收入", amount=rebate.base_amount, occurred_at=rebate.collected_at,
+                pool_name="-", note="", operator="-",
             ))
     return rows
 

@@ -36,7 +36,7 @@ describe("代挂寄售记录口径", () => {
     const listed = order({
       order_type: "HS",
       events: [{
-        ...event({ id: 7, operation_type: "CONSIGNMENT", form_extra: { consignment_platform: "盼之", listed_at: "2026-11-02T10:05" } }),
+        ...event({ id: 7, operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["盼之"], listed_at: "2026-11-02T10:05" } }),
       }],
     });
     expect(consignmentPlatform(listed)).toBe("盼之");
@@ -48,9 +48,9 @@ describe("代挂寄售记录口径", () => {
     const unlisted = order({
       order_type: "HS",
       events: [{
-        ...event({ id: 7, operation_type: "CONSIGNMENT", form_extra: { consignment_platform: "盼之", listed_at: "2026-11-02T10:05" } }),
+        ...event({ id: 7, operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["盼之"], listed_at: "2026-11-02T10:05" } }),
       }, {
-        ...event({ id: 8, operation_type: "UNLIST", form_extra: { consignment_event_id: 7, platform_unlist_scope: "PLATFORM" } }),
+        ...event({ id: 8, operation_type: "UNLIST", form_extra: { consignment_event_id: 7, consignment_platforms: ["盼之"], platform_unlist_scope: "PLATFORM" } }),
       }],
     });
     expect(isConsignmentListing(unlisted)).toBe(true);

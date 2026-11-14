@@ -1,0 +1,34 @@
+"""订单详情中的订单补充字段编辑。"""
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.audit import record_audit
+from app.core.errors import NotFound
+from app.core.security import CurrentUser
+from app.domain.trade import Order
+from app.domain.users import User
+
+from .schemas import ExecutionOrderEditItem
+
+
+def apply_order_edits(db: Session, account_id: int, items: list[ExecutionOrderEditItem], user: CurrentUser) -> None:
+    for item in items:
+        order = db.scalar(select(Order).where(Order.id == item.order_id).with_for_update())
+        if order is None or order.account_id != account_id:
+            raise NotFound("订单不存在")
+        before = {"note": order.note, "occurred_at": order.created_at.isoformat() if order.created_at else None, "operator": order.created_by, "form_extra": order.form_extra}
+        if "operator" in item.model_fields_set:
+            operator = db.scalar(select(User).where(User.username == item.operator, User.is_active.is_(True)))
+            if operator is None:
+                raise NotFound("操作人不存在或已停用")
+            order.created_by = operator.username
+        if "note" in item.model_fields_set:
+            order.note = item.note
+        if "form_extra" in item.model_fields_set and item.form_extra is not None:
+            order.form_extra = {**(order.form_extra or {}), **item.form_extra}
+        if item.occurred_at is not None:
+            occurred_at = item.occurred_at.replace(tzinfo=None)
+            order.created_at = occurred_at
+            order.trade_date = occurred_at.date()
+        order.updated_by = user.username
+        record_audit(db, action="ORDER_UPDATE", entity_type="inventory_order_edit", entity_id=order.id, actor=user.username, before=before, after={"note": order.note, "occurred_at": order.created_at.isoformat() if order.created_at else None, "operator": order.created_by, "form_extra": order.form_extra})

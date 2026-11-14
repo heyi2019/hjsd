@@ -24,6 +24,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     editingAccount,
     employees,
     eventDrafts,
+    financeDrafts,
     executionDetails,
     executionLoading,
     inlineEditId,
@@ -53,6 +54,11 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     submitDelete,
     submitVoid,
     updateEventDraft,
+    updateFinanceDraft,
+    updateEditingAccount,
+    orderDrafts,
+    updateOrderDraft,
+    updatePartyDraft,
     voidForm,
     voidPools,
     voidTarget,
@@ -177,6 +183,13 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           editing={inlineEditId === detailTarget.id ? editingAccount : undefined}
           eventDrafts={eventDrafts}
           onEventEdit={updateEventDraft}
+          financeDrafts={financeDrafts}
+          onFinanceEdit={updateFinanceDraft}
+          onProfileChange={updateEditingAccount}
+          orderDrafts={orderDrafts}
+          onOrderEdit={updateOrderDraft}
+          onOrderExtraChange={(orderId, key, value) => updateOrderDraft(orderId, { form_extra: { [key]: value } })}
+          onPartyEdit={updatePartyDraft}
           employees={employees}
           extraForm={invEditExtraForm}
           onSave={saveInline}

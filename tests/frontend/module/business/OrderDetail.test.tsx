@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";
 import type { Account } from "@/shared/api/types/accounts";
 import { OrderDetail } from "@/stocks/OrderDetail";
+import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { renderApp } from "@fixtures/render";
 
 const account = {
@@ -17,6 +18,10 @@ const account = {
   has_secondary: false,
   cost_amount: "100.00",
 } as unknown as Account;
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("OrderDetail", () => {
   it("加载中没有明细时显示加载状态", () => {
@@ -43,6 +48,16 @@ describe("OrderDetail", () => {
         }],
         rebates: [],
       }],
+      detail_view: {
+        operation_rows: [],
+        execution_rows: [{ key: "buy", order_id: 1, category: "INBOUND", action: "回收入库", occurred_at: "2026-10-15T10:20:00", amount: "100.00", operator: "admin", note: "回收登记", platform: "-", event_id: 1 }],
+        finance_rows: [{ key: "CF0001", flow_no: "CF0001", type: "买号支出", direction: "支出", amount: "100.00", occurred_at: "2026-10-15T10:20:00", pool_name: "经营荷包", note: "回收登记", operator: "admin", event_id: 1 }],
+        lifecycle: { removed_platform: "-", recovery_platform: "-", sale_platform: "-" },
+        order_notes: "-",
+        parties: [],
+        extras: [],
+      },
+      finance_summary: { cashflow_income: "0.00", rebate_income: "0.00", total_income: "0.00", total_expense: "100.00", net_amount: "-100.00" },
     } as unknown as AccountExecutionDetail;
 
     render(<OrderDetail row={account} detail={detail} loading={false} />);
@@ -59,12 +74,12 @@ describe("OrderDetail", () => {
     expect(within(panel).getByText("总支出")).toBeInTheDocument();
   });
 
-  it("FE-054：原详情测试入口不展示账号密码明文", () => {
+  it("详情态展示账号密码明文并支持复制", () => {
     const accountWithPassword = { ...account, game_password: "secret-password", game_type: "原神" } as unknown as Account;
     render(<OrderDetail row={accountWithPassword} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
     const panel = document.querySelector(".inventory-detail") as HTMLElement;
-    expect(within(panel).queryByText("secret-password")).not.toBeInTheDocument();
-    expect(within(panel).getByText("已隐藏")).toBeInTheDocument();
+    expect(within(panel).getByText("secret-password")).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "复制账号密码" })).toBeInTheDocument();
   });
 
   it("参与方按角色与名称展示，并可打开客户中心卡片", () => {
@@ -82,6 +97,19 @@ describe("OrderDetail", () => {
         counterparties: [{ id: 11, display_name: "平台A", role: "PLATFORM" }],
         events: [],
       }],
+      detail_view: {
+        operation_rows: [],
+        execution_rows: [],
+        finance_rows: [],
+        lifecycle: { removed_platform: "-", recovery_platform: "-", sale_platform: "-" },
+        order_notes: "-",
+        parties: [
+          { id: 7, display_name: "买家A", role: "BUYER", entity_type: "customer" },
+          { id: 8, display_name: "卖家B", role: "SELLER", entity_type: "customer" },
+          { id: 11, display_name: "平台A", role: "PLATFORM", entity_type: "counterparty" },
+        ],
+        extras: [],
+      },
     } as unknown as AccountExecutionDetail;
 
     render(<OrderDetail row={account} detail={detail} loading={false} onPartyClick={onPartyClick} />);
@@ -90,7 +118,7 @@ describe("OrderDetail", () => {
     expect(screen.getByRole("link", { name: "客户_卖家：卖家B" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "合作方_平台：平台A" })).toBeInTheDocument();
     fireEvent.click(buyer);
-    expect(onPartyClick).toHaveBeenCalledWith({ id: 7, display_name: "买家A", role: "BUYER", entityType: "customer" });
+    expect(onPartyClick).toHaveBeenCalledWith({ id: 7, display_name: "买家A", role: "BUYER", entity_type: "customer", entityType: "customer" });
   });
 
   it("把展开详情按基础信息、执行明细和资金明细分成独立视觉层", () => {
@@ -100,10 +128,9 @@ describe("OrderDetail", () => {
     expect(within(panel).queryByText("登记与流转信息")).toBeNull();
     expect(within(panel).queryByText("其他补充信息")).toBeNull();
     expect(within(panel).queryByText("主订单信息")).toBeNull();
-    // 账号补充资料（描述 / 作图）现置于运营信息板块
-    expect(within(panel).getByText("账号补充资料")).toBeInTheDocument();
-    expect(within(panel).getByText("描述")).toBeInTheDocument();
-    expect(within(panel).getByText("作图")).toBeInTheDocument();
+    expect(within(panel).getByText("运营信息")).toBeInTheDocument();
+    expect(within(panel).getByText("上架平台")).toBeInTheDocument();
+    expect(within(panel).getByText("下架平台")).toBeInTheDocument();
     expect(panel.querySelector(".inventory-detail__meta")).toBeTruthy();
     expect(panel.querySelector(".inventory-detail__section--execution")).toBeTruthy();
     expect(panel.querySelector(".inventory-detail__section--finance")).toBeTruthy();
@@ -115,29 +142,18 @@ describe("OrderDetail", () => {
     const panel = document.querySelector(".inventory-detail") as HTMLElement;
     expect(panel.querySelector(".inventory-detail__meta-table")).toBeTruthy();
     const accountTable = panel.querySelector(".inventory-detail__section--profile .inventory-detail__meta-table");
-    // 账号资料 7 项（游戏类型/账号/密码/区服/有无二次/钱包实名/账号备注）分 2 行网格。
-    expect(accountTable?.querySelectorAll("tbody > tr")).toHaveLength(2);
+    expect(within(panel).getByText("账号资料")).toBeInTheDocument();
+    expect(accountTable?.querySelectorAll("tbody > tr").length).toBeGreaterThan(0);
   });
 
-  it("账号补充资料（标签 描述/作图）置于运营信息，游戏账号信息不再含该组", () => {
+  it("运营信息只保留四个独立动作", () => {
     render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
-    const profileSection = document.querySelector(".inventory-detail__section--profile") as HTMLElement;
     const operationSection = document.querySelector(".inventory-detail__section--operation") as HTMLElement;
-    // 游戏账号信息不再包含账号补充资料
-    expect(profileSection.textContent).not.toContain("账号补充资料");
-    // 账号补充资料组位于运营信息，标签为「描述 / 作图」，不再使用旧名「账号描述 / 账号图片」
-    const groups = Array.from(operationSection.querySelectorAll(".inventory-detail__meta-group"));
-    const supplementGroup = groups.find((g) => g.textContent?.includes("账号补充资料")) as HTMLElement;
-    expect(supplementGroup.textContent).toContain("描述");
-    expect(supplementGroup.textContent).toContain("作图");
-    expect(supplementGroup.textContent).not.toContain("账号描述");
-    expect(supplementGroup.textContent).not.toContain("账号图片");
-    expect(supplementGroup.textContent).not.toContain("有无二次");
-    // 游戏账号信息（走建单）：账号资料组含 有无二次 与 账号备注
-    const accountGroup = Array.from(profileSection.querySelectorAll(".inventory-detail__meta-group"))
-      .find((g) => g.textContent?.includes("账号资料") && !g.textContent?.includes("补充")) as HTMLElement;
-    expect(accountGroup.textContent).toContain("有无二次");
-    expect(accountGroup.textContent).toContain("账号备注");
+    expect(within(operationSection).getByText("上架平台")).toBeInTheDocument();
+    expect(within(operationSection).getByText("下架平台")).toBeInTheDocument();
+    expect(within(operationSection).getByText("描述")).toBeInTheDocument();
+    expect(within(operationSection).getByText("作图")).toBeInTheDocument();
+    expect(within(operationSection).queryByText("当前运营状态")).toBeNull();
   });
 
   it("编辑执行明细时操作员选择器保持可读宽度", () => {
@@ -160,17 +176,187 @@ describe("OrderDetail", () => {
         }],
         rebates: [],
       }],
+      detail_view: {
+        operation_rows: [],
+        execution_rows: [{ key: "buy", order_id: 1, category: "INBOUND", action: "回收入库", occurred_at: "2026-10-15T10:20:00", amount: "100.00", operator: "admin", note: "回收登记", platform: "-", event_id: 1 }],
+        finance_rows: [],
+        lifecycle: { removed_platform: "-", recovery_platform: "-", sale_platform: "-" },
+        order_notes: "-",
+        parties: [],
+        extras: [],
+      },
     } as unknown as AccountExecutionDetail;
 
     renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} employees={[{ id: 7, username: "zhangsan", display_name: "张三", is_active: true }]} />);
     expect(document.querySelector(".inventory-edit-operator")).toBeTruthy();
   });
 
-  it("详情编辑态保留账户资料只读，不再展示账户资料编辑控件", () => {
+  it("编辑态账号输入与运营动作字段都绑定可编辑状态", () => {
+    const detail = {
+      account: { ...account, game_account: "原账号" },
+      orders: [{
+        order_id: 21,
+        order_no: "DG0021",
+        order_type: "DG",
+        created_at: "2026-10-15T10:19:00",
+        events: [{
+          id: 2101,
+          event_type: "OPERATE",
+          operation_type: "CONSIGNMENT",
+          occurred_at: "2026-10-15T10:20:00",
+          form_extra: { consignment_platforms: ["千寻"] },
+          operator_user_ids: [7],
+          amount: "0.00",
+          note: "寄售上架：千寻",
+        }],
+        rebates: [],
+      }],
+      detail_view: {
+        operation_rows: [{
+          key: "consignment",
+          action: "上架平台",
+          content: "千寻",
+          occurred_at: "2026-10-15T10:20:00",
+          operator: "张三",
+          event_id: 2101,
+        }, { key: "unlist", action: "下架平台", content: "-", occurred_at: null, operator: "-", event_id: null },
+        { key: "description", action: "描述", content: "-", occurred_at: null, operator: "-", event_id: null },
+        { key: "images", action: "作图", content: "-", occurred_at: null, operator: "-", event_id: null }],
+        finance_rows: [],
+        execution_rows: [],
+        lifecycle: { sold_at: null, removed_at: null, removed_platform: "-", recovery_platform: "-", sale_platform: "-" },
+        order_notes: "-",
+        parties: [],
+        extras: [],
+      },
+      finance_summary: { total_expense: "0.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+
+    const onProfileChange = vi.fn();
+    renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} onProfileChange={onProfileChange} employees={[{ id: 7, username: "zhangsan", display_name: "张三", is_active: true }]} />);
+
+    const accountInput = screen.getByLabelText("编辑游戏账号 / 产品") as HTMLInputElement;
+    fireEvent.change(accountInput, { target: { value: "新账号" } });
+    expect(onProfileChange).toHaveBeenCalledWith({ game_account: "新账号" });
+    expect(screen.getByRole("combobox", { name: "编辑上架平台" })).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "编辑寄售价格" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "编辑上架平台操作人" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "上传作图" })).toBeInTheDocument();
+  });
+
+  it("编辑参与方时按订单类型提供客户或渠道方的新建与选择控件", () => {
+    const detail = {
+      orders: [{
+        order_id: 22,
+        order_no: "HS0022",
+        order_type: "HS",
+        created_at: "2026-10-15T10:19:00",
+        customers: [],
+        counterparties: [],
+        events: [],
+      }],
+      detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] },
+      finance_summary: { total_expense: "0.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
+
+    expect(screen.getByRole("combobox", { name: "选择客户" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "新建客户名称" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "选择渠道方" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "新建渠道方名称" })).toBeNull();
+  });
+
+  it("编辑态账号与交付补充资料可以修改并写入对应草稿", async () => {
+    vi.spyOn(orderFormFieldsApi, "list").mockImplementation(async (scope) => {
+      if (scope === "DG") {
+        return [
+          { id: 901, order_type_code: "DG", field_key: "account_tag", label: "账号标签", field_type: "TEXT", options: null, required: false, is_active: true, sort_order: 1, locked: false, is_custom: true, section: "ACCOUNT_PRODUCT", note: null },
+          { id: 902, order_type_code: "DG", field_key: "delivery_note", label: "交付备注", field_type: "TEXT", options: null, required: false, is_active: true, sort_order: 2, locked: false, is_custom: true, section: "DELIVER", note: null },
+        ];
+      }
+      return [];
+    });
+    const detail = {
+      account: { ...account, extra_values: { account_tag: "旧标签" } },
+      orders: [{ order_id: 31, order_no: "DG0031", order_type: "DG", created_at: "2026-10-15T10:19:00", extra_values: { delivery_note: "旧交付备注" }, events: [] }],
+      detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [{ key: "delivery_note", label: "交付备注", value: "旧交付备注", section: "DELIVER" }] },
+      finance_summary: { total_expense: "0.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+    const onProfileChange = vi.fn();
+    const onOrderExtraChange = vi.fn();
+    renderApp(<OrderDetail row={{ ...account, extra_values: { account_tag: "旧标签" } } as Account} detail={detail} contextOrderId={31} loading={false} editing={{ ...account, extra_values: { account_tag: "旧标签" } } as Account} onProfileChange={onProfileChange} onOrderExtraChange={onOrderExtraChange} employees={[]} />);
+
+    await waitFor(() => expect(screen.getByDisplayValue("旧标签")).toBeInTheDocument());
+    fireEvent.change(screen.getByDisplayValue("旧标签"), { target: { value: "新标签" } });
+    expect(onProfileChange).toHaveBeenCalledWith({ extra_values: { account_tag: "新标签" } });
+    const delivery = screen.getByDisplayValue("旧交付备注");
+    fireEvent.change(delivery, { target: { value: "新交付备注" } });
+    expect(onOrderExtraChange).toHaveBeenCalledWith(31, "delivery_note", "新交付备注");
+  });
+
+  it("编辑态交付字段以账号草稿为唯一来源，不回退到旧订单快照", () => {
+    const detail = {
+      account: { ...account, bound_phone: "新手机号" },
+      orders: [{
+        order_id: 33,
+        order_no: "HS0033",
+        order_type: "HS",
+        created_at: "2026-10-15T10:19:00",
+        extra_values: { bound_phone: "旧手机号", bound_phone_owner: "旧绑定人" },
+        events: [],
+      }],
+      detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] },
+      finance_summary: { total_expense: "0.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+
+    renderApp(<OrderDetail row={{ ...account, bound_phone: "新手机号" } as Account} detail={detail} loading={false} editing={{ ...account, bound_phone: "新手机号" } as Account} employees={[]} />);
+
+    expect(screen.getByLabelText("编辑换绑手机号")).toHaveValue("新手机号");
+    expect(screen.getByLabelText("编辑手机号绑定人")).toHaveValue("");
+  });
+
+  it("编辑详情不再展示时间联动入口，时间直接在操作明细中修改", () => {
+    const detail = {
+      orders: [{ order_id: 32, order_no: "HS0032", order_type: "HS", created_at: "2026-10-15T10:19:00", events: [] }],
+      detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] },
+      finance_summary: { total_expense: "0.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+
+    renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} employees={[]} />);
+
+    expect(screen.queryByText("时间联动")).toBeNull();
+    expect(screen.queryByLabelText("编辑订单创建时间")).toBeNull();
+  });
+
+  it("售出动作登记在来源订单时仍展示卖号交付", () => {
+    const detail = {
+      account,
+      orders: [{
+        order_id: 32,
+        order_no: "HS0032",
+        order_type: "HS",
+        created_at: "2026-10-15T10:19:00",
+        events: [
+          { id: 3201, event_type: "BUY", amount: "100.00", occurred_at: "2026-10-15T10:20:00" },
+          { id: 3202, event_type: "SELL", amount: "200.00", occurred_at: "2026-10-15T11:20:00" },
+        ],
+      }],
+      detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] },
+      finance_summary: { total_expense: "100.00", total_income: "200.00" },
+    } as unknown as AccountExecutionDetail;
+
+    renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} employees={[]} />);
+
+    const deliverySection = document.querySelector(".inventory-detail__section--delivery") as HTMLElement;
+    expect(within(deliverySection).getByText("买号交付")).toBeInTheDocument();
+    expect(within(deliverySection).getByText("卖号交付")).toBeInTheDocument();
+  });
+
+  it("详情编辑态账号资料直接展示编辑控件", () => {
     renderApp(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} editing={account} employees={[]} />);
     const profile = document.querySelector(".inventory-detail__section--profile") as HTMLElement;
-    expect(within(profile).queryByLabelText("编辑游戏账号/产品")).toBeNull();
-    expect(within(profile).getByText("acc-1")).toBeInTheDocument();
+    expect(within(profile).getByLabelText("编辑游戏账号 / 产品")).toHaveValue("acc-1");
   });
 
   it("FE-269：返点进入收入笔数，总收入取服务端 finance_summary", () => {
@@ -199,6 +385,15 @@ describe("OrderDetail", () => {
         total_income: "100.00",
         total_expense: "0.00",
         net_amount: "100.00",
+      },
+      detail_view: {
+        operation_rows: [],
+        execution_rows: [],
+        finance_rows: [{ key: "RB01", flow_no: "RB01", type: "买号返点", direction: "收入", amount: "100.00", occurred_at: "2026-11-02T10:00:00", pool_name: "经营荷包", note: "-", operator: "admin" }],
+        lifecycle: { removed_platform: "-", recovery_platform: "-", sale_platform: "-" },
+        order_notes: "-",
+        parties: [],
+        extras: [],
       },
     } as unknown as AccountExecutionDetail;
 
@@ -248,7 +443,7 @@ describe("OrderDetail", () => {
     expect(within(summary).getByText("总支出").parentElement).toHaveTextContent("67.89");
   });
 
-  it("FE-129：无寄售平台的初始代挂单不应显示为已上架", () => {
+  it("无寄售平台的初始代挂单只显示未登记的运营动作", () => {
     const consignmentAccount = { ...account, inventory_type: "CONSIGNMENT" } as unknown as Account;
     const detail = {
       orders: [{
@@ -266,12 +461,11 @@ describe("OrderDetail", () => {
     render(<OrderDetail row={consignmentAccount} detail={detail} loading={false} />);
 
     const operation = document.querySelector(".inventory-detail__section--operation") as HTMLElement;
-    expect(within(operation).getByText("待售")).toBeInTheDocument();
+    expect(within(operation).getByText("上架平台")).toBeInTheDocument();
     expect(within(operation).queryByText("寄售中")).toBeNull();
-    expect(within(operation).queryByText("寄售平台 / 寄售时间")).toBeNull();
   });
 
-  it("FE-129：明确平台的代挂动作才显示寄售中和平台时间", () => {
+  it("明确平台的代挂动作在运营信息中展示平台", () => {
     const consignmentAccount = { ...account, inventory_type: "CONSIGNMENT" } as unknown as Account;
     const detail = {
       orders: [{
@@ -285,15 +479,24 @@ describe("OrderDetail", () => {
           id: 1301,
           event_type: "OPERATE",
           operation_type: "CONSIGNMENT",
-          form_extra: { consignment_platform: "盼之", listed_at: "2026-11-02T10:05" },
+          form_extra: { consignment_platforms: ["盼之"], listed_at: "2026-11-02T10:05" },
         }],
       }],
+      detail_view: {
+        operation_rows: [{ key: "consignment", action: "上架平台", content: "盼之", occurred_at: "2026-11-02T10:05", operator: "admin", event_id: 1301 }, { key: "unlist", action: "下架平台", content: "-", occurred_at: null, operator: "-", event_id: null }, { key: "description", action: "描述", content: "-", occurred_at: null, operator: "-", event_id: null }, { key: "images", action: "作图", content: "-", occurred_at: null, operator: "-", event_id: null }],
+        execution_rows: [],
+        finance_rows: [],
+        lifecycle: { removed_platform: "-", recovery_platform: "-", sale_platform: "-" },
+        order_notes: "-",
+        parties: [],
+        extras: [],
+      },
     } as unknown as AccountExecutionDetail;
 
     render(<OrderDetail row={consignmentAccount} detail={detail} loading={false} />);
 
     const operation = document.querySelector(".inventory-detail__section--operation") as HTMLElement;
-    expect(within(operation).getByText("寄售中")).toBeInTheDocument();
-    expect(within(operation).getByText("盼之 / 2026-11-02 10:05")).toBeInTheDocument();
+    expect(within(operation).getByText("盼之")).toBeInTheDocument();
+    expect(within(operation).queryByText("寄售中")).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import { CopyOutlined } from "@ant-design/icons";
-import { Descriptions, Tooltip } from "antd";
+import { Descriptions, Input, Tooltip } from "antd";
 import { useMemo } from "react";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
@@ -17,6 +17,7 @@ import {
   useOrderFormSectionLabels,
 } from "../../orders/ConfigurableField";
 import { appMessage } from "../../shared/ui/appFeedback";
+import { Select } from "../../shared/ui";
 
 type AccountProfileKey =
   | "gameType"
@@ -36,8 +37,7 @@ type AccountProfileField = {
 };
 
 type AccountProfileValueSource = {
-  meta: OrderDetailMeta;
-  account?: Account | null;
+  account: Account;
 };
 
 type AccountProfileFieldDefinition = Omit<AccountProfileField, "value"> & {
@@ -48,8 +48,8 @@ function fallbackValue(value: string | null | undefined, fallback = "-") {
   return value || fallback;
 }
 
-function channelRegionValue({ meta, account }: AccountProfileValueSource) {
-  return [account?.platform, account?.channel_region].filter(Boolean).join(" / ") || fallbackValue(meta.channelRegion);
+function channelRegionValue({ account }: AccountProfileValueSource) {
+  return [account.platform, account.channel_region].filter(Boolean).join(" / ") || "-";
 }
 
 const COPYABLE_PROFILE_KEYS = new Set<AccountProfileKey>(["gameAccount", "campAccount", "password"]);
@@ -90,24 +90,24 @@ function CopyableProfileValue({ label, value }: { label: string; value: string }
 }
 
 const ACCOUNT_PROFILE_FIELD_DEFINITIONS: AccountProfileFieldDefinition[] = [
-  { key: "gameType", cfgKey: "game_type", fallback: "游戏 / 产品类型", getValue: ({ meta, account }) => fallbackValue(account?.game_type, meta.gameType ?? undefined) },
-  { key: "gameAccount", cfgKey: "game_account", fallback: "游戏账号 / 产品", getValue: ({ meta, account }) => fallbackValue(account?.game_account, meta.gameAccount ?? undefined) },
-  { key: "campAccount", cfgKey: "camp_account", fallback: "营地账号", getValue: ({ meta, account }) => fallbackValue(account?.camp_account, meta.campAccount ?? undefined) },
+  { key: "gameType", cfgKey: "game_type", fallback: "游戏 / 产品类型", getValue: ({ account }) => fallbackValue(account.game_type) },
+  { key: "gameAccount", cfgKey: "game_account", fallback: "游戏账号 / 产品", getValue: ({ account }) => fallbackValue(account.game_account) },
+  { key: "campAccount", cfgKey: "camp_account", fallback: "营地账号", getValue: ({ account }) => fallbackValue(account.camp_account) },
   {
     key: "password",
     cfgKey: "game_password",
     fallback: "账号密码",
-    getValue: ({ meta, account }) => fallbackValue(account?.game_password, meta.password),
+    getValue: ({ account }) => fallbackValue(account.game_password),
   },
   { key: "channelRegion", cfgKey: "channel_region", fallback: "渠道 / 区服", getValue: channelRegionValue },
   {
     key: "secondary",
     cfgKey: "has_secondary",
     fallback: "有无二次",
-    getValue: ({ meta, account }) => account?.has_secondary == null ? fallbackValue(meta.secondary) : account.has_secondary ? "有" : "无",
+    getValue: ({ account }) => account.has_secondary == null ? "-" : account.has_secondary ? "有" : "无",
   },
-  { key: "walletRealname", cfgKey: "wallet_realname", fallback: "钱包实名", getValue: ({ meta, account }) => fallbackValue(account?.wallet_realname, meta.walletRealname) },
-  { key: "note", cfgKey: "game_account_note", fallback: "账号备注", getValue: ({ meta, account }) => fallbackValue(account?.note, meta.note) },
+  { key: "walletRealname", cfgKey: "wallet_realname", fallback: "钱包实名", getValue: ({ account }) => fallbackValue(account.wallet_realname) },
+  { key: "note", cfgKey: "game_account_note", fallback: "账号备注", getValue: ({ account }) => fallbackValue(account.note) },
 ];
 
 function buildAccountProfileFields(source: AccountProfileValueSource): AccountProfileField[] {
@@ -117,10 +117,10 @@ function buildAccountProfileFields(source: AccountProfileValueSource): AccountPr
   }));
 }
 
-function accountImages(account: Account | null | undefined, meta: OrderDetailMeta) {
+function accountImages(account: Account) {
   return {
-    secondary: account?.secondary_images ?? meta.secondaryImages,
-    walletRealname: account?.wallet_realname_images ?? meta.walletRealnameImages,
+    secondary: account.secondary_images ?? [],
+    walletRealname: account.wallet_realname_images ?? [],
   };
 }
 
@@ -129,10 +129,14 @@ export function OrderDetailProfileSection({
   meta,
   account,
   detail,
+  editing = false,
+  onProfileChange,
 }: {
   meta: OrderDetailMeta;
   account?: Account | null;
   detail?: AccountExecutionDetail | null;
+  editing?: boolean;
+  onProfileChange?: (changes: Partial<Account>) => void;
 }) {
   const creationOrder = useMemo(
     () => detail?.orders.find((order) => order.order_no === meta.sourceOrderNo),
@@ -141,24 +145,31 @@ export function OrderDetailProfileSection({
   const creationOrderType = creationOrder?.order_type ?? undefined;
   const { config: creationConfig } = useOrderFormConfig(creationOrderType);
   const { labels: sectionLabels } = useOrderFormSectionLabels(creationOrderType);
-  const profileAccount = detail?.account ?? account;
-  const profileSource = useMemo(() => ({ meta, account: profileAccount }), [meta, profileAccount]);
-  const accountProfileFields = useMemo(() => buildAccountProfileFields(profileSource), [profileSource]);
+  // 编辑态必须以本地草稿 account 为唯一受控源；详情快照只用于只读展示。
+  // 否则每次输入都会被 detail.account 的旧值覆盖，表现为输入框无法编辑。
+  const profileAccount = account;
+  const profileSource = useMemo(() => profileAccount ? ({ account: profileAccount }) : null, [profileAccount]);
+  const accountProfileFields = useMemo(
+    () => profileSource ? buildAccountProfileFields(profileSource) : [],
+    [profileSource],
+  );
   const visibleAccountProfileFields = useMemo(
     () => accountProfileFields.filter((field) => isFieldActive(creationConfig, field.cfgKey)),
     [accountProfileFields, creationConfig],
   );
-  const images = useMemo(() => accountImages(profileAccount, meta), [profileAccount, meta]);
+  const images = useMemo(() => profileAccount ? accountImages(profileAccount) : { secondary: [], walletRealname: [] }, [profileAccount]);
 
   const accountExtraItems = useMemo(() => {
-    const extraValues = {
-      ...(profileAccount?.extra_values ?? {}),
-      ...(creationOrder?.extra_values ?? {}),
-    };
-    return buildFormExtraDisplay(extraValues, Object.values(creationConfig)).filter(
+    const extraValues = profileAccount?.extra_values ?? {};
+    const existing = buildFormExtraDisplay(extraValues, Object.values(creationConfig)).filter(
       (item) => (creationConfig[item.key]?.section ?? "EXTRA") === "ACCOUNT_PRODUCT",
     );
-  }, [creationOrder, creationConfig, profileAccount]);
+    const existingKeys = new Set(existing.map((item) => item.key));
+    const configured = Object.values(creationConfig)
+      .filter((field) => field.is_custom && field.is_active && field.section === "ACCOUNT_PRODUCT" && !existingKeys.has(field.field_key))
+      .map((field) => ({ key: field.field_key, label: field.label, value: "", status: "active" as const }));
+    return [...existing, ...configured];
+  }, [creationConfig, profileAccount]);
 
   return (
     <div className="inventory-detail__section inventory-detail__section--profile">
@@ -169,7 +180,9 @@ export function OrderDetailProfileSection({
           <Descriptions className="inventory-detail__meta-table" size="small" bordered column={3}>
             {visibleAccountProfileFields.map((field) => (
                 <Descriptions.Item key={field.key} label={fieldLabel(creationConfig, field.cfgKey, field.fallback)}>
-                  {COPYABLE_PROFILE_KEYS.has(field.key) ? (
+                  {editing ? (
+                    <EditableProfileField field={field} account={profileAccount} onChange={onProfileChange} />
+                  ) : COPYABLE_PROFILE_KEYS.has(field.key) ? (
                     <CopyableProfileValue label={field.fallback} value={field.value} />
                   ) : field.value}
                 </Descriptions.Item>
@@ -190,7 +203,18 @@ export function OrderDetailProfileSection({
             <Descriptions className="inventory-detail__meta-table" size="small" bordered column={3}>
               {accountExtraItems.map((item) => (
                 <Descriptions.Item key={item.key} label={`${item.label}${item.status === "deleted" ? "（已删除）" : item.status === "inactive" ? "（已停用）" : ""}`}>
-                  {formatExtraDisplayValue(item.value) || "-"}
+                  {editing ? (
+                    <Input
+                      aria-label={`编辑${item.label}`}
+                      value={formatExtraDisplayValue(profileAccount?.extra_values?.[item.key] ?? item.value)}
+                      onChange={(event) => onProfileChange?.({
+                        extra_values: {
+                          ...(profileAccount?.extra_values ?? {}),
+                          [item.key]: event.target.value,
+                        },
+                      })}
+                    />
+                  ) : formatExtraDisplayValue(item.value) || "-"}
                 </Descriptions.Item>
               ))}
             </Descriptions>
@@ -199,4 +223,53 @@ export function OrderDetailProfileSection({
       </div>
     </div>
   );
+}
+
+function EditableProfileField({
+  field,
+  account,
+  onChange,
+}: {
+  field: AccountProfileField;
+  account?: Account | null;
+  onChange?: (changes: Partial<Account>) => void;
+}) {
+  if (field.key === "secondary") {
+    return (
+      <Select
+        aria-label="编辑有无二次"
+        value={account?.has_secondary == null ? undefined : account.has_secondary ? "true" : "false"}
+        placeholder="请选择"
+        options={[{ value: "true", label: "有" }, { value: "false", label: "无" }]}
+        onChange={(value: string) => onChange?.({ has_secondary: value === "true" })}
+      />
+    );
+  }
+  const value = field.key === "channelRegion"
+    ? account?.channel_region ?? ""
+    : field.key === "gameType"
+      ? account?.game_type ?? ""
+      : field.key === "gameAccount"
+        ? account?.game_account ?? ""
+        : field.key === "campAccount"
+          ? account?.camp_account ?? ""
+          : field.key === "password"
+            ? account?.game_password ?? ""
+            : field.key === "walletRealname"
+              ? account?.wallet_realname ?? ""
+              : account?.note ?? "";
+  const key = field.key === "channelRegion"
+    ? "channel_region"
+    : field.key === "gameType"
+      ? "game_type"
+      : field.key === "gameAccount"
+        ? "game_account"
+        : field.key === "campAccount"
+          ? "camp_account"
+          : field.key === "password"
+            ? "game_password"
+            : field.key === "walletRealname"
+              ? "wallet_realname"
+              : "note";
+  return <Input aria-label={`编辑${field.fallback}`} value={value} onChange={(event) => onChange?.({ [key]: event.target.value })} />;
 }

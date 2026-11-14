@@ -473,7 +473,7 @@ class TestAccountsApi:
         assert response.json()["account"]["source_order_no"] is None
         assert response.json()["orders"] == []
 
-    def test_read_only_finance_user_cannot_read_game_password(
+    def test_read_only_finance_user_can_read_game_password(
         self, seeded_client, seeded_db
     ):
         account = _account(seeded_db, "credential-scope-account", game_password="secret")
@@ -485,14 +485,14 @@ class TestAccountsApi:
         listed = seeded_client.get("/api/v1/stocks", headers=viewer_headers)
         assert listed.status_code == 200, listed.text
         item = next(row for row in listed.json()["items"] if row["id"] == account.id)
-        assert item["game_password"] is None
+        assert item["game_password"] == "secret"
 
         detail = seeded_client.get(
             f"/api/v1/stocks/{account.id}/execution-detail",
             headers=viewer_headers,
         )
         assert detail.status_code == 200, detail.text
-        assert detail.json()["account"]["game_password"] is None
+        assert detail.json()["account"]["game_password"] == "secret"
 
     def test_standalone_account_creation_endpoint_removed(self, seeded_client, headers):
         response = seeded_client.post(
@@ -656,6 +656,23 @@ class TestAccountsApi:
 
         assert response.status_code == 200, response.text
         assert response.json()["account"]["source_order_no"] == order.order_no
+
+    def test_stock_and_order_execution_detail_share_event_context(self, seeded_client, seeded_db, headers):
+        """详情路由必须把事件上下文中的汇总输入传给财务汇总器。"""
+        account = _account(seeded_db, "detail-context")
+        order = _buy(seeded_db, account, amount="300")
+
+        stock_response = seeded_client.get(
+            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
+        )
+        order_response = seeded_client.get(
+            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
+        )
+
+        assert stock_response.status_code == 200, stock_response.text
+        assert order_response.status_code == 200, order_response.text
+        assert stock_response.json()["finance_summary"]["total_expense"] == "300.00"
+        assert order_response.json()["finance_summary"]["total_expense"] == "300.00"
 
     def test_order_execution_detail_is_scoped_to_current_order(
         self, seeded_client, seeded_db, headers

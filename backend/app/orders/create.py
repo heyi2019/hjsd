@@ -437,6 +437,29 @@ def add_customer_role(
     return order
 
 
+def add_counterparty_role(
+    session: Session, order_id: int, counterparty_id: int, role: str, *,
+    actor: str, user: CurrentUser | None = None,
+) -> Order:
+    """向已有订单追加合作方角色（详情编辑使用）。"""
+    order = get_order(session, order_id, user)
+    _validate_participant_roles(order.order_type, [], [(counterparty_id, role)])
+    assert_counterparty_usable(session, counterparty_id, expected_type=role)
+    from app.domain.parties import OrderCounterpartyRole
+
+    existing = session.scalar(
+        select(OrderCounterpartyRole.id).where(
+            OrderCounterpartyRole.order_id == order_id,
+            OrderCounterpartyRole.counterparty_id == counterparty_id,
+            OrderCounterpartyRole.role == role,
+        )
+    )
+    if existing is None:
+        session.add(_counterparty_role(order_id, counterparty_id, role))
+        session.flush()
+    return order
+
+
 def _counterparty_role(order_id: int, counterparty_id: int, role: str):
     from app.domain.parties import OrderCounterpartyRole
 

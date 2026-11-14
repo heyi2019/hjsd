@@ -3,7 +3,7 @@
 账号状态与成本由订单事件驱动，本模块**不提供**改状态/改成本入口（ACC-01-03/04）。
 """
 
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -37,27 +37,16 @@ from app.stocks.profile import (
 from app.stocks.deletion import delete_inventory as stocks_delete_inventory
 from app.parties.fields import get_extra_values
 from app.domain.foundation import AuditLog
-from app.domain.users import User
-from app.domain.trade import (
-    Account,
-    Cashflow,
-    Order,
-    OrderEvent,
-    Installment,
-    Reconciliation,
-)
+from app.domain.trade import Order
 from app.core.audit import record_audit
-from app.core.errors import Conflict, NotFound, PermissionDenied, Validation
+from app.core.errors import NotFound, PermissionDenied
 from app.orders._shared import get_order
-# 复用订单台账「成交日期」的账期平移口径（事件/流水 occurred_on + 规则快照重取）。
-from app.orders.mutations import _shift_accounting_dates
 
 from .schemas import (
     AccountOut,
     AccountListOut,
     AccountProfileUpdate,
     AccountDeleteRequest,
-    ExecutionEditRequest,
     InventoryResponseOut,
     InventoryStatsOut,
     InventoryStatsQuery,
@@ -76,6 +65,8 @@ from .order_detail_view.assembler import build_order_outputs
 from .order_detail_view.finance import build_finance_summary
 from .order_detail_view.events import load_event_context
 from .order_detail_view.relations import load_relations
+from .order_detail import edit_execution_detail
+from .order_detail.schemas import ExecutionEditRequest
 
 router = APIRouter(tags=["ACC-01 账号台账"])
 
@@ -84,124 +75,12 @@ manage = require_permissions(PERM_ORDER_CREATE)
 edit_execution = require_permissions(PERM_ORDER_UPDATE, PERM_FINANCE_ORDER_EVENT_POST)
 
 
-def _apply_time_shift(db: Session, account_id: int, delta_minutes: int, actor: str) -> None:
-    """账号台账时间联动：把该账号关联订单的整条时间轴平移 N 分钟。
-
-    账期（trade_date / 事件与流水 occurred_on / 规则快照）走订单台账同源函数；
-    台账界面展示的「登记时间」「售出时间」「流水时间」取的是 created_at / posted_at
-    时间戳，必须一并平移，否则改完日期界面仍显示旧值。
-    分期还款计划（first_due_on / 期次 due_on）按既定口径不动。
-    """
-    if delta_minutes == 0:
-        return
-    db.flush()  # 让同一请求内先前的执行记录改动对下面的查询可见
-    shift = timedelta(minutes=delta_minutes)
-    orders = list(db.scalars(select(Order).where(Order.account_id == account_id)).all())
-    if not orders:
-        raise NotFound("账号关联订单不存在")
-    order_ids = [order.id for order in orders]
-    events = list(db.scalars(select(OrderEvent).where(OrderEvent.order_id.in_(order_ids))).all())
-    flows = list(db.scalars(select(Cashflow).where(Cashflow.order_id.in_(order_ids))).all())
-    for order in orders:
-        new_trade_date = order.trade_date + shift
-        _shift_accounting_dates(db, order, actor=actor, new_trade_date=new_trade_date)
-        order.trade_date = new_trade_date
-        if order.created_at is not None:
-            order.created_at = order.created_at + shift
-        order.updated_by = actor
-    for event in events:
-        if event.posted_at is not None:
-            event.posted_at = event.posted_at + shift
-        if event.created_at is not None:
-            event.created_at = event.created_at + shift
-        event.updated_by = actor
-    for flow in flows:
-        if flow.created_at is not None:
-            flow.created_at = flow.created_at + shift
-        flow.updated_by = actor
-    record_audit(
-        db, action="ORDER_UPDATE", entity_type="inventory_time_shift",
-        entity_id=account_id, actor=actor,
-        before={"delta_minutes": 0},
-        after={"delta_minutes": delta_minutes, "orders": len(orders), "events": len(events), "cashflows": len(flows)},
-    )
-
-
 @router.patch("/stocks/{account_id}/execution-edit")
 def update_execution_detail(
     account_id: int, payload: ExecutionEditRequest,
     db: Session = Depends(get_db), user: CurrentUser = edit_execution,
 ) -> dict[str, bool]:
-    account = get_account(db, account_id, user)
-    db.scalar(select(Account).where(Account.id == account_id).with_for_update())
-    if len({item.id for item in payload.events}) != len(payload.events):
-        raise Validation("同一执行记录不能重复修改")
-    changes = []
-    cost_delta = Decimal("0")
-    for item in payload.events:
-        event = db.scalar(select(OrderEvent).where(OrderEvent.id == item.id).with_for_update())
-        order = get_order(db, event.order_id, user) if event else None
-        if event is None or order is None or order.account_id != account_id or not event.is_posted:
-            raise NotFound("执行记录不存在")
-        if Decimal(str(event.amount)) != item.expected_amount:
-            raise Conflict("执行记录已被修改，请刷新后重试")
-        if item.operator_user_ids is not None:
-            ids = item.operator_user_ids
-            if len(set(ids)) != len(ids):
-                raise Validation("操作人不能重复选择")
-            valid = set(db.scalars(select(User.id).where(User.id.in_(ids), User.is_active.is_(True))).all())
-            if valid != set(ids):
-                raise Validation("所选操作人不存在或已停用")
-        flow = db.scalar(select(Cashflow).where(Cashflow.order_event_id == event.id).with_for_update())
-        if flow is not None and not user.can_see_pool(flow.pool_id):
-            raise NotFound("关联资金流水不存在")
-        if item.amount == Decimal(str(event.amount)):
-            changes.append((event, flow, item))
-            continue
-        if event.event_type not in {"BUY", "SELL"} or item.amount <= 0:
-            raise Validation("该类型执行记录暂不支持修改金额")
-        if flow is None:
-            raise NotFound("关联资金流水不存在")
-        if Decimal(str(flow.amount)) != Decimal(str(event.amount)):
-            raise Validation("执行记录与关联流水金额不一致，请先核对")
-        if (event.offset_event_id is not None or flow.reversal_of_id is not None
-            or db.scalar(select(OrderEvent.id).where(OrderEvent.offset_event_id == event.id)) is not None
-            or db.scalar(select(Cashflow.id).where(Cashflow.reversal_of_id == flow.id)) is not None):
-            raise Validation("已冲销或被冲销的记录不能直接修改")
-        if db.scalar(select(Installment.id).where(Installment.order_id == order.id)) is not None:
-            raise Validation("关联分期的记录不能直接修改，请先处理分期")
-        if db.scalar(select(RebateRecord.id).where(RebateRecord.source_order_id == order.id)) is not None:
-            raise Validation("关联返点的记录不能直接修改，请先核对返点")
-        if db.scalar(select(Reconciliation.id).where(Reconciliation.pool_id == flow.pool_id, Reconciliation.reconciled_on >= flow.occurred_on)) is not None:
-            raise Validation("资金池已有后续对账记录，不能直接修改")
-        if event.event_type == "BUY":
-            cost_delta += item.amount - Decimal(str(event.amount))
-        changes.append((event, flow, item))
-    if Decimal(str(account.cost_amount)) + cost_delta < 0:
-        raise Validation("修改后库存成本不能为负数")
-    if payload.profile is not None:
-        account = stocks_update_account_profile(db, account_id, actor=user.username, user=user,
-            **payload.profile.model_dump(exclude_unset=True))
-    for event, flow, item in changes:
-        before = {"amount": str(event.amount), "note": event.note, "operator_user_ids": event.operator_user_ids, "flow_amount": str(flow.amount) if flow else None, "flow_note": flow.note if flow else None}
-        amount_changed = item.amount != Decimal(str(event.amount))
-        event.amount = item.amount
-        if "note" in item.model_fields_set:
-            event.note = item.note
-        if item.operator_user_ids is not None:
-            event.operator_user_ids = item.operator_user_ids
-        event.updated_by = user.username
-        if flow is not None and amount_changed:
-            flow.amount = item.amount
-            flow.updated_by = user.username
-        record_audit(db, action="ORDER_UPDATE", entity_type="inventory_event_edit", entity_id=event.id, actor=user.username,
-                     before=before, after={"amount": str(item.amount), "note": event.note, "operator_user_ids": event.operator_user_ids, "flow_amount": str(flow.amount) if flow else None, "flow_note": flow.note if flow else None})
-    account.cost_amount = Decimal(str(account.cost_amount)) + cost_delta
-    if changes:
-        account.updated_by = user.username
-    if payload.time_shift is not None:
-        _apply_time_shift(db, account_id, payload.time_shift.delta_minutes, user.username)
-    db.flush()
+    edit_execution_detail(db, account_id, payload, user)
     return {"ok": True}
 
 
@@ -365,6 +244,8 @@ def execution_detail(
     event_ids = [event.id for events in events_by_order.values() for event in events]
     flow_by_event = event_context.event_cashflows
     cashflows_by_order = event_context.order_cashflows
+    action_model_rebate_ids = event_context.action_model_rebate_ids
+    deposit_loss_flow_nos = event_context.deposit_loss_flow_nos
     audit_rows: list[AccountAuditOut] = []
     if _user.has(PERM_AUDIT_READ):
         audit_filters = [

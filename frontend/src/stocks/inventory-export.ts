@@ -85,7 +85,7 @@ export function buildInventoryCsv(
       const detail = details[row.id];
       const detailText = exportDetailText(detail);
       return [
-        row.source_order_no || detail?.orders.find((order) => order.order_type !== "DG")?.order_no || detail?.orders[0]?.order_no || "",
+        row.source_order_no || "",
         row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "",
         row.inventory_type ? INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type : "",
         row.game_type,

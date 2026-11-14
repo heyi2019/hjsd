@@ -17,14 +17,17 @@ import type {
   InventoryExecutionRow,
   InventoryFinanceRow,
 } from "./OrderDetail.shared";
+import type { FinanceDraft } from "../account-edit/use-account-execution-editor";
+import type { OrderDraft } from "../account-edit/use-account-execution-editor";
+import type { PartyAddition } from "../account-edit/use-account-execution-editor";
 import "./OrderDetail.css";
-import { OrderDetailTimeShiftSection } from "./OrderDetailTimeShiftSection";
 
 type OrderDetailViewProps = {
   meta: OrderDetailMeta;
   detail?: AccountExecutionDetail | null;
   account?: Account | null;
   executionRows: InventoryExecutionRow[];
+  operationEvents?: Record<string, AccountExecutionEvent | undefined>;
   financeRows: InventoryFinanceRow[];
   expenseCount: number;
   incomeCount: number;
@@ -32,16 +35,20 @@ type OrderDetailViewProps = {
   totalIncome: string;
   editing?: Account | null;
   eventDrafts?: Record<number, InventoryEventDraft>;
-  onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
+  onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
+  financeDrafts?: Record<string, FinanceDraft>;
+  onFinanceEdit?: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
+  onProfileChange?: (changes: Partial<Account>) => void;
+  orderDrafts?: Record<number, OrderDraft>;
+  onOrderEdit?: (orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) => void;
+  onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
+  onPartyEdit?: (orderId: number, addition: PartyAddition) => void;
   employees: InventoryEmployeeOption[];
   extraForm?: FormInstance;
   /** 编辑态底部操作：保存 / 取消。不传则编辑态不渲染底部按钮（纯展示用）。 */
   onSave?: () => void;
   onCancel?: () => void;
   saving?: boolean;
-  /** 编辑态时间联动：当前平移天数与 setter（由库存台账控制器持有）。 */
-  timeShiftMinutes?: number;
-  onTimeShift?: (minutes: number) => void;
 };
 
 /** 详情容器：只负责「板块怎么摆」，板块内部各自独立成文件（见 OrderDetail*.tsx）。
@@ -54,8 +61,16 @@ export function OrderDetailView({
   editing,
   eventDrafts,
   onEventEdit,
+  financeDrafts,
+  onFinanceEdit,
+  onProfileChange,
+  orderDrafts,
+  onOrderEdit,
+  onOrderExtraChange,
+  onPartyEdit,
   employees,
   executionRows,
+  operationEvents,
   financeRows,
   expenseCount,
   incomeCount,
@@ -65,28 +80,19 @@ export function OrderDetailView({
   onSave,
   onCancel,
   saving,
-  timeShiftMinutes,
-  onTimeShift,
 }: OrderDetailViewProps) {
   if (editing) {
     return (
       <div className="inventory-detail inventory-detail--editing">
-        <OrderDetailProfileSection meta={meta} detail={detail} account={account ?? editing} />
-        <OrderDetailTimeShiftSection
-          registeredAt={meta.registeredAt}
-          soldAt={meta.soldAt}
-          flowAt={financeRows.find((row) => row.key.startsWith("flow-"))?.occurredAt ?? financeRows[0]?.occurredAt ?? "-"}
-          shiftMinutes={timeShiftMinutes ?? 0}
-          onShift={onTimeShift ?? (() => undefined)}
-        />
+        <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onProfileChange={onProfileChange} />
         <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="INVEDIT" form={extraForm}>
           <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
-            <OrderDetailDeliverySection meta={meta} detail={detail} account={account} employees={employees} editing />
-            <OrderDetailOperationSection meta={meta} editing />
+            <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onProfileChange={onProfileChange} />
+            <OrderDetailOperationSection meta={meta} editing account={editing ?? account} eventDrafts={eventDrafts} onEventEdit={onEventEdit} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} />
           </FieldConfigScope>
         </BusinessRegistrationForm>
         <OrderDetailFinanceSection
@@ -96,14 +102,27 @@ export function OrderDetailView({
           incomeCount={incomeCount}
           totalExpense={totalExpense}
           totalIncome={totalIncome}
+          financeDrafts={financeDrafts}
+          onFinanceEdit={onFinanceEdit}
+          orderDraft={meta.orderId ? orderDrafts?.[meta.orderId] : undefined}
+          onOrderExtraChange={meta.orderId == null ? undefined : (key, value) => onOrderExtraChange?.(meta.orderId!, key, value)}
           editing
         />
-        <OrderDetailPartySection meta={meta} editing />
+        <OrderDetailPartySection
+          meta={meta}
+          detail={detail}
+          editing
+          onPartyEdit={onPartyEdit}
+          orderDraft={meta.orderId ? orderDrafts?.[meta.orderId] : undefined}
+          onOrderExtraChange={meta.orderId == null ? undefined : (key, value) => onOrderExtraChange?.(meta.orderId!, key, value)}
+        />
         <OrderDetailExecutionSection
           rows={executionRows}
           editing
           eventDrafts={eventDrafts}
           onEventEdit={onEventEdit}
+          orderDrafts={orderDrafts}
+          onOrderEdit={onOrderEdit}
           employees={employees}
         />
         <div className="inventory-detail__footer">
@@ -120,7 +139,7 @@ export function OrderDetailView({
     <div className="inventory-detail">
       <OrderDetailProfileSection meta={meta} detail={detail} account={account} />
       <OrderDetailDeliverySection meta={meta} detail={detail} account={account} employees={employees} />
-      <OrderDetailOperationSection meta={meta} />
+        <OrderDetailOperationSection meta={meta} account={account} operationEvents={operationEvents} />
       <OrderDetailFinanceSection
         rows={financeRows}
         orderExtras={meta.orderExtras}

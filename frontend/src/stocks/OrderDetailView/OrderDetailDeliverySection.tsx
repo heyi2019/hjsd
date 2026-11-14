@@ -1,10 +1,11 @@
-import { Descriptions } from "antd";
+import { Descriptions, Input } from "antd";
 import { type ReactNode } from "react";
 import { useMemo } from "react";
 import type { AccountExecutionDetail, AccountExecutionOrder } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../shared/api/types/org";
-import { CustomFieldSection } from "../../orders/ConfigurableField";
+import type { OrderDraft } from "../account-edit/use-account-execution-editor";
+import { Select } from "../../shared/ui";
 import {
   buildFormExtraDisplay,
   fieldLabel,
@@ -40,26 +41,40 @@ function DeliverySubSection({
   order,
   account,
   employees,
+  editing = false,
+  draft,
+  onExtraChange,
+  onProfileChange,
 }: {
   title: string;
   orderType?: string | null | undefined;
   order?: AccountExecutionOrder;
   account?: Account | null;
   employees?: EmployeeOption[];
+  editing?: boolean;
+  draft?: OrderDraft;
+  onExtraChange?: (key: string, value: unknown) => void;
+  onProfileChange?: (changes: Partial<Account>) => void;
 }) {
   const { config } = useOrderFormConfig(orderType ?? undefined);
   const extraValues = order?.extra_values;
+  const editableValues = { ...(extraValues ?? {}), ...(draft?.form_extra ?? {}) };
   const employeeNames = useMemo(
     () => new Map((employees ?? []).map((employee) => [employee.id, employee.display_name])),
     [employees],
   );
   const mainFields = useMemo(() => DELIVERY_FIELDS.map(({ key, fallback }) => {
     let value: ReactNode = "-";
-    const values = extraValues ?? {};
+    const values = { ...(extraValues ?? {}), ...(draft?.form_extra ?? {}) };
     if (key === "bound_phone") {
-      value = account?.bound_phone || textValue(values[key]);
+      value = editing && account?.bound_phone != null
+        ? account.bound_phone
+        : account?.bound_phone || textValue(values[key]);
     } else if (key === "bound_phone_owner") {
-      value = account?.bound_phone_owner || textValue(values[key]);
+      const hasOrderDraftValue = Object.prototype.hasOwnProperty.call(values, key);
+      value = hasOrderDraftValue
+        ? (values[key] == null ? "" : String(values[key]))
+        : account?.bound_phone_owner || "-";
     } else {
       const raw = values[key];
       if (raw == null || raw === "") {
@@ -73,13 +88,17 @@ function DeliverySubSection({
       }
     }
     return { key, fallback, value };
-  }), [account, employees, employeeNames, extraValues]);
-  const deliveryItems = useMemo(
-    () => buildFormExtraDisplay(extraValues ?? {}, Object.values(config)).filter(
+  }), [account, draft, employees, employeeNames, extraValues]);
+  const deliveryItems = useMemo(() => {
+    const existing = buildFormExtraDisplay(editableValues, Object.values(config)).filter(
       (item) => (config[item.key]?.section ?? "EXTRA") === "DELIVER",
-    ),
-    [config, extraValues],
-  );
+    );
+    const existingKeys = new Set(existing.map((item) => item.key));
+    const configured = Object.values(config)
+      .filter((field) => field.is_custom && field.is_active && field.section === "DELIVER" && !existingKeys.has(field.field_key))
+      .map((field) => ({ key: field.field_key, label: field.label, value: "", status: "active" as const }));
+    return [...existing, ...configured];
+  }, [config, editableValues]);
   return (
     <div className="inventory-detail__meta-group">
       <div className="inventory-detail__meta-group-title">{title}</div>
@@ -87,14 +106,39 @@ function DeliverySubSection({
         {mainFields
           .filter((field) => isFieldActive(config, field.key))
           .map((field) => (
-            <Descriptions.Item key={field.key} label={fieldLabel(config, field.key, field.fallback)}>{field.value}</Descriptions.Item>
+            <Descriptions.Item key={field.key} label={fieldLabel(config, field.key, field.fallback)}>
+              {editing && field.key === "delivery_responsible_ids" ? (
+                <Select
+                  mode="multiple"
+                  aria-label="编辑交付负责人"
+                  value={Array.isArray(editableValues[field.key]) ? editableValues[field.key] : []}
+                  options={(employees ?? []).map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))}
+                  onChange={(next) => onExtraChange?.(field.key, next)}
+                />
+              ) : editing ? (
+                <Input
+                  aria-label={`编辑${field.fallback}`}
+                  value={field.value === "-" ? "" : String(field.value)}
+                  onChange={(event) => {
+                    if (field.key === "bound_phone") onProfileChange?.({ bound_phone: event.target.value });
+                    else onExtraChange?.(field.key, event.target.value);
+                  }}
+                />
+              ) : field.value}
+            </Descriptions.Item>
           ))}
       </Descriptions>
       {deliveryItems.length ? (
         <Descriptions className="inventory-detail__meta-table" size="small" bordered column={3}>
           {deliveryItems.map((item) => (
             <Descriptions.Item key={item.key} label={`${item.label}${item.status === "deleted" ? "（已删除）" : item.status === "inactive" ? "（已停用）" : ""}`}>
-              {formatExtraDisplayValue(item.value) || "-"}
+              {editing ? (
+                <Input
+                  aria-label={`编辑${item.label}`}
+                  value={formatExtraDisplayValue(editableValues[item.key] ?? item.value)}
+                  onChange={(event) => onExtraChange?.(item.key, event.target.value)}
+                />
+              ) : formatExtraDisplayValue(item.value) || "-"}
             </Descriptions.Item>
           ))}
         </Descriptions>
@@ -110,12 +154,18 @@ export function OrderDetailDeliverySection({
   detail,
   account,
   employees,
+  orderDrafts,
+  onOrderExtraChange,
+  onProfileChange,
 }: {
   meta: OrderDetailMeta;
   editing?: boolean;
   detail?: AccountExecutionDetail | null;
   account?: Account | null;
   employees?: EmployeeOption[];
+  orderDrafts?: Record<number, OrderDraft>;
+  onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
+  onProfileChange?: (changes: Partial<Account>) => void;
 }) {
   const creationOrder = useMemo(
     () => detail?.orders.find((order) => order.order_no === meta.sourceOrderNo),
@@ -123,16 +173,19 @@ export function OrderDetailDeliverySection({
   );
   const sellOrder = useMemo(
     () => detail?.orders.find(
-      (order) => order.order_id !== creationOrder?.order_id && order.events.some((event) => event.event_type === "SELL"),
+      (order) => order.events.some((event) => event.event_type === "SELL"),
     ),
-    [creationOrder, detail],
+    [detail],
   );
 
   if (editing) {
     return (
       <div className="inventory-detail__section inventory-detail__section--delivery">
         <InventorySectionHeading title="交付信息" />
-        <CustomFieldSection section="DELIVER" testIdSuffix="inv-edit-deliver" />
+        <div className="inventory-detail__meta">
+          <DeliverySubSection title="买号交付" orderType={creationOrder?.order_type} order={creationOrder} account={account} employees={employees} editing draft={creationOrder ? orderDrafts?.[creationOrder.order_id] : undefined} onProfileChange={onProfileChange} onExtraChange={(key, value) => creationOrder && onOrderExtraChange?.(creationOrder.order_id, key, value)} />
+          {sellOrder ? <DeliverySubSection title="卖号交付" orderType={sellOrder.order_type} order={sellOrder} account={account} employees={employees} editing draft={orderDrafts?.[sellOrder.order_id]} onProfileChange={onProfileChange} onExtraChange={(key, value) => onOrderExtraChange?.(sellOrder.order_id, key, value)} /> : null}
+        </div>
       </div>
     );
   }
@@ -146,6 +199,7 @@ export function OrderDetailDeliverySection({
           title="卖号交付"
           orderType={sellOrder?.order_type ?? creationOrder?.order_type}
           order={sellOrder}
+          account={account}
           employees={employees}
         />
       </div>

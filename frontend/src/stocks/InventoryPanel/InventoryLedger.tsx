@@ -41,13 +41,17 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     exporting,
     editingAccount,
     eventDrafts,
+    financeDrafts,
     employees,
     updateEventDraft,
+    updateFinanceDraft,
+    updateEditingAccount,
+    orderDrafts,
+    updateOrderDraft,
+    updatePartyDraft,
     saveInline,
     cancelInlineEdit,
     openPartyCard,
-    timeShiftMinutes,
-    setTimeShiftDays,
   } = controller;
 
   return (
@@ -137,13 +141,18 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
               editing={inlineEditId === row.account.id ? editingAccount : undefined}
               eventDrafts={eventDrafts}
               onEventEdit={updateEventDraft}
+              financeDrafts={financeDrafts}
+              onFinanceEdit={updateFinanceDraft}
+              onProfileChange={updateEditingAccount}
+              orderDrafts={orderDrafts}
+              onOrderEdit={updateOrderDraft}
+              onOrderExtraChange={updateOrderDraft && ((orderId, key, value) => updateOrderDraft(orderId, { form_extra: { [key]: value } }))}
+              onPartyEdit={updatePartyDraft}
               employees={employees}
               extraForm={invEditExtraForm}
               onSave={saveInline}
               onCancel={cancelInlineEdit}
               saving={savingAccount}
-              timeShiftMinutes={timeShiftMinutes}
-              onTimeShift={setTimeShiftDays}
             />
           ),
           expandRowByClick: true,

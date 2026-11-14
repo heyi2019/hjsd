@@ -1,12 +1,15 @@
 import { Input } from "antd";
+import dayjs from "dayjs";
 import { useMemo } from "react";
 import type { ColumnsType } from "antd/es/table";
 import type { AccountExecutionEvent } from "../../shared/api/types/account-execution";
-import { DataTable, MoneyInput, MoneyText, Select } from "../../shared/ui";
+import type { OrderDraft } from "../account-edit/use-account-execution-editor";
+import { DataTable, DateField, MoneyInput, MoneyText, Select } from "../../shared/ui";
 import {
   InventorySectionHeading,
   OPERATION_CATEGORY_LABEL,
   isEditableCashflowEvent,
+  resolveExecutionPlatform,
   type InventoryEmployeeOption,
   type InventoryEventDraft,
   type InventoryExecutionCategory,
@@ -25,12 +28,16 @@ export function OrderDetailExecutionSection({
   editing,
   eventDrafts,
   onEventEdit,
+  orderDrafts,
+  onOrderEdit,
   employees,
 }: {
   rows: InventoryExecutionRow[];
   editing?: boolean;
   eventDrafts?: Record<number, InventoryEventDraft>;
-  onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
+  onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
+  orderDrafts?: Record<number, OrderDraft>;
+  onOrderEdit?: (orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) => void;
   employees: InventoryEmployeeOption[];
 }) {
   const sortedRows = useMemo(
@@ -49,15 +56,53 @@ export function OrderDetailExecutionSection({
       render: (value: InventoryExecutionCategory) => OPERATION_CATEGORY_LABEL[value],
     },
     { title: "动作", dataIndex: "action", key: "action" },
-    { title: "平台", dataIndex: "platform", key: "platform", render: (value: string) => value || "-" },
-    { title: "动作时间", dataIndex: "occurredAt", key: "occurredAt" },
+    {
+      title: "平台",
+      dataIndex: "platform",
+      key: "platform",
+      render: (value: string, item) => resolveExecutionPlatform(value, item.event, item.event ? eventDrafts?.[item.event.id] : undefined),
+    },
+    {
+      title: "动作时间",
+      dataIndex: "occurredAt",
+      key: "occurredAt",
+      render: (value: string, item) => {
+        const event = item.event;
+        if (!editing) return value;
+        const draftValue = event
+          ? eventDrafts?.[event.id]?.occurred_at ?? event.occurred_at ?? ""
+          : orderDrafts?.[item.orderId]?.occurred_at || value;
+        return (
+          <DateField
+            showTime={{ format: "HH:mm" }}
+            format="YYYY-MM-DD HH:mm"
+            minuteStep={1}
+            aria-label={`编辑执行时间 ${item.action}`}
+            value={draftValue ? dayjs(draftValue) : null}
+            onChange={(next) => event
+              ? onEventEdit?.(event, { occurred_at: next?.format("YYYY-MM-DDTHH:mm:ss") ?? "" })
+              : onOrderEdit?.(item.orderId, { occurred_at: next?.format("YYYY-MM-DDTHH:mm:ss") ?? "" })}
+          />
+        );
+      },
+    },
     {
       title: "操作人",
       dataIndex: "operator",
       key: "operator",
       render: (value: string, item) => {
         const event = item.event;
-        if (!editing || !event) return value;
+        if (!editing) return value;
+        if (!event) {
+          return (
+            <Select
+              aria-label={`编辑执行操作人 ${item.action}`}
+              value={orderDrafts?.[item.orderId]?.operator || (item.operator === "-" ? undefined : item.operator)}
+              options={employees.map((employee) => ({ value: employee.username, label: employee.display_name, disabled: !employee.is_active }))}
+              onChange={(username) => onOrderEdit?.(item.orderId, { operator: String(username) })}
+            />
+          );
+        }
         return (
           <MultipleOperatorSelect
             value={eventDrafts?.[event.id]?.operator_user_ids ?? event.operator_user_ids ?? []}
@@ -95,11 +140,11 @@ export function OrderDetailExecutionSection({
       key: "note",
       render: (value: string, item) => {
         const event = item.event;
-        if (!editing || !event || !isEditableCashflowEvent(event)) return value;
+        if (!editing || !event) return value;
         return <Input aria-label={`编辑执行备注 ${item.action}`} value={eventDrafts?.[event.id]?.note ?? event.note ?? ""} onChange={(inputEvent) => onEventEdit?.(event, { note: inputEvent.target.value })} />;
       },
     },
-  ], [editing, eventDrafts, employeeOptions, onEventEdit]);
+  ], [editing, eventDrafts, employeeOptions, employees, onEventEdit, onOrderEdit, orderDrafts]);
 
   return (
     <div className="inventory-detail__section inventory-detail__section--execution inventory-execution-list">

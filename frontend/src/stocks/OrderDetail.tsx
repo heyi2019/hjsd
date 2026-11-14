@@ -19,6 +19,9 @@ import {
   type InventoryFinanceRow,
   PARTY_ROLE_LABEL,
 } from "./OrderDetailView/OrderDetail.shared";
+import type { FinanceDraft } from "./account-edit/use-account-execution-editor";
+import type { OrderDraft } from "./account-edit/use-account-execution-editor";
+import type { PartyAddition } from "./account-edit/use-account-execution-editor";
 
 function renderOrderParties(
   parties: InventoryPartyLink[],
@@ -49,14 +52,19 @@ export function OrderDetail({
   editing,
   eventDrafts,
   onEventEdit,
+  financeDrafts,
+  onFinanceEdit,
+  onProfileChange,
+  orderDrafts,
+  onOrderEdit,
+  onOrderExtraChange,
+  onPartyEdit,
   onPartyClick,
   employees = [],
   extraForm,
   onSave,
   onCancel,
   saving,
-  timeShiftMinutes,
-  onTimeShift,
 }: {
   row: Account;
   detail?: AccountExecutionDetail;
@@ -65,16 +73,20 @@ export function OrderDetail({
   loading: boolean;
   editing?: Account | null;
   eventDrafts?: Record<number, InventoryEventDraft>;
-  onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; operator_user_ids?: number[] }) => void;
+  onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
+  financeDrafts?: Record<string, FinanceDraft>;
+  onFinanceEdit?: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
+  onProfileChange?: (changes: Partial<Account>) => void;
+  orderDrafts?: Record<number, OrderDraft>;
+  onOrderEdit?: (orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) => void;
+  onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
+  onPartyEdit?: (orderId: number, addition: PartyAddition) => void;
   employees?: EmployeeOption[];
   onPartyClick?: (party: InventoryPartyLink) => void;
   extraForm?: FormInstance;
   onSave?: () => void;
   onCancel?: () => void;
   saving?: boolean;
-  /** 编辑态时间联动：平移天数与 setter。 */
-  timeShiftMinutes?: number;
-  onTimeShift?: (days: number) => void;
 }) {
   // 展开详情是订单级：即便调用方误传了账号聚合快照，这里也再次按订单主键收口，
   // 防止同一账号的寄售/回收/提号订单串入当前订单的资金、分润和操作明细。
@@ -85,10 +97,11 @@ export function OrderDetail({
     [detail, contextOrderId],
   );
   const contextOrder = useMemo(
-    () => scopedDetail?.orders.find((order) => order.order_id === contextOrderId) ?? scopedDetail?.orders[0],
+    () => scopedDetail?.orders.find((order) => order.order_id === contextOrderId),
     [scopedDetail, contextOrderId],
   );
   const sourceOrderNo = contextOrder?.order_no ?? row.source_order_no;
+  const accountSnapshot = editing ?? scopedDetail?.account ?? row;
 
   const detailView = scopedDetail?.detail_view;
   const eventById = useMemo(
@@ -110,17 +123,20 @@ export function OrderDetail({
 
   const financeRows = useMemo<InventoryFinanceRow[]>(() => (detailView?.finance_rows ?? []).map((row) => ({
     key: row.key,
+    flowNo: row.flow_no,
     type: row.type,
     direction: row.direction === "支出" ? "支出" : "收入",
     amount: row.amount,
     occurredAt: formatDateTimeMinute(row.occurred_at),
     poolName: row.pool_name,
+    note: row.note,
     operator: row.operator,
     event: row.event_id == null ? undefined : eventById.get(row.event_id),
   })), [detailView, eventById]);
 
   const executionRows = useMemo(() => (detailView?.execution_rows ?? []).map((row) => ({
     key: row.key,
+    orderId: row.order_id,
     category: row.category,
     action: row.action,
     occurredAt: formatDateTimeMinute(row.occurred_at),
@@ -130,25 +146,33 @@ export function OrderDetail({
     platform: row.platform,
     event: row.event_id == null ? undefined : eventById.get(row.event_id),
   })), [detailView, eventById]);
-  const operationRows = detailView?.operation_rows ?? [];
+  const operationRows = (detailView?.operation_rows ?? []).map((operation) => ({
+    ...operation,
+    event: operation.event_id == null ? undefined : eventById.get(operation.event_id),
+  }));
+  const operationEvents = useMemo(
+    () => Object.fromEntries(operationRows.map((operation) => [operation.key, operation.event])) as Record<string, AccountExecutionEvent | undefined>,
+    [operationRows],
+  );
   const operationRow = (key: string) => operationRows.find((item) => item.key === key);
 
   const meta = useMemo<OrderDetailMeta>(() => ({
+    orderId: contextOrder?.order_id,
     inventoryNo: row.stock_no ?? "-",
     status: row.status,
     statusLabel: STATUS_LABEL[row.status] ?? row.status,
-    gameType: row.game_type ?? null,
-    gameAccount: row.game_account ?? null,
-    campAccount: row.camp_account ?? null,
-    platform: row.platform ?? null,
-    cost: row.cost_amount ?? null,
-    businessMode: row.business_mode ? (BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode) : null,
-    inventoryType: row.inventory_type ? (INVENTORY_TYPE_LABEL[row.inventory_type] ?? row.inventory_type) : null,
-    valueAddedService: row.value_added_service ? (VALUE_ADDED_SERVICE_LABEL[row.value_added_service] ?? row.value_added_service) : null,
-    orderNo: contextOrder?.order_no ?? scopedDetail?.orders[0]?.order_no ?? row.source_order_no ?? "-",
+    gameType: accountSnapshot.game_type ?? null,
+    gameAccount: accountSnapshot.game_account ?? null,
+    campAccount: accountSnapshot.camp_account ?? null,
+    platform: accountSnapshot.platform ?? null,
+    cost: accountSnapshot.cost_amount ?? null,
+    businessMode: accountSnapshot.business_mode ? (BUSINESS_MODE_LABEL[accountSnapshot.business_mode] ?? accountSnapshot.business_mode) : null,
+    inventoryType: accountSnapshot.inventory_type ? (INVENTORY_TYPE_LABEL[accountSnapshot.inventory_type] ?? accountSnapshot.inventory_type) : null,
+    valueAddedService: accountSnapshot.value_added_service ? (VALUE_ADDED_SERVICE_LABEL[accountSnapshot.value_added_service] ?? accountSnapshot.value_added_service) : null,
+    orderNo: contextOrder?.order_no ?? row.source_order_no ?? "-",
     sourceOrderNo: sourceOrderNo ?? null,
-    createdBy: row.created_by || "-",
-    registeredAt: formatDateTimeMinute(contextOrder?.created_at ?? contextOrder?.trade_date ?? scopedDetail?.orders[0]?.created_at ?? scopedDetail?.orders[0]?.trade_date ?? row.created_at),
+    createdBy: accountSnapshot.created_by || "-",
+    registeredAt: formatDateTimeMinute(contextOrder?.created_at ?? contextOrder?.trade_date ?? accountSnapshot.created_at),
     soldAt: formatDateTimeMinute(detailView?.lifecycle.sold_at),
     removedAt: formatDateTimeMinute(detailView?.lifecycle.removed_at),
     removedPlatform: detailView?.lifecycle.removed_platform ?? "-",
@@ -164,20 +188,20 @@ export function OrderDetail({
     descriptionOperator: operationRow("description")?.operator ?? "-",
     imagesAt: formatDateTimeMinute(operationRow("images")?.occurred_at),
     imagesOperator: operationRow("images")?.operator ?? "-",
-    password: row.game_password || "-",
-    channelRegion: [row.platform, row.channel_region].filter(Boolean).join(" / ") || "-",
-    boundPhone: row.bound_phone || "-",
-    secondary: row.has_secondary == null ? "-" : row.has_secondary ? "有" : "无",
-    walletRealname: row.wallet_realname || "-",
-    walletRealnameImages: row.wallet_realname_images ?? [],
-    accountDescription: row.account_description || "-",
-    accountImages: row.account_images ?? [],
-    secondaryImages: row.secondary_images ?? [],
-    note: row.note || "-",
+    password: accountSnapshot.game_password || "-",
+    channelRegion: [accountSnapshot.platform, accountSnapshot.channel_region].filter(Boolean).join(" / ") || "-",
+    boundPhone: accountSnapshot.bound_phone || "-",
+    secondary: accountSnapshot.has_secondary == null ? "-" : accountSnapshot.has_secondary ? "有" : "无",
+    walletRealname: accountSnapshot.wallet_realname || "-",
+    walletRealnameImages: accountSnapshot.wallet_realname_images ?? [],
+    accountDescription: accountSnapshot.account_description || "-",
+    accountImages: accountSnapshot.account_images ?? [],
+    secondaryImages: accountSnapshot.secondary_images ?? [],
+    note: accountSnapshot.note || "-",
     orderNotes: detailView?.order_notes ?? "-",
     orderParties: renderOrderParties((detailView?.parties ?? []).map((party) => ({ ...party, entityType: party.entity_type === "customer" ? "customer" as const : "counterparty" as const })), onPartyClick),
     orderExtras: detailView?.extras ?? [],
-  }), [row, scopedDetail, detailView, contextOrder, sourceOrderNo, onPartyClick, operationRows]);
+  }), [accountSnapshot, row.stock_no, row.status, row.source_order_no, scopedDetail, detailView, contextOrder, sourceOrderNo, onPartyClick, operationRows]);
 
   if (loading && !detail) return <Spin size="small" />;
 
@@ -185,12 +209,20 @@ export function OrderDetail({
     <OrderDetailView
       meta={meta}
       detail={scopedDetail}
-      account={row}
+      account={accountSnapshot}
       editing={editing}
       eventDrafts={eventDrafts}
       onEventEdit={onEventEdit}
+      financeDrafts={financeDrafts}
+      onFinanceEdit={onFinanceEdit}
+      onProfileChange={onProfileChange}
+      orderDrafts={orderDrafts}
+      onOrderEdit={onOrderEdit}
+      onOrderExtraChange={onOrderExtraChange}
+      onPartyEdit={onPartyEdit}
       employees={employees}
       executionRows={executionRows}
+      operationEvents={operationEvents}
       financeRows={financeRows}
       expenseCount={expenseFlows.length}
       incomeCount={incomeFlows.length}
@@ -200,8 +232,6 @@ export function OrderDetail({
       onSave={onSave}
       onCancel={onCancel}
       saving={saving}
-      timeShiftMinutes={timeShiftMinutes}
-      onTimeShift={onTimeShift}
     />
   );
 }

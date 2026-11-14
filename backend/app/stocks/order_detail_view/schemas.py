@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 class DetailExecutionRowOut(BaseModel):
     key: str
+    order_id: int
     category: str
     action: str
     occurred_at: datetime | None = None
@@ -24,11 +25,13 @@ class DetailExecutionRowOut(BaseModel):
 
 class DetailFinanceRowOut(BaseModel):
     key: str
+    flow_no: str
     type: str
     direction: str
     amount: Decimal
     occurred_at: datetime | None = None
     pool_name: str
+    note: str
     operator: str
     event_id: int | None = None
 
@@ -39,6 +42,7 @@ class DetailOperationRowOut(BaseModel):
     content: str
     occurred_at: datetime | None = None
     operator: str
+    event_id: int | None = None
 
 
 class DetailLifecycleOut(BaseModel):

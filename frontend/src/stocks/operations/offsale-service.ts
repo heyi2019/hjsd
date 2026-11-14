@@ -47,7 +47,7 @@ export async function unlistAndCancelConsignmentOrders({
       form_extra: {
         ...unlistExtra,
         ...(record.eventId == null ? {} : { consignment_event_id: record.eventId }),
-        consignment_platform: record.platform,
+        consignment_platforms: [record.platform],
       },
     });
   }));

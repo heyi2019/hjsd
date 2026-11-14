@@ -194,7 +194,10 @@ def _event_platform(event: dict, detail: dict, account_platform: str | None) -> 
     extra = detail.get("form_extra") or {}
     if extra.get("platform_unlist_scope") == "SYSTEM":
         return "本系统"
-    return extra.get("consignment_platform") or account_platform
+    configured = extra.get("consignment_platforms")
+    if isinstance(configured, list):
+        configured = "、".join(str(item).strip() for item in configured if str(item).strip())
+    return configured or account_platform
 
 
 def _order_event_export_rows(

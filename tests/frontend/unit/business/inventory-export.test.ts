@@ -45,8 +45,8 @@ describe("库存导出", () => {
     expect(csv).toContain(",0,0,0.00,0.00");
   });
 
-  it("FE-268：库存 CSV 使用详情订单号，合计取服务端 finance_summary", () => {
-    const row = { ...account, source_order_no: "" } as unknown as Account;
+  it("FE-268：库存 CSV 使用库存绑定订单号，合计取服务端 finance_summary", () => {
+    const row = { ...account, source_order_no: "HS-FE268" } as unknown as Account;
     const csv = buildInventoryCsv([row], {
       1: {
         orders: [{

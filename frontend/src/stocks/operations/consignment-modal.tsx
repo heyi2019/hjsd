@@ -72,7 +72,7 @@ export function InventoryConsignmentModal(props: {
         form_extra_scope: "CONSIGN",
         form_extra: {
           ...values.form_extra,
-          consignment_platform: values.platform,
+          consignment_platforms: [values.platform],
           ...(price === undefined ? {} : { consignment_price: price }),
           listed_at: listedAt.format("YYYY-MM-DDTHH:mm"),
         },

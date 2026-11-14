@@ -1,6 +1,6 @@
 """INVENTORY-02 库存执行事件编辑后的库存与资金一致性。"""
 
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -126,47 +126,3 @@ def test_operator_edit_does_not_change_existing_cashflow_amount(seeded_client, s
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(Cashflow, flow.id).amount == Decimal("90")
-
-
-def test_inventory_time_shift_moves_all_three_displayed_times_together(seeded_client, seeded_db, headers):
-    """台账编辑态时间联动：任一锚点改 N 天，账期、事件、流水与三个展示时间同步平移。"""
-    account = create_account(seeded_db, game_account="time-shift", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
-    other = create_account(seeded_db, game_account="time-shift-other", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
-    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
-    other_order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=other.id)
-    post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
-    post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("200"), occurred_on=date(2026, 10, 3), actor="pytest")
-    post_event(seeded_db, other_order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
-    seeded_db.commit()
-
-    url = f"/api/v1/stocks/{account.id}"
-    before = seeded_client.get(f"{url}/execution-detail", headers=headers).json()["orders"][0]
-    created_before = seeded_db.get(Order, order.id).created_at
-    event_dates_before = {item["id"]: item["occurred_on"] for item in before["events"]}
-    buy_before = next(item for item in before["events"] if item["event_type"] == "BUY")
-
-    response = seeded_client.patch(f"{url}/execution-edit", headers=headers, json={"events": [], "time_shift": {"delta_minutes": 5 * 24 * 60}})
-    assert response.status_code == 200, response.text
-    seeded_db.expire_all()
-    shifted = seeded_db.get(Order, order.id)
-    assert shifted.trade_date == date(2026, 10, 6)
-    assert shifted.created_at == created_before + timedelta(days=5)
-    assert seeded_db.get(Order, other_order.id).trade_date == date(2026, 10, 1)  # 不波及其它账号
-
-    after = seeded_client.get(f"{url}/execution-detail", headers=headers).json()["orders"][0]
-    assert after["created_at"][:10] == (created_before + timedelta(days=5)).date().isoformat()
-    assert after["trade_date"] == "2026-10-06"
-    for item in after["events"]:
-        assert (date.fromisoformat(item["occurred_on"]) - date.fromisoformat(event_dates_before[item["id"]])).days == 5
-    buy_after = next(item for item in after["events"] if item["event_type"] == "BUY")
-    # 台账「售出时间」取 event.occurred_at(posted_at/created_at)，「流水时间」取 cashflow.occurred_at(created_at)
-    assert buy_after["occurred_at"][:10] == (date.fromisoformat(buy_before["occurred_at"][:10]) + timedelta(days=5)).isoformat()
-    assert buy_after["cashflow"]["occurred_at"][:10] == (date.fromisoformat(buy_before["cashflow"]["occurred_at"][:10]) + timedelta(days=5)).isoformat()
-    assert buy_after["cashflow"]["occurred_on"] == "2026-10-06"
-    assert seeded_db.scalar(select(AuditLog).where(AuditLog.entity_type == "inventory_time_shift", AuditLog.entity_id == str(account.id))) is not None
-
-    # 零平移是 no-op，不会重复改动时间轴
-    idle = seeded_client.patch(f"{url}/execution-edit", headers=headers, json={"events": [], "time_shift": {"delta_minutes": 0}})
-    assert idle.status_code == 200, idle.text
-    seeded_db.expire_all()
-    assert seeded_db.get(Order, order.id).trade_date == date(2026, 10, 6)

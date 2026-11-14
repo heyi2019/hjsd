@@ -78,7 +78,7 @@ export function InventoryPlatformOffsaleModal(props: {
         form_extra: {
           ...values.form_extra,
           ...(selected.eventId == null ? {} : { consignment_event_id: selected.eventId }),
-          consignment_platform: selected.platform,
+          consignment_platforms: [selected.platform],
           platform_unlisted_at: unlistedAt.format("YYYY-MM-DDTHH:mm"),
           platform_unlist_scope: "PLATFORM",
         },

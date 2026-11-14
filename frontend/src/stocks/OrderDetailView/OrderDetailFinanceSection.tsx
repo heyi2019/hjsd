@@ -1,9 +1,10 @@
-import { Descriptions, Typography } from "antd";
+import { Descriptions, Input, Typography } from "antd";
+import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import { useMemo } from "react";
-import { CustomFieldSection } from "../../orders/ConfigurableField";
-import { DataTable, MoneyText } from "../../shared/ui";
+import { DataTable, DateField, MoneyText } from "../../shared/ui";
 import type { InventoryFinanceRow, OrderDetailMeta } from "./OrderDetail.shared";
+import type { FinanceDraft, OrderDraft } from "../account-edit/use-account-execution-editor";
 
 const FINANCE_SECTION_TITLE = "费用与资金补充信息";
 
@@ -27,15 +28,65 @@ const FINANCE_COLUMNS: ColumnsType<InventoryFinanceRow> = [
   { title: "时间", dataIndex: "occurredAt", key: "occurredAt" },
   { title: "操作人", dataIndex: "operator", key: "operator" },
   { title: "资金池", dataIndex: "poolName", key: "poolName" },
+  { title: "备注", dataIndex: "note", key: "note" },
 ];
 
-function FinanceExtraFields({ fields }: { fields: OrderDetailMeta["orderExtras"] }) {
+function editableFinanceColumns(
+  drafts: Record<string, FinanceDraft> | undefined,
+  onEdit: ((flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void) | undefined,
+): ColumnsType<InventoryFinanceRow> {
+  return FINANCE_COLUMNS.map((column) => {
+    if (column.key === "时间") {
+      return {
+        ...column,
+        render: (_value: string, row: InventoryFinanceRow) => {
+          const draft = drafts?.[row.flowNo];
+          const value = draft?.occurred_at ?? row.occurredAt;
+          return <DateField showTime={{ format: "HH:mm" }} format="YYYY-MM-DD HH:mm" minuteStep={1} aria-label={`编辑资金明细时间 ${row.flowNo}`} value={value === "-" ? null : dayjs(value)} onChange={(next) => onEdit?.(row.flowNo, { occurred_at: next?.format("YYYY-MM-DDTHH:mm:ss") ?? "" })} />;
+        },
+      };
+    }
+    if (column.key === "操作人") {
+      return {
+        ...column,
+        render: (_value: string, row: InventoryFinanceRow) => <Input aria-label={`编辑资金明细操作人 ${row.flowNo}`} value={drafts?.[row.flowNo]?.operator ?? row.operator} onChange={(event) => onEdit?.(row.flowNo, { operator: event.target.value })} />,
+      };
+    }
+    if (column.key === "备注") {
+      return {
+        ...column,
+        render: (_value: string, row: InventoryFinanceRow) => <Input aria-label={`编辑资金明细备注 ${row.flowNo}`} value={drafts?.[row.flowNo]?.note ?? row.note} onChange={(event) => onEdit?.(row.flowNo, { note: event.target.value })} />,
+      };
+    }
+    return column;
+  });
+}
+
+function FinanceExtraFields({
+  fields,
+  editing,
+  draft,
+  onChange,
+}: {
+  fields: OrderDetailMeta["orderExtras"];
+  editing?: boolean;
+  draft?: OrderDraft;
+  onChange?: (key: string, value: string) => void;
+}) {
   if (!fields.length) return null;
   return (
     <div className="inventory-detail__meta-group">
       <div className="inventory-detail__meta-group-title">{FINANCE_SECTION_TITLE}</div>
       <Descriptions className="inventory-detail__meta-table" size="small" bordered column={4}>
-        {fields.map((field) => <Descriptions.Item key={field.key} label={field.label}>{field.value}</Descriptions.Item>)}
+        {fields.map((field) => <Descriptions.Item key={field.key} label={field.label}>
+          {editing ? (
+            <Input
+              aria-label={`编辑${field.label}`}
+              value={String(draft?.form_extra?.[field.key] ?? field.value ?? "")}
+              onChange={(event) => onChange?.(field.key, event.target.value)}
+            />
+          ) : field.value}
+        </Descriptions.Item>)}
       </Descriptions>
     </div>
   );
@@ -50,6 +101,10 @@ export function OrderDetailFinanceSection({
   totalExpense,
   totalIncome,
   editing,
+  financeDrafts,
+  onFinanceEdit,
+  orderDraft,
+  onOrderExtraChange,
 }: {
   rows: InventoryFinanceRow[];
   orderExtras: OrderDetailMeta["orderExtras"];
@@ -58,6 +113,10 @@ export function OrderDetailFinanceSection({
   totalExpense: string;
   totalIncome: string;
   editing?: boolean;
+  financeDrafts?: Record<string, FinanceDraft>;
+  onFinanceEdit?: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
+  orderDraft?: OrderDraft;
+  onOrderExtraChange?: (key: string, value: unknown) => void;
 }) {
   const financeFields = useMemo(
     () => orderExtras.filter((field) => field.section === "FINANCE"),
@@ -69,15 +128,14 @@ export function OrderDetailFinanceSection({
         <Typography.Text strong>资金明细</Typography.Text>
       </div>
       <div className="inventory-detail__meta">
-        {editing ? <CustomFieldSection section="FINANCE" testIdSuffix="inv-edit-finance" /> : null}
-        <FinanceExtraFields fields={financeFields} />
+        <FinanceExtraFields fields={financeFields} editing={editing} draft={orderDraft} onChange={onOrderExtraChange} />
         <div className="inventory-finance-summary">
           <div className="inventory-finance-summary__item inventory-finance-summary__item--expense"><span>支出</span><strong>{expenseCount} 笔</strong></div>
           <div className="inventory-finance-summary__item inventory-finance-summary__item--income"><span>收入</span><strong>{incomeCount} 笔</strong></div>
           <div className="inventory-finance-summary__item inventory-finance-summary__item--amount"><span>总支出</span><MoneyText value={totalExpense} /></div>
           <div className="inventory-finance-summary__item inventory-finance-summary__item--amount"><span>总收入</span><MoneyText value={totalIncome} /></div>
         </div>
-        <DataTable className="inventory-detail__data-table inventory-finance-table" columns={FINANCE_COLUMNS} rows={rows} page={1} pageSize={10} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
+        <DataTable className="inventory-detail__data-table inventory-finance-table" columns={editing ? editableFinanceColumns(financeDrafts, onFinanceEdit) : FINANCE_COLUMNS} rows={rows} page={1} pageSize={10} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
       </div>
     </div>
   );

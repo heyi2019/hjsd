@@ -15,11 +15,13 @@ export const PARTY_ROLE_LABEL: Record<string, string> = {
 
 export type InventoryFinanceRow = {
   key: string;
+  flowNo: string;
   type: string;
   direction: "支出" | "收入";
   amount: string;
   occurredAt: string;
   poolName: string;
+  note: string;
   operator: string;
   event?: AccountExecutionEvent | null;
 };
@@ -30,6 +32,7 @@ export type InventoryOperationRow = {
   content: ReactNode;
   occurredAt: string;
   operator: string;
+  event?: AccountExecutionEvent;
 };
 
 export type InventoryExecutionCategory = "INBOUND" | "OPERATING" | "OUTBOUND";
@@ -49,6 +52,7 @@ export function classifyEventCategory(eventType: string | null | undefined): Inv
 
 export type InventoryExecutionRow = {
   key: string;
+  orderId: number;
   category: InventoryExecutionCategory;
   action: string;
   occurredAt: string;
@@ -60,6 +64,26 @@ export type InventoryExecutionRow = {
   event?: AccountExecutionEvent;
 };
 
+/** 编辑态的事件草稿是详情内所有事件视图的唯一实时来源。 */
+export function resolveExecutionPlatform(
+  fallback: string,
+  event: Pick<AccountExecutionEvent, "event_type" | "operation_type" | "form_extra"> | null | undefined,
+  draft?: Pick<InventoryEventDraft, "form_extra">,
+): string {
+  if (!event || event.event_type !== "OPERATE") return fallback || "-";
+
+  const hasDraftExtra = draft?.form_extra !== undefined;
+  const extra = hasDraftExtra ? (draft.form_extra ?? {}) : (event.form_extra ?? {});
+  if (event.operation_type === "UNLIST" && extra.platform_unlist_scope === "SYSTEM") return "本系统";
+
+  const platforms = extra.consignment_platforms;
+  if (Array.isArray(platforms)) {
+    const value = platforms.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).join("、");
+    return value || (hasDraftExtra ? "-" : fallback || "-");
+  }
+  return hasDraftExtra ? "-" : fallback || "-";
+}
+
 export type InventoryPartyLink = {
   id: number;
   display_name: string;
@@ -69,6 +93,7 @@ export type InventoryPartyLink = {
 
 export type OrderDetailMeta = {
   // 基本资料（来自 account 行）
+  orderId?: number;
   inventoryNo?: string;
   status?: string;
   statusLabel?: string;
@@ -120,7 +145,13 @@ export type OrderDetailMeta = {
 };
 
 /** 编辑态下单个事件的草稿值，由上层 InventoryPanel 持有。 */
-export type InventoryEventDraft = { amount: string; note: string | null; operator_user_ids?: number[] };
+export type InventoryEventDraft = {
+  amount: string;
+  note: string | null;
+  occurred_at: string;
+  form_extra?: Record<string, unknown>;
+  operator_user_ids?: number[];
+};
 export type InventoryEmployeeOption = EmployeeOption;
 
 const EDITABLE_CASHFLOW_EVENTS = new Set(["BUY", "SELL"]);

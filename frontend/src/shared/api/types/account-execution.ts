@@ -87,6 +87,7 @@ export interface AccountExecutionOrder {
 
 export interface OrderDetailExecutionRow {
   key: string;
+  order_id: number;
   category: "INBOUND" | "OPERATING" | "OUTBOUND";
   action: string;
   occurred_at?: string | null;
@@ -99,11 +100,13 @@ export interface OrderDetailExecutionRow {
 
 export interface OrderDetailFinanceRow {
   key: string;
+  flow_no: string;
   type: string;
   direction: string;
   amount: string;
   occurred_at?: string | null;
   pool_name: string;
+  note: string;
   operator: string;
   event_id?: number | null;
 }
@@ -114,6 +117,7 @@ export interface OrderDetailOperationRow {
   content: string;
   occurred_at?: string | null;
   operator: string;
+  event_id?: number | null;
 }
 
 export interface OrderDetailView {

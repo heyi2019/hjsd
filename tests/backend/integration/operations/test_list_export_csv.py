@@ -220,8 +220,8 @@ def test_orders_export_xlsx_has_five_sheets(seeded_client, headers, seeded_db):
     assert workbook.sheetnames == ["主订单信息", "详情信息", "操作明细", "资金明细", "返点明细"]
 
     main_sheet = workbook["主订单信息"]
-    assert main_sheet.cell(row=1, column=1).value == "订单号"
-    assert main_sheet.cell(row=2, column=1).value == "HS9805"
+    assert main_sheet.cell(row=1, column=1).value == "库存编号"
+    assert main_sheet.cell(row=2, column=1).value is None
     assert "操作" not in [main_sheet.cell(row=1, column=index).value for index in range(1, main_sheet.max_column + 1)]
 
     detail_sheet = workbook["详情信息"]
@@ -343,7 +343,7 @@ def test_event_platform_follows_unlist_scope():
     )
 
     canceled_platform = {"event_type": "CANCEL"}
-    detail = {"form_extra": {"platform_unlist_scope": "PLATFORM", "consignment_platform": "交易猫"}}
+    detail = {"form_extra": {"platform_unlist_scope": "PLATFORM", "consignment_platforms": ["交易猫"]}}
     assert _event_platform(canceled_platform, detail, "安卓QQ区") == "交易猫"
 
     # 平台下架但没填寄售平台时回落到账号平台，不留空

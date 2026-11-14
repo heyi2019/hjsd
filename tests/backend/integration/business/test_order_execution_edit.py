@@ -1,4 +1,4 @@
-"""INVENTORY-02 库存执行事件编辑后的库存与资金一致性。"""
+"""API-01 订单详情编辑接口的账号、事件与资金契约。"""
 
 from datetime import date
 from decimal import Decimal
@@ -12,7 +12,7 @@ from app.orders.create import create_order
 from app.orders.events import post_event
 
 
-def test_inventory_edit_updates_event_flow_and_cost_without_changing_time(seeded_client, seeded_db, headers):
+def test_order_edit_updates_event_flow_and_cost_without_changing_time(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="edit-inventory", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
@@ -30,7 +30,7 @@ def test_inventory_edit_updates_event_flow_and_cost_without_changing_time(seeded
     assert seeded_db.scalar(select(AuditLog).where(AuditLog.entity_type == "inventory_event_edit", AuditLog.entity_id == str(event.id))) is not None
 
 
-def test_inventory_edit_saves_profile_and_amount_together(seeded_client, seeded_db, headers):
+def test_order_edit_saves_profile_and_amount_together(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="before-edit", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")

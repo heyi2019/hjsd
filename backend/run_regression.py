@@ -220,7 +220,7 @@ GROUPS = {
         "tests/backend/unit/business/test_orders_common.py",
         "tests/backend/integration/business/test_orders_guard.py",
         "tests/backend/integration/business/test_orders_router_guard.py",
-        "tests/backend/integration/business/test_inventory_execution_edit.py",
+        "tests/backend/integration/business/test_order_execution_edit.py",
         "tests/backend/integration/customer/test_order_customer_source_fixtures.py",
         "tests/backend/integration/business/test_profit_allocation_modes.py",
         "tests/backend/integration/business/test_unreachable_status_paths.py",

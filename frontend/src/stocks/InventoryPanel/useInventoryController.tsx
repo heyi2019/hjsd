@@ -1,6 +1,6 @@
 import { useSession } from "../../shared/state/session";
 import { type BusinessCenterEntryTab } from "../../orders/businessCenter";
-import { useAccountExecutionEditor } from "../../orders/OrderDetailView/editing/use-account-execution-editor";
+import { useOrderDetailEditor } from "../../orders/OrderDetailView/editing/use-order-detail-editor";
 import { useInventoryList } from "./useInventoryList";
 import { useExecutionCache } from "./useExecutionCache";
 import { useInventoryActions } from "./useInventoryActions";
@@ -66,8 +66,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   expandTo,
   } = cache;
 
-  // —— 账号台账内联编辑状态机（onSaved 回写详情缓存与列表行）——
-  const accountEditor = useAccountExecutionEditor({
+  // —— 订单详情内联编辑状态机（onSaved 回写详情缓存与列表行）——
+  const orderDetailEditor = useOrderDetailEditor({
     getExecutionDetail: (accountId) => executionDetails[accountId],
     onSaved: (accountId, detail) => {
       setExecutionDetails((current) => ({ ...current, [accountId]: detail }));
@@ -89,16 +89,16 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     employees,
     invEditExtraForm,
     savingAccount,
-  } = accountEditor;
-  const saveInline = accountEditor.saveInline;
+  } = orderDetailEditor;
+  const saveInline = orderDetailEditor.saveInline;
 
   // —— 业务动作域：open* / submit* / 删除下架 / 运营动作 ——
   const actions = useInventoryActions({
     load, setRows, setError,
     executionDetails, setExecutionDetails, loadExecution, loadOrderExecution, loadEditorExecution, dropExecutionCache,
     expandTo, expandedOrderIds, removeFromInventory,
-    editorOpenEditor: accountEditor.openEditor,
-    editorCancelInlineEdit: accountEditor.cancelInlineEdit,
+    editorOpenEditor: orderDetailEditor.openEditor,
+    editorCancelInlineEdit: orderDetailEditor.cancelInlineEdit,
     inlineEditId,
     onOrdersChanged, onNavigate,
   });

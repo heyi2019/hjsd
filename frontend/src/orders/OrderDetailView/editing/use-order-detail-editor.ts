@@ -59,7 +59,7 @@ export type PartyAddition = {
   role: string;
 };
 
-export interface AccountExecutionEditor {
+export interface OrderDetailEditor {
   editingAccount: Account | null;
   inlineEditId: number | null;
   eventDrafts: Record<number, EventDraft>;
@@ -80,17 +80,16 @@ export interface AccountExecutionEditor {
 }
 
 /**
- * 账号执行详情编辑器状态机：把库存中心与订单中心共用的「账号台账内联编辑」逻辑抽出，
- * 保证两个入口（库存中心列表 / 订单中心台账）表现一致。资料写入仍经账号编辑接口，
- * 读取及保存后的回读始终按来源订单进行，避免把同账号的其他订单混进当前详情。
+ * 订单详情编辑器状态机：库存中心和订单台账共用同一份订单级编辑状态。
+ * 账号资料随强绑定订单一起保存，读取与保存后的回读始终限定为当前订单。
  *
  * 详情缓存由各调用方注入（getExecutionDetail / onSaved），hook 自身不持有列表缓存，
- * 库存中心与订单台账因此可以共用同一套编辑状态机，同时保留各自的列表筛选口径。
+ * 库存中心与订单台账因此可共用同一套编辑状态，同时保留各自的列表筛选口径。
  */
-export function useAccountExecutionEditor(params: {
+export function useOrderDetailEditor(params: {
   getExecutionDetail: (accountId: number) => AccountExecutionDetail | undefined;
   onSaved: (accountId: number, detail: AccountExecutionDetail) => void;
-}): AccountExecutionEditor {
+}): OrderDetailEditor {
   const { getExecutionDetail, onSaved } = params;
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [inlineEditId, setInlineEditId] = useState<number | null>(null);

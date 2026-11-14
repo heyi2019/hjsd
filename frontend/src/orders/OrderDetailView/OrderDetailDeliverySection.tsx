@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import type { AccountExecutionDetail, AccountExecutionOrder } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../shared/api/types/org";
-import type { OrderDraft } from "./editing/use-account-execution-editor";
+import type { OrderDraft } from "./editing/use-order-detail-editor";
 import { Select } from "../../shared/ui";
 import {
   buildFormExtraDisplay,

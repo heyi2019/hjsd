@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildEventEdits } from "@/orders/OrderDetailView/editing/execution-edit-payload";
-import { propagateSharedOrderExtra } from "@/orders/OrderDetailView/editing/use-account-execution-editor";
+import { propagateSharedOrderExtra } from "@/orders/OrderDetailView/editing/use-order-detail-editor";
 import { resolveExecutionPlatform } from "@/orders/OrderDetailView/OrderDetail.shared";
 
 describe("详情编辑保存载荷", () => {

@@ -4,7 +4,7 @@ import type { AccountExecutionDetail } from "../../shared/api/types/account-exec
 import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { useAccountExecutionEditor } from "../OrderDetailView/editing/use-account-execution-editor";
+import { useOrderDetailEditor } from "../OrderDetailView/editing/use-order-detail-editor";
 
 /**
  * 台账表格的展开详情缓存与账号内联编辑枢纽。
@@ -42,7 +42,7 @@ export function useLedgerInlineEdit() {
       setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: false }));
     }
   };
-  const accountEditor = useAccountExecutionEditor({
+  const orderDetailEditor = useOrderDetailEditor({
     getExecutionDetail: (id) => ledgerDetails[id],
     onSaved: (id, detail) => setLedgerDetails((current) => ({ ...current, [id]: detail })),
   });
@@ -60,7 +60,7 @@ export function useLedgerInlineEdit() {
       setLedgerDetails((current) => ({ ...current, [accountId]: detail }));
       setLedgerOrderDetails((current) => ({ ...current, [order.id]: detail }));
       setExpandedOrderIds([String(order.id)]);
-      await accountEditor.openEditor(detail.account);
+      await orderDetailEditor.openEditor(detail.account);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
@@ -72,7 +72,7 @@ export function useLedgerInlineEdit() {
     if (expanded) void loadLedgerOrderDetail(record.id);
   };
 
-  // accountEditor 还持有 openEditor（仅本 hook 内部使用），对外只暴露原契约中的 12 个键。
+  // orderDetailEditor 还持有 openEditor（仅本 hook 内部使用），对外只暴露原契约中的 12 个键。
   return {
     expandedOrderIds,
     setExpandedOrderIds,
@@ -84,21 +84,21 @@ export function useLedgerInlineEdit() {
     loadLedgerOrderDetail,
     openLedgerEditor,
     handleLedgerExpand,
-    cancelInlineEdit: accountEditor.cancelInlineEdit,
-    editingAccount: accountEditor.editingAccount,
-    employees: accountEditor.employees,
-    eventDrafts: accountEditor.eventDrafts,
-    financeDrafts: accountEditor.financeDrafts,
-    inlineEditId: accountEditor.inlineEditId,
-    invEditExtraForm: accountEditor.invEditExtraForm,
-    saveInline: accountEditor.saveInline,
-    savingAccount: accountEditor.savingAccount,
-    updateEventDraft: accountEditor.updateEventDraft,
-    updateFinanceDraft: accountEditor.updateFinanceDraft,
-    updateEditingAccount: accountEditor.updateEditingAccount,
-    orderDrafts: accountEditor.orderDrafts,
-    updateOrderDraft: accountEditor.updateOrderDraft,
-    partyDrafts: accountEditor.partyDrafts,
-    updatePartyDraft: accountEditor.updatePartyDraft,
+    cancelInlineEdit: orderDetailEditor.cancelInlineEdit,
+    editingAccount: orderDetailEditor.editingAccount,
+    employees: orderDetailEditor.employees,
+    eventDrafts: orderDetailEditor.eventDrafts,
+    financeDrafts: orderDetailEditor.financeDrafts,
+    inlineEditId: orderDetailEditor.inlineEditId,
+    invEditExtraForm: orderDetailEditor.invEditExtraForm,
+    saveInline: orderDetailEditor.saveInline,
+    savingAccount: orderDetailEditor.savingAccount,
+    updateEventDraft: orderDetailEditor.updateEventDraft,
+    updateFinanceDraft: orderDetailEditor.updateFinanceDraft,
+    updateEditingAccount: orderDetailEditor.updateEditingAccount,
+    orderDrafts: orderDetailEditor.orderDrafts,
+    updateOrderDraft: orderDetailEditor.updateOrderDraft,
+    partyDrafts: orderDetailEditor.partyDrafts,
+    updatePartyDraft: orderDetailEditor.updatePartyDraft,
   };
 }

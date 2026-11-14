@@ -19,9 +19,9 @@ import {
   type OrderFinanceRow,
   PARTY_ROLE_LABEL,
 } from "./OrderDetail.shared";
-import type { FinanceDraft } from "./editing/use-account-execution-editor";
-import type { OrderDraft } from "./editing/use-account-execution-editor";
-import type { PartyAddition } from "./editing/use-account-execution-editor";
+import type { FinanceDraft } from "./editing/use-order-detail-editor";
+import type { OrderDraft } from "./editing/use-order-detail-editor";
+import type { PartyAddition } from "./editing/use-order-detail-editor";
 
 function renderOrderParties(
   parties: OrderPartyLink[],

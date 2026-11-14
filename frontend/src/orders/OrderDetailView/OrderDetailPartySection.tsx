@@ -1,7 +1,7 @@
 import { Descriptions, Input, Space } from "antd";
 import { useEffect, useMemo, useState } from "react";
-import type { OrderDraft } from "./editing/use-account-execution-editor";
-import type { PartyAddition } from "./editing/use-account-execution-editor";
+import type { OrderDraft } from "./editing/use-order-detail-editor";
+import type { PartyAddition } from "./editing/use-order-detail-editor";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Counterparty, Customer } from "../../shared/api/types/customers";
 import { customersApi, counterpartiesApi } from "../../shared/api/customers.api";

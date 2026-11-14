@@ -1,2 +1,2 @@
-export { useAccountExecutionEditor } from "./use-account-execution-editor";
-export type { AccountExecutionEditor, EventDraft } from "./use-account-execution-editor";
+export { useOrderDetailEditor } from "./use-order-detail-editor";
+export type { OrderDetailEditor, EventDraft } from "./use-order-detail-editor";

@@ -11,7 +11,7 @@ import type { Pool } from "../../shared/api/types/finance";
 import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { consignmentRecords, type ActiveConsignment } from "../operations";
-import { type InventoryPartyLink } from "../OrderDetailView/OrderDetail.shared";
+import { type InventoryPartyLink } from "../../orders/OrderDetailView/OrderDetail.shared";
 import { type InventoryProfileTarget } from "../operations";
 import { type InventoryCancellationValues } from "../InventoryCancellationDialog";
 import { type BusinessCenterEntryTab } from "../../orders/businessCenter";

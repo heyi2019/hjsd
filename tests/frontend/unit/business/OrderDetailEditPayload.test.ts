@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildEventEdits } from "@/stocks/account-edit/execution-edit-payload";
 import { propagateSharedOrderExtra } from "@/stocks/account-edit/use-account-execution-editor";
-import { resolveExecutionPlatform } from "@/stocks/OrderDetailView/OrderDetail.shared";
+import { resolveExecutionPlatform } from "@/orders/OrderDetailView/OrderDetail.shared";
 
 describe("详情编辑保存载荷", () => {
   it("会提交事件的文本、时间和操作人修改", () => {

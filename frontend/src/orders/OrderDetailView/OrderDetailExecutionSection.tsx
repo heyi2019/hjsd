@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import { useMemo } from "react";
 import type { ColumnsType } from "antd/es/table";
 import type { AccountExecutionEvent } from "../../shared/api/types/account-execution";
-import type { OrderDraft } from "../account-edit/use-account-execution-editor";
+import type { OrderDraft } from "../../stocks/account-edit/use-account-execution-editor";
 import { DataTable, DateField, MoneyInput, MoneyText, Select } from "../../shared/ui";
 import {
   InventorySectionHeading,

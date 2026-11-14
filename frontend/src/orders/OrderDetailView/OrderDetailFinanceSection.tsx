@@ -4,7 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useMemo } from "react";
 import { DataTable, DateField, MoneyText } from "../../shared/ui";
 import type { InventoryFinanceRow, OrderDetailMeta } from "./OrderDetail.shared";
-import type { FinanceDraft, OrderDraft } from "../account-edit/use-account-execution-editor";
+import type { FinanceDraft, OrderDraft } from "../../stocks/account-edit/use-account-execution-editor";
 
 const FINANCE_SECTION_TITLE = "费用与资金补充信息";
 

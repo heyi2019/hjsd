@@ -15,7 +15,7 @@ import {
   isFieldActive,
   useOrderFormConfig,
   useOrderFormSectionLabels,
-} from "../../orders/ConfigurableField";
+} from "../ConfigurableField";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Select } from "../../shared/ui";
 

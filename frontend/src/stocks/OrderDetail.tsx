@@ -11,14 +11,14 @@ import {
   INVENTORY_TYPE_LABEL,
   VALUE_ADDED_SERVICE_LABEL,
 } from "./inventory-logic";
-import { OrderDetailView } from "./OrderDetailView/OrderDetailView";
+import { OrderDetailView } from "../orders/OrderDetailView/OrderDetailView";
 import {
   type InventoryEventDraft,
   type OrderDetailMeta,
   type InventoryPartyLink,
   type InventoryFinanceRow,
   PARTY_ROLE_LABEL,
-} from "./OrderDetailView/OrderDetail.shared";
+} from "../orders/OrderDetailView/OrderDetail.shared";
 import type { FinanceDraft } from "./account-edit/use-account-execution-editor";
 import type { OrderDraft } from "./account-edit/use-account-execution-editor";
 import type { PartyAddition } from "./account-edit/use-account-execution-editor";

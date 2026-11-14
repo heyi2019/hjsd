@@ -3,7 +3,7 @@ import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
 import type { BusinessCenterEntryTab } from "../businessCenter";
 import { DataTable, PermissionButton, Select, StatRow } from "../../shared/ui";
 import { OrderDetail } from "../../stocks/OrderDetail";
-import type { InventoryPartyLink } from "../../stocks/OrderDetailView/OrderDetail.shared";
+import type { InventoryPartyLink } from "../OrderDetailView/OrderDetail.shared";
 import { countBusinessOrders } from "./helpers";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 import type { OrdersPageController } from "./useOrdersPageController";

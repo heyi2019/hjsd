@@ -5,7 +5,7 @@ import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
 import { InventoryRebateModal } from "@/stocks/rebate";
 import { InventoryConsignmentModal } from "@/stocks/operations/consignment";
-import { OrderDetailDeliverySection } from "@/stocks/OrderDetailView/OrderDetailDeliverySection";
+import { OrderDetailDeliverySection } from "@/orders/OrderDetailView/OrderDetailDeliverySection";
 
 import type { Account } from "@/shared/api/types/accounts";
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";

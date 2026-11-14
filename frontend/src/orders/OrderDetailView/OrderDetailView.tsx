@@ -3,7 +3,7 @@ import type { FormInstance } from "antd";
 import type { AccountExecutionDetail, AccountExecutionEvent } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
 import { BusinessRegistrationForm, PermissionButton } from "../../shared/ui";
-import { FieldConfigScope } from "../../orders/ConfigurableField";
+import { FieldConfigScope } from "../ConfigurableField";
 import { OrderDetailDeliverySection } from "./OrderDetailDeliverySection";
 import { OrderDetailExecutionSection } from "./OrderDetailExecutionSection";
 import { OrderDetailFinanceSection } from "./OrderDetailFinanceSection";
@@ -17,9 +17,9 @@ import type {
   InventoryExecutionRow,
   InventoryFinanceRow,
 } from "./OrderDetail.shared";
-import type { FinanceDraft } from "../account-edit/use-account-execution-editor";
-import type { OrderDraft } from "../account-edit/use-account-execution-editor";
-import type { PartyAddition } from "../account-edit/use-account-execution-editor";
+import type { FinanceDraft } from "../../stocks/account-edit/use-account-execution-editor";
+import type { OrderDraft } from "../../stocks/account-edit/use-account-execution-editor";
+import type { PartyAddition } from "../../stocks/account-edit/use-account-execution-editor";
 import "./OrderDetail.css";
 
 type OrderDetailViewProps = {

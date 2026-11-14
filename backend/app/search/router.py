@@ -64,7 +64,13 @@ def global_search(
         raise Validation("搜索关键词不能为空", details={"field": "q"})
 
     results: list[SearchResult] = []
-    for order in list_orders(db, user=user):
+    visible_orders = list_orders(db, user=user)
+    order_by_account_id = {
+        order.account_id: order
+        for order in visible_orders
+        if order.account_id is not None
+    }
+    for order in visible_orders:
         if _matches(order.order_no, query):
             results.append(
                 SearchResult(
@@ -78,6 +84,9 @@ def global_search(
             )
 
     for account in list_accounts(db, user=user):
+        source_order = order_by_account_id.get(account.id)
+        if source_order is None:
+            continue
         if any(
             _matches(value, query)
             for value in (
@@ -95,7 +104,7 @@ def global_search(
                     subtitle=" · ".join(
                         value for value in (account.game_type, account.platform) if value
                     ) or account.status,
-                    route=f"/stocks/{account.id}/execution-detail",
+                    route=f"/orders/{source_order.id}",
                 )
             )
 

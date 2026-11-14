@@ -38,6 +38,7 @@ def test_global_search_covers_order_inventory_customer_and_counterparty(
         trade_date=date(2026, 10, 17),
         owner_id=9,
         actor="pytest",
+        account_id=account.id,
     )
 
     for query, expected_type in (
@@ -55,7 +56,7 @@ def test_global_search_covers_order_inventory_customer_and_counterparty(
     account_result = seeded_client.get(
         "/api/v1/search", params={"q": account.game_account}, headers=headers
     ).json()["items"][0]
-    assert account_result["route"] == f"/stocks/{account.id}/execution-detail"
+    assert account_result["route"] == f"/orders/{order.id}"
 
     counterparty_detail = seeded_client.get(
         f"/api/v1/counterparties/{counterparty.id}", headers=headers

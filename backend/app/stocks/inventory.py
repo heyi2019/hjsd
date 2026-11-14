@@ -18,12 +18,14 @@ from ._common import INVENTORY_STATUSES, inventory_age_days as age_days, scope_f
 
 def list_accounts(
     session: Session, *, status: str | None = None, user: CurrentUser | None = None,
-    limit: int | None = None, offset: int = 0,
+    inventory_status: str | None = None, limit: int | None = None, offset: int = 0,
 ) -> list[Account]:
     # 账号台账包含所有业务类型的库存实体；在库台账与成本统计使用同一口径。
     stmt = select(Account)
     if status:
         stmt = stmt.where(Account.status == status)
+    if inventory_status:
+        stmt = stmt.where(Account.inventory_status == inventory_status)
     scope = scope_filter(session, user)
     if scope is not None:
         stmt = stmt.where(scope)
@@ -45,10 +47,7 @@ def count_accounts(session: Session, *, status: str | None = None, user: Current
 
 def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict[str, Any]]:
     """库存中心在库台账：只统计独立库存状态为在库的真实占用。"""
-    rows = [
-        row for row in list_accounts(session, user=user)
-        if row.inventory_status in INVENTORY_STATUSES
-    ]
+    rows = list_accounts(session, inventory_status=next(iter(INVENTORY_STATUSES)), user=user)
     extra_values = get_extra_values_bulk(
         session, entity_type="account", entity_ids=[row.id for row in rows]
     )
@@ -96,7 +95,7 @@ def inventory_stats(
             "over_7d_count": 0,
             "over_30d_count": 0,
         }
-    stmt = select(Account).where(Account.id.in_(ids))
+    stmt = select(Account).where(Account.id.in_(ids), Account.inventory_status.in_(INVENTORY_STATUSES))
     scope = scope_filter(session, user)
     if scope is not None:
         stmt = stmt.where(scope)

@@ -1,5 +1,5 @@
 import { CopyOutlined } from "@ant-design/icons";
-import { Descriptions, Input, Tooltip } from "antd";
+import { Descriptions, Input, Space, Tooltip } from "antd";
 import { useMemo } from "react";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
@@ -190,10 +190,10 @@ export function OrderDetailProfileSection({
           </Descriptions>
           <Descriptions className="order-detail__meta-table" size="small" bordered column={2}>
             <Descriptions.Item label="二次图片（选填）">
-              <OrderDetailImageGallery images={images.secondary} altPrefix="二次图片" />
+              <OrderDetailImageGallery images={images.secondary} altPrefix="二次图片" editing={editing} onChange={(next) => onProfileChange?.({ secondary_images: next })} />
             </Descriptions.Item>
             <Descriptions.Item label="钱包实名图片（选填）">
-              <OrderDetailImageGallery images={images.walletRealname} altPrefix="钱包实名图片" />
+              <OrderDetailImageGallery images={images.walletRealname} altPrefix="钱包实名图片" editing={editing} onChange={(next) => onProfileChange?.({ wallet_realname_images: next })} />
             </Descriptions.Item>
           </Descriptions>
         </div>
@@ -245,9 +245,15 @@ function EditableProfileField({
       />
     );
   }
-  const value = field.key === "channelRegion"
-    ? account?.channel_region ?? ""
-    : field.key === "gameType"
+  if (field.key === "channelRegion") {
+    return (
+      <Space.Compact block>
+        <Input aria-label="编辑平台" value={account?.platform ?? ""} placeholder="平台" onChange={(event) => onChange?.({ platform: event.target.value })} />
+        <Input aria-label="编辑渠道区服" value={account?.channel_region ?? ""} placeholder="渠道 / 区服" onChange={(event) => onChange?.({ channel_region: event.target.value })} />
+      </Space.Compact>
+    );
+  }
+  const value = field.key === "gameType"
       ? account?.game_type ?? ""
       : field.key === "gameAccount"
         ? account?.game_account ?? ""
@@ -258,9 +264,7 @@ function EditableProfileField({
             : field.key === "walletRealname"
               ? account?.wallet_realname ?? ""
               : account?.note ?? "";
-  const key = field.key === "channelRegion"
-    ? "channel_region"
-    : field.key === "gameType"
+  const key = field.key === "gameType"
       ? "game_type"
       : field.key === "gameAccount"
         ? "game_account"

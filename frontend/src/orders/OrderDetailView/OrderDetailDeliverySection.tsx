@@ -156,6 +156,7 @@ export function OrderDetailDeliverySection({
   employees,
   orderDrafts,
   onOrderExtraChange,
+  onOrderEdit,
   onProfileChange,
 }: {
   meta: OrderDetailMeta;
@@ -165,6 +166,7 @@ export function OrderDetailDeliverySection({
   employees?: EmployeeOption[];
   orderDrafts?: Record<number, OrderDraft>;
   onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
+  onOrderEdit?: (orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) => void;
   onProfileChange?: (changes: Partial<Account>) => void;
 }) {
   const creationOrder = useMemo(
@@ -185,6 +187,17 @@ export function OrderDetailDeliverySection({
         <div className="order-detail__meta">
           <DeliverySubSection title="买号交付" orderType={creationOrder?.order_type} order={creationOrder} account={account} employees={employees} editing draft={creationOrder ? orderDrafts?.[creationOrder.order_id] : undefined} onProfileChange={onProfileChange} onExtraChange={(key, value) => creationOrder && onOrderExtraChange?.(creationOrder.order_id, key, value)} />
           {sellOrder ? <DeliverySubSection title="卖号交付" orderType={sellOrder.order_type} order={sellOrder} account={account} employees={employees} editing draft={orderDrafts?.[sellOrder.order_id]} onProfileChange={onProfileChange} onExtraChange={(key, value) => onOrderExtraChange?.(sellOrder.order_id, key, value)} /> : null}
+          {creationOrder ? (
+            <Descriptions className="order-detail__meta-table" size="small" bordered column={1}>
+              <Descriptions.Item label="订单备注">
+                <Input
+                  aria-label="编辑订单备注"
+                  value={orderDrafts?.[creationOrder.order_id]?.note ?? creationOrder.note ?? ""}
+                  onChange={(event) => onOrderEdit?.(creationOrder.order_id, { note: event.target.value })}
+                />
+              </Descriptions.Item>
+            </Descriptions>
+          ) : null}
         </div>
       </div>
     );
@@ -202,6 +215,11 @@ export function OrderDetailDeliverySection({
           account={account}
           employees={employees}
         />
+        {creationOrder ? (
+          <Descriptions className="order-detail__meta-table" size="small" bordered column={1}>
+            <Descriptions.Item label="订单备注">{creationOrder.note || "-"}</Descriptions.Item>
+          </Descriptions>
+        ) : null}
       </div>
     </div>
   );

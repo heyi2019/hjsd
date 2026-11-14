@@ -123,7 +123,7 @@ def update_order_execution_detail(
     order = orders_get_order(db, order_id, user)
     if order.account_id is None:
         raise Validation("订单未关联库存账号", details={"order_id": order_id})
-    edit_execution_detail(db, order.account_id, payload, user)
+    edit_execution_detail(db, order_id, payload, user)
     return {"ok": True}
 
 

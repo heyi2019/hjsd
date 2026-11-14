@@ -28,8 +28,8 @@ export function useInventoryActions(params: {
   executionDetails: Record<number, AccountExecutionDetail>;
   setExecutionDetails: Dispatch<SetStateAction<Record<number, AccountExecutionDetail>>>;
   loadExecution: (row: Account, force?: boolean) => Promise<void>;
-  loadOrderExecution: (orderId: number, force?: boolean) => Promise<void>;
-  loadEditorExecution: (row: Account, orderId: number) => Promise<void>;
+  loadOrderExecution: (orderId: number, force?: boolean) => Promise<AccountExecutionDetail | null>;
+  loadEditorExecution: (row: Account, orderId: number) => Promise<AccountExecutionDetail | null>;
   dropExecutionCache: (accountId: number) => void;
   expandTo: (ids: Key[]) => void;
   expandedOrderIds: Key[];
@@ -73,8 +73,9 @@ export function useInventoryActions(params: {
       appMessage.warning("当前账号没有绑定来源订单，无法编辑");
       return;
     }
-    await loadEditorExecution(account, boundOrderId);
-    await editorOpenEditor(account);
+    const detail = await loadEditorExecution(account, boundOrderId);
+    if (!detail) return;
+    await editorOpenEditor(detail.account);
     // 就地展开该行进入内联编辑（不弹窗）。
     expandTo([String(boundOrderId)]);
   }

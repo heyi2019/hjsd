@@ -106,7 +106,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
     if (active) setMineOrders(initialMine);
   }, [active, initialMine]);
 
-  const typeNames = Object.fromEntries(types.map((type) => [type.code, type.name]));
+  const typeNames = useMemo(() => Object.fromEntries(types.map((type) => [type.code, type.name])), [types]);
   // 先按业务筛选，再按日期，最后一次排序；避免渲染层重复计算同一批订单。
   const filteredOrders = useMemo(
     () => filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter)

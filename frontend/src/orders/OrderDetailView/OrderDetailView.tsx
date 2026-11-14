@@ -91,7 +91,7 @@ export function OrderDetailView({
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="INVEDIT" form={extraForm}>
           <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
-            <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onProfileChange={onProfileChange} />
+            <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onOrderEdit={onOrderEdit} onProfileChange={onProfileChange} />
             <OrderDetailOperationSection meta={meta} editing account={editing ?? account} eventDrafts={eventDrafts} onEventEdit={onEventEdit} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} />
           </FieldConfigScope>
         </BusinessRegistrationForm>
@@ -127,8 +127,8 @@ export function OrderDetailView({
         />
         <div className="order-detail__footer">
           <Space>
-            <PermissionButton permission="order.create" type="primary" loading={saving} onClick={() => onSave?.()}>保存修改</PermissionButton>
-            <PermissionButton permission="order.create" onClick={() => onCancel?.()}>取消</PermissionButton>
+            <PermissionButton permission="order.update" type="primary" loading={saving} onClick={() => onSave?.()}>保存修改</PermissionButton>
+            <PermissionButton permission="order.update" onClick={() => onCancel?.()}>取消</PermissionButton>
           </Space>
         </div>
       </div>

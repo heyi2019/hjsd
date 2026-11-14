@@ -127,3 +127,22 @@ def test_operator_edit_does_not_change_existing_cashflow_amount(seeded_client, s
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(Cashflow, flow.id).amount == Decimal("90")
+
+
+def test_order_detail_edit_can_clear_order_note_and_operator(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="clear-order-fields", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    order.note = "旧备注"
+    seeded_db.commit()
+
+    response = seeded_client.patch(
+        f"/api/v1/orders/{order.id}/execution-edit",
+        headers=headers,
+        json={"events": [], "orders": [{"order_id": order.id, "operator": None, "note": None}]},
+    )
+
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    edited = seeded_db.get(Order, order.id)
+    assert edited.created_by == ""
+    assert edited.note is None

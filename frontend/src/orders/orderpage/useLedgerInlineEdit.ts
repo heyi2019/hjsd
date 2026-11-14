@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Order } from "../../shared/api/types/orders";
@@ -12,22 +12,14 @@ import { useOrderDetailEditor } from "../OrderDetailView/editing/use-order-detai
  */
 export function useLedgerInlineEdit() {
   const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
-  const [ledgerDetails, setLedgerDetails] = useState<Record<number, AccountExecutionDetail>>({});
-  const [ledgerDetailLoading, setLedgerDetailLoading] = useState<Record<number, boolean>>({});
   const [ledgerOrderDetails, setLedgerOrderDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [ledgerOrderDetailLoading, setLedgerOrderDetailLoading] = useState<Record<number, boolean>>({});
   const loadLedgerDetail = async (order: Pick<Order, "id" | "account_id">, force = false) => {
-    const accountId = order.account_id;
-    if (accountId == null) return;
-    if (!force && (ledgerDetails[accountId] || ledgerDetailLoading[accountId])) return;
-    setLedgerDetailLoading((current) => ({ ...current, [accountId]: true }));
+    if (order.account_id == null) return;
     try {
-      const detail = await ordersApi.executionDetail(order.id);
-      setLedgerDetails((current) => ({ ...current, [accountId]: detail }));
+      await loadLedgerOrderDetail(order.id, force);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
-    } finally {
-      setLedgerDetailLoading((current) => ({ ...current, [accountId]: false }));
     }
   };
   const loadLedgerOrderDetail = async (orderId: number, force = false) => {
@@ -43,8 +35,12 @@ export function useLedgerInlineEdit() {
     }
   };
   const orderDetailEditor = useOrderDetailEditor({
-    getExecutionDetail: (id) => ledgerDetails[id],
-    onSaved: (id, detail) => setLedgerDetails((current) => ({ ...current, [id]: detail })),
+    getExecutionDetail: (id) => Object.values(ledgerOrderDetails).find((detail) => detail.account.id === id),
+    onSaved: (id, detail) => {
+      setLedgerOrderDetails((current) => Object.fromEntries(
+        Object.entries(current).map(([orderId, cached]) => cached.account.id === id ? [orderId, detail] : [orderId, cached]),
+      ));
+    },
   });
 
   const openLedgerEditor = async (order: Order) => {
@@ -54,10 +50,8 @@ export function useLedgerInlineEdit() {
         appMessage.warning("该订单未关联库存账号，无法编辑账号资料");
         return;
       }
-      const detail = ledgerDetails[accountId]
-        ?? ledgerOrderDetails[order.id]
+      const detail = ledgerOrderDetails[order.id]
         ?? await ordersApi.executionDetail(order.id);
-      setLedgerDetails((current) => ({ ...current, [accountId]: detail }));
       setLedgerOrderDetails((current) => ({ ...current, [order.id]: detail }));
       setExpandedOrderIds([String(order.id)]);
       await orderDetailEditor.openEditor(detail.account);
@@ -65,6 +59,11 @@ export function useLedgerInlineEdit() {
       appMessage.error(normalizeError(error).message);
     }
   };
+
+  const ledgerDetails = useMemo(
+    () => Object.fromEntries(Object.values(ledgerOrderDetails).map((detail) => [detail.account.id, detail])),
+    [ledgerOrderDetails],
+  );
 
   const handleLedgerExpand = (expanded: boolean, record: Order) => {
     // 手风琴：一次只展开一行，避免多行展开同时挂载多份详情导致 DOM 与页面长度翻倍。
@@ -77,7 +76,7 @@ export function useLedgerInlineEdit() {
     expandedOrderIds,
     setExpandedOrderIds,
     ledgerDetails,
-    ledgerDetailLoading,
+    ledgerDetailLoading: {},
     loadLedgerDetail,
     ledgerOrderDetails,
     ledgerOrderDetailLoading,

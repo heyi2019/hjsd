@@ -117,7 +117,12 @@ def _latest_operation(orders: Iterable[AccountExecutionOrderOut], operation_type
     return max(events, key=lambda event: _operation_timestamp(event) or datetime.min, default=None)
 
 
-def _operation_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailOperationRowOut]:
+def _operation_rows(
+    orders: list[AccountExecutionOrderOut],
+    *,
+    account_description: str | None = None,
+    account_images: list[str] | None = None,
+) -> list[DetailOperationRowOut]:
     consignment = _latest_operation(orders, "CONSIGNMENT")
     unlist = _latest_operation(orders, "UNLIST")
     description = _latest_operation(orders, "DESCRIPTION")
@@ -131,8 +136,8 @@ def _operation_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailOperat
     return [
         DetailOperationRowOut(key="consignment", action="上架平台", content=listed_content or "-", occurred_at=_operation_timestamp(consignment), operator=_operator(consignment) if consignment else "-", event_id=consignment.id if consignment else None),
         DetailOperationRowOut(key="unlist", action="下架平台", content=unlisted_content or "-", occurred_at=_operation_timestamp(unlist), operator=_operator(unlist) if unlist else "-", event_id=unlist.id if unlist else None),
-        DetailOperationRowOut(key="description", action="描述", content="-", occurred_at=_operation_timestamp(description), operator=_operator(description) if description else "-", event_id=description.id if description else None),
-        DetailOperationRowOut(key="images", action="作图", content="-", occurred_at=_operation_timestamp(image), operator=_operator(image) if image else "-", event_id=image.id if image else None),
+        DetailOperationRowOut(key="description", action="描述", content=account_description or "-", occurred_at=_operation_timestamp(description), operator=_operator(description) if description else "-", event_id=description.id if description else None),
+        DetailOperationRowOut(key="images", action="作图", content=f"已上传 {len(account_images or [])} 张" if account_images else "-", occurred_at=_operation_timestamp(image), operator=_operator(image) if image else "-", event_id=image.id if image else None),
     ]
 
 
@@ -248,7 +253,12 @@ def _extras(orders: list[AccountExecutionOrderOut]) -> list[DetailExtraOut]:
     return result
 
 
-def build_detail_view(orders: list[AccountExecutionOrderOut]) -> OrderDetailViewOut:
+def build_detail_view(
+    orders: list[AccountExecutionOrderOut],
+    *,
+    account_description: str | None = None,
+    account_images: list[str] | None = None,
+) -> OrderDetailViewOut:
     sell = next(((event, order) for order in orders for event in order.events if event.event_type == "SELL"), None)
     cancel = next(((event, order) for order in orders for event in order.events if event.event_type == "CANCEL"), None)
     recovery = sorted({platform for order in orders if order.order_type in {"HS", "TH"} for platform in _platform_values(order)})
@@ -257,7 +267,7 @@ def build_detail_view(orders: list[AccountExecutionOrderOut]) -> OrderDetailView
     return OrderDetailViewOut(
         execution_rows=_execution_rows(orders),
         finance_rows=_finance_rows(orders),
-        operation_rows=_operation_rows(orders),
+        operation_rows=_operation_rows(orders, account_description=account_description, account_images=account_images),
         lifecycle=DetailLifecycleOut(
             sold_at=sell[0].occurred_at if sell else None,
             removed_at=cancel[0].occurred_at if cancel else None,

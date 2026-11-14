@@ -46,35 +46,40 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
       setExecutionLoading((current) => ({ ...current, [row.id]: false }));
     }
   }
-  async function loadOrderExecution(orderId: number, force = false) {
-    if (!force && (orderExecutionDetails[orderId] || orderExecutionLoading[orderId])) return;
+  async function loadOrderExecution(orderId: number, force = false): Promise<AccountExecutionDetail | null> {
+    if (!force && (orderExecutionDetails[orderId] || orderExecutionLoading[orderId])) return orderExecutionDetails[orderId] ?? null;
     setOrderExecutionLoading((current) => ({ ...current, [orderId]: true }));
     try {
       const detail = await ordersApi.executionDetail(orderId);
       setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));
+      setExecutionDetails((current) => ({ ...current, [detail.account.id]: detail }));
+      return detail;
     } catch (err) {
       setError(normalizeError(err));
+      return null;
     } finally {
       setOrderExecutionLoading((current) => ({ ...current, [orderId]: false }));
     }
   }
   /** 编辑入口同时需要账号详情与当前订单详情，两者是同一份订单执行快照。 */
-  async function loadEditorExecution(row: Account, orderId: number) {
+  async function loadEditorExecution(row: Account, orderId: number): Promise<AccountExecutionDetail | null> {
     const cached = executionDetails[row.id] ?? orderExecutionDetails[orderId];
     if (cached) {
       setExecutionDetails((current) => current[row.id] ? current : { ...current, [row.id]: cached });
       setOrderExecutionDetails((current) => current[orderId] ? current : { ...current, [orderId]: cached });
-      return;
+      return cached;
     }
-    if (executionLoading[row.id] || orderExecutionLoading[orderId]) return;
+    if (executionLoading[row.id] || orderExecutionLoading[orderId]) return null;
     setExecutionLoading((current) => ({ ...current, [row.id]: true }));
     setOrderExecutionLoading((current) => ({ ...current, [orderId]: true }));
     try {
       const detail = await ordersApi.executionDetail(orderId);
       setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
       setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));
+      return detail;
     } catch (err) {
       setError(normalizeError(err));
+      return null;
     } finally {
       setExecutionLoading((current) => ({ ...current, [row.id]: false }));
       setOrderExecutionLoading((current) => ({ ...current, [orderId]: false }));
@@ -109,15 +114,12 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
    *  必须 force：此时 useState 尚未提交，闭包里的 executionDetails 仍是旧值，不加 force 会被命中缓存直接 return。 */
   function refreshExecution(row: Account, orderId = row.source_order_id) {
     dropExecutionCache(row.id);
-    void loadExecution(row, true);
-    const cachedOrderIds = Object.entries(orderExecutionDetails)
-      .filter(([, detail]) => detail.account.id === row.id)
-      .map(([id]) => Number(id));
-    const orderIds = new Set(orderId != null ? [orderId, ...cachedOrderIds] : cachedOrderIds);
-    orderIds.forEach((id) => {
-      dropOrderExecutionCache(id);
-      void loadOrderExecution(id, true);
-    });
+    if (orderId != null) {
+      dropOrderExecutionCache(orderId);
+      void loadOrderExecution(orderId, true);
+    } else {
+      void loadExecution(row, true);
+    }
   }
 
   return {

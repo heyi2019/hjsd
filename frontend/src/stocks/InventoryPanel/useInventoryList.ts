@@ -59,16 +59,16 @@ const INVENTORY_STATS_DEBOUNCE_MS = 200;
   // T20：筛选项从「选项词典」配置读取（库存业务 / 类型）。
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
   const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
-  const gameTypeOptions = Array.from(new Set((rows ?? [])
+  const gameTypeOptions = useMemo(() => Array.from(new Set((rows ?? [])
     .map((row) => row.account_game_type)
     .filter((value): value is string => Boolean(value))))
     .sort((a, b) => a.localeCompare(b, "zh-CN"))
-    .map((value) => ({ value, label: value }));
+    .map((value) => ({ value, label: value })), [rows]);
   const load = useCallback(async () => {
     try {
       const [accountList, orderList] = await Promise.all([
         stocksApi.list({ status: "WAITING" }),
-        ordersApi.list(),
+        ordersApi.list({ status: "WAITING" }),
       ]);
       const list = toInventoryOrderRows(accountList ?? [], orderList ?? []);
       const freshIds = new Set(list.map((row) => row.account.id));
@@ -94,7 +94,14 @@ const INVENTORY_STATS_DEBOUNCE_MS = 200;
     if (refreshKey > 0) setPage(1);
   }, [refreshKey]);
   const inventoryRows = filterInventoryRows(rows ?? [], { businessMode, gameType: gameTypeFilter });
-  const countInventoryRows = (type?: string) => inventoryRows.filter((row) => !type || row.inventory_type === type).length;
+  const inventoryTypeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    inventoryRows.forEach((row) => {
+      if (row.inventory_type) counts[row.inventory_type] = (counts[row.inventory_type] ?? 0) + 1;
+    });
+    return counts;
+  }, [inventoryRows]);
+  const countInventoryRows = (type?: string) => type ? (inventoryTypeCounts[type] ?? 0) : inventoryRows.length;
   const visibleRows = useMemo(() => filterInventoryRows(rows ?? [], {
     businessMode,
     inventoryType,

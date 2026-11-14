@@ -60,6 +60,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   executionLoading,
   orderExecutionDetails,
   orderExecutionLoading,
+  setOrderExecutionDetails,
   dropExecutionCache,
   removeFromInventory,
   refreshExecution,
@@ -71,6 +72,9 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     getExecutionDetail: (accountId) => executionDetails[accountId],
     onSaved: (accountId, detail) => {
       setExecutionDetails((current) => ({ ...current, [accountId]: detail }));
+      setOrderExecutionDetails((current) => Object.fromEntries(
+        Object.entries(current).map(([orderId, cached]) => cached.account.id === accountId ? [orderId, detail] : [orderId, cached]),
+      ));
       setRows((current) => current.map((row) => row.account.id === accountId ? mergeInventoryAccount(row, detail.account) : row));
     },
   });

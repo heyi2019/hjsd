@@ -20,15 +20,24 @@ from .schemas import ExecutionEditItem, ExecutionEditRequest
 def validate_event_edits(
     db: Session,
     account: Account,
+    order_id: int,
     payload: ExecutionEditRequest,
     user: CurrentUser,
 ) -> tuple[list[tuple[OrderEvent, Cashflow | None, ExecutionEditItem]], Decimal]:
     changes: list[tuple[OrderEvent, Cashflow | None, ExecutionEditItem]] = []
     cost_delta = Decimal("0")
+    requested_operator_ids = {
+        operator_id
+        for item in payload.events
+        for operator_id in (item.operator_user_ids or [])
+    }
+    active_operator_ids = set(db.scalars(
+        select(User.id).where(User.id.in_(requested_operator_ids), User.is_active.is_(True))
+    ).all()) if requested_operator_ids else set()
     for item in payload.events:
         event = db.scalar(select(OrderEvent).where(OrderEvent.id == item.id).with_for_update())
         order = get_order(db, event.order_id, user) if event else None
-        if event is None or order is None or order.account_id != account.id or not event.is_posted:
+        if event is None or order is None or order.id != order_id or order.account_id != account.id or not event.is_posted:
             raise NotFound("执行记录不存在")
         if Decimal(str(event.amount)) != item.expected_amount:
             raise Conflict("执行记录已被修改，请刷新后重试")
@@ -36,8 +45,7 @@ def validate_event_edits(
             ids = item.operator_user_ids
             if len(set(ids)) != len(ids):
                 raise Validation("操作人不能重复选择")
-            valid = set(db.scalars(select(User.id).where(User.id.in_(ids), User.is_active.is_(True))).all())
-            if valid != set(ids):
+            if not set(ids).issubset(active_operator_ids):
                 raise Validation("所选操作人不存在或已停用")
         flow = db.scalar(select(Cashflow).where(Cashflow.order_event_id == event.id).with_for_update())
         if flow is not None and not user.can_see_pool(flow.pool_id):
@@ -101,7 +109,8 @@ def apply_event_edits(db: Session, changes: list[tuple[OrderEvent, Cashflow | No
                 flow.occurred_on = occurred_at.date()
                 flow.created_at = occurred_at
         if item.form_extra is not None:
-            event.form_extra = {**(event.form_extra or {}), **item.form_extra}
+            # 前端提交的是该事件当前完整草稿；使用替换才能真正删除已清空的平台、价格等字段。
+            event.form_extra = item.form_extra
         if item.operator_user_ids is not None:
             event.operator_user_ids = item.operator_user_ids
         event.updated_by = actor

@@ -4,9 +4,8 @@ from __future__ import annotations
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.core.security import CurrentUser, PERM_AUDIT_READ, owner_scope_filter
+from app.core.security import CurrentUser, PERM_AUDIT_READ
 from app.domain.foundation import AuditLog
-from app.domain.trade import Order
 from app.orders._shared import get_order
 from app.stocks.profile import get_account
 from app.stocks.router_output import _account_outputs
@@ -28,11 +27,9 @@ def load_order_execution_detail(
         from app.core.errors import NotFound
         raise NotFound("订单未关联库存账号")
     account = get_account(db, order.account_id, user)
-    scoped_orders = select(Order).where(Order.id == order.id, Order.account_id == account.id)
-    scope = owner_scope_filter(Order.owner_id, user, db)
-    if scope is not None:
-        scoped_orders = scoped_orders.where(scope)
-    orders = list(db.scalars(scoped_orders).all())
+    # get_order 已完成当前用户的 owner scope 校验；订单与账号是一一绑定关系，
+    # 这里直接复用已加载的订单，避免为同一详情重复查订单。
+    orders = [order]
     relations = load_relations(db, orders)
     context = load_event_context(db, [order.id])
     events = context.events_by_order
@@ -42,7 +39,12 @@ def load_order_execution_detail(
         filters = [(AuditLog.entity_type == "account") & (AuditLog.entity_id == str(account.id))]
         filters.append((AuditLog.entity_type == "order") & (AuditLog.entity_id == order.order_no))
         if event_ids:
-            filters.append((AuditLog.entity_type == "inventory_event_edit") & AuditLog.entity_id.in_([str(item) for item in event_ids]))
+            event_id_values = [str(item) for item in event_ids]
+            filters.append((AuditLog.entity_type == "inventory_event_edit") & AuditLog.entity_id.in_(event_id_values))
+        filters.append((AuditLog.entity_type == "inventory_order_edit") & (AuditLog.entity_id == str(order.id)))
+        flow_nos = [flow.flow_no for flow in context.order_cashflows.get(order.id, [])]
+        if flow_nos:
+            filters.append((AuditLog.entity_type == "inventory_cashflow_edit") & AuditLog.entity_id.in_(flow_nos))
         audit = [AccountAuditOut(id=row.id, action=row.action, entity_type=row.entity_type, entity_id=row.entity_id, actor=row.actor, reason=row.reason, occurred_at=row.occurred_at) for row in db.scalars(select(AuditLog).where(or_(*filters)).order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())).all()]
     outputs = build_order_outputs(
         orders,
@@ -58,6 +60,10 @@ def load_order_execution_detail(
         account=_account_outputs(db, [account], user)[0],
         finance_summary=build_finance_summary(db, order_ids=[order.id], event_cashflows=context.event_cashflows, order_cashflows=context.order_cashflows, order_rebates=relations.rebates_by_order, action_model_rebate_ids=context.action_model_rebate_ids, deposit_loss_flow_nos=context.deposit_loss_flow_nos),
         orders=outputs,
-        detail_view=build_detail_view(outputs),
+        detail_view=build_detail_view(
+            outputs,
+            account_description=account.account_description,
+            account_images=account.account_images or [],
+        ),
         audit=audit,
     )

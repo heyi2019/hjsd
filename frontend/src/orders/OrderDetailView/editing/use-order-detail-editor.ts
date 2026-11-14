@@ -57,6 +57,7 @@ export type PartyAddition = {
   entity_type: "customer" | "counterparty";
   entity_id: number;
   role: string;
+  operation?: "add" | "remove";
 };
 
 export interface OrderDetailEditor {
@@ -107,11 +108,14 @@ export function useOrderDetailEditor(params: {
     setFinanceDrafts({});
     setOrderDrafts({});
     setPartyDrafts({});
-    try {
-      const list = await employeesApi.list();
-      setEmployees(list);
-    } catch {
-      // 员工列表加载失败不阻断编辑：事件操作人下拉可在保存前重试或留空由后端校验。
+    if (!employees.length) {
+      try {
+        const list = await employeesApi.list();
+        setEmployees(list);
+      } catch {
+        setEmployees([]);
+        // 员工列表加载失败不阻断编辑：事件操作人下拉可在保存前重试或留空由后端校验。
+      }
     }
     setInlineEditId(account.id);
   }
@@ -167,8 +171,11 @@ export function useOrderDetailEditor(params: {
   function updatePartyDraft(orderId: number, addition: PartyAddition) {
     setPartyDrafts((current) => {
       const existing = current[orderId] ?? [];
-      const alreadyAdded = existing.some((item) => item.entity_type === addition.entity_type && item.entity_id === addition.entity_id && item.role === addition.role);
-      return alreadyAdded ? current : { ...current, [orderId]: [...existing, addition] };
+      const same = (item: PartyAddition) => item.entity_type === addition.entity_type
+        && item.entity_id === addition.entity_id
+        && item.role === addition.role;
+      if (existing.some((item) => same(item) && (item.operation ?? "add") === (addition.operation ?? "add"))) return current;
+      return { ...current, [orderId]: [...existing.filter((item) => !same(item)), addition] };
     });
   }
 
@@ -223,22 +230,22 @@ export function useOrderDetailEditor(params: {
         flow_no: draft.flow_no,
         ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
         note: draft.note,
-        ...(draft.operator ? { operator: draft.operator } : {}),
+        operator: draft.operator,
       }));
       const originalOrders = detail?.orders ?? [];
       const orders = Object.values(orderDrafts).filter((draft) => {
         const original = originalOrders.find((order) => order.order_id === draft.order_id);
-        return original && (
-          draft.occurred_at !== ""
-          || draft.operator !== ""
-          || draft.note !== ""
+        return Boolean(original && (
+          draft.occurred_at !== (original.created_at ?? "")
+          || draft.operator !== (original.operator === "-" ? "" : original.operator)
+          || draft.note !== (original.note ?? "")
           || Object.keys(draft.form_extra).length > 0
-        );
+        ));
       }).map((draft) => ({
         order_id: draft.order_id,
         ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
-        ...(draft.operator ? { operator: draft.operator } : {}),
-        ...(draft.note ? { note: draft.note } : {}),
+        operator: draft.operator,
+        note: draft.note,
         ...(Object.keys(draft.form_extra).length ? { form_extra: draft.form_extra } : {}),
       }));
       const parties = Object.entries(partyDrafts).flatMap(([orderId, additions]) => additions.map((item) => ({ order_id: Number(orderId), ...item })));
@@ -257,6 +264,7 @@ export function useOrderDetailEditor(params: {
       } catch (refreshError) {
         appMessage.warning("修改已保存，但刷新明细失败，请重新加载");
         console.warn("reload execution detail after save failed", normalizeError(refreshError).message);
+        throw refreshError;
       }
       setEditingAccount(null);
       setEventDrafts({});

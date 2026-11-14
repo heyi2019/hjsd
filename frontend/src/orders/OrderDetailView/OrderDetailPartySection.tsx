@@ -118,8 +118,10 @@ export function OrderDetailPartySection({
                 placeholder="选择客户"
                 options={customers.map((item) => ({ value: item.id, label: `${item.customer_no} · ${item.display_name}` }))}
                 onChange={(ids: number[]) => {
+                  const removed = selectedCustomerIds.filter((id) => !ids.includes(id));
                   setSelectedCustomerIds(ids);
                   ids.forEach((id) => onPartyEdit?.(meta.orderId!, { entity_type: "customer", entity_id: id, role: customerRole }));
+                  removed.forEach((id) => onPartyEdit?.(meta.orderId!, { entity_type: "customer", entity_id: id, role: customerRole, operation: "remove" }));
                 }}
               />
               <Input aria-label="新建客户名称" value={newCustomerName} placeholder="新建客户" onChange={(event) => setNewCustomerName(event.target.value)} />
@@ -133,8 +135,10 @@ export function OrderDetailPartySection({
                   placeholder="选择渠道方"
                   options={counterparties.map((item) => ({ value: item.id, label: `${item.counterparty_no} · ${item.display_name}` }))}
                   onChange={(ids: number[]) => {
+                  const removed = selectedCounterpartyIds.filter((id) => !ids.includes(id));
                     setSelectedCounterpartyIds(ids);
                     ids.forEach((id) => onPartyEdit?.(meta.orderId!, { entity_type: "counterparty", entity_id: id, role: counterpartyRole }));
+                  removed.forEach((id) => onPartyEdit?.(meta.orderId!, { entity_type: "counterparty", entity_id: id, role: counterpartyRole, operation: "remove" }));
                   }}
                 />
                 <Input aria-label="新建渠道方名称" value={newCounterpartyName} placeholder="新建渠道方" onChange={(event) => setNewCounterpartyName(event.target.value)} />

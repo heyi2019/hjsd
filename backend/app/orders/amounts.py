@@ -160,14 +160,15 @@ def _profit_flow_rows(
     """
     rows: list[tuple[int, date, Decimal, Decimal]] = []
 
+    action_model_stmt = select(OrderEvent.form_extra).where(
+        OrderEvent.event_type == EventType.REBATE.value,
+        OrderEvent.is_posted.is_(True),
+    )
+    if order_ids is not None:
+        action_model_stmt = action_model_stmt.where(OrderEvent.order_id.in_(order_ids))
     action_model_rebate_ids = {
         int((extra or {}).get("rebate_record_id"))
-        for extra in session.scalars(
-            select(OrderEvent.form_extra).where(
-                OrderEvent.event_type == EventType.REBATE.value,
-                OrderEvent.is_posted.is_(True),
-            )
-        ).all()
+        for extra in session.scalars(action_model_stmt).all()
         if isinstance(extra, dict)
         and str((extra or {}).get("rebate_record_id", "")).isdigit()
     }

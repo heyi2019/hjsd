@@ -6,11 +6,24 @@ import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { useOrderDetailEditor } from "../OrderDetailView/editing/use-order-detail-editor";
 
+export function mergeLedgerOrderWithDetail(order: Order, detail: Pick<AccountExecutionDetail, "account">): Order {
+  const { account } = detail;
+  return {
+    ...order,
+    account_game_type: account.game_type ?? order.account_game_type,
+    account_game_account: account.game_account ?? order.account_game_account,
+    account_platform: account.platform ?? order.account_platform,
+    account_status: account.status ?? order.account_status,
+    cost_amount: account.cost_amount ?? order.cost_amount,
+    stock_no: account.stock_no ?? order.stock_no,
+  };
+}
+
 /**
  * 台账表格的展开详情缓存与账号内联编辑枢纽。
  * 订单与库存必须已有明确绑定，编辑器不负责补建库存档案。
  */
-export function useLedgerInlineEdit() {
+export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountExecutionDetail) => void } = {}) {
   const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
   const [ledgerOrderDetails, setLedgerOrderDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [ledgerOrderDetailLoading, setLedgerOrderDetailLoading] = useState<Record<number, boolean>>({});
@@ -40,6 +53,7 @@ export function useLedgerInlineEdit() {
       setLedgerOrderDetails((current) => Object.fromEntries(
         Object.entries(current).map(([orderId, cached]) => cached.account.id === id ? [orderId, detail] : [orderId, cached]),
       ));
+      params.onDetailSaved?.(detail);
     },
   });
 

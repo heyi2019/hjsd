@@ -30,6 +30,32 @@ def test_order_edit_updates_event_flow_and_cost_without_changing_time(seeded_cli
     assert seeded_db.scalar(select(AuditLog).where(AuditLog.entity_type == "inventory_event_edit", AuditLog.entity_id == str(event.id))) is not None
 
 
+def test_operator_with_order_update_can_save_order_detail(seeded_client, seeded_db, operator_headers):
+    from app.core.security import DEV_USERS
+
+    account = create_account(seeded_db, game_account="operator-detail-edit", business_mode="SELF", inventory_type="RECOVERY", actor="operator")
+    order = create_order(
+        seeded_db,
+        order_type="HS",
+        trade_date=date(2026, 10, 1),
+        actor="operator",
+        account_id=account.id,
+        owner_id=DEV_USERS["operator"].id,
+        user=DEV_USERS["operator"],
+    )
+    seeded_db.commit()
+
+    response = seeded_client.patch(
+        f"/api/v1/orders/{order.id}/execution-edit",
+        headers=operator_headers,
+        json={"profile": {"game_account": "operator-detail-edited"}, "events": []},
+    )
+
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Account, account.id).game_account == "operator-detail-edited"
+
+
 def test_order_edit_saves_profile_and_amount_together(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="before-edit", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
@@ -89,6 +115,26 @@ def test_edit_execution_operator_preserves_time_and_records_actual_editor(seeded
     shown = detail.json()["orders"][0]["events"][0]
     assert shown["operator_user_ids"] == [1, 2]
     assert shown["operator_names"] == ["种子用户1", "种子用户2"]
+
+
+def test_edit_execution_operator_can_clear_all_selected_users(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="clear-event-operators", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
+    seeded_db.commit()
+    event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
+    event.operator_user_ids = [1, 2]
+    seeded_db.commit()
+
+    response = seeded_client.patch(
+        f"/api/v1/orders/{order.id}/execution-edit",
+        headers=headers,
+        json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": []}]},
+    )
+
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(OrderEvent, event.id).operator_user_ids == []
 
 
 def test_operator_selection_rejects_unknown_users(seeded_client, seeded_db, headers):

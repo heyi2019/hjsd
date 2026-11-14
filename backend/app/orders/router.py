@@ -98,7 +98,7 @@ post_events = require_permissions(
     PERM_ORDER_EVENT_POST, PERM_FINANCE_ORDER_EVENT_POST, require_all=False
 )
 update_orders = require_permissions(PERM_ORDER_UPDATE)
-edit_order_detail = require_permissions(PERM_ORDER_UPDATE, PERM_FINANCE_ORDER_EVENT_POST)
+edit_order_detail = require_permissions(PERM_ORDER_UPDATE)
 read_finance = require_permissions(PERM_FINANCE_READ)
 
 

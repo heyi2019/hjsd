@@ -53,6 +53,15 @@ export function propagateSharedOrderExtra(
   });
   return next;
 }
+
+/** 解析共享字段需要同步的订单，避免在 React 状态更新回调里读取详情缓存。 */
+export function sharedOrderIdsForEdit(
+  detail: Pick<AccountExecutionDetail, "orders"> | undefined,
+  fallbackOrderId: number,
+): number[] {
+  return detail?.orders.map((order) => order.order_id) ?? [fallbackOrderId];
+}
+
 export type PartyAddition = {
   entity_type: "customer" | "counterparty";
   entity_id: number;
@@ -152,6 +161,8 @@ export function useOrderDetailEditor(params: {
   }
 
   function updateOrderDraft(orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) {
+    const detail = editingAccount ? getExecutionDetail(editingAccount.id) : undefined;
+    const sharedOrderIds = sharedOrderIdsForEdit(detail, orderId);
     setOrderDrafts((current) => {
       const currentDraft = current[orderId] ?? { order_id: orderId, occurred_at: "", operator: "", note: "", form_extra: {} };
       const next = {
@@ -163,8 +174,7 @@ export function useOrderDetailEditor(params: {
         },
       };
       const sharedExtra = changes.form_extra ?? {};
-      const detail = editingAccount ? getExecutionDetail(editingAccount.id) : undefined;
-      return propagateSharedOrderExtra(next, detail?.orders.map((order) => order.order_id) ?? [orderId], sharedExtra);
+      return propagateSharedOrderExtra(next, sharedOrderIds, sharedExtra);
     });
   }
 

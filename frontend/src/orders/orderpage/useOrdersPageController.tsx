@@ -9,7 +9,7 @@ import { useLedgerList } from "./useLedgerList";
 import { useLedgerColumns } from "./useLedgerColumns";
 import { useOrderCancellation } from "./useOrderCancellation";
 import { useOrderActionModals } from "./useOrderActionModals";
-import { useLedgerInlineEdit } from "./useLedgerInlineEdit";
+import { mergeLedgerOrderWithDetail, useLedgerInlineEdit } from "./useLedgerInlineEdit";
 import { useSession } from "../../shared/state/session";
 
 export function useOrdersPageController(params: {
@@ -42,7 +42,13 @@ export function useOrdersPageController(params: {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // —— 表格详情 / 账号内联编辑枢纽 ——
-  const inlineEdit = useLedgerInlineEdit();
+  const inlineEdit = useLedgerInlineEdit({
+    onDetailSaved: (detail) => {
+      setOrders((current) => current.map((order) => order.account_id === detail.account.id
+        ? mergeLedgerOrderWithDetail(order, detail)
+        : order));
+    },
+  });
   const { loadLedgerDetail, openLedgerEditor } = inlineEdit;
 
   // —— 冲销 / 取消域：分笔冲销、原路退款、分期合约取消 ——

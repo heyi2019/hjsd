@@ -22,7 +22,8 @@ class ExecutionEditItem(RequestModel):
     note: str | None = None
     occurred_at: datetime | None = None
     form_extra: dict[str, object] | None = None
-    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
+    # 空数组表示清空已选操作人；未传字段才表示保持原值。
+    operator_user_ids: list[int] | None = Field(default=None, min_length=0, max_length=30)
 
 
 class ExecutionCashflowEditItem(RequestModel):

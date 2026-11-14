@@ -69,7 +69,7 @@ RUN_REG = os.path.join(BACKEND, "run_regression.py")
 MODULES = ["A", "B", "C", "D", "E", "F", "SYS"]
 
 # ---------------------------------------------------------------------------
-# 后端测试文件 -> 功能编号（按真实代码盘点；110 个文件逐一映射）
+# 后端测试文件 -> 功能编号（按真实代码盘点；122 个文件逐一映射）
 # ---------------------------------------------------------------------------
 BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_account_delete.py": "B04",
@@ -141,6 +141,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_order_customer_source_fixtures.py": "C03",
     "test_order_duplicate_account.py": "B04",
     "test_order_event_cancellable_amount.py": "B03",
+    "test_order_execution_edit.py": "B01",
     "test_order_form_fields.py": "F02",
     "test_order_status_contract.py": "B02",
     "test_order_types_api.py": "F05",

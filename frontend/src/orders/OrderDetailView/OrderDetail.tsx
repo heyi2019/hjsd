@@ -1,27 +1,27 @@
 import { Spin, Typography } from "antd";
 import type { FormInstance } from "antd";
 import { useMemo } from "react";
-import type { AccountExecutionDetail, AccountExecutionEvent } from "../shared/api/types/account-execution";
-import type { Account } from "../shared/api/types/accounts";
-import type { EmployeeOption } from "../shared/api/types/org";
-import { formatDateTimeMinute } from "../shared/lib/format";
+import type { AccountExecutionDetail, AccountExecutionEvent } from "../../shared/api/types/account-execution";
+import type { Account } from "../../shared/api/types/accounts";
+import type { EmployeeOption } from "../../shared/api/types/org";
+import { formatDateTimeMinute } from "../../shared/lib/format";
 import {
-  STATUS_LABEL,
+  INVENTORY_STATUS_LABEL,
   BUSINESS_MODE_LABEL,
-  INVENTORY_TYPE_LABEL,
+  BUSINESS_TYPE_LABEL,
   VALUE_ADDED_SERVICE_LABEL,
-} from "./inventory-logic";
-import { OrderDetailView } from "../orders/OrderDetailView/OrderDetailView";
+} from "../../shared/lib/labels";
+import { OrderDetailView } from "./OrderDetailView";
 import {
   type InventoryEventDraft,
   type OrderDetailMeta,
   type InventoryPartyLink,
   type InventoryFinanceRow,
   PARTY_ROLE_LABEL,
-} from "../orders/OrderDetailView/OrderDetail.shared";
-import type { FinanceDraft } from "./account-edit/use-account-execution-editor";
-import type { OrderDraft } from "./account-edit/use-account-execution-editor";
-import type { PartyAddition } from "./account-edit/use-account-execution-editor";
+} from "./OrderDetail.shared";
+import type { FinanceDraft } from "./editing/use-account-execution-editor";
+import type { OrderDraft } from "./editing/use-account-execution-editor";
+import type { PartyAddition } from "./editing/use-account-execution-editor";
 
 function renderOrderParties(
   parties: InventoryPartyLink[],
@@ -160,14 +160,14 @@ export function OrderDetail({
     orderId: contextOrder?.order_id,
     inventoryNo: row.stock_no ?? "-",
     status: row.status,
-    statusLabel: STATUS_LABEL[row.status] ?? row.status,
+    statusLabel: INVENTORY_STATUS_LABEL[row.status] ?? row.status,
     gameType: accountSnapshot.game_type ?? null,
     gameAccount: accountSnapshot.game_account ?? null,
     campAccount: accountSnapshot.camp_account ?? null,
     platform: accountSnapshot.platform ?? null,
     cost: accountSnapshot.cost_amount ?? null,
     businessMode: accountSnapshot.business_mode ? (BUSINESS_MODE_LABEL[accountSnapshot.business_mode] ?? accountSnapshot.business_mode) : null,
-    inventoryType: accountSnapshot.inventory_type ? (INVENTORY_TYPE_LABEL[accountSnapshot.inventory_type] ?? accountSnapshot.inventory_type) : null,
+    inventoryType: accountSnapshot.inventory_type ? (BUSINESS_TYPE_LABEL[accountSnapshot.inventory_type] ?? accountSnapshot.inventory_type) : null,
     valueAddedService: accountSnapshot.value_added_service ? (VALUE_ADDED_SERVICE_LABEL[accountSnapshot.value_added_service] ?? accountSnapshot.value_added_service) : null,
     orderNo: contextOrder?.order_no ?? row.source_order_no ?? "-",
     sourceOrderNo: sourceOrderNo ?? null,

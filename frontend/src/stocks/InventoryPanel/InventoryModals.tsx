@@ -9,7 +9,7 @@ import { InventoryConsignmentModal, InventoryPlatformOffsaleModal, InventoryProf
 import { InventoryRebateModal } from "../rebate";
 import { CashflowModal } from "../../finance/cashflow";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../sale";
-import { OrderDetail } from "../OrderDetail";
+import { OrderDetail } from "../../orders/OrderDetailView/OrderDetail";
 import type { InventoryController } from "./useInventoryController";
 import { mergeInventoryAccount } from "./types";
 

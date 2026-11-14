@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";
 import type { Account } from "@/shared/api/types/accounts";
-import { OrderDetail } from "@/stocks/OrderDetail";
+import { OrderDetail } from "@/orders/OrderDetailView/OrderDetail";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { renderApp } from "@fixtures/render";
 

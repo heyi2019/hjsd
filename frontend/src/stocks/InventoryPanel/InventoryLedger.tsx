@@ -1,7 +1,7 @@
 import { Button, Card, DatePicker, Input, Segmented, Space, Typography } from "antd";
 import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
 import { DataTable, PermissionButton, Select } from "../../shared/ui";
-import { OrderDetail } from "../OrderDetail";
+import { OrderDetail } from "../../orders/OrderDetailView/OrderDetail";
 import type { InventoryController } from "./useInventoryController";
 
 export function InventoryLedger({ controller }: { controller: InventoryController }) {

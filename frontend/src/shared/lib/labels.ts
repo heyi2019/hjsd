@@ -24,6 +24,13 @@ export const BUSINESS_TYPE_LABEL: Record<string, string> = {
   CONSIGNMENT: "代挂",
 };
 
+export const INVENTORY_STATUS_LABEL: Record<string, string> = {
+  IN_STOCK: "在库",
+  OUT_OF_STOCK: "出库",
+  SOLD: "已售",
+  VOID: "下架",
+};
+
 /**
  * 增值服务只有「分期出售」一种业务名称，不按货源类型拆成「回收分期/提号分期/代挂分期」。
  * 能否分期由货源类型决定（回收、提号可选分期出售；代挂只做全款），而不是业务类别。

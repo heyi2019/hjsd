@@ -17,9 +17,9 @@ import type {
   InventoryExecutionRow,
   InventoryFinanceRow,
 } from "./OrderDetail.shared";
-import type { FinanceDraft } from "../../stocks/account-edit/use-account-execution-editor";
-import type { OrderDraft } from "../../stocks/account-edit/use-account-execution-editor";
-import type { PartyAddition } from "../../stocks/account-edit/use-account-execution-editor";
+import type { FinanceDraft } from "./editing/use-account-execution-editor";
+import type { OrderDraft } from "./editing/use-account-execution-editor";
+import type { PartyAddition } from "./editing/use-account-execution-editor";
 import "./OrderDetail.css";
 
 type OrderDetailViewProps = {

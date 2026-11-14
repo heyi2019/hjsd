@@ -1,4 +1,4 @@
-import type { AccountExecutionEvent } from "../../shared/api/types/account-execution";
+import type { AccountExecutionEvent } from "../../../shared/api/types/account-execution";
 
 export type ExecutionEventDraft = {
   id: number;

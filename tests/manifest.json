@@ -23,8 +23,8 @@
       ],
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
-        "files": 122,
-        "cases": 1760,
+        "files": 121,
+        "cases": 1742,
         "kinds": {
           "unit": {
             "files": 31,
@@ -39,19 +39,19 @@
             }
           },
           "integration": {
-            "files": 93,
-            "cases": 1460,
+            "files": 90,
+            "cases": 1442,
             "byArea": {
               "business": 32,
               "customer": 6,
               "finance": 15,
               "operations": 7,
               "settings": 13,
-              "system": 18
+              "system": 17
             }
           }
         },
-        "_baseline_note": "低价值类型/状态码冒烟、旧兼容拒绝、不可达防御分支与重复存在性断言清理后，后端全量收集基线为 1760 例；清单按当前磁盘实际文件与用例数维护。"
+        "_baseline_note": "低价值断言与已下线手机号验证码/微信登录测试清理后，后端全量收集基线为 1742 例；清单按当前磁盘实际文件与用例数维护。"
       },
       "budgets": {
         "fast": 60,

@@ -328,7 +328,6 @@ GROUPS = {
         "tests/backend/unit/system/test_backup_scripts.py",
         "tests/backend/unit/system/test_public_release_security.py",
         "tests/backend/integration/system/test_ratelimit.py",
-        "tests/backend/integration/system/test_passwordless_login.py",
         # 2026-11-12 认证权限逻辑缺陷批次五
         "tests/backend/integration/system/test_auth_permission_batch5.py",
     ],

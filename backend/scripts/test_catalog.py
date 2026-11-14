@@ -73,7 +73,6 @@ MODULES = ["A", "B", "C", "D", "E", "F", "SYS"]
 # ---------------------------------------------------------------------------
 BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_account_delete.py": "B04",
-    "test_passwordless_login.py": "SYS01",
     "test_profit_cashflow_basis.py": "B01",
     "test_account_inventory_age.py": "B05",
     "test_account_stock_no.py": "B04",

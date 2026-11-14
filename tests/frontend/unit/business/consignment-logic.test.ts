@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AccountExecutionEvent, AccountExecutionOrder } from "@/shared/api/types/account-execution";
-import { consignmentPlatform, isActiveConsignmentListing, isConsignmentListing } from "@/orders/operations/consignment-logic";
+import { consignmentListings, consignmentPlatform, isActiveConsignmentListing, isConsignmentListing } from "@/orders/operations/consignment-logic";
 
 const event = (overrides: Partial<AccountExecutionEvent>): AccountExecutionEvent => ({
   id: 1,
@@ -55,5 +55,19 @@ describe("代挂寄售记录口径", () => {
     });
     expect(isConsignmentListing(unlisted)).toBe(true);
     expect(isActiveConsignmentListing(unlisted)).toBe(false);
+  });
+
+  it("同一订单的多条寄售记录拥有各自稳定标识", () => {
+    const listed = order({
+      events: [
+        event({ id: 7, operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["千寻"], listed_at: "2026-11-02T10:05" } }),
+        event({ id: 8, operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["千寻"], listed_at: "2026-11-02T10:10" } }),
+      ],
+    });
+
+    expect(consignmentListings([listed]).map((item) => item.id)).toEqual([
+      "1:7:千寻",
+      "1:8:千寻",
+    ]);
   });
 });

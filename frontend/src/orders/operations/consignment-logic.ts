@@ -3,6 +3,8 @@ import { formatDateTimeMinute } from "../../shared/lib/format";
 
 /** 寄售记录：寄售是原订单上的 OPERATE 事件，不是单独的 DG 订单。 */
 export type ConsignmentListing = {
+  /** 同一订单可多次在同一平台上架，下架定位必须精确到该条运营事件。 */
+  id: string;
   orderId: number;
   orderNo: string;
   eventId?: number;
@@ -50,6 +52,7 @@ function eventListings(order: AccountExecutionOrder, event: AccountExecutionEven
   return platforms
     .filter((platform) => !eventIsUnlisted(order, event, platform))
     .map((platform) => ({
+      id: `${order.order_id}:${event.id}:${platform}`,
       orderId: order.order_id,
       orderNo: order.order_no,
       eventId: event.id,

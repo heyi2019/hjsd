@@ -54,10 +54,11 @@ export function useLedgerInlineEdit() {
         appMessage.warning("该订单未关联库存账号，无法编辑账号资料");
         return;
       }
-      const detail = ledgerDetails[accountId] ?? await ordersApi.executionDetail(order.id);
+      const detail = ledgerDetails[accountId]
+        ?? ledgerOrderDetails[order.id]
+        ?? await ordersApi.executionDetail(order.id);
       setLedgerDetails((current) => ({ ...current, [accountId]: detail }));
-      const orderDetail = ledgerOrderDetails[order.id] ?? await ordersApi.executionDetail(order.id);
-      setLedgerOrderDetails((current) => ({ ...current, [order.id]: orderDetail }));
+      setLedgerOrderDetails((current) => ({ ...current, [order.id]: detail }));
       setExpandedOrderIds([String(order.id)]);
       await accountEditor.openEditor(detail.account);
     } catch (error) {

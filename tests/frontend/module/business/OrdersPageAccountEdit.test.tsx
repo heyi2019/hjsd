@@ -104,6 +104,18 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
     expect(screen.queryByRole("button", { name: "编辑账号" })).toBeNull();
   });
 
+  it("首次编辑只读取一次订单执行详情，并同时供展开区与编辑器使用", async () => {
+    renderLight(<OrdersPage />, { user: "admin" });
+    await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
+    const row = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))?.closest("tr");
+
+    await ui.click(within(row as HTMLElement).getByRole("button", { name: "编辑" }));
+
+    await screen.findByRole("button", { name: "保存修改" });
+    expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1);
+    expect(ordersApi.executionDetail).toHaveBeenCalledWith(1);
+  });
+
   it("未关联库存账号的订单不显示「编辑账号」入口", async () => {
     // 本用例刻意去掉所有订单的 account_id，验证无关联账号时不出现「编辑账号」入口。
     vi.mocked(ordersApi.list).mockResolvedValue([

@@ -13,7 +13,15 @@ import { formatDateTimeMinute } from "../../shared/lib/format";
 
 export type ActiveConsignment = ConsignmentListing;
 
-type DisplayConsignment = Omit<ActiveConsignment, "orderId"> & { orderId: number | "SYSTEM" };
+type SystemConsignment = {
+  id: "SYSTEM";
+  orderId: "SYSTEM";
+  orderNo: "ERP";
+  platform: "本系统";
+  price: null;
+  listedAt: string;
+};
+type DisplayConsignment = ActiveConsignment | SystemConsignment;
 
 export function consignmentRecords(orders: AccountExecutionOrder[]): ActiveConsignment[] {
   return consignmentListings(orders);
@@ -31,8 +39,9 @@ export function OrderPlatformOffsaleModal(props: {
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const open = Boolean(props.account);
   const canSystemOffsale = props.account?.inventory_type === "CONSIGNMENT";
-  const systemRecord: DisplayConsignment | null = canSystemOffsale && props.account
+  const systemRecord: SystemConsignment | null = canSystemOffsale && props.account
     ? {
+      id: "SYSTEM",
       orderId: "SYSTEM",
       orderNo: "ERP",
       platform: "本系统",
@@ -51,8 +60,8 @@ export function OrderPlatformOffsaleModal(props: {
     form.setFieldsValue({ unlisted_at: dayjs().second(0).millisecond(0) });
   }, [canSystemOffsale, form, open, props.account, props.records.length]);
 
-  const submit = async (values: { order_id: number | "SYSTEM"; unlisted_at?: Dayjs; reason: string; form_extra?: Record<string, unknown> }) => {
-    if (values.order_id === "SYSTEM") {
+  const submit = async (values: { listing_id: string; unlisted_at?: Dayjs; reason: string; form_extra?: Record<string, unknown> }) => {
+    if (values.listing_id === "SYSTEM") {
       setSubmitting(true);
       try {
         await props.onSystemOffsale({ reason: values.reason.trim(), form_extra: values.form_extra });
@@ -64,7 +73,7 @@ export function OrderPlatformOffsaleModal(props: {
       }
       return;
     }
-    const selected = props.records.find((record) => record.orderId === Number(values.order_id));
+    const selected = props.records.find((record) => record.id === values.listing_id);
     if (!selected) return;
     setSubmitting(true);
     try {
@@ -115,12 +124,12 @@ export function OrderPlatformOffsaleModal(props: {
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="INVOID" form={form} onFinish={submit}>
-          <CfgItem name="order_id" label="下架平台" rules={[{ required: true, message: "请选择下架平台" }]}>
+          <CfgItem name="listing_id" label="下架平台" rules={[{ required: true, message: "请选择下架平台" }]}>
             <Select
               aria-label="下架平台"
               placeholder="请选择要下架的平台"
               onChange={(value) => setSelectedMode(value === "SYSTEM" ? "SYSTEM" : "PLATFORM")}
-              options={displayRecords.map((record) => ({ value: record.orderId, label: `${record.platform}（上架于 ${record.listedAt}）` }))}
+              options={displayRecords.map((record) => ({ value: record.id, label: `${record.platform}（上架于 ${record.listedAt}）` }))}
             />
           </CfgItem>
           <CfgItem name="unlisted_at" label="下架时间" rules={[{ required: true, message: "请选择下架时间" }]}>
@@ -135,7 +144,7 @@ export function OrderPlatformOffsaleModal(props: {
       <DataTable
         size="small"
         pagination={false}
-        rowKey="orderId"
+        rowKey="id"
         rows={displayRecords}
         page={1}
         pageSize={10}

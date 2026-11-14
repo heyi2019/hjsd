@@ -345,6 +345,18 @@ describe("InventoryPanel：账号台账", () => {
     expect(screen.queryByLabelText("编辑游戏/产品类型")).toBeNull();
   });
 
+  it("首次编辑库存账号只读取一次来源订单详情", async () => {
+    vi.mocked(employeesApi.list).mockResolvedValue([]);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+
+    await ui.click(screen.getAllByRole("button", { name: "编辑" })[0]);
+
+    await screen.findByRole("button", { name: "保存修改" });
+    expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1);
+    expect(ordersApi.executionDetail).toHaveBeenCalledWith(21);
+  });
+
   it("库存编辑展示运营信息自定义字段", async () => {
     vi.mocked(employeesApi.list).mockResolvedValue([]);
     vi.mocked(orderFormFieldsApi.list).mockResolvedValue([

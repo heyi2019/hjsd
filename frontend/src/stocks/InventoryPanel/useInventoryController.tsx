@@ -54,6 +54,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   expandedOrderIds,
   loadExecution,
   loadOrderExecution,
+  loadEditorExecution,
   executionDetails,
   setExecutionDetails,
   executionLoading,
@@ -94,7 +95,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   // —— 业务动作域：open* / submit* / 删除下架 / 运营动作 ——
   const actions = useInventoryActions({
     load, setRows, setError,
-    executionDetails, setExecutionDetails, loadExecution, loadOrderExecution, dropExecutionCache,
+    executionDetails, setExecutionDetails, loadExecution, loadOrderExecution, loadEditorExecution, dropExecutionCache,
     expandTo, expandedOrderIds, removeFromInventory,
     editorOpenEditor: accountEditor.openEditor,
     editorCancelInlineEdit: accountEditor.cancelInlineEdit,

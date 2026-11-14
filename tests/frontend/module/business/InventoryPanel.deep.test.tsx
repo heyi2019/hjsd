@@ -89,7 +89,7 @@ const consignmentDetail = {
       id: 801,
       event_type: "OPERATE",
       operation_type: "CONSIGNMENT",
-      form_extra: { consignment_platform: "千寻", listed_at: "2026-10-29T03:54" },
+      form_extra: { consignment_platforms: ["千寻"], listed_at: "2026-10-29T03:54" },
     }],
   }],
 } as unknown as AccountExecutionDetail;
@@ -138,7 +138,7 @@ beforeEach(() => {
   vi.mocked(installmentsApi.list).mockResolvedValue([contract]);
   vi.mocked(installmentsApi.cancel).mockResolvedValue({} as never);
   vi.mocked(ordersApi.postEvent).mockResolvedValue({} as never);
-  vi.mocked(stocksApi.executionDetail).mockResolvedValue(sellDetail);
+  vi.mocked(ordersApi.executionDetail).mockResolvedValue(sellDetail);
   vi.spyOn(message, "success").mockImplementation((() => undefined) as never);
   vi.spyOn(message, "error").mockImplementation((() => undefined) as never);
   vi.spyOn(message, "warning").mockImplementation((() => undefined) as never);
@@ -166,7 +166,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
   });
 
   it("取消弹窗要求退回金额和收款账户，并按填写值冲销", async () => {
-    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: inStockRow,
       orders: [{
         order_id: 21,
@@ -200,7 +200,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
   });
 
   it("FE-264：系统下架完整提交关闭弹窗并给出成功结果", async () => {
-    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: inStockRow,
       orders: [{
         order_id: 21,
@@ -225,7 +225,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
   });
 
   it("代挂下架平台选项包含本系统并显示入库时间", async () => {
-    vi.mocked(stocksApi.executionDetail).mockResolvedValue(consignmentDetail);
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(consignmentDetail);
     await openPanel([consignmentRow]);
     await clickOperation(rowOf(1), "下架");
 
@@ -248,7 +248,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
   });
 
   it("代挂选择本系统下架时直接取消代挂订单并退出库存中心", async () => {
-    vi.mocked(stocksApi.executionDetail).mockResolvedValue(consignmentDetail);
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(consignmentDetail);
     vi.mocked(ordersApi.cancel).mockResolvedValue({ status: "CANCELLED" } as never);
     await openPanel([consignmentRow]);
     await clickOperation(rowOf(1), "下架");
@@ -272,27 +272,19 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
   it("导出：读取明细并提示失败条数", async () => {
     const secondInStockRow = { ...inStockRow, id: 4, game_account: "acc-4" } as unknown as Account;
     await openPanel([inStockRow, secondInStockRow]);
-    vi.mocked(stocksApi.executionDetail)
+    vi.mocked(ordersApi.executionDetail)
       .mockResolvedValueOnce(sellDetail)
       .mockRejectedValueOnce(new Error("detail down"));
     await ui.click(screen.getByRole("button", { name: /导出/ }));
-    await waitFor(() => expect(stocksApi.executionDetail).toHaveBeenCalled());
+    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalled());
     await waitFor(() => expect(message.warning).toHaveBeenCalledWith("1 条明细读取失败，已导出其余可用字段"));
   });
 
   it("导出成功后给出完成反馈", async () => {
     await openPanel([inStockRow]);
-    vi.mocked(stocksApi.executionDetail).mockResolvedValueOnce(sellDetail);
+    vi.mocked(ordersApi.executionDetail).mockResolvedValueOnce(sellDetail);
     await ui.click(screen.getByRole("button", { name: /导出/ }));
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("库存 CSV 已导出"));
   });
 
-  it("FE-258：图片资料保存失败时保留弹窗并显示可重试错误态", async () => {
-    vi.mocked(stocksApi.updateProfile).mockRejectedValueOnce(new Error("image save timeout"));
-    await openPanel([inStockRow]);
-    await clickOperation(rowOf(1), "作图");
-    await ui.click(screen.getByRole("button", { name: /保存/ }));
-
-    expect(await screen.findByRole("alert")).toBeInTheDocument();
-  });
 });

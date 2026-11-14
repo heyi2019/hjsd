@@ -58,6 +58,28 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
       setOrderExecutionLoading((current) => ({ ...current, [orderId]: false }));
     }
   }
+  /** 编辑入口同时需要账号详情与当前订单详情，两者是同一份订单执行快照。 */
+  async function loadEditorExecution(row: Account, orderId: number) {
+    const cached = executionDetails[row.id] ?? orderExecutionDetails[orderId];
+    if (cached) {
+      setExecutionDetails((current) => current[row.id] ? current : { ...current, [row.id]: cached });
+      setOrderExecutionDetails((current) => current[orderId] ? current : { ...current, [orderId]: cached });
+      return;
+    }
+    if (executionLoading[row.id] || orderExecutionLoading[orderId]) return;
+    setExecutionLoading((current) => ({ ...current, [row.id]: true }));
+    setOrderExecutionLoading((current) => ({ ...current, [orderId]: true }));
+    try {
+      const detail = await ordersApi.executionDetail(orderId);
+      setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
+      setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));
+    } catch (err) {
+      setError(normalizeError(err));
+    } finally {
+      setExecutionLoading((current) => ({ ...current, [row.id]: false }));
+      setOrderExecutionLoading((current) => ({ ...current, [orderId]: false }));
+    }
+  }
   /** 只丢弃详情缓存：用于账号已离开在库列表（售出/下架）的场景，重拉已无展示方，纯属浪费请求。 */
   function dropExecutionCache(accountId: number) {
     setExecutionDetails((current) => {
@@ -108,6 +130,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
     orderExecutionLoading,
     setOrderExecutionDetails,
     loadOrderExecution,
+    loadEditorExecution,
     dropOrderExecutionCache,
     dropExecutionCache,
     removeFromInventory,

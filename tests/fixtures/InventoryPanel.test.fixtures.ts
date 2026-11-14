@@ -67,6 +67,7 @@ export const resetInventoryPanelMocks = () => {
   resolveMock(vi.mocked(poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(rebatesApi.create), { id: 31 });
+  resolveMock(vi.mocked(rebatesApi.list), []);
   resolveMock(vi.mocked(installmentsApi.create), { id: 41 });
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },

@@ -188,6 +188,17 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(screen.queryByLabelText("编辑游戏账号/产品")).toBeNull();
   });
 
+  it("首次编辑库存账号只读取一次来源订单详情", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+
+    fireEvent.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
+
+    await screen.findByRole("button", { name: "保存修改" });
+    expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1);
+    expect(ordersApi.executionDetail).toHaveBeenCalledWith(21);
+  });
+
   it("寄售登记到来源订单，不创建 DG 代挂订单", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(stocksApi.executionDetail).mockResolvedValueOnce({

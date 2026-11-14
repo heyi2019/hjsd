@@ -384,12 +384,11 @@ def test_execution_summary_counts_rebate_income_and_bad_debt_expense(
 ):
     """库存详情：总收入含返点、总支出含坏账，净额与订单利润同口径。"""
     order_id = _order_with_events(seeded_db)
-    account_id = seeded_db.get(Order, order_id).account_id
     _add_rebate(seeded_db, order_id, "100")
     _add_bad_debt(seeded_db, order_id, "400")
 
     response = seeded_client.get(
-        f"/api/v1/stocks/{account_id}/execution-detail", headers=headers
+        f"/api/v1/orders/{order_id}/execution-detail", headers=headers
     )
 
     assert response.status_code == 200, response.text

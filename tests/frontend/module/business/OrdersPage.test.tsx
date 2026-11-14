@@ -494,7 +494,7 @@ describe("OrdersPage：四类订单台账", () => {
         account_status: "WAITING",
       },
     ]);
-    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: { id: 9, source_order_id: 3, source_order_no: "DG-2026-0003", inventory_type: "CONSIGNMENT", status: "WAITING", cost_amount: "0.00" },
       orders: [{
         order_id: 3,

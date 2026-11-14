@@ -1,5 +1,4 @@
 import { api } from "./client";
-import type { AccountExecutionDetail } from "./types/account-execution";
 import type { Account, AccountInventoryRow, InventoryStats } from "./types/accounts";
 import type { PageResponse } from "./types/common";
 
@@ -33,6 +32,4 @@ export const stocksApi = {
   /** 删除不可恢复：原因必填，由后端写入审计日志（仅管理员可调用）。 */
   remove: (id: number, reason: string) =>
     api.delete<void>(`/stocks/${id}`, { data: { reason } }).then(() => undefined),
-  executionDetail: (id: number) =>
-    api.get<AccountExecutionDetail>(`/stocks/${id}/execution-detail`).then((r) => r.data),
 };

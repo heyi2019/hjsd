@@ -84,7 +84,7 @@ def test_edit_execution_operator_preserves_time_and_records_actual_editor(seeded
     assert updated.created_by == "pytest" and updated.operator_user_ids == [1, 2] and updated.created_at == timestamp
     audit = seeded_db.scalar(select(AuditLog).where(AuditLog.entity_type == "inventory_event_edit", AuditLog.entity_id == str(event.id)))
     assert audit.actor == "admin" and audit.before_json["operator_user_ids"] is None and audit.after_json["operator_user_ids"] == [1, 2]
-    detail = seeded_client.get(f"/api/v1/stocks/{account.id}/execution-detail", headers=headers)
+    detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
     assert detail.status_code == 200
     shown = detail.json()["orders"][0]["events"][0]
     assert shown["operator_user_ids"] == [1, 2]

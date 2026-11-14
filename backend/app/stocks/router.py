@@ -201,14 +201,13 @@ def inventory_stats(
     return InventoryStatsOut(**stats)
 
 
-@router.get("/stocks/{account_id}/execution-detail", response_model=AccountExecutionDetailOut)
-def execution_detail(
+def _order_execution_detail(
     account_id: int,
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
     order_id: int | None = None,
 ) -> AccountExecutionDetailOut:
-    """查询库存账号关联的订单详情；传 order_id 时严格限定为当前订单。"""
+    """构建单个订单关联账号的执行详情。"""
     account = get_account(db, account_id, _user)
     order_stmt = select(Order).where(Order.account_id == account_id)
     if order_id is not None:
@@ -294,7 +293,7 @@ def order_execution_detail(
     order = get_order(db, order_id, _user)
     if order.account_id is None:
         raise NotFound("订单未关联库存账号")
-    return execution_detail(
+    return _order_execution_detail(
         account_id=order.account_id,
         db=db,
         _user=_user,

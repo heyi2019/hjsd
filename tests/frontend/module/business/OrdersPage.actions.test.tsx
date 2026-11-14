@@ -217,11 +217,6 @@ beforeEach(() => {
   // 下架弹窗背后会渲染库存上下文，卡片指标走这个接口；不桩会真调 api.get 返回 undefined。
   vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: 0, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 });
   vi.mocked(ordersApi.get).mockResolvedValue(order1);
-  vi.mocked(stocksApi.executionDetail).mockResolvedValue({
-    account: { id: order1.account_id, stock_no: "KU_00001", game_account: "seller-001", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
-    orders: [],
-    finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
-  } as never);
   vi.mocked(ordersApi.executionDetail).mockResolvedValue({
     account: { id: order1.account_id, stock_no: "KU_00001", game_account: "seller-001", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
     orders: [{ order_id: order1.id, order_no: order1.order_no, order_type: order1.order_type, trade_date: order1.trade_date, status: order1.status, events: [] }],
@@ -571,10 +566,6 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("运营：订单台账提供描述快捷入口并登记 DESCRIPTION 业务事件", async () => {
-    vi.mocked(stocksApi.executionDetail).mockResolvedValueOnce({
-      account: { id: 5, source_order_id: 1, source_order_no: "HS-2026-0001", game_account: "seller-001", status: "WAITING", cost_amount: "100.00" },
-      orders: [],
-    } as never);
     vi.mocked(stocksApi.updateProfile).mockResolvedValueOnce({
       id: 5, source_order_id: 1, source_order_no: "HS-2026-0001", game_account: "seller-001", status: "WAITING", cost_amount: "100.00",
     } as never);

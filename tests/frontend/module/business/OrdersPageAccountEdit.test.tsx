@@ -65,18 +65,6 @@ beforeEach(() => {
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);
-  vi.mocked(stocksApi.executionDetail).mockResolvedValue({
-    account: {
-      id: 99,
-      stock_no: "KU_00001",
-      game_account: "acc-99",
-      game_type: "原神",
-      status: "WAITING",
-      inventory_type: "RECOVERY",
-    },
-    orders: [],
-    finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
-  } as never);
   vi.mocked(ordersApi.executionDetail).mockResolvedValue({
     account: { id: 99, stock_no: "KU_00001", game_account: "acc-99", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
     orders: [{ order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE", events: [] }],

@@ -417,7 +417,7 @@ class TestAccountsApi:
         assert all("risk_level" not in row for row in listed.json()["items"])
 
         hidden_detail = seeded_client.get(
-            f"/api/v1/stocks/{other.id}/execution-detail", headers=headers
+            f"/api/v1/orders/{other_order.id}/execution-detail", headers=headers
         )
         assert hidden_detail.status_code == 404
 
@@ -466,12 +466,9 @@ class TestAccountsApi:
         headers = {"Authorization": f"Bearer {build_access_token(user)}"}
 
         response = seeded_client.get(
-            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
+            f"/api/v1/orders/{foreign_order.id}/execution-detail", headers=headers
         )
-
-        assert response.status_code == 200, response.text
-        assert response.json()["account"]["source_order_no"] is None
-        assert response.json()["orders"] == []
+        assert response.status_code == 404
 
     def test_read_only_finance_user_can_read_game_password(
         self, seeded_client, seeded_db
@@ -486,13 +483,6 @@ class TestAccountsApi:
         assert listed.status_code == 200, listed.text
         item = next(row for row in listed.json()["items"] if row["id"] == account.id)
         assert item["game_password"] == "secret"
-
-        detail = seeded_client.get(
-            f"/api/v1/stocks/{account.id}/execution-detail",
-            headers=viewer_headers,
-        )
-        assert detail.status_code == 200, detail.text
-        assert detail.json()["account"]["game_password"] == "secret"
 
     def test_standalone_account_creation_endpoint_removed(self, seeded_client, headers):
         response = seeded_client.post(
@@ -651,46 +641,23 @@ class TestAccountsApi:
         order = _buy(seeded_db, account, amount="300")
 
         response = seeded_client.get(
-            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
+            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
         assert response.json()["account"]["source_order_no"] == order.order_no
 
-    def test_stock_and_order_execution_detail_share_event_context(self, seeded_client, seeded_db, headers):
+    def test_order_execution_detail_uses_event_context(self, seeded_client, seeded_db, headers):
         """详情路由必须把事件上下文中的汇总输入传给财务汇总器。"""
         account = _account(seeded_db, "detail-context")
         order = _buy(seeded_db, account, amount="300")
 
-        stock_response = seeded_client.get(
-            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
-        )
         order_response = seeded_client.get(
             f"/api/v1/orders/{order.id}/execution-detail", headers=headers
         )
 
-        assert stock_response.status_code == 200, stock_response.text
         assert order_response.status_code == 200, order_response.text
-        assert stock_response.json()["finance_summary"]["total_expense"] == "300.00"
         assert order_response.json()["finance_summary"]["total_expense"] == "300.00"
-
-    def test_order_execution_detail_is_scoped_to_current_order(
-        self, seeded_client, seeded_db, headers
-    ):
-        account = _account(seeded_db, "detail-order-scope")
-        first = _buy(seeded_db, account, amount="100")
-        second = _buy(seeded_db, account, amount="200")
-
-        response = seeded_client.get(
-            f"/api/v1/orders/{second.id}/execution-detail", headers=headers
-        )
-
-        assert response.status_code == 200, response.text
-        payload = response.json()
-        assert [item["order_id"] for item in payload["orders"]] == [second.id]
-        assert payload["orders"][0]["order_no"] == second.order_no
-        assert payload["finance_summary"]["total_expense"] == "200.00"
-        assert first.order_no not in {item["order_no"] for item in payload["orders"]}
 
     def test_execution_detail_includes_order_linked_standalone_cashflows(
         self, seeded_client, seeded_db, headers
@@ -712,7 +679,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
+            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -755,7 +722,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
+            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -790,7 +757,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
+            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -803,7 +770,7 @@ class TestAccountsApi:
         account = _account(seeded_db, "detail-customer-party-acc")
         customer = create_customer(seeded_db, display_name="买家A", actor="pytest")
         seller = create_customer(seeded_db, display_name="卖家B", actor="pytest")
-        create_order(
+        order = create_order(
             seeded_db,
             order_type="HS",
             trade_date=TODAY,
@@ -813,7 +780,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
+            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -836,7 +803,7 @@ class TestAccountsApi:
             actor="pytest",
         )
         response = seeded_client.get(
-            f"/api/v1/stocks/{account.id}/execution-detail", headers=headers
+            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text

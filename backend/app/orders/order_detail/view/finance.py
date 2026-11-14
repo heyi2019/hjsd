@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.orders.amounts import is_deposit_loss_flow, order_profit_flow_by_order
 
-from ..schemas import (
+from app.stocks.schemas import (
     ExecutionCashflowOut,
     ExecutionFinanceSummaryOut,
     ExecutionRebateOut,

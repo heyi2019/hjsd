@@ -1,6 +1,5 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
-import { stocksApi } from "../../shared/api/stocks.api";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
@@ -9,19 +8,21 @@ import { useAccountExecutionEditor } from "../../stocks/account-edit/use-account
 
 /**
  * 台账表格的展开详情缓存与账号内联编辑枢纽。
- * 逐字切片自 useOrdersPageController；setOrders 由列表域注入，避免与数据层循环依赖。
+ * 订单与库存必须已有明确绑定，编辑器不负责补建库存档案。
  */
-export function useLedgerInlineEdit({ setOrders }: { setOrders: Dispatch<SetStateAction<Order[]>> }) {
+export function useLedgerInlineEdit() {
   const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
   const [ledgerDetails, setLedgerDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [ledgerDetailLoading, setLedgerDetailLoading] = useState<Record<number, boolean>>({});
   const [ledgerOrderDetails, setLedgerOrderDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [ledgerOrderDetailLoading, setLedgerOrderDetailLoading] = useState<Record<number, boolean>>({});
-  const loadLedgerDetail = async (accountId: number, force = false) => {
+  const loadLedgerDetail = async (order: Pick<Order, "id" | "account_id">, force = false) => {
+    const accountId = order.account_id;
+    if (accountId == null) return;
     if (!force && (ledgerDetails[accountId] || ledgerDetailLoading[accountId])) return;
     setLedgerDetailLoading((current) => ({ ...current, [accountId]: true }));
     try {
-      const detail = await stocksApi.executionDetail(accountId);
+      const detail = await ordersApi.executionDetail(order.id);
       setLedgerDetails((current) => ({ ...current, [accountId]: detail }));
     } catch (error) {
       appMessage.error(normalizeError(error).message);
@@ -50,17 +51,10 @@ export function useLedgerInlineEdit({ setOrders }: { setOrders: Dispatch<SetStat
     try {
       let accountId = order.account_id;
       if (accountId == null) {
-        if (!['ACTIVE', 'INSTALLMENT'].includes(order.status)) {
-          appMessage.warning("该历史订单未关联库存账号，当前状态不能补建库存");
-          return;
-        }
-        const materialized = await ordersApi.materializeAccount(order.id);
-        accountId = materialized.account_id;
-        if (accountId == null) throw new Error("补建库存账号后未返回库存编号");
-        setOrders((current) => current.map((item) => item.id === order.id ? { ...item, ...materialized } : item));
-        appMessage.success("已补建库存账号");
+        appMessage.warning("该订单未关联库存账号，无法编辑账号资料");
+        return;
       }
-      const detail = ledgerDetails[accountId] ?? await stocksApi.executionDetail(accountId);
+      const detail = ledgerDetails[accountId] ?? await ordersApi.executionDetail(order.id);
       setLedgerDetails((current) => ({ ...current, [accountId]: detail }));
       const orderDetail = ledgerOrderDetails[order.id] ?? await ordersApi.executionDetail(order.id);
       setLedgerOrderDetails((current) => ({ ...current, [order.id]: orderDetail }));

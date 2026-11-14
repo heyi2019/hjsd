@@ -33,68 +33,9 @@ from app.domain.enums import (
     PolicyType,
 )
 
-from ._shared import (
-    _audit_value,
-    _create_inline_inventory_account,
-    get_order,
-)
+from ._shared import _audit_value, get_order
 
 _UNSET = object()
-
-
-def materialize_inventory_account(
-    session: Session,
-    order_id: int,
-    *,
-    actor: str,
-    user: CurrentUser | None = None,
-) -> Order:
-    """为历史未关联库存账号的进行中订单补建库存账号。
-
-    新订单建档时会同步创建库存账号；该入口只负责兼容历史数据，不改变已完成
-    订单，也不覆盖已有账号关联。账号资料唯一取自订单快照，重复调用保持幂等。
-    """
-    order = get_order(session, order_id, user)
-    if order.account_id is not None:
-        return order
-    if order.status not in {
-        OrderStatus.ACTIVE.value,
-        OrderStatus.INSTALLMENT.value,
-    }:
-        raise Validation("只有进行中的订单可以补建库存账号")
-
-    snapshot = dict(order.account_snapshot or {})
-    game_account = snapshot.get("game_account")
-    if not isinstance(game_account, str) or not game_account.strip():
-        raise Validation("订单缺少游戏账号资料，无法生成库存编号")
-
-    if order.order_type not in {"HS", "TH", "DG"}:
-        raise Validation("当前订单类型不支持补建库存账号")
-
-    account = _create_inline_inventory_account(
-        session,
-        order_type=order.order_type,
-        game_account=game_account,
-        actor=actor,
-        game_type=snapshot.get("game_type"),
-        game_password=snapshot.get("game_password"),
-        channel_region=snapshot.get("channel_region"),
-        bound_phone=snapshot.get("bound_phone"),
-        has_secondary=snapshot.get("has_secondary"),
-        account_note=snapshot.get("note"),
-        platform=snapshot.get("platform"),
-        wallet_realname=snapshot.get("wallet_realname"),
-        camp_account=snapshot.get("camp_account"),
-        secondary_images=snapshot.get("secondary_images"),
-        wallet_realname_images=snapshot.get("wallet_realname_images"),
-        extra_values=snapshot.get("extra_values"),
-    )
-    if order.created_at is not None:
-        account.inventory_entry_at = order.created_at.replace(microsecond=0)
-    order.account_id = account.id
-    order.updated_by = actor
-    session.flush()
-    return order
 
 
 def _shift_accounting_dates(

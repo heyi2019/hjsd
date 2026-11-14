@@ -66,12 +66,17 @@ export function useInventoryActions(params: {
   function openProfile(account: Account, mode: InventoryProfileTarget["mode"]) {
     setProfileTarget({ account, mode });
   }
-  async function openEditor(account: Account, orderId = account.source_order_id ?? account.id) {
+  async function openEditor(account: Account, orderId?: number) {
+    const boundOrderId = orderId ?? account.source_order_id;
+    if (boundOrderId == null) {
+      appMessage.warning("当前账号没有绑定来源订单，无法编辑");
+      return;
+    }
     await loadExecution(account);
-    await loadOrderExecution(orderId);
+    await loadOrderExecution(boundOrderId);
     await editorOpenEditor(account);
     // 就地展开该行进入内联编辑（不弹窗）。
-    expandTo([String(orderId)]);
+    expandTo([String(boundOrderId)]);
   }
   function cancelInlineEdit() {
     editorCancelInlineEdit();
@@ -82,15 +87,17 @@ export function useInventoryActions(params: {
     setDetailTarget(account);
   }
   async function openCashflow(account: Account) {
+    if (account.source_order_id == null) {
+      appMessage.warning("当前账号没有绑定来源订单，无法登记资金收支");
+      return;
+    }
     try {
       const [detail, poolList] = await Promise.all([
-        executionDetails[account.id] ?? stocksApi.executionDetail(account.id),
+        executionDetails[account.id] ?? ordersApi.executionDetail(account.source_order_id),
         poolsApi.list(),
       ]);
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
-      const sourceOrder = detail.orders.find((order) => order.order_id === account.source_order_id)
-        ?? detail.orders.find((order) => order.order_type !== "DG")
-        ?? detail.orders[0];
+      const sourceOrder = detail.orders.find((order) => order.order_id === account.source_order_id);
       if (!sourceOrder) {
         appMessage.warning("当前账号没有可关联的业务订单");
         return;
@@ -102,9 +109,13 @@ export function useInventoryActions(params: {
     }
   }
   async function openVoid(account: Account) {
+    if (account.source_order_id == null) {
+      appMessage.warning("当前账号没有绑定来源订单，无法下架");
+      return;
+    }
     try {
       const [detail, poolList] = await Promise.all([
-        executionDetails[account.id] ?? stocksApi.executionDetail(account.id),
+        executionDetails[account.id] ?? ordersApi.executionDetail(account.source_order_id),
         poolsApi.list(),
       ]);
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
@@ -121,8 +132,12 @@ export function useInventoryActions(params: {
     }
   }
   async function openPlatformOffsale(account: Account) {
+    if (account.source_order_id == null) {
+      appMessage.warning("当前账号没有绑定来源订单，无法下架寄售记录");
+      return;
+    }
     try {
-      const detail = executionDetails[account.id] ?? await stocksApi.executionDetail(account.id);
+      const detail = executionDetails[account.id] ?? await ordersApi.executionDetail(account.source_order_id);
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       const records = consignmentRecords(detail.orders);
       if (!records.length) {
@@ -140,7 +155,7 @@ export function useInventoryActions(params: {
     try {
       // 系统下架先在原订单上登记所有寄售记录的 UNLIST，再冲销买入，
       // 避免出现 ERP 已下架但平台记录仍有效的中间结果。
-      const detail = executionDetails[voidTarget.account.id] ?? await stocksApi.executionDetail(voidTarget.account.id);
+      const detail = executionDetails[voidTarget.account.id] ?? await ordersApi.executionDetail(voidTarget.orderId);
       const records = consignmentRecords(detail.orders);
       await unlistAndCancelConsignmentOrders({
         records,
@@ -185,9 +200,8 @@ export function useInventoryActions(params: {
       setDeleteTarget(null);
       dropExecutionCache(target.id);
       if (inlineEditId === target.id) cancelInlineEdit();
-      const targetOrderId = target.source_order_id ?? target.id;
-      expandTo(expandedOrderIds.filter((key) => String(key) !== String(targetOrderId)));
-      appMessage.success("库存已删除");
+      expandTo(expandedOrderIds.filter((key) => String(key) !== String(target.source_order_id)));
+      appMessage.success("已删除");
       await load();
       onOrdersChanged?.();
     } catch (cause) {

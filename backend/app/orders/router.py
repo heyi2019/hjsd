@@ -49,12 +49,14 @@ from app.orders.consignment import post_consignment_operation
 from app.orders.deletion import delete_order as orders_delete_order
 from app.orders.create import add_customer_role, create_order as orders_create_order
 from app.orders.events import post_event as orders_post_event
+from app.orders.order_detail.editing import edit_execution_detail
+from app.orders.order_detail.editing.schemas import ExecutionEditRequest
 from app.orders.links import (
     create_order_link as orders_create_order_link,
     delete_order_link as orders_delete_order_link,
     list_order_links as orders_list_order_links,
 )
-from app.orders.mutations import materialize_inventory_account, update_order as orders_update_order
+from app.orders.mutations import update_order as orders_update_order
 from app.orders.pools import pool_balance as orders_pool_balance, pool_balance_summary
 from app.orders.queries import count_orders, list_orders as orders_list_orders
 
@@ -93,7 +95,23 @@ post_events = require_permissions(
     PERM_ORDER_EVENT_POST, PERM_FINANCE_ORDER_EVENT_POST, require_all=False
 )
 update_orders = require_permissions(PERM_ORDER_UPDATE)
+edit_order_detail = require_permissions(PERM_ORDER_UPDATE, PERM_FINANCE_ORDER_EVENT_POST)
 read_finance = require_permissions(PERM_FINANCE_READ)
+
+
+@router.patch("/orders/{order_id}/execution-edit")
+def update_order_execution_detail(
+    order_id: int,
+    payload: ExecutionEditRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = edit_order_detail,
+) -> dict[str, bool]:
+    """保存一个订单及其强绑定账号的详情编辑。"""
+    order = orders_get_order(db, order_id, user)
+    if order.account_id is None:
+        raise Validation("订单未关联库存账号", details={"order_id": order_id})
+    edit_execution_detail(db, order.account_id, payload, user)
+    return {"ok": True}
 
 
 @router.get("/orders", response_model=PageOut[schemas.OrderListOut])
@@ -595,18 +613,6 @@ def delete_order(
         user=user,
     )
     return Response(status_code=204)
-
-
-@router.post("/orders/{order_id}/materialize-account", response_model=schemas.OrderOut)
-def materialize_order_account(
-    order_id: int,
-    db: Session = Depends(get_db),
-    user: CurrentUser = update_orders,
-) -> schemas.OrderOut:
-    order = materialize_inventory_account(
-        db, order_id, actor=_actor(user), user=user
-    )
-    return _order_output(order)
 
 
 @router.post("/orders/{order_id}/cancel", response_model=schemas.OrderOut)

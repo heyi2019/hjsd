@@ -17,7 +17,7 @@ function csvCell(value: unknown): string {
   const text = value == null ? "" : String(value);
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
-function exportDetailText(detail: AccountExecutionDetail | undefined): {
+function exportDetailText(detail: AccountExecutionDetail | undefined, sourceOrderId?: number | null): {
   registrationAt: string;
   soldAt: string;
   removedAt: string;
@@ -36,7 +36,9 @@ function exportDetailText(detail: AccountExecutionDetail | undefined): {
   const expenseRows = financeRows.filter((row) => row.direction === "支出");
   const incomeRows = financeRows.filter((row) => row.direction === "收入");
   const eventById = new Map(orders.flatMap((order) => order.events.map((event) => [event.id, { event, order }] as const)));
-  const sourceOrder = orders[0];
+  const sourceOrder = sourceOrderId == null
+    ? undefined
+    : orders.find((order) => order.order_id === sourceOrderId);
 
   return {
     registrationAt: formatDateTimeMinute(sourceOrder?.created_at ?? sourceOrder?.trade_date),
@@ -83,7 +85,7 @@ export function buildInventoryCsv(
     INVENTORY_EXPORT_HEADERS,
     ...rows.map((row) => {
       const detail = details[row.id];
-      const detailText = exportDetailText(detail);
+      const detailText = exportDetailText(detail, row.source_order_id);
       return [
         row.source_order_no || "",
         row.business_mode ? BUSINESS_MODE_LABEL[row.business_mode] ?? row.business_mode : "",

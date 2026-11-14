@@ -42,7 +42,7 @@ from app.orders.cancellation_model import cancel_order
 from app.orders.create import create_order
 from app.orders.events import _apply_account_effect, _opposite_direction, post_event
 from app.orders.links import create_order_link, delete_order_link, list_order_links
-from app.orders.mutations import materialize_inventory_account, update_order
+from app.orders.mutations import update_order
 from app.orders.pools import pool_balance
 from app.orders.queries import list_orders
 from app.orders.router_output import _order_list_payload
@@ -170,56 +170,6 @@ def test_order_success_time_is_inventory_entry_time(seeded_db):
     )
 
     assert account.inventory_entry_at == order.created_at.replace(microsecond=0)
-
-
-def test_materialize_unlinked_active_order_creates_inventory_account(seeded_db):
-    order = create_order(
-        seeded_db,
-        order_type="DG",
-        trade_date=D,
-        actor="pytest",
-        account_snapshot={
-            "game_account": "legacy-unlinked-dg",
-            "game_type": "王者荣耀",
-            "game_password": "secret",
-            "channel_region": "安卓二区",
-        },
-    )
-    assert order.account_id is not None
-
-    # 模拟历史订单：订单有完整快照，但库存账号关联缺失。
-    order.account_id = None
-    seeded_db.flush()
-
-    restored = materialize_inventory_account(
-        seeded_db,
-        order.id,
-        actor="pytest",
-    )
-
-    assert restored.account_id is not None
-    restored_account = seeded_db.get(Account, restored.account_id)
-    assert restored_account is not None
-    assert restored_account.stock_no is not None
-    assert restored_account.inventory_type == "CONSIGNMENT"
-    assert restored_account.status == "WAITING"
-    assert restored_account.game_account == "legacy-unlinked-dg"
-
-
-def test_materialize_unlinked_completed_order_is_rejected(seeded_db):
-    order = create_order(
-        seeded_db,
-        order_type="HS",
-        trade_date=D,
-        actor="pytest",
-        account_snapshot={"game_account": "legacy-completed"},
-    )
-    order.status = OrderStatus.COMPLETED.value
-    order.account_id = None
-    seeded_db.flush()
-
-    with pytest.raises(Validation, match="只有进行中的订单"):
-        materialize_inventory_account(seeded_db, order.id, actor="pytest")
 
 
 def test_order_list_payload_includes_inventory_and_sale_responsibility_timestamps(seeded_db):

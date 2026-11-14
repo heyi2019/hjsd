@@ -1,6 +1,5 @@
 import { useLayoutEffect, useRef, useState, type Key, type Dispatch, type SetStateAction, type MutableRefObject } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
-import { stocksApi } from "../../shared/api/stocks.api";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
 import { normalizeError } from "../../shared/api/client";
@@ -33,9 +32,13 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
   }, [expandedOrderIds]);
   async function loadExecution(row: Account, force = false) {
     if (!force && (executionDetails[row.id] || executionLoading[row.id])) return;
+    if (row.source_order_id == null) {
+      setError({ message: "当前账号没有绑定来源订单，无法读取详情" });
+      return;
+    }
     setExecutionLoading((current) => ({ ...current, [row.id]: true }));
     try {
-      const detail = await stocksApi.executionDetail(row.id);
+      const detail = await ordersApi.executionDetail(row.source_order_id);
       setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
     } catch (err) {
       setError(normalizeError(err));
@@ -73,10 +76,12 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
     });
   }
   /** 售出成功后先从当前视图移除，避免库存列表在异步重拉期间继续展示已售账号。 */
-  function removeFromInventory(accountId: number, orderId = accountId) {
+  function removeFromInventory(accountId: number, orderId?: number) {
     locallyRemovedIdsRef.current.add(accountId);
     setRows((current) => current.filter((row) => row.account.id !== accountId));
-    setExpandedOrderIds((current) => current.filter((id) => String(id) !== String(orderId)));
+    if (orderId != null) {
+      setExpandedOrderIds((current) => current.filter((id) => String(id) !== String(orderId)));
+    }
   }
   /** 写操作后让详情缓存失效并立即重拉，避免展开区停在写之前的快照。
    *  必须 force：此时 useState 尚未提交，闭包里的 executionDetails 仍是旧值，不加 force 会被命中缓存直接 return。 */

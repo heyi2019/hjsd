@@ -1,8 +1,7 @@
 """库存删除服务。
 
-库存删除是管理员专属的不可恢复动作。库存编号与订单编号强绑定，
-因此删除时先复用订单删除服务清理所有关联订单，再清理库存主档；审计记录
-由各自的删除服务写入并保留，绝不留下任一侧的孤立编号。
+库存删除是管理员专属的不可恢复动作。库存编号与订单编号一对一绑定：
+库存入口先删除绑定订单，再复用本模块的主档删除步骤；审计记录由各自服务写入并保留。
 """
 
 from __future__ import annotations
@@ -35,35 +34,56 @@ def delete_inventory(
     """
     inventory = get_account(session, inventory_id, user)
     cleaned_reason = _clean_reason(reason)
-    linked_orders = _linked_orders(session, inventory_id)
+    linked_order = _linked_order(session, inventory_id)
 
-    if linked_orders:
+    if linked_order is not None:
         # 延迟导入避免 orders.deletion 与 stocks.deletion 的模块级循环依赖。
         from app.orders.deletion import delete_order
 
-        for order_id, _order_no in linked_orders:
-            delete_order(
-                session,
-                order_id,
-                actor=actor,
-                reason=f"随库存 {inventory.stock_no or inventory_id} 删除：{cleaned_reason}",
-                user=user,
-                delete_inventory_after=False,
-            )
+        delete_order(
+            session,
+            linked_order[0],
+            actor=actor,
+            reason=f"随库存 {inventory.stock_no or inventory_id} 删除：{cleaned_reason}",
+            user=user,
+            delete_inventory_after=False,
+        )
+
+    delete_inventory_record(
+        session,
+        inventory_id,
+        actor=actor,
+        reason=cleaned_reason,
+        user=user,
+        deleted_order=linked_order,
+    )
+
+
+def delete_inventory_record(
+    session: Session,
+    inventory_id: int,
+    *,
+    actor: str,
+    reason: str,
+    user: CurrentUser | None = None,
+    deleted_order: tuple[int, str] | None = None,
+) -> None:
+    """删除库存主档及其非订单从属数据；调用方已完成订单删除。"""
+    inventory = get_account(session, inventory_id, user)
+    cleaned_reason = _clean_reason(reason)
 
     # 处置记录的 account_id 是 RESTRICT 且不一定挂在当前订单上，也属于库存从属数据。
     session.query(InstallmentDisposition).filter(
         InstallmentDisposition.account_id == inventory_id
     ).delete(synchronize_session=False)
 
-    import_row_count = session.query(ImportRow).filter(
-        ImportRow.mapped_account_id == inventory_id
-    ).count()
     before = _inventory_snapshot(inventory)
 
     # 导入原始行是共享历史数据，只解除库存映射，不删除原始行。
-    session.query(ImportRow).filter(ImportRow.mapped_account_id == inventory_id).update(
-        {ImportRow.mapped_account_id: None}, synchronize_session=False
+    import_row_count = (
+        session.query(ImportRow)
+        .filter(ImportRow.mapped_account_id == inventory_id)
+        .update({ImportRow.mapped_account_id: None}, synchronize_session=False)
     )
     session.delete(inventory)
     session.flush()
@@ -77,10 +97,11 @@ def delete_inventory(
         before=before,
         after={
             "deleted": True,
-            "deleted_orders": [
-                {"id": order_id, "order_no": order_no}
-                for order_id, order_no in linked_orders
-            ],
+            "deleted_orders": (
+                [{"id": deleted_order[0], "order_no": deleted_order[1]}]
+                if deleted_order
+                else []
+            ),
             "unlinked_import_rows": import_row_count,
         },
         reason=cleaned_reason,
@@ -94,14 +115,10 @@ def _clean_reason(reason: str) -> str:
     return cleaned
 
 
-def _linked_orders(session: Session, inventory_id: int) -> list[tuple[int, str]]:
-    return list(
-        session.execute(
-            select(Order.id, Order.order_no)
-            .where(Order.account_id == inventory_id)
-            .order_by(Order.id)
-        ).all()
-    )
+def _linked_order(session: Session, inventory_id: int) -> tuple[int, str] | None:
+    return session.execute(
+        select(Order.id, Order.order_no).where(Order.account_id == inventory_id)
+    ).one_or_none()
 
 
 def _inventory_snapshot(inventory: Account) -> dict[str, object]:
@@ -127,4 +144,4 @@ def _inventory_snapshot(inventory: Account) -> dict[str, object]:
     }
 
 
-__all__ = ["delete_inventory"]
+__all__ = ["delete_inventory", "delete_inventory_record"]

@@ -19,7 +19,7 @@ def test_inventory_edit_updates_event_flow_and_cost_without_changing_time(seeded
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
     original_time = event.occurred_on
-    response = seeded_client.patch(f"/api/v1/stocks/{account.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100.00", "amount": "150.00", "note": "修改"}]})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100.00", "amount": "150.00", "note": "修改"}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(Account, account.id).cost_amount == Decimal("150")
@@ -36,7 +36,7 @@ def test_inventory_edit_saves_profile_and_amount_together(seeded_client, seeded_
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
-    response = seeded_client.patch(f"/api/v1/stocks/{account.id}/execution-edit", headers=headers, json={"profile": {"game_account": "after-edit"}, "events": [{"id": event.id, "expected_amount": "100", "amount": "150", "note": "ok"}]})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"profile": {"game_account": "after-edit"}, "events": [{"id": event.id, "expected_amount": "100", "amount": "150", "note": "ok"}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(Account, account.id).game_account == "after-edit"
@@ -49,7 +49,7 @@ def test_stale_amount_rejects_whole_edit(seeded_client, seeded_db, headers):
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
-    response = seeded_client.patch(f"/api/v1/stocks/{account.id}/execution-edit", headers=headers, json={"profile": {"game_account": "must-not-save"}, "events": [{"id": event.id, "expected_amount": "99", "amount": "150"}]})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"profile": {"game_account": "must-not-save"}, "events": [{"id": event.id, "expected_amount": "99", "amount": "150"}]})
     assert response.status_code == 409
     seeded_db.expire_all()
     assert seeded_db.get(Account, account.id).game_account == "stale-before"
@@ -59,11 +59,12 @@ def test_stale_amount_rejects_whole_edit(seeded_client, seeded_db, headers):
 def test_cannot_edit_event_of_another_account(seeded_client, seeded_db, headers):
     first = create_account(seeded_db, game_account="first", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     second = create_account(seeded_db, game_account="second", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    first_order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=first.id)
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=second.id)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
-    response = seeded_client.patch(f"/api/v1/stocks/{first.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "150"}]})
+    response = seeded_client.patch(f"/api/v1/orders/{first_order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "150"}]})
     assert response.status_code == 404
     seeded_db.expire_all()
     assert seeded_db.get(OrderEvent, event.id).amount == Decimal("100")
@@ -76,7 +77,7 @@ def test_edit_execution_operator_preserves_time_and_records_actual_editor(seeded
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
     timestamp = event.created_at
-    response = seeded_client.patch(f"/api/v1/stocks/{account.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [1, 2]}]})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [1, 2]}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     updated = seeded_db.get(OrderEvent, event.id)
@@ -96,7 +97,7 @@ def test_operator_selection_rejects_unknown_users(seeded_client, seeded_db, head
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
-    response = seeded_client.patch(f"/api/v1/stocks/{account.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [999999]}]})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [999999]}]})
     assert response.status_code == 422
     seeded_db.expire_all()
     assert seeded_db.get(OrderEvent, event.id).operator_user_ids is None
@@ -108,7 +109,7 @@ def test_zero_amount_execution_can_change_operators_without_cashflow(seeded_clie
     event = OrderEvent(order_id=order.id, event_no="ZERO-OP-001", event_type="DELIVER", amount=Decimal("0"), portion="GROSS", occurred_on=date(2026, 10, 1), is_posted=True, created_by="pytest", updated_by="pytest")
     seeded_db.add(event)
     seeded_db.commit()
-    response = seeded_client.patch(f"/api/v1/stocks/{account.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "0", "amount": "0", "operator_user_ids": [1, 2]}]})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "0", "amount": "0", "operator_user_ids": [1, 2]}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(OrderEvent, event.id).operator_user_ids == [1, 2]
@@ -122,7 +123,7 @@ def test_operator_edit_does_not_change_existing_cashflow_amount(seeded_client, s
     flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_event_id == event.id))
     flow.amount = Decimal("90")
     seeded_db.commit()
-    response = seeded_client.patch(f"/api/v1/stocks/{account.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [1, 2]}]})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [1, 2]}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(Cashflow, flow.id).amount == Decimal("90")

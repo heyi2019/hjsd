@@ -46,8 +46,8 @@ export function OrderDetailPartySection({
       customersApi.list({ status: "ACTIVE" }),
       counterpartiesApi.list({ status: "ACTIVE" }),
     ]).then(([customerRows, counterpartyRows]) => {
-      setCustomers(customerRows);
-      setCounterparties(counterpartyRows);
+      setCustomers(customerRows ?? []);
+      setCounterparties(counterpartyRows ?? []);
     }).catch(() => undefined);
   }, [editing, order]);
 

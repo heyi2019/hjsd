@@ -5,7 +5,6 @@ import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
 import { policyApi } from "../../shared/api/policy.api";
 import { poolsApi } from "../../shared/api/pools.api";
-import { stocksApi } from "../../shared/api/stocks.api";
 import type { Account } from "../../shared/api/types/accounts";
 import type { Pool } from "../../shared/api/types/finance";
 import type { EmployeeOption } from "../../shared/api/types/org";
@@ -116,7 +115,7 @@ export function useOrderActionModals({
       appMessage.warning("该订单未关联库存账号，无法执行账号动作");
       return null;
     }
-    const detail = await stocksApi.executionDetail(sourceOrder.account_id);
+    const detail = await ordersApi.executionDetail(sourceOrder.id);
     return detail.account;
   };
 
@@ -166,7 +165,7 @@ export function useOrderActionModals({
         appMessage.warning("该订单未关联库存账号，无法下架");
         return;
       }
-      const detail = await stocksApi.executionDetail(sourceOrder.account_id);
+      const detail = await ordersApi.executionDetail(sourceOrder.id);
       const records = consignmentRecords(detail.orders);
       if (!records.length) {
         appMessage.warning("当前账号没有仍在平台上的寄售记录");
@@ -208,7 +207,7 @@ export function useOrderActionModals({
     setOrderDeleteSubmitting(true);
     try {
       await ordersApi.deleteOrder(orderDeleteTarget.id, reason);
-      appMessage.success("订单及关联数据已删除");
+      appMessage.success("已删除");
       setOrderDeleteTarget(null);
       await load();
     } catch (error) {

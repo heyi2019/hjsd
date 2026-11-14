@@ -10,7 +10,7 @@ import "./profile-modal.css";
 export type InventoryProfileTarget = {
   account: Account;
   mode: "description" | "images";
-  /** 订单台账入口明确指定的业务订单；库存入口回退使用账号来源订单。 */
+  /** 订单台账入口明确指定的业务订单；库存入口使用账号绑定的来源订单。 */
   orderId?: number;
 };
 

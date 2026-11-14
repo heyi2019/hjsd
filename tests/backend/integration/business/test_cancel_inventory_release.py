@@ -1,7 +1,7 @@
 """INVENTORY-02 无流水取消后的库存回收规则。
 
 判定依据是「有无已登记（过账）资金事件」：无事件时账号状态从未因本单改变过，
-因此只有本单内联建库产生的账号需要在取消后收回，引用已有库存账号的单保持原状。
+取消会使与本单一对一绑定的账号退出库存。
 """
 from __future__ import annotations
 
@@ -77,33 +77,6 @@ def test_cancelled_inline_account_allows_same_game_account_rebuy(seeded_db):
     assert (reborn.status, reborn.inventory_status) == ("WAITING", "IN_STOCK")
     # 只有新账号在库，被取消那张保持 VOID，不会出现两条在库记录。
     assert _inventory_ids(seeded_db) == {reborn.id}
-
-
-def test_referenced_account_keeps_status_on_plain_cancel(seeded_db):
-    """引用已有库存账号的单取消后，共享账号保持原状，不被连带作废。"""
-    source = create_order(
-        seeded_db,
-        order_type="TH",
-        trade_date=D,
-        actor="pytest",
-        account_snapshot=_snapshot("cancel-referenced"),
-    )
-    account = seeded_db.get(Account, source.account_id)
-    assert account.status == AccountStatus.WAITING.value
-
-    borrower = create_order(
-        seeded_db,
-        order_type="TH",
-        trade_date=D,
-        actor="pytest",
-        account_id=account.id,
-    )
-    cancel_order(seeded_db, borrower.id, actor="pytest", reason="客户撤单")
-    seeded_db.refresh(account)
-
-    # 账号仍被回收单引用，取消提号单不应让它退出库存。
-    assert account.status == AccountStatus.WAITING.value
-    assert account.inventory_status == "IN_STOCK"
 
 
 def test_plain_cancel_with_posted_event_is_blocked_and_account_untouched(seeded_db):

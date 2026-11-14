@@ -277,14 +277,12 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         {item.id: item for item in db.scalars(select(Account).where(Account.id.in_(account_ids))).all()}
         if account_ids else {}
     )
-    source_orders_by_account: dict[int, Order] = {}
-    if account_ids:
-        for source_order in db.scalars(
-            select(Order)
-            .where(Order.account_id.in_(account_ids), Order.order_type.in_(("HS", "TH", "DG")))
-            .order_by(Order.id)
-        ).all():
-            source_orders_by_account.setdefault(source_order.account_id, source_order)
+    # 账号和订单一对一，当前列表中的订单就是账号来源，无须再按 account_id 回查订单表。
+    source_orders_by_account = {
+        order.account_id: order
+        for order in orders
+        if order.account_id is not None
+    }
     inventory_responsible_ids = {
         item
         for source_order in source_orders_by_account.values()

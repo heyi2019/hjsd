@@ -13,7 +13,7 @@ from app.domain.users import User
 from app.orders.amounts import is_deposit_loss_flow
 from app.orders.router_output import cancellable_by_event
 
-from ..schemas import ExecutionCashflowOut, ExecutionEventOut
+from app.stocks.schemas import ExecutionCashflowOut, ExecutionEventOut
 
 
 @dataclass(frozen=True)

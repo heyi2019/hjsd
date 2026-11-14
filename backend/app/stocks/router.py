@@ -14,7 +14,6 @@ from app.core.database import get_db
 from app.core.security import (
     PERM_AUDIT_READ,
     PERM_FINANCE_READ,
-    PERM_FINANCE_ORDER_EVENT_POST,
     PERM_ORDER_CREATE,
     PERM_ORDER_UPDATE,
     CurrentUser,
@@ -60,30 +59,16 @@ from .router_output import (
     _account_output,
     _account_outputs,
 )
-from .order_detail_view import build_detail_view
-from .order_detail_view.assembler import build_order_outputs
-from .order_detail_view.finance import build_finance_summary
-from .order_detail_view.events import load_event_context
-from .order_detail_view.relations import load_relations
-from .order_detail import edit_execution_detail
-from .order_detail.schemas import ExecutionEditRequest
+from app.orders.order_detail.view import build_detail_view
+from app.orders.order_detail.view.assembler import build_order_outputs
+from app.orders.order_detail.view.finance import build_finance_summary
+from app.orders.order_detail.view.events import load_event_context
+from app.orders.order_detail.view.relations import load_relations
 
 router = APIRouter(tags=["ACC-01 账号台账"])
 
 read_access = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 manage = require_permissions(PERM_ORDER_CREATE)
-edit_execution = require_permissions(PERM_ORDER_UPDATE, PERM_FINANCE_ORDER_EVENT_POST)
-
-
-@router.patch("/stocks/{account_id}/execution-edit")
-def update_execution_detail(
-    account_id: int, payload: ExecutionEditRequest,
-    db: Session = Depends(get_db), user: CurrentUser = edit_execution,
-) -> dict[str, bool]:
-    edit_execution_detail(db, account_id, payload, user)
-    return {"ok": True}
-
-
 @router.get("/stocks", response_model=AccountListOut)
 def list_accounts(
     status: str | None = Query(default=None),

@@ -198,7 +198,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
       await policyApi.setAllocations(actionOrder.id, validation.items, sourceFormExtra);
       appMessage.success("分润已保存");
       await load();
-      if (actionOrder.account_id != null) await loadLedgerDetail(actionOrder.account_id, true);
+      if (actionOrder.account_id != null) await loadLedgerDetail(actionOrder, true);
       setAllocationOpen(false);
       setActionOrder(null);
     } catch (error) {

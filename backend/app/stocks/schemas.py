@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validat
 from app.core.schemas import PageOut, RequestModel
 
 from ._common import INVENTORY_STATUSES, inventory_age_days as age_days, inventory_age_level as age_level
-from .order_detail_view.schemas import OrderDetailViewOut
+from app.orders.order_detail.view.schemas import OrderDetailViewOut
 
 class AccountOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -51,7 +51,7 @@ class AccountOut(BaseModel):
         """在库天数（自然日）：非在库为 None；与卡片指标同一口径，前端只展示。"""
         if self.inventory_status not in INVENTORY_STATUSES:
             return None
-        return age_days(self.inventory_entry_at or self.buy_date or self.created_at)
+        return age_days(self.inventory_entry_at)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

@@ -20,16 +20,6 @@ describe("stocksApi 路由", () => {
     apiMock.delete.mockResolvedValue({ data: undefined });
   });
 
-  it("所有库存详情读写请求都使用 /stocks 路由", async () => {
-    await stocksApi.updateProfile(7, { note: "备注" });
-    await stocksApi.executionDetail(7);
-    await stocksApi.updateExecution(7, { profile: {}, events: [] });
-
-    expect(apiMock.patch).toHaveBeenNthCalledWith(1, "/stocks/7", { note: "备注" });
-    expect(apiMock.get).toHaveBeenCalledWith("/stocks/7/execution-detail");
-    expect(apiMock.patch).toHaveBeenNthCalledWith(2, "/stocks/7/execution-edit", { profile: {}, events: [] });
-  });
-
   it("删除库存走 DELETE /stocks/{id} 且请求体带删除原因", async () => {
     await stocksApi.remove(7, "重复录入");
 

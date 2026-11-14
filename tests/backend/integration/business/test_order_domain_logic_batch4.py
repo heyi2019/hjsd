@@ -1,7 +1,7 @@
-"""ROBUST-01 批次四：订单域 6 条逻辑缺陷回归（#11/#12/#15/#16/#17/#19）。
+"""ROBUST-01 批次四：订单域 5 条逻辑缺陷回归（#11/#15/#16/#17/#19）。
 
 口径锚点（用户 11-12 裁决）：利润 = 收入大类 − 支出大类；本文件覆盖参与方护栏、
-分润绑定、账号状态机、重开 BUY 闭环、表单依赖与作用域注册。
+账号状态机、重开 BUY 闭环、表单依赖与作用域注册。
 """
 from __future__ import annotations
 
@@ -18,9 +18,7 @@ from app.domain.trade import (
     Order,
     OrderEvent,
     OrderFormField,
-    OrderProfitAllocation,
 )
-from app.domain.users import User
 from app.orders import form_fields as ff
 from app.orders.create import add_customer_role, create_order
 from app.orders.events import post_event
@@ -111,69 +109,6 @@ def test_add_customer_role_allows_valid_buyer(seeded_db):
     )
     assert result.id == order.id
     assert row is not None
-
-
-# ---------------------------------------------------------------- #12 多人分润
-def test_sell_event_does_not_overwrite_multi_person_allocation(seeded_db):
-    """SELL 事件只兜底「单行未绑定」，不得把多人分润的 user_id 全抹成当前执行人。"""
-    acc = _account(seeded_db, game_account="b4-alloc")
-    order = _hs_order(seeded_db, account=acc)
-    seeded_db.commit()
-    _buy(seeded_db, order)
-    seeded_db.commit()
-
-    # 造两行 SELL 分润，分别绑定用户 1 / 用户 2（模拟多人协作各占一行）。
-    seeded_db.add_all([
-        OrderProfitAllocation(
-            order_id=order.id, user_id=1, role="OWNER", allocation_type="SELL",
-            allocation_rate=Decimal("15"), allocation_amount=Decimal("0"),
-        ),
-        OrderProfitAllocation(
-            order_id=order.id, user_id=2, role="SALES", allocation_type="SELL",
-            allocation_rate=Decimal("10"), allocation_amount=Decimal("0"),
-        ),
-    ])
-    seeded_db.commit()
-
-    _sell(seeded_db, order)
-
-    rows = seeded_db.scalars(
-        select(OrderProfitAllocation).where(
-            OrderProfitAllocation.order_id == order.id,
-            OrderProfitAllocation.allocation_type == "SELL",
-        )
-    ).all()
-    # 修复前：两行都被改成执行人 pytest 的 id；修复后：各自保留。
-    assert {row.user_id for row in rows} == {1, 2}
-
-
-def test_sell_event_backfills_single_unbound_allocation(seeded_db):
-    """历史兜底仍在：该动作类型恰好单行且未绑定人员时回填当前执行人。"""
-    acc = _account(seeded_db, game_account="b4-alloc1")
-    order = _hs_order(seeded_db, account=acc)
-    seeded_db.commit()
-    _buy(seeded_db, order)
-    seeded_db.commit()
-    seeded_db.add(
-        OrderProfitAllocation(
-            order_id=order.id, user_id=None, role="OWNER", allocation_type="SELL",
-            allocation_rate=Decimal("25"), allocation_amount=Decimal("0"),
-        )
-    )
-    seeded_db.commit()
-    # actor 需对应种子里的真实用户（seeduser1），events.py 以 username 反查 id 回填。
-    actor_id = seeded_db.scalar(select(User.id).where(User.username == "seeduser1"))
-    post_event(
-        seeded_db, order.id, event_type="SELL", amount=Decimal("800"),
-        occurred_on=TODAY2, actor="seeduser1",
-    )
-    row = seeded_db.scalar(
-        select(OrderProfitAllocation).where(
-            OrderProfitAllocation.order_id == order.id,
-            OrderProfitAllocation.allocation_type == "SELL",
-        )
-    )
-    assert row.user_id == actor_id
 
 
 # ---------------------------------------------------------------- #15 账号状态机

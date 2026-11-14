@@ -24,6 +24,7 @@ from app.domain.trade import Account, Order
 from app.domain.trade_models.cashflow import Cashflow
 from app.orders import events
 from app.orders.create import create_order
+from app.stocks.profile import create_account
 
 TODAY = date(2026, 10, 6)
 
@@ -34,11 +35,16 @@ def _first_active_pool(session) -> Pool:
 
 def test_flow_c_th_distribution_fund_settlement(seeded_db):
     """BIZ-FLOW-DIST-001：TH 分销（提号）BUY+SELL 资金结算与核算属性区分。"""
-    # TH 不在本单内联库存账号（采购事实记在历史来源单），只记 BUY 成本 + SELL 收入。
-    order = create_order(
-        seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
+    account = create_account(
+        seeded_db,
+        game_account="flow-c-th-001",
+        business_mode="DISTRIBUTION",
+        inventory_type="PICKUP",
+        actor="pytest",
     )
-    assert order.order_type == "TH"
+    order = create_order(
+        seeded_db, order_type="TH", trade_date=TODAY, actor="pytest", account_id=account.id,
+    )
 
     _buy_evt, buy_flow = events.post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("800"),
@@ -67,8 +73,7 @@ def test_flow_c_th_distribution_fund_settlement(seeded_db):
     )
     assert signed == Decimal("1200.00")  # 2000 - 800
 
-    order = seeded_db.get(Order, order.id)
-    assert order.status == "COMPLETED"
+    assert seeded_db.get(Order, order.id).status == "COMPLETED"
 
 
 def test_flow_c_dg_consignment_sell_and_buy_rejected(seeded_db):

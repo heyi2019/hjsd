@@ -138,11 +138,7 @@ class TestOrderStateMachine:
 
 # ------------------------------------------------------------------ 提号售出口径
 class TestPickupSale:
-    """提号账号售出：售出单本身不再重复 BUY，采购事实按账号追溯（与 HS 同口径）。
-
-    库存中心售出提号账号时会另开一张 TH 售出单，BUY 记在提号入库那张订单上；
-    若按「本订单必须有 BUY」校验，提号将永远无法售出。
-    """
+    """提号账号售出：BUY 与 SELL 统一登记在同一来源订单。"""
 
     def _pickup_account(self, seeded_db):
         return create_account(
@@ -153,20 +149,17 @@ class TestPickupSale:
             actor="hunt",
         )
 
-    def test_sale_order_sells_without_own_buy(self, seeded_db):
+    def test_order_sells_after_own_buy(self, seeded_db):
         account = self._pickup_account(seeded_db)
-        stock_in = create_order(
+        order = create_order(
             seeded_db, order_type="TH", trade_date=D, actor="hunt", account_id=account.id,
         )
         post_event(
-            seeded_db, stock_in.id, event_type="BUY", amount="800",
+            seeded_db, order.id, event_type="BUY", amount="800",
             occurred_on=D, actor="hunt", pool_id=1,
         )
-        sale = create_order(
-            seeded_db, order_type="TH", trade_date=D, actor="hunt", account_id=account.id,
-        )
         event, flow = post_event(
-            seeded_db, sale.id, event_type="SELL", amount="1200",
+            seeded_db, order.id, event_type="SELL", amount="1200",
             occurred_on=D, actor="hunt", pool_id=1,
         )
         assert event.event_type == "SELL"
@@ -175,12 +168,12 @@ class TestPickupSale:
     def test_sale_rejected_when_account_never_bought(self, seeded_db):
         """账号从未采购入库时，售出仍必须被拦截。"""
         account = self._pickup_account(seeded_db)
-        sale = create_order(
+        order = create_order(
             seeded_db, order_type="TH", trade_date=D, actor="hunt", account_id=account.id,
         )
         with pytest.raises(Exception, match="BUY"):
             post_event(
-                seeded_db, sale.id, event_type="SELL", amount="1200",
+                seeded_db, order.id, event_type="SELL", amount="1200",
                 occurred_on=D, actor="hunt", pool_id=1,
             )
 

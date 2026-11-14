@@ -1,7 +1,7 @@
 import { Form } from "antd";
 import { useState } from "react";
 import { employeesApi } from "../../shared/api/org.api";
-import { stocksApi } from "../../shared/api/stocks.api";
+import { ordersApi } from "../../shared/api/orders.api";
 import type { AccountExecutionDetail, AccountExecutionEvent } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../shared/api/types/org";
@@ -81,8 +81,8 @@ export interface AccountExecutionEditor {
 
 /**
  * 账号执行详情编辑器状态机：把库存中心与订单中心共用的「账号台账内联编辑」逻辑抽出，
- * 保证两个入口（库存中心列表 / 订单中心台账）表现一致，且都面向同一份 stocks 记录、
- * 同一个后端接口（stocksApi.updateExecution / updateProfile），编辑后各自 re-fetch 即时反映。
+ * 保证两个入口（库存中心列表 / 订单中心台账）表现一致。资料写入仍经账号编辑接口，
+ * 读取及保存后的回读始终按来源订单进行，避免把同账号的其他订单混进当前详情。
  *
  * 详情缓存由各调用方注入（getExecutionDetail / onSaved），hook 自身不持有列表缓存，
  * 库存中心与订单台账因此可以共用同一套编辑状态机，同时保留各自的列表筛选口径。
@@ -243,7 +243,9 @@ export function useAccountExecutionEditor(params: {
         ...(Object.keys(draft.form_extra).length ? { form_extra: draft.form_extra } : {}),
       }));
       const parties = Object.entries(partyDrafts).flatMap(([orderId, additions]) => additions.map((item) => ({ order_id: Number(orderId), ...item })));
-      await stocksApi.updateExecution(id, {
+      const sourceOrderId = editingAccount.source_order_id;
+      if (sourceOrderId == null) throw new Error("账号没有绑定来源订单，无法保存详情");
+      await ordersApi.updateExecution(sourceOrderId, {
         profile,
         events,
         cashflows,
@@ -251,7 +253,7 @@ export function useAccountExecutionEditor(params: {
         parties,
       });
       try {
-        const detail = await stocksApi.executionDetail(id);
+        const detail = await ordersApi.executionDetail(sourceOrderId);
         onSaved(id, detail);
       } catch (refreshError) {
         appMessage.warning("修改已保存，但刷新明细失败，请重新加载");

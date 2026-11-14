@@ -22,7 +22,7 @@ from .schemas import (
 )
 
 if TYPE_CHECKING:
-    from ..schemas import AccountExecutionOrderOut
+    from app.stocks.schemas import AccountExecutionOrderOut
 
 INVENTORY_ORDER_TYPES = frozenset({"HS", "TH", "DG"})
 INTERNAL_EXTRA_KEYS = frozenset({

@@ -12,7 +12,7 @@ from pydantic import Field
 
 from app.core.schemas import RequestModel
 
-from ..schemas import AccountProfileUpdate
+from app.stocks.schemas import AccountProfileUpdate
 
 
 class ExecutionEditItem(RequestModel):

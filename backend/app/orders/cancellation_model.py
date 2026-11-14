@@ -159,19 +159,6 @@ def apply_installment_cancellation_account_effect(
     return account.status
 
 
-def _account_created_by_order(session: Session, order: Order) -> bool:
-    """账号是否只被本单引用，即由本单内联建库产生，而非引用已有库存账号。"""
-    if order.account_id is None:
-        return False
-    other = session.scalar(
-        select(Order.id).where(
-            Order.account_id == order.account_id,
-            Order.id != order.id,
-        )
-    )
-    return other is None
-
-
 def _retire_account_on_plain_cancel(
     session: Session,
     order: Order,
@@ -183,10 +170,8 @@ def _retire_account_on_plain_cancel(
 
     账号状态只由事件驱动，因此「无已登记事件」意味着本单从未改变过账号状态：
 
-    - **引用已有库存账号**的单（账号被多单共享）：保持原状；
-    - **内联建库**产生的账号（只被本单引用）：本单取消后它没有任何存在依据，
-      置 ``VOID`` 退出库存。否则它既留在库存列表里可被误卖，又会被建单判重
-      当作「未售出库存账号」挡住同一账号重新建单——形成死锁；
+    - 每个账号只绑定当前订单；取消后它没有继续留在库存的业务依据，
+      置 ``VOID`` 退出库存，避免可被误卖或阻止同账号重新建单；
     - **代挂（DG）**另按 ``platform_unlist_scope`` 区分：仅「本系统下架」终止
       账号，平台下架时账号仍在平台挂出（原口径，保持不变）。
     """
@@ -201,8 +186,6 @@ def _retire_account_on_plain_cancel(
         if account.status == AccountStatus.WAITING.value:
             account.status = AccountStatus.VOID.value
             account.updated_by = actor
-        return
-    if not _account_created_by_order(session, order):
         return
     # VOID 在状态机里是终态（ACCOUNT_TRANSITIONS["VOID"] 为空），已 VOID 时天然跳过。
     if ACCOUNT_TRANSITIONS.get(account.status, {}).get("VOID") is not None:

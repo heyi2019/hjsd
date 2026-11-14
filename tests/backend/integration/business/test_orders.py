@@ -231,12 +231,14 @@ class TestA02ThStock:
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
         )
         buyer = _customer(seeded_db)
+        account = _new_account(seeded_db, game_account="th-stock-acc")
         seeded_db.commit()
         order = create_order(
             seeded_db,
             order_type="TH",
             trade_date=TODAY,
             actor="pytest",
+            account_id=account.id,
             customer_roles=[(buyer.id, "BUYER")],
             counterparty_roles=[(peer.id, "PEER")],
         )
@@ -392,8 +394,9 @@ class TestEventRules:
             )
 
     def test_th_sell_requires_a_buy(self, seeded_db):
+        account = _new_account(seeded_db, game_account="th-stock-acc")
         order = create_order(
-            seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
+            seeded_db, order_type="TH", trade_date=TODAY, actor="pytest", account_id=account.id
         )
 
         with pytest.raises(Validation) as exc:
@@ -409,8 +412,9 @@ class TestEventRules:
         assert "BUY" in str(exc.value)
 
     def test_th_order_accepts_only_one_sell_event(self, seeded_db):
+        account = _new_account(seeded_db, game_account="th-stock-acc")
         order = create_order(
-            seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
+            seeded_db, order_type="TH", trade_date=TODAY, actor="pytest", account_id=account.id
         )
         buy, _ = post_event(
             seeded_db,

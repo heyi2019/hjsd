@@ -50,31 +50,19 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
     """库存账号售出必须建立在已采购入库之上。"""
     if order.order_type != "HS":
         if order.order_type == "TH":
-            # 售出单本身不再重复 BUY：采购事实记在该账号的历史订单上
-            # （提号入库单建单即登记 BUY，库存中心售出时会另开一张 TH 售出单）。
-            # 故与 HS 同口径按账号维度追溯；账号缺失的历史数据回退到本订单维度。
-            if order.account_id is not None:
-                purchased = session.scalar(
-                    select(OrderEvent.id)
-                    .join(Order, Order.id == OrderEvent.order_id)
-                    .where(
-                        Order.account_id == order.account_id,
-                        OrderEvent.event_type == EventType.BUY.value,
-                        OrderEvent.is_posted.is_(True),
-                    )
-                    .limit(1)
+            # 提号订单的采购与售出都登记在同一来源订单。
+            purchased = session.scalar(
+                select(OrderEvent.id)
+                .where(
+                    OrderEvent.order_id == order.id,
+                    OrderEvent.event_type == EventType.BUY.value,
+                    OrderEvent.is_posted.is_(True),
                 )
-            else:
-                purchased = session.scalar(
-                    select(OrderEvent.id).where(
-                        OrderEvent.order_id == order.id,
-                        OrderEvent.event_type == EventType.BUY.value,
-                        OrderEvent.is_posted.is_(True),
-                    )
-                )
+                .limit(1)
+            )
             if purchased is None:
                 raise Validation(
-                    "TH 售出前必须存在已过账 BUY 事件（账号未采购入库）",
+                    "TH 售出前必须在本订单登记已过账 BUY 事件",
                     details={"order_no": order.order_no, "account_id": order.account_id},
                 )
         return
@@ -100,9 +88,8 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
 
     purchased = session.scalar(
         select(OrderEvent.id)
-        .join(Order, Order.id == OrderEvent.order_id)
         .where(
-            Order.account_id == account.id,
+            OrderEvent.order_id == order.id,
             OrderEvent.event_type == EventType.BUY.value,
             OrderEvent.is_posted.is_(True),
         )
@@ -110,8 +97,8 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
     )
     if purchased is None:
         raise Validation(
-            "账号缺少采购入库记录，不能售出",
-            details={"account_id": account.id},
+            "本订单缺少采购入库记录，不能售出",
+            details={"order_no": order.order_no, "account_id": account.id},
         )
 
 
@@ -125,13 +112,13 @@ def _assert_event_allowed(
 ) -> None:
     """按业务类型限制事件组合，避免只依赖资金路由间接拦截非法动作。"""
     if order.order_type == "HS" and event_type == EventType.BUY.value and order.account_id is None:
-        # account_id 为空只可能是建单快照缺游戏账号（有值时上方已自动建号）。
+        # 回收订单在建单时必须已完成账号绑定；事件登记不再补建库存账号。
         if not (order.account_snapshot or {}).get("game_account"):
             raise Validation(
-                "回收订单买入必须填写游戏账号，系统将据此创建库存账号",
+                "回收订单建单时必须填写游戏账号并绑定库存账号",
                 details={"field": "game_account"},
             )
-        raise Validation("回收订单 BUY 必须关联库存账号")
+        raise Validation("回收订单 BUY 必须关联建单时绑定的库存账号")
     if order.order_type == "DG" and event_type == EventType.BUY.value:
         raise Validation("代挂业务不允许 BUY 事件")
     if order.order_type in {"TH", "DG"} and event_type == EventType.SELL.value:

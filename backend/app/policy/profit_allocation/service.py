@@ -301,8 +301,6 @@ def _set_action_allocations(
                 )
                 .order_by(OrderEvent.id.desc())
             )
-            if action is None and action_type == "BUY" and order.account_id is not None:
-                action = session.scalar(select(OrderEvent).join(Order, Order.id == OrderEvent.order_id).where(Order.account_id == order.account_id, OrderEvent.event_type == "BUY", OrderEvent.is_posted.is_(True)).order_by(OrderEvent.id.desc()))
             if action is not None:
                 candidates = [
                     int(uid) for uid in (action.operator_user_ids or []) if uid is not None

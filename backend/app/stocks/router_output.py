@@ -9,20 +9,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser, owner_scope_filter
-from app.domain.trade import Account, Order, OrderEvent
+from app.core.errors import Validation
+from app.domain.trade import Account, Order
 from app.domain.users import User
 from app.parties.fields import get_extra_values_bulk
 
 from .schemas import AccountOut
 from app.core.actor import actor_name as _actor
 
-INVENTORY_SOURCE_ORDER_TYPES = frozenset({"HS", "TH", "DG"})
-
-
 def _source_orders(
     db: Session, account_ids: list[int], user: CurrentUser | None = None
 ) -> dict[int, Order]:
-    """解析标准订单数据中的库存来源；HS/TH/DG 均可回溯到库存实体。"""
+    """读取库存账号的一对一来源订单，不按事件或时间猜测来源。"""
     if not account_ids:
         return {}
     stmt = select(Order).where(Order.account_id.in_(account_ids))
@@ -32,34 +30,18 @@ def _source_orders(
     orders = list(db.scalars(stmt.order_by(Order.trade_date.desc(), Order.id.desc())).all())
     if not orders:
         return {}
-    order_ids = [order.id for order in orders]
-    buy_order_ids = set(
-        db.scalars(
-            select(OrderEvent.order_id).where(
-                OrderEvent.order_id.in_(order_ids),
-                OrderEvent.event_type == "BUY",
-                OrderEvent.is_posted.is_(True),
-            )
-        ).all()
-    )
-    inventory_orders: dict[int, Order] = {}
-    fallback_orders: dict[int, Order] = {}
+    result: dict[int, Order] = {}
     for order in orders:
-        if order.account_id is None:
+        account_id = order.account_id
+        if account_id is None:
             continue
-        # 已取消/未过账的来源订单没有 BUY 事件，但库存记录仍应显示其订单编号，
-        # 否则详情页会出现大量“订单号 -”。正式入库订单优先使用带 BUY 的记录。
-        if order.order_type in INVENTORY_SOURCE_ORDER_TYPES:
-            fallback_orders.setdefault(order.account_id, order)
-        if order.order_type == "DG" or (
-            order.id in buy_order_ids and order.order_type in INVENTORY_SOURCE_ORDER_TYPES
-        ):
-            inventory_orders.setdefault(order.account_id, order)
-    return {
-        account_id: inventory_orders.get(account_id) or fallback_orders[account_id]
-        for account_id in account_ids
-        if account_id in inventory_orders or account_id in fallback_orders
-    }
+        if account_id in result:
+            raise Validation(
+                "库存账号存在多个来源订单",
+                details={"account_id": account_id},
+            )
+        result[account_id] = order
+    return result
 
 
 def _account_output(
@@ -119,7 +101,6 @@ def _account_outputs(
 
 
 __all__ = [
-    "INVENTORY_SOURCE_ORDER_TYPES",
     "_actor",
     "_source_orders",
     "_account_output",

@@ -4,7 +4,6 @@ import { DatePicker, Form, InputNumber } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
-import { stocksApi } from "../../shared/api/stocks.api";
 import type { Account } from "../../shared/api/types/accounts";
 import { normalizeError } from "../../shared/api/client";
 import { useOptionSet } from "../../shared/lib/optionSets";
@@ -31,18 +30,16 @@ export function InventoryConsignmentModal(props: {
   const { config } = useOrderFormConfig(open ? "CONSIGN" : undefined);
   const platforms = useOptionSet("INTERMEDIARY_PLATFORM") ?? [];
 
-  const refreshListed = async (accountId: number) => {
-    const detail = await stocksApi.executionDetail(accountId);
-    const sourceOrder = detail.orders.find((order) => order.order_id === (props.orderId ?? props.account?.source_order_id))
-      ?? detail.orders.find((order) => order.order_type !== "DG")
-      ?? detail.orders[0];
+  const refreshListed = async (orderId: number) => {
+    const detail = await ordersApi.executionDetail(orderId);
+    const sourceOrder = detail.orders.find((order) => order.order_id === orderId);
     setSourceOrderId(sourceOrder?.order_id ?? null);
-    setListed(detail.account.status === "VOID" ? [] : detail.orders.flatMap((order) => activeConsignmentListings(order).map((item) => ({
+    setListed(detail.account.status === "VOID" || !sourceOrder ? [] : activeConsignmentListings(sourceOrder).map((item) => ({
       key: item.eventId ?? item.orderId,
       platform: item.platform,
       price: item.price,
       listedAt: item.listedAt,
-    }))));
+    })));
   };
 
   useEffect(() => {
@@ -50,8 +47,9 @@ export function InventoryConsignmentModal(props: {
     setError(null);
     setSourceOrderId(props.orderId ?? props.account?.source_order_id ?? null);
     form.setFieldsValue({ listed_at: dayjs().second(0).millisecond(0) });
-    if (props.account) void refreshListed(props.account.id).catch((cause) => setError(normalizeError(cause)));
-  }, [form, open, props.account]);
+    const orderId = props.orderId ?? props.account?.source_order_id;
+    if (orderId != null) void refreshListed(orderId).catch((cause) => setError(normalizeError(cause)));
+  }, [form, open, props.account, props.orderId]);
 
   const submit = async (values: { platform?: string; consignment_price?: number | null; listed_at?: Dayjs; form_extra?: Record<string, unknown> }) => {
     if (!props.account) return;
@@ -79,7 +77,7 @@ export function InventoryConsignmentModal(props: {
       });
       appMessage.success(`${values.platform} 已上架，账号仍保持在库`);
       form.setFieldsValue({ platform: undefined, consignment_price: null, listed_at: dayjs().second(0).millisecond(0) });
-      await refreshListed(props.account.id);
+      await refreshListed(sourceOrderId);
       await props.onCreated();
     } catch (cause) {
       setError(normalizeError(cause));

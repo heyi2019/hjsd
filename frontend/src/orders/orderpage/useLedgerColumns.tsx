@@ -17,7 +17,7 @@ import { formatOrderAmount } from "./helpers";
 export function useLedgerColumns(params: {
   canDeleteOrder: boolean;
   ledgerDetails: Record<number, AccountExecutionDetail>;
-  loadLedgerDetail: (accountId: number, force?: boolean) => Promise<void>;
+  loadLedgerDetail: (order: Pick<Order, "id" | "account_id">, force?: boolean) => Promise<void>;
   openLedgerEditor: (order: Order) => void;
   openAllocations: (order: Order) => void;
   openRefund: (order: Order) => void;
@@ -125,7 +125,7 @@ export function useLedgerColumns(params: {
               trigger={["click"]}
               placement="bottomLeft"
               onOpenChange={(open) => {
-                if (open && order.account_id) void loadLedgerDetail(order.account_id);
+                if (open && order.account_id) void loadLedgerDetail(order);
               }}
               menu={{
                 className: "orders-ledger-operation-menu",

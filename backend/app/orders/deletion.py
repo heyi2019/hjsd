@@ -55,10 +55,9 @@ def delete_order(
 ) -> None:
     """删除绑定业务及其全部从属数据，并同步删除绑定库存。
 
-    订单删除会清理事件、资金流水、分润、分期、返点、押金、订单关系和导入映射。
-    若历史数据仍有多张订单挂在同一库存，删除其中任一张订单时也继续清理
-    该库存下的剩余业务，最终清理库存，不留下库存编号或订单编号孤儿记录。
-    库存服务回调本函数时关闭反向分支，由库存服务统一清理库存主档。
+    订单删除会清理事件、资金流水、分润、分期、返点、押金、订单关系和导入映射，
+    并同步删除一对一绑定的库存，不留下库存编号或订单编号孤儿记录。
+    从库存入口删除时关闭库存主档删除，由库存服务在订单删除后清理主档。
     """
     order = get_order(session, order_id, user)
     cleaned_reason = _clean_reason(reason)
@@ -81,15 +80,16 @@ def delete_order(
     )
 
     if inventory_id is not None and delete_inventory_after:
-        # 延迟导入避免 orders.deletion 与 stocks.deletion 的模块级循环依赖。
-        from app.stocks.deletion import delete_inventory
+        # 延迟导入避免模块级循环依赖；订单已删，直接删除库存主档，不再反向查订单。
+        from app.stocks.deletion import delete_inventory_record
 
-        delete_inventory(
+        delete_inventory_record(
             session,
             inventory_id,
             actor=actor,
             reason=f"随订单 {order_no} 删除：{cleaned_reason}",
             user=user,
+            deleted_order=(order_id, order_no),
         )
 
 

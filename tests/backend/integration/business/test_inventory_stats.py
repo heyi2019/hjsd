@@ -15,8 +15,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from app.domain.trade import Account
-from app.stocks.inventory import inventory_age_days, inventory_stats
+from app.stocks.inventory import inventory_stats
 from app.stocks.profile import create_account
 
 
@@ -76,27 +75,6 @@ def test_age_buckets_are_strictly_greater_than_7_and_30_days(seeded_db):
     # 第 7 天不算「超 7 天」；第 8 天算超 7 不算超 30；第 31 天两档都算。
     assert stats["over_7d_count"] == 2
     assert stats["over_30d_count"] == 1
-
-
-def test_age_falls_back_to_buy_date_when_entry_missing():
-    """stocks.inventory_entry_at 是 NOT NULL，回退分支只在模型层守：
-
-    历史客户端/导入数据可能只带 buy_date，库龄不能因此变成空值。
-    """
-    legacy = Account(
-        game_account="stats-age-legacy",
-        business_mode="SELF",
-        inventory_type="RECOVERY",
-        status="WAITING",
-        inventory_status="IN_STOCK",
-        cost_amount=Decimal("50.00"),
-        buy_date=date.today() - timedelta(days=10),
-        created_by="pytest",
-        updated_by="pytest",
-    )
-
-    assert inventory_age_days(legacy) == 10
-    assert inventory_age_days(legacy, today=date.today() + timedelta(days=21)) == 31
 
 
 def test_unknown_ids_are_ignored_instead_of_failing(seeded_db):

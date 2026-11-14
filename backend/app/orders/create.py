@@ -216,6 +216,18 @@ def create_order(
             definition.code,
             account,
         )
+        bound_order = session.execute(
+            select(Order.id, Order.order_no).where(Order.account_id == account_id)
+        ).one_or_none()
+        if bound_order is not None:
+            raise Validation(
+                "库存账号已绑定订单，不能重复建单",
+                details={
+                    "account_id": account_id,
+                    "bound_order_id": bound_order.id,
+                    "bound_order_no": bound_order.order_no,
+                },
+            )
 
     _validate_participant_roles(
         definition.code, customer_roles, counterparty_roles
@@ -310,8 +322,7 @@ def create_order(
             confirm_repurchase=confirm_repurchase,
         )
 
-    # 内联建库存账号（2026-10-28 口径）：建单成功即生成库存编号，不再等 BUY 事件。
-    # HS/TH/DG 内联建库必须有账号快照；已有 account_id 的订单直接引用库存账号。
+    # 内联建库存账号：建单成功即生成库存编号，不再等 BUY 事件。
     if definition.code in {"HS", "TH"} and account_id is None and game_account:
         account_id = _create_inline_inventory_account(
             session, order_type=definition.code, game_account=game_account, actor=actor,

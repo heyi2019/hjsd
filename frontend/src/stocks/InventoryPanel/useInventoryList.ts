@@ -14,19 +14,8 @@ import { filterInventoryRows } from "./helpers";
 import { inventoryTypeOfOrder, mergeInventoryAccount, type InventoryOrderRow } from "./types";
 
 function findInventoryOrder(account: Account, candidates: Order[]): Order | null {
-  const bySourceId = account.source_order_id == null
-    ? undefined
-    : candidates.find((order) => order.id === account.source_order_id);
-  if (bySourceId) return bySourceId;
-
-  const byStockNo = account.stock_no
-    ? candidates.filter((order) => order.stock_no === account.stock_no)
-    : [];
-  if (byStockNo.length === 1) return byStockNo[0];
-
-  // 只有账号与一张待售订单存在明确的一对一关系时才允许回落；
-  // 同账号多单且没有来源键时宁可不展示，也不能把库存编号错挂到第一张订单。
-  return candidates.length === 1 ? candidates[0] : null;
+  if (account.source_order_id == null) return null;
+  return candidates.find((order) => order.id === account.source_order_id) ?? null;
 }
 
 function toInventoryOrderRows(accounts: Account[], orders: Order[]): InventoryOrderRow[] {
@@ -138,7 +127,7 @@ const INVENTORY_STATS_DEBOUNCE_MS = 200;
     try {
       const detailResults = await Promise.all(visibleRows.map(async (row) => {
         try {
-          return [row.account.id, await stocksApi.executionDetail(row.account.id)] as const;
+          return [row.account.id, await ordersApi.executionDetail(row.id)] as const;
         } catch {
           return [row.account.id, undefined] as const;
         }

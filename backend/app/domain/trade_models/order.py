@@ -49,6 +49,9 @@ class Order(Base, AuditMixin):
         Index("ix_orders_owner_id", "owner_id"),
         Index("ix_orders_policy_version_id", "policy_version_id"),
         Index("ix_orders_account_id", "account_id"),
+        # 订单号与库存编号是一一对应：一个库存账号只能作为一个订单的账号主档。
+        # 多个 NULL 仍允许（不含账号资料的非库存类订单）。
+        UniqueConstraint("account_id", name="uq_orders_account_id"),
         CheckConstraint(
             f"status IN {OrderStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="order_status_valid",

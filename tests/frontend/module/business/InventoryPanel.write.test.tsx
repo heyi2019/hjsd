@@ -34,7 +34,7 @@ vi.mock("@/shared/api/stocks.api");;
 
 const accounts = [
   { id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },
-  { id: 2, source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
+  { id: 2, source_order_id: 22, source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
 ];
 
 beforeEach(() => {
@@ -164,6 +164,16 @@ beforeEach(() => {
         operator: "admin",
         note: "回收登记",
         cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", nature: "BUSINESS_OUT", category: "BUY", amount: "100.00" },
+      }, {
+        id: 33,
+        event_no: "EV0003",
+        event_type: "SELL",
+        amount: "350.00",
+        occurred_on: "2026-10-16",
+        occurred_at: "2026-10-16T16:45:00",
+        portion: "PROFIT",
+        is_posted: true,
+        operator: "admin",
       }],
     }],
   } as never);
@@ -229,7 +239,7 @@ describe("InventoryPanel：写入与长路径", () => {
 
     await waitFor(() => expect(vi.mocked(rebatesApi.create)).toHaveBeenCalled());
     expect(vi.mocked(rebatesApi.create).mock.calls[0][0]).toMatchObject({
-      source_order_id: 23,
+      source_order_id: 21,
       rebate_type: "SELL",
       base_amount: "350.00",
       channel: "卖号返点",
@@ -274,7 +284,7 @@ describe("InventoryPanel：写入与长路径", () => {
   });
 
   it("提号分销已登记 BUY 后可登记买号返点", async () => {
-    resolveMock(vi.mocked(stocksApi.executionDetail), {
+    resolveMock(vi.mocked(ordersApi.executionDetail), {
       account: accounts[1],
       orders: [{
         order_id: 22, order_no: "TH0002", order_type: "TH", trade_date: "2026-10-15", created_at: "2026-10-15T10:19:00", status: "ACTIVE",
@@ -289,6 +299,7 @@ describe("InventoryPanel：写入与长路径", () => {
 describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () => {
   const consignAccount = {
     id: 1,
+    source_order_id: 22,
     source_order_no: "DG-2026-0003",
     game_account: "acc-3",
     game_type: "手游",
@@ -303,7 +314,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
   }
 
   it("原订单寄售事件的已上架记录展示平台名", async () => {
-    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: { id: 1, status: "IN_STOCK" },
       orders: [
         {
@@ -316,7 +327,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
             id: 901,
             event_type: "OPERATE",
             operation_type: "CONSIGNMENT",
-            form_extra: { consignment_platform: "盼之", listed_at: "2026-10-12T09:10:00" },
+            form_extra: { consignment_platforms: ["盼之"], listed_at: "2026-10-12T09:10:00" },
           }],
         },
       ],
@@ -328,7 +339,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
   });
 
   it("寄售平台从原订单寄售事件读取", async () => {
-    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: { id: 1, status: "IN_STOCK" },
       orders: [
         {
@@ -341,7 +352,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
             id: 902,
             event_type: "OPERATE",
             operation_type: "CONSIGNMENT",
-            form_extra: { consignment_platform: "寄售平台A", listed_at: "2026-10-12T09:10:00" },
+            form_extra: { consignment_platforms: ["寄售平台A"], listed_at: "2026-10-12T09:10:00" },
           }],
         },
       ],
@@ -353,7 +364,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
   });
 
   it("账号处于 VOID 时，已上架记录为空且无旧平台残留", async () => {
-    vi.mocked(stocksApi.executionDetail).mockResolvedValue({
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: { id: 1, status: "VOID" },
       orders: [
         {

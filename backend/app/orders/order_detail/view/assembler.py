@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..schemas import AccountExecutionOrderOut
+from app.stocks.schemas import AccountExecutionOrderOut
 
 
 def build_order_outputs(

@@ -121,11 +121,8 @@ def inventory_stats(
 
 
 def inventory_age_days(row: Account, *, today: date | None = None) -> int | None:
-    """库龄（自然日）：入库存时间优先，旧数据回退买入日/建档时间。
-
-    计算口径在 `_common`（与响应字段共用），此处只负责挑出「用哪个时间」。
-    """
-    return age_days(row.inventory_entry_at or row.buy_date or row.created_at, today=today)
+    """库龄（自然日）只以入库存时间为准。"""
+    return age_days(row.inventory_entry_at, today=today)
 
 
 def _inventory_rows(session: Session, *, user: CurrentUser | None = None) -> list[Account]:

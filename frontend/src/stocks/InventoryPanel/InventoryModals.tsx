@@ -3,7 +3,6 @@ import { money, today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { ordersApi } from "../../shared/api/orders.api";
-import { stocksApi } from "../../shared/api/stocks.api";
 import { InventoryCancellationDialog } from "../InventoryCancellationDialog";
 import { InventoryDeleteDialog } from "./InventoryDeleteDialog";
 import { InventoryConsignmentModal, InventoryPlatformOffsaleModal, InventoryProfileModal, unlistAndCancelConsignmentOrders } from "../operations";
@@ -71,7 +70,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         const onCreated = async () => {
           const account = saleTarget;
           setSaleTarget(null);
-          if (account) removeFromInventory(account.id, account.source_order_id ?? account.id);
+          if (account) removeFromInventory(account.id, account.source_order_id ?? undefined);
           await load();
           if (account) controller.dropExecutionCache(account.id);
           onOrdersChanged?.();
@@ -158,12 +157,12 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           }
         }}
         onChanged={async () => {
-          const accountId = platformOffsaleTarget?.account.id;
+          const account = platformOffsaleTarget?.account;
           setPlatformOffsaleTarget(null);
-          if (!accountId) return;
+          if (!account?.source_order_id) return;
           await load();
-          const detail = await stocksApi.executionDetail(accountId);
-          setExecutionDetails((current) => ({ ...current, [accountId]: detail }));
+          const detail = await ordersApi.executionDetail(account.source_order_id);
+          setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
           onOrdersChanged?.();
         }}
       />
@@ -211,12 +210,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         onError={(error) => controller.setError(normalizeError(error))}
         onOperation={async (operationType) => {
           const account = profileTarget?.account;
-          let orderId = profileTarget?.orderId ?? account?.source_order_id;
-          if (!orderId && account) {
-            const detail = await stocksApi.executionDetail(account.id);
-            orderId = detail.orders.find((order) => order.order_type !== "DG")?.order_id
-              ?? detail.orders[0]?.order_id;
-          }
+          const orderId = profileTarget?.orderId ?? account?.source_order_id;
           if (!orderId) throw new Error("账号没有可关联的来源订单，无法登记运营事件");
           await ordersApi.postEvent(orderId, {
             event_type: "OPERATE",

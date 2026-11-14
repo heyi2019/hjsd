@@ -42,6 +42,14 @@ export interface OrderPatchPayload {
   } | null;
 }
 
+export type OrderExecutionEditPayload = {
+  profile: object;
+  events: { id: number; expected_amount: string; amount: string; note: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }[];
+  cashflows?: { flow_no: string; occurred_at?: string; note?: string | null; operator?: string }[];
+  orders?: { order_id: number; occurred_at?: string; operator?: string; note?: string | null; form_extra?: Record<string, unknown> }[];
+  parties?: { order_id: number; entity_type: "customer" | "counterparty"; entity_id: number; role: string }[];
+};
+
 export const ordersApi = {
   // 自动翻页取全量：后端 GET /orders 默认 limit=100、max=500，调用方不传 limit 时
   // 只会取到前 100 单，导致订单列表/聚合缺失数据（dev 库 627 单只取 100 的数据完整性缺口）。
@@ -82,6 +90,8 @@ export const ordersApi = {
     api.get<Order>(`/orders/${orderId}`).then((r) => r.data),
   executionDetail: (orderId: number) =>
     api.get<AccountExecutionDetail>(`/orders/${orderId}/execution-detail`).then((r) => r.data),
+  updateExecution: (orderId: number, payload: OrderExecutionEditPayload) =>
+    api.patch<{ ok: boolean }>(`/orders/${orderId}/execution-edit`, payload).then((r) => r.data),
   links: (orderId: number) =>
     api.get<OrderLink[]>(`/orders/${orderId}/links`).then((r) => r.data),
   createLink: (
@@ -194,8 +204,6 @@ export const ordersApi = {
   /** 订单编辑（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
   patch: (orderId: number, payload: OrderPatchPayload) =>
     api.patch<Order>(`/orders/${orderId}`, payload).then((r) => r.data),
-  materializeAccount: (orderId: number) =>
-    api.post<Order>(`/orders/${orderId}/materialize-account`).then((r) => r.data),
 };
 
 export const orderFormFieldsApi = {

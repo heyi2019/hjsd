@@ -42,7 +42,7 @@ export function useOrdersPageController(params: {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // —— 表格详情 / 账号内联编辑枢纽 ——
-  const inlineEdit = useLedgerInlineEdit({ setOrders });
+  const inlineEdit = useLedgerInlineEdit();
   const { loadLedgerDetail, openLedgerEditor } = inlineEdit;
 
   // —— 冲销 / 取消域：分笔冲销、原路退款、分期合约取消 ——

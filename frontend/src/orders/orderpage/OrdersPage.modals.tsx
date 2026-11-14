@@ -41,9 +41,11 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
         target={controller.profileTarget}
         onClose={() => controller.setProfileTarget(null)}
         onSaved={(updated) => {
-          const accountId = controller.profileTarget?.account.id ?? updated.id;
+          const orderId = controller.profileTarget?.orderId ?? updated.source_order_id;
           controller.setProfileTarget(null);
-          void controller.loadLedgerDetail(accountId, true);
+          if (orderId != null) {
+            void controller.loadLedgerDetail({ id: orderId, account_id: updated.id }, true);
+          }
           void controller.load();
         }}
         onError={(error) => appMessage.error(normalizeError(error).message)}

@@ -42,8 +42,8 @@ export interface InventorySaleModalProps {
   account: Account | null;
   onClose: () => void;
   onCreated: () => void | Promise<void>;
-  /** 固定货源类型（RECOVERY/PICKUP/CONSIGNMENT），用于锁定标题与买家角色；缺省时从 account.inventory_type 推断（兼容旧调用）。 */
-  inventoryType?: SaleInventoryType;
+  /** 固定货源类型（RECOVERY/PICKUP/CONSIGNMENT），由三个业务入口显式注入。 */
+  inventoryType: SaleInventoryType;
   /** 弹窗标题，按货源类型差异化。 */
   title?: string;
   /** 买家信息区标题，按货源类型差异化（代挂为委托方信息）。 */
@@ -58,7 +58,7 @@ type SaleWrapperProps = Pick<InventorySaleModalProps, "account" | "onClose" | "o
  */
 export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const { account, inventoryType, title = "售出账号", buyerInfoTitle = "买家信息" } = props;
-  const resolvedType = inventoryType ?? account?.inventory_type;
+  const resolvedType = inventoryType;
   const isConsignment = resolvedType === "CONSIGNMENT";
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);

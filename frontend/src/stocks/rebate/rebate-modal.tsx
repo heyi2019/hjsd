@@ -3,8 +3,8 @@ import { configurableLabel } from "../../shared/lib/optionSets";
 import { Form, Input, Radio, Space, Spin, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { employeesApi } from "../../shared/api/org.api";
+import { ordersApi } from "../../shared/api/orders.api";
 import { rebatesApi } from "../../shared/api/rebates.api";
-import { stocksApi } from "../../shared/api/stocks.api";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
 import type { Rebate } from "../../shared/api/types/finance";
@@ -25,20 +25,15 @@ const REBATE_KIND_LABEL: Record<RebateKind, string> = {
   SELL: "卖号返点（对应售出）",
 };
 
-function sourceOrder(detail: AccountExecutionDetail | null, kind: RebateKind) {
-  if (kind === "BUY") {
-    return detail?.orders.find((order) =>
-      ["HS", "TH"].includes(order.order_type),
-    );
-  }
-  const sellOrder = detail?.orders.find((order) => order.events.some((event) =>
-    event.event_type === "SELL",
-  ));
-  return sellOrder ?? detail?.orders.find((order) => ["HS", "TH", "DG"].includes(order.order_type));
+function sourceOrder(detail: AccountExecutionDetail | null, sourceOrderId: number | null | undefined, kind: RebateKind) {
+  const order = detail?.orders.find((item) => item.order_id === sourceOrderId);
+  if (!order) return undefined;
+  if (kind === "BUY") return ["HS", "TH"].includes(order.order_type) ? order : undefined;
+  return order.events.some((event) => event.event_type === "SELL") ? order : undefined;
 }
 
-function defaultBaseAmount(detail: AccountExecutionDetail | null, kind: RebateKind): string {
-  const order = sourceOrder(detail, kind);
+function defaultBaseAmount(detail: AccountExecutionDetail | null, sourceOrderId: number | null | undefined, kind: RebateKind): string {
+  const order = sourceOrder(detail, sourceOrderId, kind);
   const eventType = kind === "BUY" ? "BUY" : "SELL";
   return order?.events.find((event) => event.event_type === eventType)?.amount ?? "0";
 }
@@ -62,22 +57,23 @@ export function InventoryRebateModal(props: {
 
   useEffect(() => {
     if (!open || !props.account) return;
+    const sourceOrderId = props.account.source_order_id;
+    if (sourceOrderId == null) {
+      setError({ message: "当前账号没有绑定来源订单，无法登记返点" });
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setError(null);
-    void stocksApi.executionDetail(props.account.id)
+    void ordersApi.executionDetail(sourceOrderId)
       .then(async (value) => {
         if (cancelled) return;
         setDetail(value);
-        const orderIds = [...new Set(value.orders.map((order) => order.order_id))];
-        const rebateLists = await Promise.all(orderIds.map((orderId) => rebatesApi.list({ source_order_id: orderId })));
-        const uniqueRebates = new Map<number, Rebate>();
-        for (const rebate of rebateLists.flat()) uniqueRebates.set(rebate.id, rebate);
-        setRebates([...uniqueRebates.values()]);
-        const firstKind: RebateKind | undefined = sourceOrder(value, "BUY") ? "BUY" : sourceOrder(value, "SELL") ? "SELL" : undefined;
+        setRebates(await rebatesApi.list({ source_order_id: sourceOrderId }));
+        const firstKind: RebateKind | undefined = sourceOrder(value, sourceOrderId, "BUY") ? "BUY" : sourceOrder(value, sourceOrderId, "SELL") ? "SELL" : undefined;
         form.setFieldsValue({
           rebate_type: firstKind,
-          base_amount: firstKind ? defaultBaseAmount(value, firstKind) : "0",
+          base_amount: firstKind ? defaultBaseAmount(value, sourceOrderId, firstKind) : "0",
           collected_on: today(),
         });
       })
@@ -100,14 +96,14 @@ export function InventoryRebateModal(props: {
   }, [open]);
 
   const availableKinds = useMemo(
-    () => (["BUY", "SELL"] as RebateKind[]).filter((kind) => sourceOrder(detail, kind)),
-    [detail],
+    () => (["BUY", "SELL"] as RebateKind[]).filter((kind) => sourceOrder(detail, props.account?.source_order_id, kind)),
+    [detail, props.account?.source_order_id],
   );
 
   const submit = async (values: { rebate_type?: RebateKind; base_amount?: string; rate?: string; collected_on?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     if (!props.account) return;
     const kind = values.rebate_type;
-    const order = kind ? sourceOrder(detail, kind) : undefined;
+    const order = kind ? sourceOrder(detail, props.account.source_order_id, kind) : undefined;
     if (!kind || !order) return;
     setSubmitting(true);
     try {
@@ -194,7 +190,7 @@ export function InventoryRebateModal(props: {
                   const kind = event.target.value as RebateKind;
                   form.setFieldsValue({
                     rebate_type: kind,
-                    base_amount: defaultBaseAmount(detail, kind),
+                    base_amount: defaultBaseAmount(detail, props.account?.source_order_id, kind),
                   });
                 }}
               >

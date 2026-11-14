@@ -29,7 +29,7 @@ from app.domain.enums import (
     RebateType,
     SaleMode,
 )
-from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, OrderProfitAllocation
+from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.domain.users import User
 from app.finance.attributes import accounting_attribute_for_order_event
 from app.orders.form_fields import validate_form_extra
@@ -94,7 +94,7 @@ def post_event(
     allow_installment_delivery: bool = False,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
-    from ._shared import _create_inline_inventory_account, get_order
+    from ._shared import get_order
 
     allow_installment_delivery = _required_bool(
         allow_installment_delivery, field="allow_installment_delivery"
@@ -223,29 +223,6 @@ def post_event(
             details={"order_no": order.order_no, "current_status": order.status},
         )
 
-    # HS/TH BUY：订单未关联库存账号时用建单快照里的账号资料补建（正常流程建单时
-    # 已建号，此处是 API 直调/异常数据的兜底；游戏账号必填是建号前提）。
-    # 2026-10-28 去冗余：平铺列已删除，账号资料统一从 account_snapshot 读取。
-    _buy_snapshot = order.account_snapshot or {}
-    if (
-        order.order_type in {"HS", "TH"}
-        and event_type == EventType.BUY.value
-        and order.account_id is None
-        and _buy_snapshot.get("game_account")
-    ):
-        account = _create_inline_inventory_account(
-            session, order_type=order.order_type,
-            game_account=_buy_snapshot["game_account"], actor=actor,
-            game_type=_buy_snapshot.get("game_type"),
-            game_password=_buy_snapshot.get("game_password"),
-            channel_region=_buy_snapshot.get("channel_region"),
-            bound_phone=_buy_snapshot.get("bound_phone"),
-            has_secondary=_buy_snapshot.get("has_secondary"),
-            account_note=_buy_snapshot.get("note"),
-            extra_values=_buy_snapshot.get("extra_values"),
-        )
-        order.account_id = account.id
-
     _assert_event_allowed(
         session,
         order,
@@ -357,22 +334,11 @@ def post_event(
     if event_type == EventType.SELL.value and (normalized_bound_phone is not None or normalized_bound_phone_owner is not None):
         account = session.get(Account, order.account_id) if order.account_id is not None else None
         snapshot = dict(order.account_snapshot or {})
-        if not snapshot.get("game_account") and account is not None and account.game_account:
-            snapshot.update({
-                "game_account": account.game_account,
-                "game_type": account.game_type,
-                "game_password": account.game_password,
-                "channel_region": account.channel_region,
-                "has_secondary": account.has_secondary,
-                "platform": account.platform,
-                "note": account.note,
-            })
         if normalized_bound_phone is not None:
             snapshot["bound_phone"] = normalized_bound_phone
         if normalized_bound_phone_owner is not None:
             snapshot["bound_phone_owner"] = normalized_bound_phone_owner
-        if snapshot.get("game_account"):
-            order.account_snapshot = snapshot
+        order.account_snapshot = snapshot or None
         if account is not None and normalized_bound_phone is not None:
             account.bound_phone = normalized_bound_phone
             account.updated_by = actor
@@ -480,23 +446,6 @@ def post_event(
             ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单"
         )
     session.flush()
-
-    # BUY/SELL 收益人的绑定统一由 policy.profit_allocation.service.set_allocations 负责
-    # （单一执行人自动绑定、多人协作按人分行、且必须是动作执行人）。
-    # 事件登记阶段只做历史兜底：该动作类型恰好只有一行且尚未绑定人员时回填
-    # 当前执行人；多行分润一律不碰，避免把每个人的独立分润抹成同一个人。
-    if event_type in {EventType.BUY.value, EventType.SELL.value}:
-        actor_id = session.scalar(select(User.id).where(User.username == actor))
-        if actor_id is not None:
-            allocations = session.scalars(
-                select(OrderProfitAllocation).where(
-                    OrderProfitAllocation.order_id == order.id,
-                    OrderProfitAllocation.allocation_type == event_type,
-                )
-            ).all()
-            if len(allocations) == 1 and allocations[0].user_id is None:
-                allocations[0].user_id = actor_id
-                allocations[0].updated_by = actor
 
     # 售出闭环通知（用户 11-12 裁决）：该单已有分润行（先分润后卖号）→ 直接通知
     # 利润接收人；否则提醒本次 SELL 执行人去配置分润。两段都靠 ensure_notification

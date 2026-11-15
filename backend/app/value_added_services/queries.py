@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import date
 from decimal import Decimal
 
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.money import to_money
 from app.core.security import CurrentUser, owner_scope_filter
-from app.domain.trade import Installment, Order
+from app.domain.trade import Installment, InstallmentDisposition, InstallmentSchedule, Order
 
 
 def _apply_installment_filters(
@@ -70,6 +71,42 @@ def list_installments(
         user=user,
     )
     return list(session.scalars(stmt.order_by(Installment.id)).all())
+
+
+def list_installment_export_details(
+    session: Session,
+    installment_ids: list[int],
+) -> tuple[
+    dict[int, list[InstallmentSchedule]],
+    dict[int, list[InstallmentDisposition]],
+]:
+    """批量读取导出所需的期次和处置明细，避免按合约逐条查询。"""
+    if not installment_ids:
+        return {}, {}
+
+    schedules_by_installment: dict[int, list[InstallmentSchedule]] = defaultdict(list)
+    schedules = session.scalars(
+        select(InstallmentSchedule)
+        .where(InstallmentSchedule.installment_id.in_(installment_ids))
+        .order_by(InstallmentSchedule.installment_id, InstallmentSchedule.period_no)
+    ).all()
+    for schedule in schedules:
+        schedules_by_installment[schedule.installment_id].append(schedule)
+
+    dispositions_by_installment: dict[int, list[InstallmentDisposition]] = defaultdict(list)
+    dispositions = session.scalars(
+        select(InstallmentDisposition)
+        .where(InstallmentDisposition.installment_id.in_(installment_ids))
+        .order_by(
+            InstallmentDisposition.installment_id,
+            InstallmentDisposition.occurred_on,
+            InstallmentDisposition.id,
+        )
+    ).all()
+    for disposition in dispositions:
+        dispositions_by_installment[disposition.installment_id].append(disposition)
+
+    return dict(schedules_by_installment), dict(dispositions_by_installment)
 
 
 def installment_totals(

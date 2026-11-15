@@ -1,20 +1,13 @@
-"""core.security：认证、角色权限点、权限依赖（BAS-05-01）。
+"""core.security：认证会话、角色权限点、权限依赖（BAS-05-01）。
 
 两级授权：**角色权限 + 数据范围**（权限矩阵 §1）。接口必须二次鉴权，
 前端隐藏菜单不构成权限控制。查看者直接调用写接口返回 `403 PERMISSION_DENIED`。
 
-JWT 用标准库（hmac/hashlib）实现 HS256，避免为 MVP 引入额外依赖。
+JWT 和密码摘要实现位于 `core.tokens`；本模块负责登录态与授权范围。
 开发/测试环境允许 `X-Dev-User` 直通，生产环境一律拒绝。
 """
 from __future__ import annotations
 
-import base64
-import hashlib
-import hmac
-import json
-import time
-import os
-import uuid
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Sequence
 
@@ -22,9 +15,19 @@ from fastapi import Depends, Header
 from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.orm import Session
 
-from app.core.errors import AuthError, PermissionDenied, TokenExpired
 from app.core.database import get_db
+from app.core.errors import AuthError, PermissionDenied
 from app.core.settings import Settings, get_settings
+from app.core.tokens import (
+    _b64url_decode,
+    _b64url_encode,
+    _sign,
+    build_access_token,
+    decode_token,
+    encode_token,
+    hash_password,
+    verify_password,
+)
 from app.domain.users import RevokedToken, User
 
 # ------------------------------------------------------------------ 角色与权限点
@@ -238,112 +241,6 @@ def owner_scope_filter(column: ColumnElement, user: CurrentUser, session: Any | 
     if ids is None and (user.is_admin or user.owner_scope == "ALL"):
         return None
     return column.in_(ids or {user.id})
-
-
-# ------------------------------------------------------------------ JWT（stdlib）
-def _b64url_encode(raw: bytes) -> str:
-    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
-
-
-def _b64url_decode(data: str) -> bytes:
-    padding = "=" * (-len(data) % 4)
-    return base64.urlsafe_b64decode(data + padding)
-
-
-def _sign(signing_input: str, secret: str) -> str:
-    digest = hmac.new(secret.encode("utf-8"), signing_input.encode("utf-8"), hashlib.sha256)
-    return _b64url_encode(digest.digest())
-
-
-def encode_token(
-    payload: dict[str, Any],
-    *,
-    expires_minutes: int | None = None,
-    settings: Settings | None = None,
-) -> str:
-    """签发 HS256 JWT。
-
-    `expires_minutes` <= 0 会生成已过期 token，供过期链路测试使用。
-    """
-    settings = settings or get_settings()
-    issued_at = int(time.time())
-    ttl = int(settings.access_token_expire_minutes) if expires_minutes is None else int(expires_minutes)
-    body = {**payload, "iat": issued_at, "exp": issued_at + ttl * 60}
-    header = {"alg": settings.jwt_algorithm, "typ": "JWT"}
-    signing_input = ".".join(
-        [
-            _b64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8")),
-            _b64url_encode(json.dumps(body, separators=(",", ":")).encode("utf-8")),
-        ]
-    )
-    return f"{signing_input}.{_sign(signing_input, settings.jwt_secret_key)}"
-
-
-def decode_token(token: str, *, settings: Settings | None = None) -> dict[str, Any]:
-    """校验签名与有效期；失败抛 401（`AUTH_REQUIRED` / `TOKEN_EXPIRED`）。"""
-    settings = settings or get_settings()
-    parts = token.split(".")
-    if len(parts) != 3:
-        raise AuthError("登录凭证格式无效")
-    signing_input = f"{parts[0]}.{parts[1]}"
-    expected = _sign(signing_input, settings.jwt_secret_key)
-    if not hmac.compare_digest(expected, parts[2]):
-        raise AuthError("登录凭证校验失败")
-    try:
-        header = json.loads(_b64url_decode(parts[0]))
-        payload = json.loads(_b64url_decode(parts[1]))
-    except (ValueError, TypeError) as error:
-        raise AuthError("登录凭证无法解析") from error
-    if not isinstance(header, dict) or not isinstance(payload, dict):
-        raise AuthError("登录凭证内容无效")
-    if header.get("alg") != settings.jwt_algorithm:
-        raise AuthError("登录凭证算法不被接受")
-    try:
-        expires_at = int(payload.get("exp", 0))
-    except (TypeError, ValueError) as error:
-        raise AuthError("登录凭证内容无效") from error
-    if expires_at < int(time.time()):
-        raise TokenExpired("登录已过期，请重新登录")
-    return payload
-
-
-def hash_password(password: str) -> str:
-    """Hash a password with PBKDF2; the stored value contains its salt."""
-    if len(password) < 8:
-        raise ValueError("密码至少需要 8 位")
-    salt = os.urandom(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 240_000)
-    return f"pbkdf2_sha256$240000${_b64url_encode(salt)}${_b64url_encode(digest)}"
-
-
-def verify_password(password: str, encoded: str) -> bool:
-    try:
-        scheme, rounds, salt, digest = encoded.split("$", 3)
-        if scheme != "pbkdf2_sha256":
-            return False
-        candidate = hashlib.pbkdf2_hmac(
-            "sha256", password.encode(), _b64url_decode(salt), int(rounds)
-        )
-        return hmac.compare_digest(candidate, _b64url_decode(digest))
-    except (ValueError, TypeError):
-        return False
-
-
-def build_access_token(user: "CurrentUser", *, settings: Settings | None = None) -> str:
-    """把 CurrentUser 的关键信息打包进 token（不写入手机号等敏感资料）。"""
-    return encode_token(
-        {
-            "sub": str(user.id),
-            "jti": uuid.uuid4().hex,
-            "username": user.username,
-            "roles": list(user.roles),
-            "pool_ids": sorted(user.pool_ids),
-            "team_ids": sorted(user.team_ids),
-            "owner_scope": user.owner_scope,
-            "amr": user.auth_method,
-        },
-        settings=settings,
-    )
 
 
 def user_from_payload(payload: dict[str, Any]) -> CurrentUser:

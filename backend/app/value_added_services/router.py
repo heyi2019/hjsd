@@ -4,7 +4,6 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -19,7 +18,6 @@ from app.core.security import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
-from app.domain.trade import InstallmentSchedule
 from app.value_added_services import schemas
 from app.value_added_services import _shared as inst__shared
 from app.value_added_services import create as inst_create
@@ -136,16 +134,16 @@ def export_installments_csv(
     )
     rows = [output.model_dump(mode="json") for output in outputs]
     value_labels = list_columns_service.get_value_labels(db, "INSTALLMENT")
+    export_details = inst_queries.list_installment_export_details(
+        db, [output.id for output in outputs]
+    )
+    schedules_by_installment, dispositions_by_installment = export_details
     for row, output in zip(rows, outputs, strict=True):
         # 列表列注册表里「剩余」的列 key 是 remaining，而字段名是 remaining_receivable；
         # 不补这一行别名，导出那列会整列空掉（页面上却是后端算好的值）。
         row["remaining"] = row.get("remaining_receivable")
-        schedules = db.scalars(
-            select(InstallmentSchedule)
-            .where(InstallmentSchedule.installment_id == output.id)
-            .order_by(InstallmentSchedule.period_no)
-        ).all()
-        dispositions = inst_recovery.list_dispositions(db, output.id, _user)
+        schedules = schedules_by_installment.get(output.id, [])
+        dispositions = dispositions_by_installment.get(output.id, [])
         row["installment_note"] = row.get("note")
         row["installment_delivery_mode"] = row.get("delivery_mode")
         row["installment_delivered_on"] = row.get("delivered_on")

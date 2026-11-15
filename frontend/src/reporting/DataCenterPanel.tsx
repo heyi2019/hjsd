@@ -26,11 +26,15 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
       const orderParams = range?.params.from || range?.params.to
         ? { trade_date_from: range.params.from, trade_date_to: range.params.to }
         : undefined;
-      setOrderSummary(await ordersApi.summary(orderParams));
       const reportParams = range?.params.from || range?.params.to
         ? { from: range.params.from, to: range.params.to }
         : undefined;
-      setSummary(await reportsApi.dataCenter(reportParams));
+      const [nextOrderSummary, nextSummary] = await Promise.all([
+        ordersApi.summary(orderParams),
+        reportsApi.dataCenter(reportParams),
+      ]);
+      setOrderSummary(nextOrderSummary);
+      setSummary(nextSummary);
       setLoadError(null);
     } catch (error) {
       setLoadError(normalizeError(error));

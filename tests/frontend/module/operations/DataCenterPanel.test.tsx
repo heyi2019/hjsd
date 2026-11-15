@@ -25,6 +25,21 @@ beforeEach(() => {
 });
 
 describe("DataCenterPanel：经营指标", () => {
+  it("并行读取订单摘要和数据中心摘要", async () => {
+    let resolveOrders: (value: { total_count: number; completed_count: number; active_count: number }) => void = () => undefined;
+    let resolveDataCenter: (value: typeof dataCenterSummary) => void = () => undefined;
+    vi.mocked(ordersApi.summary).mockReturnValue(new Promise((resolve) => { resolveOrders = resolve; }));
+    vi.mocked(reportsApi.dataCenter).mockReturnValue(new Promise((resolve) => { resolveDataCenter = resolve; }));
+
+    renderLight(<DataCenterPanel />, { user: "admin" });
+    expect(vi.mocked(ordersApi.summary)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(reportsApi.dataCenter)).toHaveBeenCalledTimes(1);
+
+    resolveOrders({ total_count: 2, completed_count: 1, active_count: 1 });
+    resolveDataCenter(dataCenterSummary);
+    expect(await screen.findByText("售出成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
+  });
+
   it("不重复展示资金中心的余额、押金、资金池数量和资金池明细", async () => {
     renderLight(<DataCenterPanel />, { user: "admin" });
     await screen.findByText("订单总数");

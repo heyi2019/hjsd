@@ -19,7 +19,7 @@ export const rebatesApi = {
     form_extra?: Record<string, unknown>;
   }) =>
     api.post<Rebate>("/rebates", payload).then((r) => r.data),
-  update: (id: number, payload: { amount?: string; rate?: string; collected_on?: string; note?: string | null; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) =>
+  update: (id: number, payload: { amount?: string; collected_on?: string; note?: string | null; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) =>
     api.patch<Rebate>(`/rebates/${id}`, payload).then((r) => r.data),
   /** 返点退回：登记即确认收入不提供作废；退回在来源订单记一笔真实挂单 OUT（REB-01）。 */
   returnRebate: (id: number, payload: { amount: string; returned_on: string; note?: string | null }) =>

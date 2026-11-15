@@ -20,19 +20,16 @@ from app.domain.enums import (
     Nature,
     OrderStatus,
     Portion,
-    PolicyType,
     RebateStatus,
     RebateType,
 )
 from app.domain.trade import Cashflow, OrderEvent, RebateRecord
 from app.domain.users import User
-from app.foundation.order_types import get_order_type_by_code, resolve_default_pool
+from app.foundation.order_types import resolve_default_pool
 from app.orders._shared import get_order
 from app.orders.events import post_event
 from app.orders.form_fields import validate_form_extra
-from app.policy import versions as policy_versions
-
-from ._common import _non_negative, _positive
+from ._common import _positive
 
 # --------------------------------------------------------------------- 返点
 def create_rebate(
@@ -43,7 +40,6 @@ def create_rebate(
     collected_on: date,
     actor: str,
     rebate_type: str | None = None,
-    rate: Any = None,
     channel: str | None = None,
     note: str | None = None,
     operator_user_ids: list[int] | None = None,
@@ -88,37 +84,15 @@ def create_rebate(
     # 不能阻止在订单创建后先登记预计返点。
 
     rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
-    # BAS-06-04：按返点日期固化规则版本，改版不影响历史记录
-    order_type_definition = get_order_type_by_code(
-        session, order.order_type
-    )
-    policy_version_id, snapshot = policy_versions.make_snapshot(
-        session,
-        policy_code=PolicyType.REBATE.value,
-        on=collected_on,
-        scope_type="ORDER_TYPE",
-        scope_id=order_type_definition.id if order_type_definition else None,
-    )
     amount = _positive(amount, field="amount")
-    if rate is None:
-        rate = _rebate_rate_from_snapshot(snapshot, rebate_type)
-    rebate_rate = _non_negative(Decimal("0") if rate is None else rate, field="rate")
-    if rebate_rate > Decimal("100.00"):
-        raise Validation(
-            "返点比例必须在 0% 到 100% 之间",
-            details={"field": "rate", "value": str(rebate_rate)},
-        )
     operator_ids = _validate_operator_user_ids(session, operator_user_ids)
     record = RebateRecord(
         rebate_no=rebate_no,
         source_order_id=order.id,
         rebate_type=rebate_type,
         channel=channel,
-        rate=rebate_rate,
         amount=amount,
         collected_on=collected_on,
-        policy_version_id=policy_version_id,
-        policy_snapshot=snapshot,
         # 返点登记即完成收入确认，不再走后续结算/冲销状态机。
         status=RebateStatus.SETTLED.value,
         note=note,
@@ -204,30 +178,6 @@ def _validate_operator_user_ids(session: Session, operator_user_ids: list[int] |
     return operator_user_ids
 
 
-def _rebate_rate_from_snapshot(
-    snapshot: dict[str, Any] | None, rebate_type: str
-) -> Decimal | None:
-    """从 REBATE 规则快照读取费率；显式传入的 rate 始终优先。"""
-    if not snapshot:
-        return None
-    config = snapshot.get("config")
-    if not isinstance(config, dict):
-        return None
-    rates = config.get("rates")
-    value: Any = rates.get(rebate_type) if isinstance(rates, dict) else None
-    if value is None:
-        value = config.get("rate")
-    if value is None:
-        return None
-    try:
-        return to_money(value)
-    except (TypeError, ValueError, ArithmeticError) as exc:
-        raise Validation(
-            "返点规则中的费率必须是数值",
-            details={"field": "config.rate", "value": value},
-        ) from exc
-
-
 def list_rebates(
     session: Session,
     *,
@@ -275,7 +225,6 @@ def update_rebate(
     *,
     actor: str,
     amount: Any = None,
-    rate: Any = None,
     collected_on: date | None = None,
     note: str | None = None,
     operator_user_ids: list[int] | None = None,
@@ -283,7 +232,7 @@ def update_rebate(
     user: CurrentUser | None = None,
 ) -> RebateRecord:
     record = get_rebate(session, rebate_id, user=user)
-    before = {"amount": str(record.amount), "rate": str(record.rate), "collected_on": str(record.collected_on), "note": record.note}
+    before = {"amount": str(record.amount), "collected_on": str(record.collected_on), "note": record.note}
     if amount is not None:
         new_amount = _positive(amount, field="amount")
         # 护栏：返点金额不得低于累计已退，否则架空 return_rebate 的「累计退回≤金额」铁律。
@@ -294,10 +243,6 @@ def update_rebate(
                 details={"amount": str(new_amount), "already_returned": str(already)},
             )
         record.amount = new_amount
-    if rate is not None:
-        record.rate = _non_negative(rate, field="rate")
-        if record.rate > Decimal("100.00"):
-            raise Validation("返点比例必须在 0% 到 100% 之间", details={"field": "rate"})
     if collected_on is not None:
         record.collected_on = collected_on
     if note is not None:
@@ -320,7 +265,7 @@ def update_rebate(
             flow.updated_by = actor
     record.updated_by = actor
     session.flush()
-    record_audit(session, action=AuditAction.REBATE_UPDATE, entity_type="rebate_record", entity_id=record.rebate_no, actor=actor, before=before, after={"amount": str(record.amount), "rate": str(record.rate), "collected_on": str(record.collected_on), "note": record.note})
+    record_audit(session, action=AuditAction.REBATE_UPDATE, entity_type="rebate_record", entity_id=record.rebate_no, actor=actor, before=before, after={"amount": str(record.amount), "collected_on": str(record.collected_on), "note": record.note})
     return record
 
 

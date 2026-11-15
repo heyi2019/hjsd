@@ -61,7 +61,6 @@ def _order_with_sell_rebate(seeded_db, amount: str = "1000", collected_on: date 
         source_order_id=order.id,
         rebate_type="SELL",
         amount=Decimal(amount),
-        rate=Decimal("5"),
         collected_on=collected_on,
         actor="pytest",
     )
@@ -245,7 +244,6 @@ def test_void_legacy_rebate_cannot_return(seeded_db):
         rebate_no=f"REB-LEGACY-{uuid4().hex[:8]}",
         source_order_id=order_id,
         rebate_type="SELL",
-        rate=to_money("5"),
         amount=to_money("500"),
         collected_on=D,
         status=RebateStatus.VOID.value,

@@ -68,7 +68,6 @@ class TestRebateValidation:
             RebateRecord(
                 rebate_no="RB-INVALID-LINK-STATUS",
                 source_order_id=_active_order(seeded_db),
-                rate=Decimal("10"),
                 amount=Decimal("500"),
                 status="OPEN",
                 link_status="AUTO_MATCHED",
@@ -448,23 +447,6 @@ class TestRebateGuards:
             actor="pytest",
         )
         assert record.rebate_type == "SELL"
-
-
-    def test_rebate_rate_cannot_exceed_one_hundred_in_database(self, seeded_db):
-        order_id = _active_order(seeded_db)
-        record = create_rebate(
-            seeded_db,
-            source_order_id=order_id,
-            rebate_type="BUY",
-            amount=Decimal("100"),
-            collected_on=TODAY,
-            actor="pytest",
-        )
-        record.rate = Decimal("101")
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
 
     def test_source_order_notfound(self, seeded_db):
         with pytest.raises(Validation) as exc:
@@ -1325,7 +1307,6 @@ class TestFinanceApi:
                 "source_order_id": order_id,
                 "amount": "300",
                 "collected_on": TODAY.isoformat(),
-                "rate": "5",
                 "rebate_type": "BUY",
                 "channel": "WECHAT",
             },

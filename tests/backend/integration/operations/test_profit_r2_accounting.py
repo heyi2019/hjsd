@@ -48,7 +48,6 @@ def _add_rebate(seeded_db, order_id: int, amount: str, status: str) -> RebateRec
         rebate_no=f"REB-{uuid4().hex[:10]}",
         source_order_id=order_id,
         rebate_type=RebateType.SELL.value,
-        rate=to_money("5"),
         amount=to_money(amount),
         collected_on=D,
         status=status,

@@ -92,10 +92,9 @@ class RebateRecord(Base, AuditMixin):
         UniqueConstraint("rebate_no", name="uq_rebate_records_no"),
         Index("ix_rebate_records_source_order", "source_order_id"),
         CheckConstraint(
-            "rate >= 0 AND amount >= 0",
+            "amount >= 0",
             name="amount_nonneg",
         ),
-        CheckConstraint("rate <= 100", name="rate_max"),
         CheckConstraint(
             f"link_status IN {LinkStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="rebate_link_status_valid",
@@ -111,7 +110,6 @@ class RebateRecord(Base, AuditMixin):
         String(16), nullable=False
     )
     channel: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    rate: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     # BAS-06-04 规则快照：创建时固化当时生效的规则版本与参数。
     # 「改未来费率不会改写已发生订单的利润」这条红线靠它兜底 ——

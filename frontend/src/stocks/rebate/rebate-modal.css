@@ -3,7 +3,7 @@
   --resizable-modal-width: min(900px, calc(100vw - 48px));
 }
 
-/* 返点类型独占第一行；金额、比例、日期、操作人四个核心字段统一落在下一行。 */
+/* 返点类型独占第一行；金额、日期、操作人三个核心字段统一落在下一行。 */
 .business-registration-modal .inventory-rebate-form > .ant-form-item:first-child,
 .business-registration-modal .inventory-rebate-form > .rebate-core-fields {
   grid-column: 1 / -1;
@@ -33,7 +33,7 @@
   min-width: min(100%, 56rem);
 }
 .inventory-rebate-table .orders-event-row {
-  grid-template-columns: minmax(8rem, 1.2fr) minmax(7rem, 1fr) minmax(6rem, 0.9fr) minmax(8rem, 1fr) minmax(7rem, 1fr) minmax(8rem, 1.1fr);
+  grid-template-columns: minmax(8rem, 1.2fr) minmax(7rem, 1fr) minmax(8rem, 1fr) minmax(7rem, 1fr) minmax(8rem, 1.1fr);
 }
 .inventory-rebate-table .orders-event-row > [role="columnheader"],
 .inventory-rebate-table .orders-event-row > [role="cell"] {

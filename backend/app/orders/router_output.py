@@ -190,7 +190,6 @@ def _order_detail_output(
                     "rebate_no": item.rebate_no,
                     "rebate_type": item.rebate_type,
                     "channel": item.channel,
-                    "rate": item.rate,
                     "amount": item.amount,
                     "link_status": item.link_status,
                     "status": item.status,

@@ -91,7 +91,6 @@ export interface Rebate {
   source_order_id?: number | null;
   rebate_type: "BUY" | "SELL" | "UNSPECIFIED" | string;
   channel?: string | null;
-  rate: string;
   amount: string;
   link_status?: string;
   status: string;

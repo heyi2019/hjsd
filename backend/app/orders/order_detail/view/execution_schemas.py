@@ -67,7 +67,6 @@ class ExecutionRebateOut(BaseModel):
     rebate_no: str
     rebate_type: str
     channel: str | None = None
-    rate: Decimal
     amount: Decimal
     status: str
     collected_on: date

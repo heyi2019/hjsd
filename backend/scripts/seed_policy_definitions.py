@@ -50,7 +50,6 @@ from app.policy import versions as policy_versions
 
 # (编码, 名称, 说明) —— 编码严格取自 PolicyType，不新增、不自造。
 POLICY_SEEDS: list[tuple[str, str, str]] = [
-    ("REBATE", "返点比例", "返点计提口径；建单时固化快照"),
     ("COMMISSION", "提成分配", "订单提成口径；利润分配四项拆分由订单详情录入"),
     ("INSTALLMENT", "分期规则", "分期期数与节奏"),
     ("WRITE_DOWN", "跌价规则", "跌价计提口径"),
@@ -59,15 +58,13 @@ POLICY_SEEDS: list[tuple[str, str, str]] = [
 ]
 
 # 每个规则预置 1 条已发布默认版本，使配置直接就位。
-# REBATE/INSTALLMENT 的默认值由库内真实业务数据反推（rebate_records.rate 区间 3~10、
-# installments.periods 众数 3）。
+# INSTALLMENT 的默认值由库内真实业务数据反推（installments.periods 众数 3）。
 # COMMISSION/WRITE_DOWN/REFUND 库内无对应历史流水；按「不猜值」纪律
 # 「未配置提成规则显示待配置，不猜值」，config 置空（{}）表示待配置，而非填假值 0。
 # 例外：COMMISSION 的分润比例是业务既定口径（买入动作 30 / 卖出动作 30 / 运营动作 0 /
 # 公司 40，合计 100），不是猜值，故直接预置；且 create_version 拒绝空 config，
 # 预置 {} 会在 --apply 时直接抛「规则参数不能为空」。
 DEFAULT_VERSION_CONFIG: dict[str, dict[str, object]] = {
-    "REBATE": {"rate": "5"},
     "COMMISSION": {"split": {"BUY": "30", "SELL": "30", "OPERATION": "0", "COMPANY": "40"}},
     "INSTALLMENT": {"periods": "3", "cycle": "monthly"},
     "WRITE_DOWN": {},

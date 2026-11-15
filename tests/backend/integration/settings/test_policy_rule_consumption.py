@@ -78,8 +78,7 @@ def _order_with_buy(seeded_db, *, game_account: str) -> int:
 
 # ---------------------------------------------------------------- 返点金额
 
-def test_rebate_amount_is_explicit_and_rate_comes_from_rule(seeded_db):
-    _publish(seeded_db, "REBATE", {"rate": "5"})
+def test_rebate_amount_is_explicit(seeded_db):
     record = create_rebate(
         seeded_db,
         source_order_id=_order_with_buy(seeded_db, game_account="rule-explicit-amount"),
@@ -89,7 +88,6 @@ def test_rebate_amount_is_explicit_and_rate_comes_from_rule(seeded_db):
         actor="pytest",
     )
     assert record.amount == Decimal("300.00")
-    assert record.rate == Decimal("5.00")
 
 
 # ------------------------------------------------------------ 分期服务费率

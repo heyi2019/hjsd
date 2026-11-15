@@ -194,7 +194,6 @@ def test_router_get_rebate_endpoint(seeded_db):
         source_order_id=_order_with_buy(seeded_db),
         rebate_type="BUY",
         amount=Decimal("1000"),
-        rate=Decimal("5"),
         collected_on=TODAY,
         operator_user_ids=[1],
         actor="pytest",

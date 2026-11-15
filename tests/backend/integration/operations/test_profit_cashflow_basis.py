@@ -101,7 +101,6 @@ def _add_rebate(seeded_db, order_id: int, amount: str) -> None:
             rebate_no=f"REB-{uuid4().hex[:10]}",
             source_order_id=order_id,
             rebate_type=RebateType.SELL.value,
-            rate=to_money("5"),
             amount=to_money(amount),
             collected_on=D,
             status=RebateStatus.SETTLED.value,
@@ -332,7 +331,7 @@ def test_r2_rebate_column_counts_action_model_rebate_like_profit_detail(seeded_d
     # 新模型返点：create_rebate 同时生成 IN 资金流水（amount 计入 sales_income）
     create_rebate(
         seeded_db, source_order_id=order_id, rebate_type="SELL",
-        amount=Decimal("250"), rate=Decimal("5"),
+        amount=Decimal("250"),
         collected_on=D, actor="pytest",
     )
 

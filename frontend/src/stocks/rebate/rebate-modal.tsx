@@ -11,7 +11,7 @@ import type { Rebate } from "../../shared/api/types/finance";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
-import { moneyRules, percentRules } from "../../shared/lib/validators";
+import { moneyRules } from "../../shared/lib/validators";
 import { BusinessActionModal, BusinessRegistrationForm, DateField, ErrorBanner, MoneyInput, MoneyText, PermissionButton, dateValueFromEvent, dateValueProps } from "../../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../../orders/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../../orders/ResponsibleEmployeeSelect";
@@ -94,7 +94,7 @@ export function InventoryRebateModal(props: {
     [detail, props.account?.source_order_id],
   );
 
-  const submit = async (values: { rebate_type?: RebateKind; amount?: string; rate?: string; collected_on?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
+  const submit = async (values: { rebate_type?: RebateKind; amount?: string; collected_on?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     if (!props.account) return;
     const kind = values.rebate_type;
     const order = kind ? sourceOrder(detail, props.account.source_order_id, kind) : undefined;
@@ -105,7 +105,6 @@ export function InventoryRebateModal(props: {
         source_order_id: order.order_id,
         rebate_type: kind,
         amount: values.amount!,
-        rate: values.rate ?? "0",
         collected_on: values.collected_on ?? today(),
         channel: kind === "BUY" ? "买号返点" : "卖号返点",
         note: REBATE_KIND_LABEL[kind],
@@ -123,12 +122,11 @@ export function InventoryRebateModal(props: {
     }
   };
 
-  const submitEdit = async (values: { amount?: string; rate?: string; collected_on?: string; note?: string; operator_user_ids?: number[] }) => {
+  const submitEdit = async (values: { amount?: string; collected_on?: string; note?: string; operator_user_ids?: number[] }) => {
     if (!editTarget) return;
     try {
       const updated = await rebatesApi.update(editTarget.id, {
         amount: values.amount,
-        rate: values.rate,
         collected_on: values.collected_on,
         note: values.note || null,
         operator_user_ids: values.operator_user_ids,
@@ -148,7 +146,7 @@ export function InventoryRebateModal(props: {
     <>
     <BusinessActionModal
       title="登记返点"
-      fieldCount={5 + Object.keys(config).length}
+      fieldCount={4 + Object.keys(config).length}
       open={open}
       destroyOnHidden
       wrapClassName="inventory-rebate-modal"
@@ -197,9 +195,6 @@ export function InventoryRebateModal(props: {
               >
                 <MoneyInput placeholder="请输入返点金额" />
               </CfgItem>
-              <CfgItem name="rate" label="返点比例" initialValue="0" rules={[...percentRules("返点比例")]}>
-                <Input inputMode="decimal" suffix="%" placeholder="例如 5" />
-              </CfgItem>
               <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
                 <DateField />
               </CfgItem>
@@ -215,7 +210,7 @@ export function InventoryRebateModal(props: {
           <div className="ui-form-spaced orders-event-list">
             <div className="orders-event-table inventory-rebate-table" role="table" aria-label="返点明细表">
               <div className="orders-event-row orders-event-row--header" role="row">
-                {(["类型", "金额", "比例", "返点日期", "操作人", "操作"] as const).map((label) => (
+                {(["类型", "金额", "返点日期", "操作人", "操作"] as const).map((label) => (
                   <span key={label} role="columnheader">{label}</span>
                 ))}
               </div>
@@ -223,7 +218,6 @@ export function InventoryRebateModal(props: {
                 <div key={row.id} className="orders-event-row" role="row">
                   <span role="cell">{row.rebate_type === "BUY" ? "买号返点" : "卖号返点"}</span>
                   <span role="cell"><MoneyText value={row.amount} /></span>
-                  <span role="cell">{row.rate}%</span>
                   <span role="cell">{row.collected_on}</span>
                   <span role="cell">{row.operator_user_ids?.map((id) => employees.find((employee) => employee.id === id)?.display_name).filter(Boolean).join("、") || row.operator || "-"}</span>
                   <span role="cell">
@@ -234,7 +228,6 @@ export function InventoryRebateModal(props: {
                         onClick={() => {
                           editForm.setFieldsValue({
                             amount: row.amount,
-                            rate: row.rate,
                             collected_on: row.collected_on,
                             note: row.note ?? "",
                             operator_user_ids: row.operator_user_ids ?? undefined,
@@ -262,7 +255,7 @@ export function InventoryRebateModal(props: {
         一起关掉，外层已填的返点金额直接丢失。E2E：inventory-rebate-nest.spec.ts。 */}
     <BusinessActionModal
       title={editTarget ? `编辑返点 · ${editTarget.rebate_no}` : "编辑返点"}
-      fieldCount={5 + Object.keys(config).length}
+      fieldCount={4 + Object.keys(config).length}
       open={Boolean(editTarget)}
       onCancel={() => setEditTarget(null)}
       footer={null}
@@ -275,7 +268,6 @@ export function InventoryRebateModal(props: {
         wrapperCol={{ flex: "auto" }} scope="INVREBATE" form={editForm} onFinish={submitEdit}>
           <div className="rebate-core-fields">
             <CfgItem name="amount" label="返点金额" rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}> <MoneyInput /></CfgItem>
-            <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}><Input suffix="%" /></CfgItem>
             <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
             <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           </div>

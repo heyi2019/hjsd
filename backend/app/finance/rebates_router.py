@@ -90,7 +90,6 @@ def create_rebate(
         amount=payload.amount,
         collected_on=payload.collected_on,
         actor=_actor(user),
-        rate=payload.rate,
         operator_user_ids=payload.operator_user_ids,
         channel=payload.channel,
         note=payload.note,

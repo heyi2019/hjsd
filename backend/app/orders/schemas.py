@@ -364,7 +364,6 @@ class OrderRebateOut(BaseModel):
     rebate_no: str
     rebate_type: str
     channel: str | None = None
-    rate: Decimal
     amount: Decimal
     link_status: str
     status: str

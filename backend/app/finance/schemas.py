@@ -229,10 +229,8 @@ class TransferOut(BaseModel):
 class RebateCreate(RequestModel):
     source_order_id: int
     rebate_type: str = Field(description="BUY 买号返点 / SELL 卖号返点")
-    # 返点金额由登记人明确提供；规则费率只作留痕，不反推金额。
     amount: Decimal
     collected_on: date
-    rate: Decimal | None = None
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     channel: str | None = None
     note: str | None = None
@@ -241,7 +239,6 @@ class RebateCreate(RequestModel):
 
 class RebateUpdate(RequestModel):
     amount: Decimal | None = None
-    rate: Decimal | None = None
     collected_on: date | None = None
     note: str | None = None
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
@@ -256,7 +253,6 @@ class RebateOut(BaseModel):
     source_order_id: int
     rebate_type: str
     channel: str | None = None
-    rate: Decimal
     amount: Decimal
     link_status: str
     status: str

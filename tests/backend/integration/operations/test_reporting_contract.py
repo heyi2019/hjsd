@@ -452,7 +452,6 @@ class TestReportsApiDateParams:
                 rebate_no="RB-R5-SCOPE",
                 source_order_id=foreign_order.id,
                 rebate_type="SELL",
-                rate=to_money("10"),
                 amount=to_money("500"),
                 status=RebateStatus.OPEN.value,
                 link_status="UNLINKED",

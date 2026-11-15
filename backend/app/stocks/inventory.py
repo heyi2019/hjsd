@@ -6,12 +6,13 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
+from app.core.like_pattern import like_contains
 from app.core.security import CurrentUser
-from app.domain.trade import Account
+from app.domain.trade import Account, Order
 from app.parties.fields import get_extra_values_bulk
 from ._common import (
     AGE_WARNING_MAX_DAYS,
@@ -74,6 +75,79 @@ def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict
         }
         for row in rows
     ]
+
+
+def inventory_ledger(
+    session: Session, *, business_mode: str | None = None,
+    inventory_type: str | None = None, game_type: str | None = None,
+    keyword: str | None = None, date_from: date | None = None,
+    date_to: date | None = None, sort_desc: bool = True,
+    limit: int = 10, offset: int = 0, user: CurrentUser | None = None,
+) -> dict[str, Any]:
+    """服务端筛选、排序、分页库存台账，并返回分页所需统计。"""
+    type_expr = func.coalesce(
+        Account.inventory_type,
+        case((Order.order_type == "HS", "RECOVERY"), (Order.order_type == "TH", "PICKUP"),
+             (Order.order_type == "DG", "CONSIGNMENT"), else_=None),
+    )
+    game_type_expr = func.coalesce(Account.game_type, Order.account_snapshot["game_type"].as_string())
+    business_mode_expr = func.coalesce(Account.business_mode, Order.business_mode)
+    entry_day = func.date(func.coalesce(Account.inventory_entry_at, Order.trade_date, Account.created_at))
+
+    def stmt(*, include_type: bool = True, include_search_date: bool = True):
+        query = select(Account, Order).join(Order, Order.account_id == Account.id).where(
+            Account.status == "WAITING", Order.status == "WAITING",
+        )
+        scope = scope_filter(session, user)
+        if scope is not None:
+            query = query.where(scope)
+        if business_mode:
+            query = query.where(business_mode_expr == business_mode)
+        if game_type:
+            query = query.where(game_type_expr == game_type)
+        if include_type and inventory_type:
+            query = query.where(type_expr == inventory_type)
+        if include_search_date:
+            if keyword and keyword.strip():
+                pattern, escape = like_contains(keyword.strip())
+                query = query.where(or_(
+                    func.coalesce(Account.game_account, Order.account_snapshot["game_account"].as_string()).ilike(pattern, escape=escape),
+                    game_type_expr.ilike(pattern, escape=escape),
+                    func.coalesce(Account.channel_region, Order.account_snapshot["channel_region"].as_string()).ilike(pattern, escape=escape),
+                    func.coalesce(Account.platform, Order.account_snapshot["platform"].as_string()).ilike(pattern, escape=escape),
+                ))
+            if date_from:
+                query = query.where(entry_day >= date_from.isoformat())
+            if date_to:
+                query = query.where(entry_day <= date_to.isoformat())
+        return query
+
+    filtered = stmt()
+    total = int(session.scalar(select(func.count()).select_from(filtered.subquery())) or 0)
+    order_by = Order.id.desc() if sort_desc else Order.id.asc()
+    items = list(session.execute(filtered.order_by(order_by).limit(limit).offset(offset)).all())
+    facet_query = stmt(include_type=False, include_search_date=False).with_only_columns(
+        type_expr, func.count(Account.id), maintain_column_froms=True,
+    ).group_by(type_expr)
+    type_counts = {str(kind): int(count) for kind, count in session.execute(facet_query).all() if kind}
+    facet_total = int(session.scalar(select(func.count()).select_from(
+        stmt(include_type=False, include_search_date=False).subquery()
+    )) or 0)
+    # options remain available across the current business/game filters, like the prior UI.
+    game_type_query = select(game_type_expr).select_from(Account).join(
+        Order, Order.account_id == Account.id,
+    ).where(
+        Account.status == "WAITING", Order.status == "WAITING", game_type_expr.is_not(None),
+    )
+    scope = scope_filter(session, user)
+    if scope is not None:
+        game_type_query = game_type_query.where(scope)
+    game_type_query = game_type_query.distinct().order_by(game_type_expr)
+    game_types = list(session.scalars(game_type_query).all())
+    account_ids = list(session.scalars(stmt().with_only_columns(Account.id, maintain_column_froms=True)).all())
+    stats = inventory_stats(session, account_ids=account_ids, user=user)
+    return {"items": items, "total": total, "facet_total": facet_total, "type_counts": type_counts,
+            "game_types": game_types, "stats": stats}
 
 
 def total_inventory_cost(session: Session, *, user: CurrentUser | None = None) -> Decimal:
@@ -201,6 +275,7 @@ __all__ = [
     "inventory",
     "inventory_age_days",
     "inventory_cost_by_entry_date",
+    "inventory_ledger",
     "inventory_stats",
     "list_accounts",
     "total_inventory_cost",

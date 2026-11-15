@@ -23,6 +23,7 @@ from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.stocks.inventory import (
     count_accounts,
     dashboard_inventory_summary as stocks_dashboard_inventory_summary,
+    inventory_ledger as stocks_inventory_ledger,
     inventory as stocks_inventory,
     inventory_cost_by_entry_date as stocks_inventory_cost_by_entry_date,
     inventory_stats as stocks_inventory_stats,
@@ -47,6 +48,7 @@ from .schemas import (
     InventoryResponseOut,
     InventoryStatsOut,
     InventoryStatsQuery,
+    InventoryLedgerOut,
 )
 
 from .router_output import (
@@ -54,6 +56,7 @@ from .router_output import (
     _account_output,
     _account_outputs,
 )
+from app.orders.router_output import _order_list_payload
 
 router = APIRouter(tags=["ACC-01 账号台账"])
 
@@ -191,6 +194,39 @@ def inventory_cost_summary(
         user=_user,
     )
     return InventoryCostSummaryOut(total_cost=total_cost)
+
+
+@router.get("/stocks/inventory/ledger", response_model=InventoryLedgerOut)
+def inventory_ledger(
+    business_mode: str | None = Query(default=None),
+    inventory_type: str | None = Query(default=None),
+    game_type: str | None = Query(default=None),
+    keyword: str | None = Query(default=None, max_length=128),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    sort_desc: bool = Query(default=True),
+    limit: int = Query(default=10, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> InventoryLedgerOut:
+    """库存台账服务端筛选与分页；响应只包含当前页明细和后端汇总。"""
+    result = stocks_inventory_ledger(
+        db, business_mode=business_mode, inventory_type=inventory_type,
+        game_type=game_type, keyword=keyword, date_from=date_from,
+        date_to=date_to, sort_desc=sort_desc, limit=limit, offset=offset, user=user,
+    )
+    pairs = result["items"]
+    accounts = [account for account, _order in pairs]
+    orders = [order for _account, order in pairs]
+    account_outputs = _account_outputs(db, accounts, user)
+    order_outputs = _order_list_payload(db, orders)
+    return InventoryLedgerOut(
+        items=[{"account": account, "order": order}
+               for account, order in zip(account_outputs, order_outputs, strict=True)],
+        total=result["total"], facet_total=result["facet_total"], type_counts=result["type_counts"],
+        game_types=result["game_types"], stats=result["stats"],
+    )
 
 
 @router.get("/stocks/dashboard-summary", response_model=DashboardInventorySummaryOut)

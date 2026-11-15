@@ -8,6 +8,7 @@ export function MoneyInput(props: InputProps) {
     <Input
       {...props}
       className={["money-input", props.className].filter(Boolean).join(" ")}
+      autoComplete={props.autoComplete ?? "off"}
       inputMode={props.inputMode ?? "decimal"}
       suffix={props.suffix ?? "元"}
     />

@@ -14,7 +14,23 @@
   line-height: 1;
 }
 
-/* 后缀输入由外层 affix wrapper 承担聚焦光晕；内层 input 再画一层会在金额区域形成蓝色块。 */
+/* 后缀输入由外层 affix wrapper 承担背景与聚焦光晕；内层 input 保持透明，避免金额区域出现蓝色块。 */
+.money-input .ant-input,
 .money-input .ant-input:focus {
+  background: transparent !important;
   box-shadow: none !important;
+}
+
+.money-input.ant-input-affix-wrapper-focused,
+.money-input.ant-input-affix-wrapper:focus-within {
+  background: var(--color-surface) !important;
+}
+
+/* 选择浏览器历史金额后会命中 autofill；覆盖其默认蓝色内阴影，保持与输入框同色。 */
+.money-input .ant-input:-webkit-autofill,
+.money-input .ant-input:-webkit-autofill:hover,
+.money-input .ant-input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--color-antd-bg-container) inset !important;
+  box-shadow: 0 0 0 1000px var(--color-antd-bg-container) inset !important;
+  -webkit-text-fill-color: var(--color-text-primary) !important;
 }

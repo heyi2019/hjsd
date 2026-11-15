@@ -200,7 +200,7 @@ describe("AppShell：退出登录", () => {
 
 describe("AppShell：业务中心首页落点", () => {
   it("深链到订单台账子页，切走再切回进入库存中心首页", async () => {
-    await renderShell({ user: "admin", initialPath: "/business/orders" });
+    await renderShell({ user: "admin", initialPath: "/business/ledger" });
     const ordersTab = await screen.findByRole("tab", { name: "订单台账" });
     expect(ordersTab).toHaveAttribute("aria-selected", "true");
 

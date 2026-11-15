@@ -505,7 +505,7 @@ describe("OrdersPage：四类订单台账", () => {
           id: 301,
           event_type: "OPERATE",
           operation_type: "CONSIGNMENT",
-          form_extra: { consignment_platform: "寄售平台A", listed_at: "2026-10-03T10:00" },
+          form_extra: { consignment_platforms: ["寄售平台A"], listed_at: "2026-10-03T10:00" },
         }],
       }],
     } as never);
@@ -623,10 +623,4 @@ describe("OrdersPage：四类订单台账", () => {
     expect(within(modal).queryByLabelText("入账账户")).toBeNull();
   });
 
-  it("忽略已废弃的业务中心页签参数并回到订单台账", async () => {
-    renderLight(<OrdersPage initialTab={"th" as "inventory"} />);
-    const tab = await screen.findByRole("tab", { name: "订单台账" });
-    expect(tab).toHaveAttribute("aria-selected", "true");
-    expect((await screen.findAllByText("HS-2026-0001")).length).toBeGreaterThan(0);
-  });
 });

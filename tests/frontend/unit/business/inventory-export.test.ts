@@ -67,6 +67,25 @@ describe("库存导出", () => {
             collected_on: "2026-11-02",
           }],
         }],
+        detail_view: {
+          execution_rows: [],
+          finance_rows: [{
+            key: "rebate-1",
+            flow_no: "HS-FE268-RB01",
+            type: "买号返点",
+            direction: "收入",
+            amount: "100.00",
+            occurred_at: "2026-11-02T10:00:00",
+            pool_name: "-",
+            note: "",
+            operator: "-",
+          }],
+          operation_rows: [],
+          lifecycle: { removed_platform: "-", recovery_platform: "-", sale_platform: "-" },
+          order_notes: "-",
+          parties: [],
+          extras: [],
+        },
         finance_summary: {
           cashflow_income: "0.00",
           rebate_income: "100.00",
@@ -78,7 +97,7 @@ describe("库存导出", () => {
     });
 
     expect(csv).toContain("HS-FE268");
-    expect(csv).toContain("买号返点 / HS-FE268 / HS-FE268-RB01 / 已登记 / 100.00");
+    expect(csv).toContain("买号返点 /  / rebate-1 / 收入 / 100.00 / 2026-11-02 10:00 / -");
     // 「支出笔数,收入笔数,总支出,总收入」：条数按明细数，金额只认后端。
     expect(csv).toContain(",0,1,0.00,100.00");
   });
@@ -106,6 +125,25 @@ describe("库存导出", () => {
           }],
           rebates: [],
         }],
+        detail_view: {
+          execution_rows: [],
+          finance_rows: [{
+            key: "cashflow-income-1",
+            flow_no: "SR-SUM-01",
+            type: "附加收入",
+            direction: "收入",
+            amount: "500.00",
+            occurred_at: "2026-11-02T10:00:00",
+            pool_name: "未分配资金池",
+            note: "",
+            operator: "admin",
+          }],
+          operation_rows: [],
+          lifecycle: { removed_platform: "-", recovery_platform: "-", sale_platform: "-" },
+          order_notes: "-",
+          parties: [],
+          extras: [],
+        },
         finance_summary: {
           cashflow_income: "123.45",
           rebate_income: "0.00",

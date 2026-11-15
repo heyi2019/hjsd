@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -78,6 +78,31 @@ def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict
 
 def total_inventory_cost(session: Session, *, user: CurrentUser | None = None) -> Decimal:
     return to_money(sum((to_money(row.cost_amount) for row in _inventory_rows(session, user=user)), Decimal("0")))
+
+
+def inventory_cost_by_entry_date(
+    session: Session,
+    *,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    user: CurrentUser | None = None,
+) -> Decimal:
+    """按入库日期汇总仍在库账号成本，不加载库存明细。"""
+    stmt = select(func.coalesce(func.sum(Account.cost_amount), 0)).where(
+        Account.inventory_status.in_(INVENTORY_STATUSES)
+    )
+    if date_from is not None:
+        stmt = stmt.where(
+            Account.inventory_entry_at >= datetime.combine(date_from, time.min)
+        )
+    if date_to is not None:
+        stmt = stmt.where(
+            Account.inventory_entry_at < datetime.combine(date_to + timedelta(days=1), time.min)
+        )
+    scope = scope_filter(session, user)
+    if scope is not None:
+        stmt = stmt.where(scope)
+    return to_money(session.scalar(stmt) or 0)
 
 
 def inventory_stats(
@@ -175,6 +200,7 @@ __all__ = [
     "dashboard_inventory_summary",
     "inventory",
     "inventory_age_days",
+    "inventory_cost_by_entry_date",
     "inventory_stats",
     "list_accounts",
     "total_inventory_cost",

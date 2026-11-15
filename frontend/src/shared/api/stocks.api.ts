@@ -30,6 +30,10 @@ export const stocksApi = {
     api
       .get<{ items: AccountInventoryRow[]; count: number; total_cost: string }>("/stocks/inventory")
       .then((r) => r.data),
+  inventoryCostSummary: (params?: { entry_date_from?: string; entry_date_to?: string }) =>
+    api
+      .get<{ total_cost: string }>("/stocks/inventory/cost-summary", { params })
+      .then((r) => r.data),
   /** 汇总当前可见账号的占用成本与库龄档位（金额与天数只在后端算）。 */
   inventoryStats: (accountIds: number[]) =>
     api

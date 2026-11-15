@@ -45,6 +45,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     orderBusinessOptions,
     orderTypeFilter,
     page,
+    pageTotal,
     pageSize,
     setBusinessModeFilter,
     setDateRange,
@@ -159,7 +160,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
           loading={loading}
           page={page}
           pageSize={pageSize}
-          total={filteredOrders.length}
+          total={pageTotal}
           emptyText="暂无业务订单"
           className="inventory-table orders-ledger"
           expandable={{

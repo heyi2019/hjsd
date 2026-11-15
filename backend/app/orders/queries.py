@@ -31,6 +31,10 @@ def list_orders(
     owner_id: int | None = None,
     pool_id: int | None = None,
     keyword: str | None = None,
+    business_mode: str | None = None,
+    game_type: str | None = None,
+    account_status: str | None = None,
+    sort_desc: bool | None = None,
     limit: int = 100,
     offset: int = 0,
     user: CurrentUser | None = None,
@@ -39,13 +43,17 @@ def list_orders(
     stmt = _order_list_stmt(
         order_type=order_type, status=status, trade_date_from=trade_date_from,
         trade_date_to=trade_date_to, owner_id=owner_id, pool_id=pool_id,
-        keyword=keyword, user=user, mine=mine, session=session,
+        keyword=keyword, business_mode=business_mode, game_type=game_type,
+        account_status=account_status, user=user, mine=mine, session=session,
+    )
+    ordering = (
+        (Order.id.desc(),) if sort_desc is True
+        else (Order.id.asc(),) if sort_desc is False
+        else (Order.trade_date.desc(), Order.id.desc())
     )
     return list(
         session.scalars(
-            # 列表按「最近优先」：先交易日倒序，同日再按 id 倒序。
-            # 原来是 Order.id 升序，等于把最老的 20 条排在第一页，手机端和台账都反直觉。
-            stmt.order_by(Order.trade_date.desc(), Order.id.desc()).limit(limit).offset(offset)
+            stmt.order_by(*ordering).limit(limit).offset(offset)
         ).unique().all()
     )
 
@@ -54,12 +62,15 @@ def count_orders(
     session: Session, *, order_type: str | None = None, status: str | None = None,
     trade_date_from: date | None = None, trade_date_to: date | None = None,
     owner_id: int | None = None, pool_id: int | None = None,
-    keyword: str | None = None, user: CurrentUser | None = None, mine: bool = False,
+    keyword: str | None = None, business_mode: str | None = None,
+    game_type: str | None = None, account_status: str | None = None,
+    user: CurrentUser | None = None, mine: bool = False,
 ) -> int:
     stmt = _order_list_stmt(
         order_type=order_type, status=status, trade_date_from=trade_date_from,
         trade_date_to=trade_date_to, owner_id=owner_id, pool_id=pool_id,
-        keyword=keyword, user=user, mine=mine, session=session,
+        keyword=keyword, business_mode=business_mode, game_type=game_type,
+        account_status=account_status, user=user, mine=mine, session=session,
     )
     return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
 
@@ -138,7 +149,25 @@ def order_ledger_summary(
         "total_count": sum(status_counts.values()),
         "status_counts": status_counts,
         "type_counts": type_counts,
+        "game_types": _visible_game_types(session, user=user, mine=mine),
     }
+
+
+def _visible_game_types(session: Session, *, user: CurrentUser | None, mine: bool) -> list[str]:
+    game_type = func.coalesce(Account.game_type, Order.account_snapshot["game_type"].as_string())
+    stmt = _order_list_stmt(
+        order_type=None,
+        status=None,
+        trade_date_from=None,
+        trade_date_to=None,
+        owner_id=None,
+        pool_id=None,
+        keyword=None,
+        user=user,
+        mine=mine,
+        session=session,
+    ).with_only_columns(game_type, maintain_column_froms=True).where(game_type.is_not(None)).distinct()
+    return list(session.scalars(stmt.order_by(game_type)).all())
 
 
 def _order_list_stmt(

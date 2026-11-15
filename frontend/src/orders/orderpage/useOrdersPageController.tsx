@@ -34,7 +34,7 @@ export function useOrdersPageController(params: {
     gameTypeFilter, setGameTypeFilter, inventoryStatusFilter, setInventoryStatusFilter,
     dateRange, setDateRange, keyword, setKeyword,
     orderBusinessOptions, orderBusinessModeOptions, inventoryStatusOptions,
-    gameTypeOptions, typeNames, filteredOrders, ledgerSummary, summaryLoading, summaryError, load,
+    gameTypeOptions, typeNames, filteredOrders, pageTotal, ledgerSummary, summaryLoading, summaryError, load,
   } = list;
 
   // —— 建单入口 / 当前选中订单（跨域共享枢纽） ——
@@ -147,6 +147,7 @@ export function useOrdersPageController(params: {
     orders: orders,
     page: page,
     pageSize: pageSize,
+    pageTotal: pageTotal,
     reversibleEvents: reversibleEvents,
     selectedOrder: selectedOrder,
     setActiveTab: setActiveTab,

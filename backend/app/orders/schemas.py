@@ -276,6 +276,7 @@ class OrderLedgerSummaryOut(BaseModel):
     total_count: int
     status_counts: dict[str, int] = Field(default_factory=dict)
     type_counts: dict[str, int] = Field(default_factory=dict)
+    game_types: list[str] = Field(default_factory=list)
 
 
 class EventCreate(BaseModel):

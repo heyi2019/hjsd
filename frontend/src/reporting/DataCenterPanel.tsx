@@ -1,40 +1,22 @@
-/** 数据中心：今日资金与业务总览（原工作台数据内容，2026-10-13 迁入「经营中心」Tab）。
- *  现金头寸、可用余额和押金分列展示，禁止混用（FIN-01-03）。 */
-import { Card, Space } from "antd";
-import type { ColumnsType } from "antd/es/table";
+/** 数据中心：订单、库存成本与经营结果总览。资金池余额、押金和流水归资金中心负责。 */
+import { Space } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { cashflowsApi } from "../shared/api/cashflows.api";
 import { ordersApi } from "../shared/api/orders.api";
-import { poolsApi } from "../shared/api/pools.api";
 import { reportsApi } from "../shared/api/reports.api";
 import { stocksApi } from "../shared/api/stocks.api";
-import type { Pool, PoolBalance, PoolBalanceTotals } from "../shared/api/types/finance";
 import type { BusinessPnlReport } from "../shared/api/types/reporting";
 import { normalizeError } from "../shared/api/client";
-import { useListViewColumns } from "../shared/lib/listColumns";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 import type { ReportRange } from "./reports/shared";
 import {
-  DataTable,
   EntryCard,
   EntryRow,
   ErrorBanner,
-  MoneyText,
-  PermissionGate,
   StatRow,
-  StatusTag,
 } from "../shared/ui";
 
-interface PoolRow {
-  key: string;
-  pool: Pool;
-  balance?: PoolBalance;
-}
-
 export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; range?: ReportRange }) {
-  const [pools, setPools] = useState<Pool[] | null>(null);
-  const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
-  const [balanceTotals, setBalanceTotals] = useState<PoolBalanceTotals | null>(null);
   const [orderSummary, setOrderSummary] = useState<{ total_count: number; active_count: number } | null>(null);
   const [businessPnl, setBusinessPnl] = useState<BusinessPnlReport | null>(null);
   const [inventoryCost, setInventoryCost] = useState<string | null>(null);
@@ -45,14 +27,6 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await poolsApi.list();
-      setPools(list);
-      // 余额与汇总一次批量取回：原先逐池 N+1，再用浮点把卡片相加算合计。
-      const overview = await poolsApi.balances();
-      setBalances(
-        Object.fromEntries(overview.items.map((item) => [item.pool_id, item])),
-      );
-      setBalanceTotals(overview.totals);
       const orderParams = range?.params.from || range?.params.to
         ? { trade_date_from: range.params.from, trade_date_to: range.params.to }
         : undefined;
@@ -73,8 +47,6 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
       setInventoryCost(inventorySummary.total_cost);
       setLoadError(null);
     } catch (error) {
-      // 必须落到 UI：后端不可达时若只 console.error，页面会静默显示
-      // 「资金池数量 0 / 尚未配置资金池」，与「真的没有数据」无法区分。
       setLoadError(normalizeError(error));
     } finally {
       setLoading(false);
@@ -85,61 +57,11 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
     void load();
   }, [load]);
 
-  const rows: PoolRow[] = (pools ?? []).map((pool) => ({ key: pool.code, pool, balance: balances[pool.id] }));
-
-  // 合计取服务端（Decimal），前端不再对卡片浮点累加。
-  const totalAvailable = pools === null ? "不可用" : balanceTotals?.available ?? "—";
-  const totalDeposit = pools === null ? "不可用" : balanceTotals?.deposit_held ?? "—";
-  const totalInventoryCost = inventoryCost ?? (pools === null ? "不可用" : "—");
-  const totalProfit = businessPnl?.total.main_profit ?? (pools === null ? "不可用" : "—");
-  const totalStudioExpense = studioExpense ?? (pools === null ? "不可用" : "—");
+  const totalInventoryCost = inventoryCost ?? "—";
+  const totalProfit = businessPnl?.total.main_profit ?? "—";
+  const totalStudioExpense = studioExpense ?? "—";
 
   const orderCardsUnavailable = orderSummary === null;
-
-  const { arrange: arrangeColumns } = useListViewColumns("POOL_BALANCE");
-  const columns: ColumnsType<PoolRow> = [
-    {
-      title: "资金池",
-      key: "pool_code",
-      className: "ui-col-wrap",
-      onCell: () => ({ className: "ui-col-wrap" }),
-      dataIndex: ["pool", "code"],
-      render: (_value, row) => `${row.pool.name}（${row.pool.code}）`,
-    },
-    {
-      title: "状态",
-      key: "status",
-
-      dataIndex: ["pool", "status"],
-      width: 110,
-      render: (status: string) => <StatusTag status={status} />,
-    },
-    {
-      title: "收入",
-      key: "income",
-      align: "right",
-      render: (_value, row) => <MoneyText value={row.balance?.income} />,
-    },
-    {
-      title: "支出",
-      key: "expense",
-      align: "right",
-      render: (_value, row) => <MoneyText value={row.balance?.expense} />,
-    },
-    {
-      title: "押金",
-      key: "deposit_held",
-
-      align: "right",
-      render: (_value, row) => <MoneyText value={row.balance?.deposit_held} />,
-    },
-    {
-      title: "可用余额",
-      key: "available",
-      align: "right",
-      render: (_value, row) => <MoneyText value={row.balance?.available} strong />,
-    },
-  ];
 
   return (
     <section className="ui-stack">
@@ -166,37 +88,14 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
 
       <StatRow
         items={[
-          { label: "可用余额合计", amount: totalAvailable },
-          { label: "押金占用", amount: totalDeposit },
           { label: "在途成本", amount: totalInventoryCost },
           { label: "利润", amount: totalProfit, tone: "auto" },
           { label: "工作室支出", amount: totalStudioExpense },
         ]}
       />
-      <StatRow
-        items={[
-          { label: "资金池数量", kind: "count", amount: balanceTotals === null ? "不可用" : String(balanceTotals.pool_count) },
-        ]}
-      />
-
-      <PermissionGate permission="finance.read">
-        <Card className="glass" title="资金池概览">
-          <DataTable<PoolRow>
-            columns={arrangeColumns(columns)}
-            rows={rows}
-            loading={loading}
-            page={1}
-            pageSize={Math.max(rows.length, 10)}
-            total={rows.length}
-            rowKey="key"
-            emptyText={pools === null ? "资金池数据不可用，请点击重新加载" : "尚未配置资金池"}
-            onPageChange={() => undefined}
-         />
-        </Card>
-      </PermissionGate>
 
       <Space className="muted" size="small">
-        数据口径与 FIN-01 一致；提号账号进入库存后参与库存与成本统计。
+        在途成本按库存入库口径统计；资金池余额、押金和流水请进入资金中心查看。
       </Space>
     </section>
   );

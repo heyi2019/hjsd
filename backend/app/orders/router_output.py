@@ -317,9 +317,9 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         ).all():
             events_by_order.setdefault(event.order_id, []).append(event)
 
-    # 订单初始费用是直接资金明细，不生成额外业务事件。
-    # 只取未关联业务事件的直接成本流水，避免把业务事件派生流水重复计入。
-    direct_cost_by_order = {
+    # 订单初始费用是资金明细，不生成额外业务事件。
+    # 只取未关联业务事件的成本流水，避免把业务事件派生流水重复计入。
+    unlinked_cost_by_order = {
         order_id: to_money(total or 0)
         for order_id, total in db.execute(
             select(Cashflow.order_id, func.coalesce(func.sum(Cashflow.amount), 0))
@@ -355,8 +355,8 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         snapshot = order.account_snapshot or {}
         events = events_by_order.get(order.id, [])
         installment = installments.get(order.id)
-        income, buy_amount, direct_cost = event_totals(events)
-        total_cost = buy_amount + direct_cost + direct_cost_by_order.get(order.id, ZERO)
+        income, event_cost, additional_cost = event_totals(events)
+        total_cost = event_cost + additional_cost + unlinked_cost_by_order.get(order.id, ZERO)
         latest = events[0] if events else None
         sale_event = next((event for event in events if event.event_type == "SELL"), None)
         party = parties.get(order.id)

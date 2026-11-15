@@ -63,7 +63,7 @@ describe("OrderDetail", () => {
       detail_view: {
         operation_rows: [],
         execution_rows: [{ key: "buy", order_id: 1, category: "INBOUND", action: "回收入库", occurred_at: "2026-10-15T10:20:00", amount: "100.00", operator: "admin", note: "回收登记", platform: "-", event_id: 1 }],
-        finance_rows: [{ key: "CF0001", flow_no: "CF0001", type: "买号支出", direction: "支出", amount: "100.00", occurred_at: "2026-10-15T10:20:00", pool_name: "经营荷包", note: "回收登记", operator: "admin", event_id: 1 }],
+        finance_rows: [{ key: "CF0001", flow_no: "CF0001", type: "回收成本", direction: "支出", amount: "100.00", occurred_at: "2026-10-15T10:20:00", pool_name: "经营荷包", note: "回收登记", operator: "admin", event_id: 1 }],
         lifecycle: { removed_platform: "-", recovery_platform: "-", sale_platform: "-" },
         order_notes: "-",
         parties: [],
@@ -82,7 +82,7 @@ describe("OrderDetail", () => {
     expect(within(panel).getAllByText("操作人").length).toBeGreaterThanOrEqual(1);
     expect(within(panel).getAllByText("admin").length).toBeGreaterThanOrEqual(2);
     expect(within(panel).getAllByText("100.00").length).toBeGreaterThanOrEqual(2);
-    expect(within(panel).getByText("买号支出")).toBeInTheDocument();
+    expect(within(panel).getByText("回收成本")).toBeInTheDocument();
     expect(within(panel).getByText("总支出")).toBeInTheDocument();
   });
 

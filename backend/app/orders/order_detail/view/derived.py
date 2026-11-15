@@ -178,9 +178,17 @@ def _execution_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailExecut
     return rows
 
 
-def _finance_type(event_type: str, direction: str, category: str | None = None) -> str:
+def _finance_type(
+    event_type: str,
+    direction: str,
+    category: str | None = None,
+    *,
+    order_type: str | None = None,
+) -> str:
+    if event_type == "BUY":
+        return {"HS": "回收成本", "TH": "提号成本", "DG": "代挂成本"}.get(order_type, "成本")
     labels = {
-        "BUY": "买号支出", "SELL": "售出收入", "INSTALLMENT_PAYMENT": "分期回款",
+        "SELL": "售出收入", "INSTALLMENT_PAYMENT": "分期回款",
         "REBATE": "返点收入", "REFUND": "退款支出", "CANCEL": "取消冲销",
         "OPERATING_EXPENSE": "运营费用", "ADDITIONAL_INCOME": "附加收入", "ADDITIONAL_EXPENSE": "附加支出",
     }
@@ -201,14 +209,14 @@ def _finance_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailFinanceR
             if event.cashflow:
                 flow = event.cashflow
                 rows.append(DetailFinanceRowOut(
-                    key=f"flow-{flow.flow_no}", flow_no=flow.flow_no, type=_finance_type(event.event_type, flow.direction, flow.category),
+                    key=f"flow-{flow.flow_no}", flow_no=flow.flow_no, type=_finance_type(event.event_type, flow.direction, flow.category, order_type=order.order_type),
                     direction="支出" if flow.direction == "OUT" else "收入", amount=flow.amount,
                     occurred_at=flow.occurred_at, pool_name=flow.pool_name or "未分配资金池", note=flow.note or "",
                     operator=flow.operator or _operator(event), event_id=event.id,
                 ))
         for flow in order.cashflows:
             rows.append(DetailFinanceRowOut(
-                key=f"flow-{flow.flow_no}", flow_no=flow.flow_no, type=_finance_type("", flow.direction, flow.category),
+                key=f"flow-{flow.flow_no}", flow_no=flow.flow_no, type=_finance_type("", flow.direction, flow.category, order_type=order.order_type),
                 direction="支出" if flow.direction == "OUT" else "收入", amount=flow.amount,
                 occurred_at=flow.occurred_at, pool_name=flow.pool_name or "未分配资金池", note=flow.note or "", operator=flow.operator or "-",
             ))

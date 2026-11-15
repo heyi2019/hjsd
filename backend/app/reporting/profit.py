@@ -81,7 +81,7 @@ def order_profit_detail(
             continue
         if to_date and order.trade_date > to_date:
             continue
-        income, expense, _buy_amount = cashflow_by_order.get(order.id, no_totals)
+        income, expense, _account_cost = cashflow_by_order.get(order.id, no_totals)
         rebate = rebate_by_order.get(order.id, ZERO)
         items.append(
             {

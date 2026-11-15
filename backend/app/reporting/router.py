@@ -46,7 +46,7 @@ def monthly_pnl(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
 ) -> MonthlyPnlOut:
-    """月度经营损益（账号直接支出不进运营费用）。"""
+    """月度经营损益（账号成本不进运营费用）。"""
     return r2_monthly_pnl(db, from_date=from_date, to_date=to_date, user=user)
 
 

@@ -1,6 +1,6 @@
 """reporting._shared：报表共用的期间校验、金额归集、坏账与范围过滤工具。
 
-口径红线：账号买入及订单直接支出通过资金明细归集为直接成本，**不进运营费用**；未归集返点独立成列，不摊给业务。
+口径红线：账号买入及订单成本通过资金明细归集为成本，**不进运营费用**；未归集返点独立成列，不摊给业务。
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ def cashflow_totals_by_order(
     from_date: date | None = None,
     to_date: date | None = None,
 ) -> dict[int, tuple[Decimal, Decimal, Decimal]]:
-    """按订单汇总资金明细 (所有收入, 所有支出, 其中买号支出)。
+    """按订单汇总资金明细 (所有收入, 所有支出, 其中账号成本)。
 
     2026-11-05 用户裁决：利润 = 单订单所有收入 − 所有支出，可正可负可 0；
     资金走向只有收入 / 支出两种，不以「是否生成 cashflow 行」为界。
@@ -83,7 +83,7 @@ def cashflow_totals_by_order(
     expense_case = case(
         (Cashflow.direction == Direction.OUT.value, Cashflow.amount), else_=0
     )
-    buy_case = case(
+    account_cost_case = case(
         (
             and_(
                 Cashflow.direction == Direction.OUT.value,
@@ -98,7 +98,7 @@ def cashflow_totals_by_order(
             Cashflow.order_id,
             func.coalesce(func.sum(income_case), 0),
             func.coalesce(func.sum(expense_case), 0),
-            func.coalesce(func.sum(buy_case), 0),
+            func.coalesce(func.sum(account_cost_case), 0),
         )
         .where(Cashflow.order_id.is_not(None), business_cashflow_filter())
         .group_by(Cashflow.order_id)
@@ -110,8 +110,8 @@ def cashflow_totals_by_order(
     if to_date is not None:
         stmt = stmt.where(Cashflow.occurred_on <= to_date)
     totals: dict[int, list[Decimal]] = {
-        int(order_id): [to_money_or_zero(income), to_money_or_zero(expense), to_money_or_zero(buy)]
-        for order_id, income, expense, buy in session.execute(stmt).all()
+        int(order_id): [to_money_or_zero(income), to_money_or_zero(expense), to_money_or_zero(account_cost)]
+        for order_id, income, expense, account_cost in session.execute(stmt).all()
     }
     for order_id, (rebate_income, bad_debt_expense) in order_profit_flow_by_order(
         session, order_ids=ids, from_date=from_date, to_date=to_date

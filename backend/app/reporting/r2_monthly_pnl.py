@@ -1,6 +1,6 @@
 """月度经营损益。
 
-订单贡献口径（2026-11-05 用户裁决）：销售收入 / 直接成本按各订单
+订单贡献口径（2026-11-05 用户裁决）：销售收入 / 成本按各订单
 「所有收入 − 所有支出」取数，与订单利润明细、业务级损益、分润基数同源。
 资金走向只有收入 / 支出两种：返点记录是收入、分期坏账是支出，即使不生成
 资金流水也按各自发生日归月计入。返点收益列是「其中返点」的展示项，
@@ -130,7 +130,7 @@ def r2_monthly_pnl(
     op_stmt = select(Cashflow).where(
         Cashflow.status == CashflowStatus.APPROVED.value,
         Cashflow.order_event_id.is_(None),
-        # 挂订单的支出归该单「支出大类」（直接成本），不再重复进期间运营费用。
+        # 挂订单的支出归该单「支出大类」（成本），不再重复进期间运营费用。
         Cashflow.order_id.is_(None),
         or_(Cashflow.fund_nature == "BUSINESS", Cashflow.category == "OPERATING_COST"),
         or_(
@@ -143,6 +143,11 @@ def r2_monthly_pnl(
     if pool_ids is not None:
         op_stmt = op_stmt.where(Cashflow.pool_id.in_(pool_ids))
     op_rows = session.scalars(op_stmt).all()
+    reversal_ids = {flow.reversal_of_id for flow in op_rows if flow.reversal_of_id is not None}
+    original_flows = {
+        flow.id: flow
+        for flow in session.scalars(select(Cashflow).where(Cashflow.id.in_(reversal_ids))).all()
+    } if reversal_ids else {}
     operating: dict[str, Decimal] = defaultdict(lambda: ZERO)
     for flow in op_rows:
         occurred_on = flow.occurred_on
@@ -155,7 +160,7 @@ def r2_monthly_pnl(
             # 冲销流水先按「被冲销的原流水」归类，不能看冲销流水自身的方向 / 性质：
             # 冲销经营收入会生成 OUT/BUSINESS_OUT，按自身方向判断会被误记成运营费用。
             # 只有原流水确属运营费用（核算属性 / 类别），才冲减运营费用列。
-            original = session.get(Cashflow, flow.reversal_of_id)
+            original = original_flows.get(flow.reversal_of_id)
             if original is not None and (
                 original.accounting_attribute == AccountingAttribute.OPERATING_EXPENSE.value
                 or original.category == "OPERATING_COST"

@@ -6,13 +6,13 @@
 - 该口径是订单域事实，不属于报表，下沉到 orders 域避免反向依赖。
 
 口径（勿凭直觉改）：
-- GROSS / PRINCIPAL：已过账事件口径，SELL=成交额、BUY=本金占用；直接支出统一取资金明细；
+- GROSS / PRINCIPAL：已过账事件口径，SELL=成交额、BUY=本金占用；成本统一取资金明细；
   CANCEL 仅在其显式 offset 某事件时才做会计冲销；裸取消只改流程状态。
 - PROFIT（2026-11-05 用户裁决）：该订单**收入大类 − 支出大类**，可正、可负、可为 0。
   **只有收入、支出两个大类**；业务名词都是大类下的子类型，地位平等、同类同规则：
   · 收入大类：售出价（SELL）、返点、其他一切流入；
-  · 支出大类：提号价 / 回收价（BUY）、直接费用、分期坏账、其他一切流出。
-  子类型只在报表里作「其中项」展示（如「其中返点」「其中买号支出」），不是独立的钱，
+  · 支出大类：提号价 / 回收价（BUY）、其他费用、分期坏账、其他一切流出。
+  子类型只在报表里作「其中项」展示（如「其中返点」「其中账号成本」），不是独立的钱，
   绝不再加回净利。
   资金走向不以「有没有生成 cashflow 行」为界：生成流水走流水汇总；不生成流水的
   （返点登记即收入确认 / 分期坏账回收确认）在各源自成口径补入。
@@ -99,7 +99,7 @@ def is_deposit_loss_flow(
 def event_contribution(
     event: OrderEvent, event_types: dict[int, str]
 ) -> tuple[Decimal, Decimal, Decimal]:
-    """返回单个事件的 (income, buy_amount, direct_cost)。
+    """返回单个事件的 (income, event_cost, additional_cost)。
 
     注意：本函数不判断 is_posted，由调用方过滤（与既有行为保持一致）。
     """
@@ -120,11 +120,11 @@ def event_contribution(
 def event_totals(
     events: list[OrderEvent], *, from_date: date | None = None, to_date: date | None = None
 ) -> tuple[Decimal, Decimal, Decimal]:
-    """汇总一批事件的 (income, buy_amount, direct_cost)；跳过未过账与越界日期。"""
+    """汇总一批事件的 (income, event_cost, additional_cost)。"""
     event_types = {event.id: event.event_type for event in events}
     income = ZERO
-    buy_amount = ZERO
-    direct_cost = ZERO
+    event_cost = ZERO
+    additional_cost = ZERO
     for event in events:
         if not event.is_posted:
             continue
@@ -132,11 +132,11 @@ def event_totals(
             continue
         if to_date and event.occurred_on > to_date:
             continue
-        event_income, event_buy, event_cost = event_contribution(event, event_types)
+        event_income, event_amount, event_extra_cost = event_contribution(event, event_types)
         income += event_income
-        buy_amount += event_buy
-        direct_cost += event_cost
-    return income, buy_amount, direct_cost
+        event_cost += event_amount
+        additional_cost += event_extra_cost
+    return income, event_cost, additional_cost
 
 
 def _profit_flow_rows(
@@ -328,9 +328,9 @@ def order_amounts(session: Session, order_id: int) -> dict[str, Decimal]:
     events = list(
         session.scalars(select(OrderEvent).where(OrderEvent.order_id == order_id)).all()
     )
-    income, buy_amount, _ = event_totals(events)
+    income, cost, _ = event_totals(events)
     return {
         "GROSS": income,
-        "PRINCIPAL": buy_amount,
+        "PRINCIPAL": cost,
         "PROFIT": order_cashflow_profit(session, order_id),
     }

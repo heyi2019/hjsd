@@ -44,7 +44,7 @@ from app.orders.links import (
     list_order_links as orders_list_order_links,
 )
 from app.orders.mutations import update_order as orders_update_order
-from app.orders.pools import pool_balance as orders_pool_balance, pool_balance_summary
+from app.finance.balances import pool_balance as finance_pool_balance, pool_balance_summary
 from app.orders.queries import (
     count_orders,
     list_orders as orders_list_orders,
@@ -571,7 +571,7 @@ def pool_balance(
         from app.core.errors import NotFound
         raise NotFound("资金池不存在", details={"pool_id": pool_id})
     return schemas.PoolBalanceOut.model_validate(
-        orders_pool_balance(db, pool_id, user=_user)
+        finance_pool_balance(db, pool_id, user=_user)
     )
 
 

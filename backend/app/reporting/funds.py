@@ -44,7 +44,7 @@ def daily_funds_report(
     `deposit_paid` 是「其中：押金缴纳」信息列，不参与收入/支出发生额合计，
     以免与 expense 中的押金占用重复计算。
     """
-    from app.orders.pools import pool_balances
+    from app.finance.balances import pool_balances
 
     target = on or date.today()
     pool_stmt = select(Pool)

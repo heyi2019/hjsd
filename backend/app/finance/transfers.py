@@ -16,7 +16,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import AccountingAttribute, AuditAction, Direction, FundNature, Nature
 from app.domain.trade import Cashflow
 from app.orders.form_fields import validate_form_extra
-from app.orders.pools import pool_balance
+from app.finance.balances import pool_balance
 from app.foundation.pools import assert_pool_usable
 
 from ._common import _positive, _text

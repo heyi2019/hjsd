@@ -46,3 +46,8 @@ def test_manual_cashflow_request_does_not_require_derived_nature() -> None:
     )
 
     assert payload.nature is None
+
+
+def test_pool_balance_projection_belongs_to_finance() -> None:
+    importlib.import_module("app.finance.balances")
+    assert importlib.util.find_spec("app.orders.pools") is None

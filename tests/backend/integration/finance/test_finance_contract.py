@@ -26,7 +26,7 @@ from app.finance.reconciliation import create_reconciliation, resolve_reconcilia
 from app.finance.transfers import create_transfer, repair_transfer
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.orders.pools import pool_balance
+from app.finance.balances import pool_balance
 from app.parties.counterparties import create_counterparty, set_counterparty_status
 from app.reporting.funds import daily_funds_report
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl

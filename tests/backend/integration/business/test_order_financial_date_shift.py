@@ -116,7 +116,7 @@ def test_cancel_sell_flow_is_out_business_out(seeded_db):
         f"[BUG] 冲销 SELL 的流水 nature={cancel_flow.nature}，OUT 却标 BUSINESS_IN"
     )
     # 资金池收支卡片：OUT/BUSINESS_OUT 计入 expense，账与余额自洽。
-    from app.orders.pools import pool_balances
+    from app.finance.balances import pool_balances
     balances = pool_balances(seeded_db, [1])
     # 主 SELL(IN 200) + BUY(OUT 100) + CANCEL(OUT 200) → expense 应含 BUY 100 + CANCEL 200
     assert balances[1]["expense"] >= Decimal("300.00")

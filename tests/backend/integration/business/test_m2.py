@@ -27,7 +27,7 @@ from app.value_added_services import recovery as inst_recovery
 from app.value_added_services import repayment as inst_repayment
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.orders.pools import pool_balance
+from app.finance.balances import pool_balance
 from app.parties.counterparties import create_counterparty
 from app.parties.customers import create_customer
 

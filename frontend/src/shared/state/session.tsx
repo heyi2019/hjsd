@@ -2,8 +2,7 @@
  * 前端只用它控制按钮显隐；后端仍会二次鉴权，隐藏菜单不构成权限控制。 */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { ACCESS_TOKEN_KEY, changePassword as changePasswordApi, currentDevUser, currentUser as currentUserApi, login as loginApi, logout as logoutApi, persistAccessToken, setDevUser as persistDevUser } from "../api/client";
-import type { SessionUser } from "../api/client";
+import { ACCESS_TOKEN_KEY, changePassword as changePasswordApi, currentDevUser, currentUser as currentUserApi, login as loginApi, logout as logoutApi, setDevUser as persistDevUser } from "../api/client";
 
 export const ALL_PERMISSIONS = [
   "customer.read",
@@ -102,12 +101,8 @@ interface SessionValue {
   switchUser: (user: string) => void;
   authenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
-  /** 免密登录（手机号验证码 / 微信）拿到 token 后统一走这里落会话。 */
-  loginWithToken: (token: string, user: SessionUser) => void;
   mustChangePassword: boolean;
-  /** 本次会话由免密登录建立：改密页不要求「当前密码」（用户从未输入过）。 */
-  passwordlessSession: boolean;
-  changePassword: (oldPassword: string | null, newPassword: string) => Promise<void>;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -122,15 +117,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // 回落 false 落登录页，刷新页面即恢复直通——开发态不会被关在登录页外。
   const [authenticated, setAuthenticated] = useState<boolean>(() => import.meta.env.DEV || Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)));
   const [mustChangePassword, setMustChangePassword] = useState(false);
-  // 仅用于决定改密页要不要「当前密码」这一栏；真正的准入判定在后端（按 token 的 amr）。
-  const [passwordlessSession, setPasswordlessSession] = useState(false);
   useEffect(() => {
     if (!localStorage.getItem(ACCESS_TOKEN_KEY)) return;
     void currentUserApi().then((current) => {
       setRole(current.role.toLowerCase());
       setUsername(current.username);
       setMustChangePassword(Boolean(current.must_change_password));
-      setPasswordlessSession(Boolean(current.auth_method && current.auth_method !== "password"));
     }).catch(() => { localStorage.removeItem(ACCESS_TOKEN_KEY); setAuthenticated(false); });
   }, []);
   const switchUser = useCallback((next: string) => {
@@ -153,22 +145,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // 用户名必须单独存：角色来自 users.role，用户名来自 users.username，二者不可互相代替。
     setUsername(loggedIn.username);
     setMustChangePassword(Boolean(loggedIn.must_change_password));
-    setPasswordlessSession(false);
     setAuthenticated(true);
   }, []);
-  const changePassword = useCallback(async (oldPassword: string | null, newPassword: string) => {
+  const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
     await changePasswordApi(oldPassword, newPassword);
     setMustChangePassword(false);
-  }, []);
-  const loginWithToken = useCallback((token: string, next: SessionUser) => {
-    // token 落盘与内存态必须同时完成：只写其中一边会出现「刷新后失效」或
-    // 「已登录但页面停在登录页」两种半死状态。
-    persistAccessToken(token);
-    setRole(next.role.toLowerCase());
-    setUsername(next.username);
-    setMustChangePassword(Boolean(next.must_change_password));
-    setPasswordlessSession(true);
-    setAuthenticated(true);
   }, []);
   const logout = useCallback(async () => {
     // 后端 /auth/logout 失败也必须退出本地会话：否则「退出登录」点了没反应，
@@ -181,13 +162,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } finally {
       setAuthenticated(false);
       setMustChangePassword(false);
-      setPasswordlessSession(false);
     }
   }, []);
   const value = useMemo<SessionValue>(() => {
     const permissions = new Set<string>(ROLE_PERMISSIONS[role] ?? []);
-    return { role, username, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, passwordlessSession, changePassword, login, loginWithToken, logout };
-  }, [role, username, switchUser, authenticated, mustChangePassword, passwordlessSession, changePassword, login, loginWithToken, logout]);
+    return { role, username, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, changePassword, login, logout };
+  }, [role, username, switchUser, authenticated, mustChangePassword, changePassword, login, logout]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

@@ -27,7 +27,7 @@ DB_BASELINE = 1360
 
 # 允许在模块级手工声明 db 的文件。派生机制覆盖不到的只能是「自建引擎并连接」这类，
 # 每新增一个都必须在这里登记——否则「手工标记」就成了绕过守卫的后门。
-DECLARED_DB_FILES = {"test_migration.py", "test_numbering.py"}
+DECLARED_DB_FILES = {"test_core_contract.py", "test_migration.py", "test_numbering.py"}
 
 _SELF_ENGINE = re.compile(r"create_engine\s*\(")
 _CONNECTS = re.compile(r"\.connect\(\)")

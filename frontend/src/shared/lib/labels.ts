@@ -232,8 +232,6 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   USER_HANDOVER: "交接用户权限",
   PASSWORD_CHANGE: "修改密码",
   PASSWORD_RESET: "重置密码",
-  WECHAT_BIND: "绑定微信",
-  WECHAT_UNBIND: "解绑微信",
   TEAM_CREATE: "新建团队",
   TEAM_UPDATE: "编辑团队",
   FIELD_DEFINITION_CHANGE: "变更表单字段配置",

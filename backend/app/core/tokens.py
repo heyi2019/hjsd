@@ -113,7 +113,6 @@ def build_access_token(user: CurrentUser, *, settings: Settings | None = None) -
             "pool_ids": sorted(user.pool_ids),
             "team_ids": sorted(user.team_ids),
             "owner_scope": user.owner_scope,
-            "amr": user.auth_method,
         },
         settings=settings,
     )

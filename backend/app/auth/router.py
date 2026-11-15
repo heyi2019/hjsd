@@ -27,9 +27,7 @@ class LoginRequest(RequestModel):
 
 
 class PasswordChange(RequestModel):
-    # 免密登录（手机号验证码 / 微信扫码）的会话从未输入过密码，首次设置密码时无从提供「当前密码」；
-    # 是否允许省略由后端按 token 的 amr 与 must_change_password 共同判定，不信任客户端。
-    old_password: str | None = Field(default=None, max_length=128)
+    old_password: str = Field(min_length=1, max_length=128)
     new_password: str = Field(min_length=8, max_length=128)
 
 
@@ -94,9 +92,6 @@ class PublicUserOut(BaseModel):
     handover_user_id: int | None = None
     handover_note: str | None = None
     created_at: str | None = None
-    # 本次会话的认证方式（password / phone_code / wechat），由 token 的 amr 声明而来，
-    # 不存在于 users 表。前端据此决定「首次设置密码」是否还需要填当前密码。
-    auth_method: str | None = None
 
 
 class LoginOut(BaseModel):
@@ -189,7 +184,6 @@ def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_
         "id": user.id, "username": user.username, "display_name": user.display_name,
         "role": user.roles[0] if user.roles else "VIEWER", "is_active": True,
     }
-    payload["auth_method"] = user.auth_method
     return payload
 
 
@@ -201,7 +195,6 @@ def change_password(payload: PasswordChange, user: CurrentUser = Depends(get_cur
         old_password=payload.old_password,
         new_password=payload.new_password,
         actor=user.username,
-        passwordless=not user.password_authenticated,
     )
     return {"ok": True}
 

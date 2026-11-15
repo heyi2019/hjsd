@@ -50,7 +50,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("status", "订单状态", value_set="ORDER_STATUS"),
             ListColumn("account_status", "库存状态"),
             ListColumn("profit_base", "利润"),
-            ListColumn("trade_date", "日期"),
             ListColumn("actions", "操作"),
         ),
     ),

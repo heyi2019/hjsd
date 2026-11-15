@@ -21,6 +21,17 @@ CUSTOMERS = "/api/v1/customers"
 COUNTERPARTIES = "/api/v1/counterparties"
 
 
+def _user(uid=2, perms=(), pool_ids=(), owner_scope="SELF") -> CurrentUser:
+    return CurrentUser(
+        id=uid,
+        username=f"u{uid}",
+        roles=(),
+        permissions=frozenset(perms),
+        pool_ids=frozenset(pool_ids),
+        owner_scope=owner_scope,
+    )
+
+
 class TestCustomerNumbering:
     def test_cus_number_allocated_independently(self, seeded_db):
         first = create_customer(seeded_db, display_name="阿甲", actor="pytest")

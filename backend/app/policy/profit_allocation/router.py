@@ -1,6 +1,6 @@
 """订单分润配置接口。
 
-接口只保存利润归属配置，不登记 PROFIT_SHARE 事件，也不创建资金流水。
+接口只保存利润归属配置，不创建资金流水。
 """
 from __future__ import annotations
 

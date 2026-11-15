@@ -46,11 +46,11 @@ def test_list_scopes_match_registry(seeded_client, headers):
 def test_save_hides_column_and_reorders(seeded_client, headers, seeded_db):
     ledger = _scope(seeded_client, headers, "LEDGER")
     columns = ledger["columns"]
-    # 关掉「库存状态」列，并把「日期」提到第一位，其余保持相对顺序
-    rest = [column for column in columns if column["key"] not in {"account_status", "trade_date"}]
-    trade_date = next(column for column in columns if column["key"] == "trade_date")
+    # 关掉「库存状态」列，并把「入库时间」提到第一位，其余保持相对顺序
+    rest = [column for column in columns if column["key"] not in {"account_status", "inventory_entry_at"}]
+    inventory_entry_at = next(column for column in columns if column["key"] == "inventory_entry_at")
     hidden = next(column for column in columns if column["key"] == "account_status")
-    ordered = [trade_date, *rest, hidden]
+    ordered = [inventory_entry_at, *rest, hidden]
     items = [
         {
             "column_key": column["key"],
@@ -63,14 +63,14 @@ def test_save_hides_column_and_reorders(seeded_client, headers, seeded_db):
     response = _save(seeded_client, headers, "LEDGER", items)
     assert response.status_code == 200, response.text
     saved = response.json()
-    assert [column["key"] for column in saved["columns"]][0] == "trade_date"
+    assert [column["key"] for column in saved["columns"]][0] == "inventory_entry_at"
     by_key = {column["key"]: column for column in saved["columns"]}
     # 隐藏列仍出现在清单里（设置页要能重新打开），只是 is_visible=False
     assert by_key["account_status"]["is_visible"] is False
 
     # 再次读取：顺序与隐藏态已持久化
     reloaded = _scope(seeded_client, headers, "LEDGER")
-    assert reloaded["columns"][0]["key"] == "trade_date"
+    assert reloaded["columns"][0]["key"] == "inventory_entry_at"
     assert {column["key"]: column for column in reloaded["columns"]}["account_status"]["is_visible"] is False
 
     actions = [
@@ -143,7 +143,7 @@ def test_save_width_and_fixed(seeded_client, headers):
     by_key = {column["key"]: column for column in response.json()["columns"]}
     assert by_key["account_game_type"]["width"] == 180
     assert by_key["order_no"]["fixed"] == "left"
-    assert by_key["trade_date"]["width"] is None
+    assert by_key["inventory_entry_at"]["width"] is None
 
     reloaded = {column["key"]: column for column in _scope(seeded_client, headers, "LEDGER")["columns"]}
     assert reloaded["account_game_type"]["width"] == 180

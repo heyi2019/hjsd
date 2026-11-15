@@ -144,38 +144,6 @@ def test_settings_loads_from_root_env():
     assert settings.api_prefix == "/api/v1"
     assert settings.access_token_expire_minutes >= 1
 
-    # 免密登录三个通道的非法取值必须在配置层被拒绝，不能等运行时才炸。
-    # 这些防御分支是 app/core 覆盖率闸门（max_missing=0）一直在保护的路径。
-    for field, hint in (
-        ("wechat_provider", "WECHAT_PROVIDER"),
-        ("wechat_bind_verify_mode", "WECHAT_BIND_VERIFY_MODE"),
-        ("sms_provider", "SMS_PROVIDER"),
-    ):
-        with pytest.raises(ValidationError, match=hint):
-            Settings(_env_file=None, **{field: "unknown-channel"})
-
-    # 开放平台缺凭据时不得点亮微信入口；缺 AppID/Secret 与缺回调地址分别给可操作提示。
-    openplatform = dict(_env_file=None, wechat_login_enabled=True, wechat_provider="openplatform")
-    assert Settings(**openplatform).wechat_ready[1] == "微信 AppID / AppSecret 未配置"
-    assert Settings(
-        **openplatform, wechat_app_id="wx-id", wechat_app_secret="wx-secret"
-    ).wechat_ready[1] == "微信回调地址 WECHAT_REDIRECT_URI 未配置"
-    assert Settings(
-        **openplatform,
-        wechat_app_id="wx-id",
-        wechat_app_secret="wx-secret",
-        wechat_redirect_uri="https://example.com/callback",
-    ).wechat_ready == (True, None)
-
-    # 短信：disabled 一律不可送达；mock 在 production 下同样不可送达（否则验证码会被回显）。
-    assert Settings(_env_file=None, sms_provider="disabled").sms_code_deliverable is False
-    assert Settings(
-        _env_file=None,
-        sms_provider="mock",
-        app_env="production",
-        jwt_secret_key=SECURE_TEST_SECRET,
-    ).sms_code_deliverable is False
-
 
 def test_default_database_is_postgres(monkeypatch):
     """SQLite 已彻底下线：缺 .env 时的兜底地址也必须是 PG。

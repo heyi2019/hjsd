@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core import database, money, settings as settings_module
 from app import api_v1
-from app.core.errors import AppError, ErrorCode, NotFound, Validation, require_condition
+from app.core.errors import AppError, ErrorCode, NotFound, TokenExpired, Validation, require_condition
 from app.core.money import Amount, to_money
 from app.core.ratelimit import RateLimiter
 from app.core.sql_functions import year_month
@@ -24,7 +24,6 @@ from app.core.security import (
     ROLE_OPERATOR,
     AuthError,
     CurrentUser,
-    TokenExpired,
     decode_token,
     user_from_payload,
     hash_password,
@@ -34,6 +33,8 @@ from app.core.security import (
     verify_password,
 )
 from app.domain.foundation import DocumentSequence
+
+pytestmark = pytest.mark.db
 
 
 # ------------------------------------------------------------------ money
@@ -391,6 +392,24 @@ class TestPasswordGuards:
         assert verify_password("correct-horse", "broken") is False  # 302-303
 
 
+def test_passwordless_authentication_surface_is_removed():
+    import app.core.security as security
+
+    assert not hasattr(security, "AUTH_METHODS")
+    assert not hasattr(security, "AUTH_METHOD_PHONE")
+    assert not hasattr(security, "AUTH_METHOD_WECHAT")
+
+
+def test_removed_passwordless_auth_settings_are_not_part_of_runtime_config():
+    from app.core.settings import Settings
+
+    settings = Settings(_env_file=None)
+
+    assert not hasattr(settings, "phone_code_login_enabled")
+    assert not hasattr(settings, "sms_provider")
+    assert not hasattr(settings, "wechat_provider")
+
+
 class TestRequireRole:
     def test_role_dependency_allows_matching_role(self, seeded_db):
         # 依赖工厂直接调用：命中角色放行，未命中抛 PermissionDenied
@@ -553,7 +572,6 @@ class TestPayloadValidation:
             {"sub": 1, "username": "  "},
             {"sub": 1, "username": "x", "pool_ids": [1, "bad"]},
             {"sub": 1, "username": "x", "owner_scope": "INVALID"},
-            {"sub": 1, "username": "x", "amr": "FORGED"},
         ]
         for payload in invalid_payloads:
             with pytest.raises(AuthError):

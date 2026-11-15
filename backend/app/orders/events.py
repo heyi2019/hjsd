@@ -99,11 +99,6 @@ def post_event(
     allow_installment_delivery = _required_bool(
         allow_installment_delivery, field="allow_installment_delivery"
     )
-    if event_type == "PROFIT_SHARE":
-        raise Validation(
-            "PROFIT_SHARE 分润登记已下线，请使用订单利润分配配置",
-            details={"field": "event_type", "value": event_type},
-        )
     try:
         EventType(event_type)
     except ValueError as exc:

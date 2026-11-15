@@ -205,8 +205,6 @@ _AUDIT_ACTION_ADDITIONS = {
     "LIST_EXPORT": "导出列表",
     "REBATE_UPDATE": "编辑返点",
     "REBATE_DELETE": "删除返点",
-    "WECHAT_BIND": "绑定微信",
-    "WECHAT_UNBIND": "解绑微信",
 }
 
 

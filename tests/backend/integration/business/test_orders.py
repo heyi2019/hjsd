@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from app.stocks.profile import create_account
-from app.core.errors import ErrorCode, NotFound, Validation
+from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
 from app.domain.foundation import Pool
 from app.domain.parties import OrderCustomerRole
@@ -301,7 +301,7 @@ class TestEventRules:
 
         order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")
         cancel_order(seeded_db, order.id, actor="pytest", reason="撤销空订单")
-        with pytest.raises(Validation):
+        with pytest.raises(Conflict):
             post_event(
                 seeded_db, order.id, event_type="BUY", amount="100",
                 occurred_on=TODAY, actor="pytest",

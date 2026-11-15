@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -18,6 +19,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
+from app.domain.trade import InstallmentSchedule
 from app.value_added_services import schemas
 from app.value_added_services import _shared as inst__shared
 from app.value_added_services import create as inst_create

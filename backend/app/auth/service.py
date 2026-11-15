@@ -11,9 +11,9 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.verification import assert_valid_phone, normalize_phone
 from app.core.audit import record_audit
 from app.core.errors import AuthError, Conflict, Validation
+from app.core.phone import assert_valid_phone, normalize_phone
 from app.core.security import ALL_ROLES, OWNER_SCOPES, hash_password, verify_password
 from app.domain.enums import AuditAction
 from app.domain.foundation import Pool
@@ -58,12 +58,7 @@ def _required_bool(value: object, *, message: str) -> bool:
 
 
 def _optional_phone(value: object) -> str | None:
-    """用户名下的手机号：空白视为未配置；非空则按免密登录的同一口径归一化+校验。
-
-    2026-11-05 起手机号是手机号验证码 / 微信扫码登录的准入依据，写入口（设置-用户）
-    必须与读侧用同一套规则，否则「配进去了但登录说未开通」这类问题极难排查
-    （带 +86 / 空格 / 连字符的号码在通讯录复制场景很常见）。
-    """
+    """用户名下的手机号：空白视为未配置，非空值统一归一化并校验。"""
     if value is None:
         return None
     if not isinstance(value, str):
@@ -327,28 +322,16 @@ def change_password(
     session: Session,
     user_id: int,
     *,
-    old_password: str | None,
+    old_password: str,
     new_password: str,
     actor: str,
-    passwordless: bool = False,
 ) -> None:
-    """改密。`old_password` 可空，但只有「免密登录 + 尚未自设密码」这一种情形能省。
-
-    为什么要开这个口子：改密页是登录后的强制闸门，而手机号验证码 / 微信扫码登录的人
-    从未输入过密码——若无条件要求「当前密码」，这类账号首次登录即死锁，且
-    `UserUpdate` 不接 `must_change_password`，管理员也没有接口能替他清掉。
-
-    为什么边界卡在 `must_change_password`：该标记为假意味着用户已经自己设过密码，
-    此时任何会话改密都必须验旧密码，避免 token 泄露后被静默改密。
-    """
+    """改密必须校验当前密码。"""
     user = session.get(User, user_id)
     if user is None:
         raise AuthError("原密码错误")
-    if old_password:
-        if not verify_password(old_password, user.password_hash):
-            raise AuthError("原密码错误")
-    elif not (passwordless and user.must_change_password):
-        raise AuthError("请输入原密码")
+    if not verify_password(old_password, user.password_hash):
+        raise AuthError("原密码错误")
     new_password = _required_password(new_password)
     user.password_hash = hash_password(new_password)
     user.must_change_password = False

@@ -2,8 +2,8 @@
 
 为什么需要
 ----------
-规则编码是**闭集**：后端 `app/domain/enums.py::PolicyType` 只有 6 个固定值，
-`orders/service.py::make_snapshot` 只按固定编码（REBATE / COMMISSION）取快照。
+规则编码是**闭集**：后端 `app/domain/enums.py::PolicyType` 只有固定值，
+订单创建只固化仍在使用的 COMMISSION 规则快照。
 而 `policy/service.py::create_definition` **不校验编码是否属于 PolicyType**，
 所以任何入口都能写出「没人消费」的脏编码定义，且**不报错、静默失效**。
 因此定义收敛为系统预置，不再由页面创建；用户只管「设置配置 → 生成新版本并发布」。

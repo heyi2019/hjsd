@@ -29,7 +29,7 @@ export function requiredMoneyRules(label = "金额", options?: { allowNegative?:
   return [{ required: true, message: `请输入${label}` }, ...moneyRules(label, options)];
 }
 
-/** 比例（0–100）：返点比例等业务字段。 */
+/** 比例（0–100）：适用于仍保留比例口径的业务字段。 */
 export function percentRules(label = "比例"): Rule[] {
   return [
     {

@@ -192,8 +192,7 @@ export function PolicyVersionEditorModal({
         </Form.Item>
 
         <Typography.Paragraph type="secondary">
-          参数随版本固化，历史单据按建单时的快照计算。目前只有<strong>返点费率</strong>被后端读取
-          （仅在登记返点时未手填费率的情况下生效）；<strong>分润分配比例</strong>按动作留存口径，
+          参数随版本固化，历史单据按建单时的快照计算。<strong>分润分配比例</strong>按动作留存口径，
           订单「分润」仍按单录入；分期、跌价、退款的参数仅作口径留痕，接入计算前不改变金额。
         </Typography.Paragraph>
       </BusinessRegistrationForm>

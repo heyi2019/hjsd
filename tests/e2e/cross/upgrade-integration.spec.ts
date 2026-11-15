@@ -250,7 +250,7 @@ test.describe.serial("重写入用例（串行隔离）", () => {
     expect(sellAlloc).toBeTruthy();
     expect(sellAlloc.allocation_rate).toBe("25.00");
     // 售出→返点建链：DG 订单可建 SELL 类型返点（rebates.py 要求 order_type==DG）。
-    const rebateResponse = await request.post(`${base}/rebates`, { headers, data: { source_order_id: order.id, rebate_type: "SELL", amount: "100", rate: "0", collected_on: "2026-10-17" } });
+    const rebateResponse = await request.post(`${base}/rebates`, { headers, data: { source_order_id: order.id, rebate_type: "SELL", amount: "100", collected_on: "2026-10-17" } });
     expect(rebateResponse.status()).toBe(201);
     const rebate = await rebateResponse.json();
     // 口径变更：返点结算模型已重构——DG 代挂沿用统一 SELL 事件登记卖出金额与利润，

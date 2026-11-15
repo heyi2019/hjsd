@@ -22,7 +22,7 @@ from app.policy import definitions as policy_definitions
 from app.policy import versions as policy_versions
 
 
-def _make_policy(seeded_db, *, code="REBATE", name="返点规则") -> dict:
+def _make_policy(seeded_db, *, code="COMMISSION", name="分润规则") -> dict:
     return policy_definitions.create_definition(
         seeded_db,
         policy_code=code,
@@ -86,7 +86,7 @@ class TestPolicyDefinition:
 
     def test_create_and_list(self, seeded_db):
         definition = _make_policy(seeded_db)
-        assert definition["policy_code"] == "REBATE"
+        assert definition["policy_code"] == "COMMISSION"
         assert definition["status"] == PolicyStatus.DRAFT.value
         listed = policy_definitions.list_definitions(seeded_db)
         assert any(d["id"] == definition["id"] for d in listed)
@@ -269,7 +269,7 @@ class TestPolicyVersion:
             seeded_db, definition["id"], effective_from=date(2026, 1, 1), config={"rate": "5"}, actor="pytest"
         )
         resolved = policy_versions.resolve_version(
-            seeded_db, policy_code="REBATE", on=date(2026, 6, 1)
+            seeded_db, policy_code="COMMISSION", on=date(2026, 6, 1)
         )
         assert resolved is not None
         assert resolved.config == {"rate": "5"}
@@ -282,14 +282,14 @@ class TestVersionResolution:
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1), to=date(2026, 7, 1), config={"rate": "5"})
         _publish(seeded_db, definition, frm=date(2026, 7, 1), config={"rate": "8"})
-        early = policy_versions.resolve_version(seeded_db, policy_code="REBATE", on=date(2026, 3, 1))
-        late = policy_versions.resolve_version(seeded_db, policy_code="REBATE", on=date(2026, 9, 1))
+        early = policy_versions.resolve_version(seeded_db, policy_code="COMMISSION", on=date(2026, 3, 1))
+        late = policy_versions.resolve_version(seeded_db, policy_code="COMMISSION", on=date(2026, 9, 1))
         assert early is not None and early.config == {"rate": "5"}
         assert late is not None and late.config == {"rate": "8"}
 
     def test_before_first_version_returns_none(self, seeded_db):
         definition = _make_policy(seeded_db)
-        _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"})
+        _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"split": {"BUY": "30"}})
         assert policy_versions.resolve_version(
             seeded_db, policy_code="REBATE", on=date(2025, 12, 31)
         ) is None
@@ -335,22 +335,22 @@ class TestVersionResolution:
 
 
 class TestSnapshotRedline:
-    """BAS-06-04 核心红线：改未来费率不会改写已发生订单的利润。"""
+    """BAS-06-04 核心红线：改未来规则不会改写已发生订单的利润。"""
 
     def test_new_order_captures_snapshot(self, seeded_db):
         definition = _make_policy(seeded_db)
-        _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"})
+        _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"split": {"BUY": "30"}})
         order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
         assert order.policy_version_id is not None
         assert order.policy_snapshot is not None
-        assert order.policy_snapshot[PolicyType.REBATE.value]["config"] == {"rate": "5"}
+        assert order.policy_snapshot[PolicyType.COMMISSION.value]["config"] == {"split": {"BUY": "30"}}
 
     def test_rule_change_does_not_rewrite_history(self, seeded_db):
-        """本轮最关键的一条：改未来费率后，历史订单快照必须原样不动。"""
+        """本轮最关键的一条：改未来规则后，历史订单快照必须原样不动。"""
         definition = _make_policy(seeded_db)
-        _publish(seeded_db, definition, frm=date(2026, 1, 1), to=date(2026, 7, 1), config={"rate": "5"})
+        _publish(seeded_db, definition, frm=date(2026, 1, 1), to=date(2026, 7, 1), config={"split": {"BUY": "30"}})
         old_order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
@@ -358,30 +358,30 @@ class TestSnapshotRedline:
         old_snapshot = dict(old_order.policy_snapshot)
 
         # 改规则：发布新版（7 月起生效）
-        _publish(seeded_db, definition, frm=date(2026, 7, 1), config={"rate": "8"})
+        _publish(seeded_db, definition, frm=date(2026, 7, 1), config={"split": {"BUY": "40"}})
         # 同时把新版本参数直接改坏，验证历史不受任何影响
         seeded_db.refresh(old_order)
         assert old_order.policy_version_id == old_version_id
         assert old_order.policy_snapshot == old_snapshot
-        assert old_order.policy_snapshot[PolicyType.REBATE.value]["config"] == {"rate": "5"}
+        assert old_order.policy_snapshot[PolicyType.COMMISSION.value]["config"] == {"split": {"BUY": "30"}}
 
         # 新订单用新规则
         new_order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 8, 1), actor="pytest"
         )
-        assert new_order.policy_snapshot[PolicyType.REBATE.value]["config"] == {"rate": "8"}
+        assert new_order.policy_snapshot[PolicyType.COMMISSION.value]["config"] == {"split": {"BUY": "40"}}
         assert new_order.policy_version_id != old_version_id
 
     def test_snapshot_is_deep_copied(self, seeded_db):
         """快照必须是深拷贝：调用方改内存 dict 不能影响已固化数据。"""
         definition = _make_policy(seeded_db)
-        _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"})
+        _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"split": {"BUY": "30"}})
         order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
-        order.policy_snapshot[PolicyType.REBATE.value]["config"]["rate"] = "999"
+        order.policy_snapshot[PolicyType.COMMISSION.value]["config"]["split"]["BUY"] = "999"
         seeded_db.refresh(order)
-        assert order.policy_snapshot[PolicyType.REBATE.value]["config"]["rate"] == "5"
+        assert order.policy_snapshot[PolicyType.COMMISSION.value]["config"]["split"]["BUY"] == "30"
 
     def test_no_policy_yields_no_snapshot(self, seeded_db):
         """没有配置规则时不应报错，快照留空。"""
@@ -393,13 +393,13 @@ class TestSnapshotRedline:
 
     def test_snapshot_for_lookup(self, seeded_db):
         definition = _make_policy(seeded_db)
-        _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"})
+        _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"split": {"BUY": "30"}})
         order = create_order(
             seeded_db, order_type="HS", trade_date=date(2026, 6, 1), actor="pytest"
         )
         found = policy_versions.snapshot_for(seeded_db, order.id)
         assert found is not None
-        assert found["policy_snapshot"][PolicyType.REBATE.value]["version"] == 1
+        assert found["policy_snapshot"][PolicyType.COMMISSION.value]["version"] == 1
 
 
 class TestProfitAllocation:

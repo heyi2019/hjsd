@@ -30,7 +30,7 @@ def json_headers(headers):
     return {**headers, "Content-Type": "application/json"}
 
 
-def _make_policy(seeded_db, *, code="REBATE", name="返点规则") -> dict:
+def _make_policy(seeded_db, *, code="COMMISSION", name="分润规则") -> dict:
     return policy_definitions.create_definition(
         seeded_db, policy_code=code, name=name, scope_type="GLOBAL",
         description="测试用规则", actor="pytest",
@@ -259,7 +259,7 @@ class TestSnapshotAndAllocations:
         )
         assert policy_versions.snapshot_for(seeded_db, plain.id) is None
 
-        # 发布 REBATE 规则后再建单：快照固化
+        # 发布 COMMISSION 规则后再建单：快照固化
         definition = _make_policy(seeded_db)
         _publish(seeded_db, definition, frm=date(2026, 1, 1))
         snapshotted = create_order(
@@ -268,7 +268,7 @@ class TestSnapshotAndAllocations:
         snapshot = policy_versions.snapshot_for(seeded_db, snapshotted.id)
         assert snapshot is not None
         assert snapshot["policy_version_id"] == snapshotted.policy_version_id
-        assert "REBATE" in snapshot["policy_snapshot"]
+        assert "COMMISSION" in snapshot["policy_snapshot"]
 
     def test_set_allocations_notfound_and_bad_rate(self, seeded_db):
         with pytest.raises(NotFound):
@@ -300,7 +300,7 @@ class TestPolicyApi:
         definition = _make_policy(seeded_db)
 
         listed = seeded_client.get(
-            "/api/v1/policies", params={"policy_code": "REBATE"}, headers=json_headers
+            "/api/v1/policies", params={"policy_code": "COMMISSION"}, headers=json_headers
         )
         assert listed.status_code == 200, listed.text
         assert listed.json()["total"] == 1
@@ -310,7 +310,7 @@ class TestPolicyApi:
             f"/api/v1/policies/{definition['id']}", headers=json_headers
         )
         assert fetched.status_code == 200
-        assert fetched.json()["policy_code"] == "REBATE"
+        assert fetched.json()["policy_code"] == "COMMISSION"
 
         missing = seeded_client.get("/api/v1/policies/999999", headers=json_headers)
         assert missing.status_code == 404

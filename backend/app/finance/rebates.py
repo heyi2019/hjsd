@@ -48,7 +48,7 @@ def create_rebate(
 ) -> RebateRecord:
     """返点记录：来源订单必填且必须已成单（REB-01-02）。
 
-    返点金额由登记人明确提供；返点规则费率仅留痕，不参与金额计算。
+    返点金额由登记人明确提供。
     """
     try:
         order = get_order(session, source_order_id, user)

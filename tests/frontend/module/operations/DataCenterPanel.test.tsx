@@ -5,29 +5,23 @@ import { renderLight } from "@fixtures/render";
 import { DataCenterPanel } from "@/reporting/DataCenterPanel";
 import { ordersApi } from "@/shared/api/orders.api";
 import { reportsApi } from "@/shared/api/reports.api";
-import { stocksApi } from "@/shared/api/stocks.api";
 
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/reports.api");
-vi.mock("@/shared/api/stocks.api");
 
-const businessPnl = {
-  total: {
-    business_mode: null,
-    business_type: null,
-    order_count: 2,
-    main_income: "1,000.00",
-    main_cost: "200.00",
-    main_profit: "800.00",
-  },
-  items: [],
+const dataCenterSummary = {
+  sold_cost: "100.00",
+  inventory_cost: "70.00",
+  studio_cost: "30.00",
+  account_sale_profit: "60.00",
+  studio_other_income: "20.00",
+  profit: "80.00",
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 2, completed_count: 1, active_count: 1 });
-  vi.mocked(reportsApi.businessPnl).mockResolvedValue(businessPnl);
-  vi.mocked(stocksApi.inventoryCostSummary).mockResolvedValue({ total_cost: "3,500.00" });
+  vi.mocked(reportsApi.dataCenter).mockResolvedValue(dataCenterSummary);
 });
 
 describe("DataCenterPanel：经营指标", () => {
@@ -40,12 +34,15 @@ describe("DataCenterPanel：经营指标", () => {
     expect(screen.queryByText("资金池概览")).not.toBeInTheDocument();
   });
 
-  it("保留在途成本和利润，不重复展示工作室支出", async () => {
+  it("展示三类成本、利润构成和利润合计", async () => {
     renderLight(<DataCenterPanel />, { user: "admin" });
-    expect(await screen.findByText("在途成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
-    expect(screen.getByText("在途成本").closest(".ui-stat")?.textContent).toContain("3,500.00");
-    expect(screen.getByText("利润", { selector: ".ui-stat__label" }).closest(".ui-stat")?.textContent).toContain("800.00");
-    expect(screen.queryByText("工作室支出", { selector: ".ui-stat__label" })).not.toBeInTheDocument();
+    expect(await screen.findByText("售出成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
+    expect(screen.getByText("售出成本").closest(".ui-stat")?.textContent).toContain("100.00");
+    expect(screen.getByText("库存成本（未售出）").closest(".ui-stat")?.textContent).toContain("70.00");
+    expect(screen.getByText("工作室成本").closest(".ui-stat")?.textContent).toContain("30.00");
+    expect(screen.getByText("账号售出利润").closest(".ui-stat")?.textContent).toContain("60.00");
+    expect(screen.getByText("工作室其他收入").closest(".ui-stat")?.textContent).toContain("20.00");
+    expect(screen.getByText("利润").closest(".ui-stat")?.textContent).toContain("80.00");
   });
 
   it("日期范围只传给经营指标接口", async () => {
@@ -53,8 +50,7 @@ describe("DataCenterPanel：经营指标", () => {
     renderLight(<DataCenterPanel range={range} />, { user: "admin" });
     await screen.findByText("订单总数");
     expect(vi.mocked(ordersApi.summary)).toHaveBeenLastCalledWith({ trade_date_from: "2026-11-01", trade_date_to: "2026-11-15" });
-    expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-11-01", to: "2026-11-15" });
-    expect(vi.mocked(stocksApi.inventoryCostSummary)).toHaveBeenLastCalledWith({ entry_date_from: "2026-11-01", entry_date_to: "2026-11-15" });
+    expect(vi.mocked(reportsApi.dataCenter)).toHaveBeenLastCalledWith({ from: "2026-11-01", to: "2026-11-15" });
   });
 
   it("订单接口失败时显示错误并禁用订单入口", async () => {

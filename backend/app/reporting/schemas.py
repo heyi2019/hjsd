@@ -88,6 +88,15 @@ class BusinessPnlOut(ReportModel):
     total: BusinessPnlTotalOut
 
 
+class DataCenterOut(ReportModel):
+    sold_cost: Decimal
+    inventory_cost: Decimal
+    studio_cost: Decimal
+    account_sale_profit: Decimal
+    studio_other_income: Decimal
+    profit: Decimal
+
+
 class DailyFundsItemOut(ReportModel):
     pool_code: str
     pool_name: str
@@ -145,6 +154,7 @@ class OrderProfitOut(ReportModel):
 
 __all__ = [
     "BusinessPnlOut",
+    "DataCenterOut",
     "CommissionOut",
     "DailyFundsOut",
     "MonthlyPnlOut",

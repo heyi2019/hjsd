@@ -57,6 +57,15 @@ export interface BusinessPnlReport {
   items: BusinessPnlRow[];
 }
 
+export interface DataCenterSummary {
+  sold_cost: string;
+  inventory_cost: string;
+  studio_cost: string;
+  account_sale_profit: string;
+  studio_other_income: string;
+  profit: string;
+}
+
 export interface DailyFundsRow {
   pool_code: string;
   pool_name: string;

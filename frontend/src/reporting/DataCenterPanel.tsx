@@ -1,11 +1,9 @@
-/** 数据中心：订单、库存成本与经营结果总览。资金池余额、押金和流水归资金中心负责。 */
+/** 数据中心：订单、三类成本与利润构成总览；资金明细仍归资金中心负责。 */
 import { Space } from "antd";
 import { useCallback, useEffect, useState } from "react";
-import { cashflowsApi } from "../shared/api/cashflows.api";
 import { ordersApi } from "../shared/api/orders.api";
 import { reportsApi } from "../shared/api/reports.api";
-import { stocksApi } from "../shared/api/stocks.api";
-import type { BusinessPnlReport } from "../shared/api/types/reporting";
+import type { DataCenterSummary } from "../shared/api/types/reporting";
 import { normalizeError } from "../shared/api/client";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 import type { ReportRange } from "./reports/shared";
@@ -18,9 +16,7 @@ import {
 
 export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; range?: ReportRange }) {
   const [orderSummary, setOrderSummary] = useState<{ total_count: number; active_count: number } | null>(null);
-  const [businessPnl, setBusinessPnl] = useState<BusinessPnlReport | null>(null);
-  const [inventoryCost, setInventoryCost] = useState<string | null>(null);
-  const [studioExpense, setStudioExpense] = useState<string | null>(null);
+  const [summary, setSummary] = useState<DataCenterSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
 
@@ -34,17 +30,7 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
       const reportParams = range?.params.from || range?.params.to
         ? { from: range.params.from, to: range.params.to }
         : undefined;
-      setBusinessPnl(await reportsApi.businessPnl(reportParams));
-      const studioSummary = await cashflowsApi.studioSummary({
-        occurred_from: range?.params.from,
-        occurred_to: range?.params.to,
-      });
-      setStudioExpense(studioSummary.approved_expense);
-      const inventorySummary = await stocksApi.inventoryCostSummary({
-        entry_date_from: range?.params.from,
-        entry_date_to: range?.params.to,
-      });
-      setInventoryCost(inventorySummary.total_cost);
+      setSummary(await reportsApi.dataCenter(reportParams));
       setLoadError(null);
     } catch (error) {
       setLoadError(normalizeError(error));
@@ -56,10 +42,6 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
   useEffect(() => {
     void load();
   }, [load]);
-
-  const totalInventoryCost = inventoryCost ?? "—";
-  const totalProfit = businessPnl?.total.main_profit ?? "—";
-  const totalStudioExpense = studioExpense ?? "—";
 
   const orderCardsUnavailable = orderSummary === null;
 
@@ -88,14 +70,17 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
 
       <StatRow
         items={[
-          { label: "在途成本", amount: totalInventoryCost },
-          { label: "利润", amount: totalProfit, tone: "auto" },
-          { label: "工作室支出", amount: totalStudioExpense },
+          { label: "售出成本", amount: summary?.sold_cost ?? "—" },
+          { label: "库存成本（未售出）", amount: summary?.inventory_cost ?? "—" },
+          { label: "工作室成本", amount: summary?.studio_cost ?? "—" },
+          { label: "账号售出利润", amount: summary?.account_sale_profit ?? "—", tone: "auto" },
+          { label: "工作室其他收入", amount: summary?.studio_other_income ?? "—", tone: "auto" },
+          { label: "利润", amount: summary?.profit ?? "—", tone: "auto" },
         ]}
       />
 
       <Space className="muted" size="small">
-        在途成本按库存入库口径统计；资金池余额、押金和流水请进入资金中心查看。
+        利润 = 账号售出利润 + 工作室其他收入；资金池余额、押金和流水请进入资金中心查看。
       </Space>
     </section>
   );

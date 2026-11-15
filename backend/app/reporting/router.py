@@ -24,9 +24,11 @@ from app.reporting.profit import order_profit_detail
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from app.reporting.r3_commission import r3_commission_reconciliation
 from app.reporting.r5_business_pnl import r5_business_pnl
+from app.reporting.data_center import data_center_summary
 from app.reporting.schemas import (
     BusinessPnlOut,
     CommissionOut,
+    DataCenterOut,
     DailyFundsOut,
     MonthlyPnlOut,
     OrderProfitOut,
@@ -73,6 +75,17 @@ def business_pnl(
 ) -> BusinessPnlOut:
     """业务级损益：主营收入 / 成本 / 毛利均按订单资金明细收支差。"""
     return r5_business_pnl(db, from_date=from_date, to_date=to_date, user=user)
+
+
+@router.get("/reports/data-center", response_model=DataCenterOut)
+def data_center(
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = read_access,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+) -> DataCenterOut:
+    """数据中心指标：售出成本、在库成本、工作室成本与利润构成。"""
+    return data_center_summary(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/reports/daily-funds", response_model=DailyFundsOut)

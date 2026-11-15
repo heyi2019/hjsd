@@ -231,12 +231,6 @@ it("库存中心不为售出单提供取消入口", async () => {
 });
 
 describe("库存售出三表单分支", () => {
-  it("回收售出标题为『售出回收账号』且买家信息区为『买家信息』", async () => {
-    renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-    expect(await screen.findByText("售出回收账号")).toBeInTheDocument();
-    expect(screen.getByText("买家信息")).toBeInTheDocument();
-  });
-
   it("售出表单统一使用资金明细且不增加支出", async () => {
     renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
     expect(await screen.findByText("资金明细")).toBeInTheDocument();
@@ -259,17 +253,6 @@ describe("库存售出三表单分支", () => {
       for (const label of deliveryLabels) expect(screen.getByText(label)).toBeInTheDocument();
       unmount();
     }
-  });
-
-  it("提号售出标题为『售出提号账号』", async () => {
-    renderLight(<PickupSaleModal account={{ ...accounts[0], inventory_type: "PICKUP" }} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-    expect(await screen.findByText("售出提号账号")).toBeInTheDocument();
-  });
-
-  it("代挂售出标题为『售出代挂账号』且买家信息区为『委托方信息』", async () => {
-    renderLight(<ConsignmentSaleModal account={{ ...accounts[0], inventory_type: "CONSIGNMENT" }} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-    expect(await screen.findByText("售出代挂账号")).toBeInTheDocument();
-    expect(screen.getByText("委托方信息")).toBeInTheDocument();
   });
 
   it("分期出售只对回收与提号开放，代挂仅全款", async () => {

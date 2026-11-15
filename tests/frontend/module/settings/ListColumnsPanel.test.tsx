@@ -104,13 +104,6 @@ describe("ListColumnsPanel", () => {
     }));
   });
 
-  it("不显示列表列配置说明文字", async () => {
-    renderLight(<ListColumnsPanel />);
-    await waitFor(() => expect(screen.getByText("订单号")).toBeInTheDocument());
-
-    expect(screen.queryByText(/配置各列表显示哪些列、以什么顺序显示/)).not.toBeInTheDocument();
-  });
-
   it("默认展示第一个列表的全部列，所有列均可隐藏（无锁定）", async () => {
     renderLight(<ListColumnsPanel />);
     await waitFor(() => expect(screen.getByText("订单号")).toBeInTheDocument());

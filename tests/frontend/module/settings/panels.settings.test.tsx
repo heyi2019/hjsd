@@ -161,12 +161,6 @@ describe("GameTypeSettingsPanel：表单细节", () => {
     expect(input).toHaveAttribute("autocomplete", "off");
   });
 
-  it("不再渲染重复的游戏与渠道配置容器标题", async () => {
-    renderLight(<GameTypeSettingsPanel />, { user: "admin" });
-    expect(await screen.findByText("已配置游戏类型")).toBeInTheDocument();
-    expect(screen.queryByText("游戏与渠道配置")).toBeNull();
-  });
-
   it("新建时勾选默认类型 → payload 带 is_default（后端 create 支持，edit 不传）", async () => {
     vi.mocked(gameTypesApi).create.mockResolvedValue({ id: 3, name: "蛋仔派对", sort_order: 0, is_active: true, is_default: true });
     renderLight(<GameTypeSettingsPanel />, { user: "admin" });

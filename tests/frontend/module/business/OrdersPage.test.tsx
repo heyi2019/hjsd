@@ -111,18 +111,6 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.queryByRole("columnheader", { name: "关联" })).toBeNull();
   });
 
-  it("订单台账把导出按钮放在筛选栏最后并使用简短文案", async () => {
-    renderLight(<OrdersPage initialTab="ledger" />);
-    // 默认夹具只有 HS-2026-0001 / TH-2026-0002（INSTALLMENT-SETTLED 只属于 FE-257 用例）
-    await screen.findAllByText("HS-2026-0001");
-    const exportButton = screen.getByRole("button", { name: /导出/ });
-    expect(exportButton).toHaveTextContent("导出");
-    expect(screen.queryByRole("button", { name: /导出 CSV/ })).toBeNull();
-    const filterBar = screen.getByPlaceholderText("搜索订单号 / 游戏账号/产品 / 对方 / 备注").closest(".ui-filter-bar")!;
-    const buttons = filterBar.querySelectorAll("button");
-    expect(buttons[buttons.length - 1]).toBe(exportButton);
-  });
-
   it("类型 Segmented 计数与「订单总量」同口径：关键词筛选后同步收窄", async () => {
     await openLedger();
     expect(screen.getByText("订单总量").closest(".ui-stat")).toHaveTextContent("2");

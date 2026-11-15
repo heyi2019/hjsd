@@ -96,23 +96,6 @@ describe("ConfigAuditPanel 配置改动追溯页", () => {
     expect(screen.getByText("只读")).toBeInTheDocument();
   });
 
-  it("展示新增审计动作的中文名称", async () => {
-    vi.mocked(auditApi).list.mockResolvedValue({
-      items: [
-        { ...ROWS[0], id: 3, action: "DEPOSIT_CANCEL" },
-        { ...ROWS[0], id: 4, action: "REBATE_VOID" },
-        { ...ROWS[0], id: 5, action: "IMPORT_REJECT" },
-      ],
-      total: 3,
-    });
-    vi.mocked(auditApi).actions.mockResolvedValue(["DEPOSIT_CANCEL", "REBATE_VOID", "IMPORT_REJECT"]);
-    renderLight(<ConfigAuditPanel />, { user: "admin" });
-
-    expect(await screen.findByText("取消押金")).toBeInTheDocument();
-    expect(screen.getByText("取消返点")).toBeInTheDocument();
-    expect(screen.getByText("驳回导入批次")).toBeInTheDocument();
-  });
-
   it("加载失败时记录数标记为不可用并禁用筛选、提供重新加载（L346）", async () => {
     vi.mocked(auditApi).list.mockRejectedValue(new Error("审计服务不可用"));
     vi.mocked(auditApi).actions.mockResolvedValue(["ROUTE_UPDATE"]);

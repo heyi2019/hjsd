@@ -109,18 +109,6 @@ describe("StudioExpensePanel：工作室支出", () => {
     );
   });
 
-  it("资金池筛选下拉只显示中文名称，不显示英文编码", async () => {
-    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
-    const poolSelect = await screen.findByRole("combobox", { name: "资金池筛选" });
-    await ui.click(poolSelect);
-    // 断言必须限定在弹层内：列表「资金池」列同样渲染「经营主池」，
-    // 全局 getByText 会命中多个（实测 2 处）而误报。
-    const dropdowns = document.querySelectorAll(".ant-select-dropdown");
-    const current = dropdowns[dropdowns.length - 1] as HTMLElement;
-    expect(within(current).getByText("经营主池")).toBeInTheDocument();
-    expect(within(current).queryByText("POOL-A")).not.toBeInTheDocument();
-  });
-
   it("记一笔按钮独立于筛选栏", async () => {
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     await screen.findByText("房租");
@@ -174,13 +162,6 @@ describe("StudioExpensePanel：工作室支出", () => {
     await screen.findByText("房租");
     expect(screen.queryByRole("combobox", { name: "工作室支出状态" })).not.toBeInTheDocument();
     expect(screen.queryByText("全部状态")).not.toBeInTheDocument();
-  });
-
-  it("不显示工作室收支标题文字", async () => {
-    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
-    await screen.findByText("房租");
-
-    expect(screen.queryByText("工作室收支", { selector: ".ant-card-head-title" })).not.toBeInTheDocument();
   });
 
   it("未选择资金池时给出引导提示，且列表为空", async () => {

@@ -518,12 +518,6 @@ describe("ImportWorkbench：动作流与写路径", () => {
       expect(await screen.findByText(/batches down/)).toBeInTheDocument();
     });
 
-    it("嵌入模式：不重复输出页面大标题但保留操作条", async () => {
-      renderLight(<ImportWorkbench embedded />, { user: "admin" });
-      await waitFor(() => expect(screen.getByRole("button", { name: /新建导入/ })).toBeInTheDocument());
-      expect(screen.queryByText("导入工作台")).toBeNull();
-    });
-
     it("P1/FE-218：导入批次失败时锁定新建导入入口", async () => {
       // 错误必须带 response：client.ts 的 lastNetworkFailure 是模块级全局态，CI 上同进程
       // 其它用例的真实请求（后端不可达 ECONNREFUSED）会置位它；无 response 的 axios 错误

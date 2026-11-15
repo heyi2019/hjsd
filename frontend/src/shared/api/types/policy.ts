@@ -39,4 +39,18 @@ export interface ProfitAllocation {
   total_amount?: string;
 }
 
+export type ProfitAllocationType = "BUY" | "SELL" | "OPERATION" | "COMPANY";
+
+export interface ProfitAllocationTypeTotal {
+  allocation_rate: string;
+  allocation_amount: string;
+}
+
+export interface ProfitAllocationList {
+  items: ProfitAllocation[];
+  total: number;
+  order_profit?: string;
+  totals_by_type: Partial<Record<ProfitAllocationType, ProfitAllocationTypeTotal>>;
+}
+
 export interface RouteImpactPreview { changed: boolean; historical_impact: Record<string, unknown>; future_effect: string }

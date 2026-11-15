@@ -37,13 +37,18 @@ describe("OrdersPage helpers", () => {
       { allocation_type: "SELL", user_id: 4, role: "SALES", allocation_rate: "20", allocation_amount: "6" },
       { allocation_type: "OPERATION", user_id: 5, role: "SERVICE", allocation_rate: "30", allocation_amount: "9" },
       { allocation_type: "COMPANY", user_id: null, role: "OWNER", allocation_rate: "50", allocation_amount: "15" },
-    ], { BUY: [1, 2], SELL: [4], OPERATION: [5], COMPANY: [] });
+    ], { BUY: [1, 2], SELL: [4], OPERATION: [5], COMPANY: [] }, {
+      BUY: { allocation_rate: "100.00", allocation_amount: "30.00" },
+      SELL: { allocation_rate: "20.00", allocation_amount: "6.00" },
+      OPERATION: { allocation_rate: "30.00", allocation_amount: "9.00" },
+      COMPANY: { allocation_rate: "50.00", allocation_amount: "15.00" },
+    });
 
     const buyRows = rows.filter((row) => row.allocation_type === "BUY");
     // 新增的执行人直接进入同一行的多选框，比例/金额保持动作合计。
-    expect(buyRows).toEqual([expect.objectContaining({ employee_ids: [1, 2], allocation_rate: "100", allocation_amount: "30" })]);
+    expect(buyRows).toEqual([expect.objectContaining({ employee_ids: [1, 2], allocation_rate: "100.00", allocation_amount: "30.00" })]);
     const sellRows = rows.filter((row) => row.allocation_type === "SELL");
-    expect(sellRows).toEqual([expect.objectContaining({ employee_ids: [4], allocation_rate: "20", allocation_amount: "6" })]);
+    expect(sellRows).toEqual([expect.objectContaining({ employee_ids: [4], allocation_rate: "20.00", allocation_amount: "6.00" })]);
     expect(rows.filter((row) => row.allocation_type === "COMPANY")).toHaveLength(1);
   });
 
@@ -54,9 +59,14 @@ describe("OrdersPage helpers", () => {
       { allocation_type: "SELL", user_id: 4, role: "SALES", allocation_rate: "", allocation_amount: "0" },
       { allocation_type: "OPERATION", user_id: 5, role: "SERVICE", allocation_rate: "", allocation_amount: "0" },
       { allocation_type: "COMPANY", user_id: null, role: "OWNER", allocation_rate: "", allocation_amount: "0" },
-    ], { BUY: [1, 2, 3], SELL: [4], OPERATION: [5], COMPANY: [] });
+    ], { BUY: [1, 2, 3], SELL: [4], OPERATION: [5], COMPANY: [] }, {
+      BUY: { allocation_rate: "0.00", allocation_amount: "30.00" },
+      SELL: { allocation_rate: "0.00", allocation_amount: "0.00" },
+      OPERATION: { allocation_rate: "0.00", allocation_amount: "0.00" },
+      COMPANY: { allocation_rate: "0.00", allocation_amount: "0.00" },
+    });
     expect(rows.filter((row) => row.allocation_type === "BUY")).toEqual([
-      expect.objectContaining({ employee_ids: [1, 2, 3], allocation_rate: "", allocation_amount: "30" }),
+      expect.objectContaining({ employee_ids: [1, 2, 3], allocation_rate: "0.00", allocation_amount: "30.00" }),
     ]);
   });
 
@@ -67,7 +77,12 @@ describe("OrdersPage helpers", () => {
       { allocation_type: "SELL", user_id: 4, role: "SALES", allocation_rate: "0", allocation_amount: "0" },
       { allocation_type: "OPERATION", user_id: 5, role: "SERVICE", allocation_rate: "0", allocation_amount: "0" },
       { allocation_type: "COMPANY", user_id: null, role: "OWNER", allocation_rate: "0", allocation_amount: "0" },
-    ], { BUY: [1, 2], SELL: [4], OPERATION: [5], COMPANY: [] });
+    ], { BUY: [1, 2], SELL: [4], OPERATION: [5], COMPANY: [] }, {
+      BUY: { allocation_rate: "100.00", allocation_amount: "30.00" },
+      SELL: { allocation_rate: "0.00", allocation_amount: "0.00" },
+      OPERATION: { allocation_rate: "0.00", allocation_amount: "0.00" },
+      COMPANY: { allocation_rate: "0.00", allocation_amount: "0.00" },
+    });
     expect(same.filter((row) => row.allocation_type === "BUY")).toEqual([
       expect.objectContaining({ employee_ids: [1, 2], allocation_rate: "100", allocation_amount: "30" }),
     ]);
@@ -79,7 +94,12 @@ describe("OrdersPage helpers", () => {
       { allocation_type: "SELL", user_id: 4, role: "SALES", allocation_rate: "0", allocation_amount: "0" },
       { allocation_type: "OPERATION", user_id: 5, role: "SERVICE", allocation_rate: "0", allocation_amount: "0" },
       { allocation_type: "COMPANY", user_id: null, role: "OWNER", allocation_rate: "0", allocation_amount: "0" },
-    ], { BUY: [3], SELL: [4], OPERATION: [5], COMPANY: [] });
+    ], { BUY: [3], SELL: [4], OPERATION: [5], COMPANY: [] }, {
+      BUY: { allocation_rate: "100.00", allocation_amount: "30.00" },
+      SELL: { allocation_rate: "0.00", allocation_amount: "0.00" },
+      OPERATION: { allocation_rate: "0.00", allocation_amount: "0.00" },
+      COMPANY: { allocation_rate: "0.00", allocation_amount: "0.00" },
+    });
     expect(replaced.filter((row) => row.allocation_type === "BUY")).toEqual([
       expect.objectContaining({ employee_ids: [3], allocation_rate: "100", allocation_amount: "30" }),
     ]);
@@ -87,9 +107,11 @@ describe("OrdersPage helpers", () => {
     // 台账没登记该动作执行人时（候选为空）不联动，存量原样回显。
     const noCandidate = buildActionAllocationRows([
       { allocation_type: "BUY", user_id: 1, role: "BUYER", allocation_rate: "100", allocation_amount: "30" },
-    ], { BUY: [], SELL: [], OPERATION: [], COMPANY: [] });
+    ], { BUY: [], SELL: [], OPERATION: [], COMPANY: [] }, {
+      BUY: { allocation_rate: "100.00", allocation_amount: "30.00" },
+    });
     expect(noCandidate.filter((row) => row.allocation_type === "BUY")).toEqual([
-      expect.objectContaining({ employee_ids: [1], allocation_amount: "30" }),
+      expect.objectContaining({ employee_ids: [1], allocation_amount: "30.00" }),
     ]);
   });
 });

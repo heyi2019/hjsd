@@ -143,6 +143,13 @@ class InventoryStatsOut(BaseModel):
     over_30d_count: int
 
 
+class DashboardInventorySummaryOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    account_count: int
+    aging_count: int
+    overdue_count: int
+
 
 __all__ = [
     "AccountOut",
@@ -151,4 +158,5 @@ __all__ = [
     "AccountDeleteRequest",
     "AccountInventoryOut",
     "InventoryResponseOut",
+    "DashboardInventorySummaryOut",
 ]

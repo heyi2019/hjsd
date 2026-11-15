@@ -7,7 +7,6 @@ import { optionSetsApi } from "../shared/api/options.api";
 import { ordersApi } from "../shared/api/orders.api";
 import { reportsApi } from "../shared/api/reports.api";
 import { stocksApi } from "../shared/api/stocks.api";
-import type { Order } from "../shared/api/types/orders";
 import { normalizeError } from "../shared/api/client";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
 import { CreateBusinessModal, type BusinessOrderType } from "../orders/CreateBusinessModal";
@@ -24,8 +23,8 @@ import {
 export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; onPersonalNavigate?: (view: "orders" | "earnings") => void; active?: boolean }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<BusinessOrderType>("HS");
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [personalOrders, setPersonalOrders] = useState<Order[]>([]);
+  const [orderSummary, setOrderSummary] = useState<{ total_count: number; completed_count: number } | null>(null);
+  const [personalOrders, setPersonalOrders] = useState(0);
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [personalOrdersError, setPersonalOrdersError] = useState<{ message: string; code?: string } | null>(null);
@@ -45,23 +44,24 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
     const now = new Date();
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const [personalOrdersResult, ordersResult, earningsResult] = await Promise.allSettled([
-      ordersApi.list({ mine: true }),
-      ordersApi.list(),
+    const [personalOrdersResult, orderSummaryResult, earningsResult] = await Promise.allSettled([
+      ordersApi.summary({ mine: true }),
+      ordersApi.summary(),
       reportsApi.commission({ mine: true, from: monthStart, to: monthEnd }),
     ]);
     if (!mountedRef.current) return;
     if (personalOrdersResult.status === "fulfilled") {
-      setPersonalOrders(personalOrdersResult.value);
+      setPersonalOrders(personalOrdersResult.value.total_count);
       setPersonalOrdersError(null);
     } else {
       setPersonalOrdersError(normalizeError(personalOrdersResult.reason));
     }
-    if (ordersResult.status === "fulfilled") {
-      setOrders(ordersResult.value);
+    if (orderSummaryResult.status === "fulfilled") {
+      setOrderSummary(orderSummaryResult.value);
       setSummaryError(null);
     } else {
-      setSummaryError(normalizeError(ordersResult.reason));
+      setOrderSummary(null);
+      setSummaryError(normalizeError(orderSummaryResult.reason));
     }
     if (earningsResult.status === "fulfilled") {
       // payable 才是「我这份」分润；profit_base 是整单利润基数，不是个人收益。
@@ -70,38 +70,37 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
     } else {
       setEarningsError(normalizeError(earningsResult.reason));
     }
-    const [stockResult, installmentResult, reminderConfigResult] = await Promise.allSettled([
-      stocksApi.list({ status: "WAITING" }),
-      installmentsApi.list(),
+    const [installmentResult, reminderConfigResult] = await Promise.allSettled([
+      installmentsApi.totals(),
       optionSetsApi.get(BUSINESS_REMINDER_CONFIG_CODE),
     ]);
-    const notificationResult = await Promise.allSettled([
-      notificationsApi.list({ limit: 50, unread_only: true }),
-    ]);
-    if (!mountedRef.current) return;
     const reminderConfig = reminderConfigResult.status === "fulfilled"
       ? parseBusinessReminderConfig(reminderConfigResult.value?.options)
       : DEFAULT_BUSINESS_REMINDER_CONFIG;
     setBusinessReminderConfig(reminderConfig);
+    const [stockResult, notificationResult] = await Promise.allSettled([
+      stocksApi.dashboardSummary(reminderConfig.inventoryAgingDays),
+      notificationsApi.list({ limit: 50, unread_only: true }),
+    ]);
+    if (!mountedRef.current) return;
     if (stockResult.status === "fulfilled") {
-      setInventoryCount(stockResult.value.length);
-      // 天数与档位都来自后端（AccountOut）；阈值可配的是「提醒天数」，只做比较不做日期差。
-      setInventoryAgingCount(stockResult.value.filter((item) => (item.inventory_age_days ?? 0) > reminderConfig.inventoryAgingDays).length);
-      setInventoryOverdueCount(stockResult.value.filter((item) => item.inventory_age_level === "OVERDUE").length);
+      setInventoryCount(stockResult.value.account_count);
+      setInventoryAgingCount(stockResult.value.aging_count);
+      setInventoryOverdueCount(stockResult.value.overdue_count);
     } else {
       setInventoryCount(null);
       setInventoryAgingCount(null);
       setInventoryOverdueCount(null);
     }
     if (installmentResult.status === "fulfilled") {
-      setInstallmentCount(installmentResult.value.length);
-      setOverdueInstallmentCount(installmentResult.value.filter((item) => item.status === "OVERDUE").length);
+      setInstallmentCount(installmentResult.value.total_count);
+      setOverdueInstallmentCount(installmentResult.value.overdue_count);
     } else {
       setInstallmentCount(null);
       setOverdueInstallmentCount(null);
     }
-    if (notificationResult[0].status === "fulfilled") {
-      setNewProfitNotificationCount(notificationResult[0].value.items.filter((item) =>
+    if (notificationResult.status === "fulfilled") {
+      setNewProfitNotificationCount(notificationResult.value.items.filter((item) =>
         [item.notification_type ?? "", item.title, item.message].some((value) => /分润|利润/.test(value)),
       ).length);
     } else {
@@ -177,7 +176,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
         <h2 id="dashboard-summary-title" className="dashboard-summary__title">我的业务总览</h2>
         <ErrorBanner error={summaryError} onRetry={() => void loadSummary()} />
         <BusinessOverview
-          orders={orders}
+          orderSummary={orderSummary}
           inventoryCount={inventoryCount}
           inventoryAgingCount={inventoryAgingCount}
           inventoryOverdueCount={inventoryOverdueCount}
@@ -188,7 +187,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
           overdueInstallmentsEnabled={businessReminderConfig.overdueInstallmentsEnabled}
           ordersError={Boolean(summaryError)}
           loading={summaryLoading}
-          personalOrders={personalOrders.length}
+          personalOrders={personalOrders}
           personalOrdersError={Boolean(personalOrdersError)}
           onPersonalOrdersClick={() => onPersonalNavigate?.("orders")}
           personalEarnings={personalEarnings}

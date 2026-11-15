@@ -349,6 +349,7 @@ class TestPolicyApi:
         )
         assert put.status_code == 200, put.text
         assert put.json()["total"] == 4
+        assert put.json()["totals_by_type"]["OPERATION"]["allocation_rate"] == "100.00"
         # 订单总利润随分润接口下发（弹窗展示 + 金额分润上限）。该单无过账事件 → 利润 0。
         assert Decimal(str(put.json()["order_profit"])) == 0
 
@@ -357,6 +358,7 @@ class TestPolicyApi:
         )
         assert listed.status_code == 200
         assert Decimal(str(listed.json()["order_profit"])) == 0
+        assert listed.json()["totals_by_type"]["OPERATION"]["allocation_rate"] == "100.00"
         operation = next(
             item for item in listed.json()["items"] if item["allocation_type"] == "OPERATION"
         )

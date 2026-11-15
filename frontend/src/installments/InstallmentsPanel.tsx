@@ -58,6 +58,8 @@ function ContractTable({
     sortDesc,
     totalPaid,
     totalReceivable,
+    totalCount,
+    overdueCount,
   } = controller;
   return (
     <section className="ui-stack">
@@ -65,14 +67,14 @@ function ContractTable({
 
       <StatRow
         items={[
-          { label: "合约数", kind: "count", amount: String(rows.length) },
+          { label: "合约数", kind: "count", amount: String(totalCount) },
           { label: "总应收", amount: totalReceivable },
           { label: "已收合计", amount: totalPaid },
           {
             label: "逾期合约",
             kind: "count",
-            amount: String(rows.filter((r) => r.status === "OVERDUE").length),
-            tone: rows.some((r) => r.status === "OVERDUE") ? "warn" : "plain",
+            amount: String(overdueCount),
+            tone: overdueCount > 0 ? "warn" : "plain",
           },
         ]}
       />

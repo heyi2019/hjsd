@@ -3,6 +3,12 @@ import type { Account, AccountInventoryRow, InventoryStats } from "./types/accou
 import type { PageResponse } from "./types/common";
 
 export const stocksApi = {
+  dashboardSummary: (reminderDays: number) =>
+    api
+      .get<{ account_count: number; aging_count: number; overdue_count: number }>("/stocks/dashboard-summary", {
+        params: { reminder_days: reminderDays },
+      })
+      .then((r) => r.data),
   list: async (params?: { status?: string; limit?: number; offset?: number }): Promise<Account[]> => {
     if (params?.limit != null) {
       return api.get<PageResponse<Account>>("/stocks", { params }).then((r) => r.data.items);

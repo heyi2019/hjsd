@@ -24,6 +24,8 @@ class InstallmentTotalsOut(BaseModel):
     total_receivable: Decimal
     total_paid: Decimal
     total_remaining: Decimal
+    total_count: int
+    overdue_count: int
 
 
 class SaleInstallmentPlanIn(RequestModel):

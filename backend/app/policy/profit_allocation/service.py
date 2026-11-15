@@ -618,3 +618,22 @@ def _list_allocations(session: Session, order: Order) -> list[dict[str, Any]]:
         for item in out
     ]
 
+
+def summarize_allocations_by_type(
+    items: list[dict[str, Any]],
+) -> dict[str, dict[str, Decimal]]:
+    """按动作汇总已存分润比例与金额，前端回填表单时不再做数值累加。"""
+    totals: dict[str, dict[str, Decimal]] = {}
+    valid_types = {"BUY", "SELL", "OPERATION", "COMPANY"}
+    for item in items:
+        allocation_type = item.get("allocation_type")
+        if allocation_type not in valid_types:
+            continue
+        group = totals.setdefault(
+            allocation_type,
+            {"allocation_rate": Decimal("0.00"), "allocation_amount": Decimal("0.00")},
+        )
+        group["allocation_rate"] += to_money(item.get("allocation_rate") or 0)
+        group["allocation_amount"] += to_money(item.get("allocation_amount") or 0)
+    return totals
+

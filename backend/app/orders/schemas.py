@@ -258,6 +258,15 @@ class OrderListOut(OrderOut):
     installment_status: str | None = None
 
 
+class OrderSummaryOut(BaseModel):
+    """订单总量卡片只需的后端聚合结果。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    total_count: int
+    completed_count: int
+
+
 class EventCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -47,12 +47,18 @@ class ProfitAllocationOut(BaseModel):
     total_amount: Decimal = Decimal("0")
 
 
+class ProfitAllocationTypeTotal(BaseModel):
+    allocation_rate: Decimal = Decimal("0")
+    allocation_amount: Decimal = Decimal("0")
+
+
 class ProfitAllocationListOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     items: list[ProfitAllocationOut]
     total: int
     order_profit: Decimal = Decimal("0")
+    totals_by_type: dict[str, ProfitAllocationTypeTotal] = Field(default_factory=dict)
 
 
 __all__ = [
@@ -61,5 +67,6 @@ __all__ = [
     "ProfitAllocationConvertOut",
     "ProfitAllocationListOut",
     "ProfitAllocationOut",
+    "ProfitAllocationTypeTotal",
     "ProfitAllocationSet",
 ]

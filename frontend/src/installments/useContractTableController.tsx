@@ -4,7 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { installmentsApi } from "../shared/api/installments.api";
 import { ordersApi } from "../shared/api/orders.api";
-import type { Installment, InstallmentDisposition, Schedule } from "../shared/api/types/installments";
+import type { Installment, InstallmentDisposition, InstallmentTotals, Schedule } from "../shared/api/types/installments";
 import type { Order } from "../shared/api/types/orders";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
@@ -25,7 +25,7 @@ export function useContractTableController(params: { contractType: string; reloa
   const dateFrom = dateRange?.[0] ?? "";
   const dateTo = dateRange?.[1] ?? "";
   const [rows, setRows] = useState<Installment[]>([]);
-  const [totals, setTotals] = useState<{ total_receivable: string; total_paid: string; total_remaining: string } | null>(null);
+  const [totals, setTotals] = useState<InstallmentTotals | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const { can } = useSession();
@@ -287,6 +287,7 @@ export function useContractTableController(params: { contractType: string; reloa
   // 合计直接取服务端（Decimal）；日期区间已在后端筛，列表不再二次过滤。
   const totalReceivable = totals?.total_receivable ?? "0.00";
   const totalPaid = totals?.total_paid ?? "0.00";
+  const overdueCount = totals?.overdue_count ?? 0;
 
   const { arrange: arrangeColumns } = useListViewColumns("INSTALLMENT");
   const columns: ColumnsType<Installment> = [
@@ -559,6 +560,8 @@ export function useContractTableController(params: { contractType: string; reloa
     submitExtend,
     totalReceivable,
     totalPaid,
+    totalCount: totals?.total_count ?? 0,
+    overdueCount,
     arrangeColumns,
     columns,
     scheduleColumns,

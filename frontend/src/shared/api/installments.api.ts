@@ -1,6 +1,6 @@
 import { api } from "./client";
 import type { Cashflow, Deposit } from "./types/finance";
-import type { Installment, InstallmentCancelResult, InstallmentDisposition, InstallmentScheduleInput, Schedule } from "./types/installments";
+import type { Installment, InstallmentCancelResult, InstallmentDisposition, InstallmentScheduleInput, InstallmentTotals, Schedule } from "./types/installments";
 
 export const installmentsApi = {
   previewSalePlan: (payload: { sale_amount: string; down_payment: string; service_fee: string; periods: number; per_period?: string }) =>
@@ -14,7 +14,7 @@ export const installmentsApi = {
   /** 分期台合计：与 list 同一套筛选条件（含 contract_type），服务端 Decimal 聚合，前端不再 reduce。 */
   totals: (params?: { status?: string; order_id?: number; contract_type?: string; trade_date_from?: string; trade_date_to?: string }) =>
     api
-      .get<{ total_receivable: string; total_paid: string; total_remaining: string }>("/installments/totals", { params })
+      .get<InstallmentTotals>("/installments/totals", { params })
       .then((r) => r.data),
   exportCsv: (params?: { status?: string; order_id?: number }) =>
     api

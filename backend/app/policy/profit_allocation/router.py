@@ -31,6 +31,7 @@ def list_allocations(
         items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
         total=len(items),
         order_profit=order_amounts(db, order_id)["PROFIT"],
+        totals_by_type=service.summarize_allocations_by_type(items),
     )
 
 
@@ -73,6 +74,7 @@ def set_allocations(
         items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
         total=len(items),
         order_profit=order_amounts(db, order_id)["PROFIT"],
+        totals_by_type=service.summarize_allocations_by_type(items),
     )
 
 

@@ -22,7 +22,7 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.domain.enums import AccountingAttribute, Direction, FundNature, Nature
+from app.domain.enums import AccountingAttribute, Direction, FundNature, Nature, OrderStatus
 from app.domain.trade import Account, OrderEvent
 from app.foundation.order_types import resolve_default_pool
 from app.value_added_services import create as inst_create
@@ -133,6 +133,19 @@ def list_orders(
         ),
         limit=limit,
         offset=offset,
+    )
+
+
+@router.get("/orders/summary", response_model=schemas.OrderSummaryOut)
+def order_summary(
+    mine: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_orders,
+) -> schemas.OrderSummaryOut:
+    """工作台订单卡片：按当前用户可见范围聚合总量与完成量。"""
+    return schemas.OrderSummaryOut(
+        total_count=count_orders(db, user=user, mine=mine),
+        completed_count=count_orders(db, status=OrderStatus.COMPLETED.value, user=user, mine=mine),
     )
 
 

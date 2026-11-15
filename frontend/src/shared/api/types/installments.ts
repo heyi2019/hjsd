@@ -27,6 +27,14 @@ export interface Installment {
   note?: string | null;
 }
 
+export interface InstallmentTotals {
+  total_receivable: string;
+  total_paid: string;
+  total_remaining: string;
+  total_count: number;
+  overdue_count: number;
+}
+
 export interface InstallmentCancelResult {
   installment: Installment;
   order_status: string;

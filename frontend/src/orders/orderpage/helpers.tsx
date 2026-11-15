@@ -69,24 +69,6 @@ export function buildActionAllocationCandidates(order: Pick<Order, "events" | "f
   };
 }
 
-/** 把一组行里某个字段的有效数值加起来；全是空值就返回空串（不猜、不换算）。 */
-function sumRowValue(
-  rows: Array<{ allocation_rate?: string; allocation_amount?: string }>,
-  key: "allocation_rate" | "allocation_amount",
-): string {
-  let total = 0;
-  let seen = false;
-  for (const row of rows) {
-    const text = String(row[key] ?? "").trim();
-    if (text === "") continue;
-    const value = Number(text);
-    if (!Number.isFinite(value)) continue;
-    total += value;
-    seen = true;
-  }
-  return seen ? String(Number(total.toFixed(2))) : "";
-}
-
 /**
  * 按操作四项构建表单行。每个动作固定一行，人员使用多选，比例或金额只填动作合计；
  * 保存时由后端按所选人数均分并校验。
@@ -100,6 +82,7 @@ export function buildActionAllocationRows(
     allocation_amount?: string;
   }>,
   candidates: ActionAllocationCandidates,
+  totalsByType: Partial<Record<AllocationType, { allocation_rate: string; allocation_amount: string }>> = {},
 ): AllocationFormRow[] {
   const order: AllocationType[] = ["BUY", "SELL", "OPERATION", "COMPANY"];
   const rows: AllocationFormRow[] = [];
@@ -115,8 +98,8 @@ export function buildActionAllocationRows(
       employee: kind === "COMPANY" ? "COMPANY" : undefined,
       employee_ids: kind === "COMPANY" ? undefined : selectedIds,
       role: existed[0]?.role || ALLOCATION_TYPE_ROLE[kind],
-      allocation_rate: sumRowValue(existed, "allocation_rate"),
-      allocation_amount: sumRowValue(existed, "allocation_amount"),
+      allocation_rate: totalsByType[kind]?.allocation_rate ?? "",
+      allocation_amount: totalsByType[kind]?.allocation_amount ?? "",
     });
   }
   return rows;

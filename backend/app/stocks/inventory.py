@@ -13,7 +13,12 @@ from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.trade import Account
 from app.parties.fields import get_extra_values_bulk
-from ._common import INVENTORY_STATUSES, inventory_age_days as age_days, scope_filter
+from ._common import (
+    AGE_WARNING_MAX_DAYS,
+    INVENTORY_STATUSES,
+    inventory_age_days as age_days,
+    scope_filter,
+)
 
 
 def list_accounts(
@@ -119,6 +124,37 @@ def inventory_stats(
     }
 
 
+def dashboard_inventory_summary(
+    session: Session,
+    *,
+    reminder_days: int,
+    today: date | None = None,
+    user: CurrentUser | None = None,
+) -> dict[str, int]:
+    """工作台库存卡片与提醒所需的计数，保留 WAITING 订单状态口径。"""
+    stmt = select(Account.inventory_entry_at).where(Account.status == "WAITING")
+    scope = scope_filter(session, user)
+    if scope is not None:
+        stmt = stmt.where(scope)
+    entries = list(session.scalars(stmt).all())
+    reference = today or date.today()
+    aging_count = 0
+    overdue_count = 0
+    for entry_at in entries:
+        age = age_days(entry_at, today=reference)
+        if age is None:
+            continue
+        if age > reminder_days:
+            aging_count += 1
+        if age > AGE_WARNING_MAX_DAYS:
+            overdue_count += 1
+    return {
+        "account_count": len(entries),
+        "aging_count": aging_count,
+        "overdue_count": overdue_count,
+    }
+
+
 def inventory_age_days(row: Account, *, today: date | None = None) -> int | None:
     """库龄（自然日）只以入库存时间为准。"""
     return age_days(row.inventory_entry_at, today=today)
@@ -136,6 +172,7 @@ def _inventory_rows(session: Session, *, user: CurrentUser | None = None) -> lis
 
 __all__ = [
     "count_accounts",
+    "dashboard_inventory_summary",
     "inventory",
     "inventory_age_days",
     "inventory_stats",

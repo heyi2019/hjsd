@@ -10,7 +10,7 @@ import { DataTable, ErrorBanner, MoneyText, StatRow } from "../../shared/ui";
 import { type ReportRange, useReport } from "./shared";
 import { ReportExportButton } from "./ReportExportButton";
 
-export function BusinessPnl({ range }: { range: ReportRange }) {
+export function BusinessPnl({ range, showPicker = true }: { range: ReportRange; showPicker?: boolean }) {
   const { params, picker } = range;
   const { data, loading, error, reload } = useReport<BusinessPnlReport>(
     () => reportsApi.businessPnl(params),
@@ -36,7 +36,7 @@ export function BusinessPnl({ range }: { range: ReportRange }) {
   return (
     <Card className="glass" title="业务级损益">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      <Space className="ui-filter-bar ui-filter-bar--spaced">{picker}</Space>
+      {showPicker && <Space className="ui-filter-bar ui-filter-bar--spaced">{picker}</Space>}
       <StatRow
         items={[
           { label: "主营收入", amount: data?.total.main_income ?? "-" },

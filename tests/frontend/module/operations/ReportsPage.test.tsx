@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import dayjs from "dayjs";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -74,13 +74,13 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：经营中心报表", () => {
-  it("初始只加载当前激活的月度损益报表，不提前加载隐藏 Tab", async () => {
+  it("初始加载合并后的经营损益，不提前加载隐藏 Tab", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "月度损益" });
+    await screen.findByRole("tab", { name: "经营损益" });
     expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(reportsApi.commission)).not.toHaveBeenCalled();
     expect(vi.mocked(reportsApi.dailyFunds)).not.toHaveBeenCalled();
-    expect(vi.mocked(reportsApi.businessPnl)).not.toHaveBeenCalled();
     expect(vi.mocked(reportsApi.orderProfit)).not.toHaveBeenCalled();
     expect(vi.mocked(poolsApi.list)).not.toHaveBeenCalled();
   });
@@ -92,10 +92,10 @@ describe("ReportsPage：经营中心报表", () => {
       expect(document.querySelector(".ui-filter-bar")).toHaveClass("ui-filter-bar--spaced");
     };
 
-    await screen.findByRole("tab", { name: "月度损益" });
+    await screen.findByRole("tab", { name: "经营损益" });
     expectSpacedFilterBar();
 
-    for (const label of ["分润对账", "业务损益"]) {
+    for (const label of ["分润对账", "经营损益"]) {
       await ui.click(screen.getByRole("tab", { name: label }));
       await waitFor(expectSpacedFilterBar);
     }
@@ -166,19 +166,20 @@ describe("ReportsPage：经营中心报表", () => {
     ));
   });
 
-  it("五个 Tab 齐全（经营报表 + 订单利润 + 数据中心）", async () => {
+  it("四个 Tab 齐全（经营损益合并月度与业务报表）", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "月度损益" });
+    await screen.findByRole("tab", { name: "经营损益" });
     expect(Array.from(screen.getAllByRole("tab")).map((tab) => tab.textContent)).toEqual([
       "数据中心",
       "订单利润",
       "分润对账",
-      "月度损益",
-      "业务损益",
+      "经营损益",
     ]);
-    for (const label of ["月度损益", "分润对账", "业务损益", "订单利润", "数据中心"]) {
+    for (const label of ["经营损益", "分润对账", "订单利润", "数据中心"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
+    expect(screen.queryByRole("tab", { name: "月度损益" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "业务损益" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "资金日报" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "审计记录" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "库存 R1" })).not.toBeInTheDocument();
@@ -210,8 +211,9 @@ describe("ReportsPage：经营中心报表", () => {
   it("报表页内导出按钮无筛选也能导出并给出成功反馈", async () => {
     const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("月度损益");
-    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await gotoTab("经营损益");
+    const monthlyCard = screen.getByText("月度经营损益").closest(".ant-card") as HTMLElement;
+    await ui.click(within(monthlyCard).getByRole("button", { name: "导出 CSV" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith("已导出 monthly-pnl.csv"));
   });

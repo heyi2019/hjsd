@@ -125,11 +125,10 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
   it("FE-051：共享日期区间传递到经营报表和订单利润", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    const setFrom = async (report: "monthly" | "commission" | "business" | "profit") => {
+    const setFrom = async (report: "operating" | "commission" | "profit") => {
       const labels = {
-        monthly: "月度损益",
+        operating: "经营损益",
         commission: "分润对账",
-        business: "业务损益",
         profit: "订单利润",
       } as const;
       await gotoTab(labels[report]);
@@ -138,12 +137,11 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
       await ui.clear(input);
       await ui.type(input, "2026-10-01");
     };
-    await setFrom("monthly");
+    await setFrom("operating");
     await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
+    await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
     await setFrom("commission");
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", all_people: true }));
-    await setFrom("business");
-    await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
     await setFrom("profit");
     await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
   });
@@ -153,8 +151,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     const revokeUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("月度损益");
-    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await gotoTab("经营损益");
+    const monthlyCard = screen.getByText("月度经营损益").closest(".ant-card") as HTMLElement;
+    await ui.click(within(monthlyCard).getByRole("button", { name: "导出 CSV" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
     expect(createUrl).toHaveBeenCalled();
     expect(revokeUrl).toHaveBeenCalled();
@@ -176,9 +175,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     expect(vi.mocked(reportsApi.exportCsv)).not.toHaveBeenCalled();
   });
 
-  it("统计周期变更触发月度损益重新请求", async () => {
+  it("统计周期变更同时触发月度与业务损益重新请求", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("月度损益");
+    await gotoTab("经营损益");
     await screen.findAllByText("销售收入"); // MonthlyPnl StatRow + 列标题一定渲染
     // 父级提升的日期输入无 label，按激活 Tab 面板内的 class 定位（避开导出区的日期输入）
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
@@ -187,6 +186,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     // 区间变化 → monthlyPnl 重新请求（deps 含 params.from）
     await waitFor(() =>
       expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledWith({ from: "2026-01-01", to: undefined }),
+    );
+    await waitFor(() =>
+      expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenCalledWith({ from: "2026-01-01", to: undefined }),
     );
   });
 
@@ -205,7 +207,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     ) as never);
     renderLight(<ReportsPage />, { user: "admin" });
 
-    await gotoTab("月度损益");
+    await gotoTab("经营损益");
     await screen.findByText("2026-11");
     let pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
     const r2Dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
@@ -214,10 +216,8 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await ui.clear(r2Dates[1]);
     await ui.type(r2Dates[1], "2026-10-31");
     await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
-    await waitFor(() => expect(screen.queryByText("2026-11")).not.toBeInTheDocument());
-
-    await gotoTab("业务损益");
     await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+    await waitFor(() => expect(screen.queryByText("2026-11")).not.toBeInTheDocument());
   });
 
   it("FE-272：订单利润历史空区间清空收入成本和净利明细", async () => {

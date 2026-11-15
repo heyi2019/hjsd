@@ -37,13 +37,10 @@ const CENTERS: Array<{ nav: string; tabs?: string[]; dynamic?: boolean }> = [
   {
     nav: "经营中心",
     tabs: [
-      "月度损益 R2",
-      "提成对账 R3",
-      "资金日报 R4",
-      "业务损益 R5",
+      "经营损益",
+      "分润对账",
       "订单利润",
       "数据中心",
-      "审计记录",
     ],
   },
   {
@@ -65,7 +62,7 @@ function tabByName(page: Page, label: string) {
 /**
  * 点击某个 Tab 并确认选中，自动处理 antd 的**溢出收纳**与高负载下的点击丢失。
  *
- * 坑 1（溢出收纳）：经营中心 7 个 Tab 在 1280 视口下总宽超限时，antd 把尾部 Tab
+ * 坑 1（溢出收纳）：经营中心 Tab 在 1280 视口下总宽超限时，antd 把尾部 Tab
  * 收进「更多 ⌄」下拉——nav 里残留的
  * 元素点击不生效（aria-selected 恒 false）。判定用几何位置：tab 右缘越过视口
  * 右侧预留区（-80px 给 more 按钮留位）即走「更多 → 下拉项」路径。

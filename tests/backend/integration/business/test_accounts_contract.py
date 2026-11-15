@@ -737,7 +737,7 @@ class TestAccountsApi:
         rebate = create_rebate(
             seeded_db,
             source_order_id=order.id,
-            base_amount=Decimal("300"),
+            amount=Decimal("300"),
             rate=Decimal("5"),
             collected_on=TODAY,
             rebate_type="BUY",
@@ -755,7 +755,7 @@ class TestAccountsApi:
             "rebate_type": "BUY",
             "channel": "买号返点",
             "rate": "5.00",
-            "base_amount": "300.00",
+            "amount": "300.00",
             "status": "SETTLED",
             "collected_on": TODAY.isoformat(),
             "collected_at": rebate.created_at.isoformat(),

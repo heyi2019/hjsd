@@ -59,15 +59,15 @@ it("规则定义为系统预置闭集：页面不提供「新建规则」入口"
   expect(vi.mocked(policyApi.create)).not.toHaveBeenCalled();
 });
 
-it("配置项标注生效状态：返点费率标「参与计算」，计算基数标「仅留痕」", async () => {
+it("返点规则只配置费率，不显示金额计算基数", async () => {
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   await screen.findAllByText("返点比例");
   await ui.click(await screen.findByRole("button", { name: /设置配置/ }));
 
   // 分方向费率 + 统一费率：后端 rebates.py:167 真读，标 calc
   expect(await screen.findAllByText("参与计算")).toHaveLength(2);
-  // 计算基数后端由调用方传参，不读规则，标 snapshot
-  expect(screen.getAllByText("仅留痕")).toHaveLength(1);
+  expect(screen.queryByLabelText("计算基数")).toBeNull();
+  expect(screen.queryByText("仅留痕")).toBeNull();
 });
 
 it("设置配置：填写生效期和结构化字段后提交，生成新版本并立即发布", async () => {

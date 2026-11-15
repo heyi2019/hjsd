@@ -42,7 +42,7 @@ def build_finance_summary(
 
     rebate_income = sum(
         (
-            rebate.base_amount
+            rebate.amount
             for rebates in order_rebates.values()
             for rebate in rebates
             if rebate.id not in action_model_rebate_ids

@@ -49,7 +49,7 @@ def _add_rebate(seeded_db, order_id: int, amount: str, status: str) -> RebateRec
         source_order_id=order_id,
         rebate_type=RebateType.SELL.value,
         rate=to_money("5"),
-        base_amount=to_money(amount),
+        amount=to_money(amount),
         collected_on=D,
         status=status,
         link_status=LinkStatus.LINKED.value,

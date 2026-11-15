@@ -108,12 +108,12 @@ def r2_monthly_pnl(
     # 「其中返点」列独立聚合 RebateRecord（与利润明细 profit.py 同源）：
     # 不能复用 order_profit_flow_by_date 的 extra_income——那个函数对「已生成资金流水
     # 的新模型返点」做了 continue 防重复计收入，连带把它的「其中项展示」也跳过了，
-    # 导致同一笔新模型返点在月度损益列=0、利润明细列=base_amount 的口径打架。
+    # 导致同一笔新模型返点在月度损益列=0、利润明细列=amount 的口径打架。
     # 本列只作展示、不参与经营利润（operating_profit 不含它），故独立 sum 不会重复加回。
     rebate_income: dict[str, Decimal] = defaultdict(lambda: ZERO)
     if scoped_order_ids:
         rebate_rows = session.execute(
-            select(RebateRecord.collected_on, RebateRecord.base_amount)
+            select(RebateRecord.collected_on, RebateRecord.amount)
             .where(
                 RebateRecord.source_order_id.in_(scoped_order_ids),
                 RebateRecord.status != RebateStatus.VOID.value,

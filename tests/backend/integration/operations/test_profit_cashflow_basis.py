@@ -102,7 +102,7 @@ def _add_rebate(seeded_db, order_id: int, amount: str) -> None:
             source_order_id=order_id,
             rebate_type=RebateType.SELL.value,
             rate=to_money("5"),
-            base_amount=to_money(amount),
+            amount=to_money(amount),
             collected_on=D,
             status=RebateStatus.SETTLED.value,
             link_status=LinkStatus.LINKED.value,
@@ -324,15 +324,15 @@ def test_r2_rebate_column_counts_action_model_rebate_like_profit_detail(seeded_d
 
     回归：旧口径 R2 的 rebate_income 复用 order_profit_flow_by_date 的 extra_income，
     而后者对「已生成资金流水的新模型返点」continue 防重复，连带把其中项展示也跳过，
-    导致同一笔新模型返点在 R2 列=0、利润明细列=base_amount 口径打架（2026-11-12 修）。
+    导致同一笔新模型返点在 R2 列=0、利润明细列=amount 口径打架（2026-11-12 修）。
     """
     from app.finance.rebates import create_rebate
 
     order_id = _order_with_events(seeded_db)  # HS，BUY+SELL，D=2026-10-17
-    # 新模型返点：create_rebate 同时生成 IN 资金流水（base_amount 计入 sales_income）
+    # 新模型返点：create_rebate 同时生成 IN 资金流水（amount 计入 sales_income）
     create_rebate(
         seeded_db, source_order_id=order_id, rebate_type="SELL",
-        base_amount=Decimal("250"), rate=Decimal("5"),
+        amount=Decimal("250"), rate=Decimal("5"),
         collected_on=D, actor="pytest",
     )
 

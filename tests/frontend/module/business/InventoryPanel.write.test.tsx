@@ -68,7 +68,7 @@ beforeEach(() => {
     rebate_type: "BUY",
     channel: "买号返点",
     rate: "5.00",
-    base_amount: "1000.00",
+    amount: "1000.00",
     status: "OPEN",
     collected_on: "2026-10-17",
     operator: "何一",
@@ -171,7 +171,7 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(vi.mocked(rebatesApi.create).mock.calls[0][0]).toMatchObject({
       source_order_id: 21,
       rebate_type: "SELL",
-      base_amount: "350.00",
+      amount: "350.00",
       channel: "卖号返点",
     });
   });
@@ -180,7 +180,7 @@ describe("InventoryPanel：写入与长路径", () => {
     const onCreated = vi.fn();
     resolveMock(vi.mocked(rebatesApi.update), {
       id: 41, rebate_no: "HS0001-RB01", source_order_id: 21, rebate_type: "BUY",
-      rate: "5.00", base_amount: "1200.00", status: "OPEN", collected_on: "2026-10-17", operator: "何一",
+      rate: "5.00", amount: "1200.00", status: "OPEN", collected_on: "2026-10-17", operator: "何一",
     });
     renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={onCreated} />, { user: "admin" });
     expect(await screen.findByText("返点明细")).toBeInTheDocument();

@@ -453,7 +453,7 @@ class TestReportsApiDateParams:
                 source_order_id=foreign_order.id,
                 rebate_type="SELL",
                 rate=to_money("10"),
-                base_amount=to_money("500"),
+                amount=to_money("500"),
                 status=RebateStatus.OPEN.value,
                 link_status="UNLINKED",
                 collected_on=D,
@@ -519,7 +519,7 @@ class TestReports:
         assert month[0]["operating_expense"] == 0
 
     def test_r5_legacy_rebate_columns_are_removed(self, seeded_db):
-        """11-05 二次裁决：结算展示列下线，返点金额全站只认 base_amount。"""
+        """11-05 二次裁决：结算展示列下线，返点金额全站只认 amount。"""
         data = r5_business_pnl(seeded_db)
         for item in data["items"]:
             assert {"main_income", "main_cost", "main_profit"} <= set(item)

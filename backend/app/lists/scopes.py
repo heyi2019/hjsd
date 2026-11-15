@@ -118,7 +118,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("order_type", "类型"),
             ListColumn("game", "游戏/产品类型"),
             ListColumn("party", "对方"),
-            ListColumn("base_amount", "基数"),
+            ListColumn("amount", "返点金额"),
             ListColumn("remaining", "可退余额"),
             ListColumn("rate", "费率"),
             ListColumn("created_at", "返点时间"),

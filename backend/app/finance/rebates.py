@@ -30,7 +30,6 @@ from app.foundation.order_types import get_order_type_by_code, resolve_default_p
 from app.orders._shared import get_order
 from app.orders.events import post_event
 from app.orders.form_fields import validate_form_extra
-from app.orders.amounts import order_amounts
 from app.policy import versions as policy_versions
 
 from ._common import _non_negative, _positive
@@ -40,7 +39,7 @@ def create_rebate(
     session: Session,
     *,
     source_order_id: int,
-    base_amount: Any = None,
+    amount: Any,
     collected_on: date,
     actor: str,
     rebate_type: str | None = None,
@@ -53,7 +52,7 @@ def create_rebate(
 ) -> RebateRecord:
     """返点记录：来源订单必填且必须已成单（REB-01-02）。
 
-    base_amount 省略时按 REBATE 规则的 config.base 从订单事件派生（与报表同口径）。
+    返点金额由登记人明确提供；返点规则费率仅留痕，不参与金额计算。
     """
     try:
         order = get_order(session, source_order_id, user)
@@ -100,11 +99,7 @@ def create_rebate(
         scope_type="ORDER_TYPE",
         scope_id=order_type_definition.id if order_type_definition else None,
     )
-    # 基数：显式传参优先；未传时按规则 config.base 从订单事件派生（与报表同口径）。
-    resolved_base = base_amount
-    if resolved_base is None:
-        resolved_base = _rebate_base_from_snapshot(session, snapshot, order)
-    base = _positive(resolved_base, field="base_amount")
+    amount = _positive(amount, field="amount")
     if rate is None:
         rate = _rebate_rate_from_snapshot(snapshot, rebate_type)
     rebate_rate = _non_negative(Decimal("0") if rate is None else rate, field="rate")
@@ -120,7 +115,7 @@ def create_rebate(
         rebate_type=rebate_type,
         channel=channel,
         rate=rebate_rate,
-        base_amount=base,
+        amount=amount,
         collected_on=collected_on,
         policy_version_id=policy_version_id,
         policy_snapshot=snapshot,
@@ -140,7 +135,7 @@ def create_rebate(
         session,
         order.id,
         event_type="REBATE",
-        amount=base,
+        amount=amount,
         occurred_on=collected_on,
         actor=actor,
         rebate_type=rebate_type,
@@ -173,7 +168,7 @@ def create_rebate(
         direction=Direction.IN.value,
         nature=Nature.BUSINESS_IN.value,
         category="REBATE",
-        amount=base,
+        amount=amount,
         actor=actor,
         order_id=order.id,
         order_event_id=event.id,
@@ -190,7 +185,7 @@ def create_rebate(
         actor=actor,
         after={
             "source_order": order.order_no,
-            "base_amount": str(base),
+            "amount": str(amount),
             "event_no": event.event_no,
             "flow_no": flow.flow_no,
         },
@@ -207,29 +202,6 @@ def _validate_operator_user_ids(session: Session, operator_user_ids: list[int] |
     if active_ids != set(operator_user_ids):
         raise Validation("所选操作人不存在或已停用", details={"field": "operator_user_ids"})
     return operator_user_ids
-
-
-def _rebate_base_from_snapshot(
-    session: Session, snapshot: dict[str, Any] | None, order: Any
-) -> Decimal | None:
-    """按 REBATE 规则的 config.base 派生返点基数。
-
-    口径复用 app/orders/amounts.py（与报表同源）：
-    - GROSS：卖出收入合计（成交额）
-    - PRINCIPAL：买入成本合计（本金）
-    - PROFIT：该订单所有收入 - 所有支出，收入含返点、支出含坏账（见 orders/amounts.py）
-
-    规则未声明 base 时返回 None，由调用方按「base_amount 必填」报错，不静默兜底。
-    """
-    if not snapshot:
-        return None
-    config = snapshot.get("config")
-    if not isinstance(config, dict):
-        return None
-    kind = config.get("base")
-    if not isinstance(kind, str) or not kind.strip():
-        return None
-    return order_amounts(session, order.id).get(kind.strip().upper())
 
 
 def _rebate_rate_from_snapshot(
@@ -302,7 +274,7 @@ def update_rebate(
     rebate_id: int,
     *,
     actor: str,
-    base_amount: Any = None,
+    amount: Any = None,
     rate: Any = None,
     collected_on: date | None = None,
     note: str | None = None,
@@ -311,17 +283,17 @@ def update_rebate(
     user: CurrentUser | None = None,
 ) -> RebateRecord:
     record = get_rebate(session, rebate_id, user=user)
-    before = {"base_amount": str(record.base_amount), "rate": str(record.rate), "collected_on": str(record.collected_on), "note": record.note}
-    if base_amount is not None:
-        new_base = _positive(base_amount, field="base_amount")
-        # 护栏：基数不得低于累计已退，否则架空 return_rebate 的「累计退回≤金额」铁律。
+    before = {"amount": str(record.amount), "rate": str(record.rate), "collected_on": str(record.collected_on), "note": record.note}
+    if amount is not None:
+        new_amount = _positive(amount, field="amount")
+        # 护栏：返点金额不得低于累计已退，否则架空 return_rebate 的「累计退回≤金额」铁律。
         already = rebate_returned_totals(session, [record])[record.id]
-        if new_base < already:
+        if new_amount < already:
             raise Validation(
-                f"返点基数 {new_base} 不得低于累计已退 {already}",
-                details={"base_amount": str(new_base), "already_returned": str(already)},
+                f"返点金额 {new_amount} 不得低于累计已退 {already}",
+                details={"amount": str(new_amount), "already_returned": str(already)},
             )
-        record.base_amount = new_base
+        record.amount = new_amount
     if rate is not None:
         record.rate = _non_negative(rate, field="rate")
         if record.rate > Decimal("100.00"):
@@ -336,19 +308,19 @@ def update_rebate(
         record.form_extra = validate_form_extra(session, order_type_code="INVREBATE", values=form_extra) or None
     action_event = _rebate_action_event(session, record)
     if action_event is not None:
-        action_event.amount = record.base_amount
+        action_event.amount = record.amount
         action_event.occurred_on = record.collected_on
         action_event.note = record.note
         action_event.updated_by = actor
         flow = session.scalar(select(Cashflow).where(Cashflow.order_event_id == action_event.id))
         if flow is not None:
-            flow.amount = record.base_amount
+            flow.amount = record.amount
             flow.occurred_on = record.collected_on
             flow.note = record.note or flow.note
             flow.updated_by = actor
     record.updated_by = actor
     session.flush()
-    record_audit(session, action=AuditAction.REBATE_UPDATE, entity_type="rebate_record", entity_id=record.rebate_no, actor=actor, before=before, after={"base_amount": str(record.base_amount), "rate": str(record.rate), "collected_on": str(record.collected_on), "note": record.note})
+    record_audit(session, action=AuditAction.REBATE_UPDATE, entity_type="rebate_record", entity_id=record.rebate_no, actor=actor, before=before, after={"amount": str(record.amount), "rate": str(record.rate), "collected_on": str(record.collected_on), "note": record.note})
     return record
 
 
@@ -416,7 +388,7 @@ def return_rebate(
       =收入−支出 自动冲减；R2 因 op_stmt 的 `order_id.is_(None)` 不会重复进运营费用，
       只在资金流水段计入该单直接成本。若记成独立流水（不带 order_id）则不冲订单利润，
       违背「利润=收入−支出」，是缺陷。
-    - 累计退回不得超过该笔返点金额 base_amount（防重复/超额退回）；
+    - 累计退回不得超过该笔返点金额 amount（防重复/超额退回）；
       同一笔返点可分多次部分退回。
     - 资金池取原返点 IN 流水所在池，取不到再回退默认利润池，保证收支同池。
 
@@ -431,17 +403,17 @@ def return_rebate(
     if returned_on is None:
         raise Validation("退回日期必填", details={"field": "returned_on"})
 
-    base = to_money(record.base_amount)
+    amount_total = to_money(record.amount)
     # 累计已退与列表下发、编辑护栏共用同一聚合函数，杜绝三处口径漂移。
     already = rebate_returned_totals(session, [record])[record.id]
-    if already + returned > base:
+    if already + returned > amount_total:
         raise Validation(
-            f"累计退回 {already + returned} 超过返点金额 {base}，可退余额 {base - already}",
+            f"累计退回 {already + returned} 超过返点金额 {amount_total}，可退余额 {amount_total - already}",
             details={
                 "rebate_id": rebate_id,
-                "base_amount": str(base),
+                "amount": str(amount_total),
                 "already_returned": str(already),
-                "amount": str(returned),
+                "returned_amount": str(returned),
             },
         )
 

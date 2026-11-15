@@ -3,13 +3,13 @@
 背景：2026-10-26 起经营规则支持配参数，但此前**只有返点费率**被后端读取，
 其余参数只是版本留痕。本文件锁死新接入的两条链路，防止「配了不生效」回潮：
 
-1. REBATE 的 `config.base`（GROSS / PRINCIPAL / PROFIT）
-   —— base_amount 省略时按订单事件派生，口径与报表同源（app/orders/amounts.py）。
+1. REBATE 的返点费率规则
+   —— 费率只留痕，不推算返点金额；返点金额必须明确填写。
 2. INSTALLMENT 的 `config.service_fee_rate`（+ `config.base`）
    —— service_fee 省略（None）时按规则补算；**显式传 0 表示不收，不被规则覆盖**。
 
 「省略」与「传 0」必须可区分：这是两条链路成立的前提，也是为什么
-service_fee / base_amount 用 Optional 而不是 0 作哨兵。
+service_fee 用 Optional 而不是 0 作哨兵。
 """
 
 from __future__ import annotations
@@ -76,57 +76,20 @@ def _order_with_buy(seeded_db, *, game_account: str) -> int:
     return order.id
 
 
-# ---------------------------------------------------------------- 返点基数
-def test_rebate_base_derived_from_rule_principal(seeded_db):
-    _publish(seeded_db, "REBATE", {"base": "PRINCIPAL", "rate": "5"})
-    record = create_rebate(
-        seeded_db,
-        source_order_id=_order_with_buy(seeded_db, game_account="rule-base-principal"),
-        rebate_type="BUY",
-        collected_on=D,
-        actor="pytest",
-    )
-    # 买入成本 1000 → 基数由规则派生，无需手填
-    assert record.base_amount == Decimal("1000.00")
-    assert record.rate == Decimal("5.00")
+# ---------------------------------------------------------------- 返点金额
 
-
-def test_rebate_base_gross_without_sell_is_rejected(seeded_db):
-    """GROSS 取卖出收入；未卖出时为 0，必须报错而不是静默记 0 元返点。"""
-    _publish(seeded_db, "REBATE", {"base": "GROSS", "rate": "5"})
-    with pytest.raises(Validation):
-        create_rebate(
-            seeded_db,
-            source_order_id=_order_with_buy(seeded_db, game_account="rule-base-gross"),
-            rebate_type="BUY",
-            collected_on=D,
-            actor="pytest",
-        )
-
-
-def test_rebate_base_requires_explicit_or_rule_when_no_base_configured(seeded_db):
+def test_rebate_amount_is_explicit_and_rate_comes_from_rule(seeded_db):
     _publish(seeded_db, "REBATE", {"rate": "5"})
-    with pytest.raises(Validation):
-        create_rebate(
-            seeded_db,
-            source_order_id=_order_with_buy(seeded_db, game_account="rule-base-none"),
-            rebate_type="BUY",
-            collected_on=D,
-            actor="pytest",
-        )
-
-
-def test_explicit_rebate_base_wins_over_rule(seeded_db):
-    _publish(seeded_db, "REBATE", {"base": "PRINCIPAL", "rate": "5"})
     record = create_rebate(
         seeded_db,
-        source_order_id=_order_with_buy(seeded_db, game_account="rule-base-explicit"),
+        source_order_id=_order_with_buy(seeded_db, game_account="rule-explicit-amount"),
         rebate_type="BUY",
-        base_amount=Decimal("300"),
+        amount=Decimal("300"),
         collected_on=D,
         actor="pytest",
     )
-    assert record.base_amount == Decimal("300.00")
+    assert record.amount == Decimal("300.00")
+    assert record.rate == Decimal("5.00")
 
 
 # ------------------------------------------------------------ 分期服务费率

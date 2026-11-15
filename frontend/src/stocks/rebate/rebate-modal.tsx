@@ -32,12 +32,6 @@ function sourceOrder(detail: AccountExecutionDetail | null, sourceOrderId: numbe
   return order.events.some((event) => event.event_type === "SELL") ? order : undefined;
 }
 
-function defaultBaseAmount(detail: AccountExecutionDetail | null, sourceOrderId: number | null | undefined, kind: RebateKind): string {
-  const order = sourceOrder(detail, sourceOrderId, kind);
-  const eventType = kind === "BUY" ? "BUY" : "SELL";
-  return order?.events.find((event) => event.event_type === eventType)?.amount ?? "0";
-}
-
 export function InventoryRebateModal(props: {
   account: Account | null;
   onClose: () => void;
@@ -73,7 +67,7 @@ export function InventoryRebateModal(props: {
         const firstKind: RebateKind | undefined = sourceOrder(value, sourceOrderId, "BUY") ? "BUY" : sourceOrder(value, sourceOrderId, "SELL") ? "SELL" : undefined;
         form.setFieldsValue({
           rebate_type: firstKind,
-          base_amount: firstKind ? defaultBaseAmount(value, sourceOrderId, firstKind) : "0",
+          amount: undefined,
           collected_on: today(),
         });
       })
@@ -100,7 +94,7 @@ export function InventoryRebateModal(props: {
     [detail, props.account?.source_order_id],
   );
 
-  const submit = async (values: { rebate_type?: RebateKind; base_amount?: string; rate?: string; collected_on?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
+  const submit = async (values: { rebate_type?: RebateKind; amount?: string; rate?: string; collected_on?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     if (!props.account) return;
     const kind = values.rebate_type;
     const order = kind ? sourceOrder(detail, props.account.source_order_id, kind) : undefined;
@@ -110,7 +104,7 @@ export function InventoryRebateModal(props: {
       await rebatesApi.create({
         source_order_id: order.order_id,
         rebate_type: kind,
-        base_amount: values.base_amount ?? "0",
+        amount: values.amount!,
         rate: values.rate ?? "0",
         collected_on: values.collected_on ?? today(),
         channel: kind === "BUY" ? "买号返点" : "卖号返点",
@@ -129,11 +123,11 @@ export function InventoryRebateModal(props: {
     }
   };
 
-  const submitEdit = async (values: { base_amount?: string; rate?: string; collected_on?: string; note?: string; operator_user_ids?: number[] }) => {
+  const submitEdit = async (values: { amount?: string; rate?: string; collected_on?: string; note?: string; operator_user_ids?: number[] }) => {
     if (!editTarget) return;
     try {
       const updated = await rebatesApi.update(editTarget.id, {
-        base_amount: values.base_amount,
+        amount: values.amount,
         rate: values.rate,
         collected_on: values.collected_on,
         note: values.note || null,
@@ -188,10 +182,7 @@ export function InventoryRebateModal(props: {
               <Radio.Group
                 onChange={(event) => {
                   const kind = event.target.value as RebateKind;
-                  form.setFieldsValue({
-                    rebate_type: kind,
-                    base_amount: defaultBaseAmount(detail, props.account?.source_order_id, kind),
-                  });
+                  form.setFieldsValue({ rebate_type: kind });
                 }}
               >
                 {(["BUY", "SELL"] as RebateKind[]).map((kind) => <Radio key={kind} value={kind} disabled={!availableKinds.includes(kind)}>{configurableLabel("REBATE_TYPE", kind, REBATE_KIND_LABEL)}</Radio>)}
@@ -200,7 +191,7 @@ export function InventoryRebateModal(props: {
             {!availableKinds.length ? <p className="muted">当前账号没有可关联的业务订单</p> : null}
             <div className="rebate-core-fields">
               <CfgItem
-                name="base_amount"
+                name="amount"
                 label="返点金额"
                 rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}
               >
@@ -231,7 +222,7 @@ export function InventoryRebateModal(props: {
               {rebates.length ? rebates.map((row) => (
                 <div key={row.id} className="orders-event-row" role="row">
                   <span role="cell">{row.rebate_type === "BUY" ? "买号返点" : "卖号返点"}</span>
-                  <span role="cell"><MoneyText value={row.base_amount} /></span>
+                  <span role="cell"><MoneyText value={row.amount} /></span>
                   <span role="cell">{row.rate}%</span>
                   <span role="cell">{row.collected_on}</span>
                   <span role="cell">{row.operator_user_ids?.map((id) => employees.find((employee) => employee.id === id)?.display_name).filter(Boolean).join("、") || row.operator || "-"}</span>
@@ -242,7 +233,7 @@ export function InventoryRebateModal(props: {
                         size="small"
                         onClick={() => {
                           editForm.setFieldsValue({
-                            base_amount: row.base_amount,
+                            amount: row.amount,
                             rate: row.rate,
                             collected_on: row.collected_on,
                             note: row.note ?? "",
@@ -283,7 +274,7 @@ export function InventoryRebateModal(props: {
         labelCol={{ flex: "108px" }}
         wrapperCol={{ flex: "auto" }} scope="INVREBATE" form={editForm} onFinish={submitEdit}>
           <div className="rebate-core-fields">
-            <CfgItem name="base_amount" label="返点金额" rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}> <MoneyInput /></CfgItem>
+            <CfgItem name="amount" label="返点金额" rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}> <MoneyInput /></CfgItem>
             <CfgItem name="rate" label="返点比例" rules={percentRules("返点比例")}><Input suffix="%" /></CfgItem>
             <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
             <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />

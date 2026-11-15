@@ -75,7 +75,7 @@ export const resetInventoryPanelMocks = () => {
   const executionDetail = {
     account: accounts[0],
     // 财务汇总由后端下发：
-    // 支出 100.00 = CF0001，收入 1350.00 = 回款 350.00 + 返点基数 1000.00。
+    // 支出 100.00 = CF0001，收入 1350.00 = 回款 350.00 + 返点金额 1000.00。
     finance_summary: {
       cashflow_income: "350.00",
       rebate_income: "1000.00",
@@ -120,7 +120,7 @@ export const resetInventoryPanelMocks = () => {
         rebate_type: "BUY",
         channel: "买号返点",
         rate: "5.00",
-        base_amount: "1000.00",
+        amount: "1000.00",
         status: "OPEN",
         collected_on: "2026-10-17",
         collected_at: "2026-10-17T12:30:00",
@@ -167,7 +167,7 @@ export const resetInventoryPanelMocks = () => {
     ];
     const cashflowIncome = flows.filter((flow: { direction: string }) => flow.direction === "IN").reduce((sum: number, flow: { amount: string }) => sum + Number(flow.amount), 0);
     const totalExpense = flows.filter((flow: { direction: string }) => flow.direction === "OUT").reduce((sum: number, flow: { amount: string }) => sum + Number(flow.amount), 0);
-    const rebateIncome = (order.rebates ?? []).reduce((sum: number, rebate: { base_amount: string }) => sum + Number(rebate.base_amount), 0);
+    const rebateIncome = (order.rebates ?? []).reduce((sum: number, rebate: { amount: string }) => sum + Number(rebate.amount), 0);
     return {
       ...detail,
       orders: [order],

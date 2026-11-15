@@ -108,13 +108,6 @@ export const POLICY_CONFIG_SCHEMA: Record<string, PolicyFieldDef[]> = {
       effective: "calc",
       help: "未分方向时的兜底费率；同时填写时以分方向为准",
     },
-    {
-      key: "base",
-      label: "计算基数",
-      kind: "select",
-      options: AMOUNT_BASE,
-      help: "返点按哪个金额计提（PRD：返点率 / 计算基数 / 适用业务）",
-    },
   ],
   COMMISSION: [
     {

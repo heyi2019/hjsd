@@ -60,7 +60,7 @@ export interface AccountExecutionRebate {
   rebate_type: "BUY" | "SELL" | "UNSPECIFIED" | string;
   channel?: string | null;
   rate: string;
-  base_amount: string;
+  amount: string;
   status: string;
   collected_on: string;
   collected_at?: string | null;

@@ -116,7 +116,7 @@ from app.parties.schemas import (
             {"source_pool_id": 1, "target_pool_id": 2, "amount": "1.00", "occurred_on": date(2026, 10, 1)},
         ),
         (TransferRepair, {"counterpart_pool_id": 2, "reason": "补齐"}),
-        (RebateCreate, {"source_order_id": 1, "base_amount": "1.00", "collected_on": date(2026, 10, 1)}),
+        (RebateCreate, {"source_order_id": 1, "amount": "1.00", "collected_on": date(2026, 10, 1)}),
         (AccountProfileUpdate, {}),
         (PoolCreate, {"code": "POOL1", "name": "资金池"}),
         (PoolUpdate, {}),

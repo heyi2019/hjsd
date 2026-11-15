@@ -191,7 +191,7 @@ def _order_detail_output(
                     "rebate_type": item.rebate_type,
                     "channel": item.channel,
                     "rate": item.rate,
-                    "base_amount": item.base_amount,
+                    "amount": item.amount,
                     "link_status": item.link_status,
                     "status": item.status,
                     "collected_on": item.collected_on,

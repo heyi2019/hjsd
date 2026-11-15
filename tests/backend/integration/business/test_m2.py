@@ -355,7 +355,7 @@ class TestA06Rebate:
             create_rebate(
                 seeded_db,
                 source_order_id=order.id,
-                base_amount=Decimal("100"),
+                amount=Decimal("100"),
                 collected_on=TODAY,
                 actor="pytest",
             )

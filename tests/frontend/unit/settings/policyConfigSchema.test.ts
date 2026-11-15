@@ -16,13 +16,12 @@ import {
 } from "@/policy/policyConfigSchema";
 
 describe("policyConfigSchema", () => {
-  it("REBATE 声明分方向费率表 + 统一费率 + 计算基数", () => {
+  it("REBATE 只声明分方向费率表与统一费率", () => {
     const fields = policyConfigFields("REBATE");
-    expect(fields.map((f) => f.key)).toEqual(["rates", "rate", "base"]);
+    expect(fields.map((f) => f.key)).toEqual(["rates", "rate"]);
     expect(fields[0].kind).toBe("rate-table");
     expect(fields[0].rows?.map((r) => r.key)).toEqual(["BUY", "SELL"]);
     expect(fields[1].kind).toBe("percent");
-    expect(fields[2].kind).toBe("select");
   });
 
   it("六类规则都给出可配置字段（PRD v1.2:513 参数标准 + 裁决台账 Q1/Q3/Q5/Q6/Q9/Q22）", () => {
@@ -61,16 +60,14 @@ describe("policyConfigSchema", () => {
   });
 
   it("config → 表单：嵌套 rates 摊成每行一个值，缺键补空串", () => {
-    expect(configToFields("REBATE", { rates: { BUY: "5" }, rate: "3", base: "GROSS" })).toEqual({
+    expect(configToFields("REBATE", { rates: { BUY: "5" }, rate: "3" })).toEqual({
       rates: { BUY: "5", SELL: "" },
       rate: "3",
-      base: "GROSS",
     });
     // 旧数据只有统一费率时，分方向行与新增字段全部为空
     expect(configToFields("REBATE", { rate: "5" })).toEqual({
       rates: { BUY: "", SELL: "" },
       rate: "5",
-      base: "",
     });
   });
 
@@ -115,7 +112,6 @@ describe("policyConfigSchema", () => {
     for (const code of others) {
       expect(policyConfigFields(code).filter((f) => f.effective === "calc")).toEqual([]);
     }
-    // REBATE 的计算基数只是口径记录，后端 base 由调用方传入，不算 calc。
-    expect(policyConfigFields("REBATE").find((f) => f.key === "base")?.effective).toBeUndefined();
+    expect(policyConfigFields("REBATE").some((f) => f.key === "base")).toBe(false);
   });
 });

@@ -31,7 +31,7 @@ D = date(2026, 10, 17)
 RETURN_D = date(2026, 11, 12)
 
 
-def _order_with_sell_rebate(seeded_db, base: str = "1000", collected_on: date = D) -> tuple[int, int]:
+def _order_with_sell_rebate(seeded_db, amount: str = "1000", collected_on: date = D) -> tuple[int, int]:
     """造一个 HS 订单（BUY+SELL），再登记一笔新模型返点，返回 (order_id, rebate_id)。"""
     account = create_account(
         seeded_db,
@@ -60,7 +60,7 @@ def _order_with_sell_rebate(seeded_db, base: str = "1000", collected_on: date = 
         seeded_db,
         source_order_id=order.id,
         rebate_type="SELL",
-        base_amount=Decimal(base),
+        amount=Decimal(amount),
         rate=Decimal("5"),
         collected_on=collected_on,
         actor="pytest",
@@ -70,7 +70,7 @@ def _order_with_sell_rebate(seeded_db, base: str = "1000", collected_on: date = 
 
 def test_return_creates_linked_outflow_and_reduces_order_profit(seeded_db):
     """退回形成挂单 OUT，订单利润按「收入−支出」自动冲减。"""
-    order_id, rebate_id = _order_with_sell_rebate(seeded_db, base="1000")
+    order_id, rebate_id = _order_with_sell_rebate(seeded_db, amount="1000")
     before = order_cashflow_profit(seeded_db, order_id)
 
     record, flow, already = rebates.return_rebate(
@@ -92,8 +92,8 @@ def test_return_creates_linked_outflow_and_reduces_order_profit(seeded_db):
 
 
 def test_partial_returns_accumulate_and_over_return_rejected(seeded_db):
-    """同一返点可分多次部分退回，累计超 base_amount 拒绝。"""
-    order_id, rebate_id = _order_with_sell_rebate(seeded_db, base="1000")
+    """同一返点可分多次部分退回，累计超 amount 拒绝。"""
+    order_id, rebate_id = _order_with_sell_rebate(seeded_db, amount="1000")
 
     rebates.return_rebate(seeded_db, rebate_id=rebate_id, amount=Decimal("600"),
                           returned_on=RETURN_D, actor="pytest")
@@ -118,7 +118,7 @@ def test_partial_returns_accumulate_and_over_return_rejected(seeded_db):
 
 def test_return_uses_real_return_date_not_today(seeded_db):
     """归期=真实退回日（11月），不撕裂 10月返点登记月的 R2。"""
-    order_id, rebate_id = _order_with_sell_rebate(seeded_db, base="1000", collected_on=D)
+    order_id, rebate_id = _order_with_sell_rebate(seeded_db, amount="1000", collected_on=D)
     before = r2_monthly_pnl(seeded_db)
     oct_before = next(r for r in before["items"] if r["month"] == "2026-10")
 
@@ -139,7 +139,7 @@ def test_return_uses_real_return_date_not_today(seeded_db):
 
 def test_return_does_not_inflate_operating_expense(seeded_db):
     """挂单退回只进该单直接成本，不得重复进 R2 运营费用列。"""
-    order_id, rebate_id = _order_with_sell_rebate(seeded_db, base="1000")
+    order_id, rebate_id = _order_with_sell_rebate(seeded_db, amount="1000")
     before = r2_monthly_pnl(seeded_db)
     op_before = next((r["operating_expense"] for r in before["items"] if r["month"] == "2026-11"), Decimal("0"))
 
@@ -154,7 +154,7 @@ def test_return_does_not_inflate_operating_expense(seeded_db):
 
 def test_return_flow_reuses_original_rebate_pool(seeded_db):
     """退回流水与返点登记 IN 流水同池（收支同池）。"""
-    order_id, rebate_id = _order_with_sell_rebate(seeded_db, base="1000")
+    order_id, rebate_id = _order_with_sell_rebate(seeded_db, amount="1000")
     original = seeded_db.scalar(
         select(Cashflow).where(
             Cashflow.order_id == order_id,
@@ -172,7 +172,7 @@ def test_return_flow_reuses_original_rebate_pool(seeded_db):
 
 def test_return_rejects_zero_amount(seeded_db):
     """退回金额必须为正。"""
-    _order_id, rebate_id = _order_with_sell_rebate(seeded_db, base="1000")
+    _order_id, rebate_id = _order_with_sell_rebate(seeded_db, amount="1000")
     with pytest.raises(Validation):
         rebates.return_rebate(seeded_db, rebate_id=rebate_id, amount=Decimal("0"),
                               returned_on=RETURN_D, actor="pytest")
@@ -182,13 +182,13 @@ def test_list_exposes_already_returned_and_remaining(seeded_db):
     """列表/单查下发累计已退与可退余额，口径收敛到后端，前端不再自算减法。"""
     from app.finance.rebates import rebate_returned_totals
 
-    order_id, rebate_id = _order_with_sell_rebate(seeded_db, base="1000")
+    order_id, rebate_id = _order_with_sell_rebate(seeded_db, amount="1000")
     record = seeded_db.get(RebateRecord, rebate_id)
 
     # 未退时已退=0、可退=基数。
     totals = rebate_returned_totals(seeded_db, [record])
     assert totals[rebate_id] == Decimal("0.00")
-    assert Decimal("1000.00") == record.base_amount - totals[rebate_id]
+    assert Decimal("1000.00") == record.amount - totals[rebate_id]
 
     # 退 400 后：已退=400、可退=600。
     rebates.return_rebate(seeded_db, rebate_id=rebate_id, amount=Decimal("400"),
@@ -207,7 +207,7 @@ def test_return_remaining_is_derived_from_rebate(seeded_db):
     """退回结果的 remaining 为计算字段，等于返点可退余额，不重复相减。"""
     from app.finance.schemas import RebateReturnOut
 
-    order_id, rebate_id = _order_with_sell_rebate(seeded_db, base="1000")
+    order_id, rebate_id = _order_with_sell_rebate(seeded_db, amount="1000")
     record, flow, already = rebates.return_rebate(
         seeded_db, rebate_id=rebate_id, amount=Decimal("250"),
         returned_on=RETURN_D, actor="pytest",
@@ -223,30 +223,30 @@ def test_return_remaining_is_derived_from_rebate(seeded_db):
     assert result.remaining == Decimal("750.00")
 
 
-def test_update_base_below_already_returned_rejected(seeded_db):
-    """护栏：把基数改到低于累计已退会架空『累计退回≤金额』，必须拒绝。"""
-    order_id, rebate_id = _order_with_sell_rebate(seeded_db, base="1000")
+def test_update_amount_below_already_returned_rejected(seeded_db):
+    """返点金额不能改到累计已退金额以下。"""
+    order_id, rebate_id = _order_with_sell_rebate(seeded_db, amount="1000")
     rebates.return_rebate(seeded_db, rebate_id=rebate_id, amount=Decimal("600"),
                           returned_on=RETURN_D, actor="pytest")
 
     # 改到低于已退 600 → 拒绝。
     with pytest.raises(Validation):
-        rebates.update_rebate(seeded_db, rebate_id, base_amount=Decimal("500"), actor="pytest")
+        rebates.update_rebate(seeded_db, rebate_id, amount=Decimal("500"), actor="pytest")
 
     # 改到等于已退 → 允许（可退余额归零）。
-    updated = rebates.update_rebate(seeded_db, rebate_id, base_amount=Decimal("600"), actor="pytest")
-    assert updated.base_amount == Decimal("600.00")
+    updated = rebates.update_rebate(seeded_db, rebate_id, amount=Decimal("600"), actor="pytest")
+    assert updated.amount == Decimal("600.00")
 
 
 def test_void_legacy_rebate_cannot_return(seeded_db):
     """历史已作废（VOID）返点不可再退回。"""
-    order_id, _ = _order_with_sell_rebate(seeded_db, base="1000")
+    order_id, _ = _order_with_sell_rebate(seeded_db, amount="1000")
     legacy = RebateRecord(
         rebate_no=f"REB-LEGACY-{uuid4().hex[:8]}",
         source_order_id=order_id,
         rebate_type="SELL",
         rate=to_money("5"),
-        base_amount=to_money("500"),
+        amount=to_money("500"),
         collected_on=D,
         status=RebateStatus.VOID.value,
         link_status="LINKED",

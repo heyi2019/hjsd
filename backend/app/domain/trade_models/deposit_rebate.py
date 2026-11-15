@@ -92,7 +92,7 @@ class RebateRecord(Base, AuditMixin):
         UniqueConstraint("rebate_no", name="uq_rebate_records_no"),
         Index("ix_rebate_records_source_order", "source_order_id"),
         CheckConstraint(
-            "rate >= 0 AND base_amount >= 0",
+            "rate >= 0 AND amount >= 0",
             name="amount_nonneg",
         ),
         CheckConstraint("rate <= 100", name="rate_max"),
@@ -112,7 +112,7 @@ class RebateRecord(Base, AuditMixin):
     )
     channel: Mapped[str | None] = mapped_column(String(64), nullable=True)
     rate: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
-    base_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     # BAS-06-04 规则快照：创建时固化当时生效的规则版本与参数。
     # 「改未来费率不会改写已发生订单的利润」这条红线靠它兜底 ——
     # 规则版本改了也不回写快照，历史利润永远按当时口径。
@@ -134,5 +134,5 @@ class RebateRecord(Base, AuditMixin):
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 # 返点分次结算模型 `RebateSettlement`（rebate_settlements 表）已于 2026-11-05 下线：
-# 返点登记即完成收入确认，金额唯一取 rebate_records.base_amount，不再有分次到账、
+# 返点登记即完成收入确认，金额唯一取 rebate_records.amount，不再有分次到账、
 # 手续费与冲销子记录。已有库（含生产）中的历史表保留、不 drop，避免破坏历史数据。

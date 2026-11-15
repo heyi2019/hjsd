@@ -63,7 +63,7 @@ def test_rebate_uses_active_rule_rate_when_rate_is_omitted(seeded_db):
         seeded_db,
         source_order_id=_order_with_buy(seeded_db),
         rebate_type="BUY",
-        base_amount=Decimal("1000"),
+        amount=Decimal("1000"),
         collected_on=D,
         actor="pytest",
     )

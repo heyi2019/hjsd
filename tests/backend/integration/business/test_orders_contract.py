@@ -1880,7 +1880,7 @@ class TestOrdersApi:
             seeded_db,
             source_order_id=order.id,
             rebate_type="BUY",
-            base_amount="100.00",
+            amount="100.00",
             collected_on=D,
             actor="pytest",
         )

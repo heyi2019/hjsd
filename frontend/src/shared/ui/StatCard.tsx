@@ -11,11 +11,13 @@ export function StatCard(props: {
   hint?: string;
   tone?: StatTone;
   onClick?: () => void;
+  testId?: string;
 }) {
   const interactive = Boolean(props.onClick);
   return (
     <div
       className={`ui-stat ui-stat--${props.tone ?? "plain"}${interactive ? " ui-stat--interactive" : ""}`}
+      data-testid={props.testId}
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : undefined}
       onClick={props.onClick}
@@ -43,6 +45,7 @@ export function StatRow(props: {
     kind?: "count" | "money";
     hint?: string;
     onClick?: () => void;
+    testId?: string;
     /** auto：按金额正负自动上色（中国区惯例：正红负绿）。 */
     tone?: StatTone | "auto";
   }[];
@@ -70,6 +73,7 @@ export function StatRow(props: {
             hint={item.hint}
             tone={item.tone === "auto" ? "plain" : item.tone}
             onClick={item.onClick}
+            testId={item.testId}
           />
         );
       })}

@@ -210,15 +210,15 @@ describe("AppShell：角色展示与退出", () => {
     expect(within(topbar).queryByRole("button", { name: "我的当期订单" })).toBeNull();
     expect(within(topbar).queryByRole("button", { name: "我的当期收益" })).toBeNull();
 
-    await ui.click(within(dashboard).getByRole("button", { name: /我的当期订单/ }));
+    await ui.click(within(dashboard).getByTestId("dashboard-personal-orders"));
     expect(await screen.findByRole("tab", { name: "订单台账" })).toHaveAttribute("aria-selected", "true");
-    expect(vi.mocked(ordersApi.list)).toHaveBeenCalledWith({ mine: true });
+    expect(vi.mocked(ordersApi.listPage)).toHaveBeenCalledWith(expect.objectContaining({ mine: true }));
 
     await ui.click(screen.getByRole("button", { name: "工作台" }));
-    await ui.click(screen.getByRole("button", { name: /我的当期收益/ }));
+    await ui.click(screen.getByTestId("dashboard-personal-earnings"));
     const commissionTab = await screen.findByRole("tab", { name: "分润对账" });
     expect(commissionTab).toHaveAttribute("aria-selected", "true");
-    expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith({ mine: true });
+    expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith(expect.objectContaining({ mine: true }));
   });
 
   it("顶栏用户中心入口可打开弹窗", async () => {

@@ -2,7 +2,6 @@
  *  逻辑层见 useFundsPageController；视图层拆为 FundsPage.tabs 与 FundsPage.modals。 */
 import { Tabs } from "antd";
 import { ErrorBanner } from "../shared/ui";
-import { RebatesPanel } from "../rebates/RebatesPanel";
 import { StudioExpensePanel } from "./StudioExpensePanel";
 import { useFundsPageController } from "./useFundsPageController";
 import { OverviewTab, CashflowTab, ReconciliationTab, ControlsTab } from "./FundsPage.tabs";
@@ -36,7 +35,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
           { key: "cashflows", label: "流水", children: <CashflowTab ctrl={ctrl} /> },
           { key: "reconciliations", label: "对账", children: <ReconciliationTab ctrl={ctrl} /> },
           { key: "controls", label: "异常", children: <ControlsTab ctrl={ctrl} /> },
-          { key: "rebates", label: "返点明细", children: <RebatesPanel /> },
           { key: "studio-expenses", label: "工作室支出", children: <StudioExpensePanel pools={ctrl.pools} ctrl={ctrl} /> },
         ]}
       />

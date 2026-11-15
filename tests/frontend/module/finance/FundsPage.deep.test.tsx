@@ -10,7 +10,6 @@ import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { depositsApi } from "@/shared/api/installments.api";
 import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
 import { poolsApi, reconciliationsApi, transfersApi } from "@/shared/api/pools.api";
-import { rebatesApi } from "@/shared/api/rebates.api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -29,7 +28,6 @@ vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
 vi.mock("@/shared/api/policy.api");
 vi.mock("@/shared/api/pools.api");
-vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
@@ -67,10 +65,6 @@ beforeEach(() => {
   resolveMock(vi.mocked(cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "1000.00" });
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(ordersApi.list).mockResolvedValue([]);
-  // 内嵌 RebatesPanel 本套件不覆盖：同步抛错，与改造前「工厂未导出 rebatesApi」的行为一致
-  vi.mocked(rebatesApi.list).mockImplementation(() => {
-    throw new Error("rebatesApi 不在本套件覆盖范围");
-  });
 });
 
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {

@@ -9,7 +9,6 @@ import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { depositsApi } from "@/shared/api/installments.api";
 import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
 import { poolsApi, reconciliationsApi, transfersApi } from "@/shared/api/pools.api";
-import { rebatesApi } from "@/shared/api/rebates.api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -28,7 +27,6 @@ vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
 vi.mock("@/shared/api/policy.api");
 vi.mock("@/shared/api/pools.api");
-vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
@@ -64,10 +62,6 @@ beforeEach(() => {
   resolveMock(vi.mocked(cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "500.00" });
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(ordersApi.list).mockResolvedValue([]);
-  // 内嵌 RebatesPanel 本套件不覆盖：同步抛错，与改造前「工厂未导出 rebatesApi」的行为一致
-  vi.mocked(rebatesApi.list).mockImplementation(() => {
-    throw new Error("rebatesApi 不在本套件覆盖范围");
-  });
 });
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
   await ui.click(modal.querySelectorAll(".ant-select-selector")[index] as Element);
@@ -79,6 +73,12 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
 }
 
 describe("FundsPage：资金池卡片", () => {
+  it("资金中心不再展示返点明细 Tab", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    expect(screen.queryByRole("tab", { name: "返点明细" })).not.toBeInTheDocument();
+  });
+
   it("资金池列表按列表字段配置排序", async () => {
     vi.mocked(listColumnsApi.all).mockResolvedValueOnce([{
       code: "FUND_POOLS",
@@ -158,7 +158,6 @@ describe("FundsPage：资金池卡片", () => {
 
   it("P1/FE-244：资金总览数据失败时不显示零统计且禁用划转", async () => {
     vi.mocked(poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
-    vi.mocked(rebatesApi.list).mockResolvedValue([] as never);
     renderLight(<FundsPage />, { user: "admin" });
 
     expect(await screen.findByText("资金池卡片")).toBeInTheDocument();
@@ -425,7 +424,6 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(depositsApi.list).mockResolvedValueOnce([] as never);
     vi.mocked(cashflowsApi.list).mockResolvedValueOnce({ items: [], total: 0 } as never);
     vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([] as never);
-    vi.mocked(rebatesApi.list).mockResolvedValueOnce([] as never);
     renderLight(<FundsPage />, { user: "admin" });
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await screen.findByText(/POOL-A/);
@@ -463,7 +461,6 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(cashflowsApi.reverse).mockResolvedValueOnce(reversal as never);
     vi.mocked(depositsApi.list).mockResolvedValue([] as never);
     vi.mocked(reconciliationsApi.list).mockResolvedValue([] as never);
-    vi.mocked(rebatesApi.list).mockResolvedValue([] as never);
     renderLight(<FundsPage />, { user: "admin" });
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await screen.findByText(/POOL-A/);

@@ -315,7 +315,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "ROUTE_UPDATE", label: "更新资金路由" },
     { value: "CUSTOMER_CREATE", label: "新建客户" },
     { value: "CUSTOMER_UPDATE", label: "编辑客户" },
-    { value: "CONTACT_READ", label: "查看联系人" },
     { value: "CONTACT_WRITE", label: "维护联系人" },
     { value: "CUSTOMER_MERGE", label: "合并客户" },
     { value: "LEAD_CREATE", label: "新建需求" },

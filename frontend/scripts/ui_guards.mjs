@@ -337,7 +337,7 @@ const FORM_SCOPE_WHITELIST = new Map([
   ["src/users/UsersPanel.tsx", "用户管理，系统表单"],
   ["src/stocks/InventoryPanel/InventoryDeleteDialog.tsx", "账号删除二次确认：删除原因只写审计日志、不落业务字段，属系统级确认输入，不开放表单字段配置"],
   ["src/orders/OrderDeleteDialog.tsx", "订单删除二次确认：删除原因只写审计日志、不落业务字段，属系统级确认输入，不开放表单字段配置"],
-  ["src/customers/CustomerEditModal.tsx", "客户编辑弹窗，由 CustomerPanel.tsx 逐字拆出（原与新建弹窗共驻同一文件、搭 FieldConfigScope 顺风车）；扩展字段已通过 activeDefs（orderFormFieldsApi.list CUSTOMER）接入配置体系，基础字段维持裸 Form.Item 以逐字保持脱敏回写分支 contactsVisible；FieldConfigScope/CfgItem 统一接线改造另案。类比 useOrderFormFieldsPanelController 拆分条目"],
+  ["src/customers/CustomerEditModal.tsx", "客户编辑弹窗，由 CustomerPanel.tsx 逐字拆出（原与新建弹窗共驻同一文件、搭 FieldConfigScope 顺风车）；扩展字段已通过 activeDefs（orderFormFieldsApi.list CUSTOMER）接入配置体系，基础字段维持裸 Form.Item 以直接回写已建档联系方式；FieldConfigScope/CfgItem 统一接线改造另案。类比 useOrderFormFieldsPanelController 拆分条目"],
   ["src/customers/CustomerMergeModal.tsx", "客户合并确认表单：目标客户为运行时动态选择、合并原因仅记操作日志，非客户档案可配置字段，与 InventoryDeleteDialog 同属系统级确认输入"],
 ]);
 let wiredCount = 0;

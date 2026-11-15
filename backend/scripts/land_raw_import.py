@@ -8,10 +8,7 @@
 
 1. **禁止自动匹配**：`create_batch` 内部只写 `raw` 与 `status=UNMAPPED`，
    `mapped_order_id` / `mapped_account_id` 一律留空。
-2. **凭据字段不落库**：`密码` / `账号密码` / `账密` / `绑定手机号` / `买家联系方式`
-   在写入前剥离并替换为占位符（`[REDACTED]`），只记录「原字段存在且非空」的事实。
-   理由是业务口径——v1 的 26 张表没有任何列能承载游戏账号登录凭据，
-   写进 `import_rows.raw` 等于把凭据复制进一个新系统。
+2. **原始值完整落库**：导入行按源文件原样写入 `import_rows.raw`，不做脱敏、遮罩或字段剥离。
 3. **原始值逐字保留**：`房租/日用` 这类类别值原样写入 `raw`，
    不做任何归一化或改写（曾写成「房租日用」会导致 ¥11,989.90 漏计）。
 
@@ -41,21 +38,6 @@ if str(BACKEND_DIR) not in sys.path:
 PROJECT_ROOT = BACKEND_DIR.parent
 SOURCE_DIR = PROJECT_ROOT / "rawdata" / "原始数据"
 
-REDACTED = "[REDACTED]"
-
-# 凭据 / 直接个人身份信息：写入前剥离，不进 import_rows.raw。
-# 「联系方式」类同样剥离——它是买家个人信息，且 v1 有 customers.phone 可承载，
-# 不该塞进 raw 这种「原文暂存」区。
-SENSITIVE_FIELDS: frozenset[str] = frozenset(
-    {
-        "密码",
-        "账号密码",
-        "账密",
-        "绑定手机号",
-        "买家联系方式",
-    }
-)
-
 # 每份源文件 → (source_kind, 人类可读来源名)
 SOURCE_FILES: dict[str, tuple[str, str]] = {
     "sheet3_cashflow": ("STANDARD_CASHFLOW", "金山文档·资金流水"),
@@ -66,27 +48,8 @@ SOURCE_FILES: dict[str, tuple[str, str]] = {
 }
 
 
-def _strip_sensitive(fields: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
-    """剥离凭据字段，返回 (净化后的 dict, 被剥离的字段名列表)。
-
-    只在值非空时记录字段名——「字段存在但为空」与「字段不存在」对映射没有区别，
-    写进 raw 只会增加噪音。
-    """
-    cleaned: dict[str, Any] = {}
-    removed: list[str] = []
-    for key, value in fields.items():
-        if key in SENSITIVE_FIELDS:
-            if value not in (None, "", [], {}):
-                cleaned[key] = REDACTED
-                removed.append(key)
-            # 值为空则整个字段丢弃，不留空键
-            continue
-        cleaned[key] = value
-    return cleaned, removed
-
-
 def _load(stem: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """读一份源 JSON，返回 (行列表, 脱敏统计)。
+    """读一份源 JSON，返回 (行列表, 行数统计)。
 
     兼容两种行结构：`{fields: {...}}` 嵌套与 `{中文键}` 平铺。
     真实数据实测 5 份均为平铺，但两种都要支持——源文件随时可能被重新导出。
@@ -101,19 +64,15 @@ def _load(stem: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
         raise ValueError(f"{path.name} 顶层不是 records 数组")
 
     rows: list[dict[str, Any]] = []
-    stats = {"rows": 0, "redacted_cells": 0, "empty_sensitive": 0}
+    stats = {"rows": 0}
     for record in records:
         fields = record.get("fields") if isinstance(record.get("fields"), dict) else record
         # 保留金山文档行 ID，便于回溯原文位置
         source_id = record.get("id")
-        cleaned, removed = _strip_sensitive(dict(fields))
+        cleaned = dict(fields)
         if source_id is not None:
             cleaned["_source_id"] = source_id
         stats["rows"] += 1
-        stats["redacted_cells"] += len(removed)
-        stats["empty_sensitive"] += sum(
-            1 for key in SENSITIVE_FIELDS if key in fields and fields[key] in (None, "", [], {})
-        )
         rows.append(cleaned)
     return rows, stats
 
@@ -136,7 +95,7 @@ def main() -> int:
         print(f"未知源文件：{unknown}；可选：{list(SOURCE_FILES)}", file=sys.stderr)
         return 2
 
-    # 预检：先把所有文件读一遍并脱敏，任何一步失败都不写库（避免半批状态）
+    # 预检：先把所有文件读一遍，任何一步失败都不写库（避免半批状态）
     loaded: dict[str, tuple[str, str, list[dict[str, Any]], dict[str, int]]] = {}
     for stem in stems:
         try:
@@ -151,14 +110,11 @@ def main() -> int:
     print(f"待处理 {len(loaded)} 份：{'、'.join(stems)}\n")
 
     total_rows = 0
-    total_redacted = 0
     for stem, (source_kind, source_name, rows, stats) in loaded.items():
         total_rows += stats["rows"]
-        total_redacted += stats["redacted_cells"]
-        detail = f"（脱敏 {stats['redacted_cells']} 格" if stats["redacted_cells"] else ""
-        print(f"  {stem:22} {stats['rows']:4} 行  {source_kind:20} {source_name}{detail}")
+        print(f"  {stem:22} {stats['rows']:4} 行  {source_kind:20} {source_name}")
 
-    print(f"\n合计 {total_rows} 行，脱敏 {total_redacted} 格")
+    print(f"\n合计 {total_rows} 行")
 
     if args.dry_run:
         print("\n[dry-run] 未写库。去掉 --dry-run 实际落地。")
@@ -183,7 +139,7 @@ def main() -> int:
                 rows=rows,
                 source_kind=source_kind,
                 actor="land_raw_import",
-                note=f"由 land_raw_import.py 从 {stem}.json 落地；仅存原文，凭据字段已脱敏",
+                note=f"由 land_raw_import.py 从 {stem}.json 落地；完整保留原始字段",
             )
             print(f"  落地 {stem}：批次 {batch['batch_no']}（{batch['id']}）")
             created += 1

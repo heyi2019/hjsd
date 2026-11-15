@@ -1,7 +1,7 @@
-"""IMPORT-01 导入的脱敏与「只落原文」红线测试（MIG-01）。
+"""IMPORT-01 导入的原始值与「只落原文」红线测试（MIG-01）。
 
 这些用例守护的是 PRD §23 与导入回归锁死项，**不是**覆盖率：
-删掉脱敏逻辑，测试必须变红。
+导入不得改写源文件原始值。
 """
 
 from __future__ import annotations
@@ -30,42 +30,18 @@ def lander():
     return _load_script()
 
 
-class TestRedaction:
-    """凭据字段必须在写入前剥离。"""
+class TestRawValues:
+    """导入字段完整保留，不做脱敏或字段剥离。"""
 
-    def test_sensitive_fields_removed(self, lander):
-        assert lander.REDACTED == "[REDACTED]"
-        # 覆盖源数据里实际存在的全部凭据/直接身份字段
-        assert lander.SENSITIVE_FIELDS == frozenset(
-            {"密码", "账号密码", "账密", "绑定手机号", "买家联系方式"}
+    def test_sensitive_values_are_preserved(self, lander, monkeypatch, tmp_path):
+        payload = {"records": [{"日期": "2026-01-01", "密码": "secret", "绑定手机号": "13800001111"}]}
+        (tmp_path / "sheet9_orders.json").write_text(
+            json.dumps(payload, ensure_ascii=False), encoding="utf-8"
         )
-
-    def test_non_empty_sensitive_becomes_placeholder(self, lander):
-        cleaned, removed = lander._strip_sensitive({"密码": "secret", "本金": 100})
-        assert cleaned["密码"] == lander.REDACTED
-        assert "密码" in removed
-        assert cleaned["本金"] == 100
-
-    def test_empty_sensitive_key_is_dropped_not_blanked(self, lander):
-        """值为空则整键丢弃——「字段存在但为空」与「字段不存在」对映射无区别。"""
-        cleaned, removed = lander._strip_sensitive({"密码": "", "账密": None, "日期": "2026-01-01"})
-        assert "密码" not in cleaned
-        assert "账密" not in cleaned
-        assert removed == []
-        assert cleaned["日期"] == "2026-01-01"
-
-    def test_non_sensitive_untouched(self, lander):
-        """脱敏不得误伤业务字段。"""
-        fields = {
-            "日期": "2026-06-15",
-            "订单类型": "回收",
-            "本金": 5000,
-            "利润": 800,
-            "回款账户（本金/利润）": ["利润荷包（利润）"],
-        }
-        cleaned, removed = lander._strip_sensitive(dict(fields))
-        assert cleaned == fields
-        assert removed == []
+        monkeypatch.setattr(lander, "SOURCE_DIR", tmp_path)
+        rows, _stats = lander._load("sheet9_orders")
+        assert rows[0]["密码"] == "secret"
+        assert rows[0]["绑定手机号"] == "13800001111"
 
 
 class TestRawPreservation:
@@ -73,14 +49,12 @@ class TestRawPreservation:
 
     def test_operating_expense_category_keeps_slash(self, lander):
         """回归锁死项：写成「房租日用」曾导致 ¥11,989.90 漏计。"""
-        cleaned, _ = lander._strip_sensitive({"类别": "房租/日用"})
+        cleaned = {"类别": "房租/日用"}
         assert cleaned["类别"] == "房租/日用"
         assert cleaned["类别"] != "房租日用"
 
     def test_pool_names_kept_verbatim(self, lander):
-        cleaned, _ = lander._strip_sensitive(
-            {"回款账户（本金/利润）": ["投资款荷包（本金）", "利润荷包（利润）"]}
-        )
+        cleaned = {"回款账户（本金/利润）": ["投资款荷包（本金）", "利润荷包（利润）"]}
         assert cleaned["回款账户（本金/利润）"] == ["投资款荷包（本金）", "利润荷包（利润）"]
 
     def test_source_id_preserved_for_traceback(self, lander, monkeypatch, tmp_path):
@@ -91,6 +65,7 @@ class TestRawPreservation:
         monkeypatch.setattr(lander, "SOURCE_DIR", tmp_path)
         rows, _stats = lander._load("sheet9_orders")
         assert rows[0]["_source_id"] == "rec_abc"
+        assert rows[0]["密码"] == "x"
 
     def test_supports_both_nested_and_flat_shapes(self, lander, monkeypatch, tmp_path):
         """源文件随时可能重新导出，两种行结构都要支持。"""
@@ -106,8 +81,7 @@ class TestRawPreservation:
         rows, stats = lander._load("sheet17_installments")
         assert stats["rows"] == 2
         assert [r["日期"] for r in rows] == ["2026-01-01", "2026-01-02"]
-        # 两种结构的敏感字段都被脱敏
-        assert all(r["账密"] == lander.REDACTED for r in rows)
+        assert [r["账密"] for r in rows] == ["p", "q"]
 
 
 class TestNoInference:
@@ -177,21 +151,13 @@ class TestRealSourceData:
 
     def test_real_sources_land_without_credentials(self, lander):
         total = 0
-        redacted = 0
         for stem in lander.SOURCE_FILES:
             path = lander.SOURCE_DIR / f"{stem}.json"
             if not path.is_file():
                 pytest.skip(f"真实源文件缺失：{stem}")
             rows, stats = lander._load(stem)
             total += stats["rows"]
-            redacted += stats["redacted_cells"]
-            # 脱敏后不得残留任何真实凭据值
-            for row in rows:
-                for key, value in row.items():
-                    if key in lander.SENSITIVE_FIELDS:
-                        assert value == lander.REDACTED, f"{stem} 的 {key} 未脱敏"
         assert total == 340, f"源数据应 340 行，实得 {total}"
-        assert redacted == 111, f"脱敏格数应 111，实得 {redacted}"
 
     def test_real_cashflow_keeps_operating_expense_verbatim(self, lander):
         path = lander.SOURCE_DIR / "sheet3_cashflow.json"

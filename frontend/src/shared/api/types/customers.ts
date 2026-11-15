@@ -14,7 +14,6 @@ export interface Customer {
   note?: string | null;
   status: string;
   created_at?: string | null;
-  contact_masked?: boolean;
   merged_into_id?: number | null;
   /** 表单扩展字段值：field_key → 值，由统一字段配置驱动（BAS-04） */
   extra_values?: Record<string, unknown> | null;
@@ -106,8 +105,6 @@ export interface Counterparty {
   source?: string | null;
   note?: string | null;
   created_at?: string;
-  /** 联系方式是否已被后端遮罩（无 customer.contact.read 权限）；同 Customer 口径 */
-  contact_masked?: boolean;
   extra_values?: Record<string, unknown>;
   extra_fields?: Array<{ key: string; label: string; section: string; value: unknown }>;
 }

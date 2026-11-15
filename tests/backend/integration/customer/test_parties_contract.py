@@ -1,8 +1,8 @@
 """PARTY-01 parties 客户/合作方契约测试（CUS-01 / BAS-02-05 / BAS-04）。
 
-与 test_parties.py 的分工：既有文件已覆盖编号域、脱敏主路径、停用/合并参与方校验、
+与 test_parties.py 的分工：既有文件已覆盖编号域、联系方式原值输出、停用/合并参与方校验、
 合并迁移主路径、字段停用保留历史值、以及创建客户/合作方/字段端点；
-本文件补脱敏边界（空值/短串）、建单必填校验、查重空条件、查询三过滤+作用域、
+本文件补建单必填校验、查重空条件、查询三过滤+作用域、
 客户更新（含已合并冲突与联系方式审计分流）、状态机 MERGED 守卫、
 合并同源/已合并/重复角色去重、合作方查询与更新、字段定义三项校验与停用过滤、
 表单扩展字段覆写，以及 7 个未测路由端点。
@@ -31,7 +31,6 @@ from app.domain.parties import (
 from app.domain.trade import InstallmentSchedule, OrderFormField
 from app.value_added_services import create as inst_create
 from app.orders.create import create_order
-from app.parties._common import mask_id, mask_phone
 from app.parties.counterparties import (
     create_counterparty,
     get_counterparty,
@@ -104,19 +103,6 @@ def _audit_actions(seeded_db, action: AuditAction) -> list[str]:
         select(AuditLog).where(AuditLog.action == action.value)
     ).all()
     return [row.entity_id for row in rows]
-
-
-# ------------------------------------------------------------------ 脱敏边界
-class TestMaskingEdgeCases:
-    def test_mask_phone_empty_and_short(self, seeded_db):
-        assert mask_phone(None) is None  # 46
-        assert mask_phone("") == ""
-        assert mask_phone("12345") == "123**"  # 49（长度 ≤ 7 走短串分支）
-
-    def test_mask_id_empty_and_short(self, seeded_db):
-        assert mask_id(None) is None  # 56
-        assert mask_id("") == ""
-        assert mask_id("ab") == "a*"  # 59（长度 ≤ 2 走短串分支）
 
 
 # ------------------------------------------------------------------ 客户建档
@@ -687,8 +673,7 @@ class TestPartiesApi:
             CUSTOMERS, params={"keyword": "阿甲"}, headers=headers
         )
         assert response.status_code == 200, response.text
-        # admin 具备 customer.contact.read → 不脱敏
-        assert response.json()["items"][0]["contact_masked"] is False
+        assert response.json()["items"][0]["phone"] == "13800001111"
         assert response.json()["items"][0]["id"] == customer.id
         assert response.json()["items"][0]["order_roles"] == []
         assert response.json()["items"][0]["active_order_count"] == 0
@@ -778,21 +763,14 @@ class TestPartiesApi:
         assert response.status_code == 200, response.text
         assert response.json()["note"] == "长期合作"
 
-def test_customer_detail_reveal_records_contact_read_audit(seeded_client, seeded_db, headers):
-    customer = _customer(seeded_db, "脱敏审计客户")
+def test_customer_detail_does_not_record_contact_read_audit(seeded_client, seeded_db, headers):
+    customer = _customer(seeded_db, "联系方式客户", phone="13800001234")
     response = seeded_client.get(
         f"/api/v1/customers/{customer.id}/detail",
-        params={"reveal": "true"},
         headers=headers,
     )
     assert response.status_code == 200, response.text
-    audits = seeded_db.scalars(
-        select(AuditLog).where(
-            AuditLog.action == AuditAction.CONTACT_READ.value,
-            AuditLog.entity_id == customer.customer_no,
-        )
-    ).all()
-    assert audits
+    assert not any(row.action == "CONTACT_READ" for row in seeded_db.scalars(select(AuditLog)).all())
 
 
 def test_validate_owner_id_rejects_non_positive_and_inactive(seeded_db):

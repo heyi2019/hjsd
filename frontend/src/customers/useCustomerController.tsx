@@ -29,9 +29,6 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
   const [mergeTarget, setMergeTarget] = useState<Customer | null>(null);
   const [detailData, setDetailData] = useState<CustomerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  /** 点「查看」后取到的完整联系方式，仅存活于当前会话内存（刷新即回到脱敏值）。 */
-  const [revealed, setRevealed] = useState<Record<number, Customer>>({});
-  const [revealingId, setRevealingId] = useState<number | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -47,7 +44,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
   const activeDefs = fieldDefs.filter((def) => def.is_active);
 
   const [exporting, setExporting] = useState(false);
-  /** 客户按列配置导出 CSV：后端沿用筛选与联系方式脱敏口径。 */
+  /** 客户按列配置导出 CSV。 */
   const exportCustomers = async () => {
     setExporting(true);
     try {
@@ -129,38 +126,9 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     void openDetail(row);
   }, [focusId, rows]);
 
-  /** 后端默认脱敏；点「查看」才取明文，后端同时写一条 CONTACT_READ 审计。 */
-  const revealContact = async (id: number) => {
-    setRevealingId(id);
-    try {
-      const full = await customersApi.get(id, true);
-      setRevealed((prev) => ({ ...prev, [id]: full }));
-    } catch (err) {
-      setError(normalizeError(err));
-    } finally {
-      setRevealingId(null);
-    }
-  };
-
-  /** 联系方式单元格：脱敏值 + 「查看」入口；无 contact.read 权限的人拿不到按钮，也拿不到明文。 */
+  /** 联系方式单元格直接展示已建档原值。 */
   const renderContact = (row: Customer, field: "phone" | "wechat" | "qq") => {
-    const full = revealed[row.id];
-    const value = (full ?? row)[field];
-    if (!row.contact_masked || full) return value || "-";
-    return (
-      <Space size={4}>
-        <span>{value || "-"}</span>
-        <PermissionButton
-          permission="customer.contact.read"
-          type="link"
-          size="small"
-          loading={revealingId === row.id}
-          onClick={() => void revealContact(row.id)}
-        >
-          查看
-        </PermissionButton>
-      </Space>
-    );
+    return row[field] || "-";
   };
 
   const submitCreate = async (values: Record<string, unknown>) => {
@@ -192,18 +160,12 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     if (!editTarget) return;
     try {
       const extraValues = collectExtras(values, activeDefs);
-      // 脱敏值不可回写：未取得明文时不提交联系方式，避免把 138****1234 覆盖进库。
-      const contactsVisible = !editTarget.contact_masked || Boolean(revealed[editTarget.id]);
       await customersApi.patch(editTarget.id, {
         display_name: values.display_name as string,
         contact_name: values.contact_name as string,
-        ...(contactsVisible
-          ? {
-              phone: values.phone as string,
-              wechat: values.wechat as string,
-              qq: values.qq as string,
-            }
-          : {}),
+        phone: values.phone as string,
+        wechat: values.wechat as string,
+        qq: values.qq as string,
         note: (values.note as string) || null,
         extra_values: extraValues,
       });
@@ -339,7 +301,6 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     renderContact,
     requestEdit,
     requestMerge,
-    revealed,
     rows,
     summary,
     searchInput,

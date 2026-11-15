@@ -3,7 +3,7 @@
 口径：
 - 导出列 = 「设置 → 列表字段」该 scope 的可见列（隐藏列不导，actions 等 UI 列不导）；
 - 自定义列值从行扩展字段注入，SELECT 选项翻中文；
-- 客户联系方式沿用列表脱敏口径：无 `customer.contact.read` 导出脱敏值；
+- 客户联系方式沿用列表原值口径；
 - 每次导出写 LIST_EXPORT 审计。
 """
 from __future__ import annotations
@@ -364,7 +364,7 @@ def test_orders_export_xlsx_writes_list_export_audit(seeded_client, headers, see
     )
 
 
-def test_customers_export_masks_contact_without_permission(seeded_client, headers, viewer_headers, seeded_db):
+def test_customers_export_returns_full_contact(seeded_client, headers, seeded_db):
     created = seeded_client.post(
         "/api/v1/customers",
         json={"display_name": "导出客户甲", "phone": "13800001111"},
@@ -373,10 +373,8 @@ def test_customers_export_masks_contact_without_permission(seeded_client, header
     assert created.status_code == 201, created.text
 
     admin_body = seeded_client.get("/api/v1/customers/export.csv", headers=headers).text
-    assert "13800001111" in admin_body  # 有 contact.read 权限 → 明文
+    assert "13800001111" in admin_body
 
-    viewer_body = seeded_client.get("/api/v1/customers/export.csv", headers=viewer_headers).text
-    assert "13800001111" not in viewer_body  # 无权限 → 脱敏，不泄露明文
 
 
 def test_cashflows_export_chinese_header(seeded_client, headers, seeded_db):

@@ -68,31 +68,9 @@ def _validate_owner_id(session: Session, owner_id: int | None) -> None:
         )
 
 
-# --------------------------------------------------------------------- 脱敏
-def mask_phone(value: str | None) -> str | None:
-    if not value:
-        return value
-    digits = value.strip()
-    if len(digits) <= 7:
-        return digits[:3] + "*" * max(len(digits) - 3, 0)
-    return f"{digits[:3]}****{digits[-4:]}"
-
-
-def mask_id(value: str | None) -> str | None:
-    """微信号 / QQ 局部遮罩（权限矩阵 §3）。"""
-    if not value:
-        return value
-    text = value.strip()
-    if len(text) <= 2:
-        return text[0] + "*" * (len(text) - 1)
-    head = text[:2]
-    return head + "*" * (len(text) - 2)
-
-
 def to_customer_out(
     customer: Customer,
     *,
-    reveal_contact: bool,
     extra_values: Mapping[str, Any] | None = None,
     activity_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -111,33 +89,20 @@ def to_customer_out(
         "tags": customer.tags,
         "note": customer.note,
         "merged_into_id": customer.merged_into_id,
-        "contact_masked": False,
         "extra_values": dict(extra_values or {}),
         "order_roles": list((activity_summary or {}).get("order_roles", [])),
         "active_order_count": int((activity_summary or {}).get("active_order_count", 0)),
         "last_interaction_at": (activity_summary or {}).get("last_interaction_at"),
     }
-    if reveal_contact:
-        return payload
-    payload["phone"] = mask_phone(customer.phone)
-    payload["wechat"] = mask_id(customer.wechat)
-    payload["qq"] = mask_id(customer.qq)
-    payload["contact_masked"] = True
     return payload
 
 
 def to_counterparty_out(
     counterparty: Counterparty,
     *,
-    reveal_contact: bool,
     extra_values: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """合作方输出：联系方式默认脱敏，与客户同口径（权限在路由层判定）。
-
-    合作方联系人电话/微信/QQ 与客户联系方式同属敏感信息，之前 list/get 直接
-    明文序列化，任何持 counterparty.read 的角色（含 EMPLOYEE）都能拿到全量号码。
-    这里复用 mask_phone / mask_id，未获 customer.contact.read 时只回显遮罩值。
-    """
+    """合作方输出：直接返回已建档的完整联系方式。"""
     payload = {
         "id": counterparty.id,
         "counterparty_no": counterparty.counterparty_no,
@@ -152,14 +117,7 @@ def to_counterparty_out(
         "note": counterparty.note,
         "created_at": counterparty.created_at,
         "extra_values": dict(extra_values or {}),
-        "contact_masked": False,
     }
-    if reveal_contact:
-        return payload
-    payload["phone"] = mask_phone(counterparty.phone)
-    payload["wechat"] = mask_id(counterparty.wechat)
-    payload["qq"] = mask_id(counterparty.qq)
-    payload["contact_masked"] = True
     return payload
 
 

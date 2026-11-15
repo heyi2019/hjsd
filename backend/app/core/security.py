@@ -42,7 +42,6 @@ ALL_ROLES: tuple[str, ...] = (ROLE_ADMIN, ROLE_OPERATOR, ROLE_FINANCE, ROLE_AUDI
 OWNER_SCOPES: frozenset[str] = frozenset({"SELF", "TEAM", "ALL"})
 
 PERM_CUSTOMER_READ = "customer.read"
-PERM_CUSTOMER_CONTACT_READ = "customer.contact.read"
 PERM_CUSTOMER_CREATE = "customer.create"
 PERM_CUSTOMER_UPDATE = "customer.update"
 PERM_CUSTOMER_CONTACT_WRITE = "customer.contact.write"
@@ -70,7 +69,6 @@ PERM_OPTION_SET_MANAGE = "option-set.manage"
 ALL_PERMISSIONS: frozenset[str] = frozenset(
     {
         PERM_CUSTOMER_READ,
-        PERM_CUSTOMER_CONTACT_READ,
         PERM_CUSTOMER_CREATE,
         PERM_CUSTOMER_UPDATE,
         PERM_CUSTOMER_CONTACT_WRITE,
@@ -102,7 +100,6 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     ROLE_OPERATOR: frozenset(
         {
             PERM_CUSTOMER_READ,
-            PERM_CUSTOMER_CONTACT_READ,
             PERM_CUSTOMER_CREATE,
             PERM_CUSTOMER_UPDATE,
             PERM_CUSTOMER_CONTACT_WRITE,
@@ -118,7 +115,6 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     ROLE_FINANCE: frozenset(
         {
             PERM_CUSTOMER_READ,
-            PERM_CUSTOMER_CONTACT_READ,
             PERM_COUNTERPARTY_READ,
             PERM_FINANCE_READ,
             PERM_DEPOSIT_POST,
@@ -132,7 +128,6 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     ROLE_AUDITOR: frozenset(
         {
             PERM_CUSTOMER_READ,
-            PERM_CUSTOMER_CONTACT_READ,
             PERM_COUNTERPARTY_READ,
             PERM_FINANCE_READ,
             PERM_POLICY_MANAGE,

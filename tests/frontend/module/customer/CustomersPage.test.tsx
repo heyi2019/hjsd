@@ -30,7 +30,7 @@ const customers = [
     id: 1,
     customer_no: "CUS-0001",
     display_name: "张三",
-    phone: "138****8888",
+    phone: "13800008888",
     wechat: "zhangsan",
     qq: "10001",
     status: "ACTIVE",
@@ -41,7 +41,7 @@ const customers = [
     id: 2,
     customer_no: "CUS-0002",
     display_name: "李四",
-    phone: "139****9999",
+    phone: "13900009999",
     wechat: "",
     qq: "",
     status: "DISABLED",
@@ -68,6 +68,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOptionSets();
   vi.mocked(customersApi.list).mockResolvedValue(customers);
+  vi.mocked(customersApi.summary).mockResolvedValue({ total_count: 2, month_count: 1, today_count: 1 });
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
   vi.mocked(customersApi.detail).mockResolvedValue({
@@ -272,47 +273,23 @@ describe("CustomersPage：客户档案", () => {
   });
 });
 
-describe("CustomersPage：联系方式脱敏与按需查看", () => {
-  const masked = {
-    ...customers[0],
-    phone: "138****8888",
-    wechat: "zh***",
-    qq: "1***1",
-    contact_masked: true,
-  };
-  const revealedCustomer = {
-    ...masked,
-    phone: "13800008888",
-    wechat: "zhangsan",
-    qq: "10001",
-    contact_masked: false,
-  };
-
-  it("脱敏行先显示打码值，点「查看」才向后端要明文并就地替换", async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(customersApi.list).mockResolvedValue([masked]);
-    vi.mocked(customersApi.get).mockResolvedValue(revealedCustomer);
+describe("CustomersPage：联系方式直接展示", () => {
+  it("列表直接展示完整联系方式，不提供额外揭示动作", async () => {
+    vi.mocked(customersApi.list).mockResolvedValue([customers[0]]);
     renderLight(<CustomersPage />, { user: "admin" });
 
-    expect(await screen.findByText("138****8888")).toBeInTheDocument();
-    // 未点查看前，明文不应出现在页面上
-    expect(screen.queryByText("13800008888")).not.toBeInTheDocument();
-
-    await user.click(screen.getAllByRole("button", { name: /查看/ })[0]);
-
-    await waitFor(() => expect(customersApi.get).toHaveBeenCalledWith(1, true));
     expect(await screen.findByText("13800008888")).toBeInTheDocument();
-    // 三个联系字段一起放开
     expect(screen.getByText("zhangsan")).toBeInTheDocument();
     expect(screen.getByText("10001")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /查看/ })).not.toBeInTheDocument();
   });
 
-  it("脱敏且未查看时，编辑保存不提交联系方式，避免打码值覆盖真实号码", async () => {
+  it("编辑保存时提交完整联系方式", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(customersApi.list).mockResolvedValue([masked]);
-    vi.mocked(customersApi.patch).mockResolvedValue(masked);
+    vi.mocked(customersApi.list).mockResolvedValue([customers[0]]);
+    vi.mocked(customersApi.patch).mockResolvedValue(customers[0]);
     renderLight(<CustomersPage />, { user: "admin" });
-    await screen.findByText("138****8888");
+    await screen.findByText("13800008888");
 
     await user.click(screen.getAllByRole("button", { name: /详情/ })[0]);
     const drawer = await screen.findByRole("dialog");
@@ -326,9 +303,9 @@ describe("CustomersPage：联系方式脱敏与按需查看", () => {
     await waitFor(() => expect(customersApi.patch).toHaveBeenCalled());
     const payload = vi.mocked(customersApi.patch).mock.calls[0][1] as Record<string, unknown>;
     expect(payload.display_name).toBe("张三改");
-    expect(payload).not.toHaveProperty("phone");
-    expect(payload).not.toHaveProperty("wechat");
-    expect(payload).not.toHaveProperty("qq");
+    expect(payload.phone).toBe("13800008888");
+    expect(payload.wechat).toBe("zhangsan");
+    expect(payload.qq).toBe("10001");
   });
 });
 

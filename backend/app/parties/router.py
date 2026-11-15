@@ -9,6 +9,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
+from app.core.actor import actor_name as _actor
 from app.core.audit import record_audit
 from app.core.database import get_db
 from app.core.errors import PermissionDenied
@@ -63,7 +64,7 @@ from app.parties.leads import (
     update_lead as parties_update_lead,
 )
 
-from .router_output import _actor, _counterparty_output, _lead_output
+from .router_output import _counterparty_output, _lead_output
 
 router = APIRouter(tags=["CUS-01 客户与合作方"])
 
@@ -129,7 +130,7 @@ def export_customers_csv(
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> Response:
-    """客户按可见列导出 CSV：同 /customers 筛选与联系方式脱敏口径，上限 EXPORT_ROW_LIMIT。"""
+    """客户按可见列导出 CSV：同 /customers 筛选口径，上限 EXPORT_ROW_LIMIT。"""
     customers = parties_list_customers(
         db, keyword=keyword, status=status, user=user, limit=EXPORT_ROW_LIMIT, offset=0
     )
@@ -436,7 +437,7 @@ def get_counterparty(
     user: CurrentUser = read_counterparties,
 ) -> schemas.CounterpartyOut:
     item = parties_get_counterparty(db, counterparty_id)
-    return _counterparty_output(db, item, user=user)
+    return _counterparty_output(db, item)
 
 
 @router.post("/counterparties", response_model=schemas.CounterpartyOut, status_code=201)
@@ -458,7 +459,7 @@ def create_counterparty(
         note=payload.note,
         extra_values=payload.extra_values,
     )
-    return _counterparty_output(db, item, user=user)
+    return _counterparty_output(db, item)
 
 
 @router.patch("/counterparties/{counterparty_id}", response_model=schemas.CounterpartyOut)
@@ -471,7 +472,7 @@ def update_counterparty(
     item = parties_update_counterparty(
         db, counterparty_id, actor=_actor(user), **payload.model_dump(exclude_unset=True)
     )
-    return _counterparty_output(db, item, user=user)
+    return _counterparty_output(db, item)
 
 
 @router.patch(
@@ -486,7 +487,7 @@ def update_counterparty_status(
     item = set_counterparty_status(
         db, counterparty_id, active, actor=_actor(user)
     )
-    return _counterparty_output(db, item, user=user)
+    return _counterparty_output(db, item)
 
 
 __all__ = ["router"]

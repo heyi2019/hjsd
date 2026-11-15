@@ -9,6 +9,7 @@ import { resolveMock } from "@fixtures/mock-api";
 import { ordersApi } from "@/shared/api/orders.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reportsApi } from "@/shared/api/reports.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -43,6 +44,11 @@ const balance = {
   deposit_held: "100.00",
   available: "700.00",
 };
+const inventory = {
+  items: [],
+  count: 2,
+  total_cost: "3,500.00",
+};
 const businessPnl = {
   total: {
     business_mode: null,
@@ -70,6 +76,7 @@ beforeEach(() => {
   });
   vi.mocked(ordersApi.list).mockResolvedValue(orders);
   vi.mocked(reportsApi.businessPnl).mockResolvedValue(businessPnl);
+  vi.mocked(stocksApi.inventory).mockResolvedValue(inventory);
 });
 
 describe("DataCenterPanel：资金总览", () => {
@@ -96,11 +103,19 @@ describe("DataCenterPanel：资金总览", () => {
     expect(card?.textContent).not.toContain("2.00");
   });
 
-  it("统计卡包含利润，并使用金额口径展示", async () => {
+  it("数据中心展示利润并保留押金占用指标", async () => {
     renderLight(<DataCenterPanel />, { user: "admin" });
-    await screen.findByText("利润");
-    const card = screen.getByText("利润").closest(".ui-stat");
-    expect(card?.textContent).toContain("800.00");
+    await screen.findByText("可用余额合计");
+    expect(screen.getByText("利润", { selector: ".ui-stat__label" })).toBeInTheDocument();
+    expect(screen.getByText("利润").closest(".ui-stat")?.textContent).toContain("800.00");
+    expect(screen.getByText("押金占用", { selector: ".ui-stat__label" })).toBeInTheDocument();
+  });
+
+  it("统计卡展示库存账号占用的在途成本", async () => {
+    renderLight(<DataCenterPanel />, { user: "admin" });
+    await screen.findByText("在途成本");
+    const card = screen.getByText("在途成本").closest(".ui-stat");
+    expect(card?.textContent).toContain("3,500.00");
   });
 
   it("后端不可达时显示错误条，不能静默显示「尚未配置资金池」", async () => {

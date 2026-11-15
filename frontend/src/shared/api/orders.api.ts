@@ -57,6 +57,8 @@ export const ordersApi = {
   list: async (params?: {
     order_type?: string;
     status?: string;
+    trade_date_from?: string;
+    trade_date_to?: string;
     limit?: number;
     offset?: number;
     mine?: boolean;

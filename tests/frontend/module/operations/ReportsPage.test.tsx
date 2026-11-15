@@ -1,8 +1,10 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import dayjs from "dayjs";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
+import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
 import { resolveMock } from "@fixtures/mock-api";
 import { appMessage } from "@/shared/ui/appFeedback";
 
@@ -10,6 +12,7 @@ import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reportsApi } from "@/shared/api/reports.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -64,6 +67,7 @@ beforeEach(() => {
     totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
   vi.mocked(ordersApi.list).mockResolvedValue([]);
+  vi.mocked(stocksApi.inventory).mockResolvedValue({ items: [], count: 0, total_cost: "0.00" });
 });
 
 async function gotoTab(label: string) {
@@ -96,6 +100,18 @@ describe("ReportsPage：经营中心报表", () => {
       await ui.click(screen.getByRole("tab", { name: label }));
       await waitFor(expectSpacedFilterBar);
     }
+  });
+
+  it("日期筛选提供本期和上期快捷入口，账期按每月16日至次月15日计算", async () => {
+    expect(currentReportPeriod(dayjs("2026-11-16"))).toEqual({ from: "2026-11-16", to: "2026-12-15" });
+    expect(previousReportPeriod(dayjs("2026-11-16"))).toEqual({ from: "2026-10-16", to: "2026-11-15" });
+    renderLight(<ReportsPage />, { user: "admin" });
+    expect(await screen.findByRole("button", { name: "本期" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "上期" })).toBeInTheDocument();
+    const dateInputs = document.querySelectorAll<HTMLInputElement>(".ant-tabs-tabpane-active .ui-control-width-date");
+    await ui.click(screen.getByRole("button", { name: "本期" }));
+    expect(dateInputs[0]).toHaveValue(currentReportPeriod(dayjs()).from);
+    expect(dateInputs[1]).toHaveValue(currentReportPeriod(dayjs()).to);
   });
 
   it("我的收益只加载当前登录用户的分润记录", async () => {
@@ -174,6 +190,7 @@ describe("ReportsPage：经营中心报表", () => {
     renderLight(<ReportsPage onNavigate={onNavigate} />, { user: "admin" });
     await gotoTab("数据中心");
     expect(await screen.findByText("可用余额合计")).toBeInTheDocument();
+    expect(document.querySelectorAll(".ant-tabs-tabpane-active .ui-control-width-date")).toHaveLength(2);
     await ui.click(screen.getByRole("button", { name: /订单总数/ }));
     expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
   });

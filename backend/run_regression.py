@@ -25,8 +25,8 @@ REPO = ROOT.parent
 PYTHON = ROOT / ".venv" / "bin" / "python"
 
 # 模块/类型/跨模块筛选统一走共享目录（单一事实源）
-sys.path.insert(0, str(ROOT / "scripts"))
-from test_catalog import (  # noqa: E402
+sys.path.insert(0, str(REPO / "tests" / "config"))
+from catalog import (  # noqa: E402
     MODULES,
     cross_files,
     frontend_module_files,
@@ -377,7 +377,7 @@ STRUCTURAL_PREFIXES = (
     "backend/app/core/", "backend/app/domain/", "backend/app/main.py",
     "backend/app/config", "backend/app/settings", "backend/app/db",
     "backend/requirements", "backend/alembic/", "backend/run_regression.py",
-    "backend/scripts/test_catalog.py", "backend/scripts/promise_catalog.py",
+    "tests/config/catalog.py", "backend/scripts/promise_catalog.py",
     "conftest.py", "pytest.ini", "tests/conftest.py", "tests/backend/conftest.py",
     "backend/app/orders/amounts.py", "backend/app/reporting/",
     "backend/app/value_added_services/",

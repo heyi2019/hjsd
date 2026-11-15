@@ -85,6 +85,12 @@ class CustomerOut(BaseModel):
     last_interaction_at: datetime | None = None
 
 
+class CustomerSummaryOut(BaseModel):
+    total_count: int
+    month_count: int
+    today_count: int
+
+
 class CustomerWithCandidates(BaseModel):
     customer: CustomerOut
     duplicate_candidates: list[DuplicateCandidate] = Field(default_factory=list)
@@ -198,6 +204,11 @@ class LeadOut(BaseModel):
     extra_values: dict[str, Any] = Field(default_factory=dict)
 
 
+class LeadSummaryOut(BaseModel):
+    total_count: int
+    open_count: int
+
+
 class MergeRequest(RequestModel):
     target_customer_id: int
     reason: str = Field(min_length=1, max_length=500)
@@ -263,6 +274,7 @@ __all__ = [
     "CustomerBusinessOut",
     "CustomerDetailOut",
     "CustomerOut",
+    "CustomerSummaryOut",
     "CustomerOverviewOut",
     "CustomerInstallmentOut",
     "CustomerStatusUpdate",
@@ -275,5 +287,6 @@ __all__ = [
     "LeadConvert",
     "LeadCreate",
     "LeadOut",
+    "LeadSummaryOut",
     "LeadUpdate",
 ]

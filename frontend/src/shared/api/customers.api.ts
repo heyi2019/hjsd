@@ -1,8 +1,10 @@
 import { api } from "./client";
 import type { PageResponse } from "./types/common";
-import type { Counterparty, Customer, CustomerDetail, DuplicateCandidate, Lead } from "./types/customers";
+import type { Counterparty, Customer, CustomerDetail, CustomerSummary, DuplicateCandidate, Lead, LeadSummary } from "./types/customers";
 
 export const customersApi = {
+  summary: (params: { today_date: string; keyword?: string; status?: string }) =>
+    api.get<CustomerSummary>("/customers/summary", { params }).then((r) => r.data),
   list: async (params?: { keyword?: string; status?: string; limit?: number; offset?: number }): Promise<Customer[]> => {
     if (params?.limit != null) {
       return api.get<PageResponse<Customer>>("/customers", { params }).then((r) => r.data.items);
@@ -56,6 +58,7 @@ export const counterpartiesApi = {
 
 export const leadsApi = {
   list: () => api.get<Lead[]>("/leads").then(r => r.data),
+  summary: () => api.get<LeadSummary>("/leads/summary").then(r => r.data),
   create: (data: Record<string, unknown>) => api.post<Lead>("/leads", data).then(r => r.data),
   close: (id: number, reason: string, extra_values?: Record<string, unknown>) => api.post<Lead>(`/leads/${id}/close`, { reason, extra_values }).then(r => r.data),
   convert: (id: number, order_id: number, extra_values?: Record<string, unknown>) => api.post<Lead>(`/leads/${id}/convert`, { order_id, extra_values }).then(r => r.data),

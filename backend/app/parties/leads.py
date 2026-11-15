@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -136,6 +136,20 @@ def list_leads(
         if scope is not None:
             stmt = stmt.where(scope)
     return list(session.scalars(stmt.order_by(CustomerLead.id.desc())).all())
+
+
+def summarize_leads(session: Session, *, user: CurrentUser | None = None) -> dict[str, int]:
+    """Return total and open lead counts within the same owner scope as the list."""
+    stmt = select(CustomerLead.status, func.count(CustomerLead.id))
+    if user is not None:
+        scope = owner_scope_filter(CustomerLead.owner_id, user, session)
+        if scope is not None:
+            stmt = stmt.where(scope)
+    counts = dict(session.execute(stmt.group_by(CustomerLead.status)).all())
+    return {
+        "total_count": sum(counts.values()),
+        "open_count": counts.get(LeadStatus.OPEN.value, 0),
+    }
 
 
 def update_lead(

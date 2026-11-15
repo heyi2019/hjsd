@@ -1,7 +1,6 @@
 """parties.router：客户、合作方与表单扩展字段 API（CUS-01 / BAS-02-05 / BAS-04）。
 
-联系方式默认脱敏；读取完整值须 `customer.contact.read` 且**写审计**；
-修改联系方式/备注须 `customer.contact.write`；合并须 `customer.merge`。
+联系方式直接返回档案原值；修改联系方式/备注须 `customer.contact.write`；合并须 `customer.merge`。
 """
 from __future__ import annotations
 
@@ -17,7 +16,6 @@ from app.core.schemas import PageOut
 from app.core.security import (
     PERM_COUNTERPARTY_MANAGE,
     PERM_COUNTERPARTY_READ,
-    PERM_CUSTOMER_CONTACT_READ,
     PERM_CUSTOMER_CREATE,
     PERM_CUSTOMER_MERGE,
     PERM_CUSTOMER_READ,
@@ -50,6 +48,7 @@ from app.parties.customers import (
     create_customer as parties_create_customer,
     get_customer as parties_get_customer,
     list_customers as parties_list_customers,
+    summarize_customers as parties_summarize_customers,
     set_customer_status,
     update_customer as parties_update_customer,
 )
@@ -60,6 +59,7 @@ from app.parties.leads import (
     create_lead as parties_create_lead,
     get_lead as parties_get_lead,
     list_leads as parties_list_leads,
+    summarize_leads as parties_summarize_leads,
     update_lead as parties_update_lead,
 )
 
@@ -85,7 +85,6 @@ def list_customers(
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> list[schemas.CustomerOut]:
-    reveal = user.has(PERM_CUSTOMER_CONTACT_READ)
     customers = parties_list_customers(
         db, keyword=keyword, status=status, user=user, limit=limit, offset=offset
     )
@@ -99,7 +98,6 @@ def list_customers(
         items=[
             to_customer_out(
                 item,
-                reveal_contact=reveal,
                 extra_values=extras.get(item.id),
                 activity_summary=activity.get(item.id),
             )
@@ -111,6 +109,19 @@ def list_customers(
     )
 
 
+@router.get("/customers/summary", response_model=schemas.CustomerSummaryOut)
+def customer_summary(
+    today_date: date = Query(...),
+    keyword: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_customers,
+) -> schemas.CustomerSummaryOut:
+    return schemas.CustomerSummaryOut(**parties_summarize_customers(
+        db, today_date=today_date, keyword=keyword, status=status, user=user
+    ))
+
+
 @router.get("/customers/export.csv")
 def export_customers_csv(
     keyword: str | None = Query(default=None),
@@ -119,7 +130,6 @@ def export_customers_csv(
     user: CurrentUser = read_customers,
 ) -> Response:
     """客户按可见列导出 CSV：同 /customers 筛选与联系方式脱敏口径，上限 EXPORT_ROW_LIMIT。"""
-    reveal = user.has(PERM_CUSTOMER_CONTACT_READ)
     customers = parties_list_customers(
         db, keyword=keyword, status=status, user=user, limit=EXPORT_ROW_LIMIT, offset=0
     )
@@ -130,7 +140,6 @@ def export_customers_csv(
     rows = [
         to_customer_out(
             item,
-            reveal_contact=reveal,
             extra_values=extras.get(item.id),
             activity_summary=activity.get(item.id),
         )
@@ -146,7 +155,6 @@ def export_customers_csv(
         after={
             "rows": meta["row_count"],
             "column_count": meta["column_count"],
-            "contact_revealed": reveal,
             "truncated": meta["truncated"],
         },
     )
@@ -190,7 +198,7 @@ def create_customer(
     extras = get_extra_values(db, entity_type="customer", entity_id=customer.id)
     return schemas.CustomerWithCandidates(
         customer=to_customer_out(
-            customer, reveal_contact=True, extra_values=extras
+            customer, extra_values=extras
         ),
         duplicate_candidates=candidates,
     )
@@ -199,45 +207,25 @@ def create_customer(
 @router.get("/customers/{customer_id}", response_model=schemas.CustomerOut)
 def get_customer(
     customer_id: int,
-    reveal: bool = Query(default=False, description="读取完整联系方式，写审计"),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> schemas.CustomerOut:
     customer = parties_get_customer(db, customer_id, user)
-    show_full = reveal and user.has(PERM_CUSTOMER_CONTACT_READ)
-    if show_full:
-        record_audit(
-            db,
-            action=AuditAction.CONTACT_READ,
-            entity_type="customer",
-            entity_id=customer.customer_no,
-            actor=_actor(user),
-        )
     extras = get_extra_values(db, entity_type="customer", entity_id=customer.id)
-    return to_customer_out(customer, reveal_contact=show_full, extra_values=extras)
+    return to_customer_out(customer, extra_values=extras)
 
 
 @router.get("/customers/{customer_id}/detail", response_model=schemas.CustomerDetailOut)
 def get_customer_detail(
     customer_id: int,
-    reveal: bool = Query(default=False, description="读取完整联系方式，写审计"),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> schemas.CustomerDetailOut:
     customer = parties_get_customer(db, customer_id, user)
-    show_full = reveal and user.has(PERM_CUSTOMER_CONTACT_READ)
-    if show_full:
-        record_audit(
-            db,
-            action=AuditAction.CONTACT_READ,
-            entity_type="customer",
-            entity_id=customer.customer_no,
-            actor=_actor(user),
-        )
     extras = get_extra_values(db, entity_type="customer", entity_id=customer.id)
     return schemas.CustomerDetailOut(
         customer=to_customer_out(
-            customer, reveal_contact=show_full, extra_values=extras
+            customer, extra_values=extras
         ),
         **parties_get_customer_detail(db, customer_id, user),
     )
@@ -261,7 +249,6 @@ def update_customer(
     extras = get_extra_values(db, entity_type="customer", entity_id=customer.id)
     return to_customer_out(
         customer,
-        reveal_contact=user.has(PERM_CUSTOMER_CONTACT_READ),
         extra_values=extras,
     )
 
@@ -282,7 +269,7 @@ def update_customer_status(
         extra_values=payload.extra_values,
     )
     return to_customer_out(
-        customer, reveal_contact=user.has(PERM_CUSTOMER_CONTACT_READ)
+        customer
     )
 
 
@@ -302,7 +289,7 @@ def merge_customer(
         user=user,
     )
     return to_customer_out(
-        target, reveal_contact=user.has(PERM_CUSTOMER_CONTACT_READ)
+        target
     )
 
 
@@ -325,6 +312,14 @@ def list_leads(
         schemas.LeadOut.model_validate({**item.__dict__, "extra_values": extras.get(item.id, {})})
         for item in items
     ]
+
+
+@router.get("/leads/summary", response_model=schemas.LeadSummaryOut)
+def lead_summary(
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_customers,
+) -> schemas.LeadSummaryOut:
+    return schemas.LeadSummaryOut(**parties_summarize_leads(db, user=user))
 
 
 @router.get("/leads/{lead_id}", response_model=schemas.LeadOut)
@@ -420,7 +415,6 @@ def list_counterparties(
     db: Session = Depends(get_db),
     user: CurrentUser = read_counterparties,
 ) -> list[schemas.CounterpartyOut]:
-    reveal = user.has(PERM_CUSTOMER_CONTACT_READ)
     items = parties_list_counterparties(db, type=type, status=status)
     extras = get_extra_values_bulk(
         db, entity_type="counterparty", entity_ids=[item.id for item in items]
@@ -428,7 +422,7 @@ def list_counterparties(
     return [
         schemas.CounterpartyOut.model_validate(
             to_counterparty_out(
-                item, reveal_contact=reveal, extra_values=extras.get(item.id)
+                item, extra_values=extras.get(item.id)
             )
         )
         for item in items
@@ -438,12 +432,11 @@ def list_counterparties(
 @router.get("/counterparties/{counterparty_id}", response_model=schemas.CounterpartyOut)
 def get_counterparty(
     counterparty_id: int,
-    reveal: bool = Query(default=False, description="读取完整联系方式，写审计"),
     db: Session = Depends(get_db),
     user: CurrentUser = read_counterparties,
 ) -> schemas.CounterpartyOut:
     item = parties_get_counterparty(db, counterparty_id)
-    return _counterparty_output(db, item, user=user, reveal=reveal, audit_reveal=True)
+    return _counterparty_output(db, item, user=user)
 
 
 @router.post("/counterparties", response_model=schemas.CounterpartyOut, status_code=201)
@@ -465,7 +458,7 @@ def create_counterparty(
         note=payload.note,
         extra_values=payload.extra_values,
     )
-    return _counterparty_output(db, item, user=user, reveal=True)
+    return _counterparty_output(db, item, user=user)
 
 
 @router.patch("/counterparties/{counterparty_id}", response_model=schemas.CounterpartyOut)
@@ -478,7 +471,7 @@ def update_counterparty(
     item = parties_update_counterparty(
         db, counterparty_id, actor=_actor(user), **payload.model_dump(exclude_unset=True)
     )
-    return _counterparty_output(db, item, user=user, reveal=True)
+    return _counterparty_output(db, item, user=user)
 
 
 @router.patch(
@@ -493,7 +486,7 @@ def update_counterparty_status(
     item = set_counterparty_status(
         db, counterparty_id, active, actor=_actor(user)
     )
-    return _counterparty_output(db, item, user=user, reveal=True)
+    return _counterparty_output(db, item, user=user)
 
 
 __all__ = ["router"]

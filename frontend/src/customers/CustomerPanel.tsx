@@ -52,6 +52,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
     requestEdit,
     revealed,
     rows,
+    summary,
     searchInput,
     setCreateOpen,
     setKeyword,
@@ -91,7 +92,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       </Typography.Paragraph>
       <StatRow
         items={[
-          { label: "客户总数", kind: "count", amount: rows === null ? "不可用" : String(rows.length) },
+          { label: "客户总数", kind: "count", amount: rows === null ? "不可用" : String(summary?.total_count ?? 0) },
           { label: "本月新增客户数", kind: "count", amount: rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
           { label: "今日新增客户数", kind: "count", amount: rows === null ? "不可用" : String(newTodayCount ?? 0) },
         ]}

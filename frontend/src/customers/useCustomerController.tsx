@@ -14,13 +14,14 @@ import { useOptionSet } from "../shared/lib/optionSets";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { ConfirmButton, PermissionButton, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
-import { collectExtras, customerDateKey } from "./CustomersPage.fragments";
+import { collectExtras } from "./CustomersPage.fragments";
 
 /** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
 const CUSTOMER_MOBILE_HIDDEN_KEYS = ["phone", "wechat", "qq", "created_at"] as const;
 
 export function useCustomerController({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const [rows, setRows] = useState<Customer[] | null>(null);
+  const [summary, setSummary] = useState<{ total_count: number; month_count: number; today_count: number } | null>(null);
   const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
@@ -68,10 +69,16 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setRows(await customersApi.list({
+      const params = {
         ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
-      }));
+      };
+      const [customerRows, customerSummary] = await Promise.all([
+        customersApi.list(params),
+        customersApi.summary({ today_date: today(), ...params }),
+      ]);
+      setRows(customerRows);
+      setSummary(customerSummary);
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -289,8 +296,8 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
   ];
 
   const currentDate = today();
-  const newThisMonthCount = rows?.filter((row) => customerDateKey(row.created_at)?.startsWith(currentDate.slice(0, 7))).length;
-  const newTodayCount = rows?.filter((row) => customerDateKey(row.created_at) === currentDate).length;
+  const newThisMonthCount = summary?.month_count;
+  const newTodayCount = summary?.today_count;
   // —— 弹窗收口：原 JSX 内联的状态更新收为方法，供展示组件回调（语义逐字等价）——
   const cancelEdit = () => { setEditTarget(null); editForm.resetFields(); };
   const closeDetail = () => { setDetailTarget(null); setDetailData(null); };
@@ -334,6 +341,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     requestMerge,
     revealed,
     rows,
+    summary,
     searchInput,
     setCreateOpen,
     setKeyword,

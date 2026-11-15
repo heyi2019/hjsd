@@ -15,6 +15,7 @@ const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SEL
 
 export function CustomerLeadPanel() {
   const [rows, setRows] = useState<Lead[]>([]);
+  const [summary, setSummary] = useState<{ total_count: number; open_count: number } | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const { config } = useOrderFormConfig(createOpen ? "LEAD" : undefined);
@@ -28,8 +29,9 @@ export function CustomerLeadPanel() {
 
   const load = useCallback(async () => {
     try {
-      const [leadList, customerList] = await Promise.all([leadsApi.list(), customersApi.list({ status: "ACTIVE" })]);
+      const [leadList, leadSummary, customerList] = await Promise.all([leadsApi.list(), leadsApi.summary(), customersApi.list({ status: "ACTIVE" })]);
       setRows(leadList);
+      setSummary(leadSummary);
       setCustomers(customerList);
       setError(null);
     } catch (err) { setError(normalizeError(err)); }
@@ -78,9 +80,9 @@ export function CustomerLeadPanel() {
 
   return <section className="ui-stack">
     <ErrorBanner error={error} onRetry={() => void load()} />
-    <StatRow items={[{ label: "需求总数", kind: "count", amount: error ? null : String(rows.length) }, { label: "待跟进", kind: "count", amount: error ? null : String(rows.filter((row) => row.status === "OPEN").length), tone: "warn" }]} />
+    <StatRow items={[{ label: "需求总数", kind: "count", amount: error ? null : String(summary?.total_count ?? 0) }, { label: "待跟进", kind: "count", amount: error ? null : String(summary?.open_count ?? 0), tone: "warn" }]} />
     <Card className="glass" title="客户需求池" extra={<PermissionButton permission="customer.create" type="primary" disabled={Boolean(error) || customers.length === 0} onClick={() => setCreateOpen(true)}>新增需求</PermissionButton>}>
-      <DataTable<Lead> columns={columns} rows={rows} page={1} pageSize={10} total={rows.length} emptyText="暂无客户需求" pagination={error ? false : undefined} onPageChange={() => undefined}/>
+      <DataTable<Lead> columns={columns} rows={rows} page={1} pageSize={10} total={summary?.total_count ?? 0} emptyText="暂无客户需求" pagination={error ? false : undefined} onPageChange={() => undefined}/>
     </Card>
     <BusinessActionModal
       title="新增客户需求"

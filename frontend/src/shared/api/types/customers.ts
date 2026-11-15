@@ -20,6 +20,17 @@ export interface Customer {
   extra_values?: Record<string, unknown> | null;
 }
 
+export interface CustomerSummary {
+  total_count: number;
+  month_count: number;
+  today_count: number;
+}
+
+export interface LeadSummary {
+  total_count: number;
+  open_count: number;
+}
+
 /** POST /customers 建档时后端用明文联系方式精确判重返回的候选（只提示不拦截）。 */
 export interface DuplicateCandidate {
   customer_id: number;

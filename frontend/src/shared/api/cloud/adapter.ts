@@ -323,8 +323,12 @@ export const cloudAdapter: AxiosAdapter = async (config) => {
   }
 
   if (segments[0] === "reports" ||
-      path === "/pools/balances" || path === "/cashflows/studio-summary" || path.endsWith("/balance")) {
-    // 聚合类端点依赖后端业务规则，预览环境返回结构完整的空结果，不伪装数值。
+      path === "/pools/balances" || path === "/cashflows/studio-summary" ||
+      path === "/cashflows/totals" || path.endsWith("/balance")) {
+    // 聚合类端点依赖后端业务规则；云快照预览模式只返回结构完整的空结果。
+    if (path === "/cashflows/totals") {
+      return ok(config, { total_in: "0.00", total_out: "0.00" });
+    }
     return ok(config, collection([], params));
   }
 

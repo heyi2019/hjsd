@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { appMessage } from "../shared/ui/appFeedback";
 import { cashflowsApi } from "../shared/api/cashflows.api";
 import { depositsApi } from "../shared/api/installments.api";
@@ -6,7 +6,6 @@ import { poolsApi, reconciliationsApi } from "../shared/api/pools.api";
 import type { Cashflow, Deposit, Pool, PoolBalance, PoolBalanceTotals, Reconciliation } from "../shared/api/types/finance";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
-import { fromCents, toCents } from "../shared/lib/money";
 import { today } from "../shared/lib/format";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { useOptionSet } from "../shared/lib/optionSets";
@@ -62,6 +61,7 @@ export function useFundsResources(active = true) {
   cashflowAttributeRef.current = cashflowAttribute;
   const cashflowCategoryRef = useRef(cashflowCategory);
   cashflowCategoryRef.current = cashflowCategory;
+  const cashflowTotalsRequestRef = useRef(0);
 
   // 资金流水：筛选全部走服务端（对齐 finance/router.py list_cashflows 的 12 个参数），
   // 避免 2000 条上限把池/方向/状态之外的结果挡在客户端之外。
@@ -70,6 +70,7 @@ export function useFundsResources(active = true) {
 
   const fetchCashflows = useCallback(async () => {
     setCashflowsReady(false);
+    const totalsRequestId = ++cashflowTotalsRequestRef.current;
     const result = await cashflowsApi.list({
       occurred_from: cashflowFromRef.current || undefined,
       occurred_to: cashflowToRef.current || undefined,
@@ -86,12 +87,56 @@ export function useFundsResources(active = true) {
     setCashflows(result.items);
     setCashflowTotal(result.total);
     // 合计以服务端为准：同一套筛选条件下聚合，流水超过 limit 也不会静默少算。
-    setCashflowTotals({
-      income: result.total_in ?? "0.00",
-      expense: result.total_out ?? "0.00",
-    });
+    if (totalsRequestId === cashflowTotalsRequestRef.current) {
+      setCashflowTotals({
+        income: result.total_in ?? "0.00",
+        expense: result.total_out ?? "0.00",
+      });
+    }
     setCashflowsReady(true);
   }, []);
+
+  // 卡片汇总跟随当前筛选条件即时刷新，聚合始终由后端完成，不对已加载流水求和。
+  useEffect(() => {
+    if (!active) return;
+    const requestId = ++cashflowTotalsRequestRef.current;
+    const timer = window.setTimeout(() => {
+      void cashflowsApi.totals({
+        occurred_from: cashflowFrom || undefined,
+        occurred_to: cashflowTo || undefined,
+        pool_id: cashflowPoolId,
+        direction: cashflowDirection || undefined,
+        status: cashflowStatus || undefined,
+        fund_nature: cashflowFundNature || undefined,
+        accounting_attribute: cashflowAttribute || undefined,
+        category: cashflowCategory.trim() || undefined,
+        keyword: cashflowKeyword.trim() || undefined,
+      }).then((result) => {
+        if (requestId !== cashflowTotalsRequestRef.current) return;
+        setCashflowTotals({ income: result.total_in, expense: result.total_out });
+      }).catch(() => {
+        if (requestId !== cashflowTotalsRequestRef.current) return;
+        setCashflowTotals({ income: "不可用", expense: "不可用" });
+      });
+    }, 180);
+    return () => {
+      window.clearTimeout(timer);
+      if (cashflowTotalsRequestRef.current === requestId) {
+        cashflowTotalsRequestRef.current += 1;
+      }
+    };
+  }, [
+    active,
+    cashflowAttribute,
+    cashflowCategory,
+    cashflowDirection,
+    cashflowFrom,
+    cashflowFundNature,
+    cashflowKeyword,
+    cashflowPoolId,
+    cashflowStatus,
+    cashflowTo,
+  ]);
 
   const [cashflowExporting, setCashflowExporting] = useState(false);
   const exportCashflows = async () => {
@@ -189,21 +234,8 @@ export function useFundsResources(active = true) {
       .map(([transfer_id, rows]) => ({ transfer_id, flow: rows[0] }));
   }, [cashflows]);
 
-  // 总收入 / 总支出：默认取服务端合计（与列表同一套筛选条件、不受 2000 条上限影响）。
-  // 若用户刚改了筛选但还没点「查询」，列表已在本地即时收窄，此时合计同步按可见行求和，
-  // 保证卡片数字与眼睛看到的行一致；一旦点「查询」，服务端值重新接管。
-  //
-  // 关键护栏：本地求和只在「服务端已返回全部命中行」时才准确。接口 limit=2000，
-  // 当 total_in+total_out 对应的命中总数 > 已加载行数时，cashflows 只是前 2000 条的截断，
-  // 此时本地收窄求和会系统性少算（只覆盖已加载部分）。这种情形下放弃本地求和，
-  // 回退到服务端聚合值——它可能滞后于用户未提交的筛选，但数字口径准确、不误导。
-  const allRowsLoaded = cashflowTotal <= cashflows.length;
-  const cashflowLocallyNarrowed = allRowsLoaded && visibleCashflows.length !== cashflows.length;
-  const sumVisible = (directionValue: "IN" | "OUT") => visibleCashflows
-    .filter((row) => row.direction === directionValue)
-    .reduce((sum, row) => sum + toCents(row.amount), 0);
-  const totalFlowIncome = cashflowLocallyNarrowed ? fromCents(sumVisible("IN")) : cashflowTotals.income;
-  const totalFlowExpense = cashflowLocallyNarrowed ? fromCents(sumVisible("OUT")) : cashflowTotals.expense;
+  const totalFlowIncome = cashflowTotals.income;
+  const totalFlowExpense = cashflowTotals.expense;
 
   return {
     pools,

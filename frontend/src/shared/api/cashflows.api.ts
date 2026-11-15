@@ -26,6 +26,20 @@ export const cashflowsApi = {
     api
       .get<{ items: Cashflow[]; total: number; total_in?: string; total_out?: string }>("/cashflows", { params })
       .then((r) => r.data),
+  totals: (params?: {
+    pool_id?: number;
+    order_id?: number;
+    direction?: string;
+    occurred_from?: string;
+    occurred_to?: string;
+    status?: string;
+    nature?: string;
+    fund_nature?: string;
+    accounting_attribute?: string;
+    category?: string;
+    created_by?: string;
+    keyword?: string;
+  }) => api.get<{ total_in: string; total_out: string }>("/cashflows/totals", { params }).then((r) => r.data),
   /**
    * 工作室收支面板：明细 + 已入账汇总一次取回。
    *

@@ -133,6 +133,11 @@ class CashflowListOut(BaseModel):
     total_out: Decimal = Decimal("0")
 
 
+class CashflowTotalsOut(BaseModel):
+    total_in: Decimal = Decimal("0")
+    total_out: Decimal = Decimal("0")
+
+
 class CashflowCreate(RequestModel):
     pool_id: int
     occurred_on: date

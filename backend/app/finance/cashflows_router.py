@@ -139,6 +139,51 @@ def list_cashflows(
     )
 
 
+@router.get("/cashflows/totals", response_model=schemas.CashflowTotalsOut)
+def list_cashflow_totals(
+    pool_id: int | None = Query(default=None),
+    order_id: int | None = Query(default=None),
+    direction: str | None = Query(default=None),
+    occurred_from: date | None = Query(default=None),
+    occurred_to: date | None = Query(default=None),
+    status: str | None = Query(default=None),
+    nature: str | None = Query(default=None),
+    fund_nature: str | None = Query(default=None),
+    accounting_attribute: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    created_by: str | None = Query(default=None),
+    keyword: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> schemas.CashflowTotalsOut:
+    """只返回流水合计，供筛选变更时刷新统计卡，不下载分页明细。"""
+    if pool_id is not None and not user.can_see_pool(pool_id):
+        return schemas.CashflowTotalsOut()
+    pool_ids: list[int] | None = None
+    if pool_id is None and not (user.is_admin or user.owner_scope == "ALL"):
+        if not user.pool_ids:
+            return schemas.CashflowTotalsOut()
+        pool_ids = sorted(user.pool_ids)
+    total_in, total_out = cashflow_totals(
+        db,
+        pool_id=pool_id,
+        pool_ids=pool_ids,
+        order_id=order_id,
+        direction=direction,
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+        status=status,
+        nature=nature.strip().upper() if nature else None,
+        fund_nature=fund_nature.strip().upper() if fund_nature else None,
+        accounting_attribute=accounting_attribute.strip().upper() if accounting_attribute else None,
+        category=category.strip().upper() if category else None,
+        created_by=created_by,
+        keyword=keyword,
+        user=user,
+    )
+    return schemas.CashflowTotalsOut(total_in=total_in, total_out=total_out)
+
+
 @router.get("/cashflows/export.csv")
 def export_cashflows_csv(
     pool_id: int | None = Query(default=None),

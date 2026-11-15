@@ -274,9 +274,6 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
       render: (_v, row) => (
         <Space size={2}>
           {row.status === "OPEN" ? (
-            <PermissionButton permission="finance.read" size="small" onClick={() => ctrl.setUnmatchedTarget(row)}>查看未达流水</PermissionButton>
-          ) : null}
-          {row.status === "OPEN" ? (
             <PermissionButton permission="deposit.post" size="small" onClick={() => ctrl.setResolveTarget(row)}>核销</PermissionButton>
           ) : null}
         </Space>

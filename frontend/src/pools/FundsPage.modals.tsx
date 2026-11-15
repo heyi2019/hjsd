@@ -1,7 +1,7 @@
-/** 资金中心各弹窗（Modal）视图层：新增押金/流水/划转/对账，以及冲销、释放、损失、取消、修复、核销、未达流水。
+/** 资金中心各弹窗（Modal）视图层：新增押金/流水/划转/对账，以及冲销、释放、损失、取消、修复、核销。
  *  全部通过 controller 消费 useFundsPageController 暴露的表单、目标状态与写处理器。
- *  10 个表单弹窗共用 FundsActionModal 骨架；未达流水是纯展示弹窗，保持独立。 */
-import { Input, Modal as AntdModal, Typography } from "antd";
+ *  9 个表单弹窗共用 FundsActionModal 骨架。 */
+import { Input, Typography } from "antd";
 import type { FormInstance } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { ReactNode } from "react";
@@ -14,7 +14,6 @@ import { requiredMoneyRules } from "../shared/lib/validators";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL } from "../shared/lib/labels";
 import type { FundsPageController } from "./useFundsPageController";
-import type { Cashflow } from "../shared/api/types/finance";
 
 const Modal = BusinessActionModal;
 
@@ -30,7 +29,6 @@ function poolOptions(pools: Pool[], opts?: { excludeId?: number; withTitle?: boo
       return opts?.withTitle ? { value: pool.id, title: label, label } : { value: pool.id, label };
     });
 }
-
 interface FundsActionModalProps {
   title: string;
   fieldCount: number;
@@ -110,7 +108,6 @@ function FundsActionModal({
     </Modal>
   );
 }
-
 export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
   const { depositOpen, depositEditTarget, closeDeposit, depositForm, submitDeposit, write, pools } = ctrl;
   return (
@@ -145,7 +142,6 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
     </FundsActionModal>
   );
 }
-
 export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
   const { cashflowOpen, setCashflowOpen, cashflowForm, submitCashflow, write, pools, cashflowAttributeOptions, flowDirectionOptions } = ctrl;
   return (
@@ -206,7 +202,6 @@ export function ReconciliationModal({ ctrl }: { ctrl: FundsPageController }) {
       <CfgItem name="reconciled_on" label="对账日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
       <CfgItem name="account_label" label="对账账户" rules={[{ required: true }]} extra="同一资金池 + 对账账户 + 对账日期只能对账一次，重复提交会被拒绝"><Input /></CfgItem>
       <CfgItem name="statement_balance" label="账面余额" rules={requiredMoneyRules("账面余额")}><MoneyInput /></CfgItem>
-      <CfgItem name="unmatched_flow_ids" label="未达流水 ID" extra="多个 ID 用逗号分隔"><Input /></CfgItem>
       <CfgItem name="reason" label="差异原因" extra="账面余额与系统余额不一致时必填（系统余额=期初余额+已入账流水）"><Input.TextArea rows={2} /></CfgItem>
       <CfgItem name="note" label="说明"><Input.TextArea rows={2} /></CfgItem>
     </FundsActionModal>
@@ -351,40 +346,5 @@ export function CancelModal({ ctrl }: { ctrl: FundsPageController }) {
         <Input.TextArea rows={3} />
       </CfgItem>
     </FundsActionModal>
-  );
-}
-
-/** 未达流水是纯展示弹窗（AntdModal + DataTable），无表单骨架，保持独立。 */
-export function UnmatchedModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { unmatchedTarget, setUnmatchedTarget, cashflows, loading } = ctrl;
-  const unmatchedColumns: ColumnsType<Cashflow> = [
-    { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
-    { title: "流水号", dataIndex: "flow_no" },
-    { title: "日期", dataIndex: "occurred_on" },
-    { title: "类别", dataIndex: "category" },
-    { title: "资金性质", dataIndex: "fund_nature", render: (v: string | null | undefined, row) => FUND_NATURE_LABEL[v ?? (row.nature?.startsWith("EXTERNAL") ? "EXTERNAL" : "BUSINESS")] ?? v ?? "—" },
-    { title: "核算属性", dataIndex: "accounting_attribute", render: (v: string | null | undefined) => ACCOUNTING_ATTRIBUTE_LABEL[v ?? ""] ?? v ?? "—" },
-    { title: "收支", dataIndex: "direction", render: (v: string) => (v === "IN" ? "收入" : "支出") },
-    { title: "金额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "来源", dataIndex: "source" },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("FUND_FLOW_STATUS", v, { APPROVED: "已入账" })} /> },
-    { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
-  ];
-  return (
-    <AntdModal title="未达流水" open={Boolean(unmatchedTarget)} onCancel={() => setUnmatchedTarget(null)} footer={null} width={900}>
-      <Typography.Paragraph type="secondary">
-        对账记录标记的流水 ID：{unmatchedTarget?.unmatched_flow_ids?.join(", ") || "—"}
-      </Typography.Paragraph>
-      <DataTable<Cashflow>
-        columns={unmatchedColumns}
-        rows={unmatchedTarget ? cashflows.filter((row) => unmatchedTarget.unmatched_flow_ids?.includes(row.id)) : []}
-        page={1}
-        pageSize={10}
-        total={unmatchedTarget ? cashflows.filter((row) => unmatchedTarget.unmatched_flow_ids?.includes(row.id)).length : 0}
-        emptyText="当前列表未加载到对应流水"
-        onPageChange={() => undefined}
-        loading={loading}
-     />
-    </AntdModal>
   );
 }

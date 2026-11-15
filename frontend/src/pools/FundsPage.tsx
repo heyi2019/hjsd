@@ -15,7 +15,6 @@ import {
   ResolveModal,
   ReverseModal,
   TransferModal,
-  UnmatchedModal,
 } from "./FundsPage.modals";
 export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const ctrl = useFundsPageController(active);
@@ -41,7 +40,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
       <ReleaseModal ctrl={ctrl} />
       <LossModal ctrl={ctrl} />
       <CancelModal ctrl={ctrl} />
-      <UnmatchedModal ctrl={ctrl} />
     </section>
   );
 }

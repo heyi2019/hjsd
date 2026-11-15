@@ -243,26 +243,6 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
 
 
-  it("新增对账提交：未达流水 ID 按逗号解析为数组", async () => {
-    resolveMockOnce(vi.mocked(reconciliationsApi.create), { id: 210 });
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
-    await ui.click(screen.getByRole("tab", { name: "对账" }));
-    await ui.click(await screen.findByRole("button", { name: /新增对账/ }));
-    const modal = modalContent();
-    await pickSelect(modal, 0, /经营主池/);
-    await ui.clear(modal.querySelector("#reconciled_on") ?? modal);
-    await ui.type(modal.querySelector("#reconciled_on") ?? modal, "2026-10-18");
-    await ui.type(modal.querySelector("#account_label") ?? modal, "经营账户");
-    await ui.type(modal.querySelector("#statement_balance") ?? modal, "900.00");
-    await ui.type(modal.querySelector("#unmatched_flow_ids") ?? modal, "1, 2");
-    await ui.type(modal.querySelector("#note") ?? modal, "对账测试");
-    await ui.click(screen.getByRole("button", { name: /提交对账/ }));
-    await waitFor(() => expect(vi.mocked(reconciliationsApi.create)).toHaveBeenCalled());
-    const payload = vi.mocked(reconciliationsApi.create).mock.calls[0][0] as Record<string, unknown>;
-    expect(payload.unmatched_flow_ids).toEqual([1, 2]);
-  });
-
   it("新增对账预检：命中唯一约束（池+账户+日期）时阻断提交并提示调整", async () => {
     const warningSpy = vi.spyOn(message, "warning").mockReturnValue(undefined as never);
     // 初始加载即带入一条「同池+同日期+同账户」记录，模拟重复对账场景。
@@ -319,7 +299,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
   it("对账差异核销提交调用 reconciliationsApi.resolve", async () => {
     vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([{
-      id: 21, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN", unmatched_flow_ids: [1],
+      id: 21, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN",
     }]);
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });

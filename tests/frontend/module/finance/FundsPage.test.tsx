@@ -394,21 +394,6 @@ describe("FundsPage：资金写路径", () => {
     expect(screen.getAllByRole("button", { name: /释\s*放/ }).length).toBeGreaterThanOrEqual(1);
   });
 
-  it("对账可以钻取查看未达流水", async () => {
-    vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([{
-      id: 21, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN", unmatched_flow_ids: [1],
-    }]);
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
-    await ui.click(screen.getByRole("tab", { name: "对账" }));
-    await ui.click(await screen.findByRole("button", { name: /查看未达流水/ }));
-    // 未达流水弹窗按 unmatched_flow_ids 只列出对应那一条，故弹窗内精确 1 次。
-    // 旧断言要求 ≥2 依赖「关闭态弹窗也被渲染」的虚假挂载（motion 桩伪造 visible），已随桩修正失效。
-    const unmatchedModal = document.querySelector(".ant-modal") as HTMLElement;
-    expect(within(unmatchedModal).getAllByText("HS0001-CF-BUY-01")).toHaveLength(1);
-    expect(unmatchedModal.querySelectorAll("tbody tr.ant-table-row")).toHaveLength(1);
-  });
-
   it("押金损失登记提交原金额、日期、分类和原因", async () => {
     resolveMockOnce(vi.mocked(depositsApi.loss), { id: 91 });
     renderLight(<FundsPage />, { user: "finance" });

@@ -13,3 +13,8 @@
   align-items: center;
   line-height: 1;
 }
+
+/* 后缀输入由外层 affix wrapper 承担聚焦光晕；内层 input 再画一层会在金额区域形成蓝色块。 */
+.money-input .ant-input:focus {
+  box-shadow: none !important;
+}

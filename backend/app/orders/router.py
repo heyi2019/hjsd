@@ -48,6 +48,7 @@ from app.orders.pools import pool_balance as orders_pool_balance, pool_balance_s
 from app.orders.queries import (
     count_orders,
     list_orders as orders_list_orders,
+    order_ledger_summary,
     order_status_counts,
 )
 
@@ -161,6 +162,34 @@ def order_summary(
         completed_count=counts.get(OrderStatus.COMPLETED.value, 0),
         active_count=counts.get(OrderStatus.ACTIVE.value, 0) + counts.get(OrderStatus.INSTALLMENT.value, 0),
     )
+
+
+@router.get("/orders/ledger-summary", response_model=schemas.OrderLedgerSummaryOut)
+def order_ledger_summary_endpoint(
+    mine: bool = Query(default=False),
+    trade_date_from: date | None = Query(default=None),
+    trade_date_to: date | None = Query(default=None),
+    order_type: str | None = Query(default=None),
+    business_mode: str | None = Query(default=None),
+    game_type: str | None = Query(default=None),
+    account_status: str | None = Query(default=None),
+    keyword: str | None = Query(default=None, max_length=128),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_orders,
+) -> schemas.OrderLedgerSummaryOut:
+    counts = order_ledger_summary(
+        db,
+        order_type=order_type,
+        business_mode=business_mode,
+        game_type=game_type,
+        account_status=account_status,
+        keyword=keyword,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        user=user,
+        mine=mine,
+    )
+    return schemas.OrderLedgerSummaryOut(**counts)
 
 
 @router.post("/orders", response_model=schemas.OrderOut, status_code=201)

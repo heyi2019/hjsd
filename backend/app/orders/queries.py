@@ -16,6 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
+from app.domain.parties import Counterparty, Customer, OrderCounterpartyRole, OrderCustomerRole
 from app.domain.trade import (
     Account,
     Cashflow,
@@ -91,10 +92,61 @@ def order_status_counts(
     return {str(status): int(count) for status, count in session.execute(stmt).all()}
 
 
+def order_ledger_summary(
+    session: Session,
+    *,
+    order_type: str | None = None,
+    business_mode: str | None = None,
+    game_type: str | None = None,
+    account_status: str | None = None,
+    keyword: str | None = None,
+    trade_date_from: date | None = None,
+    trade_date_to: date | None = None,
+    user: CurrentUser | None = None,
+    mine: bool = False,
+) -> dict[str, object]:
+    """Aggregate ledger status cards and business-type counts under active filters."""
+    stmt = _order_list_stmt(
+        order_type=None,
+        status=None,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        owner_id=None,
+        pool_id=None,
+        keyword=keyword,
+        business_mode=business_mode,
+        game_type=game_type,
+        account_status=account_status,
+        user=user,
+        mine=mine,
+        session=session,
+    ).with_only_columns(
+        Order.order_type,
+        Order.status,
+        func.count(Order.id),
+        maintain_column_froms=True,
+    ).group_by(Order.order_type, Order.status)
+
+    type_counts: dict[str, int] = {}
+    status_counts: dict[str, int] = {}
+    for business_type, status, count in session.execute(stmt).all():
+        count = int(count)
+        type_counts[str(business_type)] = type_counts.get(str(business_type), 0) + count
+        if order_type is None or business_type == order_type:
+            status_counts[str(status)] = status_counts.get(str(status), 0) + count
+    return {
+        "total_count": sum(status_counts.values()),
+        "status_counts": status_counts,
+        "type_counts": type_counts,
+    }
+
+
 def _order_list_stmt(
     *, order_type: str | None, status: str | None,
     trade_date_from: date | None, trade_date_to: date | None,
     owner_id: int | None, pool_id: int | None, keyword: str | None,
+    business_mode: str | None = None, game_type: str | None = None,
+    account_status: str | None = None,
     user: CurrentUser | None, mine: bool, session: Session,
 ):
     stmt = select(Order).outerjoin(Account, Account.id == Order.account_id)
@@ -106,6 +158,16 @@ def _order_list_stmt(
         stmt = stmt.where(Order.trade_date >= trade_date_from)
     if trade_date_to is not None:
         stmt = stmt.where(Order.trade_date <= trade_date_to)
+    if business_mode:
+        stmt = stmt.where(
+            or_(Order.business_mode == business_mode, Account.business_mode == business_mode)
+        )
+    if game_type:
+        stmt = stmt.where(
+            func.coalesce(Account.game_type, Order.account_snapshot["game_type"].as_string()) == game_type
+        )
+    if account_status:
+        stmt = stmt.where(Account.status == account_status)
     if owner_id is not None:
         stmt = stmt.where(Order.owner_id == owner_id)
     if pool_id is not None:
@@ -130,14 +192,28 @@ def _order_list_stmt(
         stmt = stmt.where(
             or_(
                 Order.order_no.ilike(pattern, escape=escape),
-                # 2026-10-28 去冗余：平铺列已删，订单侧账号搜索走快照 JSON。
-                # 必须用 ORM 的 JSON 取值表达式而非 func.json_extract：后者是 SQLite
-                # 的 JSON1 扩展函数，PostgreSQL 无此函数，生产（PG）下订单关键字搜索
-                # 会直接 500。as_string() 由方言各自渲染——PG 出 `->>`，SQLite 出
-                # `json_extract`，两边语义一致。
+                func.coalesce(Account.game_type, Order.account_snapshot["game_type"].as_string()).ilike(pattern, escape=escape),
                 Order.account_snapshot["game_account"].as_string().ilike(pattern, escape=escape),
                 Account.game_account.ilike(pattern, escape=escape),
+                Order.account_snapshot["channel_region"].as_string().ilike(pattern, escape=escape),
+                Account.channel_region.ilike(pattern, escape=escape),
                 Order.note.ilike(pattern, escape=escape),
+                exists(
+                    select(OrderCustomerRole.id)
+                    .join(Customer, Customer.id == OrderCustomerRole.customer_id)
+                    .where(
+                        OrderCustomerRole.order_id == Order.id,
+                        or_(Customer.display_name.ilike(pattern, escape=escape), Customer.source.ilike(pattern, escape=escape)),
+                    )
+                ),
+                exists(
+                    select(OrderCounterpartyRole.id)
+                    .join(Counterparty, Counterparty.id == OrderCounterpartyRole.counterparty_id)
+                    .where(
+                        OrderCounterpartyRole.order_id == Order.id,
+                        or_(Counterparty.display_name.ilike(pattern, escape=escape), Counterparty.source.ilike(pattern, escape=escape)),
+                    )
+                ),
             )
         )
     if mine and user is not None:

@@ -234,11 +234,13 @@ beforeEach(() => {
     items: allocationRows,
     total: allocationRows.length,
     order_profit: "5000.00",
+    totals_by_type: {},
   });
   vi.mocked(policyApi.setAllocations).mockResolvedValue({
     items: allocationRows,
     total: allocationRows.length,
     order_profit: "5000.00",
+    totals_by_type: {},
   });
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 9, username: "lisi", display_name: "李四", is_active: true },
@@ -426,6 +428,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       items: [],
       total: 0,
       order_profit: "5000.00",
+      totals_by_type: {},
     });
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
@@ -457,6 +460,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       items: [],
       total: 0,
       order_profit: "5000.00",
+      totals_by_type: {},
     });
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
@@ -498,6 +502,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       items: actionAllocationRows,
       total: actionAllocationRows.length,
       order_profit: "5000.00",
+      totals_by_type: {},
     });
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");

@@ -268,6 +268,16 @@ class OrderSummaryOut(BaseModel):
     active_count: int = 0
 
 
+class OrderLedgerSummaryOut(BaseModel):
+    """Filtered order-ledger totals aggregated by the backend."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    total_count: int
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    type_counts: dict[str, int] = Field(default_factory=dict)
+
+
 class EventCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

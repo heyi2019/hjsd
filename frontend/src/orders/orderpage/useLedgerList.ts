@@ -30,6 +30,9 @@ function withinTradeDateRange(order: Order, range: [Dayjs, Dayjs] | null): boole
 export function useLedgerList(params: { active: boolean; initialMine: boolean }) {
   const { active, initialMine } = params;
   const [orders, setOrders] = useState<Order[]>([]);
+  const [ledgerSummary, setLedgerSummary] = useState<Awaited<ReturnType<typeof ordersApi.ledgerSummary>> | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
   const [types, setTypes] = useState<OrderType[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -106,6 +109,40 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
     if (active) setMineOrders(initialMine);
   }, [active, initialMine]);
 
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    setSummaryLoading(true);
+    setLedgerSummary(null);
+    const timer = window.setTimeout(() => {
+      void ordersApi.ledgerSummary({
+        mine: mineOrders,
+        ...(dateRange ? {
+          trade_date_from: dateRange[0].format("YYYY-MM-DD"),
+          trade_date_to: dateRange[1].format("YYYY-MM-DD"),
+        } : {}),
+        ...(orderTypeFilter !== "all" ? { order_type: orderTypeFilter } : {}),
+        ...(businessModeFilter !== "all" ? { business_mode: businessModeFilter } : {}),
+        ...(gameTypeFilter !== "all" ? { game_type: gameTypeFilter } : {}),
+        ...(inventoryStatusFilter !== "all" ? { account_status: inventoryStatusFilter } : {}),
+        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+      }).then((result) => {
+        if (cancelled) return;
+        setLedgerSummary(result);
+        setSummaryError(null);
+      }).catch((error) => {
+        if (cancelled) return;
+        setSummaryError(normalizeError(error));
+      }).finally(() => {
+        if (!cancelled) setSummaryLoading(false);
+      });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [active, mineOrders, dateRange, orderTypeFilter, businessModeFilter, gameTypeFilter, inventoryStatusFilter, keyword]);
+
   const typeNames = useMemo(() => Object.fromEntries(types.map((type) => [type.code, type.name])), [types]);
   // 先按业务筛选，再按日期，最后一次排序；避免渲染层重复计算同一批订单。
   const filteredOrders = useMemo(
@@ -116,16 +153,11 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
     [orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter, dateRange, ledgerSortDesc],
   );
 
-  // 类型 Segmented 计数基线：应用除「类型」外的全部筛选（关键词/日期/游戏类型/库存状态/业务模式），
-  // 保证各类型计数之和恒等于「订单总量」卡片；否则输入关键词后会出现「全部 627 / 订单总量 12」的自相矛盾。
-  const typeCountBase = useMemo(
-    () => filterBusinessOrders(orders, "all", businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter)
-      .filter((order) => withinTradeDateRange(order, dateRange)),
-    [orders, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter, dateRange],
-  );
-
   return {
     orders,
+    ledgerSummary,
+    summaryLoading,
+    summaryError,
     setOrders,
     types,
     setTypes,
@@ -161,7 +193,6 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
     gameTypeOptions,
     typeNames,
     filteredOrders,
-    typeCountBase,
     load,
   };
 }

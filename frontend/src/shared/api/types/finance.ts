@@ -84,6 +84,7 @@ export interface Cashflow {
   reversal_of_id?: number | null;
   operator?: string;
   note?: string | null;
+  form_extra?: Record<string, unknown> | null;
 }
 
 export interface Rebate {

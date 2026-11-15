@@ -42,6 +42,7 @@ function poolOptions(pools: Pool[], opts?: { excludeId?: number; withTitle?: boo
 interface FundsActionModalProps {
   title: string;
   fieldCount: number;
+  wrapClassName?: string;
   open: boolean;
   onCancel: () => void;
   scope: string;
@@ -69,6 +70,7 @@ interface FundsActionModalProps {
 function FundsActionModal({
   title,
   fieldCount,
+  wrapClassName,
   open,
   onCancel,
   scope,
@@ -85,7 +87,7 @@ function FundsActionModal({
   children,
 }: FundsActionModalProps) {
   return (
-    <Modal title={title} fieldCount={fieldCount} open={open} onCancel={onCancel} footer={null}>
+    <Modal title={title} fieldCount={fieldCount} wrapClassName={wrapClassName} open={open} onCancel={onCancel} footer={null}>
       {beforeError}
       <InlineError error={write.error} />
       {intro}
@@ -118,17 +120,20 @@ function FundsActionModal({
 }
 
 export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { depositOpen, setDepositOpen, depositForm, submitDeposit, write, pools } = ctrl;
+  const { depositOpen, depositEditTarget, closeDeposit, depositForm, submitDeposit, write, pools } = ctrl;
   return (
     <FundsActionModal
-      title="新增押金占用" fieldCount={7}
-      open={depositOpen} onCancel={() => setDepositOpen(false)}
+      title={depositEditTarget ? "编辑押金占用" : "新增押金占用"} fieldCount={7} wrapClassName="deposit-modal"
+      open={depositOpen} onCancel={closeDeposit}
       scope="FUNDDEPOSIT" form={depositForm} onFinish={submitDeposit}
       initialValues={{ paid_on: today() }}
-      write={write} permission="deposit.post" submitLabel="提交"
+      write={write} permission="deposit.post" submitLabel={depositEditTarget ? "保存修改" : "提交"}
     >
       <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}>
         <Select aria-label="资金池" options={poolOptions(pools)} />
+      </CfgItem>
+      <CfgItem name="amount" label="占用金额" rules={requiredMoneyRules("占用金额")}>
+        <MoneyInput />
       </CfgItem>
       <CfgItem name="counterparty_id" label="对手方 ID" extra="可选，填写已建档合作方 ID">
         <Input inputMode="numeric" />
@@ -136,16 +141,13 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
       <CfgItem name="source_order_id" label="来源订单 ID" extra="可选，填写关联订单 ID">
         <Input inputMode="numeric" />
       </CfgItem>
-      <CfgItem name="amount" label="占用金额" rules={requiredMoneyRules("占用金额")}>
-        <MoneyInput />
-      </CfgItem>
       <CfgItem name="paid_on" label="占用日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
         <DateField />
       </CfgItem>
       <CfgItem name="expected_release_on" label="预计释放日期" getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
         <DateField />
       </CfgItem>
-      <CfgItem name="note" label="说明">
+      <CfgItem name="note" label="说明" className="deposit-modal__note">
         <Input.TextArea rows={2} />
       </CfgItem>
     </FundsActionModal>

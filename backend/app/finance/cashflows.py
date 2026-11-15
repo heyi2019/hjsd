@@ -72,7 +72,7 @@ def create_cashflow(
     form_extra_scope: str = "FUNDFLOW",
     user: CurrentUser | None = None,
 ) -> Cashflow:
-    """创建一笔独立现金流；独立录入必须先审核，业务派生流水不走此入口。"""
+    """创建一笔独立现金流；独立录入直接入账，业务派生流水不走此入口。"""
     try:
         direction = Direction(direction).value
     except ValueError as exc:
@@ -525,6 +525,202 @@ STUDIO_EXPENSE_ATTRIBUTE = AccountingAttribute.OPERATING_EXPENSE.value
 STUDIO_INCOME_ATTRIBUTE = AccountingAttribute.SELF_REVENUE.value
 
 
+def _assert_editable_studio_cashflow(
+    session: Session,
+    cashflow_id: int,
+    user: CurrentUser | None = None,
+) -> Cashflow:
+    flow = _get_cashflow(session, cashflow_id, user)
+    if flow.status != CashflowStatus.APPROVED.value:
+        raise Validation("只有已入账的工作室收支可编辑或删除", details={"cashflow_id": flow.id})
+    if (
+        flow.order_id is not None
+        or flow.order_event_id is not None
+        or flow.deposit_id is not None
+        or flow.transfer_id is not None
+        or flow.reversal_of_id is not None
+        or flow.category in _MANUAL_EXCLUDED_CATEGORIES
+        or not (
+            (flow.direction == Direction.OUT.value and flow.accounting_attribute == STUDIO_EXPENSE_ATTRIBUTE)
+            or (flow.direction == Direction.IN.value and flow.accounting_attribute == STUDIO_INCOME_ATTRIBUTE)
+        )
+    ):
+        raise Validation("仅工作室手工收支可编辑或删除", details={"cashflow_id": flow.id})
+    if session.scalar(select(Cashflow.id).where(Cashflow.reversal_of_id == flow.id)):
+        raise Validation("已冲销的工作室收支不能编辑或删除", details={"cashflow_id": flow.id})
+    return flow
+
+
+def _normalize_studio_cashflow_fields(
+    *,
+    direction: str,
+    nature: str,
+    fund_nature: str | None,
+    accounting_attribute: str | None,
+    category: str,
+    amount: Any,
+) -> tuple[str, str, str, str, str, Decimal]:
+    try:
+        normalized_direction = Direction(direction).value
+    except ValueError as exc:
+        raise Validation(f"direction 必须为 {Direction.values()}", details={"field": "direction"}) from exc
+    try:
+        normalized_nature = Nature(nature).value
+    except ValueError as exc:
+        raise Validation(f"nature 必须为 {Nature.values()}", details={"field": "nature"}) from exc
+    if normalized_direction == Direction.IN.value and normalized_nature not in {
+        Nature.EXTERNAL_IN.value,
+        Nature.BUSINESS_IN.value,
+    }:
+        raise Validation("收入流水的 nature 不匹配", details={"direction": normalized_direction, "nature": normalized_nature})
+    if normalized_direction == Direction.OUT.value and normalized_nature != Nature.BUSINESS_OUT.value:
+        raise Validation("支出流水的 nature 不匹配", details={"direction": normalized_direction, "nature": normalized_nature})
+    label = _text(
+        category,
+        field="category",
+        message="category 不能为空",
+        uppercase=True,
+        type_message="category 必须为文本",
+    )
+    default_fund_nature, default_accounting_attribute = accounting_attributes_for_manual_cashflow(
+        nature=normalized_nature, category=label, direction=normalized_direction
+    )
+    normalized_fund_nature = fund_nature or default_fund_nature
+    normalized_accounting_attribute = accounting_attribute or default_accounting_attribute
+    try:
+        validate_fund_accounting_attribute(normalized_fund_nature, normalized_accounting_attribute)
+    except ValueError as exc:
+        raise Validation(
+            str(exc),
+            details={"fund_nature": normalized_fund_nature, "accounting_attribute": normalized_accounting_attribute},
+        ) from exc
+    if normalized_direction == Direction.OUT.value and normalized_accounting_attribute != STUDIO_EXPENSE_ATTRIBUTE:
+        raise Validation("工作室支出必须使用运营费用科目", details={"field": "accounting_attribute"})
+    if normalized_direction == Direction.IN.value and normalized_accounting_attribute != STUDIO_INCOME_ATTRIBUTE:
+        raise Validation("工作室收入必须使用自营收入科目", details={"field": "accounting_attribute"})
+    if label in _MANUAL_EXCLUDED_CATEGORIES:
+        raise Validation("该科目不属于工作室手工收支", details={"field": "category"})
+    return (
+        normalized_direction,
+        normalized_nature,
+        normalized_fund_nature,
+        normalized_accounting_attribute,
+        label,
+        _positive(amount, field="amount"),
+    )
+
+
+def update_cashflow(
+    session: Session,
+    cashflow_id: int,
+    *,
+    pool_id: int,
+    occurred_on: date,
+    direction: str,
+    nature: str,
+    fund_nature: str | None = None,
+    accounting_attribute: str | None = None,
+    category: str,
+    amount: Any,
+    note: str | None = None,
+    form_extra: Mapping[str, Any] | None = None,
+    form_extra_scope: str = "STUDIOEXP",
+    actor: str,
+    user: CurrentUser | None = None,
+) -> Cashflow:
+    flow = _assert_editable_studio_cashflow(session, cashflow_id, user)
+    if user is not None and not user.can_see_pool(pool_id):
+        raise NotFound("资金池不存在", details={"pool_id": pool_id})
+    pool = assert_pool_usable(session, pool_id)
+    (
+        normalized_direction,
+        normalized_nature,
+        normalized_fund_nature,
+        normalized_accounting_attribute,
+        label,
+        money,
+    ) = _normalize_studio_cashflow_fields(
+        direction=direction,
+        nature=nature,
+        fund_nature=fund_nature,
+        accounting_attribute=accounting_attribute,
+        category=category,
+        amount=amount,
+    )
+    before = {
+        "pool_id": flow.pool_id,
+        "occurred_on": flow.occurred_on.isoformat(),
+        "direction": flow.direction,
+        "nature": flow.nature,
+        "fund_nature": flow.fund_nature,
+        "accounting_attribute": flow.accounting_attribute,
+        "category": flow.category,
+        "amount": str(to_money(flow.amount)),
+        "note": flow.note,
+    }
+    flow.pool_id = pool.id
+    flow.occurred_on = occurred_on
+    flow.direction = normalized_direction
+    flow.nature = normalized_nature
+    flow.fund_nature = normalized_fund_nature
+    flow.accounting_attribute = normalized_accounting_attribute
+    flow.category = label
+    flow.amount = money
+    flow.note = note
+    flow.form_extra = validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None
+    flow.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.CASHFLOW_UPDATE,
+        entity_type="cashflow",
+        entity_id=flow.flow_no,
+        actor=actor,
+        before=before,
+        after={
+            "pool_id": flow.pool_id,
+            "occurred_on": occurred_on.isoformat(),
+            "direction": flow.direction,
+            "nature": flow.nature,
+            "fund_nature": flow.fund_nature,
+            "accounting_attribute": flow.accounting_attribute,
+            "category": flow.category,
+            "amount": str(money),
+            "note": note,
+        },
+    )
+    return flow
+
+
+def delete_cashflow(
+    session: Session,
+    cashflow_id: int,
+    *,
+    actor: str,
+    user: CurrentUser | None = None,
+) -> None:
+    flow = _assert_editable_studio_cashflow(session, cashflow_id, user)
+    before = {
+        "pool_id": flow.pool_id,
+        "occurred_on": flow.occurred_on.isoformat(),
+        "direction": flow.direction,
+        "category": flow.category,
+        "amount": str(to_money(flow.amount)),
+    }
+    flow_no = flow.flow_no
+    session.delete(flow)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.CASHFLOW_DELETE,
+        entity_type="cashflow",
+        entity_id=flow_no,
+        actor=actor,
+        before=before,
+        after={"deleted": True},
+    )
+
+
 def _studio_scope() -> Any:
     """「手工登记的工作室收支」的 SQL 条件，与列表里的 source=OTHER 等价。"""
     return and_(
@@ -627,7 +823,9 @@ __all__ = [
     "STUDIO_INCOME_ATTRIBUTE",
     "cashflow_totals",
     "create_cashflow",
+    "delete_cashflow",
     "list_cashflows",
     "reverse_cashflow",
     "studio_summary",
+    "update_cashflow",
 ]

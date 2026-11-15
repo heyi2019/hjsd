@@ -197,6 +197,8 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   EVENT_CREATE: "登记订单事件",
   EVENT_POST: "过账订单事件",
   DEPOSIT_CREATE: "登记押金占用",
+  DEPOSIT_UPDATE: "编辑押金占用",
+  DEPOSIT_DELETE: "删除押金占用",
   DEPOSIT_RELEASE: "释放押金",
   DEPOSIT_LOSS: "登记押金损失",
   DEPOSIT_CANCEL: "取消押金",

@@ -20,7 +20,8 @@ import type { Cashflow, Pool } from "../shared/api/types/finance";
 import { normalizeError, type NormalizedError } from "../shared/api/client";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { requiredMoneyRules } from "../shared/lib/validators";
-import { DataTable,
+import { ConfirmButton,
+  DataTable,
   BusinessActionModal,
   BusinessRegistrationForm,
   ErrorBanner,
@@ -30,8 +31,7 @@ import { DataTable,
   PermissionButton,
   Select,
   StatRow,
-  StatusTag,
-  CompactActions, } from "../shared/ui";
+} from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { DepositSection } from "./FundsPage.tabs";
 import type { FundsPageController } from "./useFundsPageController";
@@ -123,10 +123,10 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
   const [category, setCategory] = useState<string | undefined>(undefined);
 
   const [registerOpen, setRegisterOpen] = useState(false);
-  const [reverseTarget, setReverseTarget] = useState<Cashflow | null>(null);
+  const [editTarget, setEditTarget] = useState<Cashflow | null>(null);
+  const [registerDirection, setRegisterDirection] = useState<string>("OUT");
 
   const [registerForm] = Form.useForm();
-  const [reverseForm] = Form.useForm();
   const write = useAsyncAction();
 
   const from = dateRange?.[0]?.format("YYYY-MM-DD") ?? "";
@@ -182,8 +182,9 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
 
   const submitRegister = async (values: Record<string, unknown>) => {
     const direction = (values.direction as string) === "IN" ? "IN" : "OUT";
+    const editing = editTarget;
     await write.run(async () => {
-      await cashflowsApi.create({
+      const payload = {
         pool_id: Number(values.pool_id),
         occurred_on: dateText(values.occurred_on),
         direction,
@@ -194,36 +195,62 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
         amount: values.amount as string,
         note: (values.note as string) || null,
         form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
-      });
-      appMessage.success(direction === "OUT" ? "支出已登记入账" : "收入已登记入账");
+      };
+      if (editing) {
+        await cashflowsApi.update(editing.id, payload);
+        appMessage.success("工作室收支已更新");
+      } else {
+        await cashflowsApi.create(payload);
+        appMessage.success(direction === "OUT" ? "支出已登记" : "收入已登记");
+      }
       setRegisterOpen(false);
+      setEditTarget(null);
       registerForm.resetFields();
       await load();
     });
   };
 
-  const submitReverse = async (values: Record<string, unknown>) => {
-    if (!reverseTarget) return;
-    const targetId = reverseTarget.id;
+  const deleteStudioCashflow = async (cashflowId: number) => {
     await write.run(async () => {
-      await cashflowsApi.reverse(targetId, {
-        reversed_on: dateText(values.reversed_on),
-        reason: values.reason as string,
-        form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
-      });
-      appMessage.success("支出已冲销");
-      setReverseTarget(null);
-      reverseForm.resetFields();
+      await cashflowsApi.remove(cashflowId);
+      appMessage.success("工作室收支已删除");
       await load();
     });
+  };
+
+  const openRegister = () => {
+    setEditTarget(null);
+    registerForm.resetFields();
+    registerForm.setFieldsValue({ occurred_on: dayjs(today()), direction: "OUT" });
+    setRegisterDirection("OUT");
+    setRegisterOpen(true);
+  };
+
+  const openEdit = (row: Cashflow) => {
+    setEditTarget(row);
+    setRegisterDirection(row.direction === "IN" ? "IN" : "OUT");
+    registerForm.setFieldsValue({
+      pool_id: row.pool_id,
+      occurred_on: dayjs(row.occurred_on),
+      direction: row.direction,
+      category: row.category,
+      amount: row.amount,
+      note: row.note ?? undefined,
+      form_extra: row.form_extra ?? undefined,
+    });
+    setRegisterOpen(true);
+  };
+
+  const closeRegister = () => {
+    setRegisterOpen(false);
+    setEditTarget(null);
+    registerForm.resetFields();
   };
 
   // 三个数都取服务端（Decimal 聚合，含净额），前端只负责显示。
   const approvedIncome = summary?.approved_income ?? "0.00";
   const approvedExpense = summary?.approved_expense ?? "0.00";
   const netTotal = summary?.approved_net ?? "0.00";
-
-  const [registerDirection, setRegisterDirection] = useState<string>("OUT");
 
   const columns: ColumnsType<Cashflow> = [
     { title: "流水号", dataIndex: "flow_no" },
@@ -245,31 +272,28 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
-    {
-      title: "状态",
-      dataIndex: "status",
-      render: (v: string) => <StatusTag status={v} optionSet="FUND_FLOW_STATUS" />,
-    },
     { title: "来源", dataIndex: "source", render: (v: string | null | undefined) => v === "OTHER" ? "手工登记" : v || "—" },
     { title: "建立时间", dataIndex: "occurred_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
     {
       title: "操作",
-      width: 170,
+      width: 150,
       render: (_v, row) => (
         <Space size={2}>
-          {row.status === "APPROVED" && (
-            <PermissionButton
-              permission="deposit.post"
-              size="small"
-              onClick={() => {
-                reverseForm.setFieldsValue({ reversed_on: dayjs(today()) });
-                setReverseTarget(row);
-              }}
-            >
-              冲销
-            </PermissionButton>
-          )}
+          <PermissionButton permission="deposit.post" size="small" onClick={() => openEdit(row)}>
+            编辑
+          </PermissionButton>
+          <ConfirmButton
+            permission="deposit.post"
+            size="small"
+            danger
+            title="删除工作室收支"
+            description="删除后会立即移除这笔工作室收支及其经营统计，且不可恢复。"
+            okText="确认删除"
+            onConfirm={() => deleteStudioCashflow(row.id)}
+          >
+            删除
+          </ConfirmButton>
         </Space>
       ),
     },
@@ -283,11 +307,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
           permission="deposit.post"
           type="primary"
           disabled={Boolean(error)}
-          onClick={() => {
-            registerForm.setFieldsValue({ occurred_on: dayjs(today()), direction: "OUT" });
-            setRegisterDirection("OUT");
-            setRegisterOpen(true);
-          }}
+          onClick={openRegister}
         >
           记一笔
         </PermissionButton>
@@ -295,8 +315,8 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       <StatRow
         items={[
           // 失败态一律显示「—」（amount: null），不把未知状态当成可信 0
-          { label: "已入账收入", amount: error ? null : approvedIncome },
-          { label: "已入账支出", amount: error ? null : approvedExpense },
+          { label: "收入", amount: error ? null : approvedIncome },
+          { label: "支出", amount: error ? null : approvedExpense },
           { label: "净额", amount: error ? null : netTotal },
           { label: "笔数", kind: "count", amount: error ? null : flows.length },
         ]}
@@ -359,9 +379,9 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       <BusinessActionModal
         size="compact"
         wrapClassName="studio-ledger-modal"
-        title={REGISTER_TITLE}
+        title={editTarget ? "编辑工作室收支" : REGISTER_TITLE}
         open={registerOpen}
-        onCancel={() => setRegisterOpen(false)}
+        onCancel={closeRegister}
         footer={null}
       >
         <InlineError error={write.error} />
@@ -410,40 +430,12 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
           </CfgItem>
           <CustomFieldSection testIdSuffix="studio-expense" />
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
-            登记入账
+            {editTarget ? "保存修改" : "登记入账"}
           </PermissionButton>
           </FieldConfigScope>
         </BusinessRegistrationForm>
       </BusinessActionModal>
 
-      <BusinessActionModal size="compact"
-        title="冲销工作室支出"
-        open={Boolean(reverseTarget)}
-        onCancel={() => setReverseTarget(null)}
-        footer={null}
-      >
-        <InlineError error={write.error} />
-        <BusinessRegistrationForm
-          layout="horizontal"
-          labelAlign="left"
-          labelCol={{ flex: "108px" }}
-          wrapperCol={{ flex: "auto" }} scope="STUDIOREV" form={reverseForm} onFinish={submitReverse}>
-          <FieldConfigScope scope="STUDIOREV" active={Boolean(reverseTarget)}>
-          <CfgItem name="reversed_on" label="冲销日期" rules={[{ required: true, message: "请输入冲销日期" }]}>
-            <DatePicker format="YYYY-MM-DD" />
-          </CfgItem>
-          <CfgItem name="reason" label="冲销原因" rules={[{ required: true, message: "请填写冲销原因" }]}>
-            <Input.TextArea rows={3} />
-          </CfgItem>
-          <CustomFieldSection testIdSuffix="studio-reverse" />
-          <CompactActions>
-            <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
-              确认冲销
-            </PermissionButton>
-          </CompactActions>
-          </FieldConfigScope>
-        </BusinessRegistrationForm>
-      </BusinessActionModal>
     </section>
   );
 }

@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.foundation import Pool
-from app.domain.trade import Cashflow
+from app.domain.trade import Cashflow, Deposit
 from app.finance import cashflows, deposits
 from app.finance.cashflows import create_cashflow
 from app.finance.deposits import create_deposit
@@ -45,6 +45,82 @@ def test_cashflow_and_deposit_entries_come_from_real_modules():
     assert create_cashflow is cashflows.create_cashflow
     assert create_deposit is deposits.create_deposit
     assert importlib.util.find_spec("app.finance.service") is None
+
+
+def test_update_deposit_updates_the_linked_hold_cashflow(seeded_db):
+    deposit = create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
+    )
+
+    updated = deposits.update_deposit(
+        seeded_db,
+        deposit.id,
+        pool_id=1,
+        amount=Decimal("25"),
+        paid_on=date(2026, 10, 18),
+        expected_release_on=date(2026, 11, 1),
+        note="updated",
+        actor="pytest",
+    )
+    hold = seeded_db.scalar(
+        select(Cashflow).where(Cashflow.deposit_id == deposit.id, Cashflow.category == "DEPOSIT_HOLD")
+    )
+
+    assert updated.paid_amount == Decimal("25.00")
+    assert updated.paid_on == date(2026, 10, 18)
+    assert updated.note == "updated"
+    assert hold is not None
+    assert hold.amount == Decimal("25.00")
+    assert hold.occurred_on == date(2026, 10, 18)
+
+
+def test_delete_deposit_removes_its_hold_cashflow(seeded_db):
+    deposit = create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
+    )
+
+    deposits.delete_deposit(seeded_db, deposit.id, actor="pytest")
+
+    assert seeded_db.get(Deposit, deposit.id) is None
+    assert seeded_db.scalar(select(Cashflow).where(Cashflow.deposit_id == deposit.id)) is None
+
+
+def test_update_studio_cashflow_updates_the_manual_entry(seeded_db):
+    flow = _make_flow(
+        seeded_db,
+        direction="OUT",
+        nature="BUSINESS_OUT",
+        category="房租",
+        amount="3000",
+        note="10月房租",
+    )
+
+    updated = cashflows.update_cashflow(
+        seeded_db,
+        flow.id,
+        pool_id=1,
+        occurred_on=date(2026, 10, 20),
+        direction="OUT",
+        nature="BUSINESS_OUT",
+        fund_nature="BUSINESS",
+        accounting_attribute="OPERATING_EXPENSE",
+        category="房租",
+        amount=Decimal("3200"),
+        note="修正后的房租",
+        actor="pytest",
+    )
+
+    assert updated.amount == Decimal("3200.00")
+    assert updated.occurred_on == date(2026, 10, 20)
+    assert updated.note == "修正后的房租"
+
+
+def test_delete_studio_cashflow_removes_the_manual_entry(seeded_db):
+    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT", category="日用")
+
+    cashflows.delete_cashflow(seeded_db, flow.id, actor="pytest")
+
+    assert seeded_db.get(Cashflow, flow.id) is None
 
 
 def _restricted_user() -> CurrentUser:

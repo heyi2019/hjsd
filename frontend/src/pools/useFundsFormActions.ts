@@ -6,6 +6,7 @@ import { depositsApi } from "../shared/api/installments.api";
 import { reconciliationsApi, transfersApi } from "../shared/api/pools.api";
 import type { Cashflow, Deposit, PoolBalance, Reconciliation } from "../shared/api/types/finance";
 import { ACCOUNTING_ATTRIBUTE_LABEL } from "../shared/lib/labels";
+import { today } from "../shared/lib/format";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { ALLOWED_ATTRIBUTES_BY_FUND_NATURE, deriveCashflowNature } from "./FundsPage.fragments";
 
@@ -21,6 +22,7 @@ interface FundsFormActionsDeps {
 
 export function useFundsFormActions({ load, balances, reconciliations, write }: FundsFormActionsDeps) {
   const [depositOpen, setDepositOpen] = useState(false);
+  const [depositEditTarget, setDepositEditTarget] = useState<Deposit | null>(null);
   const [cashflowOpen, setCashflowOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [reconciliationOpen, setReconciliationOpen] = useState(false);
@@ -65,9 +67,37 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
   const [lossForm] = Form.useForm();
   const [cancelForm] = Form.useForm();
 
+  const openDepositCreate = () => {
+    setDepositEditTarget(null);
+    depositForm.resetFields();
+    depositForm.setFieldsValue({ paid_on: today() });
+    setDepositOpen(true);
+  };
+
+  const openDepositEdit = (target: Deposit) => {
+    setDepositEditTarget(target);
+    depositForm.setFieldsValue({
+      pool_id: target.pool_id,
+      amount: target.paid_amount,
+      paid_on: target.paid_on,
+      counterparty_id: target.counterparty_id ?? undefined,
+      source_order_id: target.source_order_id ?? undefined,
+      expected_release_on: target.expected_release_on ?? undefined,
+      note: target.note ?? undefined,
+    });
+    setDepositOpen(true);
+  };
+
+  const closeDeposit = () => {
+    setDepositOpen(false);
+    setDepositEditTarget(null);
+    depositForm.resetFields();
+  };
+
   const submitDeposit = async (values: Record<string, unknown>) => {
+    const editing = depositEditTarget;
     await write.run(async () => {
-      await depositsApi.create({
+      const payload = {
         pool_id: Number(values.pool_id),
         amount: values.amount as string,
         paid_on: values.paid_on as string,
@@ -75,10 +105,23 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
         source_order_id: values.source_order_id ? Number(values.source_order_id) : undefined,
         expected_release_on: values.expected_release_on as string | undefined,
         note: values.note as string,
-      });
-      appMessage.success("押金占用已登记，不影响经营损益");
-      setDepositOpen(false);
-      depositForm.resetFields();
+      };
+      if (editing) {
+        await depositsApi.update(editing.id, payload);
+        appMessage.success("押金占用已更新");
+      } else {
+        await depositsApi.create(payload);
+        appMessage.success("押金占用已登记，不影响经营损益");
+      }
+      closeDeposit();
+      await load();
+    });
+  };
+
+  const deleteDeposit = async (depositId: number) => {
+    await write.run(async () => {
+      await depositsApi.remove(depositId);
+      appMessage.success("押金占用已删除");
       await load();
     });
   };
@@ -246,6 +289,10 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
   return {
     depositOpen,
     setDepositOpen,
+    depositEditTarget,
+    openDepositCreate,
+    openDepositEdit,
+    closeDeposit,
     cashflowOpen,
     setCashflowOpen,
     transferOpen,
@@ -275,6 +322,7 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
     lossForm,
     cancelForm,
     submitDeposit,
+    deleteDeposit,
     submitReturn,
     submitLoss,
     submitCancelDeposit,

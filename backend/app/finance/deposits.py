@@ -108,6 +108,146 @@ def create_deposit(
     return deposit
 
 
+def _editable_deposit(
+    session: Session,
+    deposit_id: int,
+    *,
+    user: CurrentUser | None = None,
+) -> Deposit:
+    deposit = session.get(Deposit, deposit_id)
+    if deposit is None or (user is not None and not user.can_see_pool(deposit.pool_id)):
+        raise NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
+    if deposit.status != DepositStatus.PAID.value or to_money(deposit.returned_amount) > 0 or to_money(deposit.lost_amount) > 0:
+        raise Validation(
+            "只有未发生退还/损失的押金可编辑或删除",
+            details={
+                "deposit_id": deposit.id,
+                "status": deposit.status,
+                "returned_amount": str(deposit.returned_amount),
+                "lost_amount": str(deposit.lost_amount),
+            },
+        )
+    return deposit
+
+
+def update_deposit(
+    session: Session,
+    deposit_id: int,
+    *,
+    pool_id: int,
+    amount: Any,
+    paid_on: date,
+    actor: str,
+    counterparty_id: int | None = None,
+    source_order_id: int | None = None,
+    expected_release_on: date | None = None,
+    note: str | None = None,
+    form_extra: Mapping[str, Any] | None = None,
+    user: CurrentUser | None = None,
+) -> Deposit:
+    deposit = _editable_deposit(session, deposit_id, user=user)
+    money = _positive(amount, field="amount")
+    if user is not None and not user.can_see_pool(pool_id):
+        raise NotFound("资金池不存在", details={"pool_id": pool_id})
+    pool = assert_pool_usable(session, pool_id)
+    if counterparty_id is not None:
+        assert_counterparty_usable(session, counterparty_id)
+    if source_order_id is not None:
+        try:
+            get_order(session, source_order_id, user)
+        except NotFound as exc:
+            raise NotFound(
+                f"来源订单 {source_order_id} 不存在",
+                details={"source_order_id": source_order_id},
+            ) from exc
+
+    hold = session.scalar(
+        select(Cashflow).where(
+            Cashflow.deposit_id == deposit.id,
+            Cashflow.category == "DEPOSIT_HOLD",
+            Cashflow.direction == Direction.OUT.value,
+        )
+    )
+    if hold is None:
+        raise Validation("押金占用对应流水不存在，无法编辑", details={"deposit_id": deposit.id})
+
+    before = {
+        "pool_id": deposit.pool_id,
+        "amount": str(to_money(deposit.paid_amount)),
+        "paid_on": deposit.paid_on.isoformat(),
+        "counterparty_id": deposit.counterparty_id,
+        "source_order_id": deposit.source_order_id,
+        "expected_release_on": deposit.expected_release_on.isoformat() if deposit.expected_release_on else None,
+        "note": deposit.note,
+    }
+    deposit.pool_id = pool.id
+    deposit.counterparty_id = counterparty_id
+    deposit.source_order_id = source_order_id
+    deposit.paid_amount = money
+    deposit.paid_on = paid_on
+    deposit.expected_release_on = expected_release_on
+    deposit.note = note
+    deposit.updated_by = actor
+    if form_extra is not None:
+        deposit.form_extra = validate_form_extra(session, order_type_code="FUNDDEPOSIT", values=form_extra) or None
+
+    hold.pool_id = pool.id
+    hold.occurred_on = paid_on
+    hold.amount = money
+    hold.order_id = source_order_id
+    hold.updated_by = actor
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.DEPOSIT_UPDATE,
+        entity_type="deposit",
+        entity_id=str(deposit.id),
+        actor=actor,
+        before=before,
+        after={
+            "pool_id": deposit.pool_id,
+            "amount": str(money),
+            "paid_on": paid_on.isoformat(),
+            "counterparty_id": counterparty_id,
+            "source_order_id": source_order_id,
+            "expected_release_on": expected_release_on.isoformat() if expected_release_on else None,
+            "note": note,
+        },
+    )
+    return deposit
+
+
+def delete_deposit(
+    session: Session,
+    deposit_id: int,
+    *,
+    actor: str,
+    user: CurrentUser | None = None,
+) -> None:
+    deposit = _editable_deposit(session, deposit_id, user=user)
+    before = {
+        "pool_id": deposit.pool_id,
+        "amount": str(to_money(deposit.paid_amount)),
+        "paid_on": deposit.paid_on.isoformat(),
+    }
+    flows = list(session.scalars(select(Cashflow).where(Cashflow.deposit_id == deposit.id)).all())
+    if any(flow.category != "DEPOSIT_HOLD" or flow.direction != Direction.OUT.value for flow in flows):
+        raise Validation("押金已产生后续资金流水，不能直接删除", details={"deposit_id": deposit.id})
+    for flow in flows:
+        session.delete(flow)
+    session.delete(deposit)
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.DEPOSIT_DELETE,
+        entity_type="deposit",
+        entity_id=str(deposit_id),
+        actor=actor,
+        before=before,
+        after={"deleted": True},
+    )
+
+
 def return_deposit(
     session: Session,
     deposit_id: int,

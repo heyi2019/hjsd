@@ -60,6 +60,7 @@ beforeEach(() => {
   });
   resolveMock(vi.mocked(depositsApi.list), deposits);
   resolveMock(vi.mocked(cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "500.00" });
+  resolveMock(vi.mocked(cashflowsApi.totals), { total_in: "800.00", total_out: "500.00" });
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(ordersApi.list).mockResolvedValue([]);
 });
@@ -316,6 +317,7 @@ describe("FundsPage：资金写路径", () => {
     await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     await ui.click(await screen.findByRole("button", { name: /新增占用/ }));
     await waitFor(() => expect(screen.getByText("新增押金占用")).toBeInTheDocument());
+    expect(document.querySelector(".deposit-modal")).toBeInTheDocument();
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await pickSelect(modal, 0, /POOL-A/);
     await ui.type(modal.querySelector("#amount") ?? modal, "500.00");
@@ -324,6 +326,33 @@ describe("FundsPage：资金写路径", () => {
     const payload = vi.mocked(depositsApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload.pool_id).toBe(1);
     expect(payload.amount).toBe("500.00");
+  });
+
+  it("未发生释放或损失的押金可编辑并回填", async () => {
+    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00" }] as never);
+    resolveMockOnce(vi.mocked(depositsApi.update), { ...deposits[0], status: "PAID" });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    const row = screen.getByText("#99").closest("tr") as HTMLElement;
+    await ui.click(within(row).getByRole("button", { name: "编辑" }));
+    expect(await screen.findByText("编辑押金占用")).toBeInTheDocument();
+    expect(screen.getByLabelText("占用金额")).toHaveValue("500.00");
+    await ui.click(screen.getByRole("button", { name: "保存修改" }));
+    await waitFor(() => expect(vi.mocked(depositsApi.update)).toHaveBeenCalledWith(11, expect.objectContaining({ amount: "500.00", paid_on: "2026-10-17" })));
+  });
+
+  it("未发生释放或损失的押金可删除并刷新列表", async () => {
+    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00" }] as never);
+    resolveMockOnce(vi.mocked(depositsApi.remove), undefined);
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    const row = screen.getByText("#99").closest("tr") as HTMLElement;
+    await ui.click(within(row).getByRole("button", { name: "删除" }));
+    expect(await screen.findByText("删除押金占用")).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "确认删除" }));
+    await waitFor(() => expect(vi.mocked(depositsApi.remove)).toHaveBeenCalledWith(11));
   });
 
   it("押金释放按 deposit.post 门控：finance 可见、operator 不可见", async () => {

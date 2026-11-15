@@ -16,9 +16,11 @@ from app.finance import schemas
 from app.finance.deposits import (
     cancel_deposit as finance_cancel_deposit,
     create_deposit as finance_create_deposit,
+    delete_deposit as finance_delete_deposit,
     list_deposits as finance_list_deposits,
     lose_deposit as finance_lose_deposit,
     return_deposit as finance_return_deposit,
+    update_deposit as finance_update_deposit,
 )
 
 from .router_output import _actor, _cashflow_out, _deposit_out
@@ -68,6 +70,39 @@ def create_deposit(
         user=user,
     )
     return _deposit_out(item)
+
+
+@router.put("/deposits/{deposit_id}", response_model=schemas.DepositOut)
+def update_deposit(
+    deposit_id: int,
+    payload: schemas.DepositUpdate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_deposit,
+) -> schemas.DepositOut:
+    item = finance_update_deposit(
+        db,
+        deposit_id,
+        pool_id=payload.pool_id,
+        amount=payload.amount,
+        paid_on=payload.paid_on,
+        actor=_actor(user),
+        counterparty_id=payload.counterparty_id,
+        source_order_id=payload.source_order_id,
+        expected_release_on=payload.expected_release_on,
+        note=payload.note,
+        form_extra=payload.form_extra,
+        user=user,
+    )
+    return _deposit_out(item)
+
+
+@router.delete("/deposits/{deposit_id}", status_code=204, response_model=None)
+def delete_deposit(
+    deposit_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_deposit,
+) -> None:
+    finance_delete_deposit(db, deposit_id, actor=_actor(user), user=user)
 
 
 @router.post("/deposits/{deposit_id}/returns", response_model=schemas.DepositOut)

@@ -22,6 +22,10 @@ class DepositCreate(RequestModel):
     form_extra: dict[str, Any] | None = None
 
 
+class DepositUpdate(DepositCreate):
+    """未发生释放/损失的押金允许整体修正，保持占用流水同步。"""
+
+
 
 class DepositReturn(RequestModel):
     amount: Decimal
@@ -153,6 +157,22 @@ class CashflowCreate(RequestModel):
     # 表单字段配置体系（STUDIOEXP 作用域）：自定义字段值落 Cashflow.form_extra。
     form_extra: dict[str, Any] | None = None
     form_extra_scope: str = "FUNDFLOW"
+
+
+class CashflowUpdate(RequestModel):
+    """工作室手工收支直接编辑，不进入审批态。"""
+
+    pool_id: int
+    occurred_on: date
+    direction: str
+    nature: str
+    fund_nature: str | None = None
+    accounting_attribute: str | None = None
+    category: str
+    amount: Decimal
+    note: str | None = None
+    form_extra: dict[str, Any] | None = None
+    form_extra_scope: str = "STUDIOEXP"
 
 
 class CashflowReverse(RequestModel):
@@ -306,6 +326,7 @@ __all__ = [
     "CashflowListOut",
     "StudioSummaryOut",
     "CashflowCreate",
+    "CashflowUpdate",
     "CashflowReverse",
     "ReconciliationCreate",
     "ReconciliationResolve",

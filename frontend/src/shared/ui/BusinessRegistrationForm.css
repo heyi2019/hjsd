@@ -139,6 +139,33 @@
   opacity: 0.6;
 }
 
+/* 押金占用是 7 个字段的小型资金动作：标签单独占一行，避免横向标签把
+   两列控件压窄，也让辅助说明始终贴在对应输入下方。 */
+.deposit-modal .business-registration-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-5);
+}
+.deposit-modal .business-registration-form > .ant-form-item .ant-form-item-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.deposit-modal .business-registration-form > .ant-form-item .ant-form-item-label {
+  width: 100% !important;
+  padding: 0 0 var(--space-1) !important;
+}
+.deposit-modal .business-registration-form > .ant-form-item .ant-form-item-control {
+  width: 100% !important;
+}
+.deposit-modal .business-registration-form > .deposit-modal__note,
+.deposit-modal .business-registration-form > .ant-btn[type="submit"] {
+  grid-column: 1 / -1;
+}
+.deposit-modal .business-registration-form > .ant-btn[type="submit"] {
+  min-height: var(--ui-control-height-lg);
+  font-size: var(--fs-callout);
+}
+
 /* 建单表格的 1/2/3/4 列字段容器标准。 */
 :is(.business-form-layout-1x5, .business-form-layout-2x5, .business-form-layout-3x5, .business-form-layout-4x5, .business-form-layout-build-order) .business-registration-form {
   display: grid;

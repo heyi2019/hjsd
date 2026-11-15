@@ -172,9 +172,10 @@ describe("StudioExpensePanel：工作室支出", () => {
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     await screen.findByText("房租");
 
-    const cardOf = (label: string) => screen.getByText(label).closest(".ui-stat") as HTMLElement;
-    expect(within(cardOf("已入账收入")).getByText("888.88")).toBeInTheDocument();
-    expect(within(cardOf("已入账支出")).getByText("777.77")).toBeInTheDocument();
+    const statRow = document.querySelector(".ui-stat-row") as HTMLElement;
+    const cardOf = (label: string) => within(statRow).getByText(label).closest(".ui-stat") as HTMLElement;
+    expect(within(cardOf("收入")).getByText("888.88")).toBeInTheDocument();
+    expect(within(cardOf("支出")).getByText("777.77")).toBeInTheDocument();
     expect(within(cardOf("净额")).getByText("111.11")).toBeInTheDocument();
   });
 
@@ -200,6 +201,36 @@ describe("StudioExpensePanel：工作室支出", () => {
     for (const label of ["流水号", "来源", "建立时间"]) {
       expect(screen.getByRole("columnheader", { name: label })).toBeInTheDocument();
     }
+    expect(screen.queryByRole("columnheader", { name: "状态" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "冲销" })).not.toBeInTheDocument();
+  });
+
+  it("工作室收支可编辑并回填原记录", async () => {
+    resolveMockOnce(vi.mocked(cashflowsApi.update), { ...expenseFlows[0], amount: "3200.00" });
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("房租");
+    const row = screen.getByText("CF-001").closest("tr") as HTMLElement;
+    await ui.click(within(row).getByRole("button", { name: "编辑" }));
+    expect(await screen.findByText("编辑工作室收支")).toBeInTheDocument();
+    expect(screen.getByLabelText("金额")).toHaveValue("3000.00");
+    await ui.click(screen.getByRole("button", { name: "保存修改" }));
+    await waitFor(() => expect(vi.mocked(cashflowsApi.update)).toHaveBeenCalledWith(51, expect.objectContaining({
+      amount: "3000.00",
+      occurred_on: "2026-10-20",
+      category: "房租",
+    })));
+  });
+
+  it("工作室收支删除需要二次确认", async () => {
+    resolveMockOnce(vi.mocked(cashflowsApi.remove), undefined);
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("房租");
+    const row = screen.getByText("CF-001").closest("tr") as HTMLElement;
+    await ui.click(within(row).getByRole("button", { name: "删除" }));
+    expect(await screen.findByText("删除工作室收支")).toBeInTheDocument();
+    expect(cashflowsApi.remove).not.toHaveBeenCalled();
+    await ui.click(screen.getByRole("button", { name: "确认删除" }));
+    await waitFor(() => expect(vi.mocked(cashflowsApi.remove)).toHaveBeenCalledWith(51));
   });
 
   it("登记支出：提交即入账（OUT / BUSINESS_OUT / OPERATING_EXPENSE）", async () => {

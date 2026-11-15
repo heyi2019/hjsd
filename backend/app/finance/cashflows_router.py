@@ -21,9 +21,11 @@ from app.finance import schemas
 from app.finance.cashflows import (
     cashflow_totals,
     create_cashflow as finance_create_cashflow,
+    delete_cashflow as finance_delete_cashflow,
     list_cashflows as finance_list_cashflows,
     reverse_cashflow as finance_reverse_cashflow,
     studio_summary as finance_studio_summary,
+    update_cashflow as finance_update_cashflow,
 )
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
@@ -301,6 +303,42 @@ def create_order_cashflow(
         user=user,
     )
     return _cashflow_out(db, flow)
+
+
+@router.put("/cashflows/{cashflow_id}", response_model=schemas.CashflowOut)
+def update_cashflow(
+    cashflow_id: int,
+    payload: schemas.CashflowUpdate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_deposit,
+) -> schemas.CashflowOut:
+    flow = finance_update_cashflow(
+        db,
+        cashflow_id,
+        pool_id=payload.pool_id,
+        occurred_on=payload.occurred_on,
+        direction=payload.direction.strip().upper(),
+        nature=payload.nature.strip().upper(),
+        fund_nature=payload.fund_nature.strip().upper() if payload.fund_nature else None,
+        accounting_attribute=payload.accounting_attribute.strip().upper() if payload.accounting_attribute else None,
+        category=payload.category,
+        amount=payload.amount,
+        note=payload.note,
+        form_extra=payload.form_extra,
+        form_extra_scope=payload.form_extra_scope,
+        actor=_actor(user),
+        user=user,
+    )
+    return _cashflow_out(db, flow)
+
+
+@router.delete("/cashflows/{cashflow_id}", status_code=204, response_model=None)
+def delete_cashflow(
+    cashflow_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_deposit,
+) -> None:
+    finance_delete_cashflow(db, cashflow_id, actor=_actor(user), user=user)
 
 
 @router.post("/cashflows/{cashflow_id}/reverse", response_model=schemas.CashflowOut)

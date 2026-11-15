@@ -2,7 +2,7 @@
  *  每个 Tab 通过 controller 消费 useFundsPageController 暴露的状态与处理器，自身只负责列定义与渲染。 */
 import { Card, Input, Space, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { DataTable, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
+import { ConfirmButton, DataTable, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
@@ -167,7 +167,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
   );
 }
 export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
-  const { deposits, setDepositOpen, returnForm, setReturnTarget, lossForm, setLossTarget, cancelForm, setCancelTarget, loading } = ctrl;
+  const { deposits, openDepositCreate, openDepositEdit, deleteDeposit, returnForm, setReturnTarget, lossForm, setLossTarget, cancelForm, setCancelTarget, loading } = ctrl;
   const { arrange: arrangeDepositColumns } = useListViewColumns("DEPOSITS");
   const depositColumns: ColumnsType<Deposit> = [
     { title: "占用金额", dataIndex: "paid_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
@@ -180,10 +180,30 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
     { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="DEPOSIT_STATUS" /> },
     {
       title: "操作",
-      width: 270,
+      width: 360,
       key: "actions",
       render: (_v, row) => (
         <Space size={2}>
+          <PermissionButton
+            permission="deposit.post"
+            size="small"
+            disabled={row.status !== "PAID"}
+            onClick={() => openDepositEdit(row)}
+          >
+            编辑
+          </PermissionButton>
+          <ConfirmButton
+            permission="deposit.post"
+            size="small"
+            danger
+            disabled={row.status !== "PAID"}
+            title="删除押金占用"
+            description="仅未发生释放或损失的押金可以删除，删除后会同步移除对应的占用流水且不可恢复。"
+            okText="确认删除"
+            onConfirm={() => deleteDeposit(row.id)}
+          >
+            删除
+          </ConfirmButton>
           <PermissionButton
             permission="deposit.post"
             size="small"
@@ -218,7 +238,7 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
       className="glass"
       title="押金占用"
       extra={
-        <PermissionButton permission="deposit.post" type="primary" onClick={() => setDepositOpen(true)}>
+        <PermissionButton permission="deposit.post" type="primary" onClick={openDepositCreate}>
           新增占用
         </PermissionButton>
       }

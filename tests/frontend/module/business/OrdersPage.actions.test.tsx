@@ -7,6 +7,7 @@ import { OrdersPage } from "@/orders/OrdersPage";
 import { pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
+import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
 import { installmentsApi } from "@/shared/api/installments.api";
 import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
@@ -24,6 +25,7 @@ import type { ProfitAllocation } from "@/shared/api/types/policy";
 let ui: ReturnType<typeof userEvent.setup>;
 
 vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/orderCashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");
 vi.mock("@/shared/api/misc.api");
@@ -525,7 +527,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("支出")).toBeInTheDocument();
     await clickModalOk(modal);
     await waitFor(() =>
-      expect(cashflowsApi.createForOrder).toHaveBeenCalledWith(
+      expect(orderCashflowsApi.create).toHaveBeenCalledWith(
         1,
         expect.objectContaining({ direction: "OUT", amount: "500", category: "OTHER", pool_id: expect.any(Number) }),
       )
@@ -534,7 +536,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("资金收支：提交失败提示错误并关闭 loading", async () => {
-    vi.mocked(cashflowsApi.createForOrder).mockRejectedValue(new Error("create fail"));
+    vi.mocked(orderCashflowsApi.create).mockRejectedValue(new Error("create fail"));
     await openLedger();
     await openRowMenu("HS-2026-0001", "资金收支");
     const modal = await modalOf(/资金收支 · HS-2026-0001/);
@@ -555,7 +557,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.type(within(modal).getByLabelText("金额"), "100");
     await ui.type(within(modal).getByLabelText("收支备注"), "补登记收入");
     await clickModalOk(modal);
-    await waitFor(() => expect(cashflowsApi.createForOrder).toHaveBeenCalledWith(
+    await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledWith(
       1,
       expect.objectContaining({ direction: "IN", amount: "100", category: "OTHER" }),
     ));

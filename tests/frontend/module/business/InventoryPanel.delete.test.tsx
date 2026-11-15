@@ -7,6 +7,7 @@ import { stocksApi } from "@/shared/api/stocks.api";
 import { setupInventoryPanelMocks } from "@fixtures/InventoryPanel.test.fixtures";
 
 vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/orderCashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");
 vi.mock("@/shared/api/misc.api");

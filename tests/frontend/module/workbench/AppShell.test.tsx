@@ -17,9 +17,11 @@ import userEvent from "@testing-library/user-event";
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cashflowsApi } from "@/shared/api/cashflows.api";
+import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
 import { ordersApi } from "@/shared/api/orders.api";
 import { reportsApi } from "@/shared/api/reports.api";
 vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/orderCashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/deposits.api");
 vi.mock("@/shared/api/installments.api");
@@ -41,7 +43,7 @@ import { MemoryRouter } from "react-router-dom";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
-const __allApi = { cashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, employeesApi, teamsApi, usersApi, policyApi, poolsApi, reconciliationsApi, transfersApi, rebatesApi, auditApi, importsApi, reportsApi, stocksApi };
+const __allApi = { cashflowsApi, orderCashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, employeesApi, teamsApi, usersApi, policyApi, poolsApi, reconciliationsApi, transfersApi, rebatesApi, auditApi, importsApi, reportsApi, stocksApi };
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });

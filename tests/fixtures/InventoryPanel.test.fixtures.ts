@@ -1,5 +1,6 @@
 import { beforeEach, vi } from "vitest";
 import { cashflowsApi } from "@/shared/api/cashflows.api";
+import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
 import { installmentsApi } from "@/shared/api/installments.api";
 import { ordersApi } from "@/shared/api/orders.api";
@@ -82,7 +83,7 @@ export const resetInventoryPanelMocks = () => {
   seedOptionSets();
   resolveMock(vi.mocked(ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(ordersApi.postEvent), {});
-  resolveMock(vi.mocked(cashflowsApi.createForOrder), {});
+  resolveMock(vi.mocked(orderCashflowsApi.create), {});
   resolveMock(vi.mocked(customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
   resolveMock(vi.mocked(poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);

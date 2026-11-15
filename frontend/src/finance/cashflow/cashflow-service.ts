@@ -1,10 +1,10 @@
-import { cashflowsApi } from "../../shared/api/cashflows.api";
+import { orderCashflowsApi } from "../../shared/api/orderCashflows.api";
 import { today } from "../../shared/lib/format";
 import type { CashflowFormValues } from "./types";
 
 export async function createOrderCashflow(orderId: number, values: CashflowFormValues): Promise<void> {
   const direction = values.direction === "IN" ? "IN" : "OUT";
-  await cashflowsApi.createForOrder(orderId, {
+  await orderCashflowsApi.create(orderId, {
     pool_id: values.pool_id,
     occurred_on: (values.occurred_on ?? today()).toString().slice(0, 10),
     direction,

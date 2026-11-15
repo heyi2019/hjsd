@@ -73,6 +73,7 @@ def test_manual_cashflow_gets_default_fund_and_accounting_attributes(
         ("BUSINESS", "SELF_REVENUE"),
         ("BUSINESS", "ADDITIONAL_INCOME"),
         ("BUSINESS", "ADDITIONAL_EXPENSE"),
+        ("BUSINESS", "DG_DIRECT_COST"),
         ("EXTERNAL", "DEPOSIT"),
         ("INTERNAL", "INTERNAL_TRANSFER"),
     ],

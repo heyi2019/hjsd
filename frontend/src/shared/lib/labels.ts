@@ -137,7 +137,8 @@ export const FUND_NATURE_LABEL: Record<string, string> = {
 export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
   SELF_REVENUE: "自营收入",
   SELF_DIRECT_COST: "回收成本",
-  TH_DIRECT_COST: "提号/代挂成本",
+  TH_DIRECT_COST: "提号成本",
+  DG_DIRECT_COST: "代挂成本",
   TH_REVENUE: "提号/代挂收入",
   SERVICE_REVENUE: "增值服务收入",
   ADDITIONAL_INCOME: "附加收入",

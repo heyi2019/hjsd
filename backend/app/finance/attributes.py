@@ -9,6 +9,7 @@ _ALLOWED_ATTRIBUTES_BY_FUND_NATURE: dict[str, frozenset[str]] = {
         AccountingAttribute.SELF_REVENUE.value,
         AccountingAttribute.SELF_DIRECT_COST.value,
         AccountingAttribute.TH_DIRECT_COST.value,
+        AccountingAttribute.DG_DIRECT_COST.value,
         AccountingAttribute.TH_REVENUE.value,
         AccountingAttribute.SERVICE_REVENUE.value,
         AccountingAttribute.ADDITIONAL_INCOME.value,

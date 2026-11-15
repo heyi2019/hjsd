@@ -331,6 +331,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
                     (
                         AccountingAttribute.SELF_DIRECT_COST.value,
                         AccountingAttribute.TH_DIRECT_COST.value,
+                        AccountingAttribute.DG_DIRECT_COST.value,
                     )
                 ),
             )

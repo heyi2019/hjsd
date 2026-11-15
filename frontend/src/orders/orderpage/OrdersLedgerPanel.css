@@ -21,11 +21,12 @@
   border-color: transparent;
 }
 
-/* 订单台账与库存中心保持同一列密度，避免宽屏把字段拉得过松。 */
+/* 订单台账外层贴合容器，横向溢出交给 DataTable 的内容层承载。
+   外层使用 max-content 会在空态/重排时反复撑宽，导致列位置漂移。 */
 @media (min-width: 768px) {
   .orders-ledger .ant-table {
-    width: max-content;
-    min-width: max-content;
+    width: auto;
+    min-width: 0;
   }
 }
 

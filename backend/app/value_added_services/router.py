@@ -115,6 +115,17 @@ def installment_totals(
     )
 
 
+@router.post("/installments/plan", response_model=schemas.SaleInstallmentPlanOut)
+def preview_sale_installment_plan(
+    payload: schemas.SaleInstallmentPlanIn,
+    _user: CurrentUser = manage,
+) -> schemas.SaleInstallmentPlanOut:
+    """计算库存售出的分期金额；前端只展示该服务端结果。"""
+    return schemas.SaleInstallmentPlanOut.model_validate(
+        inst_create.sale_installment_plan(**payload.model_dump())
+    )
+
+
 @router.get("/installments/export.csv")
 def export_installments_csv(
     status: str | None = Query(default=None),

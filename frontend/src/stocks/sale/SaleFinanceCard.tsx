@@ -1,9 +1,9 @@
 import { Input, Radio } from "antd";
+import type { SaleInstallmentPlan } from "../../shared/api/installments.api";
 import type { Pool } from "../../shared/api/types/finance";
 import { AdaptiveFormGrid, MoneyInput, Select } from "../../shared/ui";
 import { CfgItem } from "../../orders/ConfigurableField";
 import { InstallmentScheduleFields } from "../../orders/InstallmentScheduleFields";
-import { lastPeriodAmount, saleInstallmentMismatch, type SaleInstallmentPlan } from "./sale-plan";
 
 export function SaleFinanceCard({
   isConsignment,
@@ -58,7 +58,7 @@ export function SaleFinanceCard({
             <CfgItem name="service_fee" label="分期服务费总额" initialValue="0" rules={[{ validator: async (_, value) => { if (!Number.isFinite(Number(value)) || Number(value) < 0) throw new Error("服务费不能为负数"); } }]}><MoneyInput placeholder="可选填" /></CfgItem>
             <CfgItem name="periods" label="分期期数" initialValue={1} rules={[{ validator: async (_, value) => { if (!Number.isInteger(Number(value)) || Number(value) <= 0) throw new Error("期数必须为正整数"); } }]}><Input inputMode="numeric" placeholder="请输入期数" /></CfgItem>
             <CfgItem name="per_period_service_fee" label="每期服务费" rules={[{ validator: async (_, value) => { if (value !== undefined && value !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) throw new Error("每期服务费必须为非负金额"); } }]}><MoneyInput placeholder="按服务费总额/期数计算" /></CfgItem>
-            <CfgItem name="per_period" label="每期金额" rules={[{ required: true, message: "请输入每期金额" }, { validator: async (_, value) => { if (saleInstallmentMismatch(plan, value)) throw new Error("每期金额与分期总额不匹配"); } }]} extra={plan && perPeriod != null ? `最后一期：${lastPeriodAmount(plan, perPeriod) ?? plan.lastPeriod} 元` : undefined}><MoneyInput placeholder="请输入每期应收" /></CfgItem>
+            <CfgItem name="per_period" label="每期金额" rules={[{ required: true, message: "请输入每期金额" }, { validator: async () => { if (plan?.per_period_matches === false) throw new Error("每期金额与分期总额不匹配"); } }]} extra={plan && perPeriod != null ? `最后一期：${plan.last_period} 元` : undefined}><MoneyInput placeholder="请输入每期应收" /></CfgItem>
             <div className="inventory-sale-plan">
               <div className="inventory-sale-plan__title">分期计划</div>
               <InstallmentScheduleFields name="installment_schedule" />

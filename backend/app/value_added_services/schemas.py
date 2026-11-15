@@ -26,6 +26,27 @@ class InstallmentTotalsOut(BaseModel):
     total_remaining: Decimal
 
 
+class SaleInstallmentPlanIn(RequestModel):
+    sale_amount: Decimal = Field(ge=0)
+    down_payment: Decimal = Field(default=Decimal("0"), ge=0)
+    service_fee: Decimal = Field(default=Decimal("0"), ge=0)
+    periods: int = Field(gt=0)
+    per_period: Decimal | None = Field(default=None, ge=0)
+
+
+class SaleInstallmentPlanOut(BaseModel):
+    principal: Decimal
+    down_payment: Decimal
+    service_fee: Decimal
+    periods: int
+    base_amount: Decimal
+    total_schedule_amount: Decimal
+    per_period: Decimal
+    last_period: Decimal
+    per_period_service_fee: Decimal
+    per_period_matches: bool | None = None
+
+
 class InstallmentCreate(RequestModel):
     order_id: int
     contract_type: str = Field(

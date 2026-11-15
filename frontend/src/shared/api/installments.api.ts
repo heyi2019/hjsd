@@ -3,6 +3,8 @@ import type { Cashflow, Deposit } from "./types/finance";
 import type { Installment, InstallmentCancelResult, InstallmentDisposition, InstallmentScheduleInput, Schedule } from "./types/installments";
 
 export const installmentsApi = {
+  previewSalePlan: (payload: { sale_amount: string; down_payment: string; service_fee: string; periods: number; per_period?: string }) =>
+    api.post<SaleInstallmentPlan>("/installments/plan", payload).then((r) => r.data),
   dispositions: (id: number) => api.get<InstallmentDisposition[]>(`/installments/${id}/dispositions`).then(r => r.data),
   recover: (id: number, data: {occurred_on: string; note: string; form_extra?: Record<string, unknown>}) => api.post<InstallmentDisposition>(`/installments/${id}/recover`, data).then(r => r.data),
   /** 回收转售登记：把已回收账号的新售出订单关联回分期合约（后端只认 resale_order_id）。 */
@@ -50,6 +52,19 @@ export const installmentsApi = {
   deliver: (id: number, payload: { delivery_mode: string; delivered_on: string; note: string; bound_phone?: string; bound_phone_owner?: string; form_extra?: Record<string, unknown> }) =>
     api.post<Installment>(`/installments/${id}/deliver`, payload).then((r) => r.data),
 };
+
+export interface SaleInstallmentPlan {
+  principal: string;
+  down_payment: string;
+  service_fee: string;
+  periods: number;
+  base_amount: string;
+  total_schedule_amount: string;
+  per_period: string;
+  last_period: string;
+  per_period_service_fee: string;
+  per_period_matches: boolean | null;
+}
 
 export const depositsApi = {
   list: (params?: { pool_id?: number }) =>

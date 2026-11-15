@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 from typing import Any
 from pydantic import ValidationError as PydanticValidationError
 from app.core.audit import record_audit
@@ -53,12 +53,50 @@ from app.domain.trade import (
     OrderEvent,
     OrderProfitAllocation,
 )
-
 from ._shared import (
     _add_months,
     _non_negative,
     total_receivable,
 )
+
+
+def sale_installment_plan(
+    *,
+    sale_amount: Any,
+    down_payment: Any = 0,
+    service_fee: Any = 0,
+    periods: int,
+    per_period: Any = None,
+) -> dict[str, Any]:
+    """Calculate the stock-sale installment plan using Decimal money values."""
+    sale = _non_negative(sale_amount, field="sale_amount")
+    down = _non_negative(down_payment, field="down_payment")
+    fee = _non_negative(service_fee, field="service_fee")
+    if periods <= 0:
+        raise Validation("期数必须大于 0", details={"field": "periods", "value": periods})
+    if down > sale:
+        raise Validation("首付不能超过售出金额", details={"field": "down_payment"})
+    base = sale - down
+    total = base + fee
+    suggested = (total / Decimal(periods)).quantize(Decimal("0.01"), rounding=ROUND_CEILING)
+    supplied = None if per_period is None else _non_negative(per_period, field="per_period")
+    effective = suggested if supplied is None else supplied
+    last = total - effective * (periods - 1)
+    return {
+        "principal": sale,
+        "down_payment": down,
+        "service_fee": fee,
+        "periods": periods,
+        "base_amount": base,
+        "total_schedule_amount": total,
+        "per_period": suggested,
+        "last_period": last,
+        "per_period_service_fee": (fee / Decimal(periods)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+        "per_period_matches": None if supplied is None else (
+            supplied * periods >= base and supplied * (periods - 1) <= total
+        ),
+    }
+
 
 def link_recovered_sale(
     session: Session,

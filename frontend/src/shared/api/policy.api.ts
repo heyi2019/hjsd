@@ -30,7 +30,9 @@ export const policyApi = {
       .then((r) => r.data),
   allocations: (orderId: number) =>
     api.get<{ items: ProfitAllocation[]; total: number; order_profit?: string }>(`/orders/${orderId}/profit-allocations`).then((r) => r.data),
-  setAllocations: (orderId: number, items: { user_id?: number | null; role: string; allocation_type?: "BUY" | "SELL" | "OPERATION" | "COMPANY" | null; allocation_rate: string; allocation_amount?: string }[], formExtra?: Record<string, unknown>) =>
+  convertAllocation: (orderId: number, direction: "RATE_TO_AMOUNT" | "AMOUNT_TO_RATE", value: string) =>
+    api.post<{ value: string | null }>(`/orders/${orderId}/profit-allocations/convert`, { direction, value }).then((r) => r.data),
+  setAllocations: (orderId: number, items: { employee_ids?: number[]; user_id?: number | null; role: string; allocation_type?: "BUY" | "SELL" | "OPERATION" | "COMPANY" | "" | null; allocation_rate?: string | null; allocation_amount?: string | null }[], formExtra?: Record<string, unknown>) =>
     api.put<{ items: ProfitAllocation[]; total: number; order_profit?: string }>(`/orders/${orderId}/profit-allocations`, { items, form_extra: formExtra }).then((r) => r.data),
   orderSnapshot: (orderId: number) =>
     api

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -10,15 +11,25 @@ from app.core.schemas import RequestModel
 
 class ProfitAllocationItem(RequestModel):
     user_id: int | None = Field(default=None, gt=0)
+    employee_ids: list[int] = Field(default_factory=list)
     role: str = Field(default="OWNER", min_length=1, max_length=32)
     allocation_type: str | None = Field(default=None, max_length=16)
-    allocation_rate: Decimal = Field(default=Decimal("0"), ge=0)
-    allocation_amount: Decimal = Field(default=Decimal("0"))
+    allocation_rate: Decimal | None = Field(default=Decimal("0"), ge=0)
+    allocation_amount: Decimal | None = Field(default=Decimal("0"))
 
 
 class ProfitAllocationSet(RequestModel):
     items: list[ProfitAllocationItem] = Field(default_factory=list)
     form_extra: dict[str, object] | None = None
+
+
+class ProfitAllocationConvertIn(RequestModel):
+    direction: Literal["RATE_TO_AMOUNT", "AMOUNT_TO_RATE"]
+    value: Decimal
+
+
+class ProfitAllocationConvertOut(BaseModel):
+    value: Decimal | None
 
 
 class ProfitAllocationOut(BaseModel):
@@ -46,6 +57,8 @@ class ProfitAllocationListOut(BaseModel):
 
 __all__ = [
     "ProfitAllocationItem",
+    "ProfitAllocationConvertIn",
+    "ProfitAllocationConvertOut",
     "ProfitAllocationListOut",
     "ProfitAllocationOut",
     "ProfitAllocationSet",

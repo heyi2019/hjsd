@@ -144,3 +144,10 @@ describe("dev user：X-Dev-User 角色切换", () => {
     expect(currentDevUser()).toBe("finance");
   });
 });
+
+describe("API 客户端：仅走本地后端", () => {
+  it("不再暴露云端模式开关", async () => {
+    const clientModule = await import("@/shared/api/client");
+    expect("CLOUD_MODE" in clientModule).toBe(false);
+  });
+});

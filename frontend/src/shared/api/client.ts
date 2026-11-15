@@ -1,11 +1,4 @@
 import axios, { type AxiosAdapter, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
-import { cloudAdapter } from "./cloud/adapter";
-import { isCloudMode } from "./cloud/config";
-
-/** 云端预览模式下，所有 /api/v1 请求改由云适配器承接；其它环境完全走原 FastAPI。 */
-export const CLOUD_MODE = isCloudMode();
-const CLOUD_TRANSPORT_ADAPTER = CLOUD_MODE ? cloudAdapter : undefined;
-if (CLOUD_MODE) document.title = `${document.title} · 云端预览（只读）`;
 
 /** 后端基址：本地联调 8123（8000 被 Docker 占用）；后端绑 0.0.0.0，局域网可直连。 */
 export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8123/api/v1";
@@ -22,7 +15,7 @@ export function setDevUser(user: string): void {
   localStorage.setItem(DEV_USER_KEY, user);
 }
 
-export const api = axios.create({ baseURL: API_BASE, timeout: 15_000, adapter: CLOUD_TRANSPORT_ADAPTER });
+export const api = axios.create({ baseURL: API_BASE, timeout: 15_000 });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -57,7 +50,7 @@ const pending = new Map<string, Promise<CacheEntry>>();
 
 // 纯传输层：复用相同 baseURL 与默认 xhr adapter，但不挂载本项目拦截器，
 // 供缓存层直接发起真实网络请求（避免与缓存拦截器相互递归）。
-const transport = axios.create({ baseURL: API_BASE, timeout: 15_000, adapter: CLOUD_TRANSPORT_ADAPTER });
+const transport = axios.create({ baseURL: API_BASE, timeout: 15_000 });
 
 function buildCacheKey(config: Pick<AxiosRequestConfig, "method" | "url" | "params" | "headers">): string {
   const headers = config.headers;
@@ -84,9 +77,9 @@ async function realSend(config: InternalAxiosRequestConfig): Promise<CacheEntry>
   const cfg: AxiosRequestConfig = {
     ...config,
     headers,
-    // 云模式下必须显式带上云适配器：此处 config 已被缓存层改写成 fake adapter，
-    // 若留 undefined 会回落到 transport 默认的 xhr，重新打到 /api/v1。
-    adapter: CLOUD_TRANSPORT_ADAPTER,
+    // realSend 是缓存层的真实网络出口，不能继承 api 请求上的去重/SWR 临时 adapter，
+    // 否则后台重验会再次进入自身，形成递归。
+    adapter: undefined,
     transformRequest: config.transformRequest,
     transformResponse: config.transformResponse,
   };

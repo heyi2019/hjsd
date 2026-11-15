@@ -6,6 +6,7 @@ import { DataCenterPanel } from "@/reporting/DataCenterPanel";
 import { resolveMock } from "@fixtures/mock-api";
 
 import { ordersApi } from "@/shared/api/orders.api";
+import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reportsApi } from "@/shared/api/reports.api";
 import { stocksApi } from "@/shared/api/stocks.api";
@@ -69,6 +70,7 @@ beforeEach(() => {
     totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
   });
   vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: orders.length, completed_count: 1, active_count: 1 });
+  vi.mocked(cashflowsApi.studioSummary).mockResolvedValue({ items: [], approved_income: "0.00", approved_expense: "0.00", approved_net: "0.00", count: 0 });
   vi.mocked(reportsApi.businessPnl).mockResolvedValue(businessPnl);
   vi.mocked(stocksApi.inventoryCostSummary).mockResolvedValue({ total_cost: "3,500.00" });
 });
@@ -103,6 +105,20 @@ describe("DataCenterPanel：资金总览", () => {
     expect(screen.getByText("利润", { selector: ".ui-stat__label" })).toBeInTheDocument();
     expect(screen.getByText("利润").closest(".ui-stat")?.textContent).toContain("800.00");
     expect(screen.getByText("押金占用", { selector: ".ui-stat__label" })).toBeInTheDocument();
+  });
+
+  it("数据中心展示工作室支出", async () => {
+    vi.mocked(cashflowsApi.studioSummary).mockResolvedValue({
+      items: [],
+      approved_income: "100.00",
+      approved_expense: "88.80",
+      approved_net: "11.20",
+      count: 2,
+    });
+    renderLight(<DataCenterPanel range={{ params: { from: "2026-11-01", to: "2026-11-15" }, picker: null }} />, { user: "admin" });
+    await screen.findByText("工作室支出", { selector: ".ui-stat__label" });
+    expect(screen.getByText("工作室支出").closest(".ui-stat")?.textContent).toContain("88.80");
+    expect(vi.mocked(cashflowsApi.studioSummary)).toHaveBeenLastCalledWith({ occurred_from: "2026-11-01", occurred_to: "2026-11-15" });
   });
 
   it("统计卡展示库存账号占用的在途成本", async () => {

@@ -52,7 +52,6 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
           { label: "自有权益合计", amount: totalOwned },
         ]}
       />
-      <Typography.Text type="secondary">自有权益仅计归属为「自有」的池</Typography.Text>
       <DataTable<Pool>
         columns={arrangeFundPoolColumns(poolColumns)}
         rows={pools}

@@ -3,6 +3,7 @@
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
+import { cashflowsApi } from "../shared/api/cashflows.api";
 import { ordersApi } from "../shared/api/orders.api";
 import { poolsApi } from "../shared/api/pools.api";
 import { reportsApi } from "../shared/api/reports.api";
@@ -37,6 +38,7 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
   const [orderSummary, setOrderSummary] = useState<{ total_count: number; active_count: number } | null>(null);
   const [businessPnl, setBusinessPnl] = useState<BusinessPnlReport | null>(null);
   const [inventoryCost, setInventoryCost] = useState<string | null>(null);
+  const [studioExpense, setStudioExpense] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
 
@@ -59,6 +61,11 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
         ? { from: range.params.from, to: range.params.to }
         : undefined;
       setBusinessPnl(await reportsApi.businessPnl(reportParams));
+      const studioSummary = await cashflowsApi.studioSummary({
+        occurred_from: range?.params.from,
+        occurred_to: range?.params.to,
+      });
+      setStudioExpense(studioSummary.approved_expense);
       const inventorySummary = await stocksApi.inventoryCostSummary({
         entry_date_from: range?.params.from,
         entry_date_to: range?.params.to,
@@ -85,6 +92,7 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
   const totalDeposit = pools === null ? "不可用" : balanceTotals?.deposit_held ?? "—";
   const totalInventoryCost = inventoryCost ?? (pools === null ? "不可用" : "—");
   const totalProfit = businessPnl?.total.main_profit ?? (pools === null ? "不可用" : "—");
+  const totalStudioExpense = studioExpense ?? (pools === null ? "不可用" : "—");
 
   const orderCardsUnavailable = orderSummary === null;
 
@@ -162,6 +170,7 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
           { label: "押金占用", amount: totalDeposit },
           { label: "在途成本", amount: totalInventoryCost },
           { label: "利润", amount: totalProfit, tone: "auto" },
+          { label: "工作室支出", amount: totalStudioExpense },
         ]}
       />
       <StatRow

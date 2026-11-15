@@ -320,8 +320,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     // 两池现金头寸各 800.00，但只有 OWNED 的 POOL-A 计入 → 服务端给出 800.00。
     const card = screen.getByText("自有权益合计").closest(".ui-stat");
     expect(within(card as HTMLElement).getByText("800.00")).toBeInTheDocument();
-    // 口径说明：CUSTODY/THIRD_PART 只计头寸不计权益。
-    expect(screen.getByText(/自有权益仅计归属为「自有」的池/)).toBeInTheDocument();
+    expect(screen.queryByText(/自有权益仅计归属为「自有」的池/)).not.toBeInTheDocument();
   });
 
   it("对账差异核销提交调用 reconciliationsApi.resolve", async () => {

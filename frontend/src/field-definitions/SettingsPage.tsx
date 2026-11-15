@@ -31,6 +31,7 @@ const SETTINGS_TAB_ORDER = [
   "users",
   "teams",
   "config-audit",
+  "audit",
   "appearance",
 ] as const;
 

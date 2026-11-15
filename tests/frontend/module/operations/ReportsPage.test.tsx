@@ -82,6 +82,22 @@ describe("ReportsPage：经营中心报表", () => {
     expect(vi.mocked(poolsApi.list)).not.toHaveBeenCalled();
   });
 
+  it("经营报表的日期筛选与统计卡之间保留纵向间距", async () => {
+    renderLight(<ReportsPage />, { user: "admin" });
+
+    const expectSpacedFilterBar = () => {
+      expect(document.querySelector(".ui-filter-bar")).toHaveClass("ui-filter-bar--spaced");
+    };
+
+    await screen.findByRole("tab", { name: "月度损益" });
+    expectSpacedFilterBar();
+
+    for (const label of ["分润对账", "业务损益"]) {
+      await ui.click(screen.getByRole("tab", { name: label }));
+      await waitFor(expectSpacedFilterBar);
+    }
+  });
+
   it("我的收益只加载当前登录用户的分润记录", async () => {
     renderLight(<ReportsPage initialReportTab="my-earnings" />, { user: "admin" });
     const commissionTab = await screen.findByRole("tab", { name: "分润对账" });
@@ -138,9 +154,18 @@ describe("ReportsPage：经营中心报表", () => {
   it("六个 Tab 齐全（四类经营报表 + 订单利润 + 数据中心）", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "月度损益" });
+    expect(Array.from(screen.getAllByRole("tab")).map((tab) => tab.textContent)).toEqual([
+      "数据中心",
+      "订单利润",
+      "分润对账",
+      "月度损益",
+      "资金日报",
+      "业务损益",
+    ]);
     for (const label of ["月度损益", "分润对账", "资金日报", "业务损益", "订单利润", "数据中心"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
+    expect(screen.queryByRole("tab", { name: "审计记录" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "库存 R1" })).not.toBeInTheDocument();
   });
 

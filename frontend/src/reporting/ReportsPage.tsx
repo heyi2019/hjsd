@@ -2,7 +2,6 @@
  * 各报表视图拆到 ./reports/*.tsx（导出按钮在各自页内），本文件只留 Tab 壳。 */
 import { Input, Space, Tabs } from "antd";
 import { useEffect, useState } from "react";
-import { AuditPanel } from "../audit/AuditPanel";
 import { DataCenterPanel } from "./DataCenterPanel";
 import { BusinessPnl } from "./reports/BusinessPnlReport";
 import { Commission } from "./reports/CommissionReport";
@@ -35,13 +34,12 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
     ),
   };
   const tabItems = [
-    { key: "r2", label: "月度损益", render: () => <MonthlyPnl range={reportRange} /> },
+    { key: "data-center", label: "数据中心", render: () => <DataCenterPanel onNavigate={onNavigate} /> },
+    { key: "profit", label: "订单利润", render: () => <OrderProfit range={reportRange} /> },
     { key: "r3", label: "分润对账", render: () => <Commission range={reportRange} mine={myEarnings} /> },
+    { key: "r2", label: "月度损益", render: () => <MonthlyPnl range={reportRange} /> },
     { key: "r4", label: "资金日报", render: () => <DailyFunds /> },
     { key: "r5", label: "业务损益", render: () => <BusinessPnl range={reportRange} /> },
-    { key: "profit", label: "订单利润", render: () => <OrderProfit range={reportRange} /> },
-    { key: "data-center", label: "数据中心", render: () => <DataCenterPanel onNavigate={onNavigate} /> },
-    { key: "audit", label: "审计记录", render: () => <AuditPanel /> },
   ];
 
   return (

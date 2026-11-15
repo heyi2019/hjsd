@@ -60,7 +60,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
   return (
     <Card className="glass" title={mine ? "我的收益" : "分润对账"}>
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      <Space className="ui-filter-bar">
+      <Space className="ui-filter-bar ui-filter-bar--spaced">
         {!mine ? (
           <Select
             value={selectedUserId}

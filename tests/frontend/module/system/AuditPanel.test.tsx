@@ -32,6 +32,18 @@ beforeEach(() => {
 });
 
 describe("AuditPanel：审计记录", () => {
+  it("使用公共日期控件，并按字段语义控制筛选宽度", async () => {
+    renderLight(<AuditPanel />, { user: "admin" });
+
+    const filterBar = document.querySelector(".audit-filter-bar");
+    expect(filterBar).toBeInTheDocument();
+    expect(filterBar?.querySelectorAll(".audit-filter-select")).toHaveLength(2);
+    expect(screen.getByPlaceholderText("对象编号")).toHaveClass("audit-filter-input");
+    expect(screen.getByPlaceholderText("操作人")).toHaveClass("audit-filter-input");
+    expect(screen.getByLabelText("审计开始日期").closest(".ant-picker")).toHaveClass("audit-filter-date");
+    expect(screen.getByLabelText("审计结束日期").closest(".ant-picker")).toHaveClass("audit-filter-date");
+  });
+
   it("加载并展示审计行", async () => {
     renderLight(<AuditPanel />, { user: "admin" });
     expect(await screen.findByText("admin")).toBeInTheDocument();

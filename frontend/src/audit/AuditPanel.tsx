@@ -1,5 +1,6 @@
 /** 审计查询：按对象、动作、操作人、时间追溯操作记录，数据范围由后端权限控制。 */
 import { Card, Input } from "antd";
+import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { auditApi } from "../shared/api/reports.api";
@@ -13,7 +14,8 @@ import { useListViewColumns } from "../shared/lib/listColumns";
 /** 词典未加载时的回落值，与改造前硬编码一致。 */
 const ENTITY_TYPE_FALLBACK = Object.entries(ENTITY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 const ACTION_FALLBACK = Object.entries(AUDIT_ACTION_LABEL).map(([value, label]) => ({ value, label }));
-import { DataTable, ErrorBanner, Select } from "../shared/ui";
+import { DataTable, DateField, ErrorBanner, Select } from "../shared/ui";
+import "./AuditPanel.css";
 
 export function AuditPanel() {
   const entityTypeOptions = useOptionSet("ENTITY_TYPE") ?? ENTITY_TYPE_FALLBACK;
@@ -60,29 +62,43 @@ export function AuditPanel() {
     <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Card className="glass" title="审计记录">
-        <div className="ui-filter-bar">
+        <div className="ui-filter-bar audit-filter-bar">
           <Select
             allowClear
             showSearch
             placeholder="对象类型"
+            className="audit-filter-select"
             value={entityType || undefined}
             onChange={(value) => setEntityType(value ?? "")}
             options={entityTypeOptions}
           />
-          <Input placeholder="对象编号" value={entityId} onChange={(event) => setEntityId(event.target.value)} onPressEnter={() => void load()} />
+          <Input className="audit-filter-input" placeholder="对象编号" value={entityId} onChange={(event) => setEntityId(event.target.value)} onPressEnter={() => void load()} />
           <Select
             allowClear
             showSearch
             placeholder="动作"
+            className="audit-filter-select"
             value={action || undefined}
             onChange={(value) => setAction(value ?? "")}
             options={actionOptions.length > 0
               ? actionOptions.map((value) => ({ value, label: configurableLabel("AUDIT_ACTION", value, AUDIT_ACTION_LABEL) }))
               : ACTION_FALLBACK}
           />
-          <Input placeholder="操作人" value={actor} onChange={(event) => setActor(event.target.value)} onPressEnter={() => void load()} />
-          <Input aria-label="审计开始日期" placeholder="开始日期" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-          <Input aria-label="审计结束日期" placeholder="结束日期" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+          <Input className="audit-filter-input" placeholder="操作人" value={actor} onChange={(event) => setActor(event.target.value)} onPressEnter={() => void load()} />
+          <DateField
+            className="audit-filter-date"
+            aria-label="审计开始日期"
+            placeholder="开始日期"
+            value={fromDate ? dayjs(fromDate) : null}
+            onChange={(value) => setFromDate(value?.format("YYYY-MM-DD") ?? "")}
+          />
+          <DateField
+            className="audit-filter-date"
+            aria-label="审计结束日期"
+            placeholder="结束日期"
+            value={toDate ? dayjs(toDate) : null}
+            onChange={(value) => setToDate(value?.format("YYYY-MM-DD") ?? "")}
+          />
         </div>
         <DataTable<AuditLogRow> columns={arrangeColumns(columns)} rows={rows} page={1} pageSize={20} total={rows.length} emptyText="暂无审计记录" onPageChange={() => undefined}/>
       </Card>

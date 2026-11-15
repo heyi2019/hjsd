@@ -10,6 +10,6 @@ export const dateValueProps = (value: unknown) => ({
 export const dateValueFromEvent = (value: Dayjs | null) => value?.format("YYYY-MM-DD") ?? undefined;
 
 export function DateField(props: DatePickerProps) {
-  const { format = "YYYY-MM-DD", ...rest } = props;
-  return <DatePicker {...rest} format={format} className="ui-control-full" />;
+  const { format = "YYYY-MM-DD", className, ...rest } = props;
+  return <DatePicker {...rest} format={format} className={["ui-control-full", className].filter(Boolean).join(" ")} />;
 }

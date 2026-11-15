@@ -26,6 +26,7 @@ import { UsersPanel } from "../../users/UsersPanel";
 import { AppearancePanel } from "../../app/AppearancePanel";
 import { ImportWorkbench } from "../../imports/ImportWorkbench";
 import { BusinessReminderSettingsPanel } from "./BusinessReminderSettingsPanel";
+import { AuditPanel } from "../../audit/AuditPanel";
 
 export type PanelRenderer = (navigate: (key: string) => void) => ReactElement;
 
@@ -52,5 +53,6 @@ export const PANEL_REGISTRY: Record<string, PanelRenderer> = {
   "users": () => <UsersPanel />,
   "teams": () => <TeamsPanel />,
   "config-audit": () => <ConfigAuditPanel />,
+  "audit": () => <AuditPanel />,
   "appearance": () => <AppearancePanel />,
 };

@@ -128,7 +128,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
         rowKey={(row) => `${row.id}:${row.account.id}`}
         page={page}
         pageSize={pageSize}
-        total={controller.visibleRows.length}
+        total={controller.totalCount}
         controlledPaging
         expandable={{
           expandedRowKeys: expandedOrderIds,

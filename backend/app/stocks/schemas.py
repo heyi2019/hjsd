@@ -149,6 +149,20 @@ class InventoryStatsOut(BaseModel):
     over_30d_count: int
 
 
+class InventoryLedgerItemOut(BaseModel):
+    account: AccountOut
+    order: dict[str, object]
+
+
+class InventoryLedgerOut(BaseModel):
+    items: list[InventoryLedgerItemOut]
+    total: int
+    facet_total: int
+    type_counts: dict[str, int]
+    game_types: list[str]
+    stats: InventoryStatsOut
+
+
 class DashboardInventorySummaryOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -165,5 +179,7 @@ __all__ = [
     "AccountInventoryOut",
     "InventoryResponseOut",
     "InventoryCostSummaryOut",
+    "InventoryLedgerItemOut",
+    "InventoryLedgerOut",
     "DashboardInventorySummaryOut",
 ]

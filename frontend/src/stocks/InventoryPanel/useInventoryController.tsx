@@ -43,6 +43,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   countInventoryRows,
   visibleRows,
   orderedRows,
+  totalCount,
+  setTotalCount,
   handleExport,
   exporting,
   locallyRemovedIdsRef,
@@ -76,6 +78,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
         Object.entries(current).map(([orderId, cached]) => cached.account.id === accountId ? [orderId, detail] : [orderId, cached]),
       ));
       setRows((current) => current.map((row) => row.account.id === accountId ? mergeInventoryAccount(row, detail.account) : row));
+      void load();
     },
   });
   const {
@@ -100,7 +103,12 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
   const actions = useInventoryActions({
     load, setRows, setError,
     executionDetails, setExecutionDetails, loadExecution, loadOrderExecution, loadEditorExecution, dropExecutionCache,
-    expandTo, expandedOrderIds, removeFromInventory,
+    expandTo, expandedOrderIds,
+    removeFromInventory: (accountId, orderId) => {
+      const wasVisible = rows.some((row) => row.account.id === accountId);
+      removeFromInventory(accountId, orderId);
+      if (wasVisible) setTotalCount((current) => Math.max(0, current - 1));
+    },
     editorOpenEditor: orderDetailEditor.openEditor,
     editorCancelInlineEdit: orderDetailEditor.cancelInlineEdit,
     inlineEditId,
@@ -202,6 +210,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     openProfile,
     openVoid,
     orderedRows,
+    totalCount,
     page,
     pageSize,
     platformOffsaleTarget,

@@ -151,7 +151,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
         items={[
           { label: "总收入", amount: cashflowUnavailable ? "不可用" : totalFlowIncome },
           { label: "总支出", amount: cashflowUnavailable ? "不可用" : totalFlowExpense },
-          { label: "当前结果", kind: "count", amount: cashflowUnavailable ? "不可用" : visibleCashflows.length },
+          { label: "当前结果", kind: "count", amount: cashflowUnavailable ? "不可用" : cashflowTotal },
         ]}
       />
       <DataTable<Cashflow>

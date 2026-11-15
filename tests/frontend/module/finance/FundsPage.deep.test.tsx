@@ -58,7 +58,7 @@ beforeEach(() => {
   // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
   resolveMock(vi.mocked(poolsApi.balances), {
     items: pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
-    totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
+    totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
   });
   resolveMock(vi.mocked(depositsApi.list), deposits);
   // 合计由服务端返回，桩里同步给出，避免卡片落回 0.00。
@@ -313,7 +313,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
         { ...balance, pool_id: 1, pool_code: "POOL-A" },
         { ...balance, pool_id: 2, pool_code: "POOL-B" },
       ],
-      totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "800.00" },
+      totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "800.00" },
     });
     renderLight(<FundsPage />, { user: "admin" });
     expect(await screen.findByText("自有权益合计")).toBeInTheDocument();

@@ -175,7 +175,7 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
       />
       <StatRow
         items={[
-          { label: "资金池数量", kind: "count", amount: pools === null ? "不可用" : String(pools.length) },
+          { label: "资金池数量", kind: "count", amount: balanceTotals === null ? "不可用" : String(balanceTotals.pool_count) },
         ]}
       />
 

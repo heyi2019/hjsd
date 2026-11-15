@@ -181,6 +181,7 @@ def pool_balance_summary(
     }
     zero = Decimal("0.00")
     totals = {
+        "pool_count": len(visible),
         "cash_balance": sum((item["cash_balance"] for item in items), zero),
         "available": sum((item["available"] for item in items), zero),
         "deposit_held": sum((item["deposit_held"] for item in items), zero),

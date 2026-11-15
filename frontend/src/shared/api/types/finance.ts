@@ -26,6 +26,7 @@ export interface PoolBalance {
 
 /** 资金池余额汇总：由服务端聚合，前端只展示，不再本地累加。 */
 export interface PoolBalanceTotals {
+  pool_count: number;
   cash_balance: string;
   available: string;
   deposit_held: string;

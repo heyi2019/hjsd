@@ -76,7 +76,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
       {mine ? <Note>仅展示当前登录用户在分润配置中获得的收益。</Note> : null}
       <StatRow
         items={[
-          { label: mine ? "收益订单数" : "订单数", kind: "count", amount: String(data?.order_groups.length ?? 0) },
+          { label: mine ? "收益订单数" : "订单数", kind: "count", amount: String(data?.total.order_count ?? 0) },
           { label: mine ? "我的收益" : "分润合计", amount: data?.total.profit_base ?? "-" },
         ]}
       />
@@ -86,7 +86,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
          loading={loading}
          page={1}
          pageSize={10}
-         total={orderRows.length}
+         total={data?.total.order_count ?? 0}
          rowKey="order_id"
          expandable={{
            expandedRowRender: (row) => (

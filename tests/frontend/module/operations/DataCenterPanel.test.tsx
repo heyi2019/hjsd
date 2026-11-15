@@ -67,7 +67,7 @@ beforeEach(() => {
   // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
   resolveMock(vi.mocked(poolsApi.balances), {
     items: pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
-    totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
+    totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
   });
   vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: orders.length, completed_count: 1, active_count: 1 });
   vi.mocked(cashflowsApi.studioSummary).mockResolvedValue({ items: [], approved_income: "0.00", approved_expense: "0.00", approved_net: "0.00", count: 0 });
@@ -221,7 +221,7 @@ describe("DataCenterPanel：业务入口卡（2026-10-13 从工作台迁入）",
     // 数据中心改为一次批量取余额（含服务端汇总），空池时给空 items + 零合计。
     vi.mocked(poolsApi.balances).mockResolvedValueOnce({
       items: [],
-      totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
+      totals: { pool_count: 0, cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
     });
     vi.mocked(ordersApi.summary).mockResolvedValueOnce({ total_count: 3, completed_count: 1, active_count: 2 });
     const onNavigate = vi.fn();

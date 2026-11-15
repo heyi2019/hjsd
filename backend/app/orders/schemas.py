@@ -469,6 +469,7 @@ class PoolBalanceOut(BaseModel):
 class PoolBalanceTotalsOut(BaseModel):
     """资金池余额汇总：服务端按 Decimal 聚合，前端只展示不再自己累加。"""
 
+    pool_count: int
     cash_balance: Decimal
     # 可用余额 = 现金余额；押金占用已在 expense 扣过一次，不再二次减 deposit_held。
     available: Decimal

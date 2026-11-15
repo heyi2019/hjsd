@@ -291,9 +291,8 @@ describe("FundsPage：资金流水", () => {
     expect(screen.getByText("总支出").closest(".ui-stat")).toHaveTextContent("87,654.32");
   });
 
-  it("本地收窄合计走整数分，1.005 + 0.005 不丢末位", async () => {
-    // 修复 #17：本地即时收窄的合计必须用 money.ts 的 toCents/fromCents，
-    // 浮点直接相加会把 1.005+0.005 算成 1.01（少 1 分），整数分得 1.02。
+  it("流水合计完全由服务端汇总，不按本地收窄重算", async () => {
+    // 1.005 + 0.005 的展示口径由服务端 Decimal 汇总决定；前端不再按当前已加载行二次运算。
     const rows = [
       { ...cashflows[1], id: 21, amount: "1.005", order_no: "SE-A", direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
       { ...cashflows[1], id: 22, amount: "0.005", order_no: "SE-B", direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
@@ -306,10 +305,10 @@ describe("FundsPage：资金流水", () => {
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     // 关键词 "SE" 本地收窄出两条 IN（SE-A / SE-B），排除 BUY-C；
-    // total=3 已全部加载 → 走本地求和，必须按整数分得 1.02 而非浮点的 1.01。
+    // 即便当前页面已加载全部 3 条，合计仍使用服务端返回的 1.01。
     await ui.type(screen.getByLabelText("流水搜索"), "SE");
     expect(screen.queryByText("BUY-C")).not.toBeInTheDocument();
-    expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("1.02");
+    expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("1.01");
   });
 });
 

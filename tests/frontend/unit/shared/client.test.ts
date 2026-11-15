@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import {
   api,
   DEV_USER_KEY,
@@ -106,6 +106,17 @@ describe("checkBackendHealth：启动前置检查", () => {
 });
 
 describe("changePassword：会话操作超时边界", () => {
+  it("改密要求传入当前密码字符串，不保留旧的空值兼容", () => {
+    expectTypeOf(changePassword).parameter(0).toEqualTypeOf<string>();
+  });
+
+  it("缺少当前密码时立即拒绝且不发送请求", async () => {
+    const request = vi.spyOn(api, "post").mockResolvedValue({ data: undefined } as never);
+    await expect(changePassword("" as never, "new-pass-123")).rejects.toThrow("当前密码不能为空");
+    expect(request).not.toHaveBeenCalled();
+    request.mockRestore();
+  });
+
   it("改密请求使用 5 秒超时，避免错误旧密码长时间卡在 loading", async () => {
     const request = vi.spyOn(api, "post").mockResolvedValue({ data: undefined } as never);
     await changePassword("old-pass", "new-pass-123");

@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { type AxiosAdapter, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 import { cloudAdapter } from "./cloud/adapter";
 import { isCloudMode } from "./cloud/config";
 
@@ -48,7 +48,7 @@ const GET_CACHE_MAX_STALE_MS = 30_000;
 interface CacheEntry {
   data: unknown;
   status: number;
-  headers: unknown;
+  headers: AxiosResponse["headers"];
   expireAt: number;
 }
 
@@ -59,21 +59,19 @@ const pending = new Map<string, Promise<CacheEntry>>();
 // 供缓存层直接发起真实网络请求（避免与缓存拦截器相互递归）。
 const transport = axios.create({ baseURL: API_BASE, timeout: 15_000, adapter: CLOUD_TRANSPORT_ADAPTER });
 
-function buildCacheKey(config: { method?: string; url?: string; params?: unknown; headers?: Record<string, unknown> }): string {
-  const headers = (config.headers as Record<string, unknown>) || {};
+function buildCacheKey(config: Pick<AxiosRequestConfig, "method" | "url" | "params" | "headers">): string {
+  const headers = config.headers;
   const auth =
-    (headers.Authorization as string) ||
-    (headers["X-Dev-User"] as string) ||
-    (typeof (headers as { get?: (k: string) => unknown }).get === "function"
-      ? ((headers as { get: (k: string) => unknown }).get("Authorization") as string) ||
-        ((headers as { get: (k: string) => unknown }).get("X-Dev-User") as string)
-      : "") ||
+    (headers instanceof axios.AxiosHeaders
+      ? headers.get("Authorization") || headers.get("X-Dev-User")
+      : ((headers as Record<string, unknown> | undefined)?.Authorization as string | undefined) ||
+        ((headers as Record<string, unknown> | undefined)?.["X-Dev-User"] as string | undefined)) ||
     "";
   const params = config.params ? JSON.stringify(config.params) : "";
   return `${String(config.method || "get").toUpperCase()} ${auth} ${config.url ?? ""} ${params}`;
 }
 
-async function realSend(config: any): Promise<CacheEntry> {
+async function realSend(config: InternalAxiosRequestConfig): Promise<CacheEntry> {
   // transport 复用 baseURL + xhr adapter 但**不挂载本项目拦截器**，
   // 因此 GET 请求在缓存拦截器（注册在后、先执行）抢先发出时，
   // api 的鉴权拦截器（注册在前、后执行）尚未注入 X-Dev-User，
@@ -83,7 +81,7 @@ async function realSend(config: any): Promise<CacheEntry> {
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   else headers.set("X-Dev-User", currentDevUser());
-  const cfg = {
+  const cfg: AxiosRequestConfig = {
     ...config,
     headers,
     // 云模式下必须显式带上云适配器：此处 config 已被缓存层改写成 fake adapter，
@@ -96,11 +94,18 @@ async function realSend(config: any): Promise<CacheEntry> {
   return { data: resp.data, status: resp.status, headers: resp.headers, expireAt: Date.now() + GET_CACHE_TTL_MS };
 }
 
-function fakeResponse(entry: CacheEntry): any {
-  return { data: entry.data, status: entry.status, statusText: "OK", headers: entry.headers, config: {}, request: {} };
+function fakeResponse(entry: CacheEntry): AxiosResponse {
+  return {
+    data: entry.data,
+    status: entry.status,
+    statusText: "OK",
+    headers: entry.headers,
+    config: { headers: new axios.AxiosHeaders() } as InternalAxiosRequestConfig,
+    request: {},
+  };
 }
 
-function dedupAdapter(key: string, config: any): any {
+function dedupAdapter(key: string, config: InternalAxiosRequestConfig): AxiosAdapter {
   return async () => {
     const p = pending.get(key);
     if (!p) {
@@ -111,7 +116,7 @@ function dedupAdapter(key: string, config: any): any {
   };
 }
 
-function swrAdapter(key: string, config: any): any {
+function swrAdapter(key: string, config: InternalAxiosRequestConfig): AxiosAdapter {
   return async () => {
     const cached = responseCache.get(key)!;
     // 前台立即返回陈旧值；后台静默重验，失败则保留旧值
@@ -122,7 +127,7 @@ function swrAdapter(key: string, config: any): any {
   };
 }
 
-api.interceptors.request.use((config: any) => {
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const method = String(config.method || "get").toUpperCase();
   if (method !== "GET") return config; // 写操作不参与缓存，仅触发失效（见响应拦截器）
   const key = buildCacheKey(config);
@@ -173,8 +178,9 @@ export async function checkBackendHealth(): Promise<void> {
   await api.get("/health", { timeout: 3_000 });
 }
 
-export async function changePassword(oldPassword: string | null, newPassword: string): Promise<void> {
-  const body = { old_password: oldPassword ?? "", new_password: newPassword };
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  if (!oldPassword.trim()) throw new Error("当前密码不能为空");
+  const body = { old_password: oldPassword, new_password: newPassword };
   // 会话安全操作不能沿用普通请求的 15 秒等待；失败或旧密码错误时应尽快回到可重试状态。
   await api.post("/auth/change-password", body, { timeout: 5_000 });
 }
@@ -189,7 +195,7 @@ export async function logout(): Promise<void> {
 let lastNetworkFailure: { url: string; reason: string } | null = null;
 
 api.interceptors.response.use(
-  (response: any) => {
+  (response: AxiosResponse) => {
     lastNetworkFailure = null;
     // 任何写操作成功后清空 GET 缓存，保证建单/取消后再次读取立即可见最新数据
     const method = String(response.config?.method || "get").toUpperCase();

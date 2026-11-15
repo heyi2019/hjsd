@@ -45,7 +45,11 @@ from app.orders.links import (
 )
 from app.orders.mutations import update_order as orders_update_order
 from app.orders.pools import pool_balance as orders_pool_balance, pool_balance_summary
-from app.orders.queries import count_orders, list_orders as orders_list_orders
+from app.orders.queries import (
+    count_orders,
+    list_orders as orders_list_orders,
+    order_status_counts,
+)
 
 from .router_output import (
     _actor,
@@ -139,13 +143,23 @@ def list_orders(
 @router.get("/orders/summary", response_model=schemas.OrderSummaryOut)
 def order_summary(
     mine: bool = Query(default=False),
+    trade_date_from: date | None = Query(default=None),
+    trade_date_to: date | None = Query(default=None),
     db: Session = Depends(get_db),
     user: CurrentUser = read_orders,
 ) -> schemas.OrderSummaryOut:
-    """工作台订单卡片：按当前用户可见范围聚合总量与完成量。"""
+    """工作台与数据中心订单卡片：按可见范围、日期和状态汇总。"""
+    counts = order_status_counts(
+        db,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        user=user,
+        mine=mine,
+    )
     return schemas.OrderSummaryOut(
-        total_count=count_orders(db, user=user, mine=mine),
-        completed_count=count_orders(db, status=OrderStatus.COMPLETED.value, user=user, mine=mine),
+        total_count=sum(counts.values()),
+        completed_count=counts.get(OrderStatus.COMPLETED.value, 0),
+        active_count=counts.get(OrderStatus.ACTIVE.value, 0) + counts.get(OrderStatus.INSTALLMENT.value, 0),
     )
 
 

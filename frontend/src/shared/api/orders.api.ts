@@ -50,8 +50,8 @@ export type OrderExecutionEditPayload = {
 };
 
 export const ordersApi = {
-  summary: (params?: { mine?: boolean }) =>
-    api.get<{ total_count: number; completed_count: number }>("/orders/summary", { params }).then((r) => r.data),
+  summary: (params?: { mine?: boolean; trade_date_from?: string; trade_date_to?: string }) =>
+    api.get<{ total_count: number; completed_count: number; active_count: number }>("/orders/summary", { params }).then((r) => r.data),
   // 自动翻页取全量：后端 GET /orders 默认 limit=100、max=500，调用方不传 limit 时
   // 只会取到前 100 单，导致订单列表/聚合缺失数据（dev 库 627 单只取 100 的数据完整性缺口）。
   // 仅在未显式传入 limit 时自动翻页（每页 500，最多 50 页=25k 上限防意外死循环）；

@@ -8,7 +8,6 @@ import { poolsApi } from "../shared/api/pools.api";
 import { reportsApi } from "../shared/api/reports.api";
 import { stocksApi } from "../shared/api/stocks.api";
 import type { Pool, PoolBalance, PoolBalanceTotals } from "../shared/api/types/finance";
-import type { Order } from "../shared/api/types/orders";
 import type { BusinessPnlReport } from "../shared/api/types/reporting";
 import { normalizeError } from "../shared/api/client";
 import { useListViewColumns } from "../shared/lib/listColumns";
@@ -31,15 +30,11 @@ interface PoolRow {
   balance?: PoolBalance;
 }
 
-export function countOngoingOrders(items: Pick<Order, "status">[]): number {
-  return items.filter((order) => ["ACTIVE", "INSTALLMENT"].includes(order.status)).length;
-}
-
 export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; range?: ReportRange }) {
   const [pools, setPools] = useState<Pool[] | null>(null);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
   const [balanceTotals, setBalanceTotals] = useState<PoolBalanceTotals | null>(null);
-  const [orders, setOrders] = useState<Order[] | null>(null);
+  const [orderSummary, setOrderSummary] = useState<{ total_count: number; active_count: number } | null>(null);
   const [businessPnl, setBusinessPnl] = useState<BusinessPnlReport | null>(null);
   const [inventoryCost, setInventoryCost] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,30 +51,19 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
         Object.fromEntries(overview.items.map((item) => [item.pool_id, item])),
       );
       setBalanceTotals(overview.totals);
-      // 订单计数与资金总览同源加载：订单接口失败时池数据已落 state，仍可渲染，
-      // 错误经同一 ErrorBanner 露出，不静默显示 0。
       const orderParams = range?.params.from || range?.params.to
         ? { trade_date_from: range.params.from, trade_date_to: range.params.to }
         : undefined;
-      setOrders(await ordersApi.list(orderParams));
+      setOrderSummary(await ordersApi.summary(orderParams));
       const reportParams = range?.params.from || range?.params.to
         ? { from: range.params.from, to: range.params.to }
         : undefined;
       setBusinessPnl(await reportsApi.businessPnl(reportParams));
-      const inventory = await stocksApi.inventory();
-      if (!range?.params.from && !range?.params.to) {
-        setInventoryCost(inventory.total_cost);
-      } else {
-        const filteredIds = inventory.items
-          .filter((item) => {
-            const entryDate = item.inventory_entry_at?.slice(0, 10) ?? "";
-            return (!range.params.from || entryDate >= range.params.from)
-              && (!range.params.to || entryDate <= range.params.to);
-          })
-          .map((item) => item.account_id);
-        const stats = await stocksApi.inventoryStats(filteredIds);
-        setInventoryCost(stats.occupied_cost);
-      }
+      const inventorySummary = await stocksApi.inventoryCostSummary({
+        entry_date_from: range?.params.from,
+        entry_date_to: range?.params.to,
+      });
+      setInventoryCost(inventorySummary.total_cost);
       setLoadError(null);
     } catch (error) {
       // 必须落到 UI：后端不可达时若只 console.error，页面会静默显示
@@ -102,9 +86,7 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
   const totalInventoryCost = inventoryCost ?? (pools === null ? "不可用" : "—");
   const totalProfit = businessPnl?.total.main_profit ?? (pools === null ? "不可用" : "—");
 
-  // 业务计数口径：ACTIVE 表示进行中。
-  const activeCount = orders === null ? null : countOngoingOrders(orders);
-  const orderCardsUnavailable = orders === null;
+  const orderCardsUnavailable = orderSummary === null;
 
   const { arrange: arrangeColumns } = useListViewColumns("POOL_BALANCE");
   const columns: ColumnsType<PoolRow> = [
@@ -160,14 +142,14 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
       <EntryRow>
         <EntryCard
           title="订单总数"
-          value={orders === null ? "不可用" : String(orders.length)}
+          value={orderSummary === null ? "不可用" : String(orderSummary.total_count)}
           description="点击进入业务中心 · 订单台账"
           disabled={orderCardsUnavailable}
           onClick={() => onNavigate?.("business", "ledger")}
         />
         <EntryCard
           title="进行中"
-          value={activeCount === null ? "不可用" : String(activeCount)}
+          value={orderSummary === null ? "不可用" : String(orderSummary.active_count)}
           description="点击进入业务中心 · 订单台账"
           disabled={orderCardsUnavailable}
           onClick={() => onNavigate?.("business", "ledger")}

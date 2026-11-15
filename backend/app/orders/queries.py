@@ -63,6 +63,34 @@ def count_orders(
     return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
 
 
+def order_status_counts(
+    session: Session,
+    *,
+    trade_date_from: date | None = None,
+    trade_date_to: date | None = None,
+    user: CurrentUser | None = None,
+    mine: bool = False,
+) -> dict[str, int]:
+    """按订单状态一次聚合计数，供工作台和数据中心卡片使用。"""
+    stmt = _order_list_stmt(
+        order_type=None,
+        status=None,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        owner_id=None,
+        pool_id=None,
+        keyword=None,
+        user=user,
+        mine=mine,
+        session=session,
+    ).with_only_columns(
+        Order.status,
+        func.count(Order.id),
+        maintain_column_froms=True,
+    ).group_by(Order.status)
+    return {str(status): int(count) for status, count in session.execute(stmt).all()}
+
+
 def _order_list_stmt(
     *, order_type: str | None, status: str | None,
     trade_date_from: date | None, trade_date_to: date | None,

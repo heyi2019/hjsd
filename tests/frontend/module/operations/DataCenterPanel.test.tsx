@@ -1,4 +1,3 @@
-import { countOngoingOrders } from "@/reporting/DataCenterPanel";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -44,11 +43,6 @@ const balance = {
   deposit_held: "100.00",
   available: "700.00",
 };
-const inventory = {
-  items: [],
-  count: 2,
-  total_cost: "3,500.00",
-};
 const businessPnl = {
   total: {
     business_mode: null,
@@ -74,9 +68,9 @@ beforeEach(() => {
     items: pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
     totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
   });
-  vi.mocked(ordersApi.list).mockResolvedValue(orders);
+  vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: orders.length, completed_count: 1, active_count: 1 });
   vi.mocked(reportsApi.businessPnl).mockResolvedValue(businessPnl);
-  vi.mocked(stocksApi.inventory).mockResolvedValue(inventory);
+  vi.mocked(stocksApi.inventoryCostSummary).mockResolvedValue({ total_cost: "3,500.00" });
 });
 
 describe("DataCenterPanel：资金总览", () => {
@@ -151,7 +145,7 @@ describe("DataCenterPanel：资金总览", () => {
   });
 
   it("订单接口失败不阻断资金总览：池数据仍在，错误条露出", async () => {
-    vi.mocked(ordersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(ordersApi.summary).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<DataCenterPanel />, { user: "admin" });
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
     expect(await screen.findByText(/POOL-A/)).toBeInTheDocument();
@@ -197,10 +191,7 @@ describe("DataCenterPanel：业务入口卡（2026-10-13 从工作台迁入）",
   });
 
   it("进行中统计包含分期订单，并从快捷卡进入订单台账", async () => {
-    vi.mocked(ordersApi.list).mockResolvedValueOnce([
-      ...orders,
-      { id: 3, order_no: "TH-2026-0003", order_type: "TH", capital_type: "STOCK", trade_date: "2026-10-03", status: "INSTALLMENT" },
-    ]);
+    vi.mocked(ordersApi.summary).mockResolvedValueOnce({ total_count: 3, completed_count: 1, active_count: 2 });
     const onNavigate = vi.fn();
     renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
     const card = await screen.findByRole("button", { name: /进行中/ });
@@ -210,18 +201,13 @@ describe("DataCenterPanel：业务入口卡（2026-10-13 从工作台迁入）",
   });
 
   it("P1/FE-149：数据中心进行中包含分期订单并跳转订单台账", async () => {
-    expect(countOngoingOrders([{ status: "ACTIVE" }, { status: "INSTALLMENT" }, { status: "COMPLETED" }])).toBe(2);
     vi.mocked(poolsApi.list).mockResolvedValueOnce([]);
     // 数据中心改为一次批量取余额（含服务端汇总），空池时给空 items + 零合计。
     vi.mocked(poolsApi.balances).mockResolvedValueOnce({
       items: [],
       totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
     });
-    vi.mocked(ordersApi.list).mockResolvedValueOnce([
-      { id: 10, order_no: "HS-2026-0001", order_type: "HS", capital_type: "STOCK", trade_date: "2026-10-01", status: "ACTIVE" },
-      { id: 11, order_no: "TH-2026-0002", order_type: "TH", capital_type: "STOCK", trade_date: "2026-10-02", status: "INSTALLMENT" },
-      { id: 12, order_no: "DG-2026-0003", order_type: "DG", capital_type: "ZERO", trade_date: "2026-10-03", status: "COMPLETED" },
-    ]);
+    vi.mocked(ordersApi.summary).mockResolvedValueOnce({ total_count: 3, completed_count: 1, active_count: 2 });
     const onNavigate = vi.fn();
     renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
     const card = await screen.findByRole("button", { name: /进行中/ });

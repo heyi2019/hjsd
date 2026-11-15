@@ -265,6 +265,7 @@ class OrderSummaryOut(BaseModel):
 
     total_count: int
     completed_count: int
+    active_count: int = 0
 
 
 class EventCreate(BaseModel):

@@ -61,7 +61,7 @@ describe("OrderDetail", () => {
     } as unknown as AccountExecutionDetail;
 
     render(<OrderDetail row={account} detail={detail} loading={false} />);
-    const panel = document.querySelector(".inventory-detail") as HTMLElement;
+    const panel = document.querySelector(".order-detail") as HTMLElement;
     expect(within(panel).getByText("渠道 / 区服")).toBeInTheDocument();
     // 第一部分为竖向堆叠的多个板块：游戏账号信息为板块内标题。
     expect(within(panel).getAllByText("游戏账号信息").length).toBeGreaterThanOrEqual(1);
@@ -77,7 +77,7 @@ describe("OrderDetail", () => {
   it("详情态展示账号密码明文并支持复制", () => {
     const accountWithPassword = { ...account, game_password: "secret-password", game_type: "原神" } as unknown as Account;
     render(<OrderDetail row={accountWithPassword} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
-    const panel = document.querySelector(".inventory-detail") as HTMLElement;
+    const panel = document.querySelector(".order-detail") as HTMLElement;
     expect(within(panel).getByText("secret-password")).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: "复制账号密码" })).toBeInTheDocument();
   });
@@ -123,7 +123,7 @@ describe("OrderDetail", () => {
 
   it("把展开详情按基础信息、执行明细和资金明细分成独立视觉层", () => {
     render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
-    const panel = document.querySelector(".inventory-detail") as HTMLElement;
+    const panel = document.querySelector(".order-detail") as HTMLElement;
     // 已移除的冗余分组不应再出现
     expect(within(panel).queryByText("登记与流转信息")).toBeNull();
     expect(within(panel).queryByText("其他补充信息")).toBeNull();
@@ -131,24 +131,24 @@ describe("OrderDetail", () => {
     expect(within(panel).getByText("运营信息")).toBeInTheDocument();
     expect(within(panel).getByText("上架平台")).toBeInTheDocument();
     expect(within(panel).getByText("下架平台")).toBeInTheDocument();
-    expect(panel.querySelector(".inventory-detail__meta")).toBeTruthy();
-    expect(panel.querySelector(".inventory-detail__section--execution")).toBeTruthy();
-    expect(panel.querySelector(".inventory-detail__section--finance")).toBeTruthy();
-    expect(panel.querySelector(".inventory-finance-summary__item--amount")).toBeTruthy();
+    expect(panel.querySelector(".order-detail__meta")).toBeTruthy();
+    expect(panel.querySelector(".order-detail__section--execution")).toBeTruthy();
+    expect(panel.querySelector(".order-detail__section--finance")).toBeTruthy();
+    expect(panel.querySelector(".order-finance-summary__item--amount")).toBeTruthy();
   });
 
   it("给展开表格中的信息表保留独立留白", () => {
     render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
-    const panel = document.querySelector(".inventory-detail") as HTMLElement;
-    expect(panel.querySelector(".inventory-detail__meta-table")).toBeTruthy();
-    const accountTable = panel.querySelector(".inventory-detail__section--profile .inventory-detail__meta-table");
+    const panel = document.querySelector(".order-detail") as HTMLElement;
+    expect(panel.querySelector(".order-detail__meta-table")).toBeTruthy();
+    const accountTable = panel.querySelector(".order-detail__section--profile .order-detail__meta-table");
     expect(within(panel).getByText("账号资料")).toBeInTheDocument();
     expect(accountTable?.querySelectorAll("tbody > tr").length).toBeGreaterThan(0);
   });
 
   it("运营信息只保留四个独立动作", () => {
     render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
-    const operationSection = document.querySelector(".inventory-detail__section--operation") as HTMLElement;
+    const operationSection = document.querySelector(".order-detail__section--operation") as HTMLElement;
     expect(within(operationSection).getByText("上架平台")).toBeInTheDocument();
     expect(within(operationSection).getByText("下架平台")).toBeInTheDocument();
     expect(within(operationSection).getByText("描述")).toBeInTheDocument();
@@ -329,6 +329,60 @@ describe("OrderDetail", () => {
     expect(screen.queryByLabelText("编辑订单创建时间")).toBeNull();
   });
 
+  it("没有事件记录时操作明细备注仍可编辑", () => {
+    const detail = {
+      account,
+      orders: [{ order_id: 34, order_no: "DG0034", order_type: "DG", created_at: "2026-10-15T10:19:00", operator: "admin", events: [] }],
+      detail_view: {
+        operation_rows: [],
+        execution_rows: [{ key: "34-inventory-entry", order_id: 34, category: "INBOUND", action: "代挂入库", occurred_at: "2026-10-15T10:19:00", amount: "-", operator: "admin", note: "-", platform: "-" }],
+        finance_rows: [],
+        lifecycle: {},
+        order_notes: "-",
+        parties: [],
+        extras: [],
+      },
+      finance_summary: { total_expense: "0.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+    const onOrderEdit = vi.fn();
+
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={34} loading={false} editing={account} onOrderEdit={onOrderEdit} employees={[]} />);
+
+    const note = screen.getByLabelText("编辑执行备注 代挂入库");
+    fireEvent.change(note, { target: { value: "补充入库说明" } });
+    expect(onOrderEdit).toHaveBeenCalledWith(34, { note: "补充入库说明" });
+  });
+
+  it("没有运营事件时描述和作图内容仍可编辑", () => {
+    const detail = {
+      account: { ...account, account_description: "旧描述", account_images: [] },
+      orders: [{ order_id: 35, order_no: "DG0035", order_type: "DG", created_at: "2026-10-15T10:19:00", events: [] }],
+      detail_view: {
+        operation_rows: [
+          { key: "consignment", action: "上架平台", content: "-", occurred_at: null, operator: "-", event_id: null },
+          { key: "unlist", action: "下架平台", content: "-", occurred_at: null, operator: "-", event_id: null },
+          { key: "description", action: "描述", content: "旧描述", occurred_at: null, operator: "-", event_id: null },
+          { key: "images", action: "作图", content: "-", occurred_at: null, operator: "-", event_id: null },
+        ],
+        execution_rows: [],
+        finance_rows: [],
+        lifecycle: {},
+        order_notes: "-",
+        parties: [],
+        extras: [],
+      },
+      finance_summary: { total_expense: "0.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+    const onProfileChange = vi.fn();
+
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={35} loading={false} editing={{ ...account, account_description: "旧描述", account_images: [] }} onProfileChange={onProfileChange} employees={[]} />);
+
+    const description = screen.getByLabelText("编辑运营描述");
+    fireEvent.change(description, { target: { value: "新描述" } });
+    expect(onProfileChange).toHaveBeenCalledWith({ account_description: "新描述" });
+    expect(screen.getByRole("button", { name: "上传作图" })).toBeInTheDocument();
+  });
+
   it("售出动作登记在来源订单时仍展示卖号交付", () => {
     const detail = {
       account,
@@ -348,14 +402,14 @@ describe("OrderDetail", () => {
 
     renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} employees={[]} />);
 
-    const deliverySection = document.querySelector(".inventory-detail__section--delivery") as HTMLElement;
+    const deliverySection = document.querySelector(".order-detail__section--delivery") as HTMLElement;
     expect(within(deliverySection).getByText("买号交付")).toBeInTheDocument();
     expect(within(deliverySection).getByText("卖号交付")).toBeInTheDocument();
   });
 
   it("详情编辑态账号资料直接展示编辑控件", () => {
     renderApp(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} editing={account} employees={[]} />);
-    const profile = document.querySelector(".inventory-detail__section--profile") as HTMLElement;
+    const profile = document.querySelector(".order-detail__section--profile") as HTMLElement;
     expect(within(profile).getByLabelText("编辑游戏账号 / 产品")).toHaveValue("acc-1");
   });
 
@@ -398,10 +452,10 @@ describe("OrderDetail", () => {
     } as unknown as AccountExecutionDetail;
 
     render(<OrderDetail row={account} detail={detail} loading={false} />);
-    const panel = document.querySelector(".inventory-detail") as HTMLElement;
-    const finance = panel.querySelector(".inventory-detail__section--finance") as HTMLElement;
+    const panel = document.querySelector(".order-detail") as HTMLElement;
+    const finance = panel.querySelector(".order-detail__section--finance") as HTMLElement;
     expect(within(finance).getAllByText("1 笔").length).toBeGreaterThanOrEqual(1);
-    const summary = finance.querySelector(".inventory-finance-summary") as HTMLElement;
+    const summary = finance.querySelector(".order-finance-summary") as HTMLElement;
     expect(within(summary).getByText("总收入").parentElement).toHaveTextContent("100.00");
   });
 
@@ -437,8 +491,8 @@ describe("OrderDetail", () => {
     } as unknown as AccountExecutionDetail;
 
     render(<OrderDetail row={account} detail={detail} loading={false} />);
-    const panel = document.querySelector(".inventory-detail") as HTMLElement;
-    const summary = panel.querySelector(".inventory-finance-summary") as HTMLElement;
+    const panel = document.querySelector(".order-detail") as HTMLElement;
+    const summary = panel.querySelector(".order-finance-summary") as HTMLElement;
     expect(within(summary).getByText("总收入").parentElement).toHaveTextContent("123.45");
     expect(within(summary).getByText("总支出").parentElement).toHaveTextContent("67.89");
   });
@@ -460,7 +514,7 @@ describe("OrderDetail", () => {
 
     render(<OrderDetail row={consignmentAccount} detail={detail} loading={false} />);
 
-    const operation = document.querySelector(".inventory-detail__section--operation") as HTMLElement;
+    const operation = document.querySelector(".order-detail__section--operation") as HTMLElement;
     expect(within(operation).getByText("上架平台")).toBeInTheDocument();
     expect(within(operation).queryByText("寄售中")).toBeNull();
   });
@@ -495,7 +549,7 @@ describe("OrderDetail", () => {
 
     render(<OrderDetail row={consignmentAccount} detail={detail} loading={false} />);
 
-    const operation = document.querySelector(".inventory-detail__section--operation") as HTMLElement;
+    const operation = document.querySelector(".order-detail__section--operation") as HTMLElement;
     expect(within(operation).getByText("盼之")).toBeInTheDocument();
     expect(within(operation).queryByText("寄售中")).toBeNull();
   });

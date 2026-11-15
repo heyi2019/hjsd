@@ -140,7 +140,16 @@ export function OrderDetailExecutionSection({
       key: "note",
       render: (value: string, item) => {
         const event = item.event;
-        if (!editing || !event) return value;
+        if (!editing) return value;
+        if (!event) {
+          return (
+            <Input
+              aria-label={`编辑执行备注 ${item.action}`}
+              value={orderDrafts?.[item.orderId]?.note ?? (value === "-" ? "" : value)}
+              onChange={(inputEvent) => onOrderEdit?.(item.orderId, { note: inputEvent.target.value })}
+            />
+          );
+        }
         return <Input aria-label={`编辑执行备注 ${item.action}`} value={eventDrafts?.[event.id]?.note ?? event.note ?? ""} onChange={(inputEvent) => onEventEdit?.(event, { note: inputEvent.target.value })} />;
       },
     },

@@ -234,11 +234,13 @@ beforeEach(() => {
     items: allocationRows,
     total: allocationRows.length,
     order_profit: "5000.00",
+    totals_by_type: {},
   });
   vi.mocked(policyApi.setAllocations).mockResolvedValue({
     items: allocationRows,
     total: allocationRows.length,
     order_profit: "5000.00",
+    totals_by_type: {},
   });
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 9, username: "lisi", display_name: "李四", is_active: true },
@@ -426,6 +428,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       items: [],
       total: 0,
       order_profit: "5000.00",
+      totals_by_type: {},
     });
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
@@ -451,12 +454,13 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByText("售出员")).toBeInTheDocument();
     expect(within(modal).getByText("运营员")).toBeInTheDocument();
   });
-  it("分润：一个动作多人时按人数均分，买号 2 人各得一半", async () => {
-    // 2026-11-05 口径：买号登记 2 人，买号这一份利润由 2 人均分；3 人则三人均分。
+  it("分润：一个动作多人时提交动作合计，均分由后端处理", async () => {
+    // 前端只提交动作合计和人员名单；按人数均分由后端保存服务统一处理。
     vi.mocked(policyApi.allocations).mockResolvedValue({
       items: [],
       total: 0,
       order_profit: "5000.00",
+      totals_by_type: {},
     });
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
@@ -489,11 +493,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(policyApi.setAllocations).toHaveBeenCalled());
     const [, payload] = vi.mocked(policyApi.setAllocations).mock.calls[0];
     const buyRows = payload.filter((item) => item.allocation_type === "BUY");
-    // 买号 30% 拆成两人各 15%，不是一人独得 30%
-    expect(buyRows).toHaveLength(2);
-    expect(buyRows.map((item) => item.allocation_rate)).toEqual(["15", "15"]);
-    expect(buyRows.map((item) => item.user_id)).toEqual([11, 22]);
-    expect(payload).toHaveLength(5);
+    expect(buyRows).toEqual([{ allocation_type: "BUY", employee_ids: [11, 22], role: "BUYER", allocation_rate: "30", allocation_amount: null }]);
+    expect(payload).toHaveLength(4);
   });
 
   it("分润：按操作四项提交时带上 allocation_type 与比例", async () => {
@@ -501,6 +502,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       items: actionAllocationRows,
       total: actionAllocationRows.length,
       order_profit: "5000.00",
+      totals_by_type: {},
     });
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
@@ -511,7 +513,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     const [, payload] = vi.mocked(policyApi.setAllocations).mock.calls[0];
     expect(payload).toHaveLength(4);
     expect(payload.map((item) => item.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
-    expect(payload.find((item) => item.allocation_type === "OPERATION")).toMatchObject({ user_id: 9, role: "SERVICE" });
+    expect(payload.find((item) => item.allocation_type === "OPERATION")).toMatchObject({ employee_ids: [9], role: "SERVICE" });
   });
 
   it("资金收支：退款已并入普通支出，登记为 OTHER 支出明细", async () => {

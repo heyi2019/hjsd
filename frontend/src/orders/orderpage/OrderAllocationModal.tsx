@@ -1,5 +1,6 @@
 import { Alert, Form, Input, Typography } from "antd";
 import type { FormInstance } from "antd";
+import { useRef } from "react";
 import { CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import {
   AdaptiveFormGrid,
@@ -15,10 +16,6 @@ import { EmployeeSelectControl } from "../ResponsibleEmployeeSelect";
 import type { OrdersPageController } from "./useOrdersPageController";
 import {
   ALLOCATION_TYPE_LABEL,
-  ALLOCATION_TYPE_ROLE,
-  allocationAmountFromRate,
-  allocationRateFromAmount,
-  validateAllocations,
   type ActionAllocationCandidates,
   type AllocationFormRow,
   type AllocationType,
@@ -62,16 +59,29 @@ function optionsFor(
 function AllocationFields({
   allocationCandidates,
   allocationForm,
-  allocationProfit,
   employeeOptions,
+  orderId,
   watchedRows,
 }: {
   allocationCandidates: ActionAllocationCandidates;
   allocationForm: FormInstance;
-  allocationProfit: string;
   employeeOptions: AllocationEmployeeOption[];
+  orderId: number;
   watchedRows: AllocationFormRow[];
 }) {
+  const conversionVersion = useRef<Record<number, number>>({});
+  const invalidateConversion = (row: number) => {
+    conversionVersion.current[row] = (conversionVersion.current[row] ?? 0) + 1;
+  };
+  const convertValue = (row: number, direction: "RATE_TO_AMOUNT" | "AMOUNT_TO_RATE", value: string, target: "allocation_rate" | "allocation_amount") => {
+    invalidateConversion(row);
+    const version = conversionVersion.current[row];
+    if (!value.trim()) return;
+    void policyApi.convertAllocation(orderId, direction, value).then((result) => {
+      if (conversionVersion.current[row] !== version) return;
+      allocationForm.setFieldValue(["allocations", row, target], result.value ?? "");
+    }).catch(() => undefined);
+  };
   return (
     <Form.List name="allocations">
       {(fields) => (
@@ -121,10 +131,8 @@ function AllocationFields({
                     suffix="%"
                     inputMode="decimal"
                     className="ui-control-width-120"
-                    onChange={(event) => allocationForm.setFieldValue(
-                      ["allocations", field.name, "allocation_amount"],
-                      allocationAmountFromRate(allocationProfit, event.target.value),
-                    )}
+                    onChange={() => invalidateConversion(field.name)}
+                    onBlur={(event) => convertValue(field.name, "RATE_TO_AMOUNT", event.target.value, "allocation_amount")}
                   />
                 </Form.Item>
                 <Form.Item
@@ -136,10 +144,8 @@ function AllocationFields({
                     prefix="¥"
                     inputMode="decimal"
                     className="ui-control-width-140"
-                    onChange={(event) => allocationForm.setFieldValue(
-                      ["allocations", field.name, "allocation_rate"],
-                      allocationRateFromAmount(allocationProfit, event.target.value),
-                    )}
+                    onChange={() => invalidateConversion(field.name)}
+                    onBlur={(event) => convertValue(field.name, "AMOUNT_TO_RATE", event.target.value, "allocation_rate")}
                   />
                 </Form.Item>
               </AdaptiveFormGrid>
@@ -176,26 +182,28 @@ export function AllocationModal({ controller }: { controller: AllocationControll
       appMessage.error("请先在员工花名册里选择分润对象");
       return;
     }
-    const validation = validateAllocations(rows, allocationProfit);
-    if (!validation.ok) {
-      appMessage.error(validation.error);
-      return;
-    }
     setAllocationSubmitting(true);
     try {
       const sourceFormExtra = {
         ...(values.form_extra ?? {}),
-        business_responsible_ids: [...new Set(validation.items
-          .filter((item) => item.allocation_type === "BUY" && item.user_id != null)
-          .map((item) => item.user_id as number))],
-        delivery_responsible_ids: [...new Set(validation.items
-          .filter((item) => item.allocation_type === "SELL" && item.user_id != null)
-          .map((item) => item.user_id as number))],
-        operation_responsible_ids: [...new Set(validation.items
-          .filter((item) => item.allocation_type === "OPERATION" && item.user_id != null)
-          .map((item) => item.user_id as number))],
+        business_responsible_ids: [...new Set(rows
+          .filter((item) => item.allocation_type === "BUY")
+          .flatMap((item) => item.employee_ids ?? []))],
+        delivery_responsible_ids: [...new Set(rows
+          .filter((item) => item.allocation_type === "SELL")
+          .flatMap((item) => item.employee_ids ?? []))],
+        operation_responsible_ids: [...new Set(rows
+          .filter((item) => item.allocation_type === "OPERATION")
+          .flatMap((item) => item.employee_ids ?? []))],
       };
-      await policyApi.setAllocations(actionOrder.id, validation.items, sourceFormExtra);
+      const payloadRows = rows.map((item) => ({
+        allocation_type: item.allocation_type,
+        employee_ids: item.employee_ids ?? [],
+        role: item.role ?? "OWNER",
+        allocation_rate: item.allocation_rate?.trim() ? item.allocation_rate : null,
+        allocation_amount: item.allocation_amount?.trim() ? item.allocation_amount : null,
+      }));
+      await policyApi.setAllocations(actionOrder.id, payloadRows, sourceFormExtra);
       appMessage.success("分润已保存");
       await load();
       if (actionOrder.account_id != null) await loadLedgerDetail(actionOrder, true);
@@ -244,8 +252,8 @@ export function AllocationModal({ controller }: { controller: AllocationControll
         <AllocationFields
           allocationCandidates={allocationCandidates}
           allocationForm={allocationForm}
-          allocationProfit={allocationProfit}
           employeeOptions={employeeOptions}
+          orderId={actionOrder?.id ?? 0}
           watchedRows={watchedRows}
         />
         <FieldConfigScope scope="ALLOCATION" active={allocationOpen}>

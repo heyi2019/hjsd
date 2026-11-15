@@ -1,7 +1,7 @@
 """订单金额口径：事件口径的成交额 / 本金，以及资金明细口径的利润。
 
 为什么单独成模块：
-- 报表（app/reporting/）与规则派生（返点基数、分期服务费基数）必须
+- 报表（app/reporting/）与规则派生（分期服务费基数）必须
   用同一套口径，否则「报表说成交额 1000，返点按 900 计提」这类不一致会查不出来。
 - 该口径是订单域事实，不属于报表，下沉到 orders 域避免反向依赖。
 
@@ -148,7 +148,7 @@ def _profit_flow_rows(
 ) -> list[tuple[int, date, Decimal, Decimal]]:
     """「无资金流水、但有资金走向」的事实明细：(order_id, 归期, 收入, 支出)。
 
-    - 返点记录 = 收入，金额取返点金额 `base_amount`，按 `collected_on` 归期；
+    - 返点记录 = 收入，金额取返点金额 `amount`，按 `collected_on` 归期；
       与库存详情「资金明细」的返点收入行同源（前端标为「收入」）。
     - 分期坏账 = 支出，金额取 `Installment.bad_debt_amount`，按回收处置
       `InstallmentDisposition.occurred_on` 归期；一份合约只有一次 RECOVER，
@@ -176,7 +176,7 @@ def _profit_flow_rows(
         RebateRecord.id,
         RebateRecord.source_order_id,
         RebateRecord.collected_on,
-        RebateRecord.base_amount,
+        RebateRecord.amount,
     ).where(RebateRecord.status != RebateStatus.VOID.value)
     if order_ids is not None:
         rebate_stmt = rebate_stmt.where(RebateRecord.source_order_id.in_(order_ids))

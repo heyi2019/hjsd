@@ -64,8 +64,8 @@ class TestCustomerNumbering:
         assert third.customer_no != source.customer_no
 
 
-class TestMasking:
-    def test_default_response_is_masked(self, seeded_db):
+class TestContactOutput:
+    def test_customer_output_returns_full_contact(self, seeded_db):
         customer = create_customer(
             seeded_db,
             display_name="甲",
@@ -75,20 +75,10 @@ class TestMasking:
             actor="pytest",
         )
         seeded_db.commit()
-        out = to_customer_out(customer, reveal_contact=False)
-        assert out["contact_masked"] is True
-        assert out["phone"] == "138****1234"
-        assert out["wechat"].startswith("wx") and "*" in out["wechat"]
-        assert "*" in out["qq"]
-
-    def test_reveal_returns_full_contact(self, seeded_db):
-        customer = create_customer(
-            seeded_db, display_name="甲", phone="13800001234", actor="pytest"
-        )
-        seeded_db.commit()
-        out = to_customer_out(customer, reveal_contact=True)
-        assert out["contact_masked"] is False
+        out = to_customer_out(customer)
         assert out["phone"] == "13800001234"
+        assert out["wechat"] == "wxabc"
+        assert out["qq"] == "123456"
 
 
 class TestCustomerUsability:
@@ -271,19 +261,14 @@ class TestPartiesApi:
         assert body["customer"]["customer_no"] == "CUS0002"
         assert len(body["duplicate_candidates"]) == 1
 
-    def test_reveal_contact_writes_audit(self, seeded_client, headers, seeded_db):
+    def test_customer_contact_is_full_without_reveal_audit(self, seeded_client, headers, seeded_db):
         created = seeded_client.post(
             CUSTOMERS, json={"display_name": "甲", "phone": "13800001234"}, headers=headers
         ).json()
-        detail = seeded_client.get(
-            f"{CUSTOMERS}/{created['customer']['id']}?reveal=true", headers=headers
-        ).json()
+        detail = seeded_client.get(f"{CUSTOMERS}/{created['customer']['id']}", headers=headers).json()
         assert detail["phone"] == "13800001234"
         seeded_db.commit()
-        audits = seeded_db.scalars(
-            select(AuditLog).where(AuditLog.action == AuditAction.CONTACT_READ.value)
-        ).all()
-        assert len(audits) == 1
+        assert all(row.action != "CONTACT_READ" for row in seeded_db.scalars(select(AuditLog)).all())
 
     def test_viewer_cannot_create_customer(self, seeded_client, viewer_headers):
         response = seeded_client.post(
@@ -360,7 +345,7 @@ class TestCustomerExtraValues:
         )
         seeded_db.commit()
         out = to_customer_out(
-            customer, reveal_contact=True,
+            customer,
             extra_values=get_extra_values(
                 seeded_db, entity_type="customer", entity_id=customer.id
             ),
@@ -450,10 +435,9 @@ class TestExtraValuesApi:
         assert listed["items"][0]["extra_values"] == {"credit_level": "优质"}
 
 
-# 客户和合作方联系方式权限
+# 客户和合作方联系方式直接返回原值
 
-def test_counterparty_list_masks_contact_without_permission(seeded_client):
-    # EMPLOYEE: 有 counterparty.read，无 customer.contact.read
+def test_counterparty_list_returns_full_contact(seeded_client):
     seeded_client.post(
         COUNTERPARTIES,
         json={
@@ -465,45 +449,25 @@ def test_counterparty_list_masks_contact_without_permission(seeded_client):
     resp = seeded_client.get(COUNTERPARTIES, headers={"X-Dev-User": "employee"})
     assert resp.status_code == 200, resp.text
     row = resp.json()[0]
-    assert row["contact_masked"] is True
-    assert row["phone"] == "138****9999"
-    assert row["wechat"].startswith("wx") and "*" in row["wechat"]
+    assert "contact_masked" not in row
+    assert row["phone"] == "13800009999"
+    assert row["wechat"] == "wx_peer_001"
 
-def test_counterparty_detail_reveal_requires_permission_and_writes_audit(seeded_client, seeded_db):
+def test_counterparty_detail_returns_full_contact_without_read_audit(seeded_client, seeded_db):
     cp = seeded_client.post(
         COUNTERPARTIES,
         json={"display_name": "同行乙", "type": "PEER", "phone": "13800008888"},
         headers={"X-Dev-User": "admin"},
     ).json()
 
-    # 无权限者即使传 reveal=true 也拿不到明文
-    masked = seeded_client.get(
-        f"{COUNTERPARTIES}/{cp['id']}?reveal=true", headers={"X-Dev-User": "employee"}
-    ).json()
-    assert masked["contact_masked"] is True
-    assert masked["phone"] == "138****8888"
-
-    # 有权限者显式 reveal=true 拿到明文并写审计
-    full = seeded_client.get(
-        f"{COUNTERPARTIES}/{cp['id']}?reveal=true", headers={"X-Dev-User": "admin"}
-    ).json()
-    assert full["contact_masked"] is False
+    full = seeded_client.get(f"{COUNTERPARTIES}/{cp['id']}", headers={"X-Dev-User": "employee"}).json()
+    assert "contact_masked" not in full
     assert full["phone"] == "13800008888"
     seeded_db.commit()
-    audits = seeded_db.scalars(
-        select(AuditLog).where(
-            AuditLog.action == AuditAction.CONTACT_READ.value,
-            AuditLog.entity_type == "counterparty",
-        )
-    ).all()
-    assert len(audits) == 1
+    assert all(row.action != "CONTACT_READ" for row in seeded_db.scalars(select(AuditLog)).all())
 
 def test_customer_update_honors_contact_permission(seeded_client):
-    """update 端点按 customer.contact.read 决定回显，合法经办路径仍见明文。
-
-    无联系方式读权限的判定与遮罩由 test_customer_update_masks_when_role_lacks_contact_read
-    以精确权限集合覆盖（权限矩阵无「有 update 无 contact.read」现成角色）。
-    """
+    """更新接口直接返回原联系方式，不依赖额外读取权限。"""
     created = seeded_client.post(
         CUSTOMERS,
         json={"display_name": "客户丙", "phone": "13800007777"},
@@ -515,23 +479,11 @@ def test_customer_update_honors_contact_permission(seeded_client):
         headers={"X-Dev-User": "admin"},
     )
     assert resp.status_code == 200, resp.text
-    assert resp.json()["contact_masked"] is False
     assert resp.json()["phone"] == "13800007777"
 
-def test_customer_update_masks_when_role_lacks_contact_read(seeded_db):
-    """无联系方式读权限、但有 update 权限的用户，写操作返回必须遮罩。
-
-    写操作端点已改为按 user.has(PERM_CUSTOMER_CONTACT_READ) 传 reveal_contact；
-    这里用权限集合精确的 CurrentUser 锁住该判定与 to_customer_out 输出契约。
-    """
-    from app.parties._common import to_customer_out
-
+def test_customer_update_returns_full_contact_without_read_permission(seeded_db):
     cust = create_customer(
         seeded_db, display_name="客户丁", phone="13800006666", actor="pytest"
     )
-    actor = _user(perms=("customer.update",))
-    reveal = actor.has("customer.contact.read")
-    out = to_customer_out(cust, reveal_contact=reveal)
-    assert reveal is False
-    assert out["contact_masked"] is True
-    assert out["phone"] == "138****6666"
+    out = to_customer_out(cust)
+    assert out["phone"] == "13800006666"

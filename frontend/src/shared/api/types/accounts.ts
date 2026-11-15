@@ -53,6 +53,7 @@ export interface AccountInventoryRow {
   platform?: string | null;
   status: string;
   inventory_status?: string;
+  inventory_entry_at?: string | null;
   cost_amount: string;
   account_description?: string | null;
   account_images?: string[];

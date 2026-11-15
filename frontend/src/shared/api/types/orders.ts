@@ -119,7 +119,7 @@ export interface OrderRebate {
   rebate_type: string;
   channel?: string | null;
   rate: string;
-  base_amount: string;
+  amount: string;
   link_status: string;
   status: string;
   collected_on: string;

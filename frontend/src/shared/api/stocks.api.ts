@@ -3,6 +3,12 @@ import type { Account, AccountInventoryRow, InventoryStats } from "./types/accou
 import type { PageResponse } from "./types/common";
 
 export const stocksApi = {
+  dashboardSummary: (reminderDays: number) =>
+    api
+      .get<{ account_count: number; aging_count: number; overdue_count: number }>("/stocks/dashboard-summary", {
+        params: { reminder_days: reminderDays },
+      })
+      .then((r) => r.data),
   list: async (params?: { status?: string; limit?: number; offset?: number }): Promise<Account[]> => {
     if (params?.limit != null) {
       return api.get<PageResponse<Account>>("/stocks", { params }).then((r) => r.data.items);
@@ -23,6 +29,10 @@ export const stocksApi = {
   inventory: () =>
     api
       .get<{ items: AccountInventoryRow[]; count: number; total_cost: string }>("/stocks/inventory")
+      .then((r) => r.data),
+  inventoryCostSummary: (params?: { entry_date_from?: string; entry_date_to?: string }) =>
+    api
+      .get<{ total_cost: string }>("/stocks/inventory/cost-summary", { params })
       .then((r) => r.data),
   /** 汇总当前可见账号的占用成本与库龄档位（金额与天数只在后端算）。 */
   inventoryStats: (accountIds: number[]) =>

@@ -68,8 +68,7 @@ class TestRebateValidation:
             RebateRecord(
                 rebate_no="RB-INVALID-LINK-STATUS",
                 source_order_id=_active_order(seeded_db),
-                rate=Decimal("10"),
-                base_amount=Decimal("500"),
+                amount=Decimal("500"),
                 status="OPEN",
                 link_status="AUTO_MATCHED",
                 collected_on=TODAY,
@@ -404,7 +403,7 @@ class TestRebateGuards:
                 seeded_db,
                 source_order_id=order_id,
                 rebate_type="UNSPECIFIED",
-                base_amount=Decimal("100"),
+                amount=Decimal("100"),
                 collected_on=TODAY,
                 actor="pytest",
             )
@@ -421,7 +420,7 @@ class TestRebateGuards:
             seeded_db,
             source_order_id=order.id,
             rebate_type="SELL",
-            base_amount=Decimal("100"),
+            amount=Decimal("100"),
             collected_on=TODAY,
             actor="pytest",
         )
@@ -443,33 +442,16 @@ class TestRebateGuards:
             seeded_db,
             source_order_id=order_id,
             rebate_type="SELL",
-            base_amount=Decimal("100"),
+            amount=Decimal("100"),
             collected_on=TODAY,
             actor="pytest",
         )
         assert record.rebate_type == "SELL"
 
-
-    def test_rebate_rate_cannot_exceed_one_hundred_in_database(self, seeded_db):
-        order_id = _active_order(seeded_db)
-        record = create_rebate(
-            seeded_db,
-            source_order_id=order_id,
-            rebate_type="BUY",
-            base_amount=Decimal("100"),
-            collected_on=TODAY,
-            actor="pytest",
-        )
-        record.rate = Decimal("101")
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
-
     def test_source_order_notfound(self, seeded_db):
         with pytest.raises(Validation) as exc:
             create_rebate(
-                seeded_db, source_order_id=999999, base_amount=Decimal("100"),
+                seeded_db, source_order_id=999999, amount=Decimal("100"),
                 collected_on=TODAY, actor="pytest",
             )
         assert "来源订单" in str(exc.value)
@@ -479,15 +461,15 @@ class TestRebateGuards:
         first = _active_order(seeded_db)
         second = _active_order(seeded_db)
         create_rebate(
-            seeded_db, source_order_id=first, rebate_type="BUY", base_amount=Decimal("100"),
+            seeded_db, source_order_id=first, rebate_type="BUY", amount=Decimal("100"),
             collected_on=TODAY, actor="pytest",
         )
         create_rebate(
-            seeded_db, source_order_id=second, rebate_type="BUY", base_amount=Decimal("200"),
+            seeded_db, source_order_id=second, rebate_type="BUY", amount=Decimal("200"),
             collected_on=TODAY, actor="pytest",
         )
         by_order = list_rebates(seeded_db, source_order_id=second)
-        assert [item.base_amount for item in by_order] == [Decimal("200.00")]
+        assert [item.amount for item in by_order] == [Decimal("200.00")]
         assert len(list_rebates(seeded_db)) == 2
 
 
@@ -827,11 +809,11 @@ class TestFinanceApi:
             occurred_on=TODAY, actor="pytest",
         )
         create_rebate(
-            seeded_db, source_order_id=own_order.id, rebate_type="BUY", base_amount=Decimal("10"),
+            seeded_db, source_order_id=own_order.id, rebate_type="BUY", amount=Decimal("10"),
             collected_on=TODAY, actor="pytest"
         )
         create_rebate(
-            seeded_db, source_order_id=other_order.id, rebate_type="BUY", base_amount=Decimal("20"),
+            seeded_db, source_order_id=other_order.id, rebate_type="BUY", amount=Decimal("20"),
             collected_on=TODAY, actor="pytest"
         )
 
@@ -1058,7 +1040,7 @@ class TestFinanceApi:
             "/api/v1/rebates",
             json={
                 "source_order_id": other_order.id,
-                "base_amount": "10",
+                "amount": "10",
                 "collected_on": TODAY.isoformat(),
                 "rebate_type": "BUY",
             },
@@ -1079,7 +1061,7 @@ class TestFinanceApi:
             create_rebate(
                 seeded_db,
                 source_order_id=foreign_order.id,
-                base_amount=Decimal("10"),
+                amount=Decimal("10"),
                 collected_on=TODAY,
                 actor="operator",
                 user=scoped,
@@ -1302,7 +1284,7 @@ class TestFinanceApi:
     def test_list_rebates_endpoint(self, seeded_client, seeded_db, headers):
         order_id = _active_order(seeded_db)
         create_rebate(
-            seeded_db, source_order_id=order_id, rebate_type="BUY", base_amount=Decimal("100"),
+            seeded_db, source_order_id=order_id, rebate_type="BUY", amount=Decimal("100"),
             collected_on=TODAY, actor="pytest", channel="买号返点",
             note="回收买号返点",
         )
@@ -1323,9 +1305,8 @@ class TestFinanceApi:
             "/api/v1/rebates",
             json={
                 "source_order_id": order_id,
-                "base_amount": "300",
+                "amount": "300",
                 "collected_on": TODAY.isoformat(),
-                "rate": "5",
                 "rebate_type": "BUY",
                 "channel": "WECHAT",
             },

@@ -1,9 +1,8 @@
 import { Card, List, Typography } from "antd";
-import type { Order } from "../shared/api/types/orders";
 import { StatRow } from "../shared/ui";
 
 export function BusinessOverview({
-  orders,
+  orderSummary,
   inventoryCount,
   inventoryOverdueCount,
   installmentCount,
@@ -17,7 +16,7 @@ export function BusinessOverview({
   personalEarningsError = false,
   onPersonalEarningsClick,
 }: {
-  orders: Order[];
+  orderSummary: { total_count: number; completed_count: number } | null;
   inventoryCount: number | null;
   inventoryAgingCount: number | null;
   inventoryOverdueCount: number | null;
@@ -42,8 +41,8 @@ export function BusinessOverview({
         ...(personalOrders !== undefined ? [{ label: "我的订单", kind: "count" as const, amount: personalOrdersError ? null : String(personalOrders), hint: "创建 / 售出订单", onClick: onPersonalOrdersClick }] : []),
         ...(personalEarnings !== undefined ? [{ label: "我的收益", amount: personalEarningsError ? null : personalEarnings, hint: "本月至今 · 本人应付分润", onClick: onPersonalEarningsClick }] : []),
         { label: "在库账号", kind: "count", amount: amount(inventoryCount) },
-        { label: "订单总量", kind: "count", amount: ordersError ? null : amount(orders.length) },
-        { label: "完成订单量", kind: "count", amount: ordersError ? null : amount(orders.filter((order) => order.status === "COMPLETED").length) },
+        { label: "订单总量", kind: "count", amount: ordersError || !orderSummary ? null : amount(orderSummary.total_count) },
+        { label: "完成订单量", kind: "count", amount: ordersError || !orderSummary ? null : amount(orderSummary.completed_count) },
         { label: "分期合约", kind: "count", amount: amount(installmentCount) },
         { label: "逾期合约", kind: "count", amount: amount(overdueInstallmentCount), tone: "warn" },
         { label: "在库超期账号", kind: "count", amount: amount(inventoryOverdueCount), hint: "未售超过 30 天", tone: "warn" },

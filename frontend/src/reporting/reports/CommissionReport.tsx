@@ -2,10 +2,10 @@
 
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { employeesApi } from "../../shared/api/org.api";
 import { reportsApi } from "../../shared/api/reports.api";
-import type { CommissionReport, CommissionRow } from "../../shared/api/types/reporting";
+import type { CommissionOrderGroup, CommissionReport, CommissionRow } from "../../shared/api/types/reporting";
 import { normalizeError } from "../../shared/api/client";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, Select, StatRow } from "../../shared/ui";
@@ -42,25 +42,23 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
     () => reportsApi.commission(commissionParams),
     [params.from, params.to, mine, selectedUserId],
   );
+  const orderRows = data?.order_groups ?? [];
+  const employeeNames = new Map(employees.map((employee) => [employee.id, employee.display_name]));
+  const personName = (row: CommissionRow) => row.user_id == null ? "公司" : employeeNames.get(row.user_id) ?? `人员${row.user_id}`;
+  const peopleText = (row: CommissionOrderGroup) => Array.from(new Set(row.orders.map(personName))).join("、");
+  const dateText = (value?: string | null) => value || "—";
   const { arrange: arrangeCommission } = useListViewColumns("RPT_COMMISSION");
-  const columns: ColumnsType<CommissionRow> = [
-    ...(mine ? [] : [{ title: "人员 ID", dataIndex: "user_id", width: 100 }]),
-    { title: "订单号", dataIndex: "order_no", width: 160 },
-    { title: "利润基数", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} />},
-    { title: "费率", dataIndex: "rate", align: "right", width: 90},
-    { title: "应付", dataIndex: "payable", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "已付", dataIndex: "paid", align: "right", render: (v: string) => <MoneyText value={v} />},
-    {
-      title: "差异",
-      dataIndex: "difference",
-      align: "right",
-      render: (v: string) => <MoneyText value={v} tone="auto" strong />,
-    },
+  const columns: ColumnsType<CommissionOrderGroup> = [
+    { title: "订单号", key: "order_no", dataIndex: "order_no", width: 160 },
+    { title: "入库日期", key: "inventory_date", dataIndex: "inventory_date", width: 120, render: (v: string | null) => dateText(v) },
+    { title: "出库日期", key: "outbound_date", dataIndex: "outbound_date", width: 120, render: (v: string | null) => dateText(v) },
+    { title: "分润人员", key: "people", width: 180, render: (_value, row) => peopleText(row) || "—" },
+    { title: "分润合计", key: "profit_base", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} /> },
   ];
   return (
     <Card className="glass" title={mine ? "我的收益" : "分润对账"}>
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      <Space className="ui-filter-bar">
+      <Space className="ui-filter-bar ui-filter-bar--spaced">
         {!mine ? (
           <Select
             value={selectedUserId}
@@ -79,19 +77,46 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
       <StatRow
         items={[
           { label: mine ? "收益订单数" : "订单数", kind: "count", amount: String(data?.total.order_count ?? 0) },
-          { label: mine ? "我的收益" : "分润基数", amount: data?.total.profit_base ?? "-" },
-          { label: "应付合计", amount: data?.total.payable ?? "-" },
-          { label: "已付合计", amount: data?.total.paid ?? "-" },
-          { label: "差异", amount: data?.total.difference ?? "-", tone: "auto" },
+          { label: mine ? "我的收益" : "分润合计", amount: data?.total.profit_base ?? "-" },
         ]}
       />
-             <DataTable<CommissionRow>
+      <DataTable<CommissionOrderGroup>
          columns={arrangeCommission(columns)}
-         rows={data?.items ?? []}
+         rows={orderRows}
          loading={loading}
          page={1}
          pageSize={10}
-         total={data?.items.length ?? 0}
+         total={data?.total.order_count ?? 0}
+         rowKey="order_id"
+         expandable={{
+           expandedRowRender: (row) => (
+             <table className="commission-detail-table">
+               <thead><tr><th>分润人员</th><th>分润基数</th><th>费率</th></tr></thead>
+               <tbody>
+                 {row.orders.map((detail, index) => (
+                   <tr key={`${row.order_id}-${detail.user_id ?? "company"}-${index}`}>
+                     <td>{personName(detail)}</td>
+                     <td><MoneyText value={detail.profit_base} /></td>
+                     <td>{detail.rate}</td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+           ),
+           expandIcon: ({ expanded, onExpand, record }) => (
+             <span
+               role="button"
+               tabIndex={0}
+               aria-label={`${expanded ? "收起" : "展开"}${record.order_no}分润明细`}
+               onClick={(event) => onExpand(record, event)}
+               onKeyDown={(event) => {
+                 if (event.key === "Enter" || event.key === " ") onExpand(record, event as unknown as MouseEvent<HTMLElement>);
+               }}
+             >
+               {expanded ? "收起" : "展开"}
+             </span>
+           ),
+         }}
          emptyText="所选区间无分润记录"
          onPageChange={() => undefined}
       />

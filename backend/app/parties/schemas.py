@@ -1,6 +1,6 @@
 """parties.schemas：客户、合作方、表单扩展字段的请求/响应模型。
 
-联系方式对外**默认脱敏**；只有具备 `customer.contact.read` 且显式请求时才返回完整值。
+联系方式按已建档原值返回；访问接口不再提供联系方式脱敏或按需揭示分支。
 """
 from __future__ import annotations
 
@@ -78,11 +78,16 @@ class CustomerOut(BaseModel):
     tags: list[str] | None = None
     note: str | None = None
     merged_into_id: int | None = None
-    contact_masked: bool = True
     extra_values: dict[str, Any] = Field(default_factory=dict)
     order_roles: list[str] = Field(default_factory=list)
     active_order_count: int = 0
     last_interaction_at: datetime | None = None
+
+
+class CustomerSummaryOut(BaseModel):
+    total_count: int
+    month_count: int
+    today_count: int
 
 
 class CustomerWithCandidates(BaseModel):
@@ -198,6 +203,11 @@ class LeadOut(BaseModel):
     extra_values: dict[str, Any] = Field(default_factory=dict)
 
 
+class LeadSummaryOut(BaseModel):
+    total_count: int
+    open_count: int
+
+
 class MergeRequest(RequestModel):
     target_customer_id: int
     reason: str = Field(min_length=1, max_length=500)
@@ -246,7 +256,6 @@ class CounterpartyOut(BaseModel):
     note: str | None = None
     created_at: datetime
     extra_values: dict[str, Any] = Field(default_factory=dict)
-    contact_masked: bool = False
 
 
 class ExtraValueIn(RequestModel):
@@ -263,6 +272,7 @@ __all__ = [
     "CustomerBusinessOut",
     "CustomerDetailOut",
     "CustomerOut",
+    "CustomerSummaryOut",
     "CustomerOverviewOut",
     "CustomerInstallmentOut",
     "CustomerStatusUpdate",
@@ -275,5 +285,6 @@ __all__ = [
     "LeadConvert",
     "LeadCreate",
     "LeadOut",
+    "LeadSummaryOut",
     "LeadUpdate",
 ]

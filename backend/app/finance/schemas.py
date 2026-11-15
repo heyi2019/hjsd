@@ -133,6 +133,11 @@ class CashflowListOut(BaseModel):
     total_out: Decimal = Decimal("0")
 
 
+class CashflowTotalsOut(BaseModel):
+    total_in: Decimal = Decimal("0")
+    total_out: Decimal = Decimal("0")
+
+
 class CashflowCreate(RequestModel):
     pool_id: int
     occurred_on: date
@@ -224,10 +229,8 @@ class TransferOut(BaseModel):
 class RebateCreate(RequestModel):
     source_order_id: int
     rebate_type: str = Field(description="BUY 买号返点 / SELL 卖号返点")
-    # 省略时按 REBATE 规则的 config.base 从订单事件派生；显式传入始终优先。
-    base_amount: Decimal | None = None
+    amount: Decimal
     collected_on: date
-    rate: Decimal | None = None
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     channel: str | None = None
     note: str | None = None
@@ -235,8 +238,7 @@ class RebateCreate(RequestModel):
 
 
 class RebateUpdate(RequestModel):
-    base_amount: Decimal | None = None
-    rate: Decimal | None = None
+    amount: Decimal | None = None
     collected_on: date | None = None
     note: str | None = None
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
@@ -251,8 +253,7 @@ class RebateOut(BaseModel):
     source_order_id: int
     rebate_type: str
     channel: str | None = None
-    rate: Decimal
-    base_amount: Decimal
+    amount: Decimal
     link_status: str
     status: str
     collected_on: date
@@ -268,7 +269,7 @@ class RebateOut(BaseModel):
     @property
     def remaining(self) -> Decimal:
         """可退余额 = 返点金额 - 累计已退，夹底 0（与押金 remaining_amount 同构）。"""
-        remaining = to_money(self.base_amount) - to_money(self.already_returned)
+        remaining = to_money(self.amount) - to_money(self.already_returned)
         return remaining if remaining > 0 else Decimal("0.00")
 
 

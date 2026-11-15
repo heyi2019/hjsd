@@ -1,7 +1,7 @@
 """REPORT-01 报表功能契约：R2/R3/R5、资金日报与订单利润口径。"""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -17,7 +17,7 @@ from app.domain.enums import (
     RebateStatus,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import RebateRecord
+from app.domain.trade import Account, RebateRecord
 from app.finance.cashflows import create_cashflow
 from app.orders.create import create_order
 from app.orders.events import post_event
@@ -67,6 +67,14 @@ def _month_item(data: dict, month: str) -> dict:
     matched = [item for item in data["items"] if item["month"] == month]
     assert matched, f"月份 {month} 不在报表中: {[i['month'] for i in data['items']]}"
     return matched[0]
+
+
+def _commission_details(data: dict) -> list[dict]:
+    return [
+        detail
+        for order in data["order_groups"]
+        for detail in order["orders"]
+    ]
 
 
 def _direct_cost(seeded_db, order_id: int, amount: str, occurred_on: date) -> None:
@@ -210,7 +218,7 @@ class TestR3Commission:
             seeded_db, user=user, mine=True
         )
 
-        assert {item["user_id"] for item in data["items"]} == {7}
+        assert {item["user_id"] for item in _commission_details(data)} == {7}
         assert data["total"]["order_count"] == 1
         assert data["total"]["profit_base"] == Decimal("150.00")
 
@@ -240,12 +248,12 @@ class TestR3Commission:
         all_people = r3_commission_reconciliation(
             seeded_db, user=scoped_user, all_people=True
         )
-        assert {item["user_id"] for item in all_people["items"]} == {7, 8}
+        assert {item["user_id"] for item in _commission_details(all_people)} == {7, 8}
 
         one_person = r3_commission_reconciliation(
             seeded_db, user=scoped_user, all_people=True, user_id=8
         )
-        assert {item["user_id"] for item in one_person["items"]} == {8}
+        assert {item["user_id"] for item in _commission_details(one_person)} == {8}
 
     def test_allocations_drill_down_and_date_filters(self, seeded_db):
         order = _order(seeded_db)
@@ -264,15 +272,20 @@ class TestR3Commission:
         )
 
         data = r3_commission_reconciliation(seeded_db)
-        assert data["total"]["order_count"] == 4
-        assert len(data["items"]) == 4
-        assert any(item["user_id"] == 7 for item in data["items"])
-        person = next(group for group in data["groups"] if group["user_id"] == 7)
-        assert person["user_id"] == 7
-        assert person["order_count"] == 1
+        assert data["total"]["order_count"] == 1
+        assert len(data["order_groups"]) == 1
+        assert data["order_groups"][0]["order_no"] == order.order_no
+        assert len(data["order_groups"][0]["orders"]) == 4
+        account = seeded_db.get(Account, order.account_id)
+        assert account is not None
+        account.inventory_entry_at = datetime(2026, 10, 2, 9, 30)
+        seeded_db.flush()
+        data = r3_commission_reconciliation(seeded_db)
+        assert data["order_groups"][0]["inventory_date"] == date(2026, 10, 2)
+        assert data["order_groups"][0]["outbound_date"] == D
+        person = next(item for item in _commission_details(data) if item["user_id"] == 7)
         assert person["profit_base"] == 300
-        assert person["orders"][0]["profit_base"] == 300
-        assert person["orders"][0]["rate"] == 100
+        assert person["rate"] == 100
 
         # 已完成订单与进行中订单都属于有效提成对账范围。
         completed = _order(seeded_db)
@@ -292,9 +305,9 @@ class TestR3Commission:
         )
 
         data = r3_commission_reconciliation(seeded_db)
-        person = next(group for group in data["groups"] if group["user_id"] == 7)
-        assert person["order_count"] == 2
-        assert {item["order_id"] for item in person["orders"]} == {
+        person_orders = [item for item in _commission_details(data) if item["user_id"] == 7]
+        assert len(person_orders) == 2
+        assert {item["order_id"] for item in person_orders} == {
             order.id,
             completed.id,
         }
@@ -303,13 +316,13 @@ class TestR3Commission:
         assert (
             r3_commission_reconciliation(
                 seeded_db, to_date=date(2026, 10, 1)
-            )["items"]
+            )["order_groups"]
             == []
         )
         assert (
             r3_commission_reconciliation(
                 seeded_db, from_date=date(2026, 10, 10)
-            )["items"]
+            )["order_groups"]
             == []
         )
 
@@ -452,8 +465,7 @@ class TestReportsApiDateParams:
                 rebate_no="RB-R5-SCOPE",
                 source_order_id=foreign_order.id,
                 rebate_type="SELL",
-                rate=to_money("10"),
-                base_amount=to_money("500"),
+                amount=to_money("500"),
                 status=RebateStatus.OPEN.value,
                 link_status="UNLINKED",
                 collected_on=D,
@@ -519,7 +531,7 @@ class TestReports:
         assert month[0]["operating_expense"] == 0
 
     def test_r5_legacy_rebate_columns_are_removed(self, seeded_db):
-        """11-05 二次裁决：结算展示列下线，返点金额全站只认 base_amount。"""
+        """11-05 二次裁决：结算展示列下线，返点金额全站只认 amount。"""
         data = r5_business_pnl(seeded_db)
         for item in data["items"]:
             assert {"main_income", "main_cost", "main_profit"} <= set(item)
@@ -548,7 +560,7 @@ class TestReports:
 
     def test_r3_drills_down_to_orders(self, seeded_db):
         data = r3_commission_reconciliation(seeded_db)
-        for person in data["groups"]:
-            assert person["orders"]
-            assert sum(o["profit_base"] for o in person["orders"]) == person["profit_base"]
-        assert data["total"]["order_count"] == len(data["items"])
+        for order in data["order_groups"]:
+            assert order["orders"]
+            assert sum(o["profit_base"] for o in order["orders"]) == order["profit_base"]
+        assert data["total"]["order_count"] == len(data["order_groups"])

@@ -92,8 +92,14 @@ describe("AuditPanel.deep：筛选/重试/降级分支", () => {
   it("填开始/结束日期触发 load 且参数带 from/to", async () => {
     renderLight(<AuditPanel />, { user: "admin" });
     await screen.findByText("admin");
-    await ui.type(screen.getByLabelText("审计开始日期"), "2026-01-01");
-    await ui.type(screen.getByLabelText("审计结束日期"), "2026-12-31");
+    const fromDate = screen.getByLabelText("审计开始日期");
+    const toDate = screen.getByLabelText("审计结束日期");
+    await ui.clear(fromDate);
+    await ui.type(fromDate, "2026-01-01");
+    await userEvent.keyboard("{Enter}");
+    await ui.clear(toDate);
+    await ui.type(toDate, "2026-12-31");
+    await userEvent.keyboard("{Enter}");
     await waitFor(() => {
       const args = lastListArgs();
       expect(args.from).toBe("2026-01-01");

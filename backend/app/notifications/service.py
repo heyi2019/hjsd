@@ -10,6 +10,9 @@ from app.core.time import now_utc_second_naive
 from app.domain.enums import SequenceKey
 from app.domain.notifications import Notification
 
+PROFIT_PENDING = "PROFIT_PENDING"
+PROFIT_ALLOCATED = "PROFIT_ALLOCATED"
+
 
 def create_notification(
     session: Session,
@@ -115,6 +118,20 @@ def unread_count(session: Session, *, recipient_user_id: int) -> int:
     )
 
 
+def unread_profit_count(session: Session, *, recipient_user_id: int) -> int:
+    """统计用户未读的分润待办与分润结果通知，不加载通知明细。"""
+    return int(
+        session.scalar(
+            select(func.count(Notification.id)).where(
+                Notification.recipient_user_id == recipient_user_id,
+                Notification.read_at.is_(None),
+                Notification.notification_type.in_((PROFIT_PENDING, PROFIT_ALLOCATED)),
+            )
+        )
+        or 0
+    )
+
+
 def mark_read(
     session: Session,
     notification_id: int,
@@ -139,9 +156,12 @@ def mark_read(
 
 
 __all__ = [
+    "PROFIT_ALLOCATED",
+    "PROFIT_PENDING",
     "create_notification",
     "ensure_notification",
     "list_notifications",
     "mark_read",
+    "unread_profit_count",
     "unread_count",
 ]

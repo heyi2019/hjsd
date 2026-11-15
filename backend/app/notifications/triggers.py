@@ -16,10 +16,7 @@ from app.domain.enums import OrderStatus
 from app.domain.trade import Order, OrderEvent, OrderProfitAllocation
 from app.domain.users import User
 
-from .service import ensure_notification
-
-PROFIT_PENDING = "PROFIT_PENDING"
-PROFIT_ALLOCATED = "PROFIT_ALLOCATED"
+from .service import PROFIT_ALLOCATED, PROFIT_PENDING, ensure_notification
 
 
 def _valid_user_ids(session: Session, candidates: set[int]) -> set[int]:

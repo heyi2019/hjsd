@@ -450,7 +450,7 @@ describe("OrderDetail", () => {
           rebate_type: "BUY",
           channel: "买号返点",
           rate: "10",
-          base_amount: "100.00",
+          amount: "100.00",
           status: "OPEN",
           collected_on: "2026-11-02",
         }],

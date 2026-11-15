@@ -22,7 +22,7 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.domain.enums import AccountingAttribute, Direction, FundNature, Nature
+from app.domain.enums import AccountingAttribute, Direction, FundNature, Nature, OrderStatus
 from app.domain.trade import Account, OrderEvent
 from app.foundation.order_types import resolve_default_pool
 from app.value_added_services import create as inst_create
@@ -45,7 +45,12 @@ from app.orders.links import (
 )
 from app.orders.mutations import update_order as orders_update_order
 from app.orders.pools import pool_balance as orders_pool_balance, pool_balance_summary
-from app.orders.queries import count_orders, list_orders as orders_list_orders
+from app.orders.queries import (
+    count_orders,
+    list_orders as orders_list_orders,
+    order_ledger_summary,
+    order_status_counts,
+)
 
 from .router_output import (
     _actor,
@@ -104,6 +109,10 @@ def list_orders(
     owner_id: int | None = Query(default=None, gt=0),
     pool_id: int | None = Query(default=None, gt=0),
     keyword: str | None = Query(default=None, max_length=128),
+    business_mode: str | None = Query(default=None),
+    game_type: str | None = Query(default=None),
+    account_status: str | None = Query(default=None),
+    sort_desc: bool | None = Query(default=None),
     mine: bool = Query(default=False),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
@@ -119,6 +128,10 @@ def list_orders(
         owner_id=owner_id,
         pool_id=pool_id,
         keyword=keyword,
+        business_mode=business_mode,
+        game_type=game_type,
+        account_status=account_status,
+        sort_desc=sort_desc,
         mine=mine,
         limit=limit,
         offset=offset,
@@ -129,11 +142,63 @@ def list_orders(
         total=count_orders(
             db, order_type=order_type, status=status, trade_date_from=trade_date_from,
             trade_date_to=trade_date_to, owner_id=owner_id, pool_id=pool_id,
-            keyword=keyword, user=_user, mine=mine,
+            keyword=keyword, business_mode=business_mode, game_type=game_type,
+            account_status=account_status, user=_user, mine=mine,
         ),
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/orders/summary", response_model=schemas.OrderSummaryOut)
+def order_summary(
+    mine: bool = Query(default=False),
+    trade_date_from: date | None = Query(default=None),
+    trade_date_to: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_orders,
+) -> schemas.OrderSummaryOut:
+    """工作台与数据中心订单卡片：按可见范围、日期和状态汇总。"""
+    counts = order_status_counts(
+        db,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        user=user,
+        mine=mine,
+    )
+    return schemas.OrderSummaryOut(
+        total_count=sum(counts.values()),
+        completed_count=counts.get(OrderStatus.COMPLETED.value, 0),
+        active_count=counts.get(OrderStatus.ACTIVE.value, 0) + counts.get(OrderStatus.INSTALLMENT.value, 0),
+    )
+
+
+@router.get("/orders/ledger-summary", response_model=schemas.OrderLedgerSummaryOut)
+def order_ledger_summary_endpoint(
+    mine: bool = Query(default=False),
+    trade_date_from: date | None = Query(default=None),
+    trade_date_to: date | None = Query(default=None),
+    order_type: str | None = Query(default=None),
+    business_mode: str | None = Query(default=None),
+    game_type: str | None = Query(default=None),
+    account_status: str | None = Query(default=None),
+    keyword: str | None = Query(default=None, max_length=128),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_orders,
+) -> schemas.OrderLedgerSummaryOut:
+    counts = order_ledger_summary(
+        db,
+        order_type=order_type,
+        business_mode=business_mode,
+        game_type=game_type,
+        account_status=account_status,
+        keyword=keyword,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        user=user,
+        mine=mine,
+    )
+    return schemas.OrderLedgerSummaryOut(**counts)
 
 
 @router.post("/orders", response_model=schemas.OrderOut, status_code=201)

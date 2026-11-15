@@ -5,6 +5,7 @@ import { gameTypesApi } from "@/shared/api/misc.api";
 import { orderTypesApi } from "@/shared/api/orders.api";
 import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi } from "@/shared/api/pools.api";
+import { auditApi } from "@/shared/api/reports.api";
 import type { Pool } from "@/shared/api/types/finance";
 import type { OrderType } from "@/shared/api/types/orders";
 vi.mock("@/shared/api/cashflows.api");
@@ -51,6 +52,8 @@ beforeEach(() => {
   vi.mocked(poolsApi.list).mockResolvedValue(pools);
   vi.mocked(gameTypesApi.list).mockResolvedValue([]);
   vi.mocked(policyApi.list).mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(auditApi.list).mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(auditApi.actions).mockResolvedValue([]);
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
   // 默认非紧凑：matchMedia 对任何查询返回 matches=false（与 setup.ts afterEach 一致）。
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
@@ -78,12 +81,21 @@ describe("SettingsPage.deep", () => {
     expect(screen.getByRole("tab", { name: "导入" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "人员与权限" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "团队管理" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "审计记录" })).toBeInTheDocument();
     // 配置中心为聚合入口
     expect(screen.getByRole("tab", { name: "配置中心" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "外观" })).toBeInTheDocument();
     // 原独立业务配置页签已移除
     expect(screen.queryByRole("tab", { name: "业务类型" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "游戏与渠道" })).toBeNull();
+  });
+
+  it("设置页的审计记录页签挂载完整审计流水", async () => {
+    renderLight(<SettingsPage />, { user: "admin" });
+    await screen.findByRole("tab", { name: "业务字典" });
+    await ui.click(screen.getByRole("tab", { name: "审计记录" }));
+    expect((await screen.findAllByText("审计记录")).length).toBeGreaterThan(1);
+    expect(screen.getByPlaceholderText("对象编号")).toBeInTheDocument();
   });
 
   it("查看人(viewer)屏蔽 import.manage / user.manage 条件 Tab，配置中心仍可见", async () => {

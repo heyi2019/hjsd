@@ -133,8 +133,7 @@ REBATE_EXPORT_COLUMNS = [
     ("rebate_no", "返点单号", True),
     ("rebate_type", "返点类型", True),
     ("channel", "渠道", True),
-    ("rate", "费率(%)", True),
-    ("base_amount", "基数", True),
+    ("amount", "返点金额", True),
     ("link_status", "关联状态", True),
     ("status", "状态", True),
     ("collected_on", "收到日期", True),
@@ -240,16 +239,13 @@ def _cashflow_export_rows(
 def _rebate_export_rows(order_no: str, detail: dict) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for rebate in detail.get("rebates") or []:
-        # 返点金额 = 返点记录 base_amount（全站唯一口径）；rate 仅作留痕，
-        # 不再用「基数 × 费率%」派生第二个金额。
         rows.append(
             {
                 "order_no": order_no,
                 "rebate_no": rebate.get("rebate_no"),
                 "rebate_type": rebate.get("rebate_type"),
                 "channel": rebate.get("channel"),
-                "rate": _money_or_none(rebate.get("rate")),
-                "base_amount": _money_or_none(rebate.get("base_amount")),
+                "amount": _money_or_none(rebate.get("amount")),
                 "link_status": rebate.get("link_status"),
                 "status": rebate.get("status"),
                 "collected_on": rebate.get("collected_on"),

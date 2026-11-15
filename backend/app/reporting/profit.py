@@ -67,7 +67,7 @@ def order_profit_detail(
         rebate_rows = session.execute(
             select(
                 RebateRecord.source_order_id,
-                func.coalesce(func.sum(RebateRecord.base_amount), 0),
+                func.coalesce(func.sum(RebateRecord.amount), 0),
             )
             .where(RebateRecord.source_order_id.in_(order_ids))
             .where(RebateRecord.status != RebateStatus.VOID.value)

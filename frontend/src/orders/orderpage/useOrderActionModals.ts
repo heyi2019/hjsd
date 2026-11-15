@@ -77,7 +77,7 @@ export function useOrderActionModals({
       setUsers(userResult.filter((item) => item.is_active));
       setAllocationCandidates(candidates);
       setAllocationProfit(result.order_profit ?? "0");
-      const rows: AllocationFormRow[] = buildActionAllocationRows(result.items, candidates);
+      const rows: AllocationFormRow[] = buildActionAllocationRows(result.items, candidates, result.totals_by_type);
       // 弹窗是复用的：先清空上次打开残留的字段（含 form_extra 自定义字段），再回填本单数据。
       allocationForm.resetFields();
       allocationForm.setFieldsValue({

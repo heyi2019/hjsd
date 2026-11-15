@@ -1,4 +1,4 @@
-"""REBATE-01 返点规则快照契约测试。"""
+"""REBATE-01 返点金额契约测试。"""
 from __future__ import annotations
 
 from datetime import date
@@ -8,8 +8,6 @@ from app.finance.rebates import create_rebate
 from app.stocks.profile import create_account
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy import definitions as policy_definitions
-from app.policy import versions as policy_versions
 
 
 D = date(2026, 10, 17)
@@ -43,33 +41,17 @@ def _order_with_buy(seeded_db) -> int:
     return order.id
 
 
-def test_rebate_uses_active_rule_rate_when_rate_is_omitted(seeded_db):
-    definition = policy_definitions.create_definition(
-        seeded_db,
-        policy_code="REBATE",
-        name="返点规则",
-        scope_type="GLOBAL",
-        actor="pytest",
-    )
-    policy_versions.create_version(
-        seeded_db,
-        definition["id"],
-        effective_from=D,
-        config={"rates": {"BUY": "7.50", "SELL": "3.00"}},
-        actor="pytest",
-    )
-
+def test_rebate_amount_is_explicit(seeded_db):
     record = create_rebate(
         seeded_db,
         source_order_id=_order_with_buy(seeded_db),
         rebate_type="BUY",
-        base_amount=Decimal("1000"),
+        amount=Decimal("1000"),
         collected_on=D,
         actor="pytest",
     )
 
-    assert record.rate == Decimal("7.50")
-    assert record.policy_snapshot["config"]["rates"]["BUY"] == "7.50"
+    assert record.amount == Decimal("1000.00")
     assert record.status == "SETTLED"
 
 

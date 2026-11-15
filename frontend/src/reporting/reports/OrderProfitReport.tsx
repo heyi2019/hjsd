@@ -36,7 +36,7 @@ export function OrderProfit({ range }: { range: ReportRange }) {
   return (
     <Card className="glass" title="订单利润明细">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      <Space className="ui-filter-bar">{picker}</Space>
+      <Space className="ui-filter-bar ui-filter-bar--spaced">{picker}</Space>
       <Typography.Text type="secondary">净利 = 所有收入 − 所有支出；采购支出与返点按订单关联明细核对。</Typography.Text>
       <StatRow
         items={[

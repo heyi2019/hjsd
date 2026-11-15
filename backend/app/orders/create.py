@@ -278,11 +278,11 @@ def create_order(
                 details={"field": "owner_id", "owner_id": owner_id},
             )
 
-    # BAS-06-04 规则快照：按成交日固化当时生效的返点/提成规则。
+    # BAS-06-04 规则快照：按成交日固化当时生效的分润规则。
     # 规则改版不回写这里，历史订单永远按当时口径计算。
     snapshot: dict[str, Any] = {}
     primary_version_id: int | None = None
-    for code in (PolicyType.REBATE.value, PolicyType.COMMISSION.value):
+    for code in (PolicyType.COMMISSION.value,):
         version_id, snap = policy_versions.make_snapshot(
             session,
             policy_code=code,
@@ -293,7 +293,7 @@ def create_order(
         if snap is None:
             continue
         snapshot[code] = snap
-        # policy_version_id 只存一个主版本（返点优先），完整参数在 policy_snapshot 里
+        # policy_version_id 保存当前订单的主规则版本，完整参数在 policy_snapshot 里
         if primary_version_id is None:
             primary_version_id = version_id
 

@@ -34,7 +34,7 @@ export function useOrdersPageController(params: {
     gameTypeFilter, setGameTypeFilter, inventoryStatusFilter, setInventoryStatusFilter,
     dateRange, setDateRange, keyword, setKeyword,
     orderBusinessOptions, orderBusinessModeOptions, inventoryStatusOptions,
-    gameTypeOptions, typeNames, filteredOrders, typeCountBase, load,
+    gameTypeOptions, typeNames, filteredOrders, pageTotal, ledgerSummary, summaryLoading, summaryError, load,
   } = list;
 
   // —— 建单入口 / 当前选中订单（跨域共享枢纽） ——
@@ -121,6 +121,9 @@ export function useOrdersPageController(params: {
     currentOperator: currentOperator,
     dateRange: dateRange,
     filteredOrders: filteredOrders,
+    ledgerSummary: ledgerSummary,
+    summaryLoading: summaryLoading,
+    summaryError: summaryError,
     gameTypeFilter: gameTypeFilter,
     gameTypeOptions: gameTypeOptions,
     hasSharedCancellation: hasSharedCancellation,
@@ -144,6 +147,7 @@ export function useOrdersPageController(params: {
     orders: orders,
     page: page,
     pageSize: pageSize,
+    pageTotal: pageTotal,
     reversibleEvents: reversibleEvents,
     selectedOrder: selectedOrder,
     setActiveTab: setActiveTab,
@@ -173,7 +177,6 @@ export function useOrdersPageController(params: {
     setTypes: setTypes,
     sharedCancellationEvent: sharedCancellationEvent,
     submitCancelTransaction: submitCancelTransaction,
-    typeCountBase: typeCountBase,
     typeNames: typeNames,
     types: types,
   };

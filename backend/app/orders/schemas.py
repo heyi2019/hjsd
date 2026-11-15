@@ -258,6 +258,27 @@ class OrderListOut(OrderOut):
     installment_status: str | None = None
 
 
+class OrderSummaryOut(BaseModel):
+    """订单总量卡片只需的后端聚合结果。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    total_count: int
+    completed_count: int
+    active_count: int = 0
+
+
+class OrderLedgerSummaryOut(BaseModel):
+    """Filtered order-ledger totals aggregated by the backend."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    total_count: int
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    type_counts: dict[str, int] = Field(default_factory=dict)
+    game_types: list[str] = Field(default_factory=list)
+
+
 class EventCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -355,8 +376,7 @@ class OrderRebateOut(BaseModel):
     rebate_no: str
     rebate_type: str
     channel: str | None = None
-    rate: Decimal
-    base_amount: Decimal
+    amount: Decimal
     link_status: str
     status: str
     collected_on: date
@@ -449,6 +469,7 @@ class PoolBalanceOut(BaseModel):
 class PoolBalanceTotalsOut(BaseModel):
     """资金池余额汇总：服务端按 Decimal 聚合，前端只展示不再自己累加。"""
 
+    pool_count: int
     cash_balance: Decimal
     # 可用余额 = 现金余额；押金占用已在 expense 扣过一次，不再二次减 deposit_held。
     available: Decimal

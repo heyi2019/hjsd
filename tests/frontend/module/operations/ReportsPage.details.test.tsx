@@ -41,7 +41,7 @@ vi.mock("@/shared/api/stocks.api");
 beforeEach(() => {
   vi.clearAllMocks();
   resolveMock(vi.mocked(reportsApi.monthlyPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
+  resolveMock(vi.mocked(reportsApi.commission), { order_groups: [], total: { order_count: 0, profit_base: "0", payable: "0", paid: "0", difference: "0" } });
   vi.mocked(employeesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
@@ -52,7 +52,7 @@ beforeEach(() => {
   // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
   resolveMock(vi.mocked(poolsApi.balances), {
     items: [],
-    totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
+    totals: { pool_count: 0, cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
   vi.mocked(ordersApi.list).mockResolvedValue([]);
 });
@@ -62,7 +62,7 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：各报表渲染与错误态", () => {
-  it("月度损益：渲染月份与销售收入", async () => {
+  it("经营损益：同时渲染月度趋势与业务拆分", async () => {
     resolveMockOnce(vi.mocked(reportsApi.monthlyPnl), {
       from: "2026-09",
       to: "2026-09",
@@ -78,13 +78,6 @@ describe("ReportsPage：各报表渲染与错误态", () => {
         },
       ],
     });
-    renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("月度损益");
-    expect(await screen.findByText("2026-09")).toBeInTheDocument();
-    expect(screen.getAllByText("2,000.00").length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("业务损益：渲染业务与主营收入", async () => {
     resolveMock(vi.mocked(reportsApi.businessPnl), {
       items: [
         {
@@ -97,7 +90,9 @@ describe("ReportsPage：各报表渲染与错误态", () => {
       total: {},
     });
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("业务损益");
+    await gotoTab("经营损益");
+    expect(await screen.findByText("2026-09")).toBeInTheDocument();
+    expect(screen.getAllByText("2,000.00").length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText(/HS/)).toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
   });

@@ -1,8 +1,10 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import dayjs from "dayjs";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
+import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
 import { resolveMock } from "@fixtures/mock-api";
 import { appMessage } from "@/shared/ui/appFeedback";
 
@@ -10,6 +12,7 @@ import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reportsApi } from "@/shared/api/reports.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -47,12 +50,11 @@ beforeEach(() => {
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
   resolveMock(vi.mocked(reportsApi.monthlyPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
+  resolveMock(vi.mocked(reportsApi.commission), { order_groups: [], total: { order_count: 0, profit_base: "0", payable: "0", paid: "0", difference: "0" } });
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 7, username: "operator", display_name: "业务同事", is_active: true },
     { id: 8, username: "finance", display_name: "财务同事", is_active: true },
   ]);
-  resolveMock(vi.mocked(reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
   resolveMock(vi.mocked(reportsApi.orderProfit), { items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
   resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
@@ -61,9 +63,10 @@ beforeEach(() => {
   // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
   resolveMock(vi.mocked(poolsApi.balances), {
     items: [],
-    totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
+    totals: { pool_count: 0, cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
   vi.mocked(ordersApi.list).mockResolvedValue([]);
+  vi.mocked(stocksApi.inventory).mockResolvedValue({ items: [], count: 0, total_cost: "0.00" });
 });
 
 async function gotoTab(label: string) {
@@ -71,15 +74,43 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：经营中心报表", () => {
-  it("初始只加载当前激活的月度损益报表，不提前加载隐藏 Tab", async () => {
+  it("初始加载合并后的经营损益，不提前加载隐藏 Tab", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "月度损益" });
+    await screen.findByRole("tab", { name: "经营损益" });
     expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(reportsApi.commission)).not.toHaveBeenCalled();
     expect(vi.mocked(reportsApi.dailyFunds)).not.toHaveBeenCalled();
-    expect(vi.mocked(reportsApi.businessPnl)).not.toHaveBeenCalled();
     expect(vi.mocked(reportsApi.orderProfit)).not.toHaveBeenCalled();
     expect(vi.mocked(poolsApi.list)).not.toHaveBeenCalled();
+  });
+
+  it("经营报表的日期筛选与统计卡之间保留纵向间距", async () => {
+    renderLight(<ReportsPage />, { user: "admin" });
+
+    const expectSpacedFilterBar = () => {
+      expect(document.querySelector(".ui-filter-bar")).toHaveClass("ui-filter-bar--spaced");
+    };
+
+    await screen.findByRole("tab", { name: "经营损益" });
+    expectSpacedFilterBar();
+
+    for (const label of ["分润对账", "经营损益"]) {
+      await ui.click(screen.getByRole("tab", { name: label }));
+      await waitFor(expectSpacedFilterBar);
+    }
+  });
+
+  it("日期筛选提供本期和上期快捷入口，账期按每月16日至次月15日计算", async () => {
+    expect(currentReportPeriod(dayjs("2026-11-16"))).toEqual({ from: "2026-11-16", to: "2026-12-15" });
+    expect(previousReportPeriod(dayjs("2026-11-16"))).toEqual({ from: "2026-10-16", to: "2026-11-15" });
+    renderLight(<ReportsPage />, { user: "admin" });
+    expect(await screen.findByRole("button", { name: "本期" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "上期" })).toBeInTheDocument();
+    const dateInputs = document.querySelectorAll<HTMLInputElement>(".ant-tabs-tabpane-active .ui-control-width-date");
+    await ui.click(screen.getByRole("button", { name: "本期" }));
+    expect(dateInputs[0]).toHaveValue(currentReportPeriod(dayjs()).from);
+    expect(dateInputs[1]).toHaveValue(currentReportPeriod(dayjs()).to);
   });
 
   it("我的收益只加载当前登录用户的分润记录", async () => {
@@ -135,12 +166,22 @@ describe("ReportsPage：经营中心报表", () => {
     ));
   });
 
-  it("六个 Tab 齐全（四类经营报表 + 订单利润 + 数据中心）", async () => {
+  it("四个 Tab 齐全（经营损益合并月度与业务报表）", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "月度损益" });
-    for (const label of ["月度损益", "分润对账", "资金日报", "业务损益", "订单利润", "数据中心"]) {
+    await screen.findByRole("tab", { name: "经营损益" });
+    expect(Array.from(screen.getAllByRole("tab")).map((tab) => tab.textContent)).toEqual([
+      "数据中心",
+      "订单利润",
+      "分润对账",
+      "经营损益",
+    ]);
+    for (const label of ["经营损益", "分润对账", "订单利润", "数据中心"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
+    expect(screen.queryByRole("tab", { name: "月度损益" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "业务损益" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "资金日报" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "审计记录" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "库存 R1" })).not.toBeInTheDocument();
   });
 
@@ -149,6 +190,7 @@ describe("ReportsPage：经营中心报表", () => {
     renderLight(<ReportsPage onNavigate={onNavigate} />, { user: "admin" });
     await gotoTab("数据中心");
     expect(await screen.findByText("可用余额合计")).toBeInTheDocument();
+    expect(document.querySelectorAll(".ant-tabs-tabpane-active .ui-control-width-date")).toHaveLength(2);
     await ui.click(screen.getByRole("button", { name: /订单总数/ }));
     expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
   });
@@ -169,8 +211,9 @@ describe("ReportsPage：经营中心报表", () => {
   it("报表页内导出按钮无筛选也能导出并给出成功反馈", async () => {
     const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("月度损益");
-    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await gotoTab("经营损益");
+    const monthlyCard = screen.getByText("月度经营损益").closest(".ant-card") as HTMLElement;
+    await ui.click(within(monthlyCard).getByRole("button", { name: "导出 CSV" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith("已导出 monthly-pnl.csv"));
   });

@@ -2,8 +2,8 @@
 
 为什么需要
 ----------
-规则编码是**闭集**：后端 `app/domain/enums.py::PolicyType` 只有 6 个固定值，
-`orders/service.py::make_snapshot` 只按固定编码（REBATE / COMMISSION）取快照。
+规则编码是**闭集**：后端 `app/domain/enums.py::PolicyType` 只有固定值，
+订单创建只固化仍在使用的 COMMISSION 规则快照。
 而 `policy/service.py::create_definition` **不校验编码是否属于 PolicyType**，
 所以任何入口都能写出「没人消费」的脏编码定义，且**不报错、静默失效**。
 因此定义收敛为系统预置，不再由页面创建；用户只管「设置配置 → 生成新版本并发布」。
@@ -50,7 +50,6 @@ from app.policy import versions as policy_versions
 
 # (编码, 名称, 说明) —— 编码严格取自 PolicyType，不新增、不自造。
 POLICY_SEEDS: list[tuple[str, str, str]] = [
-    ("REBATE", "返点比例", "返点计提口径；建单时固化快照"),
     ("COMMISSION", "提成分配", "订单提成口径；利润分配四项拆分由订单详情录入"),
     ("INSTALLMENT", "分期规则", "分期期数与节奏"),
     ("WRITE_DOWN", "跌价规则", "跌价计提口径"),
@@ -59,15 +58,13 @@ POLICY_SEEDS: list[tuple[str, str, str]] = [
 ]
 
 # 每个规则预置 1 条已发布默认版本，使配置直接就位。
-# REBATE/INSTALLMENT 的默认值由库内真实业务数据反推（rebate_records.rate 区间 3~10、
-# installments.periods 众数 3）。
+# INSTALLMENT 的默认值由库内真实业务数据反推（installments.periods 众数 3）。
 # COMMISSION/WRITE_DOWN/REFUND 库内无对应历史流水；按「不猜值」纪律
 # 「未配置提成规则显示待配置，不猜值」，config 置空（{}）表示待配置，而非填假值 0。
 # 例外：COMMISSION 的分润比例是业务既定口径（买入动作 30 / 卖出动作 30 / 运营动作 0 /
 # 公司 40，合计 100），不是猜值，故直接预置；且 create_version 拒绝空 config，
 # 预置 {} 会在 --apply 时直接抛「规则参数不能为空」。
 DEFAULT_VERSION_CONFIG: dict[str, dict[str, object]] = {
-    "REBATE": {"rate": "5"},
     "COMMISSION": {"split": {"BUY": "30", "SELL": "30", "OPERATION": "0", "COMPANY": "40"}},
     "INSTALLMENT": {"periods": "3", "cycle": "monthly"},
     "WRITE_DOWN": {},

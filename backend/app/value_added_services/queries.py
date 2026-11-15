@@ -9,11 +9,12 @@ from collections import defaultdict
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
 from app.core.security import CurrentUser, owner_scope_filter
+from app.domain.enums import InstallmentStatus
 from app.domain.trade import Installment, InstallmentDisposition, InstallmentSchedule, Order
 
 
@@ -140,6 +141,16 @@ def installment_totals(
             func.coalesce(func.sum(receivable), 0),
             func.coalesce(func.sum(Installment.paid_amount), 0),
             func.coalesce(func.sum(remaining), 0),
+            func.count(Installment.id),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (Installment.status == InstallmentStatus.OVERDUE.value, 1),
+                        else_=0,
+                    )
+                ),
+                0,
+            ),
         ).join(Order, Order.id == Installment.order_id),
         session=session,
         status=status,
@@ -149,9 +160,11 @@ def installment_totals(
         trade_date_to=trade_date_to,
         user=user,
     )
-    total_receivable, total_paid, total_remaining = session.execute(stmt).one()
+    total_receivable, total_paid, total_remaining, total_count, overdue_count = session.execute(stmt).one()
     return {
         "total_receivable": to_money(total_receivable or 0),
         "total_paid": to_money(total_paid or 0),
         "total_remaining": to_money(total_remaining or 0),
+        "total_count": int(total_count or 0),
+        "overdue_count": int(overdue_count or 0),
     }

@@ -31,7 +31,28 @@ def list_allocations(
         items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
         total=len(items),
         order_profit=order_amounts(db, order_id)["PROFIT"],
+        totals_by_type=service.summarize_allocations_by_type(items),
     )
+
+
+@router.post(
+    "/orders/{order_id}/profit-allocations/convert",
+    response_model=schemas.ProfitAllocationConvertOut,
+)
+def convert_allocation_value(
+    order_id: int,
+    payload: schemas.ProfitAllocationConvertIn,
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = manage_access,
+) -> schemas.ProfitAllocationConvertOut:
+    converted = service.convert_action_allocation(
+        db,
+        order_id,
+        direction=payload.direction,
+        value=payload.value,
+        user=user,
+    )
+    return schemas.ProfitAllocationConvertOut(value=converted)
 
 
 @router.put("/orders/{order_id}/profit-allocations", response_model=schemas.ProfitAllocationListOut)
@@ -53,6 +74,7 @@ def set_allocations(
         items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
         total=len(items),
         order_profit=order_amounts(db, order_id)["PROFIT"],
+        totals_by_type=service.summarize_allocations_by_type(items),
     )
 
 

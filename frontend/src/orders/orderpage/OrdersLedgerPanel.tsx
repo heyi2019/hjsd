@@ -4,7 +4,6 @@ import type { BusinessCenterEntryTab } from "../businessCenter";
 import { DataTable, PermissionButton, Select, StatRow } from "../../shared/ui";
 import { OrderDetail } from "../OrderDetailView/OrderDetail";
 import type { OrderPartyLink } from "../OrderDetailView/OrderDetail.shared";
-import { countBusinessOrders } from "./helpers";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 import type { OrdersPageController } from "./useOrdersPageController";
 import { markMobileHiddenColumns } from "../../shared/lib/listColumns";
@@ -25,6 +24,9 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     dateRange,
     expandedOrderIds,
     filteredOrders,
+    ledgerSummary,
+    summaryLoading,
+    summaryError,
     gameTypeFilter,
     gameTypeOptions,
     handleLedgerExpand,
@@ -36,7 +38,6 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     ledgerOrderDetails,
     ledgerExporting,
     ledgerSortDesc,
-    loadError,
     loading,
     onExportLedger,
     onExportLedgerXlsx,
@@ -44,7 +45,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     orderBusinessOptions,
     orderTypeFilter,
     page,
-    typeCountBase,
+    pageTotal,
     pageSize,
     setBusinessModeFilter,
     setDateRange,
@@ -67,18 +68,18 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     openLedgerEditor,
   } = controller;
 
-  const statValue = (value: number) => (loading ? "—" : loadError ? "不可用" : String(value));
-  // 计数基线由 useLedgerList 提供（已应用关键词/日期/游戏类型/库存状态/业务模式，独独不含「类型」），
-  // 与「订单总量」卡片同口径；用原始 orders 计数会出现「全部 627 / 订单总量 12」的自相矛盾。
-  const typeCount = (key: BusinessFilterKey) => countBusinessOrders(typeCountBase, key, businessModeFilter);
+  const statValue = (value: number | undefined) => (summaryLoading ? "—" : summaryError ? "不可用" : String(value ?? 0));
+  const typeCount = (key: BusinessFilterKey) => key === "all"
+    ? Object.values(ledgerSummary?.type_counts ?? {}).reduce((sum, count) => sum + count, 0)
+    : ledgerSummary?.type_counts[key] ?? 0;
 
   return (
     <section className="ui-stack orders-ledger-panel">
       <StatRow items={[
-        { label: "订单总量", kind: "count", amount: statValue(filteredOrders.length) },
-        { label: "进行中订单", kind: "count", amount: statValue(filteredOrders.filter((order) => ["ACTIVE", "INSTALLMENT"].includes(order.status)).length) },
-        { label: "完成订单量", kind: "count", amount: statValue(filteredOrders.filter((order) => order.status === "COMPLETED").length) },
-        { label: "已取消订单", kind: "count", amount: statValue(filteredOrders.filter((order) => order.status === "CANCELLED").length) },
+        { label: "订单总量", kind: "count", amount: statValue(ledgerSummary?.total_count) },
+        { label: "进行中订单", kind: "count", amount: statValue((ledgerSummary?.status_counts.ACTIVE ?? 0) + (ledgerSummary?.status_counts.INSTALLMENT ?? 0)) },
+        { label: "完成订单量", kind: "count", amount: statValue(ledgerSummary?.status_counts.COMPLETED) },
+        { label: "已取消订单", kind: "count", amount: statValue(ledgerSummary?.status_counts.CANCELLED) },
       ]} />
       <Card className="glass orders-ledger-card">
         <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters orders-ledger-filters">
@@ -159,7 +160,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
           loading={loading}
           page={page}
           pageSize={pageSize}
-          total={filteredOrders.length}
+          total={pageTotal}
           emptyText="暂无业务订单"
           className="inventory-table orders-ledger"
           expandable={{

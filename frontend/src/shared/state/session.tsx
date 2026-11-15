@@ -6,7 +6,6 @@ import { ACCESS_TOKEN_KEY, changePassword as changePasswordApi, currentDevUser, 
 
 export const ALL_PERMISSIONS = [
   "customer.read",
-  "customer.contact.read",
   "customer.create",
   "customer.update",
   "customer.contact.write",
@@ -41,7 +40,6 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "customer.read",
     "customer.create",
     "customer.update",
-    "customer.contact.read",
     "customer.contact.write",
     "counterparty.read",
     "order.create",
@@ -57,7 +55,6 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "finance.transfer",
     "finance.order.event.post",
         "customer.read",
-    "customer.contact.read",
     "counterparty.read",
     "audit.read",
     "report.read",
@@ -66,7 +63,6 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   auditor: [
     "finance.read",
     "customer.read",
-    "customer.contact.read",
     "counterparty.read",
     "policy.manage",
     "audit.read",

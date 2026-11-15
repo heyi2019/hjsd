@@ -36,6 +36,17 @@ def list_my_notifications(
     )
 
 
+@router.get("/notifications/summary", response_model=schemas.NotificationSummaryOut)
+def notification_summary(
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> schemas.NotificationSummaryOut:
+    """工作台所需的通知汇总，只返回未读分润通知数。"""
+    return schemas.NotificationSummaryOut(
+        unread_profit_total=service.unread_profit_count(db, recipient_user_id=user.id)
+    )
+
+
 @router.post("/notifications/{notification_id}/read", response_model=schemas.NotificationOut)
 def mark_notification_read(
     notification_id: int,

@@ -50,8 +50,8 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
     pageSize,
     renderContact,
     requestEdit,
-    revealed,
     rows,
+    summary,
     searchInput,
     setCreateOpen,
     setKeyword,
@@ -87,11 +87,11 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Typography.Paragraph type="secondary">
-        联系方式默认脱敏；完整联系方式按权限展示并记录读取审计。拉黑/已合并客户不可作为新订单参与方。
+        联系方式直接展示已建档原值；拉黑或已合并客户不可作为新订单参与方。
       </Typography.Paragraph>
       <StatRow
         items={[
-          { label: "客户总数", kind: "count", amount: rows === null ? "不可用" : String(rows.length) },
+          { label: "客户总数", kind: "count", amount: rows === null ? "不可用" : String(summary?.total_count ?? 0) },
           { label: "本月新增客户数", kind: "count", amount: rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
           { label: "今日新增客户数", kind: "count", amount: rows === null ? "不可用" : String(newTodayCount ?? 0) },
         ]}
@@ -155,7 +155,6 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       <CustomerEditModal
         editTarget={editTarget}
         activeDefs={activeDefs}
-        revealed={revealed}
         editForm={editForm}
         onCancel={cancelEdit}
         onSubmit={submitEdit}

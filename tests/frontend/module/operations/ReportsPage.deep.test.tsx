@@ -43,11 +43,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   resolveMock(vi.mocked(reportsApi.monthlyPnl), { items: [], total: {} });
   resolveMock(vi.mocked(reportsApi.commission), {
-    items: [],
-    total: { order_count: 0, payable: "0", paid: "0", difference: "0" },
+    order_groups: [],
+    total: { order_count: 0, profit_base: "0", payable: "0", paid: "0", difference: "0" },
   });
   vi.mocked(employeesApi.list).mockResolvedValue([]);
-  resolveMock(vi.mocked(reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
   resolveMock(vi.mocked(reportsApi.orderProfit), {
     items: [],
@@ -59,7 +58,7 @@ beforeEach(() => {
   // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
   resolveMock(vi.mocked(poolsApi.balances), {
     items: [],
-    totals: { cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
+    totals: { pool_count: 0, cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
   vi.mocked(ordersApi.list).mockResolvedValue([]);
 });
@@ -69,55 +68,67 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
-  it("分润对账：渲染人员/订单/费率/应付与差异统计", async () => {
+  it("分润对账：按订单汇总并展开查看每个人的分润明细", async () => {
+    vi.mocked(employeesApi.list).mockResolvedValueOnce([
+      { id: 1, username: "zhang", display_name: "张三", is_active: true },
+      { id: 2, username: "li", display_name: "李四", is_active: true },
+    ]);
     resolveMockOnce(vi.mocked(reportsApi.commission), {
-      items: [
-        { user_id: 1, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10", payable: "10.00", paid: "5.00", difference: "5.00" },
-      ],
-      total: { order_count: 1, payable: "10.00", paid: "5.00", difference: "5.00" },
+      order_groups: [{
+        order_id: 10,
+        order_no: "HS-2026-0010",
+        inventory_date: "2026-10-02",
+        outbound_date: "2026-10-04",
+        profit_base: "200.00",
+        orders: [
+          { user_id: 1, order_id: 10, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10" },
+          { user_id: 2, order_id: 10, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10" },
+        ],
+      }],
+      total: { order_count: 1, profit_base: "200.00", payable: "20.00", paid: "10.00", difference: "10.00" },
     });
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("分润对账");
-    await screen.findByText("HS-2026-0010");
-    expect(screen.getByText("0.10")).toBeInTheDocument(); // 费率列
-    expect(screen.getByText("应付合计")).toBeInTheDocument(); // StatRow label
-    expect(screen.getAllByText("差异").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
+    await screen.findAllByText("HS-2026-0010");
+    expect(screen.getAllByText("HS-2026-0010")).toHaveLength(1);
+    expect(screen.getByText("入库日期")).toBeInTheDocument();
+    expect(screen.getByText("出库日期")).toBeInTheDocument();
+    expect(screen.getByText("2026-10-02")).toBeInTheDocument();
+    expect(screen.getByText("2026-10-04")).toBeInTheDocument();
+    expect(screen.queryByText("分润基数")).toBeNull();
+    await ui.click(screen.getByRole("button", { name: /展开.*HS-2026-0010/ }));
+    expect(await screen.findByText("分润基数")).toBeInTheDocument();
+    expect(screen.getByText("张三")).toBeInTheDocument();
+    expect(screen.getByText("李四")).toBeInTheDocument();
+    expect(screen.getAllByText("0.10")).toHaveLength(2); // 展开明细的费率列
+    expect(screen.getAllByText("分润合计")).toHaveLength(2); // StatRow label + table header
+    expect(screen.queryByText("应付合计")).toBeNull();
+    expect(screen.queryByText("已付合计")).toBeNull();
+    expect(screen.queryByText("差异")).toBeNull();
   });
 
-  it("资金日报：渲染资金池/期初/收支/余额与标题日期", async () => {
-    resolveMockOnce(vi.mocked(reportsApi.dailyFunds), {
-      date: "2026-10-08",
-      total: { cash_balance: "80.00", deposit_held: "10.00", available: "70.00" },
-      items: [
-        { pool_name: "POOL-A", opening: "100.00", income: "50.00", expense: "20.00", deposit_held: "10.00", cash_balance: "80.00", available: "70.00" },
-      ],
+  it("分润对账：只消费订单分组契约，不回退旧明细", async () => {
+    resolveMockOnce(vi.mocked(reportsApi.commission), {
+      order_groups: [],
+      total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },
     });
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金日报");
-    expect((await screen.findAllByText("POOL-A")).length).toBeGreaterThanOrEqual(1); // 资金池/名称两列同值
-    expect(screen.getByText(/2026-10-08/)).toBeInTheDocument(); // 标题含日期
-    expect(screen.getAllByText("现金余额").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
-    expect(screen.getAllByText("可用余额").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
+    await gotoTab("分润对账");
+    await waitFor(() => expect(screen.queryByText("LEGACY-001")).not.toBeInTheDocument());
   });
 
-  it("资金日报：切换日期带 on 参数重新拉取（#56）", async () => {
-    vi.mocked(reportsApi.dailyFunds).mockClear();
+  it("资金日报已下线，经营中心不再重复展示资金日报", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金日报");
-    await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenCalled());
-    const dateInput = screen.getByLabelText("资金日报日期");
-    await ui.clear(dateInput);
-    await ui.type(dateInput, "2026-10-08");
-    await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-08" }));
+    expect(screen.queryByRole("tab", { name: "资金日报" })).toBeNull();
+    expect(vi.mocked(reportsApi.dailyFunds)).not.toHaveBeenCalled();
   });
 
   it("FE-051：共享日期区间传递到经营报表和订单利润", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    const setFrom = async (report: "monthly" | "commission" | "business" | "profit") => {
+    const setFrom = async (report: "operating" | "commission" | "profit") => {
       const labels = {
-        monthly: "月度损益",
+        operating: "经营损益",
         commission: "分润对账",
-        business: "业务损益",
         profit: "订单利润",
       } as const;
       await gotoTab(labels[report]);
@@ -126,12 +137,11 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
       await ui.clear(input);
       await ui.type(input, "2026-10-01");
     };
-    await setFrom("monthly");
+    await setFrom("operating");
     await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
+    await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
     await setFrom("commission");
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", all_people: true }));
-    await setFrom("business");
-    await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
     await setFrom("profit");
     await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
   });
@@ -141,8 +151,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     const revokeUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("月度损益");
-    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await gotoTab("经营损益");
+    const monthlyCard = screen.getByText("月度经营损益").closest(".ant-card") as HTMLElement;
+    await ui.click(within(monthlyCard).getByRole("button", { name: "导出 CSV" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
     expect(createUrl).toHaveBeenCalled();
     expect(revokeUrl).toHaveBeenCalled();
@@ -164,9 +175,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     expect(vi.mocked(reportsApi.exportCsv)).not.toHaveBeenCalled();
   });
 
-  it("统计周期变更触发月度损益重新请求", async () => {
+  it("统计周期变更同时触发月度与业务损益重新请求", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("月度损益");
+    await gotoTab("经营损益");
     await screen.findAllByText("销售收入"); // MonthlyPnl StatRow + 列标题一定渲染
     // 父级提升的日期输入无 label，按激活 Tab 面板内的 class 定位（避开导出区的日期输入）
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
@@ -175,6 +186,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     // 区间变化 → monthlyPnl 重新请求（deps 含 params.from）
     await waitFor(() =>
       expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledWith({ from: "2026-01-01", to: undefined }),
+    );
+    await waitFor(() =>
+      expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenCalledWith({ from: "2026-01-01", to: undefined }),
     );
   });
 
@@ -193,7 +207,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     ) as never);
     renderLight(<ReportsPage />, { user: "admin" });
 
-    await gotoTab("月度损益");
+    await gotoTab("经营损益");
     await screen.findByText("2026-11");
     let pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
     const r2Dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
@@ -202,10 +216,8 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await ui.clear(r2Dates[1]);
     await ui.type(r2Dates[1], "2026-10-31");
     await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
-    await waitFor(() => expect(screen.queryByText("2026-11")).not.toBeInTheDocument());
-
-    await gotoTab("业务损益");
     await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+    await waitFor(() => expect(screen.queryByText("2026-11")).not.toBeInTheDocument());
   });
 
   it("FE-272：订单利润历史空区间清空收入成本和净利明细", async () => {
@@ -228,18 +240,11 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(screen.queryByText("HS-FE272")).not.toBeInTheDocument());
   });
 
-  it("FE-273：分润对账和资金日报日期筛选切换到历史空态", async () => {
+  it("FE-273：分润对账日期筛选切换到历史空态", async () => {
     vi.mocked(reportsApi.commission).mockImplementation((params) => Promise.resolve(
-      params?.from ? { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } } : {
-        items: [{ user_id: 1, order_no: "HS-FE273", profit_base: "10", rate: "0.1", payable: "1", paid: "0", difference: "1" }],
-        total: { order_count: 1, payable: "1", paid: "0", difference: "1" },
-      },
-    ) as never);
-    vi.mocked(reportsApi.dailyFunds).mockImplementation((params) => Promise.resolve(
-      params?.on === "2026-10-01" ? { date: "2026-10-01", total: {}, items: [] } : {
-        date: "2026-11-01",
-        total: { cash_balance: "10", deposit_held: "0", available: "10" },
-        items: [{ pool_name: "POOL-FE273", opening: "10", income: "0", expense: "0", deposit_held: "0", cash_balance: "10", available: "10" }],
+      params?.from ? { order_groups: [], total: { order_count: 0, profit_base: "0", payable: "0", paid: "0", difference: "0" } } : {
+        order_groups: [{ order_id: 273, order_no: "HS-FE273", profit_base: "10", orders: [{ user_id: 1, order_id: 273, order_no: "HS-FE273", profit_base: "10", rate: "0.1" }] }],
+        total: { order_count: 1, profit_base: "10", payable: "1", paid: "0", difference: "1" },
       },
     ) as never);
     renderLight(<ReportsPage />, { user: "admin" });
@@ -255,13 +260,6 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
     await waitFor(() => expect(screen.queryByText("HS-FE273")).not.toBeInTheDocument());
 
-    await gotoTab("资金日报");
-    await screen.findByLabelText("资金日报日期");
-    const dailyDate = screen.getByLabelText("资金日报日期");
-    await ui.clear(dailyDate);
-    await ui.type(dailyDate, "2026-10-01");
-    await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-01" }));
-    await waitFor(() => expect(screen.queryByText("POOL-FE273")).not.toBeInTheDocument());
   });
 
   it("分润对账加载失败显示错误条，点「重新加载」可重试成功", async () => {
@@ -270,6 +268,6 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await gotoTab("分润对账");
     await waitFor(() => expect(document.querySelector(".ui-error-banner")).toBeTruthy());
     await ui.click(screen.getByRole("button", { name: /重新加载/ }));
-    await screen.findByText("应付合计"); // 重试成功后渲染 Commission StatRow
+    await screen.findAllByText("分润合计"); // 重试成功后渲染 Commission StatRow + table header
   });
 });

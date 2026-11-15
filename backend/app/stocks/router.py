@@ -22,7 +22,9 @@ from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.stocks.inventory import (
     count_accounts,
+    dashboard_inventory_summary as stocks_dashboard_inventory_summary,
     inventory as stocks_inventory,
+    inventory_cost_by_entry_date as stocks_inventory_cost_by_entry_date,
     inventory_stats as stocks_inventory_stats,
     list_accounts as stocks_list_accounts,
 )
@@ -40,6 +42,8 @@ from .schemas import (
     AccountListOut,
     AccountProfileUpdate,
     AccountDeleteRequest,
+    DashboardInventorySummaryOut,
+    InventoryCostSummaryOut,
     InventoryResponseOut,
     InventoryStatsOut,
     InventoryStatsQuery,
@@ -170,6 +174,36 @@ def inventory(
     rows = stocks_inventory(db, user=_user)
     total = sum((row["cost_amount"] for row in rows), Decimal("0"))
     return InventoryResponseOut(items=rows, count=len(rows), total_cost=total)
+
+
+@router.get("/stocks/inventory/cost-summary", response_model=InventoryCostSummaryOut)
+def inventory_cost_summary(
+    entry_date_from: date | None = Query(default=None),
+    entry_date_to: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> InventoryCostSummaryOut:
+    """按入库日期范围返回在库账号成本汇总，不返回库存行。"""
+    total_cost = stocks_inventory_cost_by_entry_date(
+        db,
+        date_from=entry_date_from,
+        date_to=entry_date_to,
+        user=_user,
+    )
+    return InventoryCostSummaryOut(total_cost=total_cost)
+
+
+@router.get("/stocks/dashboard-summary", response_model=DashboardInventorySummaryOut)
+def dashboard_inventory_summary(
+    reminder_days: int = Query(default=7, ge=1),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = read_access,
+) -> DashboardInventorySummaryOut:
+    """工作台库存提醒计数；仅返回汇总，不向前端传输库存明细。"""
+    summary = stocks_dashboard_inventory_summary(
+        db, reminder_days=reminder_days, user=_user
+    )
+    return DashboardInventorySummaryOut(**summary)
 
 
 @router.post("/stocks/inventory/stats", response_model=InventoryStatsOut)

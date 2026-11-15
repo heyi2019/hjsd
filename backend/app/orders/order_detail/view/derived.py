@@ -215,7 +215,7 @@ def _finance_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailFinanceR
         for rebate in order.rebates:
             rows.append(DetailFinanceRowOut(
                 key=f"rebate-{rebate.id}", flow_no=rebate.rebate_no, type=_rebate_type(rebate),
-                direction="收入", amount=rebate.base_amount, occurred_at=rebate.collected_at,
+                direction="收入", amount=rebate.amount, occurred_at=rebate.collected_at,
                 pool_name="-", note="", operator="-",
             ))
     return rows

@@ -10,7 +10,6 @@ import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { depositsApi } from "@/shared/api/installments.api";
 import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
 import { poolsApi, reconciliationsApi, transfersApi } from "@/shared/api/pools.api";
-import { rebatesApi } from "@/shared/api/rebates.api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -29,7 +28,6 @@ vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
 vi.mock("@/shared/api/policy.api");
 vi.mock("@/shared/api/pools.api");
-vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
@@ -60,17 +58,13 @@ beforeEach(() => {
   // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
   resolveMock(vi.mocked(poolsApi.balances), {
     items: pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
-    totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
+    totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
   });
   resolveMock(vi.mocked(depositsApi.list), deposits);
   // 合计由服务端返回，桩里同步给出，避免卡片落回 0.00。
   resolveMock(vi.mocked(cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "1000.00" });
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(ordersApi.list).mockResolvedValue([]);
-  // 内嵌 RebatesPanel 本套件不覆盖：同步抛错，与改造前「工厂未导出 rebatesApi」的行为一致
-  vi.mocked(rebatesApi.list).mockImplementation(() => {
-    throw new Error("rebatesApi 不在本套件覆盖范围");
-  });
 });
 
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
@@ -319,15 +313,14 @@ describe("FundsPage：资金写路径深覆盖", () => {
         { ...balance, pool_id: 1, pool_code: "POOL-A" },
         { ...balance, pool_id: 2, pool_code: "POOL-B" },
       ],
-      totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "800.00" },
+      totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "800.00" },
     });
     renderLight(<FundsPage />, { user: "admin" });
     expect(await screen.findByText("自有权益合计")).toBeInTheDocument();
     // 两池现金头寸各 800.00，但只有 OWNED 的 POOL-A 计入 → 服务端给出 800.00。
     const card = screen.getByText("自有权益合计").closest(".ui-stat");
     expect(within(card as HTMLElement).getByText("800.00")).toBeInTheDocument();
-    // 口径说明：CUSTODY/THIRD_PART 只计头寸不计权益。
-    expect(screen.getByText(/自有权益仅计归属为「自有」的池/)).toBeInTheDocument();
+    expect(screen.queryByText(/自有权益仅计归属为「自有」的池/)).not.toBeInTheDocument();
   });
 
   it("对账差异核销提交调用 reconciliationsApi.resolve", async () => {

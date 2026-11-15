@@ -9,7 +9,6 @@ import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { depositsApi } from "@/shared/api/installments.api";
 import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
 import { poolsApi, reconciliationsApi, transfersApi } from "@/shared/api/pools.api";
-import { rebatesApi } from "@/shared/api/rebates.api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -28,7 +27,6 @@ vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
 vi.mock("@/shared/api/policy.api");
 vi.mock("@/shared/api/pools.api");
-vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
@@ -58,16 +56,12 @@ beforeEach(() => {
   // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
   resolveMock(vi.mocked(poolsApi.balances), {
     items: pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
-    totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
+    totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
   });
   resolveMock(vi.mocked(depositsApi.list), deposits);
   resolveMock(vi.mocked(cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "500.00" });
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(ordersApi.list).mockResolvedValue([]);
-  // 内嵌 RebatesPanel 本套件不覆盖：同步抛错，与改造前「工厂未导出 rebatesApi」的行为一致
-  vi.mocked(rebatesApi.list).mockImplementation(() => {
-    throw new Error("rebatesApi 不在本套件覆盖范围");
-  });
 });
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
   await ui.click(modal.querySelectorAll(".ant-select-selector")[index] as Element);
@@ -79,6 +73,12 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
 }
 
 describe("FundsPage：资金池卡片", () => {
+  it("资金中心不再展示返点明细 Tab", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    expect(screen.queryByRole("tab", { name: "返点明细" })).not.toBeInTheDocument();
+  });
+
   it("资金池列表按列表字段配置排序", async () => {
     vi.mocked(listColumnsApi.all).mockResolvedValueOnce([{
       code: "FUND_POOLS",
@@ -158,7 +158,6 @@ describe("FundsPage：资金池卡片", () => {
 
   it("P1/FE-244：资金总览数据失败时不显示零统计且禁用划转", async () => {
     vi.mocked(poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
-    vi.mocked(rebatesApi.list).mockResolvedValue([] as never);
     renderLight(<FundsPage />, { user: "admin" });
 
     expect(await screen.findByText("资金池卡片")).toBeInTheDocument();
@@ -292,9 +291,8 @@ describe("FundsPage：资金流水", () => {
     expect(screen.getByText("总支出").closest(".ui-stat")).toHaveTextContent("87,654.32");
   });
 
-  it("本地收窄合计走整数分，1.005 + 0.005 不丢末位", async () => {
-    // 修复 #17：本地即时收窄的合计必须用 money.ts 的 toCents/fromCents，
-    // 浮点直接相加会把 1.005+0.005 算成 1.01（少 1 分），整数分得 1.02。
+  it("流水合计完全由服务端汇总，不按本地收窄重算", async () => {
+    // 1.005 + 0.005 的展示口径由服务端 Decimal 汇总决定；前端不再按当前已加载行二次运算。
     const rows = [
       { ...cashflows[1], id: 21, amount: "1.005", order_no: "SE-A", direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
       { ...cashflows[1], id: 22, amount: "0.005", order_no: "SE-B", direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
@@ -307,10 +305,10 @@ describe("FundsPage：资金流水", () => {
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     // 关键词 "SE" 本地收窄出两条 IN（SE-A / SE-B），排除 BUY-C；
-    // total=3 已全部加载 → 走本地求和，必须按整数分得 1.02 而非浮点的 1.01。
+    // 即便当前页面已加载全部 3 条，合计仍使用服务端返回的 1.01。
     await ui.type(screen.getByLabelText("流水搜索"), "SE");
     expect(screen.queryByText("BUY-C")).not.toBeInTheDocument();
-    expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("1.02");
+    expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("1.01");
   });
 });
 
@@ -421,11 +419,10 @@ describe("FundsPage：资金写路径", () => {
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
       { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
     ] as never);
-    vi.mocked(poolsApi.balances).mockResolvedValue({ items: [{ pool_id: 1, pool_code: "POOL-A", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }, { pool_id: 2, pool_code: "POOL-B", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }], totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" } } as never);
+  vi.mocked(poolsApi.balances).mockResolvedValue({ items: [{ pool_id: 1, pool_code: "POOL-A", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }, { pool_id: 2, pool_code: "POOL-B", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }], totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" } } as never);
     vi.mocked(depositsApi.list).mockResolvedValueOnce([] as never);
     vi.mocked(cashflowsApi.list).mockResolvedValueOnce({ items: [], total: 0 } as never);
     vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([] as never);
-    vi.mocked(rebatesApi.list).mockResolvedValueOnce([] as never);
     renderLight(<FundsPage />, { user: "admin" });
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await screen.findByText(/POOL-A/);
@@ -454,7 +451,7 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(poolsApi.list).mockResolvedValueOnce([
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
     ] as never);
-    vi.mocked(poolsApi.balances).mockResolvedValue({ items: [{ pool_id: 1, pool_code: "POOL-A", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }, { pool_id: 2, pool_code: "POOL-B", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }], totals: { cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" } } as never);
+  vi.mocked(poolsApi.balances).mockResolvedValue({ items: [{ pool_id: 1, pool_code: "POOL-A", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }, { pool_id: 2, pool_code: "POOL-B", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }], totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" } } as never);
     vi.mocked(cashflowsApi.list).mockImplementation(async (params) => {
       if (params?.direction) return { items: [], total: 0 } as never;
       mainListCalls += 1;
@@ -463,7 +460,6 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(cashflowsApi.reverse).mockResolvedValueOnce(reversal as never);
     vi.mocked(depositsApi.list).mockResolvedValue([] as never);
     vi.mocked(reconciliationsApi.list).mockResolvedValue([] as never);
-    vi.mocked(rebatesApi.list).mockResolvedValue([] as never);
     renderLight(<FundsPage />, { user: "admin" });
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await screen.findByText(/POOL-A/);

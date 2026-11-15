@@ -43,10 +43,18 @@ def report_for_export(
     if name == "monthly-pnl":
         return r2_monthly_pnl(session, from_date=from_date, to_date=to_date, user=user)
     if name == "commission":
-        return r3_commission_reconciliation(
+        commission = r3_commission_reconciliation(
             session, from_date=from_date, to_date=to_date, user=user,
             mine=mine, all_people=all_people, user_id=user_id,
         )
+        return {
+            "items": [
+                detail
+                for order in commission["order_groups"]
+                for detail in order["orders"]
+            ],
+            "total": commission["total"],
+        }
     if name == "business-pnl":
         return r5_business_pnl(session, from_date=from_date, to_date=to_date, user=user)
     if name == "daily-funds":

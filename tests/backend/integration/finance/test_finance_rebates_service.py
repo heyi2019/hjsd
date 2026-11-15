@@ -12,7 +12,6 @@ from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.finance import rebates
 from app.finance import cashflows
-from app.finance.rebates import _rebate_rate_from_snapshot
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.domain.trade import Cashflow, OrderEvent
@@ -116,14 +115,12 @@ def test_rebate_module_creates_record_directly(seeded_db):
         seeded_db,
         source_order_id=_order_with_buy(seeded_db),
         rebate_type="BUY",
-        base_amount=Decimal("1000"),
-        rate=Decimal("5"),
+        amount=Decimal("1000"),
         collected_on=TODAY,
         actor="pytest",
     )
 
     assert record.rebate_no.endswith("-RB01")
-    assert record.rate == Decimal("5.00")
 
 
 def test_rebate_creates_business_event_and_income_cashflow(seeded_db):
@@ -132,8 +129,7 @@ def test_rebate_creates_business_event_and_income_cashflow(seeded_db):
         seeded_db,
         source_order_id=order_id,
         rebate_type="BUY",
-        base_amount=Decimal("1000"),
-        rate=Decimal("5"),
+        amount=Decimal("1000"),
         collected_on=TODAY,
         actor="pytest",
     )
@@ -180,47 +176,13 @@ def test_outflow_cashflow_does_not_create_refund_event(seeded_db):
     ) is None
 
 
-# ----------------------------------------------------- 费率快照解析分支
-def test_rate_from_snapshot_config_not_dict():
-    assert _rebate_rate_from_snapshot({"config": "nope"}, "BUY") is None  # 165-166
-
-
-def test_rebate_base_from_snapshot_empty():
-    assert rebates._rebate_base_from_snapshot(None, None, None) is None
-
-
-def test_rebate_base_from_snapshot_config_not_dict():
-    assert rebates._rebate_base_from_snapshot(None, {"config": "x"}, None) is None
-
-
-def test_rate_from_snapshot_rates_dict_branch():
-    assert _rebate_rate_from_snapshot(
-        {"config": {"rates": {"BUY": "5"}}}, "BUY"
-    ) == Decimal("5.00")  # 168 字典分支
-
-
-def test_rate_from_snapshot_fallback_rate():
-    assert _rebate_rate_from_snapshot(
-        {"config": {"rate": "5"}}, "BUY"
-    ) == Decimal("5.00")  # 168-170 回退到 config.rate
-
-
-def test_rate_from_snapshot_no_rate():
-    assert _rebate_rate_from_snapshot({"config": {}}, "BUY") is None  # 170-172
-
-
-def test_rate_from_snapshot_bad_value():
-    with pytest.raises(Validation, match="费率必须是数值"):
-        _rebate_rate_from_snapshot({"config": {"rate": "abc"}}, "BUY")  # 173-176
-
-
 # ----------------------------------------------------- 返点类型与订单类型约束
 def test_create_rebate_buy_rejects_dg(seeded_db):
     order_id = _order_with_sell(seeded_db)  # DG 订单已 ACTIVE
     with pytest.raises(Validation, match="买号返点只能关联回收、提号订单"):
         rebates.create_rebate(
             seeded_db, source_order_id=order_id, rebate_type="BUY",
-            base_amount=Decimal("1000"), rate=Decimal("5"),
+            amount=Decimal("1000"),
             collected_on=TODAY, actor="pytest",
         )  # 买号返点仅限 HS/TH，DG 不可
 
@@ -230,7 +192,7 @@ def test_create_rebate_buy_allows_th(seeded_db):
     order_id = _order_with_buy(seeded_db, order_type="TH")
     record = rebates.create_rebate(
         seeded_db, source_order_id=order_id, rebate_type="BUY",
-        base_amount=Decimal("1000"), rate=Decimal("5"),
+        amount=Decimal("1000"),
         collected_on=TODAY, actor="pytest",
     )
     assert record.rebate_type == "BUY"
@@ -240,7 +202,7 @@ def test_create_rebate_sell_allows_created_order_without_sell_event(seeded_db):
     order_id = _order_with_buy(seeded_db)  # HS 订单只有 BUY 事件
     record = rebates.create_rebate(
         seeded_db, source_order_id=order_id, rebate_type="SELL",
-        base_amount=Decimal("1000"), rate=Decimal("5"),
+        amount=Decimal("1000"),
         collected_on=TODAY, actor="pytest",
     )
     assert record.rebate_type == "SELL"
@@ -251,7 +213,7 @@ def test_create_rebate_sell_allows_hs_with_sell_event(seeded_db):
     order_id = _order_with_sell(seeded_db, order_type="HS")
     record = rebates.create_rebate(
         seeded_db, source_order_id=order_id, rebate_type="SELL",
-        base_amount=Decimal("1000"), rate=Decimal("5"),
+        amount=Decimal("1000"),
         collected_on=TODAY, actor="pytest",
     )
     assert record.rebate_type == "SELL"
@@ -261,7 +223,7 @@ def test_create_rebate_sell_allows_hs_with_sell_event(seeded_db):
 def test_get_rebate_no_user(seeded_db):
     record = rebates.create_rebate(
         seeded_db, source_order_id=_order_with_buy(seeded_db),
-        rebate_type="BUY", base_amount=Decimal("1000"), rate=Decimal("5"),
+        rebate_type="BUY", amount=Decimal("1000"),
         collected_on=TODAY, actor="pytest",
     )
     assert rebates.get_rebate(seeded_db, record.id) is record
@@ -270,7 +232,7 @@ def test_get_rebate_no_user(seeded_db):
 def test_get_rebate_scope_hidden(seeded_db):
     record = rebates.create_rebate(
         seeded_db, source_order_id=_order_with_buy(seeded_db),
-        rebate_type="BUY", base_amount=Decimal("1000"), rate=Decimal("5"),
+        rebate_type="BUY", amount=Decimal("1000"),
         collected_on=TODAY, actor="pytest",
     )
     with pytest.raises(NotFound):

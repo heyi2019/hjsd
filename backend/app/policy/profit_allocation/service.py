@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from typing import Any
 from pydantic import ValidationError as PydanticValidationError
 from app.core.audit import record_audit
@@ -58,8 +58,8 @@ def set_allocations(
 
     两种录入口径，整单只能选其一：
 
-    - **按动作**（items 都带 allocation_type）：沿用 BAS-06-03 的四项结构
-      （买号/售出/运营/公司归属），比例合计必须 100%，收益人绑定动作执行人。
+    - **按动作**（items 都带 allocation_type）：买号/售出/运营/公司四项，可按比例或金额；
+      前端提交每项合计和人员，服务端校验并拆分到具体人员。
     - **按人**（items 都不带 allocation_type）：每行一个姓名（user_id；为空表示
       公司归属），比例与金额都选填——填比例按利润占比分、填金额按固定额分。
       纯比例时合计仍须 100%；一旦出现金额，改为校验金额合计不超过订单利润，
@@ -78,6 +78,13 @@ def set_allocations(
         if typed and len(typed) != len(normalized_items):
             raise Validation("按动作分润与按人分润不能混用，请统一为其中一种")
         if typed:
+            if any(item.get("employee_ids") for item in typed):
+                from app.orders.amounts import order_amounts
+
+                normalized_items = _expand_action_form_rows(
+                    typed,
+                    order_profit=order_amounts(session, order.id)["PROFIT"],
+                )
             result = _set_action_allocations(
                 session, order, items=normalized_items, actor=actor
             )
@@ -94,6 +101,118 @@ def set_allocations(
 
     notify_profit_recipients(session, order, actor=actor)
     return result
+
+
+def convert_action_allocation(
+    session: Session,
+    order_id: int,
+    *,
+    direction: str,
+    value: Decimal,
+    user: CurrentUser | None = None,
+) -> Decimal | None:
+    """Convert a grouped action share using the server's canonical order profit."""
+    order = _scoped_order(session, order_id, user)
+    from app.orders.amounts import order_amounts
+
+    profit = to_money(order_amounts(session, order.id)["PROFIT"])
+    input_value = to_money(value)
+    if direction == "RATE_TO_AMOUNT":
+        if input_value < 0 or input_value > 100:
+            raise Validation("分润比例必须在 0% 到 100% 之间")
+        return (profit * input_value / Decimal("100")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+    if direction == "AMOUNT_TO_RATE":
+        if profit == 0:
+            return None
+        return (input_value * Decimal("100") / profit).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+    raise Validation("不支持的分润换算方向")
+
+
+def _split_even(value: Decimal, count: int, *, scale: Decimal) -> list[Decimal]:
+    units = (value * scale).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    base = (units / count).to_integral_value(rounding=ROUND_DOWN)
+    parts = [base for _ in range(count)]
+    parts[-1] += units - base * count
+    return [part / scale for part in parts]
+
+
+def _expand_action_form_rows(
+    rows: list[dict[str, Any]], *, order_profit: Decimal
+) -> list[dict[str, Any]]:
+    """Validate grouped UI rows and expand them into per-person allocation records."""
+    required = {"BUY", "SELL", "OPERATION", "COMPANY"}
+    by_type: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        kind = str(row.get("allocation_type") or "").upper()
+        if kind not in required:
+            raise Validation("分润配置只允许买号、售出、运营、公司四项")
+        if kind in by_type:
+            raise Validation("分润配置每项只能有一行")
+        by_type[kind] = row
+    if set(by_type) != required:
+        raise Validation("分润配置必须包含买号、售出、运营、公司四项")
+
+    parsed: dict[str, dict[str, Any]] = {}
+    rate_total = Decimal("0")
+    amount_total = Decimal("0")
+    has_rate_only = has_amount_only = False
+    for kind, row in by_type.items():
+        rate_text = "" if row.get("allocation_rate") is None else str(row.get("allocation_rate")).strip()
+        amount_text = "" if row.get("allocation_amount") is None else str(row.get("allocation_amount")).strip()
+        rate = to_money(rate_text or 0)
+        amount = to_money(amount_text or 0)
+        has_rate = bool(rate_text)
+        has_amount = bool(amount_text)
+        if not has_rate and not has_amount:
+            raise Validation(f"{kind} 请填写比例或金额")
+        if rate < 0 or rate > 100:
+            raise Validation(f"{kind} 比例必须在 0% 到 100% 之间")
+        has_rate_only = has_rate_only or (has_rate and not has_amount)
+        has_amount_only = has_amount_only or (has_amount and not has_rate)
+        rate_total += rate
+        amount_total += amount
+        people = [] if kind == "COMPANY" else list(dict.fromkeys(row.get("employee_ids") or []))
+        if kind == "COMPANY" and row.get("employee_ids"):
+            raise Validation("公司收益不绑定人员")
+        if kind == "OPERATION" and not people:
+            raise Validation("运营收益必须绑定人员")
+        parsed[kind] = {"row": row, "rate": rate, "amount": amount, "people": people}
+
+    if has_rate_only and has_amount_only:
+        raise Validation("同一单的四项要么都按比例、要么都按金额，不能混填")
+    use_rate = abs(rate_total - Decimal("100")) <= Decimal("0.001") or amount_total == 0
+    if use_rate:
+        if abs(rate_total - Decimal("100")) > Decimal("0.001"):
+            raise Validation(f"四项比例合计必须为 100%，当前 {rate_total}%")
+    else:
+        if order_profit > 0 and amount_total < 0:
+            raise Validation("该单为盈利单，分润金额不能为负数")
+        if order_profit < 0 and amount_total > 0:
+            raise Validation("该单为亏损单，分润金额必须填负数（亏损分担额）")
+        if order_profit == 0:
+            raise Validation("该单利润为 0，按金额分润只能填 0，请改用比例")
+        if abs(amount_total) > abs(order_profit):
+            raise Validation(f"分润金额合计不能超过订单总利润 {order_profit}")
+
+    expanded: list[dict[str, Any]] = []
+    for kind, item in parsed.items():
+        row = item["row"]
+        people = item["people"] or [None]
+        values = _split_even(item["rate"], len(people), scale=Decimal("100")) if use_rate else [Decimal("0")] * len(people)
+        amounts = _split_even(item["amount"], len(people), scale=Decimal("100")) if not use_rate else [Decimal("0")] * len(people)
+        for index, person_id in enumerate(people):
+            expanded.append({
+                "user_id": person_id,
+                "role": row.get("role") or "OWNER",
+                "allocation_type": kind,
+                "allocation_rate": values[index],
+                "allocation_amount": amounts[index],
+            })
+    return expanded
 
 
 def _set_person_allocations(
@@ -248,6 +367,7 @@ def _set_action_allocations(
 
     normalized_items = items
     total = Decimal("0")
+    total_amount = Decimal("0")
     user_ids: set[int] = set()
     allocation_types: set[str] = set()
     # 四类必须齐全，但每个动作可以有多行（一个动作多人时按人数分别录一行，份额均分）。
@@ -339,7 +459,10 @@ def _set_action_allocations(
             if creator_id is not None:
                 action_actor_ids[action_type] = [int(creator_id)]
     for item in normalized_items:
-        rate = to_money(item.get("allocation_rate"))
+        rate = to_money(item.get("allocation_rate") or 0)
+        amount = to_money(item.get("allocation_amount") or 0)
+        if rate < 0 or rate > 100:
+            raise Validation("分润比例必须在 0% 到 100% 之间")
         role = str(item.get("role") or "").upper()
         if role not in AllocationRole.values():
             raise Validation(
@@ -390,6 +513,7 @@ def _set_action_allocations(
         if item.get("user_id") is not None:
             user_ids.add(int(item["user_id"]))
         total += rate
+        total_amount += amount
 
     existing_user_ids = {
         user_id
@@ -402,11 +526,22 @@ def _set_action_allocations(
             details={"field": "items.user_id", "missing": missing_user_ids},
         )
 
-    if total != Decimal("100.00"):
-        raise Validation(
-            "有效分配比例合计必须为 100%",
-            details={"total": str(total), "items": len(items)},
-        )
+    if total_amount == 0:
+        if total != Decimal("100.00"):
+            raise Validation(
+                "有效分配比例合计必须为 100%",
+                details={"total": str(total), "items": len(items)},
+            )
+    else:
+        from app.orders.amounts import order_amounts
+
+        profit = to_money(order_amounts(session, order.id)["PROFIT"])
+        if total != 0:
+            raise Validation("按金额分润时比例必须为 0")
+        if (profit > 0 and total_amount < 0) or (profit < 0 and total_amount > 0):
+            raise Validation("分润金额符号必须与订单利润一致")
+        if profit == 0 or abs(total_amount) > abs(profit):
+            raise Validation("分润金额合计不能超过订单总利润")
 
     # 整单重设：先清后写，避免残留旧比例
     for old in session.scalars(
@@ -424,7 +559,7 @@ def _set_action_allocations(
             user_id=int(item["user_id"]) if item.get("user_id") is not None else None,
             role=str(item["role"]).upper(),
             allocation_type=allocation_type,
-            allocation_rate=to_money(item.get("allocation_rate")),
+            allocation_rate=to_money(item.get("allocation_rate") or 0),
             allocation_amount=to_money(item.get("allocation_amount") or 0),
             policy_version_id=order.policy_version_id,
         )
@@ -482,4 +617,23 @@ def _list_allocations(session: Session, order: Order) -> list[dict[str, Any]]:
         {**item, "total_rate": str(total), "total_amount": str(total_amount)}
         for item in out
     ]
+
+
+def summarize_allocations_by_type(
+    items: list[dict[str, Any]],
+) -> dict[str, dict[str, Decimal]]:
+    """按动作汇总已存分润比例与金额，前端回填表单时不再做数值累加。"""
+    totals: dict[str, dict[str, Decimal]] = {}
+    valid_types = {"BUY", "SELL", "OPERATION", "COMPANY"}
+    for item in items:
+        allocation_type = item.get("allocation_type")
+        if allocation_type not in valid_types:
+            continue
+        group = totals.setdefault(
+            allocation_type,
+            {"allocation_rate": Decimal("0.00"), "allocation_amount": Decimal("0.00")},
+        )
+        group["allocation_rate"] += to_money(item.get("allocation_rate") or 0)
+        group["allocation_amount"] += to_money(item.get("allocation_amount") or 0)
+    return totals
 

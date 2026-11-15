@@ -169,6 +169,16 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     count: noCount,
   },
   {
+    key: "audit",
+    label: "审计记录",
+    summary: "完整操作流水：按对象 / 动作 / 操作人 / 时间筛选，只读",
+    group: "GOV",
+    permission: "audit.read",
+    readOnly: true,
+    entityTypes: [],
+    count: noCount,
+  },
+  {
     key: "appearance",
     label: "外观",
     summary: "浅色/深色主题，仅本地偏好，不入库",

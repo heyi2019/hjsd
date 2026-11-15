@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Dayjs } from "dayjs";
 import { orderTypesApi, ordersApi } from "../../shared/api/orders.api";
 import type { Order, OrderType } from "../../shared/api/types/orders";
@@ -7,20 +7,10 @@ import { downloadBlob } from "../../shared/api/download";
 import { ACCOUNT_STATUS_LABEL, today } from "../../shared/lib/format";
 import { filterRetiredOrderTypeOptions } from "../../shared/lib/retiredProducts";
 import { useOptionSet } from "../../shared/lib/optionSets";
-import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { filterBusinessOrders, type BusinessFilterKey, type BusinessModeFilterKey } from "./helpers";
+import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 
 type Opt = { value: string; label: string };
-
-/** 交易日是否在筛选区间内（「订单总量」与类型 Segmented 计数共用，避免两处日期判断漂移）。 */
-function withinTradeDateRange(order: Order, range: [Dayjs, Dayjs] | null): boolean {
-  if (!range) return true;
-  const tradeDate = new Date(`${order.trade_date}T00:00:00`);
-  return !Number.isNaN(tradeDate.getTime())
-    && tradeDate >= range[0].startOf("day").toDate()
-    && tradeDate <= range[1].endOf("day").toDate();
-}
 
 /**
  * 订单台账「列表域」：数据加载、筛选、分页、排序、导出与选项词典，以及派生的 filteredOrders。
@@ -30,10 +20,16 @@ function withinTradeDateRange(order: Order, range: [Dayjs, Dayjs] | null): boole
 export function useLedgerList(params: { active: boolean; initialMine: boolean }) {
   const { active, initialMine } = params;
   const [orders, setOrders] = useState<Order[]>([]);
+  const [ledgerSummary, setLedgerSummary] = useState<Awaited<ReturnType<typeof ordersApi.ledgerSummary>> | null>(null);
+  const [pageTotal, setPageTotal] = useState(0);
+  const [gameTypes, setGameTypes] = useState<string[]>([]);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
   const [types, setTypes] = useState<OrderType[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [mineOrders, setMineOrders] = useState(initialMine);
+  const requestSequence = useRef(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   // 订单台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
@@ -75,57 +71,102 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
     { value: "all", label: "全部库存状态" },
     ...(["WAITING", "SOLD", "VOID"] as const).map((value) => ({ value, label: ACCOUNT_STATUS_LABEL[value] })),
   ];
-  const gameTypeOptions = useMemo(() => {
-    const values = Array.from(new Set(orders.map((order) => order.account_game_type).filter((value): value is string => Boolean(value))))
-      .sort((a, b) => a.localeCompare(b, "zh-CN"));
-    return [{ value: "all", label: "全部游戏类型" }, ...values.map((value) => ({ value, label: value }))];
-  }, [orders]);
+  const gameTypeOptions = useMemo(
+    () => [{ value: "all", label: "全部游戏类型" }, ...gameTypes.map((value) => ({ value, label: value }))],
+    [gameTypes],
+  );
   const [keyword, setKeyword] = useState("");
 
+  const queryFilters = useMemo(() => ({
+    mine: mineOrders,
+    ...(orderTypeFilter !== "all" ? { order_type: orderTypeFilter } : {}),
+    ...(businessModeFilter !== "all" ? { business_mode: businessModeFilter } : {}),
+    ...(gameTypeFilter !== "all" ? { game_type: gameTypeFilter } : {}),
+    ...(inventoryStatusFilter !== "all" ? { account_status: inventoryStatusFilter } : {}),
+    ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+    ...(dateRange ? {
+      trade_date_from: dateRange[0].format("YYYY-MM-DD"),
+      trade_date_to: dateRange[1].format("YYYY-MM-DD"),
+    } : {}),
+  }), [mineOrders, orderTypeFilter, businessModeFilter, gameTypeFilter, inventoryStatusFilter, keyword, dateRange]);
+
   const load = useCallback(async () => {
+    const requestId = ++requestSequence.current;
     setLoading(true);
     try {
-      const [list, typeList] = await Promise.all([
-        ordersApi.list(mineOrders ? { mine: true } : undefined),
-        orderTypesApi.list(),
-      ]);
-      setOrders(list);
-      setTypes(typeList);
+      const result = await ordersApi.listPage({
+        ...queryFilters,
+        sort_desc: ledgerSortDesc,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      });
+      if (requestId !== requestSequence.current) return;
+      setOrders(result.items);
+      setPageTotal(result.total);
       setLoadError(null);
     } catch (error) {
-      setLoadError(normalizeError(error));
+      if (requestId === requestSequence.current) setLoadError(normalizeError(error));
     } finally {
-      setLoading(false);
+      if (requestId === requestSequence.current) setLoading(false);
     }
-  }, [mineOrders]);
+  }, [queryFilters, ledgerSortDesc, page, pageSize]);
 
-  // keep-alive：切走再切回不会重挂载。重新激活（active 翻回 true）时重拉列表，
-  // 保证在其他入口新建的订单（工作台快捷建单、库存中心售出/寄售/返点）的订单号及时出现在台账。
-  useReloadOnActive(active, load);
   useEffect(() => {
-    if (active) setMineOrders(initialMine);
+    if (active) {
+      setMineOrders(initialMine);
+      setPage(1);
+    }
   }, [active, initialMine]);
 
-  const typeNames = useMemo(() => Object.fromEntries(types.map((type) => [type.code, type.name])), [types]);
-  // 先按业务筛选，再按日期，最后一次排序；避免渲染层重复计算同一批订单。
-  const filteredOrders = useMemo(
-    () => filterBusinessOrders(orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter)
-      .filter((order) => withinTradeDateRange(order, dateRange))
-      .slice()
-      .sort((a, b) => (ledgerSortDesc ? b.id - a.id : a.id - b.id)),
-    [orders, orderTypeFilter, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter, dateRange, ledgerSortDesc],
-  );
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    void orderTypesApi.list().then((result) => {
+      if (!cancelled) setTypes(result);
+    }).catch((error) => {
+      if (!cancelled) setLoadError(normalizeError(error));
+    });
+    return () => { cancelled = true; };
+  }, [active, setLoadError]);
 
-  // 类型 Segmented 计数基线：应用除「类型」外的全部筛选（关键词/日期/游戏类型/库存状态/业务模式），
-  // 保证各类型计数之和恒等于「订单总量」卡片；否则输入关键词后会出现「全部 627 / 订单总量 12」的自相矛盾。
-  const typeCountBase = useMemo(
-    () => filterBusinessOrders(orders, "all", businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter)
-      .filter((order) => withinTradeDateRange(order, dateRange)),
-    [orders, businessModeFilter, keyword, gameTypeFilter, inventoryStatusFilter, dateRange],
-  );
+  // keep-alive 重新激活、筛选变更、翻页或排序变更时均由后端返回当前页。
+  useEffect(() => {
+    if (active) void load();
+  }, [active, load]);
+
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    setSummaryLoading(true);
+    setLedgerSummary(null);
+    const timer = window.setTimeout(() => {
+      void ordersApi.ledgerSummary(queryFilters).then((result) => {
+        if (cancelled) return;
+        setLedgerSummary(result);
+        setGameTypes(result.game_types);
+        setSummaryError(null);
+      }).catch((error) => {
+        if (cancelled) return;
+        setSummaryError(normalizeError(error));
+      }).finally(() => {
+        if (!cancelled) setSummaryLoading(false);
+      });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [active, queryFilters]);
+
+  const typeNames = useMemo(() => Object.fromEntries(types.map((type) => [type.code, type.name])), [types]);
+  const filteredOrders = orders;
 
   return {
     orders,
+    ledgerSummary,
+    pageTotal,
+    summaryLoading,
+    summaryError,
     setOrders,
     types,
     setTypes,
@@ -161,7 +202,6 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
     gameTypeOptions,
     typeNames,
     filteredOrders,
-    typeCountBase,
     load,
   };
 }

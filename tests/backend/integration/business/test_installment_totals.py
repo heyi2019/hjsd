@@ -85,6 +85,10 @@ def test_totals_match_list_rows(seeded_client, seeded_db, headers):
     rows = listed.json()
     assert rows
 
+    summary = seeded_client.get("/api/v1/installments/totals", headers=headers).json()
+    assert summary["total_count"] == len(rows)
+    assert summary["overdue_count"] == sum(row["status"] == "OVERDUE" for row in rows)
+
     expected_receivable = sum(Decimal(row["total_receivable"]) for row in rows)
     expected_paid = sum(Decimal(row["paid_amount"]) for row in rows)
     expected_remaining = sum(Decimal(row["remaining_receivable"]) for row in rows)

@@ -3,15 +3,17 @@
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
+import { cashflowsApi } from "../shared/api/cashflows.api";
 import { ordersApi } from "../shared/api/orders.api";
 import { poolsApi } from "../shared/api/pools.api";
 import { reportsApi } from "../shared/api/reports.api";
+import { stocksApi } from "../shared/api/stocks.api";
 import type { Pool, PoolBalance, PoolBalanceTotals } from "../shared/api/types/finance";
-import type { Order } from "../shared/api/types/orders";
 import type { BusinessPnlReport } from "../shared/api/types/reporting";
 import { normalizeError } from "../shared/api/client";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
+import type { ReportRange } from "./reports/shared";
 import {
   DataTable,
   EntryCard,
@@ -29,16 +31,14 @@ interface PoolRow {
   balance?: PoolBalance;
 }
 
-export function countOngoingOrders(items: Pick<Order, "status">[]): number {
-  return items.filter((order) => ["ACTIVE", "INSTALLMENT"].includes(order.status)).length;
-}
-
-export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
+export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; range?: ReportRange }) {
   const [pools, setPools] = useState<Pool[] | null>(null);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
   const [balanceTotals, setBalanceTotals] = useState<PoolBalanceTotals | null>(null);
-  const [orders, setOrders] = useState<Order[] | null>(null);
+  const [orderSummary, setOrderSummary] = useState<{ total_count: number; active_count: number } | null>(null);
   const [businessPnl, setBusinessPnl] = useState<BusinessPnlReport | null>(null);
+  const [inventoryCost, setInventoryCost] = useState<string | null>(null);
+  const [studioExpense, setStudioExpense] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
 
@@ -53,10 +53,24 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
         Object.fromEntries(overview.items.map((item) => [item.pool_id, item])),
       );
       setBalanceTotals(overview.totals);
-      // 订单计数与资金总览同源加载：订单接口失败时池数据已落 state，仍可渲染，
-      // 错误经同一 ErrorBanner 露出，不静默显示 0。
-      setOrders(await ordersApi.list());
-      setBusinessPnl(await reportsApi.businessPnl());
+      const orderParams = range?.params.from || range?.params.to
+        ? { trade_date_from: range.params.from, trade_date_to: range.params.to }
+        : undefined;
+      setOrderSummary(await ordersApi.summary(orderParams));
+      const reportParams = range?.params.from || range?.params.to
+        ? { from: range.params.from, to: range.params.to }
+        : undefined;
+      setBusinessPnl(await reportsApi.businessPnl(reportParams));
+      const studioSummary = await cashflowsApi.studioSummary({
+        occurred_from: range?.params.from,
+        occurred_to: range?.params.to,
+      });
+      setStudioExpense(studioSummary.approved_expense);
+      const inventorySummary = await stocksApi.inventoryCostSummary({
+        entry_date_from: range?.params.from,
+        entry_date_to: range?.params.to,
+      });
+      setInventoryCost(inventorySummary.total_cost);
       setLoadError(null);
     } catch (error) {
       // 必须落到 UI：后端不可达时若只 console.error，页面会静默显示
@@ -65,7 +79,7 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [range?.params.from, range?.params.to]);
 
   useEffect(() => {
     void load();
@@ -76,10 +90,11 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
   // 合计取服务端（Decimal），前端不再对卡片浮点累加。
   const totalAvailable = pools === null ? "不可用" : balanceTotals?.available ?? "—";
   const totalDeposit = pools === null ? "不可用" : balanceTotals?.deposit_held ?? "—";
+  const totalInventoryCost = inventoryCost ?? (pools === null ? "不可用" : "—");
+  const totalProfit = businessPnl?.total.main_profit ?? (pools === null ? "不可用" : "—");
+  const totalStudioExpense = studioExpense ?? (pools === null ? "不可用" : "—");
 
-  // 业务计数口径：ACTIVE 表示进行中。
-  const activeCount = orders === null ? null : countOngoingOrders(orders);
-  const orderCardsUnavailable = orders === null;
+  const orderCardsUnavailable = orderSummary === null;
 
   const { arrange: arrangeColumns } = useListViewColumns("POOL_BALANCE");
   const columns: ColumnsType<PoolRow> = [
@@ -130,17 +145,19 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
     <section className="ui-stack">
       <ErrorBanner error={loadError} onRetry={() => void load()} retrying={loading} />
 
+      {range ? <Space className="ui-filter-bar ui-filter-bar--spaced">{range.picker}</Space> : null}
+
       <EntryRow>
         <EntryCard
           title="订单总数"
-          value={orders === null ? "不可用" : String(orders.length)}
+          value={orderSummary === null ? "不可用" : String(orderSummary.total_count)}
           description="点击进入业务中心 · 订单台账"
           disabled={orderCardsUnavailable}
           onClick={() => onNavigate?.("business", "ledger")}
         />
         <EntryCard
           title="进行中"
-          value={activeCount === null ? "不可用" : String(activeCount)}
+          value={orderSummary === null ? "不可用" : String(orderSummary.active_count)}
           description="点击进入业务中心 · 订单台账"
           disabled={orderCardsUnavailable}
           onClick={() => onNavigate?.("business", "ledger")}
@@ -151,12 +168,14 @@ export function DataCenterPanel({ onNavigate }: { onNavigate?: (key: string, tab
         items={[
           { label: "可用余额合计", amount: totalAvailable },
           { label: "押金占用", amount: totalDeposit },
-          { label: "利润", amount: businessPnl?.total.main_profit ?? "-", tone: "auto" },
+          { label: "在途成本", amount: totalInventoryCost },
+          { label: "利润", amount: totalProfit, tone: "auto" },
+          { label: "工作室支出", amount: totalStudioExpense },
         ]}
       />
       <StatRow
         items={[
-          { label: "资金池数量", kind: "count", amount: pools === null ? "不可用" : String(pools.length) },
+          { label: "资金池数量", kind: "count", amount: balanceTotals === null ? "不可用" : String(balanceTotals.pool_count) },
         ]}
       />
 

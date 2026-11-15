@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { PolicyDefinition, PolicyVersion, ProfitAllocation } from "./types/policy";
+import type { PolicyDefinition, PolicyVersion, ProfitAllocationList } from "./types/policy";
 
 export const policyApi = {
   list: (params?: { status?: string; policy_code?: string }) =>
@@ -29,9 +29,11 @@ export const policyApi = {
       })
       .then((r) => r.data),
   allocations: (orderId: number) =>
-    api.get<{ items: ProfitAllocation[]; total: number; order_profit?: string }>(`/orders/${orderId}/profit-allocations`).then((r) => r.data),
-  setAllocations: (orderId: number, items: { user_id?: number | null; role: string; allocation_type?: "BUY" | "SELL" | "OPERATION" | "COMPANY" | null; allocation_rate: string; allocation_amount?: string }[], formExtra?: Record<string, unknown>) =>
-    api.put<{ items: ProfitAllocation[]; total: number; order_profit?: string }>(`/orders/${orderId}/profit-allocations`, { items, form_extra: formExtra }).then((r) => r.data),
+    api.get<ProfitAllocationList>(`/orders/${orderId}/profit-allocations`).then((r) => r.data),
+  convertAllocation: (orderId: number, direction: "RATE_TO_AMOUNT" | "AMOUNT_TO_RATE", value: string) =>
+    api.post<{ value: string | null }>(`/orders/${orderId}/profit-allocations/convert`, { direction, value }).then((r) => r.data),
+  setAllocations: (orderId: number, items: { employee_ids?: number[]; user_id?: number | null; role: string; allocation_type?: "BUY" | "SELL" | "OPERATION" | "COMPANY" | "" | null; allocation_rate?: string | null; allocation_amount?: string | null }[], formExtra?: Record<string, unknown>) =>
+    api.put<ProfitAllocationList>(`/orders/${orderId}/profit-allocations`, { items, form_extra: formExtra }).then((r) => r.data),
   orderSnapshot: (orderId: number) =>
     api
       .get<{ found: boolean; snapshot: { policy_version_id?: number | null; policy_snapshot?: Record<string, unknown> | null } | null }>(

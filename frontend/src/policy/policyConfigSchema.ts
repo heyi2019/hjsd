@@ -8,24 +8,21 @@
  * 关键事实（勿凭直觉改）：
  * - 后端只校验 config 是**非空对象**（app/policy/service.py:86，契约测试
  *   test_create_version_notfound_and_empty_config 锁死），不校验 key 集合。
- * - 后端引擎消费规则的有两处：
- *   ① REBATE：app/finance/rebates.py:167 先读 `config.rates[rebate_type]`，
- *      读不到回退 `config.rate`，且仅在调用方未显式传 rate 时生效；
- *   ② COMMISSION：不是「分润率」而是**按动作拆分的分润模板**
+ * - 后端引擎消费规则的是 COMMISSION：不是「分润率」而是**按动作拆分的分润模板**
  *      （买入动作 / 卖出动作 / 运营动作 / 公司），当前仅作口径留痕；
  *      订单分润弹窗仍手工录入，未取此模板（2026-10-26 用户口径：暂时都填 0）。
  *   其余四类（分期 service_fee_rate / 跌价 / 退款 / DG）后端取接口入参或专用字段，
  *   **不读规则快照**，故只作版本留痕。
  * - 每个字段用 `effective` 声明消费状态（calc / snapshot），编辑器据此在
  *   label 上打标，避免使用者误以为「配了就改金额」。
- * - 库里 config 的值都是**字符串**（seed: {"rate":"5"} / {"periods":"3"}），
+ * - 库里 config 的值都是**字符串**（例如 {"periods":"3"}），
  *   表单提交时统一 String 化，避免数据形状漂移。
  */
 export type PolicyFieldKind = "text" | "number" | "percent" | "select" | "rate-table";
 
 /** 字段的后端消费状态：calc = 引擎真读并影响计算；snapshot = 仅随版本固化留痕。
- *  取证依据（勿凭直觉改）：全仓库只有 app/finance/rebates.py:167 读 config，
- *  其余模块（含分期 service_fee_rate）取的是接口入参，不读规则快照。
+ *  取证依据（勿凭直觉改）：订单分润模板当前只作版本留痕，
+ * 其余规则参数也由各自业务接口接收，不从返点规则配置读取。
  */
 export type PolicyFieldEffective = "calc" | "snapshot";
 
@@ -42,7 +39,7 @@ export interface PolicyFieldDef {
   rows?: { key: string; label: string }[];
   placeholder?: string;
   help?: string;
-  /** 未声明即选填：REBATE 允许只填分类型或只填统一费率。 */
+  /** 未声明即选填。 */
   required?: boolean;
   /** number / percent 的取值范围。 */
   min?: number;
@@ -52,12 +49,6 @@ export interface PolicyFieldDef {
   /** rate-table 合计必须等于该值（分润四项比例必须为 100）。 */
   sumTo?: number;
 }
-
-/** 返点方向：与后端 domain/enums.py 的 RebateType 一一对应。 */
-const REBATE_ROWS = [
-  { key: "BUY", label: "买入返点" },
-  { key: "SELL", label: "卖出返点" },
-];
 
 /** 库龄分档：Q3「通过经营规则版本配置库龄区间与跌价比例」的默认三档。 */
 const AGE_ROWS = [
@@ -91,31 +82,6 @@ const AMOUNT_BASE = [
 ];
 
 export const POLICY_CONFIG_SCHEMA: Record<string, PolicyFieldDef[]> = {
-  REBATE: [
-    {
-      key: "rates",
-      label: "分方向返点",
-      kind: "rate-table",
-      rows: REBATE_ROWS,
-      effective: "calc",
-      help: "按返点方向分别设置；留空表示该方向不返点。登记返点时未手填费率才取此值",
-    },
-    {
-      key: "rate",
-      label: "统一返点比例",
-      kind: "percent",
-      placeholder: "5",
-      effective: "calc",
-      help: "未分方向时的兜底费率；同时填写时以分方向为准",
-    },
-    {
-      key: "base",
-      label: "计算基数",
-      kind: "select",
-      options: AMOUNT_BASE,
-      help: "返点按哪个金额计提（PRD：返点率 / 计算基数 / 适用业务）",
-    },
-  ],
   COMMISSION: [
     {
       key: "split",

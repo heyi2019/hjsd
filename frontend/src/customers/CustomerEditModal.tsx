@@ -8,14 +8,12 @@ import { ExtraFieldControl } from "./CustomersPage.fragments";
 export function CustomerEditModal({
   editTarget,
   activeDefs,
-  revealed,
   editForm,
   onCancel,
   onSubmit,
 }: {
   editTarget: Customer | null;
   activeDefs: OrderFormField[];
-  revealed: Record<number, Customer>;
   editForm: FormInstance;
   onCancel: () => void;
   onSubmit: (values: Record<string, unknown>) => void;
@@ -44,10 +42,9 @@ export function CustomerEditModal({
               ? {
                   display_name: editTarget.display_name,
                   contact_name: editTarget.contact_name ?? "",
-                  // 点过「查看」则用明文填表，否则留空——脱敏值不能进编辑表单。
-                  phone: (revealed[editTarget.id] ?? editTarget).phone ?? "",
-                  wechat: (revealed[editTarget.id] ?? editTarget).wechat ?? "",
-                  qq: (revealed[editTarget.id] ?? editTarget).qq ?? "",
+                  phone: editTarget.phone ?? "",
+                  wechat: editTarget.wechat ?? "",
+                  qq: editTarget.qq ?? "",
                   note: editTarget.note ?? "",
                   ...Object.fromEntries(
                     activeDefs.map((def) => [def.field_key, editTarget.extra_values?.[def.field_key]]),

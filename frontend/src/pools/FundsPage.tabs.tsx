@@ -52,7 +52,6 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
           { label: "自有权益合计", amount: totalOwned },
         ]}
       />
-      <Typography.Text type="secondary">自有权益仅计归属为「自有」的池</Typography.Text>
       <DataTable<Pool>
         columns={arrangeFundPoolColumns(poolColumns)}
         rows={pools}
@@ -152,7 +151,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
         items={[
           { label: "总收入", amount: cashflowUnavailable ? "不可用" : totalFlowIncome },
           { label: "总支出", amount: cashflowUnavailable ? "不可用" : totalFlowExpense },
-          { label: "当前结果", kind: "count", amount: cashflowUnavailable ? "不可用" : visibleCashflows.length },
+          { label: "当前结果", kind: "count", amount: cashflowUnavailable ? "不可用" : cashflowTotal },
         ]}
       />
       <DataTable<Cashflow>

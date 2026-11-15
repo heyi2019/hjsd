@@ -67,8 +67,7 @@ beforeEach(() => {
     source_order_id: 21,
     rebate_type: "BUY",
     channel: "买号返点",
-    rate: "5.00",
-    base_amount: "1000.00",
+    amount: "1000.00",
     status: "OPEN",
     collected_on: "2026-10-17",
     operator: "何一",
@@ -155,6 +154,8 @@ describe("InventoryPanel：写入与长路径", () => {
     await screen.findByText("acc-1");
     await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "返点" }));
     expect(await screen.findByText("登记返点")).toBeInTheDocument();
+    expect(screen.queryByLabelText("返点比例")).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "比例" })).not.toBeInTheDocument();
     expect(screen.queryByText(/关联业务订单创建后即可登记返点/)).toBeNull();
     expect(screen.getByLabelText("买号返点（对应回收/提号）")).toBeChecked();
     expect(screen.getByLabelText("卖号返点（对应售出）")).toBeEnabled();
@@ -165,13 +166,15 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(screen.getByLabelText("买号返点（对应回收/提号）")).toBeChecked();
     expect(screen.getByLabelText("卖号返点（对应售出）")).not.toBeChecked();
     await ui.click(screen.getByLabelText("卖号返点（对应售出）"));
+    await ui.clear(screen.getByLabelText("返点金额"));
+    await ui.type(screen.getByLabelText("返点金额"), "350.00");
     await ui.click(screen.getByRole("button", { name: "确认登记" }));
 
     await waitFor(() => expect(vi.mocked(rebatesApi.create)).toHaveBeenCalled());
     expect(vi.mocked(rebatesApi.create).mock.calls[0][0]).toMatchObject({
       source_order_id: 21,
       rebate_type: "SELL",
-      base_amount: "350.00",
+      amount: "350.00",
       channel: "卖号返点",
     });
   });
@@ -180,7 +183,7 @@ describe("InventoryPanel：写入与长路径", () => {
     const onCreated = vi.fn();
     resolveMock(vi.mocked(rebatesApi.update), {
       id: 41, rebate_no: "HS0001-RB01", source_order_id: 21, rebate_type: "BUY",
-      rate: "5.00", base_amount: "1200.00", status: "OPEN", collected_on: "2026-10-17", operator: "何一",
+      amount: "1200.00", status: "OPEN", collected_on: "2026-10-17", operator: "何一",
     });
     renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={onCreated} />, { user: "admin" });
     expect(await screen.findByText("返点明细")).toBeInTheDocument();
@@ -189,7 +192,7 @@ describe("InventoryPanel：写入与长路径", () => {
     const title = await screen.findByText(/编辑返点 · HS0001-RB01/);
     const editModal = title.closest(".ant-modal-content") as HTMLElement;
     expect(editModal).toBeTruthy();
-    // editForm 打开时已用该行返点值预填（金额/比例/日期均合法），直接保存即走 submitEdit 刷新路径。
+    // editForm 打开时已用该行返点值预填（金额/日期均合法），直接保存即走 submitEdit 刷新路径。
     // 不依赖 MoneyInput 内部 id：自定义控件可能不转发 id，按 id 定位会拿到 null。
     await userEvent.click(within(editModal).getByRole("button", { name: "保存" }));
 

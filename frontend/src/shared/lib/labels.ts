@@ -70,7 +70,6 @@ export const USER_ROLE_LABEL: Record<string, string> = {
 /** 用户中心展示用权限名称：权限编码只保留在鉴权和接口层，不直接展示给用户。 */
 export const PERMISSION_LABEL: Record<string, string> = {
   "customer.read": "查看客户",
-  "customer.contact.read": "查看客户联系人",
   "customer.create": "新建客户",
   "customer.update": "编辑客户",
   "customer.contact.write": "维护客户联系人",
@@ -179,7 +178,6 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   LIST_COLUMN_REMOVE: "列表删除自定义列",
   CUSTOMER_CREATE: "新建客户",
   CUSTOMER_UPDATE: "编辑客户",
-  CONTACT_READ: "查看联系人",
   CONTACT_WRITE: "维护联系人",
   CUSTOMER_MERGE: "合并客户",
   LEAD_CREATE: "新建需求",

@@ -34,7 +34,7 @@ test("返点弹窗的内层编辑弹窗可关闭，且不连带关闭外层", as
     data: {
       source_order_id: order.id,
       rebate_type: "BUY",
-      base_amount: "100.00",
+      amount: "100.00",
       collected_on: "2026-11-01",
       channel: "买号返点",
     },

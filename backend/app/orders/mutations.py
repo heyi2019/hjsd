@@ -127,7 +127,7 @@ def _shift_accounting_dates(
     if definition is not None:
         snapshot: dict[str, Any] = {}
         primary_version_id: int | None = None
-        for code in (PolicyType.REBATE.value, PolicyType.COMMISSION.value):
+        for code in (PolicyType.COMMISSION.value,):
             version_id, snap = policy_versions.make_snapshot(
                 session,
                 policy_code=code,

@@ -151,8 +151,8 @@ def test_shift_moves_bad_debt_rebate_and_buy_date(seeded_db):
     # 旧模型返点：collected_on = D1（无 REBATE 事件）
     seeded_db.add(RebateRecord(
         rebate_no=f"REB-{uuid4().hex[:10]}", source_order_id=order.id,
-        rebate_type=RebateType.SELL.value, rate=to_money("5"),
-        base_amount=to_money("200"), collected_on=D1, status=RebateStatus.SETTLED.value,
+        rebate_type=RebateType.SELL.value,
+        amount=to_money("200"), collected_on=D1, status=RebateStatus.SETTLED.value,
         link_status=LinkStatus.LINKED.value, created_by="pytest", updated_by="pytest",
     ))
     # 分期坏账：回收处置日 = D1

@@ -6,6 +6,21 @@ import type { Order, OrderType, OrderTypeRoute } from "./types/orders";
 import type { RouteImpactPreview } from "./types/policy";
 import type { AccountExecutionDetail } from "./types/account-execution";
 
+export interface OrderListParams {
+  order_type?: string;
+  status?: string;
+  trade_date_from?: string;
+  trade_date_to?: string;
+  business_mode?: string;
+  game_type?: string;
+  account_status?: string;
+  keyword?: string;
+  sort_desc?: boolean;
+  mine?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
 export const orderTypesApi = {
   update: (id: number, data: Partial<OrderType>) => api.patch<OrderType>(`/order-types/${id}`, data).then(r => r.data),
   setActive: (id: number, is_active: boolean) => api.patch<OrderType>(`/order-types/${id}/active`, {is_active}).then(r => r.data),
@@ -50,6 +65,25 @@ export type OrderExecutionEditPayload = {
 };
 
 export const ordersApi = {
+  summary: (params?: { mine?: boolean; trade_date_from?: string; trade_date_to?: string }) =>
+    api.get<{ total_count: number; completed_count: number; active_count: number }>("/orders/summary", { params }).then((r) => r.data),
+  ledgerSummary: (params?: {
+    mine?: boolean;
+    trade_date_from?: string;
+    trade_date_to?: string;
+    order_type?: string;
+    business_mode?: string;
+    game_type?: string;
+    account_status?: string;
+    keyword?: string;
+  }) => api.get<{
+    total_count: number;
+    status_counts: Record<string, number>;
+    type_counts: Record<string, number>;
+    game_types: string[];
+  }>("/orders/ledger-summary", { params }).then((r) => r.data),
+  listPage: (params?: OrderListParams) =>
+    api.get<PageResponse<Order>>("/orders", { params }).then((r) => r.data),
   // 自动翻页取全量：后端 GET /orders 默认 limit=100、max=500，调用方不传 limit 时
   // 只会取到前 100 单，导致订单列表/聚合缺失数据（dev 库 627 单只取 100 的数据完整性缺口）。
   // 仅在未显式传入 limit 时自动翻页（每页 500，最多 50 页=25k 上限防意外死循环）；
@@ -57,6 +91,8 @@ export const ordersApi = {
   list: async (params?: {
     order_type?: string;
     status?: string;
+    trade_date_from?: string;
+    trade_date_to?: string;
     limit?: number;
     offset?: number;
     mine?: boolean;

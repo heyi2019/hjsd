@@ -1,10 +1,10 @@
 """当前 v1 ORM schema 的唯一活动基线（2026-11-02 压平后的唯一活动迁移）。
 
 压平口径：
-- **schema 随 ORM 走**：直接 `Base.metadata.create_all()`，改模型即改基线，不再加增量 DDL 迁移；
+- **基线 schema 随 ORM 走**：直接 `Base.metadata.create_all()` 建立压平时的 schema；后续需要保留数据的结构变化使用版本化 DDL 迁移；
 - **种子随 blob 走**：`option_sets` / `order_form_fields` 由 `app.foundation.catalog_seed`
   的内嵌 base64+zlib blob 提供，新增内置字段要更新 blob，而不是再加一条 seed 迁移；
-- 当前项目只支持全新数据库：直接 ``alembic upgrade head`` 初始化。
+- 新数据库直接 ``alembic upgrade head`` 初始化；已有数据库按版本迁移。
 
 旧 SQLite 专用 DDL（如 DATETIME）不进基线，避免污染 PostgreSQL 初始化。
 """

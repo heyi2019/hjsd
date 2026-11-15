@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from sqlalchemy import func, or_, select
@@ -111,6 +112,35 @@ def count_customers(
 ) -> int:
     stmt = _customer_list_stmt(keyword=keyword, status=status, user=user, session=session)
     return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+
+
+def summarize_customers(
+    session: Session,
+    *,
+    today_date: date,
+    keyword: str | None = None,
+    status: str | None = None,
+    user: CurrentUser | None = None,
+) -> dict[str, int]:
+    """Summarize the same customer scope as the list, using the caller's local date."""
+    month_start = today_date.replace(day=1)
+    today_start = datetime.combine(today_date, time.min)
+    tomorrow_start = datetime.combine(today_date + timedelta(days=1), time.min)
+    month_start_at = datetime.combine(month_start, time.min)
+
+    def count_created(start: datetime | None = None, end: datetime | None = None) -> int:
+        stmt = _customer_list_stmt(keyword=keyword, status=status, user=user, session=session)
+        if start is not None:
+            stmt = stmt.where(Customer.created_at >= start)
+        if end is not None:
+            stmt = stmt.where(Customer.created_at < end)
+        return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+
+    return {
+        "total_count": count_created(),
+        "month_count": count_created(month_start_at, tomorrow_start),
+        "today_count": count_created(today_start, tomorrow_start),
+    }
 
 
 def _customer_list_stmt(

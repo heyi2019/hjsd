@@ -2,11 +2,12 @@ import { appMessage } from "../../shared/ui/appFeedback";
 /** 库存账号售出：回收 / 提号 / 代挂账号从库存中心售出，按货源类型映射订单类型与买家角色。 */
 import { Form } from "antd";
 import dayjs from "dayjs";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { customersApi } from "../../shared/api/customers.api";
 import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
 import { poolsApi } from "../../shared/api/pools.api";
+import { installmentsApi, type SaleInstallmentPlan } from "../../shared/api/installments.api";
 import type { Account } from "../../shared/api/types/accounts";
 import type { Customer } from "../../shared/api/types/customers";
 import type { Pool } from "../../shared/api/types/finance";
@@ -20,7 +21,6 @@ import { RecoveryCustomerSection } from "../../orders/recovery/RecoveryCustomerS
 import { DeliveryInfoSection } from "../../orders/DeliveryInfoSection";
 import { InventoryAccountSummary } from "../InventoryAccountSummary";
 import { collectFullPayment, collectInstallmentPayment } from "./receiver";
-import { perPeriodServiceFee, saleInstallmentPlan } from "./sale-plan";
 import { SaleFinanceCard } from "./SaleFinanceCard";
 import "./sale-modal.css";
 
@@ -77,32 +77,50 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const periods = Form.useWatch("periods", form);
   const lastAutoPeriodFee = useRef<number | undefined>();
   const lastAutoPeriodAmount = useRef<number | undefined>();
+  const [plan, setPlan] = useState<SaleInstallmentPlan | null>(null);
 
   useEffect(() => {
-    const nextValue = perPeriodServiceFee(serviceFee, periods);
-    if (nextValue === null) return;
-    const isAutoValue = periodServiceFee === undefined || periodServiceFee === lastAutoPeriodFee.current;
-    if (isAutoValue) {
-      form.setFieldValue("per_period_service_fee", nextValue);
-      lastAutoPeriodFee.current = nextValue;
+    const count = Number(periods);
+    const sale = Number(saleAmount);
+    const down = Number(downPayment ?? 0);
+    const fee = Number(serviceFee ?? 0);
+    if (!Number.isInteger(count) || count <= 0 || !Number.isFinite(sale) || sale < 0
+      || !Number.isFinite(down) || down < 0 || down > sale || !Number.isFinite(fee) || fee < 0) {
+      setPlan(null);
+      return;
     }
-  }, [form, periodServiceFee, periods, serviceFee]);
-
-  // 分期金额规划的唯一算法来源（见 sale-plan.ts）：自动填值、末期提示、校验共用一套「分」。
-  const plan = useMemo(
-    () => saleInstallmentPlan({ saleAmount, downPayment, serviceFee, periods }),
-    [downPayment, periods, saleAmount, serviceFee],
-  );
-
-  useEffect(() => {
-    if (!plan) return;
-    const nextValue = plan.perPeriodCents / 100;
-    const isAutoValue = perPeriod === undefined || perPeriod === lastAutoPeriodAmount.current;
-    if (isAutoValue) {
-      form.setFieldValue("per_period", nextValue);
-      lastAutoPeriodAmount.current = nextValue;
-    }
-  }, [form, perPeriod, plan]);
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void installmentsApi.previewSalePlan({
+        sale_amount: String(saleAmount),
+        down_payment: String(downPayment ?? 0),
+        service_fee: String(serviceFee ?? 0),
+        periods: count,
+        ...(perPeriod == null || perPeriod === "" ? {} : { per_period: String(perPeriod) }),
+      }).then((result) => {
+        if (cancelled) return;
+        setPlan(result);
+        const nextFee = Number(result.per_period_service_fee);
+        const isAutoFee = periodServiceFee === undefined || Number(periodServiceFee) === lastAutoPeriodFee.current;
+        if (isAutoFee) {
+          form.setFieldValue("per_period_service_fee", nextFee);
+          lastAutoPeriodFee.current = nextFee;
+        }
+        const nextAmount = Number(result.per_period);
+        const isAutoAmount = perPeriod === undefined || Number(perPeriod) === lastAutoPeriodAmount.current;
+        if (isAutoAmount) {
+          form.setFieldValue("per_period", nextAmount);
+          lastAutoPeriodAmount.current = nextAmount;
+        }
+      }).catch(() => {
+        if (!cancelled) setPlan(null);
+      });
+    }, 180);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [downPayment, form, periodServiceFee, perPeriod, periods, saleAmount, serviceFee]);
 
   useEffect(() => {
     if (paymentMethod !== "INSTALLMENT") return;

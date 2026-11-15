@@ -71,6 +71,8 @@ beforeEach(() => {
     total_receivable: "500.00",
     total_paid: "350.00",
     total_remaining: "150.00",
+    total_count: 2,
+    overdue_count: 0,
   });
   vi.mocked(ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }]);
 });
@@ -163,6 +165,8 @@ describe("InstallmentsPanel：分期合约", () => {
       total_receivable: "12345.67",
       total_paid: "8901.23",
       total_remaining: "3444.44",
+      total_count: 2,
+      overdue_count: 0,
     });
     renderLight(<InstallmentsPanel />, { user: "admin" });
     await screen.findAllByText("总应收");

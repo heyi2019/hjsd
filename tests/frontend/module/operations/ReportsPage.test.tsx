@@ -74,7 +74,7 @@ beforeEach(() => {
     totals: { pool_count: 0, cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
   vi.mocked(ordersApi.list).mockResolvedValue([]);
-  vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 0, active_count: 0 });
+  vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 0, completed_count: 0, active_count: 0 });
   vi.mocked(stocksApi.inventory).mockResolvedValue({ items: [], count: 0, total_cost: "0.00" });
 });
 

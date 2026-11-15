@@ -188,9 +188,10 @@ describe("OrdersPage：四类订单台账", () => {
     expect(within(dutyRow).getByText("16天7小时15分")).toBeInTheDocument();
 
     // 默认视图下的核心识别列与取值（完整列清单属配置能力，不在前端锁死）
-    for (const label of ["订单号", "售出金额", "库存状态", "日期", "操作"]) {
+    for (const label of ["订单号", "售出金额", "库存状态", "操作"]) {
       expect(screen.getAllByRole("columnheader", { name: label }).length).toBeGreaterThan(0);
     }
+    expect(screen.queryByRole("columnheader", { name: "日期" })).toBeNull();
     expect(document.querySelector(".orders-ledger .ant-table-content > table")).toHaveStyle({ tableLayout: "fixed" });
     for (const value of ["原神", "seller-001", "¥1,234.00", "在库"]) {
       expect(screen.getAllByText(value).length).toBeGreaterThan(0);

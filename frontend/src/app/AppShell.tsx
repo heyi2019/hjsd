@@ -104,18 +104,6 @@ export function AppShell() {
     void el.offsetWidth; // 强制 reflow，使动画重新触发
     el.classList.add("page-enter");
   }, [active]);
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        navigateTo("business", "inventory");
-        return;
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [navigateTo]);
-
   // iOS 26 Scroll Edge Effect：按滚动位置写入上下渐隐距离，内容触边时才渐隐。
   // 未溢出时两值均为 0，mask 退化为全不透明（见 navigation.css 的 .nav-list）。
   const navRef = useRef<HTMLElement>(null);

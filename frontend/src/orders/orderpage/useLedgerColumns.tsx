@@ -3,14 +3,14 @@ import type { ColumnsType } from "antd/es/table";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Order } from "../../shared/api/types/orders";
 import { ACCOUNT_STATUS_LABEL, formatDateTimeMinute, formatElapsedTime, money } from "../../shared/lib/format";
-import { columnKey, useListViewColumns } from "../../shared/lib/listColumns";
+import { useListViewColumns } from "../../shared/lib/listColumns";
 import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 import { orderOperationMenuItems } from "../operations";
 import { inventoryTypeOfOrder } from "../../stocks/InventoryPanel/types";
 import { formatOrderAmount } from "./helpers";
 
 /**
- * 订单台账列定义域：15 列的渲染配置 + 配置中心列排序 + 移动端隐藏编排。
+ * 订单台账列定义域：14 列的渲染配置 + 配置中心列排序 + 移动端隐藏编排。
  * 从 useOrdersPageController 拆出为「依赖注入式」hook —— 所有打开弹窗的动作由调用方传入，
  * 本模块只描述列的展示与点击转发，不持有任何状态、不发任何请求。
  */
@@ -60,7 +60,6 @@ export function useLedgerColumns(params: {
     { title: "订单状态", dataIndex: "status", width: "var(--col-w-80)", ellipsis: true, render: (v: string) => <StatusTag status={v} optionSet="ORDER_STATUS" /> },
     { title: "库存状态", dataIndex: "account_status", width: "var(--col-w-80)", ellipsis: true, render: (v: string | null) => v ? <StatusTag status={v} label={ACCOUNT_STATUS_LABEL[v] ?? v} /> : "-" },
     { title: "利润", dataIndex: "profit_base", width: "var(--col-w-90)", ellipsis: true, render: (_v: string | null, order) => order.account_status === "SOLD" && order.profit_base != null ? `¥${money(order.profit_base)}` : "-" },
-    { title: "日期", dataIndex: "trade_date", width: "var(--col-w-132)", ellipsis: true },
     {
       title: "操作",
       key: "actions",
@@ -177,16 +176,5 @@ export function useLedgerColumns(params: {
       },
     },
   ];
-  const configuredLedgerColumns = arrangeLedgerColumns(ledgerColumns);
-  const ledgerDateColumn = ledgerColumns.find((column) => columnKey(column) === "trade_date");
-  // 日期是订单台账的核心识别字段，避免配置中心误隐藏后整列消失。
-  const visibleLedgerColumns = ledgerDateColumn && !configuredLedgerColumns.some((column) => columnKey(column) === "trade_date")
-    ? [
-        ...configuredLedgerColumns.filter((column) => columnKey(column) !== "actions"),
-        ledgerDateColumn,
-        ...configuredLedgerColumns.filter((column) => columnKey(column) === "actions"),
-      ]
-    : configuredLedgerColumns;
-
-  return { arrangeLedgerColumns, visibleLedgerColumns };
+  return { arrangeLedgerColumns, visibleLedgerColumns: arrangeLedgerColumns(ledgerColumns) };
 }

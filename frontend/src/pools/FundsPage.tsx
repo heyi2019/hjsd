@@ -1,10 +1,10 @@
-/** 资金中心：总览 / 流水 / 工作室支出 / 对账 / 异常。
+/** 资金中心：实时资金池 / 余额 / 流水 / 对账 / 工作室支出。
  *  逻辑层见 useFundsPageController；视图层拆为 FundsPage.tabs 与 FundsPage.modals。 */
 import { Tabs } from "antd";
 import { ErrorBanner } from "../shared/ui";
 import { StudioExpensePanel } from "./StudioExpensePanel";
 import { useFundsPageController } from "./useFundsPageController";
-import { OverviewTab, CashflowTab, ReconciliationTab, ControlsTab } from "./FundsPage.tabs";
+import { OverviewTab, CashflowTab, ReconciliationTab } from "./FundsPage.tabs";
 import {
   CancelModal,
   CashflowModal,
@@ -12,7 +12,6 @@ import {
   LossModal,
   ReconciliationModal,
   ReleaseModal,
-  RepairModal,
   ResolveModal,
   ReverseModal,
   TransferModal,
@@ -34,7 +33,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
           { key: "overview", label: "总览", children: <OverviewTab ctrl={ctrl} /> },
           { key: "cashflows", label: "流水", children: <CashflowTab ctrl={ctrl} /> },
           { key: "reconciliations", label: "对账", children: <ReconciliationTab ctrl={ctrl} /> },
-          { key: "controls", label: "异常", children: <ControlsTab ctrl={ctrl} /> },
           { key: "studio-expenses", label: "工作室支出", children: <StudioExpensePanel pools={ctrl.pools} ctrl={ctrl} /> },
         ]}
       />
@@ -47,7 +45,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
       <ReleaseModal ctrl={ctrl} />
       <LossModal ctrl={ctrl} />
       <CancelModal ctrl={ctrl} />
-      <RepairModal ctrl={ctrl} />
       <UnmatchedModal ctrl={ctrl} />
     </section>
   );

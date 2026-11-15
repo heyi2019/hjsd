@@ -29,7 +29,6 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
   const [returnTarget, setReturnTarget] = useState<Deposit | null>(null);
   const [lossTarget, setLossTarget] = useState<Deposit | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Deposit | null>(null);
-  const [repairTarget, setRepairTarget] = useState<Cashflow | null>(null);
   const [unmatchedTarget, setUnmatchedTarget] = useState<Reconciliation | null>(null);
 
   // L1527-①：全部资金弹窗共用同一 write.error。任一弹窗开/关切换时清除该错误，
@@ -47,7 +46,6 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
     returnTarget,
     lossTarget,
     cancelTarget,
-    repairTarget,
     unmatchedTarget,
     write.clearError,
   ]);
@@ -66,7 +64,6 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
   const [reverseForm] = Form.useForm();
   const [lossForm] = Form.useForm();
   const [cancelForm] = Form.useForm();
-  const [repairForm] = Form.useForm();
 
   const submitDeposit = async (values: Record<string, unknown>) => {
     await write.run(async () => {
@@ -202,21 +199,6 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
     });
   };
 
-  const submitRepair = async (values: Record<string, unknown>) => {
-    if (!repairTarget?.transfer_id) return;
-    const targetId = repairTarget.transfer_id;
-    await write.run(async () => {
-      await transfersApi.repair(targetId, {
-        counterpart_pool_id: Number(values.counterpart_pool_id),
-        reason: values.reason as string,
-      });
-      appMessage.success("单边划转已修复");
-      setRepairTarget(null);
-      repairForm.resetFields();
-      await load();
-    });
-  };
-
   const submitReconciliation = async (values: Record<string, unknown>) => {
     const poolId = Number(values.pool_id);
     const reconciledOn = values.reconciled_on as string;
@@ -280,8 +262,6 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
     setLossTarget,
     cancelTarget,
     setCancelTarget,
-    repairTarget,
-    setRepairTarget,
     unmatchedTarget,
     setUnmatchedTarget,
     cashflowAttributeOptions,
@@ -294,7 +274,6 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
     reverseForm,
     lossForm,
     cancelForm,
-    repairForm,
     submitDeposit,
     submitReturn,
     submitLoss,
@@ -302,7 +281,6 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
     submitCashflow,
     reverseCashflow,
     submitTransfer,
-    submitRepair,
     submitReconciliation,
     resolveReconciliation,
   };

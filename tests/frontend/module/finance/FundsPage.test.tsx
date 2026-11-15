@@ -118,7 +118,7 @@ describe("FundsPage：资金池卡片", () => {
     expect(screen.getByRole("button", { name: /资金池划转/ })).toBeDisabled();
   });
 
-  it("FE-261：完整资金划转配对后不显示单边异常", async () => {
+  it("资金中心只展示实时资金池、余额、流水、对账和工作室支出", async () => {
     vi.mocked(cashflowsApi.list).mockResolvedValueOnce({
       items: [
         { ...cashflows[0], id: 31, transfer_id: "TRF-PAIRED-01", direction: "OUT" },
@@ -128,10 +128,11 @@ describe("FundsPage：资金池卡片", () => {
     } as never);
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
-    await ui.click(screen.getByRole("tab", { name: "异常" }));
-
-    expect(await screen.findByText("暂无单边划转异常")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /修复划转/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "总览" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "流水" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "对账" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "工作室支出" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "异常" })).not.toBeInTheDocument();
   });
 
   it("FE-229：资金流水失败时统计不可用、筛选和新增入口禁用", async () => {
@@ -374,25 +375,6 @@ describe("FundsPage：资金写路径", () => {
       reason: "对手方未按约返还",
     }]);
   });
-
-  it("单边划转可选择对端资金池并提交修复原因", async () => {
-    resolveMockOnce(vi.mocked(cashflowsApi.list), { items: [{ ...cashflows[0], transfer_id: "TRF-001" }], total: 1 });
-    vi.mocked(transfersApi.repair).mockResolvedValueOnce({ transfer_id: "TRF-001" });
-    renderLight(<FundsPage />, { user: "finance" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
-    await ui.click(screen.getByRole("tab", { name: "异常" }));
-    await ui.click(await screen.findByRole("button", { name: /修复划转/ }));
-    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
-    await pickSelect(modal, 0, /POOL-B/);
-    await ui.type(modal.querySelector("#reason") ?? modal, "补齐转入侧流水");
-    await ui.click(screen.getByRole("button", { name: /确认修复/ }));
-    await waitFor(() => expect(vi.mocked(transfersApi.repair)).toHaveBeenCalled());
-    expect(vi.mocked(transfersApi.repair).mock.calls[0]).toEqual(["TRF-001", {
-      counterpart_pool_id: 2,
-      reason: "补齐转入侧流水",
-    }]);
-  });
-
 
   it("押金取消：PAID 押金填原因后调用 depositsApi.cancel（全额冲正由后端写）", async () => {
     vi.mocked(depositsApi.list).mockResolvedValue([

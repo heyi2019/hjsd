@@ -1,4 +1,4 @@
-/** 资金中心各 Tab 视图层：overview / cashflows / reconciliations / controls。
+/** 资金中心各 Tab 视图层：overview / cashflows / reconciliations / studio expenses。
  *  每个 Tab 通过 controller 消费 useFundsPageController 暴露的状态与处理器，自身只负责列定义与渲染。 */
 import { Card, Input, Space, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -65,7 +65,6 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
     </Card>
   );
 }
-
 export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
   const {
     visibleCashflows, cashflows, cashflowKeyword, setCashflowKeyword, pools, cashflowPoolId, setCashflowPoolId,
@@ -167,7 +166,6 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
     </Card>
   );
 }
-
 export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
   const { deposits, setDepositOpen, returnForm, setReturnTarget, lossForm, setLossTarget, cancelForm, setCancelTarget, loading } = ctrl;
   const { arrange: arrangeDepositColumns } = useListViewColumns("DEPOSITS");
@@ -238,7 +236,6 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
     </Card>
   );
 }
-
 export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
   const { reconciliations, pools, reconciliationForm, setReconciliationOpen, loading, reconciliationsReady, error } = ctrl;
   const reconciliationUnavailable = !reconciliationsReady || Boolean(error);
@@ -281,40 +278,5 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
         onPageChange={() => undefined}
       />
     </Card>
-  );
-}
-
-export function ControlsTab({ ctrl }: { ctrl: FundsPageController }) {
-  const { transferAnomalies, pools, repairForm, setRepairTarget, loading } = ctrl;
-  const { arrange: arrangeTransferAnomalyColumns } = useListViewColumns("TRANSFER_ANOMALIES");
-  const transferAnomalyColumns: ColumnsType<{ transfer_id: string; flow: Cashflow }> = [
-    { title: "划转号", dataIndex: "transfer_id" },
-    { title: "现有流水", key: "flow_no", render: (_v, row) => row.flow.flow_no },
-    { title: "资金池", key: "pool", render: (_v, row) => pools.find((pool) => pool.id === row.flow.pool_id)?.name ?? row.flow.pool_id },
-    { title: "方向", key: "direction", render: (_v, row) => row.flow.direction === "IN" ? "收入" : "支出" },
-    { title: "金额", key: "amount", align: "right", render: (_v, row) => <MoneyText value={row.flow.amount} /> },
-    {
-      title: "操作",
-      key: "actions",
-      render: (_v, row) => (
-        <PermissionButton permission="finance.transfer" size="small" onClick={() => { repairForm.resetFields(); setRepairTarget(row.flow); }}>修复划转</PermissionButton>
-      ),
-    },
-  ];
-  return (
-    <div className="ui-stack">
-      <Card className="glass" title="单边划转异常">
-        <DataTable
-          columns={arrangeTransferAnomalyColumns(transferAnomalyColumns)}
-          rows={transferAnomalies}
-          page={1}
-          pageSize={10}
-          total={transferAnomalies.length}
-          emptyText="暂无单边划转异常"
-          loading={loading}
-          onPageChange={() => undefined}
-        />
-      </Card>
-    </div>
   );
 }

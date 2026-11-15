@@ -221,19 +221,6 @@ export function useFundsResources(active = true) {
     });
   }, [cashflowDirection, cashflowFrom, cashflowKeyword, cashflowPoolId, cashflowStatus, cashflowTo, cashflows]);
 
-  const transferAnomalies = useMemo(() => {
-    const grouped = new Map<string, Cashflow[]>();
-    for (const row of cashflows) {
-      if (!row.transfer_id) continue;
-      const rows = grouped.get(row.transfer_id) ?? [];
-      rows.push(row);
-      grouped.set(row.transfer_id, rows);
-    }
-    return [...grouped.entries()]
-      .filter(([, rows]) => rows.length === 1)
-      .map(([transfer_id, rows]) => ({ transfer_id, flow: rows[0] }));
-  }, [cashflows]);
-
   const totalFlowIncome = cashflowTotals.income;
   const totalFlowExpense = cashflowTotals.expense;
 
@@ -280,7 +267,6 @@ export function useFundsResources(active = true) {
     totalDeposit,
     totalOwned,
     visibleCashflows,
-    transferAnomalies,
     totalFlowIncome,
     totalFlowExpense,
   };

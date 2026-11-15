@@ -369,28 +369,6 @@ export function CancelModal({ ctrl }: { ctrl: FundsPageController }) {
   );
 }
 
-export function RepairModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { repairTarget, setRepairTarget, repairForm, submitRepair, write, pools } = ctrl;
-  return (
-    <FundsActionModal
-      title="修复单边划转" fieldCount={2}
-      open={Boolean(repairTarget)} onCancel={() => setRepairTarget(null)}
-      scope="FUNDREPAIR" form={repairForm} onFinish={submitRepair}
-      write={write} permission="finance.transfer" submitLabel="确认修复"
-      beforeError={
-        <Typography.Paragraph type="secondary">
-          划转号：{repairTarget?.transfer_id}；现有流水：{repairTarget?.flow_no}
-        </Typography.Paragraph>
-      }
-    >
-      <CfgItem name="counterpart_pool_id" label="缺失对端资金池" rules={[{ required: true }]}>
-        <Select options={poolOptions(pools, { excludeId: repairTarget?.pool_id, withTitle: true })} />
-      </CfgItem>
-      <CfgItem name="reason" label="修复原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
-    </FundsActionModal>
-  );
-}
-
 /** 未达流水是纯展示弹窗（AntdModal + DataTable），无表单骨架，保持独立。 */
 export function UnmatchedModal({ ctrl }: { ctrl: FundsPageController }) {
   const { unmatchedTarget, setUnmatchedTarget, cashflows, loading } = ctrl;

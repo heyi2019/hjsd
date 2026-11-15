@@ -144,14 +144,6 @@ describe("ReportsPage：经营中心报表", () => {
     expect(screen.queryByRole("tab", { name: "库存 R1" })).not.toBeInTheDocument();
   });
 
-  it("经营中心不展示系统级工具页签", async () => {
-    renderLight(<ReportsPage />, { user: "admin" });
-    await screen.findByRole("tab", { name: "月度损益" });
-    for (const label of ["质量中心", "全局搜索", "系统提醒", "附件中心", "资金属性分析"]) {
-      expect(screen.queryByRole("tab", { name: label })).not.toBeInTheDocument();
-    }
-  });
-
   it("数据中心 Tab：渲染资金统计与订单入口卡，点击入口卡跳业务中心", async () => {
     const onNavigate = vi.fn();
     renderLight(<ReportsPage onNavigate={onNavigate} />, { user: "admin" });

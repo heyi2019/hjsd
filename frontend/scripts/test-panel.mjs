@@ -77,7 +77,9 @@ if (!bin) {
 const args = ["run", ...targets, ...passthrough];
 
 console.log(`板块测试：${head.join(", ")}  →  ${targets.join(" ")}`);
-const child = spawn(bin, args, { stdio: "inherit", env: process.env });
+// Vitest 配置位于 frontend/vitest.config.ts；从仓库根启动时不会自动发现该配置，
+// 进而导致 @ / @fixtures 别名失效。板块测试与 test-changed 保持同一工作目录。
+const child = spawn(bin, args, { cwd: FRONTEND, stdio: "inherit", env: process.env });
 child.on("error", (error) => {
   console.error(`无法启动 vitest：${error.message}`);
   process.exit(1);

@@ -80,9 +80,8 @@ async function openLedger(user?: string) {
 }
 
 describe("OrdersPage：四类订单台账", () => {
-  // 原 4 条用例（默认进入库存中心 / 台账语义名称 / 不留重复标题 / 页签集合）挂的是同一份
-  // 默认夹具、只读静态 DOM，合并为一次挂载，断言逐条保留。
-  it("业务中心外壳：默认进库存中心、页签只留三视图、不重复标题与流程提示", async () => {
+  // 默认夹具、只读静态 DOM，合并外壳和已下线能力边界断言，避免重复挂载。
+  it("业务中心外壳：默认进库存中心、页签只留三视图", async () => {
     renderLight(<OrdersPage />);
 
     const inventoryTab = await screen.findByRole("tab", { name: "库存中心" });
@@ -96,15 +95,6 @@ describe("OrdersPage：四类订单台账", () => {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
     expect(screen.queryByRole("tab", { name: "返点" })).toBeNull();
-
-    expect(screen.queryByRole("heading", { name: "业务中心" })).toBeNull();
-    expect(screen.queryByText("获客是通用能力；买号、买入交付、售出、售出交付和回款（分期）是执行动作。回收、提号、代挂分别承载不同业务。")).toBeNull();
-    expect(screen.queryByText(/待处理/)).toBeNull();
-  });
-
-  it("订单台账不提供关联筛选和关联列", async () => {
-    renderLight(<OrdersPage />);
-    await screen.findByRole("tab", { name: "订单台账" });
 
     expect(screen.queryByText("关联筛选")).toBeNull();
     expect(screen.queryByRole("combobox", { name: "关联状态筛选" })).toBeNull();

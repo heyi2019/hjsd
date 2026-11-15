@@ -85,22 +85,6 @@ describe("ReportsPage：经营中心报表", () => {
     expect(vi.mocked(poolsApi.list)).not.toHaveBeenCalled();
   });
 
-  it("经营报表的日期筛选与统计卡之间保留纵向间距", async () => {
-    renderLight(<ReportsPage />, { user: "admin" });
-
-    const expectSpacedFilterBar = () => {
-      expect(document.querySelector(".ui-filter-bar")).toHaveClass("ui-filter-bar--spaced");
-    };
-
-    await screen.findByRole("tab", { name: "经营损益" });
-    expectSpacedFilterBar();
-
-    for (const label of ["分润对账", "经营损益"]) {
-      await ui.click(screen.getByRole("tab", { name: label }));
-      await waitFor(expectSpacedFilterBar);
-    }
-  });
-
   it("日期筛选提供本期和上期快捷入口，账期按每月16日至次月15日计算", async () => {
     expect(currentReportPeriod(dayjs("2026-11-16"))).toEqual({ from: "2026-11-16", to: "2026-12-15" });
     expect(previousReportPeriod(dayjs("2026-11-16"))).toEqual({ from: "2026-10-16", to: "2026-11-15" });

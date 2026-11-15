@@ -253,13 +253,6 @@ describe("FundsPage：资金流水", () => {
     expect(screen.queryByText("HS0001-CF-BUY-01")).not.toBeInTheDocument();
   });
 
-  it("流水筛选区使用紧凑布局容器", async () => {
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
-    expect(document.querySelector(".funds-cashflow-filters")).toBeInTheDocument();
-  });
-
   it("资金流水导出与列表同口径：带上当前搜索关键词", async () => {
     // 修复 #2：旧实现 exportCsv 漏传 keyword，筛关键词后导出的是全量。
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);

@@ -4,11 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DataCenterPanel } from "@/reporting/DataCenterPanel";
 import { ordersApi } from "@/shared/api/orders.api";
-import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { reportsApi } from "@/shared/api/reports.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 
-vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");
@@ -28,7 +26,6 @@ const businessPnl = {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 2, completed_count: 1, active_count: 1 });
-  vi.mocked(cashflowsApi.studioSummary).mockResolvedValue({ items: [], approved_income: "0.00", approved_expense: "0.00", approved_net: "0.00", count: 0 });
   vi.mocked(reportsApi.businessPnl).mockResolvedValue(businessPnl);
   vi.mocked(stocksApi.inventoryCostSummary).mockResolvedValue({ total_cost: "3,500.00" });
 });
@@ -43,19 +40,12 @@ describe("DataCenterPanel：经营指标", () => {
     expect(screen.queryByText("资金池概览")).not.toBeInTheDocument();
   });
 
-  it("保留在途成本、利润和工作室支出", async () => {
-    vi.mocked(cashflowsApi.studioSummary).mockResolvedValueOnce({
-      items: [],
-      approved_income: "100.00",
-      approved_expense: "88.80",
-      approved_net: "11.20",
-      count: 2,
-    });
+  it("保留在途成本和利润，不重复展示工作室支出", async () => {
     renderLight(<DataCenterPanel />, { user: "admin" });
     expect(await screen.findByText("在途成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
     expect(screen.getByText("在途成本").closest(".ui-stat")?.textContent).toContain("3,500.00");
     expect(screen.getByText("利润", { selector: ".ui-stat__label" }).closest(".ui-stat")?.textContent).toContain("800.00");
-    expect(screen.getByText("工作室支出", { selector: ".ui-stat__label" }).closest(".ui-stat")?.textContent).toContain("88.80");
+    expect(screen.queryByText("工作室支出", { selector: ".ui-stat__label" })).not.toBeInTheDocument();
   });
 
   it("日期范围只传给经营指标接口", async () => {
@@ -64,7 +54,6 @@ describe("DataCenterPanel：经营指标", () => {
     await screen.findByText("订单总数");
     expect(vi.mocked(ordersApi.summary)).toHaveBeenLastCalledWith({ trade_date_from: "2026-11-01", trade_date_to: "2026-11-15" });
     expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-11-01", to: "2026-11-15" });
-    expect(vi.mocked(cashflowsApi.studioSummary)).toHaveBeenLastCalledWith({ occurred_from: "2026-11-01", occurred_to: "2026-11-15" });
     expect(vi.mocked(stocksApi.inventoryCostSummary)).toHaveBeenLastCalledWith({ entry_date_from: "2026-11-01", entry_date_to: "2026-11-15" });
   });
 

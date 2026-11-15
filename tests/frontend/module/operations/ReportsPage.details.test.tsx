@@ -120,29 +120,6 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     expect(screen.getAllByText("160.00").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("订单利润：单独展示账号采购成本", async () => {
-    resolveMockOnce(vi.mocked(reportsApi.orderProfit), {
-      from: null,
-      to: null,
-      total: { income: "600.00", buy_amount: "400.00", direct_cost: "50.00", rebate: "10.00", net_profit: "160.00" },
-      items: [{
-        order_no: "HS-2026-0011",
-        order_type: "HS",
-        income: "600.00",
-        buy_amount: "400.00",
-        direct_cost: "50.00",
-        rebate: "10.00",
-        net_profit: "160.00",
-      }],
-    });
-    renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("订单利润");
-
-    expect(await screen.findByText("HS-2026-0011")).toBeInTheDocument();
-    expect(screen.getAllByText("账号采购成本").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("400.00").length).toBeGreaterThanOrEqual(1);
-  });
-
   it("P1/FE-169：订单利润展示采购成本并给出可复算口径", async () => {
     vi.mocked(reportsApi.orderProfit).mockResolvedValueOnce({
       items: [{

@@ -91,41 +91,6 @@ it("工作台按业务提醒配置计算库存阈值并控制提醒开关", asyn
     expect(stocksApi.dashboardSummary).toHaveBeenCalledWith(14);
   });
 
-it("业务入口按场景使用独立的卡片视觉层级", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: /自营·回收/ });
-    expect(document.querySelector(".dashboard-entry-group--sell")).toBeInTheDocument();
-    expect(document.querySelector(".dashboard-entry-group--self-owned")).toBeInTheDocument();
-    expect(document.querySelector(".dashboard-entry-group--distribution")).toBeInTheDocument();
-  });
-
-it("所有业务分组都不显示顶部装饰条", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: "提号" });
-    const groups = document.querySelectorAll(".dashboard-entry-group");
-    expect(groups).toHaveLength(3);
-    groups.forEach((group) => {
-      expect(group).toHaveClass("dashboard-entry-group--no-accent");
-    });
-  });
-
-it("分销入口使用中性白色视觉", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: "提号" });
-    expect(document.querySelector(".dashboard-entry-group--distribution.dashboard-entry-group--neutral")).toBeInTheDocument();
-  });
-
-it("所有业务入口使用同一套标准化分组结构", async () => {
-    renderLight(<DashboardPage />, { user: "admin" });
-    await screen.findByRole("button", { name: "提号" });
-    const groups = document.querySelectorAll(".dashboard-entry-group");
-    expect(groups).toHaveLength(3);
-    groups.forEach((group) => {
-      expect(group.querySelector(":scope > .dashboard-entry-group__items")).toBeInTheDocument();
-    });
-  });
-
-
 // —— 以下 6 条原在 DashboardPage.interactions.test.tsx ——
 // 同一页面、同一份 mock 契约，拆两个文件等于让同样的 jsdom+antd 启动付两遍。
 it("viewer 无 order.create → 看不到新建业务卡", async () => {

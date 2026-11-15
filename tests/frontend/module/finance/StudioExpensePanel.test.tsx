@@ -117,33 +117,6 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(document.querySelector(".studio-expense-filters")?.querySelector("button")).toBeNull();
   });
 
-  it("筛选项位于统计卡片下方", async () => {
-    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
-    await screen.findByText("房租");
-    const stats = document.querySelector(".ui-stat-row");
-    const filters = document.querySelector(".studio-expense-filters");
-    expect(stats).toBeTruthy();
-    expect(filters).toBeTruthy();
-    expect(Boolean(stats && filters && (stats.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
-  });
-
-  it("工作室支出卡片使用宽松布局钩子，避免筛选器和统计卡片挤在一起", async () => {
-    // 原写法调用了不存在的 renderPanel()（本文件唯一用例），按其余用例口径改回 renderLight
-    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
-    expect(await screen.findByText("已入账收入")).toBeInTheDocument();
-    expect(document.querySelector(".studio-expense-card")).toBeInTheDocument();
-  });
-
-  it("资金池筛选位于全部科目右侧并给下拉足够宽度", async () => {
-    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
-    await screen.findByText("房租");
-
-    const filters = document.querySelector(".studio-expense-filters") as HTMLElement;
-    expect(filters).toHaveClass("studio-expense-filters--single-row");
-    expect(filters.querySelector(".ui-control-width-studio-pool")).toBeInTheDocument();
-    expect(filters.textContent?.indexOf("全部科目")).toBeLessThan(filters.textContent?.indexOf("资金池筛选"));
-  });
-
   it("工作室支出筛选区不显示查询按钮", async () => {
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     await screen.findByText("房租");

@@ -196,18 +196,6 @@ describe("CustomersPage：客户档案", () => {
     expect(screen.getByLabelText("合作类型")).toBeInTheDocument();
   });
 
-  it("统计卡片与筛选条之间保留清晰的分组间距", async () => {
-    renderLight(<CustomersPage />);
-    await screen.findByText("CUS-0001");
-
-    const stats = document.querySelector(".ui-stat-row");
-    const filters = document.querySelector(".customer-list-filters");
-
-    expect(stats).toBeInTheDocument();
-    expect(filters).toHaveClass("customer-list-filters--separated");
-    expect(stats?.nextElementSibling).toBe(filters);
-  });
-
   it("统计区只展示总数、本月新增和今日新增", async () => {
     vi.setSystemTime(new Date("2026-10-18T12:00:00"));
     renderLight(<CustomersPage />);

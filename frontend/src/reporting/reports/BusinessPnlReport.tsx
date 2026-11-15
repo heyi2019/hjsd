@@ -25,7 +25,7 @@ export function BusinessPnl({ range, showPicker = true }: { range: ReportRange; 
       render: (v: string, row) => `${BUSINESS_MODE_LABEL[row.business_mode ?? ""] ?? "-"}·${BUSINESS_TYPE_LABEL[row.business_type ?? ""] ?? ORDER_TYPE_LABEL[v] ?? v}（${v}）`,
     },
     { title: "主营收入", dataIndex: "main_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "主营成本", dataIndex: "main_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "成本", dataIndex: "cost", align: "right", render: (v: string) => <MoneyText value={v} />},
     {
       title: "主营毛利",
       dataIndex: "main_profit",
@@ -40,8 +40,8 @@ export function BusinessPnl({ range, showPicker = true }: { range: ReportRange; 
       <StatRow
         items={[
           { label: "主营收入", amount: data?.total.main_income ?? "-" },
-          { label: "主营成本", amount: data?.total.main_cost ?? "-" },
-          { label: "主营毛利", amount: data?.total.main_profit ?? "-", tone: "auto" },
+          { label: "成本合计", amount: data?.total.cost ?? "-" },
+          { label: "主营利润", amount: data?.total.main_profit ?? "-", tone: "auto" },
         ]}
       />
              <DataTable<BusinessPnlRow>

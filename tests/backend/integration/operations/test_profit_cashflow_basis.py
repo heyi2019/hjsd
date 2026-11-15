@@ -299,7 +299,7 @@ def test_reports_follow_rebate_and_bad_debt(seeded_db):
     detail = order_profit_detail(seeded_db)
     item = next(row for row in detail["items"] if row["order_id"] == order_id)
     assert item["income"] == Decimal("1600.00")  # 1500 售出 + 100 返点
-    assert item["direct_cost"] == Decimal("400.00")  # 坏账计入支出侧
+    assert item["cost"] == Decimal("1400.00")  # 采购支出与坏账统一计入成本
     assert item["rebate"] == Decimal("100.00")
     assert item["net_profit"] == Decimal("200.00")
 
@@ -313,7 +313,7 @@ def test_reports_follow_rebate_and_bad_debt(seeded_db):
     # 返点已含在销售收入里，不重复加回经营利润。
     assert oct_item["operating_profit"] == (
         oct_item["sales_income"]
-        - oct_item["account_direct_cost"]
+        - oct_item["cost"]
         - oct_item["operating_expense"]
     )
 
@@ -348,7 +348,7 @@ def test_r2_rebate_column_counts_action_model_rebate_like_profit_detail(seeded_d
     # 其中项只作展示，不重复加回经营利润
     assert oct_item["operating_profit"] == (
         oct_item["sales_income"]
-        - oct_item["account_direct_cost"]
+        - oct_item["cost"]
         - oct_item["operating_expense"]
     )
 

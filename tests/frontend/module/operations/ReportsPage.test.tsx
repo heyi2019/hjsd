@@ -56,7 +56,7 @@ beforeEach(() => {
     { id: 8, username: "finance", display_name: "财务同事", is_active: true },
   ]);
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(reportsApi.orderProfit), { items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
+  resolveMock(vi.mocked(reportsApi.orderProfit), { items: [], total: { income: "0", cost: "0", rebate: "0", net_profit: "0" } });
   resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
   vi.mocked(poolsApi.list).mockResolvedValue([]);

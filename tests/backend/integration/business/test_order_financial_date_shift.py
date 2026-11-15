@@ -190,7 +190,7 @@ def test_shift_moves_bad_debt_rebate_and_buy_date(seeded_db):
     # 报表归月随之迁移：9 月归零，10 月含返点收入 200 + 坏账支出 300
     oct_item = next(r for r in r2_monthly_pnl(seeded_db)["items"] if r["month"] == "2026-10")
     assert oct_item["rebate_income"] == Decimal("200.00")
-    assert oct_item["account_direct_cost"] >= Decimal("300.00")
+    assert oct_item["cost"] >= Decimal("300.00")
 
 
 # --------------------------------------------------------------- #14 对账边界

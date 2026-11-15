@@ -105,5 +105,5 @@ def test_flow_b_hs_sell_end_to_end(seeded_client, headers, seeded_db):
     # 报表口径一致：收入 1500 / 成本 1000 / 净利 500
     detail = order_profit_detail(seeded_db, from_date=TODAY, to_date=TODAY)
     assert detail["total"]["income"] == Decimal("1500.00")
-    assert detail["total"]["buy_amount"] == Decimal("1000.00")
+    assert detail["total"]["cost"] == Decimal("1000.00")
     assert detail["total"]["net_profit"] == Decimal("500.00")

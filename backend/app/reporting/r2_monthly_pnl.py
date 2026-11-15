@@ -54,7 +54,7 @@ def r2_monthly_pnl(
     """月度经营损益：订单收支按资金明细，期间费用/返点单列。"""
     _validate_date_range(from_date, to_date)
     revenue: dict[str, Decimal] = defaultdict(lambda: ZERO)
-    direct_cost: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    cost: dict[str, Decimal] = defaultdict(lambda: ZERO)
 
     # 订单资金明细：只认挂在订单上的流水，一次性按发生日分组求和。
     income_case = case(
@@ -86,7 +86,7 @@ def r2_monthly_pnl(
     for occurred_on, income, expense in session.execute(cf_stmt).all():
         key = _month_key(occurred_on)
         revenue[key] += to_money_or_zero(income)
-        direct_cost[key] += to_money_or_zero(expense)
+        cost[key] += to_money_or_zero(expense)
 
     # 不生成资金流水、但有明确资金走向的事实：返点记录=收入，分期坏账=支出。
     # 与订单利润明细同源，按各自发生日归月；返点收益列只作「其中项」展示。
@@ -94,7 +94,7 @@ def r2_monthly_pnl(
         session.scalars(_apply_order_scope(select(Order.id), user, session)).all()
     )
     # 收入/支出大类继续走 order_profit_flow_by_date：新模型返点在这条线的收入
-    # 已由资金流水计入 revenue，坏账计入 direct_cost，口径不变。
+    # 已由资金流水计入 revenue，坏账计入 cost，口径不变。
     for occurred_on, (extra_income, extra_expense) in order_profit_flow_by_date(
         session,
         order_ids=scoped_order_ids,
@@ -103,7 +103,7 @@ def r2_monthly_pnl(
     ).items():
         key = _month_key(occurred_on)
         revenue[key] += extra_income
-        direct_cost[key] += extra_expense
+        cost[key] += extra_expense
 
     # 「其中返点」列独立聚合 RebateRecord（与利润明细 profit.py 同源）：
     # 不能复用 order_profit_flow_by_date 的 extra_income——那个函数对「已生成资金流水
@@ -167,33 +167,33 @@ def r2_monthly_pnl(
         ):
             operating[_month_key(occurred_on)] += amount
 
-    for bucket in (revenue, direct_cost, operating, rebate_income):
+    for bucket in (revenue, cost, operating, rebate_income):
         for month in list(bucket):
             if bucket[month] == ZERO:
                 del bucket[month]
-    months = sorted(set(revenue) | set(direct_cost) | set(operating) | set(rebate_income))
+    months = sorted(set(revenue) | set(cost) | set(operating) | set(rebate_income))
     items = []
     for month in months:
         income = revenue[month]
-        cost = direct_cost[month]
+        month_cost = cost[month]
         op = operating[month]
         rebate = rebate_income[month]
         items.append(
             {
                 "month": month,
                 "sales_income": income,
-                "account_direct_cost": cost,
+                "cost": month_cost,
                 "operating_expense": op,
                 # 返点收入已计入 sales_income，此处只作其中项展示，不重复加回利润。
                 "rebate_income": rebate,
-                "operating_profit": income - cost - op,
+                "operating_profit": income - month_cost - op,
             }
         )
     return {
         "items": items,
         "total": {
             "sales_income": _sum_report_field(items, "sales_income"),
-            "account_direct_cost": _sum_report_field(items, "account_direct_cost"),
+            "cost": _sum_report_field(items, "cost"),
             "operating_expense": _sum_report_field(items, "operating_expense"),
             "rebate_income": _sum_report_field(items, "rebate_income"),
             "operating_profit": _sum_report_field(items, "operating_profit"),

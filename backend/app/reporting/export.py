@@ -106,7 +106,7 @@ def report_csv(
     item_keys: set[str] = {
         key for item in items if isinstance(item, dict) for key in item
     }
-    # 只认「合计行独有」的键：明细里也出现过的未登记字段（如 buy_amount）不算，
+    # 只认「合计行独有」的键：明细里也出现过的未登记字段不算，
     # 否则界面没登记的明细字段会从合计行漏回导出表。
     total_only_keys: list[str] = [
         key for key in (total.keys() if total is not None else ()) if key not in item_keys

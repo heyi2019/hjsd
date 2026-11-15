@@ -117,7 +117,7 @@ def test_deposit_linked_to_order_in_r2_direct_cost_same_source_as_profit(seeded_
         data = r2_monthly_pnl(seeded_db)
         item = next((r for r in data["items"] if r["month"] == "2026-10"), None)
         return (
-            item["account_direct_cost"] if item else Decimal("0.00"),
+            item["cost"] if item else Decimal("0.00"),
             item["sales_income"] if item else Decimal("0.00"),
             item["operating_expense"] if item else Decimal("0.00"),
         )
@@ -182,14 +182,14 @@ def test_order_linked_normal_expense_still_in_r2_direct_cost(seeded_db):
     invest = _pool(seeded_db, "HJ_INVEST")
     base = r2_monthly_pnl(seeded_db)
     oct_before = next((r for r in base["items"] if r["month"] == "2026-10"), None)
-    before_cost = oct_before["account_direct_cost"] if oct_before else Decimal("0.00")
+    before_cost = oct_before["cost"] if oct_before else Decimal("0.00")
 
     # accounting_attribute=None 的挂单支出，验证 != DEPOSIT 的 NULL 放行
     _flow(seeded_db, pool_id=invest.id, direction="OUT", nature="BUSINESS_OUT",
           amount="300", attribute=None, order_id=order.id)
     after = r2_monthly_pnl(seeded_db)
     oct_item = next(r for r in after["items"] if r["month"] == "2026-10")
-    assert oct_item["account_direct_cost"] == before_cost + Decimal("300.00")
+    assert oct_item["cost"] == before_cost + Decimal("300.00")
 
 
 # ----------------------------------------------- #5 外部注入并入收入（删 external_in 列）

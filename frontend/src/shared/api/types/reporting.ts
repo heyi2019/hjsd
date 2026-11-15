@@ -5,7 +5,7 @@
 export interface MonthlyPnlRow {
   month: string;
   sales_income: string;
-  account_direct_cost: string;
+  cost: string;
   operating_expense: string;
   rebate_income: string;
   operating_profit: string;
@@ -48,7 +48,7 @@ export interface BusinessPnlRow {
   order_type: string;
   order_count?: number;
   main_income: string;
-  main_cost: string;
+  cost: string;
   main_profit: string;
 }
 
@@ -91,8 +91,7 @@ export interface OrderProfitRow {
   trade_date: string;
   status: string;
   income: string;
-  buy_amount: string;
-  direct_cost: string;
+  cost: string;
   rebate: string;
   net_profit: string;
 }
@@ -100,6 +99,6 @@ export interface OrderProfitRow {
 export interface OrderProfitReport {
   from?: string | null;
   to?: string | null;
-  total: { income: string; buy_amount: string; direct_cost: string; rebate: string; net_profit: string };
+  total: { income: string; cost: string; rebate: string; net_profit: string };
   items: OrderProfitRow[];
 }

@@ -121,8 +121,8 @@ class TestR2MonthlyPnl:
         full = r2_monthly_pnl(seeded_db)
         oct_item = _month_item(full, "2026-10")
         assert oct_item["sales_income"] == 1300
-        assert oct_item["account_direct_cost"] == 1000
-        assert _month_item(full, "2026-09")["account_direct_cost"] == 200
+        assert oct_item["cost"] == 1000
+        assert _month_item(full, "2026-09")["cost"] == 200
 
         # from 过滤：9 月事件被 continue
         gated = r2_monthly_pnl(seeded_db, from_date=MID_GATE)
@@ -169,13 +169,12 @@ class TestR2MonthlyPnl:
         # 资金明细口径（11-05 裁决）：撤销售出产生一笔反向资金流水，
         # 收入列仍是已入账的 800，冲销的 800 计入支出；净利仍为 -500。
         assert oct_item["sales_income"] == 800
-        assert oct_item["account_direct_cost"] == 1300
+        assert oct_item["cost"] == 1300
         assert oct_item["operating_profit"] == -500
 
         detail = order_profit_detail(seeded_db)["items"][0]
         assert detail["income"] == 800
-        assert detail["buy_amount"] == 500
-        assert detail["direct_cost"] == 800
+        assert detail["cost"] == 1300
         assert detail["net_profit"] == -500
 
 
@@ -527,14 +526,14 @@ class TestReports:
         data = r2_monthly_pnl(seeded_db)
         month = [i for i in data["items"] if i["month"] == "2026-10"]
         assert month
-        assert month[0]["account_direct_cost"] == 1300
+        assert month[0]["cost"] == 1300
         assert month[0]["operating_expense"] == 0
 
     def test_r5_legacy_rebate_columns_are_removed(self, seeded_db):
         """11-05 二次裁决：结算展示列下线，返点金额全站只认 amount。"""
         data = r5_business_pnl(seeded_db)
         for item in data["items"]:
-            assert {"main_income", "main_cost", "main_profit"} <= set(item)
+            assert {"main_income", "cost", "main_profit"} <= set(item)
             for key in ("settled_rebate", "uncollected_rebate", "full_income"):
                 assert key not in item
         for key in ("settled_rebate", "uncollected_rebate", "full_income"):
@@ -555,7 +554,7 @@ class TestReports:
             # 净利 = 资金明细所有收入 − 所有支出（11-05 裁决）；
             # 返点独立成列、不进净利。
             assert item["net_profit"] == (
-                item["income"] - item["buy_amount"] - item["direct_cost"]
+                item["income"] - item["cost"]
             )
 
     def test_r3_drills_down_to_orders(self, seeded_db):

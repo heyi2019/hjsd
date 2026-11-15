@@ -129,9 +129,9 @@ def test_return_uses_real_return_date_not_today(seeded_db):
     nov_after = next((r for r in after["items"] if r["month"] == "2026-11"), None)
     # 10月销售收入（含返点 IN 流水）不变；退回支出落在 11月直接成本。
     assert oct_after["sales_income"] == oct_before["sales_income"]
-    assert oct_after["account_direct_cost"] == oct_before["account_direct_cost"]
+    assert oct_after["cost"] == oct_before["cost"]
     assert nov_after is not None
-    assert nov_after["account_direct_cost"] == Decimal("250.00")
+    assert nov_after["cost"] == Decimal("250.00")
     # 「其中返点」列仍是 10月登记的 1000，不受退回影响（展示口径）。
     assert oct_after["rebate_income"] == Decimal("1000.00")
 
@@ -148,7 +148,7 @@ def test_return_does_not_inflate_operating_expense(seeded_db):
     after = r2_monthly_pnl(seeded_db)
     nov = next(r for r in after["items"] if r["month"] == "2026-11")
     assert nov["operating_expense"] == op_before  # 运营费用不受挂单退回影响
-    assert nov["account_direct_cost"] == Decimal("300.00")
+    assert nov["cost"] == Decimal("300.00")
 
 
 def test_return_flow_reuses_original_rebate_pool(seeded_db):

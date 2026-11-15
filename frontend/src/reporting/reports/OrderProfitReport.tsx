@@ -23,8 +23,7 @@ export function OrderProfit({ range }: { range: ReportRange }) {
     { title: "成交日", dataIndex: "trade_date", width: 110 },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} /> },
     { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "账号采购成本", dataIndex: "buy_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "直接成本", dataIndex: "direct_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "成本", dataIndex: "cost", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "返点", dataIndex: "rebate", align: "right", render: (v: string) => <MoneyText value={v} />},
     {
       title: "净利",
@@ -40,8 +39,7 @@ export function OrderProfit({ range }: { range: ReportRange }) {
       <StatRow
         items={[
           { label: "收入合计", amount: data?.total.income ?? "-" },
-          { label: "账号采购成本合计", amount: data?.total.buy_amount ?? "-" },
-          { label: "直接成本合计", amount: data?.total.direct_cost ?? "-" },
+          { label: "成本合计", amount: data?.total.cost ?? "-" },
           { label: "返点合计", amount: data?.total.rebate ?? "-" },
           { label: "净利合计", amount: data?.total.net_profit ?? "-", tone: "auto" },
         ]}

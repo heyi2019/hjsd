@@ -50,7 +50,7 @@ beforeEach(() => {
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
   resolveMock(vi.mocked(reportsApi.orderProfit), {
     items: [],
-    total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" },
+    total: { income: "0", cost: "0", rebate: "0", net_profit: "0" },
   });
   resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
@@ -195,13 +195,13 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   it("FE-270：月度损益和业务损益历史空区间清空旧明细", async () => {
     vi.mocked(reportsApi.monthlyPnl).mockImplementation((params) => Promise.resolve(
       params?.from ? { items: [], total: { sales_income: "0", operating_profit: "0" } } : {
-        items: [{ month: "2026-11", sales_income: "100", account_direct_cost: "50", operating_expense: "0", rebate_income: "0", operating_profit: "50" }],
+        items: [{ month: "2026-11", sales_income: "100", cost: "50", operating_expense: "0", rebate_income: "0", operating_profit: "50" }],
         total: { sales_income: "100", operating_profit: "50" },
       },
     ) as never);
     vi.mocked(reportsApi.businessPnl).mockImplementation((params) => Promise.resolve(
       params?.from ? { items: [], total: { main_profit: "0" } } : {
-        items: [{ order_type: "HS", business_mode: "SELF", main_income: "100", main_cost: "50", main_profit: "50" }],
+        items: [{ order_type: "HS", business_mode: "SELF", main_income: "100", cost: "50", main_profit: "50" }],
         total: { main_profit: "50" },
       },
     ) as never);
@@ -222,9 +222,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
   it("FE-272：订单利润历史空区间清空收入成本和净利明细", async () => {
     vi.mocked(reportsApi.orderProfit).mockImplementation((params) => Promise.resolve(
-      params?.from ? { items: [], total: { income: "0", buy_amount: "0", direct_cost: "0", rebate: "0", net_profit: "0" } } : {
-        items: [{ order_no: "HS-FE272", order_type: "HS", trade_date: "2026-11-01", status: "DONE", income: "100", buy_amount: "50", direct_cost: "10", rebate: "0", net_profit: "40" }],
-        total: { income: "100", buy_amount: "50", direct_cost: "10", rebate: "0", net_profit: "40" },
+      params?.from ? { items: [], total: { income: "0", cost: "0", rebate: "0", net_profit: "0" } } : {
+        items: [{ order_no: "HS-FE272", order_type: "HS", trade_date: "2026-11-01", status: "DONE", income: "100", cost: "60", rebate: "0", net_profit: "40" }],
+        total: { income: "100", cost: "60", rebate: "0", net_profit: "40" },
       },
     ) as never);
     renderLight(<ReportsPage />, { user: "admin" });

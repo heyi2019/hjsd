@@ -151,7 +151,7 @@ def test_r2_order_linked_operating_expense_not_double_counted(seeded_db):
     order_id = _bare_order(seeded_db)
     start = r2_monthly_pnl(seeded_db)
     before = next((r for r in start["items"] if r["month"] == "2026-10"), None)
-    before_cost = before["account_direct_cost"] if before else Decimal("0.00")
+    before_cost = before["cost"] if before else Decimal("0.00")
     before_op = before["operating_expense"] if before else Decimal("0.00")
 
     _flow(
@@ -163,7 +163,7 @@ def test_r2_order_linked_operating_expense_not_double_counted(seeded_db):
     after = r2_monthly_pnl(seeded_db)
     oct_item = next(r for r in after["items"] if r["month"] == "2026-10")
     # 直接成本 +300（挂单支出归该单支出大类），运营费用不变（不重复计）。
-    assert oct_item["account_direct_cost"] == before_cost + Decimal("300.00")
+    assert oct_item["cost"] == before_cost + Decimal("300.00")
     assert oct_item["operating_expense"] == before_op
 
 

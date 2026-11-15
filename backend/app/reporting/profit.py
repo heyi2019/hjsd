@@ -4,9 +4,8 @@
 可正可负可 0；与分润基数同源，取数统一走 `cashflow_totals_by_order`。
 资金走向只有收入 / 支出两种，不以「是否生成资金流水」为界：
 收入 = 资金流水 IN + 返点记录金额；支出 = 资金流水 OUT + 分期坏账金额。
-收入大类 = 售出价 + 返点 + 其他收入子类型；支出大类 = 提号价/回收价（买入成本）
-+ 直接费用 + 分期坏账 + 其他支出子类型。收入/买入成本/直接费用三列是两个大类的
-分解；返点列是「其中返点收入」展示项、已含在收入大类，不重复计入净利。
+收入大类 = 售出价 + 返点 + 其他收入子类型；支出大类 = 所有支出子类型。
+返点列是「其中返点收入」展示项、已含在收入大类，不重复计入净利。
 作废（VOID）返点不是收入，随收入大类一起排除，与售出价 CANCEL 冲销同规则。
 """
 
@@ -82,7 +81,7 @@ def order_profit_detail(
             continue
         if to_date and order.trade_date > to_date:
             continue
-        income, expense, buy_amount = cashflow_by_order.get(order.id, no_totals)
+        income, expense, _buy_amount = cashflow_by_order.get(order.id, no_totals)
         rebate = rebate_by_order.get(order.id, ZERO)
         items.append(
             {
@@ -92,8 +91,7 @@ def order_profit_detail(
                 "trade_date": order.trade_date.isoformat(),
                 "status": order.status,
                 "income": income,
-                "buy_amount": buy_amount,
-                "direct_cost": expense - buy_amount,
+                "cost": expense,
                 # 返点收入已计入上面的 income，此处只作其中项展示，不重复加进净利。
                 "rebate": rebate,
                 "net_profit": income - expense,
@@ -104,8 +102,7 @@ def order_profit_detail(
         "items": items,
         "total": {
             "income": _sum_report_field(items, "income"),
-            "buy_amount": _sum_report_field(items, "buy_amount"),
-            "direct_cost": _sum_report_field(items, "direct_cost"),
+            "cost": _sum_report_field(items, "cost"),
             "rebate": _sum_report_field(items, "rebate"),
             "net_profit": _sum_report_field(items, "net_profit"),
         },

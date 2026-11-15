@@ -204,7 +204,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         columns=(
             ListColumn("month", "月份"),
             ListColumn("sales_income", "销售收入"),
-            ListColumn("account_direct_cost", "账号直接成本"),
+            ListColumn("cost", "成本"),
             ListColumn("operating_expense", "运营费用"),
             ListColumn("rebate_income", "返点收益"),
             ListColumn("operating_profit", "经营利润"),
@@ -243,8 +243,8 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         columns=(
             ListColumn("order_type", "业务", value_set="ORDER_BUSINESS"),
             ListColumn("main_income", "主营收入"),
-            ListColumn("main_cost", "主营成本"),
-            ListColumn("main_profit", "主营毛利"),
+            ListColumn("cost", "成本"),
+            ListColumn("profit", "利润"),
         ),
     ),
     ListScope(
@@ -256,8 +256,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("trade_date", "成交日"),
             ListColumn("status", "状态", value_set="ORDER_STATUS"),
             ListColumn("income", "收入"),
-            ListColumn("buy_amount", "账号采购成本"),
-            ListColumn("direct_cost", "直接成本"),
+            ListColumn("cost", "成本"),
             ListColumn("rebate", "返点"),
             ListColumn("net_profit", "净利"),
         ),

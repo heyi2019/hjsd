@@ -15,7 +15,7 @@ class ReportModel(BaseModel):
 class MonthlyPnlItemOut(ReportModel):
     month: str
     sales_income: Decimal
-    account_direct_cost: Decimal
+    cost: Decimal
     operating_expense: Decimal
     rebate_income: Decimal
     operating_profit: Decimal
@@ -23,7 +23,7 @@ class MonthlyPnlItemOut(ReportModel):
 
 class MonthlyPnlTotalOut(ReportModel):
     sales_income: Decimal
-    account_direct_cost: Decimal
+    cost: Decimal
     operating_expense: Decimal
     rebate_income: Decimal
     operating_profit: Decimal
@@ -73,13 +73,13 @@ class BusinessPnlItemOut(ReportModel):
     business_type: str | None = None
     value_added_service: str | None = None
     main_income: Decimal
-    main_cost: Decimal
+    cost: Decimal
     main_profit: Decimal
 
 
 class BusinessPnlTotalOut(ReportModel):
     main_income: Decimal
-    main_cost: Decimal
+    cost: Decimal
     main_profit: Decimal
 
 
@@ -132,8 +132,7 @@ class OrderProfitItemOut(ReportModel):
     trade_date: str
     status: str
     income: Decimal
-    buy_amount: Decimal
-    direct_cost: Decimal
+    cost: Decimal
     rebate: Decimal
     net_profit: Decimal
     extra_values: dict[str, Any]
@@ -141,8 +140,7 @@ class OrderProfitItemOut(ReportModel):
 
 class OrderProfitTotalOut(ReportModel):
     income: Decimal
-    buy_amount: Decimal
-    direct_cost: Decimal
+    cost: Decimal
     rebate: Decimal
     net_profit: Decimal
 

@@ -75,8 +75,8 @@ def test_report_csv_appends_total_only_keys_and_drops_item_internal_keys():
 def test_report_csv_does_not_refill_keys_shared_by_item_and_total():
     """明细与合计都有的未登记键不算「合计独有」，不能漏回导出表。"""
     report = {
-        "items": [{"order_no": "HS-1", "buy_amount": "5.00"}],
-        "total": {"buy_amount": "5.00"},
+        "items": [{"order_no": "HS-1", "cost": "5.00"}],
+        "total": {"cost": "5.00"},
     }
     header = _header(report_csv(report, columns=[("order_no", "订单号", True)]))
     assert header == ["row_type", "订单号"]

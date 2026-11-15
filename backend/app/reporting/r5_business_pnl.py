@@ -71,7 +71,7 @@ def r5_business_pnl(
                 "order_type": order_type,
                 **classification,
                 "main_income": income,
-                "main_cost": direct,
+                "cost": direct,
                 "main_profit": gross_profit,
             }
         )
@@ -79,7 +79,7 @@ def r5_business_pnl(
         "items": items,
         "total": {
             "main_income": _sum_report_field(items, "main_income"),
-            "main_cost": _sum_report_field(items, "main_cost"),
+            "cost": _sum_report_field(items, "cost"),
             "main_profit": _sum_report_field(items, "main_profit"),
         },
     }

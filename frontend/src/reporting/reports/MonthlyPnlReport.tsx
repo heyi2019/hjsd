@@ -19,7 +19,7 @@ export function MonthlyPnl({ range, showPicker = true }: { range: ReportRange; s
   const columns: ColumnsType<MonthlyPnlRow> = [
     { title: "月份", dataIndex: "month", width: 110 },
     { title: "销售收入", dataIndex: "sales_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "账号直接成本", dataIndex: "account_direct_cost", align: "right", render: (v: string) => <MoneyText value={v} />},
+    { title: "成本", dataIndex: "cost", align: "right", render: (v: string) => <MoneyText value={v} />},
     { title: "运营费用", dataIndex: "operating_expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "返点收益", dataIndex: "rebate_income", align: "right", render: (v: string) => <MoneyText value={v} />},
     {

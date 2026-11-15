@@ -45,7 +45,7 @@ beforeEach(() => {
   vi.mocked(employeesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(reportsApi.orderProfit), { items: [], total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" } });
+  resolveMock(vi.mocked(reportsApi.orderProfit), { items: [], total: { income: "0", cost: "0", rebate: "0", net_profit: "0" } });
   resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
   vi.mocked(poolsApi.list).mockResolvedValue([]);
@@ -71,7 +71,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
         {
           month: "2026-09",
           sales_income: "2000.00",
-          account_direct_cost: "500.00",
+          cost: "500.00",
           operating_expense: "100.00",
           rebate_income: "50.00",
           operating_profit: "1450.00",
@@ -83,7 +83,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
         {
           order_type: "HS",
           main_income: "800.00",
-          main_cost: "300.00",
+          cost: "300.00",
           main_profit: "500.00",
         },
       ],
@@ -101,14 +101,13 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     resolveMockOnce(vi.mocked(reportsApi.orderProfit), {
       from: null,
       to: null,
-      total: { income: "0", direct_cost: "0", rebate: "0", net_profit: "0" },
+      total: { income: "0", cost: "0", rebate: "0", net_profit: "0" },
       items: [
         {
           order_no: "HS-2026-0010",
           order_type: "HS",
           income: "600.00",
-          buy_amount: "400.00",
-          direct_cost: "50.00",
+          cost: "450.00",
           rebate: "10.00",
           net_profit: "160.00",
         },
@@ -120,7 +119,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     expect(screen.getAllByText("160.00").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("P1/FE-169：订单利润展示采购成本且不展示旧口径说明", async () => {
+  it("P1/FE-169：订单利润只展示统一成本口径且不展示旧口径说明", async () => {
     vi.mocked(reportsApi.orderProfit).mockResolvedValueOnce({
       items: [{
         order_id: 11,
@@ -129,20 +128,21 @@ describe("ReportsPage：各报表渲染与错误态", () => {
         trade_date: "2026-11-01",
         status: "COMPLETED",
         income: "600.00",
-        buy_amount: "400.00",
-        direct_cost: "50.00",
+        cost: "450.00",
         rebate: "10.00",
         net_profit: "160.00",
       }],
-      total: { income: "600.00", buy_amount: "400.00", direct_cost: "50.00", rebate: "10.00", net_profit: "160.00" },
+      total: { income: "600.00", cost: "450.00", rebate: "10.00", net_profit: "160.00" },
     } as never);
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<ReportsPage />, { user: "admin" });
     await user.click(await screen.findByRole("tab", { name: /订单利润/ }));
 
     expect(await screen.findByText("HS-2026-0011")).toBeInTheDocument();
-    expect(screen.getAllByText("账号采购成本").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("成本").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("账号采购成本")).not.toBeInTheDocument();
+    expect(screen.queryByText("直接成本")).not.toBeInTheDocument();
     expect(screen.queryByText(/净利 = 所有收入 − 所有支出/)).not.toBeInTheDocument();
-    expect(screen.getAllByText("400.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("450.00").length).toBeGreaterThanOrEqual(1);
   });
 });

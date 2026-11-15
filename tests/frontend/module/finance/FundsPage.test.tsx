@@ -221,7 +221,7 @@ describe("FundsPage：资金流水", () => {
     expect(screen.getByText("总收入")).toBeInTheDocument();
     expect(screen.getByText("总支出")).toBeInTheDocument();
     expect(screen.getAllByText("本方经营").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("自营直接成本")).toBeInTheDocument();
+    expect(screen.getByText("回收成本")).toBeInTheDocument();
     expect(screen.getByText("自营收入")).toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("500.00").length).toBeGreaterThanOrEqual(1);

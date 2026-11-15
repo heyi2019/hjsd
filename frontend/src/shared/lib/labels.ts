@@ -136,8 +136,8 @@ export const FUND_NATURE_LABEL: Record<string, string> = {
 /** 核算属性：与 backend/app/domain/enums.py AccountingAttribute 一致。 */
 export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
   SELF_REVENUE: "自营收入",
-  SELF_DIRECT_COST: "自营直接成本",
-  TH_DIRECT_COST: "提号/代挂直接成本",
+  SELF_DIRECT_COST: "回收成本",
+  TH_DIRECT_COST: "提号/代挂成本",
   TH_REVENUE: "提号/代挂收入",
   SERVICE_REVENUE: "增值服务收入",
   ADDITIONAL_INCOME: "附加收入",

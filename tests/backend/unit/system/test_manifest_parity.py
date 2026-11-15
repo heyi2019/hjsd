@@ -1,7 +1,7 @@
 """TESTING-06 磁盘测试文件集合、区域归属与分层归属必须与 tests/manifest.json 一致。
 
 背景：本仓库搬过三次测试目录，每次都有一批东西「不报错地消失」——
-``test_catalog.all_backend_test_files()`` 指向已死的 ``backend/tests/v1`` 让
+``catalog.all_backend_test_files()`` 指向已死的 ``backend/tests/v1`` 让
 ``run_regression.py B`` 打印「无匹配文件」然后 exit 0；``gen_test_case_library.py``
 只用 ``os.listdir`` 扫一层，文件一下沉就从用例库里整批消失；``record_frontend_results``
 用 ``relative_to(frontend)`` 失败时 ``return None``，记录被静默丢弃。
@@ -54,8 +54,8 @@ def _test_files() -> list[Path]:
     return sorted(BE_TESTS.rglob("test_*.py"))
 
 
-sys.path.insert(0, str(BACKEND / "scripts"))
-import test_catalog as tc  # noqa: E402 — 必须先调整 sys.path
+sys.path.insert(0, str(REPO / "tests" / "config"))
+import catalog as tc  # noqa: E402 — 必须先调整 sys.path
 
 
 def _area_of(fname: str) -> str:

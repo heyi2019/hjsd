@@ -3,7 +3,7 @@
 设计背景（见 docs/testing/测试元数据台账.csv 的 PROMISE 记录与 tests/README.md）：
 - 承诺 ID 形如 ``MONEY-01`` / ``POOL-01``，与文件路径无关——搬目录、改文件名都不影响；
 - 测试文件在 docstring 头部声明 ``（MONEY-01 …）``；解析不到时回落到
-  ``test_catalog.BACKEND_FILE_TO_FUNC`` 的历史功能码，保证过渡期 110 个文件
+  ``catalog.BACKEND_FILE_TO_FUNC`` 的历史功能码，保证过渡期 110 个文件
   既不空转也能被逐步补声明；
 - 本模块只做解析与校验，不参与测试运行；守卫见
   ``tests/backend/test_promise_declaration.py``。
@@ -103,10 +103,10 @@ def _func_code(filename: str) -> str | None:
     """历史手写表兜底。延迟导入，避免本模块作为脚本运行时反向依赖 pytest。"""
     import sys
 
-    scripts = str(Path(__file__).resolve().parent)
-    if scripts not in sys.path:
-        sys.path.insert(0, scripts)
-    from test_catalog import BACKEND_FILE_TO_FUNC  # noqa: PLC0415
+    config = str(REPO / "tests" / "config")
+    if config not in sys.path:
+        sys.path.insert(0, config)
+    from catalog import BACKEND_FILE_TO_FUNC  # noqa: PLC0415
 
     return BACKEND_FILE_TO_FUNC.get(filename)
 

@@ -36,7 +36,7 @@ def test_every_test_file_has_owner() -> None:
     """不允许存在既无承诺声明、又不在历史映射表里的测试文件。"""
     orphans = [row["file"] for row in _rows() if row["source"] == "none"]
     assert not orphans, (
-        "以下测试文件既没有文件头承诺声明，也不在 test_catalog.BACKEND_FILE_TO_FUNC 中，"
+        "以下测试文件既没有文件头承诺声明，也不在 catalog.BACKEND_FILE_TO_FUNC 中，"
         f"属于无归属测试：{orphans}"
     )
 

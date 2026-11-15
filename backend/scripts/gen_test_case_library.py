@@ -14,7 +14,7 @@
 CI 缺失时由 _load_number_map() 从入库的《测试用例库.csv》自举恢复，否则按排序
 重排编号会与入库快照错位（实测 2666 条里 1640 条漂移）。
 
-文件 -> 功能 -> 模块(A/B/C/D/E/F/SYS) 的映射统一取自 scripts/test_catalog.py（单一事实源）。
+文件 -> 功能 -> 模块(A/B/C/D/E/F/SYS) 的映射统一取自 tests/config/catalog.py（单一事实源）。
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # /Users/aries/黑金时代
 BACKEND = os.path.join(REPO, "backend")
 FRONTEND = os.path.join(REPO, "frontend")
-# 功能编号由 test_catalog.load_registry() 从合并台账 FEATURE 记录读取，本脚本不直接引用台账路径。
+# 功能编号由 catalog.load_registry() 从合并台账 FEATURE 记录读取，本脚本不直接引用台账路径。
 OUT_CSV = os.path.join(REPO, "docs/testing", "测试用例库.csv")
 OUT_MD = os.path.join(REPO, "docs/testing", "测试用例库.md")
 REPORT_DIR = os.path.join(REPO, "tests", "backend", "_report")
@@ -37,8 +37,8 @@ CASE_MAP = os.path.join(REPORT_DIR, "case_number_map.json")
 CASE_INDEX = os.path.join(REPORT_DIR, "case_index.json")
 
 # 统一目录（单一事实源）
-sys.path.insert(0, os.path.join(BACKEND, "scripts"))
-from test_catalog import (  # noqa: E402
+sys.path.insert(0, os.path.join(REPO, "tests", "config"))
+from catalog import (  # noqa: E402
     BACKEND_FILE_TO_FUNC,
     CROSS_FLOW_LABEL,
     backend_file_modules,

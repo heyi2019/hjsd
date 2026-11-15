@@ -139,7 +139,7 @@ export function SequencesPanel() {
       {error ? (
         <Typography.Paragraph type="warning">编号序列数据不可用，请点击重新加载</Typography.Paragraph>
       ) : items.length > 0 ? (
-        <Descriptions bordered size="small" column={1} labelStyle={{ width: 96 }}>
+        <Descriptions bordered size="small" column={1} styles={{ label: { width: 96 } }}>
           {items.map((item) => (
             <Descriptions.Item key={item.label} label={item.label}>
               {item.lines}

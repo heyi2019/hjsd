@@ -77,7 +77,8 @@ export function useInventoryActions(params: {
     if (!detail) return;
     await editorOpenEditor(detail.account);
     // 就地展开该行进入内联编辑（不弹窗）。
-    expandTo([String(boundOrderId)]);
+    // DataTable 的行键同时包含订单和账号：同一订单可能拆成多条库存行，展开键必须使用同一复合键。
+    expandTo([`${boundOrderId}:${detail.account.id}`]);
   }
   function cancelInlineEdit() {
     editorCancelInlineEdit();
@@ -226,7 +227,7 @@ export function useInventoryActions(params: {
   async function handleExpand(expanded: boolean, row: InventoryOrderRow) {
     // 手风琴：一次只展开一行。展开详情严格按订单 ID 请求；账号仅用于资料编辑和动作适配。
     if (!expanded && inlineEditId === row.account.id) cancelInlineEdit();
-    expandTo(expanded ? [String(row.id)] : []);
+    expandTo(expanded ? [`${row.id}:${row.account.id}`] : []);
     if (expanded) await loadOrderExecution(row.id);
   }
   function openPartyCard(party: OrderPartyLink) {

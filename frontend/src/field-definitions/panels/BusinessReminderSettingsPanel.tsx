@@ -62,7 +62,7 @@ export function BusinessReminderSettingsPanel() {
             label="库存订单超过多少天提醒"
             rules={[{ required: true, message: "请输入提醒天数" }]}
           >
-            <InputNumber min={1} max={365} precision={0} addonAfter="天" />
+            <InputNumber min={1} max={365} precision={0} suffix="天" />
           </Form.Item>
           <Form.Item name="profitNotificationsEnabled" label="新的分润通知" valuePropName="checked">
             <Switch checkedChildren="开启" unCheckedChildren="关闭" />

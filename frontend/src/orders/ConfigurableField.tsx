@@ -268,22 +268,21 @@ export function injectOptionsIfMissing(
   children: ReactNode,
   def?: OrderFormField,
 ): ReactNode {
-  if (!def) return children;
-  const items = resolveOptionItems(def.options);
-  if (items.length === 0) return children;
+  const items = def ? resolveOptionItems(def.options) : [];
   const mapped = Children.map(children, (child) => {
     if (!isValidElement(child)) return child;
     const childProps = child.props as { options?: unknown };
     // 共享 Select 与 Radio.Group 均接受 options 数组；动态数据源因显式传 options 不被覆盖。
     const isOptionControl = child.type === Select || child.type === Radio.Group;
-    if (isOptionControl && childProps.options === undefined) {
+    if (items.length > 0 && isOptionControl && childProps.options === undefined) {
       return cloneElement(child as ReactElement, { options: items } as never);
     }
     return child;
   });
-  // Form.Item(name) 必须接收单一控件。Children.map 即使只有一个 child 也会返回数组，
-  // 会让 antd 放弃控件绑定并持续报警；单控件场景还原为元素本身。
-  return mapped?.length === 1 ? mapped[0] : mapped;
+  // Form.Item(name) 必须接收单一控件。JSX 中控件前后的格式空白也可能被保留为
+  // 非元素 child；按可渲染元素归一化，保证单控件场景还原为元素本身。
+  const elements = Children.toArray(mapped).filter(isValidElement);
+  return elements.length === 1 ? elements[0] : mapped;
 }
 
 /** 受配置驱动的 BusinessRegistrationField 布局项（name 在内层 Form.Item，如「联系方式」网格内的子字段）。 */

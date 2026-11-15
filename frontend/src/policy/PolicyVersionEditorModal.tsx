@@ -50,7 +50,7 @@ function renderControl(field: PolicyFieldDef) {
       <InputNumber
         min={field.min ?? 0}
         max={field.max ?? 100}
-        addonAfter="%"
+        suffix="%"
         placeholder={field.placeholder}
         className="ui-control-width-160 percent-input"
       />
@@ -166,7 +166,7 @@ export function PolicyVersionEditorModal({
                 <Space wrap size="large">
                   {(field.rows ?? []).map((row) => (
                     <Form.Item key={row.key} name={[field.key, row.key]} label={row.label} className="policy-rate-row">
-                      <InputNumber min={0} max={100} addonAfter="%" className="ui-control-width-160" />
+                      <InputNumber min={0} max={100} suffix="%" className="ui-control-width-160" />
                     </Form.Item>
                   ))}
                 </Space>

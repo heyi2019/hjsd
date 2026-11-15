@@ -161,6 +161,7 @@ export function ConfigAuditPanel() {
           <DatePicker.RangePicker
             placeholder={["起始日期", "截止日期"]}
             disabled={hasError}
+            allowEmpty={[true, true]}
             placement="bottomLeft"
             classNames={{ popup: { root: "compact-date-range-picker" } }}
             onChange={(range) => {

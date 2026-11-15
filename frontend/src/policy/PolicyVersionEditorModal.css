@@ -1,13 +1,10 @@
-/* percent-input 由 <InputNumber className="... percent-input" addonAfter="%"> 传入。
-   带 addonAfter 时 antd 会把 className 提到最外层的 .ant-input-number-group-wrapper 上
-   （实测 DOM：group-wrapper > input-number-wrapper > .ant-input-number + group-addon），
-   所以这里必须用复合选择器。原写法 `:has(.percent-input)` 查的是后代，永远不命中。 */
-.ant-input-number-group-wrapper.percent-input {
+/* percent-input 由 InputNumber 的 suffix 传入；保留内联布局，避免弃用 addonAfter。 */
+.ant-input-number-affix-wrapper.percent-input {
   display: inline-flex;
   vertical-align: middle;
 }
 
-.ant-input-number-group-wrapper.percent-input .ant-input-number-group-addon {
+.ant-input-number-affix-wrapper.percent-input .ant-input-number-suffix {
   display: inline-flex;
   align-items: center;
   justify-content: center;

@@ -12,6 +12,7 @@ import { RecoveryCustomerSection } from "./recovery/RecoveryCustomerSection";
 import { RecoveryFeeSection } from "./recovery/RecoveryFeeSection";
 import { ThOrderSection } from "./th/ThOrderSection";
 import { DgOrderSection } from "./dg/DgOrderSection";
+import "./CreateBusinessModal.css";
 import {
   buildAccountSnapshot,
   buildCounterpartyInput,
@@ -141,7 +142,12 @@ export function CreateBusinessModal(props: {
     }
   };
 
-  if (!props.open) return null;
+  // Keep the form instance connected while the modal is closed.  The controller
+  // pre-creates this form so it can reset values and preload defaults; returning
+  // null here left the instance unattached for one tick and rc-field-form logged
+  // a misleading warning in development/tests.  The hidden form has no fields
+  // and is replaced by the real modal form as soon as the modal opens.
+  if (!props.open) return <Form form={form} className="orders-hidden-form" />;
 
   return (
     <>

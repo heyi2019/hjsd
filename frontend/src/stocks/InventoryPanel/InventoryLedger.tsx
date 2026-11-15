@@ -125,6 +125,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
         className="inventory-table"
         columns={arrangeColumns(columns)}
         rows={orderedRows}
+        rowKey={(row) => `${row.id}:${row.account.id}`}
         page={page}
         pageSize={pageSize}
         total={controller.visibleRows.length}

@@ -318,7 +318,7 @@ export function ListColumnsPanel() {
           max={WIDTH_MAX}
           step={20}
           placeholder="自适应"
-          addonAfter="px"
+          suffix="px"
           value={row.key in widthDrafts ? widthDrafts[row.key] : (width ?? null)}
           disabled={saving}
           onChange={(next) => setWidthDraft(row.key, typeof next === "number" ? next : null)}

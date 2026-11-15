@@ -1,6 +1,6 @@
 /** OrderProfit：从 ReportsPage.tsx 拆出的单个报表视图。 */
 
-import { Card, Space, Typography } from "antd";
+import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { reportsApi } from "../../shared/api/reports.api";
 import type { OrderProfitReport, OrderProfitRow } from "../../shared/api/types/reporting";
@@ -37,7 +37,6 @@ export function OrderProfit({ range }: { range: ReportRange }) {
     <Card className="glass" title="订单利润明细">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar ui-filter-bar--spaced">{picker}</Space>
-      <Typography.Text type="secondary">净利 = 所有收入 − 所有支出；采购支出与返点按订单关联明细核对。</Typography.Text>
       <StatRow
         items={[
           { label: "收入合计", amount: data?.total.income ?? "-" },

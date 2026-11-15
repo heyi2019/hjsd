@@ -120,7 +120,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     expect(screen.getAllByText("160.00").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("P1/FE-169：订单利润展示采购成本并给出可复算口径", async () => {
+  it("P1/FE-169：订单利润展示采购成本且不展示旧口径说明", async () => {
     vi.mocked(reportsApi.orderProfit).mockResolvedValueOnce({
       items: [{
         order_id: 11,
@@ -142,7 +142,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
 
     expect(await screen.findByText("HS-2026-0011")).toBeInTheDocument();
     expect(screen.getAllByText("账号采购成本").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/净利 = 所有收入 − 所有支出/)).toBeInTheDocument();
+    expect(screen.queryByText(/净利 = 所有收入 − 所有支出/)).not.toBeInTheDocument();
     expect(screen.getAllByText("400.00").length).toBeGreaterThanOrEqual(1);
   });
 });

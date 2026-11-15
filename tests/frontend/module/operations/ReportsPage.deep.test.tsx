@@ -47,7 +47,6 @@ beforeEach(() => {
     total: { order_count: 0, profit_base: "0", payable: "0", paid: "0", difference: "0" },
   });
   vi.mocked(employeesApi.list).mockResolvedValue([]);
-  resolveMock(vi.mocked(reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
   resolveMock(vi.mocked(reportsApi.orderProfit), {
     items: [],
@@ -118,31 +117,10 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(screen.queryByText("LEGACY-001")).not.toBeInTheDocument());
   });
 
-  it("资金日报：渲染资金池/期初/收支/余额与标题日期", async () => {
-    resolveMockOnce(vi.mocked(reportsApi.dailyFunds), {
-      date: "2026-10-08",
-      total: { cash_balance: "80.00", deposit_held: "10.00", available: "70.00" },
-      items: [
-        { pool_name: "POOL-A", opening: "100.00", income: "50.00", expense: "20.00", deposit_held: "10.00", cash_balance: "80.00", available: "70.00" },
-      ],
-    });
+  it("资金日报已下线，经营中心不再重复展示资金日报", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金日报");
-    expect((await screen.findAllByText("POOL-A")).length).toBeGreaterThanOrEqual(1); // 资金池/名称两列同值
-    expect(screen.getByText(/2026-10-08/)).toBeInTheDocument(); // 标题含日期
-    expect(screen.getAllByText("现金余额").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
-    expect(screen.getAllByText("可用余额").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
-  });
-
-  it("资金日报：切换日期带 on 参数重新拉取（#56）", async () => {
-    vi.mocked(reportsApi.dailyFunds).mockClear();
-    renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("资金日报");
-    await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenCalled());
-    const dateInput = screen.getByLabelText("资金日报日期");
-    await ui.clear(dateInput);
-    await ui.type(dateInput, "2026-10-08");
-    await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-08" }));
+    expect(screen.queryByRole("tab", { name: "资金日报" })).toBeNull();
+    expect(vi.mocked(reportsApi.dailyFunds)).not.toHaveBeenCalled();
   });
 
   it("FE-051：共享日期区间传递到经营报表和订单利润", async () => {
@@ -262,18 +240,11 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(screen.queryByText("HS-FE272")).not.toBeInTheDocument());
   });
 
-  it("FE-273：分润对账和资金日报日期筛选切换到历史空态", async () => {
+  it("FE-273：分润对账日期筛选切换到历史空态", async () => {
     vi.mocked(reportsApi.commission).mockImplementation((params) => Promise.resolve(
       params?.from ? { order_groups: [], total: { order_count: 0, profit_base: "0", payable: "0", paid: "0", difference: "0" } } : {
         order_groups: [{ order_id: 273, order_no: "HS-FE273", profit_base: "10", orders: [{ user_id: 1, order_id: 273, order_no: "HS-FE273", profit_base: "10", rate: "0.1" }] }],
         total: { order_count: 1, profit_base: "10", payable: "1", paid: "0", difference: "1" },
-      },
-    ) as never);
-    vi.mocked(reportsApi.dailyFunds).mockImplementation((params) => Promise.resolve(
-      params?.on === "2026-10-01" ? { date: "2026-10-01", total: {}, items: [] } : {
-        date: "2026-11-01",
-        total: { cash_balance: "10", deposit_held: "0", available: "10" },
-        items: [{ pool_name: "POOL-FE273", opening: "10", income: "0", expense: "0", deposit_held: "0", cash_balance: "10", available: "10" }],
       },
     ) as never);
     renderLight(<ReportsPage />, { user: "admin" });
@@ -289,13 +260,6 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
     await waitFor(() => expect(screen.queryByText("HS-FE273")).not.toBeInTheDocument());
 
-    await gotoTab("资金日报");
-    await screen.findByLabelText("资金日报日期");
-    const dailyDate = screen.getByLabelText("资金日报日期");
-    await ui.clear(dailyDate);
-    await ui.type(dailyDate, "2026-10-01");
-    await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-01" }));
-    await waitFor(() => expect(screen.queryByText("POOL-FE273")).not.toBeInTheDocument());
   });
 
   it("分润对账加载失败显示错误条，点「重新加载」可重试成功", async () => {

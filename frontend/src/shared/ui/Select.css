@@ -10,6 +10,18 @@
   border-radius: var(--radius-sm);
 }
 
+/* 公共下拉按内容展开；长选项允许换行，避免固定触发器宽度把文案截成省略号。 */
+:where(.ant-select-dropdown.ui-select-pop) {
+  max-width: min(480px, calc(100vw - 32px));
+}
+
+:where(.ui-select-pop .ant-select-item-option-content) {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+
 /* 只收敛入场透明度；离场交还 antd，保证弹层能正常卸载。 */
 @media (prefers-reduced-motion: no-preference) {
   :where(.ant-select-dropdown.ui-select-pop) {

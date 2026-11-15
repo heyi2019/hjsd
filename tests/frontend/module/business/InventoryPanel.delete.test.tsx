@@ -54,7 +54,7 @@ describe("InventoryPanel：删除二次确认", () => {
     });
     // 删除成功后重拉列表（首次渲染 + 删除后各一次）。
     await waitFor(() => {
-      expect(stocksApi.list).toHaveBeenCalledTimes(2);
+      expect(stocksApi.inventoryLedger).toHaveBeenCalledTimes(2);
     });
     // 不断言弹窗 DOM 是否消失：jsdom + antd Modal 在 open=false 后不移除节点，
     // 关闭行为须由真实浏览器验收（本仓既有结论，单测只锁请求与副作用）。

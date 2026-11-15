@@ -210,7 +210,14 @@ beforeEach(() => {
   seedOrderFormFields();
   vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
   ui = userEvent.setup({ pointerEventsCheck: 0 });
-  vi.mocked(ordersApi.list).mockResolvedValue(orders);
+  vi.mocked(ordersApi.listPage).mockResolvedValue({ items: orders, total: orders.length, limit: 10, offset: 0 });
+  vi.mocked(ordersApi.list).mockResolvedValue([]);
+  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({
+    total_count: orders.length,
+    status_counts: { ACTIVE: 1, COMPLETED: 1, CANCELLED: 0 },
+    type_counts: { HS: 1, DG: 1 },
+    game_types: ["原神"],
+  });
   vi.mocked(orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(poolsApi.list).mockResolvedValue([
     { id: 7, code: "HJ_INVEST", name: "投资款荷包", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
@@ -286,7 +293,7 @@ async function clickModalOk(modal: HTMLElement) {
 
 describe("OrdersPage：操作与筛选分支", () => {
   it("分期订单展示售出金额而不是买入金额合计", async () => {
-    vi.mocked(ordersApi.list).mockResolvedValue([order3]);
+    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [order3], total: 1, limit: 10, offset: 0 });
     await openLedger();
     expect(screen.getAllByText("¥12,000.00").length).toBeGreaterThan(0);
   });
@@ -372,12 +379,12 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("编辑有登记事件订单：统一编辑入口仍可打开库存详情", async () => {
-    vi.mocked(ordersApi.list).mockResolvedValue([
+    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [
       {
         ...order1,
         events: [{ id: 1, event_no: "EV-1", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "1000.00" }],
       },
-    ]);
+    ], total: 1, limit: 10, offset: 0 });
     await openLedger();
     await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
     expect(await screen.findByRole("button", { name: "保存修改" })).toBeInTheDocument();
@@ -616,7 +623,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       resolvePools = resolve;
     });
 
-    vi.mocked(ordersApi.list).mockResolvedValue([cancelOrder]);
+    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [cancelOrder], total: 1, limit: 10, offset: 0 });
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...cancelOrder,
       events: [{ id: 2101, order_id: 21, event_type: "BUY", event_no: "EV-CANCEL-ASYNC-01", amount: "100.00", occurred_on: "2026-11-01", pool_id: 7, is_posted: true, cancellable_amount: "100.00" }],
@@ -689,7 +696,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("取消：分期订单按合约取消并提示退款金额", async () => {
-    vi.mocked(ordersApi.list).mockResolvedValue([order3]);
+    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [order3], total: 1, limit: 10, offset: 0 });
     vi.mocked(ordersApi.get).mockResolvedValue(order3);
     await openLedger();
     await openRowMenu("HS-2026-0003", "取消");
@@ -702,7 +709,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("取消：分期订单无可用合约时提示", async () => {
-    vi.mocked(ordersApi.list).mockResolvedValue([order3]);
+    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [order3], total: 1, limit: 10, offset: 0 });
     vi.mocked(ordersApi.get).mockResolvedValue(order3);
     vi.mocked(installmentsApi.list).mockResolvedValue([{ ...installment, status: "CANCELLED" }]);
     await openLedger();
@@ -720,7 +727,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   // 原三条（弹窗开关 / P2-190 菜单收起 / 成功后刷新列表）同一入口同一夹具，合并为一次挂载。
   it("新建订单：菜单收起、弹窗开关与成功后刷新列表", async () => {
     await openLedger();
-    const before = vi.mocked(ordersApi.list).mock.calls.length;
+    const before = vi.mocked(ordersApi.listPage).mock.calls.length;
     const trigger = screen.getByRole("button", { name: /新建订单/ });
 
     await ui.click(trigger);
@@ -741,7 +748,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await screen.findByTestId("create-stub");
     await ui.click(screen.getByRole("button", { name: /模拟新建成功/ }));
     await waitFor(() => expect(screen.queryByTestId("create-stub")).toBeNull());
-    expect(vi.mocked(ordersApi.list).mock.calls.length).toBeGreaterThan(before);
+    expect(vi.mocked(ordersApi.listPage).mock.calls.length).toBeGreaterThan(before);
   });
 
 });

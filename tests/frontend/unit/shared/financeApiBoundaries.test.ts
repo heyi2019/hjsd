@@ -7,6 +7,7 @@ import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
 import { useCashflowResources } from "@/pools/useCashflowResources";
 import { useCashflowActions } from "@/pools/useCashflowActions";
 import { useDepositActions } from "@/pools/useDepositActions";
+import { useReconciliationActions } from "@/pools/useReconciliationActions";
 import { useTransferActions } from "@/pools/useTransferActions";
 
 describe("资金中心 API 边界", () => {
@@ -19,6 +20,7 @@ describe("资金中心 API 边界", () => {
     expect(useCashflowResources).toBeDefined();
     expect(useCashflowActions).toBeDefined();
     expect(useDepositActions).toBeDefined();
+    expect(useReconciliationActions).toBeDefined();
     expect(useTransferActions).toBeDefined();
   });
 });

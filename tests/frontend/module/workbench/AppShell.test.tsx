@@ -202,20 +202,20 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
 });
 
 describe("AppShell：角色展示与退出", () => {
-  it("工作台个人卡片提供我的订单和我的收益入口，并进入对应业务视图", async () => {
+  it("工作台个人卡片提供我的当期订单和我的当期收益入口，并进入对应业务视图", async () => {
     await renderShell({ user: "admin" });
     const topbar = document.querySelector(".topbar") as HTMLElement;
     const dashboard = document.querySelector(".dashboard-page") as HTMLElement;
 
-    expect(within(topbar).queryByRole("button", { name: "我的订单" })).toBeNull();
-    expect(within(topbar).queryByRole("button", { name: "我的收益" })).toBeNull();
+    expect(within(topbar).queryByRole("button", { name: "我的当期订单" })).toBeNull();
+    expect(within(topbar).queryByRole("button", { name: "我的当期收益" })).toBeNull();
 
-    await ui.click(within(dashboard).getByRole("button", { name: /我的订单/ }));
+    await ui.click(within(dashboard).getByRole("button", { name: /我的当期订单/ }));
     expect(await screen.findByRole("tab", { name: "订单台账" })).toHaveAttribute("aria-selected", "true");
     expect(vi.mocked(ordersApi.list)).toHaveBeenCalledWith({ mine: true });
 
     await ui.click(screen.getByRole("button", { name: "工作台" }));
-    await ui.click(screen.getByRole("button", { name: /我的收益/ }));
+    await ui.click(screen.getByRole("button", { name: /我的当期收益/ }));
     const commissionTab = await screen.findByRole("tab", { name: "分润对账" });
     expect(commissionTab).toHaveAttribute("aria-selected", "true");
     expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith({ mine: true });

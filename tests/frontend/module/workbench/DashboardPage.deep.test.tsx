@@ -62,7 +62,7 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     expect(within(doneCard).getByText("2")).toBeInTheDocument();
   });
 
-  it("我的关注卡片展示当前登录用户的订单数与分润收益", async () => {
+  it("我的当期卡片展示当前登录用户的订单数与分润收益", async () => {
     vi.mocked(ordersApi.summary).mockResolvedValueOnce({ total_count: 2, completed_count: 1, active_count: 1 });
     vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 3, completed_count: 1, active_count: 2 });
     vi.mocked(reportsApi.commission).mockResolvedValue({
@@ -74,9 +74,9 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     renderLight(<DashboardPage />, { user: "operator" });
 
     await waitFor(() => expect(ordersApi.summary).toHaveBeenCalledWith({ mine: true }));
-    const orderCard = (await screen.findByText("我的订单")).closest(".ui-stat") as HTMLElement;
+    const orderCard = (await screen.findByText("我的当期订单")).closest(".ui-stat") as HTMLElement;
     const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
-    const earningsCard = screen.getByText("我的收益").closest(".ui-stat") as HTMLElement;
+    const earningsCard = screen.getByText("我的当期收益").closest(".ui-stat") as HTMLElement;
     expect(within(orderCard).getByText("2")).toBeInTheDocument();
     expect(within(totalCard).getByText("3")).toBeInTheDocument();
     expect(within(earningsCard).getByText("123.45")).toBeInTheDocument();

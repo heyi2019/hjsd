@@ -38,7 +38,7 @@ beforeEach(() => {
   vi.mocked(stocksApi.dashboardSummary).mockResolvedValue({ account_count: 0, aging_count: 0, overdue_count: 0 });
   vi.mocked(installmentsApi.list).mockResolvedValue([]);
   vi.mocked(installmentsApi.totals).mockResolvedValue({ total_count: 0, overdue_count: 0, total_receivable: "0.00", total_paid: "0.00", total_remaining: "0.00" });
-  vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], total: 0, unread_total: 0 });
+  vi.mocked(notificationsApi.summary).mockResolvedValue({ unread_profit_total: 0 });
   vi.mocked(reportsApi.commission).mockResolvedValue({
     items: [],
     total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },
@@ -50,11 +50,7 @@ it("工作台展示业务总览指标和业务提醒", async () => {
     vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 2, completed_count: 1 });
     vi.mocked(stocksApi.dashboardSummary).mockResolvedValue({ account_count: 1, aging_count: 1, overdue_count: 1 });
     vi.mocked(installmentsApi.totals).mockResolvedValue({ total_count: 1, overdue_count: 1, total_receivable: "0.00", total_paid: "0.00", total_remaining: "0.00" });
-    vi.mocked(notificationsApi.list).mockResolvedValue({
-      items: [{ id: 30, title: "新的分润通知", message: "订单 HS0001 已生成分润", notification_type: "PROFIT_ALLOCATION_SET" } as never],
-      total: 1,
-      unread_total: 1,
-    });
+    vi.mocked(notificationsApi.summary).mockResolvedValue({ unread_profit_total: 1 });
 
     renderLight(<DashboardPage />, { user: "admin" });
 
@@ -79,11 +75,7 @@ it("工作台展示业务总览指标和业务提醒", async () => {
 it("工作台按业务提醒配置计算库存阈值并控制提醒开关", async () => {
     vi.mocked(stocksApi.dashboardSummary).mockResolvedValue({ account_count: 1, aging_count: 0, overdue_count: 0 });
     vi.mocked(installmentsApi.totals).mockResolvedValue({ total_count: 1, overdue_count: 1, total_receivable: "0.00", total_paid: "0.00", total_remaining: "0.00" });
-    vi.mocked(notificationsApi.list).mockResolvedValue({
-      items: [{ id: 30, title: "新的分润通知", message: "订单 HS0001 已生成分润" } as never],
-      total: 1,
-      unread_total: 1,
-    });
+    vi.mocked(notificationsApi.summary).mockResolvedValue({ unread_profit_total: 1 });
     vi.mocked(optionSetsApi.get).mockResolvedValue({
       options: [
         { value: "inventory_aging_days", label: "14" },

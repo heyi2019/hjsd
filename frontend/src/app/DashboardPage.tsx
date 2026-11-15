@@ -80,7 +80,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
     setBusinessReminderConfig(reminderConfig);
     const [stockResult, notificationResult] = await Promise.allSettled([
       stocksApi.dashboardSummary(reminderConfig.inventoryAgingDays),
-      notificationsApi.list({ limit: 50, unread_only: true }),
+      notificationsApi.summary(),
     ]);
     if (!mountedRef.current) return;
     if (stockResult.status === "fulfilled") {
@@ -100,9 +100,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
       setOverdueInstallmentCount(null);
     }
     if (notificationResult.status === "fulfilled") {
-      setNewProfitNotificationCount(notificationResult.value.items.filter((item) =>
-        [item.notification_type ?? "", item.title, item.message].some((value) => /分润|利润/.test(value)),
-      ).length);
+      setNewProfitNotificationCount(notificationResult.value.unread_profit_total);
     } else {
       setNewProfitNotificationCount(null);
     }

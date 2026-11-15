@@ -32,7 +32,7 @@ beforeEach(() => {
   vi.mocked(stocksApi.dashboardSummary).mockResolvedValue({ account_count: 0, aging_count: 0, overdue_count: 0 });
   vi.mocked(installmentsApi.list).mockResolvedValue([]);
   vi.mocked(installmentsApi.totals).mockResolvedValue({ total_count: 0, overdue_count: 0, total_receivable: "0.00", total_paid: "0.00", total_remaining: "0.00" });
-  vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], total: 0, unread_total: 0 });
+  vi.mocked(notificationsApi.summary).mockResolvedValue({ unread_profit_total: 0 });
   vi.mocked(reportsApi.commission).mockResolvedValue({
     items: [],
     total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },

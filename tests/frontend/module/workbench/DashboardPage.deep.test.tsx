@@ -26,15 +26,14 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
-  vi.mocked(ordersApi.list).mockResolvedValue([]);
-  vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 0, completed_count: 0 });
+  vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 0, completed_count: 0, active_count: 0 });
   vi.mocked(stocksApi.list).mockResolvedValue([]);
   vi.mocked(stocksApi.dashboardSummary).mockResolvedValue({ account_count: 0, aging_count: 0, overdue_count: 0 });
   vi.mocked(installmentsApi.list).mockResolvedValue([]);
   vi.mocked(installmentsApi.totals).mockResolvedValue({ total_count: 0, overdue_count: 0, total_receivable: "0.00", total_paid: "0.00", total_remaining: "0.00" });
   vi.mocked(notificationsApi.summary).mockResolvedValue({ unread_profit_total: 0 });
   vi.mocked(reportsApi.commission).mockResolvedValue({
-    items: [],
+    order_groups: [],
     total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },
   });
 });
@@ -55,7 +54,7 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
   });
 
   it("业务总览计数：订单总量与完成订单量", async () => {
-    vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 3, completed_count: 2 });
+    vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 3, completed_count: 2, active_count: 1 });
     renderLight(<DashboardPage />, { user: "admin" });
     const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
     const doneCard = (await screen.findByText("完成订单量")).closest(".ui-stat") as HTMLElement;
@@ -64,10 +63,10 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
   });
 
   it("我的关注卡片展示当前登录用户的订单数与分润收益", async () => {
-    vi.mocked(ordersApi.summary).mockResolvedValueOnce({ total_count: 2, completed_count: 1 });
-    vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 3, completed_count: 1 });
+    vi.mocked(ordersApi.summary).mockResolvedValueOnce({ total_count: 2, completed_count: 1, active_count: 1 });
+    vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 3, completed_count: 1, active_count: 2 });
     vi.mocked(reportsApi.commission).mockResolvedValue({
-      items: [],
+      order_groups: [],
       // 2026-11-05 口径：工作台「我的收益」取 total.payable（本人应付分润），
       // 不是整单利润基数 profit_base。给两者不同值，反证不会误取利润基数。
       total: { order_count: 1, profit_base: "999.99", payable: "123.45", paid: "0.00", difference: "0.00" },

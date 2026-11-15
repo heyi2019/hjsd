@@ -246,7 +246,7 @@ def test_commission_report_uses_amount_as_payable_base(seeded_db):
     )
 
     report = r3_commission_reconciliation(seeded_db)
-    rows = [row for group in report["groups"] for row in group.get("orders", [])]
+    rows = [row for group in report["order_groups"] for row in group["orders"]]
 
     assert [row["profit_base"] for row in rows] == [Decimal("120.00")]
 
@@ -270,7 +270,7 @@ def test_person_mode_allows_negative_amount_on_loss_order(seeded_db):
     assert all(row["allocation_rate"] == "0.00" for row in rows)
 
     report = r3_commission_reconciliation(seeded_db)
-    entries = [row for group in report["groups"] for row in group.get("orders", [])]
+    entries = [row for group in report["order_groups"] for row in group["orders"]]
     assert [row["profit_base"] for row in entries] == [Decimal("-300.00")]
 
 

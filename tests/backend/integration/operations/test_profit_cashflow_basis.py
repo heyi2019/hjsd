@@ -248,7 +248,7 @@ def test_r3_rate_allocation_uses_cashflow_profit(seeded_db):
     )
 
     report = r3_commission_reconciliation(seeded_db)
-    entries = [row for group in report["groups"] for row in group.get("orders", [])]
+    entries = [row for group in report["order_groups"] for row in group["orders"]]
     assert sorted(row["profit_base"] for row in entries) == [
         Decimal("150.00"), Decimal("150.00"),
     ]
@@ -369,8 +369,8 @@ def test_r3_allocation_includes_rebate_and_bad_debt(seeded_db):
     report = r3_commission_reconciliation(seeded_db)
     entries = [
         row
-        for group in report["groups"]
-        for row in group.get("orders", [])
+        for group in report["order_groups"]
+        for row in group["orders"]
         if row["order_id"] == order_id
     ]
     assert sorted(row["profit_base"] for row in entries) == [

@@ -43,8 +43,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   resolveMock(vi.mocked(reportsApi.monthlyPnl), { items: [], total: {} });
   resolveMock(vi.mocked(reportsApi.commission), {
-    items: [],
-    total: { order_count: 0, payable: "0", paid: "0", difference: "0" },
+    order_groups: [],
+    total: { order_count: 0, profit_base: "0", payable: "0", paid: "0", difference: "0" },
   });
   vi.mocked(employeesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
@@ -69,19 +69,53 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
-  it("分润对账：渲染人员/订单/费率/应付与差异统计", async () => {
+  it("分润对账：按订单汇总并展开查看每个人的分润明细", async () => {
+    vi.mocked(employeesApi.list).mockResolvedValueOnce([
+      { id: 1, username: "zhang", display_name: "张三", is_active: true },
+      { id: 2, username: "li", display_name: "李四", is_active: true },
+    ]);
     resolveMockOnce(vi.mocked(reportsApi.commission), {
-      items: [
-        { user_id: 1, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10", payable: "10.00", paid: "5.00", difference: "5.00" },
-      ],
-      total: { order_count: 1, payable: "10.00", paid: "5.00", difference: "5.00" },
+      order_groups: [{
+        order_id: 10,
+        order_no: "HS-2026-0010",
+        inventory_date: "2026-10-02",
+        outbound_date: "2026-10-04",
+        profit_base: "200.00",
+        orders: [
+          { user_id: 1, order_id: 10, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10" },
+          { user_id: 2, order_id: 10, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10" },
+        ],
+      }],
+      total: { order_count: 1, profit_base: "200.00", payable: "20.00", paid: "10.00", difference: "10.00" },
     });
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("分润对账");
-    await screen.findByText("HS-2026-0010");
-    expect(screen.getByText("0.10")).toBeInTheDocument(); // 费率列
-    expect(screen.getByText("应付合计")).toBeInTheDocument(); // StatRow label
-    expect(screen.getAllByText("差异").length).toBeGreaterThanOrEqual(1); // StatRow + 列标题
+    await screen.findAllByText("HS-2026-0010");
+    expect(screen.getAllByText("HS-2026-0010")).toHaveLength(1);
+    expect(screen.getByText("入库日期")).toBeInTheDocument();
+    expect(screen.getByText("出库日期")).toBeInTheDocument();
+    expect(screen.getByText("2026-10-02")).toBeInTheDocument();
+    expect(screen.getByText("2026-10-04")).toBeInTheDocument();
+    expect(screen.queryByText("分润基数")).toBeNull();
+    await ui.click(screen.getByRole("button", { name: /展开.*HS-2026-0010/ }));
+    expect(await screen.findByText("分润基数")).toBeInTheDocument();
+    expect(screen.getByText("张三")).toBeInTheDocument();
+    expect(screen.getByText("李四")).toBeInTheDocument();
+    expect(screen.getAllByText("0.10")).toHaveLength(2); // 展开明细的费率列
+    expect(screen.getAllByText("分润合计")).toHaveLength(2); // StatRow label + table header
+    expect(screen.queryByText("应付合计")).toBeNull();
+    expect(screen.queryByText("已付合计")).toBeNull();
+    expect(screen.queryByText("差异")).toBeNull();
+  });
+
+  it("分润对账：只消费订单分组契约，不回退旧明细", async () => {
+    resolveMockOnce(vi.mocked(reportsApi.commission), {
+      order_groups: [],
+      total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },
+    });
+    renderLight(<ReportsPage />, { user: "admin" });
+    await gotoTab("分润对账");
+    await waitFor(() => expect(screen.queryByText("LEGACY-001")).not.toBeInTheDocument());
   });
 
   it("资金日报：渲染资金池/期初/收支/余额与标题日期", async () => {
@@ -230,9 +264,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
   it("FE-273：分润对账和资金日报日期筛选切换到历史空态", async () => {
     vi.mocked(reportsApi.commission).mockImplementation((params) => Promise.resolve(
-      params?.from ? { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } } : {
-        items: [{ user_id: 1, order_no: "HS-FE273", profit_base: "10", rate: "0.1", payable: "1", paid: "0", difference: "1" }],
-        total: { order_count: 1, payable: "1", paid: "0", difference: "1" },
+      params?.from ? { order_groups: [], total: { order_count: 0, profit_base: "0", payable: "0", paid: "0", difference: "0" } } : {
+        order_groups: [{ order_id: 273, order_no: "HS-FE273", profit_base: "10", orders: [{ user_id: 1, order_id: 273, order_no: "HS-FE273", profit_base: "10", rate: "0.1" }] }],
+        total: { order_count: 1, profit_base: "10", payable: "1", paid: "0", difference: "1" },
       },
     ) as never);
     vi.mocked(reportsApi.dailyFunds).mockImplementation((params) => Promise.resolve(
@@ -270,6 +304,6 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await gotoTab("分润对账");
     await waitFor(() => expect(document.querySelector(".ui-error-banner")).toBeTruthy());
     await ui.click(screen.getByRole("button", { name: /重新加载/ }));
-    await screen.findByText("应付合计"); // 重试成功后渲染 Commission StatRow
+    await screen.findAllByText("分润合计"); // 重试成功后渲染 Commission StatRow + table header
   });
 });

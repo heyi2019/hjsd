@@ -1,6 +1,7 @@
 """报表查询接口的响应契约。"""
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -37,36 +38,32 @@ class CommissionOrderOut(ReportModel):
     user_id: int | None = None
     order_no: str
     order_id: int
+    inventory_date: date | None = None
+    outbound_date: date | None = None
     allocation_type: str | None = None
     profit_base: Decimal
     rate: Decimal
-    amount: Decimal = Decimal("0")
-    payable: Decimal
-    paid: Decimal
-    difference: Decimal
 
 
-class CommissionGroupOut(ReportModel):
-    user_id: int | None = None
-    order_count: int
+class CommissionOrderGroupOut(ReportModel):
+    order_id: int
+    order_no: str
+    inventory_date: date | None = None
+    outbound_date: date | None = None
     profit_base: Decimal
-    payable: Decimal
-    paid: Decimal
-    difference: Decimal
     orders: list[CommissionOrderOut]
 
 
 class CommissionTotalOut(ReportModel):
     order_count: int
-    profit_base: Decimal = Decimal("0")
+    profit_base: Decimal
     payable: Decimal
     paid: Decimal
     difference: Decimal
 
 
 class CommissionOut(ReportModel):
-    items: list[CommissionOrderOut]
-    groups: list[CommissionGroupOut]
+    order_groups: list[CommissionOrderGroupOut]
     total: CommissionTotalOut
 
 

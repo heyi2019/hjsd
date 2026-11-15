@@ -50,7 +50,7 @@ beforeEach(() => {
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
   resolveMock(vi.mocked(reportsApi.monthlyPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
+  resolveMock(vi.mocked(reportsApi.commission), { order_groups: [], total: { order_count: 0, profit_base: "0", payable: "0", paid: "0", difference: "0" } });
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 7, username: "operator", display_name: "业务同事", is_active: true },
     { id: 8, username: "finance", display_name: "财务同事", is_active: true },

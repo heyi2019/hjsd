@@ -19,30 +19,27 @@ export interface MonthlyPnlReport {
 }
 
 export interface CommissionRow {
-  user_id: number;
+  user_id: number | null;
   order_id: number;
   order_no: string;
+  inventory_date?: string | null;
+  outbound_date?: string | null;
   profit_base: string;
   rate: string;
-  payable: string;
-  paid: string;
-  difference: string;
 }
 
-export interface CommissionGroup {
-  user_id: number;
-  order_count: number;
+export interface CommissionOrderGroup {
+  order_id: number;
+  order_no: string;
+  inventory_date?: string | null;
+  outbound_date?: string | null;
   profit_base: string;
-  payable: string;
-  paid: string;
-  difference: string;
   orders: CommissionRow[];
 }
 
 export interface CommissionReport {
   total: { order_count: number; profit_base: string; payable: string; paid: string; difference: string };
-  items: CommissionRow[];
-  groups?: CommissionGroup[];
+  order_groups: CommissionOrderGroup[];
 }
 
 export interface BusinessPnlRow {

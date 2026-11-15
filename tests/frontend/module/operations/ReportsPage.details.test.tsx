@@ -41,7 +41,7 @@ vi.mock("@/shared/api/stocks.api");
 beforeEach(() => {
   vi.clearAllMocks();
   resolveMock(vi.mocked(reportsApi.monthlyPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(reportsApi.commission), { items: [], total: { order_count: 0, payable: "0", paid: "0", difference: "0" } });
+  resolveMock(vi.mocked(reportsApi.commission), { order_groups: [], total: { order_count: 0, profit_base: "0", payable: "0", paid: "0", difference: "0" } });
   vi.mocked(employeesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(reportsApi.dailyFunds), { date: "2026-10-01", total: {}, items: [] });
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });

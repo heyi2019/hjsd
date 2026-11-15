@@ -32,22 +32,21 @@ vi.mock("@/shared/api/stocks.api");
 beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
-  vi.mocked(ordersApi.list).mockResolvedValue([]);
-  vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 0, completed_count: 0 });
+  vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 0, completed_count: 0, active_count: 0 });
   vi.mocked(stocksApi.list).mockResolvedValue([]);
   vi.mocked(stocksApi.dashboardSummary).mockResolvedValue({ account_count: 0, aging_count: 0, overdue_count: 0 });
   vi.mocked(installmentsApi.list).mockResolvedValue([]);
   vi.mocked(installmentsApi.totals).mockResolvedValue({ total_count: 0, overdue_count: 0, total_receivable: "0.00", total_paid: "0.00", total_remaining: "0.00" });
   vi.mocked(notificationsApi.summary).mockResolvedValue({ unread_profit_total: 0 });
   vi.mocked(reportsApi.commission).mockResolvedValue({
-    items: [],
+    order_groups: [],
     total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },
   });
 });
 
 describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
 it("工作台展示业务总览指标和业务提醒", async () => {
-    vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 2, completed_count: 1 });
+    vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 2, completed_count: 1, active_count: 1 });
     vi.mocked(stocksApi.dashboardSummary).mockResolvedValue({ account_count: 1, aging_count: 1, overdue_count: 1 });
     vi.mocked(installmentsApi.totals).mockResolvedValue({ total_count: 1, overdue_count: 1, total_receivable: "0.00", total_paid: "0.00", total_remaining: "0.00" });
     vi.mocked(notificationsApi.summary).mockResolvedValue({ unread_profit_total: 1 });
@@ -203,7 +202,7 @@ it("数据总览已迁走：不再渲染资金池表格/统计/订单入口卡",
   });
 
 it("订单请求完成时不产生未包裹 act 的异步更新警告", async () => {
-    let resolveSummary!: (value: { total_count: number; completed_count: number }) => void;
+    let resolveSummary!: (value: { total_count: number; completed_count: number; active_count: number }) => void;
     vi.mocked(ordersApi.summary).mockReturnValueOnce(new Promise((resolve) => {
       resolveSummary = resolve;
     }));
@@ -211,7 +210,7 @@ it("订单请求完成时不产生未包裹 act 的异步更新警告", async ()
     const view = renderLight(<DashboardPage />, { user: "admin" });
 
     view.unmount();
-    resolveSummary({ total_count: 0, completed_count: 0 });
+    resolveSummary({ total_count: 0, completed_count: 0, active_count: 0 });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(

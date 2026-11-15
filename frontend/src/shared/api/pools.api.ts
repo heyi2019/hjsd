@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Pool, PoolBalance, PoolBalanceTotals, Reconciliation, TransferResult } from "./types/finance";
+import type { Pool, PoolBalance, PoolBalanceTotals } from "./types/finance";
 
 export const poolsApi = {
   update: (id: number, data: Partial<Pool>) => api.patch<Pool>(`/pools/${id}`, data).then(r => r.data),
@@ -14,16 +14,4 @@ export const poolsApi = {
     api
       .get<{ items: PoolBalance[]; totals: PoolBalanceTotals }>("/pools/balances")
       .then((r) => r.data),
-};
-
-export const transfersApi = {
-  create: (data: Record<string, unknown>) => api.post<TransferResult>("/transfers", data).then(r => r.data),
-  repair: (transferId: string, data: { counterpart_pool_id: number; reason: string }) =>
-    api.post<TransferResult>(`/transfers/${transferId}/repair`, data).then(r => r.data),
-};
-
-export const reconciliationsApi = {
-  list: () => api.get<Reconciliation[]>("/reconciliations").then(r => r.data),
-  create: (data: Record<string, unknown>) => api.post<Reconciliation>("/reconciliations", data).then(r => r.data),
-  resolve: (id: number, reason: string) => api.post<Reconciliation>(`/reconciliations/${id}/resolve`, { reason }).then(r => r.data),
 };

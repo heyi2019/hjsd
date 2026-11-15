@@ -7,9 +7,11 @@ import { FundsPage } from "@/pools/FundsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
-import { depositsApi } from "@/shared/api/installments.api";
+import { depositsApi } from "@/shared/api/deposits.api";
 import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
-import { poolsApi, reconciliationsApi, transfersApi } from "@/shared/api/pools.api";
+import { poolsApi } from "@/shared/api/pools.api";
+import { reconciliationsApi } from "@/shared/api/reconciliations.api";
+import { transfersApi } from "@/shared/api/transfers.api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -21,6 +23,7 @@ beforeEach(() => {
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
+vi.mock("@/shared/api/deposits.api");
 vi.mock("@/shared/api/installments.api");
 vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
@@ -28,8 +31,10 @@ vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
 vi.mock("@/shared/api/policy.api");
 vi.mock("@/shared/api/pools.api");
+vi.mock("@/shared/api/reconciliations.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
+vi.mock("@/shared/api/transfers.api");
 
 const pools = [
   { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },

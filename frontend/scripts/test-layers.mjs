@@ -28,6 +28,7 @@ export const fastTests = [
   "tests/frontend/unit/shared/catalog.test.ts",
   "tests/frontend/unit/shared/client.cache.test.ts",
   "tests/frontend/unit/shared/client.test.ts",
+  "tests/frontend/unit/shared/financeApiBoundaries.test.ts",
   "tests/frontend/unit/shared/format.test.ts",
   "tests/frontend/unit/shared/listColumns.test.ts",
   "tests/frontend/unit/shared/money.test.ts",

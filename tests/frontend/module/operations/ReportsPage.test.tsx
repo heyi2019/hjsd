@@ -56,6 +56,14 @@ beforeEach(() => {
     { id: 8, username: "finance", display_name: "财务同事", is_active: true },
   ]);
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
+  resolveMock(vi.mocked(reportsApi.dataCenter), {
+    sold_cost: "0.00",
+    inventory_cost: "0.00",
+    studio_cost: "0.00",
+    account_sale_profit: "0.00",
+    studio_other_income: "0.00",
+    profit: "0.00",
+  });
   resolveMock(vi.mocked(reportsApi.orderProfit), { items: [], total: { income: "0", cost: "0", rebate: "0", net_profit: "0" } });
   resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
@@ -66,6 +74,7 @@ beforeEach(() => {
     totals: { pool_count: 0, cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
   vi.mocked(ordersApi.list).mockResolvedValue([]);
+  vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 0, active_count: 0 });
   vi.mocked(stocksApi.inventory).mockResolvedValue({ items: [], count: 0, total_cost: "0.00" });
 });
 
@@ -173,7 +182,7 @@ describe("ReportsPage：经营中心报表", () => {
     const onNavigate = vi.fn();
     renderLight(<ReportsPage onNavigate={onNavigate} />, { user: "admin" });
     await gotoTab("数据中心");
-    expect(await screen.findByText("可用余额合计")).toBeInTheDocument();
+    expect(await screen.findByText("利润")).toBeInTheDocument();
     expect(document.querySelectorAll(".ant-tabs-tabpane-active .ui-control-width-date")).toHaveLength(2);
     await ui.click(screen.getByRole("button", { name: /订单总数/ }));
     expect(onNavigate).toHaveBeenCalledWith("business", "ledger");

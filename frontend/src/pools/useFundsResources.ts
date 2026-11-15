@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { appMessage } from "../shared/ui/appFeedback";
 import { cashflowsApi } from "../shared/api/cashflows.api";
-import { depositsApi } from "../shared/api/installments.api";
-import { poolsApi, reconciliationsApi } from "../shared/api/pools.api";
+import { depositsApi } from "../shared/api/deposits.api";
+import { poolsApi } from "../shared/api/pools.api";
+import { reconciliationsApi } from "../shared/api/reconciliations.api";
 import type { Cashflow, Deposit, Pool, PoolBalance, PoolBalanceTotals, Reconciliation } from "../shared/api/types/finance";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";

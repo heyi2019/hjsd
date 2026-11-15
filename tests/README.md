@@ -17,14 +17,14 @@ tests/
 ├── backend/                      pytest
 │   ├── conftest.py               11 个共享夹具 + 测试库硬校验 + db 标记派生（唯一一份）
 │   ├── _repo.py                  仓库根定位（禁写 parents[N]，层数一变就错）
-│   ├── unit/<区域>/              不连库的纯逻辑与静态守卫（32 文件 / 297 例）
-│   ├── integration/<区域>/       连真实 PG 的接口与服务测试（82 文件 / 1387 例）
+│   ├── unit/<区域>/              不连库的纯逻辑与静态守卫（30 文件 / 290 例）
+│   ├── integration/<区域>/       连真实 PG 的接口与服务测试（81 文件 / 1397 例）
 │   └── _report/                  生成物（case_index.json 等），gitignore
 ├── frontend/                     vitest（root = 仓库根）
 │   ├── unit/<区域>/              不挂载 React 的纯逻辑（24 文件）
 │   └── module/<区域>/            组件与页面测试（70 文件，含 16 个 .deep 重型）
 ├── e2e/                          Playwright
-│   ├── <区域>/*.spec.ts          按区域分布；cross/ 是跨区域串联
+│   ├── <区域>/*.spec.ts          按功能分布；cross/ 集中放跨页面与端到端业务流程
 │   └── support/api-stub.ts       规格共用夹具
 ├── fixtures/                     测试基建：render/mock-api/桩/种子数据（`@fixtures` 别名）
 └── config/                       setup.ts、mock-specifier 基线
@@ -54,10 +54,12 @@ tests/
 
 文件放哪里、属于哪个板块、保护哪条承诺，是三件不同的事，**不允许任何一根轴兼任另一根**。
 
+**回归不是独立的测试类别**：修复缺陷后，仍有长期保护价值的断言并入对应功能测试；若只是重复覆盖、依赖已删除行为或没有明确业务承诺，则删除。不要按修复批次长期保留独立的“回归测试桶”。
+
 | 轴 | 载体 | 回答 |
 |---|---|---|
-| 怎么跑 | `db` marker（**由夹具依赖派生**）+ `GROUPS` | 这次改动该跑哪些、要多久 |
-| 属于哪个板块 | `run_regression.py` 的 `GROUPS` + 文件名前缀 | 改这个板块要回归什么 |
+| 怎么跑 | `db` marker（**由夹具依赖派生**）+ 功能分组 | 这次改动该跑哪些、要多久 |
+| 属于哪个板块 | 功能分组 + 文件名前缀 | 改这个板块对应哪些测试 |
 | 保护什么 | **文件头承诺 ID** + `docs/testing/测试元数据台账.csv`（`PROMISE`） | 前后端是否对得上、哪条承诺无人守 |
 
 承诺轴独立于路径，所以搬目录、改文件名都不会影响功能归属。解析与校验见
@@ -91,8 +93,7 @@ tests/
 `覆盖状态` 三态：`已覆盖`（有测试）、`待核`（有测试但断言强度未逐条核对）、`缺失（写明原因）`。
 **`待核` 不等于已守住**，它只表示证据来自文件名或关键词，尚未验证断言本身。
 
-当前 L0 状态：12 条中 1 条缺失（`IDEMPOTENCY-01` 重复提交不产生第二笔流水——现有测试
-`test_finance_idempotency_service.py` 断言的是「缺陷会发生」，不是守卫）、3 条待核。
+当前 L0 状态：`IDEMPOTENCY-01` 仍缺少有效守卫。原用例断言重复提交会产生重复流水，锁定了缺陷行为；已从测试集删除，待业务实现幂等后补上正确断言。
 
 ## 5. 执行入口
 
@@ -264,7 +265,7 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 | ~~后端测试扁平存放，没有分层~~ | **已解决**：`unit/integration` × 区域两层（2026-11-04），`test_manifest_parity.py` 守着分布 |
 | ~~前端测试散在包内 `src/` 与 `frontend/tests/`~~ | **已解决**：当前前端测试文件全部迁入 `tests/frontend/{unit,module}/<区域>/`；包内扫描为空的断言在 `manifest-parity.test.ts` |
 | ~~`vi.mock` 用相对路径，测试文件搬迁后静默失效~~ | **已解决**：`@`/`@fixtures` 别名 + `mock-specifier.test.ts`，74 处存量已清零（基线为空） |
-| ~~E2E 规格散在包内 `frontend/e2e/`~~ | **已解决**：15 个 spec 迁入 `tests/e2e/<区域>/`，快照目录随 `visual.spec.ts` 走 |
+| ~~E2E 规格散在包内 `frontend/e2e/`~~ | **已解决**：规格统一迁入 `tests/e2e/<区域>/`，快照目录随 `visual.spec.ts` 走 |
 | ~~前端测试只能整层跑，改一个板块要跑全部~~ | **已解决**：`test:panel <区域>` 与 `test:changed`（按 git 变更推断区域） |
 | `results.jsonl` 只增不减，日增约 14 MB | **已解决**：`scripts/trim_test_results.py` 覆盖保持式裁剪，14.61 MB / 102 run → **3.82 MB / 24 run**，被裁行归档进 `测试结果库/archive/`（gitignore）。裁剪后报告「未执行 0 / FAIL 0」与裁剪前逐项一致 |
 | 后端 `integration` 与 `unit` 的判定仍是「文件内 db 用例多数派」 | **已知取舍**：35 个混层文件（31%），极端如 `test_orders_contract.py` 105 集成 + 1 单元被整体归入 integration。代价是 57 条快用例跟进集成通道；未拆文件，因为拆文件会改 nodeid 与用例编号 |
@@ -320,7 +321,7 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 |---|---|---|---|---|
 | FE-001 ~ FE-007 | 登录态、导航、首次加载、空态、弹窗基础行为 | `workbench/`、`shared/`、`system/` | `system/smoke.spec.ts`、`system/navigation-leaves.spec.ts`、`system/fallback.spec.ts`、`system/visual.spec.ts` | 模块自动化已有；异常路径仍以手工为主 |
 | FE-008 ~ FE-024 | 回收/提号/代挂建单、字段校验、费用、图片、库存 | `business/`、`shared/` | `cross/business-write.spec.ts`、`cross/integration.spec.ts` | 建单主路径已有；下拉、图片、重复提交需补逐用例关联 |
-| FE-025 ~ FE-037 | 售出、分期、寄售、返点、取消和重复操作 | `business/`、`finance/` | `cross/business-write.spec.ts`、`cross/finance-write-ui.spec.ts`、`cross/integration.spec.ts` | 业务模块已有；终态与跨页面一致性需补专项回归 |
+| FE-025 ~ FE-037 | 售出、分期、寄售、返点、取消和重复操作 | `business/`、`finance/` | `cross/business-write.spec.ts`、`cross/finance-write-ui.spec.ts`、`cross/integration.spec.ts` | 业务模块已有；终态与跨页面一致性需补专项功能用例 |
 | FE-038 ~ FE-047 | 客户、合作方、用户、团队、密码和权限 | `customer/`、`settings/`、`system/` | `cross/crud.spec.ts`、`system/auth-login.spec.ts`、`system/role-switch.spec.ts` | 主路径已有；格式校验、重复编码和异常反馈需补关联 |
 | FE-048 ~ FE-056 | 资金划转、冲销、报表、导出和审计 | `finance/`、`operations/`、`system/` | `cross/finance-write-ui.spec.ts`、`finance/other-integration.spec.ts`、`cross/integration.spec.ts` | 模块自动化已有；导出反馈和报表口径需补专项场景 |
 | FE-057 ~ FE-073 | 自定义字段、列配置、游戏渠道、资金池、导入、视觉 | `settings/`、`operations/`、`workbench/` | `system/visual.spec.ts`、`cross/integration.spec.ts` | 配置与视觉已有；导入异常和下拉完整性需补逐用例关联 |

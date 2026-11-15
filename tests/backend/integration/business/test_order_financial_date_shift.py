@@ -1,11 +1,11 @@
-"""REVERSAL-01 金额链路回归（批次二）：CANCEL 冲销 nature 自洽 + 成交日期平移归期同源。
+"""REVERSAL-01 冲销流水与订单日期变更的财务一致性。
 
 口径锚点：资金走向只有收入/支出两个大类；冲销流水必须 direction/nature 自洽，
 否则余额按方向变了、资金池收支卡片与资金日报发生额列按 (direction, nature)
 取数却都不体现，账对不上。平移成交日期时，凡按各自日期归期的子类型
 （事件/流水/分期坏账/旧模型返点/账号买号日）必须一起平移，否则跨期撕裂。
 
-覆盖修复：
+验证范围：
 - #1 冲销 SELL 生成 OUT/BUSINESS_OUT（不再是矛盾的 OUT/BUSINESS_IN）；
   冲销 BUY 仍是 IN/BUSINESS_IN。
 - #6 成交日期平移同步 InstallmentDisposition.occurred_on（坏账归期）。

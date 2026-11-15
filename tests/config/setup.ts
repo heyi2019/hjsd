@@ -4,6 +4,15 @@ import { afterEach, vi } from "vitest";
 import { act, cleanup } from "@testing-library/react";
 import { resetTestBrowserState } from "@fixtures/browser-state";
 
+// rc-trigger 在 jsdom 里偶尔会先执行弹层清理 effect，再拿到触发节点，
+// 因而输出一条不会影响交互的 shadow-root 提示。只过滤这一条已知第三方
+// 环境噪声，其他 console.error（包括业务异常）仍原样输出。
+const originalConsoleError = console.error.bind(console);
+console.error = (...args: unknown[]) => {
+  if (args.length === 1 && args[0] === "Warning: trigger element and popup element should in same shadow root.") return;
+  originalConsoleError(...args);
+};
+
 afterEach(async () => {
   // 清空所有 mock 的调用记录与一次性返回值队列（mockResolvedValueOnce 等），
   // 为后续启用 isolate:false 复用模块图扫清 mock 共享泄漏；配合各文件 beforeEach 重新设定返回值。
@@ -65,6 +74,15 @@ if (process.env.VITEST) {
 }
 
 // jsdom polyfills for APIs antd v5 touches during render/unmount.
+
+// antd Upload 的图片预览会在 jsdom 中创建 canvas。jsdom 本身不实现 2D
+// context，但这些组件测试只需要完成预览 Promise，不需要像素级绘制结果。
+if (typeof HTMLCanvasElement !== "undefined") {
+  HTMLCanvasElement.prototype.getContext = (() => ({
+    drawImage: () => undefined,
+  })) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.toDataURL = (() => "data:image/png;base64,test-preview") as typeof HTMLCanvasElement.prototype.toDataURL;
+}
 
 // matchMedia (antd Grid / responsive hooks call this)
 if (!window.matchMedia) {

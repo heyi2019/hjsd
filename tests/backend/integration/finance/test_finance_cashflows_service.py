@@ -10,6 +10,7 @@ from sqlalchemy import select
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.foundation import Pool
+from app.domain.trade import Cashflow
 from app.finance import cashflows, deposits
 from app.finance.cashflows import create_cashflow
 from app.finance.deposits import create_deposit
@@ -373,6 +374,52 @@ def test_return_deposit_rejects_exceeds(seeded_db):
     with pytest.raises(Validation, match="退还金额超过未释放余额"):
         deposits.return_deposit(
             seeded_db, deposit.id, amount=Decimal("20"), released_on=TODAY, actor="pytest"
+        )
+
+
+def test_cancel_paid_deposit_writes_one_reversal(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("300"), paid_on=TODAY, actor="pytest"
+    )
+    cancelled = deposits.cancel_deposit(
+        seeded_db, deposit.id, cancelled_on=TODAY, reason="登记有误", actor="pytest"
+    )
+    rows = seeded_db.scalars(
+        select(Cashflow).where(
+            Cashflow.deposit_id == deposit.id,
+            Cashflow.category == "DEPOSIT_CANCEL",
+        )
+    ).all()
+    assert cancelled.status == "CANCELLED"
+    assert len(rows) == 1
+    assert rows[0].amount == deposit.paid_amount
+
+
+def test_cancel_unknown_deposit_not_found(seeded_db):
+    with pytest.raises(NotFound, match="押金.*不存在"):
+        deposits.cancel_deposit(
+            seeded_db, 999999, cancelled_on=TODAY, reason="x", actor="pytest"
+        )
+
+
+def test_cancel_returned_deposit_rejected(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("300"), paid_on=TODAY, actor="pytest"
+    )
+    deposits.return_deposit(
+        seeded_db, deposit.id, amount=Decimal("100"), released_on=TODAY, actor="pytest"
+    )
+    with pytest.raises(Validation):
+        deposits.cancel_deposit(
+            seeded_db, deposit.id, cancelled_on=TODAY,
+            reason="已有退还不可取消", actor="pytest",
+        )
+
+
+def test_create_deposit_rejects_negative_amount(seeded_db):
+    with pytest.raises(Validation):
+        deposits.create_deposit(
+            seeded_db, pool_id=1, amount=Decimal("-100"), paid_on=TODAY, actor="pytest"
         )
 
 

@@ -157,7 +157,6 @@ describe("库存导出", () => {
     expect(csv).toContain(",0,1,67.89,123.45");
     expect(csv).not.toContain(",0,1,0.00,500.00");
   });
-  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("FE-054：库存 CSV 不暴露账号密码", () => {
     const withPassword = { ...account, game_password: "secret-password" } as unknown as Account;

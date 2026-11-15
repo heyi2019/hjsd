@@ -135,7 +135,7 @@ GROUPS = {
         "tests/backend/unit/system/test_main_contract.py",
         "tests/backend/unit/system/test_api_contract.py",
         "tests/backend/unit/system/test_request_schema_contract.py",
-        "tests/backend/unit/system/test_money_float_guard.py",
+        "tests/backend/unit/system/test_money.py",
         "tests/backend/integration/system/test_numbering.py",
         "tests/backend/unit/system/test_state_machine.py",
     ],
@@ -143,7 +143,6 @@ GROUPS = {
     # 准入标准（后补须先实测）：单文件 < 1s、不依赖 seeded_db/seeded_client/TestClient。
     "unit": [
         "tests/backend/unit/system/test_money.py",
-        "tests/backend/unit/system/test_money_float_guard.py",
         "tests/backend/integration/system/test_numbering.py",
         "tests/backend/unit/system/test_state_machine.py",
         "tests/backend/unit/system/test_api_contract.py",
@@ -151,7 +150,6 @@ GROUPS = {
         "tests/backend/unit/business/test_cancellation_model.py",
         "tests/backend/unit/business/test_orders_common.py",
         "tests/backend/unit/finance/test_finance_attributes.py",
-        "tests/backend/unit/system/test_core_infra_gaps.py",
         "tests/backend/unit/system/test_notifications_contract.py",
         "tests/backend/unit/finance/test_rebate_current_contract.py",
         "tests/backend/unit/settings/test_product_alias_compat.py",
@@ -160,7 +158,7 @@ GROUPS = {
         # 曾长期游离在所有分组之外 —— 前端把报表视图拆成 ./reports/*.tsx 后它指错文件、
         # 7 条 RPT_* 一直红着却没人发现，证明「不在分组里的守卫等于没有守卫」。
         "tests/backend/unit/settings/test_list_scope_ui_parity.py",
-        # 承诺归属守卫：静态解析 111 个测试文件的 docstring，无 DB/HTTP，0.4s。
+        # 承诺归属守卫：静态解析当前后端测试文件的 docstring，无 DB/HTTP，0.4s。
         # 它守的是「每个测试文件都能说清自己在保护哪条承诺」，以及清单证据不指向
         # 不存在的文件——没有它，新增测试就是加一个没人知道在测什么的文件。
         "tests/backend/unit/system/test_promise_declaration.py",
@@ -183,7 +181,6 @@ GROUPS = {
         "tests/backend/integration/business/test_installments_contract.py",
         "tests/backend/integration/operations/test_reporting_contract.py",
         "tests/backend/integration/business/test_m2.py",
-        "tests/backend/integration/operations/test_m4.py",
     ],
     "foundation": [
         "tests/backend/integration/settings/test_foundation_contract.py",
@@ -208,14 +205,12 @@ GROUPS = {
         "tests/backend/integration/business/test_account_delete.py",
     ],
     "orders": [
-        "tests/backend/unit/system/test_core_contract.py",
         "tests/backend/integration/business/test_orders_contract.py",
         "tests/backend/integration/business/test_orders.py",
         "tests/backend/unit/business/test_orders_events_service.py",
         "tests/backend/unit/system/test_state_machine.py",
         "tests/backend/unit/system/test_api_contract.py",
         "tests/backend/unit/system/test_request_schema_contract.py",
-        "tests/backend/integration/business/test_bughunt.py",
         "tests/backend/unit/business/test_cancellation_model.py",
         "tests/backend/unit/business/test_orders_common.py",
         "tests/backend/integration/business/test_orders_guard.py",
@@ -223,25 +218,20 @@ GROUPS = {
         "tests/backend/integration/business/test_order_execution_edit.py",
         "tests/backend/integration/customer/test_order_customer_source_fixtures.py",
         "tests/backend/integration/business/test_profit_allocation_modes.py",
-        "tests/backend/integration/business/test_unreachable_status_paths.py",
         "tests/backend/integration/business/test_flow_recycle.py",
         "tests/backend/unit/business/test_order_status_contract.py",
         "tests/backend/integration/business/test_flow_sale.py",
         "tests/backend/integration/business/test_flow_config_driven.py",
         "tests/backend/integration/business/test_stock_intake_contract.py",
         "tests/backend/integration/business/test_cancel_inventory_release.py",
-        "tests/backend/integration/business/test_deposit_remaining.py",
         "tests/backend/integration/business/test_order_duplicate_account.py",
         "tests/backend/integration/business/test_order_event_cancellable_amount.py",
-        "tests/backend/integration/business/test_profit_cashflow_basis.py",
-        # 2026-11-12 金额链路批次二 / 订单域逻辑批次四
-        "tests/backend/integration/business/test_amount_chain_cancel_and_shift.py",
-        "tests/backend/integration/business/test_order_domain_logic_batch4.py",
+        # 2026-11-12 金额链路
+        "tests/backend/integration/business/test_order_financial_date_shift.py",
     ],
     "installments": [
         "tests/backend/integration/business/test_installments_contract.py",
         "tests/backend/integration/business/test_m2.py",
-        "tests/backend/integration/operations/test_m4.py",
         "tests/backend/integration/business/test_installments_service.py",
         "tests/backend/integration/business/test_flow_installment.py",
         "tests/backend/integration/business/test_installment_remaining.py",
@@ -251,26 +241,23 @@ GROUPS = {
         "tests/backend/integration/finance/test_finance_contract.py",
         "tests/backend/unit/finance/test_finance_attributes.py",
         "tests/backend/integration/finance/test_finance_cashflows_service.py",
+        "tests/backend/integration/finance/test_deposit_remaining.py",
         "tests/backend/integration/finance/test_finance_controls_service.py",
         "tests/backend/integration/finance/test_finance_rebates_service.py",
         "tests/backend/integration/finance/test_finance_router_contract.py",
         "tests/backend/unit/finance/test_rebate_rules_contract.py",
         "tests/backend/unit/system/test_money.py",
-        "tests/backend/unit/system/test_money_float_guard.py",
         "tests/backend/integration/finance/test_finance_reconciliation_service.py",
-        "tests/backend/integration/finance/test_finance_reporting_task5_tail.py",
         "tests/backend/integration/finance/test_finance_transfers_service.py",
         "tests/backend/unit/finance/test_rebate_current_contract.py",
         "tests/backend/integration/finance/test_finance_reversal_service.py",
-        "tests/backend/integration/finance/test_finance_idempotency_service.py",
         "tests/backend/integration/business/test_flow_distribution.py",
         "tests/backend/integration/finance/test_cashflow_totals.py",
         "tests/backend/integration/finance/test_pool_balances_batch.py",
         "tests/backend/integration/finance/test_studio_cashflow_summary.py",
         # 2026-11-12 金额链路/裁决批次（返点退回、资金两方向、金额大类口径）
         "tests/backend/integration/finance/test_rebate_return.py",
-        "tests/backend/integration/business/test_amount_chain_deposit_and_external.py",
-        "tests/backend/integration/business/test_amount_chain_void_and_r2.py",
+        "tests/backend/integration/finance/test_funds_direction_and_deposit.py",
     ],
     "parties": [
         "tests/backend/integration/customer/test_parties.py",
@@ -283,8 +270,10 @@ GROUPS = {
     "reporting": [
         "tests/backend/integration/operations/test_reporting_contract.py",
         "tests/backend/unit/operations/test_report_export_columns.py",
-        "tests/backend/integration/operations/test_reporting_service_gaps.py",
+        "tests/backend/integration/operations/test_reporting_service.py",
         "tests/backend/integration/operations/test_reporting_r_consistency.py",
+        "tests/backend/integration/operations/test_profit_cashflow_basis.py",
+        "tests/backend/integration/operations/test_profit_r2_accounting.py",
     ],
     "policy": [
         "tests/backend/integration/settings/test_m5_policy.py",
@@ -297,24 +286,22 @@ GROUPS = {
         "tests/backend/integration/system/test_audit_contract.py",
         "tests/backend/integration/system/test_attachments_service.py",
         "tests/backend/integration/system/test_notifications_service.py",
-        # 2026-11-12 通知接入批次六（分润两段式）
-        "tests/backend/integration/system/test_notification_triggers_batch6.py",
     ],
     "imports": [
         "tests/backend/unit/operations/test_import_landing.py",
         "tests/backend/integration/operations/test_import_mapping.py",
         "tests/backend/integration/operations/test_imports_contract.py",
+        "tests/backend/integration/operations/test_import_lifecycle.py",
         "tests/backend/integration/system/test_migration.py",
     ],
     # 跨域基建板块：列表列/导出、部署脚本、覆盖率与迁移基线——改动常横跨多域。
     "platform": [
+        "tests/backend/unit/system/test_core_contract.py",
         "tests/backend/integration/settings/test_list_columns.py",
         "tests/backend/integration/settings/test_list_custom_columns.py",
         "tests/backend/integration/operations/test_list_export_csv.py",
         "tests/backend/unit/system/test_deploy_script_contract.py",
         "tests/backend/unit/system/test_backup_scripts.py",
-        # 2026-11-12 数据与基础设施批次六
-        "tests/backend/integration/system/test_data_infra_batch6.py",
     ],
     "auth": [
         "tests/backend/integration/system/test_auth_contract.py",
@@ -322,8 +309,6 @@ GROUPS = {
         "tests/backend/unit/system/test_backup_scripts.py",
         "tests/backend/unit/system/test_public_release_security.py",
         "tests/backend/integration/system/test_ratelimit.py",
-        # 2026-11-12 认证权限逻辑缺陷批次五
-        "tests/backend/integration/system/test_auth_permission_batch5.py",
     ],
 }
 
@@ -368,9 +353,7 @@ def _groups_for_source_path(path: str) -> set[str]:
         t in path for t in ("order", "state_machine", "request_schema")
     ):
         selected.add("orders")
-    if "bughunt" in path:
-        selected.add("orders")
-    if "installment" in path or path.endswith("/test_m2.py") or path.endswith("/test_m4.py"):
+    if "installment" in path or path.endswith("/test_m2.py"):
         selected.add("installments")
     if path.startswith("backend/app/finance/") or "finance" in path or "rebate" in path:
         selected.add("finance")
@@ -589,7 +572,7 @@ def main() -> int:
         print(f"按变更自动选择：{label}")
         if args.list:
             if frontend_changed and not args.backend_only:
-                print("frontend: npm run test:regression:fast")
+                print("frontend: npm run check + npm run test:fast")
             print("\n".join(paths))
             return 0
         runner = str(PYTHON) if PYTHON.exists() else sys.executable
@@ -603,10 +586,11 @@ def main() -> int:
         if result.returncode:
             return result.returncode
         if frontend_changed and not args.backend_only:
-            return subprocess.run(
-                ["npm", "run", "test:regression:fast"],
-                cwd=ROOT.parent / "frontend", check=False,
-            ).returncode
+            fe_root = ROOT.parent / "frontend"
+            check_result = subprocess.run(["npm", "run", "check"], cwd=fe_root, check=False)
+            if check_result.returncode:
+                return check_result.returncode
+            return subprocess.run(["npm", "run", "test:fast"], cwd=fe_root, check=False).returncode
         return 0
     fe_paths: list[str] = []
     if args.group == "cross":

@@ -73,7 +73,7 @@ MODULES = ["A", "B", "C", "D", "E", "F", "SYS"]
 # ---------------------------------------------------------------------------
 BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_account_delete.py": "B04",
-    "test_profit_cashflow_basis.py": "B01",
+    "test_profit_cashflow_basis.py": "E01",
     "test_account_inventory_age.py": "B05",
     "test_account_stock_no.py": "B04",
     "test_accounts_contract.py": "B04",
@@ -83,22 +83,18 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_audit_contract.py": "SYS05",
     "test_auth_contract.py": "SYS01",
     "test_backup_scripts.py": "SYS09",
-    "test_bughunt.py": "B01",
     "test_cancel_inventory_release.py": "B06",
     "test_cancellation_model.py": "B02",
     "test_cashflow_totals.py": "D02",
     "test_core_contract.py": "SYS07",
-    "test_core_infra_gaps.py": "SYS10",
     "test_deploy_script_contract.py": "SYS09",
-    "test_deposit_remaining.py": "B08",
+    "test_deposit_remaining.py": "D05",
     "test_finance_attributes.py": "D02",
     "test_finance_cashflows_service.py": "D02",
     "test_finance_contract.py": "D01",
     "test_finance_controls_service.py": "D03",
-    "test_finance_idempotency_service.py": "D02",
     "test_finance_rebates_service.py": "D04",
     "test_finance_reconciliation_service.py": "D03",
-    "test_finance_reporting_task5_tail.py": "D05",
     "test_finance_reversal_service.py": "D03",
     "test_finance_router_contract.py": "D02",
     "test_finance_transfers_service.py": "D01",
@@ -127,12 +123,11 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_list_export_csv.py": "E02",
     "test_list_scope_ui_parity.py": "F03",
     "test_m2.py": "B08",
-    "test_m4.py": "E01",
+    "test_import_lifecycle.py": "E03",
     "test_m5_policy.py": "F01",
     "test_main_contract.py": "SYS07",
     "test_migration.py": "SYS13",
     "test_money.py": "SYS02",
-    "test_money_float_guard.py": "SYS02",
     "test_notifications_contract.py": "SYS08",
     "test_notifications_service.py": "SYS08",
     "test_numbering.py": "SYS03",
@@ -168,22 +163,17 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_report_export_columns.py": "E02",
     "test_reporting_contract.py": "E01",
     "test_reporting_r_consistency.py": "E01",
-    "test_reporting_service_gaps.py": "E01",
+    "test_reporting_service.py": "E01",
     "test_request_schema_contract.py": "SYS07",
     "test_settings.py": "SYS06",
     "test_state_machine.py": "SYS04",
     "test_stock_intake_contract.py": "B04",
     "test_studio_cashflow_summary.py": "D05",
-    "test_unreachable_status_paths.py": "B02",
-    # 2026-11-12 金额链路/裁决批次：8 个测试文件的功能归属（首字母须与所在区域目录一致）。
+    # 金额与财务口径功能测试归属（首字母须与所在区域目录一致）。
     "test_rebate_return.py": "D04",                       # finance — 返点退回挂单 OUT
-    "test_amount_chain_cancel_and_shift.py": "B03",       # business — 冲销 nature + 归期平移
-    "test_amount_chain_deposit_and_external.py": "B10",   # business — 资金两方向 + 押金口径
-    "test_amount_chain_void_and_r2.py": "B03",            # business — VOID 排除 + R2 不串列
-    "test_order_domain_logic_batch4.py": "B01",           # business — 订单域逻辑缺陷批次四
-    "test_auth_permission_batch5.py": "SYS01",            # system — 认证权限批次五
-    "test_data_infra_batch6.py": "SYS10",                 # system — 数据基础设施批次六
-    "test_notification_triggers_batch6.py": "SYS08",      # system — 分润两段式通知
+    "test_order_financial_date_shift.py": "B03",          # business — 冲销与成交日期联动
+    "test_funds_direction_and_deposit.py": "D05",         # finance — 收支方向与押金报表
+    "test_profit_r2_accounting.py": "E01",                # reporting — 订单利润与 R2 归类
 }
 
 # ---------------------------------------------------------------------------
@@ -195,7 +185,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
 # SYS12「测试用例库与执行记录」，让报告里的 E2E 分布失去意义。
 #
 # 归类口径（与《测试规范》一致：按「被测功能」而非「用了什么手段」）：
-#   - 外壳/界面契约类（冒烟、导航叶子、降级不白屏、弹窗对齐、视觉回归、真实接口渲染）
+    #   - 外壳/界面契约类（冒烟、导航叶子、降级不白屏、弹窗对齐、视觉基线、真实接口渲染）
 #     统一落 SYS07 —— 这些验证的是前端与 API 的对外契约，不绑定某个业务模块。
 #   - 业务写路径按主业务功能归：建单->B01、售出->B06、资金流水->D02。
 #   - 认证/角色按 SYS01。
@@ -205,7 +195,6 @@ E2E_FILE_TO_FUNC: dict[str, str] = {
     "auth-login.spec.ts": "SYS01",            # 真后端账号密码登录、JWT、越权 401
     "role-switch.spec.ts": "SYS01",           # DEV 态角色切换与导航权限门
     "business-write.spec.ts": "B01",          # 五类业务写入主路径（跨模块，见下）
-    "order-abandon-confirm.spec.ts": "B01",   # 建单弹窗「放弃未保存」确认框收尾回归
     "upgrade-integration.spec.ts": "B06",     # 页面售出/退款/分润比例
     "finance-write-ui.spec.ts": "D02",        # 资金流水/划转/返点/分期 UI 写路径
     "inventory-rebate-nest.spec.ts": "D02",   # 返点弹窗内层编辑弹窗（Modal 嵌套 / Esc 路由）
@@ -216,7 +205,7 @@ E2E_FILE_TO_FUNC: dict[str, str] = {
     "navigation-leaves.spec.ts": "SYS07",     # 二级 Tab 叶子逐个走查
     "fallback.spec.ts": "SYS07",              # 后端不可达时外壳降级不白屏
     "modal-footer.spec.ts": "SYS07",          # 业务弹窗按钮几何对齐
-    "visual.spec.ts": "SYS07",                # 响应式/可视区域/弹窗缩放回归
+    "visual.spec.ts": "SYS07",                # 响应式/可视区域/弹窗缩放基线
 }
 
 # E2E 的跨模块文件：一个 spec 覆盖多个业务模块时登记，仅影响「关联模块」列。

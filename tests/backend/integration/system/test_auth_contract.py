@@ -14,16 +14,20 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
+from app.auth import router as auth_router
+from app.auth import service, sms as sms_module
+from app.auth import wechat_router, wechat_service
+from app.auth.wechat import WeChatIdentity
+from app.core.errors import Validation
+from app.core.security import hash_password
+from app.core.security import CurrentUser, build_access_token, get_current_user, AuthError
+from app.core.settings import Settings
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
-from app.core.security import hash_password
-from app.domain.users import RevokedToken, User
 from app.domain.trade import Order
-from app.core.settings import Settings
-from app.core.security import CurrentUser, build_access_token, get_current_user, AuthError
-from app.auth import service
-from app.core.errors import Validation
+from app.domain.users import RevokedToken, User, UserWeChatBinding
 
 
 def _create_user(client: TestClient, *, username: str = "alice", password: str = "password123",
@@ -972,3 +976,114 @@ def test_current_user_owner_scope_model():
     )
     # SELF 无任何池授权（pool_ids 为空）→ 看不到任何具体池
     assert self_only.can_see_pool(1) is False
+
+
+# 认证入口、运行环境与微信绑定
+
+def test_client_ip_prefers_x_real_ip():
+    req = _request(
+        "9.9.9.9",
+        [(b"x-real-ip", b"203.0.113.10"), (b"x-forwarded-for", b"1.1.1.1, 2.2.2.2")],
+    )
+    assert auth_router._client_ip(req) == "203.0.113.10"
+    assert wechat_router._client_ip(req) == "203.0.113.10"
+
+def test_client_ip_uses_rightmost_forwarded_not_spoofable_left():
+    """攻击者可在 XFF 左侧塞任意伪造 IP；nginx 把真实对端追加到最右，必须取最右。"""
+    req = _request("9.9.9.9", [(b"x-forwarded-for", b"666.666.666.666, 198.51.100.7")])
+    assert auth_router._client_ip(req) == "198.51.100.7"
+    assert wechat_router._client_ip(req) == "198.51.100.7"
+
+def test_client_ip_falls_back_to_peer():
+    req = _request("9.9.9.9", [])
+    assert auth_router._client_ip(req) == "9.9.9.9"
+
+def test_is_production_normalizes_case_and_space(raw):
+    assert Settings(app_env=raw).is_production is True
+
+def test_is_production_false_for_non_prod(raw):
+    assert Settings(app_env=raw).is_production is False
+
+def test_mock_sms_rejected_in_production():
+    settings = Settings(app_env="PRODUCTION", sms_provider="mock")
+    with pytest.raises(Validation, match="mock 且运行在生产环境"):
+        sms_module.deliver_code(settings, phone="13800001111", code="123456", purpose="LOGIN")
+
+def test_mock_sms_allowed_in_dev():
+    settings = Settings(app_env="development", sms_provider="mock")
+    out = sms_module.deliver_code(settings, phone="13800001111", code="123456", purpose="LOGIN")
+    assert out.echo_code == "123456"
+
+def test_resolve_login_phone_changed_writes_unbind_audit(seeded_db):
+    user = User(
+        username="wxuser", display_name="微信用户", password_hash="x",
+        role="OPERATOR", owner_scope="ALL", pool_ids=[], team_ids=[],
+        phone="13800001111", is_active=True,
+    )
+    seeded_db.add(user)
+    seeded_db.flush()
+    binding = UserWeChatBinding(
+        user_id=user.id, provider="MOCK", open_id="openid-b5", bound_phone="13800001111",
+        is_active=True,
+    )
+    seeded_db.add(binding)
+    # 手机号已变更
+    user.phone = "13900002222"
+    seeded_db.commit()
+
+    settings = Settings(app_env="development", wechat_provider="mock")
+    result = wechat_service.resolve_login(
+        seeded_db, settings, WeChatIdentity(provider="MOCK", open_id="openid-b5")
+    )
+    assert result.state == "bind_required"
+    seeded_db.refresh(binding)
+    assert binding.is_active is False
+    seeded_db.commit()
+    audits = seeded_db.scalars(
+        select(AuditLog).where(
+            AuditLog.action == AuditAction.WECHAT_UNBIND.value,
+            AuditLog.reason.contains("手机号已变更"),
+        )
+    ).all()
+    assert len(audits) == 1
+
+def test_resolve_login_disabled_user_writes_unbind_audit(seeded_db):
+    user = User(
+        username="wxuser2", display_name="停用用户", password_hash="x",
+        role="OPERATOR", owner_scope="ALL", pool_ids=[], team_ids=[],
+        phone="13700001111", is_active=False,
+    )
+    seeded_db.add(user)
+    seeded_db.flush()
+    seeded_db.add(UserWeChatBinding(
+        user_id=user.id, provider="MOCK", open_id="openid-b5-2",
+        bound_phone="13700001111", is_active=True,
+    ))
+    seeded_db.commit()
+    settings = Settings(app_env="development", wechat_provider="mock")
+    with pytest.raises(AuthError, match="已停用"):
+        wechat_service.resolve_login(
+            seeded_db, settings, WeChatIdentity(provider="MOCK", open_id="openid-b5-2")
+        )
+    seeded_db.commit()
+    audits = seeded_db.scalars(
+        select(AuditLog).where(
+            AuditLog.action == AuditAction.WECHAT_UNBIND.value,
+            AuditLog.reason.contains("已停用"),
+        )
+    ).all()
+    assert len(audits) == 1
+
+
+# 认证请求测试夹具
+
+def _request(client_ip: str | None, headers: list[tuple[bytes, bytes]]) -> Request:
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/",
+        "headers": headers,
+        "query_string": b"",
+        "client": (client_ip, 12345) if client_ip else None,
+    }
+    return Request(scope)

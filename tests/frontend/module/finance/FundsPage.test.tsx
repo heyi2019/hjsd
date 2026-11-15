@@ -155,7 +155,6 @@ describe("FundsPage：资金池卡片", () => {
     expect(await screen.findByText("资金对账数据不可用，请点击重新加载")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /新增对账/ })).toBeDisabled();
   });
-  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-244：资金总览数据失败时不显示零统计且禁用划转", async () => {
     vi.mocked(poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
@@ -416,7 +415,6 @@ describe("FundsPage：资金写路径", () => {
       reason: "押金登记有误",
     }]);
   });
-  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () => {
     vi.mocked(poolsApi.list).mockResolvedValueOnce([

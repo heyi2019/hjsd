@@ -1,10 +1,4 @@
-"""REPORT-01 reporting 报表契约测试（RPT-01）：R2/R3/R5 + 订单利润明细的日期过滤与全部分组循环。
-
-与 test_m4.py::TestReports 的分工：m4 已覆盖无数据冒烟、账号 COST 不进运营费用、
-未归集返点独立列、日报与池余额一致、利润合计自洽、R3 空数据钻取；本文件补
-日期过滤边界（from/to 双向 continue）、SELL 收入、运营费用/返点结算循环、
-提成分配、订单归属返点、订单明细事件分类与返点 join、?from=&to= API 路径。
-"""
+"""REPORT-01 报表功能契约：R2/R3/R5、资金日报与订单利润口径。"""
 from __future__ import annotations
 
 from datetime import date
@@ -29,6 +23,7 @@ from app.orders.create import create_order
 from app.orders.events import post_event
 from app.policy.profit_allocation import service as policy_allocations
 from app.reporting.profit import order_profit_detail
+from app.reporting.funds import daily_funds_report
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from app.reporting.r3_commission import r3_commission_reconciliation
 from app.reporting.r5_business_pnl import r5_business_pnl
@@ -473,3 +468,87 @@ class TestReportsApiDateParams:
 
         data = r5_business_pnl(seeded_db, user=scoped)
         assert all(row["order_type"] != foreign_order.order_type for row in data["items"])
+
+
+class TestReports:
+    def test_r2_operating_expense_excludes_account_direct_cashflow(self, seeded_db):
+        """账号直接支出资金明细进入直接成本，不进入运营费用（R2 验收口径）。"""
+        from datetime import date
+
+        account = create_account(
+            seeded_db,
+            game_account="m4-r2-account",
+            business_mode="SELF",
+            inventory_type="RECOVERY",
+            actor="pytest",
+        )
+        order = create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=date(2026, 10, 4),
+            actor="pytest",
+            account_id=account.id,
+        )
+        post_event(
+            seeded_db,
+            order.id,
+            event_type="BUY",
+            amount="1000.00",
+            occurred_on=date(2026, 10, 4),
+            actor="pytest",
+        )
+        pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+        create_cashflow(
+            seeded_db,
+            pool_id=pool.id,
+            occurred_on=date(2026, 10, 4),
+            direction="OUT",
+            nature="BUSINESS_OUT",
+            fund_nature="BUSINESS",
+            accounting_attribute="SELF_DIRECT_COST",
+            category="OTHER",
+            amount=Decimal("300.00"),
+            actor="pytest",
+            order_id=order.id,
+            note="账号直接支出",
+        )
+        data = r2_monthly_pnl(seeded_db)
+        month = [i for i in data["items"] if i["month"] == "2026-10"]
+        assert month
+        assert month[0]["account_direct_cost"] == 1300
+        assert month[0]["operating_expense"] == 0
+
+    def test_r5_legacy_rebate_columns_are_removed(self, seeded_db):
+        """11-05 二次裁决：结算展示列下线，返点金额全站只认 base_amount。"""
+        data = r5_business_pnl(seeded_db)
+        for item in data["items"]:
+            assert {"main_income", "main_cost", "main_profit"} <= set(item)
+            for key in ("settled_rebate", "uncollected_rebate", "full_income"):
+                assert key not in item
+        for key in ("settled_rebate", "uncollected_rebate", "full_income"):
+            assert key not in data["total"]
+
+    def test_daily_funds_matches_pool_balance(self, seeded_db):
+        from datetime import date
+
+        report = daily_funds_report(seeded_db, on=date(2026, 10, 4))
+        assert report["items"]
+        for item in report["items"]:
+            assert "available" in item and "th_advance" not in item
+        assert report["total"]["available"] == sum(item["available"] for item in report["items"])
+
+    def test_order_profit_totals_are_consistent(self, seeded_db):
+        data = order_profit_detail(seeded_db)
+        for item in data["items"]:
+            # 净利 = 资金明细所有收入 − 所有支出（11-05 裁决）；
+            # 返点独立成列、不进净利。
+            assert item["net_profit"] == (
+                item["income"] - item["buy_amount"] - item["direct_cost"]
+            )
+
+    def test_r3_drills_down_to_orders(self, seeded_db):
+        data = r3_commission_reconciliation(seeded_db)
+        for person in data["groups"]:
+            assert person["orders"]
+            assert sum(o["profit_base"] for o in person["orders"]) == person["profit_base"]
+        assert data["total"]["order_count"] == len(data["items"])

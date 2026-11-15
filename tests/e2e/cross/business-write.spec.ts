@@ -258,3 +258,59 @@ test("数据范围：非管理员只能看到授权资金池", async ({ request 
   expect(scoped.status()).toBe(200);
   expect((await scoped.json()).every((pool: { id: number }) => pool.id === authorized)).toBe(true);
 });
+
+
+test("建单流程：关闭未保存表单时可继续编辑或确认放弃", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+
+  const mainModal = page.locator(".business-registration-modal");
+  // 确认框是独立 portal，用其 Modal 类定位；关闭动画期间仍在 DOM，故以可见性判定。
+  const confirm = page.locator(".heijin-fast-confirm");
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "今天从这里开始" })).toBeVisible();
+
+  await page.getByText("自营·回收").first().click();
+  await expect(mainModal).toBeVisible();
+  await expect(page.getByText("新建回收订单")).toBeVisible();
+
+  // 制造脏值：不填值时点关闭是直接关，不会弹确认框。
+  // 必须填「真的注册在 Form 上的字段」——弹窗首个 input 可能是下拉框内嵌的
+  // search/readonly 输入，填它不会进 form 值，dirty 判定为 false，也就不会弹确认框。
+  const accountInput = mainModal
+    .locator('.ant-form-item:has(.ant-form-item-label:has-text("游戏账号"))')
+    .locator("input")
+    .first();
+  await accountInput.fill("E2E·放弃确认");
+  await expect(accountInput).toHaveValue("E2E·放弃确认");
+
+  // ① 点确认框 X：确认框收起，回到表单继续编辑。
+  await mainModal.locator(".ant-modal-close").first().click();
+  await expect(confirm).toBeVisible();
+  await confirm.locator(".ant-modal-close").click();
+  await expect(confirm).toBeHidden();
+  await expect(mainModal).toBeVisible();
+
+  // ② 点「继续编辑」：同上，且不触发 onClose。
+  await mainModal.locator(".ant-modal-close").first().click();
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "继续编辑" }).click();
+  await expect(confirm).toBeHidden();
+  await expect(mainModal).toBeVisible();
+
+  // ③ 点「放弃」：确认框与主弹窗必须同时消失，不得残留可见确认框。
+  //    注：antd 会给双字按钮插空格（「放 弃」），故用正则而非精确名。
+  await mainModal.locator(".ant-modal-close").first().click();
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: /放\s*弃/ }).click();
+  await expect(confirm).toBeHidden();
+  await expect(mainModal).toBeHidden();
+
+  // 收尾：重新打开不得带出上一个确认框。
+  await page.getByText("自营·回收").first().click();
+  await expect(mainModal).toBeVisible();
+  await expect(confirm).toBeHidden();
+
+  expect(errors).toEqual([]);
+});

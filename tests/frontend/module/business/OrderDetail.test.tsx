@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";
 import type { Account } from "@/shared/api/types/accounts";
 import { OrderDetail } from "@/orders/OrderDetailView/OrderDetail";
@@ -22,6 +22,18 @@ const account = {
 afterEach(() => {
   vi.restoreAllMocks();
 });
+
+beforeEach(() => {
+  // OrderDetail 编辑态会按 scope 异步加载字段配置。测试不关心配置接口本身，
+  // 固定为空响应并主动等待一次微任务，避免异步清理状态落在测试 act 之外。
+  vi.spyOn(orderFormFieldsApi, "list").mockResolvedValue([]);
+});
+
+async function settleFieldConfig() {
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
 
 describe("OrderDetail", () => {
   it("加载中没有明细时显示加载状态", () => {
@@ -156,7 +168,7 @@ describe("OrderDetail", () => {
     expect(within(operationSection).queryByText("当前运营状态")).toBeNull();
   });
 
-  it("编辑执行明细时操作员选择器保持可读宽度", () => {
+  it("编辑执行明细时操作员选择器保持可读宽度", async () => {
     const detail = {
       orders: [{
         order_id: 1,
@@ -188,10 +200,11 @@ describe("OrderDetail", () => {
     } as unknown as AccountExecutionDetail;
 
     renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} employees={[{ id: 7, username: "zhangsan", display_name: "张三", is_active: true }]} />);
+    await settleFieldConfig();
     expect(document.querySelector(".inventory-edit-operator")).toBeTruthy();
   });
 
-  it("编辑态账号输入与运营动作字段都绑定可编辑状态", () => {
+  it("编辑态账号输入与运营动作字段都绑定可编辑状态", async () => {
     const detail = {
       account: { ...account, game_account: "原账号" },
       orders: [{
@@ -234,6 +247,7 @@ describe("OrderDetail", () => {
 
     const onProfileChange = vi.fn();
     renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} onProfileChange={onProfileChange} employees={[{ id: 7, username: "zhangsan", display_name: "张三", is_active: true }]} />);
+    await settleFieldConfig();
 
     const accountInput = screen.getByLabelText("编辑游戏账号 / 产品") as HTMLInputElement;
     fireEvent.change(accountInput, { target: { value: "新账号" } });
@@ -244,7 +258,7 @@ describe("OrderDetail", () => {
     expect(screen.getByRole("button", { name: "上传作图" })).toBeInTheDocument();
   });
 
-  it("编辑参与方时按订单类型提供客户或渠道方的新建与选择控件", () => {
+  it("编辑参与方时按订单类型提供客户或渠道方的新建与选择控件", async () => {
     const detail = {
       orders: [{
         order_id: 22,
@@ -260,6 +274,7 @@ describe("OrderDetail", () => {
     } as unknown as AccountExecutionDetail;
 
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
+    await settleFieldConfig();
 
     expect(screen.getByRole("combobox", { name: "选择客户" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "新建客户名称" })).toBeInTheDocument();
@@ -286,6 +301,7 @@ describe("OrderDetail", () => {
     const onProfileChange = vi.fn();
     const onOrderExtraChange = vi.fn();
     renderApp(<OrderDetail row={{ ...account, extra_values: { account_tag: "旧标签" } } as Account} detail={detail} contextOrderId={31} loading={false} editing={{ ...account, extra_values: { account_tag: "旧标签" } } as Account} onProfileChange={onProfileChange} onOrderExtraChange={onOrderExtraChange} employees={[]} />);
+    await settleFieldConfig();
 
     await waitFor(() => expect(screen.getByDisplayValue("旧标签")).toBeInTheDocument());
     fireEvent.change(screen.getByDisplayValue("旧标签"), { target: { value: "新标签" } });
@@ -295,7 +311,7 @@ describe("OrderDetail", () => {
     expect(onOrderExtraChange).toHaveBeenCalledWith(31, "delivery_note", "新交付备注");
   });
 
-  it("编辑态交付字段以账号草稿为唯一来源，不回退到旧订单快照", () => {
+  it("编辑态交付字段以账号草稿为唯一来源，不回退到旧订单快照", async () => {
     const detail = {
       account: { ...account, bound_phone: "新手机号" },
       orders: [{
@@ -311,12 +327,13 @@ describe("OrderDetail", () => {
     } as unknown as AccountExecutionDetail;
 
     renderApp(<OrderDetail row={{ ...account, bound_phone: "新手机号" } as Account} detail={detail} loading={false} editing={{ ...account, bound_phone: "新手机号" } as Account} employees={[]} />);
+    await settleFieldConfig();
 
     expect(screen.getByLabelText("编辑换绑手机号")).toHaveValue("新手机号");
     expect(screen.getByLabelText("编辑手机号绑定人")).toHaveValue("");
   });
 
-  it("编辑详情不再展示时间联动入口，时间直接在操作明细中修改", () => {
+  it("编辑详情不再展示时间联动入口，时间直接在操作明细中修改", async () => {
     const detail = {
       orders: [{ order_id: 32, order_no: "HS0032", order_type: "HS", created_at: "2026-10-15T10:19:00", events: [] }],
       detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] },
@@ -324,12 +341,13 @@ describe("OrderDetail", () => {
     } as unknown as AccountExecutionDetail;
 
     renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} employees={[]} />);
+    await settleFieldConfig();
 
     expect(screen.queryByText("时间联动")).toBeNull();
     expect(screen.queryByLabelText("编辑订单创建时间")).toBeNull();
   });
 
-  it("没有事件记录时操作明细备注仍可编辑", () => {
+  it("没有事件记录时操作明细备注仍可编辑", async () => {
     const detail = {
       account,
       orders: [{ order_id: 34, order_no: "DG0034", order_type: "DG", created_at: "2026-10-15T10:19:00", operator: "admin", events: [] }],
@@ -347,13 +365,14 @@ describe("OrderDetail", () => {
     const onOrderEdit = vi.fn();
 
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={34} loading={false} editing={account} onOrderEdit={onOrderEdit} employees={[]} />);
+    await settleFieldConfig();
 
     const note = screen.getByLabelText("编辑执行备注 代挂入库");
     fireEvent.change(note, { target: { value: "补充入库说明" } });
     expect(onOrderEdit).toHaveBeenCalledWith(34, { note: "补充入库说明" });
   });
 
-  it("没有运营事件时描述和作图内容仍可编辑", () => {
+  it("没有运营事件时描述和作图内容仍可编辑", async () => {
     const detail = {
       account: { ...account, account_description: "旧描述", account_images: [] },
       orders: [{ order_id: 35, order_no: "DG0035", order_type: "DG", created_at: "2026-10-15T10:19:00", events: [] }],
@@ -376,6 +395,7 @@ describe("OrderDetail", () => {
     const onProfileChange = vi.fn();
 
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={35} loading={false} editing={{ ...account, account_description: "旧描述", account_images: [] }} onProfileChange={onProfileChange} employees={[]} />);
+    await settleFieldConfig();
 
     const description = screen.getByLabelText("编辑运营描述");
     fireEvent.change(description, { target: { value: "新描述" } });
@@ -383,7 +403,7 @@ describe("OrderDetail", () => {
     expect(screen.getByRole("button", { name: "上传作图" })).toBeInTheDocument();
   });
 
-  it("售出动作登记在来源订单时仍展示卖号交付", () => {
+  it("售出动作登记在来源订单时仍展示卖号交付", async () => {
     const detail = {
       account,
       orders: [{
@@ -401,14 +421,16 @@ describe("OrderDetail", () => {
     } as unknown as AccountExecutionDetail;
 
     renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} employees={[]} />);
+    await settleFieldConfig();
 
     const deliverySection = document.querySelector(".order-detail__section--delivery") as HTMLElement;
     expect(within(deliverySection).getByText("买号交付")).toBeInTheDocument();
     expect(within(deliverySection).getByText("卖号交付")).toBeInTheDocument();
   });
 
-  it("详情编辑态账号资料直接展示编辑控件", () => {
+  it("详情编辑态账号资料直接展示编辑控件", async () => {
     renderApp(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} editing={account} employees={[]} />);
+    await settleFieldConfig();
     const profile = document.querySelector(".order-detail__section--profile") as HTMLElement;
     expect(within(profile).getByLabelText("编辑游戏账号 / 产品")).toHaveValue("acc-1");
   });

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
@@ -587,9 +587,9 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
       await ui.click(within(defaultModal).getByRole("button", { name: /确认登记违约/ }));
       await waitFor(() => expect(within(defaultModal).getByText(/default boom/)).toBeInTheDocument());
       // 注：motion-stub 下弹窗关闭动画不会收尾，A 弹窗在测试中仍可见、遮罩仍在；
-      // 因此这里直接以 fireEvent 打开另一个业务弹窗（提前结清）——fireEvent 绕过遮罩直接触发其 onClick。
+      // pointerEventsCheck 已在本文件的 userEvent 配置中关闭，因此仍可直接切换到另一个弹窗。
       // 打开任一业务弹窗应清空共享错误态（含从 A 弹窗切到 B 弹窗的场景）。
-      fireEvent.click(await screen.findByRole("button", { name: /提前结清/ }));
+      await ui.click(await screen.findByRole("button", { name: /提前结清/ }));
       const settleModal = openModal("提前结清");
       // 旧错误不应残留到新弹窗
       expect(within(settleModal).queryByText(/default boom/)).toBeNull();

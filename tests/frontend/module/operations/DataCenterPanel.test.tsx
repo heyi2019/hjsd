@@ -141,7 +141,6 @@ describe("DataCenterPanel：资金总览", () => {
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
     expect(await screen.findByText(/POOL-A/)).toBeInTheDocument();
   });
-  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-241：数据中心主数据失败时不显示零统计且禁用快捷入口", async () => {
     vi.mocked(poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
@@ -194,7 +193,6 @@ describe("DataCenterPanel：业务入口卡（2026-10-13 从工作台迁入）",
     await ui.click(card);
     expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
   });
-  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-149：数据中心进行中包含分期订单并跳转订单台账", async () => {
     expect(countOngoingOrders([{ status: "ACTIVE" }, { status: "INSTALLMENT" }, { status: "COMPLETED" }])).toBe(2);

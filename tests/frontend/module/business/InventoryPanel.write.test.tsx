@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -36,7 +36,10 @@ const accounts = [
   { id: 2, source_order_id: 22, source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
 ];
 
+let ui: ReturnType<typeof userEvent.setup>;
+
 beforeEach(() => {
+  ui = userEvent.setup({ pointerEventsCheck: 0 });
   clearOptionSetsCache();
   vi.clearAllMocks();
   seedOptionSets();
@@ -110,7 +113,7 @@ describe("InventoryPanel：写入与长路径", () => {
   it("库存编辑直接展开详情，账户资料保持只读", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
-    fireEvent.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
     expect(await screen.findByRole("button", { name: "保存修改" })).toBeInTheDocument();
     expect(screen.queryByLabelText("编辑游戏账号/产品")).toBeNull();
   });
@@ -119,7 +122,7 @@ describe("InventoryPanel：写入与长路径", () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
 
-    fireEvent.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
 
     await screen.findByRole("button", { name: "保存修改" });
     expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1);

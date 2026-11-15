@@ -61,6 +61,12 @@ beforeEach(() => {
   vi.mocked(ordersApi.list).mockResolvedValue(orders as never);
   vi.mocked(orderTypesApi.list).mockResolvedValue(types as never);
   vi.mocked(stocksApi.list).mockResolvedValue([]);
+  vi.mocked(stocksApi.inventoryStats).mockResolvedValue({
+    account_count: 0,
+    occupied_cost: "0.00",
+    over_7d_count: 0,
+    over_30d_count: 0,
+  });
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);

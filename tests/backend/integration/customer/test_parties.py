@@ -6,6 +6,7 @@ from datetime import date, datetime
 from sqlalchemy import select
 
 from app.core.errors import ErrorCode
+from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, CustomerStatus
 from app.domain.foundation import AuditLog
 from app.domain.parties import Customer, OrderCustomerRole
@@ -40,6 +41,16 @@ class TestCustomerNumbering:
         assert second.customer_no == "CUS0002"
         assert [item["customer_id"] for item in candidates] == [first.id]
         assert candidates[0]["matched_on"] == ["wechat"]
+
+    def test_customer_number_is_not_reused_after_merge(self, seeded_db):
+        source = create_customer(seeded_db, display_name="待合并", actor="pytest")
+        target = create_customer(seeded_db, display_name="合并目标", actor="pytest")
+        merge_customers(
+            seeded_db, source_customer_id=source.id, target_customer_id=target.id,
+            reason="重复建档", actor="pytest",
+        )
+        third = create_customer(seeded_db, display_name="新客户", actor="pytest")
+        assert third.customer_no != source.customer_no
 
 
 class TestMasking:
@@ -153,6 +164,14 @@ class TestMerge:
 
 
 class TestCounterparty:
+    def test_counterparty_is_not_persisted_as_customer(self, seeded_db):
+        peer = create_counterparty(seeded_db, display_name="同行隔离", type="PEER", actor="pytest")
+        found = seeded_db.scalar(
+            select(Customer).where(Customer.display_name == "同行隔离")
+        )
+        assert found is None
+        assert peer.counterparty_no.startswith("CP")
+
     def test_cp_number_and_type_separation(self, seeded_db):
         peer = create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"
@@ -418,3 +437,90 @@ class TestExtraValuesApi:
         assert detail["extra_values"] == {"credit_level": "优质"}
         listed = seeded_client.get(CUSTOMERS, headers=headers).json()
         assert listed["items"][0]["extra_values"] == {"credit_level": "优质"}
+
+
+# 客户和合作方联系方式权限
+
+def test_counterparty_list_masks_contact_without_permission(seeded_client):
+    # EMPLOYEE: 有 counterparty.read，无 customer.contact.read
+    seeded_client.post(
+        COUNTERPARTIES,
+        json={
+            "display_name": "同行甲", "type": "PEER", "phone": "13800009999",
+            "wechat": "wx_peer_001", "qq": "123456789",
+        },
+        headers={"X-Dev-User": "admin"},
+    )
+    resp = seeded_client.get(COUNTERPARTIES, headers={"X-Dev-User": "employee"})
+    assert resp.status_code == 200, resp.text
+    row = resp.json()[0]
+    assert row["contact_masked"] is True
+    assert row["phone"] == "138****9999"
+    assert row["wechat"].startswith("wx") and "*" in row["wechat"]
+
+def test_counterparty_detail_reveal_requires_permission_and_writes_audit(seeded_client, seeded_db):
+    cp = seeded_client.post(
+        COUNTERPARTIES,
+        json={"display_name": "同行乙", "type": "PEER", "phone": "13800008888"},
+        headers={"X-Dev-User": "admin"},
+    ).json()
+
+    # 无权限者即使传 reveal=true 也拿不到明文
+    masked = seeded_client.get(
+        f"{COUNTERPARTIES}/{cp['id']}?reveal=true", headers={"X-Dev-User": "employee"}
+    ).json()
+    assert masked["contact_masked"] is True
+    assert masked["phone"] == "138****8888"
+
+    # 有权限者显式 reveal=true 拿到明文并写审计
+    full = seeded_client.get(
+        f"{COUNTERPARTIES}/{cp['id']}?reveal=true", headers={"X-Dev-User": "admin"}
+    ).json()
+    assert full["contact_masked"] is False
+    assert full["phone"] == "13800008888"
+    seeded_db.commit()
+    audits = seeded_db.scalars(
+        select(AuditLog).where(
+            AuditLog.action == AuditAction.CONTACT_READ.value,
+            AuditLog.entity_type == "counterparty",
+        )
+    ).all()
+    assert len(audits) == 1
+
+def test_customer_update_honors_contact_permission(seeded_client):
+    """update 端点按 customer.contact.read 决定回显，合法经办路径仍见明文。
+
+    无联系方式读权限的判定与遮罩由 test_customer_update_masks_when_role_lacks_contact_read
+    以精确权限集合覆盖（权限矩阵无「有 update 无 contact.read」现成角色）。
+    """
+    created = seeded_client.post(
+        CUSTOMERS,
+        json={"display_name": "客户丙", "phone": "13800007777"},
+        headers={"X-Dev-User": "admin"},
+    ).json()["customer"]
+    resp = seeded_client.patch(
+        f"{CUSTOMERS}/{created['id']}",
+        json={"note": "已更新"},
+        headers={"X-Dev-User": "admin"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["contact_masked"] is False
+    assert resp.json()["phone"] == "13800007777"
+
+def test_customer_update_masks_when_role_lacks_contact_read(seeded_db):
+    """无联系方式读权限、但有 update 权限的用户，写操作返回必须遮罩。
+
+    写操作端点已改为按 user.has(PERM_CUSTOMER_CONTACT_READ) 传 reveal_contact；
+    这里用权限集合精确的 CurrentUser 锁住该判定与 to_customer_out 输出契约。
+    """
+    from app.parties._common import to_customer_out
+
+    cust = create_customer(
+        seeded_db, display_name="客户丁", phone="13800006666", actor="pytest"
+    )
+    actor = _user(perms=("customer.update",))
+    reveal = actor.has("customer.contact.read")
+    out = to_customer_out(cust, reveal_contact=reveal)
+    assert reveal is False
+    assert out["contact_masked"] is True
+    assert out["phone"] == "138****6666"

@@ -13,6 +13,7 @@ from app.attachments import service as svc
 from app.core.errors import NotFound, PermissionDenied, Validation
 from app.core.money import to_money
 from app.core.security import (
+    PERM_DEPOSIT_POST,
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
     PERM_ORDER_UPDATE,
@@ -162,7 +163,11 @@ def test_assert_permission_cashflow_requires_finance_read(seeded_db):
     target = svc._Target("cashflow", "x", pool_id=1)
     with pytest.raises(PermissionDenied, match="当前角色无权访问该附件"):
         svc._assert_permission(_user(), target, write=False)
-    svc._assert_permission(_user(perms=(PERM_FINANCE_READ,)), target, write=False)
+    read_only = _user(perms=(PERM_FINANCE_READ,))
+    svc._assert_permission(read_only, target, write=False)
+    with pytest.raises(PermissionDenied, match="当前角色无权访问该附件"):
+        svc._assert_permission(read_only, target, write=True)
+    svc._assert_permission(_user(perms=(PERM_DEPOSIT_POST,)), target, write=True)
 
 
 def test_assert_permission_write_requires_update_or_event_post(seeded_db):

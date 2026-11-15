@@ -17,6 +17,8 @@ from sqlalchemy import select
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.domain.trade import Order, OrderFormField
+from app.lists import export as export_module
+from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
 from app.orders.export_fields import _event_platform, _order_detail_export_fields
 
 
@@ -400,3 +402,83 @@ def test_export_writes_list_export_audit(seeded_client, headers, seeded_db):
         ).all()
     ]
     assert AuditAction.LIST_EXPORT.value in actions
+
+
+# 主列表导出上限与截断口径
+
+def test_export_row_limit_contract_is_10000():
+    assert EXPORT_ROW_LIMIT == 10_000
+
+def test_build_list_csv_truncates_when_over_limit(seeded_db, monkeypatch):
+    """拼装层兜底：即便调用方交来超量行，写出也截到上限并标注 truncated。"""
+    monkeypatch.setattr(export_module, "EXPORT_ROW_LIMIT", 3)
+    rows = [{"row_type": "明细", "title": f"第{i}行"} for i in range(5)]
+    csv_text, meta = build_list_csv(seeded_db, "CUSTOMER", rows)
+    assert meta["row_count"] == 3
+    assert meta["truncated"] is True
+    lines = [line for line in csv_text.splitlines() if line.strip()]
+    assert len(lines) - 1 == 3
+
+def test_build_list_csv_under_limit_not_truncated(seeded_db):
+    rows = [{"row_type": "明细", "title": "甲"}, {"row_type": "明细", "title": "乙"}]
+    _csv_text, meta = build_list_csv(seeded_db, "CUSTOMER", rows)
+    assert meta["row_count"] == 2
+    assert meta["truncated"] is False
+
+def test_stocks_export_passes_export_row_limit(seeded_client, headers, monkeypatch):
+    """库存导出查询层传 EXPORT_ROW_LIMIT，不再 limit=None 拉全量。"""
+    from app.stocks.inventory import list_accounts
+
+    seen: dict[str, object] = {}
+    original = list_accounts
+
+    def spy(db, **kwargs):
+        seen.update(kwargs)
+        return original(db, **kwargs)
+
+    monkeypatch.setattr("app.stocks.router.stocks_list_accounts", spy)
+    resp = seeded_client.get("/api/v1/stocks/export.csv", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert seen.get("limit") == EXPORT_ROW_LIMIT
+
+def test_customers_export_passes_export_row_limit(seeded_client, headers, monkeypatch):
+    """客户导出查询层传 EXPORT_ROW_LIMIT，不再 limit=None 拉全量。"""
+    from app.parties.customers import list_customers
+
+    seen: dict[str, object] = {}
+    original = list_customers
+
+    def spy(db, **kwargs):
+        seen.update(kwargs)
+        return original(db, **kwargs)
+
+    monkeypatch.setattr("app.parties.router.parties_list_customers", spy)
+    resp = seeded_client.get("/api/v1/customers/export.csv", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert seen.get("limit") == EXPORT_ROW_LIMIT
+
+def test_stocks_export_audit_records_row_count_and_truncated(
+    seeded_client, headers, seeded_db
+):
+    seeded_client.get("/api/v1/stocks/export.csv", headers=headers)
+    audit = seeded_db.scalars(
+        select(AuditLog)
+        .where(
+            AuditLog.entity_type == "list_export",
+            AuditLog.entity_id == "INVENTORY",
+        )
+        .order_by(AuditLog.id.desc())
+    ).first()
+    assert audit is not None
+    after = audit.after_json or {}
+    assert "rows" in after
+    assert after["truncated"] is False
+
+def test_installments_export_all_query_params_explicitly_none(seeded_client, headers):
+    """分期导出直接调用列表路由函数：每个 Query(default=None) 参数都须显式传 None。
+
+    此前漏传 contract_type，Query(None) 对象被透传进 SQL 触发 psycopg 适配 500。
+    本用例锁定「无筛选导出应正常返回」契约。
+    """
+    resp = seeded_client.get("/api/v1/installments/export.csv", headers=headers)
+    assert resp.status_code == 200, resp.text

@@ -61,6 +61,12 @@ beforeEach(() => {
   vi.mocked(ordersApi.list).mockResolvedValue(orders);
   vi.mocked(orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(stocksApi.list).mockResolvedValue([]);
+  vi.mocked(stocksApi.inventoryStats).mockResolvedValue({
+    account_count: 0,
+    occupied_cost: "0.00",
+    over_7d_count: 0,
+    over_30d_count: 0,
+  });
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);
@@ -474,7 +480,7 @@ describe("OrdersPage：四类订单台账", () => {
     expect(actionLabels[0]).toBe("售出");
     expect(actionLabels[1]).toBe("编辑");
     expect(actionLabels.indexOf("运营")).toBeLessThan(actionLabels.indexOf("返点"));
-    fireEvent.click(within(firstRow).getByRole("button", { name: "运营" }));
+    await ui.click(within(firstRow).getByRole("button", { name: "运营" }));
     for (const label of ["寄售（上架）", "下架", "描述", "作图"]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
     }

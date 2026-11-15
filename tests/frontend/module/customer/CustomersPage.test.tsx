@@ -448,7 +448,6 @@ describe("CustomersPage：行内动作", () => {
       await waitFor(() => expect(vi.mocked(counterpartiesApi.setStatus)).toHaveBeenCalledWith(11, false));
     });
   });
-  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("FE-194：客户 CSV 导出完成后给出成功反馈", async () => {
     vi.mocked(customersApi.list).mockResolvedValueOnce([

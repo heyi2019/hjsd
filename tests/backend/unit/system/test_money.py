@@ -1,6 +1,7 @@
-"""MONEY-01 T01 / SYS-01-01：金额精度 —— Decimal / DECIMAL(18,2)，禁止 float。"""
+"""MONEY-01 金额精度契约：Decimal 量化、列精度与存储往返。"""
 from __future__ import annotations
 
+import random
 from decimal import Decimal
 
 import pytest
@@ -17,11 +18,21 @@ from app.core.money import (
 )
 
 
-def test_to_money_quantizes_half_up():
-    assert to_money("1234.565") == Decimal("1234.57")
-    assert to_money(1234.564) == Decimal("1234.56")
-    assert to_money(0) == Decimal("0.00")
-    assert to_money("0.005") == Decimal("0.01")
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("1234.565", "1234.57"),
+        (1234.564, "1234.56"),
+        (0, "0.00"),
+        ("0.005", "0.01"),
+        ("1234567890123456.78", "1234567890123456.78"),
+        ("0.01", "0.01"),
+        ("-0.00", "0.00"),
+        ("1e3", "1000.00"),
+    ],
+)
+def test_to_money_quantizes_half_up(raw, expected):
+    assert str(to_money(raw)) == expected
 
 
 def test_float_addition_does_not_leak_error():
@@ -76,3 +87,15 @@ def test_amount_column_roundtrip_is_lossless_at_business_scale():
 
 def test_amount_column_precision_constants():
     assert (PRECISION, SCALE) == (18, 2)
+
+
+def test_amount_float_sum_matches_decimal():
+    """两万笔两位小数金额经过 float 存储后，聚合结果仍精确到分。"""
+    amt = Amount()
+    random.seed(7)
+    rows = [round(random.uniform(0.01, 9999.99), 2) for _ in range(20000)]
+    expected = sum(Decimal(str(value)) for value in rows)
+    floats = [amt.process_bind_param(to_money(value), None) for value in rows]
+    assert all(isinstance(value, float) for value in floats)
+    actual = to_money(sum(floats))
+    assert actual == expected.quantize(Decimal("0.01"))

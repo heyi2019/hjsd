@@ -1,6 +1,6 @@
 """IMPORT-01 导入契约测试（MIG-01 守卫分支）。
 
-与 test_m4.py / test_import_mapping.py / test_import_landing.py 的分工：
+与 test_import_lifecycle.py / test_import_mapping.py / test_import_landing.py 的分工：
 既有文件已覆盖建批、映射依据必填、前态留存、提交转未映射留痕、
 预览/对账主路径、回滚与更正主路径；本文件补各函数的 NotFound/空入参守卫、
 `list_batches`、跳过行、提交时 SKIPPED 跳过、
@@ -34,6 +34,34 @@ def _batch(seeded_db, rows=None, source_name="orders.xlsx"):
 
 def _first_row_id(seeded_db, batch_id: int) -> int:
     return imp_rows.list_rows(seeded_db, batch_id)[0]["id"]
+
+
+def test_reject_draft_batch(seeded_db):
+    batch = _batch(seeded_db)
+    out = imp_batches.reject_batch(
+        seeded_db, batch["id"], reason="源文件口径错误", actor="pytest"
+    )
+    assert out["status"] == ImportBatchStatus.REJECTED.value
+
+
+def test_reject_committed_batch_is_forbidden(seeded_db):
+    batch = _batch(seeded_db)
+    imp_rows.commit_batch(seeded_db, batch["id"], actor="pytest")
+    with pytest.raises(Validation):
+        imp_batches.reject_batch(
+            seeded_db, batch["id"], reason="已确认不可驳回", actor="pytest"
+        )
+
+
+def test_reject_batch_is_not_repeatable(seeded_db):
+    batch = _batch(seeded_db)
+    imp_batches.reject_batch(
+        seeded_db, batch["id"], reason="首次驳回", actor="pytest"
+    )
+    with pytest.raises(Validation):
+        imp_batches.reject_batch(
+            seeded_db, batch["id"], reason="重复驳回", actor="pytest"
+        )
 
 
 # ------------------------------------------------------------------ 建批守卫

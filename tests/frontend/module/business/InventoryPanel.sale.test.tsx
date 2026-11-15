@@ -305,7 +305,6 @@ describe("库存售出三表单分支", () => {
       unmount();
     }
   });
-  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-042：已拉黑客户不能参与库存售出", async () => {
     vi.mocked(customersApi.list).mockResolvedValueOnce([

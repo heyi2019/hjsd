@@ -23,35 +23,35 @@
       ],
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
-        "files": 115,
-        "cases": 1689,
+        "files": 105,
+        "cases": 1668,
         "kinds": {
           "unit": {
-            "files": 30,
-            "cases": 290,
+            "files": 28,
+            "cases": 293,
             "byArea": {
               "business": 5,
               "customer": 1,
               "finance": 3,
               "operations": 2,
               "settings": 2,
-              "system": 17
+              "system": 15
             }
           },
           "integration": {
-            "files": 85,
-            "cases": 1399,
+            "files": 77,
+            "cases": 1375,
             "byArea": {
-              "business": 32,
+              "business": 25,
               "customer": 6,
               "finance": 15,
-              "operations": 7,
+              "operations": 9,
               "settings": 13,
-              "system": 12
+              "system": 9
             }
           }
         },
-        "_baseline_note": "五个独立能力下线后，后端专项测试与清单同步收敛；清单按当前磁盘实际文件与用例数维护。"
+        "_baseline_note": "按修复批次或跨业务域堆积的测试已归入订单、规则、客户、押金、导入、认证、附件、导出、编号等功能文件；删除重复断言。清单按当前磁盘文件与 pytest 收集数维护。"
       },
       "budgets": {
         "fast": 60,
@@ -150,13 +150,12 @@
       "runner": "playwright",
       "config": "frontend/playwright.config.ts",
       "expected": {
-        "files": 15,
-        "cases": 60,
+        "files": 16,
+        "cases": 58,
         "byArea": {
           "system": 7,
-          "business": 1,
           "finance": 1,
-          "cross": 6
+          "cross": 8
         }
       },
       "budgets": {

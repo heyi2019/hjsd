@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
@@ -120,18 +120,19 @@ function rowOf(id: number): HTMLElement {
 
 async function clickOperation(row: HTMLElement, item: string) {
   if (item === "取消") {
-    fireEvent.click(within(row).getByRole("button", { name: "取消" }));
+    await ui.click(within(row).getByRole("button", { name: "取消" }));
     return;
   }
-  fireEvent.click(within(row).getByRole("button", { name: "运营" }));
+  await ui.click(within(row).getByRole("button", { name: "运营" }));
   // 菜单项文本可能与行内按钮/弹窗标题重名，必须限定在 role=menu 内点击
-  fireEvent.click(within(await screen.findByRole("menu")).getByText(item));
+  await ui.click(within(await screen.findByRole("menu")).getByText(item));
 }
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   URL.createObjectURL = vi.fn().mockReturnValue("blob:mock");
   URL.revokeObjectURL = vi.fn();
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   seedOptionSets();
   vi.mocked(employeesApi.list).mockResolvedValue([]);
   vi.mocked(installmentsApi.list).mockResolvedValue([contract]);
@@ -159,7 +160,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
 
   it("非代挂在库账号不展示下架入口", async () => {
     await openPanel([inStockRow]);
-    fireEvent.click(within(rowOf(1)).getByRole("button", { name: "运营" }));
+    await ui.click(within(rowOf(1)).getByRole("button", { name: "运营" }));
     const menu = await screen.findByRole("menu");
     expect(within(menu).queryByText("下架")).toBeNull();
   });

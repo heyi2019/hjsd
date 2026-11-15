@@ -1,6 +1,6 @@
 """API-01 orders 订单/事件契约测试（ORD-01/02、FIN-01/03）。
 
-与 test_orders.py / test_bughunt.py / test_m2.py 的分工：既有文件已覆盖四类业务建单、
+与 test_orders.py / test_m2.py 的分工：既有文件已覆盖四类业务建单、
 BUY/SELL/DELIVER/CANCEL/OPERATE(无 offset) 登记、状态机、路由缺失等主路径；
 本文件补NotFound/越权/过滤/非法入参分支、`_opposite_direction` 三分支、
 `_opposite_direction` 防御与 CANCEL 分支、以及 3 个未测路由端点。

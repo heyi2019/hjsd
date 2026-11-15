@@ -5,11 +5,14 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
+from app.core import numbering
 from app.core.errors import AppError, ErrorCode
 from app.core.numbering import allocate_number, ensure_sequence, peek_number, sequence_max
 from app.domain.enums import SequenceKey
+from app.domain.foundation import DocumentSequence
 
 # 本文件含自建临时探针库的并发用例（create_engine + connect），不依赖 v1_engine 夹具，
 # db 标记无法派生，故在模块级声明。守卫 test_db_channel.py 会核对此声明与代码是否一致。
@@ -166,3 +169,39 @@ def test_concurrent_allocation_is_unique():
     assert len(numbers) == 24
     assert len(set(numbers)) == 24, f"并发取号出现重复: {sorted(numbers)}"
     assert set(numbers) == {f"HS{i:04d}" for i in range(1, 25)}
+
+
+# 编号定义幂等与冲突处理
+
+def test_ensure_sequence_idempotent_single_row(seeded_db):
+    first = numbering.ensure_sequence(seeded_db, "B6_SEQ_IDEM", "B6", padding=5)
+    second = numbering.ensure_sequence(seeded_db, "B6_SEQ_IDEM", "B6", padding=5)
+    assert second.id == first.id
+    count = seeded_db.scalar(
+        select(func.count())
+        .select_from(DocumentSequence)
+        .where(DocumentSequence.sequence_key == "B6_SEQ_IDEM")
+    )
+    assert count == 1
+
+def test_ensure_sequence_conflict_keeps_existing_config(seeded_db):
+    """预置同 key 行模拟并发已落库：走 ON CONFLICT 分支，不覆盖既有配置。"""
+    existing = DocumentSequence(
+        sequence_key="B6_SEQ_CONFLICT", prefix="EX", padding=6, current_value=7
+    )
+    seeded_db.add(existing)
+    seeded_db.flush()
+    got = numbering.ensure_sequence(seeded_db, "B6_SEQ_CONFLICT", "ZZ", padding=4)
+    assert got.id == existing.id
+    assert (got.prefix, got.padding, got.current_value) == ("EX", 6, 7)
+    count = seeded_db.scalar(
+        select(func.count())
+        .select_from(DocumentSequence)
+        .where(DocumentSequence.sequence_key == "B6_SEQ_CONFLICT")
+    )
+    assert count == 1
+
+def test_allocate_number_after_ensure_sequence(seeded_db):
+    numbering.ensure_sequence(seeded_db, "B6_SEQ_ALLOC", "BA", padding=4)
+    assert numbering.allocate_number(seeded_db, "B6_SEQ_ALLOC") == "BA0001"
+    assert numbering.allocate_number(seeded_db, "B6_SEQ_ALLOC") == "BA0002"

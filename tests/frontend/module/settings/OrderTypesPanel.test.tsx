@@ -185,7 +185,6 @@ describe("OrderTypesPanel 业务类型主数据", () => {
     expect(within(row).queryByRole("button", { name: /停用/ })).toBeNull();
     expect(within(row).queryByRole("button", { name: /影响预览/ })).toBeNull();
   });
-  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-238：业务类型主数据失败时锁定新建入口", async () => {
     vi.mocked(orderTypesApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "types down" });

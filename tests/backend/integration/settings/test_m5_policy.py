@@ -33,6 +33,42 @@ def _make_policy(seeded_db, *, code="REBATE", name="返点规则") -> dict:
     )
 
 
+def test_supersede_active_policy_version_rejected(seeded_db):
+    definition = _make_policy(seeded_db, code="SUP-TEST")
+    version = policy_versions.create_version(
+        seeded_db, definition["id"], effective_from=date(2027, 1, 1),
+        effective_to=date(2027, 12, 31), config={"rate": "10"}, actor="pytest",
+    )
+    with pytest.raises(Validation):
+        policy_versions.supersede_draft_version(
+            seeded_db, version["id"], actor="pytest", reason="已发布版本不可取消",
+        )
+
+
+def test_expire_sweep_marks_lapsed_versions_and_is_idempotent(seeded_db):
+    definition = _make_policy(seeded_db, code="EXP-TEST")
+    lapsed = policy_versions.create_version(
+        seeded_db, definition["id"], effective_from=date(2026, 1, 1),
+        effective_to=date(2026, 12, 31), config={"rate": "10"}, actor="pytest",
+    )
+    live = policy_versions.create_version(
+        seeded_db, definition["id"], effective_from=date(2027, 1, 1),
+        effective_to=None, config={"rate": "12"}, actor="pytest",
+    )
+    first = policy_versions.expire_lapsed_versions(
+        seeded_db, on=date(2027, 1, 1), actor="pytest"
+    )
+    second = policy_versions.expire_lapsed_versions(
+        seeded_db, on=date(2027, 1, 1), actor="pytest"
+    )
+    assert first["swept"] == 1
+    assert lapsed["id"] in first["version_ids"]
+    assert live["id"] not in first["version_ids"]
+    assert seeded_db.get(PolicyVersion, lapsed["id"]).status == PolicyStatus.EXPIRED.value
+    assert seeded_db.get(PolicyVersion, live["id"]).status == PolicyStatus.ACTIVE.value
+    assert second["swept"] == 0
+
+
 def _publish(seeded_db, definition, *, frm, to=None, config, approve=True):
     version = policy_versions.create_version(
         seeded_db,

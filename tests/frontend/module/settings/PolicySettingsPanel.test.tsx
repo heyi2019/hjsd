@@ -76,8 +76,8 @@ it("设置配置：填写生效期和结构化字段后提交，生成新版本�
   await ui.click(await screen.findByRole("button", { name: /设置配置/ }));
   // 结构化字段由 schema 驱动：REBATE → 统一返点比例（percent 控件）
   const rate = screen.getByLabelText("统一返点比例");
-  // percent-input 落在带 addonAfter 的最外层 group-wrapper 上，不在 .ant-input-number 本身
-  expect(rate.closest(".ant-input-number-group-wrapper")).toHaveClass("percent-input");
+  // percent-input 落在带 suffix 的 affix wrapper 上，不在 .ant-input-number 本身
+  expect(rate.closest(".ant-input-number-affix-wrapper")).toHaveClass("percent-input");
   fireEvent.change(rate, { target: { value: "5" } });
   await ui.click(await screen.findByRole("button", { name: /保存/ }));
 

@@ -133,7 +133,6 @@ describe("TeamsPanel：团队管理", () => {
     await waitFor(() => expect(message.error).toHaveBeenCalled());
     expect(String(vi.mocked(message.error).mock.calls[0][0])).toMatch(/toggle fail/);
   });
-  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-217：团队数据失败时显示错误空态且禁用新增", async () => {
     vi.mocked(client.api).get.mockRejectedValueOnce(new Error("teams down"));

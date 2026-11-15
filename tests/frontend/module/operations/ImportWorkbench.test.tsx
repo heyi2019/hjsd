@@ -523,7 +523,6 @@ describe("ImportWorkbench：动作流与写路径", () => {
       await waitFor(() => expect(screen.getByRole("button", { name: /新建导入/ })).toBeInTheDocument());
       expect(screen.queryByText("导入工作台")).toBeNull();
     });
-    // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
     it("P1/FE-218：导入批次失败时锁定新建导入入口", async () => {
       // 错误必须带 response：client.ts 的 lastNetworkFailure 是模块级全局态，CI 上同进程

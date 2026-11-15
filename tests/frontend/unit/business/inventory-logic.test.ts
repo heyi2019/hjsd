@@ -17,7 +17,6 @@ describe("库存纯逻辑", () => {
     expect(Object.keys(INVENTORY_AGE_COLOR)).toHaveLength(3);
   });
 
-  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定", () => {
     const candidates = buildActionAllocationCandidates({

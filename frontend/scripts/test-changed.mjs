@@ -73,7 +73,6 @@ const SRC_DOMAIN_TO_REGION = {
   audit: "system",
   attachments: "system",
   notifications: "system",
-  regression: "system",
 };
 
 /** 这些 src 目录被全站依赖，改动必须放大到 quick 档。 */

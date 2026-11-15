@@ -147,7 +147,6 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     expect(screen.getAllByText("账号采购成本").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("400.00").length).toBeGreaterThanOrEqual(1);
   });
-  // —— P0/P1 Round 2026-11-01 回归桶归并（原 P0P1Round20261101.test.tsx）——
 
   it("P1/FE-169：订单利润展示采购成本并给出可复算口径", async () => {
     vi.mocked(reportsApi.orderProfit).mockResolvedValueOnce({

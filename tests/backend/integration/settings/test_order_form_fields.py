@@ -1137,3 +1137,47 @@ def test_router_section_labels_rejects_bad_section_key(seeded_client, headers):
         json={"order_type_code": "TH", "labels": {"bad key": "x"}},
     )
     assert resp.status_code == 422, resp.text
+
+
+# 条件字段与板块标签的配置校验
+
+def test_required_when_rejects_inactive_dependency(seeded_db):
+    """条件必填不得依赖已停用字段（写入时即拒绝，避免静默失效）。"""
+    ff.create_order_form_field(
+        seeded_db, order_type_code="HS", field_key="dep_inactive", label="已停用来源",
+        actor="admin", field_type="SELECT",
+        options=[{"value": "其他", "label": "其他"}],
+    )
+    seeded_db.commit()
+    ff.set_order_form_field_active(seeded_db,
+        seeded_db.scalar(
+            select(OrderFormField).where(
+                OrderFormField.order_type_code == "HS",
+                OrderFormField.field_key == "dep_inactive",
+            )
+        ).id,
+        False, actor="admin",
+    )
+    seeded_db.commit()
+    with pytest.raises(Validation, match="不存在或已停用"):
+        ff.create_order_form_field(
+            seeded_db, order_type_code="HS", field_key="cond_on_inactive", label="条件字段",
+            actor="admin",
+            required_when={"field": "dep_inactive", "op": "eq", "values": ["其他"]},
+        )
+
+def test_section_labels_rejects_unregistered_scope(seeded_db):
+    """板块标题作用域必须先在注册表登记，否则写入前端永远读不到的僵尸配置。"""
+    # "ZZ" 合法格式（2-10 位大写字母）但未在任何表单作用域注册。
+    with pytest.raises(Validation, match="未按注册表登记"):
+        ff.save_section_labels(
+            seeded_db, order_type_code="ZZ", labels={"FINANCE": "资金"}, actor="admin",
+        )
+
+def test_section_labels_accepts_registered_scope(seeded_db):
+    """已注册作用域（含非建单的订单操作作用域）仍可正常保存板块标题。"""
+    saved = ff.save_section_labels(
+        seeded_db, order_type_code="ORDEREDIT", labels={"FINANCE": "编辑页资金"}, actor="admin",
+    )
+    seeded_db.commit()
+    assert saved == {"FINANCE": "编辑页资金"}

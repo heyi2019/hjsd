@@ -38,7 +38,6 @@ def _initial_markers_for_file(filename: str) -> set[str]:
 
     if filename in {
         "test_money.py",
-        "test_money_float_guard.py",
         "test_numbering.py",
         "test_state_machine.py",
         "test_game_types.py",
@@ -85,18 +84,6 @@ def _initial_markers_for_file(filename: str) -> set[str]:
         )
     ):
         markers.add("integration")
-
-    if any(
-        token in filename
-        for token in (
-            "bughunt",
-            "_gaps",
-            "unreachable_status_paths",
-            "deploy_script_contract",
-            "account_stock_no",
-        )
-    ):
-        markers.add("regression")
 
     if any(
         token in filename

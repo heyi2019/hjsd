@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -159,7 +159,7 @@ it("回收建单将资金账户紧跟回收金额，不再展示独立资金流�
   expect(content.indexOf("资金明细")).toBeLessThan(content.indexOf("交付信息"));
 });
 
-it("代挂建单在交付信息前展示业务信息", () => {
+it("代挂建单在交付信息前展示业务信息", async () => {
   renderLight(
     <Form>
       <FieldConfigContext.Provider value={{
@@ -169,6 +169,9 @@ it("代挂建单在交付信息前展示业务信息", () => {
       </FieldConfigContext.Provider>
     </Form>,
   );
+  await act(async () => {
+    await Promise.resolve();
+  });
   const content = document.body.textContent ?? "";
   expect(content.indexOf("代挂方案")).toBeLessThan(content.indexOf("交付信息"));
 });
@@ -438,7 +441,7 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
 
     // X 的语义是「取消放弃」＝继续编辑：不得关表单、不得触发 onClose。
     // 注：确认框 DOM 是否真的隐藏属 antd 渲染层行为，jsdom + motion-stub 下关闭后
-    // 节点不会移除，断言必然失真；该收尾由 E2E（order-abandon-confirm.spec.ts）守护。
+    // 节点不会移除，断言必然失真；该收尾由 E2E（cross/business-write.spec.ts）守护。
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByText("新建回收订单")).toBeInTheDocument();
   });

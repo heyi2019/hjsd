@@ -24,6 +24,26 @@ from app.orders.events import post_event
 TODAY = date(2026, 10, 17)
 
 
+def test_cancel_deposit_endpoint_rejects_unknown_deposit(seeded_db):
+    with pytest.raises(NotFound, match="押金不存在"):
+        finance_router.cancel_deposit(
+            999999, schemas.DepositCancel(cancelled_on=TODAY, reason="x"),
+            db=seeded_db, user=_all_scope_user(),
+        )
+
+
+def test_cancel_deposit_endpoint_returns_cancelled_deposit(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
+    )
+    out = finance_router.cancel_deposit(
+        deposit.id, schemas.DepositCancel(cancelled_on=TODAY, reason="x"),
+        db=seeded_db, user=_all_scope_user(),
+    )
+    assert out.id == deposit.id
+    assert out.status == "CANCELLED"
+
+
 def _restricted_user() -> CurrentUser:
     return CurrentUser(
         id=999,

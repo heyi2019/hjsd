@@ -7,7 +7,8 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import column, create_engine, select, text
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
@@ -15,6 +16,8 @@ from app.core import database, money, settings as settings_module
 from app import api_v1
 from app.core.errors import AppError, ErrorCode, NotFound, Validation, require_condition
 from app.core.money import Amount, to_money
+from app.core.ratelimit import RateLimiter
+from app.core.sql_functions import year_month
 from app.core.numbering import peek_number, sequence_max
 from app.core.security import (
     ROLE_ADMIN,
@@ -23,11 +26,11 @@ from app.core.security import (
     CurrentUser,
     TokenExpired,
     decode_token,
+    user_from_payload,
     hash_password,
     owner_scope_filter,
     owner_scope_ids,
     require_role,
-    user_from_payload,
     verify_password,
 )
 from app.domain.foundation import DocumentSequence
@@ -484,6 +487,77 @@ class TestDatabaseLifecycle:
         assert info["database"]
         assert "sqlite_exists" not in info
         assert "jwt_secret_key" not in info
+
+    def test_reset_engine_disposes_existing(self):
+        engine = database.get_engine()
+        assert engine is not None
+        assert database.reset_engine() is not None
+
+    def test_get_engine_builds_engine_for_explicit_url(self, v1_engine):
+        engine = database.get_engine(v1_engine.url)
+        try:
+            assert engine is not database._engine
+            with engine.connect() as connection:
+                assert connection.scalar(text("select 1")) == 1
+        finally:
+            engine.dispose()
+
+    def test_get_session_factory_builds_for_explicit_url(self, v1_engine):
+        factory = database.get_session_factory(v1_engine.url)
+        assert database._session_factory is None
+        session = factory()
+        try:
+            assert session.get_bind().url.database == v1_engine.url.database
+        finally:
+            session.close()
+
+    def test_create_all_is_idempotent_on_existing_schema(self, v1_engine):
+        engine = database.create_all(v1_engine.url)
+        try:
+            from sqlalchemy import inspect
+
+            assert inspect(engine).has_table("orders")
+        finally:
+            engine.dispose()
+
+    def test_dispose_engine_clears_singletons(self, v1_engine):
+        database.reset_engine(v1_engine.url)
+        assert database._engine is not None
+        database.dispose_engine()
+        assert database._engine is None
+        assert database._session_factory is None
+
+    def test_year_month_compiles_for_supported_dialects(self):
+        expression = year_month(column("trade_date"))
+        pg_sql = str(select(expression).compile(dialect=postgresql.dialect()))
+        sqlite_sql = str(select(expression).compile(dialect=sqlite.dialect()))
+        assert "to_char(trade_date, 'YYYY-MM')" in pg_sql
+        assert "strftime('%Y-%m', trade_date)" in sqlite_sql
+
+
+class TestRateLimit:
+    def test_window_expiry_resets_counter(self, monkeypatch):
+        ticks = iter([0.0, 0.0, 61.0])
+        monkeypatch.setattr("app.core.ratelimit.time.monotonic", lambda: next(ticks))
+        limiter = RateLimiter()
+        assert limiter.is_allowed("k", limit=1, window_seconds=60) is True
+        assert limiter.is_allowed("k", limit=1, window_seconds=60) is False
+        assert limiter.is_allowed("k", limit=1, window_seconds=60) is True
+
+
+class TestPayloadValidation:
+    def test_user_from_payload_rejects_invalid_claims(self):
+        invalid_payloads = [
+            {"sub": True, "username": "x"},
+            {"sub": 0, "username": "x"},
+            {"sub": 1, "username": "  "},
+            {"sub": 1, "username": "x", "pool_ids": [1, "bad"]},
+            {"sub": 1, "username": "x", "owner_scope": "INVALID"},
+            {"sub": 1, "username": "x", "amr": "FORGED"},
+        ]
+        for payload in invalid_payloads:
+            with pytest.raises(AuthError):
+                user_from_payload(payload)
 
 
 # ------------------------------------------------------------------ 应用入口

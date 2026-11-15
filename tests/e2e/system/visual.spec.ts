@@ -63,10 +63,10 @@ async function dragMouseSteps(
 }
 
 /**
- * 视觉回归基线：只截取稳定的工作台壳层，不依赖真实后端数据。
+ * 工作台界面基线：只截取稳定的工作台壳层，不依赖真实后端数据。
  * 页面入口和导航是最容易被响应式改动误伤的区域，桌面/移动各保留一张基线。
  */
-test.describe("UI visual regression", () => {
+test.describe("UI visual baseline", () => {
   test("工作台 desktop", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "今天从这里开始" })).toBeVisible();

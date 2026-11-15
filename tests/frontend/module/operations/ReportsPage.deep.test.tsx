@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -106,7 +106,8 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await gotoTab("资金日报");
     await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenCalled());
     const dateInput = screen.getByLabelText("资金日报日期");
-    fireEvent.change(dateInput, { target: { value: "2026-10-08" } });
+    await ui.clear(dateInput);
+    await ui.type(dateInput, "2026-10-08");
     await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-08" }));
   });
 
@@ -121,7 +122,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
       } as const;
       await gotoTab(labels[report]);
       const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-      fireEvent.change(pane.querySelector<HTMLInputElement>(".ui-control-width-date")!, { target: { value: "2026-10-01" } });
+      const input = pane.querySelector<HTMLInputElement>(".ui-control-width-date")!;
+      await ui.clear(input);
+      await ui.type(input, "2026-10-01");
     };
     await setFrom("monthly");
     await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
@@ -194,8 +197,10 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await screen.findByText("2026-11");
     let pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
     const r2Dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    fireEvent.change(r2Dates[0], { target: { value: "2026-10-01" } });
-    fireEvent.change(r2Dates[1], { target: { value: "2026-10-31" } });
+    await ui.clear(r2Dates[0]);
+    await ui.type(r2Dates[0], "2026-10-01");
+    await ui.clear(r2Dates[1]);
+    await ui.type(r2Dates[1], "2026-10-31");
     await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
     await waitFor(() => expect(screen.queryByText("2026-11")).not.toBeInTheDocument());
 
@@ -215,8 +220,10 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await screen.findByText("HS-FE272");
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
     const dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    fireEvent.change(dates[0], { target: { value: "2026-10-01" } });
-    fireEvent.change(dates[1], { target: { value: "2026-10-31" } });
+    await ui.clear(dates[0]);
+    await ui.type(dates[0], "2026-10-01");
+    await ui.clear(dates[1]);
+    await ui.type(dates[1], "2026-10-31");
     await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
     await waitFor(() => expect(screen.queryByText("HS-FE272")).not.toBeInTheDocument());
   });
@@ -241,14 +248,18 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await screen.findByText("HS-FE273");
     let pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
     const r3Dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    fireEvent.change(r3Dates[0], { target: { value: "2026-10-01" } });
-    fireEvent.change(r3Dates[1], { target: { value: "2026-10-31" } });
+    await ui.clear(r3Dates[0]);
+    await ui.type(r3Dates[0], "2026-10-01");
+    await ui.clear(r3Dates[1]);
+    await ui.type(r3Dates[1], "2026-10-31");
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
     await waitFor(() => expect(screen.queryByText("HS-FE273")).not.toBeInTheDocument());
 
     await gotoTab("资金日报");
     await screen.findByLabelText("资金日报日期");
-    fireEvent.change(screen.getByLabelText("资金日报日期"), { target: { value: "2026-10-01" } });
+    const dailyDate = screen.getByLabelText("资金日报日期");
+    await ui.clear(dailyDate);
+    await ui.type(dailyDate, "2026-10-01");
     await waitFor(() => expect(vi.mocked(reportsApi.dailyFunds)).toHaveBeenLastCalledWith({ on: "2026-10-01" }));
     await waitFor(() => expect(screen.queryByText("POOL-FE273")).not.toBeInTheDocument());
   });

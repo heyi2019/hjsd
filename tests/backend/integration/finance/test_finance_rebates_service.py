@@ -185,6 +185,14 @@ def test_rate_from_snapshot_config_not_dict():
     assert _rebate_rate_from_snapshot({"config": "nope"}, "BUY") is None  # 165-166
 
 
+def test_rebate_base_from_snapshot_empty():
+    assert rebates._rebate_base_from_snapshot(None, None, None) is None
+
+
+def test_rebate_base_from_snapshot_config_not_dict():
+    assert rebates._rebate_base_from_snapshot(None, {"config": "x"}, None) is None
+
+
 def test_rate_from_snapshot_rates_dict_branch():
     assert _rebate_rate_from_snapshot(
         {"config": {"rates": {"BUY": "5"}}}, "BUY"

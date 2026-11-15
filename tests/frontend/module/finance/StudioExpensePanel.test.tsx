@@ -59,13 +59,14 @@ function mockOptionSets() {
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
+  mockOptionSets();
   // 明细与三项汇总一次取回；「什么算工作室收支」的口径在 backend
   // tests/v1/test_studio_cashflow_summary.py，这里只验展示。
   vi.mocked(cashflowsApi.studioSummary).mockResolvedValue({
     items: expenseFlows as never,
-    approved_income: "0.00",
-    approved_expense: "3000.00",
-    approved_net: "-3000.00",
+    income: "0.00",
+    expense: "3000.00",
+    net: "-3000.00",
     count: expenseFlows.length,
   });
 });
@@ -164,9 +165,9 @@ describe("StudioExpensePanel：工作室支出", () => {
     // 故意让后端汇总与两条明细（3000 + 100）对不上：卡片必须显示后端值。
     vi.mocked(cashflowsApi.studioSummary).mockResolvedValue({
       items: expenseFlows as never,
-      approved_income: "888.88",
-      approved_expense: "777.77",
-      approved_net: "111.11",
+      income: "888.88",
+      expense: "777.77",
+      net: "111.11",
       count: 2,
     });
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
@@ -251,7 +252,6 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(payload).toMatchObject({
       pool_id: 1,
       direction: "OUT",
-      nature: "BUSINESS_OUT",
       fund_nature: "BUSINESS",
       accounting_attribute: "OPERATING_EXPENSE",
       category: "房租",
@@ -285,7 +285,6 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(payload).toMatchObject({
       pool_id: 1,
       direction: "IN",
-      nature: "BUSINESS_IN",
       fund_nature: "BUSINESS",
       accounting_attribute: "SELF_REVENUE",
       category: "货款",

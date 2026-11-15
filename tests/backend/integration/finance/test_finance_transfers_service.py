@@ -23,8 +23,29 @@ def _pools(seeded_db):
     return invest, profit
 
 
+def _seed_available_cash(seeded_db, pool):
+    seeded_db.add(
+        Cashflow(
+            flow_no=f"TEST-IN-{pool.id}",
+            pool_id=pool.id,
+            occurred_on=date(2026, 10, 16),
+            nature=Nature.BUSINESS_IN.value,
+            accounting_attribute=AccountingAttribute.SELF_REVENUE.value,
+            fund_nature=FundNature.BUSINESS.value,
+            category="OTHER",
+            direction=Direction.IN.value,
+            amount=to_money("100.00"),
+            status="APPROVED",
+            created_by="pytest",
+            updated_by="pytest",
+        )
+    )
+    seeded_db.flush()
+
+
 def _make_single_side(seeded_db, *, source, target):
     """造一笔完整池间划转后删除 target 边，留下 source 单边记录。"""
+    _seed_available_cash(seeded_db, source)
     result = transfers.create_transfer(
         seeded_db,
         source_pool_id=source.id,
@@ -47,6 +68,20 @@ def test_create_transfer_rejects_same_pool(seeded_db):
             source_pool_id=invest.id,
             target_pool_id=invest.id,
             amount=Decimal("10"),
+            occurred_on=date(2026, 10, 17),
+            actor="pytest",
+        )
+
+
+def test_create_transfer_rejects_amount_above_source_available(seeded_db):
+    invest, profit = _pools(seeded_db)
+
+    with pytest.raises(Validation, match="转出资金池可用余额不足"):
+        transfers.create_transfer(
+            seeded_db,
+            source_pool_id=invest.id,
+            target_pool_id=profit.id,
+            amount=Decimal("999999999"),
             occurred_on=date(2026, 10, 17),
             actor="pytest",
         )
@@ -115,6 +150,7 @@ def test_repair_transfer_rejects_pool_not_visible_to_user(seeded_db):
 def test_repair_transfer_completes_in_direction_single_side(seeded_db):
     """单边剩余行为 IN 方向时，补齐的边应为 OUT 方向（覆盖 elif 分支）。"""
     invest, profit = _pools(seeded_db)
+    _seed_available_cash(seeded_db, invest)
     result = transfers.create_transfer(
         seeded_db,
         source_pool_id=invest.id,
@@ -143,6 +179,7 @@ def test_repair_transfer_completes_in_direction_single_side(seeded_db):
 def test_repair_transfer_rejects_multiple_rows_same_transfer(seeded_db):
     """同一 transfer_id 出现第三行（非 0/1/2 行）应命中 len(rows) != 1 防御分支。"""
     invest, profit = _pools(seeded_db)
+    _seed_available_cash(seeded_db, invest)
     result = transfers.create_transfer(
         seeded_db,
         source_pool_id=invest.id,

@@ -75,9 +75,9 @@ def test_summary_counts_only_manual_flows(seeded_client, seeded_db, headers):
     assert expense.flow_no in numbers
     assert income.flow_no in numbers
     assert payload["count"] == 2
-    assert Decimal(payload["approved_expense"]) == Decimal("300.00")
-    assert Decimal(payload["approved_income"]) == Decimal("800.00")
-    assert Decimal(payload["approved_net"]) == Decimal("500.00")
+    assert Decimal(payload["expense"]) == Decimal("300.00")
+    assert Decimal(payload["income"]) == Decimal("800.00")
+    assert Decimal(payload["net"]) == Decimal("500.00")
 
 
 def test_pending_flow_appears_in_items_but_not_in_summary(seeded_client, seeded_db, headers):
@@ -88,8 +88,8 @@ def test_pending_flow_appears_in_items_but_not_in_summary(seeded_client, seeded_
     payload = _summary(seeded_client, headers)
 
     assert [item["flow_no"] for item in payload["items"]] == [flow.flow_no]
-    assert Decimal(payload["approved_expense"]) == Decimal("0.00")
-    assert Decimal(payload["approved_net"]) == Decimal("0.00")
+    assert Decimal(payload["expense"]) == Decimal("0.00")
+    assert Decimal(payload["net"]) == Decimal("0.00")
 
 
 def test_summary_ignores_item_limit(seeded_client, seeded_db, headers):
@@ -106,7 +106,7 @@ def test_summary_ignores_item_limit(seeded_client, seeded_db, headers):
 
     assert len(payload["items"]) == 1
     # 汇总走 SQL SUM，不吃 limit：三条 100 仍是 300。
-    assert Decimal(payload["approved_expense"]) == Decimal("300.00")
+    assert Decimal(payload["expense"]) == Decimal("300.00")
 
 
 def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
@@ -139,7 +139,7 @@ def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
     payload = _summary(seeded_client, headers)
 
     assert payload["items"] == []
-    assert Decimal(payload["approved_expense"]) == Decimal("0.00")
+    assert Decimal(payload["expense"]) == Decimal("0.00")
 
 
 def test_summary_excludes_order_plain_cashflows(seeded_client, seeded_db, headers):
@@ -179,8 +179,8 @@ def test_summary_excludes_order_plain_cashflows(seeded_client, seeded_db, header
     amounts = {Decimal(item["amount"]) for item in payload["items"]}
     assert Decimal("450.00") not in amounts
     assert Decimal("90.00") in amounts
-    assert Decimal(payload["approved_expense"]) == Decimal("90.00")
-    assert Decimal(payload["approved_net"]) == Decimal("-90.00")
+    assert Decimal(payload["expense"]) == Decimal("90.00")
+    assert Decimal(payload["net"]) == Decimal("-90.00")
 
 
 def test_pool_ids_filter(seeded_client, seeded_db, headers):
@@ -213,7 +213,7 @@ def test_pool_ids_filter(seeded_client, seeded_db, headers):
     payload = _summary(seeded_client, headers, pool_ids=str(mine.pool_id))
 
     assert payload["count"] == 1
-    assert Decimal(payload["approved_expense"]) == Decimal("100.00")
+    assert Decimal(payload["expense"]) == Decimal("100.00")
 
 
 def test_pool_ids_must_be_integers(seeded_client, headers):

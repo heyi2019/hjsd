@@ -41,14 +41,6 @@ import "./StudioExpensePanel.css";
 /** 费用科目词典。 */
 const ITEM_SET_CODE = "STUDIO_EXPENSE_ITEM";
 
-const DEFAULT_EXPENSE_ITEMS: OptionItem[] = [
-  { value: "房租", label: "房租" },
-  { value: "日用", label: "日用" },
-  { value: "水电", label: "水电" },
-  { value: "物业", label: "物业" },
-  { value: "其他", label: "其他" },
-];
-
 const INCOME_ITEMS: OptionItem[] = [
   { value: "货款", label: "货款" },
   // 「退款」已随订单售后退款专用链路下线（退款统一并入普通支出）：收入科目不再保留退款。
@@ -96,26 +88,21 @@ function dateText(value: unknown): string {
   return "";
 }
 
-async function readOptionSet(code: string): Promise<OptionItem[] | null> {
-  try {
-    const set = await optionSetsApi.get(code);
-    return set.options ?? null;
-  } catch {
-    // 词典尚未创建（首次使用）：调用方按 null 回落处理，不让整页崩。
-    return null;
-  }
+async function readOptionSet(code: string): Promise<OptionItem[]> {
+  const set = await optionSetsApi.get(code);
+  return set.options ?? [];
 }
 
 export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: FundsPageController }) {
   const [flows, setFlows] = useState<Cashflow[]>([]);
   const [summary, setSummary] = useState<{
-    approved_income: string;
-    approved_expense: string;
-    approved_net: string;
+    income: string;
+    expense: string;
+    net: string;
     count: number;
   } | null>(null);
   const [poolCodes, setPoolCodes] = useState<string[]>([]);
-  const [expenseItems, setExpenseItems] = useState<OptionItem[]>(DEFAULT_EXPENSE_ITEMS);
+  const [expenseItems, setExpenseItems] = useState<OptionItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<NormalizedError | null>(null);
 
@@ -149,7 +136,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
     setLoading(true);
     try {
       const savedItems = await readOptionSet(ITEM_SET_CODE);
-      if (savedItems && savedItems.length > 0) setExpenseItems(savedItems);
+      setExpenseItems(savedItems);
       const allowedIds = pools.filter((pool) => poolCodes.includes(pool.code)).map((pool) => pool.id);
       if (allowedIds.length === 0) {
         setFlows([]);
@@ -188,7 +175,6 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
         pool_id: Number(values.pool_id),
         occurred_on: dateText(values.occurred_on),
         direction,
-        nature: direction === "OUT" ? "BUSINESS_OUT" : "BUSINESS_IN",
         fund_nature: "BUSINESS",
         accounting_attribute: direction === "OUT" ? "OPERATING_EXPENSE" : "SELF_REVENUE",
         category: values.category as string,
@@ -248,9 +234,9 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
   };
 
   // 三个数都取服务端（Decimal 聚合，含净额），前端只负责显示。
-  const approvedIncome = summary?.approved_income ?? "0.00";
-  const approvedExpense = summary?.approved_expense ?? "0.00";
-  const netTotal = summary?.approved_net ?? "0.00";
+  const income = summary?.income ?? "0.00";
+  const expense = summary?.expense ?? "0.00";
+  const netTotal = summary?.net ?? "0.00";
 
   const columns: ColumnsType<Cashflow> = [
     { title: "流水号", dataIndex: "flow_no" },
@@ -315,8 +301,8 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       <StatRow
         items={[
           // 失败态一律显示「—」（amount: null），不把未知状态当成可信 0
-          { label: "收入", amount: error ? null : approvedIncome },
-          { label: "支出", amount: error ? null : approvedExpense },
+          { label: "收入", amount: error ? null : income },
+          { label: "支出", amount: error ? null : expense },
           { label: "净额", amount: error ? null : netTotal },
           { label: "笔数", kind: "count", amount: error ? null : flows.length },
         ]}

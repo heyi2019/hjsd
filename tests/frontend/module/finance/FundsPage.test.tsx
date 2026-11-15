@@ -245,11 +245,21 @@ describe("FundsPage：资金流水", () => {
   });
 
   it("流水支持按订单号、流水号或备注关键词筛选", async () => {
+    vi.mocked(cashflowsApi.list).mockImplementation(async (params) => ({
+      items: params?.keyword
+        ? cashflows.filter((row) => `${row.order_no ?? ""} ${row.flow_no} ${row.category}`.includes(params.keyword!))
+        : cashflows,
+      total: params?.keyword ? 1 : cashflows.length,
+      total_in: "800.00",
+      total_out: "1000.00",
+    }));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     const search = screen.getByLabelText("流水搜索");
     await ui.type(search, "SELL");
+    await ui.click(screen.getByRole("button", { name: "查询" }));
+    await waitFor(() => expect(vi.mocked(cashflowsApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "SELL" })));
     expect(screen.getByText("HS0001-CF-SELL-01")).toBeInTheDocument();
     expect(screen.queryByText("HS0001-CF-BUY-01")).not.toBeInTheDocument();
   });
@@ -273,13 +283,18 @@ describe("FundsPage：资金流水", () => {
   it("流水被服务端截断时，本地关键词收窄不回退本地求和（避免少算）", async () => {
     // 修复 #1：total=5000 > 已加载 2 条（limit=2000 截断）。此时本地可见行只是部分数据，
     // 用户再输入关键词收窄，合计必须仍取服务端聚合，不能用可见的 1 条冒充全量。
-    vi.mocked(cashflowsApi.list).mockResolvedValue({
-      items: cashflows, total: 5000, total_in: "123456.78", total_out: "87654.32",
-    });
+    vi.mocked(cashflowsApi.list).mockImplementation(async (params) => ({
+      items: params?.keyword ? [cashflows[1]] : cashflows,
+      total: 5000,
+      total_in: "123456.78",
+      total_out: "87654.32",
+    }));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     await ui.type(screen.getByLabelText("流水搜索"), "SELL");
+    await ui.click(screen.getByRole("button", { name: "查询" }));
+    await waitFor(() => expect(vi.mocked(cashflowsApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "SELL" })));
     // 本地已收窄到只剩 SELL 一条，但合计不得跟着塌成这一条的 800.00。
     expect(screen.queryByText("HS0001-CF-BUY-01")).not.toBeInTheDocument();
     expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("123,456.78");
@@ -301,7 +316,15 @@ describe("FundsPage：资金流水", () => {
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     // 关键词 "SE" 本地收窄出两条 IN（SE-A / SE-B），排除 BUY-C；
     // 即便当前页面已加载全部 3 条，合计仍使用服务端返回的 1.01。
+    vi.mocked(cashflowsApi.list).mockImplementation(async (params) => ({
+      items: params?.keyword ? rows.filter((row) => `${row.order_no} ${row.flow_no}`.includes(params.keyword!)) : rows,
+      total: rows.length,
+      total_in: "1.01",
+      total_out: "9.00",
+    }));
     await ui.type(screen.getByLabelText("流水搜索"), "SE");
+    await ui.click(screen.getByRole("button", { name: "查询" }));
+    await waitFor(() => expect(vi.mocked(cashflowsApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "SE" })));
     expect(screen.queryByText("BUY-C")).not.toBeInTheDocument();
     expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("1.01");
   });
@@ -418,7 +441,7 @@ describe("FundsPage：资金写路径", () => {
     }]);
   });
 
-  it("P1/FE-049：超出转出资金池可用余额时不发起划转", async () => {
+  it("P1/FE-049：超出转出资金池可用余额时由后端拒绝", async () => {
     vi.mocked(poolsApi.list).mockResolvedValueOnce([
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
       { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
@@ -427,6 +450,7 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(depositsApi.list).mockResolvedValueOnce([] as never);
     vi.mocked(cashflowsApi.list).mockResolvedValueOnce({ items: [], total: 0 } as never);
     vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([] as never);
+    vi.mocked(transfersApi.create).mockRejectedValueOnce(new Error("转出资金池可用余额不足"));
     renderLight(<FundsPage />, { user: "admin" });
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await screen.findByText(/POOL-A/);
@@ -445,7 +469,7 @@ describe("FundsPage：资金写路径", () => {
     await user.click(screen.getByRole("button", { name: /确认划转/ }));
 
     await waitFor(() => expect(screen.getByText(/可用余额不足/)).toBeInTheDocument());
-    expect(transfersApi.create).not.toHaveBeenCalled();
+    expect(transfersApi.create).toHaveBeenCalled();
   });
 
   it("P1/FE-050：流水冲销成功后原流水不再显示重复冲销入口", async () => {

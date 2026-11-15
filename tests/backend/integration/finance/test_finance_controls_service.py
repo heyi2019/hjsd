@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.domain.foundation import Pool
 from app.finance import reconciliation, transfers
+from app.finance.cashflows import create_cashflow
 from app.finance.reconciliation import create_reconciliation
 from app.finance.transfers import create_transfer, repair_transfer
 
@@ -32,6 +33,18 @@ def test_reconciliation_module_creates_snapshot(seeded_db):
 
 def test_transfer_module_creates_symmetric_cashflows(seeded_db):
     pools = list(seeded_db.scalars(select(Pool).order_by(Pool.id)).all())
+    create_cashflow(
+        seeded_db,
+        pool_id=pools[0].id,
+        occurred_on=TODAY,
+        direction="IN",
+        nature="BUSINESS_IN",
+        fund_nature="BUSINESS",
+        accounting_attribute="SELF_REVENUE",
+        category="OTHER",
+        amount=Decimal("100"),
+        actor="pytest",
+    )
     result = transfers.create_transfer(
         seeded_db,
         source_pool_id=pools[0].id,

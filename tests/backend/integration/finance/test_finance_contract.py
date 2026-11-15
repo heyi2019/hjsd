@@ -1105,6 +1105,20 @@ class TestFinanceApi:
     ):
         invest = _pool(seeded_db, "HJ_INVEST")
         profit = _pool(seeded_db, "HJ_PROFIT")
+        create_cashflow(
+            seeded_db,
+            pool_id=invest.id,
+            occurred_on=TODAY,
+            direction="IN",
+            nature="BUSINESS_IN",
+            fund_nature="BUSINESS",
+            accounting_attribute="SELF_REVENUE",
+            category="OTHER",
+            amount="200.00",
+            actor="pytest",
+        )
+        source_before = pool_balance(seeded_db, invest.id)
+        target_before = pool_balance(seeded_db, profit.id)
 
         response = seeded_client.post(
             "/api/v1/transfers",
@@ -1129,13 +1143,15 @@ class TestFinanceApi:
         assert len({row["transfer_id"] for row in payload["cashflows"]}) == 1
         source_balance = pool_balance(seeded_db, invest.id)
         target_balance = pool_balance(seeded_db, profit.id)
-        assert source_balance["cash_balance"] == Decimal("-125.50")
-        assert target_balance["cash_balance"] == Decimal("125.50")
+        assert source_balance["cash_balance"] == source_before["cash_balance"] - Decimal("125.50")
+        assert target_balance["cash_balance"] == target_before["cash_balance"] + Decimal("125.50")
         assert source_balance["transfer_in"] == Decimal("0.00")
         assert source_balance["transfer_out"] == Decimal("125.50")
         assert target_balance["transfer_in"] == Decimal("125.50")
         assert target_balance["transfer_out"] == Decimal("0.00")
-        assert source_balance["cash_balance"] + target_balance["cash_balance"] == Decimal("0.00")
+        assert source_balance["cash_balance"] + target_balance["cash_balance"] == (
+            source_before["cash_balance"] + target_before["cash_balance"]
+        )
 
         report = daily_funds_report(seeded_db, on=TODAY)
         by_code = {item["pool_code"]: item for item in report["items"]}

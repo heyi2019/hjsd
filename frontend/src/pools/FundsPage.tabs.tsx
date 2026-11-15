@@ -67,7 +67,7 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
 }
 export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
   const {
-    visibleCashflows, cashflows, cashflowKeyword, setCashflowKeyword, pools, cashflowPoolId, setCashflowPoolId,
+    cashflows, cashflowKeyword, setCashflowKeyword, pools, cashflowPoolId, setCashflowPoolId,
     cashflowDirection, setCashflowDirection, cashflowStatus, setCashflowStatus, cashflowFundNature, setCashflowFundNature,
     cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, cashflowFrom, setCashflowFrom,
     cashflowTo, setCashflowTo, flowDirectionOptions, flowStatusOptions, flowFundNatureOptions, flowAttributeOptions,
@@ -155,10 +155,10 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       />
       <DataTable<Cashflow>
         columns={arrangeCashflowColumns(cashflowColumns)}
-        rows={visibleCashflows}
+        rows={cashflows}
         page={1}
         pageSize={10}
-        total={visibleCashflows.length}
+        total={cashflows.length}
         emptyText={cashflowUnavailable ? "资金流水数据不可用，请点击重新加载" : "暂无资金流水"}
         loading={loading}
         onPageChange={() => undefined}

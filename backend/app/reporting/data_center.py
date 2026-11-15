@@ -65,8 +65,8 @@ def data_center_summary(
         occurred_to=to_date,
         user=user,
     )
-    studio_cost = to_money(studio["approved_expense"])
-    studio_other_income = to_money(studio["approved_income"])
+    studio_cost = to_money(studio["expense"])
+    studio_other_income = to_money(studio["income"])
 
     return {
         "sold_cost": to_money(sold_cost),

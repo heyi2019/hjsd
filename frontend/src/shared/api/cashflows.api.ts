@@ -58,9 +58,9 @@ export const cashflowsApi = {
     api
       .get<{
         items: Cashflow[];
-        approved_income: string;
-        approved_expense: string;
-        approved_net: string;
+        income: string;
+        expense: string;
+        net: string;
         count: number;
       }>("/cashflows/studio-summary", { params })
       .then((r) => r.data),

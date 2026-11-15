@@ -1,7 +1,7 @@
 """资金性质、现金方向和核算属性的业务映射。"""
 from __future__ import annotations
 
-from app.domain.enums import AccountingAttribute, FundNature
+from app.domain.enums import AccountingAttribute, FundNature, Nature
 
 
 _ALLOWED_ATTRIBUTES_BY_FUND_NATURE: dict[str, frozenset[str]] = {
@@ -34,6 +34,17 @@ def validate_fund_accounting_attribute(fund_nature: str, accounting_attribute: s
         raise ValueError(
             f"资金性质与核算属性不匹配: {fund_nature}/{accounting_attribute}"
         )
+
+
+def derive_manual_cashflow_nature(
+    fund_nature: str | None, direction: str
+) -> str:
+    """由资金性质和收支方向生成手工流水的唯一 nature 口径。"""
+    if direction.upper() == "OUT":
+        return Nature.BUSINESS_OUT.value
+    if (fund_nature or "").upper() == FundNature.EXTERNAL.value:
+        return Nature.EXTERNAL_IN.value
+    return Nature.BUSINESS_IN.value
 
 
 _ORDER_EVENT_ATTRIBUTES: dict[tuple[str, str], str] = {
@@ -86,5 +97,6 @@ def accounting_attributes_for_manual_cashflow(
 __all__ = [
     "accounting_attribute_for_order_event",
     "accounting_attributes_for_manual_cashflow",
+    "derive_manual_cashflow_nature",
     "validate_fund_accounting_attribute",
 ]

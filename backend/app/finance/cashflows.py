@@ -25,6 +25,7 @@ from app.domain.enums import (
 from app.domain.trade import Cashflow, Order, OrderEvent
 from app.finance.attributes import (
     accounting_attributes_for_manual_cashflow,
+    derive_manual_cashflow_nature,
     validate_fund_accounting_attribute,
 )
 from app.foundation.pools import assert_pool_usable
@@ -58,7 +59,7 @@ def create_cashflow(
     pool_id: int,
     occurred_on: date,
     direction: str,
-    nature: str,
+    nature: str | None = None,
     fund_nature: str | None = None,
     accounting_attribute: str | None = None,
     category: str,
@@ -79,8 +80,11 @@ def create_cashflow(
         raise Validation(
             f"direction 必须为 {Direction.values()}", details={"field": "direction"}
         ) from exc
+    normalized_fund_nature = fund_nature.strip().upper() if fund_nature else None
     try:
-        nature = Nature(nature).value
+        nature = Nature(
+            nature or derive_manual_cashflow_nature(normalized_fund_nature, direction)
+        ).value
     except ValueError as exc:
         raise Validation(
             f"nature 必须为 {Nature.values()}", details={"field": "nature"}
@@ -106,7 +110,7 @@ def create_cashflow(
             nature=nature, category=label, direction=direction
         )
     )
-    fund_nature = fund_nature or default_fund_nature
+    fund_nature = normalized_fund_nature or default_fund_nature
     accounting_attribute = accounting_attribute or default_accounting_attribute
     try:
         validate_fund_accounting_attribute(fund_nature, accounting_attribute)
@@ -554,7 +558,7 @@ def _assert_editable_studio_cashflow(
 def _normalize_studio_cashflow_fields(
     *,
     direction: str,
-    nature: str,
+    nature: str | None,
     fund_nature: str | None,
     accounting_attribute: str | None,
     category: str,
@@ -564,8 +568,11 @@ def _normalize_studio_cashflow_fields(
         normalized_direction = Direction(direction).value
     except ValueError as exc:
         raise Validation(f"direction 必须为 {Direction.values()}", details={"field": "direction"}) from exc
+    normalized_fund_nature = fund_nature.strip().upper() if fund_nature else None
     try:
-        normalized_nature = Nature(nature).value
+        normalized_nature = Nature(
+            nature or derive_manual_cashflow_nature(normalized_fund_nature, normalized_direction)
+        ).value
     except ValueError as exc:
         raise Validation(f"nature 必须为 {Nature.values()}", details={"field": "nature"}) from exc
     if normalized_direction == Direction.IN.value and normalized_nature not in {
@@ -585,7 +592,7 @@ def _normalize_studio_cashflow_fields(
     default_fund_nature, default_accounting_attribute = accounting_attributes_for_manual_cashflow(
         nature=normalized_nature, category=label, direction=normalized_direction
     )
-    normalized_fund_nature = fund_nature or default_fund_nature
+    normalized_fund_nature = normalized_fund_nature or default_fund_nature
     normalized_accounting_attribute = accounting_attribute or default_accounting_attribute
     try:
         validate_fund_accounting_attribute(normalized_fund_nature, normalized_accounting_attribute)
@@ -617,7 +624,7 @@ def update_cashflow(
     pool_id: int,
     occurred_on: date,
     direction: str,
-    nature: str,
+    nature: str | None = None,
     fund_nature: str | None = None,
     accounting_attribute: str | None = None,
     category: str,
@@ -770,9 +777,9 @@ def studio_summary(
             # 选了池但一个都无权看：给空结果，而不是放宽成全部池。
             return {
                 "items": [],
-                "approved_income": Decimal("0"),
-                "approved_expense": Decimal("0"),
-                "approved_net": Decimal("0"),
+                "income": Decimal("0"),
+                "expense": Decimal("0"),
+                "net": Decimal("0"),
                 "count": 0,
             }
 
@@ -810,9 +817,9 @@ def studio_summary(
 
     return {
         "items": rows,
-        "approved_income": income,
-        "approved_expense": expense,
-        "approved_net": income - expense,
+        "income": income,
+        "expense": expense,
+        "net": income - expense,
         "count": len(rows),
     }
 

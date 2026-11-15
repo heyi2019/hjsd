@@ -111,16 +111,12 @@ class CashflowOut(BaseModel):
 
 
 class StudioSummaryOut(BaseModel):
-    """工作室收支面板：明细 + 已入账汇总，一次取回。
-
-    汇总只统计 APPROVED（待审核/已驳回不进经营口径），且不受 items 的 `limit` 影响。
-    ``approved_net`` = approved_income − approved_expense，由后端算，前端不再相减。
-    """
+    """工作室收支面板：明细与即时入账汇总一次取回。"""
 
     items: list[CashflowOut]
-    approved_income: Decimal = Decimal("0")
-    approved_expense: Decimal = Decimal("0")
-    approved_net: Decimal = Decimal("0")
+    income: Decimal = Decimal("0")
+    expense: Decimal = Decimal("0")
+    net: Decimal = Decimal("0")
     count: int = Field(ge=0)
 
 
@@ -146,7 +142,7 @@ class CashflowCreate(RequestModel):
     pool_id: int
     occurred_on: date
     direction: str
-    nature: str
+    nature: str | None = None
     fund_nature: str | None = None
     accounting_attribute: str | None = None
     category: str
@@ -165,7 +161,7 @@ class CashflowUpdate(RequestModel):
     pool_id: int
     occurred_on: date
     direction: str
-    nature: str
+    nature: str | None = None
     fund_nature: str | None = None
     accounting_attribute: str | None = None
     category: str

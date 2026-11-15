@@ -3,7 +3,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { FundsPage, deriveCashflowNature } from "@/pools/FundsPage";
+import { FundsPage } from "@/pools/FundsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
@@ -95,25 +95,11 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.click(screen.getByRole("button", { name: /提交/ }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.create)).toHaveBeenCalled());
     const payload = vi.mocked(cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>;
-    expect(payload.nature).toBe("BUSINESS_IN");
+    expect(payload.nature).toBeUndefined();
     expect(payload.fund_nature).toBe("BUSINESS");
   });
 
-  // nature 口径矩阵走纯函数单测（deriveCashflowNature，毫秒级），不再为每个口径
-  // 重复整页挂载 + 弹窗全链路（原 3 条用例各 ~1s，2026-10-27 实测重构）；
-  // 弹窗→提交→payload 的接线正确性由下方「本方经营 + 收入」1 条全链路用例守护。
-  // 口径对齐后端 create_cashflow（finance/cashflows.py:97-105）：OUT 一律 BUSINESS_OUT，
-  // 只有 IN 才按资金性质二分；独立流水禁 INTERNAL（submitCashflow 前置拦截）。
-  it("nature 口径矩阵：支出一律 BUSINESS_OUT，收入按资金性质二分", () => {
-    expect(deriveCashflowNature("EXTERNAL", "IN")).toBe("EXTERNAL_IN");
-    expect(deriveCashflowNature("EXTERNAL", "OUT")).toBe("BUSINESS_OUT");
-    expect(deriveCashflowNature("INTERNAL", "OUT")).toBe("BUSINESS_OUT");
-    expect(deriveCashflowNature("INTERNAL", "IN")).toBe("BUSINESS_IN");
-    expect(deriveCashflowNature("BUSINESS", "IN")).toBe("BUSINESS_IN");
-    expect(deriveCashflowNature("BUSINESS", "OUT")).toBe("BUSINESS_OUT");
-  });
-
-  it("独立流水选内部调拨 → 提交被前端拦截，不发必 422 的请求", async () => {
+  it("独立流水选内部调拨 → 交由后端拒绝，不在前端复制业务规则", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
@@ -127,8 +113,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.type(modal.querySelector("#amount") ?? modal, "300.00");
     await ui.type(modal.querySelector("#note") ?? modal, "内部调拨");
     await ui.click(screen.getByRole("button", { name: /提交/ }));
-    await waitFor(() => expect(vi.mocked(cashflowsApi.create)).not.toHaveBeenCalled());
-    expect(await screen.findByText(/内部调拨请通过/)).toBeInTheDocument();
+    await waitFor(() => expect(vi.mocked(cashflowsApi.create)).toHaveBeenCalled());
   });
 
 
@@ -218,7 +203,8 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(payload.amount).toBe("100.00");
   });
 
-  it("超出转出资金池可用余额时前端拦截且不发起划转", async () => {
+  it("超出转出资金池可用余额时由后端拒绝", async () => {
+    vi.mocked(transfersApi.create).mockRejectedValueOnce(new Error("转出资金池可用余额不足"));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /POOL-A/ });
     await ui.click(await screen.findByRole("button", { name: /资金池划转/ }));
@@ -230,7 +216,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
     await waitFor(() => expect(screen.getByText(/可用余额不足/)).toBeInTheDocument());
     expect(modal.querySelector("#amount")).toHaveValue("700.01");
-    expect(vi.mocked(transfersApi.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(transfersApi.create)).toHaveBeenCalled();
   });
 
   it("对账状态列显示未核销/已核销（对齐后端 ReconciliationStatus 语义）", async () => {

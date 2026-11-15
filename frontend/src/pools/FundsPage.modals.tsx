@@ -13,7 +13,6 @@ import { today } from "../shared/lib/format";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL } from "../shared/lib/labels";
-import { ALLOWED_ATTRIBUTES_BY_FUND_NATURE } from "./FundsPage.fragments";
 import type { FundsPageController } from "./useFundsPageController";
 import type { Cashflow } from "../shared/api/types/finance";
 
@@ -21,13 +20,6 @@ const Modal = BusinessActionModal;
 
 type WriteState = { error: NormalizedError | null; pending: boolean };
 type Pool = FundsPageController["pools"][number];
-
-// 收支方向词典（FUND_FLOW_DIRECTION）不可用时回落的只读集合：保证默认 IN 始终是带名称的 selected option，
-// 避免出现"控件外游离文本 IN"。收入/支出为通用方向，回落安全。
-const FLOW_DIRECTION_FALLBACK = [
-  { value: "IN", label: "收入" },
-  { value: "OUT", label: "支出" },
-];
 
 /** 资金池下拉选项：名称后附编号。excludeId 用于「修复单边划转」排除已有端，withTitle 供该处 tooltip 使用。 */
 function poolOptions(pools: Pool[], opts?: { excludeId?: number; withTitle?: boolean }) {
@@ -166,18 +158,9 @@ export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
     >
       <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
       <CfgItem name="occurred_on" label="发生日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
-      <CfgItem name="direction" label="收支方向" rules={[{ required: true }]}><Select options={flowDirectionOptions ?? FLOW_DIRECTION_FALLBACK} aria-label="收支方向" /></CfgItem>
+      <CfgItem name="direction" label="收支方向" rules={[{ required: true }]}><Select options={flowDirectionOptions ?? []} aria-label="收支方向" /></CfgItem>
       <CfgItem name="fund_nature" label="资金性质" rules={[{ required: true }]}>
-        <Select
-          onChange={(value: string) => {
-            // 资金性质切换后，原核算属性可能不在白名单内，自动改选首个合法项
-            const allowed = ALLOWED_ATTRIBUTES_BY_FUND_NATURE[value] ?? [];
-            const current = cashflowForm.getFieldValue("accounting_attribute") as string | undefined;
-            if (current && !allowed.includes(current)) {
-              cashflowForm.setFieldsValue({ accounting_attribute: allowed[0] });
-            }
-          }}
-        />
+        <Select />
       </CfgItem>
       <CfgItem name="accounting_attribute" label="核算属性" rules={[{ required: true }]} help="可选范围由资金性质决定（与后端白名单一致）">
         <Select options={cashflowAttributeOptions} />

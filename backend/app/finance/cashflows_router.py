@@ -75,9 +75,9 @@ def studio_summary(
     )
     return schemas.StudioSummaryOut(
         items=[_cashflow_out(db, item) for item in result["items"]],
-        approved_income=result["approved_income"],
-        approved_expense=result["approved_expense"],
-        approved_net=result["approved_net"],
+        income=result["income"],
+        expense=result["expense"],
+        net=result["net"],
         count=result["count"],
     )
 
@@ -247,7 +247,7 @@ def create_cashflow(
         pool_id=payload.pool_id,
         occurred_on=payload.occurred_on,
         direction=payload.direction.strip().upper(),
-        nature=payload.nature.strip().upper(),
+        nature=payload.nature.strip().upper() if payload.nature else None,
         fund_nature=payload.fund_nature.strip().upper() if payload.fund_nature else None,
         accounting_attribute=(
             payload.accounting_attribute.strip().upper()
@@ -285,7 +285,7 @@ def create_order_cashflow(
         pool_id=payload.pool_id,
         occurred_on=payload.occurred_on,
         direction=payload.direction.strip().upper(),
-        nature=payload.nature.strip().upper(),
+        nature=payload.nature.strip().upper() if payload.nature else None,
         fund_nature=payload.fund_nature.strip().upper() if payload.fund_nature else None,
         accounting_attribute=(
             payload.accounting_attribute.strip().upper()
@@ -318,7 +318,7 @@ def update_cashflow(
         pool_id=payload.pool_id,
         occurred_on=payload.occurred_on,
         direction=payload.direction.strip().upper(),
-        nature=payload.nature.strip().upper(),
+        nature=payload.nature.strip().upper() if payload.nature else None,
         fund_nature=payload.fund_nature.strip().upper() if payload.fund_nature else None,
         accounting_attribute=payload.accounting_attribute.strip().upper() if payload.accounting_attribute else None,
         category=payload.category,

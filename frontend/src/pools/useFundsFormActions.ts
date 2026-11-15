@@ -4,23 +4,21 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { cashflowsApi } from "../shared/api/cashflows.api";
 import { depositsApi } from "../shared/api/installments.api";
 import { reconciliationsApi, transfersApi } from "../shared/api/pools.api";
-import type { Cashflow, Deposit, PoolBalance, Reconciliation } from "../shared/api/types/finance";
+import type { Cashflow, Deposit, Reconciliation } from "../shared/api/types/finance";
 import { ACCOUNTING_ATTRIBUTE_LABEL } from "../shared/lib/labels";
 import { today } from "../shared/lib/format";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
-import { ALLOWED_ATTRIBUTES_BY_FUND_NATURE, deriveCashflowNature } from "./FundsPage.fragments";
 
 /** 资金中心写操作层：全部弹窗表单、目标状态与提交处理器。
  *  逐字切片自原 useFundsPageController；load/balances/reconciliations/write 由主 controller 注入，
  *  避免与数据层形成循环依赖。 */
 interface FundsFormActionsDeps {
   load: () => Promise<void>;
-  balances: Record<number, PoolBalance>;
   reconciliations: Reconciliation[];
   write: ReturnType<typeof useAsyncAction>;
 }
 
-export function useFundsFormActions({ load, balances, reconciliations, write }: FundsFormActionsDeps) {
+export function useFundsFormActions({ load, reconciliations, write }: FundsFormActionsDeps) {
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositEditTarget, setDepositEditTarget] = useState<Deposit | null>(null);
   const [cashflowOpen, setCashflowOpen] = useState(false);
@@ -55,11 +53,8 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
   const [depositForm] = Form.useForm();
   const [returnForm] = Form.useForm();
   const [cashflowForm] = Form.useForm();
-  const cashflowFormNature = Form.useWatch("fund_nature", cashflowForm) as string | undefined;
-  const cashflowAttributeOptions = (
-    ALLOWED_ATTRIBUTES_BY_FUND_NATURE[cashflowFormNature ?? "BUSINESS"]
-    ?? Object.keys(ACCOUNTING_ATTRIBUTE_LABEL)
-  ).map((value) => ({ value, label: ACCOUNTING_ATTRIBUTE_LABEL[value] ?? value }));
+  const cashflowAttributeOptions = Object.entries(ACCOUNTING_ATTRIBUTE_LABEL)
+    .map(([value, label]) => ({ value, label }));
   const [transferForm] = Form.useForm();
   const [reconciliationForm] = Form.useForm();
   const [resolveForm] = Form.useForm();
@@ -175,20 +170,12 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
 
   const submitCashflow = async (values: Record<string, unknown>) => {
     await write.run(async () => {
-      const fundNature = String(values.fund_nature ?? "BUSINESS");
       const direction = String(values.direction ?? "IN");
-      // 独立流水禁止 INTERNAL：后端 create_cashflow 对 nature=INTERNAL 一律 422，
-      // 且 INTERNAL 资金性质只匹配 INTERNAL_TRANSFER 核算属性，在任何合法 nature 下都无解。
-      // 前端下拉仍露出该选项（来自业务词典），此处作最终防线并给出可操作指引。
-      if (fundNature === "INTERNAL") {
-        throw new Error("内部调拨请通过「资金池划转」登记，独立流水不支持内部调拨性质");
-      }
       await cashflowsApi.create({
         pool_id: Number(values.pool_id),
         occurred_on: values.occurred_on as string,
         direction,
-        nature: deriveCashflowNature(fundNature, direction),
-        fund_nature: fundNature,
+        fund_nature: String(values.fund_nature ?? "BUSINESS"),
         accounting_attribute: String(values.accounting_attribute ?? "OPERATING_EXPENSE"),
         category: values.category as string,
         amount: values.amount as string,
@@ -218,19 +205,9 @@ export function useFundsFormActions({ load, balances, reconciliations, write }: 
 
   const submitTransfer = async (values: Record<string, unknown>) => {
     await write.run(async () => {
-      const sourcePoolId = Number(values.source_pool_id);
-      const targetPoolId = Number(values.target_pool_id);
-      const amount = Number(values.amount);
-      const available = balances[sourcePoolId]?.available;
-      if (sourcePoolId === targetPoolId) {
-        throw new Error("转入和转出资金池不能相同");
-      }
-      if (available != null && Number.isFinite(amount) && amount > Number(available) + 0.000001) {
-        throw new Error("转出资金池可用余额不足");
-      }
       await transfersApi.create({
-        source_pool_id: sourcePoolId,
-        target_pool_id: targetPoolId,
+        source_pool_id: Number(values.source_pool_id),
+        target_pool_id: Number(values.target_pool_id),
         amount: values.amount as string,
         occurred_on: values.occurred_on as string,
         note: values.note as string,

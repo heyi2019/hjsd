@@ -390,6 +390,18 @@ def test_list_cashflows_rejects_bad_status(seeded_db):
 
 
 def test_list_cashflows_transfer_source(seeded_db):
+    cashflows.create_cashflow(
+        seeded_db,
+        pool_id=1,
+        occurred_on=TODAY,
+        direction="IN",
+        nature="BUSINESS_IN",
+        fund_nature="BUSINESS",
+        accounting_attribute="SELF_REVENUE",
+        category="OTHER",
+        amount=Decimal("100"),
+        actor="pytest",
+    )
     transfers.create_transfer(
         seeded_db, source_pool_id=1, target_pool_id=seeded_db.scalar(select(Pool).where(Pool.code == "HJ_PROFIT")).id,
         amount=Decimal("10"), occurred_on=TODAY, actor="pytest",

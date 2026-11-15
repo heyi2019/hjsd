@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { appMessage } from "../shared/ui/appFeedback";
 import { cashflowsApi } from "../shared/api/cashflows.api";
 import { depositsApi } from "../shared/api/installments.api";
@@ -20,7 +20,7 @@ export function useFundsResources(active = true) {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [cashflows, setCashflows] = useState<Cashflow[]>([]);
   const [cashflowTotal, setCashflowTotal] = useState(0);
-  // 服务端合计（同筛选条件、不受 limit 影响）；本地即时收窄时回落到对可见行的求和。
+  // 服务端合计（同筛选条件、不受 limit 影响）。
   const [cashflowTotals, setCashflowTotals] = useState({ income: "0.00", expense: "0.00" });
   const [cashflowsReady, setCashflowsReady] = useState(false);
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
@@ -203,24 +203,6 @@ export function useFundsResources(active = true) {
   const totalDeposit = fundsReady && balanceTotals ? balanceTotals.deposit_held : unavailableAmount;
   const totalOwned = fundsReady && balanceTotals ? balanceTotals.owned_cash_balance : unavailableAmount;
 
-  const visibleCashflows = useMemo(() => {
-    const keyword = cashflowKeyword.trim().toLowerCase();
-    return cashflows.filter((row) => {
-      const searchable = [row.order_no, row.flow_no, row.category, row.note]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return (
-        (!keyword || searchable.includes(keyword))
-        && (cashflowPoolId == null || row.pool_id === cashflowPoolId)
-        && (!cashflowDirection || row.direction === cashflowDirection)
-        && (!cashflowStatus || row.status === cashflowStatus)
-        && (!cashflowFrom || row.occurred_on >= cashflowFrom)
-        && (!cashflowTo || row.occurred_on <= cashflowTo)
-      );
-    });
-  }, [cashflowDirection, cashflowFrom, cashflowKeyword, cashflowPoolId, cashflowStatus, cashflowTo, cashflows]);
-
   const totalFlowIncome = cashflowTotals.income;
   const totalFlowExpense = cashflowTotals.expense;
 
@@ -266,7 +248,6 @@ export function useFundsResources(active = true) {
     totalAvailable,
     totalDeposit,
     totalOwned,
-    visibleCashflows,
     totalFlowIncome,
     totalFlowExpense,
   };

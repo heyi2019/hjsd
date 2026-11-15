@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { depositsApi } from "@/shared/api/deposits.api";
 import { reconciliationsApi } from "@/shared/api/reconciliations.api";
+import { studioExpensesApi } from "@/shared/api/studioExpenses.api";
 import { transfersApi } from "@/shared/api/transfers.api";
 
 describe("资金中心 API 边界", () => {
@@ -8,5 +9,6 @@ describe("资金中心 API 边界", () => {
     expect(depositsApi).toBeDefined();
     expect(transfersApi).toBeDefined();
     expect(reconciliationsApi).toBeDefined();
+    expect(studioExpensesApi).toBeDefined();
   });
 });

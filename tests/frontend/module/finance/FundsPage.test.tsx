@@ -7,6 +7,7 @@ import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { depositsApi } from "@/shared/api/deposits.api";
+import { studioExpensesApi } from "@/shared/api/studioExpenses.api";
 import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reconciliationsApi } from "@/shared/api/reconciliations.api";
@@ -34,6 +35,7 @@ vi.mock("@/shared/api/reconciliations.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 vi.mock("@/shared/api/transfers.api");
+vi.mock("@/shared/api/studioExpenses.api");
 
 const pools = [
   { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
@@ -66,6 +68,7 @@ beforeEach(() => {
   resolveMock(vi.mocked(depositsApi.list), deposits);
   resolveMock(vi.mocked(cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "500.00" });
   resolveMock(vi.mocked(cashflowsApi.totals), { total_in: "800.00", total_out: "500.00" });
+  vi.mocked(studioExpensesApi.summary).mockResolvedValue({ items: [], income: "0.00", expense: "0.00", net: "0.00", count: 0 });
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(ordersApi.list).mockResolvedValue([]);
 });

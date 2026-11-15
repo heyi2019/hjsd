@@ -42,28 +42,6 @@ export const cashflowsApi = {
     created_by?: string;
     keyword?: string;
   }) => api.get<{ total_in: string; total_out: string }>("/cashflows/totals", { params }).then((r) => r.data),
-  /**
-   * 工作室收支面板：明细 + 已入账汇总一次取回。
-   *
-   * 「哪些流水算工作室收支」以及收入/支出/净额都在服务端算（`service.studio_summary`），
-   * 前端不再拉两次、不再按 source 过滤、也不再 reduce。
-   */
-  studioSummary: (params?: {
-    pool_ids?: string;
-    occurred_from?: string;
-    occurred_to?: string;
-    category?: string;
-    limit?: number;
-  }) =>
-    api
-      .get<{
-        items: Cashflow[];
-        income: string;
-        expense: string;
-        net: string;
-        count: number;
-      }>("/cashflows/studio-summary", { params })
-      .then((r) => r.data),
   exportCsv: (params?: {
     pool_id?: number;
     order_id?: number;

@@ -14,6 +14,7 @@ import dayjs, { type Dayjs } from "dayjs";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cashflowsApi } from "../shared/api/cashflows.api";
+import { studioExpensesApi } from "../shared/api/studioExpenses.api";
 import { optionSetsApi } from "../shared/api/options.api";
 import type { OptionItem } from "../shared/api/types/common";
 import type { Cashflow, Pool } from "../shared/api/types/finance";
@@ -146,7 +147,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       }
       // 明细与已入账汇总一次取回：什么算工作室收支、收入/支出/净额怎么加，全在
       // service.studio_summary 里。前端不再拉两次、不再按 source 过滤、不再 reduce。
-      const result = await cashflowsApi.studioSummary({
+      const result = await studioExpensesApi.summary({
         pool_ids: allowedIds.join(","),
         occurred_from: from || undefined,
         occurred_to: to || undefined,

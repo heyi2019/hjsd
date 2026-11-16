@@ -58,7 +58,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOptionSets();
   seedOrderFormFields();
-  vi.mocked(ordersApi.list).mockResolvedValue(orders as never);
   vi.mocked(ordersApi.listPage).mockResolvedValue({ items: orders, total: orders.length, limit: 10, offset: 0 });
   vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: orders.length, status_counts: { ACTIVE: 1, COMPLETED: 1 }, type_counts: { HS: 1, TH: 1 }, game_types: [] });
   vi.mocked(orderTypesApi.list).mockResolvedValue(types as never);
@@ -109,10 +108,10 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
 
   it("未关联库存账号的订单不显示「编辑账号」入口", async () => {
     // 本用例刻意去掉所有订单的 account_id，验证无关联账号时不出现「编辑账号」入口。
-    vi.mocked(ordersApi.list).mockResolvedValue([
+    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [
       { id: 1, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE", account_game_type: "原神", account_game_account: "seller-001", account_platform: "安卓", account_status: "WAITING" },
       { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
-    ] as never);
+    ], total: 2, limit: 10, offset: 0 } as never);
     renderLight(<OrdersPage />);
     await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
     await waitFor(() =>

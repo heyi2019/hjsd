@@ -63,16 +63,6 @@ beforeEach(() => {
     game_types: ["王者荣耀"],
     stats: { account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 },
   } as never);
-  vi.mocked(ordersApi.list).mockResolvedValue([{
-    id: 21,
-    order_no: "HS-2026-0001",
-    order_type: "HS",
-    capital_type: "SELF",
-    trade_date: "2026-10-15",
-    account_id: 1,
-    account_status: "WAITING",
-    status: "ACTIVE",
-  }] as never);
   resolveMock(vi.mocked(ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(ordersApi.postEvent), {});
   resolveMock(vi.mocked(customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);

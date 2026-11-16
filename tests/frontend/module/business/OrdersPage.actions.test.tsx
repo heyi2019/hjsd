@@ -218,7 +218,6 @@ beforeEach(() => {
   vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(ordersApi.listPage).mockResolvedValue({ items: orders, total: orders.length, limit: 10, offset: 0 });
-  vi.mocked(ordersApi.list).mockResolvedValue([]);
   vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({
     total_count: orders.length,
     status_counts: { ACTIVE: 1, COMPLETED: 1, CANCELLED: 0 },

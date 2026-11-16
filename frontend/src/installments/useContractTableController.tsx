@@ -188,8 +188,8 @@ export function useContractTableController(params: { contractType: string; reloa
 
   const openResale = async (row: Installment) => {
     try {
-      const candidates = await ordersApi.list({ status: "COMPLETED" });
-      setResaleOrders(candidates);
+      const candidates = await ordersApi.listPage({ status: "COMPLETED", limit: 500, offset: 0 });
+      setResaleOrders(candidates.items);
       resaleForm.resetFields();
       setResaleTarget(row);
       resaleForm.setFieldsValue({ occurred_on: today() });

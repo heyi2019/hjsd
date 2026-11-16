@@ -72,7 +72,6 @@ beforeEach(() => {
   resolveMock(vi.mocked(cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "1000.00" });
   vi.mocked(studioExpensesApi.summary).mockResolvedValue({ items: [], income: "0.00", expense: "0.00", net: "0.00", count: 0 });
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
-  vi.mocked(ordersApi.list).mockResolvedValue([]);
 });
 
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {

@@ -60,7 +60,6 @@ beforeEach(() => {
     items: [],
     totals: { pool_count: 0, cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
-  vi.mocked(ordersApi.list).mockResolvedValue([]);
 });
 
 async function gotoTab(label: string) {

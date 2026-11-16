@@ -80,7 +80,7 @@ beforeEach(() => {
     total_count: 2,
     overdue_count: 0,
   });
-  vi.mocked(ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }]);
+  vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }], total: 1, limit: 500, offset: 0 } as never);
 });
 
 describe("InstallmentsPanel：分期合约", () => {
@@ -275,7 +275,7 @@ describe("InstallmentsPanel：动作与减免", () => {
     vi.clearAllMocks();
     seedOrderFormFields();
     vi.mocked(installmentsApi.list).mockResolvedValue(installments);
-    vi.mocked(ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }]);
+    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }], total: 1, limit: 500, offset: 0 } as never);
   });
 
   describe("InstallmentsPanel：登记收款 / 换绑交付", () => {
@@ -439,7 +439,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     vi.clearAllMocks();
     seedOrderFormFields();
     vi.mocked(installmentsApi.list).mockResolvedValue([{ ...baseInstallment }]);
-    vi.mocked(ordersApi.list).mockResolvedValue([order]);
+    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [order], total: 1, limit: 500, offset: 0 } as never);
   });
 
   afterEach(() => {
@@ -578,7 +578,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
           ],
         },
       ]);
-      vi.mocked(ordersApi.list).mockResolvedValueOnce([order, resaleOrder]);
+      vi.mocked(ordersApi.listPage).mockResolvedValueOnce({ items: [order, resaleOrder], total: 2, limit: 500, offset: 0 } as never);
       vi.mocked(installmentsApi.resale).mockResolvedValue({
         id: 2, installment_id: 1, account_id: 2, action: "RESELL", occurred_on: "2026-10-20", related_order_id: 20, note: "转售",
       } as never);

@@ -116,16 +116,6 @@ async function openPanel(rows: Account[]) {
     game_types: ["王者荣耀"],
     stats: { account_count: rows.length, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 },
   } as never);
-  vi.mocked(ordersApi.list).mockResolvedValueOnce(rows.map((row) => ({
-    id: row.source_order_id ?? row.id,
-    order_no: row.source_order_no ?? `HS-${row.id}`,
-    order_type: row.inventory_type === "CONSIGNMENT" ? "DG" : "HS",
-    capital_type: "SELF",
-    trade_date: "2026-10-15",
-    account_id: row.id,
-    account_status: "WAITING",
-    status: "ACTIVE",
-  })) as never);
   renderLight(<InventoryPanel />, { user: "admin" });
   await waitFor(() => expect(document.querySelector("tbody tr")).toBeTruthy());
 }

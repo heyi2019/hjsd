@@ -37,7 +37,6 @@ beforeEach(() => {
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "系统管理员", is_active: true },
   ]);
-  vi.mocked(ordersApi.list).mockResolvedValue([]);
 });
 
 // antd Modal（含 ConfirmDialog）渲染在 document.body 下，testing-library 的 cleanup 不覆盖，

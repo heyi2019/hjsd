@@ -47,34 +47,6 @@ export const resetInventoryPanelMocks = () => {
     game_types: ["王者荣耀"],
     stats: { account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 },
   } as never);
-  vi.mocked(ordersApi.list).mockResolvedValue([{
-    id: 21,
-    order_no: "HS-2026-0001",
-    order_type: "HS",
-    capital_type: "SELF",
-    trade_date: "2026-10-15",
-    account_id: 1,
-    account_status: "WAITING",
-    status: "ACTIVE",
-  }, {
-    id: 23,
-    order_no: "TH0003",
-    order_type: "TH",
-    capital_type: "PEER",
-    trade_date: "2026-10-16",
-    account_id: 3,
-    account_status: "WAITING",
-    status: "ACTIVE",
-  }, {
-    id: 24,
-    order_no: "TH0004",
-    order_type: "TH",
-    capital_type: "PEER",
-    trade_date: "2026-10-17",
-    account_id: 4,
-    account_status: "WAITING",
-    status: "ACTIVE",
-  }] as never);
   // T19/T20：建单表单字段与选项词典改为从配置读取，测试需默认种子，否则下拉无选项。
   seedOrderFormFields();
   seedOptionSets();

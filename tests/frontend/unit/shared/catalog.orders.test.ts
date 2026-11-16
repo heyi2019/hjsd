@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // 受控 axios mock：transport 按 params.offset/limit 从一个共 627 条的数据集切片返回，
-// 使用统一分页响应，验证 ordersApi.list 在无显式 limit 时自动翻页取全量。
+// 使用统一分页响应，验证订单列表客户端只读取后端分页信封。
 const TOTAL = 627;
 
 vi.mock("axios", () => {
@@ -94,33 +94,36 @@ function apiInstance() {
   return (axios as any).__instances[0];
 }
 
-describe("ordersApi.list 自动翻页取全量", () => {
+describe("ordersApi.listPage 分页契约", () => {
   beforeEach(() => {
     clearApiCache();
     (axios as any).__resetCalls();
   });
 
-  it("无显式 limit 时翻页取全量（627 条 → 500+127，2 次请求）", async () => {
-    const orders = await ordersApi.list();
-    expect(orders.length).toBe(TOTAL);
-    expect((axios as any).__getCallCount()).toBe(2);
+  it("按分页参数读取当前页与总数", async () => {
+    const page = await ordersApi.listPage({ limit: 100, offset: 500, status: "COMPLETED" });
+    expect(page.items).toHaveLength(100);
+    expect(page.total).toBe(TOTAL);
+    expect(page.limit).toBe(100);
+    expect(page.offset).toBe(500);
+    expect((axios as any).__getCallCount()).toBe(1);
+    expect(apiInstance().request.mock.calls[0][0].params).toEqual({ limit: 100, offset: 500, status: "COMPLETED" });
   });
 
-  it("显式传入 limit 时单发透传（不翻页）", async () => {
-    const orders = await ordersApi.list({ limit: 100 });
-    expect(orders.length).toBe(100);
+  it("默认分页参数由后端决定并保持响应信封", async () => {
+    const page = await ordersApi.listPage();
+    expect(page.items).toHaveLength(100);
+    expect(page.total).toBe(TOTAL);
     expect((axios as any).__getCallCount()).toBe(1);
   });
 
-  it("带过滤参数时仍翻页且透传过滤条件", async () => {
-    const orders = await ordersApi.list({ order_type: "HS" });
-    expect(orders.length).toBe(TOTAL);
-    expect((axios as any).__getCallCount()).toBe(2);
-    // 两次请求都带 order_type=HS
-    const calls = apiInstance().request.mock.calls;
-    for (const c of calls) {
-      const cfg = c[0];
-      expect(cfg.params.order_type).toBe("HS");
-    }
+  it("保留过滤参数且不在客户端自动翻页", async () => {
+    await ordersApi.listPage({ order_type: "HS", limit: 50 });
+    expect((axios as any).__getCallCount()).toBe(1);
+    expect(apiInstance().request.mock.calls[0][0].params).toEqual({ order_type: "HS", limit: 50 });
+  });
+
+  it("不再暴露旧的自动翻页客户端方法", () => {
+    expect("list" in ordersApi).toBe(false);
   });
 });

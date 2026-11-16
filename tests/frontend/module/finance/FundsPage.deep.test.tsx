@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { FundsPage } from "@/pools/FundsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
-import { cashflowTotals } from "@fixtures/api-responses";
+import { cashflowPage, cashflowTotals } from "@fixtures/api-responses";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { depositsApi } from "@/shared/api/deposits.api";
@@ -71,7 +71,7 @@ beforeEach(() => {
   });
   resolveMock(vi.mocked(depositsApi.list), deposits);
   // 合计由服务端返回，桩里同步给出，避免卡片落回 0.00。
-  resolveMock(vi.mocked(cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "1000.00" });
+  resolveMock(vi.mocked(cashflowsApi.list), cashflowPage(cashflows, { total_in: "800.00", total_out: "1000.00" }));
   resolveMock(vi.mocked(cashflowsApi.totals), cashflowTotals({ total_in: "800.00", total_out: "1000.00" }));
   vi.mocked(studioExpensesApi.summary).mockResolvedValue({ items: [], income: "0.00", expense: "0.00", net: "0.00", count: 0 });
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
@@ -132,7 +132,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
   it("已入账且无关联流水 → 冲销调用 cashflowsApi.reverse", async () => {
     const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
-    resolveMock(vi.mocked(cashflowsApi.list), { items: approved, total: approved.length, total_in: "0.00", total_out: "300.00" });
+    resolveMock(vi.mocked(cashflowsApi.list), cashflowPage(approved, { total_in: "0.00", total_out: "300.00" }));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
@@ -152,11 +152,11 @@ describe("FundsPage：资金写路径深覆盖", () => {
     const reversal = { ...approved, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", reversal_of_id: 7 };
     let mainListCalls = 0;
     vi.mocked(cashflowsApi.list).mockImplementation(async (params) => {
-      if (params?.direction) return { items: [], total: 0, total_in: "0.00", total_out: "0.00" };
+      if (params?.direction) return cashflowPage([], { total_in: "0.00", total_out: "0.00" });
       mainListCalls += 1;
       return mainListCalls === 1
-        ? { items: [approved], total: 1, total_in: "0.00", total_out: "300.00" }
-        : { items: [approved, reversal], total: 2, total_in: "300.00", total_out: "300.00" };
+        ? cashflowPage([approved], { total_in: "0.00", total_out: "300.00" })
+        : cashflowPage([approved, reversal], { total_in: "300.00", total_out: "300.00" });
     });
     resolveMockOnce(vi.mocked(cashflowsApi.reverse), reversal);
     renderLight(<FundsPage />, { user: "admin" });
@@ -177,8 +177,8 @@ describe("FundsPage：资金写路径深覆盖", () => {
   it("冲销失败时保留弹窗和表单，并显示可重试错误", async () => {
     const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
     vi.mocked(cashflowsApi.list).mockImplementation(async (params) => params?.direction
-      ? { items: [], total: 0, total_in: "0.00", total_out: "0.00" }
-      : { items: approved, total: 1, total_in: "0.00", total_out: "300.00" });
+      ? cashflowPage([], { total_in: "0.00", total_out: "0.00" })
+      : cashflowPage(approved, { total_in: "0.00", total_out: "300.00" }));
     vi.mocked(cashflowsApi.reverse).mockRejectedValueOnce(new Error("冲销接口暂时不可用"));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });

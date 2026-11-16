@@ -2,6 +2,7 @@ import { Form } from "antd";
 import { useRef, useState } from "react";
 import { employeesApi } from "../../../shared/api/org.api";
 import { ordersApi } from "../../../shared/api/orders.api";
+import { useSession } from "../../../shared/state/session";
 import type { AccountExecutionDetail, AccountExecutionEvent } from "../../../shared/api/types/account-execution";
 import type { Account } from "../../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../../shared/api/types/org";
@@ -27,6 +28,12 @@ export type OrderDraft = {
 };
 
 const SHARED_ORDER_FORM_EXTRA_KEYS = new Set(["bound_phone_owner"]);
+
+/** 新增详情动作行沿用建单口径：默认当前会话对应的在职员工。 */
+export function defaultOperatorUserIds(employees: EmployeeOption[], username: string): number[] | undefined {
+  const employee = employees.find((item) => item.is_active && item.username === username);
+  return employee ? [employee.id] : undefined;
+}
 
 /** 把订单详情内的共享交付字段投影到当前详情涉及的全部订单草稿。 */
 export function propagateSharedOrderExtra(
@@ -107,6 +114,7 @@ export function useOrderDetailEditor(params: {
   onSaved: (accountId: number, detail: AccountExecutionDetail) => void;
 }): OrderDetailEditor {
   const { getExecutionDetail, onSaved } = params;
+  const { username } = useSession();
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [inlineEditId, setInlineEditId] = useState<number | null>(null);
   const [eventDrafts, setEventDrafts] = useState<Record<number, EventDraft>>({});
@@ -172,7 +180,15 @@ export function useOrderDetailEditor(params: {
   function addOperationDraft(operationType: NonNullable<OperationDraft["operation_type"]>) {
     operationDraftSequence.current += 1;
     const key = `new:${operationType.toLowerCase()}:${operationDraftSequence.current}`;
-    setOperationDrafts((current) => ({ ...current, [key]: { occurred_at: "", form_extra: {}, operation_type: operationType } }));
+    setOperationDrafts((current) => ({
+      ...current,
+      [key]: {
+        occurred_at: "",
+        form_extra: {},
+        operation_type: operationType,
+        operator_user_ids: defaultOperatorUserIds(employees, username),
+      },
+    }));
   }
 
   function removeOperationDraft(key: string) {

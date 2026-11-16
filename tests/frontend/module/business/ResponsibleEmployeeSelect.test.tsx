@@ -19,6 +19,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
 
 import * as client from "@/shared/api/client";
 import { ResponsibleEmployeeSelect } from "@/orders/ResponsibleEmployeeSelect";
+import { defaultOperatorUserIds } from "@/orders/OrderDetailView/editing/use-order-detail-editor";
 
 const employees = [
   { id: 3, username: "operator", display_name: "业务员", is_active: true },
@@ -67,5 +68,10 @@ describe("ResponsibleEmployeeSelect：按人匹配用 username，不用角色", 
 
     expect(screen.getByRole("option", { name: "业务员" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "小轩" })).not.toBeInTheDocument();
+  });
+
+  it("详情新增动作行默认当前员工", () => {
+    expect(defaultOperatorUserIds(employees, "xiaoxuan")).toEqual([5]);
+    expect(defaultOperatorUserIds(employees, "missing")).toBeUndefined();
   });
 });

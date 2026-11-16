@@ -52,7 +52,6 @@ export const counterpartiesApi = {
 };
 
 export const leadsApi = {
-  list: () => api.get<Lead[]>("/leads").then(r => r.data),
   page: (params?: { limit?: number; offset?: number; status?: string; keyword?: string; customer_id?: number }) =>
     api.get<PageResponse<Lead>>("/leads/page", {
       params: { limit: 10, offset: 0, ...params },

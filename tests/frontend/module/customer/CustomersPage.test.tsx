@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { CustomersPage } from "@/customer-center/CustomersPage";
 
-import { counterpartiesApi, customersApi, leadsApi } from "@/shared/api/customers.api";
+import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { OrderFormField } from "@/shared/api/types/forms";
 import { seedOptionSets } from "@fixtures/formFieldsSeed";
@@ -474,7 +474,6 @@ describe("CustomersPage：扩展字段（BAS-04）", () => {
   beforeEach(() => {
     ui = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(orderFormFieldsApi.list).mockResolvedValue(liveFieldDefs);
-    vi.mocked(leadsApi.list).mockResolvedValue([]);
   });
 
   it("列表按字段定义渲染扩展字段摘要列", async () => {

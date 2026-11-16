@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
+import * as client from "@/shared/api/client";
 import { CreateBusinessModal } from "@/orders/CreateBusinessModal";
 import { DgOrderSection } from "@/orders/dg/DgOrderSection";
 import { FieldConfigContext } from "@/orders/ConfigurableField";
@@ -31,6 +32,10 @@ async function pickMainPool() {
 // 跨文件在 isolate:false 下复用同一份 mock 实例，配合 setup.ts 的 resetAllMocks
 // 与各文件 beforeEach 重新设定返回值，避免闭包捕获的 vi.fn() 在共享模块图下串扰。
 vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/shared/api/client")>()),
+  currentUser: vi.fn(),
+}));
 vi.mock("@/shared/api/installments.api");
 vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
@@ -45,6 +50,7 @@ const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_act
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(client.currentUser).mockRejectedValue(new Error("backend unavailable"));
   clearOptionSetsCache();
   seedOrderFormFields();
   vi.mocked(orderTypesApi.list).mockResolvedValue(types);

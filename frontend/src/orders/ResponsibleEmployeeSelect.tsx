@@ -32,7 +32,9 @@ export function ResponsibleEmployeeSelect(props: { name: string; label: string; 
     [props.employees, username],
   );
   useEffect(() => {
-    if (defaultEmployeeId !== undefined && form.getFieldValue(props.name) == null) {
+    const currentValue = form.getFieldValue(props.name);
+    const isEmpty = currentValue == null || (Array.isArray(currentValue) && currentValue.length === 0);
+    if (defaultEmployeeId !== undefined && isEmpty) {
       form.setFieldValue(props.name, [defaultEmployeeId]);
     }
   }, [defaultEmployeeId, form, props.name]);

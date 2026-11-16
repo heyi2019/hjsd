@@ -114,12 +114,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [authenticated, setAuthenticated] = useState<boolean>(() => import.meta.env.DEV || Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)));
   const [mustChangePassword, setMustChangePassword] = useState(false);
   useEffect(() => {
-    if (!localStorage.getItem(ACCESS_TOKEN_KEY)) return;
+    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    // 开发态也要从后端同步当前用户：X-Dev-User 是角色别名，不能直接拿来匹配
+    // users.username，否则负责人控件无法默认选中真实操作对象。
+    if (!token && !import.meta.env.DEV) return;
     void currentUserApi().then((current) => {
-      setRole(current.role.toLowerCase());
+      if (token) setRole(current.role.toLowerCase());
       setUsername(current.username);
       setMustChangePassword(Boolean(current.must_change_password));
-    }).catch(() => { localStorage.removeItem(ACCESS_TOKEN_KEY); setAuthenticated(false); });
+    }).catch(() => {
+      if (token) {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        setAuthenticated(false);
+      }
+    });
   }, []);
   const switchUser = useCallback((next: string) => {
     persistDevUser(next);

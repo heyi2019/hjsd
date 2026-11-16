@@ -12,9 +12,9 @@ import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { auditApi } from "../../shared/api/reports.api";
 import type { AuditLogRow } from "../../shared/api/types/ops";
-import { normalizeError } from "../../shared/api/client";
 import { AUDIT_ACTION_LABEL, ENTITY_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel } from "../../shared/lib/optionSets";
+import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { DataTable, ErrorBanner, Select, StatusTag } from "../../shared/ui";
 import { ENTITY_TYPE_TO_ITEM, SETTINGS_ITEMS } from "../configCatalog";
 
@@ -38,10 +38,20 @@ function formatAt(value: string | null | undefined): string {
 
 export function ConfigAuditPanel() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [rows, setRows] = useState<AuditLogRow[]>([]);
   const [actions, setActions] = useState<string[]>(Object.keys(AUDIT_ACTION_LABEL));
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const load = useCallback(async () => {
+    const res = await auditApi.list({
+      entity_type: filters.entityType || undefined,
+      action: filters.action || undefined,
+      actor: filters.actor || undefined,
+      from: filters.from || undefined,
+      to: filters.to || undefined,
+      limit: FETCH_LIMIT,
+    });
+    return res.items ?? [];
+  }, [filters]);
+  const { data: loadedRows, loading, error, reload } = useSettingsResource(load);
+  const rows = loadedRows ?? [];
   const hasError = Boolean(error);
 
   // 配置项的 entity_type 选项：一个配置项可能对应多个 entity_type（如经营规则有
@@ -63,30 +73,6 @@ export function ConfigAuditPanel() {
       .then((list) => setActions(list))
       .catch(() => undefined);
   }, []);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await auditApi.list({
-        entity_type: filters.entityType || undefined,
-        action: filters.action || undefined,
-        actor: filters.actor || undefined,
-        from: filters.from || undefined,
-        to: filters.to || undefined,
-        limit: FETCH_LIMIT,
-      });
-      setRows(res.items ?? []);
-      setError(null);
-    } catch (err) {
-      setError(normalizeError(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const patch = (next: Partial<Filters>) => setFilters((prev) => ({ ...prev, ...next }));
 
@@ -119,7 +105,7 @@ export function ConfigAuditPanel() {
 
   return (
     <div className="ui-stack">
-      <ErrorBanner error={error} onRetry={() => void load()} />
+      <ErrorBanner error={error} onRetry={() => void reload()} retrying={loading} />
       <Card className="glass" title="配置改动追溯">
         {hasError ? (
           <Typography.Paragraph type="secondary">

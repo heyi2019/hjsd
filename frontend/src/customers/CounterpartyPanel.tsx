@@ -47,10 +47,11 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
       .catch(() => setFieldDefs([]));
   }, []);
 
-  const openDetail = async (row: Counterparty) => {
+  const openDetail = async (row: Counterparty, loadedDetail?: Counterparty) => {
     setDetailTarget(row);
-    setDetailData(null);
-    setDetailLoading(true);
+    setDetailData(loadedDetail ?? null);
+    setDetailLoading(!loadedDetail);
+    if (loadedDetail) return;
     try {
       setDetailData(await counterpartiesApi.get(row.id));
     } catch (err) {
@@ -64,9 +65,14 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
   useEffect(() => {
     if (focusId == null || handledFocusRef.current === focusId) return;
     const row = rows.find((item) => item.id === focusId);
-    if (!row) return;
     handledFocusRef.current = focusId;
-    void openDetail(row);
+    if (row) {
+      void openDetail(row);
+      return;
+    }
+    void counterpartiesApi.get(focusId)
+      .then((item) => openDetail(item, item))
+      .catch((err) => setError(normalizeError(err)));
   }, [focusId, rows]);
 
   const submit = async (values: Record<string, unknown>) => {

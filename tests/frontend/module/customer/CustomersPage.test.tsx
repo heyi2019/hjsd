@@ -117,10 +117,11 @@ describe("CustomersPage：客户档案", () => {
   });
 
   it("从客户中心深链参数打开指定合作方卡片", async () => {
-    vi.mocked(counterpartiesApi.list).mockResolvedValue(counterparties);
+    vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
     vi.mocked(counterpartiesApi.get).mockResolvedValue(counterparties[0]);
     renderLight(<CustomersPage focusCounterpartyId={11} />);
     expect(await screen.findByText("合作方档案 · CP-0001")).toBeInTheDocument();
+    expect(counterpartiesApi.get).toHaveBeenCalledWith(11);
   });
 
   it("加载成功后渲染客户编号与状态标签", async () => {

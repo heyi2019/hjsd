@@ -128,7 +128,7 @@ export function InventoryCancellationDialog<T extends InventoryCancellationValue
               <MoneyInput aria-label={amountLabel} placeholder={`请输入${amountLabel}`} />
             </CfgItem>
             <CfgItem alwaysActive name="pool_id" label={accountLabel} fixedLabel={accountLabel} rules={[{ required: true, message: `请选择${accountLabel}` }]}>
-              <Select placeholder={`请选择${accountLabel}`} options={props.pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent={`暂无可用${accountLabel}`} />
+              <Select placeholder={`请选择${accountLabel}`} options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} notFoundContent={`暂无可用${accountLabel}`} />
             </CfgItem>
             {props.employees ? <ResponsibleEmployeeSelect name="operator_user_ids" label={operatorLabel} employees={props.employees} className="order-cancel-employee" /> : null}
           </AdaptiveFormGrid>

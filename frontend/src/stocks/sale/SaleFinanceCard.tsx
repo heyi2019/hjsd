@@ -42,7 +42,7 @@ export function SaleFinanceCard({
         {paymentMethod === "FULL" ? (
           <>
             <CfgItem name="pool_id" label="资金账户" rules={[{ required: true, message: "请选择资金账户" }]}>
-              <Select placeholder="资金账户" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
+              <Select placeholder="资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} notFoundContent="暂无可用资金账户" />
             </CfgItem>
             <CfgItem name="cashflow_note" label="资金明细备注">
               <Input placeholder="可选填" />
@@ -53,7 +53,7 @@ export function SaleFinanceCard({
             <p className="muted">出售时选择分期，系统会建立对应的售出分期合同，并将账号标记为“分期中”。</p>
             <CfgItem name="down_payment" label="首付金额" initialValue="0" rules={[{ validator: async (_, value) => { if (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > Number(saleAmount)) throw new Error("首付不能为负数或超过售出金额"); } }]}><MoneyInput placeholder="没有首付填 0" /></CfgItem>
             <CfgItem name="pool_id" label="资金账户" rules={downPayment != null && Number(downPayment) > 0 ? [{ required: true, message: "请选择首付收款资金账户" }] : []}>
-              <Select placeholder="首付收款资金账户" options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))} notFoundContent="暂无可用资金账户" />
+              <Select placeholder="首付收款资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} notFoundContent="暂无可用资金账户" />
             </CfgItem>
             <CfgItem name="service_fee" label="分期服务费总额" initialValue="0" rules={[{ validator: async (_, value) => { if (!Number.isFinite(Number(value)) || Number(value) < 0) throw new Error("服务费不能为负数"); } }]}><MoneyInput placeholder="可选填" /></CfgItem>
             <CfgItem name="periods" label="分期期数" initialValue={1} rules={[{ validator: async (_, value) => { if (!Number.isInteger(Number(value)) || Number(value) <= 0) throw new Error("期数必须为正整数"); } }]}><Input inputMode="numeric" placeholder="请输入期数" /></CfgItem>

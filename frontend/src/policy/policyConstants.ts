@@ -14,7 +14,7 @@ export const POLICY_CODE_OPTIONS: { value: string; label: string }[] = [
   { value: "INSTALLMENT", label: "分期规则" },
   { value: "WRITE_DOWN", label: "跌价规则" },
   { value: "REFUND", label: "退款规则" },
-  { value: "DG_MIXED", label: "DG 混合单默认策略" },
+  { value: "DG_MIXED", label: "代挂混合单默认策略" },
 ];
 
 export const today = () => new Date().toISOString().slice(0, 10);

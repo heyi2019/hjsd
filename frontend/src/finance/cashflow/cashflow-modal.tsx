@@ -95,7 +95,7 @@ export function CashflowModal({
             <UiSelect
               aria-label="资金账户"
               placeholder="请选择这笔收支的资金账户"
-              options={pools.map((pool) => ({ value: pool.id, label: `${pool.name}（${pool.code}）` }))}
+              options={pools.map((pool) => ({ value: pool.id, label: pool.name }))}
               notFoundContent="暂无可用资金账户"
             />
           </CfgItem>

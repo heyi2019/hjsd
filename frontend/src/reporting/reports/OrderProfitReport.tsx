@@ -19,7 +19,7 @@ export function OrderProfit({ range }: { range: ReportRange }) {
   const { arrange: arrangeOrderProfit } = useListViewColumns("RPT_ORDER_PROFIT");
   const columns: ColumnsType<OrderProfitRow> = [
     { title: "订单号", dataIndex: "order_no", width: 160 },
-    { title: "业务", dataIndex: "order_type", width: 90, render: (v: string) => `${ORDER_TYPE_LABEL[v] ?? v}（${v}）`},
+    { title: "业务", dataIndex: "order_type", width: 90, render: (v: string) => ORDER_TYPE_LABEL[v] ?? "其他业务" },
     { title: "成交日", dataIndex: "trade_date", width: 110 },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} /> },
     { title: "收入", dataIndex: "income", align: "right", render: (v: string) => <MoneyText value={v} /> },

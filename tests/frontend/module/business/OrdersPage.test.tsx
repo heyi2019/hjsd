@@ -59,6 +59,8 @@ beforeEach(() => {
   seedOptionSets();
   seedOrderFormFields();
   vi.mocked(ordersApi.list).mockResolvedValue(orders);
+  vi.mocked(ordersApi.listPage).mockResolvedValue({ items: orders, total: orders.length, limit: 10, offset: 0 });
+  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: orders.length, status_counts: { ACTIVE: 1, COMPLETED: 1 }, type_counts: { HS: 1, TH: 1 }, game_types: [] });
   vi.mocked(orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(stocksApi.list).mockResolvedValue([]);
   vi.mocked(stocksApi.inventoryStats).mockResolvedValue({
@@ -77,6 +79,7 @@ async function openLedger(user?: string) {
   renderLight(<OrdersPage />, user ? { user } : undefined);
   await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
   await waitFor(() => expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThanOrEqual(1));
+  await waitFor(() => expect(vi.mocked(ordersApi.ledgerSummary)).toHaveBeenCalled());
 }
 
 describe("OrdersPage：四类订单台账", () => {
@@ -99,6 +102,19 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.queryByText("关联筛选")).toBeNull();
     expect(screen.queryByRole("combobox", { name: "关联状态筛选" })).toBeNull();
     expect(screen.queryByRole("columnheader", { name: "关联" })).toBeNull();
+  });
+
+  it("库存中心初始加载不触发订单台账请求", async () => {
+    renderLight(<OrdersPage />);
+
+    expect(await screen.findByRole("tab", { name: "库存中心" })).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => {
+      expect(vi.mocked(ordersApi.listPage)).not.toHaveBeenCalled();
+      expect(vi.mocked(ordersApi.ledgerSummary)).not.toHaveBeenCalled();
+      expect(vi.mocked(orderTypesApi.list)).not.toHaveBeenCalled();
+      expect(vi.mocked(installmentsApi.list)).not.toHaveBeenCalled();
+      expect(vi.mocked(installmentsApi.totals)).not.toHaveBeenCalled();
+    });
   });
 
   it("类型 Segmented 计数与「订单总量」同口径：关键词筛选后同步收窄", async () => {

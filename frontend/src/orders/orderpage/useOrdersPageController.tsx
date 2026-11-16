@@ -23,8 +23,14 @@ export function useOrdersPageController(params: {
   const { role } = useSession();
   const canDeleteOrder = role === "admin";
 
+  const normalizedInitialTab: BusinessCenterTab = initialTab ?? DEFAULT_BUSINESS_CENTER_TAB;
+  const [activeTab, setActiveTab] = useState<BusinessCenterTab>(normalizedInitialTab);
+  useEffect(() => {
+    setActiveTab(normalizedInitialTab);
+  }, [normalizedInitialTab]);
+
   // —— 列表域：加载 / 筛选 / 分页 / 排序 / 导出 / 选项词典 / 派生 filteredOrders ——
-  const list = useLedgerList({ active, initialMine });
+  const list = useLedgerList({ active: active && activeTab === "ledger", initialMine });
   const {
     orders, setOrders, types, setTypes, loadError, setLoadError, loading, setLoading,
     page, setPage, pageSize, setPageSize,
@@ -74,13 +80,6 @@ export function useOrdersPageController(params: {
     openOrderRebate, openOrderSale, openOrderConsignment, openOrderOffsale, openOrderDelete,
   } = actionModals;
 
-  const normalizedInitialTab: BusinessCenterTab = initialTab ?? DEFAULT_BUSINESS_CENTER_TAB;
-  const [activeTab, setActiveTab] = useState<BusinessCenterTab>(
-    normalizedInitialTab,
-  );
-  useEffect(() => {
-    setActiveTab(normalizedInitialTab);
-  }, [normalizedInitialTab]);
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
   const [installmentRefreshKey, setInstallmentRefreshKey] = useState(0);
 

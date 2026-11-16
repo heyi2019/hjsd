@@ -71,9 +71,14 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
         limit: pageSize,
         offset: (page - 1) * pageSize,
       };
+      const summaryParams = {
+        today_date: today(),
+        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
+      };
       const [customerPage, customerSummary] = await Promise.all([
         customersApi.page(params),
-        customersApi.summary({ today_date: today(), ...params }),
+        customersApi.summary(summaryParams),
       ]);
       setRows(customerPage.items);
       setTotal(customerPage.total);

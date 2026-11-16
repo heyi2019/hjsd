@@ -62,11 +62,7 @@ async function gotoTab(label: string) {
 
 describe("ReportsPage：各报表渲染与错误态", () => {
   it("经营损益：同时渲染月度趋势与业务拆分", async () => {
-    resolveMockOnce(vi.mocked(reportsApi.monthlyPnl), {
-      from: "2026-09",
-      to: "2026-09",
-      total: {},
-      items: [
+    resolveMockOnce(vi.mocked(reportsApi.monthlyPnl), reportResponse([
         {
           month: "2026-09",
           sales_income: "2000.00",
@@ -75,19 +71,15 @@ describe("ReportsPage：各报表渲染与错误态", () => {
           rebate_income: "50.00",
           operating_profit: "1450.00",
         },
-      ],
-    });
-    resolveMock(vi.mocked(reportsApi.businessPnl), {
-      items: [
+      ], {}));
+    resolveMock(vi.mocked(reportsApi.businessPnl), reportResponse([
         {
           order_type: "HS",
           main_income: "800.00",
           cost: "300.00",
           main_profit: "500.00",
         },
-      ],
-      total: {},
-    });
+      ], {}));
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("经营损益");
     expect(await screen.findByText("2026-09")).toBeInTheDocument();
@@ -97,11 +89,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
   });
 
   it("订单利润：渲染订单号与净额", async () => {
-    resolveMockOnce(vi.mocked(reportsApi.orderProfit), {
-      from: null,
-      to: null,
-      total: { income: "0", cost: "0", rebate: "0", net_profit: "0" },
-      items: [
+    resolveMockOnce(vi.mocked(reportsApi.orderProfit), reportResponse([
         {
           order_no: "HS-2026-0010",
           order_type: "HS",
@@ -110,8 +98,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
           rebate: "10.00",
           net_profit: "160.00",
         },
-      ],
-    });
+      ], { income: "0", cost: "0", rebate: "0", net_profit: "0" }));
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("订单利润");
     expect(await screen.findByText("HS-2026-0010")).toBeInTheDocument();
@@ -119,8 +106,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
   });
 
   it("P1/FE-169：订单利润只展示统一成本口径且不展示旧口径说明", async () => {
-    vi.mocked(reportsApi.orderProfit).mockResolvedValueOnce({
-      items: [{
+    vi.mocked(reportsApi.orderProfit).mockResolvedValueOnce(reportResponse([{
         order_id: 11,
         order_no: "HS-2026-0011",
         order_type: "HS",
@@ -130,9 +116,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
         cost: "450.00",
         rebate: "10.00",
         net_profit: "160.00",
-      }],
-      total: { income: "600.00", cost: "450.00", rebate: "10.00", net_profit: "160.00" },
-    } as never);
+      }], { income: "600.00", cost: "450.00", rebate: "10.00", net_profit: "160.00" }) as never);
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<ReportsPage />, { user: "admin" });
     await user.click(await screen.findByRole("tab", { name: /订单利润/ }));

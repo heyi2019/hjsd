@@ -107,6 +107,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
   it("资金日报已下线，经营中心不再重复展示资金日报", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
+    await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
     expect(screen.queryByRole("tab", { name: "资金日报" })).toBeNull();
   });
 
@@ -181,16 +182,20 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
   it("FE-270：月度损益和业务损益历史空区间清空旧明细", async () => {
     vi.mocked(reportsApi.monthlyPnl).mockImplementation((params) => Promise.resolve(
-      params?.from ? { items: [], total: { sales_income: "0", operating_profit: "0" } } : {
-        items: [{ month: "2026-11", sales_income: "100", cost: "50", operating_expense: "0", rebate_income: "0", operating_profit: "50" }],
-        total: { sales_income: "100", operating_profit: "50" },
-      },
+      params?.from
+        ? reportResponse([], { sales_income: "0", operating_profit: "0" })
+        : reportResponse(
+            [{ month: "2026-11", sales_income: "100", cost: "50", operating_expense: "0", rebate_income: "0", operating_profit: "50" }],
+            { sales_income: "100", operating_profit: "50" },
+          ),
     ) as never);
     vi.mocked(reportsApi.businessPnl).mockImplementation((params) => Promise.resolve(
-      params?.from ? { items: [], total: { main_profit: "0" } } : {
-        items: [{ order_type: "HS", business_mode: "SELF", main_income: "100", cost: "50", main_profit: "50" }],
-        total: { main_profit: "50" },
-      },
+      params?.from
+        ? reportResponse([], { main_profit: "0" })
+        : reportResponse(
+            [{ order_type: "HS", business_mode: "SELF", main_income: "100", cost: "50", main_profit: "50" }],
+            { main_profit: "50" },
+          ),
     ) as never);
     renderLight(<ReportsPage />, { user: "admin" });
 
@@ -209,10 +214,12 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
   it("FE-272：订单利润历史空区间清空收入成本和净利明细", async () => {
     vi.mocked(reportsApi.orderProfit).mockImplementation((params) => Promise.resolve(
-      params?.from ? { items: [], total: { income: "0", cost: "0", rebate: "0", net_profit: "0" } } : {
-        items: [{ order_no: "HS-FE272", order_type: "HS", trade_date: "2026-11-01", status: "DONE", income: "100", cost: "60", rebate: "0", net_profit: "40" }],
-        total: { income: "100", cost: "60", rebate: "0", net_profit: "40" },
-      },
+      params?.from
+        ? reportResponse([], { income: "0", cost: "0", rebate: "0", net_profit: "0" })
+        : reportResponse(
+            [{ order_no: "HS-FE272", order_type: "HS", trade_date: "2026-11-01", status: "DONE", income: "100", cost: "60", rebate: "0", net_profit: "40" }],
+            { income: "100", cost: "60", rebate: "0", net_profit: "40" },
+          ),
     ) as never);
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("订单利润");

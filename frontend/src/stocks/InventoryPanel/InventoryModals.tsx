@@ -1,7 +1,7 @@
 import { BusinessActionModal } from "../../shared/ui";
 import { money, today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { normalizeError } from "../../shared/api/client";
+import { currentDevUser, normalizeError } from "../../shared/api/client";
 import { ordersApi } from "../../shared/api/orders.api";
 import { InventoryCancellationDialog } from "../InventoryCancellationDialog";
 import { InventoryDeleteDialog } from "./InventoryDeleteDialog";
@@ -36,6 +36,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     removeFromInventory,
     cashflowPools,
     cashflowTarget,
+    cashflowUsers,
     refreshExecution,
     saleTarget,
     saveInline,
@@ -101,6 +102,11 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
       <CashflowModal
         target={cashflowTarget}
         pools={cashflowPools}
+        users={cashflowUsers}
+        scope="REFUND"
+        showOperator
+        showDetails
+        currentOperator={currentDevUser()}
         onClose={() => setCashflowTarget(null)}
         onCreated={async () => {
           const account = cashflowTarget?.account;

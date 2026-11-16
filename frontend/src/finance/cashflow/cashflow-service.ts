@@ -1,6 +1,26 @@
 import { orderCashflowsApi } from "../../shared/api/orderCashflows.api";
 import { today } from "../../shared/lib/format";
-import type { CashflowFormValues } from "./types";
+import type { CashflowDisplayItem, CashflowFormValues } from "./types";
+
+type CashflowDisplaySource = Pick<CashflowDisplayItem, "flow_no" | "occurred_on" | "direction" | "amount"> & {
+  operator?: string | null;
+};
+
+/**
+ * 订单台账与库存中心共用的资金明细口径：订单直接流水 + 事件产生的流水，按流水号去重。
+ * 金额和方向直接使用后端值，前端只负责展示编排。
+ */
+export function buildCashflowDisplayItems(
+  orderCashflows: readonly CashflowDisplaySource[] = [],
+  eventCashflows: readonly (CashflowDisplaySource | null | undefined)[] = [],
+): CashflowDisplayItem[] {
+  const seen = new Set<string>();
+  return [...orderCashflows, ...eventCashflows.flatMap((flow) => flow ? [flow] : [])].filter((flow) => {
+    if (seen.has(flow.flow_no)) return false;
+    seen.add(flow.flow_no);
+    return true;
+  });
+}
 
 export async function createOrderCashflow(orderId: number, values: CashflowFormValues): Promise<void> {
   const direction = values.direction === "IN" ? "IN" : "OUT";

@@ -1,6 +1,7 @@
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Form } from "antd";
 import { useState, type Key, type Dispatch, type SetStateAction } from "react";
+import { employeesApi } from "../../shared/api/org.api";
 import { ordersApi } from "../../shared/api/orders.api";
 import { unlistAndCancelConsignmentOrders } from "../../orders/operations";
 import { poolsApi } from "../../shared/api/pools.api";
@@ -17,7 +18,8 @@ import { type InventoryCancellationValues } from "../InventoryCancellationDialog
 import { type BusinessCenterEntryTab } from "../../orders/businessCenter";
 import { findCancelableBuy, type InventoryActionKey } from "./helpers";
 import type { InventoryOrderRow } from "./types";
-import type { CashflowTarget } from "../../finance/cashflow";
+import { buildCashflowDisplayItems, type CashflowTarget } from "../../finance/cashflow";
+import type { EmployeeOption } from "../../shared/api/types/org";
 
 export function useInventoryActions(params: {
   // list 域注入
@@ -53,6 +55,7 @@ export function useInventoryActions(params: {
   const [rebateTarget, setRebateTarget] = useState<Account | null>(null);
   const [cashflowTarget, setCashflowTarget] = useState<CashflowTarget | null>(null);
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
+  const [cashflowUsers, setCashflowUsers] = useState<EmployeeOption[]>([]);
   const [profileTarget, setProfileTarget] = useState<OrderProfileTarget | null>(null);
   const [detailTarget, setDetailTarget] = useState<Account | null>(null);
   const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
@@ -93,9 +96,10 @@ export function useInventoryActions(params: {
       return;
     }
     try {
-      const [detail, poolList] = await Promise.all([
+      const [detail, poolList, employeeList] = await Promise.all([
         executionDetails[account.id] ?? ordersApi.executionDetail(account.source_order_id),
         poolsApi.list(),
+        employeesApi.list(),
       ]);
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       const sourceOrder = detail.orders.find((order) => order.order_id === account.source_order_id);
@@ -104,7 +108,16 @@ export function useInventoryActions(params: {
         return;
       }
       setCashflowPools(poolList.filter((pool) => pool.status === "ACTIVE"));
-      setCashflowTarget({ account, orderId: sourceOrder.order_id, orderNo: sourceOrder.order_no });
+      setCashflowUsers(employeeList.filter((employee) => employee.is_active));
+      setCashflowTarget({
+        account,
+        orderId: sourceOrder.order_id,
+        orderNo: sourceOrder.order_no,
+        cashflows: buildCashflowDisplayItems(
+          sourceOrder.cashflows ?? [],
+          sourceOrder.events.flatMap((event) => event.cashflow ? [event.cashflow] : []),
+        ),
+      });
     } catch (cause) {
       setError(normalizeError(cause));
     }
@@ -242,6 +255,7 @@ export function useInventoryActions(params: {
     cashflowTarget,
     setCashflowTarget,
     cashflowPools,
+    cashflowUsers,
     profileTarget,
     setProfileTarget,
     detailTarget,

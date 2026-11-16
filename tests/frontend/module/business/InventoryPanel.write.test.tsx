@@ -115,6 +115,20 @@ beforeEach(() => {
   vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "alice", display_name: "小明", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 describe("InventoryPanel：写入与长路径", () => {
+  it("库存中心资金收支与订单台账展示同一订单的资金明细和操作人", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "资金收支" }));
+
+    const modal = await screen.findByRole("dialog", { name: /资金收支 · HS0001/ });
+    expect(within(modal).getByText("资金明细")).toBeInTheDocument();
+    expect(within(modal).getByRole("table", { name: "资金明细表" })).toHaveTextContent("支出");
+    expect(within(modal).getByRole("table", { name: "资金明细表" })).toHaveTextContent("100.00");
+    expect(within(modal).getByRole("table", { name: "资金明细表" })).toHaveTextContent("admin");
+    expect(within(modal).getByLabelText("操作人")).toBeInTheDocument();
+  });
+
   it("库存编辑直接展开详情，账户资料保持只读", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
@@ -410,6 +424,33 @@ describe("OrderDetailDeliverySection", () => {
     await ui.click(compensationType);
     await ui.click(await screen.findByText("续保", { selector: ".ant-select-item-option-content" }));
     expect(onOrderExtraChange).toHaveBeenCalledWith(25, "compensation_type", "续保");
+  });
+
+  it("编辑态交付负责人选择器保持可读宽度", async () => {
+    renderLight(
+      <OrderDetailDeliverySection
+        meta={{ sourceOrderNo: "HS-FE269" } as never}
+        detail={{
+          orders: [{ order_id: 26, order_no: "HS-FE269", order_type: "HS", created_at: "2026-11-02T10:00:00", extra_values: {}, events: [] }],
+        } as never}
+        editing
+        employees={[{ id: 7, username: "lisi", display_name: "李三（三三）", is_active: true }]}
+      />,
+      { user: "admin" },
+    );
+
+    const responsible = await waitFor(() => {
+      const select = document.querySelector<HTMLElement>('.ant-select[aria-label="编辑交付负责人"]');
+      expect(select).toBeInTheDocument();
+      return select as HTMLElement;
+    });
+    expect(responsible).toHaveClass("order-detail__delivery-responsible");
+
+    const searchInput = responsible.querySelector<HTMLInputElement>(".ant-select-selection-search-input");
+    expect(searchInput).toBeInTheDocument();
+    await ui.click(searchInput!);
+    await ui.type(searchInput!, "李");
+    expect(await screen.findByText("李三（三三）", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
   });
 
   it("FE-266：交付负责人回显员工姓名，未加载时不泄露原始 ID", async () => {

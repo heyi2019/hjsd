@@ -14,6 +14,7 @@ import { today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { consignmentRecords, type ActiveConsignment, unlistAndCancelConsignmentOrders } from "../operations";
 import type { OrderProfileTarget } from "../operations";
+import { buildCashflowDisplayItems } from "../../finance/cashflow";
 import {
   buildActionAllocationCandidates,
   buildActionAllocationRows,
@@ -103,7 +104,7 @@ export function useOrderActionModals({
       setCashflowTarget({
         orderId: order.id,
         orderNo: order.order_no,
-        cashflows: order.cashflows,
+        cashflows: buildCashflowDisplayItems(order.cashflows),
       });
     } catch (error) {
       appMessage.error(normalizeError(error).message);

@@ -86,7 +86,7 @@ def list_customers(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
-) -> list[schemas.CustomerOut]:
+) -> PageOut[schemas.CustomerOut]:
     customers = parties_list_customers(
         db, keyword=keyword, status=status, user=user, limit=limit, offset=offset
     )

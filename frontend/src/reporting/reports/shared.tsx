@@ -2,7 +2,7 @@
  * 从 ReportsPage.tsx 拆出：报表本身分文件，壳留在这里避免每个报表重复 try/catch。 */
 
 import { Typography } from "antd";
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { normalizeError } from "../../shared/api/client";
 import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 
@@ -29,8 +29,11 @@ export function useReport<T>(load: () => Promise<T>, deps: readonly unknown[]) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  // 统一负责首次激活和后续重新激活：隐藏页首次挂载不请求，首次切回只请求一次。
-  useReloadOnActive(pageActive, reload);
+  useEffect(() => {
+    reload();
+  }, [reload]);
+  // 首次挂载由上一个 effect 负责；这里仅处理隐藏页重新激活，避免重复请求。
+  useReloadOnActive(pageActive, reload, { skipFirstMount: true });
 
   return { data, loading, error, reload };
 }

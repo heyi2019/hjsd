@@ -18,7 +18,7 @@ export function setDevUser(user: string): void {
 export const api = axios.create({ baseURL: API_BASE, timeout: 15_000 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const token = import.meta.env.DEV ? null : localStorage.getItem(ACCESS_TOKEN_KEY);
   if (token) config.headers.Authorization = `Bearer ${token}`;
   else config.headers["X-Dev-User"] = currentDevUser();
   return config;
@@ -71,7 +71,7 @@ async function realSend(config: InternalAxiosRequestConfig): Promise<CacheEntry>
   // 导致 header 缺失 → 后端 401「未登录或凭证已失效」。
   // 在此显式补 dev 鉴权头，与 api 的鉴权拦截器保持同源口径。
   const headers = new axios.AxiosHeaders(config.headers);
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const token = import.meta.env.DEV ? null : localStorage.getItem(ACCESS_TOKEN_KEY);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   else headers.set("X-Dev-User", currentDevUser());
   const cfg: AxiosRequestConfig = {

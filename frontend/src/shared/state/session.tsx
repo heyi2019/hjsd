@@ -109,21 +109,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // 与 X-Dev-User 直通口径一致）；有 token 时由 /auth/me 分别回填真实角色与用户名。
   const [role, setRole] = useState<string>(currentDevUser());
   const [username, setUsername] = useState<string>(currentDevUser());
-  // DEV 态默认视为已登录（X-Dev-User 直通、本地无 token）；显式点「退出登录」后
-  // 回落 false 落登录页，刷新页面即恢复直通——开发态不会被关在登录页外。
+  // DEV 态始终视为已登录，使用 X-Dev-User 直通，不受残留生产 token 或首次改密状态影响。
   const [authenticated, setAuthenticated] = useState<boolean>(() => import.meta.env.DEV || Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)));
   const [mustChangePassword, setMustChangePassword] = useState(false);
   useEffect(() => {
+    const isDev = import.meta.env.DEV;
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    if (isDev) localStorage.removeItem(ACCESS_TOKEN_KEY);
     // 开发态也要从后端同步当前用户：X-Dev-User 是角色别名，不能直接拿来匹配
     // users.username，否则负责人控件无法默认选中真实操作对象。
-    if (!token && !import.meta.env.DEV) return;
+    if (!token && !isDev) return;
     void currentUserApi().then((current) => {
-      if (token) setRole(current.role.toLowerCase());
+      if (token && !isDev) setRole(current.role.toLowerCase());
       setUsername(current.username);
-      setMustChangePassword(Boolean(current.must_change_password));
+      if (!isDev) setMustChangePassword(Boolean(current.must_change_password));
     }).catch(() => {
-      if (token) {
+      if (token && !isDev) {
         localStorage.removeItem(ACCESS_TOKEN_KEY);
         setAuthenticated(false);
       }
@@ -156,6 +157,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setMustChangePassword(false);
   }, []);
   const logout = useCallback(async () => {
+    if (import.meta.env.DEV) {
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      setAuthenticated(true);
+      setMustChangePassword(false);
+      return;
+    }
     // 后端 /auth/logout 失败也必须退出本地会话：否则「退出登录」点了没反应，
     // 用户以为已退出却仍停留在已登录界面。
     try {

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import * as client from "@/shared/api/client";
-import { DEV_USER_KEY } from "@/shared/api/client";
+import { ACCESS_TOKEN_KEY, DEV_USER_KEY } from "@/shared/api/client";
 import { ALL_PERMISSIONS, ROLE_PERMISSIONS, type Permission, useSession } from "@/shared/state/session";
 
 vi.mock("@/shared/api/client", async (importOriginal) => ({
@@ -23,7 +23,7 @@ beforeEach(() => {
 
 /** 探针组件：把 session 暴露成可断言的文本，避免在测试里重复写 Context 样板。 */
 function Probe() {
-  const { role, username, permissions, can, switchUser, authenticated, login } = useSession();
+  const { role, username, permissions, can, switchUser, authenticated, mustChangePassword, login } = useSession();
   return (
     <div>
       <span data-testid="role">{role}</span>
@@ -32,6 +32,7 @@ function Probe() {
       <span data-testid="can-create">{String(can("order.create"))}</span>
       <span data-testid="can-update">{String(can("order.update"))}</span>
       <span data-testid="authenticated">{String(authenticated)}</span>
+      <span data-testid="must-change-password">{String(mustChangePassword)}</span>
       <button type="button" onClick={() => switchUser("finance")}>
         切到财务
       </button>
@@ -100,6 +101,16 @@ describe("switchUser：切换角色", () => {
 });
 
 describe("开发版免密登录", () => {
+  it("dev 启动忽略残留 token，不进入首次改密流程", async () => {
+    localStorage.setItem(ACCESS_TOKEN_KEY, "stale-token");
+    vi.mocked(client.currentUser).mockResolvedValue({ id: 1, username: "19873133890", role: "ADMIN", display_name: "何一", must_change_password: true });
+    renderLight(<Probe />, { user: "admin" });
+
+    await waitFor(() => expect(screen.getByTestId("authenticated")).toHaveTextContent("true"));
+    expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
+    expect(screen.getByTestId("must-change-password")).toHaveTextContent("false");
+  });
+
   it("admin 留空密码时直接建立开发会话，不调用真实密码登录接口", async () => {
     renderLight(<Probe />);
 

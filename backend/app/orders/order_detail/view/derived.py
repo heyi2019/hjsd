@@ -204,7 +204,12 @@ def _rebate_type(rebate: Any) -> str:
     return "其他返点"
 
 
-def _finance_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailFinanceRowOut]:
+def _finance_rows(
+    orders: list[AccountExecutionOrderOut],
+    *,
+    action_model_rebate_ids: set[int] | None = None,
+) -> list[DetailFinanceRowOut]:
+    action_model_rebate_ids = action_model_rebate_ids or set()
     rows: list[DetailFinanceRowOut] = []
     for order in orders:
         for event in order.events:
@@ -224,6 +229,8 @@ def _finance_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailFinanceR
                 operator_user_ids=flow.operator_user_ids,
             ))
         for rebate in order.rebates:
+            if rebate.id in action_model_rebate_ids:
+                continue
             rows.append(DetailFinanceRowOut(
                 key=f"rebate-{rebate.id}", flow_no=rebate.rebate_no, type=_rebate_type(rebate),
                 direction="收入", amount=rebate.amount, occurred_at=rebate.collected_at,
@@ -269,6 +276,7 @@ def build_detail_view(
     *,
     account_description: str | None = None,
     account_images: list[str] | None = None,
+    action_model_rebate_ids: set[int] | None = None,
 ) -> OrderDetailViewOut:
     sell = next(((event, order) for order in orders for event in order.events if event.event_type == "SELL"), None)
     cancel = next(((event, order) for order in orders for event in order.events if event.event_type == "CANCEL"), None)
@@ -277,7 +285,7 @@ def build_detail_view(
     notes = next((order.note.strip() for order in orders if order.order_type != "DG" and order.note and order.note.strip()), "-")
     return OrderDetailViewOut(
         execution_rows=_execution_rows(orders),
-        finance_rows=_finance_rows(orders),
+        finance_rows=_finance_rows(orders, action_model_rebate_ids=action_model_rebate_ids),
         operation_rows=_operation_rows(orders, account_description=account_description, account_images=account_images),
         lifecycle=DetailLifecycleOut(
             sold_at=sell[0].occurred_at if sell else None,

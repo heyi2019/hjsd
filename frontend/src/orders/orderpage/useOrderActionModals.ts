@@ -1,5 +1,7 @@
 import { Form } from "antd";
 import { useState } from "react";
+import { useSession } from "../../shared/state/session";
+import { currentDevUser, normalizeError } from "../../shared/api/client";
 import type { CashflowTarget } from "../../finance/cashflow";
 import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
@@ -9,7 +11,6 @@ import type { Account } from "../../shared/api/types/accounts";
 import type { Pool } from "../../shared/api/types/finance";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import type { Order } from "../../shared/api/types/orders";
-import { normalizeError } from "../../shared/api/client";
 import { today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { consignmentRecords, type ActiveConsignment, unlistAndCancelConsignmentOrders } from "../operations";
@@ -36,6 +37,7 @@ export function useOrderActionModals({
   selectedOrder,
   load,
 }: OrderActionModalsDeps) {
+  const { username } = useSession();
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [allocationSubmitting, setAllocationSubmitting] = useState(false);
   const [allocationForm] = Form.useForm();
@@ -73,7 +75,11 @@ export function useOrderActionModals({
         policyApi.allocations(order.id),
         employeesApi.list(),
       ]);
-      const candidates = buildActionAllocationCandidates(order);
+      const currentEmployee = userResult.find((item) => item.is_active && item.username === username)
+        ?? (import.meta.env.DEV
+          ? userResult.find((item) => item.is_active && item.username === currentDevUser())
+          : undefined);
+      const candidates = buildActionAllocationCandidates(order, currentEmployee?.id);
       setActionOrder(order);
       setUsers(userResult.filter((item) => item.is_active));
       setAllocationCandidates(candidates);

@@ -37,6 +37,14 @@ describe("库存纯逻辑", () => {
     expect(rows.map((row) => row.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
   });
 
+  it("分润售出优先使用售出事件操作人，缺失时才回退交付负责人或当前人", () => {
+    expect(buildActionAllocationCandidates({
+      form_extra: { delivery_responsible_ids: [22] },
+      events: [{ id: 1, event_no: "EV-1", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [44], cancellable_amount: "200" }],
+    })).toMatchObject({ SELL: [44] });
+    expect(buildActionAllocationCandidates({ form_extra: {}, events: [] }, 55)).toMatchObject({ SELL: [55] });
+  });
+
   // —— #19 切换冲销流水的字段回填（金额 / 资金池 / 操作人重置）——
   it("切换冲销流水：金额与资金池跟随新流水，操作人重置为默认值", () => {
     const setFieldValue = vi.fn();

@@ -23,7 +23,7 @@ export const installmentsApi = {
         responseType: "blob",
       })
       .then((r) => r.data),
-  create: (payload: Partial<Installment> & { first_due_on: string; adjust_final_period?: boolean; schedule?: InstallmentScheduleInput[] }) =>
+  create: (payload: Partial<Installment> & { first_due_on: string; adjust_final_period?: boolean; schedule?: InstallmentScheduleInput[]; operator_user_ids?: number[] }) =>
     api.post<Installment>("/installments", payload).then((r) => r.data),
   pay: (
     id: number,

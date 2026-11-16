@@ -395,6 +395,7 @@ def post_event(
             amount=money,
             order_id=order.id,
             order_event_id=event.id,
+            operator_user_ids=operator_user_ids,
             note=note,
             created_by=actor,
             updated_by=actor,

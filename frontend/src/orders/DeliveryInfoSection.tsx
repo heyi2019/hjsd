@@ -7,7 +7,11 @@ import { ResponsibleEmployeeSelect } from "./ResponsibleEmployeeSelect";
 import "./DeliveryInfoSection.css";
 
 /** 建单时已知的账号交接条件；实际交付完成仍在订单详情中登记。 */
-export function DeliveryInfoSection(props: { showIntermediary?: boolean; employees?: EmployeeOption[] }) {
+export function DeliveryInfoSection(props: {
+  showIntermediary?: boolean;
+  employees?: EmployeeOption[];
+  showSaleOperator?: boolean;
+}) {
   const form = Form.useFormInstance();
   const deliveryTitle = sectionLabel("DELIVER", "交付信息");
   const intermediaryType = Form.useWatch("intermediary_type", form);
@@ -46,6 +50,9 @@ export function DeliveryInfoSection(props: { showIntermediary?: boolean; employe
           <CfgItem name="compensation_type" label="包赔类型" rules={compensationEnabled ? [{ required: true, message: "请选择包赔类型" }] : []}><Select options={compensationTypeOptions} disabled={!compensationEnabled} placeholder={compensationEnabled ? "请选择" : "选择包赔后可选"} /></CfgItem>
         </> : null}
         <ResponsibleEmployeeSelect className="delivery-info-section__responsibles" name="delivery_responsible_ids" label="交付操作人" employees={props.employees ?? []} />
+        {props.showSaleOperator ? (
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="售出操作人" employees={props.employees ?? []} />
+        ) : null}
       </AdaptiveFormGrid>
     </BusinessRegistrationGroup>
   );

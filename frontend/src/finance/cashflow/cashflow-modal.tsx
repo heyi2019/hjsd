@@ -3,7 +3,8 @@ import { DatePicker, Form, Input, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../../orders/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../../orders/ResponsibleEmployeeSelect";
-import { normalizeError } from "../../shared/api/client";
+import { currentDevUser, normalizeError } from "../../shared/api/client";
+import { useSession } from "../../shared/state/session";
 import { today } from "../../shared/lib/format";
 import { requiredMoneyRules } from "../../shared/lib/validators";
 import { BusinessActionModal, BusinessRegistrationForm, ErrorBanner, MoneyInput, MoneyText, Select as UiSelect, dateValueFromEvent, dateValueProps } from "../../shared/ui";
@@ -26,6 +27,7 @@ export function CashflowModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const open = Boolean(target);
+  const { username } = useSession();
 
   useEffect(() => {
     if (!target) return;
@@ -37,6 +39,16 @@ export function CashflowModal({
     });
     setError(null);
   }, [form, pools, target]);
+
+  useEffect(() => {
+    if (!open || !users.length) return;
+    const currentValue = form.getFieldValue("operator_user_ids");
+    const isEmpty = currentValue == null || (Array.isArray(currentValue) && currentValue.length === 0);
+    const devUsername = import.meta.env.DEV ? currentDevUser() : undefined;
+    const currentEmployeeId = users.find((employee) => employee.is_active && employee.username === username)?.id
+      ?? (devUsername ? users.find((employee) => employee.is_active && employee.username === devUsername)?.id : undefined);
+    if (isEmpty && currentEmployeeId !== undefined) form.setFieldValue("operator_user_ids", [currentEmployeeId]);
+  }, [form, open, username, users]);
 
   const submit = async (values: CashflowFormValues) => {
     if (!target) return;

@@ -12,7 +12,8 @@ import type { Account } from "../../shared/api/types/accounts";
 import type { Customer } from "../../shared/api/types/customers";
 import type { Pool } from "../../shared/api/types/finance";
 import type { EmployeeOption } from "../../shared/api/types/org";
-import { normalizeError } from "../../shared/api/client";
+import { currentDevUser, normalizeError } from "../../shared/api/client";
+import { useSession } from "../../shared/state/session";
 import { today } from "../../shared/lib/format";
 import { BusinessActionModal, BusinessRegistrationForm, ErrorBanner, PermissionButton } from "../../shared/ui";
 import { CustomFieldSection, FieldConfigScope } from "../../orders/ConfigurableField";
@@ -66,6 +67,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
+  const { username } = useSession();
   const open = Boolean(props.account);
   const saleScope = SALE_SCOPE_BY_INVENTORY_TYPE[resolvedType ?? ""];
   const paymentMethod = Form.useWatch("payment_method", form) ?? "FULL";
@@ -165,6 +167,27 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
       setError({ message: "该库存账号未关联到入库订单，无法在其上登记售出" });
       return;
     }
+    const selectedOperatorIds = Array.isArray(values.operator_user_ids)
+      ? (values.operator_user_ids as unknown[]).filter((id): id is number => typeof id === "number")
+      : [];
+    const devUsername = import.meta.env.DEV ? currentDevUser() : undefined;
+    let currentEmployeeId = employees.find((employee) => employee.is_active && employee.username === username)?.id
+      ?? (devUsername ? employees.find((employee) => employee.is_active && employee.username === devUsername)?.id : undefined);
+    // InventoryPanel 打开售出弹窗后可以立即提交；人员列表若仍在并发加载，不能因此丢失默认当前人。
+    // 提交前补一次主数据读取，保证三个售出入口都向后端带上操作人。
+    if (currentEmployeeId === undefined) {
+      const latestEmployees = await employeesApi.list();
+      currentEmployeeId = latestEmployees.find((employee) => employee.is_active && employee.username === username)?.id
+        ?? (devUsername ? latestEmployees.find((employee) => employee.is_active && employee.username === devUsername)?.id : undefined);
+    }
+    const operatorUserIds = selectedOperatorIds.length > 0
+      ? selectedOperatorIds
+      : currentEmployeeId === undefined ? [] : [currentEmployeeId];
+    if (operatorUserIds.length === 0) {
+      setError({ message: "售出操作人必填" });
+      return;
+    }
+    values.operator_user_ids = operatorUserIds;
     setSubmitting(true);
     // 售出 = 原买入订单上的卖出动作（SELL），不再新建订单；买家建档后挂到来源单。
     try {
@@ -252,7 +275,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope={saleScope ?? ""} form={form} onFinish={submit}>
           <RecoveryCustomerSection title={buyerInfoTitle} />
-          <DeliveryInfoSection showIntermediary employees={employees} />
+          <DeliveryInfoSection showIntermediary employees={employees} showSaleOperator />
           <SaleFinanceCard
             isConsignment={isConsignment}
             paymentMethod={paymentMethod}

@@ -19,7 +19,7 @@ export type CashflowDisplayItem = {
 };
 
 export type CashflowFormValues = {
-  occurred_on?: Dayjs;
+  occurred_on?: Dayjs | string;
   direction?: string;
   amount: string;
   pool_id?: number;

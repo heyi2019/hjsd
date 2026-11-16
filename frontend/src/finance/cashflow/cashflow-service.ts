@@ -24,9 +24,12 @@ export function buildCashflowDisplayItems(
 
 export async function createOrderCashflow(orderId: number, values: CashflowFormValues): Promise<void> {
   const direction = values.direction === "IN" ? "IN" : "OUT";
+  const occurredOn = typeof values.occurred_on === "string"
+    ? values.occurred_on.slice(0, 10)
+    : values.occurred_on?.format("YYYY-MM-DD") ?? today();
   await orderCashflowsApi.create(orderId, {
     pool_id: values.pool_id,
-    occurred_on: (values.occurred_on ?? today()).toString().slice(0, 10),
+    occurred_on: occurredOn,
     direction,
     nature: direction === "IN" ? "BUSINESS_IN" : "BUSINESS_OUT",
     fund_nature: "BUSINESS",

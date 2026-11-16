@@ -510,8 +510,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "资金收支");
     const modal = await modalOf(/资金收支 · HS-2026-0001/);
-    await ui.click(within(modal).getByRole("combobox", { name: "操作人" }));
-    await ui.click(await screen.findByText("李四", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(within(modal).getByRole("combobox", { name: "操作人" }).closest(".ant-select")).toHaveTextContent("李四"));
     await ui.type(within(modal).getByLabelText("金额"), "500");
     await ui.type(within(modal).getByLabelText("收支备注"), "客户取消");
     expect(within(modal).getByText("支出")).toBeInTheDocument();
@@ -519,7 +518,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() =>
       expect(orderCashflowsApi.create).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({ direction: "OUT", amount: "500", category: "OTHER", pool_id: expect.any(Number) }),
+        expect.objectContaining({ direction: "OUT", amount: "500", category: "OTHER", occurred_on: today(), pool_id: expect.any(Number) }),
       )
     );
     expect(vi.mocked(orderCashflowsApi.create).mock.calls[0][1]).toMatchObject({ operator_user_ids: [9] });

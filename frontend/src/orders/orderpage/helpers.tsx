@@ -50,7 +50,10 @@ function postedEventOperatorIds(order: Pick<Order, "events">, eventTypes?: Set<s
 }
 
 /** 从订单事实提取四类动作操作人：建单操作人、卖出表单操作人和运营信息中的操作人。 */
-export function buildActionAllocationCandidates(order: Pick<Order, "events" | "form_extra">): ActionAllocationCandidates {
+export function buildActionAllocationCandidates(
+  order: Pick<Order, "events" | "form_extra">,
+  defaultOperatorId?: number,
+): ActionAllocationCandidates {
   const formExtra = order.form_extra ?? {};
   const businessResponsibleIds = responsibleIds(formExtra.business_responsible_ids);
   const deliveryResponsibleIds = responsibleIds(formExtra.delivery_responsible_ids);
@@ -59,9 +62,12 @@ export function buildActionAllocationCandidates(order: Pick<Order, "events" | "f
     .map((event) => event.event_type)
     .filter((eventType) => !["BUY", "SELL", "CANCEL"].includes(eventType)));
   const operationEventOperatorIds = postedEventOperatorIds(order, operationEventTypes);
+  const sellEventOperatorIds = postedEventOperatorIds(order, new Set(["SELL"]));
   return {
     BUY: businessResponsibleIds.length ? businessResponsibleIds : postedEventOperatorIds(order, new Set(["BUY"])),
-    SELL: deliveryResponsibleIds.length ? deliveryResponsibleIds : postedEventOperatorIds(order, new Set(["SELL"])),
+    SELL: sellEventOperatorIds.length
+      ? sellEventOperatorIds
+      : deliveryResponsibleIds.length ? deliveryResponsibleIds : defaultOperatorId ? [defaultOperatorId] : [],
     OPERATION: operationResponsibleIds.length
       ? operationResponsibleIds
       : operationEventOperatorIds.length ? operationEventOperatorIds : businessResponsibleIds,

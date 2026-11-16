@@ -79,6 +79,7 @@ def load_order_execution_detail(
             outputs,
             account_description=account.account_description,
             account_images=account.account_images or [],
+            action_model_rebate_ids=context.action_model_rebate_ids,
         ),
         audit=audit,
     )

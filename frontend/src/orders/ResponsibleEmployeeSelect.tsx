@@ -2,6 +2,7 @@ import { Form } from "antd";
 import type { SelectProps } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import type { EmployeeOption } from "../shared/api/types/org";
+import { currentDevUser } from "../shared/api/client";
 import { useSession } from "../shared/state/session";
 import { Select } from "../shared/ui";
 import { CfgItem } from "./ConfigurableField";
@@ -34,10 +35,13 @@ export function ResponsibleEmployeeSelect(props: { name: string; label: string; 
   // 按人匹配必须用 username（users.username），不能用 role（ADMIN/OPERATOR 这类系统角色）：
   // 拿角色去比 username 在生产环境恒不命中，默认值只能靠 /auth/me 那一路兜。
   const { username } = useSession();
-  const defaultEmployeeId = useMemo(
-    () => props.employees.find((employee) => employee.username === username)?.id,
-    [props.employees, username],
-  );
+  const defaultEmployeeId = useMemo(() => {
+    const sessionEmployee = props.employees.find((employee) => employee.is_active && employee.username === username);
+    if (sessionEmployee) return sessionEmployee.id;
+    if (!import.meta.env.DEV) return undefined;
+    const devUsername = currentDevUser();
+    return props.employees.find((employee) => employee.is_active && employee.username === devUsername)?.id;
+  }, [props.employees, username]);
   useEffect(() => {
     const currentValue = form.getFieldValue(props.name);
     const isEmpty = currentValue == null || (Array.isArray(currentValue) && currentValue.length === 0);

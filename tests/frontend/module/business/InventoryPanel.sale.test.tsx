@@ -99,6 +99,7 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
     amount: "350",
     pool_id: 3,
     portion: "PROFIT",
+    operator_user_ids: [1],
   }));
 });
 
@@ -176,8 +177,7 @@ it("代挂售出复用买号交付信息块，交付操作人提交落库到来�
     expect(screen.getByText("交易平台")).toBeInTheDocument();
     expect(screen.getByText("中介类型")).toBeInTheDocument();
     expect(screen.getByText("包赔类型")).toBeInTheDocument();
-    await ui.click(screen.getByLabelText("交付操作人"));
-    await ui.click(await screen.findByText("管理员", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(screen.getByLabelText("交付操作人").closest(".ant-select")).toHaveTextContent("管理员"));
     await ui.click(screen.getByLabelText("交易平台"));
     await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
     await ui.type(screen.getByLabelText("客户昵称"), "买家A");
@@ -238,6 +238,7 @@ it("提号库存售出可选择分期出售，确立时收首付", async () => {
       event_type: "SELL",
       sale_mode: "INSTALLMENT",
       amount: "1200",
+      operator_user_ids: [1],
     }));
   });
 
@@ -260,7 +261,7 @@ describe("库存售出三表单分支", () => {
   });
 
   it("回收、提号、代挂三种售出表单都展示统一的交付信息", async () => {
-  const deliveryLabels = ["换绑手机号", "手机号绑定人", "交易平台", "中介类型", "包赔类型", "交付操作人"];
+    const deliveryLabels = ["换绑手机号", "手机号绑定人", "交易平台", "中介类型", "包赔类型", "交付操作人", "售出操作人"];
     const cases = [
       [RecoverySaleModal, accounts[0]],
       [PickupSaleModal, { ...accounts[0], inventory_type: "PICKUP" }],

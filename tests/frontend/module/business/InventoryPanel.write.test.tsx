@@ -179,8 +179,7 @@ describe("InventoryPanel：写入与长路径", () => {
     await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "运营" }));
     await ui.click(screen.getByRole("menuitem", { name: "寄售（上架）" }));
     expect(await screen.findByText("登记寄售")).toBeInTheDocument();
-    await ui.click(screen.getByRole("combobox", { name: "操作人" }));
-    await ui.click(await screen.findByText("管理员", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "操作人" }).closest(".ant-select")).toHaveTextContent("管理员"));
 
     await ui.click(screen.getAllByRole("combobox", { name: "寄售平台" })[0]);
     await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));

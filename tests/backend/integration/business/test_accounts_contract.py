@@ -657,4 +657,6 @@ class TestAccountsApi:
             "collected_on": TODAY.isoformat(),
             "collected_at": rebate.created_at.isoformat(),
         }]
+        finance_rows = response.json()["detail_view"]["finance_rows"]
+        assert [row["type"] for row in finance_rows] == ["回收成本", "返点收入"]
 

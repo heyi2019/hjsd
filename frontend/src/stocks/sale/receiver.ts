@@ -33,6 +33,7 @@ export async function collectFullPayment(input: CollectPaymentInput): Promise<vo
     occurred_on: today(),
     pool_id: values.pool_id as number,
     portion: "PROFIT",
+    operator_user_ids: values.operator_user_ids as number[] | undefined,
     note: values.cashflow_note as string | undefined,
     bound_phone: values.bound_phone as string | undefined,
     bound_phone_owner: values.bound_phone_owner as string | undefined,
@@ -56,6 +57,7 @@ export async function collectInstallmentPayment(input: Omit<CollectPaymentInput,
     amount: String(values.amount ?? 0),
     occurred_on: today(),
     portion: "PROFIT",
+    operator_user_ids: values.operator_user_ids as number[] | undefined,
     note: values.note as string | undefined,
   });
   const installment = await installmentsApi.create({
@@ -72,6 +74,7 @@ export async function collectInstallmentPayment(input: Omit<CollectPaymentInput,
     first_due_on: firstDueOn,
     schedule,
     note: values.note as string | undefined,
+    operator_user_ids: values.operator_user_ids as number[] | undefined,
   });
   // 分期计划确立时即收首付：首付是期次 0，登记一笔 INSTALLMENT_PAYMENT 收入资金明细。
   // 无首付（首付为 0）则不产生收款事件，仅建合同。

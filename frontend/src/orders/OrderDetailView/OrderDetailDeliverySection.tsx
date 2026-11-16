@@ -27,7 +27,7 @@ const DELIVERY_FIELDS = [
   { key: "intermediary_platform", fallback: "交易平台" },
   { key: "intermediary_type", fallback: "中介类型" },
   { key: "compensation_type", fallback: "包赔类型" },
-  { key: "delivery_responsible_ids", fallback: "交付负责人" },
+  { key: "delivery_responsible_ids", fallback: "交付操作人" },
 ] as const;
 
 function textValue(value: unknown): string {
@@ -96,9 +96,9 @@ function DeliverySubSection({
       if (raw == null || raw === "") {
         value = "-";
       } else if (key === "delivery_responsible_ids" && Array.isArray(raw) && employees?.length) {
-        value = raw.map((id) => employeeNames.get(id) ?? "未知负责人").join("、") || "-";
+        value = raw.map((id) => employeeNames.get(id) ?? "未知操作人").join("、") || "-";
       } else if (key === "delivery_responsible_ids" && Array.isArray(raw)) {
-        value = raw.length ? "负责人信息加载中" : "-";
+        value = raw.length ? "操作人信息加载中" : "-";
       } else {
         value = formatExtraDisplayValue(raw);
       }
@@ -126,7 +126,7 @@ function DeliverySubSection({
               {editing && field.key === "delivery_responsible_ids" ? (
                 <Select
                   mode="multiple"
-                  aria-label="编辑交付负责人"
+                  aria-label="编辑交付操作人"
                   className="order-detail__delivery-responsible"
                   value={Array.isArray(editableValues[field.key]) ? editableValues[field.key] : []}
                   options={(employees ?? []).map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))}

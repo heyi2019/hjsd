@@ -12,6 +12,8 @@ interface SystemOffsaleCancellation {
   reason: string;
   /** 事件发生日期（YYYY-MM-DD）。 */
   occurredOn: string;
+  /** 本次下架的操作人，沿用建单/业务事件的默认当前员工并支持多选。 */
+  operatorUserIds?: number[];
   /** 下架表单的扩展字段，原样并入两个请求的 form_extra。 */
   formExtra?: Record<string, unknown>;
 }
@@ -29,6 +31,7 @@ export async function unlistAndCancelConsignmentOrders({
   note,
   reason,
   occurredOn,
+  operatorUserIds,
   formExtra,
 }: SystemOffsaleCancellation): Promise<void> {
   await Promise.all(records.map(async (record) => {
@@ -42,6 +45,7 @@ export async function unlistAndCancelConsignmentOrders({
       event_type: "OPERATE",
       operation_type: "UNLIST",
       occurred_on: occurredOn,
+      operator_user_ids: operatorUserIds,
       note,
       form_extra_scope: "INVOID",
       form_extra: {

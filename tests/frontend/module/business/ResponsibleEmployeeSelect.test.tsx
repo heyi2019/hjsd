@@ -28,7 +28,7 @@ function Harness() {
   const [form] = Form.useForm();
   return (
     <Form form={form} initialValues={{ owners: undefined }}>
-      <ResponsibleEmployeeSelect name="owners" label="交付负责人" employees={employees} />
+      <ResponsibleEmployeeSelect name="owners" label="交付操作人" employees={employees} />
     </Form>
   );
 }
@@ -43,7 +43,7 @@ beforeEach(() => {
 describe("ResponsibleEmployeeSelect：按人匹配用 username，不用角色", () => {
   it("默认勾选与当前用户名一致的员工，而不是同名的角色", async () => {
     renderLight(<Harness />);
-    const select = screen.getByLabelText("交付负责人");
+    const select = screen.getByLabelText("交付操作人");
     await waitFor(() => {
       // 命中 users.username === "xiaoxuan" 的小轩
       expect(select.closest(".ant-select")?.textContent).toContain("小轩");

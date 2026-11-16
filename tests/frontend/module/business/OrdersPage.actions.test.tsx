@@ -449,7 +449,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     for (const label of ["买号", "售出", "运营", "公司"]) {
       expect(within(modal).getByText(label)).toBeInTheDocument();
     }
-    // 买号取建单负责人，售出取卖出表单负责人，运营取运营信息中的动作负责人，均自动带出。
+    // 买号取建单操作人，售出取卖出表单操作人，运营取运营信息中的动作操作人，均自动带出。
     expect(within(modal).getByText("回收员")).toBeInTheDocument();
     expect(within(modal).getByText("售出员")).toBeInTheDocument();
     expect(within(modal).getByText("运营员")).toBeInTheDocument();
@@ -510,6 +510,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "资金收支");
     const modal = await modalOf(/资金收支 · HS-2026-0001/);
+    await ui.click(within(modal).getByRole("combobox", { name: "操作人" }));
+    await ui.click(await screen.findByText("李四", { selector: ".ant-select-item-option-content" }));
     await ui.type(within(modal).getByLabelText("金额"), "500");
     await ui.type(within(modal).getByLabelText("收支备注"), "客户取消");
     expect(within(modal).getByText("支出")).toBeInTheDocument();
@@ -520,6 +522,7 @@ describe("OrdersPage：操作与筛选分支", () => {
         expect.objectContaining({ direction: "OUT", amount: "500", category: "OTHER", pool_id: expect.any(Number) }),
       )
     );
+    expect(vi.mocked(orderCashflowsApi.create).mock.calls[0][1]).toMatchObject({ operator_user_ids: [9] });
     expect(message.success).toHaveBeenCalledWith("资金收支已登记");
   });
 

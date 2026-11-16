@@ -1,10 +1,13 @@
 import { appMessage } from "../../shared/ui/appFeedback";
-import { Input, Space, Upload } from "antd";
+import { Form, Input, Space, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
+import { employeesApi } from "../../shared/api/org.api";
 import type { Account } from "../../shared/api/types/accounts";
-import { BusinessActionModal, InlineError } from "../../shared/ui";
+import type { EmployeeOption } from "../../shared/api/types/org";
+import { BusinessActionModal, BusinessRegistrationForm, InlineError } from "../../shared/ui";
+import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import "./profile-modal.css";
 
 export type OrderProfileTarget = {
@@ -44,12 +47,14 @@ export function OrderProfileModal({
   onClose: () => void;
   onSaved: (account: Account) => void;
   onError: (error: unknown) => void;
-  onOperation?: (operationType: "IMAGE" | "DESCRIPTION") => void | Promise<void>;
+  onOperation?: (operationType: "IMAGE" | "DESCRIPTION", operatorUserIds: number[]) => void | Promise<void>;
 }) {
   const [description, setDescription] = useState("");
   const [images, setImages] = useState<UploadFile[]>([]);
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState<{ message: string } | null>(null);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [form] = Form.useForm();
 
   useEffect(() => {
     if (!target) return;
@@ -62,6 +67,9 @@ export function OrderProfileModal({
       url,
     })));
     setValidationError(null);
+    void Promise.resolve(employeesApi.list())
+      .then((items) => setEmployees((items ?? []).filter((item) => item.is_active)))
+      .catch(onError);
   }, [target]);
 
   async function imageValues(): Promise<string[]> {
@@ -76,6 +84,7 @@ export function OrderProfileModal({
     setValidationError(null);
     setSaving(true);
     try {
+      const values = await form.validateFields();
       const imagePayload = target.mode === "images" ? await imageValues() : null;
       if (target.mode === "images" && !imagePayload?.length) {
         setValidationError({ message: "请至少添加一张图片" });
@@ -91,7 +100,7 @@ export function OrderProfileModal({
       }
       await ordersApi.updateExecution(orderId, { profile: payload, events: [] });
       if (onOperation) {
-        await onOperation(target.mode === "images" ? "IMAGE" : "DESCRIPTION");
+        await onOperation(target.mode === "images" ? "IMAGE" : "DESCRIPTION", values.operator_user_ids ?? []);
       }
       onSaved({ ...target.account, ...payload });
       onClose();
@@ -116,6 +125,9 @@ export function OrderProfileModal({
       onOk={() => void save()}
     >
       <InlineError error={validationError} />
+      <BusinessRegistrationForm layout="horizontal" labelAlign="left" labelCol={{ flex: "108px" }} wrapperCol={{ flex: "auto" }} form={form}>
+        <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} required />
+      </BusinessRegistrationForm>
       {target.mode === "images" ? (
         <Space className="order-profile-description-editor" direction="vertical" size="middle">
           <ProfileContext account={target.account} />

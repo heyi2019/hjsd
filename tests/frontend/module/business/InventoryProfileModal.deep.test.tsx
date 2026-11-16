@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { OrderProfileModal, type OrderProfileTarget } from "@/orders/operations";
 import { ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
 import type { Account } from "@/shared/api/types/accounts";
 
 vi.mock("@/shared/api/cashflows.api");
@@ -64,6 +65,7 @@ beforeEach(() => {
   onSaved = vi.fn();
   onError = vi.fn();
   vi.mocked(ordersApi.updateExecution).mockResolvedValue({ ok: true });
+  vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }]);
 });
 
 describe("OrderProfileModal：描述与图片读取", () => {

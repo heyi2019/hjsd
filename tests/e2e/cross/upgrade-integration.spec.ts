@@ -242,7 +242,7 @@ test.describe.serial("重写入用例（串行隔离）", () => {
     ] } });
     expect(allocations.status()).toBe(200);
     // 按动作分润（ACTION 模型）：四项比例合计 100% 落库即可。
-    // SELL 动作位绑定「交付负责人」（delivery_responsible_ids，本表单默认值），
+    // SELL 动作位绑定「交付操作人」（delivery_responsible_ids，本表单默认值），
     // 并非建单操作人 admin，故只校验四项齐全、SELL 比例正确，不绑死具体 user_id。
     const savedAllocations = await allocations.json();
     expect(savedAllocations.items).toHaveLength(4);

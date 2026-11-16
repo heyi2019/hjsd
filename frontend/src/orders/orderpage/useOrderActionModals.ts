@@ -51,7 +51,7 @@ export function useOrderActionModals({
   const [orderOffsaleTarget, setOrderOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
   /** 订单总利润（后端 order_amounts 口径），负数即亏损单；分润弹窗顶部展示并作为金额分润上限。 */
   const [allocationProfit, setAllocationProfit] = useState<string>("0");
-  /** 按操作分配时的动作执行人候选，来自建单/售出负责人和运营信息中的操作人。 */
+  /** 按操作分配时的动作执行人候选，来自建单/售出操作人和运营信息中的操作人。 */
   const [allocationCandidates, setAllocationCandidates] = useState<ActionAllocationCandidates>({ BUY: [], SELL: [], OPERATION: [], COMPANY: [] });
   const [actionOrder, setActionOrder] = useState<Order | null>(null);
   const [users, setUsers] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
@@ -178,7 +178,7 @@ export function useOrderActionModals({
     }
   };
 
-  const handleOrderSystemOffsale = async (payload: { reason: string; form_extra?: Record<string, unknown> }) => {
+  const handleOrderSystemOffsale = async (payload: { reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     const target = orderOffsaleTarget;
     if (!target) return;
     try {
@@ -187,6 +187,7 @@ export function useOrderActionModals({
         cancelOrderIds: target.records.map((record) => record.orderId),
         note: `系统下架：${payload.reason}`,
         reason: payload.reason,
+        operatorUserIds: payload.operator_user_ids,
         occurredOn: today(),
         formExtra: payload.form_extra,
       });

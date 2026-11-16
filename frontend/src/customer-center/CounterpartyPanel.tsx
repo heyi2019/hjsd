@@ -1,7 +1,7 @@
-import { Card, Descriptions, Drawer, Form, Input, Space, Spin } from "antd";
+import { Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
+import { buildFormExtraDisplay, CfgItem, CustomFieldSection, FieldConfigScope, formatExtraDisplayValue } from "../orders/ConfigurableField";
 import { counterpartiesApi } from "../shared/api/customers.api";
 import { orderFormFieldsApi } from "../shared/api/orders.api";
 import type { Counterparty } from "../shared/api/types/customers";
@@ -139,6 +139,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
     { title: "名称", dataIndex: "display_name" },
     { title: "类型", dataIndex: "type", render: (v: string) => configurableLabel("COUNTERPARTY_TYPE", v) },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="COUNTERPARTY_STATUS" /> },
+    { title: "创建操作人", dataIndex: "created_by", render: (v: string | null | undefined) => v || "-" },
     {
       title: "操作",
       render: (_v, row) => (
@@ -315,6 +316,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         {detailLoading ? (
           <div role="status" aria-label="正在加载合作方详情"><Spin /></div>
         ) : detailData ? (
+          <>
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="合作方编号">{detailData.counterparty_no}</Descriptions.Item>
             <Descriptions.Item label="名称">{detailData.display_name}</Descriptions.Item>
@@ -324,8 +326,30 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
             <Descriptions.Item label="微信">{detailData.wechat || "-"}</Descriptions.Item>
             <Descriptions.Item label="QQ">{detailData.qq || "-"}</Descriptions.Item>
             <Descriptions.Item label="状态"><StatusTag status={detailData.status} optionSet="COUNTERPARTY_STATUS" /></Descriptions.Item>
+            <Descriptions.Item label="创建操作人">{detailData.created_by || "-"}</Descriptions.Item>
             <Descriptions.Item label="备注">{detailData.note || "-"}</Descriptions.Item>
           </Descriptions>
+          <Typography.Title level={5} className="ui-title-spaced">扩展字段</Typography.Title>
+          {(() => {
+            const items = buildFormExtraDisplay(detailData.extra_values, fieldDefs);
+            if (items.length === 0) {
+              return (
+                <Typography.Paragraph type="secondary">
+                  {fieldDefs.length === 0 ? "未配置扩展字段；在「设置 › 表单字段 › 合作方建档」新增自定义字段后，建档与详情会自动带出。" : "无扩展字段值"}
+                </Typography.Paragraph>
+              );
+            }
+            return (
+              <Descriptions column={1} bordered size="small">
+                {items.map((item) => (
+                  <Descriptions.Item key={item.key} label={`${item.label}${item.status === "deleted" ? "（已删除）" : item.status === "inactive" ? "（已停用）" : ""}`}>
+                    {formatExtraDisplayValue(item.value) || "未填写"}
+                  </Descriptions.Item>
+                ))}
+              </Descriptions>
+            );
+          })()}
+          </>
         ) : null}
       </Drawer>
     </Card>

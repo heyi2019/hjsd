@@ -133,7 +133,7 @@ export function useOrderCancellation(params: {
           }
           const amount = resolved.amount;
           // 操作人是业务事实的一部分，不能依赖异步下拉组件恰好先完成默认值注入。
-          // 用户直接确认弹窗时，最后一次从当前会话解析员工 ID，确保后端收到显式负责人。
+          // 用户直接确认弹窗时，最后一次从当前会话解析员工 ID，确保后端收到显式操作人。
           let operatorUserIds = values.operator_user_ids?.length ? values.operator_user_ids : undefined;
           if (!operatorUserIds?.length) {
             const byDevUser = cancelEmployees.find((employee) => employee.username === currentOperator);

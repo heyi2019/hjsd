@@ -9,13 +9,14 @@ def test_customer_output_always_returns_full_contact():
     cust = Customer(
         id=1, customer_no="CUS0001", display_name="张三",
         contact_name="张三", phone="13800001111", wechat="wxid_abc", qq="123456",
-        owner_id=1, status="ACTIVE",
+        owner_id=1, status="ACTIVE", created_by="admin",
     )
     out = to_customer_out(cust)
     assert "contact_masked" not in out
     assert out["phone"] == "13800001111"
     assert out["wechat"] == "wxid_abc"
     assert out["qq"] == "123456"
+    assert out["created_by"] == "admin"
 
 
 def test_counterparty_output_always_returns_full_contact():
@@ -29,9 +30,11 @@ def test_counterparty_output_always_returns_full_contact():
         wechat="wx_peer",
         qq="654321",
         status="ACTIVE",
+        created_by="admin",
     )
     out = to_counterparty_out(counterparty)
     assert "contact_masked" not in out
     assert out["phone"] == "13800002222"
     assert out["wechat"] == "wx_peer"
     assert out["qq"] == "654321"
+    assert out["created_by"] == "admin"

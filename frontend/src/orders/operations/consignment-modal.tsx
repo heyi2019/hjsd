@@ -4,11 +4,14 @@ import { DatePicker, Form, InputNumber } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
+import { employeesApi } from "../../shared/api/org.api";
 import type { Account } from "../../shared/api/types/accounts";
+import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, MoneyText, PermissionButton, Select } from "../../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../ConfigurableField";
+import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { InventoryAccountSummary } from "../../stocks/InventoryAccountSummary";
 import { activeConsignmentListings } from "./consignment-logic";
 import "./consignment-modal.css";
@@ -24,6 +27,7 @@ export function OrderConsignmentModal(props: {
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [listed, setListed] = useState<ListedPlatform[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [sourceOrderId, setSourceOrderId] = useState<number | null>(props.orderId ?? props.account?.source_order_id ?? null);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
@@ -47,11 +51,12 @@ export function OrderConsignmentModal(props: {
     setError(null);
     setSourceOrderId(props.orderId ?? props.account?.source_order_id ?? null);
     form.setFieldsValue({ listed_at: dayjs().second(0).millisecond(0) });
+    void employeesApi.list().then((items) => setEmployees(items.filter((item) => item.is_active))).catch((cause) => setError(normalizeError(cause)));
     const orderId = props.orderId ?? props.account?.source_order_id;
     if (orderId != null) void refreshListed(orderId).catch((cause) => setError(normalizeError(cause)));
   }, [form, open, props.account, props.orderId]);
 
-  const submit = async (values: { platform?: string; consignment_price?: number | null; listed_at?: Dayjs; form_extra?: Record<string, unknown> }) => {
+  const submit = async (values: { platform?: string; consignment_price?: number | null; listed_at?: Dayjs; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     if (!props.account) return;
     const listedAt = values.listed_at ?? dayjs();
     if (!values.platform) return;
@@ -66,6 +71,7 @@ export function OrderConsignmentModal(props: {
         event_type: "OPERATE",
         operation_type: "CONSIGNMENT",
         occurred_on: listedAt.format("YYYY-MM-DD"),
+        operator_user_ids: values.operator_user_ids,
         note: `寄售上架：${values.platform}`,
         form_extra_scope: "CONSIGN",
         form_extra: {
@@ -136,6 +142,7 @@ export function OrderConsignmentModal(props: {
           <CfgItem name="listed_at" label="上架时间" rules={[{ required: true, message: "请选择上架时间" }]}>
             <DatePicker aria-label="上架时间" showTime={{ format: "HH:mm" }} format="YYYY-MM-DD HH:mm" minuteStep={1} />
           </CfgItem>
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} required />
           <p className="muted">每次确认只登记一个平台；可继续选择下一个平台并填写其上架时间。</p>
           <section aria-label="已上架记录">
             <h4>已上架记录</h4>

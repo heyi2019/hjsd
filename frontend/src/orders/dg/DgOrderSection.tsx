@@ -11,7 +11,7 @@ export function DgOrderSection(props: { gameTypes?: GameTypeOption[]; employees?
   const participantTitle = sectionLabel("PARTICIPANT", "委托客户");
   return (
     <>
-      <RecoveryAccountSection gameTypes={props.gameTypes} employees={props.employees} businessResponsibleLabel="代挂负责人" accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
+      <RecoveryAccountSection gameTypes={props.gameTypes} employees={props.employees} businessResponsibleLabel="代挂操作人" accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
         <CustomFieldSection section="BUSINESS" testIdSuffix="business" />
         <CustomFieldSection section="DELIVER" testIdSuffix="deliver" />
       </RecoveryAccountSection>

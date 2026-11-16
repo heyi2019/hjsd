@@ -140,7 +140,7 @@ beforeEach(() => {
   URL.revokeObjectURL = vi.fn();
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   seedOptionSets();
-  vi.mocked(employeesApi.list).mockResolvedValue([]);
+  vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }]);
   vi.mocked(installmentsApi.list).mockResolvedValue([contract]);
   vi.mocked(installmentsApi.cancel).mockResolvedValue({} as never);
   vi.mocked(ordersApi.postEvent).mockResolvedValue({} as never);
@@ -282,6 +282,8 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await ui.click(modal.querySelector(".ant-select-selector") as HTMLElement);
     await ui.click(await screen.findByText(/本系统（上架于 2026-10-01 09:30）/, { selector: ".ant-select-item-option-content" }));
     await ui.type(screen.getByLabelText("下架原因"), "代挂结束");
+    await ui.click(within(modal).getByLabelText("操作人"));
+    await ui.click(await screen.findByText("管理员", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByRole("button", { name: "确认出库" }));
 
     await waitFor(() => expect(ordersApi.cancel).toHaveBeenCalledWith(

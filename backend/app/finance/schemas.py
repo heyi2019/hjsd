@@ -107,6 +107,7 @@ class CashflowOut(BaseModel):
     note: str | None = None
     form_extra: dict[str, Any] | None = None
     operator: str
+    operator_user_ids: list[int] | None = None
     extra_values: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -142,6 +143,7 @@ class CashflowCreate(RequestModel):
     pool_id: int
     occurred_on: date
     direction: str
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     nature: str | None = None
     fund_nature: str | None = None
     accounting_attribute: str | None = None

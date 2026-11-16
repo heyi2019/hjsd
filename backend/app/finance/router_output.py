@@ -73,6 +73,7 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         operator=(value("operator") or value("created_by"))
         if isinstance(flow, dict)
         else flow.created_by,
+        operator_user_ids=value("operator_user_ids"),
         extra_values=get_extra_values(
             db, entity_type="cashflow", entity_id=value("id")
         ),

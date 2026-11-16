@@ -150,6 +150,13 @@ def test_frontend_source_available() -> None:
     assert _FRONTEND_SRC.is_dir(), f"找不到前端源码目录：{_FRONTEND_SRC}"
 
 
+def test_installment_table_exposes_operator_column() -> None:
+    """分期台必须把合约创建操作人纳入可配置列表列。"""
+    scope = get_scope("INSTALLMENT")
+    assert scope is not None
+    assert any(column.key == "operator" and column.label == "操作人" for column in scope.columns)
+
+
 def test_every_registered_scope_has_a_panel() -> None:
     """注册表新增作用域必须同时登记一个面板映射，否则这条守卫对它形同不存在。"""
     registered = {scope.code for scope in LIST_SCOPES}

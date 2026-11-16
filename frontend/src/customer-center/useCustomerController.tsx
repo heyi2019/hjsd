@@ -223,6 +223,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     { title: "QQ", key: "qq", render: (_v, row) => renderContact(row, "qq") },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="CUSTOMER_STATUS" /> },
     { title: "建立时间", dataIndex: "created_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
+    { title: "创建操作人", dataIndex: "created_by", render: (v: string | null | undefined) => v || "-" },
     {
       title: "扩展字段",
       key: "extra_values",

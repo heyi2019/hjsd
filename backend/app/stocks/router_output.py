@@ -1,4 +1,4 @@
-"""stocks.router_output：库存账号列表/详情的输出装配（来源订单、扩展字段、入库负责人）。
+"""stocks.router_output：库存账号列表/详情的输出装配（来源订单、扩展字段、入库操作人）。
 
 只含只读查询与输出装配，不依赖 router 的权限注入与事务；
 与 orders/router_output.py、finance/router_output.py 保持同一范式。
@@ -57,7 +57,7 @@ def _account_output(
     if source_order is not None:
         output.source_order_id = source_order.id
         output.source_order_no = source_order.order_no
-    # 入库负责人优先取建单表单中的业务负责人；没有选择时回退到实际登录账号。
+    # 入库操作人优先取建单表单中的业务操作人；没有选择时回退到实际登录账号。
     output.inventory_operator = inventory_operator or account.created_by
     return output
 

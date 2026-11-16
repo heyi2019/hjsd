@@ -221,9 +221,9 @@ def list_users(actor: CurrentUser = Depends(get_current_user), db: Session = Dep
 
 @admin_router.get("/options", response_model=list[PublicUserOut])
 def list_employee_options(actor: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> list[PublicUserOut]:
-    """建单交付负责人选择器：允许可建单员工读取在职员工花名册。"""
+    """建单交付操作人选择器：允许可建单员工读取在职员工花名册。"""
     if not actor.has(PERM_ORDER_CREATE) and not actor.has(PERM_REPORT_READ):
-        raise PermissionDenied("无权选择交付负责人")
+        raise PermissionDenied("无权选择交付操作人")
     return [_public(item) for item in db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id)).all()]
 
 

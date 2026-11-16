@@ -12,7 +12,7 @@ type EmployeeSelectControlProps = Omit<SelectProps, "options"> & {
   options?: SelectProps["options"];
 };
 
-/** 统一人员选项与下拉控件；建单负责人、交付负责人、分润配置共用此入口。 */
+/** 统一人员选项与下拉控件；建单操作人、交付操作人、分润配置共用此入口。 */
 export function EmployeeSelectControl({ employees, options, ...props }: EmployeeSelectControlProps) {
   const employeeOptions = options ?? employees?.filter((employee) => employee.is_active).map((employee) => ({
     value: employee.id,
@@ -21,7 +21,7 @@ export function EmployeeSelectControl({ employees, options, ...props }: Employee
   return <Select {...props} options={employeeOptions} />;
 }
 
-/** 多人负责人：优先用当前会话员工默认值，仍允许补充其他在职员工。 */
+/** 多人操作人：优先用当前会话员工默认值，仍允许补充其他在职员工。 */
 export function ResponsibleEmployeeSelect(props: { name: string; label: string; employees: EmployeeOption[]; className?: string; required?: boolean }) {
   const form = Form.useFormInstance();
   // 按人匹配必须用 username（users.username），不能用 role（ADMIN/OPERATOR 这类系统角色）：

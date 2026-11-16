@@ -129,6 +129,7 @@ class InstallmentOut(BaseModel):
     bad_debt_amount: Decimal
     final_period_adjustment: Decimal = Decimal("0")
     status: str
+    operator: str | None = None
     delivery_mode: str | None = None
     delivered_on: date | None = None
     first_due_on: date | None = None

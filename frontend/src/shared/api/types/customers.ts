@@ -14,6 +14,7 @@ export interface Customer {
   note?: string | null;
   status: string;
   created_at?: string | null;
+  created_by?: string | null;
   merged_into_id?: number | null;
   /** 表单扩展字段值：field_key → 值，由统一字段配置驱动（BAS-04） */
   extra_values?: Record<string, unknown> | null;
@@ -104,6 +105,7 @@ export interface Counterparty {
   source?: string | null;
   note?: string | null;
   created_at?: string;
+  created_by?: string | null;
   extra_values?: Record<string, unknown>;
   extra_fields?: Array<{ key: string; label: string; section: string; value: unknown }>;
 }

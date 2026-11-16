@@ -110,18 +110,18 @@ it.each(["HS", "TH", "DG"])("%s 建单提供换绑手机号字段", async (order
 });
 
 it.each([
-  ["HS", "回收负责人"],
-  ["TH", "提号负责人"],
-  ["DG", "代挂负责人"],
+  ["HS", "回收操作人"],
+  ["TH", "提号操作人"],
+  ["DG", "代挂操作人"],
 ])("%s 在游戏账号信息登记%s", async (orderType, label) => {
   await openTypedModal(orderType);
   expect(screen.getByLabelText(label)).toBeInTheDocument();
 });
 
 it.each([
-  ["HS", "回收负责人"],
-  ["TH", "提号负责人"],
-  ["DG", "代挂负责人"],
+  ["HS", "回收操作人"],
+  ["TH", "提号操作人"],
+  ["DG", "代挂操作人"],
 ])("%s 建单的%s为必填且支持多人", async (orderType, label) => {
   await openTypedModal(orderType);
   const field = screen.getByLabelText(label);
@@ -130,9 +130,9 @@ it.each([
 });
 
 it.each([
-  ["HS", "回收负责人"],
-  ["TH", "提号负责人"],
-  ["DG", "代挂负责人"],
+  ["HS", "回收操作人"],
+  ["TH", "提号操作人"],
+  ["DG", "代挂操作人"],
 ])("%s 建单默认展示当前操作对象%s", async (orderType, label) => {
   await openTypedModal(orderType, "admin");
   const field = screen.getByLabelText(label);
@@ -156,11 +156,11 @@ it("回收建单将平台与交付条件集中展示在交付信息", async () =
   expect(within(deliverySection as HTMLElement).getByLabelText("包赔类型")).toBeInTheDocument();
 });
 
-it("交付信息默认勾选当前员工，并允许追加多位交付负责人", async () => {
+it("交付信息默认勾选当前员工，并允许追加多位交付操作人", async () => {
   await openTypedModal("HS");
 
   const deliverySection = (await screen.findByText("交付信息")).closest(".delivery-info-section") as HTMLElement;
-  const responsible = within(deliverySection).getByLabelText("交付负责人");
+  const responsible = within(deliverySection).getByLabelText("交付操作人");
   expect(responsible).toBeInTheDocument();
   await waitFor(() => expect(within(deliverySection).getByText(/系统管理员/)).toBeInTheDocument());
   await ui.click(responsible.closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);

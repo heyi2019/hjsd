@@ -2,12 +2,15 @@ import { DatePicker, Form, Input } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
+import { employeesApi } from "../../shared/api/org.api";
 import type { AccountExecutionOrder } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
+import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, PermissionButton, Select } from "../../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../ConfigurableField";
+import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { consignmentListings, type ConsignmentListing } from "./consignment-logic";
 import { formatDateTimeMinute } from "../../shared/lib/format";
 
@@ -31,12 +34,13 @@ export function OrderPlatformOffsaleModal(props: {
   account: Account | null;
   records: ActiveConsignment[];
   onClose: () => void;
-  onSystemOffsale: (payload: { reason: string; form_extra?: Record<string, unknown> }) => void | Promise<void>;
+  onSystemOffsale: (payload: { reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => void | Promise<void>;
   onChanged: () => void | Promise<void>;
 }) {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const open = Boolean(props.account);
   const canSystemOffsale = props.account?.inventory_type === "CONSIGNMENT";
   const systemRecord: SystemConsignment | null = canSystemOffsale && props.account
@@ -58,13 +62,14 @@ export function OrderPlatformOffsaleModal(props: {
     setError(null);
     setSelectedMode(props.records.length ? "PLATFORM" : canSystemOffsale ? "SYSTEM" : "PLATFORM");
     form.setFieldsValue({ unlisted_at: dayjs().second(0).millisecond(0) });
+    void employeesApi.list().then((items) => setEmployees(items.filter((item) => item.is_active))).catch((cause) => setError(normalizeError(cause)));
   }, [canSystemOffsale, form, open, props.account, props.records.length]);
 
-  const submit = async (values: { listing_id: string; unlisted_at?: Dayjs; reason: string; form_extra?: Record<string, unknown> }) => {
+  const submit = async (values: { listing_id: string; unlisted_at?: Dayjs; reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     if (values.listing_id === "SYSTEM") {
       setSubmitting(true);
       try {
-        await props.onSystemOffsale({ reason: values.reason.trim(), form_extra: values.form_extra });
+        await props.onSystemOffsale({ reason: values.reason.trim(), operator_user_ids: values.operator_user_ids, form_extra: values.form_extra });
         form.resetFields();
       } catch (cause) {
         setError(normalizeError(cause));
@@ -82,6 +87,7 @@ export function OrderPlatformOffsaleModal(props: {
         event_type: "OPERATE",
         operation_type: "UNLIST",
         occurred_on: unlistedAt.format("YYYY-MM-DD"),
+        operator_user_ids: values.operator_user_ids,
         note: `寄售下架：${selected.platform}`,
         form_extra_scope: "INVOID",
         form_extra: {
@@ -138,6 +144,7 @@ export function OrderPlatformOffsaleModal(props: {
           <CfgItem name="reason" label="下架原因" rules={[{ required: true, message: "请填写下架原因" }]}>
             <Input aria-label="下架原因" placeholder="请输入平台下架原因" />
           </CfgItem>
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} required />
           <CustomFieldSection testIdSuffix="inv-platform-offsale" />
         </BusinessRegistrationForm>
       </FieldConfigContext.Provider>

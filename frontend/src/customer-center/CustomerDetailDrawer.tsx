@@ -59,6 +59,7 @@ export function CustomerDetailDrawer({
               <Descriptions.Item label="状态">
                 <StatusTag status={customer.status} optionSet="CUSTOMER_STATUS" />
               </Descriptions.Item>
+              <Descriptions.Item label="创建操作人">{customer.created_by || "-"}</Descriptions.Item>
               <Descriptions.Item label="备注">{customer.note || "-"}</Descriptions.Item>
             </Descriptions>
             <Typography.Title level={5} className="ui-title-spaced">

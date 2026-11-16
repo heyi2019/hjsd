@@ -49,7 +49,7 @@ function postedEventOperatorIds(order: Pick<Order, "events">, eventTypes?: Set<s
     .flatMap((event) => responsibleIds(event.operator_user_ids)))];
 }
 
-/** 从订单事实提取四类动作负责人：建单负责人、卖出表单负责人和运营信息中的操作人。 */
+/** 从订单事实提取四类动作操作人：建单操作人、卖出表单操作人和运营信息中的操作人。 */
 export function buildActionAllocationCandidates(order: Pick<Order, "events" | "form_extra">): ActionAllocationCandidates {
   const formExtra = order.form_extra ?? {};
   const businessResponsibleIds = responsibleIds(formExtra.business_responsible_ids);

@@ -34,7 +34,7 @@ export function useInventoryColumns(params: {
     { title: "库存编号", key: "stock_no", width: 86, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account.stock_no) },
     { title: "订单号", dataIndex: "order_no", width: 80, ellipsis: true, render: (v: string | null) => inventoryCellValue(v) },
     { title: "入库时间", dataIndex: "inventory_entry_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
-    { title: "入库负责人", dataIndex: "inventory_operator", width: 100, ellipsis: true, render: (v: string | null, row) => inventoryCellValue(v || row.account.created_by) },
+    { title: "入库操作人", dataIndex: "inventory_operator", width: 100, ellipsis: true, render: (v: string | null, row) => inventoryCellValue(v || row.account.created_by) },
     {
       title: "成本",
       dataIndex: "cost_amount",

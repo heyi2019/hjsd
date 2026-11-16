@@ -9,7 +9,7 @@ import { CustomFieldSection } from "../ConfigurableField";
 export function ThOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOption[]; employees?: EmployeeOption[] }) {
   return (
     <>
-      <RecoveryAccountSection gameTypes={props.gameTypes} employees={props.employees} businessResponsibleLabel="提号负责人" showIntermediaryDelivery accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
+      <RecoveryAccountSection gameTypes={props.gameTypes} employees={props.employees} businessResponsibleLabel="提号操作人" showIntermediaryDelivery accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>
         <ThFeeSection pools={props.pools} financeExtras={<CustomFieldSection section="FINANCE" testIdSuffix="finance" />} />
       </RecoveryAccountSection>
       <ThSupplierSection participantExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} />

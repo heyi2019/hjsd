@@ -102,6 +102,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "金额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "来源", dataIndex: "source", render: (v: string | null | undefined) => configurableLabel("FUND_FLOW_SOURCE", v, FUND_FLOW_SOURCE_LABEL) },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("FUND_FLOW_STATUS", v, { APPROVED: "已入账" })} /> },
+    { title: "操作人", dataIndex: "operator", render: (v: string | null | undefined) => v || "—" },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
     {
       title: "操作",
@@ -190,6 +191,7 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
     { title: "已损失", dataIndex: "lost_amount", align: "right", render: (v: string | null | undefined) => <MoneyText value={v ?? "0.00"} /> },
     { title: "剩余", key: "remaining", align: "right", render: (_v, row) => (<MoneyText value={row.remaining_amount} />) },
     { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="DEPOSIT_STATUS" /> },
+    { title: "操作人", dataIndex: "operator", render: (v: string | null | undefined) => v || "—" },
     {
       title: "操作",
       width: 360,
@@ -280,6 +282,7 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "账面余额", key: "statement_balance", align: "right", render: (_v, row) => <MoneyText value={row.statement_balance} /> },
     { title: "差异", key: "difference", align: "right", render: (_v, row) => <MoneyText value={row.difference} /> },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("RECONCILIATION_STATUS", v, RECONCILIATION_STATUS_LABEL)} /> },
+    { title: "操作人", dataIndex: "operator", render: (v: string | null | undefined) => v || "—" },
     {
       title: "操作",
       key: "actions",

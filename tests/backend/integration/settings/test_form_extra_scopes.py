@@ -90,9 +90,9 @@ def test_business_responsible_fields_are_registered_for_all_order_types(seeded_d
     seeded_db.commit()
 
     expected = {
-        "HS": "回收负责人",
-        "TH": "提号负责人",
-        "DG": "代挂负责人",
+        "HS": "回收操作人",
+        "TH": "提号操作人",
+        "DG": "代挂操作人",
     }
     rows = seeded_db.scalars(
         select(OrderFormField).where(
@@ -113,7 +113,7 @@ def test_business_responsible_fields_are_registered_for_all_order_types(seeded_d
 
 @pytest.mark.parametrize(
     ("order_type_code", "label"),
-    [("HS", "回收负责人"), ("TH", "提号负责人"), ("DG", "代挂负责人")],
+    [("HS", "回收操作人"), ("TH", "提号操作人"), ("DG", "代挂操作人")],
 )
 def test_business_responsible_is_required_by_backend(seeded_db, order_type_code, label):
     seed_catalog(seeded_db)

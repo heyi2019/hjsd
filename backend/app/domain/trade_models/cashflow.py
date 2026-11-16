@@ -132,6 +132,8 @@ class Cashflow(Base, AuditMixin):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 表单字段配置体系：工作室（STUDIOEXP/STUDIOREJ/STUDIOREV）等自定义字段值。
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # 与订单业务事件一致：资金登记可指定一个或多个实际操作人。
+    operator_user_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
 
 
 class Reconciliation(Base, AuditMixin):

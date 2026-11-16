@@ -39,7 +39,7 @@ const fieldDefs = [
 ] as unknown as import("@/shared/api/types/forms").OrderFormField[];
 
 const customers = [
-  { id: 1, customer_no: "CUS-0001", display_name: "张三", phone: "138****8888", wechat: "zhangsan", qq: "10001", status: "ACTIVE", extra_values: { credit_level: "优质", legacy_note: "早期客户" } },
+  { id: 1, customer_no: "CUS-0001", display_name: "张三", phone: "138****8888", wechat: "zhangsan", qq: "10001", status: "ACTIVE", created_by: "admin", extra_values: { credit_level: "优质", legacy_note: "早期客户" } },
   { id: 2, customer_no: "CUS-0002", display_name: "李四", phone: "139****9999", wechat: "", qq: "", status: "DISABLED", extra_values: {} },
 ];
 
@@ -146,6 +146,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     expect(vi.mocked(customersApi.detail)).toHaveBeenCalledWith(1);
     const drawer = await screen.findByRole("dialog");
     expect(within(drawer).getByText("经营概览")).toBeInTheDocument();
+    expect(within(drawer).getByText("admin")).toBeInTheDocument();
     expect(within(drawer).getAllByText("关联订单").length).toBeGreaterThanOrEqual(2);
     expect(within(drawer).getAllByText("HS-2026-0010").length).toBeGreaterThanOrEqual(2);
     expect(within(drawer).getByText("分期收款")).toBeInTheDocument();

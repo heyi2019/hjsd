@@ -49,6 +49,7 @@ export interface Deposit {
   note?: string | null;
   /** 押金剩余：实收 − 已退 − 已损失，且不小于 0；后端下发，前端不再相减。 */
   remaining_amount: string;
+  operator?: string | null;
 }
 
 export interface TransferResult {
@@ -85,6 +86,7 @@ export interface Cashflow {
   operator?: string;
   note?: string | null;
   form_extra?: Record<string, unknown> | null;
+  operator_user_ids?: number[] | null;
 }
 
 export interface Rebate {
@@ -113,4 +115,4 @@ export interface RebateReturnResult {
   remaining: string;
 }
 
-export interface Reconciliation { id: number; pool_id: number; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string; reason?: string | null; note?: string | null }
+export interface Reconciliation { id: number; pool_id: number; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string; reason?: string | null; note?: string | null; operator?: string | null }

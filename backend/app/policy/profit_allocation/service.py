@@ -406,7 +406,7 @@ def _set_action_allocations(
             )
             if active_ids != set(configured):
                 raise Validation(
-                    f"{action_type} 动作负责人不存在或已停用，无法绑定收益人",
+                    f"{action_type} 动作操作人不存在或已停用，无法绑定收益人",
                     details={"field": configured_key, "user_ids": configured},
                 )
             action_actor_ids[action_type] = list(dict.fromkeys(configured))

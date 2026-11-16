@@ -135,7 +135,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         account={platformOffsaleTarget?.account ?? null}
         records={platformOffsaleTarget?.records ?? []}
         onClose={() => setPlatformOffsaleTarget(null)}
-        onSystemOffsale={async ({ reason, form_extra }) => {
+        onSystemOffsale={async ({ reason, operator_user_ids, form_extra }) => {
           const target = platformOffsaleTarget;
           setPlatformOffsaleTarget(null);
           if (!target || target.records.length === 0) return;
@@ -145,6 +145,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
               cancelOrderIds: target.records.map((record) => record.orderId),
               note: `系统下架：${reason}`,
               reason,
+              operatorUserIds: operator_user_ids,
               occurredOn: new Date().toISOString().slice(0, 10),
               formExtra: form_extra,
             });
@@ -207,7 +208,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           refreshExecution(updated, profileTarget?.orderId ?? updated.source_order_id);
         }}
         onError={(error) => controller.setError(normalizeError(error))}
-        onOperation={async (operationType) => {
+        onOperation={async (operationType, operatorUserIds) => {
           const account = profileTarget?.account;
           const orderId = profileTarget?.orderId ?? account?.source_order_id;
           if (!orderId) throw new Error("账号没有可关联的来源订单，无法登记运营事件");
@@ -215,6 +216,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
             event_type: "OPERATE",
             operation_type: operationType,
             occurred_on: today(),
+            operator_user_ids: operatorUserIds,
             note: operationType === "IMAGE" ? "库存中心登记作图" : "库存中心登记描述",
           });
         }}

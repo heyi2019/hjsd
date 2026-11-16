@@ -64,6 +64,7 @@ const counterparties = [
     wechat: "peer_a",
     qq: "20001",
     status: "ACTIVE",
+    created_by: "admin",
   },
 ];
 
@@ -238,6 +239,7 @@ describe("CustomersPage：客户档案", () => {
     await user.click(screen.getByRole("tab", { name: /合作方/ }));
     const panel = await screen.findByRole("tabpanel");
     expect(within(panel).getByText("CP-0001")).toBeInTheDocument();
+    expect(within(panel).getByText("admin")).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: /详情/ })).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: /编辑/ })).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: /拉黑/ })).toBeInTheDocument();
@@ -245,6 +247,8 @@ describe("CustomersPage：客户档案", () => {
     await user.click(within(panel).getByRole("button", { name: /详情/ }));
     const drawer = await screen.findByRole("dialog");
     expect(within(drawer).getByText("合作方档案 · CP-0001")).toBeInTheDocument();
+    expect(within(drawer).getByText("创建操作人")).toBeInTheDocument();
+    expect(within(drawer).getByText("admin")).toBeInTheDocument();
     expect(within(drawer).getByRole("button", { name: /编辑/ })).toBeInTheDocument();
   });
 

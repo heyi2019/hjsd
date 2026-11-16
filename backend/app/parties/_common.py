@@ -86,6 +86,7 @@ def to_customer_out(
         "owner_id": customer.owner_id,
         "status": customer.status,
         "created_at": customer.created_at,
+        "created_by": customer.created_by,
         "tags": customer.tags,
         "note": customer.note,
         "merged_into_id": customer.merged_into_id,
@@ -116,6 +117,7 @@ def to_counterparty_out(
         "status": counterparty.status,
         "note": counterparty.note,
         "created_at": counterparty.created_at,
+        "created_by": counterparty.created_by,
         "extra_values": dict(extra_values or {}),
     }
     return payload

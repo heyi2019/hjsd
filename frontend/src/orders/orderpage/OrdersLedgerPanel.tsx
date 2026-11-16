@@ -10,7 +10,7 @@ import { markMobileHiddenColumns } from "../../shared/lib/listColumns";
 import "./OrdersLedgerPanel.css";
 
 /** ≤640px 隐藏列：原规则写 nth-child(4)，但表格有展开列占位，实测命中的是
- *  「游戏账号/产品」而非入库负责人。本次保持默认隐藏目标不变，只把序号换成稳定 key，
+ *  「游戏账号/产品」而非入库操作人。本次保持默认隐藏目标不变，只把序号换成稳定 key，
  *  避免「设置 → 列表字段」过滤/调序后隐藏错列。 */
 const LEDGER_MOBILE_HIDDEN_KEYS = ["account_game_account"] as const;
 

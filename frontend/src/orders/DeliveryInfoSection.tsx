@@ -45,7 +45,7 @@ export function DeliveryInfoSection(props: { showIntermediary?: boolean; employe
           <CfgItem name="intermediary_type" label="中介类型"><Select options={intermediaryTypeOptions} placeholder="可选填" /></CfgItem>
           <CfgItem name="compensation_type" label="包赔类型" rules={compensationEnabled ? [{ required: true, message: "请选择包赔类型" }] : []}><Select options={compensationTypeOptions} disabled={!compensationEnabled} placeholder={compensationEnabled ? "请选择" : "选择包赔后可选"} /></CfgItem>
         </> : null}
-        <ResponsibleEmployeeSelect className="delivery-info-section__responsibles" name="delivery_responsible_ids" label="交付负责人" employees={props.employees ?? []} />
+        <ResponsibleEmployeeSelect className="delivery-info-section__responsibles" name="delivery_responsible_ids" label="交付操作人" employees={props.employees ?? []} />
       </AdaptiveFormGrid>
     </BusinessRegistrationGroup>
   );

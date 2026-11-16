@@ -23,6 +23,7 @@ from app.domain.enums import (
     Nature,
 )
 from app.domain.trade import Cashflow, Order, OrderEvent
+from app.domain.users import User
 from app.finance.attributes import (
     accounting_attributes_for_manual_cashflow,
     derive_manual_cashflow_nature,
@@ -34,6 +35,24 @@ from app.orders.form_fields import validate_form_extra
 from app.parties.fields import get_extra_values_bulk, set_extra_values
 
 from ._common import _positive, _text
+
+
+def _validate_operator_user_ids(
+    session: Session, operator_user_ids: list[int] | None
+) -> list[int] | None:
+    """按订单事件/返点的口径校验资金登记操作人。"""
+    if operator_user_ids is None:
+        return None
+    if len(set(operator_user_ids)) != len(operator_user_ids):
+        raise Validation("操作人不能重复选择", details={"field": "operator_user_ids"})
+    active_ids = set(
+        session.scalars(
+            select(User.id).where(User.id.in_(operator_user_ids), User.is_active.is_(True))
+        )
+    )
+    if active_ids != set(operator_user_ids):
+        raise Validation("所选操作人不存在或已停用", details={"field": "operator_user_ids"})
+    return operator_user_ids
 
 
 def _get_cashflow(
@@ -65,6 +84,7 @@ def create_cashflow(
     category: str,
     amount: Any,
     actor: str,
+    operator_user_ids: list[int] | None = None,
     order_id: int | None = None,
     order_event_id: int | None = None,
     note: str | None = None,
@@ -132,6 +152,7 @@ def create_cashflow(
         if event is None or (order_id is not None and event.order_id != order_id):
             raise Validation("资金明细关联的业务事件不存在或不属于该订单")
     money = _positive(amount, field="amount")
+    operator_ids = _validate_operator_user_ids(session, operator_user_ids)
     flow = Cashflow(
         flow_no=allocate_flow_no(session, direction),
         pool_id=pool.id,
@@ -149,6 +170,7 @@ def create_cashflow(
         form_extra=validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None,
         created_by=actor,
         updated_by=actor,
+        operator_user_ids=operator_ids,
     )
     session.add(flow)
     session.flush()
@@ -378,6 +400,7 @@ def _flow_row(flow: Cashflow, order_no: str | None) -> dict[str, Any]:
         "source": source,
         "note": flow.note,
         "operator": flow.created_by,
+        "operator_user_ids": flow.operator_user_ids,
     }
 
 

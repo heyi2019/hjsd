@@ -355,6 +355,7 @@ export function useContractTableController(params: { contractType: string; reloa
       render: (value: string) => <MoneyText value={value ?? "0.00"} />,
     },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={installmentDisplayStatus(v)} label={configurableLabel("INSTALLMENT_STATUS", installmentDisplayStatus(v), INSTALLMENT_STATUS_LABEL)} /> },
+    { title: "操作人", key: "operator", dataIndex: "operator", render: (v: string | null | undefined) => v || "-" },
     {
       title: "操作",
       key: "actions",

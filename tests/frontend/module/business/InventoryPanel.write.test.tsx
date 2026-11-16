@@ -112,7 +112,7 @@ beforeEach(() => {
       }],
     }],
   } as never);
-  vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "alice", display_name: "小明", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
+  vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 describe("InventoryPanel：写入与长路径", () => {
   it("代挂在库账号不再提供独立取消入口", async () => {
@@ -179,6 +179,8 @@ describe("InventoryPanel：写入与长路径", () => {
     await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "运营" }));
     await ui.click(screen.getByRole("menuitem", { name: "寄售（上架）" }));
     expect(await screen.findByText("登记寄售")).toBeInTheDocument();
+    await ui.click(screen.getByRole("combobox", { name: "操作人" }));
+    await ui.click(await screen.findByText("管理员", { selector: ".ant-select-item-option-content" }));
 
     await ui.click(screen.getAllByRole("combobox", { name: "寄售平台" })[0]);
     await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
@@ -188,6 +190,7 @@ describe("InventoryPanel：写入与长路径", () => {
       event_type: "OPERATE",
       operation_type: "CONSIGNMENT",
       form_extra_scope: "CONSIGN",
+      operator_user_ids: [1],
     })));
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
   });
@@ -450,7 +453,7 @@ describe("OrderDetailDeliverySection", () => {
     expect(onOrderExtraChange).toHaveBeenCalledWith(25, "compensation_type", "续保");
   });
 
-  it("编辑态交付负责人选择器保持可读宽度", async () => {
+  it("编辑态交付操作人选择器保持可读宽度", async () => {
     renderLight(
       <OrderDetailDeliverySection
         meta={{ sourceOrderNo: "HS-FE269" } as never}
@@ -464,7 +467,7 @@ describe("OrderDetailDeliverySection", () => {
     );
 
     const responsible = await waitFor(() => {
-      const select = document.querySelector<HTMLElement>('.ant-select[aria-label="编辑交付负责人"]');
+    const select = document.querySelector<HTMLElement>('.ant-select[aria-label="编辑交付操作人"]');
       expect(select).toBeInTheDocument();
       return select as HTMLElement;
     });
@@ -477,7 +480,7 @@ describe("OrderDetailDeliverySection", () => {
     expect(await screen.findByText("李三（三三）", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
   });
 
-  it("FE-266：交付负责人回显员工姓名，未加载时不泄露原始 ID", async () => {
+  it("FE-266：交付操作人回显员工姓名，未加载时不泄露原始 ID", async () => {
     const detail = {
       orders: [{
         order_id: 22,
@@ -506,7 +509,7 @@ describe("OrderDetailDeliverySection", () => {
       <OrderDetailDeliverySection meta={{ sourceOrderNo: "HS-FE266" } as never} detail={detail as never} />,
       { user: "admin" },
     );
-    await waitFor(() => expect(screen.getByText("负责人信息加载中")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("操作人信息加载中")).toBeInTheDocument());
     expect(screen.queryByText("7")).not.toBeInTheDocument();
   });
 

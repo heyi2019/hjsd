@@ -22,6 +22,7 @@ export interface Installment {
   /** 剩余应收：总应收 − 已收 − 坏账，且不小于 0；后端下发，前端不再相减。 */
   remaining_receivable: string;
   status: string;
+  operator?: string | null;
   delivery_mode?: string | null;
   delivered_on?: string | null;
   note?: string | null;

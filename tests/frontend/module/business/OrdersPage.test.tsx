@@ -205,7 +205,7 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.getAllByText("库存状态").length).toBeGreaterThanOrEqual(1);
 
     // 入库 / 售卖责任时间列，且行内取数正确
-    for (const label of ["入库负责人", "入库时间", "售卖人", "售卖时间", "业务", "业务类型"]) {
+    for (const label of ["入库操作人", "入库时间", "售卖操作人", "售卖时间", "业务", "业务类型"]) {
       expect(screen.getByRole("columnheader", { name: label })).toBeInTheDocument();
     }
     const dutyRow = screen.getAllByRole("row").find((item) => within(item).queryByText("HS-2026-0001") !== null)!;

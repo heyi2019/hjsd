@@ -117,7 +117,7 @@ function AllocationFields({
                   >
                     <EmployeeSelectControl
                       mode="multiple"
-                      placeholder="选择动作负责人"
+                      placeholder="选择动作操作人"
                       options={optionsFor(kind, allocationCandidates, employeeOptions)}
                     />
                   </Form.Item>
@@ -247,7 +247,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
           )}
         />
         <Typography.Paragraph type="secondary">
-          按操作分配：买号、售出、运营、公司四项。每项可多选人员，只填写一次比例或金额，确认后由系统在该项人员中平分，并同步更新来源处负责人。
+          按操作分配：买号、售出、运营、公司四项。每项可多选人员，只填写一次比例或金额，确认后由系统在该项人员中平分，并同步更新来源处操作人。
         </Typography.Paragraph>
         <AllocationFields
           allocationCandidates={allocationCandidates}

@@ -81,6 +81,7 @@ def _installment_outputs(
     return [
         schemas.InstallmentOut.model_validate({
             **item.__dict__,
+            "operator": item.created_by,
             "extra_values": extras.get(item.id, {}),
             "order": order_context[item.order_id],
             "schedules": [schemas.ScheduleOut.model_validate(row) for row in schedules_by_installment.get(item.id, [])],

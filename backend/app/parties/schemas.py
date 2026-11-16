@@ -75,6 +75,7 @@ class CustomerOut(BaseModel):
     owner_id: int | None = None
     status: str
     created_at: datetime
+    created_by: str | None = None
     tags: list[str] | None = None
     note: str | None = None
     merged_into_id: int | None = None
@@ -255,6 +256,7 @@ class CounterpartyOut(BaseModel):
     status: str
     note: str | None = None
     created_at: datetime
+    created_by: str | None = None
     extra_values: dict[str, Any] = Field(default_factory=dict)
 
 

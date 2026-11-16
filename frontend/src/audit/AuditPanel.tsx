@@ -10,10 +10,10 @@ import { AUDIT_ACTION_LABEL, ENTITY_TYPE_LABEL } from "../shared/lib/labels";
 import { formatDateTimeMinute } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
-import { ENTITY_TYPE_TO_ITEM, SETTINGS_ITEMS } from "../field-definitions/configCatalog";
+import { CONFIG_ENTITY_TYPE_LABEL, ENTITY_TYPE_TO_ITEM, SETTINGS_ITEMS } from "../field-definitions/configCatalog";
 
 function entityTypeLabel(value: string): string {
-  return ENTITY_TYPE_LABEL[value] ?? ENTITY_TYPE_LABEL[value.toLowerCase()] ?? value;
+  return CONFIG_ENTITY_TYPE_LABEL[value] ?? ENTITY_TYPE_LABEL[value] ?? ENTITY_TYPE_LABEL[value.toLowerCase()] ?? value;
 }
 
 const CONFIG_ITEM_OPTIONS = SETTINGS_ITEMS

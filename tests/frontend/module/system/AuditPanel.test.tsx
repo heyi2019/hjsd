@@ -70,6 +70,16 @@ describe("AuditPanel：审计记录", () => {
     await waitFor(() => expect(vi.mocked(auditApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ entity_type: "Pool" })));
   });
 
+  it("配置项筛选中的对象类型使用中文标签", async () => {
+    renderLight(<AuditPanel />, { user: "admin" });
+
+    const configSelect = document.querySelector(".audit-config-item-select .ant-select-selector") as HTMLElement;
+    await ui.click(configSelect);
+
+    expect(await screen.findByText("资金池 · 资金路由", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(screen.queryByText("资金池 · OrderTypePool", { selector: ".ant-select-item-option-content" })).toBeNull();
+  });
+
   it("加载失败展示错误横幅", async () => {
     vi.mocked(auditApi.list).mockRejectedValue(new Error("audit down"));
     renderLight(<AuditPanel />, { user: "admin" });

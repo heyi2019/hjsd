@@ -141,6 +141,18 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   },
 ];
 
+/** 配置审计中的 entity_type 展示名；接口值保留原样，仅在页面上翻译。 */
+export const CONFIG_ENTITY_TYPE_LABEL: Record<string, string> = {
+  OrderTypeDef: "业务类型",
+  order_form_field: "表单字段",
+  list_column_config: "列表字段",
+  Pool: "资金池",
+  OrderTypePool: "资金路由",
+  GameTypeOption: "游戏与渠道",
+  option_set: "选项词典",
+  user: "用户",
+};
+
 /** 全部涉及的 entity_type 扁平集合，供「最近配置改动」流水过滤。 */
 
 /** entity_type → 配置项标签，流水中把「order_form_field」翻成人话。 */

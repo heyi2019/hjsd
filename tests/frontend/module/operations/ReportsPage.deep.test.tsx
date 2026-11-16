@@ -151,7 +151,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("经营损益");
     const monthlyCard = screen.getByText("月度经营损益").closest(".ant-card") as HTMLElement;
-    await ui.click(within(monthlyCard).getByRole("button", { name: "导出 CSV" }));
+    await ui.click(within(monthlyCard).getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
     expect(createUrl).toHaveBeenCalled();
     expect(revokeUrl).toHaveBeenCalled();
@@ -168,7 +168,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
     await ui.type(dateInputs[0], "2026-10-31");
     await ui.type(dateInputs[1], "2026-10-01");
-    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("导出开始日期不能晚于结束日期"));
     expect(vi.mocked(reportsApi.exportCsv)).not.toHaveBeenCalled();
   });

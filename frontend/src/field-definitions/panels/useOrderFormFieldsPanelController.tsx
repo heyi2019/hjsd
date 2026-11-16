@@ -420,7 +420,7 @@ export function useOrderFormFieldsPanelController({
         initialValues={{ field_type: "TEXT", sort_order: 0, section: "EXTRA" }}
       >
         <Form.Item name="field_key" label="字段键" rules={[{ required: true }, { pattern: /^[a-z][a-z0-9_]*$/, message: "仅支持小写字母与下划线，且以小写字母开头" }]}>
-          <Input placeholder="小写下划线，如 vip_tag" disabled={editingId !== null} />
+          <Input placeholder="按小写字母和下划线填写" disabled={editingId !== null} />
         </Form.Item>
         <Form.Item
           name="label"
@@ -454,7 +454,7 @@ export function useOrderFormFieldsPanelController({
                   {fields.map(({ key, name, ...restField }) => (
                     <Space key={key} align="baseline">
                       <Form.Item {...restField} name={[name, "value"]} rules={[{ required: true, message: "值必填" }]} noStyle>
-                        <Input placeholder="value（后端枚举码/字典键）" className="ui-control-width-200" />
+                        <Input placeholder="枚举值（后端编码）" className="ui-control-width-200" />
                       </Form.Item>
                       <Form.Item {...restField} name={[name, "label"]} noStyle>
                         <Input placeholder="展示名（可空，默认同值）" className="ui-control-width-200" />

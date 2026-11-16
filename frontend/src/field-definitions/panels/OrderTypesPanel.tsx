@@ -208,7 +208,7 @@ export function OrderTypesPanel() {
             { required: true, message: "请输入类型代码" },
             { pattern: /^[A-Z0-9]{2,10}$/, message: "2-10 位大写字母或数字，创建后不可修改" },
           ]}>
-            <Input placeholder="例如 XY" maxLength={10} />
+            <Input placeholder="请输入类型代码" maxLength={10} />
           </Form.Item>
           <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入类型名称" }]}>
             <Input placeholder="例如 新业务" maxLength={64} />

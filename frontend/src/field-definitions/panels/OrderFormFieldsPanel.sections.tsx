@@ -67,7 +67,7 @@ export function SectionManagementCard({ controller }: { controller: OrderFormFie
                   ref={sectionKeyInputRef}
                   defaultValue={sectionDraft.value}
                   className="ui-control-width-180"
-                  placeholder="如 ACCOUNT_SERVICE"
+                  placeholder="按小写字母和下划线填写"
                 />
               </label>
               <label>

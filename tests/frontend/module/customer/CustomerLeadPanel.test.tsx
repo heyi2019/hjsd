@@ -159,7 +159,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
     const row = (await screen.findByText("LD-1")).closest("tr")!;
     await ui.click(within(row).getByRole("button", { name: /转单/ }));
     const modal = screen.getByText("需求转单").closest(".ant-modal-content") as HTMLElement;
-    await ui.type(within(modal).getByLabelText("订单 ID"), "99");
+    await ui.type(within(modal).getByLabelText("订单编号"), "99");
     await ui.click(within(modal).getByRole("button", { name: /确认转单/ }));
     await waitFor(() => expect(leadsApi.convert).toHaveBeenCalledWith(1, 99, undefined));
   });
@@ -177,7 +177,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
     await waitFor(() => expect(leadsApi.close).toHaveBeenCalledWith(1, undefined, undefined));
   });
 
-  it("转单弹窗「订单 ID」标签取配置值", async () => {
+  it("转单弹窗「订单编号」标签取配置值", async () => {
     vi.mocked(orderFormFieldsApi.list).mockResolvedValue([
       { id: 2, order_type_code: "LEADCONVERT", field_key: "order_id", label: "关联订单号", field_type: "TEXT", options: null, required: true, is_active: true, sort_order: 10, locked: false, is_custom: false, note: null },
     ] as never);

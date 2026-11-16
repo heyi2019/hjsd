@@ -68,12 +68,12 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
           <PermissionButton
             permission="customer.read"
             size="small"
-            aria-label="导出客户CSV"
+            aria-label="导出客户数据"
             loading={exporting}
             disabled={Boolean(error) || rows === null}
             onClick={() => void exportCustomers()}
           >
-            导出 CSV
+            导出
           </PermissionButton>
           <PermissionButton permission="customer.create" type="primary" disabled={Boolean(error) || rows === null} onClick={() => setCreateOpen(true)}>
             新建客户

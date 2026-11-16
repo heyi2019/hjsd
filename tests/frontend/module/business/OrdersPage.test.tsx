@@ -168,14 +168,14 @@ describe("OrdersPage：四类订单台账", () => {
 
     await ui.click(screen.getByRole("button", { name: /导出/ }));
     // antd Dropdown 会同时保留上一份隐藏菜单，同文案出现多次；取最新一份直接触发。
-    const csvItem = await screen.findAllByText(/导出 CSV/);
+    const csvItem = await screen.findAllByText(/导出表格/);
     fireEvent.click(csvItem[csvItem.length - 1]);
     await waitFor(() => expect(vi.mocked(ordersApi.exportCsv)).toHaveBeenCalledWith(
       expect.objectContaining({ mine: true }),
     ));
 
     await ui.click(screen.getByRole("button", { name: /导出/ }));
-    const xlsxItem = await screen.findAllByText(/导出 Excel/);
+    const xlsxItem = await screen.findAllByText(/导出工作簿/);
     fireEvent.click(xlsxItem[xlsxItem.length - 1]);
     await waitFor(() => expect(vi.mocked(ordersApi.exportXlsx)).toHaveBeenCalledWith(
       expect.objectContaining({ mine: true }),

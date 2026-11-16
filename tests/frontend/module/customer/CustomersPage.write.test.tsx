@@ -119,7 +119,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     const mergeButtons = screen.getAllByRole("button", { name: /合\s*并/ });
     await ui.click(mergeButtons[0]);
     const dialog = await screen.findByRole("dialog");
-    await ui.click(within(dialog).getByLabelText("目标客户（必须为 ACTIVE）").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(within(dialog).getByLabelText("目标客户（需为有效客户）").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
     await ui.click(await screen.findByText("CUS-0002 李四", { selector: ".ant-select-item-option-content" }));
     await ui.type(within(dialog).getByLabelText("合并原因"), "重复建档，保留李四");
 
@@ -188,7 +188,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
-    await ui.click(screen.getByRole("button", { name: "导出客户CSV" }));
+    await ui.click(screen.getByRole("button", { name: "导出客户数据" }));
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户 CSV 已导出"));
   });
 });

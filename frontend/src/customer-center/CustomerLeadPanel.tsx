@@ -154,7 +154,7 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="LEADCONVERT" form={convertForm} onFinish={convertLead}>
-          <CfgItem name="order_id" label="订单 ID" rules={[{ required: true }]}><Input /></CfgItem>
+          <CfgItem name="order_id" label="订单编号" rules={[{ required: true }]}><Input /></CfgItem>
           <CustomFieldSection testIdSuffix="lead-convert" />
           <CompactActions>
             <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>确认转单</PermissionButton>

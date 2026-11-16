@@ -42,7 +42,7 @@ export function ReportExportButton({ name, params }: { name: string; params?: Re
       anchor.download = `${name}.csv`;
       anchor.click();
       URL.revokeObjectURL(url);
-      appMessage.success(`已导出 ${name}.csv`);
+      appMessage.success("报表已导出");
     } catch (err) {
       appMessage.error(normalizeError(err).message);
     } finally {
@@ -52,7 +52,7 @@ export function ReportExportButton({ name, params }: { name: string; params?: Re
 
   return (
     <PermissionButton permission="report.export" loading={exporting} onClick={() => void exportCsv()}>
-      导出 CSV
+      导出
     </PermissionButton>
   );
 }

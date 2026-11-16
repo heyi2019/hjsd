@@ -102,11 +102,11 @@ function ContractTable({
             />
             <Button
               size="small"
-              aria-label="导出分期与回款CSV"
+              aria-label="导出分期与回款数据"
               loading={exporting}
               onClick={() => void exportCsv()}
             >
-              导出 CSV
+              导出
             </Button>
           </Space>
         }

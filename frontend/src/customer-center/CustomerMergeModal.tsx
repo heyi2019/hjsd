@@ -28,7 +28,7 @@ export function CustomerMergeModal({
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="CUSTOMER" form={mergeForm} colon={false} className="form-no-colon" onFinish={onSubmit}>
-          <Form.Item name="target_customer_id" label="目标客户（必须为 ACTIVE）" rules={[{ required: true }]}>
+          <Form.Item name="target_customer_id" label="目标客户（需为有效客户）" rules={[{ required: true }]}>
             <Select
               options={(candidates ?? [])
                 .filter((row) => row.status === "ACTIVE" && row.id !== mergeTarget?.id)

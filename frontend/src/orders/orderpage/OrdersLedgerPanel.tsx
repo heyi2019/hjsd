@@ -141,8 +141,8 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
             trigger={["click"]}
             menu={{
               items: [
-                { key: "xlsx", label: "导出 Excel（5 个 sheet：订单 + 详情 + 三类明细）" },
-                { key: "csv", label: "导出 CSV（单表，单行表头）" },
+                { key: "xlsx", label: "导出工作簿（5 个工作表：订单 + 详情 + 三类明细）" },
+                { key: "csv", label: "导出表格（单表，单行表头）" },
               ],
               onClick: ({ key }) => {
                 if (key === "xlsx") void onExportLedgerXlsx();

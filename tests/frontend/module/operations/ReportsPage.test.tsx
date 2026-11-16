@@ -118,7 +118,7 @@ describe("ReportsPage：经营中心报表", () => {
     vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage initialReportTab="my-earnings" />, { user: "admin" });
     await screen.findAllByText("我的收益");
-    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith(
       "commission",
       expect.objectContaining({ mine: true }),
@@ -151,7 +151,7 @@ describe("ReportsPage：经营中心报表", () => {
     await ui.click(personComboboxes[personComboboxes.length - 1] as HTMLElement);
     await ui.click(await screen.findByText("业务同事", { selector: ".ant-select-item-option-content" }));
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
-    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith(
       "commission",
       expect.objectContaining({ all_people: true, user_id: 7 }),
@@ -196,7 +196,7 @@ describe("ReportsPage：经营中心报表", () => {
     const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
     await ui.type(dateInputs[0], "2026-01-01");
     await ui.type(dateInputs[1], "2026-01-31");
-    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31" }));
   });
 
@@ -205,7 +205,7 @@ describe("ReportsPage：经营中心报表", () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("经营损益");
     const monthlyCard = screen.getByText("月度经营损益").closest(".ant-card") as HTMLElement;
-    await ui.click(within(monthlyCard).getByRole("button", { name: "导出 CSV" }));
+    await ui.click(within(monthlyCard).getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith("已导出 monthly-pnl.csv"));
   });
@@ -218,7 +218,7 @@ describe("ReportsPage：经营中心报表", () => {
     const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
     await ui.type(dateInputs[0], "2026-12-31");
     await ui.type(dateInputs[1], "2026-01-01");
-    await ui.click(screen.getByRole("button", { name: "导出 CSV" }));
+    await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("导出开始日期不能晚于结束日期"));
     expect(vi.mocked(reportsApi.exportCsv)).not.toHaveBeenCalled();
   });

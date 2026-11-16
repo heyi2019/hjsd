@@ -166,7 +166,7 @@ describe("CustomersPage：客户档案", () => {
     expect(await screen.findByText("客户数据不可用，请点击重新加载")).toBeInTheDocument();
     const stats = document.querySelector(".ui-stat-row") as HTMLElement;
     expect(within(stats).getAllByText("不可用")).toHaveLength(3);
-    expect(screen.getByRole("button", { name: "导出客户CSV" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "导出客户数据" })).toBeDisabled();
     expect(screen.getByRole("button", { name: /新建客户/ })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "客户状态" })).toBeDisabled();
   });
@@ -446,7 +446,7 @@ describe("CustomersPage：行内动作", () => {
     renderLight(<CustomerPanel />, { user: "admin" });
 
     await screen.findByText("CUS-0001");
-    await keeper.click(screen.getByRole("button", { name: "导出客户CSV" }));
+    await keeper.click(screen.getByRole("button", { name: "导出客户数据" }));
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户 CSV 已导出"));
     createObjectURLSpy.mockRestore();
     revokeObjectURLSpy.mockRestore();

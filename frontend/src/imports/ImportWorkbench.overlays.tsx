@@ -52,7 +52,7 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
         title={`人工指派 · 第 ${mapTarget?.row_no ?? ""} 行`}
         fields={[
           { name: "basis", label: "补录依据", required: true, kind: "textarea" as const, placeholder: "如：对账单 7 月第 9 行 / 客户确认记录" },
-          { name: "order_id", label: "关联订单 ID（可空）", kind: "number" as const },
+          { name: "order_id", label: "关联订单编号（可空）", kind: "number" as const },
           { name: "account_id", label: "关联库存编号 ID（可空）", kind: "number" as const },
         ]}
         submitText="确认指派"

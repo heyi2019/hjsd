@@ -14,7 +14,7 @@ import { ConfirmButton } from "../shared/ui";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 
 const OrdersPage = lazy(() => import("../orders/OrdersPage").then(({ OrdersPage }) => ({ default: OrdersPage })));
-const CustomersPage = lazy(() => import("../customers/CustomersPage").then(({ CustomersPage }) => ({ default: CustomersPage })));
+const CustomersPage = lazy(() => import("../customer-center/CustomersPage").then(({ CustomersPage }) => ({ default: CustomersPage })));
 const FundsPage = lazy(() => import("../pools/FundsPage").then(({ FundsPage }) => ({ default: FundsPage })));
 const ReportsPage = lazy(() => import("../reporting/ReportsPage").then(({ ReportsPage }) => ({ default: ReportsPage })));
 const SettingsPage = lazy(() => import("../field-definitions/SettingsPage").then(({ SettingsPage }) => ({ default: SettingsPage })));

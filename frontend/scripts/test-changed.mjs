@@ -60,7 +60,7 @@ const SRC_DOMAIN_TO_REGION = {
   orders: "business",
   stocks: "business",
   installments: "business",
-  customers: "customer",
+  "customer-center": "customer",
   pools: "finance",
   rebates: "finance",
   reporting: "operations",

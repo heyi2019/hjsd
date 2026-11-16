@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { CustomerLeadPanel } from "@/customers/CustomerLeadPanel";
+import { CustomerLeadPanel } from "@/customer-center/CustomerLeadPanel";
 import { customersApi, leadsApi } from "@/shared/api/customers.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { Customer, Lead } from "@/shared/api/types/customers";
@@ -37,7 +37,7 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
   seedOrderFormFields();
-  vi.mocked(leadsApi.list).mockResolvedValue(leads);
+  vi.mocked(leadsApi.page).mockResolvedValue({ items: leads, total: leads.length, limit: 10, offset: 0 });
   vi.mocked(customersApi.list).mockResolvedValue(customers);
   vi.mocked(leadsApi.create).mockResolvedValue(leads[0]);
   vi.mocked(leadsApi.close).mockResolvedValue(leads[0]);
@@ -57,13 +57,13 @@ describe("CustomerLeadPanel：客户需求池", () => {
   });
 
   it("无需求时显示空态文案", async () => {
-    vi.mocked(leadsApi.list).mockResolvedValue([]);
+    vi.mocked(leadsApi.page).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     expect(await screen.findByText("暂无客户需求")).toBeInTheDocument();
   });
 
   it("加载失败展示错误横幅", async () => {
-    vi.mocked(leadsApi.list).mockRejectedValue(new Error("lead down"));
+    vi.mocked(leadsApi.page).mockRejectedValue(new Error("lead down"));
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     expect(await screen.findByText(/lead down/)).toBeInTheDocument();
   });
@@ -94,6 +94,12 @@ describe("CustomerLeadPanel：客户需求池", () => {
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     const row = (await screen.findByText("LD-1")).closest("tr")!;
     expect(within(row).getByText("张三")).toBeInTheDocument();
+  });
+
+  it("需求列表由后台分页并传入当前页参数", async () => {
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    await screen.findByText("LD-1");
+    expect(leadsApi.page).toHaveBeenCalledWith({ limit: 10, offset: 0 });
   });
 
   it("新增需求填表并提交调用 leadsApi.create", async () => {
@@ -174,9 +180,12 @@ describe("CustomerLeadPanel：客户需求池", () => {
   });
 
   it("已关闭需求不渲染行内操作按钮", async () => {
-    vi.mocked(leadsApi.list).mockResolvedValue([
-      { id: 2, lead_no: "LD-2", customer_id: 1, customer_display_name: "张三", request_type: "SELL_ACCOUNT", budget: null, target: "卖个号", status: "CLOSED" },
-    ]);
+    vi.mocked(leadsApi.page).mockResolvedValue({
+      items: [{ id: 2, lead_no: "LD-2", customer_id: 1, customer_display_name: "张三", request_type: "SELL_ACCOUNT", budget: null, target: "卖个号", status: "CLOSED" }],
+      total: 1,
+      limit: 10,
+      offset: 0,
+    });
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     await screen.findByText("LD-2");
     expect(screen.queryByRole("button", { name: /转单/ })).toBeNull();

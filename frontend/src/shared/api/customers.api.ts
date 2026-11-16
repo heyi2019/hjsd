@@ -53,6 +53,10 @@ export const counterpartiesApi = {
 
 export const leadsApi = {
   list: () => api.get<Lead[]>("/leads").then(r => r.data),
+  page: (params?: { limit?: number; offset?: number; status?: string; keyword?: string; customer_id?: number }) =>
+    api.get<PageResponse<Lead>>("/leads/page", {
+      params: { limit: 10, offset: 0, ...params },
+    }).then((r) => r.data),
   summary: () => api.get<LeadSummary>("/leads/summary").then(r => r.data),
   create: (data: Record<string, unknown>) => api.post<Lead>("/leads", data).then(r => r.data),
   close: (id: number, reason: string, extra_values?: Record<string, unknown>) => api.post<Lead>(`/leads/${id}/close`, { reason, extra_values }).then(r => r.data),

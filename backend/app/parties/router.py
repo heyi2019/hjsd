@@ -7,7 +7,6 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.actor import actor_name as _actor
@@ -26,7 +25,6 @@ from app.core.security import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
-from app.domain.parties import Customer
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.parties import schemas
@@ -67,7 +65,7 @@ from app.parties.leads import (
     update_lead as parties_update_lead,
 )
 
-from .router_output import _counterparty_output, _lead_output
+from .router_output import _counterparty_output, _lead_output, _lead_outputs
 
 router = APIRouter(tags=["CUS-01 客户与合作方"])
 
@@ -309,24 +307,35 @@ def list_leads(
     items = parties_list_leads(
         db, customer_id=customer_id, status=status, keyword=keyword, user=user
     )
-    extras = get_extra_values_bulk(
-        db, entity_type="lead", entity_ids=[item.id for item in items]
+    return _lead_outputs(db, items)
+
+
+@router.get("/leads/page", response_model=PageOut[schemas.LeadOut])
+def list_leads_page(
+    customer_id: int | None = Query(default=None, gt=0),
+    status: str | None = Query(default=None),
+    keyword: str | None = Query(default=None, max_length=128),
+    limit: int = Query(default=10, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_customers,
+) -> PageOut[schemas.LeadOut]:
+    items = parties_list_leads(
+        db,
+        customer_id=customer_id,
+        status=status,
+        keyword=keyword,
+        user=user,
+        limit=limit,
+        offset=offset,
     )
-    customer_ids = {item.customer_id for item in items}
-    customer_names = dict(
-        db.execute(
-            select(Customer.id, Customer.display_name).where(Customer.id.in_(customer_ids))
-        ).all()
-    ) if customer_ids else {}
-    return [
-        _lead_output(
-            db,
-            item,
-            customer_display_name=customer_names.get(item.customer_id, ""),
-            extra_values=extras.get(item.id, {}),
-        )
-        for item in items
-    ]
+    summary = parties_summarize_leads(db, user=user)
+    return PageOut(
+        items=_lead_outputs(db, items),
+        total=summary["total_count"],
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/leads/summary", response_model=schemas.LeadSummaryOut)

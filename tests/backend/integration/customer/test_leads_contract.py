@@ -38,6 +38,18 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
     assert listed.status_code == 200, listed.text
     assert [item["lead_no"] for item in listed.json()] == [lead["lead_no"]]
     assert listed.json()[0]["customer_display_name"] == "需求客户"
+
+    paged = seeded_client.get(
+        "/api/v1/leads/page",
+        params={"limit": 10, "offset": 0},
+        headers=headers,
+    )
+    assert paged.status_code == 200, paged.text
+    page = paged.json()
+    assert page["total"] == 1
+    assert page["limit"] == 10
+    assert page["offset"] == 0
+    assert page["items"][0]["customer_display_name"] == "需求客户"
     assert listed.json()[0]["customer_display_name"] == "需求客户"
 
     updated = seeded_client.patch(

@@ -1,12 +1,13 @@
 """parties.router 输出装配 helper（需求池 / 合作方）。"""
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.parties import schemas
 from app.parties._common import to_counterparty_out
 from app.domain.parties import Customer
-from app.parties.fields import get_extra_values
+from app.parties.fields import get_extra_values, get_extra_values_bulk
 
 
 def _lead_output(
@@ -27,6 +28,27 @@ def _lead_output(
         ),
     })
     return output
+
+
+def _lead_outputs(db: Session, items) -> list[schemas.LeadOut]:
+    extras = get_extra_values_bulk(
+        db, entity_type="lead", entity_ids=[item.id for item in items]
+    )
+    customer_ids = {item.customer_id for item in items}
+    customer_names = dict(
+        db.execute(
+            select(Customer.id, Customer.display_name).where(Customer.id.in_(customer_ids))
+        ).all()
+    ) if customer_ids else {}
+    return [
+        _lead_output(
+            db,
+            item,
+            customer_display_name=customer_names.get(item.customer_id, ""),
+            extra_values=extras.get(item.id, {}),
+        )
+        for item in items
+    ]
 
 
 def _counterparty_output(db: Session, item) -> schemas.CounterpartyOut:

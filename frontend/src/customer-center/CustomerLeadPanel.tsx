@@ -16,6 +16,8 @@ const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SEL
 export function CustomerLeadPanel() {
   const [rows, setRows] = useState<Lead[]>([]);
   const [summary, setSummary] = useState<{ total_count: number; open_count: number } | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const { config } = useOrderFormConfig(createOpen ? "LEAD" : undefined);
@@ -30,12 +32,15 @@ export function CustomerLeadPanel() {
 
   const load = useCallback(async () => {
     try {
-      const [leadList, leadSummary] = await Promise.all([leadsApi.list(), leadsApi.summary()]);
-      setRows(leadList);
+      const [leadPage, leadSummary] = await Promise.all([
+        leadsApi.page({ limit: pageSize, offset: (page - 1) * pageSize }),
+        leadsApi.summary(),
+      ]);
+      setRows(leadPage.items);
       setSummary(leadSummary);
       setError(null);
     } catch (err) { setError(normalizeError(err)); }
-  }, []);
+  }, [page, pageSize]);
   useEffect(() => { void load(); }, [load]);
 
   const openCreate = async () => {
@@ -94,7 +99,17 @@ export function CustomerLeadPanel() {
     <ErrorBanner error={error} onRetry={() => void load()} />
     <StatRow items={[{ label: "需求总数", kind: "count", amount: error ? null : String(summary?.total_count ?? 0) }, { label: "待跟进", kind: "count", amount: error ? null : String(summary?.open_count ?? 0), tone: "warn" }]} />
     <Card className="glass" title="客户需求池" extra={<PermissionButton permission="customer.create" type="primary" loading={customersLoading} disabled={Boolean(error)} onClick={() => void openCreate()}>新增需求</PermissionButton>}>
-      <DataTable<Lead> columns={columns} rows={rows} page={1} pageSize={10} total={summary?.total_count ?? 0} emptyText="暂无客户需求" pagination={error ? false : undefined} onPageChange={() => undefined}/>
+      <DataTable<Lead>
+        columns={columns}
+        rows={rows}
+        loading={summary === null && !error}
+        page={page}
+        pageSize={pageSize}
+        total={summary?.total_count ?? 0}
+        emptyText="暂无客户需求"
+        pagination={error ? false : undefined}
+        onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
+      />
     </Card>
     <BusinessActionModal
       title="新增客户需求"

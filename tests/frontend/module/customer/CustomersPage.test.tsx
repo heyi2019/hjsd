@@ -1,10 +1,10 @@
-import { CustomerPanel } from "@/customers/CustomerPanel";
+import { CustomerPanel } from "@/customer-center/CustomerPanel";
 import { appMessage } from "@/shared/ui/appFeedback";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { CustomersPage } from "@/customers/CustomersPage";
+import { CustomersPage } from "@/customer-center/CustomersPage";
 
 import { counterpartiesApi, customersApi, leadsApi } from "@/shared/api/customers.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
@@ -23,7 +23,7 @@ vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");
-vi.mock("@/customers/CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
+vi.mock("@/customer-center/CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
 
 const customers = [
   {

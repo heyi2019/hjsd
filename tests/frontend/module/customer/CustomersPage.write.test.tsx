@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { appMessage as message } from "@/shared/ui/appFeedback";
-import { CustomersPage } from "@/customers/CustomersPage";
+import { CustomersPage } from "@/customer-center/CustomersPage";
 import { resolveMockOnce } from "@fixtures/mock-api";
 
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
@@ -28,7 +28,7 @@ vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
-vi.mock("@/customers/CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
+vi.mock("@/customer-center/CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
 
 const fieldDefs = [
   { id: 1, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "game_category", label: "常玩品类", field_type: "MULTI_SELECT", options: [{ value: "王者荣耀", label: "王者荣耀" }, { value: "和平精英", label: "和平精英" }], required: false, sort_order: 10, is_active: true },

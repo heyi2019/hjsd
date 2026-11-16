@@ -110,6 +110,8 @@ def list_leads(
     status: str | None = None,
     keyword: str | None = None,
     user: CurrentUser | None = None,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[CustomerLead]:
     stmt = select(CustomerLead)
     if customer_id is not None:
@@ -135,6 +137,8 @@ def list_leads(
         scope = owner_scope_filter(CustomerLead.owner_id, user, session)
         if scope is not None:
             stmt = stmt.where(scope)
+    if limit is not None:
+        stmt = stmt.limit(limit).offset(offset)
     return list(session.scalars(stmt.order_by(CustomerLead.id.desc())).all())
 
 

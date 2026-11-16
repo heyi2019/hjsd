@@ -189,6 +189,14 @@ def test_set_values_merges_without_dropping_history(seeded_db):
     ) == {"k1": "v1", "k2": "v2"}
 
 
+def test_set_values_clears_explicit_empty_values(seeded_db):
+    _add_field(seeded_db, "clearable")
+    customer = _customer(seeded_db)
+    _set(seeded_db, customer.id, [("clearable", "原值")])
+    _set(seeded_db, customer.id, [("clearable", None)])
+    assert get_extra_values(seeded_db, entity_type="customer", entity_id=customer.id) == {}
+
+
 def test_set_values_require_all_enforces_required_fields(seeded_db):
     customer = _customer(seeded_db)
     _add_field(seeded_db, "must", required=True)

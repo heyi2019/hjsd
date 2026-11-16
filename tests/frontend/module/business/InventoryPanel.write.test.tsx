@@ -115,6 +115,30 @@ beforeEach(() => {
   vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "alice", display_name: "小明", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 describe("InventoryPanel：写入与长路径", () => {
+  it("代挂在库账号不再提供独立取消入口", async () => {
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([{
+      account: { ...accounts[0], inventory_type: "CONSIGNMENT" },
+      order: {
+        id: 21,
+        order_no: "DG-2026-0001",
+        order_type: "DG",
+        capital_type: "ZERO",
+        trade_date: "2026-10-15",
+        account_id: 1,
+        account_status: "WAITING",
+        status: "ACTIVE",
+      },
+    }], {
+      type_counts: { CONSIGNMENT: 1 },
+      game_types: ["王者荣耀"],
+      stats: { account_count: 1, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 },
+    }) as never);
+
+    renderLight(<InventoryPanel />, { user: "admin" });
+    const row = await screen.findByText("acc-1");
+    expect(within(row.closest("tr") as HTMLElement).queryByRole("button", { name: "取消" })).toBeNull();
+  });
+
   it("库存中心资金收支与订单台账展示同一订单的资金明细和操作人", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");

@@ -11,33 +11,22 @@ const OPERATION_BUILDERS = [
   imagesOperation,
 ];
 
-const OPERATION_DEFINITIONS: readonly OrderOperationItem[] = [
-  CONSIGNMENT_OPERATION,
-  OFFSALE_OPERATION,
-  DESCRIPTION_OPERATION,
-  IMAGES_OPERATION,
-];
-
 export function orderOperationItems(context: OrderOperationContext): OrderOperationItem[] {
   return OPERATION_BUILDERS
     .map((build) => build(context))
     .filter((item): item is OrderOperationItem => item !== null);
 }
 
-/** 订单台账固定展示四项运营动作；不可执行项保留在菜单中并置灰。 */
+/** 两个业务入口共用同一份可执行运营菜单；不可执行动作直接隐藏。 */
 export function orderOperationMenuItems(
   context: OrderOperationContext,
   options: { allowProfileAfterSold?: boolean } = {},
 ) {
-  const activeKeys = new Set(orderOperationItems(context).map((item) => item.key));
+  const items = orderOperationItems(context);
   if (options.allowProfileAfterSold && context.row.status === "SOLD") {
-    activeKeys.add(DESCRIPTION_OPERATION.key);
-    activeKeys.add(IMAGES_OPERATION.key);
+    return [DESCRIPTION_OPERATION, IMAGES_OPERATION];
   }
-  return OPERATION_DEFINITIONS.map((item) => ({
-    ...item,
-    disabled: !activeKeys.has(item.key),
-  }));
+  return items;
 }
 
 export { OrderConsignmentModal } from "./consignment";

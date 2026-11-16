@@ -5,7 +5,6 @@ import { employeesApi } from "../../shared/api/org.api";
 import { ordersApi } from "../../shared/api/orders.api";
 import { unlistAndCancelConsignmentOrders } from "../../orders/operations";
 import { poolsApi } from "../../shared/api/pools.api";
-import { stocksApi } from "../../shared/api/stocks.api";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
 import type { Pool } from "../../shared/api/types/finance";
@@ -207,9 +206,14 @@ export function useInventoryActions(params: {
   async function submitDelete(reason: string) {
     if (!deleteTarget) return;
     const target = deleteTarget;
+    const sourceOrderId = target.source_order_id;
+    if (sourceOrderId == null) {
+      appMessage.error("当前库存没有关联订单，无法删除");
+      return;
+    }
     setDeleting(true);
     try {
-      await stocksApi.remove(target.id, reason);
+      await ordersApi.deleteOrder(sourceOrderId, reason);
       setDeleteTarget(null);
       dropExecutionCache(target.id);
       if (inlineEditId === target.id) cancelInlineEdit();

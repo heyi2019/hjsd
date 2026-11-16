@@ -75,6 +75,7 @@ export function useInventoryColumns(params: {
       render: (_value, row) => {
         const account = row.account;
         const operationItems = operationMenuItems(row, executionDetails[account.id]);
+        const canCancel = isEditableAccountType(row.inventory_type) && row.order_type !== "DG";
         return (
         <Space className="inventory-row-actions" size={4}>
           <PermissionButton
@@ -90,7 +91,7 @@ export function useInventoryColumns(params: {
           >
             售出
           </PermissionButton>
-          <Dropdown
+          {operationItems.length > 0 ? <Dropdown
             trigger={["click"]}
             placement="bottomLeft"
             onOpenChange={(open) => { if (open) void loadExecution(account); }}
@@ -103,7 +104,6 @@ export function useInventoryColumns(params: {
                 if (key === "description" || key === "images") handleInventoryAction(key, account);
               },
             }}
-            disabled={operationItems.length === 0}
           >
             <PermissionButton
               permission="order.create"
@@ -114,7 +114,7 @@ export function useInventoryColumns(params: {
             >
               运营
             </PermissionButton>
-          </Dropdown>
+          </Dropdown> : null}
           <PermissionButton
             permission="order.event.post"
             type="link"
@@ -141,7 +141,7 @@ export function useInventoryColumns(params: {
           </PermissionButton>
           {isEditableAccountType(row.inventory_type) ? <>
             <PermissionButton
-              permission="order.create"
+              permission="order.update"
               type="link"
               size="small"
               aria-label="编辑"
@@ -153,8 +153,8 @@ export function useInventoryColumns(params: {
             >
               编辑
             </PermissionButton>
-            <PermissionButton
-              permission="order.create"
+            {canCancel ? <PermissionButton
+              permission="order.event.post"
               type="link"
               size="small"
               danger
@@ -166,10 +166,10 @@ export function useInventoryColumns(params: {
               }}
             >
               取消
-            </PermissionButton>
+            </PermissionButton> : null}
           </> : null}
           {canDelete ? <PermissionButton
-            permission="order.create"
+            permission="order.update"
             type="link"
             size="small"
             danger

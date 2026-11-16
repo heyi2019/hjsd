@@ -488,13 +488,14 @@ describe("OrdersPage：四类订单台账", () => {
     }
     const firstRow = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))!.closest("tr")!;
     const actionLabels = Array.from(firstRow.querySelectorAll(".orders-ledger-actions button")).map((button) => button.textContent?.trim());
-    expect(actionLabels[0]).toBe("售出");
-    expect(actionLabels[1]).toBe("编辑");
-    expect(actionLabels.indexOf("运营")).toBeLessThan(actionLabels.indexOf("返点"));
+    expect(actionLabels.slice(0, 6)).toEqual(["售出", "运营", "返点", "资金收支", "分润配置", "编辑"]);
+    expect(actionLabels.indexOf("取消")).toBeGreaterThan(actionLabels.indexOf("编辑"));
+    expect(actionLabels.indexOf("删除")).toBeGreaterThan(actionLabels.indexOf("取消"));
     await ui.click(within(firstRow).getByRole("button", { name: "运营" }));
-    for (const label of ["寄售（上架）", "下架", "描述", "作图"]) {
+    for (const label of ["寄售（上架）", "描述", "作图"]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
     }
+    expect(screen.queryByRole("menuitem", { name: "下架" })).toBeNull();
   });
 
   it("待售代挂订单的操作入口显示下架而不是取消", async () => {

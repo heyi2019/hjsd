@@ -4,7 +4,7 @@ import type { AccountExecutionDetail } from "../../shared/api/types/account-exec
 import type { Order } from "../../shared/api/types/orders";
 import { ACCOUNT_STATUS_LABEL, formatDateTimeMinute, formatElapsedTime, money } from "../../shared/lib/format";
 import { useListViewColumns } from "../../shared/lib/listColumns";
-import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
+import { PermissionButton, StatusTag } from "../../shared/ui";
 import { orderOperationMenuItems } from "../operations";
 import { inventoryTypeOfOrder } from "../../stocks/InventoryPanel/types";
 import { BUSINESS_MODE_LABEL, INVENTORY_TYPE_LABEL } from "../../stocks/inventory-logic";
@@ -92,7 +92,6 @@ export function useLedgerColumns(params: {
         );
         return (
           <Space size={4} className="orders-ledger-actions">
-          <PermissionGate permission="order.event.post">
             <PermissionButton
               permission="order.create"
               type="link"
@@ -100,33 +99,7 @@ export function useLedgerColumns(params: {
               disabled={order.account_status !== "WAITING" || !order.account_id}
               onClick={(event) => { event.stopPropagation(); void openOrderSale(order); }}
             >售出</PermissionButton>
-          </PermissionGate>
-          {order.account_id || ["ACTIVE", "INSTALLMENT"].includes(order.status) ? (
-            <PermissionButton
-              permission="order.update"
-              type="link"
-              size="small"
-              title={order.account_id ? undefined : "未关联库存时会先生成库存编号"}
-              onClick={(event) => { event.stopPropagation(); void openLedgerEditor(order); }}
-            >编辑</PermissionButton>
-          ) : null}
-          <PermissionGate permission="order.event.post">
-            <PermissionButton
-              permission="order.event.post"
-              type="link"
-              size="small"
-              disabled={!hasSold || !['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
-              title={hasSold ? undefined : "订单售出后才能配置分润"}
-              onClick={(event) => { event.stopPropagation(); void openAllocations(order); }}
-            >分润配置</PermissionButton>
-            <PermissionButton
-              permission="order.event.post"
-              type="link"
-              size="small"
-              disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
-              onClick={(event) => { event.stopPropagation(); void openRefund(order); }}
-            >资金收支</PermissionButton>
-            <Dropdown
+            {operationItems.length > 0 ? <Dropdown
               trigger={["click"]}
               placement="bottomLeft"
               onOpenChange={(open) => {
@@ -151,7 +124,7 @@ export function useLedgerColumns(params: {
                 aria-label="运营"
                 onClick={(event) => event.stopPropagation()}
               >运营</PermissionButton>
-            </Dropdown>
+            </Dropdown> : null}
             <PermissionButton
               permission="order.event.post"
               type="link"
@@ -159,6 +132,30 @@ export function useLedgerColumns(params: {
               disabled={!order.account_id}
               onClick={(event) => { event.stopPropagation(); void openOrderRebate(order); }}
             >返点</PermissionButton>
+            <PermissionButton
+              permission="order.event.post"
+              type="link"
+              size="small"
+              disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
+              onClick={(event) => { event.stopPropagation(); void openRefund(order); }}
+            >资金收支</PermissionButton>
+            <PermissionButton
+              permission="order.event.post"
+              type="link"
+              size="small"
+              disabled={!hasSold || !['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
+              title={hasSold ? undefined : "订单售出后才能配置分润"}
+              onClick={(event) => { event.stopPropagation(); void openAllocations(order); }}
+            >分润配置</PermissionButton>
+            {order.account_id || ["ACTIVE", "INSTALLMENT"].includes(order.status) ? (
+              <PermissionButton
+                permission="order.update"
+                type="link"
+                size="small"
+                title={order.account_id ? undefined : "未关联库存时会先生成库存编号"}
+                onClick={(event) => { event.stopPropagation(); void openLedgerEditor(order); }}
+              >编辑</PermissionButton>
+            ) : null}
             {!canSystemOffsale ? <PermissionButton
               permission="order.event.post"
               type="link"
@@ -167,17 +164,16 @@ export function useLedgerColumns(params: {
               disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
               onClick={(event) => { event.stopPropagation(); void openCancelTransaction(order); }}
             >取消</PermissionButton> : null}
-          </PermissionGate>
-          {canDeleteOrder ? (
-            <PermissionButton
-              permission="order.update"
-              type="link"
-              size="small"
-              danger
-              onClick={(event) => { event.stopPropagation(); void openOrderDelete(order); }}
-            >删除</PermissionButton>
-          ) : null}
-        </Space>
+            {canDeleteOrder ? (
+              <PermissionButton
+                permission="order.update"
+                type="link"
+                size="small"
+                danger
+                onClick={(event) => { event.stopPropagation(); void openOrderDelete(order); }}
+              >删除</PermissionButton>
+            ) : null}
+          </Space>
         );
       },
     },

@@ -222,18 +222,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         ),
     ),
     ListScope(
-        code="TRANSFER_ANOMALIES",
-        label="资金中心·划转异常",
-        columns=(
-            ListColumn("transfer_id", "划转号"),
-            ListColumn("flow_no", "现有流水"),
-            ListColumn("pool", "资金池"),
-            ListColumn("direction", "方向"),
-            ListColumn("amount", "金额"),
-            ListColumn("actions", "操作"),
-        ),
-    ),
-    ListScope(
         code="RPT_MONTHLY_PNL",
         label="报表·月度损益",
         columns=(
@@ -264,7 +252,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("order_type", "业务", value_set="ORDER_BUSINESS"),
             ListColumn("main_income", "主营收入"),
             ListColumn("cost", "成本"),
-            ListColumn("profit", "利润"),
+            ListColumn("main_profit", "主营毛利"),
         ),
     ),
     ListScope(
@@ -282,23 +270,12 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         ),
     ),
     ListScope(
-        code="POOL_BALANCE",
-        label="数据中心·资金池概览",
-        columns=(
-            ListColumn("pool_code", "资金池"),
-            ListColumn("status", "状态"),
-            ListColumn("income", "收入"),
-            ListColumn("expense", "支出"),
-            ListColumn("deposit_held", "押金"),
-            ListColumn("available", "可用余额"),
-        ),
-    ),
-    ListScope(
         code="AUDIT_LOG",
         label="审计记录",
         columns=(
             ListColumn("occurred_at", "时间"),
             ListColumn("actor", "操作人"),
+            ListColumn("config_item", "配置项"),
             ListColumn("action", "动作"),
             ListColumn("entity_type", "对象类型"),
             ListColumn("entity_id", "对象编号"),

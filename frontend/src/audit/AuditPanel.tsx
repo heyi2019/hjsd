@@ -66,7 +66,7 @@ export function AuditPanel() {
   const columns: ColumnsType<AuditLogRow> = [
     { title: "时间", dataIndex: "occurred_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     { title: "操作人", dataIndex: "actor" },
-    { title: "配置项", dataIndex: "entity_type", render: (v: string | null) => ENTITY_TYPE_TO_ITEM[v ?? ""] ?? "—" },
+    { title: "配置项", key: "config_item", render: (_v, row) => ENTITY_TYPE_TO_ITEM[row.entity_type ?? ""] ?? "—" },
     { title: "动作", dataIndex: "action", render: (v: string) => configurableLabel("AUDIT_ACTION", v, AUDIT_ACTION_LABEL) },
     { title: "对象类型", dataIndex: "entity_type", render: (v: string) => configurableLabel("ENTITY_TYPE", v, ENTITY_TYPE_LABEL)},
     { title: "对象编号", dataIndex: "entity_id"},

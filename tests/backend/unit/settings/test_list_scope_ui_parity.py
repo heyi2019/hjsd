@@ -36,24 +36,25 @@ PANEL_SOURCES: dict[str, str] = {
     "LEDGER": "orders/orderpage/useLedgerColumns.tsx",
     "INVENTORY": "stocks/InventoryPanel/useInventoryColumns.tsx",
     "INSTALLMENT": "installments/useContractTableController.tsx",
-    "CUSTOMER": "customers/useCustomerController.tsx",
+    "CUSTOMER": "customer-center/useCustomerController.tsx",
     "COUNTERPARTY": "customer-center/CounterpartyPanel.tsx",
     "LEAD": "customer-center/CustomerLeadPanel.tsx",
-    "REBATE": "rebates/RebatesPanel.tsx",
     "CASHFLOW": "pools/FundsPage.tabs.tsx",
     "FUND_POOLS": "pools/FundsPage.tabs.tsx",
     "DEPOSITS": "pools/FundsPage.tabs.tsx",
     "RECONCILIATIONS": "pools/FundsPage.tabs.tsx",
-    "TRANSFER_ANOMALIES": "pools/FundsPage.tabs.tsx",
-    "POOL_BALANCE": "reporting/DataCenterPanel.tsx",
     "AUDIT_LOG": "audit/AuditPanel.tsx",
     # 报表视图已从 ReportsPage.tsx 拆到 ./reports/*.tsx（壳文件只剩 Tab 与批量导出），
     # 列定义在各子文件里，映射必须落到子文件，否则这条守卫对 7 张报表形同不存在。
     "RPT_MONTHLY_PNL": "reporting/reports/MonthlyPnlReport.tsx",
-    "RPT_COMMISSION": "reporting/reports/CommissionReport.tsx",
     "RPT_BUSINESS_PNL": "reporting/reports/BusinessPnlReport.tsx",
     "RPT_ORDER_PROFIT": "reporting/reports/OrderProfitReport.tsx",
 }
+
+# 返点仍有 CSV 导出作用域，但前端只在订单详情弹窗中展示关联明细，
+# 该明细表不是独立列表，且列口径不同于导出字段；分润对账同理，页面展示订单汇总、
+# 导出展示展开后的人员明细。两者都不纳入列表页一对一静态一致性守卫。
+NON_UI_SCOPES = {"REBATE", "RPT_COMMISSION"}
 
 _ARRAY_DECL = re.compile(r"=\s*\[")
 
@@ -174,15 +175,15 @@ def test_lead_table_exposes_operator_column() -> None:
 
 
 def test_every_registered_scope_has_a_panel() -> None:
-    """注册表新增作用域必须同时登记一个面板映射，否则这条守卫对它形同不存在。"""
-    registered = {scope.code for scope in LIST_SCOPES}
+    """可渲染列表必须登记面板；导出专用作用域显式列入例外。"""
+    registered = {scope.code for scope in LIST_SCOPES} - NON_UI_SCOPES
     missing = sorted(registered - set(PANEL_SOURCES))
     stale = sorted(set(PANEL_SOURCES) - registered)
     assert not missing, f"注册表有作用域没登记面板来源：{missing}"
     assert not stale, f"面板来源登记了已不存在的作用域：{stale}"
 
 
-@pytest.mark.parametrize("scope_code", [scope.code for scope in LIST_SCOPES])
+@pytest.mark.parametrize("scope_code", [scope.code for scope in LIST_SCOPES if scope.code not in NON_UI_SCOPES])
 def test_panel_columns_match_registry(scope_code: str) -> None:
     """界面列必须与注册表逐列同 key、同中文名、同顺序。
 

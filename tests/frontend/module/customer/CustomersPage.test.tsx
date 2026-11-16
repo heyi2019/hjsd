@@ -70,6 +70,7 @@ beforeEach(() => {
   vi.mocked(customersApi.list).mockResolvedValue(customers);
   vi.mocked(customersApi.summary).mockResolvedValue({ total_count: 2, month_count: 1, today_count: 1 });
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
+  vi.mocked(counterpartiesApi.page).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
   vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
   vi.mocked(customersApi.detail).mockResolvedValue({
     customer: customers[0],
@@ -117,7 +118,7 @@ describe("CustomersPage：客户档案", () => {
   });
 
   it("从客户中心深链参数打开指定合作方卡片", async () => {
-    vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
+    vi.mocked(counterpartiesApi.page).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
     vi.mocked(counterpartiesApi.get).mockResolvedValue(counterparties[0]);
     renderLight(<CustomersPage focusCounterpartyId={11} />);
     expect(await screen.findByText("合作方档案 · CP-0001")).toBeInTheDocument();
@@ -217,7 +218,7 @@ describe("CustomersPage：客户档案", () => {
 
   it("合作方复用客户的详情、编辑和拉黑操作", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(counterpartiesApi.list).mockResolvedValue(counterparties);
+    vi.mocked(counterpartiesApi.page).mockResolvedValue({ items: counterparties, total: counterparties.length, limit: 10, offset: 0 });
     vi.mocked(counterpartiesApi.get).mockResolvedValue(counterparties[0]);
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
@@ -337,6 +338,7 @@ describe("CustomersPage：行内动作", () => {
     seedOptionSets();
     vi.mocked(customersApi.list).mockResolvedValue(customers as unknown as never);
     vi.mocked(counterpartiesApi.list).mockResolvedValue(counterparties as unknown as never);
+    vi.mocked(counterpartiesApi.page).mockResolvedValue({ items: counterparties, total: counterparties.length, limit: 10, offset: 0 });
     vi.mocked(orderFormFieldsApi.list).mockResolvedValue(fieldDefs as unknown as never);
     vi.mocked(customersApi.detail).mockResolvedValue(detail as unknown as never);
     vi.mocked(counterpartiesApi.get).mockResolvedValue(counterparties[0] as unknown as never);

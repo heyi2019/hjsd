@@ -33,6 +33,7 @@ from app.parties import schemas
 from app.parties._common import to_counterparty_out, to_customer_out
 from app.parties.counterparties import (
     create_counterparty as parties_create_counterparty,
+    count_counterparties as parties_count_counterparties,
     get_counterparty as parties_get_counterparty,
     list_counterparties as parties_list_counterparties,
     set_counterparty_status,
@@ -441,6 +442,34 @@ def list_counterparties(
         )
         for item in items
     ]
+
+
+@router.get("/counterparties/page", response_model=PageOut[schemas.CounterpartyOut])
+def list_counterparties_page(
+    type: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    limit: int = Query(default=10, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_counterparties,
+) -> PageOut[schemas.CounterpartyOut]:
+    items = parties_list_counterparties(
+        db, type=type, status=status, limit=limit, offset=offset
+    )
+    extras = get_extra_values_bulk(
+        db, entity_type="counterparty", entity_ids=[item.id for item in items]
+    )
+    return PageOut(
+        items=[
+            schemas.CounterpartyOut.model_validate(
+                to_counterparty_out(item, extra_values=extras.get(item.id))
+            )
+            for item in items
+        ],
+        total=parties_count_counterparties(db, type=type, status=status),
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/counterparties/{counterparty_id}", response_model=schemas.CounterpartyOut)

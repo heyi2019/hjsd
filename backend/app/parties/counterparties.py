@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -91,14 +91,32 @@ def create_counterparty(
 
 
 def list_counterparties(
-    session: Session, *, type: str | None = None, status: str | None = None
+    session: Session,
+    *,
+    type: str | None = None,
+    status: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[Counterparty]:
     stmt = select(Counterparty)
     if type:
         stmt = stmt.where(Counterparty.type == type)
     if status:
         stmt = stmt.where(Counterparty.status == status)
+    if limit is not None:
+        stmt = stmt.limit(limit).offset(offset)
     return list(session.scalars(stmt.order_by(Counterparty.id)).all())
+
+
+def count_counterparties(
+    session: Session, *, type: str | None = None, status: str | None = None
+) -> int:
+    stmt = select(func.count(Counterparty.id))
+    if type:
+        stmt = stmt.where(Counterparty.type == type)
+    if status:
+        stmt = stmt.where(Counterparty.status == status)
+    return int(session.scalar(stmt) or 0)
 
 
 def get_counterparty(session: Session, counterparty_id: int) -> Counterparty:

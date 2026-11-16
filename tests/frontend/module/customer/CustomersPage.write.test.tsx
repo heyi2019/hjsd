@@ -47,6 +47,7 @@ beforeEach(() => {
   seedOptionSets();
   vi.mocked(customersApi.list).mockResolvedValue(customers);
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
+  vi.mocked(counterpartiesApi.page).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
   vi.mocked(orderFormFieldsApi.list).mockResolvedValue(fieldDefs);
   vi.mocked(customersApi.detail).mockResolvedValue({
     customer: customers[0],

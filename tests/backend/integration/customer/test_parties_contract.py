@@ -753,6 +753,24 @@ class TestPartiesApi:
             peer.counterparty_no
         ]
 
+    def test_list_counterparties_page_endpoint(self, seeded_client, seeded_db, headers):
+        peer = create_counterparty(
+            seeded_db, display_name="分页同行", type="PEER", actor="pytest"
+        )
+        response = seeded_client.get(
+            f"{COUNTERPARTIES}/page",
+            params={"type": "PEER", "limit": 10, "offset": 0},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["total"] == 1
+        assert payload["limit"] == 10
+        assert payload["offset"] == 0
+        assert [item["counterparty_no"] for item in payload["items"]] == [
+            peer.counterparty_no
+        ]
+
     def test_update_counterparty_endpoint(self, seeded_client, seeded_db, headers):
         peer = create_counterparty(
             seeded_db, display_name="同行A", type="PEER", actor="pytest"

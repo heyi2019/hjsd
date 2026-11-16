@@ -38,6 +38,10 @@ export const customersApi = {
 export const counterpartiesApi = {
   list: (params?: { type?: string; status?: string }) =>
     api.get<Counterparty[]>("/counterparties", { params }).then((r) => r.data),
+  page: (params?: { type?: string; status?: string; limit?: number; offset?: number }) =>
+    api.get<PageResponse<Counterparty>>("/counterparties/page", {
+      params: { limit: 10, offset: 0, ...params },
+    }).then((r) => r.data),
   create: (payload: Partial<Counterparty>) =>
     api.post<Counterparty>("/counterparties", payload).then((r) => r.data),
   get: (id: number) => api.get<Counterparty>(`/counterparties/${id}`).then((r) => r.data),

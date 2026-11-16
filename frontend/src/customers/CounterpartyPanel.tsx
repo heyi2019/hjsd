@@ -16,7 +16,10 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
-  const [rows, setRows] = useState<Counterparty[]>([]);
+  const [rows, setRows] = useState<Counterparty[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
   const [open, setOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Counterparty | null>(null);
@@ -29,12 +32,18 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
 
   const load = useCallback(async () => {
     try {
-      setRows(await counterpartiesApi.list(statusFilter ? { status: statusFilter } : undefined));
+      const response = await counterpartiesApi.page({
+        ...(statusFilter ? { status: statusFilter } : {}),
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      });
+      setRows(response.items);
+      setTotal(response.total);
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
     }
-  }, [statusFilter]);
+  }, [page, pageSize, statusFilter]);
 
   // 页面被 keep-alive 隐藏时不请求；重新激活或状态筛选变化都从后端刷新。
   useEffect(() => {
@@ -64,7 +73,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
   const handledFocusRef = useRef<number | null>(null);
   useEffect(() => {
     if (focusId == null || handledFocusRef.current === focusId) return;
-    const row = rows.find((item) => item.id === focusId);
+    const row = rows?.find((item) => item.id === focusId);
     handledFocusRef.current = focusId;
     if (row) {
       void openDetail(row);
@@ -158,23 +167,24 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
       className="glass"
       title="合作方"
       extra={
-        <PermissionButton permission="counterparty.manage" type="primary" disabled={Boolean(error) || !counterpartyTypeOptions} onClick={() => setOpen(true)}>
+        <PermissionButton permission="counterparty.manage" type="primary" disabled={Boolean(error) || rows === null || !counterpartyTypeOptions} onClick={() => setOpen(true)}>
           新建合作方
         </PermissionButton>
       }
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Space wrap className="counterparty-filter-bar">
-        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? []} disabled={counterpartyStatusOptions === null} onChange={(value) => setStatusFilter(value)} />
+        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? []} disabled={counterpartyStatusOptions === null || rows === null} onChange={(value) => { setStatusFilter(value); setPage(1); }} />
       </Space>
       <DataTable<Counterparty>
         columns={columns}
-        rows={rows}
-        page={1}
-        pageSize={10}
-        total={rows.length}
-        emptyText="暂无合作方"
-        onPageChange={() => undefined}
+        rows={rows ?? []}
+        loading={rows === null}
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        emptyText={error ? "合作方数据不可用，请点击重新加载" : "暂无合作方"}
+        onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
      />
       <BusinessActionModal title="新建合作方" fieldCount={5} open={open} onCancel={() => setOpen(false)} footer={null}>
         <FieldConfigScope scope="COUNTERPARTY" active={open}>

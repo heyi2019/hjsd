@@ -323,8 +323,16 @@ class TestCustomerExtraValues:
 
     def _defs(self, seeded_db):
         for field_key, label, field_type, options, required, sort_order in (
-            ("game_category", "常玩品类", "MULTI_SELECT", ["王者荣耀", "和平精英"], False, 10),
-            ("credit_level", "信用评级", "SELECT", ["优质", "一般", "观察", "黑名单"], False, 20),
+            (
+                "game_category", "常玩品类", "MULTI_SELECT",
+                [{"value": "王者荣耀", "label": "王者荣耀"}, {"value": "和平精英", "label": "和平精英"}],
+                False, 10,
+            ),
+            (
+                "credit_level", "信用评级", "SELECT",
+                [{"value": value, "label": value} for value in ("优质", "一般", "观察", "黑名单")],
+                False, 20,
+            ),
             ("budget", "预算", "NUMBER", None, True, 30),
         ):
             seeded_db.add(
@@ -415,7 +423,7 @@ class TestExtraValuesApi:
         seeded_db.add(
             OrderFormField(
                 order_type_code="CUSTOMER", field_key="credit_level", label="信用评级",
-                field_type="SELECT", options=["优质", "观察"], is_custom=True,
+                field_type="SELECT", options=[{"value": "优质", "label": "优质"}, {"value": "观察", "label": "观察"}], is_custom=True,
                 created_by="pytest", updated_by="pytest",
             )
         )

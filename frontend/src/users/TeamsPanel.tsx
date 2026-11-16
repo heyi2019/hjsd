@@ -1,30 +1,20 @@
 import { appMessage } from "../shared/ui/appFeedback";
 import { Card, Form, Input } from "antd";
-import { useEffect, useState } from "react";
-import { normalizeError, type NormalizedError } from "../shared/api/client";
+import { useCallback } from "react";
+import { normalizeError } from "../shared/api/client";
 import { teamsApi } from "../shared/api/org.api";
 import type { Team } from "../shared/api/types/org";
+import { useSettingsResource } from "../shared/state/useSettingsResource";
 import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton } from "../shared/ui";
 
 export function TeamsPanel() {
-  const [rows, setRows] = useState<Team[]>([]);
   const [form] = Form.useForm();
-  const [error, setError] = useState<NormalizedError | null>(null);
-  const [loading, setLoading] = useState(false);
-  const load = async () => {
-    setLoading(true);
-    try {
-      setRows(await teamsApi.list());
-      setError(null);
-    } catch (err) {
-      const normalized = normalizeError(err);
-      setError(normalized);
-      appMessage.error(normalized.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-  useEffect(() => { void load(); }, []);
+  const load = useCallback(() => teamsApi.list(), []);
+  const handleLoadError = useCallback((cause: { message: string }) => {
+    appMessage.error(cause.message);
+  }, []);
+  const { data: loadedRows, loading, error, reload } = useSettingsResource(load, { onError: handleLoadError });
+  const rows = loadedRows ?? [];
   const submit = async (values: Record<string, string>) => {
     const code = String(values.code ?? "").trim();
     const duplicated = rows.some((team) => team.code.trim().toUpperCase() === code.toUpperCase());
@@ -36,12 +26,12 @@ export function TeamsPanel() {
       await teamsApi.create({ ...values, code });
       appMessage.success("团队已创建");
       form.resetFields();
-      await load();
+      await reload();
     } catch (err) { appMessage.error(normalizeError(err).message); }
   };
-  const toggle = async (team: Team) => { try { await teamsApi.update(team.id, { is_active: !team.is_active }); appMessage.success(team.is_active ? "团队已停用" : "团队已启用"); await load(); } catch (err) { appMessage.error(normalizeError(err).message); } };
+  const toggle = async (team: Team) => { try { await teamsApi.update(team.id, { is_active: !team.is_active }); appMessage.success(team.is_active ? "团队已停用" : "团队已启用"); await reload(); } catch (err) { appMessage.error(normalizeError(err).message); } };
   return <Card className="glass" title="团队管理">
-    <ErrorBanner error={error} onRetry={() => void load()} retrying={loading} />
+    <ErrorBanner error={error} onRetry={() => void reload()} retrying={loading} />
     <DataTable<Team>
       className="ui-admin-table"
       rows={rows}

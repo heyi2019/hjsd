@@ -5,10 +5,10 @@
  *  库存编号非序列发放域、做一级分组（组级说明），分期合约号缺少后端序列记录时展示静态口径。 */
 import { configurableLabel } from "../../shared/lib/optionSets";
 import { Card, Descriptions, Typography } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { sequencesApi } from "../../shared/api/misc.api";
 import type { DocumentSequence } from "../../shared/api/types/common";
-import { normalizeError } from "../../shared/api/client";
+import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { ErrorBanner } from "../../shared/ui";
 
 const SEQUENCE_KEY_LABEL: Record<string, string> = {
@@ -72,25 +72,9 @@ function StaticEntryLine({ name, desc }: { name: string; desc: string }) {
 }
 
 export function SequencesPanel() {
-  const [rows, setRows] = useState<DocumentSequence[]>([]);
-  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      setRows(await sequencesApi.list());
-      setError(null);
-    } catch (err) {
-      setError(normalizeError(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const load = useCallback(() => sequencesApi.list(), []);
+  const { data: loadedRows, loading, error, reload } = useSettingsResource(load);
+  const rows = loadedRows ?? [];
 
   const byKey = new Map(rows.map((row) => [row.sequence_key, row]));
   const describe = (row: DocumentSequence) => {
@@ -132,7 +116,7 @@ export function SequencesPanel() {
 
   return (
     <Card className="glass" title="编号序列">
-      <ErrorBanner error={error} onRetry={() => void load()} retrying={loading} />
+      <ErrorBanner error={error} onRetry={() => void reload()} retrying={loading} />
       <Typography.Paragraph type="secondary" className="ui-card-hint">
         序列编号由后端按域独立发放，本面板只读；库存编号与分期合约号不独立发放，见条目说明。排查断号 / 跳号时对照「当前值」与业务单据最大编号：不一致说明存在发放失败或手工补号，需复查对应批次的导入与冲销记录。
       </Typography.Paragraph>

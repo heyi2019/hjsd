@@ -10,22 +10,19 @@ import { Card } from "antd";
 import { useState, type ReactElement } from "react";
 import {
   CONFIG_GROUP_LABEL,
+  CONFIG_CENTER_GROUP_ORDER,
   SETTINGS_ITEMS,
-  type ConfigGroupCode,
 } from "../configCatalog";
 import { useSession } from "../../shared/state/session";
 import { StatusTag } from "../../shared/ui";
 import { PANEL_REGISTRY } from "./panelRegistry";
 import "./ConfigCenterPanel.css";
 
-/** 分组展示顺序：配置中心聚合字段、业务主数据、工作台提醒与编号管理。 */
-const GROUP_ORDER: ConfigGroupCode[] = ["FIELD", "MASTER", "BUSINESS", "SEQUENCE"];
-
 export function ConfigCenterPanel() {
   const { can } = useSession();
   const [selected, setSelected] = useState<string>("order-types");
 
-  const groups = GROUP_ORDER.map((code) => ({
+  const groups = CONFIG_CENTER_GROUP_ORDER.map((code) => ({
     code,
     label: CONFIG_GROUP_LABEL[code],
     items: SETTINGS_ITEMS.filter(

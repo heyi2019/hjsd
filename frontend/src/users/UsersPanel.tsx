@@ -1,11 +1,12 @@
 import { appMessage } from "../shared/ui/appFeedback";
 import { Card, Form, Input, Space, Typography } from "antd";
-import { useEffect, useState } from "react";
-import { errorMessage, normalizeError, type NormalizedError } from "../shared/api/client";
+import { useCallback, useState } from "react";
+import { errorMessage } from "../shared/api/client";
 import { teamsApi, usersApi } from "../shared/api/org.api";
 import { poolsApi } from "../shared/api/pools.api";
 import type { Pool } from "../shared/api/types/finance";
 import type { ManagedUser, Team } from "../shared/api/types/org";
+import { useSettingsResource } from "../shared/state/useSettingsResource";
 import { BusinessActionModal, BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { OWNER_SCOPE_LABEL, USER_ROLE_LABEL } from "../shared/lib/labels";
 import { useOptionSet } from "../shared/lib/optionSets";
@@ -41,36 +42,30 @@ export function UsersPanel() {
   const { role } = useSession();
   const roleOptions = useOptionSet("USER_ROLE") ?? USER_ROLE_FALLBACK;
   const scopeOptions = useOptionSet("OWNER_SCOPE") ?? OWNER_SCOPE_FALLBACK;
-  const [rows, setRows] = useState<User[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [pools, setPools] = useState<Pool[]>([]);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [resetForm] = Form.useForm();
   const [editing, setEditing] = useState<User | null>(null);
   const [resetting, setResetting] = useState<User | null>(null);
-  const [loadError, setLoadError] = useState<NormalizedError | null>(null);
-  const load = async () => {
-    try {
-      const [users, teamList, poolList] = await Promise.all([usersApi.list(), teamsApi.list(), poolsApi.list()]);
-      setRows(users);
-      setTeams(teamList);
-      setPools(poolList);
-      setLoadError(null);
-    } catch (err) {
-      setLoadError(normalizeError(err));
-      appMessage.error(errorMessage(err));
-    }
-  };
-  useEffect(() => { void load(); }, []);
-  const submit = async (values: Record<string, string>) => { try { await usersApi.create(values); appMessage.success("用户已创建"); form.resetFields(); await load(); } catch (err) { appMessage.error(errorMessage(err)); } };
+  const load = useCallback(async () => {
+    const [rows, teams, pools] = await Promise.all([usersApi.list(), teamsApi.list(), poolsApi.list()]);
+    return { rows, teams, pools };
+  }, []);
+  const handleLoadError = useCallback((cause: { message: string }) => {
+    appMessage.error(cause.message);
+  }, []);
+  const { data: loaded, error: loadError, reload } = useSettingsResource(load, { onError: handleLoadError });
+  const rows = loaded?.rows ?? [];
+  const teams = loaded?.teams ?? [];
+  const pools = loaded?.pools ?? [];
+  const submit = async (values: Record<string, string>) => { try { await usersApi.create(values); appMessage.success("用户已创建"); form.resetFields(); await reload(); } catch (err) { appMessage.error(errorMessage(err)); } };
   const updateUser = async (values: Record<string, string>) => {
     if (!editing) return;
-    try { await usersApi.update(editing.id, values); appMessage.success("用户信息已更新"); setEditing(null); await load(); }
+    try { await usersApi.update(editing.id, values); appMessage.success("用户信息已更新"); setEditing(null); await reload(); }
     catch (err) { appMessage.error(errorMessage(err)); }
   };
   const toggleUser = async (user: User) => {
-    try { await usersApi.update(user.id, { is_active: !user.is_active }); appMessage.success(user.is_active ? "用户已停用" : "用户已启用"); await load(); }
+    try { await usersApi.update(user.id, { is_active: !user.is_active }); appMessage.success(user.is_active ? "用户已停用" : "用户已启用"); await reload(); }
     catch (err) { appMessage.error(errorMessage(err)); }
   };
   const resetPassword = async (values: { password: string }) => {
@@ -79,7 +74,7 @@ export function UsersPanel() {
     catch (err) { appMessage.error(errorMessage(err)); }
   };
   return <Card className="glass" title="用户管理">
-    <ErrorBanner error={loadError} onRetry={() => void load()} />
+    <ErrorBanner error={loadError} onRetry={() => void reload()} />
     {import.meta.env.DEV ? (
       <Typography.Paragraph type="secondary">
         开发态当前角色：{role}；开发态角色不纳入服务端人员列表，下面仅展示可由后端管理的用户账号。

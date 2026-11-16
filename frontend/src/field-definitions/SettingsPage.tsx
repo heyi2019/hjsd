@@ -12,7 +12,7 @@
 import { Tabs } from "antd";
 import { useEffect, useState } from "react";
 import { useSession } from "../shared/state/session";
-import { SETTINGS_ITEMS } from "./configCatalog";
+import { SETTINGS_ITEMS, SETTINGS_TAB_ORDER } from "./configCatalog";
 import { PANEL_REGISTRY } from "./panels/panelRegistry";
 import { ConfigCenterPanel } from "./panels/ConfigCenterPanel";
 import { ImportWorkbench } from "../imports/ImportWorkbench";
@@ -24,17 +24,6 @@ interface TabItem {
 }
 
 /** 设置页左侧页签顺序（不含容器类「配置中心」）；标签 / 权限 / 只读取自 configCatalog。 */
-const SETTINGS_TAB_ORDER = [
-  "business-dictionary",
-  "policies",
-  "imports",
-  "users",
-  "teams",
-  "config-audit",
-  "audit",
-  "appearance",
-] as const;
-
 export function SettingsPage() {
   const { can } = useSession();
   const [compact, setCompact] = useState(false);

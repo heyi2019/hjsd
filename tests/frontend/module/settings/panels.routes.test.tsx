@@ -14,6 +14,7 @@ import type { Pool } from "@/shared/api/types/finance";
 import type { OrderType, OrderTypeRoute } from "@/shared/api/types/orders";
 import { OrderTypeRoutesPanel } from "@/field-definitions/panels/OrderTypeRoutesPanel";
 import { PoolsAndRoutesPanel } from "@/field-definitions/panels/PoolsAndRoutesPanel";
+import { CONFIG_CENTER_GROUP_ORDER, SETTINGS_TAB_ORDER } from "@/field-definitions/configCatalog";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
@@ -99,6 +100,23 @@ describe("OrderTypeRoutesPanel 资金路由页", () => {
     expect((await screen.findAllByText("资金路由数据不可用，请点击重新加载")).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /保存路由/ })).toBeDisabled();
     expect(screen.getByText(/业务类型覆盖不可用/)).toBeInTheDocument();
+  });
+});
+
+describe("设置导航注册表", () => {
+  it("设置页与配置中心共用单一导航顺序", () => {
+    expect(SETTINGS_TAB_ORDER).toEqual([
+      "business-dictionary",
+      "policies",
+      "imports",
+      "users",
+      "teams",
+      "config-audit",
+      "audit",
+      "appearance",
+    ]);
+    expect(CONFIG_CENTER_GROUP_ORDER).toEqual(["FIELD", "MASTER", "BUSINESS", "SEQUENCE"]);
+    expect(new Set(SETTINGS_TAB_ORDER).size).toBe(SETTINGS_TAB_ORDER.length);
   });
 });
 

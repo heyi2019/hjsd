@@ -8,13 +8,6 @@
  * 不要按模型名推断，必须照抄实际值，否则查不到改动记录。
  */
 
-import { gameTypesApi, sequencesApi } from "../shared/api/misc.api";
-import { listColumnsApi, orderFormFieldsApi, orderTypesApi } from "../shared/api/orders.api";
-import { teamsApi, usersApi } from "../shared/api/org.api";
-import { policyApi } from "../shared/api/policy.api";
-import { poolsApi } from "../shared/api/pools.api";
-import { importsApi } from "../shared/api/reports.api";
-
 export type ConfigGroupCode = "FIELD" | "MASTER" | "BUSINESS" | "SEQUENCE" | "POLICY" | "GOV" | "ORG" | "OPS";
 
 export const CONFIG_GROUP_LABEL: Record<ConfigGroupCode, string> = {
@@ -40,11 +33,26 @@ interface SettingsItemMeta {
   readOnly?: boolean;
   /** 审计 entity_type（可多个，统计时取并集）。 */
   entityTypes: string[];
-  /** 当前条目数；null 表示不适用（纯开关或静态文案）。 */
-  count: () => Promise<number | null>;
 }
 
-const noCount = async (): Promise<null> => null;
+/** 设置页独立页签顺序，配置中心内部顺序也从本文件维护。 */
+export const SETTINGS_TAB_ORDER = [
+  "business-dictionary",
+  "policies",
+  "imports",
+  "users",
+  "teams",
+  "config-audit",
+  "audit",
+  "appearance",
+] as const;
+
+export const CONFIG_CENTER_GROUP_ORDER: ConfigGroupCode[] = [
+  "FIELD",
+  "MASTER",
+  "BUSINESS",
+  "SEQUENCE",
+];
 
 export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   {
@@ -55,7 +63,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     // 只收 OrderTypeDef：路由（OrderTypePool）归「资金池」项，
     // 否则同一批 ROUTE_UPDATE 会在两项里重复计数（与 Pool 的处理口径一致）。
     entityTypes: ["OrderTypeDef"],
-    count: async () => (await orderTypesApi.list()).length,
   },
   {
     key: "form-fields",
@@ -64,7 +71,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     group: "FIELD",
     permission: "field-definition.manage",
     entityTypes: ["order_form_field"],
-    count: async () => (await orderFormFieldsApi.scopes()).length,
   },
   {
     key: "list-columns",
@@ -73,7 +79,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     summary: "台账 / 库存 / 分期 / 客户 / 返点 / 资金流水 / 报表 / 审计的列显示、顺序、列宽与固定列，可新增自定义列，改动即时生效",
     group: "FIELD",
     entityTypes: ["list_column_config"],
-    count: async () => (await listColumnsApi.all()).length,
   },
   {
     key: "pools",
@@ -82,11 +87,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     summary: "资金归属池定义与过账路由：钱归谁、各业务类型按份额落到哪个池",
     group: "MASTER",
     entityTypes: ["Pool", "OrderTypePool"],
-    count: async () => {
-      const [poolRows, types] = await Promise.all([poolsApi.list(), orderTypesApi.list()]);
-      const lists = await Promise.all(types.map((type) => orderTypesApi.routes(type.id)));
-      return poolRows.length + lists.reduce((sum, rows) => sum + rows.length, 0);
-    },
   },
   {
     key: "game-types",
@@ -94,7 +94,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     summary: "产品分类选项，建单与库存共用",
     group: "MASTER",
     entityTypes: ["GameTypeOption"],
-    count: async () => (await gameTypesApi.list({ include_inactive: true })).length,
   },
   {
     key: "business-reminders",
@@ -102,7 +101,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     summary: "工作台库存、分润与逾期合约提醒规则",
     group: "BUSINESS",
     entityTypes: ["option_set"],
-    count: noCount,
   },
   {
     key: "policies",
@@ -110,7 +108,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     summary: "返点/分润/分期/折让/退款规则版本与参数，写进订单快照参与计算",
     group: "POLICY",
     entityTypes: ["policy_definition", "policy_version"],
-    count: async () => (await policyApi.list()).total,
   },
   {
     key: "users",
@@ -119,7 +116,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     group: "ORG",
     permission: "user.manage",
     entityTypes: ["user"],
-    count: async () => (await usersApi.list()).length,
   },
   {
     key: "teams",
@@ -128,7 +124,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     group: "ORG",
     permission: "user.manage",
     entityTypes: [],
-    count: async () => (await teamsApi.list()).length,
   },
   {
     key: "imports",
@@ -137,7 +132,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     group: "OPS",
     permission: "import.manage",
     entityTypes: ["import_batch"],
-    count: async () => (await importsApi.batches()).total,
   },
   {
     key: "sequences",
@@ -147,7 +141,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     permission: "order-type.manage",
     readOnly: true,
     entityTypes: [],
-    count: async () => (await sequencesApi.list()).length,
   },
   {
     key: "business-dictionary",
@@ -156,7 +149,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     group: "OPS",
     readOnly: true,
     entityTypes: [],
-    count: noCount,
   },
   {
     key: "config-audit",
@@ -166,7 +158,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     permission: "audit.read",
     readOnly: true,
     entityTypes: [],
-    count: noCount,
   },
   {
     key: "audit",
@@ -176,7 +167,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     permission: "audit.read",
     readOnly: true,
     entityTypes: [],
-    count: noCount,
   },
   {
     key: "appearance",
@@ -184,7 +174,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     summary: "浅色/深色主题，仅本地偏好，不入库",
     group: "OPS",
     entityTypes: [],
-    count: noCount,
   },
 ];
 

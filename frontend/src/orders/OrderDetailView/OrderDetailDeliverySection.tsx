@@ -127,8 +127,13 @@ function DeliverySubSection({
                 <Select
                   mode="multiple"
                   aria-label="编辑交付负责人"
+                  className="order-detail__delivery-responsible"
                   value={Array.isArray(editableValues[field.key]) ? editableValues[field.key] : []}
                   options={(employees ?? []).map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))}
+                  showSearch
+                  optionFilterProp="label"
+                  filterOption={(input, option) => String(option?.label ?? "").toLocaleLowerCase().includes(input.trim().toLocaleLowerCase())}
+                  placeholder="默认当前员工，可多选"
                   onChange={(next) => onExtraChange?.(field.key, next)}
                 />
               ) : editing && ["intermediary_platform", "intermediary_type", "compensation_type"].includes(field.key) ? (

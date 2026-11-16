@@ -1,13 +1,11 @@
-import dayjs, { type Dayjs } from "dayjs";
-import { DatePicker, Form, Input, Typography } from "antd";
+import { Form, Input, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../../orders/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../../orders/ResponsibleEmployeeSelect";
 import { currentDevUser, normalizeError } from "../../shared/api/client";
 import { useSession } from "../../shared/state/session";
-import { today } from "../../shared/lib/format";
 import { requiredMoneyRules } from "../../shared/lib/validators";
-import { BusinessActionModal, BusinessRegistrationForm, ErrorBanner, MoneyInput, MoneyText, Select as UiSelect, dateValueFromEvent, dateValueProps } from "../../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, ErrorBanner, MoneyInput, MoneyText, Select as UiSelect } from "../../shared/ui";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { createOrderCashflow } from "./cashflow-service";
 import type { CashflowFormValues, CashflowModalProps } from "./types";
@@ -33,7 +31,6 @@ export function CashflowModal({
     if (!target) return;
     form.resetFields();
     form.setFieldsValue({
-      occurred_on: dayjs(today()),
       direction: "OUT",
       pool_id: pools[0]?.id,
     });
@@ -72,7 +69,7 @@ export function CashflowModal({
   return (
     <BusinessActionModal
       title={target ? `资金收支 · ${target.orderNo}` : "资金收支"}
-      fieldCount={showDetails ? 6 : showOperator ? 6 : 5}
+      fieldCount={showDetails ? 5 : showOperator ? 5 : 4}
       open={open}
       confirmLoading={submitting}
       okText="确定"
@@ -90,9 +87,6 @@ export function CashflowModal({
         onFinish={submit}
       >
         <FieldConfigScope scope={scope} active={open}>
-          <CfgItem name="occurred_on" label="发生日期" rules={[{ required: true, message: "请选择发生日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
-            <DatePicker format="YYYY-MM-DD" className="ui-control-full" />
-          </CfgItem>
           <CfgItem name="direction" label="资金流向" rules={[{ required: true, message: "请选择资金流向" }]}>
             <UiSelect
               aria-label="资金流向"

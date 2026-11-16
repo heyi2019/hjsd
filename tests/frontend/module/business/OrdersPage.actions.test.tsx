@@ -510,6 +510,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "资金收支");
     const modal = await modalOf(/资金收支 · HS-2026-0001/);
+    expect(within(modal).queryByLabelText("发生日期")).toBeNull();
     await waitFor(() => expect(within(modal).getByRole("combobox", { name: "操作人" }).closest(".ant-select")).toHaveTextContent("李四"));
     await ui.type(within(modal).getByLabelText("金额"), "500");
     await ui.type(within(modal).getByLabelText("收支备注"), "客户取消");

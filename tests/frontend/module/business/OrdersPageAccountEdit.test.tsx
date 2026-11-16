@@ -9,6 +9,7 @@ import { employeesApi } from "@/shared/api/org.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
+import { pageResponse } from "@fixtures/api-responses";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -59,7 +60,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOptionSets();
   seedOrderFormFields();
-  vi.mocked(ordersApi.listPage).mockResolvedValue({ items: orders, total: orders.length, limit: 10, offset: 0 });
+  vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse(orders));
   vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: orders.length, status_counts: { ACTIVE: 1, COMPLETED: 1 }, type_counts: { HS: 1, TH: 1 }, game_types: [] });
   vi.mocked(orderTypesApi.list).mockResolvedValue(types as never);
   vi.mocked(stocksApi.inventoryLedger).mockResolvedValue({
@@ -135,10 +136,10 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
 
   it("未关联库存账号的订单不显示「编辑账号」入口", async () => {
     // 本用例刻意去掉所有订单的 account_id，验证无关联账号时不出现「编辑账号」入口。
-    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([
       { id: 1, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE", account_game_type: "原神", account_game_account: "seller-001", account_platform: "安卓", account_status: "WAITING" },
       { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
-    ], total: 2, limit: 10, offset: 0 } as never);
+    ]) as never);
     renderLight(<OrdersPage />);
     await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
     await waitFor(() =>

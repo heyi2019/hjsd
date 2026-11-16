@@ -15,6 +15,7 @@ import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { allFormFields, seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
+import { pageResponse } from "@fixtures/api-responses";
 import { today } from "@/shared/lib/format";
 import * as client from "@/shared/api/client";
 import type { Installment, InstallmentCancelResult } from "@/shared/api/types/installments";
@@ -218,7 +219,7 @@ beforeEach(() => {
   seedOrderFormFields();
   vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
   ui = userEvent.setup({ pointerEventsCheck: 0 });
-  vi.mocked(ordersApi.listPage).mockResolvedValue({ items: orders, total: orders.length, limit: 10, offset: 0 });
+  vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse(orders));
   vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({
     total_count: orders.length,
     status_counts: { ACTIVE: 1, COMPLETED: 1, CANCELLED: 0 },
@@ -298,7 +299,7 @@ async function clickModalOk(modal: HTMLElement) {
 
 describe("OrdersPage：操作与筛选分支", () => {
   it("分期订单展示售出金额而不是买入金额合计", async () => {
-    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [order3], total: 1, limit: 10, offset: 0 });
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([order3]));
     await openLedger();
     expect(screen.getAllByText("¥12,000.00").length).toBeGreaterThan(0);
   });
@@ -384,12 +385,12 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("编辑有登记事件订单：统一编辑入口仍可打开库存详情", async () => {
-    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([
       {
         ...order1,
         events: [{ id: 1, event_no: "EV-1", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "1000.00" }],
       },
-    ], total: 1, limit: 10, offset: 0 });
+    ]));
     await openLedger();
     await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
     expect(await screen.findByRole("button", { name: "保存修改" })).toBeInTheDocument();
@@ -625,7 +626,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       resolvePools = resolve;
     });
 
-    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [cancelOrder], total: 1, limit: 10, offset: 0 });
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([cancelOrder]));
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...cancelOrder,
       events: [{ id: 2101, order_id: 21, event_type: "BUY", event_no: "EV-CANCEL-ASYNC-01", amount: "100.00", occurred_on: "2026-11-01", pool_id: 7, is_posted: true, cancellable_amount: "100.00" }],
@@ -698,7 +699,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("取消：分期订单按合约取消并提示退款金额", async () => {
-    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [order3], total: 1, limit: 10, offset: 0 });
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([order3]));
     vi.mocked(ordersApi.get).mockResolvedValue(order3);
     await openLedger();
     await openRowMenu("HS-2026-0003", "取消");
@@ -711,7 +712,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("取消：分期订单无可用合约时提示", async () => {
-    vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [order3], total: 1, limit: 10, offset: 0 });
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([order3]));
     vi.mocked(ordersApi.get).mockResolvedValue(order3);
     vi.mocked(installmentsApi.list).mockResolvedValue([{ ...installment, status: "CANCELLED" }]);
     await openLedger();

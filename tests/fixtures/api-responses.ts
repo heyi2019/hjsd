@@ -1,4 +1,5 @@
 import type { PageResponse } from "@/shared/api/types/common";
+import type { DataCenterSummary } from "@/shared/api/types/reporting";
 
 export type OrderLedgerSummary = {
   total_count: number;
@@ -48,6 +49,22 @@ export function reportResponse<TItem, TTotal>(items: TItem[], total: TTotal): Re
 /** 构造分润对账响应，统一订单汇总与分润合计的包裹结构。 */
 export function commissionResponse<TGroup, TTotal>(orderGroups: TGroup[], total: TTotal): CommissionResponse<TGroup, TTotal> {
   return { order_groups: orderGroups, total };
+}
+
+/** 构造数据中心指标汇总，默认值与空数据状态一致。 */
+export function dataCenterSummary(overrides: Partial<DataCenterSummary> = {}): DataCenterSummary {
+  return {
+    order_count: 0,
+    active_order_count: 0,
+    sold_cost: "0.00",
+    in_transit_cost: "0.00",
+    deposit_held: "0.00",
+    studio_cost: "0.00",
+    account_sale_profit: "0.00",
+    studio_other_income: "0.00",
+    profit: "0.00",
+    ...overrides,
+  };
 }
 
 /** 构造完整订单台账汇总，默认值与空列表状态一致。 */

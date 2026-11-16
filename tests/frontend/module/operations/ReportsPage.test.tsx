@@ -7,7 +7,7 @@ import { ReportsPage } from "@/reporting/ReportsPage";
 import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
 import { resolveMock } from "@fixtures/mock-api";
 import { appMessage } from "@/shared/ui/appFeedback";
-import { commissionResponse, reportResponse } from "@fixtures/api-responses";
+import { commissionResponse, dataCenterSummary, reportResponse } from "@fixtures/api-responses";
 
 import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
@@ -56,17 +56,7 @@ beforeEach(() => {
     { id: 8, username: "finance", display_name: "财务同事", is_active: true },
   ]);
   resolveMock(vi.mocked(reportsApi.businessPnl), reportResponse([], {}));
-  resolveMock(vi.mocked(reportsApi.dataCenter), {
-    order_count: 0,
-    active_order_count: 0,
-    sold_cost: "0.00",
-    in_transit_cost: "0.00",
-    deposit_held: "0.00",
-    studio_cost: "0.00",
-    account_sale_profit: "0.00",
-    studio_other_income: "0.00",
-    profit: "0.00",
-  });
+  resolveMock(vi.mocked(reportsApi.dataCenter), dataCenterSummary());
   resolveMock(vi.mocked(reportsApi.orderProfit), reportResponse([], { income: "0", cost: "0", rebate: "0", net_profit: "0" }));
   resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
   vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: 2, status_counts: { ACTIVE: 1 }, type_counts: {}, game_types: [] });

@@ -5,10 +5,11 @@ import { renderLight } from "@fixtures/render";
 import { DataCenterPanel } from "@/reporting/DataCenterPanel";
 import { ReportsActiveContext } from "@/reporting/reports/shared";
 import { reportsApi } from "@/shared/api/reports.api";
+import { dataCenterSummary } from "@fixtures/api-responses";
 
 vi.mock("@/shared/api/reports.api");
 
-const dataCenterSummary = {
+const summary = dataCenterSummary({
   order_count: 2,
   active_order_count: 1,
   sold_cost: "100.00",
@@ -18,22 +19,22 @@ const dataCenterSummary = {
   account_sale_profit: "60.00",
   studio_other_income: "20.00",
   profit: "80.00",
-};
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(reportsApi.dataCenter).mockResolvedValue(dataCenterSummary);
+  vi.mocked(reportsApi.dataCenter).mockResolvedValue(summary);
 });
 
 describe("DataCenterPanel：经营指标", () => {
   it("只读取一次数据中心汇总", async () => {
-    let resolveDataCenter: (value: typeof dataCenterSummary) => void = () => undefined;
+    let resolveDataCenter: (value: typeof summary) => void = () => undefined;
     vi.mocked(reportsApi.dataCenter).mockReturnValue(new Promise((resolve) => { resolveDataCenter = resolve; }));
 
     renderLight(<DataCenterPanel />, { user: "admin" });
     expect(vi.mocked(reportsApi.dataCenter)).toHaveBeenCalledTimes(1);
 
-    resolveDataCenter(dataCenterSummary);
+    resolveDataCenter(summary);
     expect(await screen.findByText("售出成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
   });
 

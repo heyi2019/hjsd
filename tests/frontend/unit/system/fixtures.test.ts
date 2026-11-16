@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DEV_USER_KEY } from "@/shared/api/client";
 import { allFormFields } from "@fixtures/orderFormFieldsSeed";
 import { OPTION_SET_SEED } from "@fixtures/optionSetsSeed";
-import { pageResponse, reportResponse, commissionResponse, orderLedgerSummary, cashflowPage, cashflowTotals } from "@fixtures/api-responses";
+import { dataCenterSummary, pageResponse, reportResponse, commissionResponse, orderLedgerSummary, cashflowPage, cashflowTotals } from "@fixtures/api-responses";
 import { resetTestFixtureState } from "@fixtures/fixtures";
 
 describe("测试夹具隔离", () => {
@@ -64,6 +64,17 @@ describe("测试夹具隔离", () => {
     expect(commissionResponse([{ order_id: 1 }], { order_count: 1, profit_base: "10.00" })).toEqual({
       order_groups: [{ order_id: 1 }],
       total: { order_count: 1, profit_base: "10.00" },
+    });
+    expect(dataCenterSummary({ order_count: 2, profit: "80.00" })).toEqual({
+      order_count: 2,
+      active_order_count: 0,
+      sold_cost: "0.00",
+      in_transit_cost: "0.00",
+      deposit_held: "0.00",
+      studio_cost: "0.00",
+      account_sale_profit: "0.00",
+      studio_other_income: "0.00",
+      profit: "80.00",
     });
   });
 });

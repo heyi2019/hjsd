@@ -58,8 +58,11 @@ export interface BusinessPnlReport {
 }
 
 export interface DataCenterSummary {
+  order_count: number;
+  active_order_count: number;
   sold_cost: string;
-  inventory_cost: string;
+  in_transit_cost: string;
+  deposit_held: string;
   studio_cost: string;
   account_sale_profit: string;
   studio_other_income: string;

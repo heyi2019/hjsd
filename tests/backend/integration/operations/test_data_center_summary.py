@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.domain.foundation import Pool
 from app.finance.cashflows import create_cashflow
+from app.finance.deposits import create_deposit
 from app.orders import events
 from app.orders.create import create_order
 from app.stocks.profile import create_account
@@ -102,13 +103,23 @@ def test_data_center_separates_costs_and_combines_profit(seeded_client, seeded_d
         amount=Decimal("20.00"),
         actor="pytest",
     )
+    create_deposit(
+        seeded_db,
+        pool_id=pool_id,
+        paid_on=TODAY,
+        amount=Decimal("50.00"),
+        actor="pytest",
+    )
 
     response = seeded_client.get("/api/v1/reports/data-center", headers=headers)
 
     assert response.status_code == 200, response.text
     assert response.json() == {
+        "order_count": 2,
+        "active_order_count": 1,
         "sold_cost": "100.00",
-        "inventory_cost": "70.00",
+        "in_transit_cost": "70.00",
+        "deposit_held": "50.00",
         "studio_cost": "30.00",
         "account_sale_profit": "60.00",
         "studio_other_income": "20.00",

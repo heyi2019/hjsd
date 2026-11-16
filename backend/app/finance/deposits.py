@@ -507,7 +507,10 @@ def list_deposits(
 
 
 def deposit_held_total(
-    session: Session, pool_id: int | None = None
+    session: Session,
+    pool_id: int | None = None,
+    *,
+    user: CurrentUser | None = None,
 ) -> Decimal:
     """在押押金合计 = Σ(实缴 − 已退 − 已损失)，可按池过滤。
 
@@ -522,4 +525,6 @@ def deposit_held_total(
     )
     if pool_id:
         stmt = stmt.where(Deposit.pool_id == pool_id)
+    elif user is not None and not (user.is_admin or user.owner_scope == "ALL"):
+        stmt = stmt.where(Deposit.pool_id.in_(sorted(user.pool_ids)))
     return to_money(session.scalar(stmt) or 0)

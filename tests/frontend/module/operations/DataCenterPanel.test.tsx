@@ -4,15 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DataCenterPanel } from "@/reporting/DataCenterPanel";
 import { ReportsActiveContext } from "@/reporting/reports/shared";
-import { ordersApi } from "@/shared/api/orders.api";
 import { reportsApi } from "@/shared/api/reports.api";
 
-vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/reports.api");
 
 const dataCenterSummary = {
+  order_count: 2,
+  active_order_count: 1,
   sold_cost: "100.00",
-  inventory_cost: "70.00",
+  in_transit_cost: "70.00",
+  deposit_held: "50.00",
   studio_cost: "30.00",
   account_sale_profit: "60.00",
   studio_other_income: "20.00",
@@ -21,31 +22,25 @@ const dataCenterSummary = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: 2, status_counts: { ACTIVE: 1 }, type_counts: {}, game_types: [] });
   vi.mocked(reportsApi.dataCenter).mockResolvedValue(dataCenterSummary);
 });
 
 describe("DataCenterPanel：经营指标", () => {
-  it("并行读取订单摘要和数据中心摘要", async () => {
-    let resolveOrders: (value: { total_count: number; status_counts: Record<string, number>; type_counts: Record<string, number>; game_types: string[] }) => void = () => undefined;
+  it("只读取一次数据中心汇总", async () => {
     let resolveDataCenter: (value: typeof dataCenterSummary) => void = () => undefined;
-    vi.mocked(ordersApi.ledgerSummary).mockReturnValue(new Promise((resolve) => { resolveOrders = resolve; }));
     vi.mocked(reportsApi.dataCenter).mockReturnValue(new Promise((resolve) => { resolveDataCenter = resolve; }));
 
     renderLight(<DataCenterPanel />, { user: "admin" });
-    expect(vi.mocked(ordersApi.ledgerSummary)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(reportsApi.dataCenter)).toHaveBeenCalledTimes(1);
 
-    resolveOrders({ total_count: 2, status_counts: { ACTIVE: 1 }, type_counts: {}, game_types: [] });
     resolveDataCenter(dataCenterSummary);
     expect(await screen.findByText("售出成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
   });
 
-  it("不重复展示资金中心的余额、押金、资金池数量和资金池明细", async () => {
+  it("不重复展示资金中心的余额、资金池数量和资金池明细", async () => {
     renderLight(<DataCenterPanel />, { user: "admin" });
     await screen.findByText("订单总数");
     expect(screen.queryByText("可用余额合计")).not.toBeInTheDocument();
-    expect(screen.queryByText("押金占用")).not.toBeInTheDocument();
     expect(screen.queryByText("资金池数量")).not.toBeInTheDocument();
     expect(screen.queryByText("资金池概览")).not.toBeInTheDocument();
   });
@@ -54,7 +49,8 @@ describe("DataCenterPanel：经营指标", () => {
     renderLight(<DataCenterPanel />, { user: "admin" });
     expect(await screen.findByText("售出成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
     expect(screen.getByText("售出成本").closest(".ui-stat")?.textContent).toContain("100.00");
-    expect(screen.getByText("库存成本（未售出）").closest(".ui-stat")?.textContent).toContain("70.00");
+    expect(screen.getByText("在途成本").closest(".ui-stat")?.textContent).toContain("70.00");
+    expect(screen.getByText("押金占用").closest(".ui-stat")?.textContent).toContain("50.00");
     expect(screen.getByText("工作室成本").closest(".ui-stat")?.textContent).toContain("30.00");
     expect(screen.getByText("账号售出利润").closest(".ui-stat")?.textContent).toContain("60.00");
     expect(screen.getByText("工作室其他收入").closest(".ui-stat")?.textContent).toContain("20.00");
@@ -65,7 +61,6 @@ describe("DataCenterPanel：经营指标", () => {
     const range = { params: { from: "2026-11-01", to: "2026-11-15" }, picker: null };
     renderLight(<DataCenterPanel range={range} />, { user: "admin" });
     await screen.findByText("订单总数");
-    expect(vi.mocked(ordersApi.ledgerSummary)).toHaveBeenLastCalledWith({ trade_date_from: "2026-11-01", trade_date_to: "2026-11-15" });
     expect(vi.mocked(reportsApi.dataCenter)).toHaveBeenLastCalledWith({ from: "2026-11-01", to: "2026-11-15" });
   });
 
@@ -77,7 +72,6 @@ describe("DataCenterPanel：经营指标", () => {
       { user: "admin" },
     );
 
-    expect(vi.mocked(ordersApi.ledgerSummary)).not.toHaveBeenCalled();
     expect(vi.mocked(reportsApi.dataCenter)).not.toHaveBeenCalled();
 
     rerender(
@@ -87,14 +81,13 @@ describe("DataCenterPanel：经营指标", () => {
     );
 
     await waitFor(() => {
-      expect(vi.mocked(ordersApi.ledgerSummary)).toHaveBeenCalledTimes(1);
       expect(vi.mocked(reportsApi.dataCenter)).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByText("售出成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
   });
 
   it("订单接口失败时显示错误并禁用订单入口", async () => {
-    vi.mocked(ordersApi.ledgerSummary).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(reportsApi.dataCenter).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     const onNavigate = vi.fn();
     renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
     const totalCard = await screen.findByRole("button", { name: /订单总数/ });

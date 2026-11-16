@@ -89,8 +89,11 @@ class BusinessPnlOut(ReportModel):
 
 
 class DataCenterOut(ReportModel):
+    order_count: int
+    active_order_count: int
     sold_cost: Decimal
-    inventory_cost: Decimal
+    in_transit_cost: Decimal
+    deposit_held: Decimal
     studio_cost: Decimal
     account_sale_profit: Decimal
     studio_other_income: Decimal

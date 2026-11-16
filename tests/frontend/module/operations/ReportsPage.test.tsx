@@ -56,8 +56,11 @@ beforeEach(() => {
   ]);
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
   resolveMock(vi.mocked(reportsApi.dataCenter), {
+    order_count: 0,
+    active_order_count: 0,
     sold_cost: "0.00",
-    inventory_cost: "0.00",
+    in_transit_cost: "0.00",
+    deposit_held: "0.00",
     studio_cost: "0.00",
     account_sale_profit: "0.00",
     studio_other_income: "0.00",

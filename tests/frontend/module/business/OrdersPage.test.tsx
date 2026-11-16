@@ -10,6 +10,7 @@ import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
+import { pageResponse } from "@fixtures/api-responses";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -72,7 +73,7 @@ function setupLedgerApi(source: unknown[] = orders) {
     const rows = filterRows(params);
     const offset = params?.offset ?? 0;
     const limit = params?.limit ?? 10;
-    return { items: rows.slice(offset, offset + limit), total: rows.length, limit, offset } as never;
+    return pageResponse(rows.slice(offset, offset + limit), { total: rows.length, limit, offset }) as never;
   });
   vi.mocked(ordersApi.ledgerSummary).mockImplementation(async (params) => {
     const rows = filterRows(params);

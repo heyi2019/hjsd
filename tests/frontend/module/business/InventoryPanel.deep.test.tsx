@@ -12,6 +12,7 @@ import { poolsApi } from "@/shared/api/pools.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock } from "@fixtures/mock-api";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
+import { inventoryLedgerResponse } from "@fixtures/api-responses";
 import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";
 import type { Account } from "@/shared/api/types/accounts";
 import type { Installment } from "@/shared/api/types/installments";
@@ -96,8 +97,7 @@ const consignmentDetail = {
 const contract = { id: 21, inst_no: "INS-21", order_id: 77, contract_type: "INSTALLMENT", status: "ACTIVE" } as unknown as Installment;
 
 async function openPanel(rows: Account[]) {
-  vi.mocked(stocksApi.inventoryLedger).mockResolvedValue({
-    items: rows.map((row) => ({
+  vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse(rows.map((row) => ({
       account: row,
       order: {
         id: row.source_order_id ?? row.id,
@@ -109,13 +109,11 @@ async function openPanel(rows: Account[]) {
         account_status: "WAITING",
         status: "ACTIVE",
       },
-    })),
-    total: rows.length,
-    facet_total: rows.length,
-    type_counts: { RECOVERY: rows.length },
-    game_types: ["王者荣耀"],
-    stats: { account_count: rows.length, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 },
-  } as never);
+    })), {
+      type_counts: { RECOVERY: rows.length },
+      game_types: ["王者荣耀"],
+      stats: { account_count: rows.length, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 },
+    }) as never);
   renderLight(<InventoryPanel />, { user: "admin" });
   await waitFor(() => expect(document.querySelector("tbody tr")).toBeTruthy());
 }
@@ -156,17 +154,16 @@ beforeEach(() => {
 
 describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
   it("在库账号卡片使用后端账号统计，不使用分页订单行数", async () => {
-    vi.mocked(stocksApi.inventoryLedger).mockResolvedValue({
-      items: [{
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([{
         account: inStockRow,
         order: { id: 21, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", account_id: 1, account_status: "WAITING", status: "ACTIVE" },
-      }],
-      total: 2,
-      facet_total: 2,
-      type_counts: { RECOVERY: 2 },
-      game_types: ["王者荣耀"],
-      stats: { account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 },
-    } as never);
+      }], {
+        total: 2,
+        facet_total: 2,
+        type_counts: { RECOVERY: 2 },
+        game_types: ["王者荣耀"],
+        stats: { account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 },
+      }) as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     const card = screen.getByText("在库账号").closest(".ui-stat");

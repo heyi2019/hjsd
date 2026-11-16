@@ -17,6 +17,7 @@ import { rebatesApi } from "@/shared/api/rebates.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock } from "@fixtures/mock-api";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
+import { inventoryLedgerResponse } from "@fixtures/api-responses";
 import { clearOptionSetsCache } from "@/shared/lib/optionSets";
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
@@ -43,8 +44,7 @@ beforeEach(() => {
   clearOptionSetsCache();
   vi.clearAllMocks();
   seedOptionSets();
-  vi.mocked(stocksApi.inventoryLedger).mockResolvedValue({
-    items: [{
+  vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([{
       account: accounts[0],
       order: {
         id: 21,
@@ -56,13 +56,11 @@ beforeEach(() => {
         account_status: "WAITING",
         status: "ACTIVE",
       },
-    }],
-    total: 1,
-    facet_total: 1,
-    type_counts: { RECOVERY: 1 },
-    game_types: ["王者荣耀"],
-    stats: { account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 },
-  } as never);
+    }], {
+      type_counts: { RECOVERY: 1 },
+      game_types: ["王者荣耀"],
+      stats: { account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 },
+    }) as never);
   resolveMock(vi.mocked(ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(ordersApi.postEvent), {});
   resolveMock(vi.mocked(customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);

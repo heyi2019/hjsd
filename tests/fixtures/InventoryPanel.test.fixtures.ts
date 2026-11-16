@@ -27,7 +27,6 @@ export const stockNoAccounts = [
 
 export const resetInventoryPanelMocks = () => {
   vi.clearAllMocks();
-  vi.mocked(stocksApi.list).mockResolvedValue(accounts);
   vi.mocked(stocksApi.inventoryLedger).mockResolvedValue({
     items: [{
       account: accounts[0],
@@ -199,7 +198,6 @@ export const resetInventoryPanelMocks = () => {
       },
     } as never;
   });
-  resolveMock(vi.mocked(stocksApi.updateProfile), accounts[0]);
 };
 
 export const setupInventoryPanelMocks = () => {

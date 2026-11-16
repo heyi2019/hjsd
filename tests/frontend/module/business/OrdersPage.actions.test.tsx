@@ -13,7 +13,6 @@ import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/order
 import { employeesApi } from "@/shared/api/org.api";
 import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi } from "@/shared/api/pools.api";
-import { stocksApi } from "@/shared/api/stocks.api";
 import { allFormFields, seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 import { today } from "@/shared/lib/format";
 import * as client from "@/shared/api/client";
@@ -582,9 +581,6 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("运营：订单台账提供描述快捷入口并登记 DESCRIPTION 业务事件", async () => {
-    vi.mocked(stocksApi.updateProfile).mockResolvedValueOnce({
-      id: 5, source_order_id: 1, source_order_no: "HS-2026-0001", game_account: "seller-001", status: "WAITING", cost_amount: "100.00",
-    } as never);
     await openLedger();
     await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "运营" }));
     await ui.click(screen.getByRole("menuitem", { name: "描述" }));

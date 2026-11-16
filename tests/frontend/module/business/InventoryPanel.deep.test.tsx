@@ -96,7 +96,6 @@ const consignmentDetail = {
 const contract = { id: 21, inst_no: "INS-21", order_id: 77, contract_type: "INSTALLMENT", status: "ACTIVE" } as unknown as Installment;
 
 async function openPanel(rows: Account[]) {
-  resolveMock(vi.mocked(stocksApi.list), rows);
   vi.mocked(stocksApi.inventoryLedger).mockResolvedValue({
     items: rows.map((row) => ({
       account: row,

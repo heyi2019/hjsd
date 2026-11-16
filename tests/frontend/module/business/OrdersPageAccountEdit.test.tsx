@@ -59,8 +59,13 @@ beforeEach(() => {
   seedOptionSets();
   seedOrderFormFields();
   vi.mocked(ordersApi.list).mockResolvedValue(orders as never);
+  vi.mocked(ordersApi.listPage).mockResolvedValue({ items: orders, total: orders.length, limit: 10, offset: 0 });
+  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: orders.length, status_counts: { ACTIVE: 1, COMPLETED: 1 }, type_counts: { HS: 1, TH: 1 }, game_types: [] });
   vi.mocked(orderTypesApi.list).mockResolvedValue(types as never);
-  vi.mocked(stocksApi.list).mockResolvedValue([]);
+  vi.mocked(stocksApi.inventoryLedger).mockResolvedValue({
+    items: [], total: 0, facet_total: 0, type_counts: {}, game_types: [],
+    stats: { account_count: 0, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 },
+  } as never);
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);
@@ -69,7 +74,6 @@ beforeEach(() => {
     orders: [{ order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE", events: [] }],
     finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
   } as never);
-  vi.mocked(stocksApi.updateProfile).mockResolvedValue({ id: 99, game_account: "acc-99" } as never);
 });
 
 describe("订单台账统一编辑入口（#15 需求1）", () => {

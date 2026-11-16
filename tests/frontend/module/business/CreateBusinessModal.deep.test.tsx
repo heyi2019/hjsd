@@ -7,7 +7,6 @@ import { gameTypesApi } from "@/shared/api/misc.api";
 import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
-import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { seedOrderFormFields } from "@fixtures/formFieldsSeed";
 
@@ -23,7 +22,6 @@ vi.mock("@/shared/api/policy.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
-vi.mock("@/shared/api/stocks.api");;
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -32,9 +30,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
   vi.mocked(orderTypesApi.list).mockResolvedValue([{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }]);
-  resolveMock(vi.mocked(stocksApi.list), [
-    { id: 9, game_account: "recovery-account", business_mode: "SELF", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "0.00" },
-  ]);
   resolveMock(vi.mocked(poolsApi.list), [{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
   vi.mocked(gameTypesApi.list).mockResolvedValue([
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },

@@ -36,7 +36,26 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
   seedOptionSets();
-  vi.mocked(stocksApi.list).mockResolvedValue(accounts);
+  vi.mocked(stocksApi.inventoryLedger).mockResolvedValue({
+    items: [{
+      account: accounts[0],
+      order: {
+        id: 21,
+        order_no: "HS-2026-0001",
+        order_type: "HS",
+        capital_type: "SELF",
+        trade_date: "2026-10-01",
+        account_id: 1,
+        account_status: "WAITING",
+        status: "ACTIVE",
+      },
+    }],
+    total: 1,
+    facet_total: 1,
+    type_counts: { RECOVERY: 1 },
+    game_types: [],
+    stats: { account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 },
+  } as never);
   vi.mocked(ordersApi.list).mockResolvedValue([{
     id: 21,
     order_no: "HS-2026-0001",
@@ -56,7 +75,6 @@ beforeEach(() => {
   resolveMock(vi.mocked(rebatesApi.create), { id: 31 });
   resolveMock(vi.mocked(installmentsApi.create), { id: 41 });
   resolveMock(vi.mocked(installmentsApi.pay), { id: 51 });
-  resolveMock(vi.mocked(stocksApi.updateProfile), accounts[0]);
 });
 
 it("售出时把新买家关联到来源单而非新建订单", async () => {
@@ -111,9 +129,10 @@ it("库存售出：成功后立即从库存列表移除账号，即使列表重�
 describe("InventoryPanel：写入与长路径", () => {
 it("代挂账号售出：全款收佣金入账、售出金额仅记录、不提供分期并挂寄售方", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    resolveMockOnce(vi.mocked(stocksApi.list), [
-      { id: 5, source_order_id: 21, game_account: "acc-5", platform: "A平台", status: "WAITING", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
-    ]);
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce({
+      items: [{ account: { ...accounts[0], id: 5, source_order_id: 21, game_account: "acc-5", inventory_type: "CONSIGNMENT" }, order: { id: 21, order_no: "DG-2026-0001", order_type: "DG", capital_type: "SELF", trade_date: "2026-10-01", account_id: 5, account_status: "WAITING", status: "ACTIVE" } }],
+      total: 1, facet_total: 1, type_counts: { CONSIGNMENT: 1 }, game_types: [], stats: { account_count: 1, occupied_cost: "50.00", over_7d_count: 0, over_30d_count: 0 },
+    } as never);
     vi.mocked(ordersApi.list).mockResolvedValueOnce([{ id: 21, order_no: "DG-2026-0001", order_type: "DG", capital_type: "SELF", trade_date: "2026-10-01", account_id: 5, account_status: "WAITING", status: "ACTIVE" }] as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-5");
@@ -147,9 +166,10 @@ it("代挂账号售出：全款收佣金入账、售出金额仅记录、不提�
 
 it("代挂售出复用买号交付信息块，交付负责人提交落库到来源单", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    resolveMockOnce(vi.mocked(stocksApi.list), [
-      { id: 5, source_order_id: 21, game_account: "acc-5", platform: "A平台", status: "WAITING", cost_amount: "50.00", inventory_type: "CONSIGNMENT" },
-    ]);
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce({
+      items: [{ account: { ...accounts[0], id: 5, source_order_id: 21, game_account: "acc-5", inventory_type: "CONSIGNMENT" }, order: { id: 21, order_no: "DG-2026-0001", order_type: "DG", capital_type: "SELF", trade_date: "2026-10-01", account_id: 5, account_status: "WAITING", status: "ACTIVE" } }],
+      total: 1, facet_total: 1, type_counts: { CONSIGNMENT: 1 }, game_types: [], stats: { account_count: 1, occupied_cost: "50.00", over_7d_count: 0, over_30d_count: 0 },
+    } as never);
     vi.mocked(ordersApi.list).mockResolvedValueOnce([{ id: 21, order_no: "DG-2026-0001", order_type: "DG", capital_type: "SELF", trade_date: "2026-10-01", account_id: 5, account_status: "WAITING", status: "ACTIVE" }] as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-5");
@@ -176,9 +196,10 @@ it("代挂售出复用买号交付信息块，交付负责人提交落库到来�
 
 it("提号库存售出可选择分期出售，确立时收首付", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
-    resolveMockOnce(vi.mocked(stocksApi.list), [
-      { id: 6, source_order_id: 21, game_account: "pickup-acc", platform: "B平台", status: "WAITING", cost_amount: "0.00", inventory_type: "PICKUP" },
-    ]);
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce({
+      items: [{ account: { ...accounts[0], id: 6, source_order_id: 21, game_account: "pickup-acc", inventory_type: "PICKUP", cost_amount: "0.00" }, order: { id: 21, order_no: "TH-2026-0001", order_type: "TH", capital_type: "SELF", trade_date: "2026-10-01", account_id: 6, account_status: "WAITING", status: "ACTIVE" } }],
+      total: 1, facet_total: 1, type_counts: { PICKUP: 1 }, game_types: [], stats: { account_count: 1, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 },
+    } as never);
     vi.mocked(ordersApi.list).mockResolvedValueOnce([{ id: 21, order_no: "TH-2026-0001", order_type: "TH", capital_type: "SELF", trade_date: "2026-10-01", account_id: 6, account_status: "WAITING", status: "ACTIVE" }] as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("pickup-acc");
@@ -221,7 +242,9 @@ it("提号库存售出可选择分期出售，确立时收首付", async () => {
   });
 
 it("库存中心不为售出单提供取消入口", async () => {
-    resolveMockOnce(vi.mocked(stocksApi.list), [{ ...accounts[1], inventory_type: "PICKUP" }]);
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce({
+      items: [], total: 0, facet_total: 0, type_counts: {}, game_types: [], stats: { account_count: 0, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 },
+    } as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await waitFor(() => expect(screen.queryByText("acc-2")).toBeNull());
     expect(screen.getByText("暂无账号")).toBeInTheDocument();

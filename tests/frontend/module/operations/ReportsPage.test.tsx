@@ -12,7 +12,6 @@ import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reportsApi } from "@/shared/api/reports.api";
-import { stocksApi } from "@/shared/api/stocks.api";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {

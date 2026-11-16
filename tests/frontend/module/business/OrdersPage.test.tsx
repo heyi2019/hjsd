@@ -8,7 +8,6 @@ import { installmentsApi } from "@/shared/api/installments.api";
 import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
-import { stocksApi } from "@/shared/api/stocks.api";
 import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -54,15 +53,46 @@ const orders = [
 ];
 const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
 
+function setupLedgerApi(source: unknown[] = orders) {
+  const filterRows = (params?: Parameters<typeof ordersApi.listPage>[0]) => source.filter((row) => {
+    const item = row as Record<string, unknown>;
+    const keyword = params?.keyword?.trim();
+    if (keyword && !Object.values(item).some((value) => typeof value === "string" && value.includes(keyword))) return false;
+    if (params?.order_type && item.order_type !== params.order_type) return false;
+    if (params?.business_mode && item.capital_type !== params.business_mode) return false;
+    if (params?.game_type && item.account_game_type !== params.game_type) return false;
+    if (params?.account_status && item.account_status !== params.account_status) return false;
+    return true;
+  });
+
+  vi.mocked(ordersApi.listPage).mockImplementation(async (params) => {
+    const rows = filterRows(params);
+    const offset = params?.offset ?? 0;
+    const limit = params?.limit ?? 10;
+    return { items: rows.slice(offset, offset + limit), total: rows.length, limit, offset } as never;
+  });
+  vi.mocked(ordersApi.ledgerSummary).mockImplementation(async (params) => {
+    const rows = filterRows(params);
+    const countBy = (key: string) => rows.reduce<Record<string, number>>((counts, row) => {
+      const value = (row as Record<string, unknown>)[key];
+      if (typeof value === "string") counts[value] = (counts[value] ?? 0) + 1;
+      return counts;
+    }, {});
+    return {
+      total_count: rows.length,
+      status_counts: countBy("status"),
+      type_counts: countBy("order_type"),
+      game_types: [...new Set(rows.map((row) => (row as Record<string, unknown>).account_game_type).filter((value): value is string => typeof value === "string"))],
+    } as never;
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   seedOptionSets();
   seedOrderFormFields();
-  vi.mocked(ordersApi.list).mockResolvedValue(orders);
-  vi.mocked(ordersApi.listPage).mockResolvedValue({ items: orders, total: orders.length, limit: 10, offset: 0 });
-  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: orders.length, status_counts: { ACTIVE: 1, COMPLETED: 1 }, type_counts: { HS: 1, TH: 1 }, game_types: [] });
+  setupLedgerApi();
   vi.mocked(orderTypesApi.list).mockResolvedValue(types);
-  vi.mocked(stocksApi.list).mockResolvedValue([]);
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);
@@ -192,17 +222,8 @@ describe("OrdersPage：四类订单台账", () => {
     }
   });
 
-  it("业务中心重新激活时刷新库存列表", async () => {
-    const { rerender } = renderLight(<OrdersPage active={false} />);
-    await screen.findByRole("tab", { name: "库存中心" });
-    expect(vi.mocked(stocksApi.list)).not.toHaveBeenCalled();
-
-    rerender(<OrdersPage active />);
-    await waitFor(() => expect(vi.mocked(stocksApi.list)).toHaveBeenCalled());
-  });
-
   it("订单台账顶部展示当前筛选结果的订单统计卡", async () => {
-    vi.mocked(ordersApi.list).mockResolvedValue([
+    setupLedgerApi([
       ...orders,
       { id: 3, order_no: "DG-2026-0003", order_type: "DG", capital_type: "ZERO", trade_date: "2026-10-03", status: "CANCELLED" },
     ]);
@@ -224,7 +245,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("FE-253：订单台账加载未完成时统计卡不显示可信的零", async () => {
-    vi.mocked(ordersApi.list).mockImplementation(() => new Promise(() => undefined));
+    vi.mocked(ordersApi.listPage).mockImplementation(() => new Promise(() => undefined));
     renderLight(<OrdersPage initialTab="ledger" />);
     const ledger = await screen.findByRole("tabpanel", { name: "订单台账" });
     const card = within(ledger).getByText("订单总量").closest(".ui-stat") as HTMLElement;
@@ -233,7 +254,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("FE-257：台账有独立「订单状态」列，状态列仍只承载库存状态", async () => {
-    vi.mocked(ordersApi.list).mockResolvedValue([{
+    setupLedgerApi([{
       ...orders[0],
       status: "INSTALLMENT",
       installment_status: "SETTLED",
@@ -252,12 +273,6 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("业务中心仅保留业务作业页，不重复展示业务总览", async () => {
-    vi.mocked(stocksApi.list).mockResolvedValue([{
-      id: 10,
-      status: "WAITING",
-      inventory_entry_at: "2026-09-01T00:00:00",
-      cost_amount: "100.00",
-    } as never]);
     vi.mocked(installmentsApi.list).mockResolvedValue([{
       id: 20,
       status: "OVERDUE",
@@ -274,7 +289,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("订单搜索包含订单备注，支持按批次标记筛选", async () => {
-    vi.mocked(ordersApi.list).mockResolvedValue([
+    setupLedgerApi([
       ...orders,
       {
         id: 3,
@@ -295,7 +310,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("订单台账提供游戏类型下拉筛选", async () => {
-    vi.mocked(ordersApi.list).mockResolvedValue([
+    setupLedgerApi([
       ...orders,
       {
         id: 3,
@@ -322,7 +337,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("订单台账提供库存状态下拉筛选", async () => {
-    vi.mocked(ordersApi.list).mockResolvedValue([
+    setupLedgerApi([
       { ...orders[0], account_status: "WAITING" },
       { ...orders[1], id: 3, order_no: "TH-2026-0003", account_status: "SOLD" },
     ]);
@@ -338,7 +353,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("行展开直接复用库存中心的订单详情", async () => {
-    vi.mocked(ordersApi.list).mockResolvedValue([
+    setupLedgerApi([
       { ...orders[0], account_id: 1 },
       orders[1],
     ]);
@@ -403,7 +418,7 @@ describe("OrdersPage：四类订单台账", () => {
       order_type: "TH",
       account_id: 1,
     };
-    vi.mocked(ordersApi.list).mockResolvedValue([olderOrder, selectedOrder]);
+    setupLedgerApi([olderOrder, selectedOrder]);
     vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: {
         id: 1,
@@ -475,7 +490,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("待售代挂订单的操作入口显示下架而不是取消", async () => {
-    vi.mocked(ordersApi.list).mockResolvedValue([
+    setupLedgerApi([
       ...orders,
       {
         id: 3,
@@ -527,7 +542,7 @@ describe("OrdersPage：四类订单台账", () => {
       account_id: 10,
       account_status: "SOLD",
     };
-    vi.mocked(ordersApi.list).mockResolvedValue([...orders, soldConsignment]);
+    setupLedgerApi([...orders, soldConsignment]);
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...soldConsignment,
       events: [{ id: 401, order_id: 4, event_no: "EV-401", event_type: "SELL", amount: "500.00", is_posted: true, cancellable_amount: "500.00" }],
@@ -554,7 +569,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("加载失败时展示错误条", async () => {
-    vi.mocked(ordersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(ordersApi.listPage).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<OrdersPage />);
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });

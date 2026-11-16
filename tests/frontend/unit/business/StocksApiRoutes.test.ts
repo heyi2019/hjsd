@@ -26,6 +26,11 @@ describe("stocksApi 路由", () => {
     expect(apiMock.delete).toHaveBeenCalledWith("/stocks/7", { data: { reason: "重复录入" } });
   });
 
+  it("不再暴露旧库存列表与资料更新客户端方法", () => {
+    expect("list" in stocksApi).toBe(false);
+    expect("updateProfile" in stocksApi).toBe(false);
+  });
+
   it("库存台账导出走后端筛选接口并读取明细失败计数", async () => {
     const blob = new Blob(["csv"]);
     apiMock.get.mockResolvedValueOnce({

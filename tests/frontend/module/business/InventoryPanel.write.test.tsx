@@ -43,7 +43,6 @@ beforeEach(() => {
   clearOptionSetsCache();
   vi.clearAllMocks();
   seedOptionSets();
-  vi.mocked(stocksApi.list).mockResolvedValue(accounts);
   vi.mocked(stocksApi.inventoryLedger).mockResolvedValue({
     items: [{
       account: accounts[0],

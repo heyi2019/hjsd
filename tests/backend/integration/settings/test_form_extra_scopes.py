@@ -17,6 +17,7 @@ from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormFiel
 from app.foundation.catalog_seed import seed_catalog
 from app.orders.form_scopes import FORM_SCOPES
 from app.orders.form_fields import validate_form_extra
+from app.stocks.profile import update_account_profile
 
 
 D = "2026-10-27"
@@ -230,12 +231,12 @@ def test_account_profile_merges_form_extra(seeded_client, seeded_db, headers):
     order = _create_order(seeded_client, headers)
     account_id = order["account_id"]
     assert account_id is not None
-    response = seeded_client.patch(
-        f"/api/v1/stocks/{account_id}",
-        json={"form_extra": {"supplier": "号商A"}},
-        headers=headers,
+    update_account_profile(
+        seeded_db,
+        account_id,
+        actor="admin",
+        form_extra={"supplier": "号商A"},
     )
-    assert response.status_code == 200, response.text
     account = seeded_db.get(Account, account_id)
     assert account.form_extra == {"supplier": "号商A"}
 

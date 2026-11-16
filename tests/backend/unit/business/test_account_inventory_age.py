@@ -17,7 +17,6 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from app.domain.trade import Account
-from app.stocks.inventory import inventory_stats
 from app.stocks.profile import create_account
 from app.stocks.schemas import AccountOut
 
@@ -102,30 +101,6 @@ def _account(seeded_db, game_account: str, *, days_ago: int):
     account.inventory_entry_at = datetime.combine(date.today() - timedelta(days=days_ago), time(0, 0))
     seeded_db.flush()
     return account
-
-
-def test_api_list_publishes_age_consistent_with_card_stats(seeded_client, seeded_db, headers):
-    fresh = _account(seeded_db, "age-api-7", days_ago=7)
-    aging = _account(seeded_db, "age-api-8", days_ago=8)
-    stale = _account(seeded_db, "age-api-31", days_ago=31)
-
-    response = seeded_client.get("/api/v1/stocks", params={"status": "WAITING"}, headers=headers)
-
-    assert response.status_code == 200, response.text
-    items = {item["game_account"]: item for item in response.json()["items"]}
-    assert items["age-api-7"]["inventory_age_days"] == 7
-    assert items["age-api-7"]["inventory_age_level"] == "NORMAL"
-    assert items["age-api-8"]["inventory_age_level"] == "WARNING"
-    assert items["age-api-31"]["inventory_age_level"] == "OVERDUE"
-
-    stats = inventory_stats(
-        seeded_db, account_ids=[fresh.id, aging.id, stale.id]
-    )
-    overdue = sum(1 for item in items.values() if item["inventory_age_level"] == "OVERDUE")
-    over_7 = sum(1 for item in items.values() if (item["inventory_age_days"] or 0) > 7)
-    # 同一口径的两种视图：列表字段与卡片指标不能各算一份。
-    assert overdue == stats["over_30d_count"] == 1
-    assert over_7 == stats["over_7d_count"] == 2
 
 
 def test_export_csv_fills_age_column(seeded_client, seeded_db, headers):

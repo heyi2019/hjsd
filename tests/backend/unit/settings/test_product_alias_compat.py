@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.orders.schemas import OrderAccountSnapshot, OrderCreate
-from app.stocks.router import AccountProfileUpdate
+from app.stocks.schemas import AccountProfileUpdate
 
 
 def test_product_contract_uses_canonical_account_fields_only():

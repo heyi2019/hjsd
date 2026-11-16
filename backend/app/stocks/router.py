@@ -11,7 +11,6 @@ from app.core.database import get_db
 from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
-    PERM_ORDER_UPDATE,
     CurrentUser,
     require_permissions,
 )
@@ -19,32 +18,21 @@ from app.domain.enums import AuditAction
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.stocks.inventory import (
-    count_accounts,
     inventory_ledger as stocks_inventory_ledger,
     list_accounts as stocks_list_accounts,
 )
-from app.stocks.profile import (
-    get_account,
-    update_account_profile as stocks_update_account_profile,
-)
 from app.stocks.deletion import delete_inventory as stocks_delete_inventory
 from app.stocks.export import build_inventory_ledger_csv
-from app.parties.fields import get_extra_values
 from app.core.audit import record_audit
 from app.core.errors import PermissionDenied
 
 from .schemas import (
-    AccountOut,
-    AccountListOut,
-    AccountProfileUpdate,
     AccountDeleteRequest,
-    InventoryStatsOut,
     InventoryLedgerOut,
 )
 
 from .router_output import (
     _actor,
-    _account_output,
     _account_outputs,
 )
 from app.orders.router_output import _order_list_payload
@@ -53,26 +41,6 @@ router = APIRouter(tags=["ACC-01 账号台账"])
 
 read_access = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 manage = require_permissions(PERM_ORDER_CREATE)
-@router.get("/stocks", response_model=AccountListOut)
-def list_accounts(
-    status: str | None = Query(default=None),
-    limit: int = Query(default=100, ge=1, le=500),
-    offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
-    _user: CurrentUser = read_access,
-) -> AccountListOut:
-    items = stocks_list_accounts(db, status=status, user=_user, limit=limit, offset=offset)
-    return AccountListOut(
-        items=_account_outputs(
-            db,
-            items,
-            _user,
-        ),
-        total=count_accounts(db, status=status, user=_user),
-        limit=limit,
-        offset=offset,
-    )
-
 
 @router.get("/stocks/export.csv")
 def export_accounts_csv(
@@ -115,25 +83,6 @@ def export_accounts_csv(
         },
     )
     return file_response(csv_text, f"库存中心-{date.today().isoformat()}.csv", CSV_MEDIA_TYPE)
-
-
-@router.patch("/stocks/{account_id}", response_model=AccountOut)
-def update_account_profile(
-    account_id: int,
-    payload: AccountProfileUpdate,
-    db: Session = Depends(get_db),
-    user: CurrentUser = manage,
-) -> AccountOut:
-    get_account(db, account_id, user)
-    changes = {
-        field: getattr(payload, field)
-        for field in payload.model_fields_set
-    }
-    item = stocks_update_account_profile(
-        db, account_id, actor=_actor(user), user=user, **changes
-    )
-    extras = get_extra_values(db, entity_type="account", entity_id=item.id)
-    return _account_output(item, extra_values=extras)
 
 
 def _require_admin(user: CurrentUser) -> None:

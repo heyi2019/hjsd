@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
-from app.core.schemas import PageOut, RequestModel
+from app.core.schemas import RequestModel
 
 from ._common import INVENTORY_STATUSES, inventory_age_days as age_days, inventory_age_level as age_level
 
@@ -57,10 +57,6 @@ class AccountOut(BaseModel):
     def inventory_age_level(self) -> str | None:
         """库龄档位（NORMAL/WARNING/OVERDUE）：阈值由后端定义，前端只映射颜色。"""
         return age_level(self.inventory_age_days)
-
-
-class AccountListOut(PageOut[AccountOut]):
-    pass
 
 
 class AccountProfileUpdate(RequestModel):
@@ -125,7 +121,6 @@ class InventoryLedgerOut(BaseModel):
 
 __all__ = [
     "AccountOut",
-    "AccountListOut",
     "AccountProfileUpdate",
     "AccountDeleteRequest",
     "InventoryLedgerItemOut",

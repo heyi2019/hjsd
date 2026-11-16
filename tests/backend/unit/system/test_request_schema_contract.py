@@ -6,7 +6,7 @@ from datetime import date
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from app.stocks.router import AccountProfileUpdate
+from app.stocks.schemas import AccountProfileUpdate
 from app.auth.router import (
     LoginRequest,
     PasswordChange,

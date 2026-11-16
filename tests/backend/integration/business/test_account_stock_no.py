@@ -62,16 +62,6 @@ class TestStockNoGeneration:
             assert KU_PATTERN.match(acc.stock_no), (inv, acc.stock_no)
 
 
-    def test_stock_no_visible_in_accounts_list_api(self, seeded_client, headers, seeded_db):
-        _make(seeded_db, "api-acc-1")
-        resp = seeded_client.get("/api/v1/stocks", headers=headers)
-        assert resp.status_code == 200
-        payload = resp.json()
-        items = payload if isinstance(payload, list) else payload.get("items") or payload.get("data")
-        matched = [a for a in items if a.get("game_account") == "api-acc-1"]
-        assert matched, "api-acc-1 未出现在账号列表"
-        assert KU_PATTERN.match(matched[0]["stock_no"]), matched[0]["stock_no"]
-
     def test_stock_no_sequence_advances_with_creation(self, seeded_db):
         before = seeded_db.execute(
             text("SELECT current_value FROM document_sequences WHERE sequence_key='STOCK_NO'")

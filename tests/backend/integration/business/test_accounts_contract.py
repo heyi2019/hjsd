@@ -2,7 +2,7 @@
 
 与 test_m2.py 的分工：既有文件已覆盖建账号与账号状态随订单事件流转；
 本文件补空标识/重复建档校验、查询 404 与状态过滤、库存成本汇总
-（只统计在库与分期中），以及带状态过滤的列表端点。
+（只统计在库与分期中），以及库存台账服务。
 """
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ from app.stocks.inventory import inventory, list_accounts, total_inventory_cost
 from app.stocks.profile import create_account, get_account, update_account_profile
 from app.finance.cashflows import create_cashflow
 from app.finance.rebates import create_rebate
-from app.orders.cancellation_model import cancel_order
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.parties.counterparties import create_counterparty
@@ -57,34 +56,12 @@ def _buy(seeded_db, account, amount="500"):
     )
     return order
 
-def test_account_list_supports_limit_and_offset(seeded_client, seeded_db):
-    _account(seeded_db, "page-account-1")
-    _account(seeded_db, "page-account-2")
-    _account(seeded_db, "page-account-3")
-
-    response = seeded_client.get(
-        "/api/v1/stocks", headers={"X-Dev-User": "admin"},
-        params={"limit": 1, "offset": 1},
-    )
-
-    assert response.status_code == 200, response.text
-    assert response.json()["total"] == 3
-    assert response.json()["limit"] == 1
-    assert response.json()["offset"] == 1
-    assert len(response.json()["items"]) == 1
-    assert response.json()["items"][0]["game_account"] == "page-account-2"
-
 class TestCreateAccountGuards:
-    def test_account_records_inventory_entry_time_to_second(self, seeded_db, seeded_client):
+    def test_account_records_inventory_entry_time_to_second(self, seeded_db):
         account = _account(seeded_db, "inventory-entry-time")
-        seeded_db.flush()
 
         assert account.inventory_entry_at is not None
         assert account.inventory_entry_at.microsecond == 0
-        listed = seeded_client.get("/api/v1/stocks", headers={"X-Dev-User": "admin"})
-        assert listed.status_code == 200, listed.text
-        item = next(row for row in listed.json()["items"] if row["id"] == account.id)
-        assert item["inventory_entry_at"] is not None
 
     def test_pickup_inventory_type_can_be_created_for_th(self, seeded_db):
         account = create_account(
@@ -365,6 +342,21 @@ class TestAccountQueries:
         assert total_inventory_cost(seeded_db) == Decimal("300.00")
 
 class TestAccountsApi:
+    def test_legacy_account_list_and_profile_routes_are_removed(
+        self, seeded_client, seeded_db, headers
+    ):
+        account = _account(seeded_db, "legacy-route-target")
+
+        listed = seeded_client.get("/api/v1/stocks", headers=headers)
+        assert listed.status_code == 404, listed.text
+
+        updated = seeded_client.patch(
+            f"/api/v1/stocks/{account.id}",
+            json={"note": "不应通过旧接口修改"},
+            headers=headers,
+        )
+        assert updated.status_code in {404, 405}, updated.text
+
     def test_legacy_inventory_endpoint_is_removed(self, seeded_client, headers):
         response = seeded_client.get("/api/v1/stocks/inventory", headers=headers)
 
@@ -415,22 +407,10 @@ class TestAccountsApi:
         )
         headers = {"Authorization": f"Bearer {build_access_token(user)}"}
 
-        listed = seeded_client.get("/api/v1/stocks", headers=headers)
-        assert listed.status_code == 200, listed.text
-        assert [row["game_account"] for row in listed.json()["items"]] == [mine.game_account]
-        assert all("risk_level" not in row for row in listed.json()["items"])
-
         hidden_detail = seeded_client.get(
             f"/api/v1/orders/{other_order.id}/execution-detail", headers=headers
         )
         assert hidden_detail.status_code == 404
-
-        hidden_update = seeded_client.patch(
-            f"/api/v1/stocks/{other.id}",
-            json={"note": "不应修改"},
-            headers=headers,
-        )
-        assert hidden_update.status_code == 404
 
         inventory = seeded_client.get(
             "/api/v1/stocks/inventory/ledger",
@@ -439,6 +419,7 @@ class TestAccountsApi:
         )
         assert inventory.status_code == 200, inventory.text
         assert [row["account"]["id"] for row in inventory.json()["items"]] == [mine.id]
+        assert all("risk_level" not in row["account"] for row in inventory.json()["items"])
 
     def test_visible_account_does_not_leak_foreign_source_order(
         self, seeded_client, seeded_db
@@ -482,113 +463,18 @@ class TestAccountsApi:
         self, seeded_client, seeded_db
     ):
         account = _account(seeded_db, "credential-scope-account", game_password="secret")
+        order = _buy(seeded_db, account, amount="300")
         viewer = CurrentUser.build(
             id=9, username="finance-reader", roles=["VIEWER"], owner_scope="ALL"
         )
         viewer_headers = {"Authorization": f"Bearer {build_access_token(viewer)}"}
 
-        listed = seeded_client.get("/api/v1/stocks", headers=viewer_headers)
-        assert listed.status_code == 200, listed.text
-        item = next(row for row in listed.json()["items"] if row["id"] == account.id)
-        assert item["game_password"] == "secret"
-
-    def test_list_accounts_endpoint_with_status(self, seeded_client, seeded_db, headers):
-        account = _account(seeded_db, "api-acc")
-        _buy(seeded_db, account, amount="300")
-        response = seeded_client.get(
-            "/api/v1/stocks", params={"status": "VOID"},
-            headers=headers,
+        detail = seeded_client.get(
+            f"/api/v1/orders/{order.id}/execution-detail",
+            headers=viewer_headers,
         )
-        assert response.status_code == 200, response.text
-        assert response.json()["items"] == []
-
-        stocked = seeded_client.get(
-            "/api/v1/stocks", params={"status": AccountStatus.WAITING.value},
-            headers=headers,
-        )
-        assert [item["game_account"] for item in stocked.json()["items"]] == [account.game_account]
-
-    def test_list_accounts_resolves_each_source_order(self, seeded_client, seeded_db, headers):
-        first = _account(seeded_db, "batch-source-first")
-        second = _account(seeded_db, "batch-source-second")
-        first_order = _buy(seeded_db, first, amount="300")
-        second_order = _buy(seeded_db, second, amount="400")
-
-        response = seeded_client.get("/api/v1/stocks", headers=headers)
-
-        assert response.status_code == 200, response.text
-        source_orders = {
-            item["game_account"]: item["source_order_no"] for item in response.json()["items"]
-        }
-        assert source_orders[first.game_account] == first_order.order_no
-        assert source_orders[second.game_account] == second_order.order_no
-
-    def test_list_accounts_uses_consignment_order_without_buy(self, seeded_client, seeded_db, headers):
-        account = _account(
-            seeded_db,
-            "unposted-source",
-            business_mode="DISTRIBUTION",
-            inventory_type="CONSIGNMENT",
-        )
-        order = create_order(
-            seeded_db,
-            order_type="DG",
-            trade_date=TODAY,
-            actor="pytest",
-            account_id=account.id,
-        )
-
-        response = seeded_client.get("/api/v1/stocks", headers=headers)
-
-        assert response.status_code == 200, response.text
-        item = next(row for row in response.json()["items"] if row["game_account"] == account.game_account)
-        assert item["source_order_no"] == order.order_no
-
-    def test_list_accounts_keeps_cancelled_source_order_number(self, seeded_client, seeded_db, headers):
-        account = _account(seeded_db, "cancelled-source")
-        order = create_order(
-            seeded_db,
-            order_type="HS",
-            trade_date=TODAY,
-            actor="pytest",
-            account_id=account.id,
-        )
-        cancel_order(seeded_db, order.id, actor="pytest", reason="测试取消")
-
-        response = seeded_client.get("/api/v1/stocks", headers=headers)
-
-        assert response.status_code == 200, response.text
-        item = next(row for row in response.json()["items"] if row["game_account"] == account.game_account)
-        assert item["source_order_no"] == order.order_no
-
-    def test_list_accounts_resolves_th_source_order(self, seeded_client, seeded_db, headers):
-        account = _account(
-            seeded_db,
-            "th-source-account",
-            business_mode="DISTRIBUTION",
-            inventory_type="PICKUP",
-        )
-        order = create_order(
-            seeded_db,
-            order_type="TH",
-            trade_date=TODAY,
-            actor="pytest",
-            account_id=account.id,
-        )
-        post_event(
-            seeded_db,
-            order.id,
-            event_type="BUY",
-            amount=Decimal("100.00"),
-            occurred_on=TODAY,
-            actor="pytest",
-        )
-
-        response = seeded_client.get("/api/v1/stocks", headers=headers)
-
-        assert response.status_code == 200, response.text
-        item = next(row for row in response.json()["items"] if row["game_account"] == account.game_account)
-        assert item["source_order_no"] == order.order_no
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["account"]["game_password"] == "secret"
 
     def test_execution_detail_includes_source_order(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "detail-acc")

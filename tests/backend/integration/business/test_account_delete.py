@@ -82,11 +82,6 @@ def test_delete_inventory_removes_orders_and_keeps_audit_reason(seeded_client, s
     assert audit.before_json["game_account"] == "delete-target"
     assert audit.after_json["deleted_orders"][0]["id"] == order_id
 
-    listed = seeded_client.get("/api/v1/stocks", headers=headers)
-    assert listed.status_code == 200
-    assert account_id not in [item["id"] for item in listed.json()["items"]]
-
-
 def test_delete_requires_non_blank_reason(seeded_client, seeded_db, headers):
     account_id, _ = _account_with_order(seeded_db, "blank-reason")
     for reason in (None, "", "   "):

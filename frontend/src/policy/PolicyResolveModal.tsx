@@ -81,8 +81,8 @@ export function PolicyResolveModal({
         </Form.Item>
         <Form.Item
           name="scope_id"
-          label="范围 ID"
-          rules={scopeType && scopeType !== "GLOBAL" ? [{ required: true, message: "请输入范围 ID" }] : []}
+          label="范围编号"
+          rules={scopeType && scopeType !== "GLOBAL" ? [{ required: true, message: "请输入范围编号" }] : []}
         >
           <Input type="number" min={1} placeholder="按人员、业务类型或资金池时填写" />
         </Form.Item>

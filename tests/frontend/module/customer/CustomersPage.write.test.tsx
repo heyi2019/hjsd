@@ -189,7 +189,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
     await ui.click(screen.getByRole("button", { name: "导出客户数据" }));
-    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户 CSV 已导出"));
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户数据已导出"));
   });
 });
 

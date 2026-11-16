@@ -447,7 +447,7 @@ describe("CustomersPage：行内动作", () => {
 
     await screen.findByText("CUS-0001");
     await keeper.click(screen.getByRole("button", { name: "导出客户数据" }));
-    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户 CSV 已导出"));
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户数据已导出"));
     createObjectURLSpy.mockRestore();
     revokeObjectURLSpy.mockRestore();
     clickSpy.mockRestore();

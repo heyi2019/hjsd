@@ -313,7 +313,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await openPanel([inStockRow]);
     vi.mocked(stocksApi.inventoryLedgerExport).mockResolvedValueOnce({ blob: new Blob(["csv"]), failedDetailCount: 0 });
     await ui.click(screen.getByRole("button", { name: /导出/ }));
-    await waitFor(() => expect(message.success).toHaveBeenCalledWith("库存 CSV 已导出"));
+    await waitFor(() => expect(message.success).toHaveBeenCalledWith("库存数据已导出"));
   });
 
 });

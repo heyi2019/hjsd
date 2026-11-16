@@ -54,7 +54,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
         }),
         `客户-${today()}.csv`,
       );
-      appMessage.success("客户 CSV 已导出");
+      appMessage.success("客户数据已导出");
     } catch (err) {
       appMessage.error(normalizeError(err).message);
     } finally {

@@ -85,7 +85,7 @@ export function useInventoryList({ active = true, refreshKey = 0 }: { active?: b
       const result = await stocksApi.inventoryLedgerExport(filters);
       downloadBlob(result.blob, `库存中心_${today()}.csv`);
       if (result.failedDetailCount) appMessage.warning(`${result.failedDetailCount} 条明细读取失败，已导出其余可用字段`);
-      else appMessage.success("库存 CSV 已导出");
+      else appMessage.success("库存数据已导出");
     } catch (err) {
       appMessage.error(normalizeError(err).message);
     } finally {

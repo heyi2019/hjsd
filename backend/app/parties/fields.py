@@ -59,17 +59,15 @@ def _extra_definitions(
 
 
 def _option_values(definition: OrderFormField) -> list[str]:
-    """归一化字段选项：兼容纯字符串数组与 {value,label} 对象数组。"""
+    """读取规范化后的字段选项对象。"""
     values: list[str] = []
     for item in definition.options or []:
-        if isinstance(item, str):
-            text = item.strip()
-        elif isinstance(item, Mapping):
-            text = str(item.get("value") or "").strip()
-        else:
-            text = ""
-        if text:
-            values.append(text)
+        if not isinstance(item, Mapping):
+            raise Validation("字段选项须为对象", details={"field": "options"})
+        text = str(item.get("value") or "").strip()
+        if not text:
+            raise Validation("字段选项 value 不能为空", details={"field": "options"})
+        values.append(text)
     return values
 
 
@@ -150,7 +148,10 @@ def _validate_extra_value(definition: OrderFormField, value: Any) -> Any:
                 details={"field_key": definition.field_key},
             )
         return value
-    return str(value)
+    raise Validation(
+        f"字段类型不支持：{kind}",
+        details={"field": definition.field_key, "field_type": kind},
+    )
 
 
 def _validate_required_extras(

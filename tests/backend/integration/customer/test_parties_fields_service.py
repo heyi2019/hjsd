@@ -67,13 +67,17 @@ def test_definitions_required_only_filter(seeded_db):
     assert [d.field_key for d in required] == ["must"]
 
 
-# --------------------------------------------------------------- 选项归一化
-def test_option_values_accepts_strings_and_objects(seeded_db):
+# --------------------------------------------------------------- 选项读取
+def test_option_values_requires_canonical_objects(seeded_db):
     field = _add_field(
         seeded_db, "opt", field_type="SELECT",
-        options=["A", {"value": "B", "label": "乙"}, "  ", 3, {"label": "无值"}],
+        options=[{"value": "A", "label": "甲"}, {"value": "B", "label": "乙"}],
     )
     assert fields_module._option_values(field) == ["A", "B"]
+
+    legacy = _add_field(seeded_db, "legacy_opt", field_type="SELECT", options=["A"])
+    with pytest.raises(Validation, match="字段选项须为对象"):
+        fields_module._option_values(legacy)
 
 
 # --------------------------------------------------------------- 类型校验
@@ -109,7 +113,11 @@ def test_validate_date(seeded_db):
 
 
 def test_validate_select(seeded_db):
-    field = _field(seeded_db, "SELECT", ["优质", "观察"])
+    field = _field(
+        seeded_db,
+        "SELECT",
+        [{"value": "优质", "label": "优质"}, {"value": "观察", "label": "观察"}],
+    )
     with pytest.raises(Validation, match="必须为字符串"):
         fields_module._validate_extra_value(field, 1)
     with pytest.raises(Validation, match="取值必须在选项内"):
@@ -122,7 +130,11 @@ def test_validate_select(seeded_db):
 
 
 def test_validate_multi_select(seeded_db):
-    field = _field(seeded_db, "MULTI_SELECT", ["A", "B"])
+    field = _field(
+        seeded_db,
+        "MULTI_SELECT",
+        [{"value": "A", "label": "A"}, {"value": "B", "label": "B"}],
+    )
     with pytest.raises(Validation, match="必须为数组"):
         fields_module._validate_extra_value(field, "A")
     with pytest.raises(Validation, match="选项必须为字符串"):
@@ -138,18 +150,19 @@ def test_validate_multi_select(seeded_db):
         fields_module._validate_extra_value(empty, ["A"])
 
 
-def test_validate_text_and_unknown_type(seeded_db):
+def test_validate_text_and_rejects_unknown_type(seeded_db):
     field = _field(seeded_db, "TEXT")
     with pytest.raises(Validation, match="必须为字符串"):
         fields_module._validate_extra_value(field, 1)
     assert fields_module._validate_extra_value(field, "说明") == "说明"
 
-    # 未知类型受 DB CHECK 约束无法入库，直接按对象校验兜底分支
+    # 未知类型受 DB CHECK 约束无法入库，服务层也不再保留兜底转换。
     unknown = OrderFormField(
         order_type_code="CUSTOMER", field_key="legacy", label="legacy",
         field_type="LEGACY", is_custom=True,
     )
-    assert fields_module._validate_extra_value(unknown, 7) == "7"
+    with pytest.raises(Validation, match="字段类型不支持"):
+        fields_module._validate_extra_value(unknown, 7)
 
 
 # --------------------------------------------------------------- 写入
@@ -212,7 +225,7 @@ def test_set_values_empty_input_is_noop(seeded_db):
 
 
 def test_set_values_rejects_non_customer_entities(seeded_db):
-    # 其余实体暂无扩展字段体系：空入参兼容放行，非空入参拒绝
+    # 非人员模块的公共调用点仍允许空入参，但拒绝实际写入。
     assert set_extra_values(
         seeded_db, entity_type="order", entity_id=1, values=[]
     ) == {}

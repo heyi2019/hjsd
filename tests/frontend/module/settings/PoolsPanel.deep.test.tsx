@@ -49,7 +49,7 @@ describe("PoolsPanel.deep", () => {
   it("新建资金池成功：提交 create + 重新加载", async () => {
     renderLight(<PoolsPanel />, { user: "admin" });
     await screen.findByText("托管池");
-    await ui.type(screen.getByPlaceholderText("池代码，如 HJ_CUSTODY"), "NEW_POOL");
+    await ui.type(screen.getByPlaceholderText("请输入资金池编码"), "NEW_POOL");
     await ui.type(screen.getByPlaceholderText("显示名"), "新池");
     await ui.click(screen.getByRole("button", { name: /新增资金池/ }));
     await waitFor(() =>
@@ -68,7 +68,7 @@ describe("PoolsPanel.deep", () => {
     vi.mocked(poolsApi).create.mockRejectedValue(new Error("create fail"));
     renderLight(<PoolsPanel />, { user: "admin" });
     await screen.findByText("托管池");
-    await ui.type(screen.getByPlaceholderText("池代码，如 HJ_CUSTODY"), "BAD");
+    await ui.type(screen.getByPlaceholderText("请输入资金池编码"), "BAD");
     await ui.type(screen.getByPlaceholderText("显示名"), "坏池");
     await ui.click(screen.getByRole("button", { name: /新增资金池/ }));
     expect(await screen.findByText(/create fail/)).toBeInTheDocument();

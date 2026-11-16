@@ -9,6 +9,7 @@ import { configurableLabel } from "../shared/lib/optionSets";
 import {
   ACCOUNTING_ATTRIBUTE_LABEL,
   FUND_NATURE_LABEL,
+  FUND_FLOW_SOURCE_LABEL,
   POOL_OWNERSHIP_LABEL,
   RECONCILIATION_STATUS_LABEL,
 } from "../shared/lib/labels";
@@ -23,11 +24,11 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
       title: "资金池",
       key: "pool_code",
       dataIndex: "name",
-      render: (_v, row) => `${row.name}（${row.code}）`,
+      render: (_v, row) => row.name,
       className: "ui-col-wrap",
       onCell: () => ({ className: "ui-col-wrap" }),
     },
-    { title: "归属", dataIndex: "ownership", render: (v: string) => POOL_OWNERSHIP_LABEL[v] ?? v },
+    { title: "归属", dataIndex: "ownership", render: (v: string) => configurableLabel("POOL_OWNERSHIP", v, POOL_OWNERSHIP_LABEL) },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} optionSet="POOL_STATUS" /> },
     { title: "收入", key: "income", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.income} /> },
     { title: "支出", key: "expense", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.expense} /> },
@@ -98,7 +99,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       render: (v: string) => (v === "IN" ? "收入" : "支出"),
     },
     { title: "金额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
-    { title: "来源", dataIndex: "source" },
+    { title: "来源", dataIndex: "source", render: (v: string | null | undefined) => configurableLabel("FUND_FLOW_SOURCE", v, FUND_FLOW_SOURCE_LABEL) },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("FUND_FLOW_STATUS", v, { APPROVED: "已入账" })} /> },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
     {
@@ -129,12 +130,12 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
         <Select aria-label="流水状态" allowClear disabled={cashflowUnavailable} value={cashflowStatus} placeholder="全部状态" options={flowStatusOptions ?? []} onChange={setCashflowStatus} />
         <Select aria-label="流水资金性质" allowClear disabled={cashflowUnavailable} value={cashflowFundNature || undefined} placeholder="全部资金性质" options={flowFundNatureOptions ?? []} onChange={(value) => setCashflowFundNature(value ?? "")} />
         <Select aria-label="流水核算属性" allowClear disabled={cashflowUnavailable} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
-        <Input aria-label="流水中类别筛选" allowClear value={cashflowCategory} placeholder="类别，如 REVERSAL" onChange={(event) => setCashflowCategory(event.target.value)} />
+        <Input aria-label="流水中类别筛选" allowClear value={cashflowCategory} placeholder="类别，如冲销" onChange={(event) => setCashflowCategory(event.target.value)} />
         <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
         <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
         <PermissionButton permission="finance.read" onClick={() => void fetchCashflows()}>查询</PermissionButton>
         <PermissionButton permission="finance.read" size="small" loading={cashflowExporting} onClick={() => void exportCashflows()}>
-          导出 CSV
+          导出
         </PermissionButton>
       </div>
       {cashflowUnavailable ? (

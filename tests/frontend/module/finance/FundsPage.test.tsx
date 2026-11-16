@@ -83,7 +83,7 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
 describe("FundsPage：资金池卡片", () => {
   it("资金中心不再展示返点明细 Tab", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     expect(screen.queryByRole("tab", { name: "返点明细" })).not.toBeInTheDocument();
   });
 
@@ -98,7 +98,7 @@ describe("FundsPage：资金池卡片", () => {
     }]);
 
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     const headers = Array.from(document.querySelectorAll(".ant-table-thead tr:first-child th"))
       .map((header) => header.textContent?.trim())
       .filter(Boolean);
@@ -107,7 +107,7 @@ describe("FundsPage：资金池卡片", () => {
 
   it("渲染资金池与可用余额", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    expect(await screen.findByRole("cell", { name: /POOL-A/ })).toBeInTheDocument();
+    expect(await screen.findByRole("cell", { name: /经营主池/ })).toBeInTheDocument();
     expect(screen.getAllByText("700.00").length).toBeGreaterThanOrEqual(1);
   });
 
@@ -135,7 +135,7 @@ describe("FundsPage：资金池卡片", () => {
       total: 2,
     } as never);
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     expect(screen.getByRole("tab", { name: "总览" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "流水" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "对账" })).toBeInTheDocument();
@@ -146,7 +146,7 @@ describe("FundsPage：资金池卡片", () => {
   it("FE-229：资金流水失败时统计不可用、筛选和新增入口禁用", async () => {
     vi.mocked(cashflowsApi.list).mockRejectedValueOnce(new Error("cashflows down"));
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
 
     expect(await screen.findByText("资金流水数据不可用，请点击“查询”或页面顶部的“重新加载”。")).toBeInTheDocument();
@@ -158,7 +158,7 @@ describe("FundsPage：资金池卡片", () => {
   it("FE-230：对账失败时显示明确空态并禁用新增", async () => {
     vi.mocked(reconciliationsApi.list).mockRejectedValueOnce(new Error("reconciliations down"));
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "对账" }));
 
     expect(await screen.findByText("资金对账数据不可用，请点击重新加载")).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe("FundsPage：资金池卡片", () => {
 describe("FundsPage：押金占用", () => {
   it("删除独立押金页，押金逻辑并入工作室支出", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
 
     expect(screen.queryByRole("tab", { name: "押金" })).not.toBeInTheDocument();
     await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
@@ -193,7 +193,7 @@ describe("FundsPage：押金占用", () => {
 
   it("押金列表渲染金额与剩余（占用-已释放）", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     expect(screen.queryByText("押金编号")).not.toBeInTheDocument();
     expect(screen.getAllByText("300.00").length).toBeGreaterThanOrEqual(1); // 500-200
@@ -201,7 +201,7 @@ describe("FundsPage：押金占用", () => {
 
   it("押金明细展示对手方、来源订单和预计释放日", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     expect(screen.getByText("#99")).toBeInTheDocument();
     expect(screen.getByText("#7")).toBeInTheDocument();
@@ -212,7 +212,7 @@ describe("FundsPage：押金占用", () => {
 describe("FundsPage：资金流水", () => {
   it("资金流水录入不再提供资金池账户选择", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
 
@@ -221,7 +221,7 @@ describe("FundsPage：资金流水", () => {
 
   it("展示订单号、收支明细及总收入/总支出", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     expect(screen.getByText("HS0001-CF-BUY-01")).toBeInTheDocument();
     expect(screen.getAllByText("HS0001").length).toBeGreaterThanOrEqual(2);
@@ -244,7 +244,7 @@ describe("FundsPage：资金流水", () => {
       total_out: "87654.32",
     });
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
 
     expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("123,456.78");
@@ -261,7 +261,7 @@ describe("FundsPage：资金流水", () => {
       total_out: "1000.00",
     }));
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     const search = screen.getByLabelText("流水搜索");
     await ui.type(search, "SELL");
@@ -278,10 +278,10 @@ describe("FundsPage：资金流水", () => {
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     vi.mocked(cashflowsApi.exportCsv).mockResolvedValue(new Blob(["csv"]));
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     await ui.type(screen.getByLabelText("流水搜索"), "SELL");
-    await ui.click(screen.getByRole("button", { name: /导出 CSV/ }));
+    await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.exportCsv)).toHaveBeenCalledWith(
       expect.objectContaining({ keyword: "SELL" }),
     ));
@@ -297,7 +297,7 @@ describe("FundsPage：资金流水", () => {
       total_out: "87654.32",
     }));
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     await ui.type(screen.getByLabelText("流水搜索"), "SELL");
     await ui.click(screen.getByRole("button", { name: "查询" }));
@@ -319,7 +319,7 @@ describe("FundsPage：资金流水", () => {
       items: rows, total: rows.length, total_in: "1.01", total_out: "9.00",
     });
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     // 关键词 "SE" 本地收窄出两条 IN（SE-A / SE-B），排除 BUY-C；
     // 即便当前页面已加载全部 3 条，合计仍使用服务端返回的 1.01。
@@ -343,13 +343,13 @@ describe("FundsPage：资金写路径", () => {
   it("新增押金占用提交后回传金额与日期", async () => {
     resolveMockOnce(vi.mocked(depositsApi.create), { id: 12 });
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     await ui.click(await screen.findByRole("button", { name: /新增占用/ }));
     await waitFor(() => expect(screen.getByText("新增押金占用")).toBeInTheDocument());
     expect(document.querySelector(".deposit-modal")).toBeInTheDocument();
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
-    await pickSelect(modal, 0, /POOL-A/);
+    await pickSelect(modal, 0, /经营主池/);
     await ui.type(modal.querySelector("#amount") ?? modal, "500.00");
     await ui.click(screen.getByRole("button", { name: /提\s*交/ }));
     await waitFor(() => expect(vi.mocked(depositsApi.create)).toHaveBeenCalled());
@@ -362,7 +362,7 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00" }] as never);
     resolveMockOnce(vi.mocked(depositsApi.update), { ...deposits[0], status: "PAID" });
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     const row = screen.getByText("#99").closest("tr") as HTMLElement;
     await ui.click(within(row).getByRole("button", { name: "编辑" }));
@@ -376,7 +376,7 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00" }] as never);
     resolveMockOnce(vi.mocked(depositsApi.remove), undefined);
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     const row = screen.getByText("#99").closest("tr") as HTMLElement;
     await ui.click(within(row).getByRole("button", { name: "删除" }));
@@ -387,7 +387,7 @@ describe("FundsPage：资金写路径", () => {
 
   it("押金释放按 deposit.post 门控：finance 可见、operator 不可见", async () => {
     renderLight(<FundsPage />, { user: "finance" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     await screen.findByText("300.00");
     expect(screen.getAllByRole("button", { name: /释\s*放/ }).length).toBeGreaterThanOrEqual(1);
@@ -396,7 +396,7 @@ describe("FundsPage：资金写路径", () => {
   it("押金损失登记提交原金额、日期、分类和原因", async () => {
     resolveMockOnce(vi.mocked(depositsApi.loss), { id: 91 });
     renderLight(<FundsPage />, { user: "finance" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     await ui.click(await screen.findByRole("button", { name: /登记损失/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
@@ -419,7 +419,7 @@ describe("FundsPage：资金写路径", () => {
     ] as unknown as Awaited<ReturnType<typeof depositsApi.list>>);
     resolveMockOnce(vi.mocked(depositsApi.cancel), { id: 12 });
     renderLight(<FundsPage />, { user: "finance" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     await ui.click(await screen.findByRole("button", { name: /取\s*消/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
@@ -445,7 +445,7 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(transfersApi.create).mockRejectedValueOnce(new Error("转出资金池可用余额不足"));
     renderLight(<FundsPage />, { user: "admin" });
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await screen.findByText(/POOL-A/);
+    await screen.findByText(/经营主池/);
     await user.click(await screen.findByRole("button", { name: /资金池划转/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     const selectors = modal.querySelectorAll(".ant-select-selector");
@@ -482,7 +482,7 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(reconciliationsApi.list).mockResolvedValue([] as never);
     renderLight(<FundsPage />, { user: "admin" });
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    await screen.findByText(/POOL-A/);
+    await screen.findByText(/经营主池/);
     await user.click(screen.getByRole("tab", { name: "流水" }));
     await screen.findByText("CF-A-07");
     await user.click(screen.getByRole("button", { name: /冲销/ }));

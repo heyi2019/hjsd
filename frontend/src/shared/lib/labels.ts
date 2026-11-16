@@ -53,6 +53,14 @@ export const POOL_OWNERSHIP_LABEL: Record<string, string> = {
   THIRD_PART: "第三方",
 };
 
+export const FUND_FLOW_SOURCE_LABEL: Record<string, string> = {
+  ORDER_EVENT: "订单事件",
+  REBATE_SETTLEMENT: "返点结算",
+  DEPOSIT: "押金",
+  TRANSFER: "资金划转",
+  OTHER: "手工登记",
+};
+
 export const USER_ROLE_LABEL: Record<string, string> = {
   ADMIN: "系统管理员",
   OPERATOR: "业务经办人",

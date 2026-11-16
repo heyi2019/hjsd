@@ -138,7 +138,7 @@ export function PoolsPanel() {
       >
         <BusinessRegistrationForm form={form} layout="inline" onFinish={submit}>
           <Form.Item name="code" rules={[{ required: true }]}>
-            <Input placeholder="池代码，如 HJ_CUSTODY" />
+            <Input placeholder="请输入资金池编码" />
           </Form.Item>
           <Form.Item name="name" rules={[{ required: true }]}>
             <Input placeholder="显示名" />

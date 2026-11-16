@@ -20,12 +20,12 @@ const Modal = BusinessActionModal;
 type WriteState = { error: NormalizedError | null; pending: boolean };
 type Pool = FundsPageController["pools"][number];
 
-/** 资金池下拉选项：名称后附编号。excludeId 用于「修复单边划转」排除已有端，withTitle 供该处 tooltip 使用。 */
+/** 资金池下拉选项只展示名称；编号仍由后端按选中 id 绑定。 */
 function poolOptions(pools: Pool[], opts?: { excludeId?: number; withTitle?: boolean }) {
   return pools
     .filter((pool) => pool.id !== opts?.excludeId)
     .map((pool) => {
-      const label = `${pool.name}（${pool.code}）`;
+      const label = pool.name;
       return opts?.withTitle ? { value: pool.id, title: label, label } : { value: pool.id, label };
     });
 }
@@ -124,10 +124,10 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
       <CfgItem name="amount" label="占用金额" rules={requiredMoneyRules("占用金额")}>
         <MoneyInput />
       </CfgItem>
-      <CfgItem name="counterparty_id" label="对手方 ID" extra="可选，填写已建档合作方 ID">
+      <CfgItem name="counterparty_id" label="合作方编号" extra="可选，填写已建档合作方编号">
         <Input inputMode="numeric" />
       </CfgItem>
-      <CfgItem name="source_order_id" label="来源订单 ID" extra="可选，填写关联订单 ID">
+      <CfgItem name="source_order_id" label="来源订单编号" extra="可选，填写关联订单编号">
         <Input inputMode="numeric" />
       </CfgItem>
       <CfgItem name="paid_on" label="占用日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>

@@ -21,6 +21,7 @@ import type { Cashflow, Pool } from "../shared/api/types/finance";
 import { normalizeError, type NormalizedError } from "../shared/api/client";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { requiredMoneyRules } from "../shared/lib/validators";
+import { FUND_FLOW_SOURCE_LABEL } from "../shared/lib/labels";
 import { ConfirmButton,
   DataTable,
   BusinessActionModal,
@@ -259,7 +260,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
-    { title: "来源", dataIndex: "source", render: (v: string | null | undefined) => v === "OTHER" ? "手工登记" : v || "—" },
+    { title: "来源", dataIndex: "source", render: (v: string | null | undefined) => v ? (FUND_FLOW_SOURCE_LABEL[v] ?? v) : "—" },
     { title: "建立时间", dataIndex: "occurred_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
     {

@@ -157,12 +157,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setMustChangePassword(false);
   }, []);
   const logout = useCallback(async () => {
-    if (import.meta.env.DEV) {
-      localStorage.removeItem(ACCESS_TOKEN_KEY);
-      setAuthenticated(true);
-      setMustChangePassword(false);
-      return;
-    }
     // 后端 /auth/logout 失败也必须退出本地会话：否则「退出登录」点了没反应，
     // 用户以为已退出却仍停留在已登录界面。
     try {

@@ -1,4 +1,4 @@
-"""经营报表路由：月度损益、分润对账、业务损益、资金日报与订单利润。"""
+"""经营报表路由：月度损益、分润对账、业务损益与订单利润。"""
 from __future__ import annotations
 
 from datetime import date
@@ -19,7 +19,6 @@ from app.lists.export import build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.lists.scopes import report_scope
 from app.reporting.export import report_csv, report_for_export
-from app.reporting.funds import daily_funds_report
 from app.reporting.profit import order_profit_detail
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from app.reporting.r3_commission import r3_commission_reconciliation
@@ -29,7 +28,6 @@ from app.reporting.schemas import (
     BusinessPnlOut,
     CommissionOut,
     DataCenterOut,
-    DailyFundsOut,
     MonthlyPnlOut,
     OrderProfitOut,
 )
@@ -86,16 +84,6 @@ def data_center(
 ) -> DataCenterOut:
     """数据中心指标：售出成本、在库成本、工作室成本与利润构成。"""
     return data_center_summary(db, from_date=from_date, to_date=to_date, user=user)
-
-
-@router.get("/reports/daily-funds", response_model=DailyFundsOut)
-def daily_funds(
-    db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = read_access,
-    on: date | None = Query(default=None),
-) -> DailyFundsOut:
-    """资金日报：与 FIN-01 同日口径一致。"""
-    return daily_funds_report(db, on=on, user=user)
 
 
 @router.get("/reports/order-profit", response_model=OrderProfitOut)

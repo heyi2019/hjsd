@@ -120,7 +120,6 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   it("资金日报已下线，经营中心不再重复展示资金日报", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     expect(screen.queryByRole("tab", { name: "资金日报" })).toBeNull();
-    expect(vi.mocked(reportsApi.dailyFunds)).not.toHaveBeenCalled();
   });
 
   it("FE-051：共享日期区间传递到经营报表和订单利润", async () => {

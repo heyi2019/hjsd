@@ -1,7 +1,7 @@
 import { api } from "./client";
 import type { ImportBatch, ImportRow, MappingPreview, ReconciliationReport } from "./types/imports";
 import type { AuditEntityStat, AuditLogRow } from "./types/ops";
-import type { BusinessPnlReport, CommissionReport, DailyFundsReport, DataCenterSummary, MonthlyPnlReport, OrderProfitReport } from "./types/reporting";
+import type { BusinessPnlReport, CommissionReport, DataCenterSummary, MonthlyPnlReport, OrderProfitReport } from "./types/reporting";
 
 export const reportsApi = {
   exportCsv: (name: string, params?: {from?: string; to?: string; mine?: boolean; all_people?: boolean; user_id?: number}) => api.get<Blob>(`/reports/${name}/export.csv`, {params, responseType: "blob"}).then(r => r.data),
@@ -13,8 +13,6 @@ export const reportsApi = {
     api.get<BusinessPnlReport>("/reports/business-pnl", { params }).then((r) => r.data),
   dataCenter: (params?: { from?: string; to?: string }) =>
     api.get<DataCenterSummary>("/reports/data-center", { params }).then((r) => r.data),
-  dailyFunds: (params?: { on?: string }) =>
-    api.get<DailyFundsReport>("/reports/daily-funds", { params }).then((r) => r.data),
   orderProfit: (params?: { from?: string; to?: string }) =>
     api.get<OrderProfitReport>("/reports/order-profit", { params }).then((r) => r.data),
 };

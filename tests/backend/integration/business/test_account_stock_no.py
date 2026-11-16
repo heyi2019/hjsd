@@ -72,19 +72,6 @@ class TestStockNoGeneration:
         assert matched, "api-acc-1 未出现在账号列表"
         assert KU_PATTERN.match(matched[0]["stock_no"]), matched[0]["stock_no"]
 
-    def test_stock_no_visible_in_inventory_api(self, seeded_client, headers, seeded_db):
-        """库存中心在库台账曾漏传 stock_no（schema 有该字段但构造时没填），
-        前端「库存编号」列与导出因此整列空白。2026-11-03 补上。"""
-        acc = _make(seeded_db, "api-inv-1")
-        seeded_db.flush()
-        resp = seeded_client.get("/api/v1/stocks/inventory", headers=headers)
-        assert resp.status_code == 200
-        payload = resp.json()
-        items = payload if isinstance(payload, list) else payload.get("items") or payload.get("data")
-        matched = [a for a in items if a.get("game_account") == "api-inv-1"]
-        assert matched, "api-inv-1 未出现在库存中心在库台账"
-        assert matched[0]["stock_no"] == acc.stock_no, matched[0]
-
     def test_stock_no_sequence_advances_with_creation(self, seeded_db):
         before = seeded_db.execute(
             text("SELECT current_value FROM document_sequences WHERE sequence_key='STOCK_NO'")

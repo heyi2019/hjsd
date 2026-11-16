@@ -85,6 +85,7 @@ def inventory_ledger(
     limit: int = 10, offset: int = 0, user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """服务端筛选、排序、分页库存台账，并返回分页所需统计。"""
+    active_order_statuses = ("ACTIVE", "INSTALLMENT")
     type_expr = func.coalesce(
         Account.inventory_type,
         case((Order.order_type == "HS", "RECOVERY"), (Order.order_type == "TH", "PICKUP"),
@@ -102,7 +103,7 @@ def inventory_ledger(
 
     def stmt(*, include_type: bool = True, include_search_date: bool = True):
         query = select(Account, Order).join(Order, Order.account_id == Account.id).where(
-            Account.status == "WAITING", Order.status == "WAITING",
+            Account.status == "WAITING", Order.status.in_(active_order_statuses),
         )
         scope = scope_filter(session, user)
         if scope is not None:
@@ -143,7 +144,7 @@ def inventory_ledger(
     game_type_query = select(game_type_expr).select_from(Account).join(
         Order, Order.account_id == Account.id,
     ).where(
-        Account.status == "WAITING", Order.status == "WAITING", game_type_expr.is_not(None),
+        Account.status == "WAITING", Order.status.in_(active_order_statuses), game_type_expr.is_not(None),
     )
     scope = scope_filter(session, user)
     if scope is not None:

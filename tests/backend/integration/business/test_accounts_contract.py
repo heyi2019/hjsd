@@ -365,11 +365,19 @@ class TestAccountQueries:
         assert total_inventory_cost(seeded_db) == Decimal("300.00")
 
 class TestAccountsApi:
-    def test_inventory_endpoint_publishes_typed_response_contract(self, app):
-        schema = app.openapi()["paths"]["/api/v1/stocks/inventory"]["get"]["responses"]["200"]
-        response_schema = schema["content"]["application/json"]["schema"]
+    def test_legacy_inventory_endpoint_is_removed(self, seeded_client, headers):
+        response = seeded_client.get("/api/v1/stocks/inventory", headers=headers)
 
-        assert response_schema["$ref"].endswith("/InventoryResponseOut")
+        # 路径本身会被账号 PATCH 路由占位，但旧库存 GET 已不再提供。
+        assert response.status_code == 405
+
+    def test_legacy_inventory_cost_summary_endpoint_is_removed(self, seeded_client, headers):
+        response = seeded_client.get(
+            "/api/v1/stocks/inventory/cost-summary",
+            headers=headers,
+        )
+
+        assert response.status_code == 404
 
     def test_account_endpoints_follow_order_owner_scope(
         self, seeded_client, seeded_db
@@ -424,9 +432,13 @@ class TestAccountsApi:
         )
         assert hidden_update.status_code == 404
 
-        inventory = seeded_client.get("/api/v1/stocks/inventory", headers=headers)
+        inventory = seeded_client.get(
+            "/api/v1/stocks/inventory/ledger",
+            params={"limit": 10, "offset": 0},
+            headers=headers,
+        )
         assert inventory.status_code == 200, inventory.text
-        assert [row["account_id"] for row in inventory.json()["items"]] == [mine.id]
+        assert [row["account"]["id"] for row in inventory.json()["items"]] == [mine.id]
 
     def test_visible_account_does_not_leak_foreign_source_order(
         self, seeded_client, seeded_db

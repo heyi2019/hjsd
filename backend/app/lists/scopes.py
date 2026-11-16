@@ -223,21 +223,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         ),
     ),
     ListScope(
-        code="RPT_DAILY_FUNDS",
-        label="报表·资金日报",
-        columns=(
-            ListColumn("pool_name", "资金池"),
-            # 同一行 pool_name 被页面重复渲染成「名称」列，这里用独立 key 以免两列联动
-            ListColumn("pool_label", "名称"),
-            ListColumn("opening", "期初"),
-            ListColumn("income", "收入"),
-            ListColumn("expense", "支出"),
-            ListColumn("deposit_held", "押金占用"),
-            ListColumn("cash_balance", "现金余额"),
-            ListColumn("available", "可用余额"),
-        ),
-    ),
-    ListScope(
         code="RPT_BUSINESS_PNL",
         label="报表·业务损益",
         columns=(
@@ -300,7 +285,6 @@ def get_scope(code: str) -> ListScope | None:
 REPORT_COLUMN_SCOPES: dict[str, str] = {
     "monthly-pnl": "RPT_MONTHLY_PNL",
     "commission": "RPT_COMMISSION",
-    "daily-funds": "RPT_DAILY_FUNDS",
     "business-pnl": "RPT_BUSINESS_PNL",
     "order-profit": "RPT_ORDER_PROFIT",
 }

@@ -36,7 +36,6 @@ REPORT_NAMES = frozenset(
         "monthly-pnl",
         "commission",
         "business-pnl",
-        "daily-funds",
         "order-profit",
     }
 )

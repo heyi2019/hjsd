@@ -44,22 +44,6 @@ export interface Account {
   inventory_age_level?: "NORMAL" | "WARNING" | "OVERDUE" | null;
 }
 
-export interface AccountInventoryRow {
-  account_id: number;
-  stock_no?: string | null;
-  game_account?: string | null;
-  business_mode?: string | null;
-  inventory_type?: string | null;
-  platform?: string | null;
-  status: string;
-  inventory_status?: string;
-  inventory_entry_at?: string | null;
-  cost_amount: string;
-  account_description?: string | null;
-  account_images?: string[];
-  extra_values?: Record<string, unknown>;
-}
-
 /**
  * 库存卡片指标：由后端按「当前可见的账号集合」汇总。
  * `account_count` 是后端实际命中的集合大小（可见范围过滤后），用于核对前后端口径。

@@ -75,7 +75,6 @@ beforeEach(() => {
   });
   vi.mocked(ordersApi.list).mockResolvedValue([]);
   vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 0, completed_count: 0, active_count: 0 });
-  vi.mocked(stocksApi.inventory).mockResolvedValue({ items: [], count: 0, total_cost: "0.00" });
 });
 
 async function gotoTab(label: string) {
@@ -89,7 +88,6 @@ describe("ReportsPage：经营中心报表", () => {
     expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(reportsApi.commission)).not.toHaveBeenCalled();
-    expect(vi.mocked(reportsApi.dailyFunds)).not.toHaveBeenCalled();
     expect(vi.mocked(reportsApi.orderProfit)).not.toHaveBeenCalled();
     expect(vi.mocked(poolsApi.list)).not.toHaveBeenCalled();
   });

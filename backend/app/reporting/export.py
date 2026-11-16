@@ -13,7 +13,6 @@ from app.core.security import CurrentUser
 from sqlalchemy.orm import Session
 from ._shared import REPORT_NAMES
 
-from .funds import daily_funds_report
 from .profit import order_profit_detail
 from .r2_monthly_pnl import r2_monthly_pnl
 from .r3_commission import r3_commission_reconciliation
@@ -57,8 +56,6 @@ def report_for_export(
         }
     if name == "business-pnl":
         return r5_business_pnl(session, from_date=from_date, to_date=to_date, user=user)
-    if name == "daily-funds":
-        return daily_funds_report(session, on=on, user=user)
     return order_profit_detail(session, from_date=from_date, to_date=to_date, user=user)
 
 

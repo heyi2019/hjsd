@@ -1,4 +1,4 @@
-"""REPORT-01 报表功能契约：R2/R3/R5、资金日报与订单利润口径。"""
+"""REPORT-01 报表功能契约：R2/R3/R5 与订单利润口径。"""
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -429,8 +429,7 @@ class TestReportsApiDateParams:
         )
         finance_headers = {"Authorization": f"Bearer {build_access_token(finance)}"}
         funds = seeded_client.get("/api/v1/reports/daily-funds", headers=finance_headers)
-        assert funds.status_code == 200, funds.text
-        assert {row["pool_code"] for row in funds.json()["items"]} == {"HJ_INVEST"}
+        assert funds.status_code == 404
 
     def test_report_export_is_csv_and_viewer_cannot_export(
         self, seeded_client, headers, viewer_headers

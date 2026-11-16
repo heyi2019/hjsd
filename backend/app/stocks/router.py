@@ -4,8 +4,6 @@
 """
 
 from datetime import date
-from decimal import Decimal
-
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
@@ -23,8 +21,6 @@ from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.stocks.inventory import (
     count_accounts,
     inventory_ledger as stocks_inventory_ledger,
-    inventory as stocks_inventory,
-    inventory_cost_by_entry_date as stocks_inventory_cost_by_entry_date,
     list_accounts as stocks_list_accounts,
 )
 from app.stocks.profile import (
@@ -42,8 +38,6 @@ from .schemas import (
     AccountListOut,
     AccountProfileUpdate,
     AccountDeleteRequest,
-    InventoryCostSummaryOut,
-    InventoryResponseOut,
     InventoryStatsOut,
     InventoryLedgerOut,
 )
@@ -163,34 +157,6 @@ def delete_inventory(
     _require_admin(user)
     stocks_delete_inventory(db, account_id, actor=_actor(user), reason=payload.reason, user=user)
     return Response(status_code=204)
-
-
-@router.get("/stocks/inventory", response_model=InventoryResponseOut)
-def inventory(
-    db: Session = Depends(get_db),
-    _user: CurrentUser = read_access,
-) -> InventoryResponseOut:
-    """库存中心在库台账：只统计独立库存状态为在库的真实占用。"""
-    rows = stocks_inventory(db, user=_user)
-    total = sum((row["cost_amount"] for row in rows), Decimal("0"))
-    return InventoryResponseOut(items=rows, count=len(rows), total_cost=total)
-
-
-@router.get("/stocks/inventory/cost-summary", response_model=InventoryCostSummaryOut)
-def inventory_cost_summary(
-    entry_date_from: date | None = Query(default=None),
-    entry_date_to: date | None = Query(default=None),
-    db: Session = Depends(get_db),
-    _user: CurrentUser = read_access,
-) -> InventoryCostSummaryOut:
-    """按入库日期范围返回在库账号成本汇总，不返回库存行。"""
-    total_cost = stocks_inventory_cost_by_entry_date(
-        db,
-        date_from=entry_date_from,
-        date_to=entry_date_to,
-        user=_user,
-    )
-    return InventoryCostSummaryOut(total_cost=total_cost)
 
 
 @router.get("/stocks/inventory/ledger", response_model=InventoryLedgerOut)

@@ -437,7 +437,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "REPORT_NAME", label: "报表名称", group: "REPORT", editable: false, options: [
     { value: "monthly-pnl", label: "月度损益" },
     { value: "commission", label: "提成对账" },
-    { value: "daily-funds", label: "资金日报" },
     { value: "business-pnl", label: "业务损益" },
     { value: "order-profit", label: "订单利润" },
   ] },

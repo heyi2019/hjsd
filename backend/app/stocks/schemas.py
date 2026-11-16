@@ -100,41 +100,6 @@ class AccountDeleteRequest(RequestModel):
         return value.strip()
 
 
-class AccountInventoryOut(BaseModel):
-    """库存中心在库台账接口的单行契约；与账号台账共享同一业务字段语义。"""
-
-    model_config = ConfigDict(extra="forbid")
-
-    account_id: int
-    stock_no: str | None = None
-    game_account: str | None = None
-    business_mode: str | None = None
-    inventory_type: str | None = None
-    value_added_service: str | None = None
-    platform: str | None = None
-    status: str
-    inventory_status: str
-    inventory_entry_at: datetime
-    cost_amount: Decimal
-    account_description: str | None = None
-    account_images: list[str] = Field(default_factory=list)
-    extra_values: dict[str, object] = Field(default_factory=dict)
-
-
-class InventoryResponseOut(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    items: list[AccountInventoryOut]
-    count: int
-    total_cost: Decimal
-
-
-class InventoryCostSummaryOut(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    total_cost: Decimal
-
-
 class InventoryStatsOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -163,9 +128,6 @@ __all__ = [
     "AccountListOut",
     "AccountProfileUpdate",
     "AccountDeleteRequest",
-    "AccountInventoryOut",
-    "InventoryResponseOut",
-    "InventoryCostSummaryOut",
     "InventoryLedgerItemOut",
     "InventoryLedgerOut",
 ]

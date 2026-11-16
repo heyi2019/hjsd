@@ -49,7 +49,6 @@ PANEL_SOURCES: dict[str, str] = {
     # 列定义在各子文件里，映射必须落到子文件，否则这条守卫对 7 张报表形同不存在。
     "RPT_MONTHLY_PNL": "reporting/reports/MonthlyPnlReport.tsx",
     "RPT_COMMISSION": "reporting/reports/CommissionReport.tsx",
-    "RPT_DAILY_FUNDS": "reporting/reports/DailyFundsReport.tsx",
     "RPT_BUSINESS_PNL": "reporting/reports/BusinessPnlReport.tsx",
     "RPT_ORDER_PROFIT": "reporting/reports/OrderProfitReport.tsx",
 }

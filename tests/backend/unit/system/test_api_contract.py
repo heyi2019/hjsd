@@ -71,5 +71,5 @@ def test_every_json_api_route_declares_response_model(app):
     # → 181（移除手机号验证码 / 微信登录公开接口，-9）→ 170（下线质量分析、全局搜索、
     # 附件中心、系统提醒和资金属性分析独立入口及其后端路由）。
     # 注：public_routes 在豁免判断之前 +1，故豁免路由（含已删的 DELETE /rebates）也计数。
-    # → 169（库存台账已内聚汇总逻辑，下线旧 POST /stocks/inventory/stats）。
-    assert public_routes == 169
+    # → 166（库存台账已内聚汇总逻辑，下线旧库存列表、统计、成本汇总与资金日报入口）。
+    assert public_routes == 166

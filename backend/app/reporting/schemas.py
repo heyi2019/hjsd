@@ -97,34 +97,6 @@ class DataCenterOut(ReportModel):
     profit: Decimal
 
 
-class DailyFundsItemOut(ReportModel):
-    pool_code: str
-    pool_name: str
-    opening: Decimal
-    income: Decimal
-    expense: Decimal
-    deposit_paid: Decimal
-    deposit_held: Decimal
-    cash_balance: Decimal
-    available: Decimal
-
-
-class DailyFundsTotalOut(ReportModel):
-    opening: Decimal
-    income: Decimal
-    expense: Decimal
-    deposit_paid: Decimal
-    deposit_held: Decimal
-    cash_balance: Decimal
-    available: Decimal
-
-
-class DailyFundsOut(ReportModel):
-    date: str
-    items: list[DailyFundsItemOut]
-    total: DailyFundsTotalOut
-
-
 class OrderProfitItemOut(ReportModel):
     order_no: str
     order_id: int
@@ -154,7 +126,6 @@ __all__ = [
     "BusinessPnlOut",
     "DataCenterOut",
     "CommissionOut",
-    "DailyFundsOut",
     "MonthlyPnlOut",
     "OrderProfitOut",
 ]

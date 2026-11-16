@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Account, AccountInventoryRow, InventoryStats } from "./types/accounts";
+import type { Account, InventoryStats } from "./types/accounts";
 import type { Order } from "./types/orders";
 import type { PageResponse } from "./types/common";
 
@@ -21,14 +21,6 @@ export const stocksApi = {
   },
   updateProfile: (id: number, payload: Partial<Pick<Account, "game_account" | "game_type" | "game_password" | "camp_account" | "channel_region" | "bound_phone" | "has_secondary" | "secondary_images" | "wallet_realname" | "wallet_realname_images" | "platform" | "note" | "account_description" | "account_images">> & { form_extra?: Record<string, unknown> }) =>
     api.patch<Account>(`/stocks/${id}`, payload).then((r) => r.data),
-  inventory: () =>
-    api
-      .get<{ items: AccountInventoryRow[]; count: number; total_cost: string }>("/stocks/inventory")
-      .then((r) => r.data),
-  inventoryCostSummary: (params?: { entry_date_from?: string; entry_date_to?: string }) =>
-    api
-      .get<{ total_cost: string }>("/stocks/inventory/cost-summary", { params })
-      .then((r) => r.data),
   inventoryLedger: (params: {
     business_mode?: string;
     inventory_type?: string;

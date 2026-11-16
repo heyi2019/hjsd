@@ -83,6 +83,3 @@ def r5_business_pnl(
             "main_profit": _sum_report_field(items, "main_profit"),
         },
     }
-
-
-# --------------------------------------------------------------------- 资金日报

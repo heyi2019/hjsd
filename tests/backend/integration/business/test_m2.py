@@ -452,5 +452,9 @@ class TestM2Api:
             headers=headers,
         )
         assert created.status_code == 201, created.text
-        inventory = seeded_client.get("/api/v1/stocks/inventory", headers=headers).json()
-        assert inventory["count"] == 1
+        inventory = seeded_client.get(
+            "/api/v1/stocks/inventory/ledger",
+            params={"limit": 10, "offset": 0},
+            headers=headers,
+        ).json()
+        assert inventory["total"] == 1

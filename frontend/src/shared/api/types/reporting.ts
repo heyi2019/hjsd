@@ -66,24 +66,6 @@ export interface DataCenterSummary {
   profit: string;
 }
 
-export interface DailyFundsRow {
-  pool_code: string;
-  pool_name: string;
-  opening: string;
-  income: string;
-  expense: string;
-  deposit_paid: string;
-  deposit_held: string;
-  cash_balance: string;
-  available: string;
-}
-
-export interface DailyFundsReport {
-  date: string;
-  total: Omit<DailyFundsRow, "pool_code" | "pool_name">;
-  items: DailyFundsRow[];
-}
-
 export interface OrderProfitRow {
   order_id: number;
   order_no: string;

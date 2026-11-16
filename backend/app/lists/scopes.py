@@ -113,6 +113,18 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         ),
     ),
     ListScope(
+        code="COUNTERPARTY",
+        label="合作方",
+        columns=(
+            ListColumn("counterparty_no", "编号"),
+            ListColumn("display_name", "名称"),
+            ListColumn("type", "类型"),
+            ListColumn("status", "状态", value_set="COUNTERPARTY_STATUS"),
+            ListColumn("created_by", "创建操作人"),
+            ListColumn("actions", "操作"),
+        ),
+    ),
+    ListScope(
         code="REBATE",
         label="返点明细",
         columns=(

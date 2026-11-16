@@ -8,6 +8,7 @@ import type { Counterparty } from "../shared/api/types/customers";
 import type { OrderFormField } from "../shared/api/types/forms";
 import { normalizeError } from "../shared/api/client";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
+import { useListViewColumns } from "../shared/lib/listColumns";
 import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { collectExtras } from "./CustomersPage.fragments";
@@ -134,6 +135,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
     }
   };
 
+  const { arrange: arrangeColumns } = useListViewColumns("COUNTERPARTY");
   const columns: ColumnsType<Counterparty> = [
     { title: "编号", dataIndex: "counterparty_no" },
     { title: "名称", dataIndex: "display_name" },
@@ -142,6 +144,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
     { title: "创建操作人", dataIndex: "created_by", render: (v: string | null | undefined) => v || "-" },
     {
       title: "操作",
+      key: "actions",
       render: (_v, row) => (
         <Space size={2}>
           <PermissionButton permission="counterparty.read" size="small" onClick={() => void openDetail(row)}>
@@ -170,7 +173,6 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
       ),
     },
   ];
-
   return (
     <Card
       className="glass"
@@ -186,7 +188,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? []} disabled={counterpartyStatusOptions === null || rows === null} onChange={(value) => { setStatusFilter(value); setPage(1); }} />
       </Space>
       <DataTable<Counterparty>
-        columns={columns}
+        columns={arrangeColumns(columns)}
         rows={rows ?? []}
         loading={rows === null}
         page={page}

@@ -1,12 +1,11 @@
 /** 数据中心：订单、三类成本与利润构成总览；资金明细仍归资金中心负责。 */
 import { Space } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { ordersApi } from "../shared/api/orders.api";
 import { reportsApi } from "../shared/api/reports.api";
 import type { DataCenterSummary } from "../shared/api/types/reporting";
-import { normalizeError } from "../shared/api/client";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
-import type { ReportRange } from "./reports/shared";
+import { type ReportRange, useReport } from "./reports/shared";
 import {
   EntryCard,
   EntryRow,
@@ -15,46 +14,40 @@ import {
 } from "../shared/ui";
 
 export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; range?: ReportRange }) {
-  const [orderSummary, setOrderSummary] = useState<{ total_count: number; active_count: number } | null>(null);
-  const [summary, setSummary] = useState<DataCenterSummary | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const orderParams = range?.params.from || range?.params.to
-        ? { trade_date_from: range.params.from, trade_date_to: range.params.to }
-        : undefined;
-      const reportParams = range?.params.from || range?.params.to
-        ? { from: range.params.from, to: range.params.to }
-        : undefined;
-      const [nextOrderSummary, nextSummary] = await Promise.all([
-        ordersApi.ledgerSummary(orderParams),
-        reportsApi.dataCenter(reportParams),
-      ]);
-      setOrderSummary({
-        total_count: nextOrderSummary.total_count,
-        active_count: (nextOrderSummary.status_counts.ACTIVE ?? 0) + (nextOrderSummary.status_counts.INSTALLMENT ?? 0),
-      });
-      setSummary(nextSummary);
-      setLoadError(null);
-    } catch (error) {
-      setLoadError(normalizeError(error));
-    } finally {
-      setLoading(false);
-    }
-  }, [range?.params.from, range?.params.to]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const from = range?.params.from;
+  const to = range?.params.to;
+  const orderParams = from || to
+    ? { trade_date_from: from, trade_date_to: to }
+    : undefined;
+  const reportParams = from || to ? { from, to } : undefined;
+  const orderReport = useReport(
+    async () => {
+      const result = await ordersApi.ledgerSummary(orderParams);
+      return {
+        total_count: result.total_count,
+        active_count: (result.status_counts.ACTIVE ?? 0) + (result.status_counts.INSTALLMENT ?? 0),
+      };
+    },
+    [from, to],
+  );
+  const summaryReport = useReport<DataCenterSummary>(
+    () => reportsApi.dataCenter(reportParams),
+    [from, to],
+  );
+  const loading = orderReport.loading || summaryReport.loading;
+  const loadError = orderReport.error ?? summaryReport.error;
+  const reload = useCallback(() => {
+    orderReport.reload();
+    summaryReport.reload();
+  }, [orderReport.reload, summaryReport.reload]);
+  const orderSummary = orderReport.data;
+  const summary = summaryReport.data;
 
   const orderCardsUnavailable = orderSummary === null;
 
   return (
     <section className="ui-stack">
-      <ErrorBanner error={loadError} onRetry={() => void load()} retrying={loading} />
+      <ErrorBanner error={loadError} onRetry={reload} retrying={loading} />
 
       {range ? <Space className="ui-filter-bar ui-filter-bar--spaced">{range.picker}</Space> : null}
 

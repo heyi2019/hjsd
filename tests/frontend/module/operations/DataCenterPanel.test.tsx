@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DataCenterPanel } from "@/reporting/DataCenterPanel";
+import { ReportsActiveContext } from "@/reporting/reports/shared";
 import { ordersApi } from "@/shared/api/orders.api";
 import { reportsApi } from "@/shared/api/reports.api";
 
@@ -66,6 +67,30 @@ describe("DataCenterPanel：经营指标", () => {
     await screen.findByText("订单总数");
     expect(vi.mocked(ordersApi.ledgerSummary)).toHaveBeenLastCalledWith({ trade_date_from: "2026-11-01", trade_date_to: "2026-11-15" });
     expect(vi.mocked(reportsApi.dataCenter)).toHaveBeenLastCalledWith({ from: "2026-11-01", to: "2026-11-15" });
+  });
+
+  it("隐藏期间不请求，重新激活后重新读取经营指标", async () => {
+    const { rerender } = renderLight(
+      <ReportsActiveContext.Provider value={false}>
+        <DataCenterPanel />
+      </ReportsActiveContext.Provider>,
+      { user: "admin" },
+    );
+
+    expect(vi.mocked(ordersApi.ledgerSummary)).not.toHaveBeenCalled();
+    expect(vi.mocked(reportsApi.dataCenter)).not.toHaveBeenCalled();
+
+    rerender(
+      <ReportsActiveContext.Provider value>
+        <DataCenterPanel />
+      </ReportsActiveContext.Provider>,
+    );
+
+    await waitFor(() => {
+      expect(vi.mocked(ordersApi.ledgerSummary)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(reportsApi.dataCenter)).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText("售出成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
   });
 
   it("订单接口失败时显示错误并禁用订单入口", async () => {

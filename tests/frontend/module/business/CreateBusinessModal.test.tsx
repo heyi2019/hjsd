@@ -112,6 +112,17 @@ it.each([
   expect(screen.getByLabelText(label)).toBeInTheDocument();
 });
 
+it.each([
+  ["HS", "回收负责人"],
+  ["TH", "提号负责人"],
+  ["DG", "代挂负责人"],
+])("%s 建单的%s为必填且支持多人", async (orderType, label) => {
+  await openTypedModal(orderType);
+  const field = screen.getByLabelText(label);
+  expect(field.closest(".ant-form-item")?.querySelector(".ant-form-item-required")).not.toBeNull();
+  expect(field.closest(".ant-select")?.className).toContain("ant-select-multiple");
+});
+
 it("回收和代挂均提供手机号绑定人这一核心账号字段", async () => {
   await openTypedModal("HS");
   expect(screen.getByLabelText("手机号绑定人")).toBeInTheDocument();

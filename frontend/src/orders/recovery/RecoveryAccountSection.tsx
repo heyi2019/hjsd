@@ -176,7 +176,7 @@ export function RecoveryAccountSection(props: {
           <OptionalImagesUpload namePrefix="钱包实名图片" />
         </CfgItem>
       ) : null}
-      {props.businessResponsibleLabel ? <ResponsibleEmployeeSelect name="business_responsible_ids" label={props.businessResponsibleLabel} employees={props.employees ?? []} /> : null}
+      {props.businessResponsibleLabel ? <ResponsibleEmployeeSelect name="business_responsible_ids" label={props.businessResponsibleLabel} employees={props.employees ?? []} required /> : null}
       <CfgItem name={fieldNames.accountNote} label="账号备注" className="account-note">
         <Input placeholder="可选填" />
       </CfgItem>

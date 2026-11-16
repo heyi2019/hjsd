@@ -22,7 +22,7 @@ export function EmployeeSelectControl({ employees, options, ...props }: Employee
 }
 
 /** 多人负责人：优先用当前会话员工默认值，仍允许补充其他在职员工。 */
-export function ResponsibleEmployeeSelect(props: { name: string; label: string; employees: EmployeeOption[]; className?: string }) {
+export function ResponsibleEmployeeSelect(props: { name: string; label: string; employees: EmployeeOption[]; className?: string; required?: boolean }) {
   const form = Form.useFormInstance();
   // 按人匹配必须用 username（users.username），不能用 role（ADMIN/OPERATOR 这类系统角色）：
   // 拿角色去比 username 在生产环境恒不命中，默认值只能靠 /auth/me 那一路兜。
@@ -38,7 +38,13 @@ export function ResponsibleEmployeeSelect(props: { name: string; label: string; 
   }, [defaultEmployeeId, form, props.name]);
 
   return (
-    <CfgItem alwaysActive className={["responsible-employee-select", props.className].filter(Boolean).join(" ")} name={props.name} label={props.label}>
+    <CfgItem
+      alwaysActive
+      className={["responsible-employee-select", props.className].filter(Boolean).join(" ")}
+      name={props.name}
+      label={props.label}
+      rules={props.required ? [{ required: true, message: `${props.label}必填` }] : undefined}
+    >
       <EmployeeSelectControl mode="multiple" placeholder="默认当前员工，可多选" employees={props.employees} />
     </CfgItem>
   );

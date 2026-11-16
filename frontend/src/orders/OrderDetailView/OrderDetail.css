@@ -315,6 +315,15 @@
   pointer-events: auto;
 }
 .order-detail__image-action:hover { background: rgb(0 0 0 / 62%); }
+.order-detail__image-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .order-detail__image-upload {
   flex-direction: column;
   gap: var(--space-1);

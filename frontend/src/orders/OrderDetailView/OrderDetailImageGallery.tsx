@@ -1,5 +1,5 @@
-import { DeleteOutlined, EyeOutlined, PlusOutlined } from "@ant-design/icons";
-import { Image, Space, Upload } from "antd";
+import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined } from "@ant-design/icons";
+import { Image, Space } from "antd";
 import { useState } from "react";
 
 type OrderDetailImageGalleryProps = {
@@ -24,6 +24,28 @@ export function OrderDetailImageGallery({ images, altPrefix, limit = 3, editing 
     reader.readAsDataURL(file);
   });
 
+  const appendImages = async (files: FileList | null) => {
+    if (!files?.length) return;
+    try {
+      const nextImages = await Promise.all(Array.from(files).map(readImageData));
+      onChange?.([...images, ...nextImages].slice(0, limit));
+    } catch {
+      // 文件读取失败由浏览器直接阻止，不改变当前草稿。
+    }
+  };
+
+  const replaceImage = async (index: number, file: File | undefined) => {
+    if (!file) return;
+    try {
+      const data = await readImageData(file);
+      const nextImages = images.slice();
+      nextImages[index] = data;
+      onChange?.(nextImages);
+    } catch {
+      // 文件读取失败由浏览器直接阻止，不改变当前草稿。
+    }
+  };
+
   return (
     <Image.PreviewGroup
       preview={{
@@ -46,38 +68,49 @@ export function OrderDetailImageGallery({ images, altPrefix, limit = 3, editing 
                 <EyeOutlined />
               </button>
               {editing ? (
-                <button
-                  type="button"
-                  className="order-detail__image-action"
-                  aria-label={`删除${altPrefix} ${index + 1}`}
-                  onClick={() => onChange?.(images.filter((_, imageIndex) => imageIndex !== index))}
-                >
-                  <DeleteOutlined />
-                </button>
+                <>
+                  <label className="order-detail__image-action" title={`替换${altPrefix} ${index + 1}`}>
+                    <EditOutlined />
+                    <input
+                      className="order-detail__image-file-input"
+                      type="file"
+                      accept="image/*"
+                      aria-label={`替换${altPrefix} ${index + 1}`}
+                      onChange={(event) => {
+                        void replaceImage(index, event.currentTarget.files?.[0]);
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="order-detail__image-action"
+                    aria-label={`删除${altPrefix} ${index + 1}`}
+                    onClick={() => onChange?.(images.filter((_, imageIndex) => imageIndex !== index))}
+                  >
+                    <DeleteOutlined />
+                  </button>
+                </>
               ) : null}
             </span>
           </span>
         ))}
         {editing && images.length < limit ? (
-          <Upload
-            accept="image/*"
-            multiple
-            showUploadList={false}
-            beforeUpload={async (file) => {
-              try {
-                const data = await readImageData(file);
-                onChange?.([...images, data].slice(0, limit));
-              } catch {
-                // 文件读取失败由浏览器直接阻止，不改变当前草稿。
-              }
-              return Upload.LIST_IGNORE;
-            }}
-          >
-            <button type="button" className="order-detail__image-upload" aria-label={`上传${altPrefix}`}>
-              <PlusOutlined />
-              <span>上传图片</span>
-            </button>
-          </Upload>
+          <label className="order-detail__image-upload">
+            <PlusOutlined />
+            <span>上传图片</span>
+            <input
+              className="order-detail__image-file-input"
+              type="file"
+              accept="image/*"
+              multiple
+              aria-label={`上传${altPrefix}`}
+              onChange={(event) => {
+                void appendImages(event.currentTarget.files);
+                event.currentTarget.value = "";
+              }}
+            />
+          </label>
         ) : null}
         {editing && !visibleImages.length ? <span className="order-detail__image-empty">暂无图片</span> : null}
       </Space>

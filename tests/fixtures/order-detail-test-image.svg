@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <rect width="640" height="360" fill="#eef4ff"/>
+  <rect x="24" y="24" width="592" height="312" rx="20" fill="#ffffff" stroke="#2f6fed" stroke-width="4"/>
+  <circle cx="108" cy="124" r="44" fill="#2f6fed" opacity="0.16"/>
+  <path d="M86 124h44M108 102v44" stroke="#2f6fed" stroke-width="8" stroke-linecap="round"/>
+  <text x="184" y="132" fill="#1f2937" font-family="Arial, sans-serif" font-size="32" font-weight="700">ERP 测试图片</text>
+  <text x="184" y="182" fill="#64748b" font-family="Arial, sans-serif" font-size="22">tests/fixtures · order detail</text>
+  <text x="184" y="260" fill="#2f6fed" font-family="Arial, sans-serif" font-size="24">UPLOAD FIXTURE</text>
+</svg>

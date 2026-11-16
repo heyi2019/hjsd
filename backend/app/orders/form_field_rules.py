@@ -35,6 +35,9 @@ FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
 
+BUSINESS_RESPONSIBLE_FIELD_KEY = "business_responsible_ids"
+BUSINESS_RESPONSIBLE_ORDER_TYPES = {"HS", "TH", "DG"}
+
 
 SECTION_KEY_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{0,31}$")
 
@@ -222,3 +225,31 @@ def validate_form_extra(
         if required and not filled(normalized.get(definition.field_key)):
             raise Validation(f"字段 {definition.label} 必填", details={"field_key": definition.field_key})
     return normalized
+
+
+def validate_business_responsible(
+    session: Session,
+    *,
+    order_type_code: str,
+    values: Mapping[str, Any] | None,
+) -> None:
+    """校验三类账号订单的业务负责人核心字段。"""
+    if order_type_code not in BUSINESS_RESPONSIBLE_ORDER_TYPES:
+        return
+    definition = session.scalar(
+        select(OrderFormField).where(
+            OrderFormField.order_type_code == order_type_code,
+            OrderFormField.field_key == BUSINESS_RESPONSIBLE_FIELD_KEY,
+            OrderFormField.is_active.is_(True),
+        )
+    )
+    if definition is None or not definition.required:
+        return
+    raw = (values or {}).get(BUSINESS_RESPONSIBLE_FIELD_KEY)
+    if not isinstance(raw, list) or not raw or any(
+        isinstance(item, bool) or not isinstance(item, int) or item <= 0 for item in raw
+    ):
+        raise Validation(
+            f"字段 {definition.label} 必填",
+            details={"field_key": BUSINESS_RESPONSIBLE_FIELD_KEY},
+        )

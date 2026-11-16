@@ -31,6 +31,7 @@ from .form_field_rules import (
     _normalize_required_when,
     _normalize_field_options,
     validate_form_extra,
+    validate_business_responsible,
 )
 from .section_labels import (
     get_section_labels,
@@ -46,6 +47,7 @@ __all__ = [
     "set_order_form_field_active",
     "update_order_form_field",
     "validate_form_extra",
+    "validate_business_responsible",
     "_dependent_field_labels",
     "_reject_if_dependent",
     "FIELD_TYPES",

@@ -16,7 +16,7 @@ from app.core.errors import Validation
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
 from app.foundation.catalog_seed import seed_catalog
 from app.orders.form_scopes import FORM_SCOPES
-from app.orders.form_fields import validate_form_extra
+from app.orders.form_fields import validate_business_responsible, validate_form_extra
 from app.stocks.profile import update_account_profile
 
 
@@ -82,6 +82,54 @@ def test_allocation_scope_has_core_field_seeds(seeded_db):
         )
     )
     assert {"employee", "role", "allocation_rate", "allocation_amount"} <= keys
+
+
+def test_business_responsible_fields_are_registered_for_all_order_types(seeded_db):
+    """三类建单负责人必须是配置中心可见的内置多选必填字段。"""
+    seed_catalog(seeded_db)
+    seeded_db.commit()
+
+    expected = {
+        "HS": "回收负责人",
+        "TH": "提号负责人",
+        "DG": "代挂负责人",
+    }
+    rows = seeded_db.scalars(
+        select(OrderFormField).where(
+            OrderFormField.field_key == "business_responsible_ids",
+            OrderFormField.order_type_code.in_(expected),
+        )
+    ).all()
+
+    assert {row.order_type_code for row in rows} == set(expected)
+    for row in rows:
+        assert row.label == expected[row.order_type_code]
+        assert row.field_type == "MULTI_SELECT"
+        assert row.required is True
+        assert row.is_active is True
+        assert row.locked is True
+        assert row.is_custom is False
+
+
+@pytest.mark.parametrize(
+    ("order_type_code", "label"),
+    [("HS", "回收负责人"), ("TH", "提号负责人"), ("DG", "代挂负责人")],
+)
+def test_business_responsible_is_required_by_backend(seeded_db, order_type_code, label):
+    seed_catalog(seeded_db)
+
+    with pytest.raises(Validation, match=f"字段 {label} 必填"):
+        validate_business_responsible(
+            seeded_db,
+            order_type_code=order_type_code,
+            values={},
+        )
+
+    validate_business_responsible(
+        seeded_db,
+        order_type_code=order_type_code,
+        values={"business_responsible_ids": [1]},
+    )
 
 
 def _create_order(seeded_client, headers) -> dict:

@@ -14,7 +14,7 @@ from app.core.security import CurrentUser
 from app.domain.users import User
 from app.foundation.order_types import get_order_type_by_code
 from app.foundation.sequences import next_order_no
-from app.orders.form_fields import validate_form_extra
+from app.orders.form_fields import validate_business_responsible, validate_form_extra
 from app.parties.counterparties import assert_counterparty_usable
 from app.parties.customer_merge import assert_customer_usable
 from app.parties.fields import set_extra_values
@@ -150,6 +150,11 @@ def create_order(
     submitted_extra = dict(form_extra or {})
     merged_extra = {**snapshot_extra, **submitted_extra}
     form_extra = validate_form_extra(
+        session,
+        order_type_code=definition.code,
+        values=merged_extra,
+    )
+    validate_business_responsible(
         session,
         order_type_code=definition.code,
         values=merged_extra,

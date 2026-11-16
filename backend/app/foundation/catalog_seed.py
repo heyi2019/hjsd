@@ -17,6 +17,47 @@ SALE_PAYMENT_METHOD_OPTIONS = [
     {"value": "INSTALLMENT", "label": "分期付款"},
 ]
 
+# 三类账号订单的业务负责人是建单核心字段：选项来自当前在职员工，不来自配置中心手工维护。
+# 配置中心仍需要有字段行，用于统一展示、必填和启停配置。
+BUSINESS_RESPONSIBLE_FIELD_SEEDS = (
+    ("HS", "回收负责人"),
+    ("TH", "提号负责人"),
+    ("DG", "代挂负责人"),
+)
+
+
+def seed_business_responsible_fields(session: Session, *, actor: str = "system") -> None:
+    """注册三类建单负责人字段；重复执行不覆盖管理员已保存的配置。"""
+    for order_type_code, label in BUSINESS_RESPONSIBLE_FIELD_SEEDS:
+        exists = session.scalar(
+            select(OrderFormField).where(
+                OrderFormField.order_type_code == order_type_code,
+                OrderFormField.field_key == "business_responsible_ids",
+            )
+        )
+        if exists:
+            continue
+        session.add(
+            OrderFormField(
+                order_type_code=order_type_code,
+                field_key="business_responsible_ids",
+                label=label,
+                field_type="MULTI_SELECT",
+                options=None,
+                flow_direction=None,
+                required=True,
+                required_when=None,
+                is_active=True,
+                sort_order=1070,
+                locked=True,
+                is_custom=False,
+                section="ACCOUNT_PRODUCT",
+                note="默认当前员工，可多选",
+                created_by=actor,
+                updated_by=actor,
+            )
+        )
+
 _CATALOG_BLOB = """
 eJztfWtTU1m6/1ehrDqv/jPtdJ+ec2am6v8ikqCZDoROgt2eU1O7Imw1NSGhk9C2Z2qq8IKAEIKKiIIiNIrtJZEWNRAuH2ay905e
 +RXOuuwk67ZDdq6LPqnqVtmstS+/9aznvp7nH6eiY4lQNKLE1UT81F/++x+nhqMj6qm/nHJ4PN5eR8DtHVACFwZdp353Khy8qIbB
@@ -269,4 +310,5 @@ def seed_catalog(session: Session, *, actor: str = "system") -> None:
             continue
         values = {**values, "created_by": actor, "updated_by": actor}
         session.add(OrderFormField(**values))
+    seed_business_responsible_fields(session, actor=actor)
     session.flush()

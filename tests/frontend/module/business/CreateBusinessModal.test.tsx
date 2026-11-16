@@ -123,6 +123,16 @@ it.each([
   expect(field.closest(".ant-select")?.className).toContain("ant-select-multiple");
 });
 
+it.each([
+  ["HS", "回收负责人"],
+  ["TH", "提号负责人"],
+  ["DG", "代挂负责人"],
+])("%s 建单默认展示当前操作对象%s", async (orderType, label) => {
+  await openTypedModal(orderType, "admin");
+  const field = screen.getByLabelText(label);
+  await waitFor(() => expect(field.closest(".ant-form-item")).toHaveTextContent("系统管理员"));
+});
+
 it("回收和代挂均提供手机号绑定人这一核心账号字段", async () => {
   await openTypedModal("HS");
   expect(screen.getByLabelText("手机号绑定人")).toBeInTheDocument();

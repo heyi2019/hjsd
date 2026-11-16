@@ -14,6 +14,7 @@ type SeedDef = {
 const SCOPE_SEED: Record<string, SeedDef[]> = {
   HS: [
     { key: "has_secondary", label: "有无二次", type: "SELECT", options: [{ value: "有", label: "有" }, { value: "无", label: "无" }] },
+    { key: "business_responsible_ids", label: "回收负责人", type: "MULTI_SELECT", options: [], required: true },
     { key: "customer_source", label: "客户来源", type: "SELECT", options: customerSourceOptions },
     { key: "intermediary_platform", label: "交易平台", type: "SELECT", options: intermediaryPlatformOptions },
     { key: "intermediary_type", label: "中介类型", type: "SELECT", options: [{ value: "普中", label: "普中" }, { value: "包赔", label: "包赔" }] },
@@ -21,10 +22,12 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
   ],
   DG: [
     { key: "has_secondary", label: "有无二次", type: "SELECT", options: [{ value: "有", label: "有" }, { value: "无", label: "无" }] },
+    { key: "business_responsible_ids", label: "代挂负责人", type: "MULTI_SELECT", options: [], required: true },
     { key: "dg_customer_source", label: "客户来源", type: "SELECT", options: customerSourceOptions },
   ],
   TH: [
     { key: "has_secondary", label: "有无二次", type: "SELECT", options: [{ value: "有", label: "有" }, { value: "无", label: "无" }] },
+    { key: "business_responsible_ids", label: "提号负责人", type: "MULTI_SELECT", options: [], required: true },
     { key: "customer_source", label: "客户来源", type: "SELECT", options: customerSourceOptions },
     { key: "intermediary_platform", label: "交易平台", type: "SELECT", options: intermediaryPlatformOptions },
     { key: "intermediary_type", label: "中介类型", type: "SELECT", options: [{ value: "普中", label: "普中" }, { value: "包赔", label: "包赔" }] },
@@ -33,7 +36,13 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
   LEAD: [
     { key: "request_type", label: "需求类型", type: "SELECT", options: [{ value: "FIND_ACCOUNT", label: "找号" }, { value: "SELL_ACCOUNT", label: "卖号" }, { value: "SPECIFIC_SEARCH", label: "指定搜索" }] },
   ],
-  SALE: [
+  SALEREC: [
+    { key: "payment_method", label: "付款方式", type: "SELECT", options: [{ value: "FULL", label: "全款" }, { value: "INSTALLMENT", label: "分期付款" }] },
+  ],
+  SALETH: [
+    { key: "payment_method", label: "付款方式", type: "SELECT", options: [{ value: "FULL", label: "全款" }, { value: "INSTALLMENT", label: "分期付款" }] },
+  ],
+  SALEDG: [
     { key: "payment_method", label: "付款方式", type: "SELECT", options: [{ value: "FULL", label: "全款" }, { value: "INSTALLMENT", label: "分期付款" }] },
   ],
   FUNDFLOW: [
@@ -102,7 +111,9 @@ export function allFormFields(): OrderFormField[] {
  */
 export function seedOrderFormFields(): void {
   const all = allFormFields();
-  (orderFormFieldsApi.list as unknown as { mockResolvedValue(value: unknown): void }).mockResolvedValue(all);
+  (orderFormFieldsApi.list as unknown as {
+    mockImplementation(fn: (scope: string) => Promise<OrderFormField[]>): void;
+  }).mockImplementation(async (scope) => all.filter((row) => row.order_type_code === scope));
 }
 
 

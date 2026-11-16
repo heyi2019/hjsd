@@ -128,7 +128,7 @@ def _event_output(
             "form_extra": event.form_extra,
             "created_at": event.created_at,
             # created_by 是审计操作者；业务上的操作人以表单勾选员工为准。
-            "operator": selected_operators or event.created_by,
+            "operator": selected_operators or "-",
             "cancellable_amount": (cancellable or {}).get(event.id, Decimal("0.00")),
         }
     )
@@ -172,8 +172,7 @@ def _order_detail_output(
                     "status": item.status,
                     "order_event_id": item.order_event_id,
                     "note": item.note,
-                    "operator": _selected_operator_label(event_by_id.get(item.order_event_id), operator_names)
-                    or item.created_by,
+                    "operator": _selected_operator_label(event_by_id.get(item.order_event_id), operator_names) or "-",
                 }
             )
             for item in cashflows
@@ -368,10 +367,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             if sale_event
             else installment.created_at if installment else None
         )
-        sale_operator = (
-            (_selected_operator_label(sale_event, operator_names) or sale_event.created_by)
-            if sale_event else installment.created_by if installment else None
-        )
+        sale_operator = (_selected_operator_label(sale_event, operator_names) or None) if sale_event else None
         inventory_entry_at = account.inventory_entry_at if account else None
         payloads.append({
             "id": order.id,

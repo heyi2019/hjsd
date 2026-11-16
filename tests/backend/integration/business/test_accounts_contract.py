@@ -537,7 +537,8 @@ class TestAccountsApi:
                 "category": "OTHER",
                 "amount": "12.00",
                 "note": "订单关联的独立支出",
-                "operator": "pytest",
+                "operator": "-",
+                "operator_user_ids": None,
             }
         ]
 

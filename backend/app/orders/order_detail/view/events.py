@@ -74,13 +74,21 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
         order_cashflows.setdefault(flow.order_id, []).append(_cashflow_output(flow, pool))
 
     operator_ids = {uid for event in events for uid in (event.operator_user_ids or [])}
+    operator_ids.update(
+        uid
+        for flow in [*event_cashflows.values(), *[item for flows in order_cashflows.values() for item in flows]]
+        for uid in (flow.operator_user_ids or [])
+    )
     operator_names = {
-        user.id: user.display_name
+        user.id: user.display_name or user.username
         for user in db.scalars(select(User).where(User.id.in_(operator_ids))).all()
     } if operator_ids else {}
+    for flow in [*event_cashflows.values(), *[item for flows in order_cashflows.values() for item in flows]]:
+        flow.operator = "、".join(operator_names.get(uid, f"用户 {uid}") for uid in (flow.operator_user_ids or [])) or "-"
     cancellable_amounts = cancellable_by_event(events)
     events_by_order: dict[int, list[ExecutionEventOut]] = {}
     for event in events:
+        selected_operator_names = [operator_names.get(uid, f"用户 {uid}") for uid in (event.operator_user_ids or [])]
         events_by_order.setdefault(event.order_id, []).append(
             ExecutionEventOut(
                 id=event.id,
@@ -104,9 +112,9 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
                 note=event.note,
                 form_extra=dict(event.form_extra or {}),
                 cashflow=event_cashflows.get(event.id),
-                operator=event.created_by,
+                operator="、".join(selected_operator_names) or "-",
                 operator_user_ids=event.operator_user_ids,
-                operator_names=[operator_names.get(uid, f"用户 {uid}") for uid in (event.operator_user_ids or [])],
+                operator_names=selected_operator_names,
             )
         )
     return DetailEventContext(
@@ -129,6 +137,6 @@ def _cashflow_output(flow: Cashflow, pool: Pool) -> ExecutionCashflowOut:
         category=flow.category,
         amount=flow.amount,
         note=flow.note,
-        operator=flow.created_by,
+        operator="-",
         operator_user_ids=flow.operator_user_ids,
     )

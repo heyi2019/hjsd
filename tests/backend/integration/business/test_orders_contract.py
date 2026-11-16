@@ -268,7 +268,7 @@ def test_order_list_payload_includes_inventory_and_sale_responsibility_timestamp
     assert row["inventory_operator"] is None
     # 售卖时间取卖出事件的业务发生日 D，与 created_at 无关（created_at 是写入时刻）。
     assert row["sale_at"] == datetime(2026, 10, 4, 0, 0, 0)
-    assert row["sale_operator"] == "sale-user"
+    assert row["sale_operator"] is None
 
 def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_engine, headers, monkeypatch):
     from fastapi.testclient import TestClient
@@ -1878,7 +1878,7 @@ class TestOrdersApi:
         assert fetched.json()["id"] == order.id
         assert len(fetched.json()["events"]) == 1
         assert fetched.json()["events"][0]["event_type"] == "BUY"
-        assert fetched.json()["events"][0]["operator"] == "pytest"
+        assert fetched.json()["events"][0]["operator"] == "-"
 
         missing = seeded_client.get("/api/v1/orders/999999", headers=headers)
         assert missing.status_code == 404

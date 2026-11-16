@@ -16,6 +16,7 @@ from app.core.errors import Conflict, NotFound, Validation
 from app.core.like_pattern import like_contains
 from app.core.money import to_money
 from app.core.numbering import allocate_number
+from app.core.operation_operators import upsert_operation_operators
 from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import AuditAction, EntityType, LeadStatus, LeadType, SequenceKey
 from app.domain.parties import CustomerLead
@@ -58,6 +59,7 @@ def create_lead(
     note: str | None = None,
     user: CurrentUser | None = None,
     extra_values: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
 ) -> CustomerLead:
     customer = assert_customer_usable(session, customer_id, user=user)
     try:
@@ -99,6 +101,15 @@ def create_lead(
         entity_id=lead.lead_no,
         actor=actor,
         after={"customer_id": customer.id, "request_type": request_type},
+    )
+    upsert_operation_operators(
+        session,
+        entity_type="lead",
+        entity_id=lead.lead_no,
+        operation_key="CREATE",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+        occurred_at=lead.created_at,
     )
     return lead
 
@@ -163,6 +174,7 @@ def update_lead(
     actor: str,
     user: CurrentUser | None = None,
     extra_values: Mapping[str, Any] | None | object = _UNSET,
+    operator_user_ids: list[int] | None = None,
     **fields: Any,
 ) -> CustomerLead:
     lead = _get_lead_for_user(session, lead_id, user)
@@ -221,6 +233,14 @@ def update_lead(
             for name in fields
         },
     )
+    upsert_operation_operators(
+        session,
+        entity_type="lead",
+        entity_id=lead.lead_no,
+        operation_key="UPDATE",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+    )
     return lead
 
 
@@ -232,6 +252,7 @@ def convert_lead(
     actor: str,
     user: CurrentUser | None = None,
     extra_values: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
 ) -> CustomerLead:
     lead = _get_lead_for_user(session, lead_id, user)
     if lead.status != LeadStatus.OPEN.value:
@@ -258,6 +279,14 @@ def convert_lead(
         actor=actor,
         after={"status": lead.status, "converted_order_no": order.order_no},
     )
+    upsert_operation_operators(
+        session,
+        entity_type="lead",
+        entity_id=lead.lead_no,
+        operation_key="CONVERT",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+    )
     return lead
 
 
@@ -269,6 +298,7 @@ def close_lead(
     actor: str,
     user: CurrentUser | None = None,
     extra_values: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
 ) -> CustomerLead:
     lead = _get_lead_for_user(session, lead_id, user)
     if lead.status != LeadStatus.OPEN.value:
@@ -288,5 +318,13 @@ def close_lead(
         actor=actor,
         after={"status": lead.status},
         reason=normalized,
+    )
+    upsert_operation_operators(
+        session,
+        entity_type="lead",
+        entity_id=lead.lead_no,
+        operation_key="CLOSE",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
     )
     return lead

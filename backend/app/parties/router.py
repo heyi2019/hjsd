@@ -377,6 +377,7 @@ def create_lead(
         actor=_actor(user),
         user=user,
         extra_values=payload.extra_values,
+        operator_user_ids=payload.operator_user_ids,
     )
     return _lead_output(db, item)
 
@@ -389,9 +390,17 @@ def update_lead(
     user: CurrentUser = update_customers,
 ) -> schemas.LeadOut:
     changes = payload.model_dump(exclude_unset=True)
+    operator_user_ids = changes.pop("operator_user_ids", None)
     if "owner_id" in changes and not (user.is_admin or user.owner_scope == "ALL"):
         raise PermissionDenied("只有全量范围用户可以转交需求负责人")
-    item = parties_update_lead(db, lead_id, actor=_actor(user), user=user, **changes)
+    item = parties_update_lead(
+        db,
+        lead_id,
+        actor=_actor(user),
+        user=user,
+        operator_user_ids=operator_user_ids,
+        **changes,
+    )
     return _lead_output(db, item)
 
 
@@ -409,6 +418,7 @@ def convert_lead(
         actor=_actor(user),
         user=user,
         extra_values=payload.extra_values,
+        operator_user_ids=payload.operator_user_ids,
     )
     return _lead_output(db, item)
 
@@ -427,6 +437,7 @@ def close_lead(
         actor=_actor(user),
         user=user,
         extra_values=payload.extra_values,
+        operator_user_ids=payload.operator_user_ids,
     )
     return _lead_output(db, item)
 

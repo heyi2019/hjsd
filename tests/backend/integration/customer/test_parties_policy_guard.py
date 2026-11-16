@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import Conflict, NotFound, Validation
+from app.core.operation_operators import list_operation_operators
 from app.core.security import CurrentUser
 from app.domain.parties import (
     CustomerLead,
@@ -163,6 +164,34 @@ class TestPartiesMerge:
 
 
 class TestPartiesLeadGuards:
+    def test_lead_actions_persist_action_operators(self, seeded_db):
+        lead = create_lead(
+            seeded_db,
+            customer_id=_customer(seeded_db).id,
+            request_type="FIND_ACCOUNT",
+            target="动作操作人",
+            actor="pytest",
+            operator_user_ids=[1, 2],
+        )
+        close_lead(
+            seeded_db,
+            lead.id,
+            reason="已完成",
+            actor="pytest",
+            operator_user_ids=[2],
+        )
+
+        rows = list_operation_operators(
+            seeded_db,
+            entity_type="lead",
+            entity_id=lead.lead_no,
+        )
+
+        assert {row.operation_key: row.operator_user_ids for row in rows} == {
+            "CREATE": [1, 2],
+            "CLOSE": [2],
+        }
+
     def test_get_lead_missing(self, seeded_db):
         # 697: 需求不存在 -> NotFound
         with pytest.raises(NotFound):

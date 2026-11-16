@@ -119,4 +119,10 @@ export interface Lead {
   budget?: string | null;
   target: string;
   status: string;
+  created_by?: string | null;
+  operation_operators?: Array<{
+    operation_key: string;
+    operator_user_ids: number[];
+    occurred_at: string;
+  }>;
 }

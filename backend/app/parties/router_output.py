@@ -8,6 +8,7 @@ from app.parties import schemas
 from app.parties._common import to_counterparty_out
 from app.domain.parties import Customer
 from app.parties.fields import get_extra_values, get_extra_values_bulk
+from app.core.operation_operators import list_operation_operators_bulk
 
 
 def _lead_output(
@@ -20,12 +21,21 @@ def _lead_output(
     if customer_display_name is None:
         customer = db.get(Customer, item.customer_id)
         customer_display_name = customer.display_name if customer else ""
+    operators = list_operation_operators_bulk(
+        db,
+        entity_type="lead",
+        entity_ids=[item.lead_no],
+    )
     output = schemas.LeadOut.model_validate({
         **item.__dict__,
         "customer_display_name": customer_display_name,
         "extra_values": extra_values if extra_values is not None else get_extra_values(
             db, entity_type="lead", entity_id=item.id
         ),
+        "operation_operators": [
+            schemas.LeadOperationOperatorOut.model_validate(row)
+            for row in operators.get(item.lead_no, [])
+        ],
     })
     return output
 
@@ -40,12 +50,21 @@ def _lead_outputs(db: Session, items) -> list[schemas.LeadOut]:
             select(Customer.id, Customer.display_name).where(Customer.id.in_(customer_ids))
         ).all()
     ) if customer_ids else {}
+    operators = list_operation_operators_bulk(
+        db,
+        entity_type="lead",
+        entity_ids=[item.lead_no for item in items],
+    )
     return [
         _lead_output(
             db,
             item,
             customer_display_name=customer_names.get(item.customer_id, ""),
             extra_values=extras.get(item.id, {}),
+            operation_operators=[
+                schemas.LeadOperationOperatorOut.model_validate(row)
+                for row in operators.get(item.lead_no, [])
+            ],
         )
         for item in items
     ]

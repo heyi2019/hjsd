@@ -162,6 +162,7 @@ class LeadCreate(RequestModel):
     owner_id: int | None = Field(default=None, gt=0)
     note: str | None = Field(default=None, max_length=2000)
     extra_values: dict[str, Any] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
 class LeadUpdate(RequestModel):
@@ -170,16 +171,27 @@ class LeadUpdate(RequestModel):
     owner_id: int | None = Field(default=None, gt=0)
     note: str | None = Field(default=None, max_length=2000)
     extra_values: dict[str, Any] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
 class LeadConvert(RequestModel):
     order_id: int = Field(gt=0)
     extra_values: dict[str, Any] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
 class LeadClose(RequestModel):
     reason: str = Field(min_length=1, max_length=500)
     extra_values: dict[str, Any] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
+
+
+class LeadOperationOperatorOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    operation_key: str
+    operator_user_ids: list[int]
+    occurred_at: datetime
 
 
 class LeadOut(BaseModel):
@@ -202,6 +214,7 @@ class LeadOut(BaseModel):
     created_by: str
     updated_by: str
     extra_values: dict[str, Any] = Field(default_factory=dict)
+    operation_operators: list[LeadOperationOperatorOut] = Field(default_factory=list)
 
 
 class LeadSummaryOut(BaseModel):
@@ -286,6 +299,7 @@ __all__ = [
     "LeadClose",
     "LeadConvert",
     "LeadCreate",
+    "LeadOperationOperatorOut",
     "LeadOut",
     "LeadSummaryOut",
     "LeadUpdate",

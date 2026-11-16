@@ -61,6 +61,6 @@ export const leadsApi = {
     }).then((r) => r.data),
   summary: () => api.get<LeadSummary>("/leads/summary").then(r => r.data),
   create: (data: Record<string, unknown>) => api.post<Lead>("/leads", data).then(r => r.data),
-  close: (id: number, reason: string, extra_values?: Record<string, unknown>) => api.post<Lead>(`/leads/${id}/close`, { reason, extra_values }).then(r => r.data),
-  convert: (id: number, order_id: number, extra_values?: Record<string, unknown>) => api.post<Lead>(`/leads/${id}/convert`, { order_id, extra_values }).then(r => r.data),
+  close: (id: number, reason: string, extra_values?: Record<string, unknown>, operator_user_ids?: number[]) => api.post<Lead>(`/leads/${id}/close`, { reason, extra_values, operator_user_ids }).then(r => r.data),
+  convert: (id: number, order_id: number, extra_values?: Record<string, unknown>, operator_user_ids?: number[]) => api.post<Lead>(`/leads/${id}/convert`, { order_id, extra_values, operator_user_ids }).then(r => r.data),
 };

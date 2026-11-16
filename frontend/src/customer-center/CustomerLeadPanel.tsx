@@ -2,15 +2,18 @@ import { appMessage } from "../shared/ui/appFeedback";
 /** 客户需求池：记录需求事实，支持转单或关闭，不自动生成订单（CUS-02）。 */
 import { Card, Form, Input, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { customersApi, leadsApi } from "../shared/api/customers.api";
 import type { Customer, Lead } from "../shared/api/types/customers";
+import { employeesApi } from "../shared/api/org.api";
+import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError } from "../shared/api/client";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { BusinessActionModal, BusinessRegistrationForm, CompactActions, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules, positiveIntegerRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../orders/ConfigurableField";
 import { configurableLabel } from "../shared/lib/optionSets";
+import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
 
@@ -20,6 +23,7 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const { config } = useOrderFormConfig(createOpen ? "LEAD" : undefined);
   const [closeTarget, setCloseTarget] = useState<Lead | null>(null);
@@ -30,6 +34,12 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
   const [createForm] = Form.useForm();
   const [closeForm] = Form.useForm();
   const [convertForm] = Form.useForm();
+
+  useEffect(() => {
+    void Promise.resolve(employeesApi.list())
+      .then((items) => setEmployees((items ?? []).filter((item) => item.is_active)))
+      .catch(() => undefined);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -61,7 +71,7 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
     try {
       setError(null);
       setActing(true);
-      await leadsApi.create({ customer_id: Number(values.customer_id), request_type: values.request_type as string, budget: values.budget as string, target: values.target as string, note: values.note as string, extra_values: values.form_extra });
+      await leadsApi.create({ customer_id: Number(values.customer_id), request_type: values.request_type as string, budget: values.budget as string, target: values.target as string, note: values.note as string, extra_values: values.form_extra, operator_user_ids: values.operator_user_ids as number[] | undefined });
       appMessage.success("客户需求已创建"); setCreateOpen(false); createForm.resetFields(); await load();
     } catch (err) { setError(normalizeError(err)); }
     finally { setActing(false); }
@@ -71,7 +81,10 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
     try {
       setError(null);
       setActing(true);
-      await leadsApi.close(closeTarget.id, values.reason as string, values.form_extra as Record<string, unknown> | undefined); appMessage.success("需求已关闭"); setCloseTarget(null); closeForm.resetFields(); await load();
+      const operatorUserIds = values.operator_user_ids as number[] | undefined;
+      if (operatorUserIds?.length) await leadsApi.close(closeTarget.id, values.reason as string, values.form_extra as Record<string, unknown> | undefined, operatorUserIds);
+      else await leadsApi.close(closeTarget.id, values.reason as string, values.form_extra as Record<string, unknown> | undefined);
+      appMessage.success("需求已关闭"); setCloseTarget(null); closeForm.resetFields(); await load();
     }
     catch (err) { setError(normalizeError(err)); }
     finally { setActing(false); }
@@ -81,7 +94,10 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
     try {
       setError(null);
       setActing(true);
-      await leadsApi.convert(convertTarget.id, Number(values.order_id), values.form_extra as Record<string, unknown> | undefined); appMessage.success("需求已转单"); setConvertTarget(null); convertForm.resetFields(); await load();
+      const operatorUserIds = values.operator_user_ids as number[] | undefined;
+      if (operatorUserIds?.length) await leadsApi.convert(convertTarget.id, Number(values.order_id), values.form_extra as Record<string, unknown> | undefined, operatorUserIds);
+      else await leadsApi.convert(convertTarget.id, Number(values.order_id), values.form_extra as Record<string, unknown> | undefined);
+      appMessage.success("需求已转单"); setConvertTarget(null); convertForm.resetFields(); await load();
     }
     catch (err) { setError(normalizeError(err)); }
     finally { setActing(false); }
@@ -94,6 +110,7 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
     { title: "预算", dataIndex: "budget", align: "right", render: (v: string | null) => v ? <MoneyText value={v} /> : "-" },
     { title: "目标", dataIndex: "target" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="LEAD_STATUS" /> },
+    { title: "创建操作人", dataIndex: "created_by", render: (v: string | null | undefined, row) => v || row.operation_operators?.find((item) => item.operation_key === "CREATE")?.operator_user_ids.join("、") || "-" },
     { title: "操作", render: (_v, row) => row.status === "OPEN" ? <Space size={2}><PermissionButton permission="customer.create" size="small" onClick={() => setConvertTarget(row)}>转单</PermissionButton><PermissionButton permission="customer.update" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton></Space> : null },
   ];
 
@@ -127,6 +144,7 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
           <CfgItem name="budget" label="预算" rules={moneyRules("预算")}><MoneyInput /></CfgItem>
           <CfgItem name="target" label="需求目标" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <CfgItem name="note" label="备注"><Input.TextArea rows={2} /></CfgItem>
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="lead-create" />
           <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting} disabled={customers.length === 0}>创建需求</PermissionButton>
         </BusinessRegistrationForm>
@@ -140,6 +158,7 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="LEADCLOSE" form={closeForm} onFinish={closeLead}>
           <CfgItem name="reason" label="关闭原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="lead-close" />
           <CompactActions>
             <PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={acting}>确认关闭</PermissionButton>
@@ -155,6 +174,7 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="LEADCONVERT" form={convertForm} onFinish={convertLead}>
           <CfgItem name="order_id" label="订单编号" rules={[{ required: true, message: "请输入订单编号" }, ...positiveIntegerRules("订单编号")]}><Input inputMode="numeric" /></CfgItem>
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="lead-convert" />
           <CompactActions>
             <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>确认转单</PermissionButton>

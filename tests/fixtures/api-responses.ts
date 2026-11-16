@@ -1,4 +1,5 @@
 import type { PageResponse } from "@/shared/api/types/common";
+import type { InventoryStats } from "@/shared/api/types/accounts";
 import type { ProfitAllocation, ProfitAllocationList } from "@/shared/api/types/policy";
 import type { DataCenterSummary } from "@/shared/api/types/reporting";
 
@@ -22,6 +23,15 @@ export type CommissionResponse<TGroup, TTotal> = {
 export type ListResponse<T> = {
   items: T[];
   total: number;
+};
+
+export type InventoryLedgerResponse<T> = {
+  items: T[];
+  total: number;
+  facet_total: number;
+  type_counts: Record<string, number>;
+  game_types: string[];
+  stats: InventoryStats;
 };
 
 export type CashflowTotals = {
@@ -72,6 +82,22 @@ export function profitAllocationResponse<T extends ProfitAllocation>(
     total: items.length,
     order_profit: "0.00",
     totals_by_type: {},
+    ...overrides,
+  };
+}
+
+/** 构造库存台账响应，统一列表、筛选汇总与库存统计字段。 */
+export function inventoryLedgerResponse<T>(
+  items: T[],
+  overrides: Partial<Omit<InventoryLedgerResponse<T>, "items" | "total">> & { total?: number } = {},
+): InventoryLedgerResponse<T> {
+  return {
+    items,
+    total: items.length,
+    facet_total: items.length,
+    type_counts: {},
+    game_types: [],
+    stats: { account_count: 0, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 },
     ...overrides,
   };
 }

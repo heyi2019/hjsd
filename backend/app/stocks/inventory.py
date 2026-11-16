@@ -151,8 +151,8 @@ def inventory_ledger(
         game_type_query = game_type_query.where(scope)
     game_type_query = game_type_query.distinct().order_by(game_type_expr)
     game_types = list(session.scalars(game_type_query).all())
-    account_ids = list(session.scalars(stmt().with_only_columns(Account.id, maintain_column_froms=True)).all())
-    stats = inventory_stats(session, account_ids=account_ids, user=user)
+    account_id_query = stmt().with_only_columns(Account.id, maintain_column_froms=True).distinct()
+    stats = _inventory_stats_for_filter(session, account_id_query, user=user)
     return {"items": items, "total": total, "facet_total": facet_total, "type_counts": type_counts,
             "game_types": game_types, "stats": stats}
 
@@ -206,27 +206,35 @@ def inventory_stats(
             "over_7d_count": 0,
             "over_30d_count": 0,
         }
-    stmt = select(Account).where(Account.id.in_(ids), Account.inventory_status.in_(INVENTORY_STATUSES))
+    return _inventory_stats_for_filter(session, ids, today=today, user=user)
+
+
+def _inventory_stats_for_filter(
+    session: Session,
+    account_filter: Any,
+    *,
+    today: date | None = None,
+    user: CurrentUser | None = None,
+) -> dict[str, Any]:
+    """在数据库中聚合账号数、成本与库龄，不加载账号实体行。"""
+    reference = today or date.today()
+    cutoff_7 = datetime.combine(reference - timedelta(days=7), time.min)
+    cutoff_30 = datetime.combine(reference - timedelta(days=30), time.min)
+    stmt = select(
+        func.count(Account.id),
+        func.coalesce(func.sum(Account.cost_amount), Decimal("0")),
+        func.coalesce(func.sum(case((Account.inventory_entry_at < cutoff_7, 1), else_=0)), 0),
+        func.coalesce(func.sum(case((Account.inventory_entry_at < cutoff_30, 1), else_=0)), 0),
+    ).where(Account.id.in_(account_filter), Account.inventory_status.in_(INVENTORY_STATUSES))
     scope = scope_filter(session, user)
     if scope is not None:
         stmt = stmt.where(scope)
-    rows = list(session.scalars(stmt).all())
-    reference = today or date.today()
-    over_7d = 0
-    over_30d = 0
-    for row in rows:
-        age = inventory_age_days(row, today=reference)
-        if age is None:
-            continue
-        if age > 7:
-            over_7d += 1
-        if age > 30:
-            over_30d += 1
+    account_count, occupied_cost, over_7d, over_30d = session.execute(stmt).one()
     return {
-        "account_count": len(rows),
-        "occupied_cost": to_money(sum((to_money(row.cost_amount) for row in rows), Decimal("0"))),
-        "over_7d_count": over_7d,
-        "over_30d_count": over_30d,
+        "account_count": int(account_count or 0),
+        "occupied_cost": to_money(occupied_cost or Decimal("0")),
+        "over_7d_count": int(over_7d or 0),
+        "over_30d_count": int(over_30d or 0),
     }
 
 

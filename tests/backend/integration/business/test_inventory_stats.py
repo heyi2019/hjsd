@@ -63,6 +63,20 @@ def test_only_given_account_ids_take_part_in_totals(seeded_db):
     assert hidden.id != visible.id
 
 
+def test_stats_uses_database_aggregate_instead_of_loading_account_rows(seeded_db, monkeypatch):
+    account = _account(seeded_db, "stats-aggregate", cost="20.00", entry_days_ago=8)
+
+    def fail_row_loader(*_args, **_kwargs):
+        raise AssertionError("库存统计不应加载账号实体行")
+
+    monkeypatch.setattr(seeded_db, "scalars", fail_row_loader)
+    stats = inventory_stats(seeded_db, account_ids=[account.id])
+
+    assert stats["account_count"] == 1
+    assert stats["occupied_cost"] == Decimal("20.00")
+    assert stats["over_7d_count"] == 1
+
+
 def test_age_buckets_are_strictly_greater_than_7_and_30_days(seeded_db):
     fresh = _account(seeded_db, "stats-age-7", cost="0", entry_days_ago=7)
     aging = _account(seeded_db, "stats-age-8", cost="0", entry_days_ago=8)

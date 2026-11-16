@@ -13,7 +13,7 @@ export function InventoryView({ controller }: { controller: InventoryController 
       <ErrorBanner error={controller.error} onRetry={() => void controller.load()} />
       <StatRow
         items={[
-          { label: "在库账号", kind: "count", amount: String(controller.totalCount) },
+          { label: "在库账号", kind: "count", amount: stats ? String(stats.account_count) : "—" },
           { label: "占用成本合计", amount: stats?.occupied_cost ?? "—" },
           { label: "超7天库存账号", kind: "count", amount: stats ? String(stats.over_7d_count) : "—" },
           { label: "超30天库存账号", kind: "count", amount: stats ? String(stats.over_30d_count) : "—" },

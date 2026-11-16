@@ -79,9 +79,6 @@ export function useInventoryList({ active = true, refreshKey = 0 }: { active?: b
     if (type) return typeCounts[type] ?? 0;
     return facetTotal;
   }, [facetTotal, typeCounts]);
-  const visibleRows = rows;
-  const orderedRows = rows;
-
   async function handleExport() {
     setExporting(true);
     try {
@@ -102,7 +99,7 @@ export function useInventoryList({ active = true, refreshKey = 0 }: { active?: b
     keyword, setKeyword, dateRange, setDateRange, sortDesc, setSortDesc,
     page, setPage, pageSize, setPageSize, error, setError,
     businessOptions, inventoryTypeOptions, gameTypeOptions, load,
-    countInventoryRows, visibleRows, orderedRows, totalCount, setTotalCount,
+    countInventoryRows, totalCount, setTotalCount,
     handleExport, exporting, locallyRemovedIdsRef,
   };
 }

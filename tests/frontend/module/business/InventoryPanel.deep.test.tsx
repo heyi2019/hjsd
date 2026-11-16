@@ -155,6 +155,25 @@ beforeEach(() => {
 });
 
 describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
+  it("在库账号卡片使用后端账号统计，不使用分页订单行数", async () => {
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValue({
+      items: [{
+        account: inStockRow,
+        order: { id: 21, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", account_id: 1, account_status: "WAITING", status: "ACTIVE" },
+      }],
+      total: 2,
+      facet_total: 2,
+      type_counts: { RECOVERY: 2 },
+      game_types: ["王者荣耀"],
+      stats: { account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 },
+    } as never);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    const card = screen.getByText("在库账号").closest(".ui-stat");
+    expect(card).not.toBeNull();
+    expect(within(card as HTMLElement).getByText("1")).toBeInTheDocument();
+  });
+
   it("运营 → 描述：打开描述编辑弹窗", async () => {
     await openPanel([inStockRow]);
     await clickOperation(rowOf(1), "描述");

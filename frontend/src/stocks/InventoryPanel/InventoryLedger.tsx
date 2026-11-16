@@ -26,7 +26,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     inlineEditId,
     invEditExtraForm,
     keyword,
-    orderedRows,
+    rows,
     page,
     pageSize,
     savingAccount,
@@ -124,7 +124,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
       <DataTable
         className="inventory-table"
         columns={arrangeColumns(columns)}
-        rows={orderedRows}
+        rows={rows}
         rowKey={(row) => `${row.id}:${row.account.id}`}
         page={page}
         pageSize={pageSize}

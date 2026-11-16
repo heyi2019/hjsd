@@ -7,7 +7,7 @@ import { ReportsPage } from "@/reporting/ReportsPage";
 import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
 import { resolveMock } from "@fixtures/mock-api";
 import { appMessage } from "@/shared/ui/appFeedback";
-import { reportResponse } from "@fixtures/api-responses";
+import { commissionResponse, reportResponse } from "@fixtures/api-responses";
 
 import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
@@ -50,7 +50,7 @@ beforeEach(() => {
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
   resolveMock(vi.mocked(reportsApi.monthlyPnl), reportResponse([], {}));
-  resolveMock(vi.mocked(reportsApi.commission), { order_groups: [], total: { order_count: 0, profit_base: "0" } });
+  resolveMock(vi.mocked(reportsApi.commission), commissionResponse([], { order_count: 0, profit_base: "0" }));
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 7, username: "operator", display_name: "业务同事", is_active: true },
     { id: 8, username: "finance", display_name: "财务同事", is_active: true },

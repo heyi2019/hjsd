@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
-import { reportResponse } from "@fixtures/api-responses";
+import { commissionResponse, reportResponse } from "@fixtures/api-responses";
 
 import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
@@ -42,7 +42,7 @@ vi.mock("@/shared/api/stocks.api");
 beforeEach(() => {
   vi.clearAllMocks();
   resolveMock(vi.mocked(reportsApi.monthlyPnl), reportResponse([], {}));
-    resolveMock(vi.mocked(reportsApi.commission), { order_groups: [], total: { order_count: 0, profit_base: "0" } });
+  resolveMock(vi.mocked(reportsApi.commission), commissionResponse([], { order_count: 0, profit_base: "0" }));
   vi.mocked(employeesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(reportsApi.businessPnl), reportResponse([], {}));
   resolveMock(vi.mocked(reportsApi.orderProfit), reportResponse([], { income: "0", cost: "0", rebate: "0", net_profit: "0" }));

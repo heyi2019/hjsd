@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DEV_USER_KEY } from "@/shared/api/client";
 import { allFormFields } from "@fixtures/orderFormFieldsSeed";
 import { OPTION_SET_SEED } from "@fixtures/optionSetsSeed";
-import { pageResponse, reportResponse, orderLedgerSummary, cashflowPage, cashflowTotals } from "@fixtures/api-responses";
+import { pageResponse, reportResponse, commissionResponse, orderLedgerSummary, cashflowPage, cashflowTotals } from "@fixtures/api-responses";
 import { resetTestFixtureState } from "@fixtures/fixtures";
 
 describe("测试夹具隔离", () => {
@@ -60,6 +60,10 @@ describe("测试夹具隔离", () => {
     expect(reportResponse([{ month: "2026-11" }], { income: "1.00" })).toEqual({
       items: [{ month: "2026-11" }],
       total: { income: "1.00" },
+    });
+    expect(commissionResponse([{ order_id: 1 }], { order_count: 1, profit_base: "10.00" })).toEqual({
+      order_groups: [{ order_id: 1 }],
+      total: { order_count: 1, profit_base: "10.00" },
     });
   });
 });

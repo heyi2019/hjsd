@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
-import { reportResponse } from "@fixtures/api-responses";
+import { commissionResponse, reportResponse } from "@fixtures/api-responses";
 import { appMessage } from "@/shared/ui/appFeedback";
 
 import { ordersApi } from "@/shared/api/orders.api";
@@ -43,10 +43,7 @@ vi.mock("@/shared/ui", async (importOriginal) => {
 beforeEach(() => {
   vi.clearAllMocks();
   resolveMock(vi.mocked(reportsApi.monthlyPnl), reportResponse([], {}));
-  resolveMock(vi.mocked(reportsApi.commission), {
-    order_groups: [],
-    total: { order_count: 0, profit_base: "0" },
-  });
+  resolveMock(vi.mocked(reportsApi.commission), commissionResponse([], { order_count: 0, profit_base: "0" }));
   vi.mocked(employeesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(reportsApi.businessPnl), reportResponse([], {}));
   resolveMock(vi.mocked(reportsApi.orderProfit), reportResponse([], { income: "0", cost: "0", rebate: "0", net_profit: "0" }));
@@ -70,8 +67,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
       { id: 1, username: "zhang", display_name: "张三", is_active: true },
       { id: 2, username: "li", display_name: "李四", is_active: true },
     ]);
-    resolveMockOnce(vi.mocked(reportsApi.commission), {
-      order_groups: [{
+    resolveMockOnce(vi.mocked(reportsApi.commission), commissionResponse([{
         order_id: 10,
         order_no: "HS-2026-0010",
         inventory_date: "2026-10-02",
@@ -81,9 +77,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
           { user_id: 1, order_id: 10, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10" },
           { user_id: 2, order_id: 10, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10" },
         ],
-      }],
-        total: { order_count: 1, profit_base: "200.00" },
-    });
+      }], { order_count: 1, profit_base: "200.00" }));
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("分润对账");
     await screen.findAllByText("HS-2026-0010");
@@ -105,10 +99,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   });
 
   it("分润对账：只消费订单分组契约，不回退旧明细", async () => {
-    resolveMockOnce(vi.mocked(reportsApi.commission), {
-      order_groups: [],
-    total: { order_count: 0, profit_base: "0.00" },
-    });
+    resolveMockOnce(vi.mocked(reportsApi.commission), commissionResponse([], { order_count: 0, profit_base: "0.00" }));
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("分润对账");
     await waitFor(() => expect(screen.queryByText("LEGACY-001")).not.toBeInTheDocument());
@@ -238,10 +229,12 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
   it("FE-273：分润对账日期筛选切换到历史空态", async () => {
     vi.mocked(reportsApi.commission).mockImplementation((params) => Promise.resolve(
-      params?.from ? { order_groups: [], total: { order_count: 0, profit_base: "0" } } : {
-        order_groups: [{ order_id: 273, order_no: "HS-FE273", profit_base: "10", orders: [{ user_id: 1, order_id: 273, order_no: "HS-FE273", profit_base: "10", rate: "0.1" }] }],
-        total: { order_count: 1, profit_base: "10" },
-      },
+      params?.from
+        ? commissionResponse([], { order_count: 0, profit_base: "0" })
+        : commissionResponse(
+            [{ order_id: 273, order_no: "HS-FE273", profit_base: "10", orders: [{ user_id: 1, order_id: 273, order_no: "HS-FE273", profit_base: "10", rate: "0.1" }] }],
+            { order_count: 1, profit_base: "10" },
+          ),
     ) as never);
     renderLight(<ReportsPage />, { user: "admin" });
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Order } from "../../shared/api/types/orders";
@@ -27,25 +27,30 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
   const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
   const [ledgerOrderDetails, setLedgerOrderDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [ledgerOrderDetailLoading, setLedgerOrderDetailLoading] = useState<Record<number, boolean>>({});
+  const detailRequestsRef = useRef<Partial<Record<number, Promise<AccountExecutionDetail | null>>>>({});
   const loadLedgerDetail = async (order: Pick<Order, "id" | "account_id">, force = false) => {
     if (order.account_id == null) return;
-    try {
-      await loadLedgerOrderDetail(order.id, force);
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    }
+    await loadLedgerOrderDetail(order.id, force);
   };
-  const loadLedgerOrderDetail = async (orderId: number, force = false) => {
-    if (!force && (ledgerOrderDetails[orderId] || ledgerOrderDetailLoading[orderId])) return;
+  const loadLedgerOrderDetail = async (orderId: number, force = false): Promise<AccountExecutionDetail | null> => {
+    if (!force && ledgerOrderDetails[orderId]) return ledgerOrderDetails[orderId];
+    if (!force && detailRequestsRef.current[orderId]) return detailRequestsRef.current[orderId];
     setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: true }));
-    try {
-      const detail = await ordersApi.executionDetail(orderId);
-      setLedgerOrderDetails((current) => ({ ...current, [orderId]: detail }));
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    } finally {
-      setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: false }));
-    }
+    const request = ordersApi.executionDetail(orderId)
+      .then((detail) => {
+        setLedgerOrderDetails((current) => ({ ...current, [orderId]: detail }));
+        return detail;
+      })
+      .catch((error) => {
+        appMessage.error(normalizeError(error).message);
+        return null;
+      })
+      .finally(() => {
+        delete detailRequestsRef.current[orderId];
+        setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: false }));
+      });
+    detailRequestsRef.current[orderId] = request;
+    return request;
   };
   const orderDetailEditor = useOrderDetailEditor({
     getExecutionDetail: (id) => Object.values(ledgerOrderDetails).find((detail) => detail.account.id === id),
@@ -64,9 +69,8 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
         appMessage.warning("该订单未关联库存账号，无法编辑账号资料");
         return;
       }
-      const detail = ledgerOrderDetails[order.id]
-        ?? await ordersApi.executionDetail(order.id);
-      setLedgerOrderDetails((current) => ({ ...current, [order.id]: detail }));
+      const detail = await loadLedgerOrderDetail(order.id);
+      if (!detail) return;
       setExpandedOrderIds([String(order.id)]);
       await orderDetailEditor.openEditor(detail.account);
     } catch (error) {

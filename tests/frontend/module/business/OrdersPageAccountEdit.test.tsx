@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -104,6 +104,32 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
     await screen.findByRole("button", { name: "保存修改" });
     expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1);
     expect(ordersApi.executionDetail).toHaveBeenCalledWith(1);
+  });
+
+  it("详情请求未返回时展开后编辑也复用同一请求", async () => {
+    const detail = {
+      account: { id: 99, stock_no: "KU_00001", game_account: "acc-99", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
+      orders: [{ order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE", events: [] }],
+      finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
+    };
+    let resolveFirst: (value: unknown) => void = () => undefined;
+    const firstRequest = new Promise((resolve) => { resolveFirst = resolve; });
+    vi.mocked(ordersApi.executionDetail)
+      .mockImplementationOnce(() => firstRequest as never)
+      .mockResolvedValueOnce(detail as never);
+
+    renderLight(<OrdersPage />, { user: "admin" });
+    await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
+    const row = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))!.closest("tr")!;
+    fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);
+    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1));
+
+    const refreshedRow = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))!.closest("tr")!;
+    await ui.click(within(refreshedRow).getByRole("button", { name: "编辑" }));
+    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1));
+    resolveFirst(detail);
+    await screen.findByRole("button", { name: "保存修改" });
+    expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1);
   });
 
   it("未关联库存账号的订单不显示「编辑账号」入口", async () => {

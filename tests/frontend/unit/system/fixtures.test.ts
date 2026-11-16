@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DEV_USER_KEY } from "@/shared/api/client";
 import { allFormFields } from "@fixtures/orderFormFieldsSeed";
 import { OPTION_SET_SEED } from "@fixtures/optionSetsSeed";
-import { dataCenterSummary, inventoryLedgerResponse, listResponse, pageResponse, profitAllocationResponse, reportResponse, commissionResponse, orderLedgerSummary, cashflowPage, cashflowTotals } from "@fixtures/api-responses";
+import { dataCenterSummary, inventoryLedgerResponse, listResponse, pageResponse, profitAllocationResponse, reportResponse, commissionResponse, orderLedgerSummary, cashflowPage, cashflowTotals, poolBalancesResponse, studioExpenseSummary } from "@fixtures/api-responses";
 import { resetTestFixtureState } from "@fixtures/fixtures";
 
 describe("测试夹具隔离", () => {
@@ -91,6 +91,17 @@ describe("测试夹具隔离", () => {
       type_counts: {},
       game_types: [],
       stats: { account_count: 0, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 },
+    });
+    expect(poolBalancesResponse([{ pool_id: 1 } as never], { pool_count: 1, cash_balance: "10.00", available: "8.00", deposit_held: "2.00", owned_cash_balance: "10.00" })).toEqual({
+      items: [{ pool_id: 1 }],
+      totals: { pool_count: 1, cash_balance: "10.00", available: "8.00", deposit_held: "2.00", owned_cash_balance: "10.00" },
+    });
+    expect(studioExpenseSummary([{ id: 1 } as never], { income: "3.00", expense: "1.00", net: "2.00" })).toEqual({
+      items: [{ id: 1 }],
+      income: "3.00",
+      expense: "1.00",
+      net: "2.00",
+      count: 1,
     });
   });
 });

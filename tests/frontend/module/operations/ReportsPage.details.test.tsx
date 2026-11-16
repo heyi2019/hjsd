@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
-import { commissionResponse, reportResponse } from "@fixtures/api-responses";
+import { commissionResponse, poolBalancesResponse, reportResponse } from "@fixtures/api-responses";
 
 import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
@@ -50,10 +50,7 @@ beforeEach(() => {
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
   vi.mocked(poolsApi.list).mockResolvedValue([]);
   // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
-  resolveMock(vi.mocked(poolsApi.balances), {
-    items: [],
-    totals: { pool_count: 0, cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
-  });
+  resolveMock(vi.mocked(poolsApi.balances), poolBalancesResponse([], { pool_count: 0, cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" }));
 });
 
 async function gotoTab(label: string) {

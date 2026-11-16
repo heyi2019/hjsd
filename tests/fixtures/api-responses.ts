@@ -1,5 +1,6 @@
 import type { PageResponse } from "@/shared/api/types/common";
 import type { InventoryStats } from "@/shared/api/types/accounts";
+import type { PoolBalance, PoolBalanceTotals } from "@/shared/api/types/finance";
 import type { ProfitAllocation, ProfitAllocationList } from "@/shared/api/types/policy";
 import type { DataCenterSummary } from "@/shared/api/types/reporting";
 
@@ -44,6 +45,19 @@ export type CashflowPage<T> = {
   total: number;
   total_in: string;
   total_out: string;
+};
+
+export type PoolBalancesResponse = {
+  items: PoolBalance[];
+  totals: PoolBalanceTotals;
+};
+
+export type StudioExpenseSummary<T> = {
+  items: T[];
+  income: string;
+  expense: string;
+  net: string;
+  count: number;
 };
 
 /** 构造完整分页响应，避免测试用例用数组冒充后端分页契约。 */
@@ -144,6 +158,23 @@ export function cashflowPage<T>(items: T[], overrides: Partial<Omit<CashflowPage
     items,
     total: items.length,
     ...cashflowTotals(),
+    ...overrides,
+  };
+}
+
+/** 构造资金池批量余额响应，汇总字段始终与服务端余额契约一起出现。 */
+export function poolBalancesResponse(items: PoolBalance[], totals: PoolBalanceTotals): PoolBalancesResponse {
+  return { items, totals };
+}
+
+/** 构造工作室收支摘要响应，统一携带明细、收入、支出、净额与条目数。 */
+export function studioExpenseSummary<T>(items: T[], overrides: Partial<Omit<StudioExpenseSummary<T>, "items" | "count">> & { count?: number } = {}): StudioExpenseSummary<T> {
+  return {
+    items,
+    income: "0.00",
+    expense: "0.00",
+    net: "0.00",
+    count: items.length,
     ...overrides,
   };
 }

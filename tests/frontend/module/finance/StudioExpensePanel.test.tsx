@@ -8,6 +8,7 @@ import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { studioExpensesApi } from "@/shared/api/studioExpenses.api";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { StudioExpensePanel } from "@/pools/StudioExpensePanel";
+import { studioExpenseSummary } from "@fixtures/api-responses";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -64,13 +65,10 @@ beforeEach(() => {
   mockOptionSets();
   // 明细与三项汇总一次取回；「什么算工作室收支」的口径在 backend
   // tests/v1/test_studio_cashflow_summary.py，这里只验展示。
-  vi.mocked(studioExpensesApi.summary).mockResolvedValue({
-    items: expenseFlows as never,
-    income: "0.00",
+  vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary(expenseFlows as never, {
     expense: "3000.00",
     net: "-3000.00",
-    count: expenseFlows.length,
-  });
+  }));
 });
 
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
@@ -165,13 +163,12 @@ describe("StudioExpensePanel：工作室支出", () => {
 
   it("三个汇总数取服务端，不与当页明细相加", async () => {
     // 故意让后端汇总与两条明细（3000 + 100）对不上：卡片必须显示后端值。
-    vi.mocked(studioExpensesApi.summary).mockResolvedValue({
-      items: expenseFlows as never,
+    vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary(expenseFlows as never, {
       income: "888.88",
       expense: "777.77",
       net: "111.11",
       count: 2,
-    });
+    }));
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     await screen.findByText("房租");
 

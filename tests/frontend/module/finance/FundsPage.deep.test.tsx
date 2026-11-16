@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { FundsPage } from "@/pools/FundsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
-import { cashflowPage, cashflowTotals } from "@fixtures/api-responses";
+import { cashflowPage, cashflowTotals, poolBalancesResponse, studioExpenseSummary } from "@fixtures/api-responses";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { depositsApi } from "@/shared/api/deposits.api";
@@ -47,6 +47,8 @@ const pools = [
 const balance = {
   income: "1000.00",
   expense: "200.00",
+  transfer_in: "0.00",
+  transfer_out: "0.00",
   cash_balance: "800.00",
   deposit_held: "100.00",
   available: "700.00",
@@ -65,15 +67,15 @@ beforeEach(() => {
   vi.mocked(listColumnsApi.all).mockResolvedValue([]);
   vi.mocked(poolsApi.list).mockResolvedValue(pools);
   // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
-  resolveMock(vi.mocked(poolsApi.balances), {
-    items: pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
-    totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
-  });
+  resolveMock(vi.mocked(poolsApi.balances), poolBalancesResponse(
+    pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
+    { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
+  ));
   resolveMock(vi.mocked(depositsApi.list), deposits);
   // 合计由服务端返回，桩里同步给出，避免卡片落回 0.00。
   resolveMock(vi.mocked(cashflowsApi.list), cashflowPage(cashflows, { total_in: "800.00", total_out: "1000.00" }));
   resolveMock(vi.mocked(cashflowsApi.totals), cashflowTotals({ total_in: "800.00", total_out: "1000.00" }));
-  vi.mocked(studioExpensesApi.summary).mockResolvedValue({ items: [], income: "0.00", expense: "0.00", net: "0.00", count: 0 });
+  vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary([]));
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
 });
 
@@ -298,13 +300,12 @@ describe("FundsPage：资金写路径深覆盖", () => {
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "OWNED", status: "ACTIVE" },
       { id: 2, code: "POOL-B", name: "托管池", pool_type: "DEPOSIT", ownership: "CUSTODY", status: "ACTIVE" },
     ]);
-    resolveMock(vi.mocked(poolsApi.balances), {
-      items: [
+    resolveMock(vi.mocked(poolsApi.balances), poolBalancesResponse([
         { ...balance, pool_id: 1, pool_code: "POOL-A" },
         { ...balance, pool_id: 2, pool_code: "POOL-B" },
       ],
-      totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "800.00" },
-    });
+      { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "800.00" },
+    ));
     renderLight(<FundsPage />, { user: "admin" });
     expect(await screen.findByText("自有权益合计")).toBeInTheDocument();
     // 两池现金头寸各 800.00，但只有 OWNED 的 POOL-A 计入 → 服务端给出 800.00。

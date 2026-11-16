@@ -14,7 +14,7 @@ import { reconciliationsApi } from "@/shared/api/reconciliations.api";
 import { transfersApi } from "@/shared/api/transfers.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
-import { cashflowPage, cashflowTotals } from "@fixtures/api-responses";
+import { cashflowPage, cashflowTotals, poolBalancesResponse, studioExpenseSummary } from "@fixtures/api-responses";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -46,6 +46,8 @@ const pools = [
 const balance = {
   income: "1000.00",
   expense: "200.00",
+  transfer_in: "0.00",
+  transfer_out: "0.00",
   cash_balance: "800.00",
   deposit_held: "100.00",
   available: "700.00",
@@ -63,14 +65,14 @@ beforeEach(() => {
   vi.mocked(listColumnsApi.all).mockResolvedValue([]);
   vi.mocked(poolsApi.list).mockResolvedValue(pools);
   // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
-  resolveMock(vi.mocked(poolsApi.balances), {
-    items: pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
-    totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
-  });
+  resolveMock(vi.mocked(poolsApi.balances), poolBalancesResponse(
+    pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
+    { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
+  ));
   resolveMock(vi.mocked(depositsApi.list), deposits);
   resolveMock(vi.mocked(cashflowsApi.list), cashflowPage(cashflows, { total_in: "800.00", total_out: "500.00" }));
   resolveMock(vi.mocked(cashflowsApi.totals), cashflowTotals({ total_in: "800.00", total_out: "500.00" }));
-  vi.mocked(studioExpensesApi.summary).mockResolvedValue({ items: [], income: "0.00", expense: "0.00", net: "0.00", count: 0 });
+  vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary([]));
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
 });
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
@@ -453,7 +455,10 @@ describe("FundsPage：资金写路径", () => {
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
       { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
     ] as never);
-  vi.mocked(poolsApi.balances).mockResolvedValue({ items: [{ pool_id: 1, pool_code: "POOL-A", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }, { pool_id: 2, pool_code: "POOL-B", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }], totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" } } as never);
+  vi.mocked(poolsApi.balances).mockResolvedValue(poolBalancesResponse([
+    { ...balance, pool_id: 1, pool_code: "POOL-A" },
+    { ...balance, pool_id: 2, pool_code: "POOL-B" },
+  ], { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" }));
     vi.mocked(depositsApi.list).mockResolvedValueOnce([] as never);
     vi.mocked(cashflowsApi.list).mockResolvedValueOnce(cashflowPage([]));
     vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([] as never);
@@ -486,7 +491,10 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(poolsApi.list).mockResolvedValueOnce([
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
     ] as never);
-  vi.mocked(poolsApi.balances).mockResolvedValue({ items: [{ pool_id: 1, pool_code: "POOL-A", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }, { pool_id: 2, pool_code: "POOL-B", income: "1000.00", expense: "200.00", transfer_in: "0.00", transfer_out: "0.00", cash_balance: "800.00", deposit_held: "100.00", available: "700.00" }], totals: { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" } } as never);
+  vi.mocked(poolsApi.balances).mockResolvedValue(poolBalancesResponse([
+    { ...balance, pool_id: 1, pool_code: "POOL-A" },
+    { ...balance, pool_id: 2, pool_code: "POOL-B" },
+  ], { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" }));
     vi.mocked(cashflowsApi.list).mockImplementation(async (params) => {
       if (params?.direction) return cashflowPage([]);
       mainListCalls += 1;

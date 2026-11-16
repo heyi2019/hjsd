@@ -35,7 +35,6 @@ def get_customer_activity_summary(
     }
     if not ids:
         return summary
-    order_ids_by_customer: dict[int, set[int]] = {customer_id: set() for customer_id in ids}
     active_order_ids_by_customer: dict[int, set[int]] = {
         customer_id: set() for customer_id in ids
     }
@@ -50,7 +49,6 @@ def get_customer_activity_summary(
         item = summary[role_row.customer_id]
         if role_row.role not in item["order_roles"]:
             item["order_roles"].append(role_row.role)
-        order_ids_by_customer[role_row.customer_id].add(order.id)
         if order.status in {OrderStatus.ACTIVE.value, OrderStatus.INSTALLMENT.value}:
             active_order_ids_by_customer[role_row.customer_id].add(order.id)
         if order.created_at and (

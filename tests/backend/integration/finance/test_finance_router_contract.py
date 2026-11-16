@@ -44,7 +44,8 @@ def test_cancel_deposit_endpoint_returns_cancelled_deposit(seeded_db):
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
     out = cancel_deposit(
-        deposit.id, schemas.DepositCancel(cancelled_on=TODAY, reason="x"),
+        deposit.id,
+        schemas.DepositCancel(cancelled_on=TODAY, reason="x", operator_user_ids=[1]),
         db=seeded_db, user=_all_scope_user(),
     )
     assert out.id == deposit.id

@@ -350,6 +350,7 @@ class TestDepositQueries:
             category="OPERATING_COST",
             reason="对方违约扣除",
             actor="finance",
+            operator_user_ids=[1],
         )
         seeded_db.refresh(deposit)
         assert lost.category == "OPERATING_COST"
@@ -368,6 +369,7 @@ class TestDepositQueries:
             category="OPERATING_COST",
             reason="剩余全部损失",
             actor="finance",
+            operator_user_ids=[1],
         )
         seeded_db.refresh(deposit)
         assert deposit.status == "LOST"

@@ -116,14 +116,15 @@ function FundsActionModal({
   );
 }
 export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { depositOpen, depositEditTarget, closeDeposit, depositForm, submitDeposit, write, pools } = ctrl;
+  const { depositOpen, depositEditTarget, closeDeposit, depositForm, submitDeposit, write, pools, employees } = ctrl;
   return (
     <FundsActionModal
-      title={depositEditTarget ? "编辑押金占用" : "新增押金占用"} fieldCount={7} wrapClassName="deposit-modal"
+      title={depositEditTarget ? "编辑押金占用" : "新增押金占用"} fieldCount={8} wrapClassName="deposit-modal"
       open={depositOpen} onCancel={closeDeposit}
       scope="FUNDDEPOSIT" form={depositForm} onFinish={submitDeposit}
       initialValues={{ paid_on: today() }}
       write={write} permission="deposit.post" submitLabel={depositEditTarget ? "保存修改" : "提交"}
+      employees={employees} showOperator
     >
       <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}>
         <Select aria-label="资金池" options={poolOptions(pools)} />
@@ -255,13 +256,14 @@ export function ReverseModal({ ctrl }: { ctrl: FundsPageController }) {
 }
 
 export function ReleaseModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { returnTarget, setReturnTarget, returnForm, submitReturn, write } = ctrl;
+  const { returnTarget, setReturnTarget, returnForm, submitReturn, write, employees } = ctrl;
   return (
     <FundsActionModal
-      title="押金释放" fieldCount={2}
+      title="押金释放" fieldCount={3}
       open={Boolean(returnTarget)} onCancel={() => setReturnTarget(null)}
       scope="FUNDRELEASE" form={returnForm} onFinish={submitReturn}
       write={write} permission="deposit.post" submitLabel="确认释放"
+      employees={employees} showOperator
       intro={
         <>
           {returnTarget ? (
@@ -303,13 +305,14 @@ export function ReleaseModal({ ctrl }: { ctrl: FundsPageController }) {
 }
 
 export function LossModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { lossTarget, setLossTarget, lossForm, submitLoss, write } = ctrl;
+  const { lossTarget, setLossTarget, lossForm, submitLoss, write, employees } = ctrl;
   return (
     <FundsActionModal
-      title="登记押金损失" fieldCount={4}
+      title="登记押金损失" fieldCount={5}
       open={Boolean(lossTarget)} onCancel={() => setLossTarget(null)}
       scope="FUNDLOSS" form={lossForm} onFinish={submitLoss}
       write={write} permission="deposit.post" submitLabel="确认损失"
+      employees={employees} showOperator
       intro={
         <Typography.Paragraph type="warning">
           登记损失后该押金占用相应扣减，操作不可撤销，请核对金额与费用分类。
@@ -325,13 +328,14 @@ export function LossModal({ ctrl }: { ctrl: FundsPageController }) {
 }
 
 export function CancelModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { cancelTarget, setCancelTarget, cancelForm, submitCancelDeposit, write } = ctrl;
+  const { cancelTarget, setCancelTarget, cancelForm, submitCancelDeposit, write, employees } = ctrl;
   return (
     <FundsActionModal
-      title="取消押金" fieldCount={2}
+      title="取消押金" fieldCount={3}
       open={Boolean(cancelTarget)} onCancel={() => setCancelTarget(null)}
       scope="FUNDCANCEL" form={cancelForm} onFinish={submitCancelDeposit}
       write={write} permission="deposit.post" submitLabel="确认取消" danger
+      employees={employees} showOperator
       intro={
         <>
           {cancelTarget ? (

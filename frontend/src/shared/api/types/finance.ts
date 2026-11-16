@@ -50,6 +50,13 @@ export interface Deposit {
   /** 押金剩余：实收 − 已退 − 已损失，且不小于 0；后端下发，前端不再相减。 */
   remaining_amount: string;
   operator?: string | null;
+  operation_operators?: DepositOperationOperator[];
+}
+
+export interface DepositOperationOperator {
+  operation_key: string;
+  operator_user_ids: number[];
+  occurred_at: string;
 }
 
 export interface TransferResult {

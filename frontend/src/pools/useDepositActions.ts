@@ -40,6 +40,7 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
       source_order_id: target.source_order_id ?? undefined,
       expected_release_on: target.expected_release_on ?? undefined,
       note: target.note ?? undefined,
+      operator_user_ids: target.operation_operators?.find((item) => item.operation_key === "CREATE")?.operator_user_ids,
     });
     setDepositOpen(true);
   };
@@ -61,6 +62,7 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
         source_order_id: values.source_order_id ? Number(values.source_order_id) : undefined,
         expected_release_on: values.expected_release_on as string | undefined,
         note: values.note as string,
+        operator_user_ids: values.operator_user_ids as number[] | undefined,
       };
       if (editing) {
         await depositsApi.update(editing.id, payload);
@@ -89,6 +91,7 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
       await depositsApi.release(targetId, {
         amount: values.amount as string,
         released_on: values.released_on as string,
+        operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
       appMessage.success("押金释放已登记");
       setReturnTarget(null);
@@ -106,6 +109,7 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
         lost_on: values.lost_on as string,
         category: values.category as string,
         reason: values.reason as string,
+        operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
       appMessage.success("押金损失已登记");
       setLossTarget(null);
@@ -121,6 +125,7 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
       await depositsApi.cancel(targetId, {
         cancelled_on: values.cancelled_on as string,
         reason: values.reason as string,
+        operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
       appMessage.success("押金已取消，已生成全额冲正流水");
       setCancelTarget(null);

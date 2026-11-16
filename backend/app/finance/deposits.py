@@ -14,6 +14,7 @@ from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.time import now_second
 from app.core.money import to_money
 from app.core.numbering import allocate_flow_no
+from app.core.operation_operators import upsert_operation_operators
 from app.core.security import CurrentUser
 from app.domain.enums import (
     AccountingAttribute,
@@ -45,6 +46,7 @@ def create_deposit(
     expected_release_on: date | None = None,
     note: str | None = None,
     form_extra: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Deposit:
     money = _positive(amount, field="amount")
@@ -105,6 +107,15 @@ def create_deposit(
         actor=actor,
         after={"pool": pool.code, "amount": str(money)},
     )
+    upsert_operation_operators(
+        session,
+        entity_type="deposit",
+        entity_id=deposit.id,
+        operation_key="CREATE",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+        occurred_at=deposit.created_at,
+    )
     return deposit
 
 
@@ -143,6 +154,7 @@ def update_deposit(
     expected_release_on: date | None = None,
     note: str | None = None,
     form_extra: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Deposit:
     deposit = _editable_deposit(session, deposit_id, user=user)
@@ -214,6 +226,14 @@ def update_deposit(
             "note": note,
         },
     )
+    upsert_operation_operators(
+        session,
+        entity_type="deposit",
+        entity_id=deposit.id,
+        operation_key="UPDATE",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+    )
     return deposit
 
 
@@ -256,6 +276,7 @@ def return_deposit(
     released_on: date,
     form_extra: Mapping[str, Any] | None = None,
     actor: str,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Deposit:
     deposit = session.get(Deposit, deposit_id)
@@ -321,6 +342,14 @@ def return_deposit(
             "status": deposit.status,
         },
     )
+    upsert_operation_operators(
+        session,
+        entity_type="deposit",
+        entity_id=deposit.id,
+        operation_key="RELEASE",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+    )
     return deposit
 
 
@@ -332,6 +361,7 @@ def cancel_deposit(
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
     actor: str,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Deposit:
     """取消押金（CANCELLED）。守卫：仅未发生任何退还/损失的 PAID 押金可取消。
@@ -391,6 +421,14 @@ def cancel_deposit(
         after={"status": deposit.status, "reversed_amount": str(money)},
         reason=text,
     )
+    upsert_operation_operators(
+        session,
+        entity_type="deposit",
+        entity_id=deposit.id,
+        operation_key="CANCEL",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+    )
     return deposit
 
 
@@ -404,6 +442,7 @@ def lose_deposit(
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
     actor: str,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Cashflow:
     """把未释放押金转为受控运营费用，押金占用同步减少。"""
@@ -480,6 +519,14 @@ def lose_deposit(
             "status": deposit.status,
         },
         reason=text_reason,
+    )
+    upsert_operation_operators(
+        session,
+        entity_type="deposit",
+        entity_id=deposit.id,
+        operation_key="LOSS",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
     )
     return flow
 

@@ -365,6 +365,7 @@ describe("FundsPage：资金写路径", () => {
     await waitFor(() => expect(screen.getByText("新增押金占用")).toBeInTheDocument());
     expect(document.querySelector(".deposit-modal")).toBeInTheDocument();
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    expect(within(modal).getByText("操作人")).toBeInTheDocument();
     await pickSelect(modal, 0, /经营主池/);
     await ui.type(modal.querySelector("#amount") ?? modal, "500.00");
     await ui.click(screen.getByRole("button", { name: /提\s*交/ }));

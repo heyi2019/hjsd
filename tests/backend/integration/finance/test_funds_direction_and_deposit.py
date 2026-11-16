@@ -136,7 +136,7 @@ def test_deposit_linked_to_order_in_r2_direct_cost_same_source_as_profit(seeded_
     # 损失 500：不是第二次现金流出——R2 直接成本、订单利润都不再减。
     lose_deposit(
         seeded_db, dep.id, amount=Decimal("500"), lost_on=TODAY,
-        category="OPERATING_COST", reason="对方违约", actor="finance",
+        category="OPERATING_COST", reason="对方违约", actor="finance", operator_user_ids=[1],
     )
     seeded_db.expire_all()
     cost2, income2, op2 = r2_oct()
@@ -281,7 +281,7 @@ def test_deposit_loss_not_double_counted_in_funds_and_profit(seeded_db):
     # 损失 300：不是第二次现金流出——资金中心 expense / cash_balance 不再变
     lose_deposit(
         seeded_db, dep.id, amount=Decimal("300"), lost_on=TODAY,
-        category="OPERATING_COST", reason="对方违约", actor="finance",
+        category="OPERATING_COST", reason="对方违约", actor="finance", operator_user_ids=[1],
     )
     seeded_db.expire_all()
     after_loss = pool_balance(seeded_db, invest.id)

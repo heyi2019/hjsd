@@ -180,7 +180,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
   );
 }
 export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
-  const { deposits, openDepositCreate, openDepositEdit, deleteDeposit, returnForm, setReturnTarget, lossForm, setLossTarget, cancelForm, setCancelTarget, loading } = ctrl;
+  const { deposits, employees, openDepositCreate, openDepositEdit, deleteDeposit, returnForm, setReturnTarget, lossForm, setLossTarget, cancelForm, setCancelTarget, loading } = ctrl;
   const { arrange: arrangeDepositColumns } = useListViewColumns("DEPOSITS");
   const depositColumns: ColumnsType<Deposit> = [
     { title: "占用金额", dataIndex: "paid_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
@@ -192,6 +192,14 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
     { title: "剩余", key: "remaining", align: "right", render: (_v, row) => (<MoneyText value={row.remaining_amount} />) },
     { title: "状态", dataIndex: "status", width: 110, render: (v: string) => <StatusTag status={v} optionSet="DEPOSIT_STATUS" /> },
     { title: "操作人", dataIndex: "operator", render: (v: string | null | undefined) => v || "—" },
+    {
+      title: "动作操作人",
+      key: "operation_operators",
+      render: (_v, row) => (row.operation_operators ?? []).map((operation) => {
+        const names = operation.operator_user_ids.map((id) => employees.find((employee) => employee.id === id)?.display_name ?? `#${id}`);
+        return `${operation.operation_key}: ${names.join("、")}`;
+      }).join("；") || "—",
+    },
     {
       title: "操作",
       width: 360,

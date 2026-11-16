@@ -15,6 +15,7 @@ class DepositCreate(RequestModel):
     pool_id: int
     amount: Decimal
     paid_on: date
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     counterparty_id: int | None = None
     source_order_id: int | None = None
     expected_release_on: date | None = None
@@ -30,6 +31,7 @@ class DepositUpdate(DepositCreate):
 class DepositReturn(RequestModel):
     amount: Decimal
     released_on: date
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     form_extra: dict[str, Any] | None = None
 
 
@@ -38,13 +40,23 @@ class DepositLoss(RequestModel):
     lost_on: date
     category: str
     reason: str
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     form_extra: dict[str, Any] | None = None
 
 
 class DepositCancel(RequestModel):
     cancelled_on: date
     reason: str = Field(min_length=1, max_length=2000)
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     form_extra: dict[str, Any] | None = None
+
+
+class DepositOperationOperatorOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    operation_key: str
+    operator_user_ids: list[int]
+    occurred_at: datetime
 
 
 class DepositOut(BaseModel):
@@ -66,6 +78,7 @@ class DepositOut(BaseModel):
     created_at: datetime
     operator: str
     form_extra: dict[str, Any] | None = None
+    operation_operators: list[DepositOperationOperatorOut] = Field(default_factory=list)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -317,6 +330,7 @@ class RebateReturnOut(BaseModel):
 
 __all__ = [
     "DepositCreate",
+    "DepositOperationOperatorOut",
     "DepositOut",
     "DepositReturn",
     "DepositLoss",

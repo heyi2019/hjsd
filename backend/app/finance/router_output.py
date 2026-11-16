@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from app.core.operation_operators import list_operation_operators
 from app.domain.trade import Deposit, Order, RebateRecord
 from app.finance import schemas
 from app.parties.fields import get_extra_values
@@ -80,9 +81,17 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
     )
 
 
-def _deposit_out(item: Deposit) -> schemas.DepositOut:
+def _deposit_out(item: Deposit, db: Session | None = None) -> schemas.DepositOut:
+    operation_operators = list_operation_operators(
+        db, entity_type="deposit", entity_id=item.id
+    ) if db is not None else []
     return schemas.DepositOut.model_validate(
-        {**vars(item), "created_at": item.created_at, "operator": item.created_by}
+        {
+            **vars(item),
+            "created_at": item.created_at,
+            "operator": item.created_by,
+            "operation_operators": operation_operators,
+        }
     )
 
 

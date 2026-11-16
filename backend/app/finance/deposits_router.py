@@ -45,7 +45,7 @@ def list_deposits(
         else sorted(user.pool_ids),
         user=user,
     )
-    return [_deposit_out(item) for item in items]
+    return [_deposit_out(item, db) for item in items]
 
 
 @router.post("/deposits", response_model=schemas.DepositOut, status_code=201)
@@ -67,9 +67,10 @@ def create_deposit(
         expected_release_on=payload.expected_release_on,
         note=payload.note,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
-    return _deposit_out(item)
+    return _deposit_out(item, db)
 
 
 @router.put("/deposits/{deposit_id}", response_model=schemas.DepositOut)
@@ -91,9 +92,10 @@ def update_deposit(
         expected_release_on=payload.expected_release_on,
         note=payload.note,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
-    return _deposit_out(item)
+    return _deposit_out(item, db)
 
 
 @router.delete("/deposits/{deposit_id}", status_code=204, response_model=None)
@@ -121,10 +123,11 @@ def return_deposit(
         amount=payload.amount,
         released_on=payload.released_on,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         actor=_actor(user),
         user=user,
     )
-    return _deposit_out(item)
+    return _deposit_out(item, db)
 
 
 @router.post("/deposits/{deposit_id}/cancel", response_model=schemas.DepositOut)
@@ -144,10 +147,11 @@ def cancel_deposit(
         cancelled_on=payload.cancelled_on,
         reason=payload.reason,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         actor=_actor(user),
         user=user,
     )
-    return _deposit_out(item)
+    return _deposit_out(item, db)
 
 
 @router.post("/deposits/{deposit_id}/losses", response_model=schemas.CashflowOut)
@@ -168,6 +172,7 @@ def lose_deposit(
         category=payload.category,
         reason=payload.reason,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         actor=_actor(user),
         user=user,
     )

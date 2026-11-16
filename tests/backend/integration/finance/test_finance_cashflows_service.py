@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import NotFound, Validation
+from app.core.operation_operators import list_operation_operators
 from app.core.security import CurrentUser
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Deposit
@@ -318,6 +319,36 @@ def test_return_deposit_marks_lost(seeded_db):
         seeded_db, deposit.id, amount=Decimal("70"), released_on=TODAY, actor="pytest"
     )
     assert returned.status == "LOST"
+
+
+def test_deposit_actions_persist_action_operators(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db,
+        pool_id=1,
+        amount=Decimal("100"),
+        paid_on=TODAY,
+        actor="pytest",
+        operator_user_ids=[1, 2],
+    )
+    deposits.return_deposit(
+        seeded_db,
+        deposit.id,
+        amount=Decimal("20"),
+        released_on=TODAY,
+        actor="pytest",
+        operator_user_ids=[2],
+    )
+
+    rows = list_operation_operators(
+        seeded_db,
+        entity_type="deposit",
+        entity_id=deposit.id,
+    )
+
+    assert {row.operation_key: row.operator_user_ids for row in rows} == {
+        "CREATE": [1, 2],
+        "RELEASE": [2],
+    }
 
 
 def test_lose_deposit_rejects_user_not_visible(seeded_db):

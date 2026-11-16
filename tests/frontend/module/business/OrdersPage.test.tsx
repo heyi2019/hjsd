@@ -63,12 +63,6 @@ beforeEach(() => {
   vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: orders.length, status_counts: { ACTIVE: 1, COMPLETED: 1 }, type_counts: { HS: 1, TH: 1 }, game_types: [] });
   vi.mocked(orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(stocksApi.list).mockResolvedValue([]);
-  vi.mocked(stocksApi.inventoryStats).mockResolvedValue({
-    account_count: 0,
-    occupied_cost: "0.00",
-    over_7d_count: 0,
-    over_30d_count: 0,
-  });
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);

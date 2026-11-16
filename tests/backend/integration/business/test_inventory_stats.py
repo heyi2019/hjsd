@@ -97,28 +97,11 @@ def test_empty_selection_returns_zeros(seeded_db):
     }
 
 
-def test_api_publishes_stats_contract(seeded_client, seeded_db, headers):
-    account = _account(seeded_db, "stats-api-1", cost="88.88", entry_days_ago=2)
-
+def test_legacy_inventory_stats_endpoint_is_removed(seeded_client, headers):
     response = seeded_client.post(
         "/api/v1/stocks/inventory/stats",
-        json={"account_ids": [account.id]},
+        json={"account_ids": []},
         headers=headers,
     )
 
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert set(body) == {"account_count", "occupied_cost", "over_7d_count", "over_30d_count"}
-    assert body["account_count"] == 1
-    assert Decimal(body["occupied_cost"]) == Decimal("88.88")
-    assert body["over_7d_count"] == 0
-
-
-def test_api_rejects_payload_outside_contract(seeded_client, headers):
-    response = seeded_client.post(
-        "/api/v1/stocks/inventory/stats",
-        json={"account_ids": [1], "pool_ids": [1]},
-        headers=headers,
-    )
-
-    assert response.status_code == 422
+    assert response.status_code == 404

@@ -25,7 +25,6 @@ from app.stocks.inventory import (
     inventory_ledger as stocks_inventory_ledger,
     inventory as stocks_inventory,
     inventory_cost_by_entry_date as stocks_inventory_cost_by_entry_date,
-    inventory_stats as stocks_inventory_stats,
     list_accounts as stocks_list_accounts,
 )
 from app.stocks.profile import (
@@ -46,7 +45,6 @@ from .schemas import (
     InventoryCostSummaryOut,
     InventoryResponseOut,
     InventoryStatsOut,
-    InventoryStatsQuery,
     InventoryLedgerOut,
 )
 
@@ -282,23 +280,6 @@ def export_inventory_ledger_csv(
         },
     )
     return response
-
-
-@router.post("/stocks/inventory/stats", response_model=InventoryStatsOut)
-def inventory_stats(
-    payload: InventoryStatsQuery,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = read_access,
-) -> InventoryStatsOut:
-    """汇总当前可见账号的占用成本与库龄档位。
-
-    入参是界面此刻展示的账号集合，因此筛选口径只有一份（前端视图），
-    金额累加与库龄天数只在后端算，前端不再做 float 求和。
-    """
-    stats = stocks_inventory_stats(db, account_ids=payload.account_ids, user=_user)
-    return InventoryStatsOut(**stats)
-
-
 
 
 __all__ = ["router"]

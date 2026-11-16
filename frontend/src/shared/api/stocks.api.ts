@@ -29,11 +29,6 @@ export const stocksApi = {
     api
       .get<{ total_cost: string }>("/stocks/inventory/cost-summary", { params })
       .then((r) => r.data),
-  /** 汇总当前可见账号的占用成本与库龄档位（金额与天数只在后端算）。 */
-  inventoryStats: (accountIds: number[]) =>
-    api
-      .post<InventoryStats>("/stocks/inventory/stats", { account_ids: accountIds })
-      .then((r) => r.data),
   inventoryLedger: (params: {
     business_mode?: string;
     inventory_type?: string;

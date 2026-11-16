@@ -230,8 +230,6 @@ beforeEach(() => {
   vi.mocked(poolsApi.list).mockResolvedValue([
     { id: 7, code: "HJ_INVEST", name: "投资款荷包", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
   ]);
-  // 下架弹窗背后会渲染库存上下文，卡片指标走这个接口；不桩会真调 api.get 返回 undefined。
-  vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: 0, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 });
   vi.mocked(ordersApi.get).mockResolvedValue(order1);
   vi.mocked(ordersApi.executionDetail).mockResolvedValue({
     account: { id: order1.account_id, stock_no: "KU_00001", game_account: "seller-001", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },

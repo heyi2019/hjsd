@@ -74,7 +74,6 @@ beforeEach(() => {
     account_status: "WAITING",
     status: "ACTIVE",
   }] as never);
-  vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: 1, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
   resolveMock(vi.mocked(ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(ordersApi.postEvent), {});
   resolveMock(vi.mocked(customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);

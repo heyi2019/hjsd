@@ -135,11 +135,6 @@ class InventoryCostSummaryOut(BaseModel):
     total_cost: Decimal
 
 
-class InventoryStatsQuery(RequestModel):
-    # 界面当前可见的账号集合；筛选留在前端做视图即时反馈，聚合与库龄口径归后端。
-    account_ids: list[int] = Field(default_factory=list, max_length=5000)
-
-
 class InventoryStatsOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

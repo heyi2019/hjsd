@@ -127,7 +127,6 @@ async function openPanel(rows: Account[]) {
     account_status: "WAITING",
     status: "ACTIVE",
   })) as never);
-  vi.mocked(stocksApi.inventoryStats).mockResolvedValue({ account_count: rows.length, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 });
   renderLight(<InventoryPanel />, { user: "admin" });
   await waitFor(() => expect(document.querySelector("tbody tr")).toBeTruthy());
 }

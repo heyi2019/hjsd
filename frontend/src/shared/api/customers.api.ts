@@ -6,18 +6,17 @@ type CustomerListParams = { keyword?: string; status?: string; limit?: number; o
 
 const customerPage = (params?: CustomerListParams) =>
   api.get<PageResponse<Customer>>("/customers", {
-    params: { limit: 500, offset: 0, ...params },
+    params: { limit: 10, offset: 0, ...params },
   }).then((r) => r.data);
 
 export const customersApi = {
   summary: (params: { today_date: string; keyword?: string; status?: string }) =>
     api.get<CustomerSummary>("/customers/summary", { params }).then((r) => r.data),
-  /**
-   * 返回一个后端分页窗口。客户中心使用 page/offset；选择器调用方显式传
-   * limit=500 获取一个选项窗口，不在前端串行拼接“全量客户”。
-   */
+  /** 返回一个后端分页窗口，默认只请求当前列表页。 */
   page: (params?: CustomerListParams) => customerPage(params),
-  list: (params?: CustomerListParams): Promise<Customer[]> => customerPage(params).then((response) => response.items),
+  /** 仅供下拉选择器读取一个有界选项窗口。 */
+  list: (params?: CustomerListParams): Promise<Customer[]> =>
+    customerPage({ limit: 500, ...params }).then((response) => response.items),
   create: (payload: Partial<Customer>) =>
     api.post<{ customer: Customer; duplicate_candidates: DuplicateCandidate[] }>(
       "/customers",

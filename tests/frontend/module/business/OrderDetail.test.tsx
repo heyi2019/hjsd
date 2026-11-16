@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";
 import type { Account } from "@/shared/api/types/accounts";
 import { OrderDetail } from "@/orders/OrderDetailView/OrderDetail";
+import { resolveOperationEventContent } from "@/orders/OrderDetailView/OrderDetailOperationSection";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { renderApp } from "@fixtures/render";
 
@@ -37,6 +38,19 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it("多条运营记录按各自事件展示平台和寄售价", () => {
+    expect(resolveOperationEventContent("consignment", "盼之 / 寄售价 ¥88.00", {
+      event_type: "OPERATE",
+      operation_type: "CONSIGNMENT",
+      form_extra: { consignment_platforms: ["千寻"], consignment_price: 66 },
+    })).toBe("千寻 / 寄售价 ¥66.00");
+    expect(resolveOperationEventContent("unlist", "本系统", {
+      event_type: "OPERATE",
+      operation_type: "UNLIST",
+      form_extra: { consignment_platforms: ["盼之"], platform_unlist_scope: "PLATFORM" },
+    })).toBe("盼之");
+  });
+
   it("加载中没有明细时显示加载状态", () => {
     render(<OrderDetail row={account} loading />);
     expect(document.querySelector(".ant-spin")).toBeTruthy();

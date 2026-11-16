@@ -2,6 +2,7 @@ import { Input, InputNumber, Space, Typography } from "antd";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import { useMemo } from "react";
+import type { ReactNode } from "react";
 import { DataTable, DateField, PermissionButton, Select } from "../../shared/ui";
 import type { AccountExecutionEvent } from "../../shared/api/types/account-execution";
 import type { EmployeeOption } from "../../shared/api/types/org";
@@ -24,6 +25,39 @@ const OPERATION_TYPE_BY_KEY: Record<OrderOperationKey, NonNullable<OrderOperatio
 const OPERATION_KEY_BY_TYPE: Record<NonNullable<OrderOperationDraft["operation_type"]>, OrderOperationKey> = {
   CONSIGNMENT: "consignment", UNLIST: "unlist", DESCRIPTION: "description", IMAGE: "images",
 };
+
+function operationPlatforms(extra: Record<string, unknown>): string[] {
+  return Array.isArray(extra.consignment_platforms)
+    ? extra.consignment_platforms.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+}
+
+/** 运营明细每一行按自己的事件数据展示，不能复用最新一条记录的内容。 */
+export function resolveOperationEventContent(
+  operationKey: OrderOperationKey,
+  fallback: ReactNode,
+  event: Pick<AccountExecutionEvent, "event_type" | "operation_type" | "form_extra">,
+): ReactNode {
+  const extra = event.form_extra ?? {};
+  const platforms = operationPlatforms(extra);
+  if (operationKey === "consignment" && event.operation_type === "CONSIGNMENT") {
+    const platform = platforms.join("、");
+    const price = extra.consignment_price;
+    if (price !== undefined && price !== null && price !== "") {
+      const numericPrice = Number(price);
+      const priceText = Number.isFinite(numericPrice)
+        ? numericPrice.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : String(price);
+      return platform ? `${platform} / 寄售价 ¥${priceText}` : `寄售价 ¥${priceText}`;
+    }
+    return platform || fallback;
+  }
+  if (operationKey === "unlist" && event.operation_type === "UNLIST") {
+    if (extra.platform_unlist_scope === "SYSTEM") return "本系统";
+    return platforms.join("、") || fallback;
+  }
+  return fallback;
+}
 
 /** 运营信息展示四类动作；上架/下架允许同一账号拥有多条平台记录。 */
 export function OrderDetailOperationSection({
@@ -49,7 +83,7 @@ export function OrderDetailOperationSection({
       const editableEvents = operationKey === "consignment" || operationKey === "unlist" ? events : events.slice(0, 1);
       if (!editableEvents.length) return [{ key: operationKey, operationKey, action, content, occurredAt, operator }];
       return editableEvents.map((event, index) => ({
-        key: `${operationKey}-${event.id}`, operationKey, action, content,
+        key: `${operationKey}-${event.id}`, operationKey, action, content: resolveOperationEventContent(operationKey, content, event),
         occurredAt: event.occurred_at ?? occurredAt,
         operator: event.operator_names?.join("、") || event.operator || operator,
         event, events: [event], ariaLabelSuffix: index ? ` ${index + 1}` : "",

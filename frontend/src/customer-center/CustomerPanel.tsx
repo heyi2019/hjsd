@@ -21,7 +21,6 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
     closeDetail,
     columns,
     createOpen,
-    currentDate,
     customerStatusOptions,
     detailData,
     detailLoading,

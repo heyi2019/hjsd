@@ -29,7 +29,7 @@ export function CustomersPage({
         items={[
           { key: "customers", label: "客户档案", children: <CustomerPanel active={active} focusId={focusedCustomerId} /> },
           { key: "counterparties", label: "合作方（同行/供货方/平台）", children: <CounterpartyPanel active={active} focusId={focusedCounterpartyId} /> },
-          { key: "leads", label: "客户需求池", children: <CustomerLeadPanel /> },
+          { key: "leads", label: "客户需求池", children: <CustomerLeadPanel active={active} /> },
         ]}
       />
     </section>

@@ -102,6 +102,15 @@ describe("CustomerLeadPanel：客户需求池", () => {
     expect(leadsApi.page).toHaveBeenCalledWith({ limit: 10, offset: 0 });
   });
 
+  it("重新激活客户需求池时刷新列表", async () => {
+    const view = renderLight(<CustomerLeadPanel active={false} />, { user: "admin" });
+    expect(leadsApi.page).not.toHaveBeenCalled();
+
+    view.rerender(<CustomerLeadPanel active />);
+    expect(await screen.findByText("LD-1")).toBeInTheDocument();
+    await waitFor(() => expect(leadsApi.page).toHaveBeenCalledWith({ limit: 10, offset: 0 }));
+  });
+
   it("新增需求填表并提交调用 leadsApi.create", async () => {
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     await ui.click(await screen.findByRole("button", { name: /新增需求/ }));

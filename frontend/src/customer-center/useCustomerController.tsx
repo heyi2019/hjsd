@@ -256,7 +256,6 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     },
   ];
 
-  const currentDate = today();
   const newThisMonthCount = summary?.month_count;
   const newTodayCount = summary?.today_count;
   // —— 弹窗收口：原 JSX 内联的状态更新收为方法，供展示组件回调（语义逐字等价）——
@@ -286,7 +285,6 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     closeDetail,
     columns,
     createOpen,
-    currentDate,
     customerStatusOptions,
     detailData,
     detailLoading,

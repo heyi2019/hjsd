@@ -2,10 +2,11 @@ import { appMessage } from "../shared/ui/appFeedback";
 /** 客户需求池：记录需求事实，支持转单或关闭，不自动生成订单（CUS-02）。 */
 import { Card, Form, Input, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { customersApi, leadsApi } from "../shared/api/customers.api";
 import type { Customer, Lead } from "../shared/api/types/customers";
 import { normalizeError } from "../shared/api/client";
+import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { BusinessActionModal, BusinessRegistrationForm, CompactActions, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../orders/ConfigurableField";
@@ -13,7 +14,7 @@ import { configurableLabel } from "../shared/lib/optionSets";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
 
-export function CustomerLeadPanel() {
+export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
   const [rows, setRows] = useState<Lead[]>([]);
   const [summary, setSummary] = useState<{ total_count: number; open_count: number } | null>(null);
   const [page, setPage] = useState(1);
@@ -41,7 +42,7 @@ export function CustomerLeadPanel() {
       setError(null);
     } catch (err) { setError(normalizeError(err)); }
   }, [page, pageSize]);
-  useEffect(() => { void load(); }, [load]);
+  useReloadOnActive(active, load);
 
   const openCreate = async () => {
     try {

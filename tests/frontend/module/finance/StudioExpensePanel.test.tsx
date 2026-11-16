@@ -7,6 +7,7 @@ import { resolveMockOnce } from "@fixtures/mock-api";
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { studioExpensesApi } from "@/shared/api/studioExpenses.api";
 import { optionSetsApi } from "@/shared/api/options.api";
+import { employeesApi } from "@/shared/api/org.api";
 import { StudioExpensePanel } from "@/pools/StudioExpensePanel";
 import { studioExpenseSummary } from "@fixtures/api-responses";
 
@@ -69,6 +70,9 @@ beforeEach(() => {
     expense: "3000.00",
     net: "-3000.00",
   }));
+  vi.mocked(employeesApi.list).mockResolvedValue([
+    { id: 1, username: "admin", display_name: "管理员", is_active: true },
+  ]);
 });
 
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
@@ -219,6 +223,15 @@ describe("StudioExpensePanel：工作室支出", () => {
       occurred_on: "2026-10-20",
       category: "房租",
     })));
+  });
+
+  it("工作室收支登记带默认当前操作人", async () => {
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("房租");
+    await ui.click(screen.getByRole("button", { name: /记一笔/ }));
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    expect(within(modal).getByLabelText("操作人")).toBeInTheDocument();
+    expect(employeesApi.list).toHaveBeenCalled();
   });
 
   it("工作室收支删除需要二次确认", async () => {

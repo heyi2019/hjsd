@@ -16,8 +16,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { cashflowsApi } from "../shared/api/cashflows.api";
 import { studioExpensesApi } from "../shared/api/studioExpenses.api";
 import { optionSetsApi } from "../shared/api/options.api";
+import { employeesApi } from "../shared/api/org.api";
 import type { OptionItem } from "../shared/api/types/common";
 import type { Cashflow, Pool } from "../shared/api/types/finance";
+import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError, type NormalizedError } from "../shared/api/client";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { requiredMoneyRules } from "../shared/lib/validators";
@@ -35,6 +37,7 @@ import { ConfirmButton,
   StatRow,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
 import { DepositSection } from "./FundsPage.tabs";
 import type { FundsPageController } from "./useFundsPageController";
 /** 弹窗视觉稿落地：作用域严格限定 .studio-ledger-modal（单一弹窗），不污染全站 .ant-modal。 */
@@ -105,6 +108,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
   } | null>(null);
   const [poolCodes, setPoolCodes] = useState<string[]>([]);
   const [expenseItems, setExpenseItems] = useState<OptionItem[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<NormalizedError | null>(null);
 
@@ -133,6 +137,16 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       return current.length === 0 && pools.length > 0 ? pools.map((pool) => pool.code) : retained;
     });
   }, [pools]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.resolve(employeesApi.list())
+      .then((items) => {
+        if (!cancelled) setEmployees((items ?? []).filter((item) => item.is_active));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -182,6 +196,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
         category: values.category as string,
         amount: values.amount as string,
         note: (values.note as string) || null,
+        operator_user_ids: values.operator_user_ids as number[] | undefined,
         form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
       };
       if (editing) {
@@ -224,6 +239,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       category: row.category,
       amount: row.amount,
       note: row.note ?? undefined,
+      operator_user_ids: row.operator_user_ids ?? undefined,
       form_extra: row.form_extra ?? undefined,
     });
     setRegisterOpen(true);
@@ -262,6 +278,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
     },
     { title: "来源", dataIndex: "source", render: (v: string | null | undefined) => v ? (FUND_FLOW_SOURCE_LABEL[v] ?? v) : "—" },
     { title: "建立时间", dataIndex: "occurred_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
+    { title: "操作人", dataIndex: "operator_user_ids", render: (ids: number[] | null | undefined, row) => (ids ?? []).map((id) => employees.find((employee) => employee.id === id)?.display_name ?? `用户 ${id}`).join("、") || row.operator || "-" },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
     {
       title: "操作",
@@ -416,6 +433,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
           <CfgItem name="note" label="备注">
             <Input.TextArea rows={2} />
           </CfgItem>
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="studio-expense" />
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             {editTarget ? "保存修改" : "登记入账"}

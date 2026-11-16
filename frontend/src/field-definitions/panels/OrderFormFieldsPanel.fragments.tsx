@@ -55,12 +55,24 @@ export const describeCondition = (fieldLabel: string, cond: { op: string; values
   return `${fieldLabel} ${opText} ${(cond.values ?? []).join(" / ")}`;
 };
 
-/** 规范化表单里的 options 字段：过滤空 value，label 缺省取 value。 */
+/** 校验后端规范化的 options 字段。 */
 export const normalizeOptionItems = (raw: unknown): Array<{ value: string; label: string }> => {
   if (!Array.isArray(raw)) return [];
-  return (raw as Array<{ value?: string; label?: string }>)
-    .map((o) => ({ value: (o?.value ?? "").trim(), label: (o?.label ?? "").trim() || (o?.value ?? "").trim() }))
-    .filter((o) => o.value);
+  return raw.map((item) => {
+    if (!item || typeof item !== "object") {
+      throw new Error("选项必须使用 value/label 对象");
+    }
+    const option = item as { value?: unknown; label?: unknown };
+    if (typeof option.value !== "string" || typeof option.label !== "string") {
+      throw new Error("选项必须使用 value/label 对象");
+    }
+    const value = option.value.trim();
+    const label = option.label.trim();
+    if (!value || !label) {
+      throw new Error("选项 value/label 不能为空");
+    }
+    return { value, label };
+  });
 };
 
 export interface OrderFormFieldsPanelProps {

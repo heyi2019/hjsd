@@ -268,7 +268,7 @@ export function useOrderFormFieldsPanelController({
       field_key: row.field_key,
       label: row.label,
       field_type: row.field_type,
-      options: (row.options ?? []).map((o) => (typeof o === "string" ? { value: o, label: o } : o)),
+      options: normalizeOptionItems(row.options),
       required: Boolean(row.required),
       cond_field: row.required_when?.field,
       cond_op: row.required_when?.op ?? "eq",
@@ -345,7 +345,7 @@ export function useOrderFormFieldsPanelController({
         row.field_key === "payment_pool_id" ? "资金账户主数据 · 随资金账户配置联动" :
         ["customer_source", "dg_customer_source"].includes(row.field_key) ? "客户来源主数据 · 回收/代挂共用" :
         value && value.length
-          ? value.map((o) => (typeof o === "string" ? o : o.label)).join("、")
+          ? value.map((o) => o.label).join("、")
           : "-",
     },
     {

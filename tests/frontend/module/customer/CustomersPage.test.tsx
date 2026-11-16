@@ -11,7 +11,7 @@ import { CustomersPage } from "@/customer-center/CustomersPage";
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { OrderFormField } from "@/shared/api/types/forms";
-import { seedOptionSets } from "@fixtures/formFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { resolveMockOnce } from "@fixtures/mock-api";
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");

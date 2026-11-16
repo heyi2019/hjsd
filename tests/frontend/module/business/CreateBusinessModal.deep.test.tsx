@@ -8,7 +8,8 @@ import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
-import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 
 // 自动 mock：所有导出（含嵌套 ordersApi / orderTypesApi / ...）均为 vi.fn()
 vi.mock("@/shared/api/cashflows.api");

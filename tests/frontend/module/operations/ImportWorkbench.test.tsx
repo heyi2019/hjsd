@@ -11,7 +11,7 @@ import { resolveMock } from "@fixtures/mock-api";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { importsApi } from "@/shared/api/reports.api";
 import type { ImportBatch, ImportRow, MappingPreview, ReconciliationReport } from "@/shared/api/types/imports";
-import { seedOptionSets } from "@fixtures/formFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {

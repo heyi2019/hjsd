@@ -12,7 +12,7 @@ import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/order
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
-import { allFormFields, seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { allFormFields, seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { clearOptionSetsCache, loadOptionSets } from "@/shared/lib/optionSets";
 
 let ui: ReturnType<typeof userEvent.setup>;
@@ -224,6 +224,13 @@ it("必填校验：未选业务类型不给提交", async () => {
     await waitFor(() => expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled());
   });
 
+it("必填校验失败时显示表单级提示，避免误认为点击无效", async () => {
+    await openModal();
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("请补齐必填项后再创建订单");
+    expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
+  });
+
 it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () => {
     vi.mocked(ordersApi.create).mockRejectedValueOnce({
       isAxiosError: true,
@@ -273,6 +280,9 @@ it("FE-023：未售出的相同游戏账号由后端拒绝并保留表单", asyn
     expect(ordersApi.create).toHaveBeenCalledWith(
       expect.objectContaining({ confirm_repurchase: false }),
     );
+    await ui.clear(screen.getByLabelText("游戏账号"));
+    await ui.type(screen.getByLabelText("游戏账号"), "pickup-account-new");
+    expect(screen.queryByText(/请先售出后再建单/)).not.toBeInTheDocument();
   });
 
 it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单", async () => {

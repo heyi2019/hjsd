@@ -12,7 +12,8 @@ import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reconciliationsApi } from "@/shared/api/reconciliations.api";
 import { transfersApi } from "@/shared/api/transfers.api";
-import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {

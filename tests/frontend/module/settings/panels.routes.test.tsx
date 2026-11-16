@@ -7,7 +7,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { seedOptionSets } from "@fixtures/formFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { orderTypesApi } from "@/shared/api/orders.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import type { Pool } from "@/shared/api/types/finance";

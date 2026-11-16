@@ -39,6 +39,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");
 vi.mock("@/shared/api/transfers.api");
 import { renderApp } from "@fixtures/render";
+import { orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
 import { AppShell } from "@/app/AppShell";
 import { navigation } from "@/app/navigation";
 import { MemoryRouter } from "react-router-dom";
@@ -114,13 +115,8 @@ beforeEach(() => {
   // 通用兜底只给 []，会导致 response.items 为 undefined 进而 .filter 崩溃。
   vi.mocked(cashflowsApi.list).mockResolvedValue({ items: [], total: 0 });
   // 订单台账读取接口返回分页/汇总对象，避免从工作台进入“我的当期订单”时被通用空数组桩破坏响应契约。
-  vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
-  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({
-    total_count: 0,
-    status_counts: {},
-    type_counts: {},
-    game_types: [],
-  });
+  vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([]));
+  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue(orderLedgerSummary());
   vi.mocked(orderTypesApi.list).mockResolvedValue([]);
 });
 

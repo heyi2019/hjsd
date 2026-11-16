@@ -7,7 +7,7 @@ import { CustomerLeadPanel } from "@/customer-center/CustomerLeadPanel";
 import { customersApi, leadsApi } from "@/shared/api/customers.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { Customer, Lead } from "@/shared/api/types/customers";
-import { seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");

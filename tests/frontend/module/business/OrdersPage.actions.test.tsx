@@ -13,7 +13,8 @@ import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/order
 import { employeesApi } from "@/shared/api/org.api";
 import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi } from "@/shared/api/pools.api";
-import { allFormFields, seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { allFormFields, seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { today } from "@/shared/lib/format";
 import * as client from "@/shared/api/client";
 import type { Installment, InstallmentCancelResult } from "@/shared/api/types/installments";

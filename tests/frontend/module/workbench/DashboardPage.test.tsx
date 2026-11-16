@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
 import { dashboardApi } from "@/shared/api/dashboard.api";
-import { seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 /** 2026-10-13：工作台数据总览（资金池/统计/入口卡）已迁至「经营中心 · 数据中心」
  *  （用例见 reporting/DataCenterPanel.test.tsx）。本文件只覆盖瘦身后的工作台：
  *  纯动作入口——新建业务卡 + 登记弹窗，以及「数据已迁走」的回归断言。 */

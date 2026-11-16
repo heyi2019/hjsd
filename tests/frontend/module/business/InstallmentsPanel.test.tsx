@@ -8,7 +8,7 @@ import { InstallmentsPanel } from "@/installments/InstallmentsPanel";
 
 import { installmentsApi } from "@/shared/api/installments.api";
 import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
-import { seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");

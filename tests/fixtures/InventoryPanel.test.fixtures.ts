@@ -9,7 +9,8 @@ import { poolsApi } from "@/shared/api/pools.api";
 import { rebatesApi } from "@/shared/api/rebates.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock } from "@fixtures/mock-api";
-import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 
 export const accounts = [
   { id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", stock_no: "KU_00001", game_account: "acc-1", platform: "A平台", status: "WAITING", inventory_type: "RECOVERY", cost_amount: "100.00", buy_date: "2026-10-01", created_by: "admin", created_at: "2026-10-01T09:30:00", account_description: "高段位账号", account_images: ["data:image/png;base64,image-1", "data:image/png;base64,image-2"] },

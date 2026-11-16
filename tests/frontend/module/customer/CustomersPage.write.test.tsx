@@ -9,7 +9,7 @@ import { resolveMockOnce } from "@fixtures/mock-api";
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { OrderFormField } from "@/shared/api/types/forms";
-import { seedOptionSets } from "@fixtures/formFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {

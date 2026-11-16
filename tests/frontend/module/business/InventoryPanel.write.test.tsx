@@ -16,7 +16,7 @@ import { poolsApi } from "@/shared/api/pools.api";
 import { rebatesApi } from "@/shared/api/rebates.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock } from "@fixtures/mock-api";
-import { seedOptionSets } from "@fixtures/formFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { clearOptionSetsCache } from "@/shared/lib/optionSets";
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");

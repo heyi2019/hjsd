@@ -8,7 +8,8 @@ import { installmentsApi } from "@/shared/api/installments.api";
 import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
-import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {

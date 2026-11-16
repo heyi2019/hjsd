@@ -7,7 +7,8 @@ import { OrdersPage } from "@/orders/OrdersPage";
 import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { stocksApi } from "@/shared/api/stocks.api";
-import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 
 let ui: ReturnType<typeof userEvent.setup>;
 

@@ -255,7 +255,7 @@ describe("OrderDetail", () => {
     expect(screen.getByRole("combobox", { name: "编辑上架平台" })).toBeInTheDocument();
     expect(screen.getByRole("spinbutton", { name: "编辑寄售价格" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "编辑上架平台操作人" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "上传作图" })).toBeInTheDocument();
+    expect(screen.getByLabelText("上传作图")).toBeInTheDocument();
   });
 
   it("编辑参与方时按订单类型提供客户或渠道方的新建与选择控件", async () => {
@@ -400,7 +400,7 @@ describe("OrderDetail", () => {
     const description = screen.getByLabelText("编辑运营描述");
     fireEvent.change(description, { target: { value: "新描述" } });
     expect(onProfileChange).toHaveBeenCalledWith({ account_description: "新描述" });
-    expect(screen.getByRole("button", { name: "上传作图" })).toBeInTheDocument();
+    expect(screen.getByLabelText("上传作图")).toBeInTheDocument();
   });
 
   it("售出动作登记在来源订单时仍展示卖号交付", async () => {

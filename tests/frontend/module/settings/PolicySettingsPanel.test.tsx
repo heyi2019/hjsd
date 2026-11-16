@@ -6,7 +6,7 @@ import { PolicySettingsPanel } from "@/policy/PolicySettingsPanel";
 
 import { policyApi } from "@/shared/api/policy.api";
 import type { PolicyDefinition, PolicyVersion } from "@/shared/api/types/policy";
-import { seedOptionSets } from "@fixtures/formFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {

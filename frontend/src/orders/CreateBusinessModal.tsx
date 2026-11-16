@@ -56,6 +56,7 @@ export function CreateBusinessModal(props: {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const repurchaseConfirmedFor = useRef<string | null>(null);
+  const submitErrorVisible = useRef(false);
   const [repurchasePrompt, setRepurchasePrompt] = useState<{ values: Record<string, unknown>; gameAccount: string } | null>(null);
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
   const initialValuesRef = useRef<Record<string, unknown>>({});
@@ -127,15 +128,18 @@ export function CreateBusinessModal(props: {
       const normalized = normalizeError(error);
       if (normalized.code === "INVENTORY_ACCOUNT_IN_STOCK") {
         // 未售出重复属硬阻止：字段标红 + 页面级提示，不提供复购确认入口。
+        submitErrorVisible.current = true;
         form.setFields([{ name: "game_account", errors: [normalized.message] }]);
         setLoadError(normalized);
         return;
       }
       if (normalized.code === "REPURCHASE_CONFIRM_REQUIRED") {
+        submitErrorVisible.current = true;
         form.setFields([{ name: "game_account", errors: [normalized.message] }]);
         setRepurchasePrompt({ values, gameAccount: String(values.game_account ?? "").trim() });
         return;
       }
+      submitErrorVisible.current = true;
       setLoadError(normalized);
     } finally {
       setSubmitting(false);
@@ -182,7 +186,15 @@ export function CreateBusinessModal(props: {
         id={formId}
         scrollToFirstError
         onFinish={submit}
+        onFinishFailed={() => {
+          submitErrorVisible.current = true;
+          setLoadError({ code: "FORM_VALIDATION", message: "请补齐必填项后再创建订单" });
+        }}
         onValuesChange={(changed) => {
+          if (submitErrorVisible.current) {
+            submitErrorVisible.current = false;
+            setLoadError(null);
+          }
           const clear: Record<string, undefined> = {};
           if ("intermediary_type" in changed && changed.intermediary_type !== "包赔") {
             clear.compensation_type = undefined;

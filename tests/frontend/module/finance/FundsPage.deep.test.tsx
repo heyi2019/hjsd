@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { FundsPage } from "@/pools/FundsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
+import { cashflowTotals } from "@fixtures/api-responses";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { depositsApi } from "@/shared/api/deposits.api";
@@ -13,7 +14,8 @@ import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reconciliationsApi } from "@/shared/api/reconciliations.api";
 import { transfersApi } from "@/shared/api/transfers.api";
-import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -70,7 +72,7 @@ beforeEach(() => {
   resolveMock(vi.mocked(depositsApi.list), deposits);
   // 合计由服务端返回，桩里同步给出，避免卡片落回 0.00。
   resolveMock(vi.mocked(cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "1000.00" });
-  resolveMock(vi.mocked(cashflowsApi.totals), { total_in: "800.00", total_out: "1000.00" });
+  resolveMock(vi.mocked(cashflowsApi.totals), cashflowTotals({ total_in: "800.00", total_out: "1000.00" }));
   vi.mocked(studioExpensesApi.summary).mockResolvedValue({ items: [], income: "0.00", expense: "0.00", net: "0.00", count: 0 });
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
 });

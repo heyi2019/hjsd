@@ -11,7 +11,7 @@ import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock } from "@fixtures/mock-api";
-import { seedOptionSets } from "@fixtures/formFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";
 import type { Account } from "@/shared/api/types/accounts";
 import type { Installment } from "@/shared/api/types/installments";

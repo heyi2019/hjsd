@@ -147,7 +147,7 @@ export const POLICY_CONFIG_SCHEMA: Record<string, PolicyFieldDef[]> = {
       kind: "text",
       placeholder: "标准",
       required: true,
-      help: "混合单的默认处置策略编码；DG 不设抽成参数与默认值",
+      help: "混合单的默认处置策略编码；代挂不设抽成参数与默认值",
     },
   ],
 };

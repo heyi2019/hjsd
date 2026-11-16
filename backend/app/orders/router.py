@@ -25,7 +25,6 @@ from app.core.security import (
 from app.domain.enums import AccountingAttribute, Direction, FundNature, Nature
 from app.domain.trade import Account, OrderEvent
 from app.foundation.order_types import resolve_default_pool
-from app.value_added_services import create as inst_create
 from app.orders import schemas
 from app.orders._shared import get_order as orders_get_order
 from app.orders.cancellation_model import cancel_order as orders_cancel_order
@@ -184,19 +183,6 @@ def create_order(
     user: CurrentUser = create_orders,
 ) -> schemas.OrderOut:
     normalized_order_type = payload.order_type.strip().upper()
-    if payload.installment is not None and normalized_order_type in {"TH", "DG"}:
-        raise Validation("TH/DG 分期必须在出售动作中选择付款方式并建立分期合约")
-    if payload.initial_buy is None and payload.installment is not None and normalized_order_type != "DG":
-        raise Validation("TH 分期订单必须同时提交初始买入和分期合约")
-    expected_contract_type = {
-        "TH": "PICKUP_SALE",
-        "DG": "CONSIGNMENT_SALE",
-    }.get(normalized_order_type)
-    if payload.installment is not None and payload.installment.contract_type != expected_contract_type:
-        raise Validation(
-            f"{normalized_order_type} 订单必须使用 {expected_contract_type} 分期合约",
-            details={"contract_type": payload.installment.contract_type},
-        )
     if payload.initial_buy is not None and normalized_order_type not in {"HS", "TH"}:
         raise Validation("只有 HS 或 TH 订单可以在创建时提交初始买入")
     if payload.initial_costs and (normalized_order_type not in {"HS", "TH"} or payload.initial_buy is None):
@@ -242,32 +228,8 @@ def create_order(
         counterparty_roles=counterparty_roles,
         extra_values=payload.extra_values,
         form_extra=payload.form_extra,
-        form_extra_scope=payload.form_extra_scope,
         user=user,
     )
-    if payload.installment is not None:
-        inst_create.create_installment(
-            db,
-            order_id=order.id,
-            contract_type=payload.installment.contract_type,
-            principal=payload.installment.principal,
-            down_payment=payload.installment.down_payment,
-            service_fee=payload.installment.service_fee,
-            periods=payload.installment.periods,
-            per_period_service_fee=payload.installment.per_period_service_fee,
-            per_period=payload.installment.per_period,
-            adjust_final_period=payload.installment.adjust_final_period,
-            first_due_on=payload.installment.first_due_on,
-            delivery_mode=payload.installment.delivery_mode,
-            note=payload.installment.note,
-            schedule=(
-                [item.model_dump() for item in payload.installment.schedule]
-                if payload.installment.schedule
-                else None
-            ),
-            actor=_actor(user),
-            user=user,
-        )
     if payload.initial_buy is not None:
         orders_post_event(
             db,

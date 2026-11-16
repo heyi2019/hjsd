@@ -9,6 +9,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError
 
 from app.core.errors import NotFound, PermissionDenied, Validation
 from app.core.security import CurrentUser
@@ -55,20 +56,29 @@ def _new_account(
 
 # ---- create_order 业务校验分支（在 service 调用前即拦截，无需有效账号） ----
 
-def test_create_order_th_with_installment_rejected(seeded_db):
-    # 355: TH/DG 带分期合约须走出售动作，建单阶段禁止
-    payload = schemas.OrderCreate(
-        order_type="TH",
-        trade_date=TODAY,
-        installment=schemas.OrderInstallmentCreate(
-            contract_type="PICKUP_SALE",
-            periods=1,
-            first_due_on=TODAY,
-            principal=Decimal("0"),
-        ),
-    )
-    with pytest.raises(Validation, match="TH/DG 分期必须在出售动作中选择付款方式并建立分期合约"):
-        router.create_order(payload, db=seeded_db, user=_admin())
+def test_create_order_rejects_embedded_installment_payload():
+    # 分期只在库存售出动作中建立，建单契约不再保留不可达字段。
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        schemas.OrderCreate(
+            order_type="TH",
+            trade_date=TODAY,
+            installment={
+                "contract_type": "PICKUP_SALE",
+                "periods": 1,
+                "first_due_on": TODAY,
+                "principal": Decimal("0"),
+            },
+        )
+
+
+def test_create_order_rejects_operation_form_scope():
+    # 建单只接受订单自身字段作用域，库存操作作用域不应通过兼容字段注入。
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        schemas.OrderCreate(
+            order_type="DG",
+            trade_date=TODAY,
+            form_extra_scope="CONSIGN",
+        )
 
 def test_create_order_initial_cost_requires_buy_on_hs_th(seeded_db):
     # 373: 初始费用仅适用于同时提交初始买入的回收/提号订单

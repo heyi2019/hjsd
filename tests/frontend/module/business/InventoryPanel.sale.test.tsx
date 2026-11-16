@@ -63,6 +63,10 @@ beforeEach(() => {
   resolveMock(vi.mocked(employeesApi.list), [{ id: 1, username: "admin", display_name: "管理员", is_active: true }]);
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(rebatesApi.create), { id: 31 });
+  resolveMock(vi.mocked(installmentsApi.previewSalePlan), {
+    per_period_service_fee: "0",
+    per_period: "600",
+  });
   resolveMock(vi.mocked(installmentsApi.create), { id: 41 });
   resolveMock(vi.mocked(installmentsApi.pay), { id: 51 });
 });

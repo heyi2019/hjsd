@@ -300,7 +300,6 @@ def _order(
     owner_id=None,
     trade_date=D,
     form_extra=None,
-    form_extra_scope=None,
 ):
     if order_type == "HS" and account_id is None:
         account_id = create_account(
@@ -313,7 +312,7 @@ def _order(
     return create_order(
         seeded_db, order_type=order_type, trade_date=trade_date, actor="pytest",
         account_id=account_id, owner_id=owner_id,
-        form_extra=form_extra, form_extra_scope=form_extra_scope,
+        form_extra=form_extra,
     )
 
 def _scoped_user() -> CurrentUser:
@@ -822,25 +821,12 @@ class TestCreateOrderValidation:
         with pytest.raises(Validation, match="库存账号业务类型与订单类型不匹配"):
             _order(seeded_db, order_type="HS", account_id=account.id)
 
-    def test_consign_listing_cannot_create_an_order(self, seeded_db):
-        account = Account(
-            business_mode="DISTRIBUTION",
-            inventory_type="PICKUP",
-            status=AccountStatus.WAITING.value,
-            cost_amount=to_money("0"),
-            created_by="pytest",
-            updated_by="pytest",
-        )
-        seeded_db.add(account)
-        seeded_db.flush()
-
-        with pytest.raises(Validation, match="寄售是原订单上的运营动作"):
-            _order(
-                seeded_db,
+    def test_order_create_rejects_operation_form_scope(self):
+        with pytest.raises(ValidationError, match="extra_forbidden"):
+            schemas.OrderCreate(
                 order_type="DG",
-                account_id=account.id,
+                trade_date=D,
                 form_extra_scope="CONSIGN",
-                form_extra={"consignment_platform": "盼之", "listed_at": "2026-10-29T03:52"},
             )
 
     def test_scoped_user_cannot_attach_foreign_account(self, seeded_db):

@@ -96,35 +96,6 @@ class InitialCostCreate(InitialBuyCreate):
     flow_category: str | None = None
 
 
-class OrderInstallmentScheduleCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    period_no: int = Field(ge=1)
-    due_on: date
-
-
-class OrderInstallmentCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    contract_type: str = Field(
-        description="STOCK_SALE / PICKUP_SALE / CONSIGNMENT_SALE"
-    )
-    principal: Decimal = Field(default=Decimal("0"), ge=0)
-    down_payment: Decimal = Field(default=Decimal("0"), ge=0)
-    service_fee: Decimal = Field(default=Decimal("0"), ge=0)
-    periods: int = Field(gt=0)
-    per_period_service_fee: Decimal = Field(default=Decimal("0"), ge=0)
-    per_period: Decimal = Field(default=Decimal("0"), ge=0)
-    adjust_final_period: bool = False
-    first_due_on: date
-    delivery_mode: str | None = None
-    delivery_direction: str | None = Field(
-        default=None, description="DELIVER 的交付方向：BUY / SELL"
-    )
-    note: str | None = None
-    schedule: list[OrderInstallmentScheduleCreate] | None = None
-
-
 class OrderCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -151,15 +122,12 @@ class OrderCreate(BaseModel):
     extra_values: dict[str, object] = Field(default_factory=dict)
     # 建单表单自定义字段值（由 OrderFormField 配置驱动），独立存储于订单 form_extra。
     form_extra: dict[str, object] | None = None
-    # 库存售出/寄售等从库存发起的操作表单，值仍落订单，但按操作作用域校验。
-    form_extra_scope: str | None = Field(default=None, min_length=2, max_length=16)
     customer_roles: list[CustomerRoleInput] = Field(default_factory=list)
     counterparty_roles: list[CounterpartyRoleInput] = Field(default_factory=list)
     customer_input: CustomerDraftInput | None = None
     counterparty_input: CounterpartyDraftInput | None = None
     initial_buy: InitialBuyCreate | None = None
     initial_costs: list[InitialCostCreate] = Field(default_factory=list)
-    installment: OrderInstallmentCreate | None = None
 
 
 class OrderUpdate(BaseModel):
@@ -488,9 +456,7 @@ __all__ = [
     "OrderCreate",
     "OrderCancelIn",
     "OrderDeleteIn",
-    "OrderInstallmentCreate",
     "OrderLinkCreate",
-    "OrderInstallmentScheduleCreate",
     "OrderOut",
     "OrderDetailOut",
     "OrderListOut",

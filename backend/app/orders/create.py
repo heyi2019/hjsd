@@ -66,17 +66,17 @@ def _assert_no_duplicate_inventory_account(
     - 仅**已售出**记录 → 视为复购回流，需 ``confirm_repurchase`` 显式确认；
     - ``VOID``（已取消/作废）不参与判重，取消后可用同一账号重新建单。
 
-    缺 ``game_type`` 时无法精确匹配，跳过判重（与前端原口径一致）。
+    缺 ``game_type`` 时按账号单键判重，避免调用方通过省略产品类型绕过库存保护。
     """
-    if not game_type:
-        return
+    filters = [
+        Account.game_account == game_account,
+        Account.status != AccountStatus.VOID.value,
+    ]
+    if game_type:
+        filters.append(Account.game_type == game_type)
     rows = list(
         session.scalars(
-            select(Account).where(
-                Account.game_account == game_account,
-                Account.game_type == game_type,
-                Account.status != AccountStatus.VOID.value,
-            )
+            select(Account).where(*filters)
         ).all()
     )
     if not rows:
@@ -122,7 +122,6 @@ def create_order(
     counterparty_roles: Sequence[tuple[int, str]] = (),
     extra_values: Mapping[str, Any] | None = None,
     form_extra: Mapping[str, Any] | None = None,
-    form_extra_scope: str | None = None,
     user: CurrentUser | None = None,
 ) -> Order:
     definition = get_order_type_by_code(session, order_type)
@@ -135,11 +134,6 @@ def create_order(
             f"业务类型 {order_type} 已停用，禁止新建单",
             code=ErrorCode.ORDER_TYPE_DISABLED,
             details={"order_type": order_type},
-        )
-    if (form_extra_scope or "").strip().upper() == "CONSIGN":
-        raise Validation(
-            "寄售是原订单上的运营动作，不能通过建单接口新建订单",
-            details={"field": "form_extra_scope", "value": "CONSIGN"},
         )
     # 账号资料的唯一输入是 account_snapshot；库存账号引用只传 account_id。
     if account_snapshot is not None and account_id is not None:
@@ -157,7 +151,7 @@ def create_order(
     merged_extra = {**snapshot_extra, **submitted_extra}
     form_extra = validate_form_extra(
         session,
-        order_type_code=(form_extra_scope or definition.code),
+        order_type_code=definition.code,
         values=merged_extra,
     )
     account_field_keys = set(session.scalars(

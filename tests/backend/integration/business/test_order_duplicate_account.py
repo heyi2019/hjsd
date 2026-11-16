@@ -57,6 +57,22 @@ def test_unsold_duplicate_is_rejected(seeded_db):
     assert excinfo.value.details["account_ids"]
 
 
+def test_missing_game_type_cannot_bypass_duplicate_guard(seeded_db):
+    """缺少游戏类型时也不能绕过同账号未售库存判重。"""
+    _create(seeded_db, "dup-missing-game-type")
+
+    with pytest.raises(Validation) as excinfo:
+        create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=D,
+            actor="pytest",
+            account_snapshot={"game_account": "dup-missing-game-type"},
+        )
+
+    assert excinfo.value.code == ErrorCode.INVENTORY_ACCOUNT_IN_STOCK
+
+
 def test_sold_duplicate_requires_confirmation(seeded_db):
     """仅有已售出记录时要求确认复购回流，不直接拒绝。"""
     order = _create(seeded_db, "dup-sold")

@@ -1,5 +1,5 @@
 import { SearchOutlined } from "@ant-design/icons";
-import { Button, Card, Input, Space, Typography } from "antd";
+import { Card, Input, Space, Typography } from "antd";
 import type { Customer } from "../shared/api/types/customers";
 import { markMobileHiddenColumns } from "../shared/lib/listColumns";
 import { DataTable, ErrorBanner, PermissionButton, Select, StatRow } from "../shared/ui";
@@ -64,7 +64,8 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       title="客户档案"
       extra={
         <Space>
-          <Button
+          <PermissionButton
+            permission="customer.read"
             size="small"
             aria-label="导出客户CSV"
             loading={exporting}
@@ -72,7 +73,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
             onClick={() => void exportCustomers()}
           >
             导出 CSV
-          </Button>
+          </PermissionButton>
           <PermissionButton permission="customer.create" type="primary" disabled={Boolean(error) || rows === null} onClick={() => setCreateOpen(true)}>
             新建客户
           </PermissionButton>
@@ -93,7 +94,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       <Space wrap className="customer-list-filters customer-list-filters--separated">
         <Input.Search
           aria-label="搜索客户"
-          enterButton={<Button icon={<SearchOutlined />} aria-label="搜索客户" />}
+          enterButton={<PermissionButton permission="customer.read" icon={<SearchOutlined />} aria-label="搜索客户" />}
           value={searchInput}
           allowClear
           placeholder="搜索客户编号 / 名字 / 手机 / 微信 / QQ"

@@ -7,6 +7,7 @@ import { ReportsPage } from "@/reporting/ReportsPage";
 import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
 import { resolveMock } from "@fixtures/mock-api";
 import { appMessage } from "@/shared/ui/appFeedback";
+import { reportResponse } from "@fixtures/api-responses";
 
 import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
@@ -48,13 +49,13 @@ beforeEach(() => {
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
-  resolveMock(vi.mocked(reportsApi.monthlyPnl), { items: [], total: {} });
+  resolveMock(vi.mocked(reportsApi.monthlyPnl), reportResponse([], {}));
   resolveMock(vi.mocked(reportsApi.commission), { order_groups: [], total: { order_count: 0, profit_base: "0" } });
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 7, username: "operator", display_name: "业务同事", is_active: true },
     { id: 8, username: "finance", display_name: "财务同事", is_active: true },
   ]);
-  resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
+  resolveMock(vi.mocked(reportsApi.businessPnl), reportResponse([], {}));
   resolveMock(vi.mocked(reportsApi.dataCenter), {
     order_count: 0,
     active_order_count: 0,
@@ -66,7 +67,7 @@ beforeEach(() => {
     studio_other_income: "0.00",
     profit: "0.00",
   });
-  resolveMock(vi.mocked(reportsApi.orderProfit), { items: [], total: { income: "0", cost: "0", rebate: "0", net_profit: "0" } });
+  resolveMock(vi.mocked(reportsApi.orderProfit), reportResponse([], { income: "0", cost: "0", rebate: "0", net_profit: "0" }));
   resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
   vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: 2, status_counts: { ACTIVE: 1 }, type_counts: {}, game_types: [] });
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。

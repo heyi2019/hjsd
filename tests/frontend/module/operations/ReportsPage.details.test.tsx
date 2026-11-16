@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
+import { reportResponse } from "@fixtures/api-responses";
 
 import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
@@ -40,11 +41,11 @@ vi.mock("@/shared/api/stocks.api");
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resolveMock(vi.mocked(reportsApi.monthlyPnl), { items: [], total: {} });
+  resolveMock(vi.mocked(reportsApi.monthlyPnl), reportResponse([], {}));
     resolveMock(vi.mocked(reportsApi.commission), { order_groups: [], total: { order_count: 0, profit_base: "0" } });
   vi.mocked(employeesApi.list).mockResolvedValue([]);
-  resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
-  resolveMock(vi.mocked(reportsApi.orderProfit), { items: [], total: { income: "0", cost: "0", rebate: "0", net_profit: "0" } });
+  resolveMock(vi.mocked(reportsApi.businessPnl), reportResponse([], {}));
+  resolveMock(vi.mocked(reportsApi.orderProfit), reportResponse([], { income: "0", cost: "0", rebate: "0", net_profit: "0" }));
   resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
   vi.mocked(poolsApi.list).mockResolvedValue([]);

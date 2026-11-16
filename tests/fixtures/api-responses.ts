@@ -7,6 +7,11 @@ export type OrderLedgerSummary = {
   game_types: string[];
 };
 
+export type ReportResponse<TItem, TTotal> = {
+  items: TItem[];
+  total: TTotal;
+};
+
 export type CashflowTotals = {
   total_in: string;
   total_out: string;
@@ -28,6 +33,11 @@ export function pageResponse<T>(items: T[], overrides: Partial<PageResponse<T>> 
     offset: 0,
     ...overrides,
   };
+}
+
+/** 构造经营报表响应，统一 items 与服务端汇总 total 的包裹结构。 */
+export function reportResponse<TItem, TTotal>(items: TItem[], total: TTotal): ReportResponse<TItem, TTotal> {
+  return { items, total };
 }
 
 /** 构造完整订单台账汇总，默认值与空列表状态一致。 */

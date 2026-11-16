@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DEV_USER_KEY } from "@/shared/api/client";
 import { allFormFields } from "@fixtures/orderFormFieldsSeed";
 import { OPTION_SET_SEED } from "@fixtures/optionSetsSeed";
-import { pageResponse, orderLedgerSummary, cashflowPage, cashflowTotals } from "@fixtures/api-responses";
+import { pageResponse, reportResponse, orderLedgerSummary, cashflowPage, cashflowTotals } from "@fixtures/api-responses";
 import { resetTestFixtureState } from "@fixtures/fixtures";
 
 describe("测试夹具隔离", () => {
@@ -56,6 +56,10 @@ describe("测试夹具隔离", () => {
       total: 1,
       total_in: "12.00",
       total_out: "3.00",
+    });
+    expect(reportResponse([{ month: "2026-11" }], { income: "1.00" })).toEqual({
+      items: [{ month: "2026-11" }],
+      total: { income: "1.00" },
     });
   });
 });

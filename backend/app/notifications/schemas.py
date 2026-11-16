@@ -28,8 +28,4 @@ class NotificationListOut(BaseModel):
     unread_total: int
 
 
-class NotificationSummaryOut(BaseModel):
-    unread_profit_total: int
-
-
-__all__ = ["NotificationListOut", "NotificationOut", "NotificationSummaryOut"]
+__all__ = ["NotificationListOut", "NotificationOut"]

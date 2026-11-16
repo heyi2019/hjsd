@@ -57,6 +57,26 @@ def test_order_create_uses_account_snapshot_as_the_only_account_input():
             game_account="legacy-flat-account",
         )
 
+
+def test_workbench_summary_exposes_one_backend_aggregate(seeded_client, headers):
+    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert set(payload) == {
+        "period",
+        "orders",
+        "personal_orders",
+        "personal_earnings",
+        "inventory",
+        "installments",
+        "notifications",
+        "reminders",
+    }
+    assert set(payload["period"]) == {"from", "to"}
+    assert seeded_client.get("/api/v1/stocks/dashboard-summary", headers=headers).status_code in {404, 405}
+    assert seeded_client.get("/api/v1/notifications/summary", headers=headers).status_code in {404, 405}
+
 def test_order_create_validates_active_custom_field_values(seeded_db):
     field = OrderFormField(
         order_type_code="HS",

@@ -22,7 +22,6 @@ from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.stocks.inventory import (
     count_accounts,
-    dashboard_inventory_summary as stocks_dashboard_inventory_summary,
     inventory_ledger as stocks_inventory_ledger,
     inventory as stocks_inventory,
     inventory_cost_by_entry_date as stocks_inventory_cost_by_entry_date,
@@ -43,7 +42,6 @@ from .schemas import (
     AccountListOut,
     AccountProfileUpdate,
     AccountDeleteRequest,
-    DashboardInventorySummaryOut,
     InventoryCostSummaryOut,
     InventoryResponseOut,
     InventoryStatsOut,
@@ -227,19 +225,6 @@ def inventory_ledger(
         total=result["total"], facet_total=result["facet_total"], type_counts=result["type_counts"],
         game_types=result["game_types"], stats=result["stats"],
     )
-
-
-@router.get("/stocks/dashboard-summary", response_model=DashboardInventorySummaryOut)
-def dashboard_inventory_summary(
-    reminder_days: int = Query(default=7, ge=1),
-    db: Session = Depends(get_db),
-    _user: CurrentUser = read_access,
-) -> DashboardInventorySummaryOut:
-    """工作台库存提醒计数；仅返回汇总，不向前端传输库存明细。"""
-    summary = stocks_dashboard_inventory_summary(
-        db, reminder_days=reminder_days, user=_user
-    )
-    return DashboardInventorySummaryOut(**summary)
 
 
 @router.post("/stocks/inventory/stats", response_model=InventoryStatsOut)

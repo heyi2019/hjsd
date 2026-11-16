@@ -20,7 +20,9 @@ import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
 import { ordersApi } from "@/shared/api/orders.api";
 import { reportsApi } from "@/shared/api/reports.api";
+import { dashboardApi } from "@/shared/api/dashboard.api";
 vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/dashboard.api");
 vi.mock("@/shared/api/orderCashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/deposits.api");
@@ -43,7 +45,7 @@ import { MemoryRouter } from "react-router-dom";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
-const __allApi = { cashflowsApi, orderCashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, employeesApi, teamsApi, usersApi, policyApi, poolsApi, reconciliationsApi, transfersApi, rebatesApi, auditApi, importsApi, reportsApi, stocksApi };
+const __allApi = { dashboardApi, cashflowsApi, orderCashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, employeesApi, teamsApi, usersApi, policyApi, poolsApi, reconciliationsApi, transfersApi, rebatesApi, auditApi, importsApi, reportsApi, stocksApi };
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
@@ -77,6 +79,7 @@ const { deepStub, OBJECT_SHAPED } = vi.hoisted(() => {
 
   /** 返回对象而非数组的接口：其余一律 []（列表类）。 */
   const OBJECT_SHAPED = new Set([
+    "dashboardApi",
     "reportsApi",
     "auditApi",
     "importsApi",

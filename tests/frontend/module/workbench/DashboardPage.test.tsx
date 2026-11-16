@@ -4,19 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
-
-import { installmentsApi } from "@/shared/api/installments.api";
-import { notificationsApi } from "@/shared/api/misc.api";
-import { optionSetsApi } from "@/shared/api/options.api";
-import { ordersApi } from "@/shared/api/orders.api";
-import { reportsApi } from "@/shared/api/reports.api";
-import { stocksApi } from "@/shared/api/stocks.api";
+import { dashboardApi } from "@/shared/api/dashboard.api";
 import { seedOrderFormFields } from "@fixtures/formFieldsSeed";
 /** 2026-10-13：工作台数据总览（资金池/统计/入口卡）已迁至「经营中心 · 数据中心」
  *  （用例见 reporting/DataCenterPanel.test.tsx）。本文件只覆盖瘦身后的工作台：
  *  纯动作入口——新建业务卡 + 登记弹窗，以及「数据已迁走」的回归断言。 */
 
 vi.mock("@/shared/api/cashflows.api");
+vi.mock("@/shared/api/dashboard.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");
 vi.mock("@/shared/api/misc.api");
@@ -32,24 +27,30 @@ vi.mock("@/shared/api/stocks.api");
 beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
-  vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 0, completed_count: 0, active_count: 0 });
-  vi.mocked(stocksApi.list).mockResolvedValue([]);
-  vi.mocked(stocksApi.dashboardSummary).mockResolvedValue({ account_count: 0, aging_count: 0, overdue_count: 0 });
-  vi.mocked(installmentsApi.list).mockResolvedValue([]);
-  vi.mocked(installmentsApi.totals).mockResolvedValue({ total_count: 0, overdue_count: 0, total_receivable: "0.00", total_paid: "0.00", total_remaining: "0.00" });
-  vi.mocked(notificationsApi.summary).mockResolvedValue({ unread_profit_total: 0 });
-  vi.mocked(reportsApi.commission).mockResolvedValue({
-    order_groups: [],
-    total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },
+  vi.mocked(dashboardApi.summary).mockResolvedValue({
+    period: { from: "2026-11-01", to: "2026-11-16" },
+    orders: { total_count: 0, completed_count: 0, active_count: 0 },
+    personal_orders: 0,
+    personal_earnings: "0.00",
+    inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
+    installments: { total_count: 0, overdue_count: 0 },
+    notifications: { unread_profit_total: 0 },
+    reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
   });
 });
 
 describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
 it("工作台展示业务总览指标和业务提醒", async () => {
-    vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 2, completed_count: 1, active_count: 1 });
-    vi.mocked(stocksApi.dashboardSummary).mockResolvedValue({ account_count: 1, aging_count: 1, overdue_count: 1 });
-    vi.mocked(installmentsApi.totals).mockResolvedValue({ total_count: 1, overdue_count: 1, total_receivable: "0.00", total_paid: "0.00", total_remaining: "0.00" });
-    vi.mocked(notificationsApi.summary).mockResolvedValue({ unread_profit_total: 1 });
+    vi.mocked(dashboardApi.summary).mockResolvedValue({
+      period: { from: "2026-11-01", to: "2026-11-16" },
+      orders: { total_count: 2, completed_count: 1, active_count: 1 },
+      personal_orders: 0,
+      personal_earnings: "0.00",
+      inventory: { account_count: 1, aging_count: 1, overdue_count: 1 },
+      installments: { total_count: 1, overdue_count: 1 },
+      notifications: { unread_profit_total: 1 },
+      reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
+    });
 
     renderLight(<DashboardPage />, { user: "admin" });
 
@@ -72,23 +73,22 @@ it("工作台展示业务总览指标和业务提醒", async () => {
   });
 
 it("工作台按业务提醒配置计算库存阈值并控制提醒开关", async () => {
-    vi.mocked(stocksApi.dashboardSummary).mockResolvedValue({ account_count: 1, aging_count: 0, overdue_count: 0 });
-    vi.mocked(installmentsApi.totals).mockResolvedValue({ total_count: 1, overdue_count: 1, total_receivable: "0.00", total_paid: "0.00", total_remaining: "0.00" });
-    vi.mocked(notificationsApi.summary).mockResolvedValue({ unread_profit_total: 1 });
-    vi.mocked(optionSetsApi.get).mockResolvedValue({
-      options: [
-        { value: "inventory_aging_days", label: "14" },
-        { value: "profit_notifications_enabled", label: "0" },
-        { value: "overdue_installments_enabled", label: "0" },
-      ],
-    } as never);
+    vi.mocked(dashboardApi.summary).mockResolvedValue({
+      period: { from: "2026-11-01", to: "2026-11-16" },
+      orders: { total_count: 0, completed_count: 0, active_count: 0 },
+      personal_orders: 0,
+      personal_earnings: "0.00",
+      inventory: { account_count: 1, aging_count: 0, overdue_count: 0 },
+      installments: { total_count: 1, overdue_count: 1 },
+      notifications: { unread_profit_total: 1 },
+      reminders: { inventory_aging_days: 14, profit_notifications_enabled: false, overdue_installments_enabled: false },
+    });
 
     renderLight(<DashboardPage />, { user: "admin" });
 
     const alerts = await screen.findByRole("region", { name: "我的消息" });
     expect(within(alerts).getByText("暂无异常事项")).toBeInTheDocument();
-    expect(vi.mocked(optionSetsApi.get)).toHaveBeenCalledWith("BUSINESS_OVERVIEW_REMINDERS");
-    expect(stocksApi.dashboardSummary).toHaveBeenCalledWith(14);
+    expect(vi.mocked(dashboardApi.summary)).toHaveBeenCalledTimes(1);
   });
 
 // —— 以下 6 条原在 DashboardPage.interactions.test.tsx ——
@@ -124,15 +124,24 @@ it("点击提号卡直接打开提号登记弹窗（不跳转页面）", async (
   });
 
 it("订单请求完成时不产生未包裹 act 的异步更新警告", async () => {
-    let resolveSummary!: (value: { total_count: number; completed_count: number; active_count: number }) => void;
-    vi.mocked(ordersApi.summary).mockReturnValueOnce(new Promise((resolve) => {
+    let resolveSummary!: (value: Awaited<ReturnType<typeof dashboardApi.summary>>) => void;
+    vi.mocked(dashboardApi.summary).mockReturnValueOnce(new Promise((resolve) => {
       resolveSummary = resolve;
     }));
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const view = renderLight(<DashboardPage />, { user: "admin" });
 
     view.unmount();
-    resolveSummary({ total_count: 0, completed_count: 0, active_count: 0 });
+    resolveSummary({
+      period: { from: "2026-11-01", to: "2026-11-16" },
+      orders: { total_count: 0, completed_count: 0, active_count: 0 },
+      personal_orders: 0,
+      personal_earnings: "0.00",
+      inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
+      installments: { total_count: 0, overdue_count: 0 },
+      notifications: { unread_profit_total: 0 },
+      reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
+    });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(

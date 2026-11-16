@@ -163,14 +163,6 @@ class InventoryLedgerOut(BaseModel):
     stats: InventoryStatsOut
 
 
-class DashboardInventorySummaryOut(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    account_count: int
-    aging_count: int
-    overdue_count: int
-
-
 __all__ = [
     "AccountOut",
     "AccountListOut",
@@ -181,5 +173,4 @@ __all__ = [
     "InventoryCostSummaryOut",
     "InventoryLedgerItemOut",
     "InventoryLedgerOut",
-    "DashboardInventorySummaryOut",
 ]

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_BUSINESS_REMINDER_CONFIG, parseBusinessReminderConfig } from "@/app/businessReminderConfig";
+import { buildDashboardAlertMessages } from "@/app/dashboardSummary";
 
 describe("业务提醒配置", () => {
   it("未配置时使用默认规则", () => {
@@ -16,5 +17,19 @@ describe("业务提醒配置", () => {
       profitNotificationsEnabled: false,
       overdueInstallmentsEnabled: true,
     });
+  });
+
+  it("按提醒配置生成工作台消息", () => {
+    expect(buildDashboardAlertMessages({
+      inventoryAgingCount: 2,
+      inventoryAgingDays: 14,
+      newProfitNotificationCount: 1,
+      profitNotificationsEnabled: true,
+      overdueInstallmentCount: 3,
+      overdueInstallmentsEnabled: false,
+    })).toEqual([
+      "库存订单入库超过 14 天 2 个",
+      "新的分润通知 1 条",
+    ]);
   });
 });

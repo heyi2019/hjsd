@@ -91,6 +91,16 @@ describe("ConfigCenterPanel", () => {
     expect(screen.getByText("逾期合约提醒")).toBeInTheDocument();
   });
 
+  it("业务提醒面板复用配置中心容器，不嵌套重复卡片标题", async () => {
+    const ui = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<ConfigCenterPanel />, { user: "admin" });
+    await ui.click(screen.getByTestId("center-nav-business-reminders"));
+
+    const content = screen.getByTestId("center-content");
+    expect(content.querySelectorAll(".ant-card")).toHaveLength(1);
+    expect(within(content).getAllByText("业务提醒")).toHaveLength(1);
+  });
+
   it("点击顶部页签切换到对应现有页面（业务类型 → 列表字段）", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<ConfigCenterPanel />, { user: "admin" });

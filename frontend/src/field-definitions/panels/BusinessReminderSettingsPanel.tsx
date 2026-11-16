@@ -1,4 +1,4 @@
-import { Card, Form, InputNumber, Switch, Typography } from "antd";
+import { Form, InputNumber, Switch, Typography } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { optionSetsApi } from "../../shared/api/options.api";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
@@ -50,7 +50,7 @@ export function BusinessReminderSettingsPanel() {
   };
 
   return (
-    <Card className="glass" title="业务提醒">
+    <section className="business-reminder-settings">
       <ErrorBanner error={error} onRetry={() => void reloadSection()} retrying={loading} />
       <Typography.Paragraph type="secondary">
         控制工作台业务总览中的提醒规则。库存提醒按入库天数计算，分润和逾期合约提醒可单独关闭。
@@ -77,6 +77,6 @@ export function BusinessReminderSettingsPanel() {
           <PermissionButton permission="option-set.manage" type="primary" htmlType="submit">保存配置</PermissionButton>
         </BusinessRegistrationForm>
       </PermissionGate>
-    </Card>
+    </section>
   );
 }

@@ -15,6 +15,58 @@
   margin-top: 0;
 }
 
+/* 筛选工具栏按“标签 + 控件”成组排布，避免 Space 的 flex-shrink 把中文标签压成竖排。 */
+.order-form-fields__toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) auto minmax(190px, 1fr) auto minmax(180px, 1fr) auto minmax(140px, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.order-form-fields__toolbar > * {
+  min-width: 0;
+}
+
+.order-form-fields__toolbar > .ant-typography {
+  white-space: nowrap;
+}
+
+.order-form-fields__toolbar .ant-segmented,
+.order-form-fields__toolbar .ant-select {
+  max-width: 100%;
+}
+
+.order-form-fields__toolbar .ant-segmented {
+  min-width: 190px;
+}
+
+.order-form-fields__toolbar .ant-segmented-group {
+  white-space: nowrap;
+}
+
+.order-form-fields__toolbar .ui-control-width-140,
+.order-form-fields__toolbar .ui-control-width-180,
+.order-form-fields__toolbar .ui-control-width-260 {
+  width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .order-form-fields__toolbar {
+    grid-template-columns: auto minmax(180px, 1fr) auto minmax(190px, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .order-form-fields__toolbar {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .order-form-fields__toolbar .ant-segmented {
+    min-width: 0;
+  }
+}
+
 .order-form-fields__container .ant-table-wrapper,
 .order-form-fields__container .ui-table-wrap {
   margin-top: var(--space-3);

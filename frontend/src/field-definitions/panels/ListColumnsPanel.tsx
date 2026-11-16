@@ -19,8 +19,9 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listColumnsApi } from "../../shared/api/orders.api";
 import type { ListColumnConfig, ListCustomFieldOption, ListScopeConfig } from "../../shared/api/types/forms";
-import { normalizeError } from "../../shared/api/client";
+import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { refreshListColumns } from "../../shared/lib/listColumns";
+import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import {
   ConfirmButton,
   DataTable,
@@ -31,6 +32,7 @@ import {
   StatusTag,
 } from "../../shared/ui";
 import { appMessage } from "../../shared/ui/appFeedback";
+import "./ListColumnsPanel.css";
 
 const FIXED_OPTIONS = [
   { value: "none", label: "不固定" },
@@ -46,7 +48,7 @@ export function ListColumnsPanel() {
   const [scopes, setScopes] = useState<ListScopeConfig[]>([]);
   const [activeScope, setActiveScope] = useState<string>("");
   const [rows, setRows] = useState<ListColumnConfig[]>([]);
-  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
   const [saving, setSaving] = useState(false);
   /** 列宽输入草稿：只在失焦/回车时提交，避免每敲一个数字打一次接口。 */
   const [widthDrafts, setWidthDrafts] = useState<Record<string, number | null>>({});
@@ -77,26 +79,18 @@ export function ListColumnsPanel() {
     refreshListColumns();
   }, []);
 
-  const load = useCallback(async () => {
-    try {
-      applyScopes(await listColumnsApi.all(), activeScope || undefined);
-      setError(null);
-    } catch (err) {
-      setError(normalizeError(err));
-    }
-  }, [activeScope, applyScopes]);
+  const load = useCallback(() => listColumnsApi.all(), []);
+  const { data: loadedScopes, loading, error: loadError, reload } = useSettingsResource(load);
+  const error = mutationError ?? loadError;
 
   useEffect(() => {
-    void listColumnsApi
-      .all()
-      .then((items) => {
-        applyScopes(items);
-        setError(null);
-      })
-      .catch((err) => setError(normalizeError(err)));
-    // 只在挂载时拉一次；切换列表用本地缓存，避免每次切换都打接口
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (loadedScopes) applyScopes(loadedScopes, activeScope || undefined);
+  }, [activeScope, applyScopes, loadedScopes]);
+
+  const reloadPanel = useCallback(async () => {
+    setMutationError(null);
+    await reload();
+  }, [reload]);
 
   const switchScope = (code: string) => {
     setActiveScope(code);
@@ -215,9 +209,9 @@ export function ListColumnsPanel() {
     setFieldOptions([]);
     try {
       setFieldOptions(await listColumnsApi.customFields());
-      setError(null);
+      setMutationError(null);
     } catch (err) {
-      setError(normalizeError(err));
+      setMutationError(normalizeError(err));
     }
   };
 
@@ -402,10 +396,10 @@ export function ListColumnsPanel() {
   ];
 
   return (
-    <section className="ui-stack">
-      <ErrorBanner error={error} onRetry={() => void load()} />
+    <section className="ui-stack list-columns-panel">
+      <ErrorBanner error={error} onRetry={() => void reloadPanel()} retrying={loading} />
 
-      <Space className="ui-toolbar-spaced" align="center" data-testid="list-columns-master">
+      <div className="list-columns__toolbar" data-testid="list-columns-master">
         <Typography.Text strong>列表</Typography.Text>
         <Select
           className="ui-control-width-260"
@@ -461,9 +455,9 @@ export function ListColumnsPanel() {
         >
           恢复默认
         </ConfirmButton>
-      </Space>
+      </div>
 
-      <div data-testid="list-columns-detail">
+      <div className="list-columns__detail" data-testid="list-columns-detail">
         <DataTable<ListColumnConfig>
           columns={columns}
           rows={rows}
@@ -471,6 +465,7 @@ export function ListColumnsPanel() {
           page={1}
           pageSize={Math.max(rows.length, 10)}
           total={rows.length}
+          loading={loading || saving}
           emptyText="该列表暂无可配置的列"
           onPageChange={() => undefined}
           rowSelection={{

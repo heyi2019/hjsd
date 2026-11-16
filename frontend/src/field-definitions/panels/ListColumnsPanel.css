@@ -1,0 +1,45 @@
+.list-columns-panel,
+.list-columns__detail {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 按控制组排布，避免 Space 的 flex-shrink 把设置项挤出内容区。 */
+.list-columns__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.list-columns__toolbar > * {
+  min-width: 0;
+}
+
+.list-columns__toolbar > .ant-typography {
+  white-space: nowrap;
+}
+
+.list-columns__toolbar .ant-select {
+  flex: 1 1 260px;
+  min-width: 180px;
+  max-width: 260px;
+}
+
+.list-columns__detail {
+  overflow: hidden;
+}
+
+.list-columns__detail .ui-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media (max-width: 760px) {
+  .list-columns__toolbar .ant-select {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}

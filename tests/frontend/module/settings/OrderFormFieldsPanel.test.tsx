@@ -66,6 +66,16 @@ beforeEach(() => {
 });
 
 describe("OrderFormFieldsPanel", () => {
+  it("顶部筛选工具栏使用稳定的横向布局容器", async () => {
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+
+    const toolbar = await screen.findByText("表单");
+    expect(toolbar.closest(".order-form-fields__toolbar")).toBeInTheDocument();
+    expect(screen.getByText("建单快捷入口")).toBeInTheDocument();
+    expect(screen.getByText("板块筛选")).toBeInTheDocument();
+    expect(screen.getByText("状态筛选")).toBeInTheDocument();
+  });
+
   it("显示板块管理容器并列出运营信息板块", async () => {
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
 

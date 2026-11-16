@@ -104,6 +104,14 @@ describe("ListColumnsPanel", () => {
     }));
   });
 
+  it("工具栏与明细表都约束在设置面板宽度内", async () => {
+    renderLight(<ListColumnsPanel />);
+    await waitFor(() => expect(screen.getByText("订单号")).toBeInTheDocument());
+
+    expect(screen.getByTestId("list-columns-master")).toHaveClass("list-columns__toolbar");
+    expect(screen.getByTestId("list-columns-detail")).toHaveClass("list-columns__detail");
+  });
+
   it("默认展示第一个列表的全部列，所有列均可隐藏（无锁定）", async () => {
     renderLight(<ListColumnsPanel />);
     await waitFor(() => expect(screen.getByText("订单号")).toBeInTheDocument());

@@ -7,10 +7,11 @@ import type { OrderType, OrderTypeRoute } from "../../shared/api/types/orders";
 import { poolsApi } from "../../shared/api/pools.api";
 import type { Pool } from "../../shared/api/types/finance";
 import type { RouteImpactPreview } from "../../shared/api/types/policy";
-import { normalizeError } from "../../shared/api/client";
+import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { filterRetiredOrderTypes } from "../../shared/lib/retiredProducts";
+import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 
 const FUND_NATURE_LABEL: Record<string, string> = {
@@ -45,8 +46,7 @@ export function OrderTypesPanel() {
   const capitalTypeOptions = useOptionSet("CAPITAL_TYPE") ?? CAPITAL_TYPE_FALLBACK;
   const portionOptions = useOptionSet("ROUTE_PORTION") ?? PORTION_FALLBACK;
   const fundNatureOptions = useOptionSet("ROUTE_FUND_NATURE") ?? FUND_NATURE_FALLBACK;
-  const [rows, setRows] = useState<OrderType[]>([]);
-  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
   const [pools, setPools] = useState<Pool[]>([]);
   const [previewTarget, setPreviewTarget] = useState<OrderType | null>(null);
   const [editTarget, setEditTarget] = useState<OrderType | null>(null);
@@ -58,29 +58,25 @@ export function OrderTypesPanel() {
   const [editForm] = Form.useForm();
   const [createForm] = Form.useForm();
   const [routeForm] = Form.useForm();
-  const load = useCallback(async () => {
-    try {
-      setRows(filterRetiredOrderTypes(await orderTypesApi.list()));
-      setError(null);
-    } catch (err) {
-      setError(normalizeError(err));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const load = useCallback(async () => filterRetiredOrderTypes(await orderTypesApi.list()), []);
+  const { data: loadedRows, loading, error: loadError, reload } = useSettingsResource(load);
+  const rows = loadedRows ?? [];
+  const error = mutationError ?? loadError;
+  const reloadPanel = useCallback(async () => {
+    setMutationError(null);
+    await reload();
+  }, [reload]);
   useEffect(() => { poolsApi.list().then(setPools).catch(() => setPools([])); }, []);
 
   const toggleActive = async (row: OrderType) => {
-    try { await orderTypesApi.setActive(row.id, !row.is_active); await load(); }
-    catch (err) { setError(normalizeError(err)); }
+    try { await orderTypesApi.setActive(row.id, !row.is_active); setMutationError(null); await reload(); }
+    catch (err) { setMutationError(normalizeError(err)); }
   };
 
   const runPreview = async (values: Record<string, unknown>) => {
     if (!previewTarget) return;
     try { setPreview(await orderTypesApi.impactPreview(previewTarget.code, values.portion as string, values.pool_code as string, values.fund_nature ? String(values.fund_nature) : undefined)); appMessage.success("已生成路由影响预览"); }
-    catch (err) { setError(normalizeError(err)); }
+    catch (err) { setMutationError(normalizeError(err)); }
   };
 
   const create = async (values: Record<string, unknown>) => {
@@ -96,7 +92,8 @@ export function OrderTypesPanel() {
       appMessage.success("业务类型已创建");
       setCreateOpen(false);
       createForm.resetFields();
-      await load();
+      setMutationError(null);
+      await reload();
     } catch (err) { appMessage.error(normalizeError(err).message); }
   };
 
@@ -138,8 +135,9 @@ export function OrderTypesPanel() {
       appMessage.success("业务类型已更新");
       setEditTarget(null);
       editForm.resetFields();
-      await load();
-    } catch (err) { setError(normalizeError(err)); }
+      setMutationError(null);
+      await reload();
+    } catch (err) { setMutationError(normalizeError(err)); }
   };
 
   const columns: ColumnsType<OrderType> = [
@@ -174,10 +172,11 @@ export function OrderTypesPanel() {
           新建类型
         </PermissionButton>
       </div>
-      <ErrorBanner error={error} onRetry={() => void load()} />
+      <ErrorBanner error={error} onRetry={() => void reloadPanel()} retrying={loading} />
       <DataTable<OrderType>
         columns={columns}
         rows={rows}
+        loading={loading}
         page={1}
         pageSize={Math.max(rows.length, 10)}
         total={rows.length}

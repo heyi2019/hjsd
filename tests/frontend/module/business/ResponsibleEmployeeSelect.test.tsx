@@ -1,4 +1,5 @@
 import { Form } from "antd";
+import userEvent from "@testing-library/user-event";
 import { screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -50,5 +51,21 @@ describe("ResponsibleEmployeeSelect：按人匹配用 username，不用角色", 
     });
     // 不能因为 role === "operator" 就钩上 username 恰好同名的「业务员」
     expect(select.closest(".ant-select")?.textContent).not.toContain("业务员");
+  });
+
+  it("可以按员工姓名模糊检索操作人", async () => {
+    const ui = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<Harness />);
+
+    const select = screen.getByLabelText("交付操作人");
+    await waitFor(() => expect(select.closest(".ant-select")?.textContent).toContain("小轩"));
+    await ui.click(select);
+
+    const searchInput = document.querySelector<HTMLInputElement>(".ant-select-selection-search-input");
+    expect(searchInput).not.toBeNull();
+    await ui.type(searchInput!, "业务员");
+
+    expect(screen.getByRole("option", { name: "业务员" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "小轩" })).not.toBeInTheDocument();
   });
 });

@@ -18,7 +18,14 @@ export function EmployeeSelectControl({ employees, options, ...props }: Employee
     value: employee.id,
     label: employee.display_name,
   })) ?? [];
-  return <Select {...props} options={employeeOptions} />;
+  return (
+    <Select
+      {...props}
+      showSearch={props.showSearch ?? true}
+      optionFilterProp={props.optionFilterProp ?? "label"}
+      options={employeeOptions}
+    />
+  );
 }
 
 /** 多人操作人：优先用当前会话员工默认值，仍允许补充其他在职员工。 */

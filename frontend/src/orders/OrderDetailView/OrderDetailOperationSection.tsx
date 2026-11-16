@@ -134,7 +134,7 @@ function editableOperationColumns(
     },
     {
       title: "操作人", dataIndex: "operator", key: "operator", width: 120,
-      render: (_value: string, row: OrderOperationRow) => { const draft = row.event ? drafts?.[row.event.id] : operationDrafts?.[row.key]; return <Select mode="multiple" aria-label={`编辑${row.action}操作人${row.ariaLabelSuffix ?? ""}`} value={draft?.operator_user_ids ?? row.event?.operator_user_ids ?? []} options={employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))} onChange={(ids) => updateOperation(row, { operator_user_ids: ids })} />; },
+      render: (_value: string, row: OrderOperationRow) => { const draft = row.event ? drafts?.[row.event.id] : operationDrafts?.[row.key]; return <Select mode="multiple" showSearch optionFilterProp="label" aria-label={`编辑${row.action}操作人${row.ariaLabelSuffix ?? ""}`} value={draft?.operator_user_ids ?? row.event?.operator_user_ids ?? []} options={employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))} onChange={(ids) => updateOperation(row, { operator_user_ids: ids })} />; },
     },
     {
       title: "操作", key: "operation", width: 64,

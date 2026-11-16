@@ -175,6 +175,8 @@ function ContractTable({
                         render: (ids: number[], operation) => (
                           <Select
                             mode="multiple"
+                            showSearch
+                            optionFilterProp="label"
                             aria-label={`编辑${operationLabel(operation.operation_key)}操作人`}
                             value={ids}
                             options={employees.map((employee) => ({ value: employee.id, label: employee.display_name }))}

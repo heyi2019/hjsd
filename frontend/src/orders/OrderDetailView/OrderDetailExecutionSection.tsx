@@ -97,6 +97,8 @@ export function OrderDetailExecutionSection({
           return (
             <Select
               aria-label={`编辑执行操作人 ${item.action}`}
+              showSearch
+              optionFilterProp="label"
               value={orderDrafts?.[item.orderId]?.operator || (item.operator === "-" ? undefined : item.operator)}
               options={employees.map((employee) => ({ value: employee.username, label: employee.display_name, disabled: !employee.is_active }))}
               onChange={(username) => onOrderEdit?.(item.orderId, { operator: String(username) })}
@@ -179,6 +181,8 @@ function MultipleOperatorSelect({
       className="inventory-edit-operator"
       mode="multiple"
       aria-label="编辑执行操作人"
+      showSearch
+      optionFilterProp="label"
       placeholder={placeholder}
       value={value}
       options={options}

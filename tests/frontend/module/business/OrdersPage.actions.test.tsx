@@ -15,7 +15,7 @@ import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { allFormFields, seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
-import { pageResponse } from "@fixtures/api-responses";
+import { pageResponse, profitAllocationResponse } from "@fixtures/api-responses";
 import { today } from "@/shared/lib/format";
 import * as client from "@/shared/api/client";
 import type { Installment, InstallmentCancelResult } from "@/shared/api/types/installments";
@@ -245,18 +245,8 @@ beforeEach(() => {
     cash_flows: [],
     warnings: [],
   } as never);
-  vi.mocked(policyApi.allocations).mockResolvedValue({
-    items: allocationRows,
-    total: allocationRows.length,
-    order_profit: "5000.00",
-    totals_by_type: {},
-  });
-  vi.mocked(policyApi.setAllocations).mockResolvedValue({
-    items: allocationRows,
-    total: allocationRows.length,
-    order_profit: "5000.00",
-    totals_by_type: {},
-  });
+  vi.mocked(policyApi.allocations).mockResolvedValue(profitAllocationResponse(allocationRows, { order_profit: "5000.00" }));
+  vi.mocked(policyApi.setAllocations).mockResolvedValue(profitAllocationResponse(allocationRows, { order_profit: "5000.00" }));
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 9, username: "lisi", display_name: "李四", is_active: true },
     { id: 11, username: "recovery", display_name: "回收员", is_active: true },
@@ -439,12 +429,7 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   it("分润：无存量时按操作四项展开，买号/售出自动绑定动作执行人", async () => {
     // 空分润 → 按操作口径起步：买号、售出、运营、公司四项固定展开。
-    vi.mocked(policyApi.allocations).mockResolvedValue({
-      items: [],
-      total: 0,
-      order_profit: "5000.00",
-      totals_by_type: {},
-    });
+    vi.mocked(policyApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00" }));
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       form_extra: {
@@ -471,12 +456,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
   it("分润：一个动作多人时提交动作合计，均分由后端处理", async () => {
     // 前端只提交动作合计和人员名单；按人数均分由后端保存服务统一处理。
-    vi.mocked(policyApi.allocations).mockResolvedValue({
-      items: [],
-      total: 0,
-      order_profit: "5000.00",
-      totals_by_type: {},
-    });
+    vi.mocked(policyApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00" }));
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       form_extra: {
@@ -513,12 +493,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：按操作四项提交时带上 allocation_type 与比例", async () => {
-    vi.mocked(policyApi.allocations).mockResolvedValue({
-      items: actionAllocationRows,
-      total: actionAllocationRows.length,
-      order_profit: "5000.00",
-      totals_by_type: {},
-    });
+    vi.mocked(policyApi.allocations).mockResolvedValue(profitAllocationResponse(actionAllocationRows, { order_profit: "5000.00" }));
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);

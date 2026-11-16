@@ -1,4 +1,5 @@
 import type { PageResponse } from "@/shared/api/types/common";
+import type { ProfitAllocation, ProfitAllocationList } from "@/shared/api/types/policy";
 import type { DataCenterSummary } from "@/shared/api/types/reporting";
 
 export type OrderLedgerSummary = {
@@ -59,6 +60,20 @@ export function commissionResponse<TGroup, TTotal>(orderGroups: TGroup[], total:
 /** 构造不带分页游标的列表响应，统一 items 与条目总数。 */
 export function listResponse<T>(items: T[], total = items.length): ListResponse<T> {
   return { items, total };
+}
+
+/** 构造订单分润配置响应，统一保留订单利润与按类型汇总。 */
+export function profitAllocationResponse<T extends ProfitAllocation>(
+  items: T[],
+  overrides: Partial<Omit<ProfitAllocationList, "items" | "total">> & { total?: number } = {},
+): ProfitAllocationList {
+  return {
+    items,
+    total: items.length,
+    order_profit: "0.00",
+    totals_by_type: {},
+    ...overrides,
+  };
 }
 
 /** 构造数据中心指标汇总，默认值与空数据状态一致。 */

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DEV_USER_KEY } from "@/shared/api/client";
 import { allFormFields } from "@fixtures/orderFormFieldsSeed";
 import { OPTION_SET_SEED } from "@fixtures/optionSetsSeed";
-import { dataCenterSummary, listResponse, pageResponse, reportResponse, commissionResponse, orderLedgerSummary, cashflowPage, cashflowTotals } from "@fixtures/api-responses";
+import { dataCenterSummary, listResponse, pageResponse, profitAllocationResponse, reportResponse, commissionResponse, orderLedgerSummary, cashflowPage, cashflowTotals } from "@fixtures/api-responses";
 import { resetTestFixtureState } from "@fixtures/fixtures";
 
 describe("测试夹具隔离", () => {
@@ -78,5 +78,11 @@ describe("测试夹具隔离", () => {
     });
     expect(listResponse([{ id: 1 }])).toEqual({ items: [{ id: 1 }], total: 1 });
     expect(listResponse([{ id: 1 }], 3)).toEqual({ items: [{ id: 1 }], total: 3 });
+    expect(profitAllocationResponse([{ id: 1 } as never], { order_profit: "10.00" })).toEqual({
+      items: [{ id: 1 }],
+      total: 1,
+      order_profit: "10.00",
+      totals_by_type: {},
+    });
   });
 });

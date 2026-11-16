@@ -1,31 +1,23 @@
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Checkbox, Form, Input, InputNumber, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { gameTypesApi } from "../../shared/api/misc.api";
 import type { GameTypeOption } from "../../shared/api/types/org";
-import { normalizeError } from "../../shared/api/client";
+import { normalizeError, type NormalizedError } from "../../shared/api/client";
+import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 import "./GameTypeSettingsPanel.css";
 
 export function GameTypeSettingsPanel() {
-  const [rows, setRows] = useState<GameTypeOption[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
   const [form] = Form.useForm();
 
-  const load = useCallback(async () => {
-    try {
-      setRows(await gameTypesApi.list({ include_inactive: true }));
-      setError(null);
-    } catch (err) {
-      setError(normalizeError(err));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const load = useCallback(() => gameTypesApi.list({ include_inactive: true }), []);
+  const { data: loadedRows, loading, error: loadError, reload } = useSettingsResource(load);
+  const rows = loadedRows ?? [];
+  const error = mutationError ?? loadError;
 
   const submit = async (values: { game_type_name: string; sort_order?: number; is_default?: boolean; channel_regions?: string[] }) => {
     try {
@@ -40,9 +32,10 @@ export function GameTypeSettingsPanel() {
       }
       setEditingId(null);
       form.resetFields();
-      await load();
+      setMutationError(null);
+      await reload();
     } catch (err) {
-      setError(normalizeError(err));
+      setMutationError(normalizeError(err));
     }
   };
 
@@ -59,9 +52,10 @@ export function GameTypeSettingsPanel() {
   const run = async (action: () => Promise<unknown>) => {
     try {
       await action();
-      await load();
+      setMutationError(null);
+      await reload();
     } catch (err) {
-      setError(normalizeError(err));
+      setMutationError(normalizeError(err));
     }
   };
 
@@ -120,8 +114,7 @@ export function GameTypeSettingsPanel() {
               description="删除后不可恢复；默认游戏类型需先取消默认。"
               okText="删除"
               onConfirm={async () => {
-                await gameTypesApi.remove(row.id);
-                await load();
+                await run(() => gameTypesApi.remove(row.id));
               }}
             >
               删除
@@ -134,7 +127,7 @@ export function GameTypeSettingsPanel() {
 
   return (
     <section className="game-type-settings-panel">
-      <ErrorBanner error={error} onRetry={() => void load()} />
+      <ErrorBanner error={error} onRetry={() => void reload()} retrying={loading} />
       <Typography.Paragraph type="secondary">
         新建订单和账号时使用这里的标准选项，支持模糊搜索；每个游戏类型可配置对应的渠道／区服。勾选默认后，新建表单会自动带出该类型。默认项不能停用。
       </Typography.Paragraph>
@@ -145,6 +138,7 @@ export function GameTypeSettingsPanel() {
           rowKey="id"
           columns={columns}
           rows={rows}
+          loading={loading}
           page={1}
           pageSize={10}
           total={rows.length}

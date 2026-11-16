@@ -285,7 +285,8 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     setMergeTarget(target);
     setMergeCandidates(null);
     try {
-      setMergeCandidates(await customersApi.list({ status: "ACTIVE", limit: 500, offset: 0 }));
+      const customerPage = await customersApi.page({ status: "ACTIVE", limit: 500, offset: 0 });
+      setMergeCandidates(customerPage.items);
     } catch (err) {
       setError(normalizeError(err));
       setMergeCandidates([]);

@@ -49,7 +49,8 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
       setError(null);
       setCustomersLoading(true);
       if (customers.length === 0) {
-        setCustomers(await customersApi.list({ status: "ACTIVE", limit: 500, offset: 0 }));
+        const customerPage = await customersApi.page({ status: "ACTIVE", limit: 500, offset: 0 });
+        setCustomers(customerPage.items);
       }
       setCreateOpen(true);
     } catch (err) { setError(normalizeError(err)); }

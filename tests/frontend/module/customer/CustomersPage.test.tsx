@@ -373,7 +373,7 @@ describe("CustomersPage：行内动作", () => {
       renderLight(<CustomersPage />, { user: "admin" });
       await screen.findByText("CUS-0001");
       await ui.click(screen.getAllByRole("button", { name: /合\s*并/ })[0]);
-      await waitFor(() => expect(vi.mocked(customersApi.list)).toHaveBeenCalledWith({ status: "ACTIVE", limit: 500, offset: 0 }));
+      await waitFor(() => expect(vi.mocked(customersApi.page)).toHaveBeenCalledWith({ status: "ACTIVE", limit: 500, offset: 0 }));
       const modal = await screen.findByRole("dialog");
       const selector = modal.querySelector(".ant-select-selector") as Element;
       await ui.click(selector);

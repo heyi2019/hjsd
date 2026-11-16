@@ -38,7 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
   vi.mocked(leadsApi.page).mockResolvedValue({ items: leads, total: leads.length, limit: 10, offset: 0 });
-  vi.mocked(customersApi.list).mockResolvedValue(customers);
+  vi.mocked(customersApi.page).mockResolvedValue({ items: customers, total: customers.length, limit: 500, offset: 0 });
   vi.mocked(leadsApi.create).mockResolvedValue(leads[0]);
   vi.mocked(leadsApi.close).mockResolvedValue(leads[0]);
   vi.mocked(leadsApi.convert).mockResolvedValue(leads[0]);
@@ -69,7 +69,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
   });
 
   it("客户列表为空时允许打开新增但禁止提交", async () => {
-    vi.mocked(customersApi.list).mockResolvedValue([]);
+    vi.mocked(customersApi.page).mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 });
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     expect(await screen.findByText("需求总数")).toBeInTheDocument();
     const createButton = screen.getByRole("button", { name: /新增需求/ });
@@ -82,15 +82,15 @@ describe("CustomerLeadPanel：客户需求池", () => {
   it("首屏不加载客户全集，点击新增时才加载客户选项", async () => {
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     await screen.findByText("LD-1");
-    expect(customersApi.list).not.toHaveBeenCalled();
+    expect(customersApi.page).not.toHaveBeenCalled();
 
     await ui.click(screen.getByRole("button", { name: /新增需求/ }));
     await screen.findByText("新增客户需求");
-    expect(customersApi.list).toHaveBeenCalledWith({ status: "ACTIVE", limit: 500, offset: 0 });
+    expect(customersApi.page).toHaveBeenCalledWith({ status: "ACTIVE", limit: 500, offset: 0 });
   });
 
   it("需求列表直接展示后端返回的客户名称", async () => {
-    vi.mocked(customersApi.list).mockResolvedValue([]);
+    vi.mocked(customersApi.page).mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 });
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     const row = (await screen.findByText("LD-1")).closest("tr")!;
     expect(within(row).getByText("张三")).toBeInTheDocument();

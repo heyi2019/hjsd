@@ -1,10 +1,12 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { normalizeError } from "../shared/api/client";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { useCashflowResources } from "./useCashflowResources";
 import { useDepositResources } from "./useDepositResources";
 import { usePoolResources } from "./usePoolResources";
 import { useReconciliationResources } from "./useReconciliationResources";
+import { employeesApi } from "../shared/api/org.api";
+import type { EmployeeOption } from "../shared/api/types/org";
 
 /** 资金中心数据/查询层：资金池、余额、押金、流水、对账的加载与筛选，以及派生统计。
  *  逐字切片自原 useFundsPageController，仅按职责归位；写操作见 useFundsFormActions。 */
@@ -15,8 +17,19 @@ export function useFundsResources(active = true) {
   const [reconciliationsReady, setReconciliationsReady] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [fundsReady, setFundsReady] = useState(false);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loading, setLoading] = useState(false);
   const cashflow = useCashflowResources(active);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.resolve(employeesApi.list())
+      .then((items) => {
+        if (!cancelled) setEmployees((items ?? []).filter((item) => item.is_active));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,6 +68,7 @@ export function useFundsResources(active = true) {
 
   return {
     pools: poolResources.pools,
+    employees,
     balances: poolResources.balances,
     deposits: depositResources.deposits,
     ...cashflow,

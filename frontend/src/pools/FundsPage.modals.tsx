@@ -8,12 +8,14 @@ import type { ReactNode } from "react";
 import { BusinessActionModal, BusinessRegistrationForm, DataTable, DateField, InlineError, MoneyInput, MoneyText, PermissionButton, Select, StatusTag, dateValueFromEvent, dateValueProps } from "../shared/ui";
 import type { NormalizedError } from "../shared/api/client";
 import type { Permission } from "../shared/state/session";
+import type { EmployeeOption } from "../shared/api/types/org";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 import { today } from "../shared/lib/format";
 import { positiveIntegerRules, requiredMoneyRules } from "../shared/lib/validators";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL } from "../shared/lib/labels";
 import type { FundsPageController } from "./useFundsPageController";
+import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
 
 const Modal = BusinessActionModal;
 
@@ -50,6 +52,8 @@ interface FundsActionModalProps {
   /** 表单内部的说明（冲销规则），位于字段之前。 */
   formIntro?: ReactNode;
   children: ReactNode;
+  employees?: EmployeeOption[];
+  showOperator?: boolean;
 }
 
 /**
@@ -75,6 +79,8 @@ function FundsActionModal({
   intro,
   formIntro,
   children,
+  employees = [],
+  showOperator = false,
 }: FundsActionModalProps) {
   return (
     <Modal title={title} fieldCount={fieldCount} wrapClassName={wrapClassName} open={open} onCancel={onCancel} footer={null}>
@@ -94,6 +100,7 @@ function FundsActionModal({
         >
           {formIntro}
           {children}
+          {showOperator ? <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} /> : null}
           <PermissionButton
             permission={permission}
             type="primary"
@@ -143,7 +150,7 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
   );
 }
 export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { cashflowOpen, setCashflowOpen, cashflowForm, submitCashflow, write, pools, cashflowAttributeOptions, flowDirectionOptions } = ctrl;
+  const { cashflowOpen, setCashflowOpen, cashflowForm, submitCashflow, write, pools, employees, cashflowAttributeOptions, flowDirectionOptions } = ctrl;
   return (
     <FundsActionModal
       title="新增独立资金流水" fieldCount={8}
@@ -151,6 +158,7 @@ export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
       scope="FUNDFLOW" form={cashflowForm} onFinish={submitCashflow}
       initialValues={{ occurred_on: today(), direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" }}
       write={write} permission="deposit.post" submitLabel="提交"
+      employees={employees} showOperator
     >
       <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
       <CfgItem name="occurred_on" label="发生日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>

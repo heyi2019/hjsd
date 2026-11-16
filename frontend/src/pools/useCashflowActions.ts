@@ -32,6 +32,7 @@ export function useCashflowActions({ load, write }: CashflowActionsDeps) {
         category: values.category as string,
         amount: values.amount as string,
         note: values.note as string,
+        operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
       appMessage.success("独立资金流水已提交，已入账");
       setCashflowOpen(false);

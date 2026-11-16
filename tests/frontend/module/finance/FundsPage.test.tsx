@@ -12,6 +12,7 @@ import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reconciliationsApi } from "@/shared/api/reconciliations.api";
 import { transfersApi } from "@/shared/api/transfers.api";
+import { employeesApi } from "@/shared/api/org.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { cashflowPage, cashflowTotals, poolBalancesResponse, studioExpenseSummary } from "@fixtures/api-responses";
@@ -74,6 +75,9 @@ beforeEach(() => {
   resolveMock(vi.mocked(cashflowsApi.totals), cashflowTotals({ total_in: "800.00", total_out: "500.00" }));
   vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary([]));
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
+  vi.mocked(employeesApi.list).mockResolvedValue([
+    { id: 1, username: "admin", display_name: "管理员", is_active: true },
+  ]);
 });
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
   await ui.click(modal.querySelectorAll(".ant-select-selector")[index] as Element);
@@ -227,6 +231,17 @@ describe("FundsPage：资金流水", () => {
     await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
 
     expect(screen.queryByText("资金池账户")).not.toBeInTheDocument();
+  });
+
+  it("资金流水录入显示操作人选择", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
+
+    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+    expect(within(modal).getByLabelText("操作人")).toBeInTheDocument();
+    expect(employeesApi.list).toHaveBeenCalled();
   });
 
   it("展示订单号、收支明细及总收入/总支出", async () => {

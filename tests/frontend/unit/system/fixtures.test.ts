@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DEV_USER_KEY } from "@/shared/api/client";
 import { allFormFields } from "@fixtures/orderFormFieldsSeed";
 import { OPTION_SET_SEED } from "@fixtures/optionSetsSeed";
-import { dataCenterSummary, inventoryLedgerResponse, listResponse, pageResponse, profitAllocationResponse, reportResponse, commissionResponse, orderLedgerSummary, cashflowPage, cashflowTotals, poolBalancesResponse, studioExpenseSummary } from "@fixtures/api-responses";
+import { dataCenterSummary, installmentTotals, inventoryLedgerResponse, listResponse, orderLedgerSummary, pageResponse, poolBalancesResponse, profitAllocationResponse, reportResponse, commissionResponse, cashflowPage, cashflowTotals, studioExpenseSummary } from "@fixtures/api-responses";
 import { resetTestFixtureState } from "@fixtures/fixtures";
 
 describe("测试夹具隔离", () => {
@@ -102,6 +102,13 @@ describe("测试夹具隔离", () => {
       expense: "1.00",
       net: "2.00",
       count: 1,
+    });
+    expect(installmentTotals({ total_paid: "3.00" })).toEqual({
+      total_receivable: "0.00",
+      total_paid: "3.00",
+      total_remaining: "0.00",
+      total_count: 0,
+      overdue_count: 0,
     });
   });
 });

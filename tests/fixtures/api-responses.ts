@@ -1,6 +1,7 @@
 import type { PageResponse } from "@/shared/api/types/common";
 import type { InventoryStats } from "@/shared/api/types/accounts";
 import type { PoolBalance, PoolBalanceTotals } from "@/shared/api/types/finance";
+import type { InstallmentTotals } from "@/shared/api/types/installments";
 import type { ProfitAllocation, ProfitAllocationList } from "@/shared/api/types/policy";
 import type { DataCenterSummary } from "@/shared/api/types/reporting";
 
@@ -175,6 +176,18 @@ export function studioExpenseSummary<T>(items: T[], overrides: Partial<Omit<Stud
     expense: "0.00",
     net: "0.00",
     count: items.length,
+    ...overrides,
+  };
+}
+
+/** 构造分期服务端汇总，默认值与空数据状态一致。 */
+export function installmentTotals(overrides: Partial<InstallmentTotals> = {}): InstallmentTotals {
+  return {
+    total_receivable: "0.00",
+    total_paid: "0.00",
+    total_remaining: "0.00",
+    total_count: 0,
+    overdue_count: 0,
     ...overrides,
   };
 }

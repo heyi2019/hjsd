@@ -9,7 +9,7 @@ import { employeesApi } from "@/shared/api/org.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
-import { inventoryLedgerResponse, pageResponse } from "@fixtures/api-responses";
+import { inventoryLedgerResponse, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -61,7 +61,7 @@ beforeEach(() => {
   seedOptionSets();
   seedOrderFormFields();
   vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse(orders));
-  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: orders.length, status_counts: { ACTIVE: 1, COMPLETED: 1 }, type_counts: { HS: 1, TH: 1 }, game_types: [] });
+  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue(orderLedgerSummary({ total_count: orders.length, status_counts: { ACTIVE: 1, COMPLETED: 1 }, type_counts: { HS: 1, TH: 1 } }));
   vi.mocked(orderTypesApi.list).mockResolvedValue(types as never);
   vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([]) as never);
   vi.mocked(employeesApi.list).mockResolvedValue([

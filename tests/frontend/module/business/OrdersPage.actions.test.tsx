@@ -15,7 +15,7 @@ import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { allFormFields, seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
-import { pageResponse, profitAllocationResponse } from "@fixtures/api-responses";
+import { orderLedgerSummary, pageResponse, profitAllocationResponse } from "@fixtures/api-responses";
 import { today } from "@/shared/lib/format";
 import * as client from "@/shared/api/client";
 import type { Installment, InstallmentCancelResult } from "@/shared/api/types/installments";
@@ -220,12 +220,12 @@ beforeEach(() => {
   vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse(orders));
-  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({
+  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue(orderLedgerSummary({
     total_count: orders.length,
     status_counts: { ACTIVE: 1, COMPLETED: 1, CANCELLED: 0 },
     type_counts: { HS: 1, DG: 1 },
     game_types: ["原神"],
-  });
+  }));
   vi.mocked(orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(poolsApi.list).mockResolvedValue([
     { id: 7, code: "HJ_INVEST", name: "投资款荷包", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },

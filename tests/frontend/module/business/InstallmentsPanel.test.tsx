@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { resolveMockOnce } from "@fixtures/mock-api";
+import { installmentTotals } from "@fixtures/api-responses";
 import { InstallmentsPanel } from "@/installments/InstallmentsPanel";
 
 import { installmentsApi } from "@/shared/api/installments.api";
@@ -74,13 +75,12 @@ beforeEach(() => {
   vi.mocked(installmentsApi.list).mockResolvedValue(installments);
   // 合计由服务端下发（Decimal 聚合）；「300+200」这类算术的契约在
   // backend tests/v1/test_installment_totals.py，前端只验展示。
-  vi.mocked(installmentsApi.totals).mockResolvedValue({
+  vi.mocked(installmentsApi.totals).mockResolvedValue(installmentTotals({
     total_receivable: "500.00",
     total_paid: "350.00",
     total_remaining: "150.00",
     total_count: 2,
-    overdue_count: 0,
-  });
+  }));
   vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }], { limit: 500 }) as never);
 });
 
@@ -168,13 +168,12 @@ describe("InstallmentsPanel：分期合约", () => {
 
   it("合计取服务端，不与当页明细相加（明细只回当前区间）", async () => {
     // 故意让服务端合计与两条明细之和（500 / 350）不同：卡片不得自己 reduce。
-    vi.mocked(installmentsApi.totals).mockResolvedValue({
+    vi.mocked(installmentsApi.totals).mockResolvedValue(installmentTotals({
       total_receivable: "12345.67",
       total_paid: "8901.23",
       total_remaining: "3444.44",
       total_count: 2,
-      overdue_count: 0,
-    });
+    }));
     renderLight(<InstallmentsPanel />, { user: "admin" });
     await screen.findAllByText("总应收");
 

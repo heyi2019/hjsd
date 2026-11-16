@@ -1,7 +1,7 @@
 import { Card, Form, InputNumber, Switch, Typography } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { optionSetsApi } from "../../shared/api/options.api";
-import { normalizeError } from "../../shared/api/client";
+import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import {
   buildBusinessReminderOptions,
   BUSINESS_REMINDER_CONFIG_CODE,
@@ -10,28 +10,31 @@ import {
   type BusinessReminderConfig,
 } from "../../app/businessReminderConfig";
 import { appMessage } from "../../shared/ui/appFeedback";
+import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { BusinessRegistrationForm, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
 
 export function BusinessReminderSettingsPanel() {
   const [form] = Form.useForm<BusinessReminderConfig>();
-  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const config = await optionSetsApi.get(BUSINESS_REMINDER_CONFIG_CODE);
-      form.setFieldsValue(parseBusinessReminderConfig(config?.options));
-      setError(null);
-    } catch (err) {
-      form.setFieldsValue(DEFAULT_BUSINESS_REMINDER_CONFIG);
-      setError(normalizeError(err));
-    } finally {
-      setLoading(false);
-    }
+    const config = await optionSetsApi.get(BUSINESS_REMINDER_CONFIG_CODE);
+    return parseBusinessReminderConfig(config?.options);
+  }, []);
+  const handleLoadError = useCallback(() => {
+    form.setFieldsValue(DEFAULT_BUSINESS_REMINDER_CONFIG);
   }, [form]);
+  const { data: loadedConfig, loading, error: loadError, reload } = useSettingsResource(load, { onError: handleLoadError });
+  const error = mutationError ?? loadError;
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (loadedConfig) form.setFieldsValue(loadedConfig);
+  }, [form, loadedConfig]);
+
+  const reloadSection = useCallback(async () => {
+    setMutationError(null);
+    await reload();
+  }, [reload]);
 
   const save = async (values: BusinessReminderConfig) => {
     try {
@@ -39,15 +42,16 @@ export function BusinessReminderSettingsPanel() {
         options: buildBusinessReminderOptions(values),
       });
       appMessage.success("业务提醒配置已保存");
-      await load();
+      setMutationError(null);
+      await reload();
     } catch (err) {
-      setError(normalizeError(err));
+      setMutationError(normalizeError(err));
     }
   };
 
   return (
     <Card className="glass" title="业务提醒">
-      <ErrorBanner error={error} onRetry={() => void load()} />
+      <ErrorBanner error={error} onRetry={() => void reloadSection()} retrying={loading} />
       <Typography.Paragraph type="secondary">
         控制工作台业务总览中的提醒规则。库存提醒按入库天数计算，分润和逾期合约提醒可单独关闭。
       </Typography.Paragraph>

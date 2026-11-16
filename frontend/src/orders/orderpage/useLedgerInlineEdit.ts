@@ -114,6 +114,7 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
     updateEventDraft: orderDetailEditor.updateEventDraft,
     updateOperationDraft: orderDetailEditor.updateOperationDraft,
     addOperationDraft: orderDetailEditor.addOperationDraft,
+    removeOperationDraft: orderDetailEditor.removeOperationDraft,
     updateFinanceDraft: orderDetailEditor.updateFinanceDraft,
     updateEditingAccount: orderDetailEditor.updateEditingAccount,
     orderDrafts: orderDetailEditor.orderDrafts,

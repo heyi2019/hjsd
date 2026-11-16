@@ -277,6 +277,45 @@ describe("OrderDetail", () => {
     expect(onAddOperationRow).toHaveBeenCalledWith("CONSIGNMENT");
   });
 
+  it("新增上架行按动作分组插入，并且可以删除新增行", async () => {
+    const onRemoveOperationRow = vi.fn();
+    const detail = {
+      orders: [{ order_id: 1, order_no: "DG0001", order_type: "DG", created_at: "2026-10-15T10:19:00", events: [], rebates: [] }],
+      detail_view: {
+        operation_rows: [
+          { key: "consignment", action: "上架平台", content: "千寻", occurred_at: null, operator: "-", event_id: null },
+          { key: "unlist", action: "下架平台", content: "-", occurred_at: null, operator: "-", event_id: null },
+          { key: "description", action: "描述", content: "-", occurred_at: null, operator: "-", event_id: null },
+          { key: "images", action: "作图", content: "-", occurred_at: null, operator: "-", event_id: null },
+        ],
+        finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [],
+      },
+      finance_summary: { total_expense: "0.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+    const operationDrafts = {
+      "new:consignment:1": { operation_type: "CONSIGNMENT" as const, occurred_at: "", form_extra: {} },
+      "new:unlist:2": { operation_type: "UNLIST" as const, occurred_at: "", form_extra: {} },
+    };
+    renderApp(
+      <OrderDetail
+        row={account}
+        detail={detail}
+        loading={false}
+        editing={account}
+        operationDrafts={operationDrafts}
+        onRemoveOperationRow={onRemoveOperationRow}
+      />,
+    );
+    await settleFieldConfig();
+
+    const operationRows = Array.from(document.querySelectorAll(".order-operation-table tbody tr"));
+    expect(operationRows.slice(1).map((row) => row.textContent?.trim().slice(0, 4))).toEqual(["上架平台", "上架平台", "下架平台", "下架平台", "描述", "作图上传"]);
+    await fireEvent.click(screen.getByRole("button", { name: "删除新增上架平台" }));
+    expect(onRemoveOperationRow).toHaveBeenCalledWith("new:consignment:1");
+    await fireEvent.click(screen.getByRole("button", { name: "删除新增下架平台" }));
+    expect(onRemoveOperationRow).toHaveBeenCalledWith("new:unlist:2");
+  });
+
   it("编辑参与方时按订单类型提供客户或渠道方的新建与选择控件", async () => {
     const detail = {
       orders: [{

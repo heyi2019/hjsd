@@ -27,7 +27,7 @@ const OPERATION_KEY_BY_TYPE: Record<NonNullable<OrderOperationDraft["operation_t
 
 /** 运营信息展示四类动作；上架/下架允许同一账号拥有多条平台记录。 */
 export function OrderDetailOperationSection({
-  meta, editing, account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onAddOperationRow, onProfileChange, employees = [], operationEvents,
+  meta, editing, account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onAddOperationRow, onRemoveOperationRow, onProfileChange, employees = [], operationEvents,
 }: {
   meta: OrderDetailMeta;
   editing?: boolean;
@@ -37,6 +37,7 @@ export function OrderDetailOperationSection({
   onEventEdit?: (event: AccountExecutionEvent, changes: { occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
   onOperationEdit?: (key: string, changes: Partial<OrderOperationDraft>) => void;
   onAddOperationRow?: (operationType: NonNullable<OrderOperationDraft["operation_type"]>) => void;
+  onRemoveOperationRow?: (key: string) => void;
   onProfileChange?: (changes: Partial<Account>) => void;
   employees?: EmployeeOption[];
   operationEvents?: Record<string, AccountExecutionEvent[]>;
@@ -54,18 +55,19 @@ export function OrderDetailOperationSection({
         event, events: [event], ariaLabelSuffix: index ? ` ${index + 1}` : "",
       }));
     };
-    const createdRows: OrderOperationRow[] = Object.entries(operationDrafts ?? {}).filter(([key]) => key.startsWith("new:")).flatMap(([key, draft]) => {
-      if (!draft) return [];
+    const createdRowsByOperation = Object.entries(operationDrafts ?? {}).filter(([key]) => key.startsWith("new:")).reduce<Record<OrderOperationKey, OrderOperationRow[]>>((groups, [key, draft]) => {
+      if (!draft) return groups;
       const operationKey = draft.operation_type ? OPERATION_KEY_BY_TYPE[draft.operation_type] : "consignment";
       const action = operationKey === "consignment" ? "上架平台" : operationKey === "unlist" ? "下架平台" : operationKey === "description" ? "描述" : "作图";
-      return [{ key, operationKey, action, content: "-", occurredAt: "", operator: "-", ariaLabelSuffix: ` ${key.split(":").pop() ?? "新增"}` }];
-    });
+      groups[operationKey].push({ key, operationKey, action, content: "-", occurredAt: "", operator: "-", ariaLabelSuffix: ` ${key.split(":").pop() ?? "新增"}` });
+      return groups;
+    }, { consignment: [], unlist: [], description: [], images: [] });
+    const createdRows = (operationKey: OrderOperationKey) => createdRowsByOperation[operationKey];
     return [
-      ...makeRows("consignment", "上架平台", meta.listedPlatform, meta.listedAt, meta.listedOperator),
-      ...makeRows("unlist", "下架平台", meta.unlistedPlatform, meta.unlistedAt, meta.unlistedOperator),
-      ...makeRows("description", "描述", meta.accountDescription, meta.descriptionAt, meta.descriptionOperator),
-      ...makeRows("images", "作图", <OrderDetailImageGallery images={account?.account_images ?? []} altPrefix="作图" limit={9} />, meta.imagesAt, meta.imagesOperator),
-      ...createdRows,
+      ...makeRows("consignment", "上架平台", meta.listedPlatform, meta.listedAt, meta.listedOperator), ...createdRows("consignment"),
+      ...makeRows("unlist", "下架平台", meta.unlistedPlatform, meta.unlistedAt, meta.unlistedOperator), ...createdRows("unlist"),
+      ...makeRows("description", "描述", meta.accountDescription, meta.descriptionAt, meta.descriptionOperator), ...createdRows("description"),
+      ...makeRows("images", "作图", <OrderDetailImageGallery images={account?.account_images ?? []} altPrefix="作图" limit={9} />, meta.imagesAt, meta.imagesOperator), ...createdRows("images"),
     ];
   }, [account, meta, operationDrafts, operationEvents]);
 
@@ -76,7 +78,7 @@ export function OrderDetailOperationSection({
         <PermissionButton permission="order.update" type="link" size="small" onClick={() => onAddOperationRow?.("CONSIGNMENT")}>+ 添加上架行</PermissionButton>
         <PermissionButton permission="order.update" type="link" size="small" onClick={() => onAddOperationRow?.("UNLIST")}>+ 添加下架行</PermissionButton>
       </Space>
-      <DataTable className="order-detail__data-table order-operation-table" columns={editableOperationColumns(account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onProfileChange, employees, platformOptions)} rows={rows} page={1} pageSize={20} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
+      <DataTable className="order-detail__data-table order-operation-table" columns={editableOperationColumns(account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onRemoveOperationRow, onProfileChange, employees, platformOptions)} rows={rows} page={1} pageSize={20} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
     </div>;
   }
   return <div className="order-detail__section order-detail__section--operation">
@@ -91,6 +93,7 @@ function editableOperationColumns(
   operationDrafts: Partial<Record<string, OrderOperationDraft>> | undefined,
   onEventEdit: ((event: AccountExecutionEvent, changes: { occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void) | undefined,
   onOperationEdit: ((key: string, changes: Partial<OrderOperationDraft>) => void) | undefined,
+  onRemoveOperationRow: ((key: string) => void) | undefined,
   onProfileChange: ((changes: Partial<Account>) => void) | undefined,
   employees: EmployeeOption[],
   platformOptions: Array<{ value: string; label: string }>,
@@ -132,6 +135,12 @@ function editableOperationColumns(
     {
       title: "操作人", dataIndex: "operator", key: "operator", width: 120,
       render: (_value: string, row: OrderOperationRow) => { const draft = row.event ? drafts?.[row.event.id] : operationDrafts?.[row.key]; return <Select mode="multiple" aria-label={`编辑${row.action}操作人${row.ariaLabelSuffix ?? ""}`} value={draft?.operator_user_ids ?? row.event?.operator_user_ids ?? []} options={employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))} onChange={(ids) => updateOperation(row, { operator_user_ids: ids })} />; },
+    },
+    {
+      title: "操作", key: "operation", width: 64,
+      render: (_value: unknown, row: OrderOperationRow) => row.key.startsWith("new:")
+        ? <PermissionButton permission="order.update" type="link" danger size="small" aria-label={`删除新增${row.action}`} onClick={() => onRemoveOperationRow?.(row.key)}>删除</PermissionButton>
+        : null,
     },
   ];
 }

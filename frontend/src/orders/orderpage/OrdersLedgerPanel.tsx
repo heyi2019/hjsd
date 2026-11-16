@@ -63,6 +63,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     updateEventDraft,
     updateOperationDraft,
     addOperationDraft,
+    removeOperationDraft,
     employees,
     invEditExtraForm,
     savingAccount,
@@ -188,6 +189,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
                   onEventEdit={updateEventDraft}
                   onOperationEdit={updateOperationDraft}
                   onAddOperationRow={addOperationDraft}
+                  onRemoveOperationRow={removeOperationDraft}
                   financeDrafts={controller.financeDrafts}
                   onFinanceEdit={controller.updateFinanceDraft}
                   onProfileChange={controller.updateEditingAccount}

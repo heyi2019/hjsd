@@ -40,6 +40,7 @@ type OrderDetailViewProps = {
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
   onOperationEdit?: (key: string, changes: Partial<OrderOperationDraft>) => void;
   onAddOperationRow?: (operationType: NonNullable<OrderOperationDraft["operation_type"]>) => void;
+  onRemoveOperationRow?: (key: string) => void;
   financeDrafts?: Record<string, FinanceDraft>;
   onFinanceEdit?: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
   onProfileChange?: (changes: Partial<Account>) => void;
@@ -68,6 +69,7 @@ export function OrderDetailView({
   onEventEdit,
   onOperationEdit,
   onAddOperationRow,
+  onRemoveOperationRow,
   financeDrafts,
   onFinanceEdit,
   onProfileChange,
@@ -99,7 +101,7 @@ export function OrderDetailView({
           wrapperCol={{ flex: "auto" }} scope="INVEDIT" form={extraForm}>
           <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
             <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onOrderEdit={onOrderEdit} onProfileChange={onProfileChange} />
-            <OrderDetailOperationSection meta={meta} editing account={editing ?? account} eventDrafts={eventDrafts} operationDrafts={operationDrafts} onEventEdit={onEventEdit} onOperationEdit={onOperationEdit} onAddOperationRow={onAddOperationRow} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} />
+            <OrderDetailOperationSection meta={meta} editing account={editing ?? account} eventDrafts={eventDrafts} operationDrafts={operationDrafts} onEventEdit={onEventEdit} onOperationEdit={onOperationEdit} onAddOperationRow={onAddOperationRow} onRemoveOperationRow={onRemoveOperationRow} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} />
           </FieldConfigScope>
         </BusinessRegistrationForm>
         <OrderDetailFinanceSection

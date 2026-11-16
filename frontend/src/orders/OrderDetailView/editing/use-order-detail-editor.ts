@@ -79,6 +79,7 @@ export interface OrderDetailEditor {
   operationDrafts: Partial<Record<string, OperationDraft>>;
   updateOperationDraft: (key: string, changes: Partial<OperationDraft>) => void;
   addOperationDraft: (operationType: NonNullable<OperationDraft["operation_type"]>) => void;
+  removeOperationDraft: (key: string) => void;
   financeDrafts: Record<string, FinanceDraft>;
   updateFinanceDraft: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
   updateEditingAccount: (changes: Partial<Account>) => void;
@@ -172,6 +173,15 @@ export function useOrderDetailEditor(params: {
     operationDraftSequence.current += 1;
     const key = `new:${operationType.toLowerCase()}:${operationDraftSequence.current}`;
     setOperationDrafts((current) => ({ ...current, [key]: { occurred_at: "", form_extra: {}, operation_type: operationType } }));
+  }
+
+  function removeOperationDraft(key: string) {
+    setOperationDrafts((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
   }
 
   function updateFinanceDraft(flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) {
@@ -327,6 +337,7 @@ export function useOrderDetailEditor(params: {
     operationDrafts,
     updateOperationDraft,
     addOperationDraft,
+    removeOperationDraft,
     financeDrafts,
     updateFinanceDraft,
     updateEditingAccount,

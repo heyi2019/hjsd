@@ -47,6 +47,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     updateEventDraft,
     updateOperationDraft,
     addOperationDraft,
+    removeOperationDraft,
     updateFinanceDraft,
     updateEditingAccount,
     orderDrafts,
@@ -148,6 +149,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
               onEventEdit={updateEventDraft}
               onOperationEdit={updateOperationDraft}
               onAddOperationRow={addOperationDraft}
+              onRemoveOperationRow={removeOperationDraft}
               financeDrafts={financeDrafts}
               onFinanceEdit={updateFinanceDraft}
               onProfileChange={updateEditingAccount}

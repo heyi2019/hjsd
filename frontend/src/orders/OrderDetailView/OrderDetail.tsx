@@ -56,6 +56,7 @@ export function OrderDetail({
   onEventEdit,
   onOperationEdit,
   onAddOperationRow,
+  onRemoveOperationRow,
   financeDrafts,
   onFinanceEdit,
   onProfileChange,
@@ -81,6 +82,7 @@ export function OrderDetail({
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
   onOperationEdit?: (key: string, changes: Partial<OrderOperationDraft>) => void;
   onAddOperationRow?: (operationType: NonNullable<OrderOperationDraft["operation_type"]>) => void;
+  onRemoveOperationRow?: (key: string) => void;
   financeDrafts?: Record<string, FinanceDraft>;
   onFinanceEdit?: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
   onProfileChange?: (changes: Partial<Account>) => void;
@@ -229,6 +231,7 @@ export function OrderDetail({
       onEventEdit={onEventEdit}
       onOperationEdit={onOperationEdit}
       onAddOperationRow={onAddOperationRow}
+      onRemoveOperationRow={onRemoveOperationRow}
       financeDrafts={financeDrafts}
       onFinanceEdit={onFinanceEdit}
       onProfileChange={onProfileChange}

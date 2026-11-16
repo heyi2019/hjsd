@@ -18,6 +18,7 @@ import { collectExtras } from "./CustomersPage.fragments";
 /** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
 export function useCustomerController({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const [rows, setRows] = useState<Customer[] | null>(null);
+  const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<{ total_count: number; month_count: number; today_count: number } | null>(null);
   const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -70,11 +71,12 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
         limit: pageSize,
         offset: (page - 1) * pageSize,
       };
-      const [customerRows, customerSummary] = await Promise.all([
-        customersApi.list(params),
+      const [customerPage, customerSummary] = await Promise.all([
+        customersApi.page(params),
         customersApi.summary({ today_date: today(), ...params }),
       ]);
-      setRows(customerRows);
+      setRows(customerPage.items);
+      setTotal(customerPage.total);
       setSummary(customerSummary);
       setError(null);
     } catch (err) {
@@ -335,5 +337,6 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     submitCreate,
     submitEdit,
     submitMerge,
+    total,
   };
 }

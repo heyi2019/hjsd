@@ -2,6 +2,13 @@ import { api } from "./client";
 import type { PageResponse } from "./types/common";
 import type { Counterparty, Customer, CustomerDetail, CustomerSummary, DuplicateCandidate, Lead, LeadSummary } from "./types/customers";
 
+type CustomerListParams = { keyword?: string; status?: string; limit?: number; offset?: number };
+
+const customerPage = (params?: CustomerListParams) =>
+  api.get<PageResponse<Customer>>("/customers", {
+    params: { limit: 500, offset: 0, ...params },
+  }).then((r) => r.data);
+
 export const customersApi = {
   summary: (params: { today_date: string; keyword?: string; status?: string }) =>
     api.get<CustomerSummary>("/customers/summary", { params }).then((r) => r.data),
@@ -9,10 +16,8 @@ export const customersApi = {
    * 返回一个后端分页窗口。客户中心使用 page/offset；选择器调用方显式传
    * limit=500 获取一个选项窗口，不在前端串行拼接“全量客户”。
    */
-  list: (params?: { keyword?: string; status?: string; limit?: number; offset?: number }): Promise<Customer[]> =>
-    api.get<PageResponse<Customer>>("/customers", {
-      params: { limit: 500, offset: 0, ...params },
-    }).then((r) => r.data.items),
+  page: (params?: CustomerListParams) => customerPage(params),
+  list: (params?: CustomerListParams): Promise<Customer[]> => customerPage(params).then((response) => response.items),
   create: (payload: Partial<Customer>) =>
     api.post<{ customer: Customer; duplicate_candidates: DuplicateCandidate[] }>(
       "/customers",

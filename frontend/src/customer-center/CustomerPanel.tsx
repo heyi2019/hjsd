@@ -57,6 +57,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
     submitCreate,
     submitEdit,
     submitMerge,
+    total,
   } = useCustomerController({ active, focusId });
   return (
     <Card
@@ -86,7 +87,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       </Typography.Paragraph>
       <StatRow
         items={[
-          { label: "客户总数", kind: "count", amount: rows === null ? "不可用" : String(summary?.total_count ?? 0) },
+          { label: "客户总数", kind: "count", amount: rows === null ? "不可用" : String(total) },
           { label: "本月新增客户数", kind: "count", amount: rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
           { label: "今日新增客户数", kind: "count", amount: rows === null ? "不可用" : String(newTodayCount ?? 0) },
         ]}
@@ -130,7 +131,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
         loading={loading}
         page={page}
         pageSize={pageSize}
-        total={summary?.total_count ?? 0}
+        total={total}
         className="customer-table"
        
         emptyText={error || rows === null ? "客户数据不可用，请点击重新加载" : "暂无客户档案"}

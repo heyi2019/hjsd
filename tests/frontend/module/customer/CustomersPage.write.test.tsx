@@ -46,6 +46,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOptionSets();
   vi.mocked(customersApi.list).mockResolvedValue(customers);
+  vi.mocked(customersApi.page).mockImplementation(async (params) => {
+    const items = await vi.mocked(customersApi.list)(params);
+    return { items, total: items.length, limit: params?.limit ?? 10, offset: params?.offset ?? 0 };
+  });
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(counterpartiesApi.page).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
   vi.mocked(orderFormFieldsApi.list).mockResolvedValue(fieldDefs);
@@ -98,8 +102,8 @@ describe("CustomersPage：权限门控与写操作", () => {
     await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalled());
     // 只提示：message.warning 携带「重复候选」文案（renderLight 未用 antd <App>，静态 message 不进 React 树，故不查 DOM 文本）
     expect(warningSpy).toHaveBeenCalledWith(expect.stringContaining("重复候选"));
-    // 未拦截：创建成功后走成功分支刷新列表（customersApi.list 第 2 次调用）
-    await waitFor(() => expect(vi.mocked(customersApi.list)).toHaveBeenCalledTimes(2));
+    // 未拦截：创建成功后走成功分支刷新列表（客户分页接口第 2 次调用）
+    await waitFor(() => expect(vi.mocked(customersApi.page)).toHaveBeenCalledTimes(2));
   });
 
   it("合并弹窗取消后重开不残留上次选的目标客户与原因", async () => {
@@ -149,6 +153,20 @@ describe("CustomersPage：权限门控与写操作", () => {
     expect(within(drawer).getByText("逾期 1 期")).toBeInTheDocument();
   });
 
+  it("客户详情加载中不展示列表快照字段", async () => {
+    let resolveDetail!: (value: unknown) => void;
+    vi.mocked(customersApi.detail).mockImplementationOnce(() => new Promise((resolve) => { resolveDetail = resolve; }) as never);
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await ui.click(screen.getAllByRole("button", { name: /详情/ })[0]);
+
+    const drawer = await screen.findByRole("dialog");
+    expect(within(drawer).getByRole("status", { name: "正在加载客户详情" })).toBeInTheDocument();
+    expect(within(drawer).queryByText("138****8888")).not.toBeInTheDocument();
+
+    resolveDetail({ customer: customers[0], overview: {}, business: [], installments: [], audit: [] });
+  });
+
   it("客户列表支持关键词搜索并把条件传给后端", async () => {
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
@@ -159,7 +177,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     await ui.click(screen.getByRole("button", { name: "搜索客户" }));
     // 用 toHaveBeenCalledWith 而非 toHaveBeenLastCalledWith：搜索后页面可能再触发一次刷新调用，
     // 断言「关键词确实传给了后端」才是本用例的意图，避免与刷新调用竞争导致偶发红。
-    await waitFor(() => expect(vi.mocked(customersApi.list)).toHaveBeenCalledWith({ keyword: "张三", limit: 10, offset: 0 }));
+    await waitFor(() => expect(vi.mocked(customersApi.page)).toHaveBeenCalledWith({ keyword: "张三", limit: 10, offset: 0 }));
   });
 
   it("客户 CSV 导出完成后给出成功反馈", async () => {

@@ -25,10 +25,10 @@ export function CustomerDetailDrawer({
   onClose: () => void;
   onRequestEdit: (target: Customer) => void;
 }) {
-  const customer = detailData?.customer ?? detailTarget;
+  const customer = detailData?.customer;
   return (
       <Drawer
-        title={customer ? `客户档案 · ${customer.customer_no}` : "客户档案"}
+        title={detailTarget ? `客户档案 · ${detailTarget.customer_no}` : "客户档案"}
         open={Boolean(detailTarget)}
         onClose={onClose}
         width={720}

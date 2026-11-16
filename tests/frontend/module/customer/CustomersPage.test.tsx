@@ -68,6 +68,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOptionSets();
   vi.mocked(customersApi.list).mockResolvedValue(customers);
+  vi.mocked(customersApi.page).mockImplementation(async (params) => {
+    const items = await vi.mocked(customersApi.list)(params);
+    return { items, total: items.length, limit: params?.limit ?? 10, offset: params?.offset ?? 0 };
+  });
   vi.mocked(customersApi.summary).mockResolvedValue({ total_count: 2, month_count: 1, today_count: 1 });
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(counterpartiesApi.page).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
@@ -344,6 +348,10 @@ describe("CustomersPage：行内动作", () => {
     vi.clearAllMocks();
     seedOptionSets();
     vi.mocked(customersApi.list).mockResolvedValue(customers as unknown as never);
+    vi.mocked(customersApi.page).mockImplementation(async (params) => {
+      const items = await vi.mocked(customersApi.list)(params);
+      return { items, total: items.length, limit: params?.limit ?? 10, offset: params?.offset ?? 0 };
+    });
     vi.mocked(counterpartiesApi.list).mockResolvedValue(counterparties as unknown as never);
     vi.mocked(counterpartiesApi.page).mockResolvedValue({ items: counterparties, total: counterparties.length, limit: 10, offset: 0 });
     vi.mocked(orderFormFieldsApi.list).mockResolvedValue(fieldDefs as unknown as never);

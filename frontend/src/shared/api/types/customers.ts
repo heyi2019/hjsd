@@ -20,7 +20,6 @@ export interface Customer {
 }
 
 export interface CustomerSummary {
-  total_count: number;
   month_count: number;
   today_count: number;
 }

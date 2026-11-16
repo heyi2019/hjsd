@@ -85,7 +85,6 @@ class CustomerOut(BaseModel):
 
 
 class CustomerSummaryOut(BaseModel):
-    total_count: int
     month_count: int
     today_count: int
 

@@ -19,7 +19,7 @@ import { collectExtras } from "./CustomersPage.fragments";
 export function useCustomerController({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const [rows, setRows] = useState<Customer[] | null>(null);
   const [total, setTotal] = useState(0);
-  const [summary, setSummary] = useState<{ total_count: number; month_count: number; today_count: number } | null>(null);
+  const [summary, setSummary] = useState<{ month_count: number; today_count: number } | null>(null);
   const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Customer | null>(null);

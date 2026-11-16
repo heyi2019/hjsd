@@ -137,7 +137,6 @@ def summarize_customers(
         return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
 
     return {
-        "total_count": count_created(),
         "month_count": count_created(month_start_at, tomorrow_start),
         "today_count": count_created(today_start, tomorrow_start),
     }

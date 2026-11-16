@@ -72,7 +72,7 @@ beforeEach(() => {
     const items = await vi.mocked(customersApi.list)(params);
     return { items, total: items.length, limit: params?.limit ?? 10, offset: params?.offset ?? 0 };
   });
-  vi.mocked(customersApi.summary).mockResolvedValue({ total_count: 2, month_count: 1, today_count: 1 });
+  vi.mocked(customersApi.summary).mockResolvedValue({ month_count: 1, today_count: 1 });
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(counterpartiesApi.page).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
   vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);

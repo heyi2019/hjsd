@@ -279,7 +279,7 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
   );
 }
 export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
-  const { reconciliations, pools, reconciliationForm, setReconciliationOpen, loading, reconciliationsReady, error } = ctrl;
+  const { reconciliations, pools, employees, reconciliationForm, setReconciliationOpen, loading, reconciliationsReady, error } = ctrl;
   const reconciliationUnavailable = !reconciliationsReady || Boolean(error);
   const { arrange: arrangeReconciliationColumns } = useListViewColumns("RECONCILIATIONS");
   const reconciliationColumns: ColumnsType<Reconciliation> = [
@@ -291,6 +291,14 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "差异", key: "difference", align: "right", render: (_v, row) => <MoneyText value={row.difference} /> },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("RECONCILIATION_STATUS", v, RECONCILIATION_STATUS_LABEL)} /> },
     { title: "操作人", dataIndex: "operator", render: (v: string | null | undefined) => v || "—" },
+    {
+      title: "动作操作人",
+      key: "operation_operators",
+      render: (_v, row) => (row.operation_operators ?? []).map((operation) => {
+        const names = operation.operator_user_ids.map((id) => employees.find((employee) => employee.id === id)?.display_name ?? `#${id}`);
+        return `${operation.operation_key}: ${names.join("、")}`;
+      }).join("；") || "—",
+    },
     {
       title: "操作",
       key: "actions",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildGroupedScopeOptions } from "@/field-definitions/formScopes";
+import { normalizeOptionItems } from "@/field-definitions/panels/OrderFormFieldsPanel.fragments";
 
 const scopes = [
   { code: "SALE", label: "售出", group: "INVENTORY" },
@@ -14,6 +15,11 @@ const scopes = [
 
 it("不为缺失的后端作用域制造本地兼容清单", () => {
   expect(buildGroupedScopeOptions([])).toEqual([]);
+});
+
+it("表单字段选项只接受后端规范对象", () => {
+  expect(normalizeOptionItems([{ value: "A", label: "甲" }])).toEqual([{ value: "A", label: "甲" }]);
+  expect(() => normalizeOptionItems(["A"] as never)).toThrow("选项必须使用 value/label 对象");
 });
 
 describe("表单作用域顺序", () => {

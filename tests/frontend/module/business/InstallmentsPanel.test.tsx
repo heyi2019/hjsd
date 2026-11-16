@@ -67,6 +67,7 @@ const installments = [
   },
   schedules: [],
   dispositions: [],
+  operation_operators: [],
 }));
 
 beforeEach(() => {
@@ -268,6 +269,7 @@ describe("InstallmentsPanel：动作与减免", () => {
     },
     schedules: [],
     dispositions: [],
+    operation_operators: [],
   }));
 
   beforeEach(() => {
@@ -410,6 +412,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
       { id: 1, installment_id: 1, period_no: 0, due_on: "2026-10-01", due_amount: "100.00", received_amount: "0.00", status: "PENDING" },
     ],
     dispositions: [],
+    operation_operators: [],
   };
 
   const order = {

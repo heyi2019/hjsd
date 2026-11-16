@@ -57,7 +57,7 @@ describe("详情编辑保存载荷", () => {
   it("交付共享字段修改后，详情内的相关订单草稿一起更新", () => {
     const result = propagateSharedOrderExtra(
       {
-        1: { order_id: 1, occurred_at: "", operator: "", note: "", form_extra: { delivery_note: "保留" } },
+        1: { order_id: 1, occurred_at: "", note: "", form_extra: { delivery_note: "保留" } },
       },
       [1, 2],
       { bound_phone_owner: "新绑定人" },

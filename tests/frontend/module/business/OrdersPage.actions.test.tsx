@@ -185,6 +185,7 @@ const installment: Installment = {
   total_receivable: "12000.00",
   remaining_receivable: "12000.00",
   status: "ACTIVE",
+  operation_operators: [],
   order: {
     id: 3,
     order_no: "HS-2026-0003",

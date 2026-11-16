@@ -13,6 +13,7 @@ import {
   isFieldActive,
   useOrderFormConfig,
 } from "../ConfigurableField";
+import { useOptionSet } from "../../shared/lib/optionSets";
 import {
   OrderSectionHeading,
   type OrderDetailMeta,
@@ -31,6 +32,13 @@ const DELIVERY_FIELDS = [
 
 function textValue(value: unknown): string {
   return typeof value === "string" && value.trim() ? value : "-";
+}
+
+function selectOptions(options: Array<{ value: string; label: string }>, value: unknown) {
+  const current = typeof value === "string" ? value : "";
+  return current && !options.some((option) => option.value === current)
+    ? [{ value: current, label: current }, ...options]
+    : options;
 }
 
 /** 单个交付子块（买号交付 / 卖号交付）：按对应订单类型配置驱动渲染主交付字段 + DELIVER 自定义字段。
@@ -57,6 +65,14 @@ function DeliverySubSection({
   onProfileChange?: (changes: Partial<Account>) => void;
 }) {
   const { config } = useOrderFormConfig(orderType ?? undefined);
+  const platformOptions = useOptionSet("INTERMEDIARY_PLATFORM");
+  const intermediaryTypeOptions = useOptionSet("INTERMEDIARY_TYPE");
+  const compensationTypeOptions = useOptionSet("COMPENSATION_TYPE");
+  const optionsByField: Record<string, Array<{ value: string; label: string }>> = {
+    intermediary_platform: platformOptions ?? config.intermediary_platform?.options ?? [],
+    intermediary_type: intermediaryTypeOptions ?? config.intermediary_type?.options ?? [],
+    compensation_type: compensationTypeOptions ?? config.compensation_type?.options ?? [],
+  };
   const extraValues = order?.extra_values;
   const editableValues = { ...(extraValues ?? {}), ...(draft?.form_extra ?? {}) };
   const employeeNames = useMemo(
@@ -114,6 +130,18 @@ function DeliverySubSection({
                   value={Array.isArray(editableValues[field.key]) ? editableValues[field.key] : []}
                   options={(employees ?? []).map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))}
                   onChange={(next) => onExtraChange?.(field.key, next)}
+                />
+              ) : editing && ["intermediary_platform", "intermediary_type", "compensation_type"].includes(field.key) ? (
+                <Select
+                  aria-label={`编辑${field.fallback}`}
+                  allowClear
+                  value={editableValues[field.key] == null || editableValues[field.key] === "" ? undefined : String(editableValues[field.key])}
+                  showSearch
+                  optionFilterProp="label"
+                  defaultActiveFirstOption
+                  placeholder="可选填"
+                  options={selectOptions(optionsByField[field.key] ?? [], editableValues[field.key])}
+                  onChange={(value: string | undefined) => onExtraChange?.(field.key, value ?? null)}
                 />
               ) : editing ? (
                 <Input

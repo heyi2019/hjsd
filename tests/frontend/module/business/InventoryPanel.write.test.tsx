@@ -359,6 +359,59 @@ describe("OrderDetailDeliverySection", () => {
     });
   });
 
+  it("编辑态交易平台、中介类型和包赔类型可以下拉选择", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValueOnce([
+      {
+        id: 1, order_type_code: "HS", field_key: "intermediary_platform", label: "交易平台", field_type: "SELECT",
+        options: [{ value: "盼之", label: "盼之" }, { value: "其他", label: "其他" }], required: false, is_active: true, sort_order: 1, locked: false, is_custom: false,
+      },
+      {
+        id: 2, order_type_code: "HS", field_key: "intermediary_type", label: "中介类型", field_type: "SELECT",
+        options: [{ value: "普中", label: "普中" }, { value: "包赔", label: "包赔" }], required: false, is_active: true, sort_order: 2, locked: false, is_custom: false,
+      },
+      {
+        id: 3, order_type_code: "HS", field_key: "compensation_type", label: "包赔类型", field_type: "SELECT",
+        options: [{ value: "首保", label: "首保" }, { value: "续保", label: "续保" }], required: false, is_active: true, sort_order: 3, locked: false, is_custom: false,
+      },
+    ] as never);
+    const onOrderExtraChange = vi.fn();
+    const detail = {
+      orders: [{
+        order_id: 25,
+        order_no: "HS-FE268",
+        order_type: "HS",
+        created_at: "2026-11-02T10:00:00",
+        extra_values: { intermediary_platform: "盼之", intermediary_type: "普中", compensation_type: "首保" },
+        events: [],
+      }],
+    };
+
+    renderLight(
+      <OrderDetailDeliverySection
+        meta={{ sourceOrderNo: "HS-FE268" } as never}
+        detail={detail as never}
+        editing
+        onOrderExtraChange={onOrderExtraChange}
+      />,
+      { user: "admin" },
+    );
+
+    const platform = await screen.findByRole("combobox", { name: "编辑交易平台" });
+    await ui.click(platform);
+    await ui.click(await screen.findByText("其他", { selector: ".ant-select-item-option-content" }));
+    expect(onOrderExtraChange).toHaveBeenCalledWith(25, "intermediary_platform", "其他");
+
+    const intermediaryType = screen.getByRole("combobox", { name: "编辑中介类型" });
+    await ui.click(intermediaryType);
+    await ui.click(await screen.findByText("包赔", { selector: ".ant-select-item-option-content" }));
+    expect(onOrderExtraChange).toHaveBeenCalledWith(25, "intermediary_type", "包赔");
+
+    const compensationType = screen.getByRole("combobox", { name: "编辑包赔类型" });
+    await ui.click(compensationType);
+    await ui.click(await screen.findByText("续保", { selector: ".ant-select-item-option-content" }));
+    expect(onOrderExtraChange).toHaveBeenCalledWith(25, "compensation_type", "续保");
+  });
+
   it("FE-266：交付负责人回显员工姓名，未加载时不泄露原始 ID", async () => {
     const detail = {
       orders: [{

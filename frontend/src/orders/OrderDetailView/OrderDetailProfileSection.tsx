@@ -245,6 +245,18 @@ function EditableProfileField({
       />
     );
   }
+  if (field.key === "walletRealname") {
+    return (
+      <Select
+        aria-label="编辑钱包实名"
+        allowClear
+        value={account?.wallet_realname ?? undefined}
+        placeholder="请选择"
+        options={[{ value: "未注销", label: "未注销" }, { value: "已注销", label: "已注销" }]}
+        onChange={(value: string | undefined) => onChange?.({ wallet_realname: value ?? null })}
+      />
+    );
+  }
   if (field.key === "channelRegion") {
     return (
       <Space.Compact block>
@@ -261,9 +273,7 @@ function EditableProfileField({
           ? account?.camp_account ?? ""
           : field.key === "password"
             ? account?.game_password ?? ""
-            : field.key === "walletRealname"
-              ? account?.wallet_realname ?? ""
-              : account?.note ?? "";
+            : account?.note ?? "";
   const key = field.key === "gameType"
       ? "game_type"
       : field.key === "gameAccount"
@@ -272,8 +282,6 @@ function EditableProfileField({
           ? "camp_account"
           : field.key === "password"
             ? "game_password"
-            : field.key === "walletRealname"
-              ? "wallet_realname"
-              : "note";
+            : "note";
   return <Input aria-label={`编辑${field.fallback}`} value={value} onChange={(event) => onChange?.({ [key]: event.target.value })} />;
 }

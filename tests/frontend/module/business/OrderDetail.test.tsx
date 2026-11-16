@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";
 import type { Account } from "@/shared/api/types/accounts";
@@ -433,6 +434,31 @@ describe("OrderDetail", () => {
     await settleFieldConfig();
     const profile = document.querySelector(".order-detail__section--profile") as HTMLElement;
     expect(within(profile).getByLabelText("编辑游戏账号 / 产品")).toHaveValue("acc-1");
+  });
+
+  it("编辑态钱包实名可以下拉选择实名状态", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const onProfileChange = vi.fn();
+    const accountWithWalletRealname = { ...account, wallet_realname: "未注销" } as unknown as Account;
+
+    renderApp(
+      <OrderDetail
+        row={accountWithWalletRealname}
+        detail={{ orders: [] } as unknown as AccountExecutionDetail}
+        loading={false}
+        editing={accountWithWalletRealname}
+        onProfileChange={onProfileChange}
+        employees={[]}
+      />,
+    );
+    await settleFieldConfig();
+
+    const profile = document.querySelector(".order-detail__section--profile") as HTMLElement;
+    const walletRealname = within(profile).getByRole("combobox", { name: "编辑钱包实名" });
+    await user.click(walletRealname);
+    await user.click(await screen.findByText("已注销", { selector: ".ant-select-item-option-content" }));
+
+    expect(onProfileChange).toHaveBeenCalledWith({ wallet_realname: "已注销" });
   });
 
   it("FE-269：返点进入收入笔数，总收入取服务端 finance_summary", () => {

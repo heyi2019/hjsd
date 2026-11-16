@@ -12,7 +12,7 @@ from collections.abc import Mapping, Sequence
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
@@ -128,17 +128,44 @@ def summarize_customers(
     tomorrow_start = datetime.combine(today_date + timedelta(days=1), time.min)
     month_start_at = datetime.combine(month_start, time.min)
 
-    def count_created(start: datetime | None = None, end: datetime | None = None) -> int:
-        stmt = _customer_list_stmt(keyword=keyword, status=status, user=user, session=session)
-        if start is not None:
-            stmt = stmt.where(Customer.created_at >= start)
-        if end is not None:
-            stmt = stmt.where(Customer.created_at < end)
-        return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+    scope = _customer_list_stmt(
+        keyword=keyword, status=status, user=user, session=session
+    ).subquery()
+    created_at = scope.c.created_at
+    month_count, today_count = session.execute(
+        select(
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            (created_at >= month_start_at)
+                            & (created_at < tomorrow_start),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            (created_at >= today_start)
+                            & (created_at < tomorrow_start),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ),
+        ).select_from(scope)
+    ).one()
 
     return {
-        "month_count": count_created(month_start_at, tomorrow_start),
-        "today_count": count_created(today_start, tomorrow_start),
+        "month_count": int(month_count),
+        "today_count": int(today_count),
     }
 
 

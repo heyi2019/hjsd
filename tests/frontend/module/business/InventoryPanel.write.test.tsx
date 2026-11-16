@@ -200,6 +200,7 @@ describe("InventoryPanel：写入与长路径", () => {
     await screen.findByText("acc-1");
     await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "返点" }));
     expect(await screen.findByText("登记返点")).toBeInTheDocument();
+    expect(screen.queryByLabelText("返点日期")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("返点比例")).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "比例" })).not.toBeInTheDocument();
     expect(screen.queryByText(/关联业务订单创建后即可登记返点/)).toBeNull();

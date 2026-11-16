@@ -68,7 +68,6 @@ export function InventoryRebateModal(props: {
         form.setFieldsValue({
           rebate_type: firstKind,
           amount: undefined,
-          collected_on: today(),
         });
       })
       .catch((cause) => {
@@ -146,7 +145,7 @@ export function InventoryRebateModal(props: {
     <>
     <BusinessActionModal
       title="登记返点"
-      fieldCount={4 + Object.keys(config).length}
+      fieldCount={3 + Object.keys(config).length}
       open={open}
       destroyOnHidden
       wrapClassName="inventory-rebate-modal"
@@ -194,9 +193,6 @@ export function InventoryRebateModal(props: {
                 rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}
               >
                 <MoneyInput placeholder="请输入返点金额" />
-              </CfgItem>
-              <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
-                <DateField />
               </CfgItem>
               <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
             </div>

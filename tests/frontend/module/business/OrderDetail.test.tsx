@@ -6,6 +6,7 @@ import type { Account } from "@/shared/api/types/accounts";
 import { OrderDetail } from "@/orders/OrderDetailView/OrderDetail";
 import { resolveOperationEventContent } from "@/orders/OrderDetailView/OrderDetailOperationSection";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
+import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
 import { renderApp } from "@fixtures/render";
 
 const account = {
@@ -345,10 +346,20 @@ describe("OrderDetail", () => {
       finance_summary: { total_expense: "0.00", total_income: "0.00" },
     } as unknown as AccountExecutionDetail;
 
+    vi.spyOn(customersApi, "list").mockResolvedValue([
+      { id: 1, customer_no: "C001", display_name: "买家A", status: "ACTIVE" },
+      { id: 2, customer_no: "C002", display_name: "卖家B", status: "ACTIVE" },
+    ] as never);
+    vi.spyOn(counterpartiesApi, "list").mockResolvedValue([] as never);
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
     await settleFieldConfig();
 
-    expect(screen.getByRole("combobox", { name: "选择客户" })).toBeInTheDocument();
+    const customerSelect = screen.getByRole("combobox", { name: "选择客户" });
+    await userEvent.click(customerSelect);
+    await waitFor(() => expect(screen.getByRole("option", { name: /买家A/ })).toBeInTheDocument());
+    await userEvent.type(customerSelect, "买家A");
+    expect(screen.getByRole("option", { name: /买家A/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /卖家B/ })).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "新建客户名称" })).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "选择渠道方" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: "新建渠道方名称" })).toBeNull();

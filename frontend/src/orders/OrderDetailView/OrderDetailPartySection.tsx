@@ -113,6 +113,8 @@ export function OrderDetailPartySection({
             <Space.Compact block>
               <Select
                 mode="multiple"
+                showSearch
+                optionFilterProp="label"
                 aria-label="选择客户"
                 value={selectedCustomerIds}
                 placeholder="选择客户"
@@ -130,6 +132,8 @@ export function OrderDetailPartySection({
             {counterpartyRole ? <Space.Compact block>
                 <Select
                   mode="multiple"
+                  showSearch
+                  optionFilterProp="label"
                   aria-label="选择渠道方"
                   value={selectedCounterpartyIds}
                   placeholder="选择渠道方"

@@ -2,7 +2,7 @@ import { Form, Input, Typography } from "antd";
 import type { FormInstance } from "antd";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 import type { OrderFormField } from "../shared/api/types/forms";
-import { BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, PermissionButton } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, dateValueFromEvent, dateValueProps, PermissionButton } from "../shared/ui";
 import { ExtraFieldControl } from "./CustomersPage.fragments";
 
 const CUSTOMER_CREATE_FORM_ID = "customer-create-form";
@@ -71,6 +71,8 @@ export function CustomerCreateModal({
                   name={def.field_key}
                   label={def.label}
                   valuePropName={def.field_type === "BOOLEAN" ? "checked" : "value"}
+                  getValueFromEvent={def.field_type === "DATE" ? dateValueFromEvent : undefined}
+                  getValueProps={def.field_type === "DATE" ? dateValueProps : undefined}
                   rules={def.required ? [{ required: true, message: `请填写${def.label}` }] : []}
                 >
                   <ExtraFieldControl def={def} />

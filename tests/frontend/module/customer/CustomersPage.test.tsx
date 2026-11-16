@@ -1,5 +1,7 @@
 import { CustomerPanel } from "@/customer-center/CustomerPanel";
+import { CustomerEditModal } from "@/customer-center/CustomerEditModal";
 import { appMessage } from "@/shared/ui/appFeedback";
+import { Form } from "antd";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -508,6 +510,74 @@ describe("CustomersPage：扩展字段（BAS-04）", () => {
     await ui.click(screen.getByRole("button", { name: /建\s*档/ }));
     await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalled());
     expect(vi.mocked(customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五", extra_values: { referrer: "老王" } });
+  });
+
+  it("合作方自定义字段提交到 extra_values", async () => {
+    const counterpartyFieldDefs = [{
+      id: 101,
+      order_type_code: "COUNTERPARTY",
+      is_custom: true,
+      locked: false,
+      field_key: "settlement_note",
+      label: "结算备注",
+      field_type: "TEXT",
+      options: null,
+      required: false,
+      sort_order: 10,
+      is_active: true,
+    }] as unknown as import("@/shared/api/types/forms").OrderFormField[];
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => (
+      scope === "COUNTERPARTY" ? counterpartyFieldDefs : liveFieldDefs
+    ) as never);
+    vi.mocked(counterpartiesApi.page).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
+    vi.mocked(counterpartiesApi.create).mockResolvedValue({ id: 12 } as never);
+
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await ui.click(screen.getByRole("tab", { name: /合作方/ }));
+    await ui.click(await screen.findByRole("button", { name: /新建合作方$/ }));
+    await ui.type(await screen.findByLabelText("名称"), "同行乙");
+    await ui.type(await screen.findByLabelText("结算备注"), "月结");
+    await ui.click(screen.getByRole("button", { name: "建档" }));
+
+    await waitFor(() => expect(counterpartiesApi.create).toHaveBeenCalled());
+    expect(counterpartiesApi.create).toHaveBeenCalledWith(expect.objectContaining({
+      display_name: "同行乙",
+      extra_values: { settlement_note: "月结" },
+    }));
+  });
+
+  it("客户编辑时把日期扩展字段回填到日期控件", async () => {
+    const dateDef = {
+      id: 201,
+      order_type_code: "CUSTOMER",
+      is_custom: true,
+      locked: false,
+      field_key: "birthday",
+      label: "生日",
+      field_type: "DATE",
+      options: null,
+      required: false,
+      sort_order: 10,
+      is_active: true,
+    } as unknown as import("@/shared/api/types/forms").OrderFormField;
+    function DateEditHarness() {
+      const [editForm] = Form.useForm();
+      return (
+        <CustomerEditModal
+          editTarget={{ ...customers[0], extra_values: { birthday: "2026-11-16" } } as never}
+          activeDefs={[dateDef]}
+          editForm={editForm}
+          onCancel={() => undefined}
+          onSubmit={() => undefined}
+        />
+      );
+    }
+    renderLight(
+      <DateEditHarness />,
+    );
+
+    expect(await screen.findByLabelText("生日")).toHaveValue("2026-11-16");
   });
 
   it("详情抽屉展示扩展字段值，停用字段标注保留历史值", async () => {

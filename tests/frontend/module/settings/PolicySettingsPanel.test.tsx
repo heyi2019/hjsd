@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -164,6 +164,21 @@ it("生效期自查：未命中时提示该日该作用域无生效版本", asyn
   await ui.click(await screen.findByRole("button", { name: /生效期自查/ }));
   await ui.click(await screen.findByRole("button", { name: /解析/ }));
   expect(await screen.findByText(/没有生效的规则版本/)).toBeInTheDocument();
+});
+
+it("生效期自查：范围编号只接受正整数", async () => {
+  renderLight(<PolicySettingsPanel />, { user: "admin" });
+  await screen.findAllByText("分润分配");
+  await ui.click(await screen.findByRole("button", { name: /生效期自查/ }));
+  await ui.click(screen.getByRole("combobox", { name: "适用范围" }));
+  const dropdowns = document.querySelectorAll(".ant-select-dropdown");
+  const current = dropdowns[dropdowns.length - 1] as HTMLElement;
+  await ui.click(within(current).getByText("按业务类型", { selector: ".ant-select-item-option-content" }));
+  await ui.type(screen.getByLabelText("范围编号"), "1.5");
+  await ui.click(screen.getByRole("button", { name: /解析/ }));
+
+  expect(await screen.findByText("范围编号必须是正整数")).toBeInTheDocument();
+  expect(policyApi.resolve).not.toHaveBeenCalled();
 });
 
 it("草稿版本可取消（SUPERSEDED）：填理由后调用 policyApi.supersede", async () => {

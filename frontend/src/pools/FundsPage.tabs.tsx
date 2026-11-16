@@ -1,8 +1,9 @@
 /** 资金中心各 Tab 视图层：overview / cashflows / reconciliations / studio expenses。
  *  每个 Tab 通过 controller 消费 useFundsPageController 暴露的状态与处理器，自身只负责列定义与渲染。 */
 import { Card, Input, Space, Tooltip, Typography } from "antd";
+import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
-import { ConfirmButton, DataTable, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
+import { ConfirmButton, DataTable, DateField, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
@@ -131,8 +132,18 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
         <Select aria-label="流水资金性质" allowClear disabled={cashflowUnavailable} value={cashflowFundNature || undefined} placeholder="全部资金性质" options={flowFundNatureOptions ?? []} onChange={(value) => setCashflowFundNature(value ?? "")} />
         <Select aria-label="流水核算属性" allowClear disabled={cashflowUnavailable} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
         <Input aria-label="流水中类别筛选" allowClear value={cashflowCategory} placeholder="类别，如冲销" onChange={(event) => setCashflowCategory(event.target.value)} />
-        <Input aria-label="流水开始日期" value={cashflowFrom} placeholder="开始日期" onChange={(event) => setCashflowFrom(event.target.value)} />
-        <Input aria-label="流水结束日期" value={cashflowTo} placeholder="结束日期" onChange={(event) => setCashflowTo(event.target.value)} />
+        <DateField
+          aria-label="流水开始日期"
+          placeholder="开始日期"
+          value={cashflowFrom ? dayjs(cashflowFrom) : null}
+          onChange={(value) => setCashflowFrom(value?.format("YYYY-MM-DD") ?? "")}
+        />
+        <DateField
+          aria-label="流水结束日期"
+          placeholder="结束日期"
+          value={cashflowTo ? dayjs(cashflowTo) : null}
+          onChange={(value) => setCashflowTo(value?.format("YYYY-MM-DD") ?? "")}
+        />
         <PermissionButton permission="finance.read" onClick={() => void fetchCashflows()}>查询</PermissionButton>
         <PermissionButton permission="finance.read" size="small" loading={cashflowExporting} onClick={() => void exportCashflows()}>
           导出

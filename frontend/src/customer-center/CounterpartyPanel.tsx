@@ -30,6 +30,14 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
 
+  const collectCounterpartyExtras = (values: Record<string, unknown>, includeEmpty = false) => {
+    const formExtra = values.form_extra;
+    const nestedValues = formExtra && typeof formExtra === "object" && !Array.isArray(formExtra)
+      ? formExtra as Record<string, unknown>
+      : {};
+    return collectExtras(nestedValues, fieldDefs, { includeEmpty });
+  };
+
   const load = useCallback(async () => {
     try {
       const response = await counterpartiesApi.page({
@@ -94,7 +102,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         wechat: values.wechat as string,
         qq: values.qq as string,
         note: (values.note as string) || null,
-        extra_values: collectExtras(values, fieldDefs),
+        extra_values: collectCounterpartyExtras(values),
       });
       appMessage.success("合作方已建档");
       setOpen(false);
@@ -115,7 +123,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
         wechat: values.wechat as string,
         qq: values.qq as string,
         note: (values.note as string) || null,
-        extra_values: collectExtras(values, fieldDefs),
+        extra_values: collectCounterpartyExtras(values, true),
       });
       appMessage.success("合作方已更新");
       setEditTarget(null);
@@ -247,6 +255,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
                   wechat: editTarget.wechat ?? "",
                   qq: editTarget.qq ?? "",
                   note: editTarget.note ?? "",
+                  form_extra: editTarget.extra_values ?? {},
                 }
               : undefined
           }

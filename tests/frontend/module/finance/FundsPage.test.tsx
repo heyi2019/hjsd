@@ -210,6 +210,15 @@ describe("FundsPage：押金占用", () => {
 });
 
 describe("FundsPage：资金流水", () => {
+  it("资金流水日期筛选使用公共日期控件", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "流水" }));
+
+    expect(screen.getByLabelText("流水开始日期").closest(".ant-picker")).toBeInTheDocument();
+    expect(screen.getByLabelText("流水结束日期").closest(".ant-picker")).toBeInTheDocument();
+  });
+
   it("资金流水录入不再提供资金池账户选择", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });

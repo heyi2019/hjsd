@@ -3,6 +3,7 @@ import { BusinessActionModal, BusinessRegistrationForm, Select } from "../shared
 import { useEffect } from "react";
 import { today } from "./policyConstants";
 import { describeConfig } from "./policyConfigSchema";
+import { positiveIntegerRules } from "../shared/lib/validators";
 
 export interface PolicyResolveValues {
   policy_code: string;
@@ -46,6 +47,9 @@ export function PolicyResolveModal({
 }: PolicyResolveModalProps) {
   const [form] = Form.useForm<PolicyResolveValues>();
   const scopeType = Form.useWatch("scope_type", form);
+  const scopeIdRules = scopeType && scopeType !== "GLOBAL"
+    ? [{ required: true, message: "请输入范围编号" }, ...positiveIntegerRules("范围编号")]
+    : [];
 
   useEffect(() => {
     if (!open) return;
@@ -82,9 +86,9 @@ export function PolicyResolveModal({
         <Form.Item
           name="scope_id"
           label="范围编号"
-          rules={scopeType && scopeType !== "GLOBAL" ? [{ required: true, message: "请输入范围编号" }] : []}
+          rules={scopeIdRules}
         >
-          <Input type="number" min={1} placeholder="按人员、业务类型或资金池时填写" />
+          <Input inputMode="numeric" placeholder="按人员、业务类型或资金池时填写" />
         </Form.Item>
         {result ? (
           result.found && result.version ? (

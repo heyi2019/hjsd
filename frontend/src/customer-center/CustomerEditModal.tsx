@@ -2,7 +2,7 @@ import { Form, Input } from "antd";
 import type { FormInstance } from "antd";
 import type { Customer } from "../shared/api/types/customers";
 import type { OrderFormField } from "../shared/api/types/forms";
-import { BusinessActionModal, BusinessRegistrationForm, PermissionButton } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps, PermissionButton } from "../shared/ui";
 import { ExtraFieldControl } from "./CustomersPage.fragments";
 
 export function CustomerEditModal({
@@ -79,6 +79,8 @@ export function CustomerEditModal({
               name={def.field_key}
               label={def.label}
               valuePropName={def.field_type === "BOOLEAN" ? "checked" : "value"}
+              getValueFromEvent={def.field_type === "DATE" ? dateValueFromEvent : undefined}
+              getValueProps={def.field_type === "DATE" ? dateValueProps : undefined}
               rules={def.required ? [{ required: true, message: `请填写${def.label}` }] : []}
             >
               <ExtraFieldControl def={def} />

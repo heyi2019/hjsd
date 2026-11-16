@@ -25,4 +25,26 @@ describe("stocksApi 路由", () => {
 
     expect(apiMock.delete).toHaveBeenCalledWith("/stocks/7", { data: { reason: "重复录入" } });
   });
+
+  it("库存台账导出走后端筛选接口并读取明细失败计数", async () => {
+    const blob = new Blob(["csv"]);
+    apiMock.get.mockResolvedValueOnce({
+      data: blob,
+      headers: { "x-inventory-detail-failures": "2" },
+    });
+
+    const result = await stocksApi.inventoryLedgerExport({
+      business_mode: "SELF",
+      sort_desc: false,
+    });
+
+    expect(apiMock.get).toHaveBeenCalledWith(
+      "/stocks/inventory/ledger/export.csv",
+      expect.objectContaining({
+        params: expect.objectContaining({ business_mode: "SELF", sort_desc: false }),
+        responseType: "blob",
+      }),
+    );
+    expect(result).toEqual({ blob, failedDetailCount: 2 });
+  });
 });

@@ -97,6 +97,26 @@ const contract = { id: 21, inst_no: "INS-21", order_id: 77, contract_type: "INST
 
 async function openPanel(rows: Account[]) {
   resolveMock(vi.mocked(stocksApi.list), rows);
+  vi.mocked(stocksApi.inventoryLedger).mockResolvedValue({
+    items: rows.map((row) => ({
+      account: row,
+      order: {
+        id: row.source_order_id ?? row.id,
+        order_no: row.source_order_no ?? `HS-${row.id}`,
+        order_type: row.inventory_type === "CONSIGNMENT" ? "DG" : "HS",
+        capital_type: "SELF",
+        trade_date: "2026-10-15",
+        account_id: row.id,
+        account_status: "WAITING",
+        status: "ACTIVE",
+      },
+    })),
+    total: rows.length,
+    facet_total: rows.length,
+    type_counts: { RECOVERY: rows.length },
+    game_types: ["王者荣耀"],
+    stats: { account_count: rows.length, occupied_cost: "100.00", over_7d_count: 0, over_30d_count: 0 },
+  } as never);
   vi.mocked(ordersApi.list).mockResolvedValueOnce(rows.map((row) => ({
     id: row.source_order_id ?? row.id,
     order_no: row.source_order_no ?? `HS-${row.id}`,
@@ -139,6 +159,7 @@ beforeEach(() => {
   vi.mocked(installmentsApi.cancel).mockResolvedValue({} as never);
   vi.mocked(ordersApi.postEvent).mockResolvedValue({} as never);
   vi.mocked(ordersApi.executionDetail).mockResolvedValue(sellDetail);
+  vi.mocked(stocksApi.inventoryLedgerExport).mockResolvedValue({ blob: new Blob(["csv"]), failedDetailCount: 0 });
   vi.spyOn(message, "success").mockImplementation((() => undefined) as never);
   vi.spyOn(message, "error").mockImplementation((() => undefined) as never);
   vi.spyOn(message, "warning").mockImplementation((() => undefined) as never);
@@ -272,17 +293,18 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
   it("导出：读取明细并提示失败条数", async () => {
     const secondInStockRow = { ...inStockRow, id: 4, game_account: "acc-4" } as unknown as Account;
     await openPanel([inStockRow, secondInStockRow]);
-    vi.mocked(ordersApi.executionDetail)
-      .mockResolvedValueOnce(sellDetail)
-      .mockRejectedValueOnce(new Error("detail down"));
+    vi.mocked(stocksApi.inventoryLedgerExport).mockResolvedValueOnce({
+      blob: new Blob(["csv"]),
+      failedDetailCount: 1,
+    });
     await ui.click(screen.getByRole("button", { name: /导出/ }));
-    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalled());
+    await waitFor(() => expect(stocksApi.inventoryLedgerExport).toHaveBeenCalled());
     await waitFor(() => expect(message.warning).toHaveBeenCalledWith("1 条明细读取失败，已导出其余可用字段"));
   });
 
   it("导出成功后给出完成反馈", async () => {
     await openPanel([inStockRow]);
-    vi.mocked(ordersApi.executionDetail).mockResolvedValueOnce(sellDetail);
+    vi.mocked(stocksApi.inventoryLedgerExport).mockResolvedValueOnce({ blob: new Blob(["csv"]), failedDetailCount: 0 });
     await ui.click(screen.getByRole("button", { name: /导出/ }));
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("库存 CSV 已导出"));
   });

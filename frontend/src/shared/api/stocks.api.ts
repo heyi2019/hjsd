@@ -52,6 +52,24 @@ export const stocksApi = {
     game_types: string[];
     stats: InventoryStats;
   }>("/stocks/inventory/ledger", { params }).then((r) => r.data),
+  inventoryLedgerExport: async (params: {
+    business_mode?: string;
+    inventory_type?: string;
+    game_type?: string;
+    keyword?: string;
+    date_from?: string;
+    date_to?: string;
+    sort_desc?: boolean;
+  }): Promise<{ blob: Blob; failedDetailCount: number }> => {
+    const response = await api.get<Blob>("/stocks/inventory/ledger/export.csv", {
+      params: { ...params, _t: Date.now() },
+      responseType: "blob",
+    });
+    return {
+      blob: response.data,
+      failedDetailCount: Number(response.headers["x-inventory-detail-failures"] ?? 0),
+    };
+  },
   /** 删除不可恢复：原因必填，由后端写入审计日志（仅管理员可调用）。 */
   remove: (id: number, reason: string) =>
     api.delete<void>(`/stocks/${id}`, { data: { reason } }).then(() => undefined),

@@ -1,16 +1,13 @@
 import { appMessage } from "../../shared/ui/appFeedback";
 import { type Dayjs } from "dayjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ordersApi } from "../../shared/api/orders.api";
 import { stocksApi } from "../../shared/api/stocks.api";
-import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { InventoryStats } from "../../shared/api/types/accounts";
 import { normalizeError } from "../../shared/api/client";
-import { downloadInventoryCsv } from "../inventory-export";
+import { downloadBlob } from "../../shared/api/download";
+import { today } from "../../shared/lib/format";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { inventoryTypeOfOrder, mergeInventoryAccount, type InventoryOrderRow } from "./types";
-
-const PAGE_SIZE_MAX = 500;
 
 function toInventoryOrderRow(account: InventoryOrderRow["account"], order: InventoryOrderRow): InventoryOrderRow {
   return mergeInventoryAccount({
@@ -88,26 +85,12 @@ export function useInventoryList({ active = true, refreshKey = 0 }: { active?: b
   async function handleExport() {
     setExporting(true);
     try {
-      const allRows: InventoryOrderRow[] = [];
-      let offset = 0;
-      while (true) {
-        const result = await stocksApi.inventoryLedger({ ...filters, limit: PAGE_SIZE_MAX, offset });
-        allRows.push(...result.items.map(({ account, order }) => toInventoryOrderRow(account, order as InventoryOrderRow)));
-        offset += result.items.length;
-        if (!result.items.length || offset >= result.total) break;
-      }
-      const detailResults = await Promise.all(allRows.map(async (row) => {
-        try {
-          return [row.account.id, await ordersApi.executionDetail(row.id)] as const;
-        } catch {
-          return [row.account.id, undefined] as const;
-        }
-      }));
-      const details = Object.fromEntries(detailResults) as Partial<Record<number, AccountExecutionDetail>>;
-      const failedCount = detailResults.filter(([, detail]) => !detail).length;
-      downloadInventoryCsv(allRows.map((row) => row.account), details);
-      if (failedCount) appMessage.warning(`${failedCount} 条明细读取失败，已导出其余可用字段`);
+      const result = await stocksApi.inventoryLedgerExport(filters);
+      downloadBlob(result.blob, `库存中心_${today()}.csv`);
+      if (result.failedDetailCount) appMessage.warning(`${result.failedDetailCount} 条明细读取失败，已导出其余可用字段`);
       else appMessage.success("库存 CSV 已导出");
+    } catch (err) {
+      appMessage.error(normalizeError(err).message);
     } finally {
       setExporting(false);
     }

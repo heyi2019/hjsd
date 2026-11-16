@@ -33,6 +33,7 @@ from app.stocks.profile import (
     update_account_profile as stocks_update_account_profile,
 )
 from app.stocks.deletion import delete_inventory as stocks_delete_inventory
+from app.stocks.export import build_inventory_ledger_csv
 from app.parties.fields import get_extra_values
 from app.core.audit import record_audit
 from app.core.errors import PermissionDenied
@@ -225,6 +226,62 @@ def inventory_ledger(
         total=result["total"], facet_total=result["facet_total"], type_counts=result["type_counts"],
         game_types=result["game_types"], stats=result["stats"],
     )
+
+
+@router.get("/stocks/inventory/ledger/export.csv")
+def export_inventory_ledger_csv(
+    business_mode: str | None = Query(default=None),
+    inventory_type: str | None = Query(default=None),
+    game_type: str | None = Query(default=None),
+    keyword: str | None = Query(default=None, max_length=128),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    sort_desc: bool = Query(default=True),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> Response:
+    """按库存中心当前筛选口径导出；明细读取与 CSV 拼装不再由浏览器承担。"""
+    result = stocks_inventory_ledger(
+        db,
+        business_mode=business_mode,
+        inventory_type=inventory_type,
+        game_type=game_type,
+        keyword=keyword,
+        date_from=date_from,
+        date_to=date_to,
+        sort_desc=sort_desc,
+        limit=EXPORT_ROW_LIMIT,
+        offset=0,
+        user=user,
+    )
+    pairs = result["items"]
+    accounts = _account_outputs(db, [account for account, _order in pairs], user)
+    csv_text, failed_details = build_inventory_ledger_csv(
+        pairs,
+        accounts,
+        db=db,
+        user=user,
+    )
+    response = file_response(
+        csv_text,
+        f"库存中心-{date.today().isoformat()}.csv",
+        CSV_MEDIA_TYPE,
+    )
+    response.headers["X-Inventory-Detail-Failures"] = str(failed_details)
+    record_audit(
+        db,
+        action=AuditAction.LIST_EXPORT,
+        entity_type="list_export",
+        entity_id="INVENTORY",
+        actor=user.username,
+        after={
+            "rows": len(pairs),
+            "total": result["total"],
+            "truncated": result["total"] > EXPORT_ROW_LIMIT,
+            "detail_failures": failed_details,
+        },
+    )
+    return response
 
 
 @router.post("/stocks/inventory/stats", response_model=InventoryStatsOut)

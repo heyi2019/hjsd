@@ -6,7 +6,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import Date, case, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
@@ -91,8 +91,14 @@ def inventory_ledger(
              (Order.order_type == "DG", "CONSIGNMENT"), else_=None),
     )
     game_type_expr = func.coalesce(Account.game_type, Order.account_snapshot["game_type"].as_string())
-    business_mode_expr = func.coalesce(Account.business_mode, Order.business_mode)
-    entry_day = func.date(func.coalesce(Account.inventory_entry_at, Order.trade_date, Account.created_at))
+    business_mode_expr = func.coalesce(
+        Account.business_mode,
+        Order.account_snapshot["business_mode"].as_string(),
+    )
+    entry_day = cast(
+        func.date(func.coalesce(Account.inventory_entry_at, Order.trade_date, Account.created_at)),
+        Date,
+    )
 
     def stmt(*, include_type: bool = True, include_search_date: bool = True):
         query = select(Account, Order).join(Order, Order.account_id == Account.id).where(
@@ -117,9 +123,9 @@ def inventory_ledger(
                     func.coalesce(Account.platform, Order.account_snapshot["platform"].as_string()).ilike(pattern, escape=escape),
                 ))
             if date_from:
-                query = query.where(entry_day >= date_from.isoformat())
+                query = query.where(entry_day >= date_from)
             if date_to:
-                query = query.where(entry_day <= date_to.isoformat())
+                query = query.where(entry_day <= date_to)
         return query
 
     filtered = stmt()

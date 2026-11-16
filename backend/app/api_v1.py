@@ -122,6 +122,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Inventory-Detail-Failures"],
     )
 
     # 响应压缩：列表类端点返回高冗余 JSON（实测 /orders 约 489KB → gzip 约 16KB，压比 ~30x）。

@@ -39,7 +39,6 @@ export function useInventoryActions(params: {
   editorCancelInlineEdit: () => void;
   inlineEditId: number | null;
   // 上层回调
-  onOrdersChanged?: () => void;
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
 }) {
   const {
@@ -47,7 +46,7 @@ export function useInventoryActions(params: {
     executionDetails, setExecutionDetails, loadExecution, loadOrderExecution, loadEditorExecution, dropExecutionCache,
     expandTo, expandedOrderIds, removeFromInventory,
     editorOpenEditor, editorCancelInlineEdit, inlineEditId,
-    onOrdersChanged, onNavigate,
+    onNavigate,
   } = params;
   const [saleTarget, setSaleTarget] = useState<Account | null>(null);
   const [consignmentTarget, setConsignmentTarget] = useState<Account | null>(null);
@@ -185,7 +184,6 @@ export function useInventoryActions(params: {
       // 用户无法确认下架是否已经完成。
       void load();
       // 取消会改订单/流水状态，同步通知上层重拉台账与分期列表。
-      onOrdersChanged?.();
     } catch (cause) {
       setError(normalizeError(cause));
     } finally {
@@ -205,7 +203,6 @@ export function useInventoryActions(params: {
       expandTo(expandedOrderIds.filter((key) => String(key) !== String(target.source_order_id)));
       appMessage.success("已删除");
       await load();
-      onOrdersChanged?.();
     } catch (cause) {
       // 失败时弹窗保持打开，用户可改原因后重试；错误必须出声，不能「点了没反应」。
       appMessage.error(normalizeError(cause).message);

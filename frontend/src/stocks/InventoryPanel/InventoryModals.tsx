@@ -30,7 +30,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     invEditExtraForm,
     load,
     loadExecution,
-    onOrdersChanged,
     platformOffsaleTarget,
     profileTarget,
     rebateTarget,
@@ -73,7 +72,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           if (account) removeFromInventory(account.id, account.source_order_id ?? undefined);
           await load();
           if (account) controller.dropExecutionCache(account.id);
-          onOrdersChanged?.();
         };
         const common = { account: saleTarget, onClose: () => setSaleTarget(null), onCreated };
         if (saleTarget.inventory_type === "CONSIGNMENT") return <ConsignmentSaleModal {...common} />;
@@ -88,7 +86,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           setConsignmentTarget(null);
           await load();
           if (account) refreshExecution(account);
-          onOrdersChanged?.();
         }}
       />
       <InventoryRebateModal
@@ -99,7 +96,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           setRebateTarget(null);
           await load();
           if (account) refreshExecution(account);
-          onOrdersChanged?.();
         }}
       />
       <CashflowModal
@@ -111,7 +107,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           setCashflowTarget(null);
           await load();
           if (account) refreshExecution(account);
-          onOrdersChanged?.();
         }}
       />
       <InventoryCancellationDialog
@@ -150,7 +145,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
             appMessage.success("寄售记录已下架，账号已出库");
             await load();
             refreshExecution(target.account);
-            onOrdersChanged?.();
           } catch (cause) {
             controller.setError(normalizeError(cause));
             await load();
@@ -163,7 +157,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           await load();
           const detail = await ordersApi.executionDetail(account.source_order_id);
           setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
-          onOrdersChanged?.();
         }}
       />
       <BusinessActionModal

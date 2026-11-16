@@ -1,5 +1,5 @@
 /** 业务中心：库存中心、订单台账与分期回款。 */
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Dropdown, Tabs } from "antd";
 import { InventoryPanel } from "../stocks/InventoryPanel";
 import { InstallmentsPanel } from "../installments/InstallmentsPanel";
@@ -33,18 +33,8 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
   } = controller;
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [markingOverdue, setMarkingOverdue] = useState(false);
-  // 分期面板不再有刷新按钮，而 antd Tabs 默认保留已打开的页签（组件不卸载），
-  // 切回时不会重新 load —— 故「切入即刷新」：非首次切入时递增 refreshKey 触发重拉。
-  // 首屏已由挂载时的 load 覆盖，这里跳过，避免切进去就打两个请求。
-  const enteredCollectionsRef = useRef(activeTab === "collections");
   const handleTabChange = (key: BusinessCenterTab) => {
     setActiveTab(key);
-    if (key !== "collections") return;
-    if (enteredCollectionsRef.current) {
-      setInstallmentRefreshKey((value) => value + 1);
-    } else {
-      enteredCollectionsRef.current = true;
-    }
   };
   const markOverdue = async () => {
     setMarkingOverdue(true);
@@ -59,9 +49,10 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
 
   return (
     <section className="ui-stack orders-page">
-      <ErrorBanner error={loadError} onRetry={() => void load()} retrying={loading} />
+      {activeTab === "ledger" ? <ErrorBanner error={loadError} onRetry={() => void load()} retrying={loading} /> : null}
       <Tabs
         activeKey={activeTab}
+        destroyOnHidden
         onChange={(key) => handleTabChange(key as BusinessCenterTab)}
         tabBarExtraContent={activeTab === "collections" ? (
           <PermissionButton permission="order.event.post" size="small" loading={markingOverdue} onClick={() => void markOverdue()}>
@@ -87,7 +78,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
           {
             key: "inventory",
             label: "库存中心",
-            children: <InventoryPanel active={active} refreshKey={inventoryRefreshKey} onOrdersChanged={() => { setInstallmentRefreshKey((key) => key + 1); void load(); }} onNavigate={onNavigate} />,
+            children: <InventoryPanel active={active} refreshKey={inventoryRefreshKey} onNavigate={onNavigate} />,
           },
           {
             key: "ledger",

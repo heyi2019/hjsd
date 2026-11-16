@@ -4,12 +4,11 @@ import { InventoryView } from "./InventoryPanel/InventoryView";
 import { useInventoryController } from "./InventoryPanel/useInventoryController";
 import "./InventoryPanel.css";
 
-export function InventoryPanel({ refreshKey = 0, active = true, onOrdersChanged, onNavigate }: {
+export function InventoryPanel({ refreshKey = 0, active = true, onNavigate }: {
   refreshKey?: number;
   active?: boolean;
-  onOrdersChanged?: () => void;
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
 }) {
-  const controller = useInventoryController({ refreshKey, active, onOrdersChanged, onNavigate });
+  const controller = useInventoryController({ refreshKey, active, onNavigate });
   return <InventoryView controller={controller} />;
 }

@@ -6,9 +6,9 @@ import { type OrdersPageController } from "./useOrdersPageController";
 export function CreateBusinessModalWrapper({ controller }: { controller: OrdersPageController }) {
   const {
     createType,
+    activeTab,
     load,
     setCreateType,
-    setInstallmentRefreshKey,
     setInventoryRefreshKey,
   } = controller;
   return (
@@ -18,8 +18,7 @@ export function CreateBusinessModalWrapper({ controller }: { controller: OrdersP
         onCreated={async () => {
           setCreateType(undefined);
           setInventoryRefreshKey((key) => key + 1);
-          // 建单后同步重拉「分期回款」列表，覆盖售出分期等会生成新合约的场景。
-          setInstallmentRefreshKey((key) => key + 1);
+          if (activeTab !== "ledger") return;
           await load();
         }}
         initialOrderType={createType ?? "HS"}

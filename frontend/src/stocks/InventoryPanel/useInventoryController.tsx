@@ -7,7 +7,7 @@ import { useInventoryActions } from "./useInventoryActions";
 import { useInventoryColumns } from "./useInventoryColumns";
 import { mergeInventoryAccount } from "./types";
 
-export function useInventoryController({ refreshKey = 0, active = true, onOrdersChanged, onNavigate }: { refreshKey?: number; active?: boolean; onOrdersChanged?: () => void; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
+export function useInventoryController({ refreshKey = 0, active = true, onNavigate }: { refreshKey?: number; active?: boolean; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
   // 删除不可逆：按钮按系统角色显隐，后端仍做管理员二次鉴权。
   const { role } = useSession();
   const canDelete = role === "admin";
@@ -112,7 +112,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     editorOpenEditor: orderDetailEditor.openEditor,
     editorCancelInlineEdit: orderDetailEditor.cancelInlineEdit,
     inlineEditId,
-    onOrdersChanged, onNavigate,
+    onNavigate,
   });
   const {
   saleTarget,
@@ -202,7 +202,6 @@ export function useInventoryController({ refreshKey = 0, active = true, onOrders
     loadOrderExecution,
     mobileFieldOrder,
     onNavigate,
-    onOrdersChanged,
     openDetail,
     openEditor,
     openPartyCard,

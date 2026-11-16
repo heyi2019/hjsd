@@ -107,10 +107,7 @@ describe("设置导航注册表", () => {
   it("设置页与配置中心共用单一导航顺序", () => {
     expect(SETTINGS_TAB_ORDER).toEqual([
       "business-dictionary",
-      "policies",
-      "imports",
-      "users",
-      "teams",
+      "organization",
       "config-audit",
       "audit",
       "appearance",

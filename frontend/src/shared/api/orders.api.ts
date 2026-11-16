@@ -270,7 +270,7 @@ export const listColumnsApi = {
   all: () => api.get<ListScopeConfig[]>("/list-columns").then((r) => r.data),
   save: (
     scope: string,
-    items: Array<Pick<ListColumnConfig, "key" | "is_visible" | "sort_order" | "width" | "fixed">>,
+    items: Array<Pick<ListColumnConfig, "key" | "is_visible" | "sort_order" | "fixed">>,
   ) =>
     api
       .put<ListScopeConfig>(`/list-columns/${scope}`, {
@@ -278,7 +278,6 @@ export const listColumnsApi = {
           column_key: item.key,
           is_visible: item.is_visible,
           sort_order: item.sort_order,
-          width: item.width ?? null,
           fixed: item.fixed ?? null,
         })),
       })

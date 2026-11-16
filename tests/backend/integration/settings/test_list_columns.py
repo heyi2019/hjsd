@@ -125,15 +125,14 @@ def test_write_requires_permission(seeded_client, viewer_headers):
     assert response.status_code == 403, response.text
 
 
-def test_save_width_and_fixed(seeded_client, headers):
-    """列宽与固定列：保存后持久化；显式传 null 表示回到「不覆盖」。"""
+def test_save_fixed(seeded_client, headers):
+    """固定列保存后持久化；显式传 null 表示取消固定。"""
     ledger = _scope(seeded_client, headers, "LEDGER")
     items = [
         {
             "column_key": column["key"],
             "is_visible": column["is_visible"],
             "sort_order": index * 10,
-            "width": 180 if column["key"] == "account_game_type" else None,
             "fixed": "left" if column["key"] == "order_no" else None,
         }
         for index, column in enumerate(ledger["columns"])
@@ -141,30 +140,22 @@ def test_save_width_and_fixed(seeded_client, headers):
     response = _save(seeded_client, headers, "LEDGER", items)
     assert response.status_code == 200, response.text
     by_key = {column["key"]: column for column in response.json()["columns"]}
-    assert by_key["account_game_type"]["width"] == 180
     assert by_key["order_no"]["fixed"] == "left"
-    assert by_key["inventory_entry_at"]["width"] is None
 
     reloaded = {column["key"]: column for column in _scope(seeded_client, headers, "LEDGER")["columns"]}
-    assert reloaded["account_game_type"]["width"] == 180
     assert reloaded["order_no"]["fixed"] == "left"
 
     # 取消覆盖：传 null 后回到默认
-    next(item for item in items if item["column_key"] == "account_game_type")["width"] = None
     next(item for item in items if item["column_key"] == "order_no")["fixed"] = None
     cleared = _save(seeded_client, headers, "LEDGER", items)
     assert cleared.status_code == 200, cleared.text
     cleared_by_key = {column["key"]: column for column in cleared.json()["columns"]}
-    assert cleared_by_key["account_game_type"]["width"] is None
     assert cleared_by_key["order_no"]["fixed"] is None
 
 
-def test_invalid_width_and_fixed_rejected(seeded_client, headers):
-    """越界列宽与非法固定值一律 422（前端置灰之外的第二道闸）。"""
+def test_invalid_fixed_rejected(seeded_client, headers):
+    """非法固定值由后端拒绝。"""
     base = {"column_key": "order_no", "is_visible": True, "sort_order": 0}
-    too_wide = _save(seeded_client, headers, "LEDGER", [{**base, "width": 2000}])
-    assert too_wide.status_code == 422, too_wide.text
-
     bad_fixed = _save(seeded_client, headers, "LEDGER", [{**base, "fixed": "center"}])
     assert bad_fixed.status_code == 422, bad_fixed.text
 
@@ -177,7 +168,6 @@ def test_reset_restores_registry_default(seeded_client, headers, seeded_db):
             "column_key": column["key"],
             "is_visible": False if column["key"] == "status" else column["is_visible"],
             "sort_order": index * 10,
-            "width": 300 if column["key"] == "party" else None,
         }
         for index, column in enumerate(reversed(ledger["columns"]))
     ]
@@ -189,7 +179,7 @@ def test_reset_restores_registry_default(seeded_client, headers, seeded_db):
     reset = response.json()
     assert [column["key"] for column in reset["columns"]] == [column.key for column in _registry("LEDGER")]
     assert all(column["is_visible"] for column in reset["columns"])
-    assert all(column["width"] is None and column["fixed"] is None for column in reset["columns"])
+    assert all(column["fixed"] is None for column in reset["columns"])
 
     actions = [
         row.action

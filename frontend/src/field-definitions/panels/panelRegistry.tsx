@@ -20,11 +20,8 @@ import { ListColumnsPanel } from "./ListColumnsPanel";
 import { PartySourceSettingsPanel } from "./PartySourceSettingsPanel";
 import { PoolsAndRoutesPanel } from "./PoolsAndRoutesPanel";
 import { SequencesPanel } from "./SequencesPanel";
-import { PolicySettingsPanel } from "../../policy/PolicySettingsPanel";
-import { TeamsPanel } from "../../users/TeamsPanel";
-import { UsersPanel } from "../../users/UsersPanel";
+import { OrganizationSettingsPanel } from "../../users/OrganizationSettingsPanel";
 import { AppearancePanel } from "../../app/AppearancePanel";
-import { ImportWorkbench } from "../../imports/ImportWorkbench";
 import { BusinessReminderSettingsPanel } from "./BusinessReminderSettingsPanel";
 import { AuditPanel } from "../../audit/AuditPanel";
 
@@ -48,10 +45,7 @@ export const PANEL_REGISTRY: Record<string, PanelRenderer> = {
   "game-types": () => <GameTypeSettingsPanel />,
   "intermediary-platforms": () => <IntermediaryPlatformSettingsPanel />,
   "party-sources": () => <PartySourceSettingsPanel />,
-  "policies": () => <PolicySettingsPanel />,
-  "imports": () => <ImportWorkbench embedded />,
-  "users": () => <UsersPanel />,
-  "teams": () => <TeamsPanel />,
+  "organization": () => <OrganizationSettingsPanel />,
   "config-audit": () => <ConfigAuditPanel />,
   "audit": () => <AuditPanel />,
   "appearance": () => <AppearancePanel />,

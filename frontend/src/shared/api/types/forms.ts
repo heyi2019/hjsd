@@ -45,8 +45,6 @@ export interface ListColumnConfig {
   locked: boolean;
   is_visible: boolean;
   sort_order: number;
-  /** 列宽覆盖值（px）；null/undefined = 沿用列定义自身宽度 */
-  width?: number | null;
   /** 固定列；null/undefined = 不固定 */
   fixed?: "left" | "right" | null;
   /** 管理员新增的自定义列（绑定表单自定义字段） */

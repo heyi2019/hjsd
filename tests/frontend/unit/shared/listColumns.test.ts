@@ -102,24 +102,24 @@ describe("applyColumnConfig", () => {
     expect(columnKey({})).toBe("");
   });
 
-  it("配置里的列宽与固定态覆盖到列定义上", () => {
+  it("配置里的固定态覆盖到列定义上，列宽配置不再影响列定义", () => {
     const withSize: ListScopeConfig = {
       ...config,
       columns: config.columns.map((column) =>
         column.key === "order_no"
-          ? { ...column, width: 160, fixed: "left" as const }
+          ? { ...column, fixed: "left" as const }
           : column,
       ),
     };
     const result = applyColumnConfig(columns, withSize);
     const orderNo = result.find((column) => columnKey(column) === "order_no");
-    expect(orderNo).toMatchObject({ width: 160, fixed: "left" });
+    expect(orderNo).toMatchObject({ fixed: "left" });
     // 未配置宽度的列不受影响（仍是原对象，不无谓重建）
     const tradeDate = result.find((column) => columnKey(column) === "trade_date");
     expect(tradeDate).toEqual({ dataIndex: "trade_date" });
   });
 
-  it("width / fixed 为 null 时不覆盖，沿用列定义默认值", () => {
+  it("fixed 为 null 时不覆盖，沿用列定义默认值", () => {
     const original = [{ dataIndex: "order_no", width: 220 }];
     const result = applyColumnConfig(original, {
       code: "LEDGER",
@@ -131,7 +131,6 @@ describe("applyColumnConfig", () => {
           locked: true,
           is_visible: true,
           sort_order: 0,
-          width: null,
           fixed: null,
         },
       ],
@@ -183,7 +182,7 @@ describe("applyColumnConfig", () => {
     expect(hidden.map(columnKey)).not.toContain("extra:vip_tag");
   });
 
-  it("自定义列宽/固定态覆盖同样生效，且不重复注入同名内置列", () => {
+  it("自定义列固定态覆盖同样生效，且不重复注入同名内置列", () => {
     const withCustom: ListScopeConfig = {
       ...config,
       columns: [
@@ -194,7 +193,6 @@ describe("applyColumnConfig", () => {
           locked: false,
           is_visible: true,
           sort_order: 30,
-          width: 180,
           fixed: "left" as const,
           custom: true,
           source_key: "vip_tag",
@@ -204,7 +202,6 @@ describe("applyColumnConfig", () => {
     const result = applyColumnConfig(columns, withCustom);
     expect(result.filter((column) => columnKey(column) === "extra:vip_tag")).toHaveLength(1);
     expect(result.find((column) => columnKey(column) === "extra:vip_tag")).toMatchObject({
-      width: 180,
       fixed: "left",
     });
   });

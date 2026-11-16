@@ -1,5 +1,5 @@
 /** 列表列显示配置（前端读取侧）：
- *  从后端拿「哪些列显示 + 什么顺序 + 列宽/固定态」，按配置过滤/排序/覆盖任意 ColumnsType。
+ *  从后端拿「哪些列显示 + 什么顺序 + 固定态」，按配置过滤/排序/覆盖任意 ColumnsType。
  *
  *  设计要点：
  *  - 配置是**服务端单一事实源**（设置页可配、多人共享、有审计），前端不写本地副本；
@@ -173,7 +173,7 @@ export function formatCustomValue(
 
 /** 由配置生成自定义列定义：无 dataIndex，用 render 从行扩展字段取值。
  *
- *  生成的列 key 与后端 column_key 一致，因此后续过滤/排序/列宽/固定覆盖全部照常生效；
+ *  生成的列 key 与后端 column_key 一致，因此后续过滤/排序/固定覆盖全部照常生效；
  *  各列表页无需改动一行代码，只要调用了 arrange() 就会自动带上自定义列。
  */
 function buildCustomColumns<T extends { key?: unknown; dataIndex?: unknown }>(
@@ -195,11 +195,8 @@ function buildCustomColumns<T extends { key?: unknown; dataIndex?: unknown }>(
     );
 }
 
-/** 纯函数：按配置过滤 + 排序 + 覆盖列宽/固定态（便于单测；hook 只是数据来源包装）。
- *
- *  列宽与固定态只在配置里**有值**时覆盖：`null` 表示不覆盖，仍用列定义自身的默认值
- *  —— 这样代码里调整默认列宽不会被历史配置锁死，也不会为未配置的列多造对象。
- *  配置里 `custom` 的列会自动生成列定义注入（见 buildCustomColumns）。
+/** 纯函数：按配置过滤 + 排序 + 覆盖固定态（便于单测；hook 只是数据来源包装）。
+ * 配置里 `custom` 的列会自动生成列定义注入（见 buildCustomColumns）。
  */
 export function applyColumnConfig<T extends { key?: unknown; dataIndex?: unknown }>(
   columns: T[],
@@ -208,12 +205,10 @@ export function applyColumnConfig<T extends { key?: unknown; dataIndex?: unknown
   if (!config) return columns;
   const order = new Map<string, number>();
   const visible = new Map<string, boolean>();
-  const width = new Map<string, number>();
   const fixed = new Map<string, "left" | "right">();
   config.columns.forEach((column, index) => {
     order.set(column.key, column.sort_order ?? index);
     visible.set(column.key, column.is_visible);
-    if (column.width != null) width.set(column.key, column.width);
     if (column.fixed) fixed.set(column.key, column.fixed);
   });
   const existing = new Set(columns.map(columnKey));
@@ -224,14 +219,12 @@ export function applyColumnConfig<T extends { key?: unknown; dataIndex?: unknown
   const decorated = source
     .map((column, index) => {
       const key = columnKey(column);
-      const widthOverride = width.get(key);
       const fixedOverride = fixed.get(key);
       const merged =
-        widthOverride == null && fixedOverride == null
+        fixedOverride == null
           ? column
           : ({
               ...column,
-              ...(widthOverride != null ? { width: widthOverride } : {}),
               ...(fixedOverride ? { fixed: fixedOverride } : {}),
             } as unknown as T);
       return { column: merged, index, key };

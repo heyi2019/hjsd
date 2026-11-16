@@ -58,6 +58,13 @@ const ledgerWithCustom: ListScopeConfig = {
 };
 
 describe("ListColumnsPanel", () => {
+  it("不再提供列宽配置，只保留显示、顺序与固定列", async () => {
+    renderLight(<ListColumnsPanel />, { user: "admin" });
+    await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());
+    expect(screen.queryByRole("columnheader", { name: "列宽" })).toBeNull();
+    expect(screen.queryByRole("spinbutton", { name: /列宽/ })).toBeNull();
+  });
+
   beforeEach(() => {
     vi.mocked(listColumnsApi.all).mockResolvedValue([ledger, inventory]);
     vi.mocked(listColumnsApi.reset).mockResolvedValue(ledger);
@@ -98,7 +105,6 @@ describe("ListColumnsPanel", () => {
         locked: (scope === "LEDGER" ? ledger : inventory).columns.find((c) => c.key === item.key)?.locked ?? false,
         is_visible: item.is_visible,
         sort_order: index * 10,
-        width: item.width ?? null,
         fixed: item.fixed ?? null,
       })),
     }));
@@ -157,50 +163,15 @@ describe("ListColumnsPanel", () => {
     expect(screen.queryByText("对方 / 来源")).not.toBeInTheDocument();
   });
 
-  it("列宽：输入后不立即提交，失焦才提交一次并夹到 40~800", async () => {
+  it("固定列：选中后随整表提交", async () => {
     renderLight(<ListColumnsPanel />);
     await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());
-
-    const input = screen.getByRole("spinbutton", { name: "列宽_party" });
-    await userEvent.clear(input);
-    await userEvent.type(input, "180");
-    // 打字过程中不打接口
-    expect(listColumnsApi.save).not.toHaveBeenCalled();
-
-    await userEvent.tab();
-    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(1));
-    const [, items] = vi.mocked(listColumnsApi.save).mock.calls[0];
-    expect(items.find((item) => item.key === "party")?.width).toBe(180);
-
-    // 越界值由组件夹到 40~800，避免提交必然 422 的请求
-    const again = screen.getByRole("spinbutton", { name: "列宽_party" });
-    await userEvent.clear(again);
-    await userEvent.type(again, "9999");
-    await userEvent.tab();
-    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(2));
-    const calls = vi.mocked(listColumnsApi.save).mock.calls;
-    const clamped = calls[calls.length - 1][1].find((item) => item.key === "party")?.width ?? 0;
-    expect(clamped).toBeLessThanOrEqual(800);
-    expect(clamped).toBeGreaterThanOrEqual(40);
-  });
-
-  it("固定列：选中后随整表提交，且不覆盖已设列宽", async () => {
-    renderLight(<ListColumnsPanel />);
-    await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());
-
-    const input = screen.getByRole("spinbutton", { name: "列宽_party" });
-    await userEvent.clear(input);
-    await userEvent.type(input, "200");
-    await userEvent.tab();
-    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(1));
 
     await userEvent.click(screen.getByRole("combobox", { name: "固定_party" }));
     await userEvent.click(await screen.findByTitle("固定左侧"));
-    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(2));
-    const calls = vi.mocked(listColumnsApi.save).mock.calls;
-    const lastItems = calls[calls.length - 1][1];
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalledTimes(1));
+    const lastItems = vi.mocked(listColumnsApi.save).mock.calls[0][1];
     expect(lastItems.find((item) => item.key === "party")?.fixed).toBe("left");
-    expect(lastItems.find((item) => item.key === "party")?.width).toBe(200);
   });
 
   it("全部显示：一次提交把所有列设为可见", async () => {

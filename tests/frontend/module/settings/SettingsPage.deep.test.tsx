@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gameTypesApi } from "@/shared/api/misc.api";
 import { orderTypesApi } from "@/shared/api/orders.api";
-import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { auditApi } from "@/shared/api/reports.api";
 import type { Pool } from "@/shared/api/types/finance";
@@ -15,7 +14,6 @@ vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
-vi.mock("@/shared/api/policy.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
@@ -51,7 +49,6 @@ beforeEach(() => {
   vi.mocked(orderTypesApi.list).mockResolvedValue(orderTypes);
   vi.mocked(poolsApi.list).mockResolvedValue(pools);
   vi.mocked(gameTypesApi.list).mockResolvedValue([]);
-  vi.mocked(policyApi.list).mockResolvedValue({ items: [], total: 0 });
   vi.mocked(auditApi.list).mockResolvedValue({ items: [], total: 0 });
   vi.mocked(auditApi.actions).mockResolvedValue([]);
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
@@ -75,12 +72,14 @@ async function openConfigCenter() {
 }
 
 describe("SettingsPage.deep", () => {
-  it("管理员可见全部条件 Tab（导入/人员与权限/团队管理），业务配置类已聚合进配置中心", async () => {
+  it("管理员可见保留的设置入口，规则清单与导入已下线，人员和团队合并", async () => {
     renderLight(<SettingsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务字典" });
-    expect(screen.getByRole("tab", { name: "导入" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "人员与权限" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "团队管理" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "导入" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "经营规则" })).toBeNull();
+    expect(screen.getByRole("tab", { name: "人员与团队" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "人员与权限" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "团队管理" })).toBeNull();
     expect(screen.getByRole("tab", { name: "审计记录" })).toBeInTheDocument();
     // 配置中心为聚合入口
     expect(screen.getByRole("tab", { name: "配置中心" })).toBeInTheDocument();
@@ -98,12 +97,13 @@ describe("SettingsPage.deep", () => {
     expect(screen.getByPlaceholderText("对象编号")).toBeInTheDocument();
   });
 
-  it("查看人(viewer)屏蔽 import.manage / user.manage 条件 Tab，配置中心仍可见", async () => {
+  it("查看人(viewer)屏蔽 user.manage 条件 Tab，配置中心仍可见", async () => {
     renderLight(<SettingsPage />, { user: "viewer" });
     await screen.findByRole("tab", { name: "业务字典" });
     expect(screen.queryByRole("tab", { name: "导入" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "人员与权限" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "团队管理" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "人员与团队" })).toBeNull();
     // 配置中心（含无权限字段/主数据项）仍可作为入口
     expect(screen.getByRole("tab", { name: "配置中心" })).toBeInTheDocument();
   });
@@ -146,7 +146,7 @@ describe("SettingsPage.deep", () => {
     expect(await screen.findByText("托管池")).toBeInTheDocument();
   });
 
-  it("配置中心内可遍历业务类型与游戏类型，设置页仍可打开经营规则与外观", async () => {
+  it("配置中心内可遍历业务类型与游戏类型，设置页仍可打开外观", async () => {
     // AppearancePanel 依赖 GlassProvider，需走 renderApp（含 AllProviders）。
     renderApp(<SettingsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务字典" });
@@ -157,10 +157,6 @@ describe("SettingsPage.deep", () => {
 
     await ui.click(screen.getByTestId("center-nav-game-types"));
     await waitFor(() => expect(vi.mocked(gameTypesApi.list)).toHaveBeenCalled());
-
-    // 回到设置页主 Tab（非业务配置类仍独立存在）
-    await ui.click(screen.getByRole("tab", { name: "经营规则" }));
-    await waitFor(() => expect(vi.mocked(policyApi.list)).toHaveBeenCalled());
 
     await ui.click(screen.getByRole("tab", { name: "外观" }));
     expect(await screen.findByText("玻璃材质透明度")).toBeInTheDocument();

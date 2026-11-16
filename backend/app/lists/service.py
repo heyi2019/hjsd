@@ -1,10 +1,10 @@
 """lists.service：列表列配置的读取与保存 + 自定义列定义。
 
 口径：
-- 列清单与中文名以注册表为准，库只存 is_visible / sort_order / width / fixed；
+- 列清单与中文名以注册表为准，库只存 is_visible / sort_order / fixed；
 - 缺行的列（新增列）默认可见，按注册表位置插入，不需要数据迁移；
 - 锁定列（身份列/操作列）不允许隐藏，后端二次校验，不能只靠前端置灰；
-- width / fixed 只存「覆盖值」，None 表示沿用列定义默认（代码改默认不会被历史配置锁死）；
+- fixed 只存「覆盖值」，None 表示不固定；
 - 保存整表覆盖该 scope，并写审计（前后值都记，便于追溯谁把哪列关了）。
 
 自定义列（ListCustomColumn）：
@@ -107,7 +107,6 @@ def _merge(
                 "value_labels": None,
                 "is_visible": row.is_visible if row is not None else True,
                 "sort_order": row.sort_order if row is not None else index * 10,
-                "width": row.width if row is not None else None,
                 "fixed": row.fixed if row is not None else None,
             }
         )
@@ -127,7 +126,6 @@ def _merge(
                 "value_labels": definition.value_labels or None,
                 "is_visible": row.is_visible if row is not None else True,
                 "sort_order": row.sort_order if row is not None else base + position * 10,
-                "width": row.width if row is not None else None,
                 "fixed": row.fixed if row is not None else None,
             }
         )
@@ -164,7 +162,6 @@ def _config_snapshot(rows: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
         key: {
             "is_visible": row.is_visible,
             "sort_order": row.sort_order,
-            "width": row.width,
             "fixed": row.fixed,
         }
         for key, row in rows.items()
@@ -244,7 +241,6 @@ def save_config(
                     column_key=key,
                     is_visible=item["is_visible"],
                     sort_order=sort_order,
-                    width=item.get("width"),
                     fixed=item.get("fixed"),
                     created_by=actor,
                     updated_by=actor,
@@ -255,12 +251,10 @@ def save_config(
         if (
             row.is_visible != item["is_visible"]
             or row.sort_order != sort_order
-            or row.width != item.get("width")
             or row.fixed != item.get("fixed")
         ):
             row.is_visible = item["is_visible"]
             row.sort_order = sort_order
-            row.width = item.get("width")
             row.fixed = item.get("fixed")
             row.updated_by = actor
             changed = True
@@ -271,7 +265,6 @@ def save_config(
             item["column_key"]: {
                 "is_visible": item["is_visible"],
                 "sort_order": index * 10,
-                "width": item.get("width"),
                 "fixed": item.get("fixed"),
             }
             for index, item in enumerate(items)

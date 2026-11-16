@@ -1,10 +1,10 @@
-/** 列表字段配置（设置页）：决定各列表**显示哪些列**、**列的先后顺序**、**列宽与固定列**，
+/** 列表字段配置（设置页）：决定各列表**显示哪些列**、**列的先后顺序**与**固定列**，
  *  并可**新增自定义列**（绑定表单自定义字段，值从行数据扩展字段取）。
  *
  * 覆盖订单台账、库存中心、分期与回款、客户、返点、资金流水、报表、审计等现役列表。
  * 口径：
  *  - 内置列清单与中文名由后端注册表下发（app/lists/scopes.py），此处只改
- *    「显示/隐藏 + 顺序 + 列宽 + 固定列」；
+ *    「显示/隐藏 + 顺序 + 固定列」；
  *  - 自定义列由管理员新增，绑定一个已启用的表单自定义字段（field_key）；列键统一
  *    `extra:{field_key}`，显示状态与内置列共用同一套保存逻辑；
  *  - 所有列（含身份列/操作列）均可隐藏与调序，无锁定约束；
@@ -14,7 +14,7 @@
  *  - 恢复默认只清显示配置，自定义列定义保留；要删必须显式点「删除」。
  *  - 注意：部分列表（报表/审计等）的行数据不带扩展字段，新增的列会显示为空（"-"）。
  */
-import { Input, InputNumber, Modal, Space, Typography } from "antd";
+import { Input, Modal, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listColumnsApi } from "../../shared/api/orders.api";
@@ -40,18 +40,12 @@ const FIXED_OPTIONS = [
   { value: "right", label: "固定右侧" },
 ];
 
-/** 列宽最小/最大值：与后端 ListColumnItem 的 40~800 保持一致。 */
-const WIDTH_MIN = 40;
-const WIDTH_MAX = 800;
-
 export function ListColumnsPanel() {
   const [scopes, setScopes] = useState<ListScopeConfig[]>([]);
   const [activeScope, setActiveScope] = useState<string>("");
   const [rows, setRows] = useState<ListColumnConfig[]>([]);
   const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
   const [saving, setSaving] = useState(false);
-  /** 列宽输入草稿：只在失焦/回车时提交，避免每敲一个数字打一次接口。 */
-  const [widthDrafts, setWidthDrafts] = useState<Record<string, number | null>>({});
   // 新增自定义列弹窗状态
   const [addOpen, setAddOpen] = useState(false);
   const [fieldOptions, setFieldOptions] = useState<ListCustomFieldOption[]>([]);
@@ -71,11 +65,10 @@ export function ListColumnsPanel() {
     setRows(items.find((item) => item.code === target)?.columns ?? []);
   }, []);
 
-  /** 一次保存成功后统一回填：行、scope 缓存、列宽草稿、通知所有已挂载列表重排。 */
+  /** 一次保存成功后统一回填行、scope 缓存，并通知所有已挂载列表重排。 */
   const applySaved = useCallback((saved: ListScopeConfig) => {
     setRows(saved.columns);
     setScopes((items) => items.map((item) => (item.code === saved.code ? saved : item)));
-    setWidthDrafts({});
     refreshListColumns();
   }, []);
 
@@ -95,7 +88,6 @@ export function ListColumnsPanel() {
   const switchScope = (code: string) => {
     setActiveScope(code);
     setRows(scopes.find((item) => item.code === code)?.columns ?? []);
-    setWidthDrafts({});
     setSelectedRowKeys([]);
   };
 
@@ -111,7 +103,6 @@ export function ListColumnsPanel() {
           key: column.key,
           is_visible: column.is_visible,
           sort_order: index * 10,
-          width: column.width ?? null,
           fixed: column.fixed ?? null,
         })),
       );
@@ -130,27 +121,6 @@ export function ListColumnsPanel() {
       rows.map((column) => (column.key === key ? { ...column, is_visible: visible } : column)),
       visible ? "已设为显示" : "已隐藏该列",
     );
-
-  /** 列宽：留空 = 自适应（存 null，表示不覆盖列定义宽度）。 */
-  const setWidthDraft = (key: string, value: number | null) =>
-    setWidthDrafts((prev) => ({ ...prev, [key]: value }));
-
-  const commitWidth = (key: string, current: number | null | undefined) => {
-    if (!(key in widthDrafts)) return;
-    const draft = widthDrafts[key];
-    setWidthDrafts((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-    const normalized =
-      draft === null ? null : Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, Math.round(draft)));
-    if ((normalized ?? null) === (current ?? null)) return;
-    void persist(
-      rows.map((column) => (column.key === key ? { ...column, width: normalized } : column)),
-      normalized ? `列宽已设为 ${normalized} px` : "已改为自适应宽度",
-    );
-  };
 
   const setFixed = (key: string, fixed: string) =>
     persist(
@@ -297,28 +267,6 @@ export function ListColumnsPanel() {
         <Space size={4}>
           <StatusTag status={visible ? "ACTIVE" : "DISABLED"} label={visible ? "显示" : "已隐藏"} />
         </Space>
-      ),
-    },
-    {
-      title: "列宽",
-      dataIndex: "width",
-      width: 150,
-      render: (width: number | null | undefined, row) => (
-        <InputNumber
-          className="ui-control-width-120"
-          size="small"
-          aria-label={`列宽_${row.key}`}
-          min={WIDTH_MIN}
-          max={WIDTH_MAX}
-          step={20}
-          placeholder="自适应"
-          suffix="px"
-          value={row.key in widthDrafts ? widthDrafts[row.key] : (width ?? null)}
-          disabled={saving}
-          onChange={(next) => setWidthDraft(row.key, typeof next === "number" ? next : null)}
-          onBlur={() => commitWidth(row.key, width)}
-          onPressEnter={() => commitWidth(row.key, width)}
-        />
       ),
     },
     {
@@ -514,7 +462,7 @@ export function ListColumnsPanel() {
           从候选里选一个字段，把它作为一列加到当前列表：可以是表单自定义字段（SELECT
           值会翻成中文），也可以是「数据中已有值」的历史字段（按原值展示）。
           列值取自行数据的扩展字段（form_extra / extra_values）；若该列表的行没有这个字段值，
-          单元格会显示「-」。列名可自定义，新增后可照常隐藏、排序、调列宽与固定。
+          单元格会显示「-」。列名可自定义，新增后可照常隐藏、排序与固定。
         </Typography.Paragraph>
         <Space direction="vertical" className="ui-control-full">
           <Typography.Text strong>来源字段</Typography.Text>

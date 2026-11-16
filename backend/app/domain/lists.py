@@ -6,7 +6,7 @@
 
 `ListCustomColumn` 存管理员在「设置 → 列表字段」里**新增的列**：它绑定一个表单自定义
 字段（field_key），列值从行数据的 form_extra / extra_values 里按该键取。显示状态
-（可见/顺序/列宽/固定）仍复用 `ListColumnConfig`，列键统一加 `extra:` 前缀以免与
+（可见/顺序/固定）仍复用 `ListColumnConfig`，列键统一加 `extra:` 前缀以免与
 注册表内置列撞名。恢复默认只清配置行，不删自定义列定义 —— 新增的列是配置资产，
 要删必须显式删除。
 """
@@ -32,9 +32,7 @@ class ListColumnConfig(Base, AuditMixin):
     column_key: Mapped[str] = mapped_column(String(64), nullable=False)
     is_visible: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    # 列宽与固定态：NULL = 不覆盖，沿用列定义自身的宽度/不固定。
-    # 只存「覆盖值」，代码里调整默认列宽不会被历史配置锁死。
-    width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # 固定态：NULL = 不固定。
     fixed: Mapped[str | None] = mapped_column(String(8), nullable=True)
 
 

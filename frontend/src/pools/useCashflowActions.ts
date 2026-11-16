@@ -48,6 +48,7 @@ export function useCashflowActions({ load, write }: CashflowActionsDeps) {
       await cashflowsApi.reverse(targetId, {
         reversed_on: values.reversed_on as string,
         reason: values.reason as string,
+        operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
       appMessage.success("流水已冲销");
       setReverseTarget(null);

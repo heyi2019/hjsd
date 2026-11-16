@@ -12,6 +12,7 @@ from app.core.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
 from app.core.numbering import allocate_flow_no
+from app.core.operation_operators import upsert_operation_operators
 from app.core.security import CurrentUser
 from app.domain.enums import AccountingAttribute, AuditAction, Direction, FundNature, Nature
 from app.domain.trade import Cashflow
@@ -31,6 +32,7 @@ def create_transfer(
     actor: str,
     note: str | None = None,
     form_extra: dict[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """原子生成一出一入的 INTERNAL 流水，完成池间转移且不改变合并现金。"""
@@ -95,6 +97,15 @@ def create_transfer(
             "amount": str(money),
         },
     )
+    upsert_operation_operators(
+        session,
+        entity_type="transfer",
+        entity_id=transfer_id,
+        operation_key="CREATE",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+        occurred_at=outgoing.created_at,
+    )
     return {
         "transfer_id": transfer_id,
         "source_pool_id": source.id,
@@ -113,6 +124,7 @@ def repair_transfer(
     actor: str,
     reason: str,
     form_extra: dict[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """只为单边内部划转补齐缺失的一边，禁止把异常静默当成正常新划转。"""
@@ -192,6 +204,15 @@ def repair_transfer(
             "amount": str(flow.amount),
         },
         reason=text_reason,
+    )
+    upsert_operation_operators(
+        session,
+        entity_type="transfer",
+        entity_id=transfer,
+        operation_key="REPAIR",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+        occurred_at=flow.created_at,
     )
     return {
         "transfer_id": transfer,

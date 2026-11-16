@@ -358,6 +358,7 @@ def reverse_cashflow(
         reason=payload.reason,
         form_extra=payload.form_extra,
         form_extra_scope=payload.form_extra_scope,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
     return _cashflow_out(db, flow)

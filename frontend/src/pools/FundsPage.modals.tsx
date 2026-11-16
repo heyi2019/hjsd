@@ -178,14 +178,14 @@ export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
 }
 
 export function TransferModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { transferOpen, setTransferOpen, transferForm, submitTransfer, write, pools } = ctrl;
+  const { transferOpen, setTransferOpen, transferForm, submitTransfer, write, pools, employees } = ctrl;
   return (
     <FundsActionModal
-      title="资金池划转" fieldCount={5}
+      title="资金池划转" fieldCount={6}
       open={transferOpen} onCancel={() => setTransferOpen(false)}
       scope="FUNDTRANSFER" form={transferForm} onFinish={submitTransfer}
       initialValues={{ occurred_on: today() }}
-      write={write} permission="finance.transfer" submitLabel="确认划转"
+      write={write} permission="finance.transfer" submitLabel="确认划转" employees={employees} showOperator
     >
       <CfgItem name="source_pool_id" label="转出资金池" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
       <CfgItem name="target_pool_id" label="转入资金池" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
@@ -197,14 +197,14 @@ export function TransferModal({ ctrl }: { ctrl: FundsPageController }) {
 }
 
 export function ReconciliationModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { reconciliationOpen, setReconciliationOpen, reconciliationForm, submitReconciliation, write, pools } = ctrl;
+  const { reconciliationOpen, setReconciliationOpen, reconciliationForm, submitReconciliation, write, pools, employees } = ctrl;
   return (
     <FundsActionModal
-      title="新增资金对账" fieldCount={7}
+      title="新增资金对账" fieldCount={8}
       open={reconciliationOpen} onCancel={() => setReconciliationOpen(false)}
       scope="FUNDRECON" form={reconciliationForm} onFinish={submitReconciliation}
       initialValues={{ reconciled_on: today() }}
-      write={write} permission="deposit.post" submitLabel="提交对账"
+      write={write} permission="deposit.post" submitLabel="提交对账" employees={employees} showOperator
     >
       <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select aria-label="资金池" options={poolOptions(pools)} /></CfgItem>
       <CfgItem name="reconciled_on" label="对账日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
@@ -217,13 +217,13 @@ export function ReconciliationModal({ ctrl }: { ctrl: FundsPageController }) {
 }
 
 export function ResolveModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { resolveTarget, setResolveTarget, resolveForm, resolveReconciliation, write } = ctrl;
+  const { resolveTarget, setResolveTarget, resolveForm, resolveReconciliation, write, employees } = ctrl;
   return (
     <FundsActionModal
-      title="核销对账差异" fieldCount={1}
+      title="核销对账差异" fieldCount={2}
       open={Boolean(resolveTarget)} onCancel={() => setResolveTarget(null)}
       scope="FUNDCLEAR" form={resolveForm} onFinish={resolveReconciliation}
-      write={write} permission="deposit.post" submitLabel="确认核销"
+      write={write} permission="deposit.post" submitLabel="确认核销" employees={employees} showOperator
     >
       <CfgItem name="reason" label="处理说明" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
     </FundsActionModal>
@@ -231,13 +231,13 @@ export function ResolveModal({ ctrl }: { ctrl: FundsPageController }) {
 }
 
 export function ReverseModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { reverseTarget, setReverseTarget, reverseForm, reverseCashflow, write } = ctrl;
+  const { reverseTarget, setReverseTarget, reverseForm, reverseCashflow, write, employees } = ctrl;
   return (
     <FundsActionModal
-      title="冲销资金流水" fieldCount={2}
+      title="冲销资金流水" fieldCount={3}
       open={Boolean(reverseTarget)} onCancel={() => setReverseTarget(null)}
       scope="FUNDREVERSE" form={reverseForm} onFinish={reverseCashflow}
-      write={write} permission="deposit.post" submitLabel="确认冲销"
+      write={write} permission="deposit.post" submitLabel="确认冲销" employees={employees} showOperator
       formIntro={
         <Typography.Paragraph type="secondary" className="ui-drawer-hint">
           冲销会生成一笔方向相反、金额相同的流水：自动继承原流水的资金性质，核算属性固定为「冲销」，

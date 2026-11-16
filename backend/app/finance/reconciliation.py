@@ -13,6 +13,7 @@ from app.core.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.time import now_second
 from app.core.money import to_money
+from app.core.operation_operators import upsert_operation_operators
 from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, CashflowStatus, Direction, ReconciliationStatus
 from app.domain.trade import Cashflow, Reconciliation
@@ -63,6 +64,7 @@ def create_reconciliation(
     reason: str | None = None,
     note: str | None = None,
     form_extra: dict[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Reconciliation:
     if user is not None and not user.can_see_pool(pool_id):
@@ -168,6 +170,15 @@ def create_reconciliation(
         },
         reason=text_reason or None,
     )
+    upsert_operation_operators(
+        session,
+        entity_type="reconciliation",
+        entity_id=item.id,
+        operation_key="CREATE",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+        occurred_at=item.created_at,
+    )
     return item
 
 
@@ -206,6 +217,7 @@ def resolve_reconciliation(
     actor: str,
     reason: str,
     form_extra: dict[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Reconciliation:
     text_reason = _text(
@@ -233,6 +245,14 @@ def resolve_reconciliation(
         actor=actor,
         after={"status": item.status, "resolved_by": actor},
         reason=text_reason,
+    )
+    upsert_operation_operators(
+        session,
+        entity_type="reconciliation",
+        entity_id=item.id,
+        operation_key="RESOLVE",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
     )
     return item
 

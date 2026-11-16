@@ -109,9 +109,16 @@ def _rebate_out(
     return schemas.RebateOut.model_validate(payload)
 
 
-def _reconciliation_out(item) -> schemas.ReconciliationOut:
+def _reconciliation_out(item, db: Session | None = None) -> schemas.ReconciliationOut:
     return schemas.ReconciliationOut.model_validate(
-        {**vars(item), "created_at": item.created_at, "operator": item.created_by}
+        {
+            **vars(item),
+            "created_at": item.created_at,
+            "operator": item.created_by,
+            "operation_operators": list_operation_operators(
+                db, entity_type="reconciliation", entity_id=item.id
+            ) if db is not None else [],
+        }
     )
 
 
@@ -126,6 +133,9 @@ def _transfer_out(db: Session, result: dict) -> schemas.TransferOut:
         occurred_on=result["occurred_on"],
         created_at=first_flow.created_at,
         operator=first_flow.created_by,
+        operation_operators=list_operation_operators(
+            db, entity_type="transfer", entity_id=result["transfer_id"]
+        ),
         cashflows=[_cashflow_out(db, flow) for flow in flows],
     )
 

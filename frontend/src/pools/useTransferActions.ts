@@ -22,6 +22,7 @@ export function useTransferActions({ load, write }: TransferActionsDeps) {
         amount: values.amount as string,
         occurred_on: values.occurred_on as string,
         note: values.note as string,
+        operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
       appMessage.success("资金池划转已登记");
       setTransferOpen(false);

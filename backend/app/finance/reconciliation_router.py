@@ -46,7 +46,7 @@ def list_reconciliations(
         else sorted(user.pool_ids),
         user=user,
     )
-    return [_reconciliation_out(item) for item in items]
+    return [_reconciliation_out(item, db) for item in items]
 
 
 @router.post("/reconciliations", response_model=schemas.ReconciliationOut, status_code=201)
@@ -67,10 +67,11 @@ def create_reconciliation(
         reason=payload.reason,
         note=payload.note,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         actor=_actor(user),
         user=user,
     )
-    return _reconciliation_out(item)
+    return _reconciliation_out(item, db)
 
 
 @router.post(
@@ -89,9 +90,10 @@ def resolve_reconciliation(
         actor=_actor(user),
         reason=payload.reason,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
-    return _reconciliation_out(item)
+    return _reconciliation_out(item, db)
 
 
 @router.post("/transfers", response_model=schemas.TransferOut, status_code=201)
@@ -111,6 +113,7 @@ def create_transfer(
         actor=_actor(user),
         note=payload.note,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
     return _transfer_out(db, result)
@@ -135,6 +138,7 @@ def repair_transfer(
         actor=_actor(user),
         reason=payload.reason,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
     return _transfer_out(db, result)

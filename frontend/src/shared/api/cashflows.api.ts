@@ -5,7 +5,7 @@ export const cashflowsApi = {
   create: (data: Record<string, unknown>) => api.post<Cashflow>("/cashflows", data).then(r => r.data),
   update: (id: number, data: Record<string, unknown>) => api.put<Cashflow>(`/cashflows/${id}`, data).then(r => r.data),
   remove: (id: number) => api.delete(`/cashflows/${id}`),
-  reverse: (id: number, data: {reversed_on: string; reason: string; form_extra?: Record<string, unknown>}) => api.post<Cashflow>(`/cashflows/${id}/reverse`, data).then(r => r.data),
+  reverse: (id: number, data: {reversed_on: string; reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown>}) => api.post<Cashflow>(`/cashflows/${id}/reverse`, data).then(r => r.data),
   list: (params?: {
     pool_id?: number;
     order_id?: number;

@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.stocks.profile import create_account
 from app.core.errors import NotFound, Validation
+from app.core.operation_operators import list_operation_operators
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, RebateRecord, Reconciliation
@@ -579,6 +580,7 @@ class TestReconciliation:
             unmatched_flow_ids=[flow.id],
             reason="银行手续费尚未入账",
             actor="finance",
+            operator_user_ids=[1],
         )
 
         assert item.system_balance == Decimal("100.00")
@@ -587,7 +589,7 @@ class TestReconciliation:
         assert item.status == "OPEN"
 
         resolved = resolve_reconciliation(
-            seeded_db, item.id, actor="finance", reason="已完成银行核对"
+            seeded_db, item.id, actor="finance", reason="已完成银行核对", operator_user_ids=[1]
         )
         assert resolved.status == "RESOLVED"
         assert resolved.resolved_by == "finance"
@@ -608,6 +610,35 @@ class TestReconciliation:
                 statement_balance=Decimal("1.00"),
                 actor="finance",
             )
+
+    def test_reconciliation_actions_persist_action_operators(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        item = create_reconciliation(
+            seeded_db,
+            pool_id=invest.id,
+            reconciled_on=TODAY,
+            account_label="动作快照账户",
+            statement_balance=Decimal("0.00"),
+            actor="pytest",
+            operator_user_ids=[1, 2],
+        )
+        resolve_reconciliation(
+            seeded_db,
+            item.id,
+            actor="pytest",
+            reason="已完成核对",
+            operator_user_ids=[2],
+        )
+
+        rows = list_operation_operators(
+            seeded_db,
+            entity_type="reconciliation",
+            entity_id=item.id,
+        )
+        assert {row.operation_key: row.operator_user_ids for row in rows} == {
+            "CREATE": [1, 2],
+            "RESOLVE": [2],
+        }
 
 
 class TestFinanceApi:
@@ -1200,6 +1231,7 @@ class TestFinanceApi:
             counterpart_pool_id=profit.id,
             actor="finance",
             reason="补齐历史单边划转",
+            operator_user_ids=[1],
         )
 
         assert len(result["cashflows"]) == 2

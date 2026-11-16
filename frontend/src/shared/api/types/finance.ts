@@ -66,6 +66,7 @@ export interface TransferResult {
   amount?: string;
   occurred_on?: string;
   cashflows?: Cashflow[];
+  operation_operators?: DepositOperationOperator[];
 }
 
 export interface Cashflow {
@@ -122,4 +123,4 @@ export interface RebateReturnResult {
   remaining: string;
 }
 
-export interface Reconciliation { id: number; pool_id: number; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string; reason?: string | null; note?: string | null; operator?: string | null }
+export interface Reconciliation { id: number; pool_id: number; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string; reason?: string | null; note?: string | null; operator?: string | null; operation_operators?: DepositOperationOperator[] }

@@ -39,6 +39,7 @@ export function useReconciliationActions({ load, reconciliations, write }: Recon
         statement_balance: values.statement_balance as string,
         reason: values.reason as string,
         note: values.note as string,
+        operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
       appMessage.success("对账记录已提交");
       setReconciliationOpen(false);
@@ -51,7 +52,7 @@ export function useReconciliationActions({ load, reconciliations, write }: Recon
     if (!resolveTarget) return;
     const targetId = resolveTarget.id;
     await write.run(async () => {
-      await reconciliationsApi.resolve(targetId, values.reason as string);
+      await reconciliationsApi.resolve(targetId, values.reason as string, values.operator_user_ids as number[] | undefined);
       appMessage.success("对账差异已核销");
       setResolveTarget(null);
       resolveForm.resetFields();

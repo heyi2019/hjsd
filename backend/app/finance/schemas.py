@@ -189,6 +189,7 @@ class CashflowUpdate(RequestModel):
 class CashflowReverse(RequestModel):
     reversed_on: date
     reason: str
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     # 表单字段配置体系（STUDIOREV 作用域）：落冲销流水 form_extra。
     form_extra: dict[str, Any] | None = None
     form_extra_scope: str = "FUNDREVERSE"
@@ -199,6 +200,7 @@ class ReconciliationCreate(RequestModel):
     reconciled_on: date
     account_label: str
     statement_balance: Decimal
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     unmatched_flow_ids: list[int] = Field(default_factory=list)
     reason: str | None = None
     note: str | None = None
@@ -207,6 +209,7 @@ class ReconciliationCreate(RequestModel):
 
 class ReconciliationResolve(RequestModel):
     reason: str
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     form_extra: dict[str, Any] | None = None
 
 
@@ -229,6 +232,7 @@ class ReconciliationOut(BaseModel):
     created_at: datetime
     operator: str
     form_extra: dict[str, Any] | None = None
+    operation_operators: list[DepositOperationOperatorOut] = Field(default_factory=list)
 
 
 class TransferCreate(RequestModel):
@@ -236,6 +240,7 @@ class TransferCreate(RequestModel):
     target_pool_id: int
     amount: Decimal
     occurred_on: date
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     note: str | None = None
     form_extra: dict[str, Any] | None = None
 
@@ -243,6 +248,7 @@ class TransferCreate(RequestModel):
 class TransferRepair(RequestModel):
     counterpart_pool_id: int
     reason: str
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     form_extra: dict[str, Any] | None = None
 
 
@@ -255,6 +261,7 @@ class TransferOut(BaseModel):
     created_at: datetime
     operator: str
     cashflows: list[CashflowOut]
+    operation_operators: list[DepositOperationOperatorOut] = Field(default_factory=list)
 
 
 class RebateCreate(RequestModel):

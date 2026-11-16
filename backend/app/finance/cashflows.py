@@ -207,6 +207,7 @@ def reverse_cashflow(
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
     form_extra_scope: str = "FUNDREVERSE",
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Cashflow:
     text_reason = _text(
@@ -253,6 +254,7 @@ def reverse_cashflow(
         reviewed_at=now_second(),
         created_by=actor,
         updated_by=actor,
+        operator_user_ids=_validate_operator_user_ids(session, operator_user_ids),
     )
     session.add(reversal)
     session.flush()

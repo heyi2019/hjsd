@@ -23,20 +23,32 @@ export function CustomerLeadPanel() {
   const [convertTarget, setConvertTarget] = useState<Lead | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [acting, setActing] = useState(false);
+  const [customersLoading, setCustomersLoading] = useState(false);
   const [createForm] = Form.useForm();
   const [closeForm] = Form.useForm();
   const [convertForm] = Form.useForm();
 
   const load = useCallback(async () => {
     try {
-      const [leadList, leadSummary, customerList] = await Promise.all([leadsApi.list(), leadsApi.summary(), customersApi.list({ status: "ACTIVE", limit: 500, offset: 0 })]);
+      const [leadList, leadSummary] = await Promise.all([leadsApi.list(), leadsApi.summary()]);
       setRows(leadList);
       setSummary(leadSummary);
-      setCustomers(customerList);
       setError(null);
     } catch (err) { setError(normalizeError(err)); }
   }, []);
   useEffect(() => { void load(); }, [load]);
+
+  const openCreate = async () => {
+    try {
+      setError(null);
+      setCustomersLoading(true);
+      if (customers.length === 0) {
+        setCustomers(await customersApi.list({ status: "ACTIVE", limit: 500, offset: 0 }));
+      }
+      setCreateOpen(true);
+    } catch (err) { setError(normalizeError(err)); }
+    finally { setCustomersLoading(false); }
+  };
 
   const createLead = async (values: Record<string, unknown>) => {
     try {
@@ -70,7 +82,7 @@ export function CustomerLeadPanel() {
 
   const columns: ColumnsType<Lead> = [
     { title: "需求编号", dataIndex: "lead_no" },
-    { title: "客户", render: (_v, row) => customers.find((customer) => customer.id === row.customer_id)?.display_name ?? row.customer_id },
+    { title: "客户", dataIndex: "customer_display_name", render: (v: string, row) => v || row.customer_id },
     { title: "需求类型", dataIndex: "request_type", render: (v: string) => configurableLabel("LEAD_TYPE", v, REQUEST_TYPE_LABEL) },
     { title: "预算", dataIndex: "budget", align: "right", render: (v: string | null) => v ? <MoneyText value={v} /> : "-" },
     { title: "目标", dataIndex: "target" },
@@ -81,7 +93,7 @@ export function CustomerLeadPanel() {
   return <section className="ui-stack">
     <ErrorBanner error={error} onRetry={() => void load()} />
     <StatRow items={[{ label: "需求总数", kind: "count", amount: error ? null : String(summary?.total_count ?? 0) }, { label: "待跟进", kind: "count", amount: error ? null : String(summary?.open_count ?? 0), tone: "warn" }]} />
-    <Card className="glass" title="客户需求池" extra={<PermissionButton permission="customer.create" type="primary" disabled={Boolean(error) || customers.length === 0} onClick={() => setCreateOpen(true)}>新增需求</PermissionButton>}>
+    <Card className="glass" title="客户需求池" extra={<PermissionButton permission="customer.create" type="primary" loading={customersLoading} disabled={Boolean(error)} onClick={() => void openCreate()}>新增需求</PermissionButton>}>
       <DataTable<Lead> columns={columns} rows={rows} page={1} pageSize={10} total={summary?.total_count ?? 0} emptyText="暂无客户需求" pagination={error ? false : undefined} onPageChange={() => undefined}/>
     </Card>
     <BusinessActionModal

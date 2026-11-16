@@ -109,4 +109,13 @@ export interface Counterparty {
   extra_fields?: Array<{ key: string; label: string; section: string; value: unknown }>;
 }
 
-export interface Lead { id: number; lead_no: string; customer_id: number; request_type: string; budget?: string | null; target: string; status: string }
+export interface Lead {
+  id: number;
+  lead_no: string;
+  customer_id: number;
+  customer_display_name: string;
+  request_type: string;
+  budget?: string | null;
+  target: string;
+  status: string;
+}

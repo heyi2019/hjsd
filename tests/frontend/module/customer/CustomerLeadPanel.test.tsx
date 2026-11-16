@@ -27,8 +27,8 @@ const customers: Customer[] = [
 ];
 
 const leads: Lead[] = [
-  { id: 1, lead_no: "LD-1", customer_id: 1, request_type: "FIND_ACCOUNT", budget: "100.00", target: "找一个号", status: "OPEN" },
-  { id: 2, lead_no: "LD-2", customer_id: 1, request_type: "SELL_ACCOUNT", budget: null, target: "卖个号", status: "CLOSED" },
+  { id: 1, lead_no: "LD-1", customer_id: 1, customer_display_name: "张三", request_type: "FIND_ACCOUNT", budget: "100.00", target: "找一个号", status: "OPEN" },
+  { id: 2, lead_no: "LD-2", customer_id: 1, customer_display_name: "张三", request_type: "SELL_ACCOUNT", budget: null, target: "卖个号", status: "CLOSED" },
 ];
 
 let ui: ReturnType<typeof userEvent.setup>;
@@ -68,11 +68,32 @@ describe("CustomerLeadPanel：客户需求池", () => {
     expect(await screen.findByText(/lead down/)).toBeInTheDocument();
   });
 
-  it("客户列表为空时禁用新增需求入口", async () => {
+  it("客户列表为空时允许打开新增但禁止提交", async () => {
     vi.mocked(customersApi.list).mockResolvedValue([]);
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     expect(await screen.findByText("需求总数")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /新增需求/ })).toBeDisabled();
+    const createButton = screen.getByRole("button", { name: /新增需求/ });
+    expect(createButton).toBeEnabled();
+    await ui.click(createButton);
+    const modal = await screen.findByText("新增客户需求");
+    expect(within(modal.closest(".ant-modal-content") as HTMLElement).getByRole("button", { name: /创建需求/ })).toBeDisabled();
+  });
+
+  it("首屏不加载客户全集，点击新增时才加载客户选项", async () => {
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    await screen.findByText("LD-1");
+    expect(customersApi.list).not.toHaveBeenCalled();
+
+    await ui.click(screen.getByRole("button", { name: /新增需求/ }));
+    await screen.findByText("新增客户需求");
+    expect(customersApi.list).toHaveBeenCalledWith({ status: "ACTIVE", limit: 500, offset: 0 });
+  });
+
+  it("需求列表直接展示后端返回的客户名称", async () => {
+    vi.mocked(customersApi.list).mockResolvedValue([]);
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    const row = (await screen.findByText("LD-1")).closest("tr")!;
+    expect(within(row).getByText("张三")).toBeInTheDocument();
   });
 
   it("新增需求填表并提交调用 leadsApi.create", async () => {
@@ -154,7 +175,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
 
   it("已关闭需求不渲染行内操作按钮", async () => {
     vi.mocked(leadsApi.list).mockResolvedValue([
-      { id: 2, lead_no: "LD-2", customer_id: 1, request_type: "SELL_ACCOUNT", budget: null, target: "卖个号", status: "CLOSED" },
+      { id: 2, lead_no: "LD-2", customer_id: 1, customer_display_name: "张三", request_type: "SELL_ACCOUNT", budget: null, target: "卖个号", status: "CLOSED" },
     ]);
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     await screen.findByText("LD-2");

@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.actor import actor_name as _actor
@@ -25,6 +26,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
+from app.domain.parties import Customer
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.parties import schemas
@@ -309,8 +311,19 @@ def list_leads(
     extras = get_extra_values_bulk(
         db, entity_type="lead", entity_ids=[item.id for item in items]
     )
+    customer_ids = {item.customer_id for item in items}
+    customer_names = dict(
+        db.execute(
+            select(Customer.id, Customer.display_name).where(Customer.id.in_(customer_ids))
+        ).all()
+    ) if customer_ids else {}
     return [
-        schemas.LeadOut.model_validate({**item.__dict__, "extra_values": extras.get(item.id, {})})
+        _lead_output(
+            db,
+            item,
+            customer_display_name=customer_names.get(item.customer_id, ""),
+            extra_values=extras.get(item.id, {}),
+        )
         for item in items
     ]
 

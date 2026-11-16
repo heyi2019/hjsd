@@ -27,6 +27,8 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
     lead = created.json()
     assert lead["lead_no"].startswith("REQ")
     assert lead["status"] == "OPEN"
+    assert lead["customer_display_name"] == "需求客户"
+    assert lead["customer_display_name"] == "需求客户"
 
     listed = seeded_client.get(
         "/api/v1/leads",
@@ -35,6 +37,8 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
     )
     assert listed.status_code == 200, listed.text
     assert [item["lead_no"] for item in listed.json()] == [lead["lead_no"]]
+    assert listed.json()[0]["customer_display_name"] == "需求客户"
+    assert listed.json()[0]["customer_display_name"] == "需求客户"
 
     updated = seeded_client.patch(
         f"/api/v1/leads/{lead['id']}",

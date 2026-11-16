@@ -188,6 +188,7 @@ class LeadOut(BaseModel):
     id: int
     lead_no: str
     customer_id: int
+    customer_display_name: str
     request_type: str
     budget: Decimal | None = None
     target: str

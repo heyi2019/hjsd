@@ -256,6 +256,17 @@ def test_order_detail_edit_rejects_unknown_inventory_operator(seeded_client, see
     assert seeded_db.get(Order, order.id).form_extra["business_responsible_ids"] == [1]
 
 
+def test_order_detail_does_not_use_creator_as_inventory_operator(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="no-inventory-operator", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    seeded_db.commit()
+
+    detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+
+    assert detail.status_code == 200
+    assert detail.json()["orders"][0]["operator"] == "-"
+
+
 def test_order_detail_edit_can_add_platform_operation_row_with_its_own_time_and_price(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="add-platform-row", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

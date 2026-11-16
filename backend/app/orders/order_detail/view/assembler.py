@@ -53,7 +53,7 @@ def build_order_outputs(
                 counterparties=counterparties_by_order.get(order.id, []),
                 rebates=rebates_by_order.get(order.id, []),
                 events=events_by_order.get(order.id, []),
-                operator="、".join((operator_names_by_order or {}).get(order.id, [])) or order.created_by,
+                operator="、".join((operator_names_by_order or {}).get(order.id, [])) or "-",
                 operator_user_ids=(
                     list(extra_values["business_responsible_ids"])
                     if isinstance(extra_values.get("business_responsible_ids"), list)

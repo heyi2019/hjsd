@@ -37,6 +37,7 @@ const orders = [
     capital_type: "SELF",
     trade_date: "2026-10-01",
     status: "ACTIVE",
+    account_business_mode: "SELF",
     account_game_type: "原神",
     account_game_account: "seller-001",
     account_platform: "安卓",
@@ -47,6 +48,7 @@ const orders = [
     last_event_type: "BUY",
     inventory_operator: "入库员",
     inventory_entry_at: "2026-10-01T09:30:00",
+    cost_amount: "100.00",
     sale_operator: "售卖员",
     sale_at: "2026-10-17T16:45:00",
   },
@@ -202,7 +204,7 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.getAllByText("库存状态").length).toBeGreaterThanOrEqual(1);
 
     // 入库 / 售卖责任时间列，且行内取数正确
-    for (const label of ["入库负责人", "入库时间", "售卖人", "售卖时间"]) {
+    for (const label of ["入库负责人", "入库时间", "售卖人", "售卖时间", "业务", "业务类型"]) {
       expect(screen.getByRole("columnheader", { name: label })).toBeInTheDocument();
     }
     const dutyRow = screen.getAllByRole("row").find((item) => within(item).queryByText("HS-2026-0001") !== null)!;
@@ -211,6 +213,8 @@ describe("OrdersPage：四类订单台账", () => {
     expect(within(dutyRow).getByText("售卖员")).toBeInTheDocument();
     expect(within(dutyRow).getByText("2026-10-17 16:45")).toBeInTheDocument();
     expect(within(dutyRow).getByText("16天7小时15分")).toBeInTheDocument();
+    expect(within(dutyRow).getByText("自营")).toBeInTheDocument();
+    expect(within(dutyRow).getByText("回收")).toBeInTheDocument();
 
     // 默认视图下的核心识别列与取值（完整列清单属配置能力，不在前端锁死）
     for (const label of ["订单号", "售出金额", "库存状态", "操作"]) {
@@ -221,6 +225,8 @@ describe("OrdersPage：四类订单台账", () => {
     for (const value of ["原神", "seller-001", "¥1,234.00", "在库"]) {
       expect(screen.getAllByText(value).length).toBeGreaterThan(0);
     }
+    const waitingCostRow = screen.getAllByRole("row").find((item) => within(item).queryByText("HS-2026-0001") !== null)!;
+    expect(within(waitingCostRow).getByText("¥100.00")).toBeInTheDocument();
   });
 
   it("订单台账顶部展示当前筛选结果的订单统计卡", async () => {

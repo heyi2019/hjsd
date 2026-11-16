@@ -57,7 +57,7 @@ def export_accounts_csv(
         accounts,
         _user,
     )
-    # 「未售时长」列的注册键是 inventory_age，而响应字段叫 inventory_age_days，
+    # 「在手时间」列的注册键是 inventory_age，而响应字段叫 inventory_age_days，
     # 不补别名整列会导出成空（列在、值没有）。格式与前端本地导出保持一致：`N天`。
     # 「状态」列（注册键 status）在界面上展示的是**库存状态**（在库/出库），
     # 不是库存周期状态（WAITING/SOLD/VOID）；不覆盖就会导出另一套值域的裸码。

@@ -28,7 +28,7 @@ describe("库存导出", () => {
     expect(csv).toContain('"高段位\n账号"');
   });
 
-  it("未售时长列直取后端天数，不按入库时间自行计算", () => {
+  it("在手时间列直取后端天数，不按入库时间自行计算", () => {
     // inventory_entry_at 给 2020 年：若前端还在算日期差，会导出上千天。
     const csv = buildInventoryCsv([
       { ...account, inventory_entry_at: "2020-01-01T00:00:00", inventory_age_days: 12 } as unknown as Account,

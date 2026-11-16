@@ -9,16 +9,26 @@ from datetime import datetime
 from app.domain.trade import OrderEvent
 
 
-def _elapsed_label(start: datetime | None, end: datetime | None) -> str:
-    """入库到售出的在手时长，按「X天X小时X分」展示（与前端 formatElapsedTime 同口径）。
+def _elapsed_label(
+    start: datetime | None,
+    end: datetime | None,
+    *,
+    now: datetime | None = None,
+) -> str:
+    """统一计算入库到当前/售出的持有时长，按「X天X小时X分」展示。
 
-    缺任一端或时间倒挂返回 "-"：未售账号的「已持有多久」属库存中心「未售时长」，
-    台账只表达「实际在手过多久」，不按当前时刻推算。
+    未售时以当前时间作为结束点，已售时以售出时间作为结束点；两个列表只展示这一个
+    后端口径，前端不再自行补算或把未售账号显示成空值。
     """
-    if start is None or end is None or end < start:
+    if start is None:
         return "-"
+    effective_end = end if end is not None else (now or datetime.now())
+    # 售卖事件只有业务日期时会落在当天 00:00；与入库时刻比较会倒挂，
+    # 按库存库龄的“未来时间归零”口径展示为 0 分，而不是丢失时长。
+    if effective_end < start:
+        effective_end = start
     try:
-        total_minutes = int((end - start).total_seconds()) // 60
+        total_minutes = int((effective_end - start).total_seconds()) // 60
     except TypeError:  # 一端带时区一端不带（历史导入数据）时不做臆测
         return "-"
     days, rest = divmod(total_minutes, 1_440)

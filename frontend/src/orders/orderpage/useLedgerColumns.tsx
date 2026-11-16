@@ -7,10 +7,11 @@ import { useListViewColumns } from "../../shared/lib/listColumns";
 import { PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 import { orderOperationMenuItems } from "../operations";
 import { inventoryTypeOfOrder } from "../../stocks/InventoryPanel/types";
+import { BUSINESS_MODE_LABEL, INVENTORY_TYPE_LABEL } from "../../stocks/inventory-logic";
 import { formatOrderAmount } from "./helpers";
 
 /**
- * 订单台账列定义域：14 列的渲染配置 + 配置中心列排序 + 移动端隐藏编排。
+ * 订单台账列定义域：库存共享字段与订单字段的渲染配置 + 配置中心列排序 + 移动端隐藏编排。
  * 从 useOrdersPageController 拆出为「依赖注入式」hook —— 所有打开弹窗的动作由调用方传入，
  * 本模块只描述列的展示与点击转发，不持有任何状态、不发任何请求。
  */
@@ -50,9 +51,14 @@ export function useLedgerColumns(params: {
     { title: "订单号", dataIndex: "order_no", width: "var(--col-w-80)", ellipsis: true },
     { title: "入库时间", dataIndex: "inventory_entry_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
     { title: "入库负责人", dataIndex: "inventory_operator", width: "var(--col-w-100)", ellipsis: true, render: (v: string | null) => v || "-" },
-    { title: "成本", dataIndex: "cost_amount", width: "var(--col-w-90)", ellipsis: true, render: (_v: string | null, order) => order.account_status === "SOLD" && order.cost_amount != null ? `¥${money(order.cost_amount)}` : "-" },
+    { title: "成本", dataIndex: "cost_amount", width: "var(--col-w-90)", ellipsis: true, render: (_v: string | null, order) => order.cost_amount != null ? `¥${money(order.cost_amount)}` : "-" },
     { title: "游戏/产品类型", dataIndex: "account_game_type", width: "var(--col-w-80)", ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "游戏账号/产品", dataIndex: "account_game_account", width: "var(--col-w-120)", ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "业务", key: "business_mode", width: "var(--col-w-56)", ellipsis: true, render: (_v, order) => order.account_business_mode ? BUSINESS_MODE_LABEL[order.account_business_mode] ?? order.account_business_mode : "-" },
+    { title: "业务类型", key: "inventory_type", width: "var(--col-w-68)", ellipsis: true, render: (_v, order) => {
+      const inventoryType = inventoryTypeOfOrder(order);
+      return inventoryType ? INVENTORY_TYPE_LABEL[inventoryType] ?? inventoryType : "-";
+    } },
     { title: "售卖时间", dataIndex: "sale_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
     { title: "售卖人", dataIndex: "sale_operator", width: "var(--col-w-100)", ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "售出金额", dataIndex: "sale_amount", width: "var(--col-w-90)", ellipsis: true, render: (_v: string | null, order) => formatOrderAmount(order) },

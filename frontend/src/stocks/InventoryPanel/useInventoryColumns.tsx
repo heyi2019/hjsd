@@ -47,7 +47,7 @@ export function useInventoryColumns(params: {
     { title: "业务", key: "business_mode", width: 56, ellipsis: true, render: (_v, row) => row.account_business_mode ? BUSINESS_MODE_LABEL[row.account_business_mode] ?? row.account_business_mode : inventoryCellValue(null)},
     { title: "业务类型", dataIndex: "inventory_type", width: 68, ellipsis: true, render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : inventoryCellValue(v) },
     {
-      title: "未售时长",
+      title: "在手时间",
       width: 68,
 
       // key 必须与 scopes.py 的 ListColumn 注册（inventory_age）一致，

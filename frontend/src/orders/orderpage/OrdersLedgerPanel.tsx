@@ -59,7 +59,10 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     editingAccount,
     inlineEditId,
     eventDrafts,
+    operationDrafts,
     updateEventDraft,
+    updateOperationDraft,
+    addOperationDraft,
     employees,
     invEditExtraForm,
     savingAccount,
@@ -181,7 +184,10 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
                   onPartyClick={(party: OrderPartyLink) => onNavigate?.(party.entityType === "customer" ? `customers?customer_id=${party.id}` : `customers?counterparty_id=${party.id}`)}
                   editing={inlineEditId === detail.account.id ? editingAccount : undefined}
                   eventDrafts={eventDrafts}
+                  operationDrafts={operationDrafts}
                   onEventEdit={updateEventDraft}
+                  onOperationEdit={updateOperationDraft}
+                  onAddOperationRow={addOperationDraft}
                   financeDrafts={controller.financeDrafts}
                   onFinanceEdit={controller.updateFinanceDraft}
                   onProfileChange={controller.updateEditingAccount}

@@ -192,3 +192,56 @@ def test_order_detail_edit_can_clear_order_note_and_operator(seeded_client, seed
     edited = seeded_db.get(Order, order.id)
     assert edited.created_by == ""
     assert edited.note is None
+
+
+def test_order_detail_edit_can_add_platform_operation_row_with_its_own_time_and_price(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="add-platform-row", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    seeded_db.commit()
+
+    response = seeded_client.patch(
+        f"/api/v1/orders/{order.id}/execution-edit",
+        headers=headers,
+        json={"events": [], "new_events": [{
+            "operation_type": "CONSIGNMENT",
+            "occurred_at": "2026-10-03T12:34:00",
+            "operator_user_ids": [1],
+            "form_extra": {"consignment_platforms": ["千寻"], "consignment_price": 123.45},
+        }]},
+    )
+
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "OPERATE"))
+    assert event is not None
+    assert event.form_extra["consignment_platforms"] == ["千寻"]
+    assert event.form_extra["consignment_price"] == 123.45
+    assert event.form_extra["listed_at"] == "2026-10-03T12:34:00"
+    assert event.posted_at.isoformat() == "2026-10-03T12:34:00"
+
+
+def test_order_detail_edit_keeps_new_time_when_platform_and_time_change_together(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="edit-platform-row", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra_scope="CONSIGN", form_extra={"consignment_platforms": ["旧平台"], "listed_at": "2026-10-01T10:00:00"})
+    seeded_db.commit()
+    event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "OPERATE"))
+
+    response = seeded_client.patch(
+        f"/api/v1/orders/{order.id}/execution-edit",
+        headers=headers,
+        json={"events": [{
+            "id": event.id,
+            "expected_amount": "0.00",
+            "amount": "0.00",
+            "occurred_at": "2026-10-02T11:20:00",
+            "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["新平台"]},
+        }]},
+    )
+
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    edited = seeded_db.get(OrderEvent, event.id)
+    assert edited.form_extra["consignment_platforms"] == ["新平台"]
+    assert edited.form_extra["listed_at"] == "2026-10-02T11:20:00"
+    assert edited.posted_at.isoformat() == "2026-10-02T11:20:00"

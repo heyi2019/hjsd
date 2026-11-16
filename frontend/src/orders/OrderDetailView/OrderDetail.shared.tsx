@@ -28,11 +28,14 @@ export type OrderFinanceRow = {
 
 export type OrderOperationRow = {
   key: string;
+  operationKey?: OrderOperationKey;
   action: string;
   content: ReactNode;
   occurredAt: string;
   operator: string;
   event?: AccountExecutionEvent;
+  events?: AccountExecutionEvent[];
+  ariaLabelSuffix?: string;
 };
 
 export type OrderExecutionCategory = "INBOUND" | "OPERATING" | "OUTBOUND";
@@ -151,6 +154,13 @@ export type OrderEventDraft = {
   occurred_at: string;
   form_extra?: Record<string, unknown>;
   operator_user_ids?: number[];
+};
+export type OrderOperationKey = "consignment" | "unlist" | "description" | "images";
+export type OrderOperationDraft = {
+  occurred_at: string;
+  form_extra: Record<string, unknown>;
+  operator_user_ids?: number[];
+  operation_type?: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST";
 };
 export type OrderEmployeeOption = EmployeeOption;
 

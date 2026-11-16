@@ -14,7 +14,7 @@ from app.stocks.profile import update_account_profile
 
 from .schemas import ExecutionEditRequest
 from .cashflows import apply_cashflow_edits
-from .events import apply_event_edits, validate_event_edits
+from .events import apply_event_edits, apply_operation_event_creates, validate_event_edits
 from .orders import apply_order_edits
 from .parties import apply_party_edits
 
@@ -44,6 +44,7 @@ def edit_execution_detail(db: Session, order_id: int, payload: ExecutionEditRequ
             **payload.profile.model_dump(exclude_unset=True),
         )
     apply_event_edits(db, event_changes, user.username)
+    apply_operation_event_creates(db, order_id, payload.new_events, user.username, user)
     apply_cashflow_edits(db, account.id, order_id, payload.cashflows, user)
     apply_order_edits(db, account.id, order_id, payload.orders, user)
     apply_party_edits(db, account.id, order_id, payload.parties, user)

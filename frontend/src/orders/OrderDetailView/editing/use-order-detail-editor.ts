@@ -1,5 +1,5 @@
 import { Form } from "antd";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { employeesApi } from "../../../shared/api/org.api";
 import { ordersApi } from "../../../shared/api/orders.api";
 import type { AccountExecutionDetail, AccountExecutionEvent } from "../../../shared/api/types/account-execution";
@@ -7,9 +7,11 @@ import type { Account } from "../../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../../shared/api/types/org";
 import { normalizeError } from "../../../shared/api/client";
 import { appMessage } from "../../../shared/ui/appFeedback";
-import { buildEventEdits, type ExecutionEventDraft } from "./execution-edit-payload";
+import { buildEventEdits, buildOperationEventCreates, type ExecutionEventDraft } from "./execution-edit-payload";
+import type { OrderOperationDraft } from "../OrderDetail.shared";
 
 export type EventDraft = ExecutionEventDraft;
+export type OperationDraft = OrderOperationDraft;
 export type FinanceDraft = {
   flow_no: string;
   occurred_at: string;
@@ -74,6 +76,9 @@ export interface OrderDetailEditor {
   inlineEditId: number | null;
   eventDrafts: Record<number, EventDraft>;
   updateEventDraft: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
+  operationDrafts: Partial<Record<string, OperationDraft>>;
+  updateOperationDraft: (key: string, changes: Partial<OperationDraft>) => void;
+  addOperationDraft: (operationType: NonNullable<OperationDraft["operation_type"]>) => void;
   financeDrafts: Record<string, FinanceDraft>;
   updateFinanceDraft: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
   updateEditingAccount: (changes: Partial<Account>) => void;
@@ -104,6 +109,8 @@ export function useOrderDetailEditor(params: {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [inlineEditId, setInlineEditId] = useState<number | null>(null);
   const [eventDrafts, setEventDrafts] = useState<Record<number, EventDraft>>({});
+  const [operationDrafts, setOperationDrafts] = useState<Record<string, OperationDraft>>({});
+  const operationDraftSequence = useRef(0);
   const [financeDrafts, setFinanceDrafts] = useState<Record<string, FinanceDraft>>({});
   const [orderDrafts, setOrderDrafts] = useState<Record<number, OrderDraft>>({});
   const [partyDrafts, setPartyDrafts] = useState<Record<number, PartyAddition[]>>({});
@@ -114,6 +121,7 @@ export function useOrderDetailEditor(params: {
   async function openEditor(account: Account) {
     setEditingAccount({ ...account });
     setEventDrafts({});
+    setOperationDrafts({});
     setFinanceDrafts({});
     setOrderDrafts({});
     setPartyDrafts({});
@@ -133,6 +141,7 @@ export function useOrderDetailEditor(params: {
     setInlineEditId(null);
     setEditingAccount(null);
     setEventDrafts({});
+    setOperationDrafts({});
     setFinanceDrafts({});
     setOrderDrafts({});
     setPartyDrafts({});
@@ -147,6 +156,22 @@ export function useOrderDetailEditor(params: {
         ...changes,
       },
     }));
+  }
+
+  function updateOperationDraft(key: string, changes: Partial<OperationDraft>) {
+    setOperationDrafts((current) => ({
+      ...current,
+      [key]: {
+        ...(current[key] ?? { occurred_at: "", form_extra: {} }),
+        ...changes,
+      },
+    }));
+  }
+
+  function addOperationDraft(operationType: NonNullable<OperationDraft["operation_type"]>) {
+    operationDraftSequence.current += 1;
+    const key = `new:${operationType.toLowerCase()}:${operationDraftSequence.current}`;
+    setOperationDrafts((current) => ({ ...current, [key]: { occurred_at: "", form_extra: {}, operation_type: operationType } }));
   }
 
   function updateFinanceDraft(flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) {
@@ -232,6 +257,7 @@ export function useOrderDetailEditor(params: {
       const detail = getExecutionDetail(id);
       const originalEvents = detail?.orders.flatMap((order) => order.events) ?? [];
       const events = buildEventEdits(originalEvents, eventDrafts);
+      const new_events = buildOperationEventCreates(operationDrafts);
       const originalFinanceRows = detail?.detail_view.finance_rows ?? [];
       const cashflows = Object.values(financeDrafts).filter((draft) => {
         const original = originalFinanceRows.find((row) => row.flow_no === draft.flow_no);
@@ -264,6 +290,7 @@ export function useOrderDetailEditor(params: {
       await ordersApi.updateExecution(sourceOrderId, {
         profile,
         events,
+        new_events,
         cashflows,
         orders,
         parties,
@@ -278,6 +305,7 @@ export function useOrderDetailEditor(params: {
       }
       setEditingAccount(null);
       setEventDrafts({});
+      setOperationDrafts({});
       setFinanceDrafts({});
       setOrderDrafts({});
       setPartyDrafts({});
@@ -296,6 +324,9 @@ export function useOrderDetailEditor(params: {
     inlineEditId,
     eventDrafts,
     updateEventDraft,
+    operationDrafts,
+    updateOperationDraft,
+    addOperationDraft,
     financeDrafts,
     updateFinanceDraft,
     updateEditingAccount,

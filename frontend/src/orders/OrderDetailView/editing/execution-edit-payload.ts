@@ -20,6 +20,34 @@ export type ExecutionEventEdit = {
   form_extra?: Record<string, unknown>;
 };
 
+export type OperationEventCreateDraft = {
+  occurred_at: string;
+  form_extra: Record<string, unknown>;
+  operator_user_ids?: number[];
+  operation_type?: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST";
+};
+
+export type ExecutionOperationCreate = {
+  operation_type: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST";
+  occurred_at: string;
+  form_extra?: Record<string, unknown>;
+  operator_user_ids?: number[];
+};
+
+export function buildOperationEventCreates(
+  drafts: Record<string, OperationEventCreateDraft>,
+): ExecutionOperationCreate[] {
+  return Object.values(drafts).filter((draft) => Boolean(draft.operation_type && (draft.occurred_at || Object.keys(draft.form_extra).length || draft.operator_user_ids?.length))).map((draft) => {
+    if (!draft.occurred_at) throw new Error("请填写运营动作时间");
+    return {
+      operation_type: draft.operation_type!,
+      occurred_at: draft.occurred_at,
+      ...(Object.keys(draft.form_extra).length ? { form_extra: draft.form_extra } : {}),
+      ...(draft.operator_user_ids !== undefined ? { operator_user_ids: draft.operator_user_ids } : {}),
+    };
+  });
+}
+
 function sameOperators(left?: number[] | null, right?: number[]) {
   if (right === undefined) return true;
   return JSON.stringify(left ?? []) === JSON.stringify(right);

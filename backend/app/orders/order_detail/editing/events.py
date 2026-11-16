@@ -1,6 +1,7 @@
 """订单详情中的执行事件编辑。"""
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi.encoders import jsonable_encoder
@@ -13,8 +14,47 @@ from app.core.security import CurrentUser
 from app.domain.trade import Account, Cashflow, Installment, OrderEvent, RebateRecord, Reconciliation
 from app.domain.users import User
 from app.orders._shared import get_order
+from app.orders.events import post_event
 
-from .schemas import ExecutionEditItem, ExecutionEditRequest
+from .schemas import ExecutionEditItem, ExecutionEditRequest, ExecutionOperationCreateItem
+
+
+def apply_operation_event_creates(
+    db: Session,
+    order_id: int,
+    items: list[ExecutionOperationCreateItem],
+    actor: str,
+    user: CurrentUser,
+) -> None:
+    """把编辑态补录的运营动作落为正式事件，并保留用户选择的时间。"""
+    for item in items:
+        occurred_at = item.occurred_at.replace(tzinfo=None)
+        form_extra = dict(item.form_extra or {})
+        if item.operation_type == "CONSIGNMENT":
+            form_extra["listed_at"] = occurred_at.isoformat()
+            form_extra_scope = "CONSIGN"
+        elif item.operation_type == "UNLIST":
+            form_extra["platform_unlisted_at"] = occurred_at.isoformat()
+            form_extra_scope = "INVOID"
+        else:
+            form_extra_scope = "INVEDIT"
+        event, _ = post_event(
+            db,
+            order_id,
+            event_type="OPERATE",
+            operation_type=item.operation_type,
+            amount=0,
+            occurred_on=occurred_at.date(),
+            actor=actor,
+            operator_user_ids=item.operator_user_ids,
+            form_extra=form_extra,
+            form_extra_scope=form_extra_scope,
+            user=user,
+        )
+        # post_event 的 posted_at 是登记时间；详情编辑必须使用用户选定的运营时间。
+        event.occurred_on = occurred_at.date()
+        event.posted_at = occurred_at
+        event.updated_by = actor
 
 
 def validate_event_edits(
@@ -111,6 +151,13 @@ def apply_event_edits(db: Session, changes: list[tuple[OrderEvent, Cashflow | No
         if item.form_extra is not None:
             # 前端提交的是该事件当前完整草稿；使用替换才能真正删除已清空的平台、价格等字段。
             event.form_extra = item.form_extra
+            # 同时修改平台与时间时，时间字段仍以时间控件为准，避免完整草稿里的旧值覆盖新时间。
+            if item.occurred_at is not None:
+                operation_type = (event.form_extra or {}).get("operation_type")
+                if event.event_type == "OPERATE" and operation_type == "CONSIGNMENT":
+                    event.form_extra = {**(event.form_extra or {}), "listed_at": occurred_at.isoformat()}
+                elif event.event_type == "OPERATE" and operation_type == "UNLIST":
+                    event.form_extra = {**(event.form_extra or {}), "platform_unlisted_at": occurred_at.isoformat()}
         if item.operator_user_ids is not None:
             event.operator_user_ids = item.operator_user_ids
         event.updated_by = actor

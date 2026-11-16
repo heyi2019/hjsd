@@ -26,6 +26,13 @@ class ExecutionEditItem(RequestModel):
     operator_user_ids: list[int] | None = Field(default=None, min_length=0, max_length=30)
 
 
+class ExecutionOperationCreateItem(RequestModel):
+    operation_type: Literal["IMAGE", "DESCRIPTION", "CONSIGNMENT", "UNLIST"]
+    occurred_at: datetime
+    form_extra: dict[str, object] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=0, max_length=30)
+
+
 class ExecutionCashflowEditItem(RequestModel):
     flow_no: str = Field(min_length=1, max_length=32)
     occurred_at: datetime | None = None
@@ -51,6 +58,7 @@ class ExecutionPartyEditItem(RequestModel):
 
 class ExecutionEditRequest(RequestModel):
     events: list[ExecutionEditItem] = Field(max_length=100)
+    new_events: list[ExecutionOperationCreateItem] = Field(default_factory=list, max_length=20)
     cashflows: list[ExecutionCashflowEditItem] = Field(default_factory=list, max_length=100)
     orders: list[ExecutionOrderEditItem] = Field(default_factory=list, max_length=20)
     parties: list[ExecutionPartyEditItem] = Field(default_factory=list, max_length=50)
@@ -59,6 +67,7 @@ class ExecutionEditRequest(RequestModel):
 
 __all__ = [
     "ExecutionEditItem",
+    "ExecutionOperationCreateItem",
     "ExecutionCashflowEditItem",
     "ExecutionOrderEditItem",
     "ExecutionPartyEditItem",

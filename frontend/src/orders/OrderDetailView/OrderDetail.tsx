@@ -14,6 +14,7 @@ import {
 import { OrderDetailView } from "./OrderDetailView";
 import {
   type OrderEventDraft,
+  type OrderOperationDraft,
   type OrderDetailMeta,
   type OrderPartyLink,
   type OrderFinanceRow,
@@ -51,7 +52,10 @@ export function OrderDetail({
   loading,
   editing,
   eventDrafts,
+  operationDrafts,
   onEventEdit,
+  onOperationEdit,
+  onAddOperationRow,
   financeDrafts,
   onFinanceEdit,
   onProfileChange,
@@ -73,7 +77,10 @@ export function OrderDetail({
   loading: boolean;
   editing?: Account | null;
   eventDrafts?: Record<number, OrderEventDraft>;
+  operationDrafts?: Partial<Record<string, OrderOperationDraft>>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
+  onOperationEdit?: (key: string, changes: Partial<OrderOperationDraft>) => void;
+  onAddOperationRow?: (operationType: NonNullable<OrderOperationDraft["operation_type"]>) => void;
   financeDrafts?: Record<string, FinanceDraft>;
   onFinanceEdit?: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
   onProfileChange?: (changes: Partial<Account>) => void;
@@ -150,10 +157,16 @@ export function OrderDetail({
     ...operation,
     event: operation.event_id == null ? undefined : eventById.get(operation.event_id),
   }));
-  const operationEvents = useMemo(
-    () => Object.fromEntries(operationRows.map((operation) => [operation.key, operation.event])) as Record<string, AccountExecutionEvent | undefined>,
-    [operationRows],
-  );
+  const operationEvents = useMemo(() => {
+    const typeByKey: Record<string, string> = { consignment: "CONSIGNMENT", unlist: "UNLIST", description: "DESCRIPTION", images: "IMAGE" };
+    const events = (scopedDetail?.orders ?? []).flatMap((order) => order.events);
+    return Object.fromEntries(Object.entries(typeByKey).map(([key, operationType]) => [
+      key,
+      events
+        .filter((event) => event.event_type === "OPERATE" && event.operation_type === operationType)
+        .sort((left, right) => String(right.occurred_at ?? "").localeCompare(String(left.occurred_at ?? ""))),
+    ])) as Record<string, AccountExecutionEvent[]>;
+  }, [scopedDetail]);
   const operationRow = (key: string) => operationRows.find((item) => item.key === key);
 
   const meta = useMemo<OrderDetailMeta>(() => ({
@@ -212,7 +225,10 @@ export function OrderDetail({
       account={accountSnapshot}
       editing={editing}
       eventDrafts={eventDrafts}
+      operationDrafts={operationDrafts}
       onEventEdit={onEventEdit}
+      onOperationEdit={onOperationEdit}
+      onAddOperationRow={onAddOperationRow}
       financeDrafts={financeDrafts}
       onFinanceEdit={onFinanceEdit}
       onProfileChange={onProfileChange}

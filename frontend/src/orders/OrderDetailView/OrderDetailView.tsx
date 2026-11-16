@@ -14,6 +14,7 @@ import type {
   OrderDetailMeta,
   OrderEmployeeOption,
   OrderEventDraft,
+  OrderOperationDraft,
   OrderExecutionRow,
   OrderFinanceRow,
 } from "./OrderDetail.shared";
@@ -27,7 +28,7 @@ type OrderDetailViewProps = {
   detail?: AccountExecutionDetail | null;
   account?: Account | null;
   executionRows: OrderExecutionRow[];
-  operationEvents?: Record<string, AccountExecutionEvent | undefined>;
+  operationEvents?: Record<string, AccountExecutionEvent[]>;
   financeRows: OrderFinanceRow[];
   expenseCount: number;
   incomeCount: number;
@@ -35,7 +36,10 @@ type OrderDetailViewProps = {
   totalIncome: string;
   editing?: Account | null;
   eventDrafts?: Record<number, OrderEventDraft>;
+  operationDrafts?: Partial<Record<string, OrderOperationDraft>>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
+  onOperationEdit?: (key: string, changes: Partial<OrderOperationDraft>) => void;
+  onAddOperationRow?: (operationType: NonNullable<OrderOperationDraft["operation_type"]>) => void;
   financeDrafts?: Record<string, FinanceDraft>;
   onFinanceEdit?: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
   onProfileChange?: (changes: Partial<Account>) => void;
@@ -60,7 +64,10 @@ export function OrderDetailView({
   account,
   editing,
   eventDrafts,
+  operationDrafts,
   onEventEdit,
+  onOperationEdit,
+  onAddOperationRow,
   financeDrafts,
   onFinanceEdit,
   onProfileChange,
@@ -92,7 +99,7 @@ export function OrderDetailView({
           wrapperCol={{ flex: "auto" }} scope="INVEDIT" form={extraForm}>
           <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
             <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onOrderEdit={onOrderEdit} onProfileChange={onProfileChange} />
-            <OrderDetailOperationSection meta={meta} editing account={editing ?? account} eventDrafts={eventDrafts} onEventEdit={onEventEdit} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} />
+            <OrderDetailOperationSection meta={meta} editing account={editing ?? account} eventDrafts={eventDrafts} operationDrafts={operationDrafts} onEventEdit={onEventEdit} onOperationEdit={onOperationEdit} onAddOperationRow={onAddOperationRow} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} />
           </FieldConfigScope>
         </BusinessRegistrationForm>
         <OrderDetailFinanceSection

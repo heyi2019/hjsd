@@ -41,9 +41,12 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     exporting,
     editingAccount,
     eventDrafts,
+    operationDrafts,
     financeDrafts,
     employees,
     updateEventDraft,
+    updateOperationDraft,
+    addOperationDraft,
     updateFinanceDraft,
     updateEditingAccount,
     orderDrafts,
@@ -141,7 +144,10 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
               onPartyClick={openPartyCard}
               editing={inlineEditId === row.account.id ? editingAccount : undefined}
               eventDrafts={eventDrafts}
+              operationDrafts={operationDrafts}
               onEventEdit={updateEventDraft}
+              onOperationEdit={updateOperationDraft}
+              onAddOperationRow={addOperationDraft}
               financeDrafts={financeDrafts}
               onFinanceEdit={updateFinanceDraft}
               onProfileChange={updateEditingAccount}

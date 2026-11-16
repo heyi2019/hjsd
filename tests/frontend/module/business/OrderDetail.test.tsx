@@ -222,6 +222,15 @@ describe("OrderDetail", () => {
           operator_user_ids: [7],
           amount: "0.00",
           note: "寄售上架：千寻",
+        }, {
+          id: 2102,
+          event_type: "OPERATE",
+          operation_type: "CONSIGNMENT",
+          occurred_at: "2026-10-16T11:20:00",
+          form_extra: { consignment_platforms: ["盼之"], consignment_price: 88 },
+          operator_user_ids: [7],
+          amount: "0.00",
+          note: "寄售上架：盼之",
         }],
         rebates: [],
       }],
@@ -232,7 +241,7 @@ describe("OrderDetail", () => {
           content: "千寻",
           occurred_at: "2026-10-15T10:20:00",
           operator: "张三",
-          event_id: 2101,
+          event_id: 2102,
         }, { key: "unlist", action: "下架平台", content: "-", occurred_at: null, operator: "-", event_id: null },
         { key: "description", action: "描述", content: "-", occurred_at: null, operator: "-", event_id: null },
         { key: "images", action: "作图", content: "-", occurred_at: null, operator: "-", event_id: null }],
@@ -247,16 +256,25 @@ describe("OrderDetail", () => {
     } as unknown as AccountExecutionDetail;
 
     const onProfileChange = vi.fn();
-    renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} onProfileChange={onProfileChange} employees={[{ id: 7, username: "zhangsan", display_name: "张三", is_active: true }]} />);
+    const onAddOperationRow = vi.fn();
+    renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} onProfileChange={onProfileChange} onAddOperationRow={onAddOperationRow} employees={[{ id: 7, username: "zhangsan", display_name: "张三", is_active: true }]} />);
     await settleFieldConfig();
 
     const accountInput = screen.getByLabelText("编辑游戏账号 / 产品") as HTMLInputElement;
     fireEvent.change(accountInput, { target: { value: "新账号" } });
     expect(onProfileChange).toHaveBeenCalledWith({ game_account: "新账号" });
     expect(screen.getByRole("combobox", { name: "编辑上架平台" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "编辑上架平台 2" })).toBeInTheDocument();
     expect(screen.getByRole("spinbutton", { name: "编辑寄售价格" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "编辑上架平台操作人" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "编辑下架平台" })).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑上架平台时间")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑下架平台时间")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑描述时间")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑作图时间")).toBeInTheDocument();
     expect(screen.getByLabelText("上传作图")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "+ 添加上架行" }));
+    expect(onAddOperationRow).toHaveBeenCalledWith("CONSIGNMENT");
   });
 
   it("编辑参与方时按订单类型提供客户或渠道方的新建与选择控件", async () => {

@@ -13,6 +13,7 @@ import { BusinessActionModal, BusinessRegistrationForm, CompactActions, DataTabl
 import { moneyRules, positiveIntegerRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../orders/ConfigurableField";
 import { configurableLabel } from "../shared/lib/optionSets";
+import { useListViewColumns } from "../shared/lib/listColumns";
 import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
@@ -103,6 +104,7 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
     finally { setActing(false); }
   };
 
+  const { arrange: arrangeColumns } = useListViewColumns("LEAD");
   const columns: ColumnsType<Lead> = [
     { title: "需求编号", dataIndex: "lead_no" },
     { title: "客户", dataIndex: "customer_display_name", render: (v: string, row) => v || row.customer_id },
@@ -111,7 +113,7 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
     { title: "目标", dataIndex: "target" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="LEAD_STATUS" /> },
     { title: "创建操作人", dataIndex: "created_by", render: (v: string | null | undefined, row) => v || row.operation_operators?.find((item) => item.operation_key === "CREATE")?.operator_user_ids.join("、") || "-" },
-    { title: "操作", render: (_v, row) => row.status === "OPEN" ? <Space size={2}><PermissionButton permission="customer.create" size="small" onClick={() => setConvertTarget(row)}>转单</PermissionButton><PermissionButton permission="customer.update" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton></Space> : null },
+    { title: "操作", key: "actions", render: (_v, row) => row.status === "OPEN" ? <Space size={2}><PermissionButton permission="customer.create" size="small" onClick={() => setConvertTarget(row)}>转单</PermissionButton><PermissionButton permission="customer.update" size="small" onClick={() => setCloseTarget(row)}>关闭</PermissionButton></Space> : null },
   ];
 
   return <section className="ui-stack">
@@ -119,7 +121,7 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
     <StatRow items={[{ label: "需求总数", kind: "count", amount: error ? null : String(summary?.total_count ?? 0) }, { label: "待跟进", kind: "count", amount: error ? null : String(summary?.open_count ?? 0), tone: "warn" }]} />
     <Card className="glass" title="客户需求池" extra={<PermissionButton permission="customer.create" type="primary" loading={customersLoading} disabled={Boolean(error)} onClick={() => void openCreate()}>新增需求</PermissionButton>}>
       <DataTable<Lead>
-        columns={columns}
+        columns={arrangeColumns(columns)}
         rows={rows}
         loading={summary === null && !error}
         page={page}

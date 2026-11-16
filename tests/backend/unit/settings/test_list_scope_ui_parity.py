@@ -38,6 +38,7 @@ PANEL_SOURCES: dict[str, str] = {
     "INSTALLMENT": "installments/useContractTableController.tsx",
     "CUSTOMER": "customers/useCustomerController.tsx",
     "COUNTERPARTY": "customer-center/CounterpartyPanel.tsx",
+    "LEAD": "customer-center/CustomerLeadPanel.tsx",
     "REBATE": "rebates/RebatesPanel.tsx",
     "CASHFLOW": "pools/FundsPage.tabs.tsx",
     "FUND_POOLS": "pools/FundsPage.tabs.tsx",
@@ -161,6 +162,13 @@ def test_installment_table_exposes_operator_column() -> None:
 def test_counterparty_table_exposes_creator_column() -> None:
     """合作方列表必须把创建操作人纳入可配置列。"""
     scope = get_scope("COUNTERPARTY")
+    assert scope is not None
+    assert any(column.key == "created_by" and column.label == "创建操作人" for column in scope.columns)
+
+
+def test_lead_table_exposes_operator_column() -> None:
+    """客户需求列表必须把创建操作人纳入可配置列。"""
+    scope = get_scope("LEAD")
     assert scope is not None
     assert any(column.key == "created_by" and column.label == "创建操作人" for column in scope.columns)
 

@@ -125,6 +125,20 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         ),
     ),
     ListScope(
+        code="LEAD",
+        label="客户需求",
+        columns=(
+            ListColumn("lead_no", "需求编号"),
+            ListColumn("customer_display_name", "客户"),
+            ListColumn("request_type", "需求类型", value_set="LEAD_TYPE"),
+            ListColumn("budget", "预算"),
+            ListColumn("target", "目标"),
+            ListColumn("status", "状态", value_set="LEAD_STATUS"),
+            ListColumn("created_by", "创建操作人"),
+            ListColumn("actions", "操作"),
+        ),
+    ),
+    ListScope(
         code="REBATE",
         label="返点明细",
         columns=(

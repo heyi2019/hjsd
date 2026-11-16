@@ -117,6 +117,13 @@ describe("CustomersPage：客户档案", () => {
     expect(await screen.findByText("客户档案 · CUS-0001")).toBeInTheDocument();
   });
 
+  it("深链客户不在当前页时直接使用详情接口打开", async () => {
+    vi.mocked(customersApi.list).mockResolvedValue([]);
+    renderLight(<CustomersPage focusCustomerId={1} />);
+    expect(await screen.findByText("客户档案 · CUS-0001")).toBeInTheDocument();
+    expect(customersApi.detail).toHaveBeenCalledWith(1);
+  });
+
   it("从客户中心深链参数打开指定合作方卡片", async () => {
     vi.mocked(counterpartiesApi.page).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
     vi.mocked(counterpartiesApi.get).mockResolvedValue(counterparties[0]);

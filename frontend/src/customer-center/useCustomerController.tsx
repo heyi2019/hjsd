@@ -110,6 +110,21 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     }
   };
 
+  const openDetailById = async (customerId: number) => {
+    setDetailTarget(null);
+    setDetailData(null);
+    setDetailLoading(true);
+    try {
+      const detail = await customersApi.detail(customerId);
+      setDetailTarget(detail.customer);
+      setDetailData(detail);
+    } catch (err) {
+      setError(normalizeError(err));
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
   const handledFocusRef = useRef<number | null>(null);
   useEffect(() => {
     if (focusId == null || handledFocusRef.current === focusId || rows === null || loading) return;
@@ -120,9 +135,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
       return;
     }
     // 后端分页后，深链客户可能不在当前页；直接按 ID 从后端取，不依赖列表快照。
-    void customersApi.get(focusId)
-      .then((customer) => openDetail(customer))
-      .catch((err) => setError(normalizeError(err)));
+    void openDetailById(focusId);
   }, [focusId, loading, rows]);
 
   /** 联系方式单元格直接展示已建档原值。 */

@@ -18,7 +18,6 @@ export const customersApi = {
       "/customers",
       payload,
     ).then((r) => r.data),
-  get: (id: number) => api.get<Customer>(`/customers/${id}`).then((r) => r.data),
   detail: (id: number) => api.get<CustomerDetail>(`/customers/${id}/detail`).then((r) => r.data),
   patch: (id: number, payload: Partial<Customer>) =>
     api.patch<Customer>(`/customers/${id}`, payload).then((r) => r.data),

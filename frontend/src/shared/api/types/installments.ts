@@ -29,6 +29,13 @@ export interface Installment {
   order: InstallmentOrderContext;
   schedules: Schedule[];
   dispositions: InstallmentDisposition[];
+  operation_operators: InstallmentOperationOperator[];
+}
+
+export interface InstallmentOperationOperator {
+  operation_key: string;
+  operator_user_ids: number[];
+  occurred_at: string;
 }
 
 export interface InstallmentOrderContext {

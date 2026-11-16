@@ -4,8 +4,10 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { installmentsApi } from "../shared/api/installments.api";
 import { ordersApi } from "../shared/api/orders.api";
+import { employeesApi } from "../shared/api/org.api";
 import type { Installment, InstallmentTotals, Schedule } from "../shared/api/types/installments";
 import type { Order } from "../shared/api/types/orders";
+import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { INSTALLMENT_STATUS_LABEL, installmentDisplayStatus, money, today } from "../shared/lib/format";
@@ -28,6 +30,7 @@ export function useContractTableController(params: { contractType: string; reloa
   const [totals, setTotals] = useState<InstallmentTotals | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
   const [resaleOrders, setResaleOrders] = useState<Order[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const { can } = useSession();
   // 提前结清：后端接受 order.event.post 或 finance.order.event.post 任一，取当前用户实际持有的码做门控。
   const settlePermission: Permission = can("order.event.post") ? "order.event.post" : "finance.order.event.post";
@@ -98,6 +101,18 @@ export function useContractTableController(params: { contractType: string; reloa
     void load();
   }, [load, reloadKey]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.resolve(employeesApi.list())
+      .then((items) => {
+        if (!cancelled) setEmployees((items ?? []).filter((item) => item.is_active));
+      })
+      .catch((err) => {
+        if (!cancelled) setError(normalizeError(err));
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   const [exporting, setExporting] = useState(false);
   /** 分期与回款按列配置导出 CSV：导出全部分期合约（含其他业务类型的合约表）。 */
   const exportCsv = async () => {
@@ -118,6 +133,7 @@ export function useContractTableController(params: { contractType: string; reloa
           amount: values.amount as string,
           paid_on: values.paid_on as string,
           period_no: values.period_no === undefined ? undefined : Number(values.period_no),
+          operator_user_ids: values.operator_user_ids as number[] | undefined,
           form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("收款已登记");
@@ -161,6 +177,7 @@ export function useContractTableController(params: { contractType: string; reloa
         await installmentsApi.recover(recoverTarget.id, {
           occurred_on: values.occurred_on as string,
           note: values.note as string,
+          operator_user_ids: values.operator_user_ids as number[] | undefined,
           form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("逾期账号已登记回收");
@@ -177,6 +194,7 @@ export function useContractTableController(params: { contractType: string; reloa
           resale_order_id: Number(values.resale_order_id),
           occurred_on: values.occurred_on as string,
           note: values.note as string,
+          operator_user_ids: values.operator_user_ids as number[] | undefined,
           form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("已登记出售，原分期与出售订单的利润关联保留");
@@ -204,6 +222,7 @@ export function useContractTableController(params: { contractType: string; reloa
         const result = await installmentsApi.cancel(cancelTarget.id, {
           cancelled_on: values.cancelled_on as string,
           reason: values.reason as string,
+          operator_user_ids: values.operator_user_ids as number[] | undefined,
           form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         const refundSummary = `退款已登记：¥${money(result.refund_amount)}`;
@@ -225,6 +244,7 @@ export function useContractTableController(params: { contractType: string; reloa
           paid_on: values.paid_on as string,
           pool_id: values.pool_id === undefined ? undefined : Number(values.pool_id),
           note: values.note as string | undefined,
+          operator_user_ids: values.operator_user_ids as number[] | undefined,
           form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("已提前结清，剩余应收一次性收清");
@@ -237,7 +257,7 @@ export function useContractTableController(params: { contractType: string; reloa
   const submitDefault = async (values: Record<string, unknown>) => {
     if (!defaultTarget) return;
     await write.run(async () => {
-        await installmentsApi.markDefault(defaultTarget.id, { reason: values.reason as string, form_extra: values.form_extra as Record<string, unknown> | undefined });
+        await installmentsApi.markDefault(defaultTarget.id, { reason: values.reason as string, operator_user_ids: values.operator_user_ids as number[] | undefined, form_extra: values.form_extra as Record<string, unknown> | undefined });
         appMessage.success("已登记违约，合约进入 DEFAULTED");
         setDefaultTarget(null);
         defaultForm.resetFields();
@@ -252,6 +272,7 @@ export function useContractTableController(params: { contractType: string; reloa
           amount: values.amount as string,
           waived_on: values.waived_on as string,
           reason: values.reason as string,
+          operator_user_ids: values.operator_user_ids as number[] | undefined,
           form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("期次减免已登记");
@@ -267,6 +288,7 @@ export function useContractTableController(params: { contractType: string; reloa
         await installmentsApi.extendSchedule(extendTarget.installment_id, extendTarget.period_no, {
           new_due_on: values.new_due_on as string,
           reason: values.reason as string,
+          operator_user_ids: values.operator_user_ids as number[] | undefined,
           form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
         appMessage.success("期次展期已登记");
@@ -274,6 +296,16 @@ export function useContractTableController(params: { contractType: string; reloa
         extendForm.resetFields();
         await load();
     });
+  };
+
+  const updateOperationOperators = async (installmentId: number, operationKey: string, operatorUserIds: number[]) => {
+    try {
+      await installmentsApi.updateOperationOperators(installmentId, operationKey, operatorUserIds);
+      appMessage.success("操作人已更新");
+      await load();
+    } catch (err) {
+      appMessage.error(normalizeError(err).message);
+    }
   };
 
   // 总应收 / 剩余应收都只采用后端下发值（含「不小于 0」的 clamp），前端不再自行推导。
@@ -546,10 +578,12 @@ export function useContractTableController(params: { contractType: string; reloa
     submitDefault,
     submitWaive,
     submitExtend,
+    updateOperationOperators,
     totalReceivable,
     totalPaid,
     totalCount: totals?.total_count ?? 0,
     overdueCount,
+    employees,
     arrangeColumns,
     columns,
     scheduleColumns,

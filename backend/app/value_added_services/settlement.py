@@ -16,6 +16,7 @@ from app.core.errors import (
     Validation,
 )
 from app.core.money import to_money
+from app.core.operation_operators import upsert_operation_operators
 from app.core.state_machine import (
     INSTALLMENT_TRANSITIONS,
     transition,
@@ -46,6 +47,7 @@ def settle_early(
     pool_id: int | None = None,
     note: str | None = None,
     form_extra: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Installment:
     """提前收清剩余应收，逐期生成分期收入资金明细并关闭未来计划。"""
@@ -95,6 +97,7 @@ def settle_early(
             actor=actor,
             pool_id=pool_id,
             note=note or f"提前结清 {installment.inst_no} 第 {row.period_no} 期",
+            operator_user_ids=operator_user_ids,
             user=user,
         )
     session.flush()
@@ -110,6 +113,14 @@ def settle_early(
             "status": installment.status,
         },
     )
+    upsert_operation_operators(
+        session,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        operation_key="SETTLE",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+    )
     return installment
 
 
@@ -120,6 +131,7 @@ def mark_default(
     actor: str,
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Installment:
     """将逾期合约置为违约，保留未收计划供后续追偿。"""
@@ -150,5 +162,13 @@ def mark_default(
         actor=actor,
         after={"status": installment.status},
         reason=text_reason,
+    )
+    upsert_operation_operators(
+        session,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        operation_key="DEFAULT",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
     )
     return installment

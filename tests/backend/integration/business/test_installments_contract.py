@@ -995,6 +995,23 @@ class TestInstallmentsApi:
         assert row["first_due_on"] == PAST.isoformat()
         assert row["note"] == "分期备注"
 
+    def test_detail_can_update_action_operators(self, seeded_client, seeded_db, headers):
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id)
+
+        response = seeded_client.put(
+            f"/api/v1/installments/{contract.id}/operation-operators/CREATE",
+            json={"operator_user_ids": [1, 2]},
+            headers=headers,
+        )
+
+        assert response.status_code == 200, response.text
+        create_operator_row = next(
+            row for row in response.json()["operation_operators"]
+            if row["operation_key"] == "CREATE"
+        )
+        assert create_operator_row["operator_user_ids"] == [1, 2]
+
     def test_list_endpoint_returns_order_context_from_database(
         self, seeded_client, seeded_db, headers
     ):

@@ -22,6 +22,7 @@ from app.core.errors import (
     Validation,
 )
 from app.core.money import to_money
+from app.core.operation_operators import upsert_operation_operators
 from app.core.state_machine import (
     INSTALLMENT_TRANSITIONS,
     ORDER_TRANSITIONS,
@@ -55,6 +56,7 @@ def pay(
     pool_id: int | None = None,
     note: str | None = None,
     form_extra: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> tuple[Installment, InstallmentSchedule]:
     """收款：直接登记收入资金明细，不创建订单业务事件。"""
@@ -118,6 +120,7 @@ def pay(
         category="INSTALLMENT_PAYMENT",
         amount=money,
         actor=actor,
+        operator_user_ids=operator_user_ids,
         order_id=order.id,
         note=note or f"分期收款 {installment.inst_no} 第 {schedule.period_no} 期",
         user=user,
@@ -162,6 +165,15 @@ def pay(
             "status": installment.status,
         },
     )
+    upsert_operation_operators(
+        session,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        operation_key=f"PAY:{schedule.id}",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+        occurred_at=None,
+    )
     return installment, schedule
 
 
@@ -173,6 +185,7 @@ def cancel_installment(
     actor: str,
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """终止交付前分期并冲销已登记的收款资金明细。"""
@@ -267,6 +280,14 @@ def cancel_installment(
         },
         reason=text_reason,
     )
+    upsert_operation_operators(
+        session,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        operation_key="CANCEL",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+    )
     return {
         "installment": installment,
         "order_status": order.status,
@@ -287,6 +308,7 @@ def waive_schedule(
     actor: str,
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> InstallmentSchedule:
     """登记经授权的期次减免，不改写原应收金额。"""
@@ -357,6 +379,14 @@ def waive_schedule(
         },
         reason=text_reason,
     )
+    upsert_operation_operators(
+        session,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        operation_key=f"WAIVE:{period_no}",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+    )
     return schedule
 
 
@@ -369,6 +399,7 @@ def extend_schedule(
     actor: str,
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> InstallmentSchedule:
     """修改未收期次到期日，并通过审计保留原计划日期。"""
@@ -404,6 +435,14 @@ def extend_schedule(
         before={"period_no": period_no, "due_on": original_due_on.isoformat()},
         after={"period_no": period_no, "due_on": new_due_on.isoformat()},
         reason=text_reason,
+    )
+    upsert_operation_operators(
+        session,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        operation_key=f"EXTEND:{period_no}",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
     )
     return schedule
 

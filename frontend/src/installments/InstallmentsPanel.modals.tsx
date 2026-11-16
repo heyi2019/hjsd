@@ -17,6 +17,7 @@ import type { NormalizedError } from "../shared/api/client";
 import type { Permission } from "../shared/state/session";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import type { ContractTableController } from "./useContractTableController";
+import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
 
 const Modal = BusinessActionModal;
 
@@ -37,6 +38,7 @@ interface InstallmentActionModalProps {
   outro?: ReactNode;
   section?: string;
   testIdSuffix: string;
+  employees: ContractTableController["employees"];
   children?: ReactNode;
 }
 
@@ -59,6 +61,7 @@ function InstallmentActionModal({
   outro,
   section,
   testIdSuffix,
+  employees,
   children,
 }: InstallmentActionModalProps) {
   return (
@@ -76,6 +79,7 @@ function InstallmentActionModal({
         >
           {intro}
           {children}
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection {...(section ? { section } : {})} testIdSuffix={testIdSuffix} />
           {outro}
           <PermissionButton
@@ -94,7 +98,7 @@ function InstallmentActionModal({
 }
 
 export function PayModal({ controller }: { controller: ContractTableController }) {
-  const { payForm, payTarget, setPayTarget, submitPay, write } = controller;
+  const { employees, payForm, payTarget, setPayTarget, submitPay, write } = controller;
   return (
     <InstallmentActionModal
       title={payTarget ? `分期收款 · ${payTarget.inst_no}` : "分期收款"}
@@ -106,6 +110,7 @@ export function PayModal({ controller }: { controller: ContractTableController }
       write={write}
       permission="order.event.post"
       submitLabel="确认收款"
+      employees={employees}
       testIdSuffix="installment-pay"
     >
       <CfgItem name="period_no" label="期次（0=首付，留空按到期顺序）">
@@ -134,7 +139,7 @@ export function PayModal({ controller }: { controller: ContractTableController }
 }
 
 export function RecoverModal({ controller }: { controller: ContractTableController }) {
-  const { recoverForm, recoverTarget, setRecoverTarget, submitRecover, write } = controller;
+  const { employees, recoverForm, recoverTarget, setRecoverTarget, submitRecover, write } = controller;
   return (
     <InstallmentActionModal
       title={recoverTarget ? `逾期回收 · ${recoverTarget.inst_no}` : "逾期回收"}
@@ -146,6 +151,7 @@ export function RecoverModal({ controller }: { controller: ContractTableControll
       write={write}
       permission="order.update"
       submitLabel="确认回收"
+      employees={employees}
       testIdSuffix="installment-recover"
     >
       <CfgItem
@@ -165,7 +171,7 @@ export function RecoverModal({ controller }: { controller: ContractTableControll
 }
 
 export function ResaleModal({ controller }: { controller: ContractTableController }) {
-  const { resaleOrders, resaleForm, resaleTarget, setResaleTarget, submitResale, write } = controller;
+  const { employees, resaleOrders, resaleForm, resaleTarget, setResaleTarget, submitResale, write } = controller;
   return (
     <InstallmentActionModal
       title={resaleTarget ? `登记出售 · ${resaleTarget.inst_no}` : "登记出售"}
@@ -177,6 +183,7 @@ export function ResaleModal({ controller }: { controller: ContractTableControlle
       write={write}
       permission="order.update"
       submitLabel="确认登记"
+      employees={employees}
       intro={
         <Typography.Paragraph type="secondary">
           回收账号转售登记：请先在库存中心售出该账号生成售出订单，再在此关联。
@@ -219,7 +226,7 @@ export function ResaleModal({ controller }: { controller: ContractTableControlle
 }
 
 export function DeliverModal({ controller }: { controller: ContractTableController }) {
-  const { deliverForm, deliverTarget, setDeliverTarget, submitDeliver, write } = controller;
+  const { deliverForm, deliverTarget, employees, setDeliverTarget, submitDeliver, write } = controller;
   return (
     <InstallmentActionModal
       title={deliverTarget ? `换绑交付 · ${deliverTarget.inst_no}` : "换绑交付"}
@@ -231,6 +238,7 @@ export function DeliverModal({ controller }: { controller: ContractTableControll
       write={write}
       permission="order.event.post"
       submitLabel="确认交付"
+      employees={employees}
       testIdSuffix="installment-deliver-extra"
       outro={
         <Typography.Paragraph type="secondary">
@@ -265,7 +273,7 @@ export function DeliverModal({ controller }: { controller: ContractTableControll
 }
 
 export function CancelModal({ controller }: { controller: ContractTableController }) {
-  const { cancelForm, cancelTarget, setCancelTarget, submitCancel, write } = controller;
+  const { cancelForm, cancelTarget, employees, setCancelTarget, submitCancel, write } = controller;
   return (
     <InstallmentActionModal
       title={cancelTarget ? `退款登记 · ${cancelTarget.inst_no}` : "退款登记"}
@@ -278,6 +286,7 @@ export function CancelModal({ controller }: { controller: ContractTableControlle
       permission="order.event.post"
       danger
       submitLabel="确认退款并终止分期"
+      employees={employees}
       intro={
         <Typography.Paragraph type="secondary">
           {cancelTarget?.contract_type === "PICKUP_SALE"
@@ -304,7 +313,7 @@ export function CancelModal({ controller }: { controller: ContractTableControlle
 }
 
 export function SettleModal({ controller }: { controller: ContractTableController }) {
-  const { settleForm, settlePermission, settleTarget, setSettleTarget, submitSettleEarly, write } =
+  const { employees, settleForm, settlePermission, settleTarget, setSettleTarget, submitSettleEarly, write } =
     controller;
   return (
     <InstallmentActionModal
@@ -317,6 +326,7 @@ export function SettleModal({ controller }: { controller: ContractTableControlle
       write={write}
       permission={settlePermission}
       submitLabel="确认提前结清"
+      employees={employees}
       intro={
         <Typography.Paragraph type="secondary">
           一次性收清全部剩余应收，逐期生成收款并关闭未来期次；不指定资金池时按原收款资金池入账。
@@ -341,7 +351,7 @@ export function SettleModal({ controller }: { controller: ContractTableControlle
 }
 
 export function DefaultModal({ controller }: { controller: ContractTableController }) {
-  const { defaultForm, defaultTarget, setDefaultTarget, submitDefault, write } = controller;
+  const { defaultForm, defaultTarget, employees, setDefaultTarget, submitDefault, write } = controller;
   return (
     <InstallmentActionModal
       title={defaultTarget ? `登记违约 · ${defaultTarget.inst_no}` : "登记违约"}
@@ -354,6 +364,7 @@ export function DefaultModal({ controller }: { controller: ContractTableControll
       permission="order.update"
       danger
       submitLabel="确认登记违约"
+      employees={employees}
       intro={
         <Typography.Paragraph type="secondary">
           登记后合约进入 DEFAULTED，仅可继续收款或关闭，不可再交付。
@@ -369,7 +380,7 @@ export function DefaultModal({ controller }: { controller: ContractTableControll
 }
 
 export function WaiveModal({ controller }: { controller: ContractTableController }) {
-  const { waiveForm, waiveTarget, setWaiveTarget, submitWaive, write } = controller;
+  const { employees, waiveForm, waiveTarget, setWaiveTarget, submitWaive, write } = controller;
   return (
     <InstallmentActionModal
       title={waiveTarget ? `期次减免 · 第 ${waiveTarget.period_no} 期` : "期次减免"}
@@ -381,6 +392,7 @@ export function WaiveModal({ controller }: { controller: ContractTableController
       write={write}
       permission="order.update"
       submitLabel="确认减免"
+      employees={employees}
       intro={
         <Typography.Paragraph type="secondary">
           已收款部分不可减免，减免额不得超过该期未收金额；减免后该期不再计入催收。
@@ -408,7 +420,7 @@ export function WaiveModal({ controller }: { controller: ContractTableController
 }
 
 export function ExtendModal({ controller }: { controller: ContractTableController }) {
-  const { extendForm, extendTarget, setExtendTarget, submitExtend, write } = controller;
+  const { employees, extendForm, extendTarget, setExtendTarget, submitExtend, write } = controller;
   return (
     <InstallmentActionModal
       title={
@@ -424,6 +436,7 @@ export function ExtendModal({ controller }: { controller: ContractTableControlle
       write={write}
       permission="order.update"
       submitLabel="确认展期"
+      employees={employees}
       intro={
         <Typography.Paragraph type="secondary">
           新到期日必须晚于原到期日；逾期期次展期后回到 PENDING。

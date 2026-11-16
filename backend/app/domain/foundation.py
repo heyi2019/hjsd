@@ -203,8 +203,34 @@ class AuditLog(Base):
     request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
+class BusinessOperationOperator(Base, AuditMixin):
+    """业务动作的实际操作人快照；同一业务记录可按动作分别保存多人。"""
+
+    __tablename__ = "business_operation_operators"
+    __table_args__ = (
+        UniqueConstraint(
+            "entity_type", "entity_id", "operation_key",
+            name="uq_business_operation_operators_key",
+        ),
+        Index(
+            "ix_business_operation_operators_entity",
+            "entity_type", "entity_id", "id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    entity_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    operation_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    operator_user_ids: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=now_second, server_default=func.now()
+    )
+
+
 __all__ = [
     "AuditLog",
+    "BusinessOperationOperator",
     "DocumentSequence",
     "GameTypeOption",
     "OrderTypeDef",

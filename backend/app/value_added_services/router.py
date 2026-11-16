@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.database import get_db
+from app.core.errors import NotFound
 from app.core.security import (
     PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
@@ -32,6 +33,11 @@ from app.lists.export import build_list_csv, detail_json
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.parties.fields import get_extra_values_bulk
 from app.core.actor import actor_name as _actor
+from app.core.operation_operators import (
+    get_operation_operators,
+    list_operation_operators_bulk,
+    upsert_operation_operators,
+)
 
 router = APIRouter(tags=["HS-01 分期合约"])
 
@@ -78,6 +84,11 @@ def _installment_outputs(
         schedules_by_installment, dispositions_by_installment = (
             inst_queries.list_installment_export_details(db, [item.id for item in items])
         )
+    operator_rows_by_installment = list_operation_operators_bulk(
+        db,
+        entity_type="installment",
+        entity_ids=[item.inst_no for item in items],
+    )
     return [
         schemas.InstallmentOut.model_validate({
             **item.__dict__,
@@ -86,6 +97,10 @@ def _installment_outputs(
             "order": order_context[item.order_id],
             "schedules": [schemas.ScheduleOut.model_validate(row) for row in schedules_by_installment.get(item.id, [])],
             "dispositions": [schemas.DispositionOut.model_validate(row) for row in dispositions_by_installment.get(item.id, [])],
+            "operation_operators": [
+                schemas.OperationOperatorOut.model_validate(row)
+                for row in operator_rows_by_installment.get(item.inst_no, [])
+            ],
         })
         for item in items
     ]
@@ -238,6 +253,50 @@ def create_installment(
         note=payload.note,
         schedule=[item.model_dump() for item in payload.schedule] if payload.schedule else None,
         extra_values=payload.extra_values,
+        operator_user_ids=payload.operator_user_ids,
+    )
+    return _installment_output(db, item)
+
+
+@router.put(
+    "/installments/{installment_id}/operation-operators/{operation_key}",
+    response_model=schemas.InstallmentOut,
+)
+def update_installment_operation_operators(
+    installment_id: int,
+    operation_key: str,
+    payload: schemas.OperationOperatorsUpdateIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = default_manage,
+) -> schemas.InstallmentOut:
+    """详情页只更新动作操作人，不改建单人和动作发生时间。"""
+    item = inst__shared.get_installment(db, installment_id, user)
+    existing = get_operation_operators(
+        db,
+        entity_type="installment",
+        entity_id=item.inst_no,
+        operation_key=operation_key,
+    )
+    if existing is None:
+        raise NotFound("业务动作操作人记录不存在")
+    before = list(existing.operator_user_ids)
+    upsert_operation_operators(
+        db,
+        entity_type="installment",
+        entity_id=item.inst_no,
+        operation_key=operation_key,
+        actor=_actor(user),
+        operator_user_ids=payload.operator_user_ids,
+        occurred_at=existing.occurred_at,
+    )
+    record_audit(
+        db,
+        action=AuditAction.ORDER_UPDATE,
+        entity_type="installment_operation_operators",
+        entity_id=f"{item.inst_no}:{operation_key}",
+        actor=_actor(user),
+        before={"operator_user_ids": before},
+        after={"operator_user_ids": payload.operator_user_ids},
     )
     return _installment_output(db, item)
 
@@ -277,6 +336,7 @@ def waive_schedule(
         actor=_actor(user),
         reason=payload.reason,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
     return schemas.ScheduleOut.model_validate(item)
@@ -301,6 +361,7 @@ def extend_schedule(
         actor=_actor(user),
         reason=payload.reason,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
     return schemas.ScheduleOut.model_validate(item)
@@ -325,6 +386,7 @@ def pay_installment(
         pool_id=payload.pool_id,
         note=payload.note,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
     return schemas.PaymentResult(
@@ -350,6 +412,7 @@ def cancel_installment(
         actor=_actor(user),
         reason=payload.reason,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
     return schemas.InstallmentCancelResult(
@@ -378,6 +441,7 @@ def settle_early_installment(
         pool_id=payload.pool_id,
         note=payload.note,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         actor=_actor(user),
         user=user,
     )
@@ -399,6 +463,7 @@ def default_installment(
         actor=_actor(user),
         reason=payload.reason,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
     return _installment_output(db, item)
@@ -421,6 +486,7 @@ def recover_installment_account(
         actor=_actor(user),
         note=payload.note,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
     return schemas.DispositionOut.model_validate(item)
@@ -459,6 +525,7 @@ def resale_installment_account(
         actor=_actor(user),
         note=payload.note,
         form_extra=payload.form_extra,
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
     return schemas.DispositionOut.model_validate(item)
@@ -483,6 +550,7 @@ def deliver_installment(
         bound_phone_owner=payload.bound_phone_owner,
         form_extra=payload.form_extra,
         actor=_actor(user),
+        operator_user_ids=payload.operator_user_ids,
         user=user,
     )
     return _installment_output(db, item)

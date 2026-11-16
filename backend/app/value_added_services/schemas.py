@@ -1,7 +1,7 @@
 """installments.schemas：分期合约与收款请求/响应模型。"""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -26,6 +26,20 @@ class InstallmentTotalsOut(BaseModel):
     total_remaining: Decimal
     total_count: int
     overdue_count: int
+
+
+class OperationOperatorOut(BaseModel):
+    """某个业务动作的操作人快照，供列表展开/详情编辑使用。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    operation_key: str
+    operator_user_ids: list[int]
+    occurred_at: datetime
+
+
+class OperationOperatorsUpdateIn(RequestModel):
+    operator_user_ids: list[int] = Field(min_length=1, max_length=30)
 
 
 class SaleInstallmentPlanIn(RequestModel):
@@ -68,6 +82,7 @@ class InstallmentCreate(RequestModel):
     schedule: list[ScheduleCreate] | None = None
     extra_values: dict[str, Any] | None = None
     form_extra: dict[str, Any] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
 class ScheduleOut(BaseModel):
@@ -139,6 +154,7 @@ class InstallmentOut(BaseModel):
     order: InstallmentOrderOut
     schedules: list[ScheduleOut] = Field(default_factory=list)
     dispositions: list[DispositionOut] = Field(default_factory=list)
+    operation_operators: list[OperationOperatorOut] = Field(default_factory=list)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -173,6 +189,7 @@ class PaymentIn(RequestModel):
     pool_id: int | None = None
     note: str | None = None
     form_extra: dict[str, Any] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
 class EarlySettlementIn(RequestModel):
@@ -180,11 +197,13 @@ class EarlySettlementIn(RequestModel):
     pool_id: int | None = None
     note: str | None = None
     form_extra: dict[str, Any] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
 class DefaultIn(RequestModel):
     reason: str = Field(min_length=1)
     form_extra: dict[str, Any] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
 class CancelIn(RequestModel):
@@ -192,12 +211,14 @@ class CancelIn(RequestModel):
     reason: str = Field(min_length=1)
     # 表单字段配置体系（INVCANCEL 作用域）：自定义字段值落分期 form_extra。
     form_extra: dict[str, object] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
 class DispositionIn(RequestModel):
     occurred_on: date
     note: str = Field(min_length=1)
     form_extra: dict[str, Any] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
 class ResaleIn(DispositionIn):
@@ -209,12 +230,14 @@ class ScheduleWaiveIn(RequestModel):
     waived_on: date
     reason: str = Field(min_length=1)
     form_extra: dict[str, Any] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
 class ScheduleExtendIn(RequestModel):
     new_due_on: date
     reason: str = Field(min_length=1)
     form_extra: dict[str, Any] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
 class DeliverIn(RequestModel):
@@ -224,6 +247,7 @@ class DeliverIn(RequestModel):
     bound_phone: str | None = Field(default=None, max_length=64)
     bound_phone_owner: str | None = Field(default=None, max_length=128)
     form_extra: dict[str, Any] | None = None
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
 class PaymentResult(BaseModel):
@@ -255,6 +279,8 @@ __all__ = [
     "InstallmentOrderOut",
     "InstallmentOut",
     "InstallmentCancelResult",
+    "OperationOperatorOut",
+    "OperationOperatorsUpdateIn",
     "MarkOverdueOut",
     "PaymentIn",
     "PaymentResult",

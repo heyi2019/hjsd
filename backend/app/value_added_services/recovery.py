@@ -21,6 +21,7 @@ from app.core.errors import (
     Validation,
 )
 from app.core.money import to_money
+from app.core.operation_operators import upsert_operation_operators
 from app.core.state_machine import (
     ACCOUNT_TRANSITIONS,
     INSTALLMENT_TRANSITIONS,
@@ -58,6 +59,7 @@ def recover_account(
     actor: str,
     note: str,
     form_extra: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> InstallmentDisposition:
     """登记账号回收并关闭原分期，不改写原分期应收。"""
@@ -122,6 +124,15 @@ def recover_account(
         },
         reason=text_note,
     )
+    upsert_operation_operators(
+        session,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        operation_key="RECOVER",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+        occurred_at=None,
+    )
     return disposition
 
 
@@ -134,6 +145,7 @@ def record_sale(
     actor: str,
     note: str,
     form_extra: Mapping[str, Any] | None = None,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> InstallmentDisposition:
     """登记回收账号的出售订单，并保留原分期与出售订单的利润关联。"""
@@ -200,6 +212,14 @@ def record_sale(
         after={"account_id": original_order.account_id, "sale_order_id": sale_order.id},
         reason=text_note,
     )
+    upsert_operation_operators(
+        session,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        operation_key="RESELL",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+    )
     return disposition
 
 
@@ -230,6 +250,7 @@ def deliver(
     bound_phone_owner: str | None = None,
     form_extra: Mapping[str, Any] | None = None,
     actor: str,
+    operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Installment:
     """换绑交付：只能从 `SETTLED` 进入，生成无金额 `DELIVER`（A04 / A05）。"""
@@ -266,6 +287,7 @@ def deliver(
         bound_phone=bound_phone,
         bound_phone_owner=bound_phone_owner,
         form_extra=form_extra,
+        operator_user_ids=operator_user_ids,
         user=user,
         allow_installment_delivery=True,
     )
@@ -283,6 +305,14 @@ def deliver(
         entity_id=installment.inst_no,
         actor=actor,
         after={"delivery_mode": delivery_mode, "delivered_on": delivered_on.isoformat()},
+    )
+    upsert_operation_operators(
+        session,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        operation_key="DELIVER",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
     )
     return installment
 

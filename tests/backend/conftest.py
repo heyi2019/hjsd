@@ -232,7 +232,7 @@ from app.foundation.seeds import seed_foundation  # noqa: E402
 
 
 def seed_default_users(db: Session) -> None:
-    """补齐测试常用的占位用户（id 1..9）。
+    """补齐测试常用的占位用户（id 1..9 及动作操作人别名）。
 
     迁移 0008 给 orders.owner_id / customers.owner_id / order_profit_allocations.user_id
     补了指向 users 的外键，故测试里直接写死的 user_id/owner_id（如 1/2/3/7/9）必须对应真实用户，
@@ -244,6 +244,28 @@ def seed_default_users(db: Session) -> None:
                 id=uid,
                 username=f"seeduser{uid}",
                 display_name=f"种子用户{uid}",
+                password_hash="seed-not-real",
+                role="ADMIN",
+                owner_scope="ALL",
+                pool_ids=[],
+                team_ids=[],
+                is_active=True,
+            ))
+    for uid, username in {
+        10: "pytest",
+        11: "cashier",
+        12: "collector",
+        13: "contract-creator",
+        14: "delivery",
+        15: "recovery-operator",
+        16: "risk",
+        17: "admin",
+    }.items():
+        if db.get(users.User, uid) is None:
+            db.add(users.User(
+                id=uid,
+                username=username,
+                display_name=username,
                 password_hash="seed-not-real",
                 role="ADMIN",
                 owner_scope="ALL",

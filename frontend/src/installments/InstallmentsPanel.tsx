@@ -7,7 +7,7 @@ import { installmentsApi } from "../shared/api/installments.api";
 import type { Installment, Schedule } from "../shared/api/types/installments";
 import { today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
-import { DataTable, ErrorBanner, PermissionButton, StatRow } from "../shared/ui";
+import { DataTable, ErrorBanner, PermissionButton, Select, StatRow } from "../shared/ui";
 
 
 import { DISPOSITION_LABEL } from "./InstallmentsPanel.fragments";
@@ -57,7 +57,26 @@ function ContractTable({
     totalReceivable,
     totalCount,
     overdueCount,
+    employees,
+    updateOperationOperators,
   } = controller;
+  const employeeNames = new Map(employees.map((employee) => [employee.id, employee.display_name]));
+  const operationLabel = (key: string) => {
+    const [action, period] = key.split(":");
+    const label: Record<string, string> = {
+      CREATE: "建单",
+      PAY: "收款",
+      DELIVER: "交付",
+      RECOVER: "回收",
+      RESELL: "转售",
+      CANCEL: "终止",
+      SETTLE: "提前结清",
+      DEFAULT: "标记坏账",
+      WAIVE: "减免",
+      EXTEND: "展期",
+    };
+    return period ? `${label[action] ?? action}（${period}）` : label[action] ?? action;
+  };
   return (
     <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} />
@@ -122,8 +141,10 @@ function ContractTable({
           emptyText="暂无分期合约"
           onPageChange={() => undefined}
           expandable={{
-            expandedRowRender: (row) => (
-              <Space direction="vertical" size="middle" className="installment-detail-stack">
+            expandedRowRender: (row) => {
+              const operationOperators = row.operation_operators ?? [];
+              return (
+                <Space direction="vertical" size="middle" className="installment-detail-stack">
                 <DataTable<Schedule>
                 rows={row.schedules}
                 page={1}
@@ -133,6 +154,39 @@ function ContractTable({
                 emptyText="暂无期次"
                 columns={scheduleColumns}
               />
+              {operationOperators.length > 0 && (
+                <div>
+                  <Typography.Text strong>动作操作人</Typography.Text>
+                  <DataTable
+                    rows={operationOperators}
+                    page={1}
+                    pageSize={20}
+                    total={operationOperators.length}
+                    onPageChange={() => undefined}
+                    pagination={false}
+                    rowKey="operation_key"
+                    size="small"
+                    columns={[
+                      { title: "动作", dataIndex: "operation_key", key: "operation_key", render: (value: string) => operationLabel(value) },
+                      {
+                        title: "操作人",
+                        dataIndex: "operator_user_ids",
+                        key: "operator_user_ids",
+                        render: (ids: number[], operation) => (
+                          <Select
+                            mode="multiple"
+                            aria-label={`编辑${operationLabel(operation.operation_key)}操作人`}
+                            value={ids}
+                            options={employees.map((employee) => ({ value: employee.id, label: employee.display_name }))}
+                            onChange={(next) => void updateOperationOperators(row.id, operation.operation_key, next as number[])}
+                          />
+                        ),
+                      },
+                      { title: "动作时间", dataIndex: "occurred_at", key: "occurred_at" },
+                    ]}
+                  />
+                </div>
+              )}
               {row.dispositions.length > 0 && (
                 <Typography.Paragraph>
                   处置记录：{row.dispositions.map((item) =>
@@ -140,8 +194,9 @@ function ContractTable({
                   ).join("、")}
                 </Typography.Paragraph>
               )}
-            </Space>
-          ),
+                </Space>
+              );
+            },
         }}
       />
       </Card>

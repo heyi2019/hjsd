@@ -28,6 +28,7 @@ from app.core.errors import (
     Validation,
 )
 from app.core.money import to_money
+from app.core.operation_operators import upsert_operation_operators
 from app.core.state_machine import (
     ACCOUNT_TRANSITIONS,
     ORDER_TRANSITIONS,
@@ -264,6 +265,7 @@ def create_installment(
     extra_values: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
     adjust_final_period: bool = False,
+    operator_user_ids: list[int] | None = None,
 ) -> Installment:
     if first_due_on is None:
         raise Validation("首期应还日期必填", details={"field": "first_due_on"})
@@ -522,5 +524,14 @@ def create_installment(
             "contract_type": contract_type,
             "total_receivable": str(total_receivable(installment)),
         },
+    )
+    upsert_operation_operators(
+        session,
+        entity_type="installment",
+        entity_id=installment.inst_no,
+        operation_key="CREATE",
+        actor=actor,
+        operator_user_ids=operator_user_ids,
+        occurred_at=installment.created_at,
     )
     return installment

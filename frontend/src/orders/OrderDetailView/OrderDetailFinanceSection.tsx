@@ -36,7 +36,7 @@ function editableFinanceColumns(
   onEdit: ((flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void) | undefined,
 ): ColumnsType<OrderFinanceRow> {
   return FINANCE_COLUMNS.map((column) => {
-    if (column.key === "时间") {
+    if (column.key === "occurredAt") {
       return {
         ...column,
         render: (_value: string, row: OrderFinanceRow) => {
@@ -46,13 +46,13 @@ function editableFinanceColumns(
         },
       };
     }
-    if (column.key === "操作人") {
+    if (column.key === "operator") {
       return {
         ...column,
         render: (_value: string, row: OrderFinanceRow) => <Input aria-label={`编辑资金明细操作人 ${row.flowNo}`} value={drafts?.[row.flowNo]?.operator ?? row.operator} onChange={(event) => onEdit?.(row.flowNo, { operator: event.target.value })} />,
       };
     }
-    if (column.key === "备注") {
+    if (column.key === "note") {
       return {
         ...column,
         render: (_value: string, row: OrderFinanceRow) => <Input aria-label={`编辑资金明细备注 ${row.flowNo}`} value={drafts?.[row.flowNo]?.note ?? row.note} onChange={(event) => onEdit?.(row.flowNo, { note: event.target.value })} />,

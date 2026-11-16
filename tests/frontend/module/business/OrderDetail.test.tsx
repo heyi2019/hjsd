@@ -419,6 +419,29 @@ describe("OrderDetail", () => {
     expect(screen.queryByLabelText("编辑订单创建时间")).toBeNull();
   });
 
+  it("编辑态资金明细的时间、操作人和备注可以修改", async () => {
+    const detail = {
+      orders: [{ order_id: 36, order_no: "HS0036", order_type: "HS", created_at: "2026-10-15T10:19:00", events: [] }],
+      detail_view: {
+        operation_rows: [],
+        execution_rows: [],
+        finance_rows: [{ key: "CF0036", flow_no: "CF0036", type: "回收成本", direction: "支出", amount: "100.00", occurred_at: "2026-10-15T10:20:00", pool_name: "经营荷包", note: "旧备注", operator: "admin" }],
+        lifecycle: {},
+        order_notes: "-",
+        parties: [],
+        extras: [],
+      },
+      finance_summary: { total_expense: "100.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={36} loading={false} editing={account} />);
+    await settleFieldConfig();
+
+    expect(screen.getByLabelText("编辑资金明细时间 CF0036")).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑资金明细操作人 CF0036")).toHaveValue("admin");
+    expect(screen.getByLabelText("编辑资金明细备注 CF0036")).toHaveValue("旧备注");
+  });
+
   it("没有事件记录时操作明细备注仍可编辑", async () => {
     const detail = {
       account,

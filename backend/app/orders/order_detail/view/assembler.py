@@ -20,6 +20,7 @@ def build_order_outputs(
     counterparties_by_order: dict[int, list[Any]],
     rebates_by_order: dict[int, list[Any]],
     events_by_order: dict[int, list[Any]],
+    operator_names_by_order: dict[int, list[str]] | None = None,
 ) -> list[AccountExecutionOrderOut]:
     outputs: list[AccountExecutionOrderOut] = []
     for order in orders:
@@ -52,7 +53,12 @@ def build_order_outputs(
                 counterparties=counterparties_by_order.get(order.id, []),
                 rebates=rebates_by_order.get(order.id, []),
                 events=events_by_order.get(order.id, []),
-                operator=order.created_by,
+                operator="、".join((operator_names_by_order or {}).get(order.id, [])) or order.created_by,
+                operator_user_ids=(
+                    list(extra_values["business_responsible_ids"])
+                    if isinstance(extra_values.get("business_responsible_ids"), list)
+                    else None
+                ),
             )
         )
     return outputs

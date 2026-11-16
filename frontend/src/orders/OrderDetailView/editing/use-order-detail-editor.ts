@@ -22,7 +22,6 @@ export type FinanceDraft = {
 export type OrderDraft = {
   order_id: number;
   occurred_at: string;
-  operator: string;
   note: string;
   form_extra: Record<string, unknown>;
 };
@@ -51,7 +50,6 @@ export function propagateSharedOrderExtra(
     const current = next[orderId] ?? {
       order_id: orderId,
       occurred_at: "",
-      operator: "",
       note: "",
       form_extra: {},
     };
@@ -215,7 +213,7 @@ export function useOrderDetailEditor(params: {
     const detail = editingAccount ? getExecutionDetail(editingAccount.id) : undefined;
     const sharedOrderIds = sharedOrderIdsForEdit(detail, orderId);
     setOrderDrafts((current) => {
-      const currentDraft = current[orderId] ?? { order_id: orderId, occurred_at: "", operator: "", note: "", form_extra: {} };
+      const currentDraft = current[orderId] ?? { order_id: orderId, occurred_at: "", note: "", form_extra: {} };
       const next = {
         ...current,
         [orderId]: {
@@ -304,14 +302,12 @@ export function useOrderDetailEditor(params: {
         const original = originalOrders.find((order) => order.order_id === draft.order_id);
         return Boolean(original && (
           draft.occurred_at !== (original.created_at ?? "")
-          || draft.operator !== (original.operator === "-" ? "" : original.operator)
           || draft.note !== (original.note ?? "")
           || Object.keys(draft.form_extra).length > 0
         ));
       }).map((draft) => ({
         order_id: draft.order_id,
         ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
-        operator: draft.operator,
         note: draft.note,
         ...(Object.keys(draft.form_extra).length ? { form_extra: draft.form_extra } : {}),
       }));

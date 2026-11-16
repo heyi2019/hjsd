@@ -30,6 +30,7 @@ export function OrderDetailExecutionSection({
   onEventEdit,
   orderDrafts,
   onOrderEdit,
+  onOrderExtraChange,
   employees,
 }: {
   rows: OrderExecutionRow[];
@@ -38,6 +39,7 @@ export function OrderDetailExecutionSection({
   onEventEdit?: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
   orderDrafts?: Record<number, OrderDraft>;
   onOrderEdit?: (orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) => void;
+  onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
   employees: OrderEmployeeOption[];
 }) {
   const sortedRows = useMemo(
@@ -95,13 +97,12 @@ export function OrderDetailExecutionSection({
         if (!editing) return value;
         if (!event) {
           return (
-            <Select
-              aria-label={`编辑执行操作人 ${item.action}`}
-              showSearch
-              optionFilterProp="label"
-              value={orderDrafts?.[item.orderId]?.operator || (item.operator === "-" ? undefined : item.operator)}
-              options={employees.map((employee) => ({ value: employee.username, label: employee.display_name, disabled: !employee.is_active }))}
-              onChange={(username) => onOrderEdit?.(item.orderId, { operator: String(username) })}
+            <MultipleOperatorSelect
+              ariaLabel={`编辑执行操作人 ${item.action}`}
+              value={(orderDrafts?.[item.orderId]?.form_extra?.business_responsible_ids as number[] | undefined) ?? item.operatorUserIds ?? []}
+              options={employeeOptions}
+              placeholder={value}
+              onChange={(ids) => onOrderExtraChange?.(item.orderId, "business_responsible_ids", ids)}
             />
           );
         }
@@ -155,7 +156,7 @@ export function OrderDetailExecutionSection({
         return <Input aria-label={`编辑执行备注 ${item.action}`} value={eventDrafts?.[event.id]?.note ?? event.note ?? ""} onChange={(inputEvent) => onEventEdit?.(event, { note: inputEvent.target.value })} />;
       },
     },
-  ], [editing, eventDrafts, employeeOptions, employees, onEventEdit, onOrderEdit, orderDrafts]);
+  ], [editing, eventDrafts, employeeOptions, onEventEdit, onOrderEdit, onOrderExtraChange, orderDrafts]);
 
   return (
     <div className="order-detail__section order-detail__section--execution inventory-execution-list">
@@ -166,11 +167,13 @@ export function OrderDetailExecutionSection({
 }
 
 function MultipleOperatorSelect({
+  ariaLabel = "编辑执行操作人",
   value,
   options,
   placeholder,
   onChange,
 }: {
+  ariaLabel?: string;
   value: number[];
   options: Array<{ value: number; label: string; disabled: boolean }>;
   placeholder: string;
@@ -180,7 +183,7 @@ function MultipleOperatorSelect({
     <Select
       className="inventory-edit-operator"
       mode="multiple"
-      aria-label="编辑执行操作人"
+      aria-label={ariaLabel}
       showSearch
       optionFilterProp="label"
       placeholder={placeholder}

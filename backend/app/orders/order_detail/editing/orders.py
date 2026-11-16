@@ -6,7 +6,7 @@ from app.core.audit import record_audit
 from app.core.errors import NotFound
 from app.core.security import CurrentUser
 from app.domain.trade import Order
-from app.domain.users import User
+from app.orders.form_fields import validate_business_responsible
 
 from .schemas import ExecutionOrderEditItem
 
@@ -17,18 +17,12 @@ def apply_order_edits(db: Session, account_id: int, target_order_id: int, items:
         if order is None or order.id != target_order_id or order.account_id != account_id:
             raise NotFound("订单不存在")
         before = {"note": order.note, "occurred_at": order.created_at.isoformat() if order.created_at else None, "operator": order.created_by, "form_extra": order.form_extra}
-        if "operator" in item.model_fields_set:
-            if not item.operator:
-                order.created_by = ""
-            else:
-                operator = db.scalar(select(User).where(User.username == item.operator, User.is_active.is_(True)))
-                if operator is None:
-                    raise NotFound("操作人不存在或已停用")
-                order.created_by = operator.username
         if "note" in item.model_fields_set:
             order.note = item.note
         if "form_extra" in item.model_fields_set and item.form_extra is not None:
-            order.form_extra = {**(order.form_extra or {}), **item.form_extra}
+            next_extra = {**(order.form_extra or {}), **item.form_extra}
+            validate_business_responsible(db, order_type_code=order.order_type, values=next_extra)
+            order.form_extra = next_extra
         if "occurred_at" in item.model_fields_set and item.occurred_at is not None:
             occurred_at = item.occurred_at.replace(tzinfo=None)
             order.created_at = occurred_at

@@ -220,6 +220,63 @@ describe("OrderDetail", () => {
     expect(document.querySelector(".inventory-edit-operator")).toBeTruthy();
   });
 
+  it("入库执行行沿用建单业务操作人并支持多选编辑", async () => {
+    const onOrderExtraChange = vi.fn();
+    const detail = {
+      orders: [{
+        order_id: 1,
+        order_no: "HS0001",
+        order_type: "HS",
+        created_at: "2026-10-15T10:19:00",
+        extra_values: { business_responsible_ids: [7] },
+        events: [],
+        rebates: [],
+      }],
+      detail_view: {
+        operation_rows: [],
+        execution_rows: [{
+          key: "inventory-entry",
+          order_id: 1,
+          category: "INBOUND",
+          action: "回收入库",
+          occurred_at: "2026-10-15T10:19:00",
+          amount: null,
+          operator: "张三",
+          operator_user_ids: [7],
+          note: "-",
+          platform: "-",
+        }],
+        finance_rows: [],
+        lifecycle: { removed_platform: "-", recovery_platform: "-", sale_platform: "-" },
+        order_notes: "-",
+        parties: [],
+        extras: [],
+      },
+      finance_summary: { total_expense: "0.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+
+    renderApp(
+      <OrderDetail
+        row={account}
+        detail={detail}
+        loading={false}
+        editing={account}
+        employees={[
+          { id: 7, username: "zhangsan", display_name: "张三", is_active: true },
+          { id: 8, username: "lisi", display_name: "李四", is_active: true },
+        ]}
+        onOrderExtraChange={onOrderExtraChange}
+      />,
+    );
+    await settleFieldConfig();
+
+    const operator = screen.getByRole("combobox", { name: "编辑执行操作人 回收入库" });
+    expect(operator.closest(".inventory-edit-operator")).toBeTruthy();
+    await userEvent.click(operator);
+    await userEvent.click(await screen.findByText("李四", { selector: ".ant-select-item-option-content" }));
+    expect(onOrderExtraChange).toHaveBeenCalledWith(1, "business_responsible_ids", [7, 8]);
+  });
+
   it("编辑态账号输入与运营动作字段都绑定可编辑状态", async () => {
     const detail = {
       account: { ...account, game_account: "原账号" },

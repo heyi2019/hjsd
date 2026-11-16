@@ -64,6 +64,7 @@ export type OrderExecutionRow = {
   amount: string;
   note: string;
   platform: string;
+  operatorUserIds?: number[] | null;
   /** 建单入库展示行没有对应的业务事件，不参与编辑和资金处理。 */
   event?: AccountExecutionEvent;
 };

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser, PERM_AUDIT_READ
 from app.domain.foundation import AuditLog
+from app.domain.users import User
 from app.orders._shared import get_order
 from app.stocks.profile import get_account
 from app.stocks.router_output import _account_outputs
@@ -46,6 +47,16 @@ def load_order_execution_detail(
         if flow_nos:
             filters.append((AuditLog.entity_type == "inventory_cashflow_edit") & AuditLog.entity_id.in_(flow_nos))
         audit = [AccountAuditOut(id=row.id, action=row.action, entity_type=row.entity_type, entity_id=row.entity_id, actor=row.actor, reason=row.reason, occurred_at=row.occurred_at) for row in db.scalars(select(AuditLog).where(or_(*filters)).order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())).all()]
+    responsible_ids = {
+        user_id
+        for values in relations.order_extra_values.values()
+        for user_id in (values.get("business_responsible_ids") or [])
+        if isinstance(user_id, int) and user_id > 0
+    }
+    names_by_id = {
+        user.id: user.display_name or user.username
+        for user in db.scalars(select(User).where(User.id.in_(responsible_ids))).all()
+    } if responsible_ids else {}
     outputs = build_order_outputs(
         orders,
         order_extra_values=relations.order_extra_values,
@@ -55,6 +66,10 @@ def load_order_execution_detail(
         counterparties_by_order=relations.counterparties_by_order,
         rebates_by_order=relations.rebates_by_order,
         events_by_order=events,
+        operator_names_by_order={
+            order.id: [names_by_id[user_id] for user_id in (relations.order_extra_values.get(order.id, {}).get("business_responsible_ids") or []) if user_id in names_by_id]
+            for order in orders
+        },
     )
     return AccountExecutionDetailOut(
         account=_account_outputs(db, [account], user)[0],

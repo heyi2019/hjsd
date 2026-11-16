@@ -133,6 +133,7 @@ export function OrderDetailView({
           onEventEdit={onEventEdit}
           orderDrafts={orderDrafts}
           onOrderEdit={onOrderEdit}
+          onOrderExtraChange={onOrderExtraChange}
           employees={employees}
         />
         <div className="order-detail__footer">

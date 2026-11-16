@@ -154,6 +154,7 @@ export function OrderDetail({
     operator: row.operator,
     note: row.note,
     platform: row.platform,
+    operatorUserIds: row.operator_user_ids,
     event: row.event_id == null ? undefined : eventById.get(row.event_id),
   })), [detailView, eventById]);
   const operationRows = (detailView?.operation_rows ?? []).map((operation) => ({

@@ -20,6 +20,7 @@ class DetailExecutionRowOut(BaseModel):
     operator: str
     note: str
     platform: str
+    operator_user_ids: list[int] | None = None
     event_id: int | None = None
 
 

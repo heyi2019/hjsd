@@ -197,7 +197,7 @@ def test_operator_edit_does_not_change_existing_cashflow_amount(seeded_client, s
     assert seeded_db.get(Cashflow, flow.id).amount == Decimal("90")
 
 
-def test_order_detail_edit_can_clear_order_note_and_operator(seeded_client, seeded_db, headers):
+def test_order_detail_edit_can_clear_order_note_and_business_operators(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="clear-order-fields", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     order.note = "旧备注"
@@ -206,14 +206,54 @@ def test_order_detail_edit_can_clear_order_note_and_operator(seeded_client, seed
     response = seeded_client.patch(
         f"/api/v1/orders/{order.id}/execution-edit",
         headers=headers,
-        json={"events": [], "orders": [{"order_id": order.id, "operator": None, "note": None}]},
+        json={"events": [], "orders": [{"order_id": order.id, "form_extra": {"business_responsible_ids": []}, "note": None}]},
     )
 
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     edited = seeded_db.get(Order, order.id)
-    assert edited.created_by == ""
+    assert edited.created_by == "pytest"
+    assert edited.form_extra["business_responsible_ids"] == []
     assert edited.note is None
+
+
+def test_order_detail_edit_updates_inventory_operator_ids(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="inventory-operator-ids", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    order.form_extra = {"business_responsible_ids": [1]}
+    seeded_db.commit()
+
+    response = seeded_client.patch(
+        f"/api/v1/orders/{order.id}/execution-edit",
+        headers=headers,
+        json={"events": [], "orders": [{"order_id": order.id, "form_extra": {"business_responsible_ids": [1, 2]}}]},
+    )
+
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Order, order.id).form_extra["business_responsible_ids"] == [1, 2]
+    detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+    assert detail.status_code == 200
+    shown = detail.json()["orders"][0]
+    assert shown["operator_user_ids"] == [1, 2]
+    assert shown["operator"] == "种子用户1、种子用户2"
+
+
+def test_order_detail_edit_rejects_unknown_inventory_operator(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="invalid-inventory-operator", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    order.form_extra = {"business_responsible_ids": [1]}
+    seeded_db.commit()
+
+    response = seeded_client.patch(
+        f"/api/v1/orders/{order.id}/execution-edit",
+        headers=headers,
+        json={"events": [], "orders": [{"order_id": order.id, "form_extra": {"business_responsible_ids": [999999]}}]},
+    )
+
+    assert response.status_code == 422, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Order, order.id).form_extra["business_responsible_ids"] == [1]
 
 
 def test_order_detail_edit_can_add_platform_operation_row_with_its_own_time_and_price(seeded_client, seeded_db, headers):

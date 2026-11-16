@@ -157,6 +157,7 @@ def _execution_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailExecut
                 occurred_at=order.created_at,
                 amount=None,
                 operator=order.operator or "-",
+                operator_user_ids=order.operator_user_ids,
                 note="-",
                 platform=order.account_platform or "-",
             ))
@@ -169,6 +170,7 @@ def _execution_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailExecut
                 occurred_at=event.occurred_at,
                 amount=event.amount,
                 operator=_operator(event),
+                operator_user_ids=event.operator_user_ids,
                 note=event.note or "-",
                 platform=_event_platform(order, event, has_system_unlisted),
                 event_id=event.id,

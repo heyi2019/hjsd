@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
 from app.domain.trade import OrderFormField
+from app.domain.users import User
 from app.orders.form_scopes import SCOPE_CODES
 
 FIELD_TYPES = ("TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT")
@@ -243,13 +244,25 @@ def validate_business_responsible(
             OrderFormField.is_active.is_(True),
         )
     )
-    if definition is None or not definition.required:
-        return
     raw = (values or {}).get(BUSINESS_RESPONSIBLE_FIELD_KEY)
+    label = definition.label if definition is not None else "业务操作人"
+    if raw in (None, []) and (definition is None or not definition.required):
+        return
     if not isinstance(raw, list) or not raw or any(
         isinstance(item, bool) or not isinstance(item, int) or item <= 0 for item in raw
     ):
         raise Validation(
-            f"字段 {definition.label} 必填",
+            f"字段 {label} 必填",
+            details={"field_key": BUSINESS_RESPONSIBLE_FIELD_KEY},
+        )
+    if len(set(raw)) != len(raw):
+        raise Validation(
+            f"字段 {label} 不能重复选择",
+            details={"field_key": BUSINESS_RESPONSIBLE_FIELD_KEY},
+        )
+    active_ids = set(session.scalars(select(User.id).where(User.id.in_(raw), User.is_active.is_(True))))
+    if active_ids != set(raw):
+        raise Validation(
+            f"字段 {label} 必须选择在职员工",
             details={"field_key": BUSINESS_RESPONSIBLE_FIELD_KEY},
         )

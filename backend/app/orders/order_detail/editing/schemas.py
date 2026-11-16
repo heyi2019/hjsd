@@ -45,7 +45,6 @@ class ExecutionCashflowEditItem(RequestModel):
 class ExecutionOrderEditItem(RequestModel):
     order_id: int = Field(gt=0)
     occurred_at: datetime | None = None
-    operator: str | None = Field(default=None, max_length=64)
     note: str | None = None
     form_extra: dict[str, object] | None = None
 

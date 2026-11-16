@@ -84,6 +84,7 @@ export interface AccountExecutionOrder {
   rebates?: AccountExecutionRebate[];
   events: AccountExecutionEvent[];
   operator: string;
+  operator_user_ids?: number[] | null;
 }
 
 export interface OrderDetailExecutionRow {
@@ -96,6 +97,7 @@ export interface OrderDetailExecutionRow {
   operator: string;
   note: string;
   platform: string;
+  operator_user_ids?: number[] | null;
   event_id?: number | null;
 }
 

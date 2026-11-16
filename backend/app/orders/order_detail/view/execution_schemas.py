@@ -91,6 +91,7 @@ class AccountExecutionOrderOut(BaseModel):
     rebates: list[ExecutionRebateOut] = Field(default_factory=list)
     events: list[ExecutionEventOut]
     operator: str
+    operator_user_ids: list[int] | None = None
 
 
 class AccountAuditOut(BaseModel):

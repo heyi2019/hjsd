@@ -111,12 +111,18 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
 
   const handledFocusRef = useRef<number | null>(null);
   useEffect(() => {
-    if (focusId == null || handledFocusRef.current === focusId) return;
+    if (focusId == null || handledFocusRef.current === focusId || rows === null || loading) return;
     const row = rows?.find((item) => item.id === focusId);
-    if (!row) return;
     handledFocusRef.current = focusId;
-    void openDetail(row);
-  }, [focusId, rows]);
+    if (row) {
+      void openDetail(row);
+      return;
+    }
+    // 后端分页后，深链客户可能不在当前页；直接按 ID 从后端取，不依赖列表快照。
+    void customersApi.get(focusId)
+      .then((customer) => openDetail(customer))
+      .catch((err) => setError(normalizeError(err)));
+  }, [focusId, loading, rows]);
 
   /** 联系方式单元格直接展示已建档原值。 */
   const renderContact = (row: Customer, field: "phone" | "wechat" | "qq") => {

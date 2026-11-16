@@ -24,6 +24,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
   const [detailTarget, setDetailTarget] = useState<Customer | null>(null);
   const [mergeTarget, setMergeTarget] = useState<Customer | null>(null);
+  const [mergeCandidates, setMergeCandidates] = useState<Customer[] | null>(null);
   const [detailData, setDetailData] = useState<CustomerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -264,8 +265,18 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
   const requestEdit = (target: Customer) => { setEditTarget(target); setDetailTarget(null); };
   // 合并弹窗复用同一 Form 实例：取消或再次打开都必须清空，避免上次选的目标客户与原因残留
   // 导致把 A 客户误合并到 B 客户上次选的目标上（#13）。
-  const cancelMerge = () => { setMergeTarget(null); mergeForm.resetFields(); };
-  const requestMerge = (target: Customer) => { mergeForm.resetFields(); setMergeTarget(target); };
+  const cancelMerge = () => { setMergeTarget(null); setMergeCandidates(null); mergeForm.resetFields(); };
+  const requestMerge = async (target: Customer) => {
+    mergeForm.resetFields();
+    setMergeTarget(target);
+    setMergeCandidates(null);
+    try {
+      setMergeCandidates(await customersApi.list({ status: "ACTIVE", limit: 500, offset: 0 }));
+    } catch (err) {
+      setError(normalizeError(err));
+      setMergeCandidates([]);
+    }
+  };
 
   return {
     activeDefs,
@@ -291,6 +302,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     load,
     loading,
     mergeForm,
+    mergeCandidates,
     mergeTarget,
     newThisMonthCount,
     newTodayCount,

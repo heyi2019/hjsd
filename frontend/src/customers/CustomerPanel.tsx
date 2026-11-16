@@ -37,6 +37,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
     load,
     loading,
     mergeForm,
+    mergeCandidates,
     mergeTarget,
     newThisMonthCount,
     newTodayCount,
@@ -165,7 +166,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       />
       <CustomerMergeModal
         mergeTarget={mergeTarget}
-        rows={rows}
+        candidates={mergeCandidates}
         mergeForm={mergeForm}
         onCancel={cancelMerge}
         onSubmit={submitMerge}

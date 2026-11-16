@@ -5,13 +5,13 @@ import { BusinessActionModal, BusinessRegistrationForm, CompactActions, Permissi
 
 export function CustomerMergeModal({
   mergeTarget,
-  rows,
+  candidates,
   mergeForm,
   onCancel,
   onSubmit,
 }: {
   mergeTarget: Customer | null;
-  rows: Customer[] | null;
+  candidates: Customer[] | null;
   mergeForm: FormInstance;
   onCancel: () => void;
   onSubmit: (values: Record<string, unknown>) => void;
@@ -30,7 +30,7 @@ export function CustomerMergeModal({
           wrapperCol={{ flex: "auto" }} scope="CUSTOMER" form={mergeForm} colon={false} className="form-no-colon" onFinish={onSubmit}>
           <Form.Item name="target_customer_id" label="目标客户（必须为 ACTIVE）" rules={[{ required: true }]}>
             <Select
-              options={(rows ?? [])
+              options={(candidates ?? [])
                 .filter((row) => row.status === "ACTIVE" && row.id !== mergeTarget?.id)
                 .map((row) => ({ value: row.id, label: `${row.customer_no} ${row.display_name}` }))}
             />

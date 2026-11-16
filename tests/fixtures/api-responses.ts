@@ -6,6 +6,7 @@ import type { ProfitAllocation, ProfitAllocationList } from "@/shared/api/types/
 import type { DataCenterSummary } from "@/shared/api/types/reporting";
 import type { DashboardSummary } from "@/shared/api/dashboard.api";
 import type { Customer, CustomerDetail, CustomerSummary } from "@/shared/api/types/customers";
+import type { OptionSet, OptionSetList } from "@/shared/api/types/common";
 
 export type OrderLedgerSummary = {
   total_count: number;
@@ -234,4 +235,14 @@ export function customerDetail(customer: Customer, overrides: Partial<Omit<Custo
     audit: [],
     ...overrides,
   };
+}
+
+/** 构造选项字典列表响应。 */
+export function optionSetList(items: OptionSet[] = []): OptionSetList {
+  return { items };
+}
+
+/** 构造选项字典详情响应，默认返回空选项集。 */
+export function optionSet(overrides: Partial<OptionSet> = {}): OptionSet {
+  return { id: 0, code: "", label: "", group: "", editable: true, options: [], ...overrides };
 }

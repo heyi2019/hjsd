@@ -7,6 +7,7 @@ import { gameTypesApi } from "@/shared/api/misc.api";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { OrderFormField } from "@/shared/api/types/forms";
+import { optionSet } from "@fixtures/api-responses";
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");
@@ -62,7 +63,7 @@ beforeEach(() => {
   vi.mocked(orderFormFieldsApi).list.mockResolvedValue([]);
   vi.mocked(orderFormFieldsApi).scopes = vi.fn().mockResolvedValue([]);
   vi.mocked(gameTypesApi.list).mockResolvedValue([]);
-  vi.mocked(optionSetsApi).get = vi.fn().mockResolvedValue({ options: [] } as never);
+  vi.mocked(optionSetsApi).get = vi.fn().mockResolvedValue(optionSet() as never);
 });
 
 describe("OrderFormFieldsPanel", () => {

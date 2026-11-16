@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DEV_USER_KEY } from "@/shared/api/client";
 import { allFormFields } from "@fixtures/orderFormFieldsSeed";
 import { OPTION_SET_SEED } from "@fixtures/optionSetsSeed";
-import { customerDetail, customerSummary, dashboardSummary, dataCenterSummary, installmentTotals, inventoryLedgerResponse, listResponse, orderLedgerSummary, pageResponse, poolBalancesResponse, profitAllocationResponse, reportResponse, commissionResponse, cashflowPage, cashflowTotals, studioExpenseSummary } from "@fixtures/api-responses";
+import { customerDetail, customerSummary, dashboardSummary, dataCenterSummary, installmentTotals, inventoryLedgerResponse, listResponse, optionSet, optionSetList, orderLedgerSummary, pageResponse, poolBalancesResponse, profitAllocationResponse, reportResponse, commissionResponse, cashflowPage, cashflowTotals, studioExpenseSummary } from "@fixtures/api-responses";
 import { resetTestFixtureState } from "@fixtures/fixtures";
 
 describe("测试夹具隔离", () => {
@@ -137,6 +137,15 @@ describe("测试夹具隔离", () => {
       business: [],
       installments: [],
       audit: [],
+    });
+    expect(optionSetList()).toEqual({ items: [] });
+    expect(optionSet({ code: "ORDER_TYPE" })).toEqual({
+      id: 0,
+      code: "ORDER_TYPE",
+      label: "",
+      group: "",
+      editable: true,
+      options: [],
     });
   });
 });

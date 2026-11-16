@@ -7,6 +7,7 @@ import { listColumnsApi, orderTypesApi } from "@/shared/api/orders.api";
 import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import type { OrderType } from "@/shared/api/types/orders";
+import { optionSet, optionSetList } from "@fixtures/api-responses";
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");
@@ -44,8 +45,8 @@ beforeEach(() => {
     { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
   ] as never);
   vi.mocked(gameTypesApi.list).mockResolvedValue([] as never);
-  vi.mocked(optionSetsApi.list).mockResolvedValue({ items: [] } as never);
-  vi.mocked(optionSetsApi.get).mockResolvedValue({ options: [] } as never);
+  vi.mocked(optionSetsApi.list).mockResolvedValue(optionSetList() as never);
+  vi.mocked(optionSetsApi.get).mockResolvedValue(optionSet() as never);
   vi.mocked(policyApi.list).mockResolvedValue({ items: [], total: 0 } as never);
   vi.mocked(listColumnsApi.all).mockResolvedValue([] as never);
   vi.mocked(sequencesApi.list).mockResolvedValue([] as never);

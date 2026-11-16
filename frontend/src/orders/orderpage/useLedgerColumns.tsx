@@ -54,8 +54,8 @@ export function useLedgerColumns(params: {
     { title: "成本", dataIndex: "cost_amount", width: "var(--col-w-90)", ellipsis: true, render: (_v: string | null, order) => order.cost_amount != null ? `¥${money(order.cost_amount)}` : "-" },
     { title: "游戏/产品类型", dataIndex: "account_game_type", width: "var(--col-w-80)", ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "游戏账号/产品", dataIndex: "account_game_account", width: "var(--col-w-120)", ellipsis: true, render: (v: string | null) => v || "-" },
-    { title: "业务", key: "business_mode", width: "var(--col-w-56)", ellipsis: true, render: (_v, order) => order.account_business_mode ? BUSINESS_MODE_LABEL[order.account_business_mode] ?? order.account_business_mode : "-" },
-    { title: "业务类型", key: "inventory_type", width: "var(--col-w-68)", ellipsis: true, render: (_v, order) => {
+    { title: "业务", key: "business_mode", width: "var(--col-w-60)", ellipsis: true, render: (_v, order) => order.account_business_mode ? BUSINESS_MODE_LABEL[order.account_business_mode] ?? order.account_business_mode : "-" },
+    { title: "业务类型", key: "inventory_type", width: "var(--col-w-70)", ellipsis: true, render: (_v, order) => {
       const inventoryType = inventoryTypeOfOrder(order);
       return inventoryType ? INVENTORY_TYPE_LABEL[inventoryType] ?? inventoryType : "-";
     } },

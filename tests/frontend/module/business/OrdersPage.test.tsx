@@ -223,6 +223,9 @@ describe("OrdersPage：四类订单台账", () => {
     }
     expect(screen.queryByRole("columnheader", { name: "日期" })).toBeNull();
     expect(document.querySelector(".orders-ledger .ant-table-content > table")).toHaveStyle({ tableLayout: "fixed" });
+    const ledgerColumnWidths = Array.from(document.querySelectorAll(".orders-ledger .ant-table-content > table col")).map((column) => column.getAttribute("style"));
+    expect(ledgerColumnWidths).toContain("width: var(--col-w-60);");
+    expect(ledgerColumnWidths).toContain("width: var(--col-w-70);");
     for (const value of ["原神", "seller-001", "¥1,234.00", "在库"]) {
       expect(screen.getAllByText(value).length).toBeGreaterThan(0);
     }

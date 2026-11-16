@@ -1,12 +1,13 @@
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Card, Form, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { poolsApi } from "../../shared/api/pools.api";
 import type { Pool } from "../../shared/api/types/finance";
-import { normalizeError } from "../../shared/api/client";
+import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { POOL_OWNERSHIP_LABEL, POOL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
+import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { BusinessActionModal, BusinessRegistrationForm, Select } from "../../shared/ui";
 
 /** 词典未加载/未打桩时的回落值，与改造前硬编码完全一致，保证零行为变化。 */
@@ -25,23 +26,18 @@ import { ConfirmButton, DataTable, ErrorBanner, InlineError, PermissionButton, P
 export function PoolsPanel() {
   const poolTypeOptions = useOptionSet("POOL_TYPE") ?? POOL_TYPE_FALLBACK;
   const ownershipOptions = useOptionSet("POOL_OWNERSHIP") ?? POOL_OWNERSHIP_FALLBACK;
-  const [rows, setRows] = useState<Pool[]>([]);
-  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [editing, setEditing] = useState<Pool | null>(null);
-  const load = useCallback(async () => {
-    try {
-      setRows(await poolsApi.list());
-      setError(null);
-    } catch (err) {
-      setError(normalizeError(err));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const load = useCallback(() => poolsApi.list(), []);
+  const { data: loadedRows, loading, error: loadError, reload } = useSettingsResource(load);
+  const rows = loadedRows ?? [];
+  const error = mutationError ?? loadError;
+  const reloadPanel = useCallback(async () => {
+    setMutationError(null);
+    await reload();
+  }, [reload]);
 
   const submit = async (values: Record<string, unknown>) => {
     try {
@@ -53,24 +49,26 @@ export function PoolsPanel() {
       });
       appMessage.success("资金池已创建");
       form.resetFields();
-      await load();
+      setMutationError(null);
+      await reload();
     } catch (err) {
-      setError(normalizeError(err));
+      setMutationError(normalizeError(err));
     }
   };
 
   const toggleStatus = async (row: Pool) => {
-    try { await poolsApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE"); appMessage.success(row.status === "ACTIVE" ? "资金池已停用" : "资金池已启用"); await load(); }
-    catch (err) { setError(normalizeError(err)); }
+    try { await poolsApi.setStatus(row.id, row.status === "ACTIVE" ? "DISABLED" : "ACTIVE"); appMessage.success(row.status === "ACTIVE" ? "资金池已停用" : "资金池已启用"); setMutationError(null); await reload(); }
+    catch (err) { setMutationError(normalizeError(err)); }
   };
 
   const remove = async (row: Pool) => {
     try {
       await poolsApi.remove(row.id);
       appMessage.success("资金池已删除");
-      await load();
+      setMutationError(null);
+      await reload();
     } catch (err) {
-      setError(normalizeError(err));
+      setMutationError(normalizeError(err));
     }
   };
 
@@ -85,9 +83,10 @@ export function PoolsPanel() {
       });
       appMessage.success("资金池已更新");
       setEditing(null);
-      await load();
+      setMutationError(null);
+      await reload();
     } catch (err) {
-      setError(normalizeError(err));
+      setMutationError(normalizeError(err));
     }
   };
 
@@ -122,10 +121,11 @@ export function PoolsPanel() {
   ];
   return (
     <Card className="glass" title="资金池主数据">
-      <ErrorBanner error={error} onRetry={() => void load()} />
+      <ErrorBanner error={error} onRetry={() => void reloadPanel()} retrying={loading} />
       <DataTable<Pool>
         columns={columns}
         rows={rows}
+        loading={loading}
         page={1}
         pageSize={Math.max(rows.length, 10)}
         total={rows.length}

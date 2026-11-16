@@ -2,6 +2,7 @@ import { Form } from "antd";
 import type { ReactNode } from "react";
 import type { Pool } from "../../shared/api/types/finance";
 import { sumMoney } from "../../shared/lib/money";
+import { moneyRules } from "../../shared/lib/validators";
 import { BusinessRegistrationSection, MoneyInput, Select } from "../../shared/ui";
 import { CfgItem, fieldLabel, sectionLabel, useFieldConfig } from "../ConfigurableField";
 import { FinancePrimaryCard } from "./FinancePrimaryCard";
@@ -21,6 +22,7 @@ export function PurchaseFinanceSection(props: {
   const amount = Form.useWatch(props.amountName);
   const expenseItems = Form.useWatch("expense_items") as Array<{ amount?: unknown }> | undefined;
   const totalCost = sumMoney([amount, ...(expenseItems ?? []).map((item) => item.amount)]);
+  const resolvedAmountLabel = fieldLabel(config, props.amountName, props.amountLabel);
 
   return (
     <BusinessRegistrationSection title={sectionLabel("FINANCE", "资金明细")} description={props.description}>
@@ -28,8 +30,8 @@ export function PurchaseFinanceSection(props: {
         <CfgItem
           alwaysActive={props.alwaysActive}
           name={props.amountName}
-          label={fieldLabel(config, props.amountName, props.amountLabel)}
-          rules={[{ required: true, message: props.requiredMessage }]}
+          label={resolvedAmountLabel}
+          rules={[{ required: true, message: props.requiredMessage }, ...moneyRules(resolvedAmountLabel)]}
         >
           <MoneyInput placeholder="请输入金额" />
         </CfgItem>

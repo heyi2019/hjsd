@@ -1,4 +1,5 @@
 import { Form, Input } from "antd";
+import { requiredMoneyRules } from "../../shared/lib/validators";
 import { AdaptiveFormGrid, MoneyInput, PermissionButton } from "../../shared/ui";
 import "./FinanceExpenseItems.css";
 
@@ -24,7 +25,7 @@ export function FinanceExpenseItems({ className }: { className?: string }) {
                 <Form.Item
                   name={[field.name, "amount"]}
                   label="金额"
-                  rules={[{ required: true, message: "请输入支出金额" }]}
+                  rules={requiredMoneyRules("支出金额")}
                 >
                   <MoneyInput placeholder="金额" />
                 </Form.Item>

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
 import { dashboardApi } from "@/shared/api/dashboard.api";
+import { dashboardSummary } from "@fixtures/api-responses";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/dashboard.api");
@@ -23,16 +24,7 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
-  vi.mocked(dashboardApi.summary).mockResolvedValue({
-    period: { from: "2026-11-01", to: "2026-11-16" },
-    orders: { total_count: 0, completed_count: 0, active_count: 0 },
-    personal_orders: 0,
-    personal_earnings: "0.00",
-    inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
-    installments: { total_count: 0, overdue_count: 0 },
-    notifications: { pending_profit_count: 0, allocated_profit_count: 0 },
-    reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
-  });
+  vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary());
 });
 
 describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
@@ -51,16 +43,9 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
   });
 
   it("业务总览计数：订单总量与完成订单量", async () => {
-    vi.mocked(dashboardApi.summary).mockResolvedValue({
-      period: { from: "2026-11-01", to: "2026-11-16" },
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
       orders: { total_count: 3, completed_count: 2, active_count: 1 },
-      personal_orders: 0,
-      personal_earnings: "0.00",
-      inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
-      installments: { total_count: 0, overdue_count: 0 },
-      notifications: { pending_profit_count: 0, allocated_profit_count: 0 },
-      reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
-    });
+    }));
     renderLight(<DashboardPage />, { user: "admin" });
     const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
     const doneCard = (await screen.findByText("完成订单量")).closest(".ui-stat") as HTMLElement;
@@ -69,16 +54,11 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
   });
 
   it("我的当期卡片展示当前登录用户的订单数与分润收益", async () => {
-    vi.mocked(dashboardApi.summary).mockResolvedValue({
-      period: { from: "2026-11-01", to: "2026-11-16" },
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
       orders: { total_count: 3, completed_count: 1, active_count: 2 },
       personal_orders: 2,
       personal_earnings: "123.45",
-      inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
-      installments: { total_count: 0, overdue_count: 0 },
-      notifications: { pending_profit_count: 0, allocated_profit_count: 0 },
-      reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
-    });
+    }));
     renderLight(<DashboardPage />, { user: "operator" });
 
     await waitFor(() => expect(dashboardApi.summary).toHaveBeenCalledTimes(1));

@@ -6,6 +6,7 @@ import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
 import { dashboardApi } from "@/shared/api/dashboard.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
+import { dashboardSummary } from "@fixtures/api-responses";
 /** 2026-10-13：工作台数据总览（资金池/统计/入口卡）已迁至「经营中心 · 数据中心」
  *  （用例见 reporting/DataCenterPanel.test.tsx）。本文件只覆盖瘦身后的工作台：
  *  纯动作入口——新建业务卡 + 登记弹窗，以及「数据已迁走」的回归断言。 */
@@ -27,30 +28,17 @@ vi.mock("@/shared/api/stocks.api");
 beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
-  vi.mocked(dashboardApi.summary).mockResolvedValue({
-    period: { from: "2026-11-01", to: "2026-11-16" },
-    orders: { total_count: 0, completed_count: 0, active_count: 0 },
-    personal_orders: 0,
-    personal_earnings: "0.00",
-    inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
-    installments: { total_count: 0, overdue_count: 0 },
-    notifications: { pending_profit_count: 0, allocated_profit_count: 0 },
-    reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
-  });
+  vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary());
 });
 
 describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
 it("工作台展示业务总览指标和业务提醒", async () => {
-    vi.mocked(dashboardApi.summary).mockResolvedValue({
-      period: { from: "2026-11-01", to: "2026-11-16" },
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
       orders: { total_count: 2, completed_count: 1, active_count: 1 },
-      personal_orders: 0,
-      personal_earnings: "0.00",
       inventory: { account_count: 1, aging_count: 1, overdue_count: 1 },
       installments: { total_count: 1, overdue_count: 1 },
       notifications: { pending_profit_count: 1, allocated_profit_count: 1 },
-      reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
-    });
+    }));
 
     renderLight(<DashboardPage />, { user: "admin" });
 
@@ -74,16 +62,12 @@ it("工作台展示业务总览指标和业务提醒", async () => {
   });
 
 it("工作台按业务提醒配置计算库存阈值并控制提醒开关", async () => {
-    vi.mocked(dashboardApi.summary).mockResolvedValue({
-      period: { from: "2026-11-01", to: "2026-11-16" },
-      orders: { total_count: 0, completed_count: 0, active_count: 0 },
-      personal_orders: 0,
-      personal_earnings: "0.00",
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
       inventory: { account_count: 1, aging_count: 0, overdue_count: 0 },
       installments: { total_count: 1, overdue_count: 1 },
       notifications: { pending_profit_count: 0, allocated_profit_count: 1 },
       reminders: { inventory_aging_days: 14, profit_notifications_enabled: false, overdue_installments_enabled: false },
-    });
+    }));
 
     renderLight(<DashboardPage />, { user: "admin" });
 

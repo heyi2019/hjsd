@@ -23,6 +23,12 @@ beforeEach(() => {
 });
 
 describe("ChangePasswordPage：首次登录改密", () => {
+  it("首次登录改密复用登录页的品牌布局", () => {
+    renderLight(<ChangePasswordPage />);
+    expect(screen.getByRole("region", { name: "产品介绍" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "首次登录设置密码" })).toBeInTheDocument();
+  });
+
   it("两次新密码不一致给出错误提示", async () => {
     renderLight(<ChangePasswordPage />);
     await ui.type(screen.getByLabelText("当前密码"), "old");

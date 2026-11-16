@@ -2,6 +2,7 @@ import { Button, Card, Form, Input } from "antd";
 import { useState } from "react";
 import { errorMessage } from "../shared/api/client";
 import { useSession } from "../shared/state/session";
+import { LoginAside } from "./LoginAside";
 
 type ChangePasswordFormValues = {
   old_password: string;
@@ -32,6 +33,7 @@ export function ChangePasswordPage() {
   };
   return (
     <main className="login-shell">
+      <LoginAside />
       <Card className="login-card" variant="borderless">
         <div className="login-hero">
           <span className="login-brand-mark" aria-hidden="true">宜</span>

@@ -4,6 +4,8 @@ import type { PoolBalance, PoolBalanceTotals } from "@/shared/api/types/finance"
 import type { InstallmentTotals } from "@/shared/api/types/installments";
 import type { ProfitAllocation, ProfitAllocationList } from "@/shared/api/types/policy";
 import type { DataCenterSummary } from "@/shared/api/types/reporting";
+import type { DashboardSummary } from "@/shared/api/dashboard.api";
+import type { Customer, CustomerDetail, CustomerSummary } from "@/shared/api/types/customers";
 
 export type OrderLedgerSummary = {
   total_count: number;
@@ -188,6 +190,48 @@ export function installmentTotals(overrides: Partial<InstallmentTotals> = {}): I
     total_remaining: "0.00",
     total_count: 0,
     overdue_count: 0,
+    ...overrides,
+  };
+}
+
+/** 构造工作台汇总，默认值与空数据状态一致。 */
+export function dashboardSummary(overrides: Partial<DashboardSummary> = {}): DashboardSummary {
+  return {
+    period: { from: "2026-11-01", to: "2026-11-16" },
+    orders: { total_count: 0, completed_count: 0, active_count: 0 },
+    personal_orders: 0,
+    personal_earnings: "0.00",
+    inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
+    installments: { total_count: 0, overdue_count: 0 },
+    notifications: { pending_profit_count: 0, allocated_profit_count: 0 },
+    reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
+    ...overrides,
+  };
+}
+
+/** 构造客户中心统计，默认值与空数据状态一致。 */
+export function customerSummary(overrides: Partial<CustomerSummary> = {}): CustomerSummary {
+  return { month_count: 0, today_count: 0, ...overrides };
+}
+
+/** 构造客户详情聚合，默认值与空详情状态一致。 */
+export function customerDetail(customer: Customer, overrides: Partial<Omit<CustomerDetail, "customer">> = {}): CustomerDetail {
+  return {
+    customer,
+    overview: {
+      order_count: 0,
+      active_order_count: 0,
+      completed_order_count: 0,
+      cancelled_order_count: 0,
+      last_trade_date: null,
+      installment_paid_total: "0.00",
+      installment_receivable_total: "0.00",
+      installment_remaining_total: "0.00",
+      overdue_period_count: 0,
+    },
+    business: [],
+    installments: [],
+    audit: [],
     ...overrides,
   };
 }

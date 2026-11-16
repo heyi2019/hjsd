@@ -13,7 +13,7 @@ import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { OrderFormField } from "@/shared/api/types/forms";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { resolveMockOnce } from "@fixtures/mock-api";
-import { pageResponse } from "@fixtures/api-responses";
+import { customerDetail, customerSummary, pageResponse } from "@fixtures/api-responses";
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");
@@ -75,12 +75,11 @@ beforeEach(() => {
     const items = await vi.mocked(customersApi.list)(params);
     return pageResponse(items, { limit: params?.limit ?? 10, offset: params?.offset ?? 0 });
   });
-  vi.mocked(customersApi.summary).mockResolvedValue({ month_count: 1, today_count: 1 });
+  vi.mocked(customersApi.summary).mockResolvedValue(customerSummary({ month_count: 1, today_count: 1 }));
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse([]));
   vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
-  vi.mocked(customersApi.detail).mockResolvedValue({
-    customer: customers[0],
+  vi.mocked(customersApi.detail).mockResolvedValue(customerDetail(customers[0], {
     overview: {
       order_count: 1,
       active_order_count: 1,
@@ -115,8 +114,7 @@ beforeEach(() => {
       overdue_periods: 1,
       first_due_on: "2026-10-17",
     }],
-    audit: [],
-  });
+  }));
 });
 describe("CustomersPage：客户档案", () => {
   it("从客户中心深链参数打开指定客户卡片", async () => {

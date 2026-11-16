@@ -5,6 +5,7 @@ import {
   errorMessage,
 } from "../shared/api/client";
 import { useSession } from "../shared/state/session";
+import { LoginAside } from "./LoginAside";
 
 /** 登录页只提供账号密码登录；账号需先在「设置-用户」中由管理员创建。 */
 export function LoginPage() {
@@ -36,20 +37,7 @@ export function LoginPage() {
 
   return (
     <main className="login-shell">
-      <section className="login-aside" aria-label="产品介绍">
-        <div className="login-aside__topline">
-          <span className="login-brand-mark" aria-hidden="true">宜</span>
-          <span>宜游轩</span>
-        </div>
-        <div className="login-aside__content">
-          <p className="login-kicker">业务运营中枢</p>
-          <h1>经营，<br /><em>进入高速模式。</em></h1>
-          <p className="login-aside__copy">订单、资金、库存与利润，在一个工作台里实时同步。</p>
-        </div>
-        <div className="login-aside__footer">
-          <span>订单</span><i /> <span>资金</span><i /> <span>经营</span>
-        </div>
-      </section>
+      <LoginAside />
       <Card className="login-card" variant="borderless">
         <div className="login-card-head">
           <p className="login-kicker">欢迎回来</p>

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DEV_USER_KEY } from "@/shared/api/client";
 import { allFormFields } from "@fixtures/orderFormFieldsSeed";
 import { OPTION_SET_SEED } from "@fixtures/optionSetsSeed";
-import { dataCenterSummary, installmentTotals, inventoryLedgerResponse, listResponse, orderLedgerSummary, pageResponse, poolBalancesResponse, profitAllocationResponse, reportResponse, commissionResponse, cashflowPage, cashflowTotals, studioExpenseSummary } from "@fixtures/api-responses";
+import { customerDetail, customerSummary, dashboardSummary, dataCenterSummary, installmentTotals, inventoryLedgerResponse, listResponse, orderLedgerSummary, pageResponse, poolBalancesResponse, profitAllocationResponse, reportResponse, commissionResponse, cashflowPage, cashflowTotals, studioExpenseSummary } from "@fixtures/api-responses";
 import { resetTestFixtureState } from "@fixtures/fixtures";
 
 describe("测试夹具隔离", () => {
@@ -109,6 +109,34 @@ describe("测试夹具隔离", () => {
       total_remaining: "0.00",
       total_count: 0,
       overdue_count: 0,
+    });
+    expect(dashboardSummary({ personal_orders: 2, personal_earnings: "3.00" })).toEqual({
+      period: { from: "2026-11-01", to: "2026-11-16" },
+      orders: { total_count: 0, completed_count: 0, active_count: 0 },
+      personal_orders: 2,
+      personal_earnings: "3.00",
+      inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
+      installments: { total_count: 0, overdue_count: 0 },
+      notifications: { pending_profit_count: 0, allocated_profit_count: 0 },
+      reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
+    });
+    expect(customerSummary({ month_count: 2 })).toEqual({ month_count: 2, today_count: 0 });
+    expect(customerDetail({ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" })).toEqual({
+      customer: { id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" },
+      overview: {
+        order_count: 0,
+        active_order_count: 0,
+        completed_order_count: 0,
+        cancelled_order_count: 0,
+        last_trade_date: null,
+        installment_paid_total: "0.00",
+        installment_receivable_total: "0.00",
+        installment_remaining_total: "0.00",
+        overdue_period_count: 0,
+      },
+      business: [],
+      installments: [],
+      audit: [],
     });
   });
 });

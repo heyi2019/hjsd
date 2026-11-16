@@ -126,4 +126,8 @@ describe("ordersApi.listPage 分页契约", () => {
   it("不再暴露旧的自动翻页客户端方法", () => {
     expect("list" in ordersApi).toBe(false);
   });
+
+  it("不再暴露旧订单摘要客户端方法", () => {
+    expect("summary" in ordersApi).toBe(false);
+  });
 });

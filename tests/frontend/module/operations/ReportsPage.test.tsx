@@ -65,6 +65,7 @@ beforeEach(() => {
   });
   resolveMock(vi.mocked(reportsApi.orderProfit), { items: [], total: { income: "0", cost: "0", rebate: "0", net_profit: "0" } });
   resolveMock(vi.mocked(reportsApi.exportCsv), new Blob(["csv"]));
+  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: 2, status_counts: { ACTIVE: 1 }, type_counts: {}, game_types: [] });
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
   vi.mocked(poolsApi.list).mockResolvedValue([]);
   // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
@@ -72,7 +73,6 @@ beforeEach(() => {
     items: [],
     totals: { pool_count: 0, cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" },
   });
-  vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 0, completed_count: 0, active_count: 0 });
 });
 
 async function gotoTab(label: string) {

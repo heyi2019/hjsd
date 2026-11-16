@@ -20,22 +20,22 @@ const dataCenterSummary = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(ordersApi.summary).mockResolvedValue({ total_count: 2, completed_count: 1, active_count: 1 });
+  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: 2, status_counts: { ACTIVE: 1 }, type_counts: {}, game_types: [] });
   vi.mocked(reportsApi.dataCenter).mockResolvedValue(dataCenterSummary);
 });
 
 describe("DataCenterPanel：经营指标", () => {
   it("并行读取订单摘要和数据中心摘要", async () => {
-    let resolveOrders: (value: { total_count: number; completed_count: number; active_count: number }) => void = () => undefined;
+    let resolveOrders: (value: { total_count: number; status_counts: Record<string, number>; type_counts: Record<string, number>; game_types: string[] }) => void = () => undefined;
     let resolveDataCenter: (value: typeof dataCenterSummary) => void = () => undefined;
-    vi.mocked(ordersApi.summary).mockReturnValue(new Promise((resolve) => { resolveOrders = resolve; }));
+    vi.mocked(ordersApi.ledgerSummary).mockReturnValue(new Promise((resolve) => { resolveOrders = resolve; }));
     vi.mocked(reportsApi.dataCenter).mockReturnValue(new Promise((resolve) => { resolveDataCenter = resolve; }));
 
     renderLight(<DataCenterPanel />, { user: "admin" });
-    expect(vi.mocked(ordersApi.summary)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ordersApi.ledgerSummary)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(reportsApi.dataCenter)).toHaveBeenCalledTimes(1);
 
-    resolveOrders({ total_count: 2, completed_count: 1, active_count: 1 });
+    resolveOrders({ total_count: 2, status_counts: { ACTIVE: 1 }, type_counts: {}, game_types: [] });
     resolveDataCenter(dataCenterSummary);
     expect(await screen.findByText("售出成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
   });
@@ -64,12 +64,12 @@ describe("DataCenterPanel：经营指标", () => {
     const range = { params: { from: "2026-11-01", to: "2026-11-15" }, picker: null };
     renderLight(<DataCenterPanel range={range} />, { user: "admin" });
     await screen.findByText("订单总数");
-    expect(vi.mocked(ordersApi.summary)).toHaveBeenLastCalledWith({ trade_date_from: "2026-11-01", trade_date_to: "2026-11-15" });
+    expect(vi.mocked(ordersApi.ledgerSummary)).toHaveBeenLastCalledWith({ trade_date_from: "2026-11-01", trade_date_to: "2026-11-15" });
     expect(vi.mocked(reportsApi.dataCenter)).toHaveBeenLastCalledWith({ from: "2026-11-01", to: "2026-11-15" });
   });
 
   it("订单接口失败时显示错误并禁用订单入口", async () => {
-    vi.mocked(ordersApi.summary).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(ordersApi.ledgerSummary).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     const onNavigate = vi.fn();
     renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
     const totalCard = await screen.findByRole("button", { name: /订单总数/ });

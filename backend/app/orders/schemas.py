@@ -258,16 +258,6 @@ class OrderListOut(OrderOut):
     installment_status: str | None = None
 
 
-class OrderSummaryOut(BaseModel):
-    """订单总量卡片只需的后端聚合结果。"""
-
-    model_config = ConfigDict(extra="forbid")
-
-    total_count: int
-    completed_count: int
-    active_count: int = 0
-
-
 class OrderLedgerSummaryOut(BaseModel):
     """Filtered order-ledger totals aggregated by the backend."""
 

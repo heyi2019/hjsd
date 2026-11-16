@@ -22,7 +22,7 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.domain.enums import AccountingAttribute, Direction, FundNature, Nature, OrderStatus
+from app.domain.enums import AccountingAttribute, Direction, FundNature, Nature
 from app.domain.trade import Account, OrderEvent
 from app.foundation.order_types import resolve_default_pool
 from app.value_added_services import create as inst_create
@@ -49,7 +49,6 @@ from app.orders.queries import (
     count_orders,
     list_orders as orders_list_orders,
     order_ledger_summary,
-    order_status_counts,
 )
 
 from .router_output import (
@@ -147,29 +146,6 @@ def list_orders(
         ),
         limit=limit,
         offset=offset,
-    )
-
-
-@router.get("/orders/summary", response_model=schemas.OrderSummaryOut)
-def order_summary(
-    mine: bool = Query(default=False),
-    trade_date_from: date | None = Query(default=None),
-    trade_date_to: date | None = Query(default=None),
-    db: Session = Depends(get_db),
-    user: CurrentUser = read_orders,
-) -> schemas.OrderSummaryOut:
-    """工作台与数据中心订单卡片：按可见范围、日期和状态汇总。"""
-    counts = order_status_counts(
-        db,
-        trade_date_from=trade_date_from,
-        trade_date_to=trade_date_to,
-        user=user,
-        mine=mine,
-    )
-    return schemas.OrderSummaryOut(
-        total_count=sum(counts.values()),
-        completed_count=counts.get(OrderStatus.COMPLETED.value, 0),
-        active_count=counts.get(OrderStatus.ACTIVE.value, 0) + counts.get(OrderStatus.INSTALLMENT.value, 0),
     )
 
 

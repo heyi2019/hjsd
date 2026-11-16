@@ -65,8 +65,6 @@ export type OrderExecutionEditPayload = {
 };
 
 export const ordersApi = {
-  summary: (params?: { mine?: boolean; trade_date_from?: string; trade_date_to?: string }) =>
-    api.get<{ total_count: number; completed_count: number; active_count: number }>("/orders/summary", { params }).then((r) => r.data),
   ledgerSummary: (params?: {
     mine?: boolean;
     trade_date_from?: string;

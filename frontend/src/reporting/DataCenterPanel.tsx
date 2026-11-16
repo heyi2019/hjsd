@@ -30,10 +30,13 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
         ? { from: range.params.from, to: range.params.to }
         : undefined;
       const [nextOrderSummary, nextSummary] = await Promise.all([
-        ordersApi.summary(orderParams),
+        ordersApi.ledgerSummary(orderParams),
         reportsApi.dataCenter(reportParams),
       ]);
-      setOrderSummary(nextOrderSummary);
+      setOrderSummary({
+        total_count: nextOrderSummary.total_count,
+        active_count: (nextOrderSummary.status_counts.ACTIVE ?? 0) + (nextOrderSummary.status_counts.INSTALLMENT ?? 0),
+      });
       setSummary(nextSummary);
       setLoadError(null);
     } catch (error) {

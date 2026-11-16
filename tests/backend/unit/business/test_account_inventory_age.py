@@ -17,6 +17,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from app.domain.trade import Account
+from app.stocks.inventory import dashboard_inventory_summary
 from app.stocks.profile import create_account
 from app.stocks.schemas import AccountOut
 
@@ -101,6 +102,30 @@ def _account(seeded_db, game_account: str, *, days_ago: int):
     account.inventory_entry_at = datetime.combine(date.today() - timedelta(days=days_ago), time(0, 0))
     seeded_db.flush()
     return account
+
+
+def test_dashboard_summary_aggregates_inventory_age_without_loading_rows(seeded_db):
+    """工作台只取数据库聚合结果，不把所有入库时间加载到 Python。"""
+    today = date.today()
+    _account(seeded_db, "dashboard-fresh", days_ago=7)
+    _account(seeded_db, "dashboard-aging", days_ago=8)
+    _account(seeded_db, "dashboard-overdue", days_ago=31)
+
+    class AggregateOnlySession:
+        def __init__(self, session):
+            self._session = session
+
+        def scalars(self, *args, **kwargs):
+            raise AssertionError("工作台库存汇总不应加载账号明细行")
+
+        def execute(self, *args, **kwargs):
+            return self._session.execute(*args, **kwargs)
+
+    summary = dashboard_inventory_summary(
+        AggregateOnlySession(seeded_db), reminder_days=7, today=today
+    )
+
+    assert summary == {"account_count": 3, "aging_count": 2, "overdue_count": 1}
 
 
 def test_export_csv_fills_age_column(seeded_client, seeded_db, headers):

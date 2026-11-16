@@ -89,7 +89,7 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
         onOk={() => {
           void importForm.validateFields().then(async (values) => {
             if (!importFile?.originFileObj) {
-              appMessage.error("请选择 JSON 或 CSV 文件");
+              appMessage.error("请选择导入文件");
               return;
             }
             setImporting(true);
@@ -147,7 +147,7 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
               maxCount={1}
               beforeUpload={(file) => {
                 if (!isSupportedImportFile(file)) {
-                  appMessage.error("只支持 JSON 或 CSV 文件");
+                  appMessage.error("文件格式不受支持");
                   return Upload.LIST_IGNORE;
                 }
                 return false;
@@ -156,7 +156,7 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
               onChange={({ fileList }) => setImportFile(fileList[0] ?? null)}
               onRemove={() => { setImportFile(null); return true; }}
             >
-              <PermissionButton permission="import.manage">选择 JSON / CSV 文件</PermissionButton>
+              <PermissionButton permission="import.manage">选择导入文件</PermissionButton>
             </Upload>
             <Typography.Paragraph type="secondary" className="ui-drawer-hint">
               文件只会作为原始行保存，不会自动匹配、覆盖业务单或生成现金流。
@@ -261,7 +261,7 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
         fields={[
           {
             name: "rows",
-            label: "更正内容（JSON 行数组）",
+            label: "更正内容（数据行数组）",
             required: true,
             kind: "textarea" as const,
             placeholder: '[{"row_no": 3, "amount": "123.45"}, {"row_no": 7, "note": "补充说明"}]',
@@ -279,11 +279,11 @@ export function ImportWorkbenchOverlays({ controller }: { controller: ImportWork
           try {
             rows = JSON.parse(String(values.rows ?? "[]"));
             if (!Array.isArray(rows) || rows.length === 0) {
-              appMessage.error("更正内容必须是非空 JSON 数组");
+              appMessage.error("更正内容必须是非空数据行数组");
               return;
             }
           } catch {
-            appMessage.error("更正内容不是合法 JSON，请检查格式");
+            appMessage.error("更正内容格式不正确，请检查内容");
             return;
           }
           void act(async () => {

@@ -445,14 +445,14 @@ describe("ImportWorkbench：动作流与写路径", () => {
       await openImportModal();
       await fillImportBase("2026年10月订单");
       await ui.click(screen.getByRole("button", { name: /开始导入/ }));
-      await waitFor(() => expect(message.error).toHaveBeenCalledWith("请选择 JSON 或 CSV 文件"));
+      await waitFor(() => expect(message.error).toHaveBeenCalledWith("请选择导入文件"));
     });
 
     it("FE-063：PNG 在上传阶段被拒绝，不进入导入批次", async () => {
       await openWorkbench();
       const fileInput = await openImportModal();
       await attachFile(fileInput, makeFile(["not-a-table"], "account-image.png", { type: "image/png" }));
-      expect(message.error).toHaveBeenCalledWith("只支持 JSON 或 CSV 文件");
+      expect(message.error).toHaveBeenCalledWith("文件格式不受支持");
       expect(importsApi.createBatch).not.toHaveBeenCalled();
     });
 
@@ -498,7 +498,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
       await attachFile(fileInput, makeFile(['{"金额":"100"}'], "rows.json", { type: "application/json" }));
       await ui.click(screen.getByRole("button", { name: /开始导入/ }));
       // 同一错误同时出现在 Modal 内 InlineError 与页面 ErrorBanner
-      expect((await screen.findAllByText(/JSON 文件必须是对象数组/)).length).toBeGreaterThan(0);
+      expect((await screen.findAllByText(/数据文件必须是对象数组/)).length).toBeGreaterThan(0);
     });
 
     it("下载当前类型导入模板：创建 Blob 链接、触发下载并给出成功反馈（L286）", async () => {

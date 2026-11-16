@@ -21,12 +21,12 @@ export function parseImportText(text: string, filename: string): Record<string, 
   if (filename.toLowerCase().endsWith(".json")) {
     const parsed: unknown = JSON.parse(text);
     if (!Array.isArray(parsed) || parsed.some((row) => row === null || typeof row !== "object" || Array.isArray(row))) {
-      throw new Error("JSON 文件必须是对象数组");
+      throw new Error("数据文件必须是对象数组");
     }
     return parsed as Record<string, unknown>[];
   }
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (lines.length < 2) throw new Error("CSV 文件至少需要一行表头和一行数据");
+  if (lines.length < 2) throw new Error("数据文件至少需要一行表头和一行数据");
   const headers = lines[0].split(",").map((item) => item.trim());
   return lines.slice(1).map((line) => {
     const values = line.split(",");

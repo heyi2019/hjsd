@@ -46,3 +46,19 @@ export function percentRules(label = "比例"): Rule[] {
     },
   ];
 }
+
+/** 正整数编号：用于订单、客户、合作方等数据库 ID 输入。 */
+export function positiveIntegerRules(label = "编号"): Rule[] {
+  return [
+    {
+      validator: (_rule, value) => {
+        if (value === undefined || value === null || value === "") return Promise.resolve();
+        const number = Number(value);
+        if (!Number.isInteger(number) || number <= 0) {
+          return Promise.reject(new Error(`${label}必须是正整数`));
+        }
+        return Promise.resolve();
+      },
+    },
+  ];
+}

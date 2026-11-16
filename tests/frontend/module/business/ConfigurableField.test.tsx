@@ -11,6 +11,7 @@ import { Form, Input, Radio } from "antd";
 import type { OrderFormField } from "@/shared/api/types/forms";
 import { Select } from "@/shared/ui";
 import { renderLight } from "@fixtures/render";
+import { splitFormExtra } from "@/orders/create/submit-helpers";
 import {
   CfgItem,
   CfgNestedItem,
@@ -196,6 +197,46 @@ describe("CustomFormField", () => {
     renderLight(<Harness />);
     await ui.click(screen.getByRole("button", { name: "提交" }));
     expect(await screen.findByText("必填项必填")).toBeInTheDocument();
+  });
+
+  it("DATE 字段提交本地日期字符串而不是 dayjs 对象", async () => {
+    const def = makeField({ field_key: "deadline", label: "截止日期", field_type: "DATE" });
+    let captured: Record<string, unknown> | null = null;
+    const Harness = () => {
+      const [form] = Form.useForm();
+      return (
+        <Form form={form} onFinish={(values) => { captured = values; }}>
+          <CustomFormField def={def} />
+          <button type="submit">提交日期</button>
+        </Form>
+      );
+    };
+    renderLight(<Harness />);
+    const input = screen.getByLabelText("截止日期");
+    await ui.type(input, "2026-11-16{enter}");
+    await ui.click(screen.getByRole("button", { name: "提交日期" }));
+    await waitFor(() => expect(captured).not.toBeNull());
+    const submitted = captured as unknown as { form_extra: Record<string, unknown> };
+    expect(submitted.form_extra.deadline).toBe("2026-11-16");
+  });
+
+  it("清空可选自定义字段不会提交 null", async () => {
+    const def = makeField({ field_key: "optional_number", label: "可选数字", field_type: "NUMBER" });
+    let captured: Record<string, unknown> | null = null;
+    const Harness = () => {
+      const [form] = Form.useForm();
+      return (
+        <Form form={form} initialValues={{ form_extra: { optional_number: null } }} onFinish={(values) => { captured = values; }}>
+          <CustomFormField def={def} />
+          <button type="submit">提交空值</button>
+        </Form>
+      );
+    };
+    renderLight(<Harness />);
+    await ui.click(screen.getByRole("button", { name: "提交空值" }));
+    await waitFor(() => expect(captured).not.toBeNull());
+    const cleaned = splitFormExtra(captured ?? {}, { optional_number: def });
+    expect(cleaned.orderFormExtra.optional_number).toBeUndefined();
   });
 
   it("SELECT 字段渲染选项控件", () => {

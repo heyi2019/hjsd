@@ -210,6 +210,20 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(payload.amount).toBe("100.00");
   });
 
+  it("资金池划转金额不接受负数", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /POOL-A/ });
+    await ui.click(await screen.findByRole("button", { name: /资金池划转/ }));
+    const modal = modalContent();
+    await pickSelect(modal, 0, /经营主池/);
+    await pickSelect(modal, 1, /押金池/);
+    await ui.type(modal.querySelector("#amount") ?? modal, "-100");
+    await ui.click(screen.getByRole("button", { name: /确认划转/ }));
+
+    expect(await screen.findByText("划转金额不能为负数")).toBeInTheDocument();
+    expect(vi.mocked(transfersApi.create)).not.toHaveBeenCalled();
+  });
+
   it("超出转出资金池可用余额时由后端拒绝", async () => {
     vi.mocked(transfersApi.create).mockRejectedValueOnce(new Error("转出资金池可用余额不足"));
     renderLight(<FundsPage />, { user: "admin" });

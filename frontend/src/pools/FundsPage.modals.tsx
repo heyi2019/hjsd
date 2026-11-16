@@ -10,7 +10,7 @@ import type { NormalizedError } from "../shared/api/client";
 import type { Permission } from "../shared/state/session";
 import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 import { today } from "../shared/lib/format";
-import { requiredMoneyRules } from "../shared/lib/validators";
+import { positiveIntegerRules, requiredMoneyRules } from "../shared/lib/validators";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL } from "../shared/lib/labels";
 import type { FundsPageController } from "./useFundsPageController";
@@ -124,10 +124,10 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
       <CfgItem name="amount" label="占用金额" rules={requiredMoneyRules("占用金额")}>
         <MoneyInput />
       </CfgItem>
-      <CfgItem name="counterparty_id" label="合作方编号" extra="可选，填写已建档合作方编号">
+      <CfgItem name="counterparty_id" label="合作方编号" rules={positiveIntegerRules("合作方编号")} extra="可选，填写已建档合作方编号">
         <Input inputMode="numeric" />
       </CfgItem>
-      <CfgItem name="source_order_id" label="来源订单编号" extra="可选，填写关联订单编号">
+      <CfgItem name="source_order_id" label="来源订单编号" rules={positiveIntegerRules("来源订单编号")} extra="可选，填写关联订单编号">
         <Input inputMode="numeric" />
       </CfgItem>
       <CfgItem name="paid_on" label="占用日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
@@ -180,8 +180,7 @@ export function TransferModal({ ctrl }: { ctrl: FundsPageController }) {
     >
       <CfgItem name="source_pool_id" label="转出资金池" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
       <CfgItem name="target_pool_id" label="转入资金池" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
-      {/* L1527-②：负数由业务校验层给出双提示（页面级缓解），故此处放开 allowNegative */}
-      <CfgItem name="amount" label="划转金额" rules={requiredMoneyRules("划转金额", { allowNegative: true })}><MoneyInput /></CfgItem>
+      <CfgItem name="amount" label="划转金额" rules={requiredMoneyRules("划转金额")}><MoneyInput /></CfgItem>
       <CfgItem name="occurred_on" label="划转日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
       <CfgItem name="note" label="说明"><Input.TextArea rows={2} /></CfgItem>
     </FundsActionModal>

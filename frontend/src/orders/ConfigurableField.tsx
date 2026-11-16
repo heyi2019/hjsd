@@ -7,7 +7,7 @@
  *  保证既有表单在无配置或接口异常时与现状一致。
  */
 import { DatePicker, Form, Input, InputNumber, Radio, Switch, Typography, type FormItemProps } from "antd";
-import { BusinessRegistrationField, Select } from "../shared/ui";
+import { BusinessRegistrationField, dateValueFromEvent, dateValueProps, Select } from "../shared/ui";
 import type { ReactElement, ReactNode } from "react";
 import { Children, cloneElement, createContext, isValidElement, useContext, useEffect, useState } from "react";
 import type { Rule } from "antd/es/form";
@@ -417,7 +417,13 @@ export function CustomFormField({ def }: { def: OrderFormField }): ReactElement 
       );
     case "DATE":
       return (
-        <Form.Item name={name} label={def.label} rules={rules}>
+        <Form.Item
+          name={name}
+          label={def.label}
+          rules={rules}
+          getValueFromEvent={dateValueFromEvent}
+          getValueProps={dateValueProps}
+        >
           <DatePicker className="ui-control-full" />
         </Form.Item>
       );

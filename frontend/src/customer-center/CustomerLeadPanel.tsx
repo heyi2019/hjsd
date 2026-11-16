@@ -8,7 +8,7 @@ import type { Customer, Lead } from "../shared/api/types/customers";
 import { normalizeError } from "../shared/api/client";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { BusinessActionModal, BusinessRegistrationForm, CompactActions, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
-import { moneyRules } from "../shared/lib/validators";
+import { moneyRules, positiveIntegerRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../orders/ConfigurableField";
 import { configurableLabel } from "../shared/lib/optionSets";
 
@@ -154,7 +154,7 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="LEADCONVERT" form={convertForm} onFinish={convertLead}>
-          <CfgItem name="order_id" label="订单编号" rules={[{ required: true }]}><Input /></CfgItem>
+          <CfgItem name="order_id" label="订单编号" rules={[{ required: true, message: "请输入订单编号" }, ...positiveIntegerRules("订单编号")]}><Input inputMode="numeric" /></CfgItem>
           <CustomFieldSection testIdSuffix="lead-convert" />
           <CompactActions>
             <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>确认转单</PermissionButton>

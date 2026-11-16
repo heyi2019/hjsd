@@ -358,6 +358,22 @@ describe("FundsPage：资金写路径", () => {
     expect(payload.amount).toBe("500.00");
   });
 
+  it("押金关联编号必须是正整数", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    await ui.click(await screen.findByRole("button", { name: /新增占用/ }));
+    const modal = await screen.findByText("新增押金占用");
+    const content = modal.closest(".ant-modal-content") as HTMLElement;
+    await pickSelect(content, 0, /经营主池/);
+    await ui.type(within(content).getByLabelText("占用金额"), "500.00");
+    await ui.type(within(content).getByLabelText("合作方编号"), "1.5");
+    await ui.click(screen.getByRole("button", { name: /提\s*交/ }));
+
+    expect(await screen.findByText("合作方编号必须是正整数")).toBeInTheDocument();
+    expect(vi.mocked(depositsApi.create)).not.toHaveBeenCalled();
+  });
+
   it("未发生释放或损失的押金可编辑并回填", async () => {
     vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00" }] as never);
     resolveMockOnce(vi.mocked(depositsApi.update), { ...deposits[0], status: "PAID" });

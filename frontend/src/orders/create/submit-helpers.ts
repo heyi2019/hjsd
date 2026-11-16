@@ -7,16 +7,20 @@ type Values = Record<string, unknown>;
 /** 账号自定义字段（ACCOUNT_PRODUCT）归集到 account_snapshot，其余留在订单 form_extra。 */
 export function splitFormExtra(values: Values, config: FieldConfigMap) {
   const formExtra = (values.form_extra as Record<string, unknown> | undefined) ?? {};
+  const hasValue = (value: unknown) => value !== undefined
+    && value !== null
+    && value !== ""
+    && !(Array.isArray(value) && value.length === 0);
   const accountExtraKeys = new Set(
     Object.values(config)
       .filter((field) => field.is_custom && field.is_active && field.section === "ACCOUNT_PRODUCT")
       .map((field) => field.field_key),
   );
   const accountExtraValues = Object.fromEntries(
-    Object.entries(formExtra).filter(([key, value]) => accountExtraKeys.has(key) && value !== undefined && value !== ""),
+    Object.entries(formExtra).filter(([key, value]) => accountExtraKeys.has(key) && hasValue(value)),
   );
   const orderFormExtra = Object.fromEntries(
-    Object.entries(formExtra).filter(([key]) => !accountExtraKeys.has(key)),
+    Object.entries(formExtra).filter(([key, value]) => !accountExtraKeys.has(key) && hasValue(value)),
   );
   for (const key of ["business_responsible_ids", "delivery_responsible_ids"]) {
     const responsibleIds = Array.isArray(values[key])

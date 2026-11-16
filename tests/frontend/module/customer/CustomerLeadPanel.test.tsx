@@ -164,6 +164,18 @@ describe("CustomerLeadPanel：客户需求池", () => {
     await waitFor(() => expect(leadsApi.convert).toHaveBeenCalledWith(1, 99, undefined));
   });
 
+  it("转单订单编号必须是正整数", async () => {
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    const row = (await screen.findByText("LD-1")).closest("tr")!;
+    await ui.click(within(row).getByRole("button", { name: /转单/ }));
+    const modal = screen.getByText("需求转单").closest(".ant-modal-content") as HTMLElement;
+    await ui.type(within(modal).getByLabelText("订单编号"), "1.5");
+    await ui.click(within(modal).getByRole("button", { name: /确认转单/ }));
+
+    expect(await screen.findByText("订单编号必须是正整数")).toBeInTheDocument();
+    expect(vi.mocked(leadsApi.convert)).not.toHaveBeenCalled();
+  });
+
   it("配置停用后关闭弹窗不渲染「关闭原因」字段", async () => {
     vi.mocked(orderFormFieldsApi.list).mockResolvedValue([
       { id: 1, order_type_code: "LEADCLOSE", field_key: "reason", label: "关闭原因", field_type: "TEXT", options: null, required: true, is_active: false, sort_order: 10, locked: false, is_custom: false, note: null },

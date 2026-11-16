@@ -102,6 +102,13 @@ beforeEach(() => {
     }
   }
   vi.mocked(cashflowsApi.list).mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({
+    total_count: 0,
+    status_counts: {},
+    type_counts: {},
+    game_types: [],
+  });
+  vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
 });
 
 async function renderShell(options: { user?: string; initialPath?: string } = {}) {

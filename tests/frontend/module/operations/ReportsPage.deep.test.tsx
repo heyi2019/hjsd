@@ -44,7 +44,7 @@ beforeEach(() => {
   resolveMock(vi.mocked(reportsApi.monthlyPnl), { items: [], total: {} });
   resolveMock(vi.mocked(reportsApi.commission), {
     order_groups: [],
-    total: { order_count: 0, profit_base: "0", payable: "0", paid: "0", difference: "0" },
+    total: { order_count: 0, profit_base: "0" },
   });
   vi.mocked(employeesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(reportsApi.businessPnl), { items: [], total: {} });
@@ -84,7 +84,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
           { user_id: 2, order_id: 10, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10" },
         ],
       }],
-      total: { order_count: 1, profit_base: "200.00", payable: "20.00", paid: "10.00", difference: "10.00" },
+        total: { order_count: 1, profit_base: "200.00" },
     });
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("分润对账");
@@ -109,7 +109,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   it("分润对账：只消费订单分组契约，不回退旧明细", async () => {
     resolveMockOnce(vi.mocked(reportsApi.commission), {
       order_groups: [],
-      total: { order_count: 0, profit_base: "0.00", payable: "0.00", paid: "0.00", difference: "0.00" },
+    total: { order_count: 0, profit_base: "0.00" },
     });
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("分润对账");
@@ -240,9 +240,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
   it("FE-273：分润对账日期筛选切换到历史空态", async () => {
     vi.mocked(reportsApi.commission).mockImplementation((params) => Promise.resolve(
-      params?.from ? { order_groups: [], total: { order_count: 0, profit_base: "0", payable: "0", paid: "0", difference: "0" } } : {
+      params?.from ? { order_groups: [], total: { order_count: 0, profit_base: "0" } } : {
         order_groups: [{ order_id: 273, order_no: "HS-FE273", profit_base: "10", orders: [{ user_id: 1, order_id: 273, order_no: "HS-FE273", profit_base: "10", rate: "0.1" }] }],
-        total: { order_count: 1, profit_base: "10", payable: "1", paid: "0", difference: "1" },
+        total: { order_count: 1, profit_base: "10" },
       },
     ) as never);
     renderLight(<ReportsPage />, { user: "admin" });

@@ -79,6 +79,23 @@ def test_workbench_summary_exposes_one_backend_aggregate(seeded_client, headers)
     assert seeded_client.get("/api/v1/notifications/summary", headers=headers).status_code in {404, 405}
 
 
+def test_workbench_personal_earnings_uses_commission_profit_base(
+    seeded_client, headers, monkeypatch
+):
+    monkeypatch.setattr(
+        "app.workbench.service.r3_commission_reconciliation",
+        lambda *args, **kwargs: {
+            "order_groups": [],
+            "total": {"order_count": 1, "profit_base": Decimal("123.45")},
+        },
+    )
+
+    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["personal_earnings"] == "123.45"
+
+
 def test_workbench_order_cards_use_the_current_period(seeded_client, headers, monkeypatch):
     calls = []
 

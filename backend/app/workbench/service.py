@@ -101,7 +101,7 @@ def dashboard_summary(session: Session, *, user: CurrentUser) -> dict[str, Any]:
             user=user,
             mine=True,
         )
-        personal_earnings = commission["total"]["payable"]
+        personal_earnings = commission["total"]["profit_base"]
 
     return {
         "period": {"from": month_start, "to": today},

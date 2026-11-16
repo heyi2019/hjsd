@@ -57,9 +57,6 @@ class CommissionOrderGroupOut(ReportModel):
 class CommissionTotalOut(ReportModel):
     order_count: int
     profit_base: Decimal
-    payable: Decimal
-    paid: Decimal
-    difference: Decimal
 
 
 class CommissionOut(ReportModel):

@@ -8,7 +8,7 @@ import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
-import { seedOrderFormFields } from "@fixtures/formFieldsSeed";
+import { seedOptionSets, seedOrderFormFields } from "@fixtures/formFieldsSeed";
 
 // 自动 mock：所有导出（含嵌套 ordersApi / orderTypesApi / ...）均为 vi.fn()
 vi.mock("@/shared/api/cashflows.api");
@@ -28,6 +28,7 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
+  seedOptionSets();
   seedOrderFormFields();
   vi.mocked(orderTypesApi.list).mockResolvedValue([{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }]);
   resolveMock(vi.mocked(poolsApi.list), [{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);

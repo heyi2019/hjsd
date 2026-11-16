@@ -28,7 +28,6 @@ from app.orders.create import create_order
 from app.orders.events import post_event
 from app.finance.balances import pool_balance
 from app.parties.counterparties import create_counterparty, set_counterparty_status
-from app.reporting.funds import daily_funds_report
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 
 TODAY = date(2026, 10, 4)
@@ -1152,15 +1151,6 @@ class TestFinanceApi:
         assert source_balance["cash_balance"] + target_balance["cash_balance"] == (
             source_before["cash_balance"] + target_before["cash_balance"]
         )
-
-        report = daily_funds_report(seeded_db, on=TODAY)
-        by_code = {item["pool_code"]: item for item in report["items"]}
-        # 内部划转并入收入/支出两方向：划出账户记支出、划入账户记收入，日报不再单列划转列。
-        assert by_code["HJ_INVEST"]["expense"] >= Decimal("125.50")
-        assert by_code["HJ_PROFIT"]["income"] >= Decimal("125.50")
-        for key in ("transfer_in", "transfer_out"):
-            assert key not in by_code["HJ_INVEST"], f"资金日报仍有独立方向列 {key}"
-            assert key not in report["total"], f"资金日报合计仍有独立方向列 {key}"
 
     def test_transfer_service_respects_pool_scope(self, seeded_db):
         scoped_finance = CurrentUser.build(

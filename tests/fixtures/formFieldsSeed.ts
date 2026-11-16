@@ -140,6 +140,7 @@ export interface SeedOptionSet {
 }
 
 export const OPTION_SET_SEED: SeedOptionSet[] = [
+  { code: "CUSTOMER_SOURCE", label: "客户来源主数据", group: "BUSINESS", editable: true, options: SRC },
   { code: "INVENTORY_STATUS", label: "库存状态", group: "INVENTORY", editable: false, options: [
     { value: "IN_STOCK", label: "在库" }, { value: "OUT_OF_STOCK", label: "出库" },
   ] },

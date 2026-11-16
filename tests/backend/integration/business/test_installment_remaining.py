@@ -10,12 +10,13 @@
 """
 from __future__ import annotations
 
+import csv
 from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.domain.trade import Installment
+from app.domain.trade import Installment, Order
 from app.orders.create import create_order
 from app.value_added_services import create as inst_create
 
@@ -46,8 +47,19 @@ def _output(seeded_db, contract: Installment):
     from app.value_added_services import schemas
 
     seeded_db.refresh(contract)
+    order = seeded_db.get(Order, contract.order_id)
+    assert order is not None
     return schemas.InstallmentOut.model_validate(
-        {**contract.__dict__, "extra_values": {}}
+        {
+            **contract.__dict__,
+            "extra_values": {},
+            "order": {
+                "id": order.id,
+                "order_no": order.order_no,
+                "order_type": order.order_type,
+                "trade_date": order.trade_date,
+            },
+        }
     )
 
 
@@ -106,12 +118,12 @@ def test_export_rows_include_remaining_receivable(seeded_client, seeded_db, head
 
     response = seeded_client.get("/api/v1/installments/export.csv", headers=headers)
     assert response.status_code == 200, response.text
-    lines = response.text.splitlines()
-    header = lines[0].split(",")
+    rows = list(csv.reader(response.text.splitlines()))
+    header = rows[0]
     # 列表列注册表里「剩余」列 key 是 remaining，导出必须真的填上值（不是空列）。
     assert "剩余" in header
     index = header.index("剩余")
-    contract_rows = [line.split(",") for line in lines[1:] if contract.inst_no in line]
+    contract_rows = [row for row in rows[1:] if contract.inst_no in row]
     assert contract_rows, "导出应包含刚创建的合约"
     assert contract_rows[0][index] == "1200.00"
 

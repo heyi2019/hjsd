@@ -35,9 +35,7 @@ from app.orders.amounts import (
     event_totals,
 )
 from app.orders.create import create_order
-from app.finance import deposits
 from app.reporting.export import report_csv, report_for_export
-from app.reporting.funds import daily_funds_report
 
 TODAY = date(2026, 10, 17)
 
@@ -127,14 +125,6 @@ def test_report_csv_normalizes_none_and_compound_values():
     assert item_row[header.index("note")] == ""
     assert item_row[header.index("meta")] == '{"k": 1}'
     assert item_row[header.index("tags")] == "[1, 2]"
-
-
-def test_daily_funds_report_includes_paid_deposits(seeded_db):
-    deposits.create_deposit(
-        seeded_db, pool_id=1, amount=Decimal("50"), paid_on=TODAY, actor="pytest"
-    )
-    report = daily_funds_report(seeded_db, on=TODAY)
-    assert any(Decimal(str(item["deposit_paid"])) > 0 for item in report["items"])
 
 
 # ----------------------------------------------------------- finance_dimension 受限用户

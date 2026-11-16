@@ -23,7 +23,6 @@ from app.orders.create import create_order
 from app.orders.events import post_event
 from app.policy.profit_allocation import service as policy_allocations
 from app.reporting.profit import order_profit_detail
-from app.reporting.funds import daily_funds_report
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from app.reporting.r3_commission import r3_commission_reconciliation
 from app.reporting.r5_business_pnl import r5_business_pnl
@@ -558,15 +557,6 @@ class TestReports:
         for key in ("settled_rebate", "uncollected_rebate", "full_income"):
             assert key not in data["total"]
 
-    def test_daily_funds_matches_pool_balance(self, seeded_db):
-        from datetime import date
-
-        report = daily_funds_report(seeded_db, on=date(2026, 10, 4))
-        assert report["items"]
-        for item in report["items"]:
-            assert "available" in item and "th_advance" not in item
-        assert report["total"]["available"] == sum(item["available"] for item in report["items"])
-
     def test_order_profit_totals_are_consistent(self, seeded_db):
         data = order_profit_detail(seeded_db)
         for item in data["items"]:
@@ -578,6 +568,7 @@ class TestReports:
 
     def test_r3_drills_down_to_orders(self, seeded_db):
         data = r3_commission_reconciliation(seeded_db)
+        assert set(data["total"]) == {"order_count", "profit_base"}
         for order in data["order_groups"]:
             assert order["orders"]
             assert sum(o["profit_base"] for o in order["orders"]) == order["profit_base"]

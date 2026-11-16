@@ -4,7 +4,6 @@
 import { Typography } from "antd";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { normalizeError } from "../../shared/api/client";
-import { useReloadOnActive } from "../../shared/state/reloadOnActive";
 
 /** 报表视图共用的统计周期筛选：提升到父级，使各带区间筛选的报表在 Tab 切换（非挂载）后仍保留筛选条件。 */
 export type ReportRange = { params: { from?: string; to?: string }; picker: ReactNode };
@@ -30,10 +29,8 @@ export function useReport<T>(load: () => Promise<T>, deps: readonly unknown[]) {
   }, deps);
 
   useEffect(() => {
-    reload();
-  }, [reload]);
-  // 首次挂载由上一个 effect 负责；这里仅处理隐藏页重新激活，避免重复请求。
-  useReloadOnActive(pageActive, reload, { skipFirstMount: true });
+    if (pageActive) reload();
+  }, [pageActive, reload]);
 
   return { data, loading, error, reload };
 }

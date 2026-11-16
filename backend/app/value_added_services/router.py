@@ -177,9 +177,9 @@ def export_installments_csv(
     )
     schedules_by_installment, dispositions_by_installment = export_details
     for row, output in zip(rows, outputs, strict=True):
-        # 列表列注册表里「剩余」的列 key 是 remaining，而字段名是 remaining_receivable；
-        # 不补这一行别名，导出那列会整列空掉（页面上却是后端算好的值）。
-        row["remaining"] = row.get("remaining_receivable")
+        # 列表列注册表里「剩余」的列 key 是 remaining，而响应字段是 remaining_receivable；
+        # 直接读取输出模型的计算字段，保证导出与列表接口使用同一服务端口径。
+        row["remaining"] = output.remaining_receivable
         schedules = schedules_by_installment.get(output.id, [])
         dispositions = dispositions_by_installment.get(output.id, [])
         row["installment_note"] = row.get("note")

@@ -1,5 +1,4 @@
-"""分润对账（应付 / 已付 / 差异）。
-"""
+"""分润对账：订单汇总与人员分润明细。"""
 
 from __future__ import annotations
 
@@ -141,9 +140,6 @@ def r3_commission_reconciliation(
         "total": {
             "order_count": len(order_groups),
             "profit_base": total_profit_base,
-            "payable": ZERO,
-            "paid": ZERO,
-            "difference": ZERO,
         },
     }
 

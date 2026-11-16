@@ -265,7 +265,7 @@ def test_order_list_payload_includes_inventory_and_sale_responsibility_timestamp
     row = _order_list_payload(seeded_db, [order])[0]
 
     assert row["inventory_entry_at"] == datetime(2026, 10, 1, 9, 30, 0)
-    assert row["inventory_operator"] == "inventory-user"
+    assert row["inventory_operator"] is None
     # 售卖时间取卖出事件的业务发生日 D，与 created_at 无关（created_at 是写入时刻）。
     assert row["sale_at"] == datetime(2026, 10, 4, 0, 0, 0)
     assert row["sale_operator"] == "sale-user"

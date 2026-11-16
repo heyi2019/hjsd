@@ -57,8 +57,8 @@ def _account_output(
     if source_order is not None:
         output.source_order_id = source_order.id
         output.source_order_no = source_order.order_no
-    # 入库操作人优先取建单表单中的业务操作人；没有选择时回退到实际登录账号。
-    output.inventory_operator = inventory_operator or account.created_by
+    # 入库操作人只取建单表单中的业务操作人；创建人不属于入库操作人。
+    output.inventory_operator = inventory_operator or None
     return output
 
 

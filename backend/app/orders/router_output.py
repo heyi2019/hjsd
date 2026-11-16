@@ -405,7 +405,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
                 _form_responsible_label(
                     source_orders_by_account.get(account.id).form_extra if account and source_orders_by_account.get(account.id) else None,
                     inventory_operator_names,
-                    account.created_by if account else None,
+                    None,
                 )
                 if account else None
             ),

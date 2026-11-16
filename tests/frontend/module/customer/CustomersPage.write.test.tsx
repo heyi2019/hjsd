@@ -10,6 +10,7 @@ import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { OrderFormField } from "@/shared/api/types/forms";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
+import { pageResponse } from "@fixtures/api-responses";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -48,10 +49,10 @@ beforeEach(() => {
   vi.mocked(customersApi.list).mockResolvedValue(customers);
   vi.mocked(customersApi.page).mockImplementation(async (params) => {
     const items = await vi.mocked(customersApi.list)(params);
-    return { items, total: items.length, limit: params?.limit ?? 10, offset: params?.offset ?? 0 };
+    return pageResponse(items, { limit: params?.limit ?? 10, offset: params?.offset ?? 0 });
   });
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
-  vi.mocked(counterpartiesApi.page).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
+  vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse([]));
   vi.mocked(orderFormFieldsApi.list).mockResolvedValue(fieldDefs);
   vi.mocked(customersApi.detail).mockResolvedValue({
     customer: customers[0],

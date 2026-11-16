@@ -118,18 +118,22 @@ def unread_count(session: Session, *, recipient_user_id: int) -> int:
     )
 
 
-def unread_profit_count(session: Session, *, recipient_user_id: int) -> int:
-    """统计用户未读的分润待办与分润结果通知，不加载通知明细。"""
-    return int(
-        session.scalar(
-            select(func.count(Notification.id)).where(
-                Notification.recipient_user_id == recipient_user_id,
-                Notification.read_at.is_(None),
-                Notification.notification_type.in_((PROFIT_PENDING, PROFIT_ALLOCATED)),
-            )
+def unread_profit_counts(session: Session, *, recipient_user_id: int) -> dict[str, int]:
+    """按分润阶段统计用户未读通知，不加载通知明细。"""
+    rows = session.execute(
+        select(Notification.notification_type, func.count(Notification.id))
+        .where(
+            Notification.recipient_user_id == recipient_user_id,
+            Notification.read_at.is_(None),
+            Notification.notification_type.in_((PROFIT_PENDING, PROFIT_ALLOCATED)),
         )
-        or 0
-    )
+        .group_by(Notification.notification_type)
+    ).all()
+    counts = {notification_type: int(total) for notification_type, total in rows}
+    return {
+        "pending_profit_count": counts.get(PROFIT_PENDING, 0),
+        "allocated_profit_count": counts.get(PROFIT_ALLOCATED, 0),
+    }
 
 
 def mark_read(
@@ -162,6 +166,6 @@ __all__ = [
     "ensure_notification",
     "list_notifications",
     "mark_read",
-    "unread_profit_count",
+    "unread_profit_counts",
     "unread_count",
 ]

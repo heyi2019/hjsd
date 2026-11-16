@@ -34,7 +34,7 @@ beforeEach(() => {
     personal_earnings: "0.00",
     inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
     installments: { total_count: 0, overdue_count: 0 },
-    notifications: { unread_profit_total: 0 },
+    notifications: { pending_profit_count: 0, allocated_profit_count: 0 },
     reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
   });
 });
@@ -48,7 +48,7 @@ it("工作台展示业务总览指标和业务提醒", async () => {
       personal_earnings: "0.00",
       inventory: { account_count: 1, aging_count: 1, overdue_count: 1 },
       installments: { total_count: 1, overdue_count: 1 },
-      notifications: { unread_profit_total: 1 },
+      notifications: { pending_profit_count: 1, allocated_profit_count: 1 },
       reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
     });
 
@@ -69,7 +69,8 @@ it("工作台展示业务总览指标和业务提醒", async () => {
     }
     const alerts = await screen.findByRole("region", { name: "我的消息" });
     expect(within(alerts).getByText("库存订单入库超过 7 天 1 个")).toBeInTheDocument();
-    expect(within(alerts).getByText("新的分润通知 1 条")).toBeInTheDocument();
+    expect(within(alerts).getByText("分润待配置 1 条")).toBeInTheDocument();
+    expect(within(alerts).getByText("获得分润通知 1 条")).toBeInTheDocument();
   });
 
 it("工作台按业务提醒配置计算库存阈值并控制提醒开关", async () => {
@@ -80,7 +81,7 @@ it("工作台按业务提醒配置计算库存阈值并控制提醒开关", asyn
       personal_earnings: "0.00",
       inventory: { account_count: 1, aging_count: 0, overdue_count: 0 },
       installments: { total_count: 1, overdue_count: 1 },
-      notifications: { unread_profit_total: 1 },
+      notifications: { pending_profit_count: 0, allocated_profit_count: 1 },
       reminders: { inventory_aging_days: 14, profit_notifications_enabled: false, overdue_installments_enabled: false },
     });
 
@@ -139,7 +140,7 @@ it("订单请求完成时不产生未包裹 act 的异步更新警告", async ()
       personal_earnings: "0.00",
       inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
       installments: { total_count: 0, overdue_count: 0 },
-      notifications: { unread_profit_total: 0 },
+      notifications: { pending_profit_count: 0, allocated_profit_count: 0 },
       reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
     });
     await new Promise((resolve) => setTimeout(resolve, 0));

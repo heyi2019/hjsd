@@ -32,7 +32,8 @@ class DashboardInstallmentsOut(BaseModel):
 
 
 class DashboardNotificationsOut(BaseModel):
-    unread_profit_total: int
+    pending_profit_count: int
+    allocated_profit_count: int
 
 
 class DashboardRemindersOut(BaseModel):

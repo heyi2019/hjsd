@@ -1,7 +1,8 @@
 export interface DashboardAlertInputs {
   inventoryAgingCount: number | null;
   inventoryAgingDays: number;
-  newProfitNotificationCount: number | null;
+  pendingProfitCount: number | null;
+  allocatedProfitCount: number | null;
   profitNotificationsEnabled: boolean;
   overdueInstallmentCount: number | null;
   overdueInstallmentsEnabled: boolean;
@@ -10,7 +11,8 @@ export interface DashboardAlertInputs {
 export function buildDashboardAlertMessages({
   inventoryAgingCount,
   inventoryAgingDays,
-  newProfitNotificationCount,
+  pendingProfitCount,
+  allocatedProfitCount,
   profitNotificationsEnabled,
   overdueInstallmentCount,
   overdueInstallmentsEnabled,
@@ -19,8 +21,11 @@ export function buildDashboardAlertMessages({
     inventoryAgingCount && inventoryAgingCount > 0
       ? `库存订单入库超过 ${inventoryAgingDays} 天 ${inventoryAgingCount} 个`
       : null,
-    profitNotificationsEnabled && newProfitNotificationCount && newProfitNotificationCount > 0
-      ? `新的分润通知 ${newProfitNotificationCount} 条`
+    profitNotificationsEnabled && pendingProfitCount && pendingProfitCount > 0
+      ? `分润待配置 ${pendingProfitCount} 条`
+      : null,
+    profitNotificationsEnabled && allocatedProfitCount && allocatedProfitCount > 0
+      ? `获得分润通知 ${allocatedProfitCount} 条`
       : null,
     overdueInstallmentsEnabled && overdueInstallmentCount && overdueInstallmentCount > 0
       ? `逾期合约 ${overdueInstallmentCount} 个`

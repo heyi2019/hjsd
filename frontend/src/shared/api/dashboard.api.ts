@@ -7,7 +7,7 @@ export interface DashboardSummary {
   personal_earnings: string | number | null;
   inventory: { account_count: number; aging_count: number; overdue_count: number } | null;
   installments: { total_count: number; overdue_count: number } | null;
-  notifications: { unread_profit_total: number };
+  notifications: { pending_profit_count: number; allocated_profit_count: number };
   reminders: {
     inventory_aging_days: number;
     profit_notifications_enabled: boolean;

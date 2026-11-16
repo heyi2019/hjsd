@@ -23,7 +23,6 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
     inventoryOverdueCount,
     installmentCount,
     overdueInstallmentCount,
-    newProfitNotificationCount,
     businessReminderConfig,
     businessAlerts,
     loadSummary,
@@ -91,7 +90,6 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
           inventoryAgingCount={inventoryAgingCount}
           inventoryOverdueCount={inventoryOverdueCount}
           installmentCount={installmentCount}
-          newProfitNotificationCount={newProfitNotificationCount}
           overdueInstallmentCount={overdueInstallmentCount}
           profitNotificationsEnabled={businessReminderConfig.profitNotificationsEnabled}
           overdueInstallmentsEnabled={businessReminderConfig.overdueInstallmentsEnabled}

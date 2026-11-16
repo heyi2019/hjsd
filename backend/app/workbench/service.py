@@ -61,8 +61,19 @@ def dashboard_summary(session: Session, *, user: CurrentUser) -> dict[str, Any]:
     inventory = None
     installments = None
     if can_orders:
-        counts = order_status_counts(session, user=user)
-        personal_counts = order_status_counts(session, user=user, mine=True)
+        counts = order_status_counts(
+            session,
+            trade_date_from=month_start,
+            trade_date_to=today,
+            user=user,
+        )
+        personal_counts = order_status_counts(
+            session,
+            trade_date_from=month_start,
+            trade_date_to=today,
+            user=user,
+            mine=True,
+        )
         orders = {
             "total_count": sum(counts.values()),
             "completed_count": counts.get("COMPLETED", 0),
@@ -99,10 +110,8 @@ def dashboard_summary(session: Session, *, user: CurrentUser) -> dict[str, Any]:
         "personal_earnings": personal_earnings,
         "inventory": inventory,
         "installments": installments,
-        "notifications": {
-            "unread_profit_total": notification_service.unread_profit_count(
-                session, recipient_user_id=user.id
-            ),
-        },
+        "notifications": notification_service.unread_profit_counts(
+            session, recipient_user_id=user.id
+        ),
         "reminders": reminders,
     }

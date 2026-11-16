@@ -23,13 +23,14 @@ describe("业务提醒配置", () => {
     expect(buildDashboardAlertMessages({
       inventoryAgingCount: 2,
       inventoryAgingDays: 14,
-      newProfitNotificationCount: 1,
+      pendingProfitCount: 0,
+      allocatedProfitCount: 1,
       profitNotificationsEnabled: true,
       overdueInstallmentCount: 3,
       overdueInstallmentsEnabled: false,
     })).toEqual([
       "库存订单入库超过 14 天 2 个",
-      "新的分润通知 1 条",
+      "获得分润通知 1 条",
     ]);
   });
 });

@@ -30,7 +30,7 @@ beforeEach(() => {
     personal_earnings: "0.00",
     inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
     installments: { total_count: 0, overdue_count: 0 },
-    notifications: { unread_profit_total: 0 },
+    notifications: { pending_profit_count: 0, allocated_profit_count: 0 },
     reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
   });
 });
@@ -58,7 +58,7 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
       personal_earnings: "0.00",
       inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
       installments: { total_count: 0, overdue_count: 0 },
-      notifications: { unread_profit_total: 0 },
+      notifications: { pending_profit_count: 0, allocated_profit_count: 0 },
       reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
     });
     renderLight(<DashboardPage />, { user: "admin" });
@@ -76,7 +76,7 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
       personal_earnings: "123.45",
       inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
       installments: { total_count: 0, overdue_count: 0 },
-      notifications: { unread_profit_total: 0 },
+      notifications: { pending_profit_count: 0, allocated_profit_count: 0 },
       reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
     });
     renderLight(<DashboardPage />, { user: "operator" });

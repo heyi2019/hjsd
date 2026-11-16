@@ -18,7 +18,8 @@ export function useDashboardSummary(active = true) {
   const [inventoryOverdueCount, setInventoryOverdueCount] = useState<number | null>(null);
   const [installmentCount, setInstallmentCount] = useState<number | null>(null);
   const [overdueInstallmentCount, setOverdueInstallmentCount] = useState<number | null>(null);
-  const [newProfitNotificationCount, setNewProfitNotificationCount] = useState<number | null>(null);
+  const [pendingProfitCount, setPendingProfitCount] = useState<number | null>(null);
+  const [allocatedProfitCount, setAllocatedProfitCount] = useState<number | null>(null);
   const [businessReminderConfig, setBusinessReminderConfig] = useState<BusinessReminderConfig>(DEFAULT_BUSINESS_REMINDER_CONFIG);
   const mountedRef = useRef(true);
 
@@ -41,7 +42,8 @@ export function useDashboardSummary(active = true) {
       setInventoryOverdueCount(summary.inventory?.overdue_count ?? null);
       setInstallmentCount(summary.installments?.total_count ?? null);
       setOverdueInstallmentCount(summary.installments?.overdue_count ?? null);
-      setNewProfitNotificationCount(summary.notifications.unread_profit_total);
+      setPendingProfitCount(summary.notifications.pending_profit_count);
+      setAllocatedProfitCount(summary.notifications.allocated_profit_count);
       setBusinessReminderConfig({
         inventoryAgingDays: summary.reminders.inventory_aging_days,
         profitNotificationsEnabled: summary.reminders.profit_notifications_enabled,
@@ -60,7 +62,8 @@ export function useDashboardSummary(active = true) {
       setInventoryOverdueCount(null);
       setInstallmentCount(null);
       setOverdueInstallmentCount(null);
-      setNewProfitNotificationCount(null);
+      setPendingProfitCount(null);
+      setAllocatedProfitCount(null);
     } finally {
       if (mountedRef.current) setSummaryLoading(false);
     }
@@ -74,7 +77,8 @@ export function useDashboardSummary(active = true) {
   const businessAlerts = buildDashboardAlertMessages({
     inventoryAgingCount,
     inventoryAgingDays: businessReminderConfig.inventoryAgingDays,
-    newProfitNotificationCount,
+    pendingProfitCount,
+    allocatedProfitCount,
     profitNotificationsEnabled: businessReminderConfig.profitNotificationsEnabled,
     overdueInstallmentCount,
     overdueInstallmentsEnabled: businessReminderConfig.overdueInstallmentsEnabled,
@@ -93,7 +97,6 @@ export function useDashboardSummary(active = true) {
     inventoryOverdueCount,
     installmentCount,
     overdueInstallmentCount,
-    newProfitNotificationCount,
     businessReminderConfig,
     businessAlerts,
     loadSummary,

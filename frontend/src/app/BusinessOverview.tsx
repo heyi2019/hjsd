@@ -21,7 +21,6 @@ export function BusinessOverview({
   inventoryAgingCount: number | null;
   inventoryOverdueCount: number | null;
   installmentCount: number | null;
-  newProfitNotificationCount: number | null;
   overdueInstallmentCount: number | null;
   profitNotificationsEnabled?: boolean;
   overdueInstallmentsEnabled?: boolean;

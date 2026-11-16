@@ -74,8 +74,32 @@ def test_workbench_summary_exposes_one_backend_aggregate(seeded_client, headers)
         "reminders",
     }
     assert set(payload["period"]) == {"from", "to"}
+    assert set(payload["notifications"]) == {"pending_profit_count", "allocated_profit_count"}
     assert seeded_client.get("/api/v1/stocks/dashboard-summary", headers=headers).status_code in {404, 405}
     assert seeded_client.get("/api/v1/notifications/summary", headers=headers).status_code in {404, 405}
+
+
+def test_workbench_order_cards_use_the_current_period(seeded_client, headers, monkeypatch):
+    calls = []
+
+    def fake_order_status_counts(session, **kwargs):
+        calls.append(kwargs)
+        return {"COMPLETED": 1}
+
+    monkeypatch.setattr("app.workbench.service.order_status_counts", fake_order_status_counts)
+
+    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+
+    assert response.status_code == 200, response.text
+    assert len(calls) == 2
+    today = date.today()
+    expected = {"trade_date_from": today.replace(day=1), "trade_date_to": today}
+    assert calls[0]["trade_date_from"] == expected["trade_date_from"]
+    assert calls[0]["trade_date_to"] == expected["trade_date_to"]
+    assert calls[0].get("mine", False) is False
+    assert calls[1]["trade_date_from"] == expected["trade_date_from"]
+    assert calls[1]["trade_date_to"] == expected["trade_date_to"]
+    assert calls[1]["mine"] is True
 
 def test_order_create_validates_active_custom_field_values(seeded_db):
     field = OrderFormField(

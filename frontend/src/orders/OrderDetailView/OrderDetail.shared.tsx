@@ -23,6 +23,7 @@ export type OrderFinanceRow = {
   poolName: string;
   note: string;
   operator: string;
+  operatorUserIds?: number[] | null;
   event?: AccountExecutionEvent | null;
 };
 

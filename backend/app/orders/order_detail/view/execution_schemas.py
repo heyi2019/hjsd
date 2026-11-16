@@ -21,6 +21,7 @@ class ExecutionCashflowOut(BaseModel):
     amount: Decimal
     note: str | None = None
     operator: str
+    operator_user_ids: list[int] | None = None
 
 
 class ExecutionEventOut(BaseModel):

@@ -140,6 +140,7 @@ export function OrderDetail({
     poolName: row.pool_name,
     note: row.note,
     operator: row.operator,
+    operatorUserIds: row.operator_user_ids,
     event: row.event_id == null ? undefined : eventById.get(row.event_id),
   })), [detailView, eventById]);
 

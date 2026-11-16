@@ -15,6 +15,7 @@ export interface AccountExecutionCashflow {
   amount: string;
   note?: string | null;
   operator: string;
+  operator_user_ids?: number[] | null;
 }
 
 export interface AccountExecutionEvent {
@@ -108,6 +109,7 @@ export interface OrderDetailFinanceRow {
   pool_name: string;
   note: string;
   operator: string;
+  operator_user_ids?: number[] | null;
   event_id?: number | null;
 }
 

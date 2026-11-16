@@ -60,7 +60,7 @@ export type OrderExecutionEditPayload = {
   profile: object;
   events: { id: number; expected_amount: string; amount: string; note: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }[];
   new_events?: { operation_type: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST"; occurred_at: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }[];
-  cashflows?: { flow_no: string; occurred_at?: string; note?: string | null; operator?: string }[];
+  cashflows?: { flow_no: string; occurred_at?: string; note?: string | null; operator_user_ids?: number[] }[];
   orders?: { order_id: number; occurred_at?: string; operator?: string; note?: string | null; form_extra?: Record<string, unknown> }[];
   parties?: { order_id: number; entity_type: "customer" | "counterparty"; entity_id: number; role: string; operation?: "add" | "remove" }[];
 };

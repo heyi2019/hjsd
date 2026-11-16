@@ -2,7 +2,8 @@ import { Descriptions, Input, Typography } from "antd";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import { useMemo } from "react";
-import { DataTable, DateField, MoneyText } from "../../shared/ui";
+import { DataTable, DateField, MoneyText, Select } from "../../shared/ui";
+import type { EmployeeOption } from "../../shared/api/types/org";
 import type { OrderFinanceRow, OrderDetailMeta } from "./OrderDetail.shared";
 import type { FinanceDraft, OrderDraft } from "./editing/use-order-detail-editor";
 
@@ -34,6 +35,7 @@ const FINANCE_COLUMNS: ColumnsType<OrderFinanceRow> = [
 function editableFinanceColumns(
   drafts: Record<string, FinanceDraft> | undefined,
   onEdit: ((flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void) | undefined,
+  employees: EmployeeOption[],
 ): ColumnsType<OrderFinanceRow> {
   return FINANCE_COLUMNS.map((column) => {
     if (column.key === "occurredAt") {
@@ -49,7 +51,18 @@ function editableFinanceColumns(
     if (column.key === "operator") {
       return {
         ...column,
-        render: (_value: string, row: OrderFinanceRow) => <Input aria-label={`编辑资金明细操作人 ${row.flowNo}`} value={drafts?.[row.flowNo]?.operator ?? row.operator} onChange={(event) => onEdit?.(row.flowNo, { operator: event.target.value })} />,
+        render: (_value: string, row: OrderFinanceRow) => (
+          <Select
+            mode="multiple"
+            showSearch
+            optionFilterProp="label"
+            aria-label={`编辑资金明细操作人 ${row.flowNo}`}
+            value={drafts?.[row.flowNo]?.operator_user_ids ?? row.operatorUserIds ?? []}
+            options={employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))}
+            placeholder="默认当前员工，可多选"
+            onChange={(ids) => onEdit?.(row.flowNo, { operator_user_ids: ids as number[] })}
+          />
+        ),
       };
     }
     if (column.key === "note") {
@@ -105,6 +118,7 @@ export function OrderDetailFinanceSection({
   onFinanceEdit,
   orderDraft,
   onOrderExtraChange,
+  employees = [],
 }: {
   rows: OrderFinanceRow[];
   orderExtras: OrderDetailMeta["orderExtras"];
@@ -117,6 +131,7 @@ export function OrderDetailFinanceSection({
   onFinanceEdit?: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
   orderDraft?: OrderDraft;
   onOrderExtraChange?: (key: string, value: unknown) => void;
+  employees?: EmployeeOption[];
 }) {
   const financeFields = useMemo(
     () => orderExtras.filter((field) => field.section === "FINANCE"),
@@ -135,7 +150,7 @@ export function OrderDetailFinanceSection({
           <div className="order-finance-summary__item order-finance-summary__item--amount"><span>总支出</span><MoneyText value={totalExpense} /></div>
           <div className="order-finance-summary__item order-finance-summary__item--amount"><span>总收入</span><MoneyText value={totalIncome} /></div>
         </div>
-        <DataTable className="order-detail__data-table order-finance-table" columns={editing ? editableFinanceColumns(financeDrafts, onFinanceEdit) : FINANCE_COLUMNS} rows={rows} page={1} pageSize={10} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
+        <DataTable className="order-detail__data-table order-finance-table" columns={editing ? editableFinanceColumns(financeDrafts, onFinanceEdit, employees) : FINANCE_COLUMNS} rows={rows} page={1} pageSize={10} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
       </div>
     </div>
   );

@@ -17,7 +17,7 @@ export type FinanceDraft = {
   flow_no: string;
   occurred_at: string;
   note: string;
-  operator: string;
+  operator_user_ids?: number[];
 };
 export type OrderDraft = {
   order_id: number;
@@ -203,7 +203,7 @@ export function useOrderDetailEditor(params: {
   function updateFinanceDraft(flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) {
     setFinanceDrafts((current) => ({
       ...current,
-      [flowNo]: { ...(current[flowNo] ?? { flow_no: flowNo, occurred_at: "", note: "", operator: "" }), ...changes },
+      [flowNo]: { ...(current[flowNo] ?? { flow_no: flowNo, occurred_at: "", note: "" }), ...changes },
     }));
   }
 
@@ -287,12 +287,17 @@ export function useOrderDetailEditor(params: {
       const originalFinanceRows = detail?.detail_view.finance_rows ?? [];
       const cashflows = Object.values(financeDrafts).filter((draft) => {
         const original = originalFinanceRows.find((row) => row.flow_no === draft.flow_no);
-        return original && (draft.occurred_at !== (original.occurred_at ?? "") || draft.note !== (original.note ?? "") || draft.operator !== original.operator);
+        return original && (
+          draft.occurred_at !== (original.occurred_at ?? "")
+          || draft.note !== (original.note ?? "")
+          || draft.operator_user_ids !== undefined
+            && JSON.stringify(draft.operator_user_ids) !== JSON.stringify(original.operator_user_ids ?? [])
+        );
       }).map((draft) => ({
         flow_no: draft.flow_no,
         ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
         note: draft.note,
-        operator: draft.operator,
+        ...(draft.operator_user_ids !== undefined ? { operator_user_ids: draft.operator_user_ids } : {}),
       }));
       const originalOrders = detail?.orders ?? [];
       const orders = Object.values(orderDrafts).filter((draft) => {

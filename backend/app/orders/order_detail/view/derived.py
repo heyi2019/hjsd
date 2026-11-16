@@ -212,13 +212,14 @@ def _finance_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailFinanceR
                     key=f"flow-{flow.flow_no}", flow_no=flow.flow_no, type=_finance_type(event.event_type, flow.direction, flow.category, order_type=order.order_type),
                     direction="支出" if flow.direction == "OUT" else "收入", amount=flow.amount,
                     occurred_at=flow.occurred_at, pool_name=flow.pool_name or "未分配资金池", note=flow.note or "",
-                    operator=flow.operator or _operator(event), event_id=event.id,
+                    operator=flow.operator or _operator(event), operator_user_ids=flow.operator_user_ids, event_id=event.id,
                 ))
         for flow in order.cashflows:
             rows.append(DetailFinanceRowOut(
                 key=f"flow-{flow.flow_no}", flow_no=flow.flow_no, type=_finance_type("", flow.direction, flow.category, order_type=order.order_type),
                 direction="支出" if flow.direction == "OUT" else "收入", amount=flow.amount,
                 occurred_at=flow.occurred_at, pool_name=flow.pool_name or "未分配资金池", note=flow.note or "", operator=flow.operator or "-",
+                operator_user_ids=flow.operator_user_ids,
             ))
         for rebate in order.rebates:
             rows.append(DetailFinanceRowOut(

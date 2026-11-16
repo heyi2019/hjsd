@@ -38,6 +38,8 @@ class ExecutionCashflowEditItem(RequestModel):
     occurred_at: datetime | None = None
     note: str | None = None
     operator: str | None = Field(default=None, max_length=64)
+    # 空数组表示清空已选操作人；未传字段才表示保持原值。
+    operator_user_ids: list[int] | None = Field(default=None, min_length=0, max_length=30)
 
 
 class ExecutionOrderEditItem(RequestModel):

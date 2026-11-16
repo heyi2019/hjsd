@@ -425,7 +425,7 @@ describe("OrderDetail", () => {
       detail_view: {
         operation_rows: [],
         execution_rows: [],
-        finance_rows: [{ key: "CF0036", flow_no: "CF0036", type: "回收成本", direction: "支出", amount: "100.00", occurred_at: "2026-10-15T10:20:00", pool_name: "经营荷包", note: "旧备注", operator: "admin" }],
+        finance_rows: [{ key: "CF0036", flow_no: "CF0036", type: "回收成本", direction: "支出", amount: "100.00", occurred_at: "2026-10-15T10:20:00", pool_name: "经营荷包", note: "旧备注", operator: "admin", operator_user_ids: [1] }],
         lifecycle: {},
         order_notes: "-",
         parties: [],
@@ -434,11 +434,11 @@ describe("OrderDetail", () => {
       finance_summary: { total_expense: "100.00", total_income: "0.00" },
     } as unknown as AccountExecutionDetail;
 
-    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={36} loading={false} editing={account} />);
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={36} loading={false} editing={account} employees={[{ id: 1, username: "admin", display_name: "管理员", is_active: true }]} />);
     await settleFieldConfig();
 
     expect(screen.getByLabelText("编辑资金明细时间 CF0036")).toBeInTheDocument();
-    expect(screen.getByLabelText("编辑资金明细操作人 CF0036")).toHaveValue("admin");
+    expect(document.querySelector('.ant-select[aria-label="编辑资金明细操作人 CF0036"]')?.textContent).toContain("管理员");
     expect(screen.getByLabelText("编辑资金明细备注 CF0036")).toHaveValue("旧备注");
   });
 

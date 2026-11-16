@@ -117,6 +117,28 @@ def test_edit_execution_operator_preserves_time_and_records_actual_editor(seeded
     assert shown["operator_names"] == ["种子用户1", "种子用户2"]
 
 
+def test_order_detail_edit_updates_cashflow_operators(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="cashflow-operator-edit", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
+    seeded_db.commit()
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == order.id))
+
+    response = seeded_client.patch(
+        f"/api/v1/orders/{order.id}/execution-edit",
+        headers=headers,
+        json={"events": [], "cashflows": [{"flow_no": flow.flow_no, "operator_user_ids": [1, 2]}]},
+    )
+
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Cashflow, flow.id).operator_user_ids == [1, 2]
+    detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+    assert detail.status_code == 200
+    shown = detail.json()["detail_view"]["finance_rows"][0]
+    assert shown["operator_user_ids"] == [1, 2]
+
+
 def test_edit_execution_operator_can_clear_all_selected_users(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="clear-event-operators", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

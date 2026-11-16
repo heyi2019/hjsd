@@ -130,4 +130,5 @@ def _cashflow_output(flow: Cashflow, pool: Pool) -> ExecutionCashflowOut:
         amount=flow.amount,
         note=flow.note,
         operator=flow.created_by,
+        operator_user_ids=flow.operator_user_ids,
     )

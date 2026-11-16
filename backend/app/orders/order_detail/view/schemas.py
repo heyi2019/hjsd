@@ -33,6 +33,7 @@ class DetailFinanceRowOut(BaseModel):
     pool_name: str
     note: str
     operator: str
+    operator_user_ids: list[int] | None = None
     event_id: int | None = None
 
 

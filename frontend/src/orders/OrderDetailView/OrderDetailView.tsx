@@ -115,6 +115,7 @@ export function OrderDetailView({
           onFinanceEdit={onFinanceEdit}
           orderDraft={meta.orderId ? orderDrafts?.[meta.orderId] : undefined}
           onOrderExtraChange={meta.orderId == null ? undefined : (key, value) => onOrderExtraChange?.(meta.orderId!, key, value)}
+          employees={employees}
           editing
         />
         <OrderDetailPartySection

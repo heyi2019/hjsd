@@ -64,11 +64,11 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 90,
+        "files": 92,
         "layers": {
           "fast": 15,
           "quick": 8,
-          "react": 55,
+          "react": 57,
           "deep": 12
         },
         "cases": {
@@ -87,16 +87,16 @@
           },
           "module": {
             "workbench": 6,
-            "business": 19,
+            "business": 20,
             "customer": 3,
             "finance": 4,
             "operations": 5,
-            "settings": 15,
+            "settings": 16,
             "shared": 8,
             "system": 5
           }
         },
-        "_baseline_note": "资金中心 API 边界拆分后，当前磁盘实际为 90 个测试文件、fast 15 个、react 55 个、deep 12 个；tests/frontend/{unit,module}/<区域>/ 为唯一前端测试根。",
+        "_baseline_note": "当前磁盘实际为 92 个测试文件、fast 15 个、react 57 个、deep 12 个；tests/frontend/{unit,module}/<区域>/ 为唯一前端测试根。",
         "root_layout": "tests/frontend/<unit|module>/<区域>/",
         "baseline": {
           "_doc": "2026-11-04 搬迁后实测（同机同代码）。cpu = user+sys，跨会话可比；wall 受并发会话干扰。",

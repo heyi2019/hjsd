@@ -155,7 +155,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
     expect(createUrl).toHaveBeenCalled();
     expect(revokeUrl).toHaveBeenCalled();
-    expect(successSpy).toHaveBeenCalledWith("已导出 monthly-pnl.csv");
+    expect(successSpy).toHaveBeenCalledWith("报表已导出");
     createUrl.mockRestore();
     revokeUrl.mockRestore();
   });

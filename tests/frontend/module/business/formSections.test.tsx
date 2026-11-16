@@ -2,11 +2,20 @@
 import { useState } from "react";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Button, Form, type FormInstance } from "antd";
 import { renderLight } from "@fixtures/render";
+import { seedOptionSets } from "@fixtures/formFieldsSeed";
 import { CustomerSourceFields } from "@/orders/CustomerSourceInput";
 import { FinanceExpenseItems } from "@/orders/finance/FinanceExpenseItems";
+import { clearOptionSetsCache } from "@/shared/lib/optionSets";
+
+vi.mock("@/shared/api/options.api");
+
+beforeEach(() => {
+  clearOptionSetsCache();
+  seedOptionSets();
+});
 
 describe("CustomerSourceFields：客户来源校验文案", () => {
   function Harness() {

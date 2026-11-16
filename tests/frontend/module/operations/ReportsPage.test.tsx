@@ -207,7 +207,7 @@ describe("ReportsPage：经营中心报表", () => {
     const monthlyCard = screen.getByText("月度经营损益").closest(".ant-card") as HTMLElement;
     await ui.click(within(monthlyCard).getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
-    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("已导出 monthly-pnl.csv"));
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("报表已导出"));
   });
 
   it("导出日期反向（开始晚于结束）时拦截并给出错误提示，不发起导出", async () => {

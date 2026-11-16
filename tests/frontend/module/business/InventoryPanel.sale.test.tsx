@@ -85,7 +85,7 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
   await ui.type(screen.getByLabelText("客户昵称"), "新买家");
   await ui.type(screen.getByLabelText("售出金额"), "350");
   await ui.click(screen.getByLabelText("资金账户"));
-  await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  await ui.click(await screen.findByText(/利润池/));
   fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
 
   await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalledWith(expect.objectContaining({
@@ -113,7 +113,7 @@ it("库存售出：成功后立即从库存列表移除账号，即使列表重�
   await ui.type(screen.getByLabelText("客户昵称"), "买家A");
   await ui.type(screen.getByLabelText("售出金额"), "350");
   await ui.click(screen.getByLabelText("资金账户"));
-  await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  await ui.click(await screen.findByText(/利润池/));
   await ui.click(screen.getByRole("button", { name: /确认售出/ }));
 
   await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalled());
@@ -141,7 +141,7 @@ it("代挂账号售出：全款收佣金入账、售出金额仅记录、不提�
     await ui.type(screen.getByPlaceholderText("请输入利润（代挂佣金）"), "200");
     await ui.type(screen.getByPlaceholderText("代挂无买入价，此处仅作记录，不计入利润"), "1000");
     await ui.click(screen.getByLabelText("资金账户"));
-    await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  await ui.click(await screen.findByText(/利润池/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
     await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalled());
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
@@ -177,7 +177,7 @@ it("代挂售出复用买号交付信息块，交付负责人提交落库到来�
     await ui.type(screen.getByLabelText("客户昵称"), "买家A");
     await ui.type(screen.getByPlaceholderText("请输入利润（代挂佣金）"), "200");
     await ui.click(screen.getByLabelText("资金账户"));
-    await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  await ui.click(await screen.findByText(/利润池/));
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
     await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalled());
     // 售出表单中的交付字段（含交付负责人）随售出提交 merge 进来源单 form_extra，详情的卖号交付直接复用。
@@ -202,7 +202,7 @@ it("提号库存售出可选择分期出售，确立时收首付", async () => {
     await ui.clear(screen.getByLabelText("首付金额"));
     await ui.type(screen.getByLabelText("首付金额"), "300");
     await ui.click(screen.getByLabelText("资金账户"));
-    await ui.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+  await ui.click(await screen.findByText(/利润池/));
     await ui.clear(screen.getByLabelText("分期期数"));
     await ui.type(screen.getByLabelText("分期期数"), "2");
     await ui.clear(screen.getByLabelText("每期金额"));
@@ -325,7 +325,7 @@ describe("库存售出三表单分支", () => {
     await user.type(screen.getByLabelText("客户昵称"), "买家A");
     await user.type(screen.getByLabelText("售出金额"), "350");
     await user.click(screen.getByLabelText("资金账户"));
-    await user.click(await screen.findByText(/利润池（HJ_PROFIT）/));
+    await user.click(await screen.findByText(/利润池/));
     await user.click(screen.getByRole("button", { name: /确认售出/ }));
 
     await waitFor(() => expect(screen.getByText(/客户已拉黑，不能作为售出买家/)).toBeInTheDocument());

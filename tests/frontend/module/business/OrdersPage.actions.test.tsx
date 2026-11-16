@@ -658,7 +658,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getByLabelText("退回金额")).toBeInTheDocument();
     expect(within(modal).getByLabelText("收款账户")).toBeInTheDocument();
     await ui.click(within(modal).getByLabelText("收款账户"));
-    await ui.click((await screen.findAllByText("投资款荷包（HJ_INVEST）"))[1]);
+    await ui.click((await screen.findAllByText("投资款荷包"))[1]);
     await ui.type(within(modal).getByLabelText("取消原因"), "对方退款");
     await clickModalOk(modal);
     await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(

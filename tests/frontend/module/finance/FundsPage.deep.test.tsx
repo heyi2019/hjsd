@@ -70,6 +70,7 @@ beforeEach(() => {
   resolveMock(vi.mocked(depositsApi.list), deposits);
   // 合计由服务端返回，桩里同步给出，避免卡片落回 0.00。
   resolveMock(vi.mocked(cashflowsApi.list), { items: cashflows, total: cashflows.length, total_in: "800.00", total_out: "1000.00" });
+  resolveMock(vi.mocked(cashflowsApi.totals), { total_in: "800.00", total_out: "1000.00" });
   vi.mocked(studioExpensesApi.summary).mockResolvedValue({ items: [], income: "0.00", expense: "0.00", net: "0.00", count: 0 });
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
 });
@@ -90,7 +91,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   it("新增流水（本方经营 + 收入）→ nature=BUSINESS_IN", async () => {
     resolveMockOnce(vi.mocked(cashflowsApi.create), { id: 100 });
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
     const modal = modalContent();
@@ -108,7 +109,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
   it("独立流水选内部调拨 → 交由后端拒绝，不在前端复制业务规则", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
     const modal = modalContent();
@@ -131,7 +132,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
     resolveMock(vi.mocked(cashflowsApi.list), { items: approved, total: approved.length, total_in: "0.00", total_out: "300.00" });
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     await ui.click(await screen.findByRole("button", { name: /冲\s*销/ }));
     const modal = modalContent();
@@ -157,7 +158,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     });
     resolveMockOnce(vi.mocked(cashflowsApi.reverse), reversal);
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     await screen.findByText("CF-A-07");
     await ui.click(await screen.findByRole("button", { name: /冲\s*销/ }));
@@ -178,7 +179,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
       : { items: approved, total: 1, total_in: "0.00", total_out: "300.00" });
     vi.mocked(cashflowsApi.reverse).mockRejectedValueOnce(new Error("冲销接口暂时不可用"));
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
     await screen.findByText("CF-A-07");
     await ui.click(await screen.findByRole("button", { name: /冲\s*销/ }));
@@ -195,7 +196,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   it("资金池划转提交调用 transfersApi.create", async () => {
     resolveMockOnce(vi.mocked(transfersApi.create), { id: 200, transfer_id: "TRF-200" });
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(await screen.findByRole("button", { name: /资金池划转/ }));
     const modal = modalContent();
     await pickSelect(modal, 0, /经营主池/);
@@ -212,7 +213,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
   it("资金池划转金额不接受负数", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(await screen.findByRole("button", { name: /资金池划转/ }));
     const modal = modalContent();
     await pickSelect(modal, 0, /经营主池/);
@@ -227,7 +228,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   it("超出转出资金池可用余额时由后端拒绝", async () => {
     vi.mocked(transfersApi.create).mockRejectedValueOnce(new Error("转出资金池可用余额不足"));
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(await screen.findByRole("button", { name: /资金池划转/ }));
     const modal = modalContent();
     await pickSelect(modal, 0, /经营主池/);
@@ -246,7 +247,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
       { id: 32, pool_id: 1, reconciled_on: "2026-10-17", account_label: "经营账户", system_balance: "800.00", statement_balance: "800.00", difference: "0.00", status: "RESOLVED" },
     ]);
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "对账" }));
     expect(await screen.findByText("未核销")).toBeInTheDocument();
     expect(screen.getByText("已核销")).toBeInTheDocument();
@@ -263,7 +264,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
       { id: 30, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN" },
     ]);
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "对账" }));
     await ui.click(await screen.findByRole("button", { name: /新增对账/ }));
     const modal = modalContent();
@@ -282,7 +283,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
   it("对账页展示系统余额口径说明", async () => {
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "对账" }));
     expect(await screen.findByText(/系统余额口径：截至对账日期「已入账」流水的累计/)).toBeInTheDocument();
   });
@@ -315,7 +316,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
       id: 21, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN",
     }]);
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "对账" }));
     await ui.click(await screen.findByRole("button", { name: /核销/ }));
     const modal = modalContent();
@@ -327,7 +328,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   it("押金释放提交调用 depositsApi.release", async () => {
     resolveMockOnce(vi.mocked(depositsApi.release), { id: 11 });
     renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /POOL-A/ });
+    await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
     await ui.click(await screen.findByRole("button", { name: /释\s*放/ }));
     const modal = modalContent();

@@ -84,7 +84,7 @@ describe("OrdersPage helpers", () => {
       COMPANY: { allocation_rate: "0.00", allocation_amount: "0.00" },
     });
     expect(same.filter((row) => row.allocation_type === "BUY")).toEqual([
-      expect.objectContaining({ employee_ids: [1, 2], allocation_rate: "100", allocation_amount: "30" }),
+      expect.objectContaining({ employee_ids: [1, 2], allocation_rate: "100.00", allocation_amount: "30.00" }),
     ]);
 
     // 台账把买号从 1 换成 3：1 已不是该动作执行人（后端会拒绝非执行人收益人），
@@ -101,7 +101,7 @@ describe("OrdersPage helpers", () => {
       COMPANY: { allocation_rate: "0.00", allocation_amount: "0.00" },
     });
     expect(replaced.filter((row) => row.allocation_type === "BUY")).toEqual([
-      expect.objectContaining({ employee_ids: [3], allocation_rate: "100", allocation_amount: "30" }),
+      expect.objectContaining({ employee_ids: [3], allocation_rate: "100.00", allocation_amount: "30.00" }),
     ]);
 
     // 台账没登记该动作执行人时（候选为空）不联动，存量原样回显。

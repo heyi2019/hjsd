@@ -37,6 +37,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");
 vi.mock("@/shared/api/transfers.api");
 import { renderApp } from "@fixtures/render";
+import { cashflowPage, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
 import { AppShell } from "@/app/AppShell";
 import { MemoryRouter } from "react-router-dom";
 
@@ -101,14 +102,9 @@ beforeEach(() => {
       }
     }
   }
-  vi.mocked(cashflowsApi.list).mockResolvedValue({ items: [], total: 0 });
-  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({
-    total_count: 0,
-    status_counts: {},
-    type_counts: {},
-    game_types: [],
-  });
-  vi.mocked(ordersApi.listPage).mockResolvedValue({ items: [], total: 0, limit: 10, offset: 0 });
+  vi.mocked(cashflowsApi.list).mockResolvedValue(cashflowPage([]));
+  vi.mocked(ordersApi.ledgerSummary).mockResolvedValue(orderLedgerSummary());
+  vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([]));
 });
 
 async function renderShell(options: { user?: string; initialPath?: string } = {}) {

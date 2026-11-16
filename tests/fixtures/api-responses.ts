@@ -12,6 +12,13 @@ export type CashflowTotals = {
   total_out: string;
 };
 
+export type CashflowPage<T> = {
+  items: T[];
+  total: number;
+  total_in: string;
+  total_out: string;
+};
+
 /** 构造完整分页响应，避免测试用例用数组冒充后端分页契约。 */
 export function pageResponse<T>(items: T[], overrides: Partial<PageResponse<T>> = {}): PageResponse<T> {
   return {
@@ -39,6 +46,16 @@ export function cashflowTotals(overrides: Partial<CashflowTotals> = {}): Cashflo
   return {
     total_in: "0.00",
     total_out: "0.00",
+    ...overrides,
+  };
+}
+
+/** 构造资金流水分页响应，统一携带服务端聚合的收入/支出总额。 */
+export function cashflowPage<T>(items: T[], overrides: Partial<Omit<CashflowPage<T>, "items" | "total">> & { total?: number } = {}): CashflowPage<T> {
+  return {
+    items,
+    total: items.length,
+    ...cashflowTotals(),
     ...overrides,
   };
 }

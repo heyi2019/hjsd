@@ -39,7 +39,6 @@ interface SettingsItemMeta {
 export const SETTINGS_TAB_ORDER = [
   "business-dictionary",
   "organization",
-  "config-audit",
   "audit",
   "appearance",
 ] as const;
@@ -121,15 +120,6 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     label: "业务字典",
     summary: "术语口径说明，纯静态文案",
     group: "OPS",
-    readOnly: true,
-    entityTypes: [],
-  },
-  {
-    key: "config-audit",
-    label: "改动追溯",
-    summary: "配置改动流水：按配置项 / 动作 / 操作人 / 时间筛选，只读",
-    group: "GOV",
-    permission: "audit.read",
     readOnly: true,
     entityTypes: [],
   },

@@ -1,18 +1,9 @@
-/**
- * 配置类只读面板——由 3 个碎片文件合并而来：
- *   ConfigAuditPanel.test.tsx / SequencesPanel.test.tsx / BusinessReminderSettingsPanel.test.tsx
- * 合并动因同上（文件级 import/transform 是固定成本）；用例与断言逐条保留，各自 describe 隔离。
- */
+/** 配置类只读面板——编号序列与业务提醒。 */
 import { screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { seedOptionSets } from "@fixtures/formFieldsSeed";
 import { sequencesApi } from "@/shared/api/misc.api";
 import { optionSetsApi } from "@/shared/api/options.api";
-import { auditApi } from "@/shared/api/reports.api";
-import type { AuditLogRow } from "@/shared/api/types/ops";
-import { ConfigAuditPanel } from "@/field-definitions/panels/ConfigAuditPanel";
 import { SequencesPanel } from "@/field-definitions/panels/SequencesPanel";
 import { BusinessReminderSettingsPanel } from "@/field-definitions/panels/BusinessReminderSettingsPanel";
 
@@ -28,110 +19,6 @@ vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
-
-const ROWS = [
-  {
-    id: 1,
-    actor: "admin",
-    action: "ROUTE_UPDATE",
-    entity_type: "OrderTypePool",
-    entity_id: "11",
-    reason: "调整代挂总额去向",
-    occurred_at: "2026-10-26T13:00:00",
-  },
-  {
-    id: 2,
-    actor: "finance",
-    action: "POOL_DISABLE",
-    entity_type: "Pool",
-    entity_id: "3",
-    reason: null,
-    occurred_at: "2026-10-20T09:30:00",
-  },
-] as unknown as AuditLogRow[];
-
-describe("ConfigAuditPanel 配置改动追溯页", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    seedOptionSets();
-    vi.mocked(auditApi).list.mockResolvedValue({ items: ROWS, total: ROWS.length });
-    vi.mocked(auditApi).actions.mockResolvedValue(["ROUTE_UPDATE", "POOL_DISABLE"]);
-  });
-
-  it("把 entity_type 翻成配置项名与对象类型，动作走审计动作中文表", async () => {
-    renderLight(<ConfigAuditPanel />, { user: "admin" });
-
-    expect(await screen.findByText("配置改动追溯")).toBeInTheDocument();
-    // 配置项名来自 configCatalog 的 ENTITY_TYPE_TO_ITEM（4cd136c 后 OrderTypePool 归「资金池」项）；
-    // 对象类型列来自 ENTITY_TYPE 词典（「资金路由」）。两列各命中一次。
-    expect(screen.getAllByText("资金池").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("资金路由").length).toBeGreaterThanOrEqual(1);
-    // 对象类型已翻成中文，不再显示裸码
-    expect(screen.queryByText("OrderTypePool")).not.toBeInTheDocument();
-    // 动作中文名来自 AUDIT_ACTION_LABEL
-    expect(screen.getByText("更新资金路由")).toBeInTheDocument();
-    expect(screen.getByText("停用资金池")).toBeInTheDocument();
-    // 备注为空回落占位，不显示空白
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
-  });
-
-  it("筛选条件变化会带上对应参数重新查询", async () => {
-    renderLight(<ConfigAuditPanel />, { user: "admin" });
-    await screen.findByText("配置改动追溯");
-
-    await waitFor(() =>
-      expect(vi.mocked(auditApi).list).toHaveBeenCalledWith(expect.objectContaining({ limit: 500 })),
-    );
-    // 初始不传任何筛选
-    expect(vi.mocked(auditApi).list).not.toHaveBeenCalledWith(
-      expect.objectContaining({ entity_type: expect.any(String) }),
-    );
-  });
-
-  it("只读：页面不提供任何写入口", async () => {
-    renderLight(<ConfigAuditPanel />, { user: "admin" });
-    await screen.findByText("配置改动追溯");
-
-    expect(screen.queryByRole("button", { name: /保存|新建|删除|提交/ })).toBeNull();
-    expect(screen.getByText("只读")).toBeInTheDocument();
-  });
-
-  it("加载失败时记录数标记为不可用并禁用筛选、提供重新加载（L346）", async () => {
-    vi.mocked(auditApi).list.mockRejectedValue(new Error("审计服务不可用"));
-    vi.mocked(auditApi).actions.mockResolvedValue(["ROUTE_UPDATE"]);
-    const { container } = renderLight(<ConfigAuditPanel />, { user: "admin" });
-
-    // 失败态不再以“共 0 条”误导，记录数标记为不可用
-    expect(await screen.findByText(/记录加载失败，当前记录数不可用/)).toBeInTheDocument();
-    expect(screen.queryByText(/当前筛选下共 0 条/)).not.toBeInTheDocument();
-    // 仍提供重新加载入口
-    expect(screen.getByRole("button", { name: /重新加载/ })).toBeInTheDocument();
-    // 筛选控件在失败态被禁用，避免基于损坏状态构建查询
-    const selects = container.querySelectorAll(".ant-select");
-    expect(selects).toHaveLength(2);
-    selects.forEach((select) => expect(select).toHaveClass("ant-select-disabled"));
-    expect(container.querySelector(".ant-picker")).toHaveClass("ant-picker-disabled");
-    expect(container.querySelector(".ant-input")).toHaveClass("ant-input-disabled");
-  });
-
-  it("FE-176：按动作筛选改动追溯并只保留匹配记录", async () => {
-    const other = { ...ROWS[0], id: 9, actor: "finance", action: "POOL_DISABLE", entity_type: "Pool" } as AuditLogRow;
-    vi.mocked(auditApi).list.mockImplementation(async (params) =>
-      params?.action === "ROUTE_UPDATE"
-        ? { items: [ROWS[0]], total: 1 }
-        : { items: [ROWS[0], other], total: 2 },
-    );
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderLight(<ConfigAuditPanel />, { user: "admin" });
-    await screen.findByText("配置改动追溯");
-    const actionSelect = document.querySelectorAll(".ui-filter-bar .ant-select")[1] as HTMLElement;
-    await user.click(actionSelect.querySelector(".ant-select-selector") as HTMLElement);
-    await user.click(await screen.findByText("更新资金路由", { selector: ".ant-select-item-option-content" }));
-    await waitFor(() => expect(vi.mocked(auditApi).list).toHaveBeenLastCalledWith(expect.objectContaining({ action: "ROUTE_UPDATE" })));
-    expect(screen.getByText("admin")).toBeInTheDocument();
-    expect(screen.queryByText("finance")).toBeNull();
-  });
-});
 
 describe("SequencesPanel", () => {
   beforeEach(() => {

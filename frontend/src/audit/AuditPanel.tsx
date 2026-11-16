@@ -10,6 +10,18 @@ import { AUDIT_ACTION_LABEL, ENTITY_TYPE_LABEL } from "../shared/lib/labels";
 import { formatDateTimeMinute } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
+import { ENTITY_TYPE_TO_ITEM, SETTINGS_ITEMS } from "../field-definitions/configCatalog";
+
+function entityTypeLabel(value: string): string {
+  return ENTITY_TYPE_LABEL[value] ?? ENTITY_TYPE_LABEL[value.toLowerCase()] ?? value;
+}
+
+const CONFIG_ITEM_OPTIONS = SETTINGS_ITEMS
+  .flatMap((item) => item.entityTypes.map((type) => ({
+    value: type,
+    label: `${item.label} · ${entityTypeLabel(type)}`,
+  })))
+  .sort((a, b) => a.label.localeCompare(b.label, "zh-Hans-CN"));
 
 /** 词典未加载时的回落值，与改造前硬编码一致。 */
 const ENTITY_TYPE_FALLBACK = Object.entries(ENTITY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
@@ -20,6 +32,7 @@ import "./AuditPanel.css";
 export function AuditPanel() {
   const entityTypeOptions = useOptionSet("ENTITY_TYPE") ?? ENTITY_TYPE_FALLBACK;
   const [rows, setRows] = useState<AuditLogRow[]>([]);
+  const [configItem, setConfigItem] = useState("");
   const [entityType, setEntityType] = useState("");
   const [entityId, setEntityId] = useState("");
   const [action, setAction] = useState("");
@@ -31,7 +44,7 @@ export function AuditPanel() {
   const load = useCallback(async () => {
     try {
       const result = await auditApi.list({
-        entity_type: entityType || undefined,
+        entity_type: configItem || entityType || undefined,
         entity_id: entityId || undefined,
         action: action || undefined,
         actor: actor || undefined,
@@ -44,7 +57,7 @@ export function AuditPanel() {
     } catch (err) {
       setError(normalizeError(err));
     }
-  }, [entityType, entityId, action, actor, fromDate, toDate]);
+  }, [configItem, entityType, entityId, action, actor, fromDate, toDate]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     auditApi.actions().then(setActionOptions).catch(() => undefined);
@@ -53,6 +66,7 @@ export function AuditPanel() {
   const columns: ColumnsType<AuditLogRow> = [
     { title: "时间", dataIndex: "occurred_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     { title: "操作人", dataIndex: "actor" },
+    { title: "配置项", dataIndex: "entity_type", render: (v: string | null) => ENTITY_TYPE_TO_ITEM[v ?? ""] ?? "—" },
     { title: "动作", dataIndex: "action", render: (v: string) => configurableLabel("AUDIT_ACTION", v, AUDIT_ACTION_LABEL) },
     { title: "对象类型", dataIndex: "entity_type", render: (v: string) => configurableLabel("ENTITY_TYPE", v, ENTITY_TYPE_LABEL)},
     { title: "对象编号", dataIndex: "entity_id"},
@@ -66,10 +80,25 @@ export function AuditPanel() {
           <Select
             allowClear
             showSearch
+            placeholder="配置项"
+            className="audit-filter-select audit-config-item-select"
+            value={configItem || undefined}
+            onChange={(value) => {
+              setConfigItem(value ?? "");
+              if (value) setEntityType("");
+            }}
+            options={CONFIG_ITEM_OPTIONS}
+          />
+          <Select
+            allowClear
+            showSearch
             placeholder="对象类型"
-            className="audit-filter-select"
+            className="audit-filter-select audit-entity-type-select"
             value={entityType || undefined}
-            onChange={(value) => setEntityType(value ?? "")}
+            onChange={(value) => {
+              setEntityType(value ?? "");
+              if (value) setConfigItem("");
+            }}
             options={entityTypeOptions}
           />
           <Input className="audit-filter-input" placeholder="对象编号" value={entityId} onChange={(event) => setEntityId(event.target.value)} onPressEnter={() => void load()} />
@@ -77,7 +106,7 @@ export function AuditPanel() {
             allowClear
             showSearch
             placeholder="动作"
-            className="audit-filter-select"
+            className="audit-filter-select audit-action-select"
             value={action || undefined}
             onChange={(value) => setAction(value ?? "")}
             options={actionOptions.length > 0

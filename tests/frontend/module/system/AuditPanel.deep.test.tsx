@@ -31,9 +31,8 @@ beforeEach(() => {
   vi.mocked(auditApi.actions).mockResolvedValue(["ORDER_CREATE"]);
 });
 
-async function pickSelectByIndex(index: number, optionLabel: string) {
-  const select = document.querySelectorAll(".ant-select")[index] as HTMLElement;
-  await ui.click(select.querySelector(".ant-select-selector") as HTMLElement);
+async function pickSelect(selector: string, optionLabel: string) {
+  await ui.click(document.querySelector(`${selector} .ant-select-selector`) as HTMLElement);
   await ui.click(await screen.findByText(optionLabel, { selector: ".ant-select-item-option-content" }));
 }
 
@@ -70,14 +69,14 @@ describe("AuditPanel.deep：筛选/重试/降级分支", () => {
   it("选对象类型触发 load 且参数带 entity_type", async () => {
     renderLight(<AuditPanel />, { user: "admin" });
     await screen.findByText("admin");
-    await pickSelectByIndex(0, "订单");
+    await pickSelect(".audit-entity-type-select", "订单");
     await waitFor(() => expect(lastListArgs().entity_type).toBe("order"));
   });
 
   it("选动作触发 load 且参数带 action", async () => {
     renderLight(<AuditPanel />, { user: "admin" });
     await screen.findByText("admin");
-    await pickSelectByIndex(1, "新建订单");
+    await pickSelect(".audit-action-select", "新建订单");
     await waitFor(() => expect(lastListArgs().action).toBe("ORDER_CREATE"));
   });
 

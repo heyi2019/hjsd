@@ -37,7 +37,8 @@ describe("AuditPanel：审计记录", () => {
 
     const filterBar = document.querySelector(".audit-filter-bar");
     expect(filterBar).toBeInTheDocument();
-    expect(filterBar?.querySelectorAll(".audit-filter-select")).toHaveLength(2);
+    expect(filterBar?.querySelectorAll(".audit-filter-select")).toHaveLength(3);
+    expect(document.querySelector(".audit-config-item-select")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("对象编号")).toHaveClass("audit-filter-input");
     expect(screen.getByPlaceholderText("操作人")).toHaveClass("audit-filter-input");
     expect(screen.getByLabelText("审计开始日期").closest(".ant-picker")).toHaveClass("audit-filter-date");
@@ -50,6 +51,23 @@ describe("AuditPanel：审计记录", () => {
     // 动作与对象类型均按中文标签渲染（AUDIT_ACTION_LABEL / ENTITY_TYPE_LABEL）
     expect(screen.getByText("新建订单")).toBeInTheDocument();
     expect(screen.getByText("订单")).toBeInTheDocument();
+  });
+
+  it("展示配置项列并支持按配置项筛选", async () => {
+    vi.mocked(auditApi.list).mockResolvedValue({
+      items: [{ ...rows[0], entity_type: "Pool", action: "POOL_DISABLE" }],
+      total: 1,
+    });
+    vi.mocked(auditApi.actions).mockResolvedValue(["POOL_DISABLE"]);
+    renderLight(<AuditPanel />, { user: "admin" });
+
+    expect(await screen.findByText("资金池")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "配置项" })).toBeInTheDocument();
+
+    const configSelect = document.querySelector(".audit-config-item-select .ant-select-selector") as HTMLElement;
+    await ui.click(configSelect);
+    await ui.click(await screen.findByText("资金池 · 资金池", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(vi.mocked(auditApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ entity_type: "Pool" })));
   });
 
   it("加载失败展示错误横幅", async () => {
@@ -71,8 +89,8 @@ describe("AuditPanel：审计记录", () => {
     vi.mocked(auditApi.actions).mockRejectedValueOnce(new Error("actions down"));
     renderLight(<AuditPanel />, { user: "admin" });
     await screen.findByText("admin");
-    const actionSelect = document.querySelectorAll(".ui-filter-bar .ant-select")[1] as HTMLElement;
-    await ui.click(actionSelect.querySelector(".ant-select-selector") as HTMLElement);
+    const actionSelect = document.querySelector(".audit-action-select .ant-select-selector") as HTMLElement;
+    await ui.click(actionSelect);
     expect(await screen.findByText("新建资金池", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
   });
 
@@ -85,8 +103,8 @@ describe("AuditPanel：审计记录", () => {
     );
     renderLight(<AuditPanel />, { user: "admin" });
     await screen.findByText("finance");
-    const entitySelect = document.querySelectorAll(".ui-filter-bar .ant-select")[0] as HTMLElement;
-    await ui.click(entitySelect.querySelector(".ant-select-selector") as HTMLElement);
+    const entitySelect = document.querySelector(".audit-entity-type-select .ant-select-selector") as HTMLElement;
+    await ui.click(entitySelect);
     await ui.click(await screen.findByText("订单", { selector: ".ant-select-item-option-content" }));
     await waitFor(() => expect(vi.mocked(auditApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ entity_type: "order" })));
     expect(screen.getByText("admin")).toBeInTheDocument();
@@ -103,8 +121,8 @@ describe("AuditPanel：审计记录", () => {
     );
     renderLight(<AuditPanel />, { user: "admin" });
     await screen.findByText("finance");
-    const actionSelect = document.querySelectorAll(".ui-filter-bar .ant-select")[1] as HTMLElement;
-    await ui.click(actionSelect.querySelector(".ant-select-selector") as HTMLElement);
+    const actionSelect = document.querySelector(".audit-action-select .ant-select-selector") as HTMLElement;
+    await ui.click(actionSelect);
     await ui.click(await screen.findByText("新建订单", { selector: ".ant-select-item-option-content" }));
     await waitFor(() => expect(vi.mocked(auditApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ action: "ORDER_CREATE" })));
     expect(screen.getByText("admin")).toBeInTheDocument();

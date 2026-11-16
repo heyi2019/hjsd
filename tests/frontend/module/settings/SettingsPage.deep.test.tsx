@@ -81,6 +81,7 @@ describe("SettingsPage.deep", () => {
     expect(screen.queryByRole("tab", { name: "人员与权限" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "团队管理" })).toBeNull();
     expect(screen.getByRole("tab", { name: "审计记录" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "改动追溯" })).toBeNull();
     // 配置中心为聚合入口
     expect(screen.getByRole("tab", { name: "配置中心" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "外观" })).toBeInTheDocument();
@@ -94,6 +95,7 @@ describe("SettingsPage.deep", () => {
     await screen.findByRole("tab", { name: "业务字典" });
     await ui.click(screen.getByRole("tab", { name: "审计记录" }));
     expect((await screen.findAllByText("审计记录")).length).toBeGreaterThan(1);
+    expect(document.querySelector(".audit-config-item-select")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("对象编号")).toBeInTheDocument();
   });
 

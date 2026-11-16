@@ -108,7 +108,6 @@ describe("设置导航注册表", () => {
     expect(SETTINGS_TAB_ORDER).toEqual([
       "business-dictionary",
       "organization",
-      "config-audit",
       "audit",
       "appearance",
     ]);

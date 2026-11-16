@@ -238,7 +238,11 @@ def set_extra_values(
         session, entity_type=entity_type, entity_id=entity_id, values=values
     )
     merged = dict(entity.form_extra or {})
-    merged.update(saved)
+    for field_key, value in saved.items():
+        if value is None or value == "" or value == []:
+            merged.pop(field_key, None)
+        else:
+            merged[field_key] = value
     entity.form_extra = merged
     session.flush()
     return saved

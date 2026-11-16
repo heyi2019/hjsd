@@ -19,7 +19,7 @@ from app.core.security import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
-from app.domain.trade import InstallmentSchedule
+from app.domain.trade import InstallmentSchedule, Order
 from app.value_added_services import schemas
 from app.value_added_services import _shared as inst__shared
 from app.value_added_services import create as inst_create
@@ -30,7 +30,7 @@ from app.value_added_services import settlement as inst_settlement
 from app.lists import service as list_columns_service
 from app.lists.export import build_list_csv, detail_json
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
-from app.parties.fields import get_extra_values, get_extra_values_bulk
+from app.parties.fields import get_extra_values_bulk
 from app.core.actor import actor_name as _actor
 
 router = APIRouter(tags=["HS-01 分期合约"])
@@ -55,12 +55,43 @@ INSTALLMENT_DETAIL_EXPORT_COLUMNS = [
 ]
 
 
-def _installment_output(db: Session, item) -> schemas.InstallmentOut:
-    output = schemas.InstallmentOut.model_validate(item)
-    output.extra_values = get_extra_values(
-        db, entity_type="installment", entity_id=item.id
+def _installment_outputs(
+    db: Session,
+    items,
+    *,
+    include_details: bool = False,
+) -> list[schemas.InstallmentOut]:
+    if not items:
+        return []
+    extras = get_extra_values_bulk(
+        db, entity_type="installment", entity_ids=[item.id for item in items]
     )
-    return output
+    order_ids = {item.order_id for item in items}
+    orders = {
+        order.id: order
+        for order in db.scalars(select(Order).where(Order.id.in_(order_ids))).all()
+    }
+    order_context = inst_queries.installment_order_context(db, list(orders.values()))
+    schedules_by_installment: dict[int, list] = {}
+    dispositions_by_installment: dict[int, list] = {}
+    if include_details:
+        schedules_by_installment, dispositions_by_installment = (
+            inst_queries.list_installment_export_details(db, [item.id for item in items])
+        )
+    return [
+        schemas.InstallmentOut.model_validate({
+            **item.__dict__,
+            "extra_values": extras.get(item.id, {}),
+            "order": order_context[item.order_id],
+            "schedules": [schemas.ScheduleOut.model_validate(row) for row in schedules_by_installment.get(item.id, [])],
+            "dispositions": [schemas.DispositionOut.model_validate(row) for row in dispositions_by_installment.get(item.id, [])],
+        })
+        for item in items
+    ]
+
+
+def _installment_output(db: Session, item) -> schemas.InstallmentOut:
+    return _installment_outputs(db, [item])[0]
 
 
 @router.get("/installments", response_model=list[schemas.InstallmentOut])
@@ -82,13 +113,7 @@ def list_installments(
         trade_date_to=trade_date_to,
         user=_user,
     )
-    extras = get_extra_values_bulk(
-        db, entity_type="installment", entity_ids=[item.id for item in items]
-    )
-    return [
-        schemas.InstallmentOut.model_validate({**item.__dict__, "extra_values": extras.get(item.id, {})})
-        for item in items
-    ]
+    return _installment_outputs(db, items, include_details=True)
 
 
 @router.get("/installments/totals", response_model=schemas.InstallmentTotalsOut)

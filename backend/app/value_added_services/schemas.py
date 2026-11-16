@@ -70,6 +70,47 @@ class InstallmentCreate(RequestModel):
     form_extra: dict[str, Any] | None = None
 
 
+class ScheduleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    installment_id: int
+    period_no: int
+    due_on: date
+    service_fee_rate: Decimal
+    due_amount: Decimal
+    received_amount: Decimal
+    waived_amount: Decimal
+    status: str
+
+
+class DispositionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    installment_id: int
+    account_id: int
+    action: str
+    occurred_on: date
+    related_order_id: int | None = None
+    note: str
+
+
+class InstallmentOrderOut(BaseModel):
+    """分期列表所需的订单事实，直接由后端从订单/库存/参与方表装配。"""
+
+    id: int
+    order_no: str
+    order_type: str
+    trade_date: date
+    account_game_type: str | None = None
+    account_game_account: str | None = None
+    account_business_mode: str | None = None
+    party_name: str | None = None
+    bound_phone: str | None = None
+    bound_phone_owner: str | None = None
+
+
 class InstallmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -94,6 +135,9 @@ class InstallmentOut(BaseModel):
     note: str | None = None
     extra_values: dict[str, Any] = Field(default_factory=dict)
     form_extra: dict[str, Any] | None = None
+    order: InstallmentOrderOut
+    schedules: list[ScheduleOut] = Field(default_factory=list)
+    dispositions: list[DispositionOut] = Field(default_factory=list)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -119,20 +163,6 @@ class InstallmentOut(BaseModel):
             - to_money(self.bad_debt_amount or 0)
         )
         return remaining if remaining > 0 else Decimal("0.00")
-
-
-class ScheduleOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    installment_id: int
-    period_no: int
-    due_on: date
-    service_fee_rate: Decimal
-    due_amount: Decimal
-    received_amount: Decimal
-    waived_amount: Decimal
-    status: str
 
 
 class PaymentIn(RequestModel):
@@ -171,18 +201,6 @@ class DispositionIn(RequestModel):
 
 class ResaleIn(DispositionIn):
     resale_order_id: int
-
-
-class DispositionOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    installment_id: int
-    account_id: int
-    action: str
-    occurred_on: date
-    related_order_id: int | None = None
-    note: str
 
 
 class ScheduleWaiveIn(RequestModel):
@@ -233,6 +251,7 @@ __all__ = [
     "DispositionOut",
     "EarlySettlementIn",
     "InstallmentCreate",
+    "InstallmentOrderOut",
     "InstallmentOut",
     "InstallmentCancelResult",
     "MarkOverdueOut",

@@ -5,21 +5,14 @@ import type { Counterparty, Customer, CustomerDetail, CustomerSummary, Duplicate
 export const customersApi = {
   summary: (params: { today_date: string; keyword?: string; status?: string }) =>
     api.get<CustomerSummary>("/customers/summary", { params }).then((r) => r.data),
-  list: async (params?: { keyword?: string; status?: string; limit?: number; offset?: number }): Promise<Customer[]> => {
-    if (params?.limit != null) {
-      return api.get<PageResponse<Customer>>("/customers", { params }).then((r) => r.data.items);
-    }
-    const all: Customer[] = [];
-    const PAGE = 500;
-    for (let i = 0; i < 50; i++) {
-      const page = await api.get<PageResponse<Customer>>("/customers", {
-        params: { ...params, limit: PAGE, offset: i * PAGE },
-      }).then((r) => r.data.items);
-      all.push(...page);
-      if (page.length < PAGE) break;
-    }
-    return all;
-  },
+  /**
+   * 返回一个后端分页窗口。客户中心使用 page/offset；选择器调用方显式传
+   * limit=500 获取一个选项窗口，不在前端串行拼接“全量客户”。
+   */
+  list: (params?: { keyword?: string; status?: string; limit?: number; offset?: number }): Promise<Customer[]> =>
+    api.get<PageResponse<Customer>>("/customers", {
+      params: { limit: 500, offset: 0, ...params },
+    }).then((r) => r.data.items),
   create: (payload: Partial<Customer>) =>
     api.post<{ customer: Customer; duplicate_candidates: DuplicateCandidate[] }>(
       "/customers",

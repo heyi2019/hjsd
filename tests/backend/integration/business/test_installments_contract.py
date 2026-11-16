@@ -995,6 +995,58 @@ class TestInstallmentsApi:
         assert row["first_due_on"] == PAST.isoformat()
         assert row["note"] == "分期备注"
 
+    def test_list_endpoint_returns_order_context_from_database(
+        self, seeded_client, seeded_db, headers
+    ):
+        order = _order(seeded_db, order_type="TH", trade_date=PAST)
+        contract = _contract(seeded_db, order.id)
+
+        response = seeded_client.get("/api/v1/installments", headers=headers)
+
+        assert response.status_code == 200, response.text
+        row = next(item for item in response.json() if item["id"] == contract.id)
+        assert {
+            key: row["order"][key]
+            for key in ("id", "order_no", "order_type", "trade_date")
+        } == {
+            "id": order.id,
+            "order_no": order.order_no,
+            "order_type": "TH",
+            "trade_date": PAST.isoformat(),
+        }
+
+    def test_list_endpoint_returns_schedule_and_disposition_details(
+        self, seeded_client, seeded_db, headers
+    ):
+        account = _account(seeded_db, "installment-list-details")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, amount="800")
+        contract = _contract(
+            seeded_db,
+            order.id,
+            contract_type=InstallmentContractType.STOCK_SALE.value,
+            principal="1000",
+            down_payment="100",
+            periods=1,
+            per_period="900",
+            first_due_on=PAST,
+        )
+        inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
+        inst_recovery.recover_account(
+            seeded_db,
+            contract.id,
+            occurred_on=TODAY,
+            note="逾期回收",
+            actor="pytest",
+        )
+
+        response = seeded_client.get("/api/v1/installments", headers=headers)
+
+        assert response.status_code == 200, response.text
+        row = next(item for item in response.json() if item["id"] == contract.id)
+        assert row["schedules"][0]["installment_id"] == contract.id
+        assert row["dispositions"][0]["action"] == "RECOVER"
+
     def test_deliver_endpoint(self, seeded_client, seeded_db, headers):
         order = _order(seeded_db)
         contract = _contract(

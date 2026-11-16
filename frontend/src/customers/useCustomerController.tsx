@@ -11,14 +11,11 @@ import { downloadBlob } from "../shared/api/download";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { useOptionSet } from "../shared/lib/optionSets";
-import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { ConfirmButton, PermissionButton, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { collectExtras } from "./CustomersPage.fragments";
 
 /** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
-const CUSTOMER_MOBILE_HIDDEN_KEYS = ["phone", "wechat", "qq", "created_at"] as const;
-
 export function useCustomerController({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const [rows, setRows] = useState<Customer[] | null>(null);
   const [summary, setSummary] = useState<{ total_count: number; month_count: number; today_count: number } | null>(null);
@@ -69,6 +66,8 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
       const params = {
         ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
       };
       const [customerRows, customerSummary] = await Promise.all([
         customersApi.list(params),
@@ -82,19 +81,12 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     } finally {
       setLoading(false);
     }
-  }, [keyword, statusFilter]);
+  }, [keyword, page, pageSize, statusFilter]);
 
-  // keep-alive：建单流程会自动建档客户，重新激活时重拉避免列表过期。
-  // 首次挂载由筛选 effect 负责；keep-alive 重新激活时仍由统一入口刷新。
-  useReloadOnActive(active, load, { skipFirstMount: true });
-  const wasActiveRef = useRef(active);
+  // 页面被 keep-alive 隐藏时不请求；重新激活、筛选、翻页都由同一个后端查询入口刷新。
   useEffect(() => {
-    const wasActive = wasActiveRef.current;
-    wasActiveRef.current = active;
-    // 从隐藏页切回时交给 useReloadOnActive，避免激活瞬间重复请求。
-    if (!active || !wasActive) return;
-    void load();
-  }, [active, keyword, statusFilter, load]);
+    if (active) void load();
+  }, [active, load]);
 
   useEffect(() => {
     // 扩展字段定义来自「客户建档」表单的自定义字段；加载失败不阻断客户页
@@ -159,7 +151,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
   const submitEdit = async (values: Record<string, unknown>) => {
     if (!editTarget) return;
     try {
-      const extraValues = collectExtras(values, activeDefs);
+      const extraValues = collectExtras(values, activeDefs, { includeEmpty: true });
       await customersApi.patch(editTarget.id, {
         display_name: values.display_name as string,
         contact_name: values.contact_name as string,

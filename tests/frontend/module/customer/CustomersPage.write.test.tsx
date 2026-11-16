@@ -158,7 +158,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     await ui.click(screen.getByRole("button", { name: "搜索客户" }));
     // 用 toHaveBeenCalledWith 而非 toHaveBeenLastCalledWith：搜索后页面可能再触发一次刷新调用，
     // 断言「关键词确实传给了后端」才是本用例的意图，避免与刷新调用竞争导致偶发红。
-    await waitFor(() => expect(vi.mocked(customersApi.list)).toHaveBeenCalledWith({ keyword: "张三" }));
+    await waitFor(() => expect(vi.mocked(customersApi.list)).toHaveBeenCalledWith({ keyword: "张三", limit: 10, offset: 0 }));
   });
 
   it("客户 CSV 导出完成后给出成功反馈", async () => {

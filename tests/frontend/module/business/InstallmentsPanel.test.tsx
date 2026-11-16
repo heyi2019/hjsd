@@ -55,16 +55,22 @@ const installments = [
     remaining_receivable: "0.00",
     status: "DELIVERED",
   },
-];
+].map((item) => ({
+  ...item,
+  order: {
+    id: item.order_id,
+    order_no: "HS-2026-0010",
+    order_type: "HS",
+    trade_date: "2026-10-01",
+  },
+  schedules: [],
+  dispositions: [],
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
   vi.mocked(installmentsApi.list).mockResolvedValue(installments);
-  vi.mocked(installmentsApi.schedules).mockResolvedValue([
-    { id: 1, installment_id: 1, period_no: 0, due_on: "2026-10-01", due_amount: "100.00", received_amount: "100.00", status: "PAID" },
-  ]);
-  vi.mocked(installmentsApi.dispositions).mockResolvedValue([]);
   // 合计由服务端下发（Decimal 聚合）；「300+200」这类算术的契约在
   // backend tests/v1/test_installment_totals.py，前端只验展示。
   vi.mocked(installmentsApi.totals).mockResolvedValue({
@@ -252,28 +258,37 @@ describe("InstallmentsPanel：动作与减免", () => {
       remaining_receivable: "0.00",
       status: "DELIVERED",
     },
-  ];
+  ].map((item) => ({
+    ...item,
+    order: {
+      id: item.order_id,
+      order_no: "HS-2026-0010",
+      order_type: "HS",
+      trade_date: "2026-10-01",
+    },
+    schedules: [],
+    dispositions: [],
+  }));
 
   beforeEach(() => {
     ui = userEvent.setup({ pointerEventsCheck: 0 });
     vi.clearAllMocks();
     seedOrderFormFields();
     vi.mocked(installmentsApi.list).mockResolvedValue(installments);
-    vi.mocked(installmentsApi.schedules).mockResolvedValue([
-      { id: 1, installment_id: 1, period_no: 0, due_on: "2026-10-01", due_amount: "100.00", received_amount: "100.00", status: "PAID" },
-    ]);
-    vi.mocked(installmentsApi.dispositions).mockResolvedValue([]);
     vi.mocked(ordersApi.list).mockResolvedValue([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }]);
   });
 
   describe("InstallmentsPanel：登记收款 / 换绑交付", () => {
     it("已有回收和转售记录时禁用重复处置", async () => {
       vi.mocked(installmentsApi.list).mockResolvedValueOnce([
-        { ...installments[0], status: "OVERDUE" },
-      ]);
-      vi.mocked(installmentsApi.dispositions).mockResolvedValueOnce([
-        { id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" },
-        { id: 2, installment_id: 1, account_id: 2, action: "RESELL", occurred_on: "2026-10-13", note: "转售" },
+        {
+          ...installments[0],
+          status: "OVERDUE",
+          dispositions: [
+            { id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" },
+            { id: 2, installment_id: 1, account_id: 2, action: "RESELL", occurred_on: "2026-10-13", note: "转售" },
+          ],
+        },
       ]);
       renderLight(<InstallmentsPanel />, { user: "admin" });
       await screen.findByText("HS0001-INS01");
@@ -381,6 +396,20 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     final_period_adjustment: "0.00",
     waived_amount: "0.00",
     bad_debt_amount: "0.00",
+    order: {
+      id: 10,
+      order_no: "HS-2026-0010",
+      order_type: "HS",
+      trade_date: "2026-10-01",
+      account_business_mode: "SELF",
+      account_game_type: "王者荣耀",
+      account_game_account: "abc",
+      party_name: "张三",
+    },
+    schedules: [
+      { id: 1, installment_id: 1, period_no: 0, due_on: "2026-10-01", due_amount: "100.00", received_amount: "0.00", status: "PENDING" },
+    ],
+    dispositions: [],
   };
 
   const order = {
@@ -410,10 +439,6 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     vi.clearAllMocks();
     seedOrderFormFields();
     vi.mocked(installmentsApi.list).mockResolvedValue([{ ...baseInstallment }]);
-    vi.mocked(installmentsApi.schedules).mockResolvedValue([
-      { id: 1, installment_id: 1, period_no: 0, due_on: "2026-10-01", due_amount: "100.00", received_amount: "100.00", status: "PENDING" },
-    ]);
-    vi.mocked(installmentsApi.dispositions).mockResolvedValue([]);
     vi.mocked(ordersApi.list).mockResolvedValue([order]);
   });
 
@@ -530,10 +555,13 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
 
     it("CLOSED 且已有回收记录 → 行内提供登记出售入口", async () => {
       vi.mocked(installmentsApi.list).mockResolvedValueOnce([
-        { ...baseInstallment, status: "CLOSED" },
-      ]);
-      vi.mocked(installmentsApi.dispositions).mockResolvedValueOnce([
-        { id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" },
+        {
+          ...baseInstallment,
+          status: "CLOSED",
+          dispositions: [
+            { id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" },
+          ],
+        },
       ]);
       renderLight(<InstallmentsPanel />, { user: "admin" });
       await screen.findByText("HS0001-INS01");
@@ -542,10 +570,13 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
 
     it("登记出售：选择出售订单并填写后调用 resale 关联", async () => {
       vi.mocked(installmentsApi.list).mockResolvedValueOnce([
-        { ...baseInstallment, status: "CLOSED" },
-      ]);
-      vi.mocked(installmentsApi.dispositions).mockResolvedValueOnce([
-        { id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" },
+        {
+          ...baseInstallment,
+          status: "CLOSED",
+          dispositions: [
+            { id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" },
+          ],
+        },
       ]);
       vi.mocked(ordersApi.list).mockResolvedValueOnce([order, resaleOrder]);
       vi.mocked(installmentsApi.resale).mockResolvedValue({

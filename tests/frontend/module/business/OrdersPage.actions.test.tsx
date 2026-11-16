@@ -184,6 +184,14 @@ const installment: Installment = {
   total_receivable: "12000.00",
   remaining_receivable: "12000.00",
   status: "ACTIVE",
+  order: {
+    id: 3,
+    order_no: "HS-2026-0003",
+    order_type: "HS",
+    trade_date: "2026-10-03",
+  },
+  schedules: [],
+  dispositions: [],
 };
 const installmentCancelResult: InstallmentCancelResult = {
   installment,

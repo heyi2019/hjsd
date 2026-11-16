@@ -32,20 +32,17 @@ function ContractTable({
     cancelForm,
     columns,
     defaultForm,
-    dispositions,
     error,
     exportCsv,
     exporting,
     load,
     loading,
     openDeliver,
-    orders,
     payForm,
     recoverForm,
     resaleForm,
     rows,
     scheduleColumns,
-    schedules,
     setCancelTarget,
     setDefaultTarget,
     setPayTarget,
@@ -128,17 +125,17 @@ function ContractTable({
             expandedRowRender: (row) => (
               <Space direction="vertical" size="middle" className="installment-detail-stack">
                 <DataTable<Schedule>
-                rows={schedules[row.id] ?? []}
+                rows={row.schedules}
                 page={1}
                 pageSize={20}
-                total={(schedules[row.id] ?? []).length}
+                total={row.schedules.length}
                 onPageChange={() => undefined}
                 emptyText="暂无期次"
                 columns={scheduleColumns}
               />
-              {(dispositions[row.id] ?? []).length > 0 && (
+              {row.dispositions.length > 0 && (
                 <Typography.Paragraph>
-                  处置记录：{(dispositions[row.id] ?? []).map((item) =>
+                  处置记录：{row.dispositions.map((item) =>
                     `${configurableLabel("INSTALLMENT_DISPOSITION", item.action, DISPOSITION_LABEL)}（${item.occurred_on}）`,
                   ).join("、")}
                 </Typography.Paragraph>

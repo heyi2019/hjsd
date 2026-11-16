@@ -43,7 +43,7 @@ export function OrderDetailPartySection({
     setSelectedCustomerIds(order?.customers?.map((item) => item.id) ?? []);
     setSelectedCounterpartyIds(order?.counterparties?.map((item) => item.id) ?? []);
     void Promise.all([
-      customersApi.list({ status: "ACTIVE" }),
+      customersApi.list({ status: "ACTIVE", limit: 500, offset: 0 }),
       counterpartiesApi.list({ status: "ACTIVE" }),
     ]).then(([customerRows, counterpartyRows]) => {
       setCustomers(customerRows ?? []);

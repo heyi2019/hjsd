@@ -7,21 +7,10 @@ import { orderFormFieldsApi } from "../shared/api/orders.api";
 import type { Counterparty } from "../shared/api/types/customers";
 import type { OrderFormField } from "../shared/api/types/forms";
 import { normalizeError } from "../shared/api/client";
-import { COUNTERPARTY_TYPE_LABEL } from "../shared/lib/labels";
-import { useOptionSet } from "../shared/lib/optionSets";
-import { useReloadOnActive } from "../shared/state/reloadOnActive";
+import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { collectExtras } from "./CustomersPage.fragments";
-
-const COUNTERPARTY_STATUS_OPTIONS = [
-  { value: "ACTIVE", label: "进行中" },
-  { value: "DISABLED", label: "已拉黑" },
-];
-
-// 类型词典不可用时回落的只读集合：保证默认类型 PEER 始终是带名称的 selected option，
-// 避免出现"控件外游离文本 PEER"。来源与 COUNTERPARTY_TYPE_LABEL 一致（含 PEER/SUPPLIER/PLATFORM 等）。
-const COUNTERPARTY_TYPE_FALLBACK = Object.entries(COUNTERPARTY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
 
 export function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
@@ -40,15 +29,17 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
 
   const load = useCallback(async () => {
     try {
-      setRows(await counterpartiesApi.list());
+      setRows(await counterpartiesApi.list(statusFilter ? { status: statusFilter } : undefined));
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
     }
-  }, []);
+  }, [statusFilter]);
 
-  // keep-alive：提号建单会自动建档供货方，重新激活时重拉避免列表过期。
-  useReloadOnActive(active, load);
+  // 页面被 keep-alive 隐藏时不请求；重新激活或状态筛选变化都从后端刷新。
+  useEffect(() => {
+    if (active) void load();
+  }, [active, load]);
 
   useEffect(() => {
     orderFormFieldsApi.list("COUNTERPARTY", true)
@@ -123,7 +114,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
   const columns: ColumnsType<Counterparty> = [
     { title: "编号", dataIndex: "counterparty_no" },
     { title: "名称", dataIndex: "display_name" },
-    { title: "类型", dataIndex: "type", render: (v: string) => COUNTERPARTY_TYPE_LABEL[v] ?? v },
+    { title: "类型", dataIndex: "type", render: (v: string) => configurableLabel("COUNTERPARTY_TYPE", v) },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="COUNTERPARTY_STATUS" /> },
     {
       title: "操作",
@@ -156,8 +147,6 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
     },
   ];
 
-  const visibleCounterparties = statusFilter ? rows.filter((r) => r.status === statusFilter) : rows;
-
   return (
     <Card
       className="glass"
@@ -170,14 +159,14 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Space wrap className="counterparty-filter-bar">
-        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? COUNTERPARTY_STATUS_OPTIONS} onChange={(value) => setStatusFilter(value)} />
+        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? []} disabled={counterpartyStatusOptions === null} onChange={(value) => setStatusFilter(value)} />
       </Space>
       <DataTable<Counterparty>
         columns={columns}
-        rows={visibleCounterparties}
+        rows={rows}
         page={1}
         pageSize={10}
-        total={visibleCounterparties.length}
+        total={rows.length}
         emptyText="暂无合作方"
         onPageChange={() => undefined}
      />
@@ -192,7 +181,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
             <Input />
           </CfgItem>
           <CfgItem name="type" label="类型" rules={[{ required: true }]}>
-            <Select options={counterpartyTypeOptions ?? COUNTERPARTY_TYPE_FALLBACK} />
+            <Select options={counterpartyTypeOptions ?? []} />
           </CfgItem>
           <CfgItem name="contact_name" label="联系人">
             <Input />
@@ -304,7 +293,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="合作方编号">{detailData.counterparty_no}</Descriptions.Item>
             <Descriptions.Item label="名称">{detailData.display_name}</Descriptions.Item>
-            <Descriptions.Item label="类型">{COUNTERPARTY_TYPE_LABEL[detailData.type] ?? detailData.type}</Descriptions.Item>
+            <Descriptions.Item label="类型">{configurableLabel("COUNTERPARTY_TYPE", detailData.type)}</Descriptions.Item>
             <Descriptions.Item label="联系人">{detailData.contact_name || "-"}</Descriptions.Item>
             <Descriptions.Item label="手机">{detailData.phone || "-"}</Descriptions.Item>
             <Descriptions.Item label="微信">{detailData.wechat || "-"}</Descriptions.Item>

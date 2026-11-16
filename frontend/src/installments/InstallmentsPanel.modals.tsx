@@ -94,7 +94,7 @@ function InstallmentActionModal({
 }
 
 export function PayModal({ controller }: { controller: ContractTableController }) {
-  const { payForm, payTarget, schedules, setPayTarget, submitPay, write } = controller;
+  const { payForm, payTarget, setPayTarget, submitPay, write } = controller;
   return (
     <InstallmentActionModal
       title={payTarget ? `分期收款 · ${payTarget.inst_no}` : "分期收款"}
@@ -111,7 +111,7 @@ export function PayModal({ controller }: { controller: ContractTableController }
       <CfgItem name="period_no" label="期次（0=首付，留空按到期顺序）">
         <Select
           allowClear
-          options={(schedules[payTarget?.id ?? 0] ?? []).map((schedule) => ({
+          options={(payTarget?.schedules ?? []).map((schedule) => ({
             value: schedule.period_no,
             label: schedule.period_no === 0 ? "首付" : `第 ${schedule.period_no} 期`,
           }))}
@@ -165,7 +165,7 @@ export function RecoverModal({ controller }: { controller: ContractTableControll
 }
 
 export function ResaleModal({ controller }: { controller: ContractTableController }) {
-  const { orders, resaleForm, resaleTarget, setResaleTarget, submitResale, write } = controller;
+  const { resaleOrders, resaleForm, resaleTarget, setResaleTarget, submitResale, write } = controller;
   return (
     <InstallmentActionModal
       title={resaleTarget ? `登记出售 · ${resaleTarget.inst_no}` : "登记出售"}
@@ -194,7 +194,7 @@ export function ResaleModal({ controller }: { controller: ContractTableControlle
           showSearch
           placeholder="请选择售出订单"
           optionFilterProp="label"
-          options={orders
+          options={resaleOrders
             .filter((item) => item.id !== resaleTarget?.order_id)
             .map((item) => ({
               value: item.id,

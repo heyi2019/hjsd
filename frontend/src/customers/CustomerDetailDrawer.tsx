@@ -7,7 +7,6 @@ import { money } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { DataTable, PermissionButton, StatRow, StatusTag } from "../shared/ui";
-import { CUSTOMER_ROLE_LABEL } from "./CustomersPage.fragments";
 
 export function CustomerDetailDrawer({
   detailTarget,
@@ -26,19 +25,20 @@ export function CustomerDetailDrawer({
   onClose: () => void;
   onRequestEdit: (target: Customer) => void;
 }) {
+  const customer = detailData?.customer ?? detailTarget;
   return (
       <Drawer
-        title={detailTarget ? `客户档案 · ${detailTarget.customer_no}` : "客户档案"}
+        title={customer ? `客户档案 · ${customer.customer_no}` : "客户档案"}
         open={Boolean(detailTarget)}
         onClose={onClose}
         width={720}
         destroyOnHidden
         extra={
-          detailTarget && detailTarget.status === "ACTIVE" ? (
+          customer && customer.status === "ACTIVE" ? (
             <PermissionButton
               permission="customer.update"
               size="small"
-              onClick={() => onRequestEdit(detailTarget)}
+              onClick={() => onRequestEdit(customer)}
             >
               编辑
             </PermissionButton>
@@ -47,25 +47,25 @@ export function CustomerDetailDrawer({
       >
         {detailLoading ? (
           <div role="status" aria-label="正在加载客户详情"><Spin /></div>
-        ) : detailTarget ? (
+        ) : customer ? (
           <>
             <Descriptions column={1} bordered size="small">
-              <Descriptions.Item label="客户编号">{detailTarget.customer_no}</Descriptions.Item>
-              <Descriptions.Item label="名字">{detailTarget.display_name}</Descriptions.Item>
-              <Descriptions.Item label="联系人">{detailTarget.contact_name || "-"}</Descriptions.Item>
-              <Descriptions.Item label="手机">{detailTarget ? renderContact(detailTarget, "phone") : "-"}</Descriptions.Item>
-              <Descriptions.Item label="微信">{detailTarget ? renderContact(detailTarget, "wechat") : "-"}</Descriptions.Item>
-              <Descriptions.Item label="QQ">{detailTarget ? renderContact(detailTarget, "qq") : "-"}</Descriptions.Item>
+              <Descriptions.Item label="客户编号">{customer.customer_no}</Descriptions.Item>
+              <Descriptions.Item label="名字">{customer.display_name}</Descriptions.Item>
+              <Descriptions.Item label="联系人">{customer.contact_name || "-"}</Descriptions.Item>
+              <Descriptions.Item label="手机">{renderContact(customer, "phone")}</Descriptions.Item>
+              <Descriptions.Item label="微信">{renderContact(customer, "wechat")}</Descriptions.Item>
+              <Descriptions.Item label="QQ">{renderContact(customer, "qq")}</Descriptions.Item>
               <Descriptions.Item label="状态">
-                <StatusTag status={detailTarget.status} optionSet="CUSTOMER_STATUS" />
+                <StatusTag status={customer.status} optionSet="CUSTOMER_STATUS" />
               </Descriptions.Item>
-              <Descriptions.Item label="备注">{detailTarget.note || "-"}</Descriptions.Item>
+              <Descriptions.Item label="备注">{customer.note || "-"}</Descriptions.Item>
             </Descriptions>
             <Typography.Title level={5} className="ui-title-spaced">
               扩展字段
             </Typography.Title>
             {(() => {
-              const items = buildFormExtraDisplay(detailTarget.extra_values, fieldDefs);
+              const items = buildFormExtraDisplay(customer.extra_values, fieldDefs);
               if (items.length === 0) {
                 return (
                   <Typography.Paragraph type="secondary">
@@ -111,7 +111,7 @@ export function CustomerDetailDrawer({
                       title: "角色",
                       render: (_value, row) =>
                         row.roles
-                          .map((role) => configurableLabel("ORDER_CUSTOMER_ROLE", role, CUSTOMER_ROLE_LABEL))
+                          .map((role) => configurableLabel("ORDER_CUSTOMER_ROLE", role))
                           .join("、") || "-",
                     },
                     { title: "状态", render: (_value, row) => <StatusTag status={row.status} optionSet="ORDER_STATUS" /> },

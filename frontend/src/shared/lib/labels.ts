@@ -53,12 +53,6 @@ export const POOL_OWNERSHIP_LABEL: Record<string, string> = {
   THIRD_PART: "第三方",
 };
 
-export const COUNTERPARTY_TYPE_LABEL: Record<string, string> = {
-  PEER: "同行",
-  SUPPLIER: "供货方",
-  PLATFORM: "平台",
-};
-
 export const USER_ROLE_LABEL: Record<string, string> = {
   ADMIN: "系统管理员",
   OPERATOR: "业务经办人",

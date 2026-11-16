@@ -4,7 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { installmentsApi } from "../shared/api/installments.api";
 import { ordersApi } from "../shared/api/orders.api";
-import type { Installment, InstallmentDisposition, InstallmentTotals, Schedule } from "../shared/api/types/installments";
+import type { Installment, InstallmentTotals, Schedule } from "../shared/api/types/installments";
 import type { Order } from "../shared/api/types/orders";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
@@ -27,12 +27,10 @@ export function useContractTableController(params: { contractType: string; reloa
   const [rows, setRows] = useState<Installment[]>([]);
   const [totals, setTotals] = useState<InstallmentTotals | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [resaleOrders, setResaleOrders] = useState<Order[]>([]);
   const { can } = useSession();
   // 提前结清：后端接受 order.event.post 或 finance.order.event.post 任一，取当前用户实际持有的码做门控。
   const settlePermission: Permission = can("order.event.post") ? "order.event.post" : "finance.order.event.post";
-  const [schedules, setSchedules] = useState<Record<number, Schedule[]>>({});
-  const [dispositions, setDispositions] = useState<Record<number, InstallmentDisposition[]>>({});
   const [payTarget, setPayTarget] = useState<Installment | null>(null);
   const [deliverTarget, setDeliverTarget] = useState<Installment | null>(null);
   const [recoverTarget, setRecoverTarget] = useState<Installment | null>(null);
@@ -82,27 +80,12 @@ export function useContractTableController(params: { contractType: string; reloa
         trade_date_from: dateFrom || undefined,
         trade_date_to: dateTo || undefined,
       };
-      const [list, orderList, summary] = await Promise.all([
+      const [list, summary] = await Promise.all([
         installmentsApi.list(rangeParams),
-        ordersApi.list(),
         installmentsApi.totals(rangeParams),
       ]);
-      // 服务端已按 contract_type 过滤；此处保留幂等过滤作为旧后端防御，不改变口径。
-      const filtered = list.filter((item) => item.contract_type === contractType);
-      setRows(filtered);
-      setOrders(orderList);
+      setRows(list);
       setTotals(summary);
-      const entries = await Promise.all(
-        filtered.map(async (item) => {
-          const [scheduleRows, dispositionRows] = await Promise.all([
-            installmentsApi.schedules(item.id),
-            installmentsApi.dispositions(item.id),
-          ]);
-          return [item.id, scheduleRows, dispositionRows] as const;
-        }),
-      );
-      setSchedules(Object.fromEntries(entries.map(([id, scheduleRows]) => [id, scheduleRows])));
-      setDispositions(Object.fromEntries(entries.map(([id, _scheduleRows, dispositionRows]) => [id, dispositionRows])));
       setError(null);
     } catch (err) {
       setError(normalizeError(err));
@@ -163,13 +146,12 @@ export function useContractTableController(params: { contractType: string; reloa
   };
 
   const openDeliver = (row: Installment) => {
-    const order = orders.find((item) => item.id === row.order_id);
     deliverForm.resetFields();
     setDeliverTarget(row);
     deliverForm.setFieldsValue({
       delivered_on: today(),
-      bound_phone: order?.account_snapshot?.bound_phone ?? undefined,
-      bound_phone_owner: order?.account_snapshot?.bound_phone_owner ?? undefined,
+      bound_phone: row.order.bound_phone ?? undefined,
+      bound_phone_owner: row.order.bound_phone_owner ?? undefined,
     });
   };
 
@@ -202,6 +184,18 @@ export function useContractTableController(params: { contractType: string; reloa
         resaleForm.resetFields();
         await load();
     });
+  };
+
+  const openResale = async (row: Installment) => {
+    try {
+      const candidates = await ordersApi.list({ status: "COMPLETED" });
+      setResaleOrders(candidates);
+      resaleForm.resetFields();
+      setResaleTarget(row);
+      resaleForm.setFieldsValue({ occurred_on: today() });
+    } catch (err) {
+      setError(normalizeError(err));
+    }
   };
 
   const submitCancel = async (values: Record<string, unknown>) => {
@@ -295,33 +289,31 @@ export function useContractTableController(params: { contractType: string; reloa
     {
       title: "订单",
       key: "order",
-      render: (_v, row) => orders.find((order) => order.id === row.order_id)?.order_no ?? row.order_id,
+      render: (_v, row) => row.order.order_no,
     },
     {
       title: "业务",
       key: "business",
-      render: (_v, row) => BUSINESS_MODE_LABEL[orders.find((order) => order.id === row.order_id)?.account_business_mode ?? ""] || "-",
+      render: (_v, row) => BUSINESS_MODE_LABEL[row.order.account_business_mode ?? ""] || "-",
     },
     {
       title: "类型",
       key: "order_type",
       render: (_v, row) => {
-        const order = orders.find((item) => item.id === row.order_id);
-        return order ? orderTypeLabel(order.order_type, { ...ORDER_TYPE_LABEL }) : "-";
+        return orderTypeLabel(row.order.order_type, { ...ORDER_TYPE_LABEL });
       },
     },
     {
       title: "产品",
       key: "product",
       render: (_v, row) => {
-        const order = orders.find((item) => item.id === row.order_id);
-        return order ? [order.account_game_type, order.account_game_account].filter(Boolean).join(" / ") || "-" : "-";
+        return [row.order.account_game_type, row.order.account_game_account].filter(Boolean).join(" / ") || "-";
       },
     },
     {
       title: "对方",
       key: "party",
-      render: (_v, row) => orders.find((order) => order.id === row.order_id)?.party_name || "-",
+      render: (_v, row) => row.order.party_name || "-",
     },
     {
       title: "总应收",
@@ -390,7 +382,7 @@ export function useContractTableController(params: { contractType: string; reloa
             size="small"
             disabled={
               !(["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status)) ||
-              dispositions[row.id]?.some((item) => item.action === "RECOVER")
+              row.dispositions.some((item) => item.action === "RECOVER")
             }
             onClick={() => { recoverForm.resetFields(); setRecoverTarget(row); recoverForm.setFieldsValue({ occurred_on: today() }); }}
           >
@@ -423,12 +415,12 @@ export function useContractTableController(params: { contractType: string; reloa
             登记违约
           </PermissionButton>
           {["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status) &&
-            dispositions[row.id]?.some((item) => item.action === "RECOVER") &&
-            !dispositions[row.id]?.some((item) => item.action === "RESELL") && (
+            row.dispositions.some((item) => item.action === "RECOVER") &&
+            !row.dispositions.some((item) => item.action === "RESELL") && (
               <PermissionButton
                 permission="order.update"
                 size="small"
-                onClick={() => { resaleForm.resetFields(); setResaleTarget(row); resaleForm.setFieldsValue({ occurred_on: today() }); }}
+                onClick={() => void openResale(row)}
               >
                 登记出售
               </PermissionButton>
@@ -504,14 +496,8 @@ export function useContractTableController(params: { contractType: string; reloa
     setRows,
     sortDesc,
     setSortDesc,
-    orders,
-    setOrders,
     can,
     settlePermission,
-    schedules,
-    setSchedules,
-    dispositions,
-    setDispositions,
     payTarget,
     setPayTarget,
     deliverTarget,
@@ -520,6 +506,7 @@ export function useContractTableController(params: { contractType: string; reloa
     setRecoverTarget,
     resaleTarget,
     setResaleTarget,
+    resaleOrders,
     cancelTarget,
     setCancelTarget,
     settleTarget,

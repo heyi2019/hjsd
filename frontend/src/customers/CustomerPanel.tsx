@@ -9,14 +9,8 @@ import { CustomerEditModal } from "./CustomerEditModal";
 import { CustomerMergeModal } from "./CustomerMergeModal";
 import { useCustomerController } from "./useCustomerController";
 
-const SearchButton = Button;
 /** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
 const CUSTOMER_MOBILE_HIDDEN_KEYS = ["phone", "wechat", "qq", "created_at"] as const;
-const CUSTOMER_STATUS_OPTIONS = [
-  { value: "ACTIVE", label: "启用中" },
-  { value: "DISABLED", label: "已拉黑" },
-  { value: "MERGED", label: "已合并" },
-];
 
 export function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
   const {
@@ -99,7 +93,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       <Space wrap className="customer-list-filters customer-list-filters--separated">
         <Input.Search
           aria-label="搜索客户"
-          enterButton={<SearchButton icon={<SearchOutlined />} aria-label="搜索客户" />}
+          enterButton={<Button icon={<SearchOutlined />} aria-label="搜索客户" />}
           value={searchInput}
           allowClear
           placeholder="搜索客户编号 / 名字 / 手机 / 微信 / QQ"
@@ -120,8 +114,8 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
           allowClear
           placeholder="全部状态"
           value={statusFilter}
-          disabled={Boolean(error) || rows === null}
-          options={customerStatusOptions ?? CUSTOMER_STATUS_OPTIONS}
+          disabled={Boolean(error) || rows === null || customerStatusOptions === null}
+          options={customerStatusOptions ?? []}
           onChange={(value) => {
             setStatusFilter(value);
             setPage(1);
@@ -135,7 +129,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
         loading={loading}
         page={page}
         pageSize={pageSize}
-        total={rows?.length ?? 0}
+        total={summary?.total_count ?? 0}
         className="customer-table"
        
         emptyText={error || rows === null ? "客户数据不可用，请点击重新加载" : "暂无客户档案"}

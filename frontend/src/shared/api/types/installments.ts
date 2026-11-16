@@ -25,6 +25,22 @@ export interface Installment {
   delivery_mode?: string | null;
   delivered_on?: string | null;
   note?: string | null;
+  order: InstallmentOrderContext;
+  schedules: Schedule[];
+  dispositions: InstallmentDisposition[];
+}
+
+export interface InstallmentOrderContext {
+  id: number;
+  order_no: string;
+  order_type: string;
+  trade_date: string;
+  account_game_type?: string | null;
+  account_game_account?: string | null;
+  account_business_mode?: string | null;
+  party_name?: string | null;
+  bound_phone?: string | null;
+  bound_phone_owner?: string | null;
 }
 
 export interface InstallmentTotals {

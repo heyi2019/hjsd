@@ -137,7 +137,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    void Promise.all([customersApi.list(), poolsApi.list(), employeesApi.list()])
+    void Promise.all([customersApi.list({ limit: 500, offset: 0 }), poolsApi.list(), employeesApi.list()])
       .then(([customerList, poolList, employeeList]) => {
         if (cancelled) return;
         setCustomers(customerList);

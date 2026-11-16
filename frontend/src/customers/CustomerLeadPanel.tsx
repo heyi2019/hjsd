@@ -29,7 +29,7 @@ export function CustomerLeadPanel() {
 
   const load = useCallback(async () => {
     try {
-      const [leadList, leadSummary, customerList] = await Promise.all([leadsApi.list(), leadsApi.summary(), customersApi.list({ status: "ACTIVE" })]);
+      const [leadList, leadSummary, customerList] = await Promise.all([leadsApi.list(), leadsApi.summary(), customersApi.list({ status: "ACTIVE", limit: 500, offset: 0 })]);
       setRows(leadList);
       setSummary(leadSummary);
       setCustomers(customerList);

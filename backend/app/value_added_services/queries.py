@@ -16,6 +16,8 @@ from app.core.money import to_money
 from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import InstallmentStatus
 from app.domain.trade import Installment, InstallmentDisposition, InstallmentSchedule, Order
+from app.domain.parties import Counterparty, Customer, OrderCounterpartyRole, OrderCustomerRole
+from app.domain.trade import Account
 
 
 def _apply_installment_filters(
@@ -72,6 +74,56 @@ def list_installments(
         user=user,
     )
     return list(session.scalars(stmt.order_by(Installment.id)).all())
+
+
+def installment_order_context(
+    session: Session,
+    orders: list[Order],
+) -> dict[int, dict[str, object]]:
+    """批量组装分期列表需要的订单事实，避免前端再拉全量订单。"""
+    if not orders:
+        return {}
+
+    order_ids = [order.id for order in orders]
+    account_ids = [order.account_id for order in orders if order.account_id is not None]
+    accounts = {
+        account.id: account
+        for account in session.scalars(
+            select(Account).where(Account.id.in_(account_ids))
+        ).all()
+    } if account_ids else {}
+
+    parties: dict[int, str] = {}
+    for role, customer in session.execute(
+        select(OrderCustomerRole, Customer)
+        .join(Customer, Customer.id == OrderCustomerRole.customer_id)
+        .where(OrderCustomerRole.order_id.in_(order_ids))
+    ).all():
+        parties.setdefault(role.order_id, customer.display_name)
+    for role, counterparty in session.execute(
+        select(OrderCounterpartyRole, Counterparty)
+        .join(Counterparty, Counterparty.id == OrderCounterpartyRole.counterparty_id)
+        .where(OrderCounterpartyRole.order_id.in_(order_ids))
+    ).all():
+        parties.setdefault(role.order_id, counterparty.display_name)
+
+    result: dict[int, dict[str, object]] = {}
+    for order in orders:
+        account = accounts.get(order.account_id)
+        snapshot = order.account_snapshot or {}
+        result[order.id] = {
+            "id": order.id,
+            "order_no": order.order_no,
+            "order_type": order.order_type,
+            "trade_date": order.trade_date,
+            "account_game_type": (account.game_type if account else None) or snapshot.get("game_type"),
+            "account_game_account": (account.game_account if account else None) or snapshot.get("game_account"),
+            "account_business_mode": account.business_mode if account else None,
+            "party_name": parties.get(order.id),
+            "bound_phone": (account.bound_phone if account else None) or snapshot.get("bound_phone"),
+            "bound_phone_owner": snapshot.get("bound_phone_owner"),
+        }
+    return result
 
 
 def list_installment_export_details(

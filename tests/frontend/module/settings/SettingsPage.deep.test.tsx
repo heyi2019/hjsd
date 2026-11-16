@@ -21,6 +21,7 @@ vi.mock("@/shared/api/stocks.api");;
 import * as client from "@/shared/api/client";
 import { renderLight, renderApp } from "@fixtures/render";
 import { SettingsPage } from "@/field-definitions/SettingsPage";
+import { listResponse } from "@fixtures/api-responses";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -49,7 +50,7 @@ beforeEach(() => {
   vi.mocked(orderTypesApi.list).mockResolvedValue(orderTypes);
   vi.mocked(poolsApi.list).mockResolvedValue(pools);
   vi.mocked(gameTypesApi.list).mockResolvedValue([]);
-  vi.mocked(auditApi.list).mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(auditApi.list).mockResolvedValue(listResponse([]));
   vi.mocked(auditApi.actions).mockResolvedValue([]);
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
   // 默认非紧凑：matchMedia 对任何查询返回 matches=false（与 setup.ts afterEach 一致）。

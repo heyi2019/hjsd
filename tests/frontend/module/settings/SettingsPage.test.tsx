@@ -37,6 +37,7 @@ import { renderLight } from "@fixtures/render";
 import { screen } from "@testing-library/react";
 import { SettingsPage } from "@/field-definitions/SettingsPage";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { listResponse } from "@fixtures/api-responses";
 
 const orderTypes = [
   { id: 1, code: "HS", name: "回收", capital_type: "OWNED", is_active: true },
@@ -53,7 +54,7 @@ beforeEach(() => {
   vi.mocked(optionSetsApi.list).mockResolvedValue({ items: [] });
   vi.mocked(gameTypesApi.list).mockResolvedValue([]);
   vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
-  vi.mocked(policyApi.list).mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(policyApi.list).mockResolvedValue(listResponse([]));
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
 });
 

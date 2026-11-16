@@ -7,6 +7,7 @@ import { PolicySettingsPanel } from "@/policy/PolicySettingsPanel";
 import { policyApi } from "@/shared/api/policy.api";
 import type { PolicyDefinition, PolicyVersion } from "@/shared/api/types/policy";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
+import { listResponse } from "@fixtures/api-responses";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -46,8 +47,8 @@ const activeVersions = [
 ] as unknown as import("@/shared/api/types/policy").PolicyVersion[];
 
 beforeEach(() => {
-  vi.mocked(policyApi.list).mockResolvedValue({ items: definitions, total: definitions.length });
-  vi.mocked(policyApi.versions).mockResolvedValue({ items: activeVersions, total: activeVersions.length });
+  vi.mocked(policyApi.list).mockResolvedValue(listResponse(definitions));
+  vi.mocked(policyApi.versions).mockResolvedValue(listResponse(activeVersions));
   vi.mocked(policyApi.createVersion).mockResolvedValue(activeVersions[0]);
 });
 
@@ -79,8 +80,8 @@ it("未定义字段的规则：保存按钮禁用并说明不可配置（避免�
   const custom = [
     { id: 9, policy_code: "CUSTOM_X", name: "自定义规则", scope_type: "GLOBAL", scope_id: null, status: "ACTIVE" },
   ] as unknown as import("@/shared/api/types/policy").PolicyDefinition[];
-  vi.mocked(policyApi.list).mockResolvedValue({ items: custom, total: 1 });
-  vi.mocked(policyApi.versions).mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(policyApi.list).mockResolvedValue(listResponse(custom));
+  vi.mocked(policyApi.versions).mockResolvedValue(listResponse([]));
 
   renderLight(<PolicySettingsPanel />, { user: "admin" });
   await screen.findAllByText("自定义规则");
@@ -194,7 +195,7 @@ it("草稿版本可取消（SUPERSEDED）：填理由后调用 policyApi.superse
     approved_at: null,
     note: null,
   } as unknown as import("@/shared/api/types/policy").PolicyVersion;
-  vi.mocked(policyApi.versions).mockResolvedValue({ items: [activeVersions[0], draft], total: 2 });
+  vi.mocked(policyApi.versions).mockResolvedValue(listResponse([activeVersions[0], draft]));
   vi.mocked(policyApi.supersede).mockResolvedValue({ ...draft, status: "SUPERSEDED" } as never);
 
   renderLight(<PolicySettingsPanel />, { user: "admin" });

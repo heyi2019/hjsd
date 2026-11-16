@@ -5,6 +5,7 @@ import { renderLight } from "@fixtures/render";
 import { AuditPanel } from "@/audit/AuditPanel";
 import { auditApi } from "@/shared/api/reports.api";
 import type { AuditLogRow } from "@/shared/api/types/ops";
+import { listResponse } from "@fixtures/api-responses";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
@@ -27,7 +28,7 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
-  vi.mocked(auditApi.list).mockResolvedValue({ items: rows, total: rows.length });
+  vi.mocked(auditApi.list).mockResolvedValue(listResponse(rows));
   vi.mocked(auditApi.actions).mockResolvedValue(["ORDER_CREATE"]);
 });
 
@@ -61,7 +62,7 @@ describe("AuditPanel.deep：筛选/重试/降级分支", () => {
   });
 
   it("空数据：展示 emptyText「暂无审计记录」", async () => {
-    vi.mocked(auditApi.list).mockResolvedValue({ items: [], total: 0 });
+    vi.mocked(auditApi.list).mockResolvedValue(listResponse([]));
     renderLight(<AuditPanel />, { user: "admin" });
     expect(await screen.findByText("暂无审计记录")).toBeInTheDocument();
   });

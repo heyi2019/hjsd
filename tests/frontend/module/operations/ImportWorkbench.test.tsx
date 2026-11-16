@@ -12,6 +12,7 @@ import { optionSetsApi } from "@/shared/api/options.api";
 import { importsApi } from "@/shared/api/reports.api";
 import type { ImportBatch, ImportRow, MappingPreview, ReconciliationReport } from "@/shared/api/types/imports";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
+import { listResponse } from "@fixtures/api-responses";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -72,8 +73,8 @@ const recon = {
 
 beforeEach(() => {
   seedOptionSets();
-  resolveMock(vi.mocked(importsApi.batches), { items: [batch], total: 1 });
-  resolveMock(vi.mocked(importsApi.rows), { items: importRows, total: importRows.length });
+  resolveMock(vi.mocked(importsApi.batches), listResponse([batch]));
+  resolveMock(vi.mocked(importsApi.rows), listResponse(importRows));
   resolveMock(vi.mocked(importsApi.preview), mappingPreview);
   resolveMock(vi.mocked(importsApi.reconciliation), recon);
   resolveMock(vi.mocked(importsApi.map), {});
@@ -141,11 +142,10 @@ it("提交批次：DRAFT 状态可提交，admin 点确认批次 调用 vi.mocke
 
 it("写操作触发刷新后保持当前批次，不被重置回第一个（#12）", async () => {
   const batch2 = { ...batch, id: 2, batch_no: "MIG-01-02", source_name: "8月对账单" } as ImportBatch;
-  resolveMock(vi.mocked(importsApi.batches), { items: [batch, batch2], total: 2 });
-  vi.mocked(importsApi.rows).mockImplementation(async (batchId: number) => ({
-    items: importRows.map((row) => ({ ...row, batch_id: batchId })),
-    total: importRows.length,
-  }));
+  resolveMock(vi.mocked(importsApi.batches), listResponse([batch, batch2]));
+  vi.mocked(importsApi.rows).mockImplementation(async (batchId: number) => listResponse(
+    importRows.map((row) => ({ ...row, batch_id: batchId })),
+  ));
   renderLight(<ImportWorkbench />, { user: "admin" });
   await screen.findByText("金额=100"); // 默认加载第一个批次
 
@@ -254,8 +254,8 @@ describe("ImportWorkbench：动作流与写路径", () => {
     }) as unknown as ReconciliationReport;
 
   function setDefaults() {
-    resolveMock(vi.mocked(importsApi.batches), { items: [batch], total: 1 });
-    resolveMock(vi.mocked(importsApi.rows), { items: [makeRow()], total: 1 });
+    resolveMock(vi.mocked(importsApi.batches), listResponse([batch]));
+    resolveMock(vi.mocked(importsApi.rows), listResponse([makeRow()]));
     resolveMock(vi.mocked(importsApi.preview), preview());
     resolveMock(vi.mocked(importsApi.reconciliation), recon());
     resolveMock(vi.mocked(importsApi.map), {});
@@ -286,7 +286,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
 
   async function openWorkbench(rows: ImportRow[] = [makeRow()]) {
     if (rows.length) {
-      resolveMock(vi.mocked(importsApi.rows), { items: rows, total: rows.length });
+      resolveMock(vi.mocked(importsApi.rows), listResponse(rows));
     }
     renderLight(<ImportWorkbench />, { user: "admin" });
     await screen.findByText("导入工作台");
@@ -401,7 +401,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
     });
 
     it("批次无行时显示空态文案", async () => {
-      resolveMock(vi.mocked(importsApi.rows), { items: [], total: 0 });
+      resolveMock(vi.mocked(importsApi.rows), listResponse([]));
       renderLight(<ImportWorkbench />, { user: "admin" });
       expect(await screen.findByText("该批次暂无行")).toBeInTheDocument();
     });
@@ -536,7 +536,7 @@ describe("ImportWorkbench：动作流与写路径", () => {
     });
 
     it("P1/FE-220：导入数据类型字典失败时仍保持完整可选项", async () => {
-      vi.mocked(importsApi.batches).mockResolvedValueOnce({ items: [], total: 0 } as never);
+      vi.mocked(importsApi.batches).mockResolvedValueOnce(listResponse([]) as never);
       vi.mocked(optionSetsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "option sets down" });
       clearOptionSetsCache();
       renderLight(<ImportWorkbench />, { user: "admin" });

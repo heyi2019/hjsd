@@ -13,6 +13,7 @@ import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { PoolsPanel } from "@/field-definitions/panels/PoolsPanel";
 import { GameTypeSettingsPanel } from "@/field-definitions/panels/GameTypeSettingsPanel";
+import { listResponse } from "@fixtures/api-responses";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
@@ -37,8 +38,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(poolsApi).list.mockResolvedValue(pools);
-  vi.mocked(policyApi).list.mockResolvedValue({ items: [], total: 0 });
-  vi.mocked(policyApi).versions.mockResolvedValue({ items: [], total: 0 });
+  vi.mocked(policyApi).list.mockResolvedValue(listResponse([]));
+  vi.mocked(policyApi).versions.mockResolvedValue(listResponse([]));
   vi.mocked(gameTypesApi).list.mockResolvedValue([
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
     { id: 2, name: "原神", sort_order: 20, is_active: true, is_default: false },

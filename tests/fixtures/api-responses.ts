@@ -18,6 +18,11 @@ export type CommissionResponse<TGroup, TTotal> = {
   total: TTotal;
 };
 
+export type ListResponse<T> = {
+  items: T[];
+  total: number;
+};
+
 export type CashflowTotals = {
   total_in: string;
   total_out: string;
@@ -49,6 +54,11 @@ export function reportResponse<TItem, TTotal>(items: TItem[], total: TTotal): Re
 /** 构造分润对账响应，统一订单汇总与分润合计的包裹结构。 */
 export function commissionResponse<TGroup, TTotal>(orderGroups: TGroup[], total: TTotal): CommissionResponse<TGroup, TTotal> {
   return { order_groups: orderGroups, total };
+}
+
+/** 构造不带分页游标的列表响应，统一 items 与条目总数。 */
+export function listResponse<T>(items: T[], total = items.length): ListResponse<T> {
+  return { items, total };
 }
 
 /** 构造数据中心指标汇总，默认值与空数据状态一致。 */

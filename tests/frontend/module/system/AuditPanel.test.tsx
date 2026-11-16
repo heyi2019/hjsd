@@ -5,6 +5,7 @@ import { renderLight } from "@fixtures/render";
 import { AuditPanel } from "@/audit/AuditPanel";
 import { auditApi } from "@/shared/api/reports.api";
 import type { AuditLogRow } from "@/shared/api/types/ops";
+import { listResponse } from "@fixtures/api-responses";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
@@ -27,7 +28,7 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
-  vi.mocked(auditApi.list).mockResolvedValue({ items: rows, total: rows.length });
+  vi.mocked(auditApi.list).mockResolvedValue(listResponse(rows));
   vi.mocked(auditApi.actions).mockResolvedValue(["ORDER_CREATE"]);
 });
 
@@ -43,6 +44,8 @@ describe("AuditPanel：审计记录", () => {
     expect(screen.getByPlaceholderText("操作人")).toHaveClass("audit-filter-input");
     expect(screen.getByLabelText("审计开始日期").closest(".ant-picker")).toHaveClass("audit-filter-date");
     expect(screen.getByLabelText("审计结束日期").closest(".ant-picker")).toHaveClass("audit-filter-date");
+    expect(await screen.findByText("admin")).toBeInTheDocument();
+    await waitFor(() => expect(vi.mocked(auditApi.actions)).toHaveBeenCalledTimes(1));
   });
 
   it("加载并展示审计行", async () => {
@@ -54,10 +57,7 @@ describe("AuditPanel：审计记录", () => {
   });
 
   it("展示配置项列并支持按配置项筛选", async () => {
-    vi.mocked(auditApi.list).mockResolvedValue({
-      items: [{ ...rows[0], entity_type: "Pool", action: "POOL_DISABLE" }],
-      total: 1,
-    });
+    vi.mocked(auditApi.list).mockResolvedValue(listResponse([{ ...rows[0], entity_type: "Pool", action: "POOL_DISABLE" }]));
     vi.mocked(auditApi.actions).mockResolvedValue(["POOL_DISABLE"]);
     renderLight(<AuditPanel />, { user: "admin" });
 
@@ -108,8 +108,8 @@ describe("AuditPanel：审计记录", () => {
     const otherRow = { ...rows[0], id: 2, actor: "finance", action: "POOL_DISABLE", entity_type: "Pool", entity_id: "3" } as AuditLogRow;
     vi.mocked(auditApi.list).mockImplementation(async (params) =>
       params?.entity_type === "order"
-        ? { items: [rows[0]], total: 1 }
-        : { items: [rows[0], otherRow], total: 2 },
+        ? listResponse([rows[0]])
+        : listResponse([rows[0], otherRow]),
     );
     renderLight(<AuditPanel />, { user: "admin" });
     await screen.findByText("finance");
@@ -126,8 +126,8 @@ describe("AuditPanel：审计记录", () => {
     const otherRow = { ...rows[0], id: 2, actor: "finance", action: "POOL_DISABLE", entity_type: "Pool", entity_id: "3" } as AuditLogRow;
     vi.mocked(auditApi.list).mockImplementation(async (params) =>
       params?.action === "ORDER_CREATE"
-        ? { items: [rows[0]], total: 1 }
-        : { items: [rows[0], otherRow], total: 2 },
+        ? listResponse([rows[0]])
+        : listResponse([rows[0], otherRow]),
     );
     renderLight(<AuditPanel />, { user: "admin" });
     await screen.findByText("finance");

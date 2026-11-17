@@ -10,14 +10,14 @@ import { SessionProvider } from "@/shared/state/session";
 import { ThemeProvider } from "@/shared/state/theme";
 import { DEV_USER_KEY } from "@/shared/api/client";
 
-export function AllProviders({ children }: { children: ReactNode }) {
+export function AllProviders({ children, syncDevUser = false }: { children: ReactNode; syncDevUser?: boolean }) {
   return (
     // 关闭 antd 中文按钮自动插空格（"建 单"），否则所有按按钮文案定位的断言都要写正则。
     // 注：antd 5.29 起 autoInsertSpaceInButton 已废弃，改走 button.autoInsertSpace。
     <ConfigProvider locale={zhCN} button={{ autoInsertSpace: false }}>
       <ThemeProvider>
         <GlassProvider>
-          <SessionProvider>{children}</SessionProvider>
+          <SessionProvider syncDevUser={syncDevUser}>{children}</SessionProvider>
         </GlassProvider>
       </ThemeProvider>
     </ConfigProvider>
@@ -29,10 +29,10 @@ export function AllProviders({ children }: { children: ReactNode }) {
  * 大多数页面测试不读取这两个状态，避免每个用例重复启动 matchMedia、
  * localStorage 读写和 documentElement 样式同步。
  */
-export function LightProviders({ children }: { children: ReactNode }) {
+export function LightProviders({ children, syncDevUser = false }: { children: ReactNode; syncDevUser?: boolean }) {
   return (
     <ConfigProvider locale={zhCN} button={{ autoInsertSpace: false }}>
-      <SessionProvider>{children}</SessionProvider>
+      <SessionProvider syncDevUser={syncDevUser}>{children}</SessionProvider>
     </ConfigProvider>
   );
 }
@@ -40,18 +40,24 @@ export function LightProviders({ children }: { children: ReactNode }) {
 /** 以指定 dev 角色渲染组件；user 会先写入 localStorage，SessionProvider 据此解析权限。 */
 export function renderApp(
   ui: ReactElement,
-  options: { user?: string } & Omit<RenderOptions, "wrapper"> = {},
+  options: { user?: string; syncDevUser?: boolean } & Omit<RenderOptions, "wrapper"> = {},
 ): RenderResult {
-  const { user, ...rest } = options;
+  const { user, syncDevUser = false, ...rest } = options;
   if (user !== undefined) localStorage.setItem(DEV_USER_KEY, user);
-  return render(ui, { wrapper: AllProviders, ...rest });
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <AllProviders syncDevUser={syncDevUser}>{children}</AllProviders>
+  );
+  return render(ui, { wrapper: Wrapper, ...rest });
 }
 
 export function renderLight(
   ui: ReactElement,
-  options: { user?: string } & Omit<RenderOptions, "wrapper"> = {},
+  options: { user?: string; syncDevUser?: boolean } & Omit<RenderOptions, "wrapper"> = {},
 ): RenderResult {
-  const { user, ...rest } = options;
+  const { user, syncDevUser = false, ...rest } = options;
   if (user !== undefined) localStorage.setItem(DEV_USER_KEY, user);
-  return render(ui, { wrapper: LightProviders, ...rest });
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <LightProviders syncDevUser={syncDevUser}>{children}</LightProviders>
+  );
+  return render(ui, { wrapper: Wrapper, ...rest });
 }

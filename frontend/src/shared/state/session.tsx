@@ -104,7 +104,14 @@ interface SessionValue {
 
 const SessionContext = createContext<SessionValue | null>(null);
 
-export function SessionProvider({ children }: { children: ReactNode }) {
+export function SessionProvider({
+  children,
+  syncDevUser = true,
+}: {
+  children: ReactNode;
+  /** 组件测试默认关闭后端同步；生产开发页保持真实用户同步。 */
+  syncDevUser?: boolean;
+}) {
   // role 与 username 分开存：dev 态直接拿 dev 身份兜底（此时两者同为 dev 用户名，
   // 与 X-Dev-User 直通口径一致）；有 token 时由 /auth/me 分别回填真实角色与用户名。
   const [role, setRole] = useState<string>(currentDevUser());
@@ -117,7 +124,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
     if (isDev) localStorage.removeItem(ACCESS_TOKEN_KEY);
     // 开发态也要从后端同步当前用户：X-Dev-User 是角色别名，不能直接拿来匹配
-    // users.username，否则负责人控件无法默认选中真实操作对象。
+    // users.username，否则负责人控件无法默认选中真实操作对象。组件测试可显式关闭，
+    // 避免纯组件用例依赖本地后端。
+    if (isDev && !syncDevUser) return;
     if (!token && !isDev) return;
     void currentUserApi().then((current) => {
       if (token && !isDev) setRole(current.role.toLowerCase());
@@ -129,7 +138,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setAuthenticated(false);
       }
     });
-  }, []);
+  }, [syncDevUser]);
   const switchUser = useCallback((next: string) => {
     persistDevUser(next);
     // dev 直通时「当前身份」本身就是这个 dev 用户名，role 与 username 同步。

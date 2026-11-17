@@ -262,7 +262,9 @@ beforeEach(() => {
 });
 
 async function openLedger(user = "admin") {
-  renderLight(<OrdersPage />, { user });
+  // 该操作流校验当前用户会被默认带入操作人；显式开启真实会话同步，
+  // 其余组件测试仍保持默认隔离本地后端。
+  renderLight(<OrdersPage />, { user, syncDevUser: true });
   await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
   await waitFor(() => expect(document.querySelector("tbody tr")).toBeTruthy());
 }

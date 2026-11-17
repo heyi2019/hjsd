@@ -101,10 +101,15 @@ describe("switchUser：切换角色", () => {
 });
 
 describe("开发版免密登录", () => {
+  it("组件测试默认不请求后端同步开发用户", () => {
+    renderLight(<Probe />, { user: "admin" });
+    expect(client.currentUser).not.toHaveBeenCalled();
+  });
+
   it("dev 启动忽略残留 token，不进入首次改密流程", async () => {
     localStorage.setItem(ACCESS_TOKEN_KEY, "stale-token");
     vi.mocked(client.currentUser).mockResolvedValue({ id: 1, username: "19873133890", role: "ADMIN", display_name: "何一", must_change_password: true });
-    renderLight(<Probe />, { user: "admin" });
+    renderLight(<Probe />, { user: "admin", syncDevUser: true });
 
     await waitFor(() => expect(screen.getByTestId("authenticated")).toHaveTextContent("true"));
     expect(localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
@@ -125,7 +130,7 @@ describe("开发版免密登录", () => {
 describe("角色与用户分离", () => {
   it("开发态同步后端当前用户，负责人默认值按实际用户名匹配", async () => {
     vi.mocked(client.currentUser).mockResolvedValue({ id: 1, username: "19873133890", role: "ADMIN", display_name: "何一" });
-    renderLight(<Probe />, { user: "admin" });
+    renderLight(<Probe />, { user: "admin", syncDevUser: true });
 
     await waitFor(() => expect(screen.getByTestId("username")).toHaveTextContent("19873133890"));
   });

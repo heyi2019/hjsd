@@ -445,7 +445,7 @@ def test_customers_export_passes_export_row_limit(seeded_client, headers, monkey
         seen.update(kwargs)
         return original(db, **kwargs)
 
-    monkeypatch.setattr("app.customer_center.router.parties_list_customers", spy)
+    monkeypatch.setattr("app.customer_center.customers_router.parties_list_customers", spy)
     resp = seeded_client.get("/api/v1/customers/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
     assert seen.get("limit") == EXPORT_ROW_LIMIT

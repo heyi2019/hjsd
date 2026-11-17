@@ -20,7 +20,7 @@ export function useOrdersPageController(params: {
 } = {}) {
   const { active = true, initialTab, initialMine = false, onNavigate } = params;
   const currentOperator = currentDevUser();
-  const { role } = useSession();
+  const { role, username } = useSession();
   const canDeleteOrder = role === "admin";
 
   const normalizedInitialTab: BusinessCenterTab = initialTab ?? DEFAULT_BUSINESS_CENTER_TAB;
@@ -142,6 +142,7 @@ export function useOrdersPageController(params: {
     openCancelTransaction: openCancelTransaction,
     orderBusinessModeOptions: orderBusinessModeOptions,
     orderBusinessOptions: orderBusinessOptions,
+    operatorUsername: username,
     orderTypeFilter: orderTypeFilter,
     orders: orders,
     page: page,

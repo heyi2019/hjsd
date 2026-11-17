@@ -65,6 +65,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     addOperationDraft,
     removeOperationDraft,
     employees,
+    operatorUsername,
     invEditExtraForm,
     savingAccount,
     cancelInlineEdit,
@@ -198,6 +199,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
                   onOrderExtraChange={(orderId, key, value) => controller.updateOrderDraft(orderId, { form_extra: { [key]: value } })}
                   onPartyEdit={controller.updatePartyDraft}
                   employees={employees}
+                  operatorUsername={operatorUsername}
                   extraForm={invEditExtraForm}
                   onSave={saveInline}
                   onCancel={cancelInlineEdit}

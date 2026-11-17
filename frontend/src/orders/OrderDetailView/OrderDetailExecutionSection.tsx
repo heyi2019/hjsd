@@ -15,6 +15,8 @@ import {
   type OrderExecutionCategory,
   type OrderExecutionRow,
 } from "./OrderDetail.shared";
+import { defaultOperatorUserIds } from "./editing/use-order-detail-editor";
+import { currentDevUser } from "../../shared/api/client";
 
 const CATEGORY_RANK: Record<OrderExecutionCategory, number> = {
   INBOUND: 0,
@@ -32,6 +34,7 @@ export function OrderDetailExecutionSection({
   onOrderEdit,
   onOrderExtraChange,
   employees,
+  operatorUsername = currentDevUser(),
 }: {
   rows: OrderExecutionRow[];
   editing?: boolean;
@@ -41,7 +44,9 @@ export function OrderDetailExecutionSection({
   onOrderEdit?: (orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) => void;
   onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
   employees: OrderEmployeeOption[];
+  operatorUsername?: string;
 }) {
+  const defaultOperatorIds = defaultOperatorUserIds(employees, operatorUsername) ?? [];
   const sortedRows = useMemo(
     () => [...rows].sort((a, b) => CATEGORY_RANK[a.category] - CATEGORY_RANK[b.category]),
     [rows],
@@ -96,22 +101,26 @@ export function OrderDetailExecutionSection({
         const event = item.event;
         if (!editing) return value;
         if (!event) {
+          const storedIds = (orderDrafts?.[item.orderId]?.form_extra?.business_responsible_ids as number[] | undefined) ?? item.operatorUserIds ?? [];
+          const operatorIds = storedIds.length ? storedIds : defaultOperatorIds;
           return (
             <MultipleOperatorSelect
               ariaLabel={`编辑执行操作人 ${item.action}`}
-              value={(orderDrafts?.[item.orderId]?.form_extra?.business_responsible_ids as number[] | undefined) ?? item.operatorUserIds ?? []}
+              value={operatorIds}
               options={employeeOptions}
               placeholder={value}
-              onChange={(ids) => onOrderExtraChange?.(item.orderId, "business_responsible_ids", ids)}
+              onChange={(ids) => onOrderExtraChange?.(item.orderId, "business_responsible_ids", ids.length ? ids : operatorIds)}
             />
           );
         }
+        const storedIds = eventDrafts?.[event.id]?.operator_user_ids ?? event.operator_user_ids ?? [];
+        const operatorIds = storedIds.length ? storedIds : defaultOperatorIds;
         return (
           <MultipleOperatorSelect
-            value={eventDrafts?.[event.id]?.operator_user_ids ?? event.operator_user_ids ?? []}
+            value={operatorIds}
             options={employeeOptions}
             placeholder={value}
-            onChange={(ids) => onEventEdit?.(event, { operator_user_ids: ids })}
+            onChange={(ids) => onEventEdit?.(event, { operator_user_ids: ids.length ? ids : operatorIds })}
           />
         );
       },
@@ -156,7 +165,7 @@ export function OrderDetailExecutionSection({
         return <Input aria-label={`编辑执行备注 ${item.action}`} value={eventDrafts?.[event.id]?.note ?? event.note ?? ""} onChange={(inputEvent) => onEventEdit?.(event, { note: inputEvent.target.value })} />;
       },
     },
-  ], [editing, eventDrafts, employeeOptions, onEventEdit, onOrderEdit, onOrderExtraChange, orderDrafts]);
+  ], [defaultOperatorIds, editing, eventDrafts, employeeOptions, onEventEdit, onOrderEdit, onOrderExtraChange, orderDrafts]);
 
   return (
     <div className="order-detail__section order-detail__section--execution inventory-execution-list">

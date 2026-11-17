@@ -220,6 +220,57 @@ describe("OrderDetail", () => {
     expect(document.querySelector(".inventory-edit-operator")).toBeTruthy();
   });
 
+  it("编辑详情时缺失的操作人统一默认当前员工", async () => {
+    const detail = {
+      orders: [{
+        order_id: 1,
+        order_no: "HS0001",
+        order_type: "HS",
+        created_at: "2026-10-15T10:19:00",
+        events: [
+          {
+            id: 1,
+            event_no: "EV0001",
+            event_type: "BUY",
+            amount: "100.00",
+            occurred_at: "2026-10-15T10:20:00",
+            operator_user_ids: [],
+            note: "回收登记",
+          },
+          {
+            id: 2,
+            event_no: "EV0002",
+            event_type: "OPERATE",
+            operation_type: "CONSIGNMENT",
+            occurred_at: "2026-10-15T10:21:00",
+            form_extra: { consignment_platforms: ["千寻"] },
+            operator_user_ids: [],
+            amount: "0.00",
+            note: "寄售上架：千寻",
+          },
+        ],
+        rebates: [],
+      }],
+      detail_view: {
+        operation_rows: [{ key: "consignment", action: "上架平台", content: "千寻", occurred_at: "2026-10-15T10:21:00", operator: "-", event_id: 2 }],
+        execution_rows: [{ key: "buy", order_id: 1, category: "INBOUND", action: "回收入库", occurred_at: "2026-10-15T10:20:00", amount: "100.00", operator: "-", operator_user_ids: [], note: "回收登记", platform: "-", event_id: 1 }],
+        finance_rows: [{ key: "CF0001", flow_no: "CF0001", type: "回收成本", direction: "支出", amount: "100.00", occurred_at: "2026-10-15T10:20:00", pool_name: "经营荷包", note: "回收登记", operator: "-", operator_user_ids: [] }],
+        lifecycle: { removed_platform: "-", recovery_platform: "-", sale_platform: "-" },
+        order_notes: "-",
+        parties: [],
+        extras: [],
+      },
+      finance_summary: { total_expense: "100.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+
+    renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} employees={[{ id: 1, username: "admin", display_name: "管理员", is_active: true }]} />);
+    await settleFieldConfig();
+
+    expect(screen.getByRole("combobox", { name: "编辑执行操作人" }).closest(".ant-select")?.textContent).toContain("管理员");
+    expect(screen.getByRole("combobox", { name: "编辑上架平台操作人" }).closest(".ant-select")?.textContent).toContain("管理员");
+    expect(screen.getByRole("combobox", { name: "编辑资金明细操作人 CF0001" }).closest(".ant-select")?.textContent).toContain("管理员");
+  });
+
   it("入库执行行沿用建单业务操作人并支持多选编辑", async () => {
     const onOrderExtraChange = vi.fn();
     const detail = {

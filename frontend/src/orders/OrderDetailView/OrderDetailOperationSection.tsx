@@ -11,6 +11,8 @@ import type { OrderEventDraft, OrderOperationDraft, OrderOperationKey, OrderOper
 import { OrderDetailImageGallery } from "./OrderDetailImageGallery";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { OrderSectionHeading, type OrderDetailMeta } from "./OrderDetail.shared";
+import { defaultOperatorUserIds } from "./editing/use-order-detail-editor";
+import { currentDevUser } from "../../shared/api/client";
 
 const OPERATION_COLUMNS: ColumnsType<OrderOperationRow> = [
   { title: "动作", dataIndex: "action", key: "action", width: 88 },
@@ -61,7 +63,7 @@ export function resolveOperationEventContent(
 
 /** 运营信息展示四类动作；上架/下架允许同一账号拥有多条平台记录。 */
 export function OrderDetailOperationSection({
-  meta, editing, account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onAddOperationRow, onRemoveOperationRow, onProfileChange, employees = [], operationEvents,
+  meta, editing, account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onAddOperationRow, onRemoveOperationRow, onProfileChange, employees = [], operationEvents, operatorUsername = currentDevUser(),
 }: {
   meta: OrderDetailMeta;
   editing?: boolean;
@@ -75,8 +77,10 @@ export function OrderDetailOperationSection({
   onProfileChange?: (changes: Partial<Account>) => void;
   employees?: EmployeeOption[];
   operationEvents?: Record<string, AccountExecutionEvent[]>;
+  operatorUsername?: string;
 }) {
   const platformOptions = useOptionSet("INTERMEDIARY_PLATFORM") ?? [];
+  const defaultOperatorIds = defaultOperatorUserIds(employees, operatorUsername) ?? [];
   const rows = useMemo<OrderOperationRow[]>(() => {
     const makeRows = (operationKey: OrderOperationKey, action: string, content: OrderOperationRow["content"], occurredAt: string, operator: string) => {
       const events = operationEvents?.[operationKey] ?? [];
@@ -112,7 +116,7 @@ export function OrderDetailOperationSection({
         <PermissionButton permission="order.update" type="link" size="small" onClick={() => onAddOperationRow?.("CONSIGNMENT")}>+ 添加上架行</PermissionButton>
         <PermissionButton permission="order.update" type="link" size="small" onClick={() => onAddOperationRow?.("UNLIST")}>+ 添加下架行</PermissionButton>
       </Space>
-      <DataTable className="order-detail__data-table order-operation-table" columns={editableOperationColumns(account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onRemoveOperationRow, onProfileChange, employees, platformOptions)} rows={rows} page={1} pageSize={20} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
+      <DataTable className="order-detail__data-table order-operation-table" columns={editableOperationColumns(account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onRemoveOperationRow, onProfileChange, employees, platformOptions, defaultOperatorIds)} rows={rows} page={1} pageSize={20} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
     </div>;
   }
   return <div className="order-detail__section order-detail__section--operation">
@@ -131,6 +135,7 @@ function editableOperationColumns(
   onProfileChange: ((changes: Partial<Account>) => void) | undefined,
   employees: EmployeeOption[],
   platformOptions: Array<{ value: string; label: string }>,
+  defaultOperatorIds: number[],
 ): ColumnsType<OrderOperationRow> {
   const platformOptionValues = (current: string[], includeSystem = false) => {
     const options = [...platformOptions];
@@ -168,7 +173,12 @@ function editableOperationColumns(
     },
     {
       title: "操作人", dataIndex: "operator", key: "operator", width: 120,
-      render: (_value: string, row: OrderOperationRow) => { const draft = row.event ? drafts?.[row.event.id] : operationDrafts?.[row.key]; return <Select mode="multiple" showSearch optionFilterProp="label" aria-label={`编辑${row.action}操作人${row.ariaLabelSuffix ?? ""}`} value={draft?.operator_user_ids ?? row.event?.operator_user_ids ?? []} options={employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))} onChange={(ids) => updateOperation(row, { operator_user_ids: ids })} />; },
+      render: (_value: string, row: OrderOperationRow) => {
+        const draft = row.event ? drafts?.[row.event.id] : operationDrafts?.[row.key];
+        const storedIds = draft?.operator_user_ids ?? row.event?.operator_user_ids ?? [];
+        const operatorIds = storedIds.length ? storedIds : defaultOperatorIds;
+        return <Select mode="multiple" showSearch optionFilterProp="label" aria-label={`编辑${row.action}操作人${row.ariaLabelSuffix ?? ""}`} value={operatorIds} options={employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))} onChange={(ids) => updateOperation(row, { operator_user_ids: ids.length ? ids : operatorIds })} />;
+      },
     },
     {
       title: "操作", key: "operation", width: 64,

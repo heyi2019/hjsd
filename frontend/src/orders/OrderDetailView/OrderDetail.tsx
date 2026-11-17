@@ -5,6 +5,7 @@ import type { AccountExecutionDetail, AccountExecutionEvent } from "../../shared
 import type { Account } from "../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import { formatDateTimeMinute } from "../../shared/lib/format";
+import { currentDevUser } from "../../shared/api/client";
 import {
   INVENTORY_STATUS_LABEL,
   BUSINESS_MODE_LABEL,
@@ -66,6 +67,7 @@ export function OrderDetail({
   onPartyEdit,
   onPartyClick,
   employees = [],
+  operatorUsername = currentDevUser(),
   extraForm,
   onSave,
   onCancel,
@@ -91,6 +93,7 @@ export function OrderDetail({
   onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
   onPartyEdit?: (orderId: number, addition: PartyAddition) => void;
   employees?: EmployeeOption[];
+  operatorUsername?: string;
   onPartyClick?: (party: OrderPartyLink) => void;
   extraForm?: FormInstance;
   onSave?: () => void;
@@ -242,6 +245,7 @@ export function OrderDetail({
       onOrderExtraChange={onOrderExtraChange}
       onPartyEdit={onPartyEdit}
       employees={employees}
+      operatorUsername={operatorUsername}
       executionRows={executionRows}
       operationEvents={operationEvents}
       financeRows={financeRows}

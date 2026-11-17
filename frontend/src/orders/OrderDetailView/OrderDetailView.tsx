@@ -49,6 +49,7 @@ type OrderDetailViewProps = {
   onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
   onPartyEdit?: (orderId: number, addition: PartyAddition) => void;
   employees: OrderEmployeeOption[];
+  operatorUsername?: string;
   extraForm?: FormInstance;
   /** 编辑态底部操作：保存 / 取消。不传则编辑态不渲染底部按钮（纯展示用）。 */
   onSave?: () => void;
@@ -78,6 +79,7 @@ export function OrderDetailView({
   onOrderExtraChange,
   onPartyEdit,
   employees,
+  operatorUsername,
   executionRows,
   operationEvents,
   financeRows,
@@ -101,7 +103,7 @@ export function OrderDetailView({
           wrapperCol={{ flex: "auto" }} scope="INVEDIT" form={extraForm}>
           <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
             <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onOrderEdit={onOrderEdit} onProfileChange={onProfileChange} />
-            <OrderDetailOperationSection meta={meta} editing account={editing ?? account} eventDrafts={eventDrafts} operationDrafts={operationDrafts} onEventEdit={onEventEdit} onOperationEdit={onOperationEdit} onAddOperationRow={onAddOperationRow} onRemoveOperationRow={onRemoveOperationRow} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} />
+            <OrderDetailOperationSection meta={meta} editing account={editing ?? account} eventDrafts={eventDrafts} operationDrafts={operationDrafts} onEventEdit={onEventEdit} onOperationEdit={onOperationEdit} onAddOperationRow={onAddOperationRow} onRemoveOperationRow={onRemoveOperationRow} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} operatorUsername={operatorUsername} />
           </FieldConfigScope>
         </BusinessRegistrationForm>
         <OrderDetailFinanceSection
@@ -116,6 +118,7 @@ export function OrderDetailView({
           orderDraft={meta.orderId ? orderDrafts?.[meta.orderId] : undefined}
           onOrderExtraChange={meta.orderId == null ? undefined : (key, value) => onOrderExtraChange?.(meta.orderId!, key, value)}
           employees={employees}
+          operatorUsername={operatorUsername}
           editing
         />
         <OrderDetailPartySection
@@ -135,6 +138,7 @@ export function OrderDetailView({
           onOrderEdit={onOrderEdit}
           onOrderExtraChange={onOrderExtraChange}
           employees={employees}
+          operatorUsername={operatorUsername}
         />
         <div className="order-detail__footer">
           <Space>
@@ -150,7 +154,7 @@ export function OrderDetailView({
     <div className="order-detail">
       <OrderDetailProfileSection meta={meta} detail={detail} account={account} />
       <OrderDetailDeliverySection meta={meta} detail={detail} account={account} employees={employees} />
-        <OrderDetailOperationSection meta={meta} account={account} operationEvents={operationEvents} />
+        <OrderDetailOperationSection meta={meta} account={account} operationEvents={operationEvents} operatorUsername={operatorUsername} />
       <OrderDetailFinanceSection
         rows={financeRows}
         orderExtras={meta.orderExtras}
@@ -160,7 +164,7 @@ export function OrderDetailView({
         totalIncome={totalIncome}
       />
       <OrderDetailPartySection meta={meta} />
-      <OrderDetailExecutionSection rows={executionRows} employees={employees} />
+      <OrderDetailExecutionSection rows={executionRows} employees={employees} operatorUsername={operatorUsername} />
     </div>
   );
 }

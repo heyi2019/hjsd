@@ -44,6 +44,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     operationDrafts,
     financeDrafts,
     employees,
+    operatorUsername,
     updateEventDraft,
     updateOperationDraft,
     addOperationDraft,
@@ -158,6 +159,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
               onOrderExtraChange={updateOrderDraft && ((orderId, key, value) => updateOrderDraft(orderId, { form_extra: { [key]: value } }))}
               onPartyEdit={updatePartyDraft}
               employees={employees}
+              operatorUsername={operatorUsername}
               extraForm={invEditExtraForm}
               onSave={saveInline}
               onCancel={cancelInlineEdit}

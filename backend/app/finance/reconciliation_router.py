@@ -56,7 +56,7 @@ def create_reconciliation(
     user: CurrentUser = post_deposit,
 ) -> schemas.ReconciliationOut:
     if not user.can_see_pool(payload.pool_id):
-        raise NotFound("资金池不存在", details={"pool_id": payload.pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": payload.pool_id})
     item = finance_create_reconciliation(
         db,
         pool_id=payload.pool_id,
@@ -103,7 +103,7 @@ def create_transfer(
     user: CurrentUser = post_transfer,
 ) -> schemas.TransferOut:
     if not user.can_see_pool(payload.source_pool_id) or not user.can_see_pool(payload.target_pool_id):
-        raise NotFound("资金池不存在", details={"pool_id": payload.source_pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": payload.source_pool_id})
     result = finance_create_transfer(
         db,
         source_pool_id=payload.source_pool_id,
@@ -130,7 +130,7 @@ def repair_transfer(
     user: CurrentUser = post_transfer,
 ) -> schemas.TransferOut:
     if not user.can_see_pool(payload.counterpart_pool_id):
-        raise NotFound("资金池不存在", details={"pool_id": payload.counterpart_pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": payload.counterpart_pool_id})
     result = finance_repair_transfer(
         db,
         transfer_id,

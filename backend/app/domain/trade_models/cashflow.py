@@ -74,7 +74,7 @@ class Cashflow(Base, AuditMixin):
             name="cashflow_direction_nature_valid",
         ),
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
-        # 一笔订单事件可派生多笔资金流水（如售出拆分进不同资金池）。
+        # 一笔订单事件可派生多笔资金流水（如售出拆分进不同资金账户）。
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
         Index("ix_cashflow_order", "order_id"),
         Index("ix_cashflow_source", "source_type", "source_id"),
@@ -126,7 +126,7 @@ class Cashflow(Base, AuditMixin):
 
 
 class Reconciliation(Base, AuditMixin):
-    """按资金池、账单日和账户固化的日对账快照。"""
+    """按资金账户、账单日和账户固化的日对账快照。"""
 
     __tablename__ = "reconciliations"
     __table_args__ = (

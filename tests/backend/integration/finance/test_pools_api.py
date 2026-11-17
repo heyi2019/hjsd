@@ -1,4 +1,4 @@
-"""MASTER-01 T02 / BAS-03 API：资金池端点、权限与错误码。
+"""MASTER-01 T02 / BAS-03 API：资金账户端点、权限与错误码。
 
 权限矩阵 §2：主数据写操作只有系统管理员可做；
 查看者（`viewer`）调写接口必须 403 `PERMISSION_DENIED`，且不得泄露对象是否存在。
@@ -40,6 +40,20 @@ def test_create_and_list_pool(client, headers):
 
     listed = client.get(POOLS, headers=headers).json()
     assert any(item["code"] == "HJ_CUSTODY" for item in listed)
+
+
+def test_create_pool_can_set_default(client, headers):
+    created = client.post(
+        POOLS,
+        json={"code": "HJ_DEFAULT", "name": "默认账户", "is_default": True},
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["is_default"] is True
+
+    listed = {item["code"]: item for item in client.get(POOLS, headers=headers).json()}
+    assert listed["HJ_DEFAULT"]["is_default"] is True
+    assert sum(item["is_default"] for item in listed.values()) == 1
 
 
 def test_custom_pool_type_is_supported_as_registry_value(client, headers):

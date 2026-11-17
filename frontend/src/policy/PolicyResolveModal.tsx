@@ -88,7 +88,7 @@ export function PolicyResolveModal({
           label="范围编号"
           rules={scopeIdRules}
         >
-          <Input inputMode="numeric" placeholder="按人员、业务类型或资金池时填写" />
+          <Input inputMode="numeric" placeholder="按人员、业务类型或资金账户时填写" />
         </Form.Item>
         {result ? (
           result.found && result.version ? (

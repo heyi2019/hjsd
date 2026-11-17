@@ -40,7 +40,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listResponse, optionSetList } from "@fixtures/api-responses";
 
 const orderTypes = [
-  { id: 1, code: "HS", name: "回收", capital_type: "OWNED", is_active: true },
+  { id: 1, code: "HS", name: "回收", is_active: true },
 ] as unknown as import("@/shared/api/types/orders").OrderType[];
 
 const pools = [

@@ -1,4 +1,4 @@
-"""资金池主数据服务。"""
+"""资金账户主数据服务。"""
 from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
@@ -11,7 +11,7 @@ from app.domain.enums import AuditAction, PoolOwnership, PoolStatus, PoolType
 from app.domain.foundation import Pool
 from app.parties.fields import set_extra_values
 from ._common import _UNSET, _get_pool_or_404, _normalize_pool_code, _required_name, _required_pool_type, _snapshot
-# --------------------------------------------------------------------- 资金池
+# --------------------------------------------------------------------- 资金账户
 def list_pools(session: Session, *, include_disabled: bool = True, user: CurrentUser | None = None) -> list[Pool]:
     stmt = select(Pool).order_by(Pool.id)
     if not include_disabled:
@@ -24,8 +24,48 @@ def get_pool_by_code(session: Session, code: str) -> Pool | None:
 def require_pool_by_code(session: Session, code: str) -> Pool:
     pool = get_pool_by_code(session, code)
     if pool is None:
-        raise NotFound("资金池不存在", details={"pool_code": code})
+        raise NotFound("资金账户不存在", details={"pool_code": code})
     return pool
+def get_default_pool(session: Session) -> Pool | None:
+    """落账默认池：优先 `is_default` 且活动；否则回退到唯一活动池。"""
+    marked = list(
+        session.scalars(
+            select(Pool).where(
+                Pool.is_default.is_(True), Pool.status == PoolStatus.ACTIVE.value
+            )
+        )
+    )
+    if len(marked) == 1:
+        return marked[0]
+    active = list(
+        session.scalars(select(Pool).where(Pool.status == PoolStatus.ACTIVE.value))
+    )
+    return active[0] if len(active) == 1 else None
+
+
+def require_default_pool(session: Session) -> Pool:
+    """未显式指定 pool_id 时的落账池（2026-11-17 删除业务↔池路由后）。"""
+    pool = get_default_pool(session)
+    if pool is None:
+        active = list(
+            session.scalars(select(Pool).where(Pool.status == PoolStatus.ACTIVE.value))
+        )
+        marked = [item.id for item in active if item.is_default]
+        raise Validation(
+            "未配置唯一的默认资金账户（is_default 或唯一活动池）",
+            code=ErrorCode.POOL_ROUTE_MISSING,
+            details={"active_pool_ids": [item.id for item in active], "default_pool_ids": marked},
+        )
+    return pool
+
+
+def _switch_default_pool(session: Session, pool: Pool) -> None:
+    """把 pool 设为唯一默认资金账户；其余池的 is_default 一并清掉。"""
+    for other in session.scalars(select(Pool).where(Pool.is_default.is_(True))):
+        other.is_default = False
+    pool.is_default = True
+
+
 def create_pool(
     session: Session,
     *,
@@ -34,15 +74,16 @@ def create_pool(
     actor: str,
     pool_type: str = PoolType.OTHER.value,
     ownership: str = PoolOwnership.OWNED.value,
+    is_default: bool = False,
     note: str | None = None,
     extra_values: Mapping[str, Any] | None = None,
 ) -> Pool:
-    """新增资金池：新增池无需改代码（PRD §1.2）。"""
+    """新增资金账户：新增池无需改代码（PRD §1.2）。"""
     normalized = _normalize_pool_code(code)
     normalized_name = _required_name(name, field="name")
     if session.scalar(select(Pool).where(Pool.code == normalized)) is not None:
         raise Validation(
-            f"资金池代码 {normalized} 已存在",
+            f"资金账户代码 {normalized} 已存在",
             code=ErrorCode.DUPLICATE_CODE,
             details={"code": normalized},
         )
@@ -56,11 +97,14 @@ def create_pool(
         pool_type=_required_pool_type(pool_type),
         ownership=ownership,
         status=PoolStatus.ACTIVE.value,
+        is_default=False,
         note=note,
         created_by=actor,
         updated_by=actor,
     )
     session.add(pool)
+    if is_default:
+        _switch_default_pool(session, pool)
     session.flush()
     set_extra_values(
         session,
@@ -75,7 +119,7 @@ def create_pool(
         entity_type="Pool",
         entity_id=pool.id,
         actor=actor,
-        after=_snapshot(pool, ("code", "name", "pool_type", "ownership", "status")),
+        after=_snapshot(pool, ("code", "name", "pool_type", "ownership", "status", "is_default")),
     )
     return pool
 def update_pool(
@@ -87,6 +131,7 @@ def update_pool(
     note: str | None = None,
     pool_type: str | None = None,
     ownership: str | None = None,
+    is_default: bool | None = None,
     extra_values: Mapping[str, Any] | None | object = _UNSET,
 ) -> Pool:
     """V18：`code` 永久不可修改，只有显示名/备注/用途/归属可更新。"""
@@ -98,7 +143,7 @@ def update_pool(
     next_ownership = ownership if ownership is not None else pool.ownership
     if next_ownership not in PoolOwnership.values():
         raise Validation("ownership 取值非法", details={"ownership": next_ownership})
-    before = _snapshot(pool, ("name", "note", "pool_type", "ownership"))
+    before = _snapshot(pool, ("name", "note", "pool_type", "ownership", "is_default"))
     if name is not None:
         pool.name = next_name
     if note is not None:
@@ -107,6 +152,11 @@ def update_pool(
         pool.pool_type = next_pool_type
     if ownership is not None:
         pool.ownership = next_ownership
+    if is_default is not None:
+        if is_default:
+            _switch_default_pool(session, pool)
+        else:
+            pool.is_default = False
     pool.updated_by = actor
     session.flush()
     if extra_values is not _UNSET:
@@ -123,13 +173,13 @@ def update_pool(
         entity_id=pool.id,
         actor=actor,
         before=before,
-        after=_snapshot(pool, ("name", "note", "pool_type", "ownership")),
+        after=_snapshot(pool, ("name", "note", "pool_type", "ownership", "is_default")),
     )
     return pool
 def set_pool_status(session: Session, pool_id: int, status: str, *, actor: str) -> Pool:
     """启用/停用；停用后禁止新增流水（V17 只允许停用不允许删除）。"""
     if status not in PoolStatus.values():
-        raise Validation("资金池状态取值非法", details={"status": status})
+        raise Validation("资金账户状态取值非法", details={"status": status})
     pool = _get_pool_or_404(session, pool_id)
     before = _snapshot(pool, ("status",))
     pool.status = status
@@ -165,7 +215,7 @@ def delete_pool(session: Session, pool_id: int, *, actor: str) -> None:
     pool = _get_pool_or_404(session, pool_id)
     if _has_cashflow(session, pool_id):
         raise Validation(
-            "该资金池已产生流水，只能停用不能删除",
+            "该资金账户已产生流水，只能停用不能删除",
             code=ErrorCode.POOL_HAS_TRANSACTIONS,
             details={"pool_id": pool_id, "pool_code": pool.code},
         )
@@ -185,7 +235,7 @@ def assert_pool_usable(session: Session, pool_id: int) -> Pool:
     pool = _get_pool_or_404(session, pool_id)
     if pool.status != PoolStatus.ACTIVE.value:
         raise Validation(
-            f"资金池 {pool.code} 已停用，不可用于新记录",
+            f"资金账户 {pool.code} 已停用，不可用于新记录",
             code=ErrorCode.POOL_DISABLED,
             details={"pool_code": pool.code},
         )

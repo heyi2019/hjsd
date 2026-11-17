@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { poolsApi } from "../shared/api/pools.api";
 import type { Pool, PoolBalance, PoolBalanceTotals } from "../shared/api/types/finance";
 
-/** 资金池读取域：资金池主数据、余额明细与服务端汇总。 */
+/** 资金账户读取域：资金账户主数据、余额明细与服务端汇总。 */
 export function usePoolResources() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});

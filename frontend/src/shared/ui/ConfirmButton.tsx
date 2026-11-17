@@ -1,7 +1,7 @@
 import { appMessage } from "./appFeedback";
 /** 破坏性/不可逆操作的统一按钮：二次确认 + loading + 防重 + 权限门控。
  *
- * 背景：此前全站 Popconfirm 仅 4 处，流水审核、规则发布、停用资金池/业务类型/用户、
+ * 背景：此前全站 Popconfirm 仅 4 处，流水审核、规则发布、停用资金账户/业务类型/用户、
  * 客户拉黑等都是一键生效——误点即落库且不可撤销。这里把「确认 + 反馈 + 防重 + 权限」
  * 收成一个组件，调用方只需提供 `title`（做什么）与 `description`（影响什么/能否撤销）。
  */
@@ -17,7 +17,7 @@ export function ConfirmButton(
   props: {
     /** 权限：无权限时隐藏触发按钮。退出登录等无需权限的操作可省略。 */
     permission?: Permission;
-    /** 确认标题：说清「做什么」，例如「停用资金池」。 */
+    /** 确认标题：说清「做什么」，例如「停用资金账户」。 */
     title: ReactNode;
     /** 后果说明：说清「影响什么 / 能否撤销」，这是确认弹窗唯一有价值的信息。 */
     description?: ReactNode;

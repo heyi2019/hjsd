@@ -96,7 +96,7 @@
   align-items: flex-start;
   gap: 12px;
 }
-/* 标签列宽固定 84px：15px 字号下 4 字标签（「资金池：」）实测 71px，
+/* 标签列宽固定 84px：15px 字号下 4 字标签（「资金账户：」）实测 71px，
    76px 会让文字几乎贴住控件左缘；84px 留 13px 呼吸，且不小于最长字段名。
    不用 --col-w-* 系列（160/96/…）——那是语义栅格宽度，在 560 弹窗里会把控件挤窄。 */
 .studio-ledger-modal .studio-ledger-form .ant-form-item-label {

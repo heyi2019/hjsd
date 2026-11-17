@@ -11,7 +11,7 @@ from app.stocks.profile import create_account
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
 from app.domain.foundation import Pool
-from app.foundation.order_types import resolve_default_pool
+from app.foundation.order_types import get_order_type_by_code
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.value_added_services import create as inst_create
@@ -139,17 +139,14 @@ class TestA01HsStock:
         assert account.cost_amount == Decimal("1000.00")
         assert account.status == AccountStatus.SOLD.value
 
-        # 现金流：BUY 出、SELL 入，且每个事件各一条
+        # 现金流：BUY 出、SELL 入，删除路由后统一落默认池（HJ_INVEST，is_default）
         invest = _pool(seeded_db, "HJ_INVEST")
-        profit = _pool(seeded_db, "HJ_PROFIT")
-        out_flows = _flows(seeded_db, invest.id)
-        in_flows = _flows(seeded_db, profit.id)
-        assert [str(flow.amount) for flow in out_flows] == ["1000.00"]
-        assert all(flow.direction == Direction.OUT.value for flow in out_flows)
-        assert out_flows[0].accounting_attribute == "SELF_DIRECT_COST"
-        assert [str(flow.amount) for flow in in_flows] == ["1400.00"]
-        assert in_flows[0].direction == Direction.IN.value
-        assert in_flows[0].accounting_attribute == "SELF_REVENUE"
+        flows = _flows(seeded_db, invest.id)
+        assert [str(flow.amount) for flow in flows] == ["1000.00", "1400.00"]
+        assert flows[0].direction == Direction.OUT.value
+        assert flows[0].accounting_attribute == "SELF_DIRECT_COST"
+        assert flows[1].direction == Direction.IN.value
+        assert flows[1].accounting_attribute == "SELF_REVENUE"
 
         events = seeded_db.scalars(
             select(OrderEvent).where(OrderEvent.order_id == order.id)
@@ -157,8 +154,8 @@ class TestA01HsStock:
         assert len(events) == 2
         assert len({event.event_no for event in events}) == 2
         assert events[0].event_no == f"{order.order_no}-EV-BUY-01"
-        assert out_flows[0].flow_no == "ZC00001"
-        assert in_flows[0].flow_no == "SR00001"
+        assert flows[0].flow_no == "ZC00001"
+        assert flows[1].flow_no == "SR00001"
 
     def test_cost_event_is_removed(self, seeded_db):
         order = create_order(
@@ -244,7 +241,7 @@ class TestA02ThStock:
         seeded_db.commit()
 
 class TestA03DgZeroCapital:
-    def test_service_income_routes_to_profit_pool(self, seeded_db):
+    def test_service_income_goes_to_default_pool(self, seeded_db):
         consignor = _customer(seeded_db, "委托方")
         seeded_db.commit()
         order = create_order(
@@ -255,17 +252,23 @@ class TestA03DgZeroCapital:
             customer_roles=[(consignor.id, "CONSIGNOR")],
         )
         seeded_db.commit()
-        # 零本金由路由表达：DG 没有 PRINCIPAL 路由，因此无法登记本金支出。
-        assert resolve_default_pool(seeded_db, "DG", "PRINCIPAL") is None
-        assert resolve_default_pool(seeded_db, "DG", "PROFIT") is not None
+        # 零本金由业务类型标记表达：DG 标记 is_zero_principal，登记本金支出会被拒。
+        definition = get_order_type_by_code(seeded_db, "DG")
+        assert definition is not None and definition.is_zero_principal is True
+        with pytest.raises(Validation, match="不允许 BUY 事件"):
+            post_event(
+                seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
+                occurred_on=TODAY, actor="pytest", portion="PRINCIPAL",
+            )
 
         post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("200"),
             occurred_on=TODAY, actor="pytest", portion="GROSS",
         )
         seeded_db.commit()
-        profit = _pool(seeded_db, "HJ_PROFIT")
-        flows = _flows(seeded_db, profit.id)
+        # 删除路由后 DG 服务收入落默认池（不再分利润池）
+        default_pool = _pool(seeded_db, "HJ_INVEST")
+        flows = _flows(seeded_db, default_pool.id)
         assert len(flows) == 1
         assert str(flows[0].amount) == "200.00"
         assert flows[0].nature == Nature.BUSINESS_IN.value
@@ -647,7 +650,7 @@ class TestEventRules:
             seeded_db, order_type="DG", trade_date=TODAY, actor="pytest"
         )
         seeded_db.commit()
-        # DG 是零本金业务，业务事件组合先于资金路由校验拦截 BUY。
+        # DG 是零本金业务，业务事件组合先于资金账户解析拦截 BUY。
         with pytest.raises(Exception) as exc:
             post_event(
                 seeded_db, order.id, event_type="BUY", amount=Decimal("100"),

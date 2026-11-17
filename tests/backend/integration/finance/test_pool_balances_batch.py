@@ -1,4 +1,4 @@
-"""POOL-01 资金池批量余额与汇总（FIN-01）。
+"""POOL-01 资金账户批量余额与汇总（FIN-01）。
 
 背景：资金页 / 数据中心原先按池逐个调 `/pools/{id}/balance`（N+1），再用浮点把
 卡片相加算「总余额 / 可用 / 押金 / 自有权益」。合计属财务事实，改由服务端一次算清，
@@ -47,7 +47,7 @@ def test_batch_items_match_single_pool_and_totals_are_decimal_sums(
     assert batch.status_code == 200, batch.text
     body = batch.json()
 
-    assert body["items"], "至少应返回种子里已有的资金池"
+    assert body["items"], "至少应返回种子里已有的资金账户"
     for item in body["items"]:
         single = seeded_client.get(
             f"/api/v1/pools/{item['pool_id']}/balance", headers=headers

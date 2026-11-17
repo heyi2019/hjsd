@@ -40,7 +40,6 @@ BACKEND_DIR = _backend_root()
 EXPECTED_TABLES = {
     "pools",
     "order_type_defs",
-    "order_type_pools",
     "document_sequences",
     "audit_logs",
     "alembic_version",
@@ -248,8 +247,11 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
         assert "region" not in account_columns
         assert "channels" not in account_columns
 
-        route_columns = _column_names(engine, "order_type_pools")
-        assert "fund_nature" in route_columns
+        type_columns = _column_names(engine, "order_type_defs")
+        assert "is_zero_principal" in type_columns
+        assert "capital_type" not in type_columns
+        pool_columns = _column_names(engine, "pools")
+        assert "is_default" in pool_columns
 
         # 资金流水 CHECK：INTERNAL 必须绑定 TRANSFER 来源（跨方言只看约束语义）。
         cashflow_clause = _check_clauses(engine, "cashflow")
@@ -260,32 +262,9 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
         pools = {row[0] for row in connection.execute(text("SELECT code FROM pools"))}
         assert pools == {"HJ_INVEST", "HJ_PROFIT"}
 
-        types = {
-            row[0]: row[1]
-            for row in connection.execute(
-                text("SELECT code, capital_type FROM order_type_defs ORDER BY code")
-            )
-        }
-        assert types == {
-            "HS": "STOCK",
-            "TH": "STOCK",
-            "DG": "ZERO",
-        }
+        types = {row[0] for row in connection.execute(text("SELECT code FROM order_type_defs"))}
+        assert types == {"HS", "TH", "DG"}
 
-        routes = {
-            row[0]: row[1]
-            for row in connection.execute(
-                text(
-                    "SELECT t.code || '/' || p.portion, pool.code "
-                    "FROM order_type_pools p "
-                    "JOIN order_type_defs t ON t.id = p.order_type_id "
-                    "JOIN pools pool ON pool.id = p.pool_id"
-                )
-            )
-        }
-        assert routes["HS/PRINCIPAL"] == "HJ_INVEST"
-        assert routes["HS/PROFIT"] == "HJ_PROFIT"
-        assert routes["DG/GROSS"] == "HJ_PROFIT"
 
         sequences = {
             row[0] for row in connection.execute(text("SELECT sequence_key FROM document_sequences"))
@@ -366,8 +345,7 @@ def test_upgrade_is_repeatable(migration_db):
     with engine.connect() as connection:
         pool_count = connection.execute(text("SELECT COUNT(*) FROM pools")).scalar()
         type_count = connection.execute(text("SELECT COUNT(*) FROM order_type_defs")).scalar()
-        route_count = connection.execute(text("SELECT COUNT(*) FROM order_type_pools")).scalar()
-    assert (pool_count, type_count, route_count) == (2, 3, 6)
+    assert (pool_count, type_count) == (2, 3)
 
 
 def test_current_migration_head_is_exposed():

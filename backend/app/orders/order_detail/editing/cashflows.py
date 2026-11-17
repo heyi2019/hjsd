@@ -42,7 +42,7 @@ def apply_cashflow_edits(db: Session, account_id: int, target_order_id: int, ite
         }
         if "pool_id" in item.model_fields_set and item.pool_id is not None:
             if not user.can_see_pool(item.pool_id):
-                raise NotFound("资金池不存在", details={"pool_id": item.pool_id})
+                raise NotFound("资金账户不存在", details={"pool_id": item.pool_id})
             flow.pool_id = assert_pool_usable(db, item.pool_id).id
         if "amount" in item.model_fields_set and item.amount is not None:
             flow.amount = item.amount

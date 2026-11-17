@@ -4,7 +4,7 @@ export const SCOPE_OPTIONS: { value: string; label: string }[] = [
   { value: "GLOBAL", label: "全局" },
   { value: "ORDER_TYPE", label: "按业务类型" },
   { value: "USER", label: "按人员" },
-  { value: "POOL", label: "按资金池" },
+  { value: "POOL", label: "按资金账户" },
 ];
 
 /** 规则编码必须与后端 PolicyType 一致：后端按固定编码消费快照（分润/分期），

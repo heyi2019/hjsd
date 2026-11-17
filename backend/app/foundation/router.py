@@ -2,7 +2,7 @@
 
 端点与接口契约一致：
 - GET/POST `/pools`、PATCH `/pools/{id}`、PATCH `/pools/{id}/status`、DELETE `/pools/{id}`；
-- GET/POST `/order-types`、GET/POST `/order-types/{code}/routes`；
+- GET/POST/PATCH `/order-types`；
 - GET `/sequences`（编号域与下一个可用编号）。
 
 写接口由 Service 事务执行并写审计；越权统一 `403 PERMISSION_DENIED`。
@@ -35,10 +35,7 @@ from app.foundation.game_types import (
 from app.foundation.order_types import (
     create_order_type as foundation_create_order_type,
     list_order_types as foundation_list_order_types,
-    list_routes as foundation_list_routes,
-    route_impact_preview as foundation_route_impact_preview,
     set_order_type_active as foundation_set_order_type_active,
-    set_route as foundation_set_route,
     update_order_type as foundation_update_order_type,
 )
 from app.foundation.pools import (
@@ -52,7 +49,7 @@ from app.foundation.sequences import list_sequences as foundation_list_sequences
 from app.parties.fields import get_extra_values_bulk
 
 from app.core.actor import actor_name as _actor
-from .router_output import _order_type_output, _pool_output, _route_out
+from .router_output import _order_type_output, _pool_output
 
 router = APIRouter(tags=["BAS-02/03 业务与资金主数据"])
 
@@ -136,7 +133,7 @@ def delete_game_type(
     return Response(status_code=204)
 
 
-# --------------------------------------------------------------------- 资金池
+# --------------------------------------------------------------------- 资金账户
 @router.get("/pools", response_model=list[schemas.PoolOut])
 def list_pools(
     include_disabled: bool = Query(default=True),
@@ -166,6 +163,7 @@ def create_pool(
         actor=_actor(user),
         pool_type=payload.pool_type,
         ownership=payload.ownership.value,
+        is_default=payload.is_default,
         note=payload.note,
         extra_values=payload.extra_values,
     )
@@ -230,7 +228,7 @@ def create_order_type(
         db,
         code=payload.code,
         name=payload.name,
-        capital_type=payload.capital_type.value,
+        is_zero_principal=payload.is_zero_principal,
         actor=_actor(user),
         sequence_prefix=payload.sequence_prefix,
         sort_order=payload.sort_order,
@@ -253,6 +251,7 @@ def update_order_type(
         name=payload.name,
         description=payload.description,
         sort_order=payload.sort_order,
+        is_zero_principal=payload.is_zero_principal,
     )
     return _order_type_output(order_type)
 
@@ -266,59 +265,6 @@ def set_order_type_active(
 ) -> schemas.OrderTypeOut:
     order_type = foundation_set_order_type_active(db, order_type_id, is_active, actor=_actor(user))
     return _order_type_output(order_type)
-
-
-@router.get("/order-types/{order_type_id}/routes", response_model=list[schemas.RouteOut])
-def list_routes(
-    order_type_id: int,
-    db: Session = Depends(get_db),
-    user: CurrentUser = Depends(get_current_user),
-) -> list[schemas.RouteOut]:
-    del user
-    routes = foundation_list_routes(db, order_type_id=order_type_id)
-    return [_route_out(route) for route in routes]
-
-
-@router.post("/order-types/{code}/routes", response_model=schemas.RouteOut, status_code=201)
-def set_route(
-    code: str,
-    payload: schemas.RouteIn,
-    db: Session = Depends(get_db),
-    user: CurrentUser = manage_order_types,
-) -> schemas.RouteOut:
-    route = foundation_set_route(
-        db,
-        order_type_code=code,
-        portion=payload.portion.value,
-        pool_code=payload.pool_code,
-        fund_nature=payload.fund_nature.value if payload.fund_nature else None,
-        actor=_actor(user),
-        priority=payload.priority,
-    )
-    return _route_out(route)
-
-
-@router.get(
-    "/order-types/{code}/routes/impact-preview",
-    response_model=schemas.RouteImpactPreviewOut,
-)
-def route_impact_preview(
-    code: str,
-    portion: schemas.Portion = Query(...),
-    fund_nature: schemas.FundNature | None = Query(default=None),
-    pool_code: str = Query(..., min_length=2, max_length=64),
-    db: Session = Depends(get_db),
-    _user: CurrentUser = manage_order_types,
-) -> schemas.RouteImpactPreviewOut:
-    return schemas.RouteImpactPreviewOut.model_validate(
-        foundation_route_impact_preview(
-            db,
-            order_type_code=code,
-            portion=portion.value,
-            pool_code=pool_code,
-            fund_nature=fund_nature.value if fund_nature else None,
-        )
-    )
 
 
 # ----------------------------------------------------------------------- 编号

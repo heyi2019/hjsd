@@ -8,7 +8,7 @@ import { useReconciliationResources } from "./useReconciliationResources";
 import { employeesApi } from "../shared/api/org.api";
 import type { EmployeeOption } from "../shared/api/types/org";
 
-/** 资金中心数据/查询层：资金池、余额、押金、流水、对账的加载与筛选，以及派生统计。
+/** 资金中心数据/查询层：资金账户、余额、押金、流水、对账的加载与筛选，以及派生统计。
  *  逐字切片自原 useFundsPageController，仅按职责归位；写操作见 useFundsFormActions。 */
 export function useFundsResources(active = true) {
   const poolResources = usePoolResources();
@@ -55,7 +55,7 @@ export function useFundsResources(active = true) {
 
   // 四张统计卡全部取服务端汇总（Decimal 聚合）：前端不再对卡片浮点累加，也不再有 N+1。
   // 自有权益口径（domain/enums.py PoolOwnership：OWNED 计入权益，CUSTODY/THIRD_PART 只计现金头寸）
-  // 由后端按资金池主数据判定，权益按现金头寸计、不扣押金占用。
+  // 由后端按资金账户主数据判定，权益按现金头寸计、不扣押金占用。
   const unavailableAmount = error ? "不可用" : "—";
   const balanceTotals = poolResources.balanceTotals;
   const totalCash = fundsReady && balanceTotals ? balanceTotals.cash_balance : unavailableAmount;

@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Any
 from app.core.audit import record_audit
 from app.core.security import CurrentUser
-from app.domain.enums import CashflowSourceType, Direction, FundNature, Nature
+from app.domain.enums import CashflowSourceType, Direction, Nature
 from app.finance.attributes import accounting_attribute_for_order_event
 from app.finance.cashflows import create_cashflow, reverse_cashflow
 from app.orders.events_rules import _resolve_pool
@@ -104,12 +104,9 @@ def pay(
     accounting_attribute = accounting_attribute_for_order_event(
         order.order_type, EventType.SELL.value
     )
-    fund_nature = FundNature.BUSINESS.value
     resolved_pool_id = pool_id
     if resolved_pool_id is None:
-        resolved_pool_id = _resolve_pool(
-            session, order, "PROFIT", fund_nature=fund_nature
-        ).id
+        resolved_pool_id = _resolve_pool(session, order, "PROFIT").id
     create_cashflow(
         session,
         pool_id=resolved_pool_id,

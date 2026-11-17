@@ -1,5 +1,5 @@
 /**
- * 设置面板（资金池 / 游戏类型）——由 3 个碎片文件合并而来：
+ * 设置面板（资金账户 / 游戏类型）——由 3 个碎片文件合并而来：
  *   SettingsPanels.test.tsx / PoolsPanel.test.tsx / GameTypeSettingsPanel.test.tsx
  * 合并动因：每个测试文件都要走一遍模块图加载与 transform（实测约 2s/文件），
  * 与本文件用例数无关；合并只减少文件数，用例与断言逐条保留（各自 describe 隔离）。
@@ -48,26 +48,26 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("设置面板：资金池", () => {
-  it("admin 可见新增资金池入口", async () => {
+describe("设置面板：资金账户", () => {
+  it("admin 可见新增资金账户入口", async () => {
     renderLight(<PoolsPanel />, { user: "admin" });
     expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /新增资金池/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /新增资金账户/ })).toBeInTheDocument();
   });
 
   it("viewer 无 pool.manage 时显示只读回退且无新增按钮", async () => {
     renderLight(<PoolsPanel />, { user: "viewer" });
     expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
     expect(screen.getByText("当前角色无主数据维护权限。")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /新增资金池/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /新增资金账户/ })).toBeNull();
   });
 
-  it("admin 可编辑资金池名称、用途和归属", async () => {
+  it("admin 可编辑资金账户名称、用途和归属", async () => {
     vi.mocked(poolsApi).update.mockResolvedValue({ ...pools[0], name: "新托管池" });
     renderLight(<PoolsPanel />, { user: "admin" });
     expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /编辑/ }));
-    const dialog = screen.getByRole("dialog", { name: /编辑资金池/ });
+    const dialog = screen.getByRole("dialog", { name: /编辑资金账户/ });
     const name = within(dialog).getAllByRole("textbox")[1];
     await ui.clear(name);
     await ui.type(name, "新托管池");
@@ -81,34 +81,34 @@ describe("PoolsPanel：失败态与空态", () => {
     renderLight(<PoolsPanel />, { user: "admin" });
 
     expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
-    expect(screen.queryByText("资金池账户")).not.toBeInTheDocument();
+    expect(screen.queryByText("资金账户账户")).not.toBeInTheDocument();
   });
 
-  it("编辑资金池保存失败时弹窗内显示错误且不关闭（L1801）", async () => {
+  it("编辑资金账户保存失败时弹窗内显示错误且不关闭（L1801）", async () => {
     const local = userEvent.setup();
-    vi.mocked(poolsApi).update.mockRejectedValue(new Error("资金池保存失败"));
+    vi.mocked(poolsApi).update.mockRejectedValue(new Error("资金账户保存失败"));
     renderLight(<PoolsPanel />, { user: "admin" });
     await screen.findByText("HJ_CUSTODY");
 
     await local.click(screen.getByText("编辑"));
-    expect(await screen.findByText("编辑资金池 · HJ_CUSTODY")).toBeInTheDocument();
+    expect(await screen.findByText("编辑资金账户 · HJ_CUSTODY")).toBeInTheDocument();
     await local.click(screen.getByText("保存"));
 
     // 编辑弹窗内即时显示错误，用户无需关闭弹窗去页面顶部找错误（限定弹窗体，避开页面级 ErrorBanner 的同文案）
     const modalBody = document.querySelector(".ant-modal-body") as HTMLElement;
-    expect(await within(modalBody).findByText(/资金池保存失败/)).toBeInTheDocument();
+    expect(await within(modalBody).findByText(/资金账户保存失败/)).toBeInTheDocument();
     // 弹窗保持打开，保留已填表单供修正
-    expect(screen.getByText("编辑资金池 · HJ_CUSTODY")).toBeInTheDocument();
+    expect(screen.getByText("编辑资金账户 · HJ_CUSTODY")).toBeInTheDocument();
     // 失败不触发列表重载，避免覆盖错误态
     expect(vi.mocked(poolsApi).list).toHaveBeenCalledTimes(1);
   });
 
-  it("FE-239：资金池主数据失败时显示错误空态并禁用新增", async () => {
+  it("FE-239：资金账户主数据失败时显示错误空态并禁用新增", async () => {
     vi.mocked(poolsApi).list.mockRejectedValueOnce(new Error("pools down"));
     renderLight(<PoolsPanel />, { user: "admin" });
 
-    expect(await screen.findByText("资金池数据不可用，请点击重新加载")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /新增资金池/ })).toBeDisabled();
+    expect(await screen.findByText("资金账户数据不可用，请点击重新加载")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /新增资金账户/ })).toBeDisabled();
   });
 });
 

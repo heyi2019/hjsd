@@ -1444,9 +1444,9 @@ class TestCancelOffsetDirection:
             post_event(
                 seeded_db, order.id, event_type="CANCEL", amount="10.00",
                 occurred_on=D, actor="pytest", offset_event_id=buy.id,
-                pool_id=2, reason="资金池更正",
+                pool_id=2, reason="资金账户更正",
             )
-        assert "资金池" in str(wrong_pool.value)
+        assert "资金账户" in str(wrong_pool.value)
 
         post_event(
             seeded_db, order.id, event_type="CANCEL", amount="60.00",

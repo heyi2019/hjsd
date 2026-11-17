@@ -1,63 +1,20 @@
 import { appMessage } from "../../shared/ui/appFeedback";
-import { Form, Input, Space, Typography, InputNumber } from "antd";
+import { Form, Input, Space, Switch, Typography, InputNumber } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { orderTypesApi } from "../../shared/api/orders.api";
-import type { OrderType, OrderTypeRoute } from "../../shared/api/types/orders";
-import { poolsApi } from "../../shared/api/pools.api";
-import type { Pool } from "../../shared/api/types/finance";
-import type { RouteImpactPreview } from "../../shared/api/types/policy";
+import type { OrderType } from "../../shared/api/types/orders";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
-import { CAPITAL_TYPE_LABEL } from "../../shared/lib/labels";
-import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { filterRetiredOrderTypes } from "../../shared/lib/retiredProducts";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 
-const FUND_NATURE_LABEL: Record<string, string> = {
-  BUSINESS: "本方经营",
-  EXTERNAL: "外部/受托",
-  INTERNAL: "内部调拨",
-};
-
-const PORTION_LABEL: Record<string, string> = {
-  PRINCIPAL: "本金",
-  PROFIT: "利润",
-  GROSS: "总额",
-};
-
-/** 词典未加载/未打桩时的回落值，与改造前硬编码完全一致，保证零行为变化。 */
-const CAPITAL_TYPE_FALLBACK = [
-  { value: "STOCK", label: CAPITAL_TYPE_LABEL.STOCK },
-  { value: "ZERO", label: CAPITAL_TYPE_LABEL.ZERO },
-];
-const PORTION_FALLBACK = [
-  { value: "PRINCIPAL", label: "本金" },
-  { value: "PROFIT", label: "利润" },
-  { value: "GROSS", label: "总额" },
-];
-const FUND_NATURE_FALLBACK = [
-  { value: "BUSINESS", label: FUND_NATURE_LABEL.BUSINESS },
-  { value: "EXTERNAL", label: FUND_NATURE_LABEL.EXTERNAL },
-  { value: "INTERNAL", label: FUND_NATURE_LABEL.INTERNAL },
-];
-
 export function OrderTypesPanel() {
-  const capitalTypeOptions = useOptionSet("CAPITAL_TYPE") ?? CAPITAL_TYPE_FALLBACK;
-  const portionOptions = useOptionSet("ROUTE_PORTION") ?? PORTION_FALLBACK;
-  const fundNatureOptions = useOptionSet("ROUTE_FUND_NATURE") ?? FUND_NATURE_FALLBACK;
   const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
-  const [pools, setPools] = useState<Pool[]>([]);
-  const [previewTarget, setPreviewTarget] = useState<OrderType | null>(null);
   const [editTarget, setEditTarget] = useState<OrderType | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [routeTarget, setRouteTarget] = useState<OrderType | null>(null);
-  const [routes, setRoutes] = useState<OrderTypeRoute[]>([]);
-  const [preview, setPreview] = useState<RouteImpactPreview | null>(null);
-  const [previewForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [createForm] = Form.useForm();
-  const [routeForm] = Form.useForm();
   const load = useCallback(async () => filterRetiredOrderTypes(await orderTypesApi.list()), []);
   const { data: loadedRows, loading, error: loadError, reload } = useSettingsResource(load);
   const rows = loadedRows ?? [];
@@ -66,16 +23,9 @@ export function OrderTypesPanel() {
     setMutationError(null);
     await reload();
   }, [reload]);
-  useEffect(() => { poolsApi.list().then(setPools).catch(() => setPools([])); }, []);
 
   const toggleActive = async (row: OrderType) => {
     try { await orderTypesApi.setActive(row.id, !row.is_active); setMutationError(null); await reload(); }
-    catch (err) { setMutationError(normalizeError(err)); }
-  };
-
-  const runPreview = async (values: Record<string, unknown>) => {
-    if (!previewTarget) return;
-    try { setPreview(await orderTypesApi.impactPreview(previewTarget.code, values.portion as string, values.pool_code as string, values.fund_nature ? String(values.fund_nature) : undefined)); appMessage.success("已生成路由影响预览"); }
     catch (err) { setMutationError(normalizeError(err)); }
   };
 
@@ -84,7 +34,7 @@ export function OrderTypesPanel() {
       await orderTypesApi.create({
         code: String(values.code).trim().toUpperCase(),
         name: String(values.name).trim(),
-        capital_type: values.capital_type as string,
+        is_zero_principal: Boolean(values.is_zero_principal),
         sequence_prefix: values.sequence_prefix ? String(values.sequence_prefix).trim().toUpperCase() : undefined,
         sort_order: Number(values.sort_order ?? 0),
         description: values.description ? String(values.description) : null,
@@ -97,38 +47,12 @@ export function OrderTypesPanel() {
     } catch (err) { appMessage.error(normalizeError(err).message); }
   };
 
-  const openRoutes = async (row: OrderType) => {
-    setRouteTarget(row);
-    routeForm.resetFields();
-    try {
-      const list = await orderTypesApi.routes(row.id);
-      setRoutes(list ?? []);
-    } catch (err) {
-      appMessage.error(normalizeError(err).message);
-      setRoutes([]);
-    }
-  };
-
-  const submitRoute = async (values: Record<string, unknown>) => {
-    if (!routeTarget) return;
-    try {
-      await orderTypesApi.setRoute(routeTarget.code, {
-        portion: String(values.portion),
-        pool_code: String(values.pool_code),
-        fund_nature: values.fund_nature ? String(values.fund_nature) : null,
-        priority: Number(values.priority ?? 0),
-      });
-      appMessage.success("资金路由已保存");
-      routeForm.resetFields();
-      setRoutes(await orderTypesApi.routes(routeTarget.id));
-    } catch (err) { appMessage.error(normalizeError(err).message); }
-  };
-
   const update = async (values: Record<string, unknown>) => {
     if (!editTarget) return;
     try {
       await orderTypesApi.update(editTarget.id, {
         name: values.name as string,
+        is_zero_principal: Boolean(values.is_zero_principal),
         description: (values.description as string) || null,
         sort_order: values.sort_order as number,
       });
@@ -143,7 +67,13 @@ export function OrderTypesPanel() {
   const columns: ColumnsType<OrderType> = [
     { title: "代码", dataIndex: "code" },
     { title: "名称", dataIndex: "name" },
-    { title: "资金性质", dataIndex: "capital_type", render: (v: string) => configurableLabel("CAPITAL_TYPE", v, CAPITAL_TYPE_LABEL) },
+    {
+      title: "零本金",
+      dataIndex: "is_zero_principal",
+      render: (value: boolean) => (
+        <StatusTag status={value ? "ACTIVE" : "DISABLED"} label={value ? "是" : "否"} />
+      ),
+    },
     {
       title: "启用",
       dataIndex: "is_active",
@@ -151,7 +81,7 @@ export function OrderTypesPanel() {
         <StatusTag status={value ? "ACTIVE" : "DISABLED"} label={value ? "是" : "否"} />
       ),
     },
-    { title: "操作", render: (_v, row) => <PermissionGate permission="order-type.manage"><Space size={2}><PermissionButton permission="order-type.manage" size="small" onClick={() => { setEditTarget(row); editForm.setFieldsValue(row); }}>编辑</PermissionButton><PermissionButton permission="order-type.manage" size="small" onClick={() => void openRoutes(row)}>路由</PermissionButton><ConfirmButton
+    { title: "操作", render: (_v, row) => <PermissionGate permission="order-type.manage"><Space size={2}><PermissionButton permission="order-type.manage" size="small" onClick={() => { setEditTarget(row); editForm.setFieldsValue(row); }}>编辑</PermissionButton><ConfirmButton
               permission="order-type.manage"
               size="small"
               title={row.is_active ? `停用业务类型「${row.name}」` : `启用业务类型「${row.name}」`}
@@ -162,7 +92,7 @@ export function OrderTypesPanel() {
               onConfirm={() => toggleActive(row)}
             >
               {row.is_active ? "停用" : "启用"}
-            </ConfirmButton><PermissionButton permission="order-type.manage" size="small" onClick={() => { setPreviewTarget(row); setPreview(null); }}>影响预览</PermissionButton></Space></PermissionGate> },
+            </ConfirmButton></Space></PermissionGate> },
   ];
 
   return (
@@ -188,7 +118,7 @@ export function OrderTypesPanel() {
         fallback={<Typography.Paragraph type="secondary">当前角色无主数据维护权限，仅可查看。</Typography.Paragraph>}
       >
         <Typography.Paragraph type="secondary">
-          业务类型与资金路由由后端主数据接口控制；代码创建后不可修改，路由按「份额 → 资金池」配置。
+          业务类型由后端主数据接口控制；代码创建后不可修改。「零本金」表示该业务不垫付本金（如 DG 代挂），登记本金支出会被拒绝。
         </Typography.Paragraph>
       </PermissionGate>
       <BusinessActionModal
@@ -203,7 +133,7 @@ export function OrderTypesPanel() {
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
-          wrapperCol={{ flex: "auto" }} form={createForm} onFinish={create} initialValues={{ capital_type: "STOCK", sort_order: 0 }}>
+          wrapperCol={{ flex: "auto" }} form={createForm} onFinish={create} initialValues={{ sort_order: 0 }}>
           <Form.Item name="code" label="代码" rules={[
             { required: true, message: "请输入类型代码" },
             { pattern: /^[A-Z0-9]{2,10}$/, message: "2-10 位大写字母或数字，创建后不可修改" },
@@ -213,8 +143,8 @@ export function OrderTypesPanel() {
           <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入类型名称" }]}>
             <Input placeholder="例如 新业务" maxLength={64} />
           </Form.Item>
-          <Form.Item name="capital_type" label="资金性质" rules={[{ required: true }]}>
-            <Select options={capitalTypeOptions} />
+          <Form.Item name="is_zero_principal" label="零本金" valuePropName="checked" extra="勾选后该业务不垫付本金，登记本金支出会被拒绝">
+            <Switch checkedChildren="是" unCheckedChildren="否" />
           </Form.Item>
           <Form.Item name="sequence_prefix" label="编号前缀" extra="选填，默认等于代码；订单编号 = 前缀 + 日期 + 序号">
             <Input placeholder="默认同代码" maxLength={16} />
@@ -227,20 +157,6 @@ export function OrderTypesPanel() {
           </Form.Item>
         </BusinessRegistrationForm>
       </BusinessActionModal>
-      <BusinessActionModal size="compact" title={previewTarget ? `${previewTarget.code} 路由影响预览` : "路由影响预览"} open={Boolean(previewTarget)} onCancel={() => setPreviewTarget(null)} footer={null}>
-        <BusinessRegistrationForm
-          layout="horizontal"
-          labelAlign="left"
-          labelCol={{ flex: "108px" }}
-          wrapperCol={{ flex: "auto" }} form={previewForm} onFinish={runPreview}>
-          <Form.Item name="portion" label="资金份额" rules={[{ required: true }]}><Select options={portionOptions} /></Form.Item>
-          <Form.Item name="pool_code" label="目标资金池" rules={[{ required: true }]}><Select options={pools.map((pool) => ({ value: pool.code, label: `${pool.name}（${pool.code}）` }))} /></Form.Item>
-          <CompactActions>
-            <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">生成预览</PermissionButton>
-          </CompactActions>
-        </BusinessRegistrationForm>
-        {preview ? <Typography.Paragraph><strong>影响结果：</strong>{preview.changed ? "将发生变化" : "无变化"}<br />历史影响：{JSON.stringify(preview.historical_impact)}<br />未来影响：{preview.future_effect}</Typography.Paragraph> : null}
-      </BusinessActionModal>
       <BusinessActionModal title={editTarget ? `编辑业务类型 · ${editTarget.code}` : "编辑业务类型"} fieldCount={5} open={Boolean(editTarget)} onCancel={() => { setEditTarget(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} okText="保存">
         <BusinessRegistrationForm
           layout="horizontal"
@@ -248,56 +164,10 @@ export function OrderTypesPanel() {
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} form={editForm} onFinish={update}>
           <Form.Item label="代码"><Input value={editTarget?.code} disabled /></Form.Item>
-          <Form.Item label="资金性质"><Input value={editTarget?.capital_type} disabled /></Form.Item>
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="is_zero_principal" label="零本金" valuePropName="checked"><Switch checkedChildren="是" unCheckedChildren="否" /></Form.Item>
           <Form.Item name="sort_order" label="排序"><InputNumber min={0} precision={0} className="ui-control-full" /></Form.Item>
           <Form.Item name="description" label="说明"><Input.TextArea rows={3} /></Form.Item>
-        </BusinessRegistrationForm>
-      </BusinessActionModal>
-      <BusinessActionModal
-        title={routeTarget ? `资金路由 · ${routeTarget.code}` : "资金路由"}
-        open={Boolean(routeTarget)}
-        onCancel={() => { setRouteTarget(null); routeForm.resetFields(); }}
-        footer={null}
-        width={640}
-      >
-        <Typography.Paragraph type="secondary">
-          路由决定该类型订单的过账去向：按资金份额（本金/利润/总额）与资金性质匹配目标资金池，优先级大者优先。
-        </Typography.Paragraph>
-        <DataTable<OrderTypeRoute>
-          columns={[
-            { title: "份额", dataIndex: "portion", render: (v: string) => configurableLabel("ROUTE_PORTION", v, PORTION_LABEL) },
-            { title: "资金性质", dataIndex: "fund_nature", render: (v: string | null) => (v ? configurableLabel("ROUTE_FUND_NATURE", v, FUND_NATURE_LABEL) : "不限") },
-            { title: "目标资金池", render: (_v, row) => `${row.pool_name}（${row.pool_code}）` },
-            { title: "优先级", dataIndex: "priority" },
-            { title: "启用", dataIndex: "is_active", render: (v: boolean) => <StatusTag status={v ? "ACTIVE" : "DISABLED"} label={v ? "是" : "否"} /> },
-          ]}
-          rows={routes}
-          page={1}
-          pageSize={Math.max(routes.length, 5)}
-          total={routes.length}
-          emptyText="暂无路由配置"
-          onPageChange={() => undefined}
-       />
-        <Typography.Paragraph strong className="ui-form-spaced">新增 / 覆盖路由</Typography.Paragraph>
-        <BusinessRegistrationForm
-          layout="horizontal"
-          labelAlign="left"
-          labelCol={{ flex: "108px" }}
-          wrapperCol={{ flex: "auto" }} form={routeForm} onFinish={submitRoute} initialValues={{ portion: "PRINCIPAL", priority: 0 }}>
-          <Form.Item name="portion" label="资金份额" rules={[{ required: true }]}>
-            <Select options={portionOptions} />
-          </Form.Item>
-          <Form.Item name="fund_nature" label="资金性质" extra="选填；不填表示不限性质">
-            <Select allowClear placeholder="不限" options={fundNatureOptions} />
-          </Form.Item>
-          <Form.Item name="pool_code" label="目标资金池" rules={[{ required: true, message: "请选择目标资金池" }]}>
-            <Select placeholder="请选择资金池" options={pools.map((pool) => ({ value: pool.code, label: `${pool.name}（${pool.code}）` }))} />
-          </Form.Item>
-          <Form.Item name="priority" label="优先级" extra="大者优先；同份额同性质只取最高优先级">
-            <InputNumber min={0} precision={0} className="ui-control-full" />
-          </Form.Item>
-          <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">保存路由</PermissionButton>
         </BusinessRegistrationForm>
       </BusinessActionModal>
     </section>

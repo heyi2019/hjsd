@@ -45,8 +45,8 @@ describe("库存纯逻辑", () => {
     expect(buildActionAllocationCandidates({ form_extra: {}, events: [] }, 55)).toMatchObject({ SELL: [55] });
   });
 
-  // —— #19 切换冲销流水的字段回填（金额 / 资金池 / 操作人重置）——
-  it("切换冲销流水：金额与资金池跟随新流水，操作人重置为默认值", () => {
+  // —— #19 切换冲销流水的字段回填（金额 / 资金账户 / 操作人重置）——
+  it("切换冲销流水：金额与资金账户跟随新流水，操作人重置为默认值", () => {
     const setFieldValue = vi.fn();
     applyOffsetEventSelection(
       setFieldValue,
@@ -58,7 +58,7 @@ describe("库存纯逻辑", () => {
     expect(setFieldValue).toHaveBeenCalledWith("operator_user_ids", [42]);
   });
 
-  it("切换到的新流水无资金池时清空旧账户，不留残留", () => {
+  it("切换到的新流水无资金账户时清空旧账户，不留残留", () => {
     const setFieldValue = vi.fn();
     applyOffsetEventSelection(setFieldValue, { remaining: "50.00" }, [7]);
     // pool_id 必须被显式清空（undefined），否则会残留上一笔流水的账户。

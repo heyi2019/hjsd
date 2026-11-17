@@ -166,7 +166,7 @@ export function cashflowPage<T>(items: T[], overrides: Partial<Omit<CashflowPage
   };
 }
 
-/** 构造资金池批量余额响应，汇总字段始终与服务端余额契约一起出现。 */
+/** 构造资金账户批量余额响应，汇总字段始终与服务端余额契约一起出现。 */
 export function poolBalancesResponse(items: PoolBalance[], totals: PoolBalanceTotals): PoolBalancesResponse {
   return { items, totals };
 }

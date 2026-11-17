@@ -85,7 +85,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "DRAFT", label: "草稿" }, { value: "ACTIVE", label: "已发布" }, { value: "EXPIRED", label: "已失效" }, { value: "SUPERSEDED", label: "已被取代" },
   ] },
   { code: "POLICY_SCOPE_TYPE", label: "规则适用范围", group: "POLICY", editable: false, options: [
-    { value: "GLOBAL", label: "全局" }, { value: "ORDER_TYPE", label: "按业务类型" }, { value: "USER", label: "按人员" }, { value: "POOL", label: "按资金池" },
+    { value: "GLOBAL", label: "全局" }, { value: "ORDER_TYPE", label: "按业务类型" }, { value: "USER", label: "按人员" }, { value: "POOL", label: "按资金账户" },
   ] },
   { code: "RECONCILIATION_STATUS", label: "日对账状态", group: "FUND", editable: false, options: [
     { value: "OPEN", label: "未核销" }, { value: "RESOLVED", label: "已核销" },
@@ -93,7 +93,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "REBATE_STATUS", label: "返点状态", group: "FUND", editable: false, options: [
     { value: "OPEN", label: "未结算" }, { value: "PARTIALLY_SETTLED", label: "部分结算" }, { value: "SETTLED", label: "已结清" }, { value: "VOID", label: "失效" },
   ] },
-  { code: "POOL_STATUS", label: "资金池状态", group: "FUND", editable: false, options: [
+  { code: "POOL_STATUS", label: "资金账户状态", group: "FUND", editable: false, options: [
     { value: "ACTIVE", label: "进行中" }, { value: "DISABLED", label: "已停用" },
   ] },
   { code: "USER_ROLE", label: "用户角色", group: "SYSTEM", editable: false, options: [
@@ -102,21 +102,12 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "OWNER_SCOPE", label: "数据可见范围", group: "SYSTEM", editable: false, options: [
     { value: "SELF", label: "本人" }, { value: "TEAM", label: "团队" }, { value: "ALL", label: "全部" },
   ] },
-  /* ── 0009 补种：资金池主数据 / 资金路由 / 佣金 / 订单角色 / 违约处置 / 导入行 / 字段元数据 ── */
-  { code: "POOL_TYPE", label: "资金池用途类型", group: "FUND", editable: false, options: [
+  /* ── 0009 补种：资金账户主数据 / 佣金 / 订单角色 / 违约处置 / 导入行 / 字段元数据 ── */
+  { code: "POOL_TYPE", label: "资金账户用途类型", group: "FUND", editable: false, options: [
     { value: "INVEST", label: "投资款" }, { value: "PROFIT", label: "利润" }, { value: "OTHER", label: "其他" },
   ] },
-  { code: "POOL_OWNERSHIP", label: "资金池归属", group: "FUND", editable: false, options: [
+  { code: "POOL_OWNERSHIP", label: "资金账户归属", group: "FUND", editable: false, options: [
     { value: "OWNED", label: "自有" }, { value: "CUSTODY", label: "代管" }, { value: "THIRD_PART", label: "第三方" },
-  ] },
-  { code: "CAPITAL_TYPE", label: "资金性质", group: "ORDER", editable: false, options: [
-    { value: "STOCK", label: "库存型" }, { value: "ZERO", label: "零本金型" },
-  ] },
-  { code: "ROUTE_PORTION", label: "资金份额", group: "ORDER", editable: false, options: [
-    { value: "PRINCIPAL", label: "本金" }, { value: "PROFIT", label: "利润" }, { value: "GROSS", label: "总额" },
-  ] },
-  { code: "ROUTE_FUND_NATURE", label: "路由资金性质", group: "ORDER", editable: false, options: [
-    { value: "BUSINESS", label: "本方经营" }, { value: "EXTERNAL", label: "外部/受托" }, { value: "INTERNAL", label: "内部调拨" },
   ] },
   { code: "COMMISSION_PAYER", label: "佣金承担方", group: "ORDER", editable: false, options: [
     { value: "BUYER", label: "买方" }, { value: "CONSIGNOR", label: "寄售方" }, { value: "PLATFORM", label: "平台" },
@@ -148,7 +139,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "reconciliation", label: "日对账" },
     { value: "lead", label: "客户需求" },
     { value: "order_form_field", label: "订单表单字段" },
-    { value: "OrderTypePool", label: "资金路由" },
     { value: "transfer", label: "资金划转" },
     { value: "report_export", label: "报表导出" },
     { value: "policy_version", label: "规则版本" },
@@ -159,19 +149,19 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "policy_definition", label: "规则定义" },
     { value: "option_set", label: "选项词典" },
     { value: "GameTypeOption", label: "游戏类型" },
-    { value: "Pool", label: "资金池" },
+    { value: "Pool", label: "资金账户" },
     { value: "Seed", label: "种子数据" },
     { value: "deposit", label: "押金" },
-    { value: "pool", label: "资金池" },
+    { value: "pool", label: "资金账户" },
   ] },
   { code: "FIELD_TYPE", label: "字段类型", group: "FIELD", editable: false, options: [
     { value: "TEXT", label: "文本" }, { value: "NUMBER", label: "数字" }, { value: "DATE", label: "日期" }, { value: "BOOLEAN", label: "是/否" }, { value: "SELECT", label: "单选" }, { value: "MULTI_SELECT", label: "多选" },
   ] },
   { code: "AUDIT_ACTION", label: "审计动作", group: "AUDIT", editable: false, options: [
-    { value: "POOL_CREATE", label: "新建资金池" },
-    { value: "POOL_UPDATE", label: "编辑资金池" },
-    { value: "POOL_DISABLE", label: "停用资金池" },
-    { value: "POOL_DELETE", label: "删除资金池" },
+    { value: "POOL_CREATE", label: "新建资金账户" },
+    { value: "POOL_UPDATE", label: "编辑资金账户" },
+    { value: "POOL_DISABLE", label: "停用资金账户" },
+    { value: "POOL_DELETE", label: "删除资金账户" },
     { value: "ORDER_TYPE_CREATE", label: "新建业务类型" },
     { value: "ORDER_TYPE_UPDATE", label: "编辑业务类型" },
     { value: "ORDER_TYPE_DISABLE", label: "停用业务类型" },
@@ -179,7 +169,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "GAME_TYPE_UPDATE", label: "编辑游戏类型" },
     { value: "GAME_TYPE_DISABLE", label: "停用游戏类型" },
     { value: "GAME_TYPE_DEFAULT", label: "设置默认游戏类型" },
-    { value: "ROUTE_UPDATE", label: "更新资金路由" },
     { value: "CUSTOMER_CREATE", label: "新建客户" },
     { value: "CUSTOMER_UPDATE", label: "编辑客户" },
     { value: "CONTACT_WRITE", label: "维护联系人" },

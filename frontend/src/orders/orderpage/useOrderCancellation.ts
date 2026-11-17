@@ -163,7 +163,7 @@ export function useOrderCancellation(params: {
           });
           appMessage.success(cancelScope === "INVREFUND"
             ? `取消已登记：入账 ¥${money(result.event.amount)}，已进入公司钱包`
-            : `取消已登记：退款 ¥${money(result.event.amount)}，已按原资金池退还客户`);
+            : `取消已登记：退款 ¥${money(result.event.amount)}，已按原资金账户退还客户`);
         } else {
           await ordersApi.cancel(order.id, { reason: values.reason, form_extra: values.form_extra });
           appMessage.success("交易已取消，无已登记款项需要退款");

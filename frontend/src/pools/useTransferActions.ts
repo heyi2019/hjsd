@@ -9,7 +9,7 @@ interface TransferActionsDeps {
   write: ReturnType<typeof useAsyncAction>;
 }
 
-/** 资金池划转写路径：登记池间资金转移。 */
+/** 资金账户划转写路径：登记池间资金转移。 */
 export function useTransferActions({ load, write }: TransferActionsDeps) {
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferForm] = Form.useForm();
@@ -24,7 +24,7 @@ export function useTransferActions({ load, write }: TransferActionsDeps) {
         note: values.note as string,
         operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
-      appMessage.success("资金池划转已登记");
+      appMessage.success("资金账户划转已登记");
       setTransferOpen(false);
       transferForm.resetFields();
       await load();

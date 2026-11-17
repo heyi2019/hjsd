@@ -15,16 +15,14 @@ from app.domain.enums import (
     AuditAction,
     CashflowSourceType,
     Direction,
-    FundNature,
     Nature,
     OrderStatus,
-    Portion,
     RebateStatus,
     RebateType,
 )
 from app.domain.trade import Cashflow, OrderEvent, RebateRecord
 from app.domain.users import User
-from app.foundation.order_types import resolve_default_pool
+from app.foundation.pools import require_default_pool
 from app.orders._shared import get_order
 from app.orders.events import post_event
 from app.orders.form_fields import validate_form_extra
@@ -121,18 +119,7 @@ def create_rebate(
     event_extra = dict(event.form_extra or {})
     event_extra["rebate_record_id"] = record.id
     event.form_extra = event_extra
-    pool = resolve_default_pool(
-        session,
-        order.order_type,
-        Portion.PROFIT.value,
-        fund_nature=FundNature.BUSINESS.value,
-    )
-    if pool is None:
-        raise Validation(
-            f"业务 {order.order_type} 未配置 {Portion.PROFIT.value} 资金池",
-            code=ErrorCode.POOL_ROUTE_MISSING,
-            details={"order_type": order.order_type, "portion": Portion.PROFIT.value},
-        )
+    pool = require_default_pool(session)
     from app.finance.cashflows import create_cashflow
 
     flow = create_cashflow(

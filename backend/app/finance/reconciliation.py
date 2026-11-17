@@ -67,7 +67,7 @@ def create_reconciliation(
     user: CurrentUser | None = None,
 ) -> Reconciliation:
     if user is not None and not user.can_see_pool(pool_id):
-        raise NotFound("资金池不存在", details={"pool_id": pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     pool = assert_pool_usable(session, pool_id)
     label = _text(
         account_label,
@@ -84,7 +84,7 @@ def create_reconciliation(
         )
     )
     if duplicate is not None:
-        raise Validation("同一资金池、日期和账户只能对账一次")
+        raise Validation("同一资金账户、日期和账户只能对账一次")
 
     try:
         raw_ids = list(unmatched_flow_ids or [])
@@ -123,7 +123,7 @@ def create_reconciliation(
         ]
         if invalid:
             raise Validation(
-                "未达流水必须属于当前资金池且不晚于对账日",
+                "未达流水必须属于当前资金账户且不晚于对账日",
                 details={"field": "unmatched_flow_ids", "invalid": invalid},
             )
 

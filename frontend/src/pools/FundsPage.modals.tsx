@@ -13,7 +13,7 @@ import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
 import { today } from "../shared/lib/format";
 import { positiveIntegerRules, requiredMoneyRules } from "../shared/lib/validators";
 import { configurableLabel } from "../shared/lib/optionSets";
-import { ACCOUNTING_ATTRIBUTE_LABEL, FUND_NATURE_LABEL } from "../shared/lib/labels";
+import { ACCOUNTING_ATTRIBUTE_LABEL } from "../shared/lib/labels";
 import type { FundsPageController } from "./useFundsPageController";
 import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
 
@@ -22,7 +22,7 @@ const Modal = BusinessActionModal;
 type WriteState = { error: NormalizedError | null; pending: boolean };
 type Pool = FundsPageController["pools"][number];
 
-/** 资金池下拉选项只展示名称；编号仍由后端按选中 id 绑定。 */
+/** 资金账户下拉选项只展示名称；编号仍由后端按选中 id 绑定。 */
 function poolOptions(pools: Pool[], opts?: { excludeId?: number; withTitle?: boolean }) {
   return pools
     .filter((pool) => pool.id !== opts?.excludeId)
@@ -126,8 +126,8 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
       write={write} permission="deposit.post" submitLabel={depositEditTarget ? "保存修改" : "提交"}
       employees={employees} showOperator
     >
-      <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}>
-        <Select aria-label="资金池" options={poolOptions(pools)} />
+      <CfgItem name="pool_id" label="资金账户" rules={[{ required: true }]}>
+        <Select aria-label="资金账户" options={poolOptions(pools)} />
       </CfgItem>
       <CfgItem name="amount" label="占用金额" rules={requiredMoneyRules("占用金额")}>
         <MoneyInput />
@@ -161,7 +161,7 @@ export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
       write={write} permission="deposit.post" submitLabel="提交"
       employees={employees} showOperator
     >
-      <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
+      <CfgItem name="pool_id" label="资金账户" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
       <CfgItem name="occurred_on" label="发生日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
       <CfgItem name="direction" label="收支方向" rules={[{ required: true }]}><Select options={flowDirectionOptions ?? []} aria-label="收支方向" /></CfgItem>
       <CfgItem name="accounting_attribute" label="核算属性" rules={[{ required: true }]}>
@@ -178,14 +178,14 @@ export function TransferModal({ ctrl }: { ctrl: FundsPageController }) {
   const { transferOpen, setTransferOpen, transferForm, submitTransfer, write, pools, employees } = ctrl;
   return (
     <FundsActionModal
-      title="资金池划转" fieldCount={6}
+      title="资金账户划转" fieldCount={6}
       open={transferOpen} onCancel={() => setTransferOpen(false)}
       scope="FUNDTRANSFER" form={transferForm} onFinish={submitTransfer}
       initialValues={{ occurred_on: today() }}
       write={write} permission="finance.transfer" submitLabel="确认划转" employees={employees} showOperator
     >
-      <CfgItem name="source_pool_id" label="转出资金池" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
-      <CfgItem name="target_pool_id" label="转入资金池" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
+      <CfgItem name="source_pool_id" label="转出资金账户" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
+      <CfgItem name="target_pool_id" label="转入资金账户" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
       <CfgItem name="amount" label="划转金额" rules={requiredMoneyRules("划转金额")}><MoneyInput /></CfgItem>
       <CfgItem name="occurred_on" label="划转日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
       <CfgItem name="note" label="说明"><Input.TextArea rows={2} /></CfgItem>
@@ -203,9 +203,9 @@ export function ReconciliationModal({ ctrl }: { ctrl: FundsPageController }) {
       initialValues={{ reconciled_on: today() }}
       write={write} permission="deposit.post" submitLabel="提交对账" employees={employees} showOperator
     >
-      <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select aria-label="资金池" options={poolOptions(pools)} /></CfgItem>
+      <CfgItem name="pool_id" label="资金账户" rules={[{ required: true }]}><Select aria-label="资金账户" options={poolOptions(pools)} /></CfgItem>
       <CfgItem name="reconciled_on" label="对账日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
-      <CfgItem name="account_label" label="对账账户" rules={[{ required: true }]} extra="同一资金池 + 对账账户 + 对账日期只能对账一次，重复提交会被拒绝"><Input /></CfgItem>
+      <CfgItem name="account_label" label="对账账户" rules={[{ required: true }]} extra="同一资金账户 + 对账账户 + 对账日期只能对账一次，重复提交会被拒绝"><Input /></CfgItem>
       <CfgItem name="statement_balance" label="账面余额" rules={requiredMoneyRules("账面余额")}><MoneyInput /></CfgItem>
       <CfgItem name="reason" label="差异原因" extra="账面余额与系统余额不一致时必填（系统余额=期初余额+已入账流水）"><Input.TextArea rows={2} /></CfgItem>
       <CfgItem name="note" label="说明"><Input.TextArea rows={2} /></CfgItem>
@@ -342,7 +342,7 @@ export function CancelModal({ ctrl }: { ctrl: FundsPageController }) {
           ) : null}
           <Typography.Paragraph type="warning">
             取消用于「押金登记有误 / 租约取消且押金从未实际占用」。系统会按占用全额自动写一笔
-            DEPOSIT_CANCEL 冲正流水把资金池占用冲平，操作不可撤销；已发生退还或损失的押金请改用释放 / 登记损失。
+            DEPOSIT_CANCEL 冲正流水把资金账户占用冲平，操作不可撤销；已发生退还或损失的押金请改用释放 / 登记损失。
           </Typography.Paragraph>
         </>
       }

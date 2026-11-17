@@ -144,7 +144,7 @@ def _check_pool_ids(session: Session, pool_ids: list[int] | None) -> None:
         for row in session.execute(select(Pool.id).where(Pool.id.in_(requested))).all()
     }
     if actual != requested:
-        raise Validation("资金池不存在", details={"pool_ids": sorted(requested - actual)})
+        raise Validation("资金账户不存在", details={"pool_ids": sorted(requested - actual)})
 
 
 def create_user(
@@ -168,7 +168,7 @@ def create_user(
     normalized_username = _required_text(username, message="用户名不能为空")
     normalized_display_name = _required_text(display_name, message="显示名称不能为空")
     password = _required_password(password)
-    pool_ids = _validate_id_list(pool_ids, label="资金池") or []
+    pool_ids = _validate_id_list(pool_ids, label="资金账户") or []
     team_ids = _validate_id_list(team_ids, label="团队") or []
     if session.scalar(select(User).where(User.username == normalized_username)):
         raise Conflict("用户名已存在")
@@ -219,7 +219,7 @@ def update_user(
     if handover_fields and changes.get("is_active") is not False:
         raise Validation("交接字段只能随停用提交", details={"fields": sorted(handover_fields)})
     if "pool_ids" in changes:
-        changes = {**changes, "pool_ids": _validate_id_list(changes["pool_ids"], label="资金池")}
+        changes = {**changes, "pool_ids": _validate_id_list(changes["pool_ids"], label="资金账户")}
     if "team_ids" in changes:
         changes = {**changes, "team_ids": _validate_id_list(changes["team_ids"], label="团队")}
     _check_pool_ids(session, changes.get("pool_ids") if "pool_ids" in changes else None)  # type: ignore[arg-type]

@@ -1,10 +1,10 @@
-"""MASTER-01 资金池主数据 Service：建池、停用、删除与审计。"""
+"""MASTER-01 资金账户主数据 Service：建池、停用、删除与审计。"""
 from __future__ import annotations
 
 import pytest
 
 from app.core.errors import AppError, ErrorCode
-from app.domain.enums import AuditAction, CapitalType, PoolOwnership, PoolStatus
+from app.domain.enums import AuditAction, PoolOwnership, PoolStatus
 from app.domain.foundation import AuditLog
 from app.foundation import pools as pools_service
 from app.foundation.order_types import list_order_types
@@ -28,7 +28,7 @@ class TestSeed:
 
         assert first["pools_created"] == 2
         assert first["order_types_created"] == 3
-        assert first["routes_created"] == 6
+        assert first["default_pool_marked"] == 1
         assert second["pools_created"] == 0
         assert second["pools_skipped"] == 2
         assert second["order_types_created"] == 0
@@ -42,14 +42,8 @@ class TestSeed:
         assert invest.pool_type == "INVEST"
         assert profit.pool_type == "PROFIT"
 
-        expected = {
-            "HS": (CapitalType.STOCK.value, 1),
-            "TH": (CapitalType.STOCK.value, 2),
-            "DG": (CapitalType.ZERO.value, 3),
-        }
         codes = {item.code: item for item in list_order_types(seeded_db)}
-        for code, (capital_type, _) in expected.items():
-            assert codes[code].capital_type == capital_type
+        for code in ("HS", "TH", "DG"):
             assert codes[code].is_active is True
 
     def test_seed_writes_audit(self, seeded_db):

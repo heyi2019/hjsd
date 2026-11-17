@@ -257,8 +257,8 @@ describe("StatCard：基础容器", () => {
 
 describe("ErrorBanner：给可执行下一步，不只复述报错", () => {
   it("有错误码时同时给出文案与处置提示", () => {
-    render(<ErrorBanner error={{ message: "缺少资金池路由", code: "POOL_ROUTE_MISSING" }} />);
-    expect(screen.getByText("缺少资金池路由")).toBeInTheDocument();
+    render(<ErrorBanner error={{ message: "缺少资金账户路由", code: "POOL_ROUTE_MISSING" }} />);
+    expect(screen.getByText("缺少资金账户路由")).toBeInTheDocument();
     expect(screen.getByText(/设置 → 主数据/)).toBeInTheDocument();
   });
 

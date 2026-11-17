@@ -13,7 +13,8 @@ from app.core.audit import record_audit
 from app.core.business_numbering import event_no as next_event_no
 from app.core.money import to_money
 from app.domain.foundation import Pool
-from app.foundation.order_types import resolve_default_pool
+from app.foundation.order_types import get_order_type_by_code
+from app.foundation.pools import require_default_pool
 from ._common import _required_text
 from .cancellation_model import (
     apply_cancellation_account_effect,
@@ -110,7 +111,7 @@ def _assert_event_allowed(
     offset_event_id: int | None = None,
     reason: str | None = None,
 ) -> None:
-    """按业务类型限制事件组合，避免只依赖资金路由间接拦截非法动作。"""
+    """按业务类型限制事件组合，避免只依赖资金账户解析间接拦截非法动作。"""
     if order.order_type == "HS" and event_type == EventType.BUY.value and order.account_id is None:
         # 回收订单在建单时必须已完成账号绑定；事件登记不再补建库存账号。
         if not (order.account_snapshot or {}).get("game_account"):
@@ -331,33 +332,34 @@ def _resolve_pool(
     session: Session,
     order: Order,
     portion: str,
-    *,
-    fund_nature: str | None = None,
 ) -> Pool:
-    pool = resolve_default_pool(
-        session, order.order_type, portion, fund_nature=fund_nature
-    )
-    if pool is None:
+    """落账资金账户：零本金业务拒绝本金支出，其余一律进唯一活动池。
+
+    2026-11-17 删除业务↔池路由后，池不再由（业务 + 份额）决定；
+    零本金改为业务类型自身的标记（`order_type_defs.is_zero_principal`）。
+    """
+    definition = get_order_type_by_code(session, order.order_type)
+    if (
+        definition is not None
+        and definition.is_zero_principal
+        and portion == "PRINCIPAL"
+    ):
         raise Validation(
-            f"业务 {order.order_type} 未配置 {portion} 资金池路由",
-            code=ErrorCode.POOL_ROUTE_MISSING,
-            details={
-                "order_type": order.order_type,
-                "portion": portion,
-                "fund_nature": fund_nature,
-            },
+            f"业务 {order.order_type}（{definition.name}）为零本金型，不能登记本金支出",
+            code=ErrorCode.ZERO_PRINCIPAL_FORBIDDEN,
+            details={"order_type": order.order_type, "portion": portion},
         )
-    return pool
+    return require_default_pool(session)
 
 
 def _assert_pool_active(session: Session, pool_id: int) -> Pool:
     """停用池不得用于新记录（QLT-01-04：主数据一致性校验）。"""
     pool = session.get(Pool, pool_id)
     if pool is None:
-        raise NotFound(f"资金池 {pool_id} 不存在", details={"pool_id": pool_id})
+        raise NotFound(f"资金账户 {pool_id} 不存在", details={"pool_id": pool_id})
     if pool.status != PoolStatus.ACTIVE.value:
         raise Validation(
-            f"资金池 {pool.code} 已停用，不能登记新流水",
+            f"资金账户 {pool.code} 已停用，不能登记新流水",
             code=ErrorCode.POOL_DISABLED,
             details={"pool_code": pool.code, "status": pool.status},
         )

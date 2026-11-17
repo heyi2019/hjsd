@@ -55,7 +55,7 @@ def create_deposit(
     user: CurrentUser = post_deposit,
 ) -> schemas.DepositOut:
     if not user.can_see_pool(payload.pool_id):
-        raise NotFound("资金池不存在", details={"pool_id": payload.pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": payload.pool_id})
     item = finance_create_deposit(
         db,
         pool_id=payload.pool_id,

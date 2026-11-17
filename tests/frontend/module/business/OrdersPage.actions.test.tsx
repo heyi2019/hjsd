@@ -165,7 +165,7 @@ const link1: OrderLink = {
   note: "来源单",
   created_at: "2026-10-01T10:00:00",
 };
-const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
+const types = [{ id: 1, code: "HS", name: "回收", is_active: true }];
 
 const installment: Installment = {
   id: 11,

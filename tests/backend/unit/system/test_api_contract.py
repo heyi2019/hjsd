@@ -59,9 +59,7 @@ def test_every_json_api_route_declares_response_model(app):
     # → 176（主列表导出 +6：/orders /stocks /customers /installments /rebates /cashflows）。
     # → 174（删除资金流水审核/驳回端点：POST /cashflows/{id}/approve、POST /cashflows/{id}/reject，
     # 资金流水改为创建即入账；下游 reporting/orders 仍按 ==APPROVED 过滤，不受影响）。
-    # order-types 路由配置的两个端点已包含在 174 的当前实际基线中，
-    # 不再重复叠加计数：GET /order-types/{order_type_id}/routes、
-    # GET /order-types/{code}/routes/impact-preview。
+    # 资金账户路由配置端点已删除，落账账户改由唯一默认账户解析。
     # → 175（订单台账 xlsx 导出：GET /orders/export.xlsx，非 JSON 已入豁免表）。
     # → 179（派生运算下沉后端 +4：GET /pools/balances、GET /installments/totals、
     # GET /cashflows/studio-summary、POST /stocks/inventory/stats）。
@@ -74,5 +72,5 @@ def test_every_json_api_route_declares_response_model(app):
     # → 181（移除手机号验证码 / 微信登录公开接口，-9）→ 170（下线质量分析、全局搜索、
     # 附件中心、系统提醒和资金属性分析独立入口及其后端路由）。
     # 注：public_routes 在豁免判断之前 +1，故豁免路由（含已删的 DELETE /rebates）也计数。
-    # → 181（2026-11-17 复核：当前路由总数含新增资金/库存/操作人端点）。
-    assert public_routes == 181
+    # → 178（2026-11-17 删除资金账户路由的 3 个端点）。
+    assert public_routes == 178

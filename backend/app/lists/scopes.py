@@ -176,9 +176,9 @@ LIST_SCOPES: tuple[ListScope, ...] = (
     ),
     ListScope(
         code="FUND_POOLS",
-        label="资金中心·资金池",
+        label="资金中心·资金账户",
         columns=(
-            ListColumn("pool_code", "资金池"),
+            ListColumn("pool_code", "资金账户"),
             ListColumn("ownership", "归属"),
             ListColumn("status", "状态", value_set="POOL_STATUS"),
             ListColumn("income", "收入"),
@@ -208,7 +208,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="RECONCILIATIONS",
         label="资金中心·资金对账",
         columns=(
-            ListColumn("pool", "资金池"),
+            ListColumn("pool", "资金账户"),
             ListColumn("reconciled_on", "对账日期"),
             ListColumn("account_label", "账户"),
             ListColumn("system_balance", "系统余额"),

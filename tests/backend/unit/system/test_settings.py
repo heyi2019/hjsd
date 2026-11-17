@@ -194,7 +194,7 @@ def test_describe_redacts_database_password():
 # --- CORS：dev 端口通配 ---------------------------------------------------
 # 背景（实测事故）：前端换到 5199 端口后，CORS 预检返回 400，
 # axios 全部 Failed to fetch，但页面**不报错**，只静默显示
-# 「资金池数量 0 / 尚未配置资金池」，与「真的没有数据」无法区分。
+# 「资金账户数量 0 / 尚未配置资金账户」，与「真的没有数据」无法区分。
 
 
 def test_dev_allows_any_local_port():

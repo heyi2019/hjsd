@@ -15,18 +15,15 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import NotFound, Validation
-from app.domain.enums import CapitalType, PoolOwnership, PoolStatus, Portion
-from app.domain.foundation import OrderTypeDef, OrderTypePool
+from app.domain.enums import PoolOwnership, PoolStatus
+from app.domain.foundation import OrderTypeDef
 from app.foundation import seeds
 from app.foundation.order_types import (
     create_order_type,
     get_order_type_by_code,
     list_order_types,
-    require_default_pool,
     require_order_type_by_code,
-    resolve_default_pool,
     set_order_type_active,
-    set_route,
     update_order_type,
 )
 from app.foundation.pools import (
@@ -119,7 +116,7 @@ class TestPoolGuards:
         pool = _pool(seeded_db, "TMPSTA")
         with pytest.raises(Validation) as exc:
             set_pool_status(seeded_db, pool.id, "BOGUS", actor="pytest")
-        assert "资金池状态取值非法" in str(exc.value)
+        assert "资金账户状态取值非法" in str(exc.value)
 
     def test_has_cashflow_returns_false_without_flows(self, seeded_db):
         # PG 下 cashflow 表恒存在；此处验证「该池无流水时返回 False」（delete_pool 据此放行）
@@ -133,41 +130,12 @@ class TestOrderTypeGuards:
             seeded_db,
             code="TBOOL",
             name="布尔状态校验",
-            capital_type=CapitalType.STOCK.value,
             actor="pytest",
         )
         with pytest.raises(Validation, match="is_active 必须为布尔值"):
             set_order_type_active(
                 seeded_db, order_type.id, "false", actor="pytest"
             )
-        with pytest.raises(Validation, match="is_active 必须为布尔值"):
-            set_route(
-                seeded_db,
-                order_type_code=order_type.code,
-                portion=Portion.PRINCIPAL.value,
-                pool_code="HJ_INVEST",
-                is_active="false",
-                actor="pytest",
-            )
-
-    def test_activation_requires_an_active_route_to_an_active_pool(self, seeded_db):
-        order_type = create_order_type(
-            seeded_db,
-            code="TBR",
-            name="路由状态校验",
-            capital_type=CapitalType.STOCK.value,
-            actor="pytest",
-        )
-        set_route(
-            seeded_db,
-            order_type_code=order_type.code,
-            portion=Portion.PRINCIPAL.value,
-            pool_code="HJ_INVEST",
-            is_active=False,
-            actor="pytest",
-        )
-        with pytest.raises(Validation, match="启用中的资金池路由"):
-            set_order_type_active(seeded_db, order_type.id, True, actor="pytest")
 
     def test_order_type_name_and_prefix_are_validated(self, seeded_db):
         with pytest.raises(Validation):
@@ -175,16 +143,14 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TBN",
                 name="   ",
-                capital_type=CapitalType.STOCK.value,
-                actor="pytest",
+                    actor="pytest",
             )
         with pytest.raises(Validation):
             create_order_type(
                 seeded_db,
                 code="TBP",
                 name="同行代收",
-                capital_type=CapitalType.STOCK.value,
-                sequence_prefix="TB-",
+                    sequence_prefix="TB-",
                 actor="pytest",
             )
 
@@ -194,8 +160,7 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TB",
                 name="同行代收",
-                capital_type=CapitalType.STOCK.value,
-                sort_order=-1,
+                    sort_order=-1,
                 actor="pytest",
             )
         assert "排序值不能为负数" in str(exc.value)
@@ -206,8 +171,7 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TBT",
                 name="类型值校验",
-                capital_type=CapitalType.STOCK.value,
-                sort_order=True,
+                    sort_order=True,
                 actor="pytest",
             )
 
@@ -217,8 +181,7 @@ class TestOrderTypeGuards:
                 seeded_db,
                 code="TB",
                 name="同行代收",
-                capital_type=CapitalType.STOCK.value,
-                sequence_prefix="HS",
+                    sequence_prefix="HS",
                 actor="pytest",
             )
         assert "编号前缀 HS 已存在" in str(exc.value)
@@ -237,8 +200,7 @@ class TestOrderTypeGuards:
                 OrderTypeDef.__table__.insert().values(
                     code="TB",
                     name="同行代收",
-                    capital_type=CapitalType.STOCK.value,
-                    sequence_prefix="TB",
+                            sequence_prefix="TB",
                     sequence_key="ORDER_TB",
                     is_active=False,
                     sort_order=-1,
@@ -253,8 +215,7 @@ class TestOrderTypeGuards:
                 OrderTypeDef.__table__.insert().values(
                     code="TB",
                     name="同行代收",
-                    capital_type=CapitalType.STOCK.value,
-                    sequence_prefix="HS",
+                            sequence_prefix="HS",
                     sequence_key="ORDER_TB",
                     is_active=False,
                     sort_order=0,
@@ -289,64 +250,8 @@ class TestOrderTypeGuards:
         assert updated.name == "代挂改名"
         assert updated.description == "客户让我帮忙卖他的号"
         assert updated.sort_order == 99
-        # code / capital_type 不随更新变动（BAS-02-03）
+        # code 与编号前缀不随更新变动（BAS-02-03）
         assert updated.code == "DG"
-
-
-class TestRouteGuards:
-    def test_negative_priority_rejected(self, seeded_db):
-        with pytest.raises(Validation) as exc:
-            set_route(
-                seeded_db,
-                order_type_code="HS",
-                portion=Portion.PRINCIPAL.value,
-                pool_code="HJ_INVEST",
-                priority=-1,
-                actor="pytest",
-            )
-        assert "优先级不能为负数" in str(exc.value)
-
-    def test_database_rejects_negative_route_priority(self, seeded_db):
-        order_type = require_order_type_by_code(seeded_db, "HS")
-        pool = require_pool_by_code(seeded_db, "HJ_INVEST")
-        with pytest.raises(IntegrityError):
-            seeded_db.execute(
-                OrderTypePool.__table__.insert().values(
-                    order_type_id=order_type.id,
-                    pool_id=pool.id,
-                    portion=Portion.GROSS.value,
-                    priority=-1,
-                    is_active=True,
-                )
-            )
-
-    def test_invalid_portion_rejected(self, seeded_db):
-        with pytest.raises(Validation) as exc:
-            set_route(
-                seeded_db, order_type_code="HS", portion="BOGUS",
-                pool_code="HJ_INVEST", actor="pytest",
-            )
-        assert "portion 取值非法" in str(exc.value)
-
-    def test_default_pool_resolved_for_seeded_route(self, seeded_db):
-        pool = require_default_pool(seeded_db, "HS", "PRINCIPAL")
-        assert pool.code == "HJ_INVEST"
-
-    def test_disabled_pool_cannot_be_default_route(self, seeded_db):
-        invest = require_pool_by_code(seeded_db, "HJ_INVEST")
-        set_pool_status(seeded_db, invest.id, PoolStatus.DISABLED.value, actor="pytest")
-        with pytest.raises(Validation) as exc:
-            require_default_pool(seeded_db, "HS", "PRINCIPAL")
-        assert "已停用" in str(exc.value)
-
-    def test_unknown_order_type_route_returns_none(self, seeded_db):
-        with pytest.raises(NotFound):
-            resolve_default_pool(seeded_db, "ZZ", "PRINCIPAL")
-
-    def test_invalid_portion_in_default_pool_lookup_rejected(self, seeded_db):
-        with pytest.raises(Validation) as exc:
-            resolve_default_pool(seeded_db, "HS", "BOGUS")
-        assert "portion 取值非法" in str(exc.value)
 
 
 class TestNumberingHelpers:
@@ -358,27 +263,9 @@ class TestNumberingHelpers:
 
 
 class TestSeedGuards:
-    def test_seed_skips_route_when_order_type_missing(self, db, monkeypatch):
-        # 路由种子遇到不存在的业务类型时跳过而不是崩
-        monkeypatch.setattr(
-            seeds,
-            "SEED_ROUTES",
-            seeds.SEED_ROUTES + (("ZZ", "PRINCIPAL", "HJ_INVEST"),),
-        )
-        stats = seeds.seed_foundation(db, actor="pytest")
-        db.commit()
-        assert stats["pools_created"] == 2
-        assert get_order_type_by_code(db, "ZZ") is None
-
     def test_seed_is_applied_true(self, seeded_db):
         assert seeds.seed_is_applied(seeded_db) is True
 
-    def test_seed_is_applied_false_when_route_missing(self, seeded_db):
-        # 池与业务类型齐全但缺一条种子路由 → 判定未落地（_all_seed_routes_ready 短路）
-        route = seeded_db.scalars(select(OrderTypePool)).first()
-        seeded_db.delete(route)
-        seeded_db.flush()
-        assert seeds.seed_is_applied(seeded_db) is False
 
 
 class TestFoundationApi:
@@ -460,28 +347,6 @@ class TestFoundationApi:
             item for item in response.json() if item["sequence_key"] == target.sequence_key
         )
         assert row["next_number"] == "<已达上限 99999>"
-
-    def test_route_impact_preview_does_not_change_history(
-        self, seeded_client, seeded_db, headers
-    ):
-        create_order(
-            seeded_db, order_type="HS", trade_date=date(2026, 10, 17), actor="pytest"
-        )
-        response = seeded_client.get(
-            "/api/v1/order-types/HS/routes/impact-preview",
-            params={
-                "portion": "PRINCIPAL",
-                "pool_code": "HJ_PROFIT",
-            },
-            headers=headers,
-        )
-        assert response.status_code == 200, response.text
-        payload = response.json()
-        assert payload["changed"] is True
-        assert payload["current_route"]["pool_code"] == "HJ_INVEST"
-        assert payload["proposed_route"]["pool_code"] == "HJ_PROFIT"
-        assert payload["historical_impact"]["order_count"] == 1
-        assert payload["historical_impact"]["unchanged"] is True
 
     def test_update_pool_endpoint_applies_ownership_enum_to_value(
         self, seeded_client, seeded_db, headers

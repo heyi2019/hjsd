@@ -21,8 +21,8 @@ async function fillChecked(locator: Locator, value: string) {
 test("资金中心页面划转后生成一收一支的内部资金流水", async ({ page }) => {
   await page.goto("/");
   await navItem(page, "资金中心").click();
-  await page.getByRole("button", { name: "资金池划转" }).click();
-  const dialog = page.getByRole("dialog", { name: "资金池划转" });
+  await page.getByRole("button", { name: "资金账户划转" }).click();
+  const dialog = page.getByRole("dialog", { name: "资金账户划转" });
   await dialog.locator(".ant-select-selector").first().click();
   await page.getByTitle("利润荷包（HJ_PROFIT）").last().click();
   await dialog.locator(".ant-select-selector").last().click();

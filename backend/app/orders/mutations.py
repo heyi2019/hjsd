@@ -60,7 +60,7 @@ def _shift_accounting_dates(
         select(Cashflow).where(Cashflow.order_id == order.id)
     ).all()
 
-    # #14 对账边界：平移会改动流水的 occurred_on；若任一流水所属资金池在
+    # #14 对账边界：平移会改动流水的 occurred_on；若任一流水所属资金账户在
     # 「该流水旧日期→新日期」移动区间内已有对账快照（含 OPEN/RESOLVED，对账一旦
     # 建立即固化当日余额），平移会把流水挪进/挪出已对账期间，破坏快照，必须拒绝。
     # 用流水实际日期区间而非 trade_date：买入/收款常发生在成交日之前，区间更宽。
@@ -78,7 +78,7 @@ def _shift_accounting_dates(
             ).first()
             if locked is not None:
                 raise Validation(
-                    "成交日期涉及资金池已对账期间，不能平移账期",
+                    "成交日期涉及资金账户已对账期间，不能平移账期",
                     details={"from": order.trade_date.isoformat(), "to": new_trade_date.isoformat()},
                 )
 

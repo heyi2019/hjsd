@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.schemas import RequestModel
-from app.domain.enums import CapitalType, FundNature, PoolOwnership, PoolStatus, PoolType, Portion
+from app.domain.enums import PoolOwnership, PoolStatus, PoolType
 
 
 class PoolCreate(RequestModel):
@@ -21,6 +21,8 @@ class PoolCreate(RequestModel):
     # pool_type 是可扩展注册值，不锁死在首批枚举。
     pool_type: str = Field(default=PoolType.OTHER.value, min_length=1, max_length=32)
     ownership: PoolOwnership = PoolOwnership.OWNED
+    # 默认资金账户：未显式指定 pool_id 的流水落这里（全局唯一）。
+    is_default: bool = False
     note: str | None = None
     extra_values: dict[str, Any] | None = None
 
@@ -33,6 +35,7 @@ class PoolUpdate(RequestModel):
     # pool_type 是可扩展注册值，不锁死在首批枚举。
     pool_type: str | None = Field(default=None, min_length=1, max_length=32)
     ownership: PoolOwnership | None = None
+    is_default: bool | None = None
     extra_values: dict[str, Any] | None = None
 
 
@@ -49,6 +52,7 @@ class PoolOut(BaseModel):
     pool_type: str
     ownership: str
     status: str
+    is_default: bool
     note: str | None = None
     created_at: datetime
     updated_at: datetime
@@ -60,7 +64,7 @@ class OrderTypeCreate(RequestModel):
 
     code: str = Field(min_length=2, max_length=10, description="2-10 位大写字母数字，创建后不可修改")
     name: str = Field(min_length=1, max_length=64)
-    capital_type: CapitalType
+    is_zero_principal: bool = False
     sequence_prefix: str | None = Field(default=None, max_length=16, description="默认等于 code")
     sort_order: int = 0
     description: str | None = None
@@ -70,6 +74,7 @@ class OrderTypeUpdate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: str | None = Field(default=None, min_length=1, max_length=64)
+    is_zero_principal: bool | None = None
     description: str | None = None
     sort_order: int | None = None
 
@@ -80,7 +85,7 @@ class OrderTypeOut(BaseModel):
     id: int
     code: str
     name: str
-    capital_type: str
+    is_zero_principal: bool
     business_mode: str | None = None
     business_type: str | None = None
     value_added_service: str | None = None
@@ -129,36 +134,6 @@ class GameTypeOut(BaseModel):
     updated_at: datetime
 
 
-class RouteIn(RequestModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    portion: Portion = Portion.GROSS
-    fund_nature: FundNature | None = None
-    pool_code: str = Field(min_length=2, max_length=64)
-    priority: int = 0
-
-
-class RouteOut(BaseModel):
-    id: int
-    order_type_code: str
-    portion: str
-    fund_nature: str | None = None
-    pool_code: str
-    pool_name: str
-    priority: int
-    is_active: bool
-
-
-class RouteImpactPreviewOut(BaseModel):
-    order_type: str
-    portion: str
-    current_route: dict | None = None
-    proposed_route: dict
-    changed: bool
-    historical_impact: dict
-    future_effect: str
-
-
 class SequenceOut(BaseModel):
     sequence_key: str
     prefix: str
@@ -178,8 +153,5 @@ __all__ = [
     "PoolOut",
     "PoolStatusUpdate",
     "PoolUpdate",
-    "RouteIn",
-    "RouteImpactPreviewOut",
-    "RouteOut",
     "SequenceOut",
 ]

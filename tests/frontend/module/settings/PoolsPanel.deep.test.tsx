@@ -46,31 +46,32 @@ describe("PoolsPanel.deep", () => {
     expect(screen.getByText("代管")).toBeInTheDocument();
   });
 
-  it("新建资金池成功：提交 create + 重新加载", async () => {
+  it("新建资金账户成功：提交 create + 重新加载", async () => {
     renderLight(<PoolsPanel />, { user: "admin" });
     await screen.findByText("托管池");
-    await ui.type(screen.getByPlaceholderText("请输入资金池编码"), "NEW_POOL");
+    await ui.type(screen.getByPlaceholderText("请输入资金账户编码"), "NEW_POOL");
     await ui.type(screen.getByPlaceholderText("显示名"), "新池");
-    await ui.click(screen.getByRole("button", { name: /新增资金池/ }));
+    await ui.click(screen.getByRole("button", { name: /新增资金账户/ }));
     await waitFor(() =>
       expect(vi.mocked(poolsApi.create)).toHaveBeenCalledWith({
         code: "NEW_POOL",
         name: "新池",
         pool_type: "OTHER",
         ownership: "OWNED",
+        is_default: false,
       }),
     );
-    expect(message.success).toHaveBeenCalledWith("资金池已创建");
+    expect(message.success).toHaveBeenCalledWith("资金账户已创建");
     await waitFor(() => expect(vi.mocked(poolsApi.list)).toHaveBeenCalledTimes(2));
   });
 
-  it("新建资金池失败：错误横幅", async () => {
+  it("新建资金账户失败：错误横幅", async () => {
     vi.mocked(poolsApi).create.mockRejectedValue(new Error("create fail"));
     renderLight(<PoolsPanel />, { user: "admin" });
     await screen.findByText("托管池");
-    await ui.type(screen.getByPlaceholderText("请输入资金池编码"), "BAD");
+    await ui.type(screen.getByPlaceholderText("请输入资金账户编码"), "BAD");
     await ui.type(screen.getByPlaceholderText("显示名"), "坏池");
-    await ui.click(screen.getByRole("button", { name: /新增资金池/ }));
+    await ui.click(screen.getByRole("button", { name: /新增资金账户/ }));
     expect(await screen.findByText(/create fail/)).toBeInTheDocument();
   });
 
@@ -78,7 +79,7 @@ describe("PoolsPanel.deep", () => {
     renderLight(<PoolsPanel />, { user: "admin" });
     const row = (await screen.findByText("托管池")).closest("tr") as HTMLElement;
     await ui.click(within(row).getByRole("button", { name: /编辑/ }));
-    const modal = (await screen.findByText(/编辑资金池 · HJ_CUSTODY/)).closest(".ant-modal-content") as HTMLElement;
+    const modal = (await screen.findByText(/编辑资金账户 · HJ_CUSTODY/)).closest(".ant-modal-content") as HTMLElement;
     const nameInput = within(modal).getByDisplayValue("托管池") as HTMLInputElement;
     await ui.clear(nameInput);
     await ui.type(nameInput, "托管池改");
@@ -89,7 +90,7 @@ describe("PoolsPanel.deep", () => {
         expect.objectContaining({ name: "托管池改", pool_type: "INVEST", ownership: "OWNED" }),
       ),
     );
-    expect(message.success).toHaveBeenCalledWith("资金池已更新");
+    expect(message.success).toHaveBeenCalledWith("资金账户已更新");
   });
 
   it("编辑保存失败：错误横幅", async () => {
@@ -97,7 +98,7 @@ describe("PoolsPanel.deep", () => {
     renderLight(<PoolsPanel />, { user: "admin" });
     const row = (await screen.findByText("托管池")).closest("tr") as HTMLElement;
     await ui.click(within(row).getByRole("button", { name: /编辑/ }));
-    const modal = (await screen.findByText(/编辑资金池 · HJ_CUSTODY/)).closest(".ant-modal-content") as HTMLElement;
+    const modal = (await screen.findByText(/编辑资金账户 · HJ_CUSTODY/)).closest(".ant-modal-content") as HTMLElement;
     await ui.click(within(modal).getByRole("button", { name: /保存/ }));
     expect(await within(modal).findByText(/update fail/)).toBeInTheDocument();
   });
@@ -108,7 +109,7 @@ describe("PoolsPanel.deep", () => {
     await ui.click(within(row).getByRole("button", { name: /停用/ }));
     await ui.click(await screen.findByRole("button", { name: /确认/ }));
     await waitFor(() => expect(vi.mocked(poolsApi.setStatus)).toHaveBeenCalledWith(1, "DISABLED"));
-    expect(message.success).toHaveBeenCalledWith("资金池已停用");
+    expect(message.success).toHaveBeenCalledWith("资金账户已停用");
   });
 
   it("启用（ConfirmButton）：setStatus(id, ACTIVE)", async () => {
@@ -117,7 +118,7 @@ describe("PoolsPanel.deep", () => {
     await ui.click(within(row).getByRole("button", { name: /启用/ }));
     await ui.click(await screen.findByRole("button", { name: /确认/ }));
     await waitFor(() => expect(vi.mocked(poolsApi.setStatus)).toHaveBeenCalledWith(2, "ACTIVE"));
-    expect(message.success).toHaveBeenCalledWith("资金池已启用");
+    expect(message.success).toHaveBeenCalledWith("资金账户已启用");
   });
 
   it("无 pool.manage 权限时隐藏操作并展示 fallback", async () => {
@@ -134,8 +135,8 @@ describe("PoolsPanel.deep", () => {
       .mockResolvedValue(pools);
     renderLight(<PoolsPanel />, { user: "admin" });
     expect(await screen.findByText(/pools down/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /新增资金池/ })).toBeDisabled();
-    expect(screen.getByText("资金池数据不可用，请点击重新加载")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /新增资金账户/ })).toBeDisabled();
+    expect(screen.getByText("资金账户数据不可用，请点击重新加载")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /重新加载/ }));
     await waitFor(() => expect(vi.mocked(poolsApi.list)).toHaveBeenCalledTimes(2));
     expect(await screen.findByText("托管池")).toBeInTheDocument();

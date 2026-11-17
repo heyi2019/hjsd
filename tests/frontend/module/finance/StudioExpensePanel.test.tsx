@@ -92,14 +92,14 @@ async function pickDirection(modal: HTMLElement, label: "支出" | "收入") {
 }
 
 describe("StudioExpensePanel：工作室支出", () => {
-  it("默认汇总全部资金池且不显示资金池筛选", async () => {
+  it("默认汇总全部资金账户且不显示资金账户筛选", async () => {
     mockOptionSets();
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
 
     expect(screen.queryByRole("button", { name: /配置承载池/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: /经营主池/ })).not.toBeInTheDocument();
     expect(await screen.findByText("房租")).toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "资金池筛选" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "资金账户筛选" })).not.toBeInTheDocument();
     expect(document.querySelector(".studio-expense-shell")).toBeTruthy();
     expect(vi.mocked(studioExpensesApi.summary).mock.lastCall?.[0]).not.toHaveProperty("pool_ids");
   });

@@ -112,27 +112,6 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(payload.nature).toBeUndefined();
   });
 
-  it("独立流水选内部调拨 → 交由后端拒绝，不在前端复制业务规则", async () => {
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
-    await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
-    const modal = modalContent();
-    await pickSelect(modal, 0, /经营主池/);
-    // 资金性质 dropdown 序号 2（弹窗 select 顺序：0 资金池 / 1 收支方向 / 2 资金性质 / 3 核算属性）选「内部调拨」
-    await pickSelect(modal, 2, /内部调拨/);
-    await ui.type(modal.querySelector("#occurred_on") ?? modal, "2026-10-17");
-    await ui.type(modal.querySelector("#category") ?? modal, "TRANSFER");
-    await ui.type(modal.querySelector("#amount") ?? modal, "300.00");
-    await ui.type(modal.querySelector("#note") ?? modal, "内部调拨");
-    await ui.click(screen.getByRole("button", { name: /提交/ }));
-    await waitFor(() => expect(vi.mocked(cashflowsApi.create)).toHaveBeenCalled());
-  });
-
-
-
-
-
   it("已入账且无关联流水 → 冲销调用 cashflowsApi.reverse", async () => {
     const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source_type: "MANUAL", source_id: null, source: "MANUAL", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" }];
     resolveMock(vi.mocked(cashflowsApi.list), cashflowPage(approved, { total_in: "0.00", total_out: "300.00" }));
@@ -171,11 +150,11 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(screen.getByRole("button", { name: /确认冲销/ })).toBeEnabled();
   });
 
-  it("资金池划转提交调用 transfersApi.create", async () => {
+  it("资金账户划转提交调用 transfersApi.create", async () => {
     resolveMockOnce(vi.mocked(transfersApi.create), { id: 200, transfer_id: "TRF-200" });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(await screen.findByRole("button", { name: /资金池划转/ }));
+    await ui.click(await screen.findByRole("button", { name: /资金账户划转/ }));
     const modal = modalContent();
     await pickSelect(modal, 0, /经营主池/);
     await pickSelect(modal, 1, /押金池/);
@@ -189,10 +168,10 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(payload.amount).toBe("100.00");
   });
 
-  it("资金池划转金额不接受负数", async () => {
+  it("资金账户划转金额不接受负数", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(await screen.findByRole("button", { name: /资金池划转/ }));
+    await ui.click(await screen.findByRole("button", { name: /资金账户划转/ }));
     const modal = modalContent();
     await pickSelect(modal, 0, /经营主池/);
     await pickSelect(modal, 1, /押金池/);
@@ -237,7 +216,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.type(modal.querySelector("#statement_balance") ?? modal, "900.00");
     await ui.click(screen.getByRole("button", { name: /提交对账/ }));
     await waitFor(() =>
-      expect(warningSpy).toHaveBeenCalledWith("同一资金池、对账账户和日期只能对账一次，请调整对账日期或账户"),
+      expect(warningSpy).toHaveBeenCalledWith("同一资金账户、对账账户和日期只能对账一次，请调整对账日期或账户"),
     );
     expect(vi.mocked(reconciliationsApi.create)).not.toHaveBeenCalled();
     warningSpy.mockRestore();

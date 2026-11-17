@@ -3,7 +3,7 @@
 业务链路（项目第七阶段·跨模块测试·流程 A）
 ------------------------------------------
 客户(可省略) → 回收订单(HS + 账号快照) → 内联入库(Account) → 记 BUY 事件(采购成本)
-→ 资金流水(Cashflow, 支出) → 资金池余额变化 → 账号成本(cost_amount) 写入
+→ 资金流水(Cashflow, 支出) → 资金账户余额变化 → 账号成本(cost_amount) 写入
 → 订单详情可见该流水。
 
 本文件只验证**跨模块数据一致性**：同一个业务动作在库存/订单/资金三处的状态同源、
@@ -59,7 +59,7 @@ def test_recycle_flow_buy_event_records_cashflow_and_updates_pool_balance(
     """BIZ-FLOW-RECYCLE-001：回收建单→内联入库→记 BUY 事件，三处状态同源。
 
     黑盒：建 HS 单 + 记 BUY(1000, pool) → 201 且返回 cashflow_no；
-    白盒：Cashflow 行落库（OUT/APPROVED/绑定本单/本池）、资金池余额减少 1000、
+    白盒：Cashflow 行落库（OUT/APPROVED/绑定本单/本池）、资金账户余额减少 1000、
     账号 cost_amount 写入 1000、订单详情暴露该流水。
     """
     order_id, account_id = _post_hs_recycle(
@@ -98,7 +98,7 @@ def test_recycle_flow_buy_event_records_cashflow_and_updates_pool_balance(
     assert flow.amount == 1000
     assert flow.pool_id == pool.id
 
-    # 资金池现金余额 = 已审核流水有符号和；支出 1000 应使 cash_balance 减少 1000。
+    # 资金账户现金余额 = 已审核流水有符号和；支出 1000 应使 cash_balance 减少 1000。
     balance_after = float(
         seeded_client.get(f"/api/v1/pools/{pool.id}/balance", headers=headers).json()[
             "cash_balance"

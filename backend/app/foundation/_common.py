@@ -1,6 +1,6 @@
-"""foundation.service：资金池 / 业务类型 / 路由 / 编号序列的 Service 层。
+"""foundation.service：资金账户 / 业务类型 / 路由 / 编号序列的 Service 层。
 所有写操作在同一个 Service 事务内完成：**业务落库 + 审计写盘**，失败整体回滚。
-业务类型与资金池都是主数据：新增业务/新增池不需要改代码、不改表（V32/V33）。
+业务类型与资金账户都是主数据：新增业务/新增池不需要改代码、不改表（V32/V33）。
 """
 from __future__ import annotations
 import re
@@ -59,7 +59,7 @@ def _non_negative_int(value: object, *, field: str) -> int:
 def _get_pool_or_404(session: Session, pool_id: int) -> Pool:
     pool = session.get(Pool, pool_id)
     if pool is None:
-        raise NotFound("资金池不存在", details={"pool_id": pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     return pool
 def _get_order_type_or_404(session: Session, order_type_id: int) -> OrderTypeDef:
     order_type = session.get(OrderTypeDef, order_type_id)

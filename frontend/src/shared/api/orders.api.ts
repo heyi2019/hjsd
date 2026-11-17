@@ -2,8 +2,7 @@ import { api } from "./client";
 import type { PageResponse } from "./types/common";
 import type { FormScope, ListColumnConfig, ListCustomFieldOption, ListScopeConfig, OrderFormField } from "./types/forms";
 import type { EventPostResult, OrderLink } from "./types/order-events";
-import type { Order, OrderType, OrderTypeRoute } from "./types/orders";
-import type { RouteImpactPreview } from "./types/policy";
+import type { Order, OrderType } from "./types/orders";
 import type { AccountExecutionDetail } from "./types/account-execution";
 
 export interface OrderListParams {
@@ -24,17 +23,9 @@ export interface OrderListParams {
 export const orderTypesApi = {
   update: (id: number, data: Partial<OrderType>) => api.patch<OrderType>(`/order-types/${id}`, data).then(r => r.data),
   setActive: (id: number, is_active: boolean) => api.patch<OrderType>(`/order-types/${id}/active`, {is_active}).then(r => r.data),
-  impactPreview: (code: string, portion: string, pool_code: string, fund_nature?: string) => api.get<RouteImpactPreview>(`/order-types/${code}/routes/impact-preview`, {params: {portion, pool_code, fund_nature}}).then(r => r.data),
   list: () => api.get<OrderType[]>("/order-types").then((r) => r.data),
   create: (payload: Partial<OrderType>) =>
     api.post<OrderType>("/order-types", payload).then((r) => r.data),
-  routes: (orderTypeId: number) =>
-    api.get<OrderTypeRoute[]>(`/order-types/${orderTypeId}/routes`).then((r) => r.data),
-  setRoute: (
-    code: string,
-    payload: { portion: string; pool_code: string; fund_nature?: string | null; priority?: number },
-  ) =>
-    api.post<OrderTypeRoute>(`/order-types/${code}/routes`, payload).then((r) => r.data),
 };
 /** 订单编辑入参（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
 export interface OrderPatchPayload {

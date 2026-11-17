@@ -1,4 +1,4 @@
-"""orders.router：订单、事件与资金池余额 API（ORD-01/02、FIN-01）。
+"""orders.router：订单、事件与资金账户余额 API（ORD-01/02、FIN-01）。
 
 金额类动作全部走 Service 事务；列表页只提供查询，不做直接登记。
 """
@@ -22,9 +22,9 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction, FundNature, Nature
+from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction, Nature
 from app.domain.trade import Account, OrderEvent
-from app.foundation.order_types import resolve_default_pool
+from app.foundation.pools import require_default_pool
 from app.orders import schemas
 from app.orders._shared import get_order as orders_get_order
 from app.orders.cancellation_model import cancel_order as orders_cancel_order
@@ -245,20 +245,7 @@ def create_order(
     for cost in payload.initial_costs:
         # 初始费用是支出资金明细；业务事件只记录
         # BUY/SELL/DELIVER/OPERATE 等业务事实。账号成本仍由这笔订单支出明细累计。
-        pool_id = cost.pool_id
-        if pool_id is None:
-            pool = resolve_default_pool(
-                db,
-                order.order_type,
-                cost.portion,
-                fund_nature=FundNature.BUSINESS.value,
-            )
-            if pool is None:
-                raise Validation(
-                    f"业务 {order.order_type} 未配置 {cost.portion} 资金池",
-                    details={"order_type": order.order_type, "portion": cost.portion},
-                )
-            pool_id = pool.id
+        pool_id = cost.pool_id or require_default_pool(db).id
         from app.finance.cashflows import create_cashflow
 
         create_cashflow(
@@ -491,7 +478,7 @@ def pool_balances_summary(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_finance,
 ) -> schemas.PoolBalanceListOut:
-    """全部可见资金池的余额卡片 + 汇总（一次请求，替代前端逐池 N+1 与本地累加）。"""
+    """全部可见资金账户的余额卡片 + 汇总（一次请求，替代前端逐池 N+1 与本地累加）。"""
     items, totals = pool_balance_summary(db, user=_user)
     return schemas.PoolBalanceListOut(
         items=[schemas.PoolBalanceOut.model_validate(item) for item in items],
@@ -507,7 +494,7 @@ def pool_balance(
 ) -> schemas.PoolBalanceOut:
     if not _user.can_see_pool(pool_id):
         from app.core.errors import NotFound
-        raise NotFound("资金池不存在", details={"pool_id": pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     return schemas.PoolBalanceOut.model_validate(
         finance_pool_balance(db, pool_id, user=_user)
     )

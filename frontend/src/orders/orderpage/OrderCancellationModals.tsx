@@ -74,11 +74,11 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
           <Typography.Paragraph type="secondary">
             {cancelInstallmentTarget
               ? cancelInstallmentTarget.contract_type === "PICKUP_SALE"
-                ? "按已收款原资金池退款，提号取消后交易直接结束。"
-                : "按已收款原资金池退款，取消后账号回到库存。"
+                ? "按已收款原资金账户退款，提号取消后交易直接结束。"
+                : "按已收款原资金账户退款，取消后账号回到库存。"
               : cancelScope === "INVREFUND"
-                ? "冲销入库流水，金额进入公司钱包；可按原资金池入账，也可做部分冲销。"
-                : "冲销售出流水，金额退还客户；可按原资金池退款，也可做部分冲销。"}
+                ? "冲销入库流水，金额进入公司钱包；可按原资金账户入账，也可做部分冲销。"
+                : "冲销售出流水，金额退还客户；可按原资金账户退款，也可做部分冲销。"}
           </Typography.Paragraph>
           {cancelOrderTarget && cancelableEventsForScope(cancelOrderTarget, cancelScope).length > 0 ? (
             <div className="order-cancel-meta">

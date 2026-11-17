@@ -26,7 +26,7 @@ import { listResponse } from "@fixtures/api-responses";
 let ui: ReturnType<typeof userEvent.setup>;
 
 const orderTypes = [
-  { id: 1, code: "HS", name: "回收", capital_type: "OWNED", is_active: true },
+  { id: 1, code: "HS", name: "回收", is_active: true },
 ] as unknown as import("@/shared/api/types/orders").OrderType[];
 
 const pools = [
@@ -137,7 +137,7 @@ describe("SettingsPage.deep", () => {
   });
 
 
-  it("切换 Tab 仅挂载激活面板：配置中心内点资金池触发 PoolsPanel 挂载（poolsApi.list 被调用）", async () => {
+  it("切换 Tab 仅挂载激活面板：配置中心内点资金账户触发 PoolsPanel 挂载（poolsApi.list 被调用）", async () => {
     renderLight(<SettingsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务字典" });
     await openConfigCenter();
@@ -145,7 +145,7 @@ describe("SettingsPage.deep", () => {
     expect(screen.queryByText("托管池")).toBeNull();
     await ui.click(screen.getByTestId("center-nav-pools"));
     await waitFor(() => expect(vi.mocked(poolsApi.list)).toHaveBeenCalled());
-    // 资金池内容可见（托管池）
+    // 资金账户内容可见（托管池）
     expect(await screen.findByText("托管池")).toBeInTheDocument();
   });
 

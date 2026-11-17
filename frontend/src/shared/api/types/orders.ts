@@ -8,22 +8,11 @@ export interface OrderType {
   id: number;
   code: string;
   name: string;
-  capital_type: string;
+  is_zero_principal?: boolean;
   is_active: boolean;
   description?: string | null;
   sort_order?: number;
   sequence_prefix?: string | null;
-}
-
-export interface OrderTypeRoute {
-  id: number;
-  order_type_code: string;
-  portion: string;
-  fund_nature?: string | null;
-  pool_code: string;
-  pool_name: string;
-  priority: number;
-  is_active: boolean;
 }
 
 export interface Order {

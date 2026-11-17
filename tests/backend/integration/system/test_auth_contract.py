@@ -675,7 +675,7 @@ def test_user_service_validates_password_and_scope_id_shapes(seeded_db):
             actor="pytest",
         )
 
-    with pytest.raises(Validation, match="资金池 ID 必须为正整数"):
+    with pytest.raises(Validation, match="资金账户 ID 必须为正整数"):
         service.create_user(
             seeded_db,
             username="bad-pool-id",
@@ -951,7 +951,7 @@ def test_bearer_permissions_refresh_after_user_deactivation(client: TestClient):
 def test_current_user_owner_scope_model():
     """CurrentUser 的数据范围模型是权限隔离的底座，单独钉住。
 
-    - 管理员 / ALL 范围可见任意资金池；
+    - 管理员 / ALL 范围可见任意资金账户；
     - TEAM 范围按 pool_ids 判定可见性；
     - SELF 范围（pool_ids 为空）看不到任何具体池。
     """

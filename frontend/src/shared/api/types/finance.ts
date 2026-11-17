@@ -9,6 +9,8 @@ export interface Pool {
   pool_type: string;
   ownership: string;
   status: string;
+  /** 默认资金账户：未显式指定资金账户的流水落这里（全局唯一）。 */
+  is_default?: boolean;
   note?: string | null;
 }
 
@@ -24,7 +26,7 @@ export interface PoolBalance {
   available: string;
 }
 
-/** 资金池余额汇总：由服务端聚合，前端只展示，不再本地累加。 */
+/** 资金账户余额汇总：由服务端聚合，前端只展示，不再本地累加。 */
 export interface PoolBalanceTotals {
   pool_count: number;
   cash_balance: string;

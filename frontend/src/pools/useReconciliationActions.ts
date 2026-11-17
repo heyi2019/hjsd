@@ -27,7 +27,7 @@ export function useReconciliationActions({ load, reconciliations, write }: Recon
         (row) => row.pool_id === poolId && row.reconciled_on === reconciledOn && row.account_label === accountLabel,
       )
     ) {
-      appMessage.warning("同一资金池、对账账户和日期只能对账一次，请调整对账日期或账户");
+      appMessage.warning("同一资金账户、对账账户和日期只能对账一次，请调整对账日期或账户");
       return;
     }
 

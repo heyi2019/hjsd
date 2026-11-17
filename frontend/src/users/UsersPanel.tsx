@@ -95,7 +95,7 @@ export function UsersPanel() {
         { title: "角色", dataIndex: "role", render: (v: string) => USER_ROLE_LABEL[v] ?? v },
         { title: "数据范围", dataIndex: "owner_scope", render: (v: string) => OWNER_SCOPE_LABEL[v] ?? v },
         { title: "团队", render: (_: unknown, user: User) => (user.team_ids ?? []).map((id) => teams.find((team) => team.id === id)?.name ?? id).join("、") || "-" },
-        { title: "资金池", render: (_: unknown, user: User) => (user.pool_ids ?? []).map((id) => pools.find((pool) => pool.id === id)?.name ?? id).join("、") || (user.owner_scope === "ALL" ? "全部" : "-") },
+        { title: "资金账户", render: (_: unknown, user: User) => (user.pool_ids ?? []).map((id) => pools.find((pool) => pool.id === id)?.name ?? id).join("、") || (user.owner_scope === "ALL" ? "全部" : "-") },
         { title: "状态", dataIndex: "is_active", render: (v: boolean) => v ? "启用" : "停用" },
         { title: "操作", key: "actions", render: (_: unknown, user: User) => <Space size={2}><PermissionButton permission="user.manage" size="small" onClick={() => { setEditing(user); editForm.setFieldsValue({ display_name: user.display_name, phone: user.phone ?? "", role: user.role, owner_scope: user.owner_scope, pool_ids: user.pool_ids ?? [], team_ids: user.team_ids ?? [] }); }}>编辑</PermissionButton><ConfirmButton
               permission="user.manage"
@@ -119,7 +119,7 @@ export function UsersPanel() {
       <Form.Item name="role" initialValue="VIEWER"><Select options={roleOptions} aria-label="角色" className="ui-control-width-140" /></Form.Item>
       <Form.Item name="owner_scope" initialValue="SELF"><Select options={scopeOptions} aria-label="数据范围" className="ui-control-width-100" /></Form.Item>
       <Form.Item name="team_ids"><Select mode="multiple" aria-label="所属团队" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} placeholder="所属团队" className="ui-control-min-180" /></Form.Item>
-      <Form.Item name="pool_ids"><Select mode="multiple" aria-label="可见资金池" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} placeholder="可见资金池" className="ui-control-min-180" /></Form.Item>
+      <Form.Item name="pool_ids"><Select mode="multiple" aria-label="可见资金账户" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} placeholder="可见资金账户" className="ui-control-min-180" /></Form.Item>
       <PermissionButton permission="user.manage" type="primary" htmlType="submit" disabled={Boolean(loadError)}>新增用户</PermissionButton>
     </BusinessRegistrationForm>
     <BusinessActionModal title={`编辑用户：${editing?.username ?? ""}`} fieldCount={6} open={Boolean(editing)} onCancel={() => setEditing(null)} onOk={() => editForm.submit()} destroyOnHidden>
@@ -135,7 +135,7 @@ export function UsersPanel() {
         <Form.Item name="role" label="角色" rules={[{ required: true }]}><Select options={roleOptions} aria-label="角色" /></Form.Item>
         <Form.Item name="owner_scope" label="数据范围" rules={[{ required: true }]}><Select options={scopeOptions} aria-label="数据范围" /></Form.Item>
         <Form.Item name="team_ids" label="所属团队"><Select mode="multiple" aria-label="所属团队" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} /></Form.Item>
-        <Form.Item name="pool_ids" label="可见资金池"><Select mode="multiple" aria-label="可见资金池" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item>
+        <Form.Item name="pool_ids" label="可见资金账户"><Select mode="multiple" aria-label="可见资金账户" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item>
       </BusinessRegistrationForm>
     </BusinessActionModal>
     <BusinessActionModal size="compact" title={`重置密码：${resetting?.username ?? ""}`} open={Boolean(resetting)} onCancel={() => setResetting(null)} onOk={() => resetForm.submit()} destroyOnHidden>

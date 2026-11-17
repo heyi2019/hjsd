@@ -52,7 +52,6 @@ beforeEach(() => {
         id: 21,
         order_no: "HS-2026-0001",
         order_type: "HS",
-        capital_type: "SELF",
         trade_date: "2026-10-15",
         account_id: 1,
         account_status: "WAITING",
@@ -127,7 +126,6 @@ describe("InventoryPanel：写入与长路径", () => {
         id: 21,
         order_no: "DG-2026-0001",
         order_type: "DG",
-        capital_type: "ZERO",
         trade_date: "2026-10-15",
         account_id: 1,
         account_status: "WAITING",
@@ -636,7 +634,7 @@ describe("库存售出三表单分支", () => {
     const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce(inventoryLedgerResponse([{
       account: { ...accounts[0], id: 5, source_order_id: 21, game_account: "acc-5", inventory_type: "CONSIGNMENT" },
-      order: { id: 21, order_no: "DG-2026-0001", order_type: "DG", capital_type: "SELF", trade_date: "2026-10-01", account_id: 5, account_status: "WAITING", status: "ACTIVE" },
+      order: { id: 21, order_no: "DG-2026-0001", order_type: "DG", trade_date: "2026-10-01", account_id: 5, account_status: "WAITING", status: "ACTIVE" },
     }], { type_counts: { CONSIGNMENT: 1 }, stats: { account_count: 1, occupied_cost: "50.00", over_7d_count: 0, over_30d_count: 0 } }) as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-5");
@@ -665,7 +663,7 @@ describe("库存售出三表单分支", () => {
     const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce(inventoryLedgerResponse([{
       account: { ...accounts[0], id: 5, source_order_id: 21, game_account: "acc-5", inventory_type: "CONSIGNMENT" },
-      order: { id: 21, order_no: "DG-2026-0001", order_type: "DG", capital_type: "SELF", trade_date: "2026-10-01", account_id: 5, account_status: "WAITING", status: "ACTIVE" },
+      order: { id: 21, order_no: "DG-2026-0001", order_type: "DG", trade_date: "2026-10-01", account_id: 5, account_status: "WAITING", status: "ACTIVE" },
     }], { type_counts: { CONSIGNMENT: 1 }, stats: { account_count: 1, occupied_cost: "50.00", over_7d_count: 0, over_30d_count: 0 } }) as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-5");
@@ -693,7 +691,7 @@ describe("库存售出三表单分支", () => {
     const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce(inventoryLedgerResponse([{
       account: { ...accounts[0], id: 6, source_order_id: 21, game_account: "pickup-acc", inventory_type: "PICKUP", cost_amount: "0.00" },
-      order: { id: 21, order_no: "TH-2026-0001", order_type: "TH", capital_type: "SELF", trade_date: "2026-10-01", account_id: 6, account_status: "WAITING", status: "ACTIVE" },
+      order: { id: 21, order_no: "TH-2026-0001", order_type: "TH", trade_date: "2026-10-01", account_id: 6, account_status: "WAITING", status: "ACTIVE" },
     }], { type_counts: { PICKUP: 1 }, stats: { account_count: 1, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 } }) as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("pickup-acc");

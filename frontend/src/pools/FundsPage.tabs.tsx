@@ -26,7 +26,7 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
   const { arrange: arrangeFundPoolColumns } = useListViewColumns("FUND_POOLS");
   const poolColumns: ColumnsType<Pool> = [
     {
-      title: "资金池",
+      title: "资金账户",
       key: "pool_code",
       dataIndex: "name",
       render: (_v, row) => row.name,
@@ -43,10 +43,10 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
   return (
     <Card
       className="glass"
-      title="资金池卡片"
+      title="资金账户卡片"
       extra={
         <PermissionButton permission="finance.transfer" type="primary" disabled={!fundsReady || loading || Boolean(error)} onClick={() => { transferForm.setFieldsValue({ occurred_on: today() }); setTransferOpen(true); }}>
-          资金池划转
+          资金账户划转
         </PermissionButton>
       }
     >
@@ -64,7 +64,7 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
         page={1}
         pageSize={10}
         total={pools.length}
-        emptyText={error ? "资金数据不可用，请点击重新加载" : "尚未配置资金池"}
+        emptyText={error ? "资金数据不可用，请点击重新加载" : "尚未配置资金账户"}
         loading={loading}
         onPageChange={() => undefined}
       />
@@ -127,7 +127,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
     <Card className="glass" title="资金明细" extra={<PermissionButton permission="deposit.post" type="primary" disabled={cashflowUnavailable || loading || !flowDirectionOptions} onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>
       <div className="ui-filter-bar funds-cashflow-filters">
         <Input aria-label="流水搜索" allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注" onChange={(event) => setCashflowKeyword(event.target.value)} />
-        <Select aria-label="流水资金池" allowClear disabled={cashflowUnavailable} value={cashflowPoolId} placeholder="全部资金池" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
+        <Select aria-label="流水资金账户" allowClear disabled={cashflowUnavailable} value={cashflowPoolId} placeholder="全部资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
         <Select aria-label="流水方向" allowClear disabled={cashflowUnavailable} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
         <Select aria-label="流水账簿" allowClear disabled={cashflowUnavailable} value={cashflowLedgerType || undefined} placeholder="全部账簿" options={Object.entries(LEDGER_TYPE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(value) => setCashflowLedgerType(value ?? "")} />
         <Select aria-label="流水核算属性" allowClear disabled={cashflowUnavailable} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
@@ -282,7 +282,7 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
   const reconciliationUnavailable = !reconciliationsReady || Boolean(error);
   const { arrange: arrangeReconciliationColumns } = useListViewColumns("RECONCILIATIONS");
   const reconciliationColumns: ColumnsType<Reconciliation> = [
-    { title: "资金池", key: "pool", render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? row.pool_id },
+    { title: "资金账户", key: "pool", render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? row.pool_id },
     { title: "对账日期", dataIndex: "reconciled_on" },
     { title: "账户", dataIndex: "account_label" },
     { title: <Tooltip title="期初余额（账户级对账）+ 截至对账日已入账流水">系统余额</Tooltip>, key: "system_balance", align: "right", render: (_v, row) => <MoneyText value={row.system_balance} /> },

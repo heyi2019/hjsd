@@ -1,7 +1,7 @@
 """REVERSAL-01 冲销流水与订单日期变更的财务一致性。
 
 口径锚点：资金走向只有收入/支出两个大类；冲销流水必须 direction/nature 自洽，
-否则余额按方向变了、资金池收支卡片与资金日报发生额列按 (direction, nature)
+否则余额按方向变了、资金账户收支卡片与资金日报发生额列按 (direction, nature)
 取数却都不体现，账对不上。平移成交日期时，凡按各自日期归期的子类型
 （事件/流水/分期坏账/旧模型返点/账号买号日）必须一起平移，否则跨期撕裂。
 
@@ -11,7 +11,7 @@
 - #6 成交日期平移同步 InstallmentDisposition.occurred_on（坏账归期）。
 - #7 成交日期平移同步旧模型 RebateRecord.collected_on（返点归期）。
 - #18 平移同步 Account.buy_date（仅本单有已过账 BUY 事件时）。
-- #14 平移触及已对账资金池期间时拒绝。
+- #14 平移触及已对账资金账户期间时拒绝。
 """
 from __future__ import annotations
 
@@ -112,7 +112,7 @@ def test_cancel_sell_flow_is_out_business_out(seeded_db):
     assert cancel_flow.nature == Nature.BUSINESS_OUT.value, (
         f"[BUG] 冲销 SELL 的流水 nature={cancel_flow.nature}，OUT 却标 BUSINESS_IN"
     )
-    # 资金池收支卡片：OUT/BUSINESS_OUT 计入 expense，账与余额自洽。
+    # 资金账户收支卡片：OUT/BUSINESS_OUT 计入 expense，账与余额自洽。
     from app.finance.balances import pool_balances
     balances = pool_balances(seeded_db, [1])
     # 主 SELL(IN 200) + BUY(OUT 100) + CANCEL(OUT 200) → expense 应含 BUY 100 + CANCEL 200
@@ -192,7 +192,7 @@ def test_shift_moves_bad_debt_rebate_and_buy_date(seeded_db):
 
 # --------------------------------------------------------------- #14 对账边界
 def test_shift_rejected_when_crossing_reconciled_period(seeded_db):
-    """平移流水跨越资金池已对账日期时拒绝，保护已固化余额快照。"""
+    """平移流水跨越资金账户已对账日期时拒绝，保护已固化余额快照。"""
     order, _account = _recovery_order(seeded_db, trade_date=D1)
     post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),

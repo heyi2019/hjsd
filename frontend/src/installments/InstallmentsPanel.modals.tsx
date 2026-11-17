@@ -290,8 +290,8 @@ export function CancelModal({ controller }: { controller: ContractTableControlle
       intro={
         <Typography.Paragraph type="secondary">
           {cancelTarget?.contract_type === "PICKUP_SALE"
-            ? "按已收款原资金池退款，提号取消后账号直接结束。"
-            : "按已收款原资金池退款，取消后账号回到库存。"}
+            ? "按已收款原资金账户退款，提号取消后账号直接结束。"
+            : "按已收款原资金账户退款，取消后账号回到库存。"}
         </Typography.Paragraph>
       }
       testIdSuffix="installment-cancel"
@@ -329,7 +329,7 @@ export function SettleModal({ controller }: { controller: ContractTableControlle
       employees={employees}
       intro={
         <Typography.Paragraph type="secondary">
-          一次性收清全部剩余应收，逐期生成收款并关闭未来期次；不指定资金池时按原收款资金池入账。
+          一次性收清全部剩余应收，逐期生成收款并关闭未来期次；不指定资金账户时按原收款资金账户入账。
         </Typography.Paragraph>
       }
       testIdSuffix="installment-settle"

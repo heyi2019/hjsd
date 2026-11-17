@@ -34,7 +34,6 @@ from app.foundation.schemas import (
     PoolCreate,
     PoolStatusUpdate,
     PoolUpdate,
-    RouteIn,
 )
 from app.value_added_services.schemas import (
     DefaultIn,
@@ -118,12 +117,11 @@ from app.parties.schemas import (
         (TransferRepair, {"counterpart_pool_id": 2, "reason": "补齐"}),
         (RebateCreate, {"source_order_id": 1, "amount": "1.00", "collected_on": date(2026, 10, 1)}),
         (AccountProfileUpdate, {}),
-        (PoolCreate, {"code": "POOL1", "name": "资金池"}),
+        (PoolCreate, {"code": "POOL1", "name": "资金账户"}),
         (PoolUpdate, {}),
         (PoolStatusUpdate, {"status": "ACTIVE"}),
-        (OrderTypeCreate, {"code": "TB", "name": "测试业务", "capital_type": "STOCK"}),
+        (OrderTypeCreate, {"code": "TB", "name": "测试业务"}),
         (OrderTypeUpdate, {}),
-        (RouteIn, {"portion": "PRINCIPAL", "pool_code": "POOL1"}),
         (EventCreate, {"event_type": "SELL", "occurred_on": date(2026, 10, 1)}),
     ],
 )

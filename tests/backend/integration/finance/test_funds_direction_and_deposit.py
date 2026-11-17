@@ -183,7 +183,7 @@ def test_order_linked_normal_expense_still_in_r2_direct_cost(seeded_db):
 
 # ----------------------------------------------- #5 外部注入进入收入
 def test_external_in_updates_income(seeded_db):
-    """外部注入进入资金池收入，余额与收入同源。"""
+    """外部注入进入资金账户收入，余额与收入同源。"""
     invest = _pool(seeded_db, "HJ_INVEST")
     before = pool_balance(seeded_db, invest.id)
     _flow(seeded_db, pool_id=invest.id, direction="IN",

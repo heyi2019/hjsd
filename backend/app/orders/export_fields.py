@@ -123,7 +123,7 @@ CASHFLOW_EXPORT_COLUMNS = [
     ("amount", "金额", True),
     ("occurred_on", "时间", True),
     ("operator", "操作人", True),
-    ("pool_name", "资金池", True),
+    ("pool_name", "资金账户", True),
     ("note", "备注", True),
 ]
 

@@ -54,5 +54,3 @@ export interface ProfitAllocationList {
   allocatable_profit?: string;
   totals_by_type: Partial<Record<ProfitAllocationType, ProfitAllocationTypeTotal>>;
 }
-
-export interface RouteImpactPreview { changed: boolean; historical_impact: Record<string, unknown>; future_effect: string }

@@ -50,7 +50,7 @@ def create_deposit(
 ) -> Deposit:
     money = _positive(amount, field="amount")
     if user is not None and not user.can_see_pool(pool_id):
-        raise NotFound("资金池不存在", details={"pool_id": pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     pool = assert_pool_usable(session, pool_id)
     if counterparty_id is not None:
         assert_counterparty_usable(session, counterparty_id)
@@ -159,7 +159,7 @@ def update_deposit(
     deposit = _editable_deposit(session, deposit_id, user=user)
     money = _positive(amount, field="amount")
     if user is not None and not user.can_see_pool(pool_id):
-        raise NotFound("资金池不存在", details={"pool_id": pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     pool = assert_pool_usable(session, pool_id)
     if counterparty_id is not None:
         assert_counterparty_usable(session, counterparty_id)
@@ -563,7 +563,7 @@ def deposit_held_total(
 ) -> Decimal:
     """在押押金合计 = Σ(实缴 − 已退 − 已损失)，可按池过滤。
 
-    与 `PoolBalanceOut.deposit_held` 信息列同源；占用已进资金池 OUT，
+    与 `PoolBalanceOut.deposit_held` 信息列同源；占用已进资金账户 OUT，
     此值仅作台账展示，不参与可用余额二次扣减。
     """
     stmt = select(

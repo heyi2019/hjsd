@@ -5,7 +5,7 @@
 TH（提号）/ DG（代挂）订单同属分销 business_mode，但其资金结算口径与自营 HS 不同：
 - 核算属性区分自营(SELF_*)与分销(TH_*/SERVICE_REVENUE)；
 - BUY/SELL 落入同一默认业务池，同一池余额 = 收入 − 支出；
-- DG 不允许 BUY（仅全款），且其 SELL 未配置默认 PRINCIPAL 资金池路由，必须显式 pool_id。
+- DG 不允许 BUY（仅全款），且其 SELL 未配置默认 PRINCIPAL 资金账户路由，必须显式 pool_id。
 
 本文件只验证**跨模块资金结算一致性**，不重复单模块规则断言。
 测试分类：服务级集成（seeded_db 校验 DB 状态）。
@@ -61,7 +61,7 @@ def test_flow_c_th_distribution_fund_settlement(seeded_db):
     assert buy_flow.direction == Direction.OUT.value
     assert sell_flow.direction == Direction.IN.value
 
-    # 分销资金池路由：BUY 与 SELL 落入同一默认业务池。
+    # 分销资金账户路由：BUY 与 SELL 落入同一默认业务池。
     assert buy_flow.pool_id == sell_flow.pool_id
 
     rows = seeded_db.scalars(

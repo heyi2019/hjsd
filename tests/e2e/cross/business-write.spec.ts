@@ -95,7 +95,7 @@ test("自营分期出售：买入、分期收款、结清后交付", async ({ re
   expect((await delivery.json()).status).toBe("DELIVERED");
 });
 
-test("资金闭环：独立流水审核冲销、资金池划转与日对账", async ({ request }) => {
+test("资金闭环：独立流水审核冲销、资金账户划转与日对账", async ({ request }) => {
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
   const headers = { "X-Dev-User": "admin" };
   const poolsResponse = await request.get(`${apiBase}/pools`, { headers });
@@ -210,18 +210,14 @@ test("治理能力：报表导出与订单附件闭环", async ({ request }) => 
   expect(removed.status()).toBe(200);
 });
 
-test("主数据治理：业务类型路由影响预览", async ({ request }) => {
+test("主数据治理：业务类型零本金标记可见", async ({ request }) => {
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
   const headers = { "X-Dev-User": "admin" };
   const types = await request.get(`${apiBase}/order-types`, { headers });
   expect(types.ok()).toBe(true);
-  const orderType = (await types.json()).find((item: { code: string }) => item.code === "HS");
-  expect(orderType).toBeTruthy();
-  const pools = await request.get(`${apiBase}/pools`, { headers });
-  const pool = (await pools.json())[0];
-  const preview = await request.get(`${apiBase}/order-types/${orderType.code}/routes/impact-preview`, { headers, params: { portion: "PRINCIPAL", pool_code: pool.code } });
-  expect(preview.status()).toBe(200);
-  expect((await preview.json()).future_effect).toBeTruthy();
+  const orderTypes = await types.json();
+  expect(orderTypes.find((item: { code: string }) => item.code === "HS")?.is_zero_principal).toBe(false);
+  expect(orderTypes.find((item: { code: string }) => item.code === "DG")?.is_zero_principal).toBe(true);
 });
 
 test("治理权限：viewer 拒绝报表导出，审计可追溯业务操作", async ({ request }) => {
@@ -233,7 +229,7 @@ test("治理权限：viewer 拒绝报表导出，审计可追溯业务操作", a
   expect((await adminAudit.json()).items).toBeDefined();
 });
 
-test("数据范围：管理员可配置用户资金池范围", async ({ request }) => {
+test("数据范围：管理员可配置用户资金账户范围", async ({ request }) => {
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
   const headers = { "X-Dev-User": "admin" };
   const pools = await request.get(`${apiBase}/pools`, { headers });
@@ -245,7 +241,7 @@ test("数据范围：管理员可配置用户资金池范围", async ({ request 
   expect(body.pool_ids).toContain(pool.id);
 });
 
-test("数据范围：非管理员只能看到授权资金池", async ({ request }) => {
+test("数据范围：非管理员只能看到授权资金账户", async ({ request }) => {
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
   const adminHeaders = { "X-Dev-User": "admin" };
   const pools = await request.get(`${apiBase}/pools`, { headers: adminHeaders });

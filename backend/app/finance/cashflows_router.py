@@ -41,7 +41,7 @@ post_rebate = require_permissions(PERM_ORDER_EVENT_POST)
 def studio_summary(
     pool_ids: str | None = Query(
         default=None,
-        description="逗号分隔的资金池 ID；不传则按当前用户可见池",
+        description="逗号分隔的资金账户 ID；不传则按当前用户可见池",
     ),
     occurred_from: date | None = Query(default=None),
     occurred_to: date | None = Query(default=None),

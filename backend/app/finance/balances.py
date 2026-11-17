@@ -1,4 +1,4 @@
-"""资金池余额投影：所有资金池卡片与可用余额的唯一计算入口。"""
+"""资金账户余额投影：所有资金账户卡片与可用余额的唯一计算入口。"""
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -20,7 +20,7 @@ from app.orders.amounts import business_cashflow_filter
 def pool_balances(
     session: Session, pool_ids: Iterable[int], user: CurrentUser | None = None
 ) -> dict[int, dict[str, Any]]:
-    """批量聚合资金池余额，避免逐池查询。"""
+    """批量聚合资金账户余额，避免逐池查询。"""
     ids = list(dict.fromkeys(pool_ids))
     if not ids:
         return {}
@@ -30,7 +30,7 @@ def pool_balances(
     }
     for pool_id in ids:
         if pool_id not in pools or (user is not None and not user.can_see_pool(pool_id)):
-            raise NotFound(f"资金池 {pool_id} 不存在", details={"pool_id": pool_id})
+            raise NotFound(f"资金账户 {pool_id} 不存在", details={"pool_id": pool_id})
 
     cells: dict[int, dict[tuple[str, str, str | None], Decimal]] = {}
     for pool_id, direction, nature, attribute, amount in session.execute(
@@ -109,14 +109,14 @@ def pool_balances(
 def pool_balance(
     session: Session, pool_id: int, user: CurrentUser | None = None
 ) -> dict[str, Any]:
-    """返回单个资金池余额投影。"""
+    """返回单个资金账户余额投影。"""
     return pool_balances(session, [pool_id], user=user)[pool_id]
 
 
 def pool_balance_summary(
     session: Session, user: CurrentUser | None = None
 ) -> tuple[list[dict[str, Any]], dict[str, Decimal]]:
-    """返回当前用户可见资金池及服务端汇总。"""
+    """返回当前用户可见资金账户及服务端汇总。"""
     pools = list(session.scalars(select(Pool).order_by(Pool.id)))
     visible = [pool for pool in pools if user is None or user.can_see_pool(pool.id)]
     balances = pool_balances(session, [pool.id for pool in visible], user=user) if visible else {}

@@ -1,11 +1,11 @@
 import { appMessage } from "../shared/ui/appFeedback";
-/** 工作室收支：在指定资金池上快速登记日常开销与零星收入（房租 / 日用 / 水电 …）。
+/** 工作室收支：在指定资金账户上快速登记日常开销与零星收入（房租 / 日用 / 水电 …）。
  *
  * 设计约束（刻意不新增后端表）：
  * - **入账复用「新增独立流水」**：支出 = OUT / BUSINESS_OUT / OPERATING_EXPENSE，
  *   收入 = IN / BUSINESS_IN / SELF_REVENUE，科目落在 `category`。只存在一套入账口径。
  * - **不走审核态**：提交即入账（后端独立流水直接 APPROVED，登记即计入损益，无需审核）。
- * - **统一汇总全部资金池**：工作室运营页不再按资金池拆分筛选；登记时仍需选择入账资金池。
+ * - **统一汇总全部资金账户**：工作室运营页不再按资金账户拆分筛选；登记时仍需选择入账资金账户。
  */
 import { Card, DatePicker, Form, Input, Segmented, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -236,7 +236,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
     { title: "流水号", dataIndex: "flow_no" },
     { title: "日期", dataIndex: "occurred_on" },
     {
-      title: "资金池",
+      title: "资金账户",
       render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? row.pool_id,
     },
     {
@@ -362,10 +362,10 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
           onFinish={submitRegister}
         >
           <FieldConfigScope scope="STUDIOEXP" active={registerOpen}>
-          <CfgItem name="pool_id" label="资金池" rules={[{ required: true, message: "请选择资金池" }]}>
+          <CfgItem name="pool_id" label="资金账户" rules={[{ required: true, message: "请选择资金账户" }]}>
             <Select
               options={pools.map((pool) => ({ value: pool.id, label: pool.name }))}
-              placeholder="选择资金池"
+              placeholder="选择资金账户"
             />
           </CfgItem>
           <CfgItem name="occurred_on" label="日期" rules={[{ required: true, message: "请输入日期" }]}>

@@ -35,7 +35,6 @@ export const resetInventoryPanelMocks = () => {
         id: 21,
         order_no: "HS-2026-0001",
         order_type: "HS",
-        capital_type: "SELF",
         trade_date: "2026-10-15",
         account_id: 1,
         account_status: "WAITING",

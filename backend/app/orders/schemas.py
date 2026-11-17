@@ -423,7 +423,7 @@ class PoolBalanceOut(BaseModel):
 
 
 class PoolBalanceTotalsOut(BaseModel):
-    """资金池余额汇总：服务端按 Decimal 聚合，前端只展示不再自己累加。"""
+    """资金账户余额汇总：服务端按 Decimal 聚合，前端只展示不再自己累加。"""
 
     pool_count: int
     cash_balance: Decimal

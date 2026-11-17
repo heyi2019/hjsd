@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from unittest.mock import patch
 
 import pytest
 from sqlalchemy import select
@@ -298,12 +297,14 @@ def test_get_offset_event_rejects_non_money_event(seeded_db):
         events._get_offset_event(seeded_db, deliver_ev.id, order_id=order.id)
 
 
-def test_resolve_pool_rejects_unrouted_type(seeded_db):
+def test_resolve_pool_requires_default_pool(seeded_db):
     unknown_order = Order(order_type="ZZ")
-    # resolve_default_pool 对未知类型会先抛 NotFound，这里强制返回 None 直达 696 行
-    with patch("app.orders.events_rules.resolve_default_pool", return_value=None):
-        with pytest.raises(Validation, match="未配置"):
-            events._resolve_pool(seeded_db, unknown_order, "PRINCIPAL")
+    # 2026-11-17 删除路由后：落账池=唯一默认池；没有任何池时直接拒绝
+    for pool in seeded_db.scalars(select(Pool)).all():
+        seeded_db.delete(pool)
+    seeded_db.flush()
+    with pytest.raises(Validation, match="默认资金账户"):
+        events._resolve_pool(seeded_db, unknown_order, "PRINCIPAL")
 
 
 # --------------------------------------------------------------------- service.py
@@ -404,7 +405,7 @@ def test_list_orders_filters_by_pool(seeded_db):
     invest = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
     profit = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_PROFIT"))
     if invest is None or profit is None:
-        pytest.fail("种子资金池缺失")
+        pytest.fail("种子资金账户缺失")
 
     acc_hit = _new_account(seeded_db, game_account="guard-pool-hit")
     acc_miss = _new_account(seeded_db, game_account="guard-pool-miss")

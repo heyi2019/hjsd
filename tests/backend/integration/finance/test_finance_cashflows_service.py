@@ -263,7 +263,7 @@ def test_create_cashflow_rejects_external_in_without_note(seeded_db):
 
 
 def test_create_cashflow_rejects_user_not_visible(seeded_db):
-    with pytest.raises(NotFound, match="资金池不存在"):
+    with pytest.raises(NotFound, match="资金账户不存在"):
         cashflows.create_cashflow(
             seeded_db,
             pool_id=1,
@@ -336,7 +336,7 @@ def test_reverse_cashflow_in_direction(seeded_db):
 
 
 def test_create_deposit_rejects_user_not_visible(seeded_db):
-    with pytest.raises(NotFound, match="资金池不存在"):
+    with pytest.raises(NotFound, match="资金账户不存在"):
         deposits.create_deposit(
             seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest",
             user=_restricted_user(),
@@ -432,7 +432,7 @@ def test_list_deposits_user_filter(seeded_db):
 
 def test_list_cashflows_user_filter(seeded_db):
     _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
-    # 无权资金池一律返回空：明细为空、总数也为 0（返回值恒为 (rows, total) 二元组，
+    # 无权资金账户一律返回空：明细为空、总数也为 0（返回值恒为 (rows, total) 二元组，
     # 原先这里返回裸 [] 会让调用方解包时报错，只是路由层提前拦住了才没暴露）。
     rows, total = cashflows.list_cashflows(
         seeded_db, pool_id=1, user=_restricted_user()

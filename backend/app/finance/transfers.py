@@ -1,4 +1,4 @@
-"""finance 资金池间划转服务（FIN-06）。"""
+"""finance 资金账户间划转服务（FIN-06）。"""
 from __future__ import annotations
 
 from datetime import date
@@ -41,14 +41,14 @@ def create_transfer(
     if user is not None and (
         not user.can_see_pool(source_pool_id) or not user.can_see_pool(target_pool_id)
     ):
-        raise NotFound("资金池不存在", details={"pool_id": source_pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": source_pool_id})
     money = _positive(amount, field="amount")
     source = assert_pool_usable(session, source_pool_id)
     target = assert_pool_usable(session, target_pool_id)
     available = to_money(pool_balance(session, source.id, user=user)["available"])
     if money > available:
         raise Validation(
-            "转出资金池可用余额不足",
+            "转出资金账户可用余额不足",
             details={
                 "source_pool_id": source.id,
                 "amount": str(money),
@@ -161,10 +161,10 @@ def repair_transfer(
     if user is not None and (
         not user.can_see_pool(source.pool_id) or not user.can_see_pool(counterpart_pool_id)
     ):
-        raise NotFound("资金池不存在", details={"pool_id": counterpart_pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": counterpart_pool_id})
     target = assert_pool_usable(session, counterpart_pool_id)
     if target.id == source.pool_id:
-        raise Validation("修复对端资金池不能与原资金池相同")
+        raise Validation("修复对端资金账户不能与原资金账户相同")
     if source.direction == Direction.OUT.value:
         direction = Direction.IN.value
     elif source.direction == Direction.IN.value:

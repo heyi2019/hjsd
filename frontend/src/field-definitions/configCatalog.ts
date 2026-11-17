@@ -4,7 +4,7 @@
  *
  * entityTypes 取自后端 audit_logs.entity_type 的**实际写入值**（dev 库实证）。
  * ⚠️ 大小写不统一且无规律：`order_form_field`/`field_definition` 是下划线小写，
- * 而 `OrderTypeDef`/`OrderTypePool`/`GameTypeOption`/`Pool` 是驼峰或首字母大写。
+ * 而 `OrderTypeDef`/`GameTypeOption`/`Pool` 是驼峰或首字母大写。
  * 不要按模型名推断，必须照抄实际值，否则查不到改动记录。
  */
 
@@ -54,10 +54,8 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   {
     key: "order-types",
     label: "业务类型",
-    summary: "回收/提号/代挂等定义，含资金性质与编号前缀",
+    summary: "回收/提号/代挂等定义，含零本金规则与编号前缀",
     group: "MASTER",
-    // 只收 OrderTypeDef：路由（OrderTypePool）归「资金池」项，
-    // 否则同一批 ROUTE_UPDATE 会在两项里重复计数（与 Pool 的处理口径一致）。
     entityTypes: ["OrderTypeDef"],
   },
   {
@@ -78,11 +76,10 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   },
   {
     key: "pools",
-    label: "资金池",
-    // 池与路由同属设置页「资金池」页签（池为视图一、路由为视图二），此处合并计数。
-    summary: "资金归属池定义与过账路由：钱归谁、各业务类型按份额落到哪个池",
+    label: "资金账户",
+    summary: "资金账户定义与默认落账账户：钱归谁、未指定账户时统一落账到哪里",
     group: "MASTER",
-    entityTypes: ["Pool", "OrderTypePool"],
+    entityTypes: ["Pool"],
   },
   {
     key: "game-types",
@@ -146,8 +143,7 @@ export const CONFIG_ENTITY_TYPE_LABEL: Record<string, string> = {
   OrderTypeDef: "业务类型",
   order_form_field: "表单字段",
   list_column_config: "列表字段",
-  Pool: "资金池",
-  OrderTypePool: "资金路由",
+  Pool: "资金账户",
   GameTypeOption: "游戏与渠道",
   option_set: "选项词典",
   user: "用户",

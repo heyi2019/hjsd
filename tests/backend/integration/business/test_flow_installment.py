@@ -4,7 +4,7 @@
 -------------------------------
 HS 回收单 → BUY（入库）→ 建分期合约(STOCK_SALE) → 两期回款(PAYMENT) → 交付(DELIVER)
 → 分期状态机 PENDING→ACTIVE→SETTLED→DELIVERED，订单最终 COMPLETED，回款现金流
-落入同一资金池。另验 DG/代挂不允许分期（仅全款）。
+落入同一资金账户。另验 DG/代挂不允许分期（仅全款）。
 
 本文件只验证**跨模块数据一致性**，不重复单模块规则断言。
 测试分类：服务级集成（seeded_db 校验 DB 状态）。
@@ -81,7 +81,7 @@ def test_flow_d_installment_full_lifecycle(seeded_db):
     order = seeded_db.get(Order, order.id)
     assert order.status == OrderStatus.COMPLETED.value
 
-    # 两笔 PAYMENT 现金流入同一资金池，合计 1200。
+    # 两笔 PAYMENT 现金流入同一资金账户，合计 1200。
     flows = seeded_db.scalars(
         select(Cashflow).where(Cashflow.order_id == order.id)
     ).all()

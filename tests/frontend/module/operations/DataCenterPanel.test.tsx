@@ -38,12 +38,12 @@ describe("DataCenterPanel：经营指标", () => {
     expect(await screen.findByText("售出成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
   });
 
-  it("不重复展示资金中心的余额、资金池数量和资金池明细", async () => {
+  it("不重复展示资金中心的余额、资金账户数量和资金账户明细", async () => {
     renderLight(<DataCenterPanel />, { user: "admin" });
     await screen.findByText("订单总数");
     expect(screen.queryByText("可用余额合计")).not.toBeInTheDocument();
-    expect(screen.queryByText("资金池数量")).not.toBeInTheDocument();
-    expect(screen.queryByText("资金池概览")).not.toBeInTheDocument();
+    expect(screen.queryByText("资金账户数量")).not.toBeInTheDocument();
+    expect(screen.queryByText("资金账户概览")).not.toBeInTheDocument();
   });
 
   it("展示三类成本、利润构成和利润合计", async () => {

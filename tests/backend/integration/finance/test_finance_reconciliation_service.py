@@ -32,7 +32,7 @@ def _restricted_user() -> CurrentUser:
 def _seed_recon(seeded_db):
     """在 HJ_INVEST 池上造两笔已审核流水，建立系统余额基线 50+20=70。
 
-    资金池账户下线后系统余额即「池内已审核流水有符号和」，原本来自
+    资金账户账户下线后系统余额即「池内已审核流水有符号和」，原本来自
     PoolAccount.opening_balance 的 50 改为等额期初流水，基线保持不变。
     """
     pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
@@ -62,7 +62,7 @@ def test_create_reconciliation_rejects_duplicate(seeded_db):
         statement_balance=Decimal("70"),
         actor="pytest",
     )
-    with pytest.raises(Validation, match="同一资金池、日期和账户只能对账一次"):
+    with pytest.raises(Validation, match="同一资金账户、日期和账户只能对账一次"):
         create_reconciliation(
             seeded_db,
             pool_id=pool.id,
@@ -129,7 +129,7 @@ def test_create_reconciliation_rejects_flow_outside_pool(seeded_db):
         amount=Decimal("5"),
         actor="pytest",
     )
-    with pytest.raises(Validation, match="未达流水必须属于当前资金池且不晚于对账日"):
+    with pytest.raises(Validation, match="未达流水必须属于当前资金账户且不晚于对账日"):
         create_reconciliation(
             seeded_db,
             pool_id=pool.id,
@@ -216,7 +216,7 @@ def test_create_reconciliation_survives_decimal_balances(seeded_db):
 
 def test_create_reconciliation_rejects_user_not_visible(seeded_db):
     pool = _seed_recon(seeded_db)
-    with pytest.raises(NotFound, match="资金池不存在"):
+    with pytest.raises(NotFound, match="资金账户不存在"):
         create_reconciliation(
             seeded_db,
             pool_id=pool.id,

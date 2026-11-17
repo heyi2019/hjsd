@@ -89,20 +89,20 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
   await ui.click(option);
 }
 
-describe("FundsPage：资金池卡片", () => {
+describe("FundsPage：资金账户卡片", () => {
   it("资金中心不再展示返点明细 Tab", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     expect(screen.queryByRole("tab", { name: "返点明细" })).not.toBeInTheDocument();
   });
 
-  it("资金池列表按列表字段配置排序", async () => {
+  it("资金账户列表按列表字段配置排序", async () => {
     vi.mocked(listColumnsApi.all).mockResolvedValueOnce([{
       code: "FUND_POOLS",
-      label: "资金中心·资金池",
+      label: "资金中心·资金账户",
       columns: [
         { key: "available", label: "可用余额", locked: false, is_visible: true, sort_order: 0 },
-        { key: "pool_code", label: "资金池", locked: false, is_visible: true, sort_order: 10 },
+        { key: "pool_code", label: "资金账户", locked: false, is_visible: true, sort_order: 10 },
       ],
     }]);
 
@@ -114,7 +114,7 @@ describe("FundsPage：资金池卡片", () => {
     expect(headers[0]).toBe("可用余额");
   });
 
-  it("渲染资金池与可用余额", async () => {
+  it("渲染资金账户与可用余额", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     expect(await screen.findByRole("cell", { name: /经营主池/ })).toBeInTheDocument();
     expect(screen.getAllByText("700.00").length).toBeGreaterThanOrEqual(1);
@@ -126,13 +126,13 @@ describe("FundsPage：资金池卡片", () => {
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
-  it("FE-228：资金池主数据失败时总览不可用且划转入口禁用", async () => {
+  it("FE-228：资金账户主数据失败时总览不可用且划转入口禁用", async () => {
     vi.mocked(poolsApi.list).mockRejectedValueOnce(new Error("pools down"));
     renderLight(<FundsPage />, { user: "admin" });
 
-    expect(await screen.findByText("资金池卡片")).toBeInTheDocument();
+    expect(await screen.findByText("资金账户卡片")).toBeInTheDocument();
     expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("不可用");
-    expect(screen.getByRole("button", { name: /资金池划转/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeDisabled();
   });
 
   it("资金中心将工作室运营、对账和押金作为一级入口", async () => {
@@ -195,10 +195,10 @@ describe("FundsPage：资金池卡片", () => {
     vi.mocked(poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
     renderLight(<FundsPage />, { user: "admin" });
 
-    expect(await screen.findByText("资金池卡片")).toBeInTheDocument();
+    expect(await screen.findByText("资金账户卡片")).toBeInTheDocument();
     expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("不可用");
     expect(screen.getByText("可用余额合计").closest(".ui-stat")).toHaveTextContent("不可用");
-    expect(screen.getByRole("button", { name: /资金池划转/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeDisabled();
   });
 });
 
@@ -244,13 +244,13 @@ describe("FundsPage：资金流水", () => {
     expect(screen.getByLabelText("流水结束日期").closest(".ant-picker")).toBeInTheDocument();
   });
 
-  it("资金流水录入不再提供资金池账户选择", async () => {
+  it("资金流水录入不再提供资金账户账户选择", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
 
-    expect(screen.queryByText("资金池账户")).not.toBeInTheDocument();
+    expect(screen.queryByText("资金账户账户")).not.toBeInTheDocument();
   });
 
   it("资金流水录入显示操作人选择", async () => {
@@ -487,7 +487,7 @@ describe("FundsPage：资金写路径", () => {
     }]);
   });
 
-  it("P1/FE-049：超出转出资金池可用余额时由后端拒绝", async () => {
+  it("P1/FE-049：超出转出资金账户可用余额时由后端拒绝", async () => {
     vi.mocked(poolsApi.list).mockResolvedValueOnce([
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
       { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
@@ -499,11 +499,11 @@ describe("FundsPage：资金写路径", () => {
     vi.mocked(depositsApi.list).mockResolvedValueOnce([] as never);
     vi.mocked(cashflowsApi.list).mockResolvedValueOnce(cashflowPage([]));
     vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([] as never);
-    vi.mocked(transfersApi.create).mockRejectedValueOnce(new Error("转出资金池可用余额不足"));
+    vi.mocked(transfersApi.create).mockRejectedValueOnce(new Error("转出资金账户可用余额不足"));
     renderLight(<FundsPage />, { user: "admin" });
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await screen.findByText(/经营主池/);
-    await user.click(await screen.findByRole("button", { name: /资金池划转/ }));
+    await user.click(await screen.findByRole("button", { name: /资金账户划转/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     const selectors = modal.querySelectorAll(".ant-select-selector");
     const choosePool = async (index: number, title: RegExp) => {

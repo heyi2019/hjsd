@@ -175,5 +175,5 @@ def test_order_list_payload_includes_counterparty_role(seeded_db):
 # ---- pool_balance：无池授权返回 NotFound（603-605） ----
 
 def test_pool_balance_hidden_for_unauthorized_viewer(seeded_db):
-    with pytest.raises(NotFound, match="资金池不存在"):
+    with pytest.raises(NotFound, match="资金账户不存在"):
         router.pool_balance(1, db=seeded_db, _user=_viewer())

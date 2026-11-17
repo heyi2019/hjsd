@@ -41,7 +41,6 @@ const orders = [
     id: 1,
     order_no: "HS-2026-0001",
     order_type: "HS",
-    capital_type: "SELF",
     trade_date: "2026-10-01",
     status: "ACTIVE",
     account_business_mode: "SELF",
@@ -59,9 +58,9 @@ const orders = [
     sale_operator: "售卖员",
     sale_at: "2026-10-17T16:45:00",
   },
-  { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
+  { id: 2, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-02", status: "COMPLETED" },
 ];
-const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
+const types = [{ id: 1, code: "HS", name: "回收", is_active: true }];
 
 function setupLedgerApi(source: unknown[] = orders) {
   const filterRows = (params?: Parameters<typeof ordersApi.listPage>[0]) => source.filter((row) => {
@@ -69,7 +68,7 @@ function setupLedgerApi(source: unknown[] = orders) {
     const keyword = params?.keyword?.trim();
     if (keyword && !Object.values(item).some((value) => typeof value === "string" && value.includes(keyword))) return false;
     if (params?.order_type && item.order_type !== params.order_type) return false;
-    if (params?.business_mode && item.capital_type !== params.business_mode) return false;
+    if (params?.business_mode && item.business_mode !== params.business_mode) return false;
     if (params?.game_type && item.account_game_type !== params.game_type) return false;
     if (params?.account_status && item.account_status !== params.account_status) return false;
     return true;
@@ -242,7 +241,7 @@ describe("OrdersPage：四类订单台账", () => {
   it("订单台账顶部展示当前筛选结果的订单统计卡", async () => {
     setupLedgerApi([
       ...orders,
-      { id: 3, order_no: "DG-2026-0003", order_type: "DG", capital_type: "ZERO", trade_date: "2026-10-03", status: "CANCELLED" },
+      { id: 3, order_no: "DG-2026-0003", order_type: "DG", trade_date: "2026-10-03", status: "CANCELLED" },
     ]);
 
     await openLedger();
@@ -312,7 +311,6 @@ describe("OrdersPage：四类订单台账", () => {
         id: 3,
         order_no: "DG-2026-0003",
         order_type: "DG",
-        capital_type: "ZERO",
         trade_date: "2026-10-03",
         status: "ACTIVE",
         note: "[批量验收] DG 分期出售",
@@ -333,7 +331,6 @@ describe("OrdersPage：四类订单台账", () => {
         id: 3,
         order_no: "DG-2026-0003",
         order_type: "DG",
-        capital_type: "ZERO",
         trade_date: "2026-10-03",
         status: "ACTIVE",
         account_game_type: "王者荣耀",
@@ -514,7 +511,6 @@ describe("OrdersPage：四类订单台账", () => {
         id: 3,
         order_no: "DG-2026-0003",
         order_type: "DG",
-        capital_type: "ZERO",
         trade_date: "2026-10-03",
         status: "ACTIVE",
         account_id: 9,
@@ -554,7 +550,6 @@ describe("OrdersPage：四类订单台账", () => {
       id: 4,
       order_no: "DG-2026-0004",
       order_type: "DG",
-      capital_type: "ZERO",
       trade_date: "2026-10-04",
       status: "COMPLETED",
       account_id: 10,
@@ -565,7 +560,7 @@ describe("OrdersPage：四类订单台账", () => {
       ...soldConsignment,
       events: [{ id: 401, order_id: 4, event_no: "EV-401", event_type: "SELL", amount: "500.00", is_posted: true, cancellable_amount: "500.00" }],
     } as never);
-    // 打开取消弹窗前会并行拉资金池与员工；未 mock 时 poolList 为 undefined，
+    // 打开取消弹窗前会并行拉资金账户与员工；未 mock 时 poolList 为 undefined，
     // openCancelTransaction 内部抛错被 catch 吞掉 → 弹窗不出现。
     vi.mocked(poolsApi.list).mockResolvedValue([
       { id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" },
@@ -661,13 +656,13 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
 
   const accountOrders = [
     {
-      id: 1, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE", account_id: 99,
+      id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE", account_id: 99,
       account_game_type: "原神", account_game_account: "seller-001", account_platform: "安卓", account_status: "WAITING", party_name: "卖家甲", party_source: "同行推荐",
       sale_amount: "1234.00", last_event_type: "BUY", inventory_operator: "入库员", inventory_entry_at: "2026-10-01T09:30:00", sale_operator: "售卖员", sale_at: "2026-10-17T16:45:00",
     },
-    { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
+    { id: 2, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-02", status: "COMPLETED" },
   ];
-  const accountTypes = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
+  const accountTypes = [{ id: 1, code: "HS", name: "回收", is_active: true }];
 
   beforeEach(() => {
     accountUi = userEvent.setup({ pointerEventsCheck: 0 });
@@ -746,8 +741,8 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
 
   it("未关联库存账号的订单不显示「编辑账号」入口", async () => {
     vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([
-      { id: 1, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE", account_game_type: "原神", account_game_account: "seller-001", account_platform: "安卓", account_status: "WAITING" },
-      { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
+      { id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE", account_game_type: "原神", account_game_account: "seller-001", account_platform: "安卓", account_status: "WAITING" },
+      { id: 2, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-02", status: "COMPLETED" },
     ]) as never);
     renderLight(<OrdersPage />);
     await accountUi.click(await screen.findByRole("tab", { name: "订单台账" }));

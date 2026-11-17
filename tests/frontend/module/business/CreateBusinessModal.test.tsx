@@ -46,7 +46,7 @@ vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 
-const types = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
+const types = [{ id: 1, code: "HS", name: "回收", is_active: true }];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -247,7 +247,7 @@ it("必填校验失败时显示表单级提示，避免误认为点击无效", a
 it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () => {
     vi.mocked(ordersApi.create).mockRejectedValueOnce({
       isAxiosError: true,
-      response: { data: { code: "POOL_ROUTE_MISSING", message: "缺少资金池路由" } },
+      response: { data: { code: "POOL_ROUTE_MISSING", message: "缺少资金账户路由" } },
       message: "Request failed",
     });
     const { container } = await openTypedModal("TH");

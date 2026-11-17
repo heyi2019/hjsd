@@ -91,7 +91,7 @@ def test_create_transfer_rejects_same_pool(seeded_db):
 def test_create_transfer_rejects_amount_above_source_available(seeded_db):
     invest, profit = _pools(seeded_db)
 
-    with pytest.raises(Validation, match="转出资金池可用余额不足"):
+    with pytest.raises(Validation, match="转出资金账户可用余额不足"):
         transfers.create_transfer(
             seeded_db,
             source_pool_id=invest.id,
@@ -116,7 +116,7 @@ def test_repair_transfer_rejects_unknown(seeded_db):
 def test_repair_transfer_rejects_same_counterpart_pool(seeded_db):
     invest, profit = _pools(seeded_db)
     tid = _make_single_side(seeded_db, source=invest, target=profit)
-    with pytest.raises(Validation, match="修复对端资金池不能与原资金池相同"):
+    with pytest.raises(Validation, match="修复对端资金账户不能与原资金账户相同"):
         transfers.repair_transfer(
             seeded_db,
             tid,
@@ -151,7 +151,7 @@ def test_repair_transfer_rejects_pool_not_visible_to_user(seeded_db):
         pool_ids=frozenset(),
         owner_scope="SELF",
     )
-    with pytest.raises(NotFound, match="资金池不存在"):
+    with pytest.raises(NotFound, match="资金账户不存在"):
         transfers.repair_transfer(
             seeded_db,
             tid,

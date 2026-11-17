@@ -134,7 +134,7 @@ describe("库存导出", () => {
             direction: "收入",
             amount: "500.00",
             occurred_at: "2026-11-02T10:00:00",
-            pool_name: "未分配资金池",
+            pool_name: "未分配资金账户",
             note: "",
             operator: "admin",
           }],

@@ -229,7 +229,7 @@ E2E_CROSS_MODULE: dict[str, set[str]] = {
 # 这些文件本身仍是 IT 类型，仅额外标记「跨模块」。
 # ---------------------------------------------------------------------------
 CROSS_MODULE_FILES: dict[str, set[str]] = {
-    "test_flow_sale.py": {"B", "D"},            # 售出：订单状态 + 资金池余额同源
+    "test_flow_sale.py": {"B", "D"},            # 售出：订单状态 + 资金账户余额同源
     "test_flow_distribution.py": {"B", "D"},    # 分销结算：订单 + 资金
     "test_flow_installment.py": {"B", "D"},     # 分期回款：订单 + 资金
     "test_flow_recycle.py": {"B", "D"},         # 回收售出：库存 + 资金

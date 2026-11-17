@@ -83,7 +83,7 @@ beforeEach(() => {
     total_remaining: "150.00",
     total_count: 2,
   }));
-  vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }], { limit: 500 }) as never);
+  vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE" }], { limit: 500 }) as never);
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);
@@ -281,7 +281,7 @@ describe("InstallmentsPanel：动作与减免", () => {
     vi.clearAllMocks();
     seedOrderFormFields();
     vi.mocked(installmentsApi.list).mockResolvedValue(installments);
-    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }], { limit: 500 }) as never);
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE" }], { limit: 500 }) as never);
   });
 
   describe("InstallmentsPanel：登记收款 / 换绑交付", () => {
@@ -423,7 +423,6 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     id: 10,
     order_no: "HS-2026-0010",
     order_type: "HS",
-    capital_type: "SELF",
     account_business_mode: "SELF",
     account_game_type: "王者荣耀",
     account_game_account: "abc",

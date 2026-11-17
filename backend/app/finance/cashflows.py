@@ -134,7 +134,7 @@ def create_cashflow(
     ):
         raise Validation("独立收款必须填写摘要", details={"field": "note"})
     if user is not None and not user.can_see_pool(pool_id):
-        raise NotFound("资金池不存在", details={"pool_id": pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     pool = assert_pool_usable(session, pool_id)
     if order_id is not None:
         get_order(session, order_id, user)
@@ -644,7 +644,7 @@ def update_cashflow(
 ) -> Cashflow:
     flow = _assert_editable_studio_cashflow(session, cashflow_id, user)
     if user is not None and not user.can_see_pool(pool_id):
-        raise NotFound("资金池不存在", details={"pool_id": pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     pool = assert_pool_usable(session, pool_id)
     (
         normalized_direction,

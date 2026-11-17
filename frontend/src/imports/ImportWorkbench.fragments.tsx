@@ -45,7 +45,7 @@ export const IMPORT_TEMPLATES: Record<string, { filename: string; content: strin
   },
   STANDARD_CASHFLOW: {
     filename: "资金流水导入模板.csv",
-    content: "发生日期,金额,收支方向,资金池,业务类型,订单号,说明\n2026-01-31,0.00,IN,,HS,,",
+    content: "发生日期,金额,收支方向,资金账户,业务类型,订单号,说明\n2026-01-31,0.00,IN,,HS,,",
   },
   STANDARD_INSTALLMENT: {
     filename: "分期导入模板.csv",

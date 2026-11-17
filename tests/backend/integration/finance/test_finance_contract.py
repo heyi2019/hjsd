@@ -1191,7 +1191,7 @@ class TestFinanceApi:
             owner_scope="SELF",
             pool_ids=frozenset({1}),
         )
-        with pytest.raises(NotFound, match="资金池不存在"):
+        with pytest.raises(NotFound, match="资金账户不存在"):
             create_transfer(
                 seeded_db,
                 source_pool_id=2,

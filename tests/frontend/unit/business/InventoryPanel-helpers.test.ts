@@ -25,7 +25,6 @@ const row = (overrides: {
     id: account.id,
     order_no: "HS-1",
     order_type: "HS",
-    capital_type: "STOCK",
     trade_date: "2026-10-01",
     status: "ACTIVE",
     account_status: account.status,

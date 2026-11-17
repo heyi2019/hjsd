@@ -118,7 +118,7 @@ def validate_event_edits(
         if db.scalar(select(RebateRecord.id).where(RebateRecord.source_order_id == order.id)) is not None:
             raise Validation("关联返点的记录不能直接修改，请先核对返点")
         if db.scalar(select(Reconciliation.id).where(Reconciliation.pool_id == flow.pool_id, Reconciliation.reconciled_on >= flow.occurred_on)) is not None:
-            raise Validation("资金池已有后续对账记录，不能直接修改")
+            raise Validation("资金账户已有后续对账记录，不能直接修改")
         if event.event_type == "BUY":
             cost_delta += item.amount - Decimal(str(event.amount))
         changes.append((event, flow, item))

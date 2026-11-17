@@ -8,11 +8,6 @@ export const ORDER_TYPE_LABEL: Record<string, string> = {
   DG: "代挂",
 };
 
-export const CAPITAL_TYPE_LABEL: Record<string, string> = {
-  STOCK: "库存型",
-  ZERO: "零本金型",
-};
-
 export const BUSINESS_MODE_LABEL: Record<string, string> = {
   SELF: "自营",
   DISTRIBUTION: "分销",
@@ -91,7 +86,7 @@ export const PERMISSION_LABEL: Record<string, string> = {
   "policy.manage": "管理经营规则",
   "field-definition.manage": "管理字段配置",
   "audit.read": "查看审计记录",
-  "pool.manage": "管理资金池",
+  "pool.manage": "管理资金账户",
   "order-type.manage": "管理业务类型",
   "option-set.manage": "管理选项词典",
   "report.read": "查看报表",
@@ -111,7 +106,7 @@ export const ENTITY_TYPE_LABEL: Record<string, string> = {
   account: "账号",
   customer: "客户",
   installment: "分期合约",
-  pool: "资金池",
+  pool: "资金账户",
   cashflow: "资金流水",
   lead: "需求",
   counterparty: "合作方",
@@ -130,13 +125,6 @@ export function orderTypeLabel(code: string | null | undefined, names?: Record<s
   if (!code) return "-";
   return names?.[code] ?? ORDER_TYPE_LABEL[code] ?? code;
 }
-
-/** 资金所有权性质（FundNature 三值）：与 backend/app/domain/enums.py FundNature 一致。 */
-export const FUND_NATURE_LABEL: Record<string, string> = {
-  BUSINESS: "本方经营",
-  EXTERNAL: "外部/受托",
-  INTERNAL: "内部调拨",
-};
 
 /** 核算属性：与 backend/app/domain/enums.py AccountingAttribute 一致。 */
 export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
@@ -166,10 +154,10 @@ export const RECONCILIATION_STATUS_LABEL: Record<string, string> = {
 /** 审计动作中文名：与 backend/app/domain/enums.py AuditAction 对齐（随枚举增补）。
  *  后端 option_sets 的 AUDIT_ACTION 为只读死字典，未覆盖的新动作由本表兜底翻译。 */
 export const AUDIT_ACTION_LABEL: Record<string, string> = {
-  POOL_CREATE: "新建资金池",
-  POOL_UPDATE: "编辑资金池",
-  POOL_DISABLE: "停用资金池",
-  POOL_DELETE: "删除资金池",
+  POOL_CREATE: "新建资金账户",
+  POOL_UPDATE: "编辑资金账户",
+  POOL_DISABLE: "停用资金账户",
+  POOL_DELETE: "删除资金账户",
   ORDER_TYPE_CREATE: "新建业务类型",
   ORDER_TYPE_UPDATE: "编辑业务类型",
   ORDER_TYPE_DISABLE: "停用业务类型",
@@ -177,7 +165,6 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   GAME_TYPE_UPDATE: "编辑游戏类型",
   GAME_TYPE_DISABLE: "停用游戏类型",
   GAME_TYPE_DEFAULT: "设置默认游戏类型",
-  ROUTE_UPDATE: "更新资金路由",
   LIST_COLUMNS_UPDATE: "列表列显示配置变更",
   LIST_COLUMNS_RESET: "列表列配置恢复默认",
   LIST_COLUMN_ADD: "列表新增自定义列",

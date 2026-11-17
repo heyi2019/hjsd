@@ -61,23 +61,23 @@ describe("AuditPanel：审计记录", () => {
     vi.mocked(auditApi.actions).mockResolvedValue(["POOL_DISABLE"]);
     renderLight(<AuditPanel />, { user: "admin" });
 
-    expect(await screen.findByText("资金池")).toBeInTheDocument();
+    expect(await screen.findByText("资金账户")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "配置项" })).toBeInTheDocument();
 
     const configSelect = document.querySelector(".audit-config-item-select .ant-select-selector") as HTMLElement;
     await ui.click(configSelect);
-    await ui.click(await screen.findByText("资金池 · 资金池", { selector: ".ant-select-item-option-content" }));
+    await ui.click(await screen.findByText("资金账户 · 资金账户", { selector: ".ant-select-item-option-content" }));
     await waitFor(() => expect(vi.mocked(auditApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ entity_type: "Pool" })));
   });
 
-  it("配置项筛选中的对象类型使用中文标签", async () => {
+  it("配置项筛选不再展示已删除的资金路由对象", async () => {
     renderLight(<AuditPanel />, { user: "admin" });
 
     const configSelect = document.querySelector(".audit-config-item-select .ant-select-selector") as HTMLElement;
     await ui.click(configSelect);
 
-    expect(await screen.findByText("资金池 · 资金路由", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
-    expect(screen.queryByText("资金池 · OrderTypePool", { selector: ".ant-select-item-option-content" })).toBeNull();
+    expect(screen.queryByText("资金账户 · 资金路由", { selector: ".ant-select-item-option-content" })).toBeNull();
+    expect(screen.queryByText("资金账户 · OrderTypePool", { selector: ".ant-select-item-option-content" })).toBeNull();
   });
 
   it("加载失败展示错误横幅", async () => {
@@ -101,7 +101,7 @@ describe("AuditPanel：审计记录", () => {
     await screen.findByText("admin");
     const actionSelect = document.querySelector(".audit-action-select .ant-select-selector") as HTMLElement;
     await ui.click(actionSelect);
-    expect(await screen.findByText("新建资金池", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(await screen.findByText("新建资金账户", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
   });
 
   it("FE-150：选择对象类型后只查询对应审计记录", async () => {

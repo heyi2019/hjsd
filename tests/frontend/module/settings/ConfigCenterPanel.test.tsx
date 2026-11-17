@@ -34,13 +34,12 @@ import { renderLight } from "@fixtures/render";
 import { ConfigCenterPanel } from "@/field-definitions/panels/ConfigCenterPanel";
 
 const orderTypes = [
-  { id: 1, code: "HS", name: "回收", capital_type: "OWNED", is_active: true },
+  { id: 1, code: "HS", name: "回收", is_active: true },
 ] as unknown as import("@/shared/api/types/orders").OrderType[];
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(orderTypesApi.list).mockResolvedValue(orderTypes);
-  vi.mocked(orderTypesApi.routes).mockResolvedValue([] as never);
   vi.mocked(poolsApi.list).mockResolvedValue([
     { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
   ] as never);

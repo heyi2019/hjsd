@@ -65,7 +65,7 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
       />
 
       <Space className="muted" size="small">
-        利润 = 账号售出利润 + 工作室其他收入；资金池余额和流水请进入资金中心查看。
+        利润 = 账号售出利润 + 工作室其他收入；资金账户余额和流水请进入资金中心查看。
       </Space>
     </section>
   );

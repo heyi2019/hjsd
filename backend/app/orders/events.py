@@ -23,7 +23,6 @@ from app.domain.enums import (
     CashflowSourceType,
     Direction,
     EventType,
-    FundNature,
     Nature,
     OperationType,
     OrderStatus,
@@ -174,7 +173,7 @@ def post_event(
         if active_ids != set(operator_user_ids):
             raise Validation("所选操作人不存在或已停用", details={"field": "operator_user_ids"})
     if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
-        raise NotFound("资金池不存在", details={"pool_id": pool_id})
+        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     can_cancel_completed = (
         event_type == EventType.CANCEL.value
         and order.status == OrderStatus.COMPLETED.value
@@ -273,7 +272,7 @@ def post_event(
         offset = _get_offset_event(session, offset_event_id, order_id=order.id)
         if pool_id is not None and pool_id != offset.pool_id:
             raise Validation(
-                "冲销必须沿用被冲销事件的资金池",
+                "冲销必须沿用被冲销事件的资金账户",
                 details={
                     "offset_event_id": offset_event_id,
                     "offset_pool_id": offset.pool_id,
@@ -298,21 +297,19 @@ def post_event(
                 },
             )
         cancel_fully_consumed = money >= remaining
-    fund_nature: str | None = None
     accounting_attribute: str | None = None
     resolved_pool_id: int | None = None
     if has_cashflow:
         accounting_attribute = accounting_attribute_for_order_event(
             order.order_type, event_type
         )
-        fund_nature = FundNature.BUSINESS.value
         resolved_pool_id = (
             pool_id
             or (offset.pool_id if offset is not None else None)
-            or _resolve_pool(session, order, portion, fund_nature=fund_nature).id
+            or _resolve_pool(session, order, portion).id
         )
         if user is not None and not user.can_see_pool(resolved_pool_id):
-            raise NotFound("资金池不存在", details={"pool_id": resolved_pool_id})
+            raise NotFound("资金账户不存在", details={"pool_id": resolved_pool_id})
         _assert_pool_active(session, resolved_pool_id)
     cancel_direction = Direction.IN.value
     if event_type == EventType.CANCEL.value:
@@ -373,7 +370,7 @@ def post_event(
     if event_type == EventType.CANCEL.value:
         direction = cancel_direction
         # nature 必须随反转后的 direction 走，否则会产出 OUT/BUSINESS_IN（或
-        # IN/BUSINESS_OUT）这种自相矛盾的流水：余额按方向变了，但资金池收支卡片
+        # IN/BUSINESS_OUT）这种自相矛盾的流水：余额按方向变了，但资金账户收支卡片
         # 与资金日报发生额列按 (direction, nature) 取数，两边都不体现，账对不上。
         # 与 finance/cashflows.py::reverse_cashflow 的反向约定保持一致。
         nature = (

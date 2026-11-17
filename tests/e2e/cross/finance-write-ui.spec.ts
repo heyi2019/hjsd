@@ -16,7 +16,7 @@ import { navItem } from "../support/api-stub";
  *    .ant-select-item-option`（hasText 子串）精确点击「刚打开的那个」可见下拉里的目标项；
  *    并对长列表（虚拟滚动）循环滚到底直到目标项渲染可见。
  *  - 打开 Select：定位含 label 文本的 .ant-form-item 内的 .ant-select-selector 点击。
- *    antd Form.Item label 默认带冒号（"资金池："），故 label 用子串匹配。
+ *    antd Form.Item label 默认带冒号（"资金账户："），故 label 用子串匹配。
  *  - MoneyInput / Input：就是 antd Input，`dialog.getByLabel('xxx').fill()` 直填
  *    （getByLabel 对带冒号/必填星号的 label 做子串匹配）。
  *  - Modal：role=dialog；提交按钮用 `getByRole('button', { name })`。
@@ -183,7 +183,7 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await pickSelect(page, dialog, "资金池", /投资款荷包/);
+    await pickSelect(page, dialog, "资金账户", /投资款荷包/);
     await dialog.getByLabel("发生日期").fill("2026-10-21");
     await pickSelect(page, dialog, "收支方向", "收入");
     await pickSelect(page, dialog, "资金性质", "本方经营");
@@ -198,12 +198,12 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     expect(errors).toEqual([]);
   });
 
-  test("资金中心·总览：资金池划转登记", async ({ page, request }) => {
+  test("资金中心·总览：资金账户划转登记", async ({ page, request }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
 
     // E2E 库整次运行只重建一次、用例间累积，前面的 business-write 等用例会从「投资款荷包」
-    // 大量支出，把它拖成负可用余额，导致转出 1.00 被后端以「转出资金池可用余额不足」拒绝
+    // 大量支出，把它拖成负可用余额，导致转出 1.00 被后端以「转出资金账户可用余额不足」拒绝
     //（实测 -1,191.00）。故先经 API 给转出池注入一笔外部收入（收入流水不受余额限制），
     // 让本用例与执行顺序解耦、确定性通过。
     const pools = (await (
@@ -229,18 +229,18 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
 
     await page.goto("/");
     await navItem(page, "资金中心").click(); // 默认总览
-    await page.getByRole("button", { name: "资金池划转" }).click();
+    await page.getByRole("button", { name: "资金账户划转" }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await pickSelect(page, dialog, "转出资金池", /投资款荷包/);
-    await pickSelect(page, dialog, "转入资金池", /利润荷包/);
+    await pickSelect(page, dialog, "转出资金账户", /投资款荷包/);
+    await pickSelect(page, dialog, "转入资金账户", /利润荷包/);
     await dialog.getByLabel("划转金额").fill("1.00");
     await dialog.getByLabel("划转日期").fill("2026-10-21");
     await dialog.getByLabel("说明").fill("E2E 划转 UI");
     await dialog.getByRole("button", { name: "确认划转" }).click();
 
-    await expect(page.getByText("资金池划转已登记")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("资金账户划转已登记")).toBeVisible({ timeout: 10000 });
     expect(errors).toEqual([]);
   });
 

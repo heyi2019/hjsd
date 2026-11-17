@@ -103,7 +103,6 @@ async function openPanel(rows: Account[]) {
         id: row.source_order_id ?? row.id,
         order_no: row.source_order_no ?? `HS-${row.id}`,
         order_type: row.inventory_type === "CONSIGNMENT" ? "DG" : "HS",
-        capital_type: "SELF",
         trade_date: "2026-10-15",
         account_id: row.id,
         account_status: "WAITING",
@@ -156,7 +155,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
   it("在库账号卡片使用后端账号统计，不使用分页订单行数", async () => {
     vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([{
         account: inStockRow,
-        order: { id: 21, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-15", account_id: 1, account_status: "WAITING", status: "ACTIVE" },
+        order: { id: 21, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-15", account_id: 1, account_status: "WAITING", status: "ACTIVE" },
       }], {
         total: 2,
         facet_total: 2,

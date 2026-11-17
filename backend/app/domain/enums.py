@@ -1,7 +1,7 @@
 """domain.enums：v1 封闭枚举与编号域。
 
 取值以本模块定义为唯一来源，数据库 CHECK 约束与之同步：
-- `capital_type`、`ownership`、业务 code 等核算枚举保持封闭；
+- `portion`、`ownership`、业务 code 等核算枚举保持封闭；
 - `pool_type` 是**注册表**（V31），扩展登记新值即可，不改表。
 """
 from __future__ import annotations
@@ -40,13 +40,6 @@ class PoolType(StrEnum):
     INVEST = "INVEST"
     PROFIT = "PROFIT"
     OTHER = "OTHER"
-
-
-class CapitalType(StrEnum):
-    """资金性质：默认取业务定义，允许按单覆盖（V34）。"""
-
-    STOCK = "STOCK"  # 回收：库存型
-    ZERO = "ZERO"  # 代挂：零本金
 
 
 class Portion(StrEnum):
@@ -213,14 +206,6 @@ class Nature(StrEnum):
     INTERNAL = "INTERNAL"
 
 
-class FundNature(StrEnum):
-    """资金所有权性质：本方经营、外部/受托或本方内部调拨。"""
-
-    BUSINESS = "BUSINESS"
-    EXTERNAL = "EXTERNAL"
-    INTERNAL = "INTERNAL"
-
-
 class CashflowLedgerType(StrEnum):
     """资金流水所属顶层账簿：公司业务或工作室运营。"""
 
@@ -382,7 +367,7 @@ class PolicyScopeType(StrEnum):
     GLOBAL = "GLOBAL"  # 全局
     ORDER_TYPE = "ORDER_TYPE"  # 按业务类型（scope_id = order_type_defs.id）
     USER = "USER"  # 按人员（scope_id = users.id）
-    POOL = "POOL"  # 按资金池（scope_id = pools.id）
+    POOL = "POOL"  # 按资金账户（scope_id = pools.id）
 
 
 class PolicyType(StrEnum):
@@ -470,7 +455,6 @@ class AuditAction(StrEnum):
     GAME_TYPE_UPDATE = "GAME_TYPE_UPDATE"
     GAME_TYPE_DISABLE = "GAME_TYPE_DISABLE"
     GAME_TYPE_DEFAULT = "GAME_TYPE_DEFAULT"
-    ROUTE_UPDATE = "ROUTE_UPDATE"
     CUSTOMER_CREATE = "CUSTOMER_CREATE"
     CUSTOMER_UPDATE = "CUSTOMER_UPDATE"
     CONTACT_WRITE = "CONTACT_WRITE"
@@ -565,7 +549,6 @@ class AuditAction(StrEnum):
 __all__ = [
     "AccountStatus",
     "AuditAction",
-    "CapitalType",
     "AccountingAttribute",
     "CashflowLedgerType",
     "CashflowSourceType",
@@ -583,7 +566,6 @@ __all__ = [
     "EventType",
     "SaleMode",
     "OperationType",
-    "FundNature",
     "InstallmentContractType",
     "InstallmentDispositionAction",
     "InstallmentStatus",

@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
 from app.core import numbering
-from app.core.errors import AppError, ErrorCode
+from app.core.errors import AppError, ErrorCode, Validation
 from app.core.numbering import allocate_number, ensure_sequence, peek_number, sequence_max
 from app.domain.enums import SequenceKey
 from app.domain.foundation import DocumentSequence
@@ -205,3 +205,10 @@ def test_allocate_number_after_ensure_sequence(seeded_db):
     numbering.ensure_sequence(seeded_db, "B6_SEQ_ALLOC", "BA", padding=4)
     assert numbering.allocate_number(seeded_db, "B6_SEQ_ALLOC") == "BA0001"
     assert numbering.allocate_number(seeded_db, "B6_SEQ_ALLOC") == "BA0002"
+
+
+def test_ensure_sequence_raises_when_row_missing_after_insert(db, monkeypatch):
+    """防御分支：ON CONFLICT 落行后回读仍为 None（约束/方言异常）时明确报错。"""
+    monkeypatch.setattr(db, "scalar", lambda *a, **k: None)
+    with pytest.raises(Validation, match="初始化失败"):
+        ensure_sequence(db, SequenceKey.ORDER_HS, "HS", 4)

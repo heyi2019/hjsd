@@ -7,6 +7,7 @@ from app.core.errors import Validation
 from app.core.operation_operators import (
     get_operation_operators,
     list_operation_operators,
+    list_operation_operators_bulk,
     upsert_operation_operators,
 )
 
@@ -97,3 +98,50 @@ def test_operation_operators_list_is_scoped_and_stable(seeded_db):
 
     assert [row.operation_key for row in rows] == ["CREATE", "PAY:1"]
     assert rows[1].operator_user_ids == [1, 2]
+
+
+def test_operation_operators_reject_unknown_actor(seeded_db):
+    """operator_user_ids 未传时按 actor 用户名解析；名字不存在必须明确报错。"""
+    with pytest.raises(Validation, match="当前操作人不存在或已停用"):
+        upsert_operation_operators(
+            seeded_db,
+            entity_type="installment",
+            entity_id="INST0009",
+            operation_key="PAY:9",
+            actor="ghost-user",
+            operator_user_ids=None,
+        )
+
+
+def test_operation_operators_reject_empty_selection(seeded_db):
+    with pytest.raises(Validation, match="至少选择一名操作人"):
+        upsert_operation_operators(
+            seeded_db,
+            entity_type="installment",
+            entity_id="INST0009",
+            operation_key="PAY:9",
+            actor="seeduser1",
+            operator_user_ids=[],
+        )
+
+
+def test_operation_operators_reject_blank_entity_keys(seeded_db):
+    """entity_type / entity_id / operation_key 去空白后任一为空都拒收。"""
+    for kwargs in (
+        {"entity_type": "   ", "entity_id": "INST0009", "operation_key": "PAY:9"},
+        {"entity_type": "installment", "entity_id": "   ", "operation_key": "PAY:9"},
+        {"entity_type": "installment", "entity_id": "INST0009", "operation_key": ""},
+    ):
+        with pytest.raises(Validation, match="业务动作标识不能为空"):
+            upsert_operation_operators(
+                seeded_db,
+                actor="seeduser1",
+                operator_user_ids=[1],
+                **kwargs,
+            )
+
+
+def test_bulk_operators_returns_empty_for_no_entities(seeded_db):
+    assert list_operation_operators_bulk(
+        seeded_db, entity_type="installment", entity_ids=[]
+    ) == {}

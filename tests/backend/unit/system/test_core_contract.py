@@ -601,3 +601,24 @@ class TestApiV1Health:
             "status": "error",
             "database_status": "unavailable",
         }
+
+
+# ----------------------------------------------------- phone 前缀归一化补口
+from app.core.phone import normalize_phone  # noqa: E402
+
+
+class TestPhoneNormalize:
+    def test_strips_separators_and_plus86(self):
+        assert normalize_phone("+86 138-0013-8000") == "13800138000"
+
+    def test_strips_0086_prefix(self):
+        assert normalize_phone("008613800138000") == "13800138000"
+
+    def test_strips_86_prefix_only_for_13_digits(self):
+        # 13 位且以 86 开头才剥前缀；8613800138（10位）不剥
+        assert normalize_phone("8613800138000") == "13800138000"
+        assert normalize_phone("8613800138") == "8613800138"
+
+    def test_none_and_plain(self):
+        assert normalize_phone(None) == ""
+        assert normalize_phone("13800138000") == "13800138000"

@@ -157,6 +157,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setMustChangePassword(false);
   }, []);
   const logout = useCallback(async () => {
+    // 先结束本地会话，再尝试通知服务端；网络慢或后端不可达时也必须立即落登录页。
+    setAuthenticated(false);
+    setMustChangePassword(false);
     // 后端 /auth/logout 失败也必须退出本地会话：否则「退出登录」点了没反应，
     // 用户以为已退出却仍停留在已登录界面。
     try {
@@ -165,6 +168,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // 退出是本地会话的终止动作，不应被后端不可达阻断或产生未处理拒绝。
       // 服务端若可达会撤销 token；不可达时 finally 仍清理本地 token 并落登录页。
     } finally {
+      // logoutApi 自身负责清理 token；这里保留 finally 只确保未来替换实现时状态仍收口。
       setAuthenticated(false);
       setMustChangePassword(false);
     }

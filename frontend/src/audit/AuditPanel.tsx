@@ -8,7 +8,7 @@ import type { AuditLogRow } from "../shared/api/types/ops";
 import { normalizeError } from "../shared/api/client";
 import { AUDIT_ACTION_LABEL, ENTITY_TYPE_LABEL } from "../shared/lib/labels";
 import { formatDateTimeMinute } from "../shared/lib/format";
-import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
+import { configurableLabel } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { CONFIG_ENTITY_TYPE_LABEL, ENTITY_TYPE_TO_ITEM, SETTINGS_ITEMS } from "../field-definitions/configCatalog";
 
@@ -30,7 +30,9 @@ import { DataTable, DateField, ErrorBanner, Select } from "../shared/ui";
 import "./AuditPanel.css";
 
 export function AuditPanel() {
-  const entityTypeOptions = useOptionSet("ENTITY_TYPE") ?? ENTITY_TYPE_FALLBACK;
+  // 对象类型筛选直接用代码事实源（ENTITY_TYPE_LABEL 与审计实际写入的小写表名对齐）：
+  // ENTITY_TYPE 词典已被历史数据污染（混入 OrderTypePool/Seed 等类名 28 值），不可作选项源。
+  const entityTypeOptions = ENTITY_TYPE_FALLBACK;
   const [rows, setRows] = useState<AuditLogRow[]>([]);
   const [configItem, setConfigItem] = useState("");
   const [entityType, setEntityType] = useState("");

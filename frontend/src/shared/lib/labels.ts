@@ -164,6 +164,7 @@ export const CASHFLOW_CATEGORY_LABEL: Record<string, string> = {
   INSTALLMENT_PAYMENT: "分期还款",
   TRANSFER: "划转",
   REVERSAL: "冲销",
+  OTHER: "其他",
 };
 
 /** 审计动作中文名：与 backend/app/domain/enums.py AuditAction 对齐（随枚举增补）。

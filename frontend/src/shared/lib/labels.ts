@@ -110,6 +110,10 @@ export const ENTITY_TYPE_LABEL: Record<string, string> = {
   cashflow: "资金流水",
   lead: "需求",
   counterparty: "合作方",
+  // 订单详情页内编辑动作使用的细分实体类型（写点在 order_detail/editing/*）
+  inventory_order_edit: "订单编辑",
+  inventory_event_edit: "订单事件编辑",
+  inventory_cashflow_edit: "流水编辑",
 };
 
 export const FIELD_TYPE_LABEL: Record<string, string> = {

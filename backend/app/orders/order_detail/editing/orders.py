@@ -28,4 +28,4 @@ def apply_order_edits(db: Session, account_id: int, target_order_id: int, items:
             order.created_at = occurred_at
             order.trade_date = occurred_at.date()
         order.updated_by = user.username
-        record_audit(db, action="ORDER_UPDATE", entity_type="inventory_order_edit", entity_id=order.id, actor=user.username, before=before, after={"note": order.note, "occurred_at": order.created_at.isoformat() if order.created_at else None, "operator": order.created_by, "form_extra": order.form_extra})
+        record_audit(db, action="ORDER_UPDATE", entity_type="inventory_order_edit", entity_id=order.order_no, actor=user.username, before=before, after={"note": order.note, "occurred_at": order.created_at.isoformat() if order.created_at else None, "operator": order.created_by, "form_extra": order.form_extra})

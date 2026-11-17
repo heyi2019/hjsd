@@ -241,7 +241,7 @@ def set_action_allocations(
         session,
         action=AuditAction.PROFIT_ALLOCATION_SET,
         entity_type="order",
-        entity_id=order.id,
+        entity_id=order.order_no,
         actor=actor,
         after={
             "allocations": [

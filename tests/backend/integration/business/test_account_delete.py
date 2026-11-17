@@ -74,7 +74,7 @@ def test_delete_inventory_removes_orders_and_keeps_audit_reason(seeded_client, s
     audit = seeded_db.scalar(
         select(AuditLog).where(
             AuditLog.action == AuditAction.ACCOUNT_DELETE,
-            AuditLog.entity_id == str(account_id),
+            AuditLog.entity_id == stock_no,
         )
     )
     assert audit is not None and audit.reason == "重复录入，需清理"

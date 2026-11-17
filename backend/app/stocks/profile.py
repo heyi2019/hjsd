@@ -104,7 +104,7 @@ def create_account(
         session,
         action=AuditAction.ACCOUNT_CREATE,
         entity_type="account",
-        entity_id=str(account.id),
+        entity_id=account.stock_no,
         actor=actor,
         after={
             "game_account": account.game_account,
@@ -237,7 +237,7 @@ def update_account_profile(
         session,
         action=AuditAction.ACCOUNT_UPDATE,
         entity_type="account",
-        entity_id=str(account.id),
+        entity_id=account.stock_no,
         actor=actor,
         before=before,
         after={

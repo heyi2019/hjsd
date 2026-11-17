@@ -135,17 +135,27 @@ def _collect_columns(items: list[str], found: list[tuple[str, str | None]]) -> N
 
 
 def panel_columns(scope: str) -> list[tuple[str, str | None]]:
-    """按源码顺序返回该作用域在界面上的 [(列 key, 中文名)]。"""
+    """按源码顺序返回该作用域在界面上的 [(列 key, 中文名)]。
+
+    锚点后可能有非列数组（如筛选下拉的分组选项），逐个尝试：
+    跳过解析不出列键的数组，取第一个全部条目都带 key/dataIndex 的。
+    """
     relative = PANEL_SOURCES[scope]
     text = (_FRONTEND_SRC / relative).read_text(encoding="utf-8")
     marker = f'useListViewColumns("{scope}")'
     anchor = text.find(marker)
     assert anchor >= 0, f"{relative} 里没有 {marker}：作用域改名或面板换实现时要同步本测试"
-    declaration = _ARRAY_DECL.search(text, anchor)
-    assert declaration, f"{relative} 里 {marker} 之后找不到列数组"
-    found: list[tuple[str, str | None]] = []
-    _collect_columns(_split_items(_array_body(text, declaration.end() - 1)), found)
-    return found
+    errors: list[str] = []
+    for declaration in _ARRAY_DECL.finditer(text, anchor):
+        found: list[tuple[str, str | None]] = []
+        try:
+            _collect_columns(_split_items(_array_body(text, declaration.end() - 1)), found)
+        except AssertionError as exc:
+            errors.append(str(exc))
+            continue
+        if found:
+            return found
+    assert False, f"{relative} 里 {marker} 之后没找到可解析的列数组；最近一次解析错误：{errors[-1] if errors else '无'}"
 
 
 def test_frontend_source_available() -> None:

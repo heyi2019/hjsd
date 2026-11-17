@@ -262,7 +262,7 @@ class TestCreateAccountGuards:
         actions = list(
             seeded_db.scalars(
                 select(AuditLog.action)
-                .where(AuditLog.entity_id == str(account.id))
+                .where(AuditLog.entity_id == account.stock_no)
                 .order_by(AuditLog.id)
             )
         )
@@ -275,7 +275,7 @@ class TestCreateAccountGuards:
             select(AuditLog)
             .where(
                 AuditLog.entity_type == "account",
-                AuditLog.entity_id == str(account.id),
+                AuditLog.entity_id == account.stock_no,
                 AuditLog.action == AuditAction.ACCOUNT_CREATE.value,
             )
         )

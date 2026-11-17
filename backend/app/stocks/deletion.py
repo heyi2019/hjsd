@@ -93,7 +93,7 @@ def delete_inventory_record(
         session,
         action=AuditAction.ACCOUNT_DELETE,
         entity_type="account",
-        entity_id=str(inventory_id),
+        entity_id=inventory.stock_no or str(inventory_id),
         actor=actor,
         before=before,
         after={

@@ -37,12 +37,12 @@ def load_order_execution_detail(
     event_ids = [event.id for rows in events.values() for event in rows]
     audit: list[AccountAuditOut] = []
     if user.has(PERM_AUDIT_READ):
-        filters = [(AuditLog.entity_type == "account") & (AuditLog.entity_id == str(account.id))]
+        filters = [(AuditLog.entity_type == "account") & AuditLog.entity_id.in_([str(account.id), account.stock_no])]
         filters.append((AuditLog.entity_type == "order") & (AuditLog.entity_id == order.order_no))
         if event_ids:
             event_id_values = [str(item) for item in event_ids]
             filters.append((AuditLog.entity_type == "inventory_event_edit") & AuditLog.entity_id.in_(event_id_values))
-        filters.append((AuditLog.entity_type == "inventory_order_edit") & (AuditLog.entity_id == str(order.id)))
+        filters.append((AuditLog.entity_type == "inventory_order_edit") & AuditLog.entity_id.in_([str(order.id), order.order_no]))
         flow_nos = [flow.flow_no for flow in context.order_cashflows.get(order.id, [])]
         if flow_nos:
             filters.append((AuditLog.entity_type == "inventory_cashflow_edit") & AuditLog.entity_id.in_(flow_nos))

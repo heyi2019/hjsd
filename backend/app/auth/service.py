@@ -284,7 +284,7 @@ def update_user(
                 session,
                 action=AuditAction.USER_HANDOVER,
                 entity_type="order",
-                entity_id=order.id,
+                entity_id=order.order_no,
                 actor=actor,
                 before=order_before,
                 after={"owner_id": order.owner_id, "handover_user_id": handover_target},

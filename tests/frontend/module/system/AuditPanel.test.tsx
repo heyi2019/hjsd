@@ -61,7 +61,8 @@ describe("AuditPanel：审计记录", () => {
     vi.mocked(auditApi.actions).mockResolvedValue(["POOL_DISABLE"]);
     renderLight(<AuditPanel />, { user: "admin" });
 
-    expect(await screen.findByText("资金账户")).toBeInTheDocument();
+    // entity_type=Pool 同时出现在「配置项」列与「对象类型」列（后者现在也翻译类名），用 findAll
+    expect((await screen.findAllByText("资金账户")).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole("columnheader", { name: "配置项" })).toBeInTheDocument();
 
     const configSelect = document.querySelector(".audit-config-item-select .ant-select-selector") as HTMLElement;

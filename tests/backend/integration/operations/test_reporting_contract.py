@@ -571,3 +571,100 @@ class TestReports:
             assert order["orders"]
             assert sum(o["profit_base"] for o in order["orders"]) == order["profit_base"]
         assert data["total"]["order_count"] == len(data["order_groups"])
+
+
+# ----------------------------------------------------- 覆盖补口：池作用域与日期窗口
+from app.finance import rebates  # noqa: E402
+from app.reporting.export import report_for_export  # noqa: E402
+from app.reporting.router import business_pnl  # noqa: E402
+
+
+def _pool1_user(seeded_db) -> CurrentUser:
+    """真实 User 行 + 仅授权池 1 的 CurrentUser（orders.owner_id 有 FK 约束）。"""
+    from app.core.tokens import hash_password
+    from app.domain.users import User
+
+    row = User(
+        username=f"r2scope-{uuid4().hex[:8]}",
+        display_name="R2 Scope",
+        password_hash=hash_password("scope-pass-123"),
+        role="OPERATOR",
+        owner_scope="SELF",
+        pool_ids=[1],
+        team_ids=[],
+        is_active=True,
+    )
+    seeded_db.add(row)
+    seeded_db.flush()
+    return CurrentUser(
+        id=row.id,
+        username=row.username,
+        roles=(),
+        permissions=frozenset(),
+        pool_ids=frozenset({1}),
+        owner_scope="SELF",
+    )
+
+
+def test_r2_pool_scope_and_date_window_filters(seeded_db):
+    """池作用域用户：返点/运营费只认授权池，且发生日窗口外的行被跳过。"""
+    user = _pool1_user(seeded_db)
+    account_id = create_account(
+        seeded_db,
+        game_account=f"r2-scope-{uuid4().hex[:8]}",
+        business_mode="SELF",
+        inventory_type="RECOVERY",
+        actor="pytest",
+    ).id
+    order = create_order(
+        seeded_db, order_type="HS", trade_date=D, actor="pytest",
+        account_id=account_id,
+    )
+    order.owner_id = user.id
+    seeded_db.flush()
+    late = date(2026, 11, 20)
+    # 窗口 [2026-10-01, 2026-10-31] 两侧各一笔返点：早于 from / 晚于 to
+    rebates.create_rebate(
+        seeded_db, source_order_id=order.id, rebate_type="BUY",
+        amount=Decimal("30"), collected_on=EARLY, actor="pytest",
+    )
+    rebates.create_rebate(
+        seeded_db, source_order_id=order.id, rebate_type="BUY",
+        amount=Decimal("40"), collected_on=late, actor="pytest",
+    )
+    # 运营费用：池1窗口内 + 池2（无授权） + 池1窗口外两侧
+    for occurred_on, pool_id, amount in (
+        (D, 1, Decimal("10")),
+        (D, 2, Decimal("99")),
+        (EARLY, 1, Decimal("5")),
+        (late, 1, Decimal("7")),
+    ):
+        create_cashflow(
+            seeded_db, pool_id=pool_id, occurred_on=occurred_on,
+            direction="OUT", nature="BUSINESS_OUT",
+            accounting_attribute="OPERATING_EXPENSE", category="OFFICE",
+            amount=amount, actor="pytest",
+        )
+    data = r2_monthly_pnl(
+        seeded_db, from_date=date(2026, 10, 1), to_date=date(2026, 10, 31),
+        user=user,
+    )
+    oct_item = _month_item(data, "2026-10")
+    assert oct_item["operating_expense"] == Decimal("10")
+    # 窗口外返点不进「其中返点」：仅窗口内（无）→ 2026-10 该列为 0
+    assert oct_item["rebate_income"] == Decimal("0")
+
+
+def test_report_for_export_monthly_pnl_and_order_profit(seeded_db):
+    """导出统一入口：monthly-pnl / business-pnl / order-profit 三个分支。"""
+    monthly = report_for_export(seeded_db, "monthly-pnl", user=None)
+    assert "items" in monthly
+    business = report_for_export(seeded_db, "business-pnl", user=None)
+    assert "items" in business
+    profit = report_for_export(seeded_db, "order-profit", user=None)
+    assert "items" in profit
+
+
+def test_router_business_pnl_endpoint(seeded_db):
+    out = business_pnl(db=seeded_db, user=None, from_date=None, to_date=None)
+    assert "items" in out

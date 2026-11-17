@@ -18,7 +18,7 @@ from app.core.security import (
 from app.lists.export import build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.lists.scopes import report_scope
-from app.reporting.export import report_csv, report_for_export
+from app.reporting.export import report_for_export
 from app.reporting.profit import order_profit_detail
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from app.reporting.r3_commission import r3_commission_reconciliation
@@ -125,15 +125,13 @@ def export_report(
     )
     # 导出列 = 该报表在「设置 → 列表字段」里的可见列：隐藏的列不导，表头用中文列名。
     # 列拼装（含自定义列注入与值翻译）统一走 lists.export，与主列表导出同一套口径。
+    # REPORT_NAMES 四个报表的列作用域在 lists.scopes 全部注册（RPT_*），
+    # report_scope 对合法报表名恒非空，无降级分支。
     scope = report_scope(report_name)
-    if scope is not None:
-        total = report.get("total") if isinstance(report.get("total"), dict) else None
-        csv_text, export_meta = build_list_csv(
-            db, scope.code, report.get("items") or [], total=total
-        )
-    else:
-        csv_text = report_csv(report)
-        export_meta = {"column_count": None, "translated_columns": []}
+    total = report.get("total") if isinstance(report.get("total"), dict) else None
+    csv_text, export_meta = build_list_csv(
+        db, scope.code, report.get("items") or [], total=total
+    )
     record_audit(
         db,
         action="REPORT_EXPORT",

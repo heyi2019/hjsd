@@ -430,9 +430,9 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(within(second).getByLabelText("分润备注")).toHaveValue(""));
   });
 
-  it("分润：无存量时按操作四项展开，买号/售出自动绑定动作执行人", async () => {
-    // 空分润 → 按操作口径起步：买号、售出、运营、公司四项固定展开。
-    vi.mocked(policyApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00" }));
+  it("分润：只展示可分配动作，公司比例由规则配置补入", async () => {
+    // 空分润 → 只展示买号、售出、运营；公司 40% 隐藏并由规则配置自动补入。
+    vi.mocked(policyApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00", allocatable_profit: "3000.00", company_rate: "40.00" }));
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       form_extra: {
@@ -448,10 +448,13 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
-    expect(within(modal).getAllByLabelText("比例")).toHaveLength(4);
-    for (const label of ["买号", "售出", "运营", "公司"]) {
+    expect(within(modal).getByText(/可分配利润/)).toBeInTheDocument();
+    expect(within(modal).getByText("3,000.00")).toBeInTheDocument();
+    expect(within(modal).getAllByLabelText("比例")).toHaveLength(3);
+    for (const label of ["买号", "售出", "运营"]) {
       expect(within(modal).getByText(label)).toBeInTheDocument();
     }
+    expect(within(modal).queryByText("公司")).toBeNull();
     // 买号取建单操作人，售出取卖出表单操作人，运营取运营信息中的动作操作人，均自动带出。
     expect(within(modal).getByText("回收员")).toBeInTheDocument();
     expect(within(modal).getByText("售出员")).toBeInTheDocument();
@@ -479,13 +482,11 @@ describe("OrdersPage：操作与筛选分支", () => {
     // 买号两人只占一行，人员多选后填写动作合计。
     expect(within(modal).getByText("买号")).toBeInTheDocument();
     const rates = within(modal).getAllByLabelText("比例");
-    expect(rates).toHaveLength(4);
+    expect(rates).toHaveLength(3);
     fireEvent.change(rates[0], { target: { value: "30" } });
 
-    // 售出 40、运营 20、公司 10，四项合计 100
-    fireEvent.change(rates[1], { target: { value: "40" } });
-    fireEvent.change(rates[2], { target: { value: "20" } });
-    fireEvent.change(rates[3], { target: { value: "10" } });
+    // 售出 30、运营 0；公司 40 由规则配置自动补入，四项合计 100
+    fireEvent.change(rates[1], { target: { value: "30" } });
 
     await clickModalOk(modal);
     await waitFor(() => expect(policyApi.setAllocations).toHaveBeenCalled());
@@ -496,17 +497,18 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：按操作四项提交时带上 allocation_type 与比例", async () => {
-    vi.mocked(policyApi.allocations).mockResolvedValue(profitAllocationResponse(actionAllocationRows, { order_profit: "5000.00" }));
+    vi.mocked(policyApi.allocations).mockResolvedValue(profitAllocationResponse(actionAllocationRows, { order_profit: "5000.00", allocatable_profit: "3000.00", company_rate: "40.00" }));
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
-    expect(within(modal).getAllByLabelText("比例")).toHaveLength(4);
+    expect(within(modal).getAllByLabelText("比例")).toHaveLength(3);
     await clickModalOk(modal);
     await waitFor(() => expect(policyApi.setAllocations).toHaveBeenCalled());
     const [, payload] = vi.mocked(policyApi.setAllocations).mock.calls[0];
     expect(payload).toHaveLength(4);
     expect(payload.map((item) => item.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
     expect(payload.find((item) => item.allocation_type === "OPERATION")).toMatchObject({ employee_ids: [9], role: "SERVICE" });
+    expect(payload.find((item) => item.allocation_type === "COMPANY")).toMatchObject({ allocation_rate: "40.00" });
   });
 
   it("资金收支：退款已并入普通支出，登记为 OTHER 支出明细", async () => {

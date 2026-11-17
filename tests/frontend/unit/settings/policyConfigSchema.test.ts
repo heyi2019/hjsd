@@ -24,7 +24,7 @@ describe("policyConfigSchema", () => {
     expect(policyConfigFields("NOT_EXISTS")).toEqual([]);
     expect(policyHasConfig("NOT_EXISTS")).toBe(false);
     // 关键字段必须在：分润按动作拆分的比例表 / 服务费率 / 跌价比例 / 期数
-    expect(policyConfigFields("COMMISSION").map((f) => f.key)).toEqual(["split"]);
+    expect(policyConfigFields("COMMISSION").map((f) => f.key)).toEqual(["split", "loss_company_rate"]);
     expect(policyConfigFields("INSTALLMENT").map((f) => f.key)).toContain("service_fee_rate");
     expect(policyConfigFields("WRITE_DOWN")[0].kind).toBe("rate-table");
     expect(policyConfigFields("WRITE_DOWN")[0].rows).toHaveLength(3);
@@ -38,6 +38,7 @@ describe("policyConfigSchema", () => {
     // 未配置规则时表单直接落业务默认口径，不需要手填到 100%
     expect(configToFields("COMMISSION", {})).toEqual({
       split: { BUY: "30", SELL: "30", OPERATION: "0", COMPANY: "40" },
+      loss_company_rate: "",
     });
   });
 
@@ -74,8 +75,8 @@ describe("policyConfigSchema", () => {
   it("返点规则不再包含费率配置", () => {
     expect(policyConfigFields("REBATE")).toEqual([]);
     expect(policyHasConfig("REBATE")).toBe(false);
-    const others = ["COMMISSION", "INSTALLMENT", "WRITE_DOWN", "REFUND", "DG_MIXED"];
-    for (const code of others) {
+    expect(policyConfigFields("COMMISSION").find((f) => f.key === "loss_company_rate")?.effective).toBe("calc");
+    for (const code of ["INSTALLMENT", "WRITE_DOWN", "REFUND", "DG_MIXED"]) {
       expect(policyConfigFields(code).filter((f) => f.effective === "calc")).toEqual([]);
     }
   });

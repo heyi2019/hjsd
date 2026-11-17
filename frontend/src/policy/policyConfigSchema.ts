@@ -8,9 +8,8 @@
  * 关键事实（勿凭直觉改）：
  * - 后端只校验 config 是**非空对象**（app/policy/service.py:86，契约测试
  *   test_create_version_notfound_and_empty_config 锁死），不校验 key 集合。
- * - 后端引擎消费规则的是 COMMISSION：不是「分润率」而是**按动作拆分的分润模板**
- *      （买入动作 / 卖出动作 / 运营动作 / 公司），当前仅作口径留痕；
- *      订单分润弹窗仍手工录入，未取此模板（2026-10-26 用户口径：暂时都填 0）。
+ * - 后端引擎消费规则的是 COMMISSION：订单分润弹窗按订单快照读取公司比例，
+ *      盈利使用 split.COMPANY，亏损使用 loss_company_rate；动作人员仍在订单分润弹窗录入。
  *   其余四类（分期 service_fee_rate / 跌价 / 退款 / DG）后端取接口入参或专用字段，
  *   **不读规则快照**，故只作版本留痕。
  * - 每个字段用 `effective` 声明消费状态（calc / snapshot），编辑器据此在
@@ -90,7 +89,17 @@ export const POLICY_CONFIG_SCHEMA: Record<string, PolicyFieldDef[]> = {
       rows: ALLOCATION_ROWS,
       sumTo: 100,
       rowDefaults: DEFAULT_COMMISSION_SPLIT,
-      help: "利润按动作拆分：买入动作、卖出动作、运营动作各拿对应比例，公司拿剩余；合计必须 100%。订单利润分配弹窗当前仍手工录入，暂不取此模板",
+      help: "盈利订单使用公司比例作为公司留存，买入动作、卖出动作、运营动作在分润弹窗内从剩余可分配利润中分配；四项合计 100%",
+    },
+    {
+      key: "loss_company_rate",
+      label: "亏损公司比例",
+      kind: "percent",
+      effective: "calc",
+      placeholder: "50",
+      min: 0,
+      max: 100,
+      help: "亏损订单由公司承担的比例；未配置时按 50% 计算",
     },
   ],
   INSTALLMENT: [

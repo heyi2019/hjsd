@@ -30,6 +30,45 @@ from .._shared import (
     _scoped_order,
 )
 
+DEFAULT_PROFIT_COMPANY_RATE = Decimal("40")
+DEFAULT_LOSS_COMPANY_RATE = Decimal("50")
+
+
+def company_rate_for_order(order: Order, order_profit: Decimal) -> Decimal:
+    """读取订单创建时固化的公司分润比例，盈利与亏损使用不同配置。"""
+    snapshot = order.policy_snapshot if isinstance(order.policy_snapshot, Mapping) else {}
+    commission = snapshot.get("COMMISSION")
+    commission_config = commission.get("config") if isinstance(commission, Mapping) else {}
+    config = commission_config if isinstance(commission_config, Mapping) else {}
+    split = config.get("split")
+    split_config = split if isinstance(split, Mapping) else {}
+    raw = (
+        config.get("loss_company_rate", split_config.get("LOSS_COMPANY", DEFAULT_LOSS_COMPANY_RATE))
+        if order_profit < 0
+        else split_config.get("COMPANY", DEFAULT_PROFIT_COMPANY_RATE)
+    )
+    rate = to_money(raw or 0)
+    if rate < 0 or rate > 100:
+        raise Validation("公司分润比例必须在 0% 到 100% 之间", details={"company_rate": str(rate)})
+    return rate
+
+
+def allocation_terms(session: Session, order_id: int, user: CurrentUser | None = None) -> dict[str, Decimal]:
+    """返回订单总利润、公司比例与扣除公司后的可分配利润。"""
+    order = _scoped_order(session, order_id, user)
+    from app.orders.amounts import order_amounts
+
+    order_profit = to_money(order_amounts(session, order.id)["PROFIT"])
+    company_rate = company_rate_for_order(order, order_profit)
+    allocatable_profit = (order_profit * (Decimal("100") - company_rate) / Decimal("100")).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    return {
+        "order_profit": order_profit,
+        "company_rate": company_rate,
+        "allocatable_profit": allocatable_profit,
+    }
+
 def _normalize_allocation_item(value: Any) -> dict[str, Any]:
     try:
         return ProfitAllocationItem.model_validate(value).model_dump()
@@ -81,9 +120,11 @@ def set_allocations(
             if any(item.get("employee_ids") for item in typed):
                 from app.orders.amounts import order_amounts
 
+                order_profit = to_money(order_amounts(session, order.id)["PROFIT"])
                 normalized_items = _expand_action_form_rows(
                     typed,
-                    order_profit=order_amounts(session, order.id)["PROFIT"],
+                    order_profit=order_profit,
+                    company_rate=company_rate_for_order(order, order_profit),
                 )
             result = _set_action_allocations(
                 session, order, items=normalized_items, actor=actor
@@ -115,7 +156,11 @@ def convert_action_allocation(
     order = _scoped_order(session, order_id, user)
     from app.orders.amounts import order_amounts
 
-    profit = to_money(order_amounts(session, order.id)["PROFIT"])
+    order_profit = to_money(order_amounts(session, order.id)["PROFIT"])
+    company_rate = company_rate_for_order(order, order_profit)
+    profit = (order_profit * (Decimal("100") - company_rate) / Decimal("100")).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
     input_value = to_money(value)
     if direction == "RATE_TO_AMOUNT":
         if input_value < 0 or input_value > 100:
@@ -141,9 +186,19 @@ def _split_even(value: Decimal, count: int, *, scale: Decimal) -> list[Decimal]:
 
 
 def _expand_action_form_rows(
-    rows: list[dict[str, Any]], *, order_profit: Decimal
+    rows: list[dict[str, Any]], *, order_profit: Decimal, company_rate: Decimal
 ) -> list[dict[str, Any]]:
     """Validate grouped UI rows and expand them into per-person allocation records."""
+    if not any(str(row.get("allocation_type") or "").upper() == "COMPANY" for row in rows):
+        rows = [
+            *rows,
+            {
+                "allocation_type": "COMPANY",
+                "role": "OWNER",
+                "allocation_rate": str(company_rate),
+                "allocation_amount": None,
+            },
+        ]
     required = {"BUY", "SELL", "OPERATION", "COMPANY"}
     by_type: dict[str, dict[str, Any]] = {}
     for row in rows:

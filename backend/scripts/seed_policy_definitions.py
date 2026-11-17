@@ -65,7 +65,7 @@ POLICY_SEEDS: list[tuple[str, str, str]] = [
 # 公司 40，合计 100），不是猜值，故直接预置；且 create_version 拒绝空 config，
 # 预置 {} 会在 --apply 时直接抛「规则参数不能为空」。
 DEFAULT_VERSION_CONFIG: dict[str, dict[str, object]] = {
-    "COMMISSION": {"split": {"BUY": "30", "SELL": "30", "OPERATION": "0", "COMPANY": "40"}},
+    "COMMISSION": {"split": {"BUY": "30", "SELL": "30", "OPERATION": "0", "COMPANY": "40"}, "loss_company_rate": "50"},
     "INSTALLMENT": {"periods": "3", "cycle": "monthly"},
     "WRITE_DOWN": {},
     "REFUND": {},

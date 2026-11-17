@@ -93,6 +93,17 @@ function AllocationFields({
             const employeeRequired = !company && Boolean(kind && allocationCandidates[kind].length);
             const kindLabel = kind ? ALLOCATION_TYPE_LABEL[kind] : "姓名";
 
+            if (company) {
+              return (
+                <div key={field.key} hidden>
+                  <Form.Item name={[field.name, "allocation_type"]} hidden><Input /></Form.Item>
+                  <Form.Item name={[field.name, "employee_ids"]} hidden><Input /></Form.Item>
+                  <Form.Item name={[field.name, "allocation_rate"]} hidden><Input /></Form.Item>
+                  <Form.Item name={[field.name, "allocation_amount"]} hidden><Input /></Form.Item>
+                </div>
+              );
+            }
+
             return (
               <AdaptiveFormGrid key={field.key} className="orders-allocation-row is-action">
                 <Form.Item name={[field.name, "allocation_type"]} hidden><Input /></Form.Item>
@@ -241,13 +252,13 @@ export function AllocationModal({ controller }: { controller: AllocationControll
           showIcon
           message={(
             <span>
-              订单总利润：<MoneyText value={allocationProfit} tone="auto" strong />
+              可分配利润：<MoneyText value={allocationProfit} tone="auto" strong />
               {allocationIsLoss ? "（亏损）金额分润请填负数，表示该人分担的亏损额" : null}
             </span>
           )}
         />
         <Typography.Paragraph type="secondary">
-          按操作分配：买号、售出、运营、公司四项。每项可多选人员，只填写一次比例或金额，确认后由系统在该项人员中平分，并同步更新来源处操作人。
+          按操作分配：买号、售出、运营三项可多选人员，公司比例按经营规则自动计入。每项只填写一次比例或金额，确认后由系统在该项人员中平分，并同步更新来源处操作人。
         </Typography.Paragraph>
         <AllocationFields
           allocationCandidates={allocationCandidates}

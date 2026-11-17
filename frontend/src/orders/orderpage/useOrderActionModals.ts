@@ -51,7 +51,7 @@ export function useOrderActionModals({
   const [cashflowUsers, setCashflowUsers] = useState<EmployeeOption[]>([]);
   const [profileTarget, setProfileTarget] = useState<OrderProfileTarget | null>(null);
   const [orderOffsaleTarget, setOrderOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
-  /** 订单总利润（后端 order_amounts 口径），负数即亏损单；分润弹窗顶部展示并作为金额分润上限。 */
+  /** 扣除公司配置比例后的可分配利润，负数表示可分配的亏损分担额。 */
   const [allocationProfit, setAllocationProfit] = useState<string>("0");
   /** 按操作分配时的动作执行人候选，来自建单/售出操作人和运营信息中的操作人。 */
   const [allocationCandidates, setAllocationCandidates] = useState<ActionAllocationCandidates>({ BUY: [], SELL: [], OPERATION: [], COMPANY: [] });
@@ -83,8 +83,13 @@ export function useOrderActionModals({
       setActionOrder(order);
       setUsers(userResult.filter((item) => item.is_active));
       setAllocationCandidates(candidates);
-      setAllocationProfit(result.order_profit ?? "0");
+      setAllocationProfit(result.allocatable_profit ?? result.order_profit ?? "0");
       const rows: AllocationFormRow[] = buildActionAllocationRows(result.items, candidates, result.totals_by_type);
+      const companyRow = rows.find((row) => row.allocation_type === "COMPANY");
+      if (companyRow) {
+        companyRow.allocation_rate = result.company_rate ?? "40";
+        companyRow.allocation_amount = "";
+      }
       // 弹窗是复用的：先清空上次打开残留的字段（含 form_extra 自定义字段），再回填本单数据。
       allocationForm.resetFields();
       allocationForm.setFieldsValue({

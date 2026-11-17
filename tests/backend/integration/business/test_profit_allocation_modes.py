@@ -21,6 +21,7 @@ from app.stocks.profile import create_account
 from app.core.errors import Validation
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
+from app.domain.trade import Order
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.policy.profit_allocation import service as policy_allocations
@@ -56,6 +57,56 @@ def _order_with_profit(seeded_db, *, buy: str = "1000", sell: str = "1500") -> i
         occurred_on=D, actor="pytest", pool_id=1,
     )
     return order.id
+
+
+def test_allocation_terms_use_profit_and_loss_company_rates(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    assert order is not None
+    order.policy_snapshot = {
+        "COMMISSION": {
+            "config": {"split": {"COMPANY": "40"}, "loss_company_rate": "50"},
+        },
+    }
+    seeded_db.flush()
+
+    profit_terms = policy_allocations.allocation_terms(seeded_db, order_id)
+    assert profit_terms == {
+        "order_profit": Decimal("500.00"),
+        "company_rate": Decimal("40.00"),
+        "allocatable_profit": Decimal("300.00"),
+    }
+
+    loss_order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
+    loss_order = seeded_db.get(Order, loss_order_id)
+    assert loss_order is not None
+    loss_order.policy_snapshot = order.policy_snapshot
+    seeded_db.flush()
+    loss_terms = policy_allocations.allocation_terms(seeded_db, loss_order_id)
+    assert loss_terms["company_rate"] == Decimal("50.00")
+    assert loss_terms["allocatable_profit"] == Decimal("-250.00")
+
+
+def test_action_rows_can_omit_company_when_company_rate_is_configured(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    assert order is not None
+    order.form_extra = {"business_responsible_ids": [1], "delivery_responsible_ids": [1]}
+    order.policy_snapshot = {"COMMISSION": {"config": {"split": {"COMPANY": "40"}}}}
+    seeded_db.flush()
+
+    rows = policy_allocations.set_allocations(
+        seeded_db,
+        order_id,
+        items=[
+            {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_rate": "30"},
+            {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_rate": "30"},
+            {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_rate": "0"},
+        ],
+    )
+
+    company = next(row for row in rows if row["allocation_type"] == "COMPANY")
+    assert company["allocation_rate"] == "40.00"
 
 
 def test_person_mode_allows_same_user_in_two_roles(seeded_db):

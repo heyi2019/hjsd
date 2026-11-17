@@ -11,8 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import PERM_ORDER_CREATE, PERM_POLICY_MANAGE, CurrentUser, require_permissions
-from app.orders.amounts import order_amounts
-
 from . import schemas, service
 
 router = APIRouter(tags=["policy"])
@@ -27,10 +25,13 @@ def list_allocations(
     user: CurrentUser = read_access,
 ) -> schemas.ProfitAllocationListOut:
     items = service.list_allocations(db, order_id, user=user)
+    terms = service.allocation_terms(db, order_id, user=user)
     return schemas.ProfitAllocationListOut(
         items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
         total=len(items),
-        order_profit=order_amounts(db, order_id)["PROFIT"],
+        order_profit=terms["order_profit"],
+        company_rate=terms["company_rate"],
+        allocatable_profit=terms["allocatable_profit"],
         totals_by_type=service.summarize_allocations_by_type(items),
     )
 
@@ -70,10 +71,13 @@ def set_allocations(
         form_extra=payload.form_extra,
         user=user,
     )
+    terms = service.allocation_terms(db, order_id, user=user)
     return schemas.ProfitAllocationListOut(
         items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
         total=len(items),
-        order_profit=order_amounts(db, order_id)["PROFIT"],
+        order_profit=terms["order_profit"],
+        company_rate=terms["company_rate"],
+        allocatable_profit=terms["allocatable_profit"],
         totals_by_type=service.summarize_allocations_by_type(items),
     )
 

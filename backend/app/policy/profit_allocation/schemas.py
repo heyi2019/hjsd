@@ -58,6 +58,8 @@ class ProfitAllocationListOut(BaseModel):
     items: list[ProfitAllocationOut]
     total: int
     order_profit: Decimal = Decimal("0")
+    company_rate: Decimal = Decimal("40")
+    allocatable_profit: Decimal = Decimal("0")
     totals_by_type: dict[str, ProfitAllocationTypeTotal] = Field(default_factory=dict)
 
 

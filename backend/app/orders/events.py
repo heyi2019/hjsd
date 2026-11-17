@@ -221,6 +221,129 @@ def _normalize_event_input(
     )
 
 
+def _resolve_event_funding_context(
+    session: Session,
+    order: Order,
+    *,
+    event_type: str,
+    offset_event_id: int | None,
+    pool_id: int | None,
+    money: Any,
+    has_cashflow: bool,
+    portion: str,
+    user: CurrentUser | None,
+) -> tuple[Any | None, bool, str | None, int | None, str]:
+    """冲销解析 + 资金池/会计属性路由 + 冲销方向：只读校验与派生，口径与原内联版本一致。
+
+    返回 (offset, cancel_fully_consumed, accounting_attribute,
+    resolved_pool_id, cancel_direction)，供后续事件落库与现金流派生复用。
+    """
+    offset = None
+    cancel_fully_consumed = False
+    if event_type == EventType.CANCEL.value and offset_event_id is not None:
+        offset = _get_offset_event(session, offset_event_id, order_id=order.id)
+        if pool_id is not None and pool_id != offset.pool_id:
+            raise Validation(
+                "冲销必须沿用被冲销事件的资金账户",
+                details={
+                    "offset_event_id": offset_event_id,
+                    "offset_pool_id": offset.pool_id,
+                    "pool_id": pool_id,
+                },
+            )
+        already_cancelled = session.scalar(
+            select(func.coalesce(func.sum(OrderEvent.amount), 0)).where(
+                OrderEvent.offset_event_id == offset.id,
+                OrderEvent.event_type == EventType.CANCEL.value,
+                OrderEvent.is_posted.is_(True),
+            )
+        ) or 0
+        remaining = to_money(offset.amount) - to_money(already_cancelled)
+        if money > remaining:
+            raise Validation(
+                f"超过被冲销事件剩余可冲销金额 {remaining}",
+                details={
+                    "offset_event_id": offset_event_id,
+                    "remaining": str(remaining),
+                    "amount": str(money),
+                },
+            )
+        cancel_fully_consumed = money >= remaining
+    accounting_attribute: str | None = None
+    resolved_pool_id: int | None = None
+    if has_cashflow:
+        accounting_attribute = accounting_attribute_for_order_event(
+            order.order_type, event_type
+        )
+        resolved_pool_id = (
+            pool_id
+            or (offset.pool_id if offset is not None else None)
+            or _resolve_pool(session, order, portion).id
+        )
+        if user is not None and not user.can_see_pool(resolved_pool_id):
+            raise NotFound("资金账户不存在", details={"pool_id": resolved_pool_id})
+        _assert_pool_active(session, resolved_pool_id)
+    cancel_direction = Direction.IN.value
+    if event_type == EventType.CANCEL.value:
+        cancel_direction = _opposite_direction(offset_event_id, session, order_id=order.id)
+    return (
+        offset,
+        cancel_fully_consumed,
+        accounting_attribute,
+        resolved_pool_id,
+        cancel_direction,
+    )
+
+
+def _build_event_form_extra(
+    session: Session,
+    order: Order,
+    *,
+    event_type: str,
+    sale_mode: str | None,
+    operation_type: str | None,
+    rebate_type: str | None,
+    bound_phone: str | None,
+    bound_phone_owner: str | None,
+    form_extra: Mapping[str, Any] | None,
+    form_extra_scope: str | None,
+    actor: str,
+) -> dict[str, Any]:
+    """规范化绑定手机、校验扩展字段，并在 SELL 时写入账号/订单快照。
+
+    对 order / account 的写入通过 ORM 引用保留，副作用与判定口径与原内联版本一致。
+    """
+    normalized_bound_phone = bound_phone.strip() if isinstance(bound_phone, str) and bound_phone.strip() else None
+    normalized_bound_phone_owner = bound_phone_owner.strip() if isinstance(bound_phone_owner, str) and bound_phone_owner.strip() else None
+    event_form_extra = validate_form_extra(
+        session, order_type_code=(form_extra_scope or "REFUND"), values=form_extra
+    )
+    if event_type == EventType.SELL.value and sale_mode is not None:
+        event_form_extra["sale_mode"] = sale_mode
+    if operation_type is not None:
+        event_form_extra["operation_type"] = operation_type
+    if rebate_type is not None:
+        event_form_extra["rebate_type"] = rebate_type
+    if event_type == EventType.SELL.value and (normalized_bound_phone is not None or normalized_bound_phone_owner is not None):
+        account = session.get(Account, order.account_id) if order.account_id is not None else None
+        snapshot = dict(order.account_snapshot or {})
+        if normalized_bound_phone is not None:
+            snapshot["bound_phone"] = normalized_bound_phone
+        if normalized_bound_phone_owner is not None:
+            snapshot["bound_phone_owner"] = normalized_bound_phone_owner
+        order.account_snapshot = snapshot or None
+        if account is not None and normalized_bound_phone is not None:
+            account.bound_phone = normalized_bound_phone
+            account.updated_by = actor
+        event_form_extra.update(
+            {"bound_phone": normalized_bound_phone} if normalized_bound_phone is not None else {}
+        )
+        event_form_extra.update(
+            {"bound_phone_owner": normalized_bound_phone_owner} if normalized_bound_phone_owner is not None else {}
+        )
+    return event_form_extra
+
+
 def post_event(
     session: Session,
     order_id: int,
@@ -323,83 +446,37 @@ def post_event(
             "分期售出只登记 SELL 业务事实，资金账户与金额应在分期收款时填写",
             details={"field": "pool_id"},
         )
-    offset = None
-    cancel_fully_consumed = False
-    if event_type == EventType.CANCEL.value and offset_event_id is not None:
-        offset = _get_offset_event(session, offset_event_id, order_id=order.id)
-        if pool_id is not None and pool_id != offset.pool_id:
-            raise Validation(
-                "冲销必须沿用被冲销事件的资金账户",
-                details={
-                    "offset_event_id": offset_event_id,
-                    "offset_pool_id": offset.pool_id,
-                    "pool_id": pool_id,
-                },
-            )
-        already_cancelled = session.scalar(
-            select(func.coalesce(func.sum(OrderEvent.amount), 0)).where(
-                OrderEvent.offset_event_id == offset.id,
-                OrderEvent.event_type == EventType.CANCEL.value,
-                OrderEvent.is_posted.is_(True),
-            )
-        ) or 0
-        remaining = to_money(offset.amount) - to_money(already_cancelled)
-        if money > remaining:
-            raise Validation(
-                f"超过被冲销事件剩余可冲销金额 {remaining}",
-                details={
-                    "offset_event_id": offset_event_id,
-                    "remaining": str(remaining),
-                    "amount": str(money),
-                },
-            )
-        cancel_fully_consumed = money >= remaining
-    accounting_attribute: str | None = None
-    resolved_pool_id: int | None = None
-    if has_cashflow:
-        accounting_attribute = accounting_attribute_for_order_event(
-            order.order_type, event_type
-        )
-        resolved_pool_id = (
-            pool_id
-            or (offset.pool_id if offset is not None else None)
-            or _resolve_pool(session, order, portion).id
-        )
-        if user is not None and not user.can_see_pool(resolved_pool_id):
-            raise NotFound("资金账户不存在", details={"pool_id": resolved_pool_id})
-        _assert_pool_active(session, resolved_pool_id)
-    cancel_direction = Direction.IN.value
-    if event_type == EventType.CANCEL.value:
-        cancel_direction = _opposite_direction(offset_event_id, session, order_id=order.id)
-
-    normalized_bound_phone = bound_phone.strip() if isinstance(bound_phone, str) and bound_phone.strip() else None
-    normalized_bound_phone_owner = bound_phone_owner.strip() if isinstance(bound_phone_owner, str) and bound_phone_owner.strip() else None
-    event_form_extra = validate_form_extra(
-        session, order_type_code=(form_extra_scope or "REFUND"), values=form_extra
+    (
+        offset,
+        cancel_fully_consumed,
+        accounting_attribute,
+        resolved_pool_id,
+        cancel_direction,
+    ) = _resolve_event_funding_context(
+        session,
+        order,
+        event_type=event_type,
+        offset_event_id=offset_event_id,
+        pool_id=pool_id,
+        money=money,
+        has_cashflow=has_cashflow,
+        portion=portion,
+        user=user,
     )
-    if event_type == EventType.SELL.value and sale_mode is not None:
-        event_form_extra["sale_mode"] = sale_mode
-    if operation_type is not None:
-        event_form_extra["operation_type"] = operation_type
-    if rebate_type is not None:
-        event_form_extra["rebate_type"] = rebate_type
-    if event_type == EventType.SELL.value and (normalized_bound_phone is not None or normalized_bound_phone_owner is not None):
-        account = session.get(Account, order.account_id) if order.account_id is not None else None
-        snapshot = dict(order.account_snapshot or {})
-        if normalized_bound_phone is not None:
-            snapshot["bound_phone"] = normalized_bound_phone
-        if normalized_bound_phone_owner is not None:
-            snapshot["bound_phone_owner"] = normalized_bound_phone_owner
-        order.account_snapshot = snapshot or None
-        if account is not None and normalized_bound_phone is not None:
-            account.bound_phone = normalized_bound_phone
-            account.updated_by = actor
-        event_form_extra.update(
-            {"bound_phone": normalized_bound_phone} if normalized_bound_phone is not None else {}
-        )
-        event_form_extra.update(
-            {"bound_phone_owner": normalized_bound_phone_owner} if normalized_bound_phone_owner is not None else {}
-        )
+
+    event_form_extra = _build_event_form_extra(
+        session,
+        order,
+        event_type=event_type,
+        sale_mode=sale_mode,
+        operation_type=operation_type,
+        rebate_type=rebate_type,
+        bound_phone=bound_phone,
+        bound_phone_owner=bound_phone_owner,
+        form_extra=form_extra,
+        form_extra_scope=form_extra_scope,
+        actor=actor,
+    )
 
     event = OrderEvent(
         event_no=next_event_no(

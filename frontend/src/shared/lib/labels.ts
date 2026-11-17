@@ -134,7 +134,6 @@ export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
   SELF_REVENUE: "回收收入",
   TH_DIRECT_COST: "提号成本",
   TH_REVENUE: "提号收入",
-  DG_DIRECT_COST: "代挂成本",
   DG_REVENUE: "代挂收入",
   SERVICE_REVENUE: "增值服务费收入",
   REBATE_INCOME: "返点收入",

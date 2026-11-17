@@ -319,6 +319,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
 
     # 订单初始费用是资金明细，不生成额外业务事件。
     # 只取未关联业务事件的成本流水，避免把业务事件派生流水重复计入。
+    # （初始费用仅回收/提号订单可提交，DG 无初始成本；此处只需识别两种直接成本属性。）
     unlinked_cost_by_order = {
         order_id: to_money(total or 0)
         for order_id, total in db.execute(
@@ -331,7 +332,6 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
                     (
                         AccountingAttribute.SELF_DIRECT_COST.value,
                         AccountingAttribute.TH_DIRECT_COST.value,
-                        AccountingAttribute.DG_DIRECT_COST.value,
                     )
                 ),
             )

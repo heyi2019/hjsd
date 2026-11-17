@@ -220,8 +220,7 @@ class AccountingAttribute(StrEnum):
     # 返点收入(REBATE_INCOME)/代挂收入(DG_REVENUE)/其他收支(OTHER_*)独立成值。
     SELF_REVENUE = "SELF_REVENUE"  # 回收收入（HS 售出；工作室收入同用此属性）
     SELF_DIRECT_COST = "SELF_DIRECT_COST"  # 回收成本（HS 买入）
-    TH_DIRECT_COST = "TH_DIRECT_COST"  # 提号成本
-    DG_DIRECT_COST = "DG_DIRECT_COST"  # 代挂成本
+    TH_DIRECT_COST = "TH_DIRECT_COST"  # 提号成本（TH/DG 建单初始成本共用）
     TH_REVENUE = "TH_REVENUE"  # 提号收入
     DG_REVENUE = "DG_REVENUE"  # 代挂收入（DG 售出与分期收款）
     SERVICE_REVENUE = "SERVICE_REVENUE"  # 增值服务费收入

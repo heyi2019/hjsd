@@ -257,17 +257,19 @@ def create_order(
 
         # 初始成本流水由 finance 域经 collaboration 注册点提供挂账器，
         # orders 不再反向 import finance.cashflows（backend/.importlinter 契约）。
+        # 初始成本核算属性：回收/提号各归其位（2026-11-18 用户裁决：
+        # 「提号就是提号成本」）；DG 代挂无独立成本属性，初始成本落其他支出。
+        initial_cost_attribute = {
+            "HS": AccountingAttribute.SELF_DIRECT_COST.value,
+            "TH": AccountingAttribute.TH_DIRECT_COST.value,
+        }.get(order.order_type, AccountingAttribute.OTHER_EXPENSE.value)
         create_cost_flow(
             db,
             pool_id=pool_id,
             occurred_on=cost.occurred_on,
             direction=Direction.OUT.value,
             nature=Nature.BUSINESS_OUT.value,
-            accounting_attribute=(
-                AccountingAttribute.SELF_DIRECT_COST.value
-                if order.order_type == "HS"
-                else AccountingAttribute.TH_DIRECT_COST.value
-            ),
+            accounting_attribute=initial_cost_attribute,
             category=cost.flow_category or "OTHER",
             amount=cost.amount,
             source_type=CashflowSourceType.ORDER.value,

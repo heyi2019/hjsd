@@ -188,7 +188,8 @@ def _finance_type(
     order_type: str | None = None,
 ) -> str:
     if event_type == "BUY":
-        return {"HS": "回收成本", "TH": "提号成本", "DG": "代挂成本"}.get(order_type, "成本")
+        # DG 不允许 BUY（仅全款），无代挂成本概念，BUY 标签只区分回收/提号。
+        return {"HS": "回收成本", "TH": "提号成本"}.get(order_type, "成本")
     labels = {
         "SELL": "售出收入", "INSTALLMENT_PAYMENT": "分期回款",
         "REBATE": "返点收入", "REFUND": "退款支出", "CANCEL": "取消冲销",

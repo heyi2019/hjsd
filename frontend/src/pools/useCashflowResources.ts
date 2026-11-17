@@ -157,8 +157,8 @@ export function useCashflowResources(active = true) {
     cashflowCategory,
     setCashflowCategory,
     // 筛选选项用代码事实源（与后端枚举/新建流水表单同源），不用孤儿词典：
-    // FUND_FLOW_ACCOUNTING_ATTRIBUTE 词典后端无种子代码，数据漂移（缺 DG_DIRECT_COST、
-    // TH label 误导性合并），改走 ACCOUNTING_ATTRIBUTE_LABEL（14 项与枚举一一对应）。
+    // FUND_FLOW_ACCOUNTING_ATTRIBUTE 词典后端无种子代码，数据漂移（2026-11-18
+    // 口径改版后与枚举差异更大），改走 ACCOUNTING_ATTRIBUTE_LABEL（15 项与枚举一一对应）。
     flowDirectionOptions: FLOW_DIRECTION_OPTIONS,
     flowAttributeOptions: Object.entries(ACCOUNTING_ATTRIBUTE_LABEL).map(
       ([value, label]) => ({ value, label }),

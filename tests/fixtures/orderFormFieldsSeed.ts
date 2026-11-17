@@ -56,7 +56,6 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
         { value: "SELF_REVENUE", label: "回收收入" },
         { value: "TH_DIRECT_COST", label: "提号成本" },
         { value: "TH_REVENUE", label: "提号收入" },
-        { value: "DG_DIRECT_COST", label: "代挂成本" },
         { value: "DG_REVENUE", label: "代挂收入" },
         { value: "SERVICE_REVENUE", label: "增值服务费收入" },
         { value: "REBATE_INCOME", label: "返点收入" },

@@ -147,6 +147,12 @@ describe("CustomersPage：客户档案", () => {
     expect(screen.getAllByText("已拉黑").length).toBeGreaterThanOrEqual(1); // DISABLED
   });
 
+  it("客户搜索按钮不嵌套 button，保持合法且可访问的 DOM 结构", async () => {
+    renderLight(<CustomersPage />);
+    await screen.findByText("CUS-0001");
+    expect(document.querySelector(".customer-list-filters button button")).toBeNull();
+  });
+
   it("客户状态筛选覆盖已合并状态", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<CustomersPage />, { user: "admin" });

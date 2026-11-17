@@ -2,7 +2,7 @@ import { SearchOutlined } from "@ant-design/icons";
 import { Card, Input, Space, Typography } from "antd";
 import type { Customer } from "../shared/api/types/customers";
 import { markMobileHiddenColumns } from "../shared/lib/listColumns";
-import { DataTable, ErrorBanner, PermissionButton, Select, StatRow } from "../shared/ui";
+import { DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatRow } from "../shared/ui";
 import { CustomerCreateModal } from "./CustomerCreateModal";
 import { CustomerDetailDrawer } from "./CustomerDetailDrawer";
 import { CustomerEditModal } from "./CustomerEditModal";
@@ -95,7 +95,11 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
       <Space wrap className="customer-list-filters customer-list-filters--separated">
         <Input.Search
           aria-label="搜索客户"
-          enterButton={<PermissionButton permission="customer.read" icon={<SearchOutlined />} aria-label="搜索客户" />}
+          enterButton={(
+            <PermissionGate permission="customer.read">
+              <span aria-label="搜索客户"><SearchOutlined /></span>
+            </PermissionGate>
+          )}
           value={searchInput}
           allowClear
           placeholder="搜索客户编号 / 名字 / 手机 / 微信 / QQ"

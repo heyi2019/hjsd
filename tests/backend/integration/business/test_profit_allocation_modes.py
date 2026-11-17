@@ -272,7 +272,7 @@ def test_person_mode_company_row_has_no_user(seeded_db):
     assert [row["user_id"] for row in rows] == [1, None]
 
 
-def _latest_audit(seeded_db, entity_type: str, entity_id: int) -> AuditLog | None:
+def _latest_audit(seeded_db, entity_type: str, entity_id: str | int) -> AuditLog | None:
     return seeded_db.scalars(
         select(AuditLog)
         .where(AuditLog.entity_type == entity_type, AuditLog.entity_id == str(entity_id))
@@ -290,7 +290,9 @@ def test_person_allocation_writes_dedicated_audit_action(seeded_db):
         items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "100"}],
     )
 
-    entry = _latest_audit(seeded_db, "order", order_id)
+    order = seeded_db.get(Order, order_id)
+    assert order is not None
+    entry = _latest_audit(seeded_db, "order", order.order_no)
     assert entry is not None
     assert entry.action == AuditAction.PROFIT_ALLOCATION_SET.value
     assert entry.action != AuditAction.EXCEPTION_APPROVE.value

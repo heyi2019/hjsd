@@ -165,6 +165,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     expect(within(drawer).queryByText("138****8888")).not.toBeInTheDocument();
 
     resolveDetail({ customer: customers[0], overview: {}, business: [], installments: [], audit: [] });
+    await waitFor(() => expect(within(drawer).queryByRole("status", { name: "正在加载客户详情" })).toBeNull());
   });
 
   it("客户列表支持关键词搜索并把条件传给后端", async () => {

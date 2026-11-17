@@ -25,6 +25,7 @@ from app.domain.trade import Order
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.policy.profit_allocation import service as policy_allocations
+from app.policy.profit_allocation.terms import allocation_terms
 from app.policy import definitions as policy_definitions
 from app.reporting.r3_commission import r3_commission_reconciliation
 
@@ -70,7 +71,7 @@ def test_allocation_terms_use_profit_and_loss_company_rates(seeded_db):
     }
     seeded_db.flush()
 
-    profit_terms = policy_allocations.allocation_terms(seeded_db, order_id)
+    profit_terms = allocation_terms(seeded_db, order_id)
     assert profit_terms == {
         "order_profit": Decimal("500.00"),
         "company_rate": Decimal("40.00"),
@@ -82,7 +83,7 @@ def test_allocation_terms_use_profit_and_loss_company_rates(seeded_db):
     assert loss_order is not None
     loss_order.policy_snapshot = order.policy_snapshot
     seeded_db.flush()
-    loss_terms = policy_allocations.allocation_terms(seeded_db, loss_order_id)
+    loss_terms = allocation_terms(seeded_db, loss_order_id)
     assert loss_terms["company_rate"] == Decimal("50.00")
     assert loss_terms["allocatable_profit"] == Decimal("-250.00")
 

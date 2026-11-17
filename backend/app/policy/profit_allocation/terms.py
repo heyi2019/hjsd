@@ -1,0 +1,106 @@
+"""公司分润比例与可分配利润（BAS-06-03 口径计算）。
+
+从 service.py 拆出（2026-11-18）：比例读取、分润口径、比例/金额换算
+都是纯口径知识，不含写路径。
+"""
+from __future__ import annotations
+
+from collections.abc import Mapping
+from decimal import Decimal, ROUND_HALF_UP
+
+from sqlalchemy.orm import Session
+
+from app.core.errors import Validation
+from app.core.money import to_money
+from app.core.security import CurrentUser
+from app.domain.trade import Order
+
+from .._shared import _scoped_order
+
+DEFAULT_PROFIT_COMPANY_RATE = Decimal("40")
+DEFAULT_LOSS_COMPANY_RATE = Decimal("50")
+
+
+def company_rate_for_order(order: Order, order_profit: Decimal) -> Decimal:
+    """读取订单创建时固化的公司分润比例，盈利与亏损使用不同配置。"""
+    snapshot = order.policy_snapshot if isinstance(order.policy_snapshot, Mapping) else {}
+    commission = snapshot.get("COMMISSION")
+    commission_config = commission.get("config") if isinstance(commission, Mapping) else {}
+    config = commission_config if isinstance(commission_config, Mapping) else {}
+    split = config.get("split")
+    split_config = split if isinstance(split, Mapping) else {}
+    raw = (
+        config.get("loss_company_rate", split_config.get("LOSS_COMPANY", DEFAULT_LOSS_COMPANY_RATE))
+        if order_profit < 0
+        else split_config.get("COMPANY", DEFAULT_PROFIT_COMPANY_RATE)
+    )
+    rate = to_money(raw or 0)
+    if rate < 0 or rate > 100:
+        raise Validation("公司分润比例必须在 0% 到 100% 之间", details={"company_rate": str(rate)})
+    return rate
+
+
+def order_profit_of(session: Session, order: Order) -> Decimal:
+    """订单总利润（orders/amounts 同源）。"""
+    from app.orders.amounts import order_amounts
+
+    return to_money(order_amounts(session, order.id)["PROFIT"])
+
+
+def allocatable_profit_for(order_profit: Decimal, company_rate: Decimal) -> Decimal:
+    """扣除公司比例后的可分配利润。"""
+    return (order_profit * (Decimal("100") - company_rate) / Decimal("100")).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+
+
+def allocation_terms(session: Session, order_id: int, user: CurrentUser | None = None) -> dict[str, Decimal]:
+    """返回订单总利润、公司比例与扣除公司后的可分配利润。"""
+    order = _scoped_order(session, order_id, user)
+    order_profit = order_profit_of(session, order)
+    company_rate = company_rate_for_order(order, order_profit)
+    return {
+        "order_profit": order_profit,
+        "company_rate": company_rate,
+        "allocatable_profit": allocatable_profit_for(order_profit, company_rate),
+    }
+
+
+def convert_action_allocation(
+    session: Session,
+    order_id: int,
+    *,
+    direction: str,
+    value: Decimal,
+    user: CurrentUser | None = None,
+) -> Decimal | None:
+    """Convert a grouped action share using the server's canonical order profit."""
+    order = _scoped_order(session, order_id, user)
+    order_profit = order_profit_of(session, order)
+    company_rate = company_rate_for_order(order, order_profit)
+    profit = allocatable_profit_for(order_profit, company_rate)
+    input_value = to_money(value)
+    if direction == "RATE_TO_AMOUNT":
+        if input_value < 0 or input_value > 100:
+            raise Validation("分润比例必须在 0% 到 100% 之间")
+        return (profit * input_value / Decimal("100")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+    if direction == "AMOUNT_TO_RATE":
+        if profit == 0:
+            return None
+        return (input_value * Decimal("100") / profit).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+    raise Validation("不支持的分润换算方向")
+
+
+__all__ = [
+    "DEFAULT_LOSS_COMPANY_RATE",
+    "DEFAULT_PROFIT_COMPANY_RATE",
+    "allocatable_profit_for",
+    "allocation_terms",
+    "company_rate_for_order",
+    "convert_action_allocation",
+    "order_profit_of",
+]

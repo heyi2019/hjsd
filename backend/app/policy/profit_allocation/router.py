@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import PERM_ORDER_CREATE, PERM_POLICY_MANAGE, CurrentUser, require_permissions
-from . import schemas, service
+from . import listing, schemas, service, terms
 
 router = APIRouter(tags=["policy"])
 manage_access = require_permissions(PERM_POLICY_MANAGE)
@@ -24,15 +24,15 @@ def list_allocations(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
 ) -> schemas.ProfitAllocationListOut:
-    items = service.list_allocations(db, order_id, user=user)
-    terms = service.allocation_terms(db, order_id, user=user)
+    items = listing.list_allocations(db, order_id, user=user)
+    terms_result = terms.allocation_terms(db, order_id, user=user)
     return schemas.ProfitAllocationListOut(
         items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
         total=len(items),
-        order_profit=terms["order_profit"],
-        company_rate=terms["company_rate"],
-        allocatable_profit=terms["allocatable_profit"],
-        totals_by_type=service.summarize_allocations_by_type(items),
+        order_profit=terms_result["order_profit"],
+        company_rate=terms_result["company_rate"],
+        allocatable_profit=terms_result["allocatable_profit"],
+        totals_by_type=listing.summarize_allocations_by_type(items),
     )
 
 
@@ -46,7 +46,7 @@ def convert_allocation_value(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
 ) -> schemas.ProfitAllocationConvertOut:
-    converted = service.convert_action_allocation(
+    converted = terms.convert_action_allocation(
         db,
         order_id,
         direction=payload.direction,
@@ -71,14 +71,14 @@ def set_allocations(
         form_extra=payload.form_extra,
         user=user,
     )
-    terms = service.allocation_terms(db, order_id, user=user)
+    terms_result = terms.allocation_terms(db, order_id, user=user)
     return schemas.ProfitAllocationListOut(
         items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
         total=len(items),
-        order_profit=terms["order_profit"],
-        company_rate=terms["company_rate"],
-        allocatable_profit=terms["allocatable_profit"],
-        totals_by_type=service.summarize_allocations_by_type(items),
+        order_profit=terms_result["order_profit"],
+        company_rate=terms_result["company_rate"],
+        allocatable_profit=terms_result["allocatable_profit"],
+        totals_by_type=listing.summarize_allocations_by_type(items),
     )
 
 

@@ -18,6 +18,7 @@ from app.domain.trade import OrderEvent, OrderProfitAllocation
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.policy.profit_allocation import service as policy_allocations
+from app.policy.profit_allocation.listing import list_allocations
 from app.policy import definitions as policy_definitions
 from app.policy import versions as policy_versions
 
@@ -675,7 +676,7 @@ class TestProfitAllocation:
             policy_allocations.set_allocations(seeded_db, order.id, items=items)
         post_event(seeded_db, order.id, event_type="SELL", amount="100", portion="PROFIT", occurred_on=date(2026, 6, 1), actor="seeduser2")
         policy_allocations.set_allocations(seeded_db, order.id, items=items)
-        by_type = {item["allocation_type"]: item for item in policy_allocations.list_allocations(seeded_db, order.id)}
+        by_type = {item["allocation_type"]: item for item in list_allocations(seeded_db, order.id)}
         assert by_type["SELL"]["user_id"] == 2
 
     def test_total_must_be_100(self, seeded_db):
@@ -747,7 +748,7 @@ class TestProfitAllocation:
             items=[{"allocation_type": kind, "user_id": 3 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": "100" if kind == "OPERATION" else "0"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
             actor="pytest",
         )
-        items = policy_allocations.list_allocations(seeded_db, order.id)
+        items = list_allocations(seeded_db, order.id)
         assert len(items) == 4
         assert next(item for item in items if item["allocation_type"] == "OPERATION")["user_id"] == 3
 

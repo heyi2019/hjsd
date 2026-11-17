@@ -1,9 +1,10 @@
-/** 分层全量回归脚本：各层依次执行，避免本地与 CI 争抢资源。 */
+/** 分层全量回归脚本：轻量层并行，重型层依次执行，平衡速度与资源占用。 */
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { spawn } from "node:child_process";
 import { fastTests, quickTests, matchesAny } from "./test-layers.mjs";
+import { runParallelJobs } from "./test-full-sharded-scheduling.mjs";
 
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const rawArgs = process.argv.slice(2);
@@ -11,7 +12,7 @@ const mode = rawArgs.includes("--deep-only") ? "deep-only" : rawArgs.includes("-
 // 模式标志不传给 vitest，其余参数（如 --reporter）原样透传。
 const extraArgs = rawArgs.filter((arg) => arg !== "--deep-only" && arg !== "--all");
 
-// 各层内部可使用 Vitest worker；层间保持串行，避免资源争抢和日志交错。
+// fast/quick 彼此独立，使用缓冲输出并行；react/deep 保持串行，避免重型 jsdom 层争抢资源。
 
 const testFilePattern = /\.(test|spec)\.(ts|tsx)$/;
 const DEEP_PATTERN = /\.deep\.test\.(ts|tsx)$/;
@@ -131,8 +132,13 @@ const layerDesc = mode === "deep-only"
   : mode === "all"
     ? `全量（含 deep）：fast ${fastFiles.length} / quick ${quickFiles.length} / react ${reactFiles.length} / react-deep ${deepFiles.length}`
     : `日常（不含 deep）：fast ${fastFiles.length} / quick ${quickFiles.length} / react ${reactFiles.length}（react-deep ${deepFiles.length} 移出，由 test:full:deep 承担）`;
-console.log(`${layerDesc}，各层串行`);
+console.log(`${layerDesc}，fast + quick 并行，react${mode === "all" ? " + react-deep" : ""} 串行`);
 const failures = [];
+const parallelJobs = mode === "deep-only" ? [] : jobs.splice(0, 2);
+if (parallelJobs.length > 0) {
+  failures.push(...await runParallelJobs(parallelJobs, run));
+  console.log("✓ fast + quick 并行完成");
+}
 for (const [name, args, timeout] of jobs) {
   try {
     await run(name, args, timeout);

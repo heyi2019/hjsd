@@ -12,7 +12,8 @@
 #    其中「结构对代码」走 deploy/scripts/schema_diff.py 做列级比对——只数表个数查不出
 #    「表齐但少一列」，而那正是老包配新代码上线后的典型 500 来源。
 # 3) 精确值用参数传，不写死在脚本里——包内容会变，脚本不该跟着改。
-# 4) 退出码：0 全过 / 1 有不变量失败 / 2 环境或前置错误。
+# 4) 退出码：0 全过（或未发布无包可演练的 SKIP）/ 1 有不变量失败 / 2 环境或前置错误。
+# 5) cron 无人盯日志：SKIP/失败一律发 macOS 通知，成功不发。
 
 set -euo pipefail
 export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
@@ -24,13 +25,23 @@ PGUSER="${ERP_PG_USER:-erp_app}"
 DUMP="${1:-}"
 EXPECT="${2:-}"
 
-die() { echo "✗ $*" >&2; exit 2; }
+# 失败/跳过时推 macOS 通知（cron 无终端，日志没人看；通知是唯一触达路径）。
+notify() { # $1=标题 $2=正文
+  command -v osascript >/dev/null 2>&1 || return 0
+  osascript -e "display notification \"$2\" with title \"ERP恢复演练\" subtitle \"$1\"" >/dev/null 2>&1 || true
+}
+
+die() { echo "✗ $*" >&2; notify "环境错误" "$*"; exit 2; }
 command -v docker >/dev/null 2>&1 || die "找不到 docker（cron 下需先设 PATH）"
 docker ps --format '{{.Names}}' | grep -qx "${CONTAINER}" || die "容器 ${CONTAINER} 未运行"
 
 if [ -z "${DUMP}" ]; then
   SHA_FILE="${REPO_ROOT}/backups/release_latest.sha256"
-  [ -f "${SHA_FILE}" ] || die "未指定包，且找不到 ${SHA_FILE}"
+  # 未发布属正常状态（非失败）：日志留痕 SKIP，不告警，等 deploy.sh 首次发布后自动转为真实演练。
+  if [ ! -f "${SHA_FILE}" ]; then
+    echo "=== 恢复演练 SKIP $(date '+%F %T')：无上线包（${SHA_FILE} 不存在，尚未发布过）==="
+    exit 0
+  fi
   DUMP="${REPO_ROOT}/$(awk '{print $2}' "${SHA_FILE}")"
 fi
 [ -f "${DUMP}" ] || die "包不存在：${DUMP}"
@@ -54,6 +65,7 @@ if [ -f "${SIDECAR}" ]; then
     echo "哈希 : ✅ 与 sidecar 一致"
   else
     echo "哈希 : ❌ 与 sidecar 不一致，已中止" >&2
+    notify "哈希不一致" "$(basename "${DUMP}") 与 sidecar 校验不符，已中止"
     exit 2
   fi
 fi
@@ -70,6 +82,7 @@ if ! docker exec -i "${CONTAINER}" pg_restore -U "${PGUSER}" -d "${DB}" \
       --no-owner --single-transaction < "${DUMP}" 2>/tmp/restore_drill.err; then
   echo "✗ 恢复失败，pg_restore 输出：" >&2
   tail -5 /tmp/restore_drill.err >&2
+  notify "恢复失败" "$(basename "${DUMP}") 未能恢复，详见 /tmp/heijin_restore_drill.log"
   exit 2
 fi
 echo "恢复 : ✅ 无错误"
@@ -144,6 +157,7 @@ fi
 
 if [ "${FAIL}" -ne 0 ]; then
   echo "=== 结论：❌ 有不变量或期望值不符 ==="
+  notify "演练失败" "不变量或期望值不符，详见 /tmp/heijin_restore_drill.log"
   exit 1
 fi
 echo "=== 结论：✅ 全部通过（临时库 ${DB} 将自动删除）==="

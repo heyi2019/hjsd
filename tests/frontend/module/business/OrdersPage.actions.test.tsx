@@ -38,6 +38,11 @@ vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
+// 操作流只验证订单台账与分期入口；库存面板由 InventoryPanel 专项测试覆盖。
+vi.mock("@/stocks/InventoryPanel", () => ({
+  InventoryPanel: ({ active = true }: { active?: boolean }) => active ? <div data-testid="inventory-panel-test-stub" /> : null,
+}));
+
 // openAllocations 会调用 api.get("/users") 拉取收益人；normalizeError 必须保留真实实现。
 vi.mock("@/shared/api/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/shared/api/client")>();
@@ -47,11 +52,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => {
     currentUser: vi.fn(),
   };
 });
-// 这两行曾写作 "../../stocks/InventoryPanel"、"../../installments/InstallmentsPanel"，
-// 从 src/orders/ 解析到根本不存在的 frontend/stocks/，mock 从未命中——测试一直在渲染真面板，
-// 且断言恰恰依赖真面板（切到「分期与回款」会真发请求）。2026-11-04 修正路径后立刻红了，
-// 说明修 mock 不等于修意图：本文件要测的是 OrdersPage 的编排，面板保持真实渲染。
-// 需要桩掉面板时请在同一文件内同步改断言，不要只改说明符。
+// 订单页的台账编排与分期入口保留真实组件；库存面板本身由独立专项覆盖。
 
 // CreateBusinessModal 用桩替换：暴露 open/onClose/onCreated 三个口，用于覆盖回调分支。
 vi.mock("@/orders/CreateBusinessModal", () => ({

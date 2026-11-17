@@ -1,8 +1,9 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/stocks/InventoryPanel";
+import { RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/stocks/sale";
 import { InventoryRebateModal } from "@/stocks/rebate";
 import { OrderConsignmentModal } from "@/orders/operations/consignment";
 import { OrderDetailDeliverySection } from "@/orders/OrderDetailView/OrderDetailDeliverySection";
@@ -16,6 +17,7 @@ import { poolsApi } from "@/shared/api/pools.api";
 import { rebatesApi } from "@/shared/api/rebates.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock } from "@fixtures/mock-api";
+import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { inventoryLedgerResponse } from "@fixtures/api-responses";
 import { clearOptionSetsCache } from "@/shared/lib/optionSets";
@@ -63,6 +65,7 @@ beforeEach(() => {
     }) as never);
   resolveMock(vi.mocked(ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(ordersApi.postEvent), {});
+  resolveMock(vi.mocked(ordersApi.addCustomerRole), { id: 21 });
   resolveMock(vi.mocked(customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
   resolveMock(vi.mocked(poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
@@ -79,6 +82,8 @@ beforeEach(() => {
     operator: "何一",
   }] as never);
   resolveMock(vi.mocked(installmentsApi.create), { id: 41 });
+  resolveMock(vi.mocked(installmentsApi.pay), { id: 51 });
+  resolveMock(vi.mocked(installmentsApi.previewSalePlan), { per_period_service_fee: "0", per_period: "600" });
   vi.mocked(ordersApi.executionDetail).mockResolvedValue({
     account: accounts[0],
     orders: [{
@@ -576,4 +581,238 @@ describe("OrderDetailDeliverySection", () => {
 
     await waitFor(() => expect(screen.getAllByText("盼之").length).toBeGreaterThan(0));
   });
+});
+
+// —— 原 InventoryPanel.sale.test.tsx ——
+// 售出、写入和详情编辑共享同一页面依赖与初始化，合并后避免重复启动重型库存页面。
+describe("库存售出流程", () => {
+beforeEach(() => {
+  seedOrderFormFields();
+});
+
+it("售出时把新买家关联到来源单而非新建订单", async () => {
+  const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
+  resolveMock(vi.mocked(customersApi.list), []);
+  resolveMock(vi.mocked(customersApi.create), {
+    customer: { id: 8, customer_no: "C0008", display_name: "新买家", status: "ACTIVE" },
+    duplicate_candidates: [],
+  });
+  renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+
+  expect(await screen.findByText("买家信息")).toBeInTheDocument();
+  expect(screen.getByText("资金明细")).toBeInTheDocument();
+  await saleUi.type(screen.getByLabelText("客户昵称"), "新买家");
+  await saleUi.type(screen.getByLabelText("售出金额"), "350");
+  await saleUi.click(screen.getByLabelText("资金账户"));
+  await saleUi.click(await screen.findByText(/利润池/));
+  fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+
+  await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalledWith(expect.objectContaining({ display_name: "新买家" })));
+  expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
+  expect(vi.mocked(ordersApi.addCustomerRole)).toHaveBeenCalledWith(21, { customer_id: 8, role: "BUYER" });
+  expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
+    event_type: "SELL", amount: "350", pool_id: 3, portion: "PROFIT", operator_user_ids: [1],
+  }));
+});
+
+it("库存售出：成功后立即从库存列表移除账号，即使列表重拉暂时返回旧快照", async () => {
+  const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<InventoryPanel />, { user: "admin" });
+
+  expect(await screen.findByText("acc-1")).toBeInTheDocument();
+  await saleUi.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "售出" }));
+  await saleUi.type(screen.getByLabelText("客户昵称"), "买家A");
+  await saleUi.type(screen.getByLabelText("售出金额"), "350");
+  await saleUi.click(screen.getByLabelText("资金账户"));
+  await saleUi.click(await screen.findByText(/利润池/));
+  await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
+
+  await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalled());
+  await waitFor(() => expect(screen.queryByText("acc-1")).not.toBeInTheDocument());
+});
+
+describe("库存售出三表单分支", () => {
+  it("代挂账号售出：全款收佣金入账、售出金额仅记录、不提供分期并挂寄售方", async () => {
+    const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce(inventoryLedgerResponse([{
+      account: { ...accounts[0], id: 5, source_order_id: 21, game_account: "acc-5", inventory_type: "CONSIGNMENT" },
+      order: { id: 21, order_no: "DG-2026-0001", order_type: "DG", capital_type: "SELF", trade_date: "2026-10-01", account_id: 5, account_status: "WAITING", status: "ACTIVE" },
+    }], { type_counts: { CONSIGNMENT: 1 }, stats: { account_count: 1, occupied_cost: "50.00", over_7d_count: 0, over_30d_count: 0 } }) as never);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-5");
+    fireEvent.click(screen.getByRole("button", { name: /售出/ }));
+    expect(await screen.findByText("售出代挂账号")).toBeInTheDocument();
+    expect(screen.getByLabelText("利润")).toBeInTheDocument();
+    expect(screen.getByLabelText("售出金额（仅记录）")).toBeInTheDocument();
+    expect(screen.queryByText("付款方式")).toBeNull();
+    expect(screen.queryByText("分期付款")).toBeNull();
+    await saleUi.type(screen.getByLabelText("客户昵称"), "买家A");
+    await saleUi.type(screen.getByPlaceholderText("请输入利润（代挂佣金）"), "200");
+    await saleUi.type(screen.getByPlaceholderText("代挂无买入价，此处仅作记录，不计入利润"), "1000");
+    await saleUi.click(screen.getByLabelText("资金账户"));
+    await saleUi.click(await screen.findByText(/利润池/));
+    await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
+    await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalled());
+    expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
+      event_type: "SELL", amount: "200", pool_id: 3, portion: "PROFIT", form_extra: { sale_amount: "1000" },
+    }));
+    expect(vi.mocked(ordersApi.addCustomerRole)).toHaveBeenCalledWith(21, { customer_id: 7, role: "CONSIGNOR" });
+    expect(vi.mocked(installmentsApi.create)).not.toHaveBeenCalled();
+  });
+
+  it("代挂售出复用买号交付信息块，交付操作人提交落库到来源单", async () => {
+    const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce(inventoryLedgerResponse([{
+      account: { ...accounts[0], id: 5, source_order_id: 21, game_account: "acc-5", inventory_type: "CONSIGNMENT" },
+      order: { id: 21, order_no: "DG-2026-0001", order_type: "DG", capital_type: "SELF", trade_date: "2026-10-01", account_id: 5, account_status: "WAITING", status: "ACTIVE" },
+    }], { type_counts: { CONSIGNMENT: 1 }, stats: { account_count: 1, occupied_cost: "50.00", over_7d_count: 0, over_30d_count: 0 } }) as never);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-5");
+    fireEvent.click(screen.getByRole("button", { name: /售出/ }));
+    expect(await screen.findByText("售出代挂账号")).toBeInTheDocument();
+    expect(screen.getByText("交付操作人")).toBeInTheDocument();
+    expect(screen.getByText("交易平台")).toBeInTheDocument();
+    expect(screen.getByText("中介类型")).toBeInTheDocument();
+    expect(screen.getByText("包赔类型")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText("交付操作人").closest(".ant-select")).toHaveTextContent("管理员"));
+    await saleUi.click(screen.getByLabelText("交易平台"));
+    await saleUi.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    await saleUi.type(screen.getByLabelText("客户昵称"), "买家A");
+    await saleUi.type(screen.getByPlaceholderText("请输入利润（代挂佣金）"), "200");
+    await saleUi.click(screen.getByLabelText("资金账户"));
+    await saleUi.click(await screen.findByText(/利润池/));
+    await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
+    await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(ordersApi.patch)).toHaveBeenCalledWith(21, expect.objectContaining({
+      form_extra: expect.objectContaining({ delivery_responsible_ids: [1], intermediary_platform: "盼之" }),
+    })));
+  });
+
+  it("提号库存售出可选择分期出售，确立时收首付", async () => {
+    const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce(inventoryLedgerResponse([{
+      account: { ...accounts[0], id: 6, source_order_id: 21, game_account: "pickup-acc", inventory_type: "PICKUP", cost_amount: "0.00" },
+      order: { id: 21, order_no: "TH-2026-0001", order_type: "TH", capital_type: "SELF", trade_date: "2026-10-01", account_id: 6, account_status: "WAITING", status: "ACTIVE" },
+    }], { type_counts: { PICKUP: 1 }, stats: { account_count: 1, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 } }) as never);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("pickup-acc");
+    fireEvent.click(screen.getByRole("button", { name: /售出/ }));
+    expect(await screen.findByText("售出提号账号")).toBeInTheDocument();
+    await saleUi.type(screen.getByLabelText("客户昵称"), "买家A");
+    await saleUi.type(screen.getByPlaceholderText("请输入金额"), "1200");
+    await saleUi.click(await screen.findByText("分期付款"));
+    await saleUi.clear(screen.getByLabelText("首付金额"));
+    await saleUi.type(screen.getByLabelText("首付金额"), "300");
+    await saleUi.click(screen.getByLabelText("资金账户"));
+    await saleUi.click(await screen.findByText(/利润池/));
+    await saleUi.clear(screen.getByLabelText("分期期数"));
+    await saleUi.type(screen.getByLabelText("分期期数"), "2");
+    await saleUi.clear(screen.getByLabelText("每期金额"));
+    await saleUi.type(screen.getByLabelText("每期金额"), "600");
+    expect(screen.getByLabelText("第 1 期到期日")).toBeInTheDocument();
+    expect(screen.getByLabelText("第 2 期到期日")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+
+    await waitFor(() => expect(vi.mocked(installmentsApi.create)).toHaveBeenCalledWith(expect.objectContaining({
+      order_id: 21, contract_type: "STOCK_SALE", principal: "1200", down_payment: "300",
+    })));
+    await waitFor(() => expect(vi.mocked(installmentsApi.pay)).toHaveBeenCalledWith(
+      41, expect.objectContaining({ amount: "300", period_no: 0, pool_id: 3 }),
+    ));
+    expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
+      event_type: "SELL", sale_mode: "INSTALLMENT", amount: "1200", operator_user_ids: [1],
+    }));
+  });
+
+  it("库存中心不为售出单提供取消入口", async () => {
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce(inventoryLedgerResponse([]) as never);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await waitFor(() => expect(screen.queryByText("acc-2")).toBeNull());
+    expect(screen.getByText("暂无账号")).toBeInTheDocument();
+    expect(vi.mocked(ordersApi.postEvent)).not.toHaveBeenCalled();
+  });
+
+  it("售出表单统一使用资金明细且不增加支出", async () => {
+    renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+    expect(await screen.findByText("资金明细")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /增加支出/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("售出金额2")).not.toBeInTheDocument();
+    expect(screen.queryByText("资金账户2")).not.toBeInTheDocument();
+  });
+
+  it("回收、提号、代挂三种售出表单都展示统一的交付信息", async () => {
+    const deliveryLabels = ["换绑手机号", "手机号绑定人", "交易平台", "中介类型", "包赔类型", "交付操作人", "售出操作人"];
+    const cases = [
+      [RecoverySaleModal, accounts[0]],
+      [PickupSaleModal, { ...accounts[0], inventory_type: "PICKUP" }],
+      [ConsignmentSaleModal, { ...accounts[0], inventory_type: "CONSIGNMENT" }],
+    ] as const;
+    for (const [Modal, account] of cases) {
+      const { unmount } = renderLight(<Modal account={account} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+      expect(await screen.findByText("交付信息")).toBeInTheDocument();
+      for (const label of deliveryLabels) expect(screen.getByText(label)).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("分期出售只对回收与提号开放，代挂仅全款", async () => {
+    const cases = [
+      [RecoverySaleModal, accounts[0], "买家信息", true],
+      [PickupSaleModal, { ...accounts[0], inventory_type: "PICKUP" }, "买家信息", true],
+      [ConsignmentSaleModal, { ...accounts[0], inventory_type: "CONSIGNMENT" }, "委托方信息", false],
+    ] as const;
+    for (const [Modal, account, buyerSection, supportsInstallment] of cases) {
+      const { unmount } = renderLight(<Modal account={account} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+      await screen.findByText(buyerSection);
+      if (supportsInstallment) expect(screen.getByText("付款方式")).toBeInTheDocument();
+      else expect(screen.queryByText("付款方式")).toBeNull();
+      unmount();
+    }
+  });
+
+  it("三类售出各取独立作用域配置，互不共用", async () => {
+    const cases = [
+      [RecoverySaleModal, accounts[0], "SALEREC"],
+      [PickupSaleModal, { ...accounts[0], inventory_type: "PICKUP" }, "SALETH"],
+      [ConsignmentSaleModal, { ...accounts[0], inventory_type: "CONSIGNMENT" }, "SALEDG"],
+    ] as const;
+    for (const [Modal, account, scope] of cases) {
+      vi.mocked(orderFormFieldsApi.list).mockClear();
+      vi.mocked(orderFormFieldsApi.listSectionLabels).mockClear();
+      const { unmount } = renderLight(<Modal account={account} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+      await waitFor(() => expect(orderFormFieldsApi.list).toHaveBeenCalledWith(scope, true));
+      expect(vi.mocked(orderFormFieldsApi.list).mock.calls.every(([code]) => code === scope)).toBe(true);
+      expect(orderFormFieldsApi.listSectionLabels).toHaveBeenCalledWith(scope);
+      unmount();
+    }
+  });
+
+  it("P1/FE-042：已拉黑客户不能参与库存售出", async () => {
+    vi.mocked(customersApi.list).mockResolvedValueOnce([{ id: 7, display_name: "买家A", status: "DISABLED" }] as never);
+    vi.mocked(poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
+    vi.mocked(employeesApi.list).mockResolvedValueOnce([{ id: 1, username: "admin", display_name: "管理员", is_active: true }] as never);
+    renderLight(
+      <RecoverySaleModal
+        account={{ id: 1, source_order_id: 21, source_order_no: "HS-2026-0001", game_account: "acc-1", status: "WAITING", inventory_type: "RECOVERY" } as never}
+        onClose={() => undefined}
+        onCreated={() => undefined}
+      />,
+      { user: "admin" },
+    );
+    const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
+    await screen.findByText("买家信息");
+    await saleUi.type(screen.getByLabelText("客户昵称"), "买家A");
+    await saleUi.type(screen.getByLabelText("售出金额"), "350");
+    await saleUi.click(screen.getByLabelText("资金账户"));
+    await saleUi.click(await screen.findByText(/利润池/));
+    await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
+
+    await waitFor(() => expect(screen.getByText(/客户已拉黑，不能作为售出买家/)).toBeInTheDocument());
+    expect(ordersApi.addCustomerRole).not.toHaveBeenCalled();
+    expect(ordersApi.postEvent).not.toHaveBeenCalled();
+  });
+});
+
 });

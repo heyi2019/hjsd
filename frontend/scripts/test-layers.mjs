@@ -25,7 +25,18 @@ export const fastTests = [
   // 业务纯逻辑
   "tests/frontend/unit/business/inventory-export.test.ts",
   "tests/frontend/unit/business/inventory-logic.test.ts",
+  "tests/frontend/unit/business/InventoryPanel-helpers.test.ts",
+  "tests/frontend/unit/business/OrderDetailEditPayload.test.ts",
+  "tests/frontend/unit/business/StocksApiRoutes.test.ts",
+  "tests/frontend/unit/business/consignment-logic.test.ts",
+  "tests/frontend/unit/business/findCancelable.test.ts",
+  "tests/frontend/unit/business/helpers.test.ts",
+  "tests/frontend/unit/business/order-operations.test.ts",
   "tests/frontend/unit/business/orderpage-helpers.test.ts",
+  "tests/frontend/unit/settings/formScopes.test.ts",
+  "tests/frontend/unit/settings/policyConfigSchema.test.ts",
+  "tests/frontend/unit/shared/antdTheme.test.ts",
+  "tests/frontend/unit/workbench/businessReminderConfig.test.ts",
   // 共享层 API 客户端与工具函数
   "tests/frontend/unit/shared/catalog.orders.test.ts",
   "tests/frontend/unit/shared/catalog.test.ts",

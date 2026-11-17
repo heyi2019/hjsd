@@ -20,8 +20,7 @@ const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const REPO = path.resolve(here(".."));
 const SRC = here("./src");
 
-// [2026-11-04 实测重定] worker 数按核数推导，不写死：本地 8 核 → 4/2，CI 4 vCPU → 2/2。
-// 写死 4 的后果是在 GitHub 2~4 vCPU runner 上超订 2 倍，反比 2 worker 慢。
+// React 层固定 4 worker：本地与 CI 保持同一并发口径，避免机器核数变化导致耗时抖动。
 // 实测（8 核，56 文件 / 756 例，同机同代码）：
 //   react  1 worker 163.5s（三次 164.74/160.84/164.92）
 //   react  4 worker 116.6s ← 采纳（每 worker 约吃 2 核，核数/2）
@@ -31,7 +30,7 @@ const SRC = here("./src");
 // react-deep 同样按核推导（16 文件 / 124 例）：
 //   1 worker 45.77s / 2 worker 34.08s / 4 worker 32.65s ← 取 2，边际收益已很小
 const CPUS = os.cpus().length;
-const REACT_WORKERS = Math.max(2, Math.floor(CPUS / 2));
+const REACT_WORKERS = 4;
 const DEEP_WORKERS = Math.max(2, Math.floor(CPUS / 4));
 
 // Antd v5 + jsdom reliable test config.

@@ -31,6 +31,11 @@ vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
+// 订单台账测试不覆盖库存面板本身；库存面板有独立回归，主页面测试用轻量桩避免重复挂载整套库存依赖。
+vi.mock("@/stocks/InventoryPanel", () => ({
+  InventoryPanel: ({ active = true }: { active?: boolean }) => active ? <div data-testid="inventory-panel-test-stub" /> : null,
+}));
+
 const orders = [
   {
     id: 1,
@@ -584,6 +589,7 @@ describe("OrdersPage：四类订单台账", () => {
   it("加载失败时展示错误条", async () => {
     vi.mocked(ordersApi.listPage).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<OrdersPage />);
+    await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 

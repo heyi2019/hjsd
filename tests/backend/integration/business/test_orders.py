@@ -158,8 +158,8 @@ class TestA01HsStock:
         assert len(events) == 2
         assert len({event.event_no for event in events}) == 2
         assert events[0].event_no == f"{order.order_no}-EV-BUY-01"
-        assert out_flows[0].flow_no == f"{order.order_no}-CF-BUY-01"
-        assert in_flows[0].flow_no == f"{order.order_no}-CF-SELL-01"
+        assert out_flows[0].flow_no == "ZC00001"
+        assert in_flows[0].flow_no == "SR00001"
 
     def test_cost_event_is_removed(self, seeded_db):
         order = create_order(
@@ -751,7 +751,7 @@ class TestOrdersApi:
         )
         assert event.status_code == 201
         body = event.json()
-        assert body["cashflow_no"] == "HS0001-CF-SELL-01"
+        assert body["cashflow_no"] == "SR00001"
         assert body["event"]["event_type"] == "SELL"
         assert body["event"]["reason"] == "买家确认收款"
         assert body["event"]["note"] == "售出动作备注"

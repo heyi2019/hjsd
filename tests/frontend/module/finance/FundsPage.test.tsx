@@ -57,8 +57,8 @@ const deposits = [
   { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" },
 ];
 const cashflows = [
-  { id: 1, status: "APPROVED", flow_no: "HS0001-CF-BUY-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
-  { id: 2, status: "APPROVED", flow_no: "HS0001-CF-SELL-01", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
+  { id: 1, status: "APPROVED", flow_no: "ZC00001", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
+  { id: 2, status: "APPROVED", flow_no: "SR00001", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
 ];
 
 beforeEach(() => {
@@ -249,7 +249,7 @@ describe("FundsPage：资金流水", () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "流水" }));
-    expect(screen.getByText("HS0001-CF-BUY-01")).toBeInTheDocument();
+    expect(screen.getByText("ZC00001")).toBeInTheDocument();
     expect(screen.getAllByText("HS0001").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("总收入")).toBeInTheDocument();
     expect(screen.getByText("总支出")).toBeInTheDocument();
@@ -290,8 +290,8 @@ describe("FundsPage：资金流水", () => {
     await ui.type(search, "SELL");
     await ui.click(screen.getByRole("button", { name: "查询" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "SELL" })));
-    expect(screen.getByText("HS0001-CF-SELL-01")).toBeInTheDocument();
-    expect(screen.queryByText("HS0001-CF-BUY-01")).not.toBeInTheDocument();
+    expect(screen.getByText("SR00001")).toBeInTheDocument();
+    expect(screen.queryByText("ZC00001")).not.toBeInTheDocument();
   });
 
   it("资金流水导出与列表同口径：带上当前搜索关键词", async () => {
@@ -324,7 +324,7 @@ describe("FundsPage：资金流水", () => {
     await ui.click(screen.getByRole("button", { name: "查询" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "SELL" })));
     // 本地已收窄到只剩 SELL 一条，但合计不得跟着塌成这一条的 800.00。
-    expect(screen.queryByText("HS0001-CF-BUY-01")).not.toBeInTheDocument();
+    expect(screen.queryByText("ZC00001")).not.toBeInTheDocument();
     expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("123,456.78");
     expect(screen.getByText("总支出").closest(".ui-stat")).toHaveTextContent("87,654.32");
   });

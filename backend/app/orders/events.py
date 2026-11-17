@@ -10,10 +10,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
-from app.core.business_numbering import cashflow_no as next_cashflow_no
 from app.core.business_numbering import event_no as next_event_no
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import to_money
+from app.core.numbering import allocate_flow_no
 from app.core.security import CurrentUser
 from app.core.time import now_second
 from app.core.state_machine import ORDER_TRANSITIONS, transition
@@ -382,9 +382,7 @@ def post_event(
     flow: Cashflow | None = None
     if has_cashflow:
         flow = Cashflow(
-            flow_no=next_cashflow_no(
-                session, order_no=order.order_no, order_id=order.id, category=category
-            ),
+            flow_no=allocate_flow_no(session, direction),
             pool_id=event.pool_id,
             occurred_on=occurred_on,
             nature=nature,

@@ -5,7 +5,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.domain.trade import (
-    Cashflow,
     Order,
     OrderEvent,
     RebateRecord,
@@ -30,21 +29,6 @@ def event_no(session: Session, *, order_no: str, order_id: int, event_type: str)
     return f"{order_no}-EV-{event_type}-{count + 1:02d}"
 
 
-def cashflow_no(
-    session: Session, *, order_no: str, order_id: int, category: str
-) -> str:
-    _lock_row(session, Order, order_id)
-    count = session.scalar(
-        select(func.count(Cashflow.id))
-        .join(OrderEvent, Cashflow.order_event_id == OrderEvent.id)
-        .where(
-            OrderEvent.order_id == order_id,
-            Cashflow.category == category,
-        )
-    ) or 0
-    return f"{order_no}-CF-{category}-{count + 1:02d}"
-
-
 def installment_no(order_no: str) -> str:
     """分期合约号：每个业务订单只有一个，直接由订单号派生。"""
     return f"{order_no}-FQ"
@@ -59,7 +43,6 @@ def rebate_no(session: Session, *, order_no: str, order_id: int) -> str:
 
 
 __all__ = [
-    "cashflow_no",
     "event_no",
     "installment_no",
     "rebate_no",

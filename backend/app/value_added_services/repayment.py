@@ -10,7 +10,7 @@ from typing import Any
 from app.core.audit import record_audit
 from app.core.security import CurrentUser
 from app.domain.enums import CashflowSourceType, Direction, Nature
-from app.finance.attributes import accounting_attribute_for_order_event
+from app.domain.cashflow_attributes import accounting_attribute_for_order_event
 from app.finance.cashflows import create_cashflow, reverse_cashflow
 from app.orders.events_rules import _resolve_pool
 from sqlalchemy import select

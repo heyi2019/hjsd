@@ -410,37 +410,6 @@ class EventPostResult(BaseModel):
     cashflow_no: str | None = None
 
 
-class PoolBalanceOut(BaseModel):
-    pool_id: int
-    pool_code: str
-    income: Decimal
-    expense: Decimal
-    transfer_in: Decimal
-    transfer_out: Decimal
-    cash_balance: Decimal
-    deposit_held: Decimal
-    available: Decimal
-
-
-class PoolBalanceTotalsOut(BaseModel):
-    """资金账户余额汇总：服务端按 Decimal 聚合，前端只展示不再自己累加。"""
-
-    pool_count: int
-    cash_balance: Decimal
-    # 可用余额 = 现金余额；押金占用已在 expense 扣过一次，不再二次减 deposit_held。
-    available: Decimal
-    deposit_held: Decimal  # 其中项：押金占用，仅展示不参与 available 计算
-    # 自有权益口径：仅 ownership=OWNED 的池、按现金头寸计（押金占用已进 expense）。
-    owned_cash_balance: Decimal
-
-
-class PoolBalanceListOut(BaseModel):
-    """批量余额：一次返回全部可见池的卡片与汇总，替代前端逐池 N+1。"""
-
-    items: list[PoolBalanceOut]
-    totals: PoolBalanceTotalsOut
-
-
 __all__ = [
     "EventCreate",
     "EventOut",
@@ -464,7 +433,6 @@ __all__ = [
     "OrderFormFieldCreate",
     "OrderFormFieldUpdate",
     "RequiredWhen",
-    "PoolBalanceOut",
 ]
 
 

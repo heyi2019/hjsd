@@ -29,8 +29,6 @@ source_modules =
 forbidden_modules =
     app.finance
 ignore_imports =
-    app.orders.events -> app.finance.attributes
-    app.orders.router -> app.finance.balances
     app.orders.router -> app.finance.cashflows
 
 [importlinter:contract:orders-not-import-value-added-services]

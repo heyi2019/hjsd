@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date
-from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import func, select
@@ -18,7 +17,6 @@ from app.core.security import CurrentUser
 from app.core.time import now_second
 from app.core.state_machine import ORDER_TRANSITIONS, transition
 from app.domain.enums import (
-    AccountingAttribute,
     AuditAction,
     CashflowSourceType,
     Direction,
@@ -32,7 +30,7 @@ from app.domain.enums import (
 )
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.domain.users import User
-from app.finance.attributes import accounting_attribute_for_order_event
+from app.domain.cashflow_attributes import accounting_attribute_for_order_event
 from app.orders.form_fields import validate_form_extra
 from ._common import (
     _non_negative_money,

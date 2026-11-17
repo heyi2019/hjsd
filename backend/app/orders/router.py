@@ -43,7 +43,6 @@ from app.orders.links import (
     list_order_links as orders_list_order_links,
 )
 from app.orders.mutations import update_order as orders_update_order
-from app.finance.balances import pool_balance as finance_pool_balance, pool_balance_summary
 from app.orders.queries import (
     count_orders,
     list_orders as orders_list_orders,
@@ -70,7 +69,6 @@ post_events = require_permissions(
 )
 update_orders = require_permissions(PERM_ORDER_UPDATE)
 edit_order_detail = require_permissions(PERM_ORDER_UPDATE)
-read_finance = require_permissions(PERM_FINANCE_READ)
 
 
 @router.get("/orders/{order_id}/execution-detail", response_model=AccountExecutionDetailOut)
@@ -471,33 +469,6 @@ def add_order_customer_role(
     )
     order = orders_get_order(db, order_id, user)
     return _order_output(order)
-
-
-@router.get("/pools/balances", response_model=schemas.PoolBalanceListOut)
-def pool_balances_summary(
-    db: Session = Depends(get_db),
-    _user: CurrentUser = read_finance,
-) -> schemas.PoolBalanceListOut:
-    """全部可见资金账户的余额卡片 + 汇总（一次请求，替代前端逐池 N+1 与本地累加）。"""
-    items, totals = pool_balance_summary(db, user=_user)
-    return schemas.PoolBalanceListOut(
-        items=[schemas.PoolBalanceOut.model_validate(item) for item in items],
-        totals=schemas.PoolBalanceTotalsOut.model_validate(totals),
-    )
-
-
-@router.get("/pools/{pool_id}/balance", response_model=schemas.PoolBalanceOut)
-def pool_balance(
-    pool_id: int,
-    db: Session = Depends(get_db),
-    _user: CurrentUser = read_finance,
-) -> schemas.PoolBalanceOut:
-    if not _user.can_see_pool(pool_id):
-        from app.core.errors import NotFound
-        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
-    return schemas.PoolBalanceOut.model_validate(
-        finance_pool_balance(db, pool_id, user=_user)
-    )
 
 
 __all__ = ["router"]

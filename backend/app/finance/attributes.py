@@ -1,4 +1,8 @@
-"""现金方向与核算属性的业务映射。"""
+"""现金方向与核算属性的业务映射。
+
+订单事件核算属性映射已归位到 app/domain/cashflow_attributes.py（2026-11-18 P0-A，
+orders / vas 双方引用 domain 不再有反向依赖）；本文件只保留 finance 域内的映射。
+"""
 from __future__ import annotations
 
 from app.domain.enums import AccountingAttribute, Nature
@@ -7,31 +11,6 @@ from app.domain.enums import AccountingAttribute, Nature
 def derive_manual_cashflow_nature(direction: str) -> str:
     """按收支方向生成手工流水的默认性质。"""
     return Nature.BUSINESS_OUT.value if direction.upper() == "OUT" else Nature.BUSINESS_IN.value
-
-
-_ORDER_EVENT_ATTRIBUTES: dict[tuple[str, str], str] = {
-    ("HS", "BUY"): AccountingAttribute.SELF_DIRECT_COST.value,
-    ("HS", "SELL"): AccountingAttribute.SELF_REVENUE.value,
-    ("HS", "CANCEL"): AccountingAttribute.REVERSAL.value,
-    ("TH", "BUY"): AccountingAttribute.TH_DIRECT_COST.value,
-    ("TH", "SELL"): AccountingAttribute.TH_REVENUE.value,
-    ("TH", "CANCEL"): AccountingAttribute.REVERSAL.value,
-    ("DG", "SELL"): AccountingAttribute.SERVICE_REVENUE.value,
-    ("DG", "CANCEL"): AccountingAttribute.REVERSAL.value,
-}
-
-
-def accounting_attribute_for_order_event(
-    order_type: str, event_type: str
-) -> tuple[str, str]:
-    """返回订单事件对应的核算属性。"""
-    try:
-        attribute = _ORDER_EVENT_ATTRIBUTES[(order_type.upper(), event_type.upper())]
-    except KeyError as exc:
-        raise ValueError(
-            f"未定义订单事件核算属性: {order_type}/{event_type}"
-        ) from exc
-    return attribute
 
 
 def accounting_attribute_for_manual_cashflow(
@@ -53,7 +32,6 @@ def accounting_attribute_for_manual_cashflow(
 
 
 __all__ = [
-    "accounting_attribute_for_order_event",
     "accounting_attribute_for_manual_cashflow",
     "derive_manual_cashflow_nature",
 ]

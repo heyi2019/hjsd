@@ -84,3 +84,91 @@ class TestOrderTypeValidationGuards:
                 sequence_prefix=123,
                 actor="pytest",
             )
+
+
+class TestLookupAndZeroPrincipal:
+    """Task #5 补口：代码查找 NotFound、零本金开关更新与种子回填分支。"""
+
+    def test_require_order_type_by_code_success_and_not_found(self, db):
+        from app.foundation.order_types import require_order_type_by_code
+
+        created = create_order_type(
+            db, code="LKT", name="查找类型", sequence_prefix="LKT", actor="pytest"
+        )
+        db.commit()
+        assert require_order_type_by_code(db, "LKT").id == created.id
+
+        with pytest.raises(AppError) as exc:
+            require_order_type_by_code(db, "NOPE")
+        assert exc.value.code == ErrorCode.RESOURCE_NOT_FOUND
+
+    def test_update_zero_principal_flag_roundtrip(self, seeded_db):
+        from app.foundation.order_types import (
+            get_order_type_by_code,
+            update_order_type,
+        )
+
+        dg = get_order_type_by_code(seeded_db, "DG")
+        assert dg.is_zero_principal is True
+
+        update_order_type(seeded_db, dg.id, actor="pytest", is_zero_principal=False)
+        assert get_order_type_by_code(seeded_db, "DG").is_zero_principal is False
+
+        update_order_type(seeded_db, dg.id, actor="pytest", is_zero_principal=True)
+        assert get_order_type_by_code(seeded_db, "DG").is_zero_principal is True
+
+    def test_update_zero_principal_rejects_non_bool(self, seeded_db):
+        from app.foundation.order_types import (
+            get_order_type_by_code,
+            update_order_type,
+        )
+
+        dg = get_order_type_by_code(seeded_db, "DG")
+        with pytest.raises(AppError):
+            update_order_type(seeded_db, dg.id, actor="pytest", is_zero_principal="yes")
+
+    def test_seed_repairs_mutated_audit_action_options(self, db):
+        """AUDIT_ACTION 是只读系统字典：被改动后重跑种子必须修正回来。"""
+        from sqlalchemy import select
+
+        seed_catalog(db, actor="pytest")
+        db.commit()
+        row = db.scalar(select(OptionSet).where(OptionSet.code == "AUDIT_ACTION"))
+        original = row.options
+        row.options = [{"value": "TAMPERED", "label": "篡改"}]
+        db.commit()
+
+        seed_catalog(db, actor="pytest")
+        db.commit()
+        db.refresh(row)
+        assert row.options == original
+        assert row.options != [{"value": "TAMPERED", "label": "篡改"}]
+
+    def test_seed_backfills_empty_sale_payment_method_options(self, db):
+        """旧库 SALEREC/SALETH 付款方式字段 options 为空时由种子回填；非空不覆盖。"""
+        from sqlalchemy import select
+
+        seed_catalog(db, actor="pytest")
+        db.commit()
+        field = db.scalar(
+            select(OrderFormField).where(
+                OrderFormField.order_type_code == "SALEREC",
+                OrderFormField.field_key == "payment_method",
+            )
+        )
+        assert field is not None
+        field.options = None
+        db.commit()
+
+        seed_catalog(db, actor="pytest")
+        db.commit()
+        db.refresh(field)
+        assert field.options  # 已回填非空选项
+
+        # 管理员配置过的非空 options 不被覆盖
+        field.options = [{"value": "ADMIN", "label": "管理员自定义"}]
+        db.commit()
+        seed_catalog(db, actor="pytest")
+        db.commit()
+        db.refresh(field)
+        assert field.options == [{"value": "ADMIN", "label": "管理员自定义"}]

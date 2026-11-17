@@ -145,3 +145,52 @@ class TestPools:
         result = assert_pool_usable(db, pool.id)
         assert result.id == pool.id
         assert result.status == PoolStatus.ACTIVE.value
+
+
+class TestDefaultPoolAndLookup:
+    """Task #5 补口：默认资金账户语义（2026-11-17 路由下线后）与代码查找分支。"""
+
+    def test_require_pool_by_code_raises_resource_not_found(self, db):
+        from app.foundation.pools import require_pool_by_code
+
+        pool = create_pool(db, code="TMPLK", name="查找池", actor="pytest")
+        db.commit()
+        assert require_pool_by_code(db, "TMPLK").id == pool.id
+
+        with pytest.raises(AppError) as exc:
+            require_pool_by_code(db, "NO_SUCH_POOL")
+        assert exc.value.code == ErrorCode.RESOURCE_NOT_FOUND
+
+    def test_require_default_pool_raises_when_no_default(self, db):
+        """两个活动池且无 is_default：无法确定唯一默认账户，须拒绝落账。"""
+        from app.foundation.pools import require_default_pool
+
+        create_pool(db, code="TMPD1", name="甲池", actor="pytest")
+        create_pool(db, code="TMPD2", name="乙池", actor="pytest")
+        db.commit()
+        with pytest.raises(AppError) as exc:
+            require_default_pool(db)
+        assert exc.value.code == ErrorCode.POOL_ROUTE_MISSING
+        assert exc.value.details["active_pool_ids"]
+
+    def test_switch_default_moves_exclusive_flag(self, seeded_db):
+        """切换默认账户：旧默认被清、新默认唯一；再显式取消后无默认。"""
+        invest = get_pool_by_code(seeded_db, "HJ_INVEST")
+        profit = get_pool_by_code(seeded_db, "HJ_PROFIT")
+        assert invest.is_default is True
+        assert profit.is_default is False
+
+        update_pool(seeded_db, profit.id, actor="pytest", is_default=True)
+        assert profit.is_default is True
+        assert get_pool_by_code(seeded_db, "HJ_INVEST").is_default is False
+
+        update_pool(seeded_db, profit.id, actor="pytest", is_default=False)
+        assert profit.is_default is False
+
+    def test_has_cashflow_tolerates_missing_table(self):
+        """防御兜底：未建表的空库按「无流水」处理，不抛错。"""
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        bare = sessionmaker(bind=create_engine("sqlite://"))()
+        assert pools_service._has_cashflow(bare, 1) is False

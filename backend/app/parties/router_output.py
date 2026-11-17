@@ -17,15 +17,19 @@ def _lead_output(
     *,
     customer_display_name: str | None = None,
     extra_values: dict | None = None,
+    operation_operators: list[schemas.LeadOperationOperatorOut] | None = None,
 ) -> schemas.LeadOut:
     if customer_display_name is None:
         customer = db.get(Customer, item.customer_id)
         customer_display_name = customer.display_name if customer else ""
-    operators = list_operation_operators_bulk(
-        db,
-        entity_type="lead",
-        entity_ids=[item.lead_no],
-    )
+    if operation_operators is None:
+        operators = list_operation_operators_bulk(
+            db,
+            entity_type="lead",
+            entity_ids=[item.lead_no],
+        ).get(item.lead_no, [])
+    else:
+        operators = operation_operators
     output = schemas.LeadOut.model_validate({
         **item.__dict__,
         "customer_display_name": customer_display_name,
@@ -34,7 +38,7 @@ def _lead_output(
         ),
         "operation_operators": [
             schemas.LeadOperationOperatorOut.model_validate(row)
-            for row in operators.get(item.lead_no, [])
+            for row in operators
         ],
     })
     return output

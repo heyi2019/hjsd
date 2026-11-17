@@ -1,3 +1,5 @@
+"""CALC-01 订单详情派生标签由后端统一计算。"""
+
 from datetime import datetime
 
 from app.orders.order_detail.view.derived import _finance_type

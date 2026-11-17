@@ -1,3 +1,4 @@
+"""EXPORT-01 库存台账导出由服务端按注册列输出。"""
 from __future__ import annotations
 
 

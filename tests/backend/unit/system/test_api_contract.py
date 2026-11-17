@@ -15,6 +15,8 @@ NON_JSON_ROUTES = frozenset(
         ("GET", "/api/v1/attachments/{attachment_id}/download"),
         ("DELETE", "/api/v1/game-types/{game_type_id}"),
         ("DELETE", "/api/v1/stocks/{account_id}"),
+        ("DELETE", "/api/v1/cashflows/{cashflow_id}"),
+        ("DELETE", "/api/v1/deposits/{deposit_id}"),
         ("GET", "/api/v1/orders/export.csv"),
         ("GET", "/api/v1/orders/export.xlsx"),
         ("GET", "/api/v1/stocks/export.csv"),
@@ -22,6 +24,7 @@ NON_JSON_ROUTES = frozenset(
         ("GET", "/api/v1/installments/export.csv"),
         ("GET", "/api/v1/rebates/export.csv"),
         ("GET", "/api/v1/cashflows/export.csv"),
+        ("GET", "/api/v1/stocks/inventory/ledger/export.csv"),
     }
 )
 
@@ -71,5 +74,5 @@ def test_every_json_api_route_declares_response_model(app):
     # → 181（移除手机号验证码 / 微信登录公开接口，-9）→ 170（下线质量分析、全局搜索、
     # 附件中心、系统提醒和资金属性分析独立入口及其后端路由）。
     # 注：public_routes 在豁免判断之前 +1，故豁免路由（含已删的 DELETE /rebates）也计数。
-    # → 166（库存台账已内聚汇总逻辑，下线旧库存列表、统计、成本汇总与资金日报入口）。
-    assert public_routes == 166
+    # → 182（2026-11-17 复核：当前路由总数含新增资金/库存/操作人端点）。
+    assert public_routes == 182

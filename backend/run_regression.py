@@ -173,6 +173,9 @@ GROUPS = {
         # 它守的是「搬目录后扫描范围仍指向旧路径」——失败表现是结果为空而非报错，
         # 用例会整批从用例库与报告里消失。纯静态，< 0.1s。
         "tests/backend/unit/system/test_manifest_parity.py",
+        "tests/backend/unit/finance/test_finance_boundaries.py",
+        "tests/backend/unit/business/test_order_detail_labels.py",
+        "tests/backend/unit/business/test_operation_operators.py",
     ],
     "p0": [
         "tests/backend/integration/settings/test_order_types_api.py",
@@ -228,6 +231,8 @@ GROUPS = {
         "tests/backend/integration/business/test_order_event_cancellable_amount.py",
         # 2026-11-12 金额链路
         "tests/backend/integration/business/test_order_financial_date_shift.py",
+        "tests/backend/unit/business/test_order_detail_labels.py",
+        "tests/backend/unit/business/test_operation_operators.py",
     ],
     "installments": [
         "tests/backend/integration/business/test_installments_contract.py",
@@ -258,6 +263,7 @@ GROUPS = {
         # 2026-11-12 金额链路/裁决批次（返点退回、资金两方向、金额大类口径）
         "tests/backend/integration/finance/test_rebate_return.py",
         "tests/backend/integration/finance/test_funds_direction_and_deposit.py",
+        "tests/backend/unit/finance/test_finance_boundaries.py",
     ],
     "parties": [
         "tests/backend/integration/customer/test_parties.py",
@@ -274,6 +280,7 @@ GROUPS = {
         "tests/backend/integration/operations/test_reporting_r_consistency.py",
         "tests/backend/integration/operations/test_profit_cashflow_basis.py",
         "tests/backend/integration/operations/test_profit_r2_accounting.py",
+        "tests/backend/integration/operations/test_data_center_summary.py",
     ],
     "policy": [
         "tests/backend/integration/settings/test_m5_policy.py",
@@ -302,6 +309,7 @@ GROUPS = {
         "tests/backend/integration/operations/test_list_export_csv.py",
         "tests/backend/unit/system/test_deploy_script_contract.py",
         "tests/backend/unit/system/test_backup_scripts.py",
+        "tests/backend/integration/business/test_inventory_ledger_export.py",
     ],
     "auth": [
         "tests/backend/integration/system/test_auth_contract.py",

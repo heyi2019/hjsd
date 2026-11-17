@@ -1,4 +1,4 @@
-"""资金中心边界：业务口径由 finance 后端统一负责。"""
+"""CASHFLOW-02 资金中心边界：业务口径由 finance 后端统一负责。"""
 
 import importlib
 

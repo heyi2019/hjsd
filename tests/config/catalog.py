@@ -174,6 +174,11 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_order_financial_date_shift.py": "B03",          # business — 冲销与成交日期联动
     "test_funds_direction_and_deposit.py": "D05",         # finance — 收支方向与押金报表
     "test_profit_r2_accounting.py": "E01",                # reporting — 订单利润与 R2 归类
+    "test_data_center_summary.py": "E01",                 # reporting — 数据中心汇总
+    "test_inventory_ledger_export.py": "B05",             # business — 库存台账导出
+    "test_finance_boundaries.py": "D02",                  # finance — 资金业务边界
+    "test_order_detail_labels.py": "B03",                # business — 订单详情派生标签
+    "test_operation_operators.py": "B08",                # business — 分期操作人快照
 }
 
 # ---------------------------------------------------------------------------

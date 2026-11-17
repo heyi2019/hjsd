@@ -64,19 +64,19 @@ PROMISE,,,,,,,,CONTACT-01,L2,双端,客户与合作方联系方式按已建档�
 PROMISE,,,,,,,,AUDIT-01,L2,后端,关键写路径必须留审计记录（record_audit）,无法追责,test_audit_contract.py,待核,,需按写路径清单逐条核对
 PROMISE,,,,,,,,TESTING-01,L2,双端,每个测试文件必须归属一条已登记承诺；清单证据文件必须真实存在,测试资产腐烂：不知在守什么，也无法判断哪条承诺无人守,test_promise_declaration.py,已覆盖,,
 PROMISE,,,,,,,,TESTING-02,L2,后端,每个测试文件必须登记在 run_regression.GROUPS 至少一个组内；GROUPS 不得指向不存在的文件,测试写完却没有入口执行，缺陷静默通过 CI（已发生：13 个文件 68 个用例从未执行）,test_group_coverage.py,已覆盖,,
-PROMISE,,,,,,,,API-01,L2,双端,对外 API 契约（字段名、类型、错误码、分页结构）不得静默变更,契约漂移→前端静默错乱，调用方无从察觉,test_accounts_contract.py;test_attachments_contract.py;test_installments_contract.py;test_notifications_contract.py;test_order_execution_edit.py;test_orders_contract.py,已覆盖,,
-PROMISE,,,,,,,,CALC-01,L2,双端,聚合与派生指标（未售天数、合计、剩余、汇总）必须由服务端下发，前端不得自行计算,前后端各算一遍，同一数据两处显示不同,test_account_inventory_age.py;test_inventory_stats.py;test_order_event_cancellable_amount.py,已覆盖,,承接原 ACC-01 / ORD-01 中的派生口径部分
+PROMISE,,,,,,,,API-01,L2,双端,对外 API 契约（字段名、类型、错误码、分页结构）不得静默变更,契约漂移→前端静默错乱，调用方无从察觉,test_accounts_contract.py;test_attachments_contract.py;test_installments_contract.py;test_notifications_contract.py;test_operation_operators.py;test_order_execution_edit.py;test_orders_contract.py,已覆盖,,
+PROMISE,,,,,,,,CALC-01,L2,双端,聚合与派生指标（未售天数、合计、剩余、汇总）必须由服务端下发，前端不得自行计算,前后端各算一遍，同一数据两处显示不同,test_account_inventory_age.py;test_inventory_stats.py;test_order_detail_labels.py;test_order_event_cancellable_amount.py,已覆盖,,承接原 ACC-01 / ORD-01 中的派生口径部分
 PROMISE,,,,,,,,MASTER-01,L1,后端,主数据写操作仅管理员；被引用对象不得停用或删除（422）,引用断裂，历史单无法解析,test_foundation_contract.py;test_order_types_api.py;test_pools_api.py,已覆盖,,
 PROMISE,,,,,,,,POLICY-01,L1,后端,经营规则版本化并快照固化，历史单只读当时快照，禁止读实时规则,历史单金额随规则变更而变，无法复算,test_m5_policy.py;test_policy_contract.py,已覆盖,,
 PROMISE,,,,,,,,IMPORT-01,L1,后端,导入只落原文并完整保留原始字段；映射幂等，重复导入不产生第二份数据,原始数据丢失 / 重复入账,test_import_landing.py;test_import_mapping.py;test_imports_contract.py,已覆盖,,
 PROMISE,,,,,,,,PARTY-01,L1,后端,客户角色按单判定，档案不设固定类型；合作方不写客户角色,角色固化后跨单业务无法表达,test_parties.py;test_parties_contract.py;test_leads_contract.py,已覆盖,,对应 11-02 客户角色裁决
 PROMISE,,,,,,,,FORM-01,L1,后端,参与核算的字段禁入活字段（须升格固定列）；扩展字段按声明类型校验,核算字段漂移，口径不可复算,test_parties_fields_service.py,已覆盖,,
-PROMISE,,,,,,,,REPORT-01,L1,后端,报表合计与筛选在服务端完成，不受分页影响,报表静默少算,test_reporting_contract.py;test_reporting_service.py;test_reporting_r_consistency.py;test_profit_cashflow_basis.py;test_profit_r2_accounting.py,已覆盖,,与 CASHFLOW-01 分工：后者管流水合计，本条目管报表域
+PROMISE,,,,,,,,REPORT-01,L1,后端,报表合计与筛选在服务端完成，不受分页影响,报表静默少算,test_data_center_summary.py;test_reporting_contract.py;test_reporting_service.py;test_reporting_r_consistency.py;test_profit_cashflow_basis.py;test_profit_r2_accounting.py,已覆盖,,与 CASHFLOW-01 分工：后者管流水合计，本条目管报表域
 PROMISE,,,,,,,,MIGRATE-01,L1,后端,迁移基线可重复执行、不覆盖旧库、Up/Down 闭环,升级破坏数据且无法回滚,test_migration.py,已覆盖,,
 PROMISE,,,,,,,,CONFIG-01,L1,后端,配置只来自根目录 .env，不得指向旧库,连错库，对错误的数据执行操作,test_settings.py,已覆盖,,
 PROMISE,,,,,,,,FLOW-01,L2,双端,跨模块业务流程端到端闭合（建单→库存→资金→报表）,单点都正确但串联断裂，业务实际走不通,test_flow_recycle.py;test_flow_sale.py;test_flow_distribution.py;test_flow_installment.py;test_flow_config_driven.py,已覆盖,,
 PROMISE,,,,,,,,PROFIT-01,L1,后端,分润四项（BUY/SELL/OPERATION/COMPANY）合计恒为 100%,分润金额不平，账目无法闭合,test_profit_allocation_modes.py,已覆盖,,
-PROMISE,,,,,,,,CASHFLOW-02,L1,后端,流水三轴属性（nature / fund_nature / accounting_attribute）取值受枚举约束,非法属性落库，账面分类失真,test_finance_attributes.py,已覆盖,,
+PROMISE,,,,,,,,CASHFLOW-02,L1,后端,流水三轴属性（nature / fund_nature / accounting_attribute）取值受枚举约束,非法属性落库，账面分类失真,test_finance_attributes.py;test_finance_boundaries.py,已覆盖,,
 PROMISE,,,,,,,,LIST-01,L3,双端,列表列注册表与界面逐列同名同序,列显示错位，导出与界面不一致,test_list_columns.py;test_list_custom_columns.py;test_list_scope_ui_parity.py,已覆盖,,
 PROMISE,,,,,,,,EXPORT-01,L3,后端,导出口径 = 可见列 + 中文表头 + 值翻译，与列配置一致,对外交付的表格与系统不符,test_list_export_csv.py;test_report_export_columns.py,已覆盖,,
 PROMISE,,,,,,,,SECURITY-01,L2,后端,公开发布的安全边界（越权、注入、敏感信息暴露）不得回退,对外暴露内部数据,test_public_release_security.py,已覆盖,,

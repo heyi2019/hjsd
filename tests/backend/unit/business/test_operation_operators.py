@@ -1,3 +1,4 @@
+"""API-01 业务操作人快照按统一接口契约读写。"""
 from __future__ import annotations
 
 import pytest

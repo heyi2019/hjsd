@@ -237,11 +237,11 @@ class TestA05HsStockSale:
 
         inst_recovery.deliver(
             seeded_db, contract.id, delivery_mode="CUSTOMER_SELF",
-            delivered_on=TODAY, note="客户自行换绑凭证", actor="delivery-operator",
+            delivered_on=TODAY, note="客户自行换绑凭证", actor="admin",
         )
         seeded_db.commit()
         assert seeded_db.get(Installment, contract.id).status == InstallmentStatus.DELIVERED.value
-        assert seeded_db.get(type(account), account.id).updated_by == "delivery-operator"
+        assert seeded_db.get(type(account), account.id).updated_by == "admin"
 
     def test_stock_sale_requires_hs_order(self, seeded_db):
         account = create_account(

@@ -86,6 +86,16 @@ jobs:
       - name: Prepare test configuration
         run: cp .env.example .env
 
+      # 基线一致性门禁：「改 ORM 即改基线」策略的静默失败模式是 ORM 与 alembic 0001 漂移
+      # （测试库 create_all 全绿、生产 alembic 缺列）。本步骤建临时 drill 库跑 alembic upgrade head，
+      # 再与 Base.metadata 比对（等价于比对 create_all），差异非空即红。
+      # 本地同款校验：bash scripts/check_baseline.sh（BASE_URL 未指定时读根 .env）。
+      - name: Verify alembic baseline matches ORM
+        working-directory: backend
+        env:
+          BASE_URL: "postgresql+psycopg://erp_app:erp_app@127.0.0.1:5432"
+        run: bash scripts/check_baseline.sh
+
       # main-ci-cd 在 release sha 上 dispatch 本门禁，并注入「原始 push 范围」路径集。
       # CI checkout 后 git status 恒为空，不能靠脚本自己读工作区。
       - name: Determine test scope (分层策略)

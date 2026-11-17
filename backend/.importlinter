@@ -1,0 +1,57 @@
+# Import Linter 契约（2026-11-17 架构评估 P0-B 落地）
+#
+# 背景：orders 被五个域引用是最上游；但实测发现三处双向依赖（环），
+# 代码里已出现「函数内延迟 import」补丁（events.py:60 / router.py:249 / deletion.py:84），
+# 这是循环依赖的典型症状。本文件固化合法依赖方向：
+#
+#   合法方向（下游 -> 上游实体域）：
+#     finance / value_added_services / policy / reporting / stocks -> orders
+#     reporting / value_added_services -> finance
+#
+#   禁止的反向边（存量违规已在 ignore_imports 豁免，新增一行即红）：
+#     orders -> finance          （events.py 会计属性、router.py 池余额、挂流水）
+#     orders -> value_added_services（events.py 回收单联动）
+#     stocks -> orders           （库存导出/删除/列表反向引订单）
+#
+# 运行：backend 目录下执行 lint-imports（CI lint-gate 同步强制）。
+# 豁免纪律：整边豁免（行级豁免对延迟 import / 多符号 as 导入匹配不稳定）——
+#           这些边正是后续「跨域原语归位」（P0-A）要消灭的，
+#           归位后同步删除对应豁免，使豁免清单单调收紧（与 lint_baseline.txt 同一套方法论）。
+
+[importlinter]
+root_package = app
+
+[importlinter:contract:orders-not-import-finance]
+name = orders 不得依赖 finance（合法方向只有 finance -> orders）
+type = forbidden
+source_modules =
+    app.orders
+forbidden_modules =
+    app.finance
+ignore_imports =
+    app.orders.events -> app.finance.attributes
+    app.orders.router -> app.finance.balances
+    app.orders.router -> app.finance.cashflows
+
+[importlinter:contract:orders-not-import-value-added-services]
+name = orders 不得依赖 value_added_services（合法方向只有 value_added_services -> orders）
+type = forbidden
+source_modules =
+    app.orders
+forbidden_modules =
+    app.value_added_services
+ignore_imports =
+    app.orders.events -> app.value_added_services.create
+
+[importlinter:contract:stocks-not-import-orders]
+name = stocks 不得依赖 orders（合法方向只有 orders -> stocks）
+type = forbidden
+source_modules =
+    app.stocks
+forbidden_modules =
+    app.orders
+ignore_imports =
+    app.stocks.export -> app.orders.order_detail.view.execution
+    app.stocks.router -> app.lists.export
+    app.stocks.deletion -> app.orders.deletion
+    app.stocks.router -> app.orders.router_output

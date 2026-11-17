@@ -38,3 +38,14 @@ jobs:
         # 存量数字随清理收紧，此处不写死条数（避免文档漂移），以 lint_baseline.txt 为准。
         working-directory: backend
         run: python run_regression.py lint
+
+      - name: Install import-linter (pinned to match requirements-dev.txt)
+        working-directory: backend
+        run: pip install import-linter==2.16
+
+      - name: Run import contract gate
+        # 域依赖方向门禁（backend/.importlinter）：orders 不得依赖 finance / value_added_services，
+        # stocks 不得依赖 orders。存量环已整边豁免（豁免清单随 P0-A 原语归位单调收紧），
+        # 新增违规 import 即红。负面验证已做：去豁免必报 (l.38) 违规。
+        working-directory: backend
+        run: lint-imports

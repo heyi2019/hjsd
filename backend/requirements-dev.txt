@@ -4,6 +4,8 @@
 pytest>=8.0.0
 pytest-xdist==3.8.0
 pyflakes>=3.2.0
+# 域依赖方向门禁（backend/.importlinter）：固化 orders/finance/stocks 合法依赖方向，拦截新环
+import-linter==2.16
 # FastAPI TestClient 的传输层依赖（app/ 内不直接 import，但测试需要）
 httpx==0.27.2
 # 只在批量导入 Excel 场景才需要；当前代码库零引用，按需再开

@@ -16,6 +16,7 @@ import { reconciliationsApi } from "@/shared/api/reconciliations.api";
 import { transfersApi } from "@/shared/api/transfers.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
+import { employeesApi } from "@/shared/api/org.api";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -77,6 +78,7 @@ beforeEach(() => {
   resolveMock(vi.mocked(cashflowsApi.totals), cashflowTotals({ total_in: "800.00", total_out: "1000.00" }));
   vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary([]));
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
+  vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }]);
 });
 
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
@@ -323,9 +325,10 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.click(screen.getByRole("tab", { name: "对账" }));
     await ui.click(await screen.findByRole("button", { name: /核销/ }));
     const modal = modalContent();
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "操作人" }).closest(".ant-select")).toHaveTextContent("管理员"));
     await ui.type(modal.querySelector("#reason") ?? modal, "已补录漏记流水");
     await ui.click(screen.getByRole("button", { name: /确认核销/ }));
-    await waitFor(() => expect(vi.mocked(reconciliationsApi.resolve)).toHaveBeenCalledWith(21, "已补录漏记流水"));
+    await waitFor(() => expect(vi.mocked(reconciliationsApi.resolve)).toHaveBeenCalledWith(21, "已补录漏记流水", [1]));
   });
 
   it("押金释放提交调用 depositsApi.release", async () => {

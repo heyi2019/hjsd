@@ -324,7 +324,6 @@ describe("CustomersPage：联系方式直接展示", () => {
 
 // —— 原 CustomersPage.actions.test.tsx ——
 // 同一页面、同一份 catalog automock + 同一份 CustomerLeadPanel 替身。
-// CustomersPage.write.test.tsx 未合并：它用带 importOriginal 的工厂，与 automock 语义不同。
 describe("CustomersPage：行内动作", () => {
   let ui: ReturnType<typeof userEvent.setup>;
 
@@ -464,6 +463,156 @@ describe("CustomersPage：行内动作", () => {
     revokeObjectURLSpy.mockRestore();
     clickSpy.mockRestore();
     successSpy.mockRestore();
+  });
+});
+
+// —— 原 CustomersPage.write.test.tsx ——
+// 同一页面、同一份 jsdom+antd 启动；保留独立 fixture 作用域，避免与上面的展示/行内动作数据互相污染。
+describe("CustomersPage：权限门控与写操作", () => {
+  let ui: ReturnType<typeof userEvent.setup>;
+
+  const fieldDefs = [
+    { id: 1, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "game_category", label: "常玩品类", field_type: "MULTI_SELECT", options: [{ value: "王者荣耀", label: "王者荣耀" }, { value: "和平精英", label: "和平精英" }], required: false, sort_order: 10, is_active: true },
+    { id: 2, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "credit_level", label: "信用评级", field_type: "SELECT", options: [{ value: "优质", label: "优质" }, { value: "一般", label: "一般" }, { value: "观察", label: "观察" }, { value: "黑名单", label: "黑名单" }], required: false, sort_order: 20, is_active: true },
+    { id: 3, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "referrer", label: "转介绍人", field_type: "TEXT", options: null, required: false, sort_order: 30, is_active: true },
+    { id: 4, order_type_code: "CUSTOMER", is_custom: true, locked: false, field_key: "legacy_note", label: "历史备注", field_type: "TEXT", options: null, required: false, sort_order: 40, is_active: false },
+  ] as unknown as import("@/shared/api/types/forms").OrderFormField[];
+
+  const customers = [
+    { id: 1, customer_no: "CUS-0001", display_name: "张三", phone: "138****8888", wechat: "zhangsan", qq: "10001", status: "ACTIVE", created_by: "admin", extra_values: { credit_level: "优质", legacy_note: "早期客户" } },
+    { id: 2, customer_no: "CUS-0002", display_name: "李四", phone: "139****9999", wechat: "", qq: "", status: "DISABLED", extra_values: {} },
+  ];
+
+  beforeEach(() => {
+    ui = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.clearAllMocks();
+    seedOptionSets();
+    vi.mocked(customersApi.list).mockResolvedValue(customers);
+    vi.mocked(customersApi.page).mockImplementation(async (params) => {
+      const items = await vi.mocked(customersApi.list)(params);
+      return pageResponse(items, { limit: params?.limit ?? 10, offset: params?.offset ?? 0 });
+    });
+    vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
+    vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse([]));
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue(fieldDefs);
+    vi.mocked(customersApi.detail).mockResolvedValue(customerDetail(customers[0], {
+      overview: { order_count: 1, active_order_count: 1, completed_order_count: 0, cancelled_order_count: 0, last_trade_date: "2026-10-18", cumulative_profit: "250.00", installment_paid_total: "100.00", installment_receivable_total: "1000.00", installment_remaining_total: "900.00", overdue_period_count: 1 },
+      business: [{ order_id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "STOCK", status: "ACTIVE", trade_date: "2026-10-18", roles: ["BUYER"] }],
+      installments: [{ id: 20, inst_no: "HS-2026-0010-INS01", order_id: 10, order_no: "HS-2026-0010", contract_type: "STOCK_SALE", status: "OVERDUE", principal: "1000.00", total_receivable: "1000.00", paid_amount: "100.00", remaining_amount: "900.00", overdue_periods: 1, first_due_on: "2026-10-17" }],
+    }));
+  });
+
+  it("admin 可见「新建客户」入口，且非 ACTIVE 客户合并按钮禁用", async () => {
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    expect(screen.getByRole("button", { name: /新建/ })).toBeInTheDocument();
+    const mergeButtons = screen.getAllByRole("button", { name: /合\s*并/ });
+    expect(mergeButtons.length).toBe(2);
+    expect(mergeButtons.some((b) => !(b as HTMLButtonElement).disabled)).toBe(true);
+    expect(mergeButtons.some((b) => (b as HTMLButtonElement).disabled)).toBe(true);
+  });
+
+  it("viewer 无 customer.create 权限 → 新建入口不渲染", async () => {
+    renderLight(<CustomersPage />, { user: "viewer" });
+    await screen.findByText("CUS-0001");
+    expect(screen.queryByRole("button", { name: /新建/ })).toBeNull();
+  });
+
+  it("新建客户提交后回传字段并刷新列表", async () => {
+    resolveMockOnce(vi.mocked(customersApi.create), { customer: { id: 3, customer_no: "CUS-0003" }, duplicate_candidates: [] });
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await ui.click(screen.getByRole("button", { name: /新建/ }));
+    await ui.type(await screen.findByLabelText("名字"), "王五");
+    await ui.click(screen.getByRole("button", { name: /建\s*档/ }));
+    await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五" });
+  });
+
+  it("重复候选不拦截，只提示（创建仍成功）", async () => {
+    const warningSpy = vi.spyOn(appMessage, "warning");
+    resolveMockOnce(vi.mocked(customersApi.create), { customer: { id: 4 }, duplicate_candidates: [{ id: 2 }] });
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await ui.click(screen.getByRole("button", { name: /新建/ }));
+    await ui.type(await screen.findByLabelText("名字"), "李四");
+    await ui.click(screen.getByRole("button", { name: /建\s*档/ }));
+    await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalled());
+    expect(warningSpy).toHaveBeenCalledWith(expect.stringContaining("重复候选"));
+    await waitFor(() => expect(vi.mocked(customersApi.page)).toHaveBeenCalledTimes(2));
+  });
+
+  it("合并弹窗取消后重开不残留上次选的目标客户与原因", async () => {
+    vi.mocked(customersApi.list).mockResolvedValue([
+      { id: 1, customer_no: "CUS-0001", display_name: "张三", phone: "138****8888", status: "ACTIVE", extra_values: {} },
+      { id: 2, customer_no: "CUS-0002", display_name: "李四", phone: "139****9999", status: "ACTIVE", extra_values: {} },
+    ]);
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    const mergeButtons = screen.getAllByRole("button", { name: /合\s*并/ });
+    await ui.click(mergeButtons[0]);
+    const dialog = await screen.findByRole("dialog");
+    await ui.click(within(dialog).getByLabelText("目标客户（需为有效客户）").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("CUS-0002 李四", { selector: ".ant-select-item-option-content" }));
+    await ui.type(within(dialog).getByLabelText("合并原因"), "重复建档，保留李四");
+    await ui.click(dialog.querySelector(".ant-modal-close") as Element);
+    await ui.click(screen.getAllByRole("button", { name: /合\s*并/ })[0]);
+    await waitFor(() => {
+      const dialogs = document.querySelectorAll<HTMLElement>(".ant-modal-content");
+      const reopened = Array.from(dialogs).find((el) => el.textContent?.includes("合并客户 · CUS-0001"));
+      expect(reopened).toBeTruthy();
+      expect(within(reopened!).getByLabelText("合并原因")).toHaveValue("");
+      expect(reopened!.querySelector("#target_customer_id")?.closest(".ant-form-item")?.querySelector(".ant-select-selection-item")).toBeNull();
+    });
+  });
+
+  it("客户详情加载经营概览、关联订单和分期收款", async () => {
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await ui.click(screen.getAllByRole("button", { name: /详\s*情/ })[0]);
+    expect(vi.mocked(customersApi.detail)).toHaveBeenCalledWith(1);
+    const drawer = await screen.findByRole("dialog");
+    expect(within(drawer).getByText("经营概览")).toBeInTheDocument();
+    expect(within(drawer).getByText("累计利润")).toBeInTheDocument();
+    expect(within(drawer).getByText("250.00")).toBeInTheDocument();
+    expect(within(drawer).getByText("admin")).toBeInTheDocument();
+    expect(within(drawer).getAllByText("关联订单").length).toBeGreaterThanOrEqual(2);
+    expect(within(drawer).getAllByText("HS-2026-0010").length).toBeGreaterThanOrEqual(2);
+    expect(within(drawer).getByText("分期收款")).toBeInTheDocument();
+    expect(within(drawer).getByText("逾期 1 期")).toBeInTheDocument();
+  });
+
+  it("客户详情加载中不展示列表快照字段", async () => {
+    let resolveDetail!: (value: unknown) => void;
+    vi.mocked(customersApi.detail).mockImplementationOnce(() => new Promise((resolve) => { resolveDetail = resolve; }) as never);
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await ui.click(screen.getAllByRole("button", { name: /详情/ })[0]);
+    const drawer = await screen.findByRole("dialog");
+    expect(within(drawer).getByRole("status", { name: "正在加载客户详情" })).toBeInTheDocument();
+    expect(within(drawer).queryByText("138****8888")).not.toBeInTheDocument();
+    resolveDetail({ customer: customers[0], overview: {}, business: [], installments: [], audit: [] });
+    await waitFor(() => expect(within(drawer).queryByRole("status", { name: "正在加载客户详情" })).toBeNull());
+  });
+
+  it("客户列表支持关键词搜索并把条件传给后端", async () => {
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await ui.type(screen.getByRole("searchbox", { name: "搜索客户" }), "张三");
+    await ui.click(screen.getByRole("button", { name: "搜索客户" }));
+    await waitFor(() => expect(vi.mocked(customersApi.page)).toHaveBeenCalledWith({ keyword: "张三", limit: 10, offset: 0 }));
+  });
+
+  it("客户 CSV 导出完成后给出成功反馈", async () => {
+    const successSpy = vi.spyOn(appMessage, "success");
+    vi.mocked(customersApi.exportCsv).mockResolvedValueOnce(new Blob(["csv"]));
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:customer");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await ui.click(screen.getByRole("button", { name: "导出客户数据" }));
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户数据已导出"));
   });
 });
 

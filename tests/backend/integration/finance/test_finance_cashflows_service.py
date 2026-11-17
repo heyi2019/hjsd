@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import NotFound, Validation
+from app.core.numbering import allocate_flow_no
 from app.core.operation_operators import list_operation_operators
 from app.core.security import CurrentUser
 from app.domain.enums import CashflowLedgerType, CashflowSourceType
@@ -903,3 +904,166 @@ def test_update_cashflow_rejects_invisible_pool(seeded_db):
             direction="OUT", category="房租", amount=Decimal("30"),
             actor="pytest", user=_pool1_user(),
         )
+
+
+# ----------------------------------------------------- 押金编辑/删除守卫补口
+def test_update_unknown_deposit_not_found(seeded_db):
+    with pytest.raises(NotFound, match="押金 999999 不存在"):
+        deposits.update_deposit(
+            seeded_db, 999999, pool_id=1, amount=Decimal("10"),
+            paid_on=TODAY, actor="pytest",
+        )
+
+
+def test_update_deposit_rejects_after_return(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    deposits.return_deposit(
+        seeded_db, deposit.id, amount=Decimal("40"), released_on=TODAY, actor="pytest"
+    )
+    with pytest.raises(Validation, match="只有未发生退还/损失的押金可编辑或删除"):
+        deposits.update_deposit(
+            seeded_db, deposit.id, pool_id=1, amount=Decimal("10"),
+            paid_on=TODAY, actor="pytest",
+        )
+
+
+def test_update_deposit_rejects_invisible_target_pool(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    with pytest.raises(NotFound, match="资金账户不存在"):
+        deposits.update_deposit(
+            seeded_db, deposit.id, pool_id=2, amount=Decimal("10"),
+            paid_on=TODAY, actor="pytest", user=_pool1_user(),
+        )
+
+
+def test_update_deposit_rejects_unknown_counterparty(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    with pytest.raises(NotFound):
+        deposits.update_deposit(
+            seeded_db, deposit.id, pool_id=1, amount=Decimal("10"),
+            paid_on=TODAY, actor="pytest", counterparty_id=999999,
+        )
+
+
+def test_update_deposit_rejects_unknown_source_order(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    with pytest.raises(NotFound, match="来源订单 999999 不存在"):
+        deposits.update_deposit(
+            seeded_db, deposit.id, pool_id=1, amount=Decimal("10"),
+            paid_on=TODAY, actor="pytest", source_order_id=999999,
+        )
+
+
+def test_update_deposit_missing_hold_flow(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    hold = seeded_db.scalar(select(Cashflow).where(
+        Cashflow.source_type == CashflowSourceType.DEPOSIT.value,
+        Cashflow.source_id == str(deposit.id),
+        Cashflow.category == "DEPOSIT_HOLD",
+    ))
+    seeded_db.delete(hold)
+    seeded_db.flush()
+    with pytest.raises(Validation, match="押金占用对应流水不存在"):
+        deposits.update_deposit(
+            seeded_db, deposit.id, pool_id=1, amount=Decimal("10"),
+            paid_on=TODAY, actor="pytest",
+        )
+
+
+def test_update_deposit_with_form_extra(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    deposits.update_deposit(
+        seeded_db, deposit.id, pool_id=1, amount=Decimal("120"),
+        paid_on=TODAY, actor="pytest", form_extra={"交接说明": "换池"},
+    )
+    assert (deposit.form_extra or {}).get("交接说明") == "换池"
+    assert deposit.paid_amount == Decimal("120")
+
+
+def test_delete_deposit_rejects_with_subsequent_flows(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    # 状态干净的押金 + 一笔非占用的押金来源流水（模拟历史脏数据/孤儿流水）
+    seeded_db.add(Cashflow(
+        flow_no=allocate_flow_no(seeded_db, "IN"), pool_id=1, occurred_on=TODAY,
+        nature="BUSINESS_IN", accounting_attribute="DEPOSIT",
+        category="DEPOSIT_RELEASE", direction="IN", amount=Decimal("1"),
+        source_type=CashflowSourceType.DEPOSIT.value, source_id=str(deposit.id),
+        created_by="pytest", updated_by="pytest",
+    ))
+    seeded_db.flush()
+    with pytest.raises(Validation, match="押金已产生后续资金流水"):
+        deposits.delete_deposit(seeded_db, deposit.id, actor="pytest")
+
+
+def test_create_deposit_rejects_unknown_counterparty(seeded_db):
+    with pytest.raises(NotFound):
+        deposits.create_deposit(
+            seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY,
+            actor="pytest", counterparty_id=999999,
+        )
+
+
+def test_list_deposits_pool_filter_respects_user_scope(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    # pool_id 过滤 + 授权用户可见
+    assert deposits.list_deposits(seeded_db, pool_id=1, user=_pool1_user()) == [deposit]
+    # pool_ids 过滤：只保留授权内的池
+    assert deposits.list_deposits(seeded_db, pool_ids=[1, 2], user=_pool1_user()) == [deposit]
+
+
+def test_deposit_held_total_filters_by_pool(seeded_db):
+    deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    assert deposits.deposit_held_total(seeded_db, pool_id=1) == Decimal("100")
+    assert deposits.deposit_held_total(seeded_db, pool_id=2) == Decimal("0")
+
+
+def test_return_deposit_with_form_extra(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    deposits.return_deposit(
+        seeded_db, deposit.id, amount=Decimal("60"), released_on=TODAY,
+        actor="pytest", form_extra={"退还渠道": "支付宝"},
+    )
+    assert (deposit.form_extra or {}).get("退还渠道") == "支付宝"
+    assert deposit.returned_amount == Decimal("60")
+
+
+def test_cancel_deposit_with_form_extra(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    deposits.cancel_deposit(
+        seeded_db, deposit.id, cancelled_on=TODAY, reason="登记有误",
+        actor="pytest", form_extra={"取消原因补充": "误录池"},
+    )
+    assert (deposit.form_extra or {}).get("取消原因补充") == "误录池"
+    assert deposit.status == "CANCELLED"
+
+
+def test_deposit_held_total_scoped_for_operator(seeded_db):
+    deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    # 只授权池 1 的用户：能看到本池在押合计
+    assert deposits.deposit_held_total(seeded_db, user=_pool1_user()) == Decimal("100")
+    # 无任何池授权的用户：合计为 0
+    assert deposits.deposit_held_total(seeded_db, user=_restricted_user()) == Decimal("0")

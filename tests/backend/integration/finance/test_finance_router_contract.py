@@ -212,3 +212,226 @@ def test_router_get_rebate_endpoint(seeded_db):
 
 
 # ----------------------------------------------------- settle_rebate 记录不存在
+
+
+# ----------------------------------------------------- cashflows_router 补口
+from app.core.errors import Validation  # noqa: E402
+from app.domain.enums import CashflowLedgerType  # noqa: E402
+from app.finance import cashflows as cashflow_service  # noqa: E402
+from app.finance.cashflows_router import (  # noqa: E402
+    create_order_cashflow,
+    delete_cashflow as delete_cashflow_endpoint,
+    list_cashflow_totals,
+    update_cashflow as update_cashflow_endpoint,
+)
+
+
+def _pool1_user() -> CurrentUser:
+    return CurrentUser(
+        id=888,
+        username="pool1only",
+        roles=(),
+        permissions=frozenset(),
+        pool_ids=frozenset({1}),
+        owner_scope="SELF",
+    )
+
+
+def test_router_list_cashflow_totals_pool_not_visible(seeded_db):
+    totals = list_cashflow_totals(pool_id=1, db=seeded_db, user=_restricted_user())
+    assert totals.total_in == Decimal("0")
+    assert totals.total_out == Decimal("0")
+
+
+def test_router_list_cashflow_totals_empty_pool_ids(seeded_db):
+    totals = list_cashflow_totals(pool_id=None, db=seeded_db, user=_restricted_user())
+    assert totals.total_in == Decimal("0")
+    assert totals.total_out == Decimal("0")
+
+
+def test_router_list_cashflow_totals_scoped_pool_ids(seeded_db):
+    cashflow_service.create_cashflow(
+        seeded_db, pool_id=1, occurred_on=TODAY,
+        direction="IN", nature="EXTERNAL_IN", category="客户收款",
+        amount=Decimal("80"), actor="pytest", note="合计可见性",
+    )
+    totals = list_cashflow_totals(
+        pool_id=None, db=seeded_db, user=_pool1_user(),
+        order_id=None, direction=None, occurred_from=None, occurred_to=None,
+        nature=None, ledger_type=None, accounting_attribute=None, category=None,
+        created_by=None, keyword=None,
+    )
+    assert totals.total_in == Decimal("80")
+
+
+def test_router_list_cashflow_totals_main_path(seeded_db):
+    cashflow_service.create_cashflow(
+        seeded_db, pool_id=1, occurred_on=TODAY,
+        direction="IN", nature="EXTERNAL_IN", category="客户收款",
+        amount=Decimal("100"), actor="pytest", note="端点合计",
+    )
+    cashflow_service.create_cashflow(
+        seeded_db, pool_id=1, occurred_on=TODAY,
+        direction="OUT", nature="BUSINESS_OUT", category="OTHER",
+        amount=Decimal("30"), actor="pytest",
+    )
+    totals = list_cashflow_totals(
+        pool_id=None, db=seeded_db, user=_all_scope_user(),
+        order_id=None, direction=None, occurred_from=None, occurred_to=None,
+        nature=None, ledger_type=None, accounting_attribute=None, category=None,
+        created_by=None, keyword=None,
+    )
+    assert totals.total_in == Decimal("100")
+    assert totals.total_out == Decimal("30")
+
+
+def test_router_create_order_cashflow_rejects_order_mismatch(seeded_db):
+    with pytest.raises(Validation, match="资金明细关联订单与路径订单不一致"):
+        create_order_cashflow(
+            1,
+            schemas.CashflowCreate(
+                pool_id=1, occurred_on=TODAY, direction="OUT",
+                category="OTHER", amount=Decimal("10"), order_id=2,
+            ),
+            db=seeded_db, user=_all_scope_user(),
+        )
+
+
+def _studio_flow(seeded_db, *, direction="OUT", category="房租", amount="20"):
+    return cashflow_service.create_cashflow(
+        seeded_db, pool_id=1, occurred_on=TODAY,
+        direction=direction,
+        nature="BUSINESS_OUT" if direction == "OUT" else "BUSINESS_IN",
+        category=category, amount=Decimal(amount), actor="pytest",
+        ledger_type=CashflowLedgerType.STUDIO.value,
+    )
+
+
+def test_router_update_cashflow_endpoint(seeded_db):
+    flow = _studio_flow(seeded_db)
+    out = update_cashflow_endpoint(
+        flow.id,
+        schemas.CashflowUpdate(
+            pool_id=1, occurred_on=TODAY, direction="OUT",
+            category="房租", amount=Decimal("35"), note="端点编辑",
+        ),
+        db=seeded_db, user=_all_scope_user(),
+    )
+    assert out.amount == Decimal("35.00")
+    assert out.note == "端点编辑"
+
+
+def test_router_delete_cashflow_endpoint(seeded_db):
+    flow = _studio_flow(seeded_db)
+    result = delete_cashflow_endpoint(flow.id, db=seeded_db, user=_all_scope_user())
+    assert result is None
+    assert seeded_db.get(type(flow), flow.id) is None
+
+
+# ----------------------------------------------------- 查询层与零头端点补口
+from app.domain.trade import Deposit  # noqa: E402
+from app.finance.balances import pool_balances  # noqa: E402
+from app.finance.cashflow_queries import cashflow_totals, studio_summary  # noqa: E402
+from app.finance.deposits_router import (  # noqa: E402
+    delete_deposit as delete_deposit_endpoint,
+    update_deposit as update_deposit_endpoint,
+)
+from app.finance.rebates_router import (  # noqa: E402
+    update_rebate as update_rebate_endpoint,
+)
+from app.finance.reconciliation import resolve_reconciliation  # noqa: E402
+
+
+def test_query_list_cashflows_rejects_bad_ledger_type(seeded_db):
+    from app.finance.cashflow_queries import list_cashflows as query_list
+
+    with pytest.raises(Validation, match="ledger_type 必须为"):
+        query_list(seeded_db, ledger_type="NOPE")
+
+
+def test_cashflow_totals_pool_not_visible(seeded_db):
+    total_in, total_out = cashflow_totals(
+        seeded_db, pool_id=1, user=_restricted_user(),
+    )
+    assert total_in == Decimal("0")
+    assert total_out == Decimal("0")
+
+
+def test_studio_summary_filters_pool_scope(seeded_db):
+    cashflow_service.create_cashflow(
+        seeded_db, pool_id=1, occurred_on=TODAY,
+        direction="OUT", nature="BUSINESS_OUT", category="房租",
+        amount=Decimal("20"), actor="pytest",
+        ledger_type=CashflowLedgerType.STUDIO.value,
+    )
+    visible = studio_summary(seeded_db, pool_ids=[1, 2], user=_pool1_user())
+    assert visible["count"] == 1
+    hidden = studio_summary(seeded_db, pool_ids=[9], user=_pool1_user())
+    assert hidden["count"] == 0
+    assert hidden["income"] == Decimal("0")
+    assert hidden["expense"] == Decimal("0")
+
+
+def test_pool_balances_rejects_unknown_pool(seeded_db):
+    # 空 ids 直接返回空表，不查库
+    assert pool_balances(seeded_db, []) == {}
+    with pytest.raises(NotFound, match="资金账户 999999 不存在"):
+        pool_balances(seeded_db, [999999])
+    # 池真实存在但用户无权可见：同样拒答
+    with pytest.raises(NotFound, match="资金账户 1 不存在"):
+        pool_balances(seeded_db, [1], user=_restricted_user())
+
+
+def test_router_update_rebate_endpoint(seeded_db):
+    order_id = _order_with_buy(seeded_db)
+    record = rebates.create_rebate(
+        seeded_db, source_order_id=order_id, rebate_type="BUY",
+        amount=Decimal("800"), collected_on=TODAY, actor="pytest",
+    )
+    out = update_rebate_endpoint(
+        record.id, schemas.RebateUpdate(amount=Decimal("500")),
+        db=seeded_db, user=_all_scope_user(),
+    )
+    assert out.amount == Decimal("500.00")
+
+
+def test_resolve_reconciliation_with_form_extra(seeded_db):
+    from app.finance.reconciliation_router import create_reconciliation
+
+    item = create_reconciliation(
+        payload=schemas.ReconciliationCreate(
+            pool_id=1, reconciled_on=TODAY, account_label="农行 8678",
+            statement_balance=Decimal("100"),
+            reason="对账差异待核销", operator_user_ids=[1],
+        ),
+        db=seeded_db, user=_all_scope_user(),
+    )
+    resolved = resolve_reconciliation(
+        seeded_db, item.id, actor="pytest", reason="已对平",
+        form_extra={"差异说明": "无"}, operator_user_ids=[1],
+    )
+    assert resolved.status == "RESOLVED"
+    assert (resolved.form_extra or {}).get("差异说明") == "无"
+
+
+def test_router_update_deposit_endpoint(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    out = update_deposit_endpoint(
+        deposit.id,
+        schemas.DepositUpdate(
+            pool_id=1, amount=Decimal("120"), paid_on=TODAY,
+            operator_user_ids=[1],
+        ),
+        db=seeded_db, user=_all_scope_user(),
+    )
+    assert out.paid_amount == Decimal("120.00")
+
+
+def test_router_delete_deposit_endpoint(seeded_db):
+    deposit = deposits.create_deposit(
+        seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+    )
+    assert delete_deposit_endpoint(deposit.id, db=seeded_db, user=_all_scope_user()) is None
+    assert seeded_db.get(Deposit, deposit.id) is None

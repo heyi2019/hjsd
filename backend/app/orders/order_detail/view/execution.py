@@ -83,3 +83,10 @@ def load_order_execution_detail(
         ),
         audit=audit,
     )
+
+
+# 跨域注册（P0-A 第三批）：库存台账导出的执行明细读取经注册点取用，
+# stocks 不反向 import 本模块（合法方向只有 orders -> stocks）。
+from app.stocks.collaboration import register_order_execution_loader  # noqa: E402
+
+register_order_execution_loader(load_order_execution_detail)

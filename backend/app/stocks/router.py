@@ -35,7 +35,7 @@ from .router_output import (
     _actor,
     _account_outputs,
 )
-from app.orders.router_output import _order_list_payload
+from app.stocks.collaboration import build_order_list_payload
 
 router = APIRouter(tags=["ACC-01 账号台账"])
 
@@ -132,7 +132,7 @@ def inventory_ledger(
     accounts = [account for account, _order in pairs]
     orders = [order for _account, order in pairs]
     account_outputs = _account_outputs(db, accounts, user)
-    order_outputs = _order_list_payload(db, orders)
+    order_outputs = build_order_list_payload(db, orders)
     return InventoryLedgerOut(
         items=[{"account": account, "order": order}
                for account, order in zip(account_outputs, order_outputs, strict=True)],

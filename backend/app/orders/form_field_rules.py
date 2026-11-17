@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import Validation
 from app.domain.trade import OrderFormField
 from app.domain.users import User
-from app.orders.form_scopes import SCOPE_CODES
+from app.domain.form_scopes import SCOPE_CODES
 
 FIELD_TYPES = ("TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT")
 

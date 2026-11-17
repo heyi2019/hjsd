@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from app.core.security import CurrentUser
-from app.orders.order_detail.view.execution import load_order_execution_detail
+from app.stocks.collaboration import load_order_execution
 from app.stocks.schemas import AccountOut
 
 
@@ -129,7 +129,7 @@ def build_inventory_ledger_csv(
     failed_details = 0
     for (account, order), account_out in zip(pairs, accounts, strict=True):
         try:
-            detail = load_order_execution_detail(db, order.id, user)
+            detail = load_order_execution(db, order.id, user)
         except Exception:
             detail = None
             failed_details += 1

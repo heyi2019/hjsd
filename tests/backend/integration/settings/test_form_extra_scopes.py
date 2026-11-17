@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.core.errors import Validation
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
 from app.foundation.catalog_seed import seed_catalog
-from app.orders.form_scopes import FORM_SCOPES
+from app.domain.form_scopes import FORM_SCOPES
 from app.orders.form_fields import validate_business_responsible, validate_form_extra
 from app.stocks.profile import update_account_profile
 
@@ -56,7 +56,7 @@ def test_scopes_endpoint_lists_all_scopes(seeded_client, headers):
 
 def test_operation_scope_seeds_match_registry(seeded_db):
     """当前基线为所有操作作用域落入可读取的字段种子。"""
-    from app.orders import form_scopes
+    from app.domain import form_scopes
 
     seed_catalog(seeded_db)
     seeded_db.commit()
@@ -299,7 +299,7 @@ def test_sale_scopes_have_independent_field_sets(seeded_db):
 
     from app.domain.trade_models.form_config import OrderFormField
     from app.foundation.catalog_seed import seed_catalog
-    from app.orders.form_scopes import SCOPE_CODES
+    from app.domain.form_scopes import SCOPE_CODES
 
     seed_catalog(seeded_db, actor="pytest")
     seeded_db.flush()

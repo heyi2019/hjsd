@@ -39,7 +39,7 @@ def list_form_scopes(
     _user: CurrentUser = read_form_config,
 ) -> list[schemas.FormScopeOut]:
     """表单作用域注册表：设置页「表单」下拉的单一事实源。"""
-    from app.orders.form_scopes import list_scopes
+    from app.domain.form_scopes import list_scopes
 
     return [schemas.FormScopeOut.model_validate(item) for item in list_scopes()]
 

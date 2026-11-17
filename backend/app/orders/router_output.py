@@ -28,7 +28,6 @@ from app.domain.trade import (
     Cashflow,
     Installment,
     InstallmentSchedule,
-    Order,
     OrderEvent,
     RebateRecord,
 )
@@ -146,7 +145,6 @@ def _order_detail_output(
         .order_by(OrderEvent.occurred_on, OrderEvent.id)
     ).all()
     operator_names = _operator_names(db, events)
-    event_by_id = {event.id: event for event in events}
     cancellable = cancellable_by_event(list(events))
     output.events = [_event_output(event, operator_names, cancellable) for event in events]
     output.links = [
@@ -434,3 +432,9 @@ __all__ = [
     "_order_detail_output",
     "_order_list_payload",
 ]
+
+# 跨域注册（P0-A 第三批）：stocks 台账页的订单列输出经注册点取用，
+# stocks 不反向 import 本模块（合法方向只有 orders -> stocks）。
+from app.stocks.collaboration import register_order_list_payload_builder  # noqa: E402
+
+register_order_list_payload_builder(_order_list_payload)

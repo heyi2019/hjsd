@@ -37,10 +37,11 @@ def delete_inventory(
     linked_order = _linked_order(session, inventory_id)
 
     if linked_order is not None:
-        # 延迟导入避免 orders.deletion 与 stocks.deletion 的模块级循环依赖。
-        from app.orders.deletion import delete_order
+        # 经 stocks.collaboration 注册点调用 orders.deletion.delete_order，
+        # stocks 不反向 import orders（2026-11-18 P0-A 第三批）。
+        from .collaboration import delete_linked_order
 
-        delete_order(
+        delete_linked_order(
             session,
             linked_order[0],
             actor=actor,

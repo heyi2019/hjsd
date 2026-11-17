@@ -30,7 +30,7 @@ from app.domain.options import OptionSet
 from app.domain.parties import Customer
 from app.domain.trade import Order, OrderFormField
 from app.lists.scopes import LIST_SCOPES, ListScope, get_scope
-from app.orders.form_scopes import FORM_SCOPES
+from app.domain.form_scopes import FORM_SCOPES
 
 CUSTOM_KEY_PREFIX = "extra:"
 

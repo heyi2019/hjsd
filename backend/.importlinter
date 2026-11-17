@@ -8,11 +8,12 @@
 #     finance / value_added_services / policy / reporting / stocks -> orders
 #     reporting / value_added_services -> finance
 #
-#   禁止的反向边（P0-A 已消灭前两处存量环，2026-11-18）：
+#   禁止的反向边（P0-A 已全部消灭，2026-11-18，三批归位）：
 #     orders -> finance          已归位：会计属性移 domain 层、余额端点移 finance 域、
 #                                初始成本挂账改 app/orders/collaboration.py 注册点
 #     orders -> value_added_services 已归位：SELL 回收联动改 collaboration 注册点
-#     stocks -> orders           存量环仍在豁免（导出/删除/列表三处，归位待后续批次）
+#     stocks -> orders           已归位：FORM_SCOPES 移 domain 层（断 lists 间接环）；
+#                                导出/台账/删除联动改 app/stocks/collaboration.py 注册点
 #
 # 运行：backend 目录下执行 lint-imports（CI lint-gate 同步强制）。
 # 豁免纪律：整边豁免（行级豁免对延迟 import / 多符号 as 导入匹配不稳定）——
@@ -44,8 +45,3 @@ source_modules =
     app.stocks
 forbidden_modules =
     app.orders
-ignore_imports =
-    app.stocks.export -> app.orders.order_detail.view.execution
-    app.stocks.router -> app.lists.export
-    app.stocks.deletion -> app.orders.deletion
-    app.stocks.router -> app.orders.router_output

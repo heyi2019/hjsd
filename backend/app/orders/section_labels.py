@@ -15,7 +15,7 @@ from .form_field_rules import (
     ORDER_TYPE_CODE_PATTERN,
     _validate_section,
 )
-from .form_scopes import SCOPE_CODES
+from app.domain.form_scopes import SCOPE_CODES
 
 def get_section_labels(session: Session, *, order_type_code: str) -> dict[str, str]:
     """返回该业务类型下已自定义（落库）的板块标题映射：section_key -> 显示标题。

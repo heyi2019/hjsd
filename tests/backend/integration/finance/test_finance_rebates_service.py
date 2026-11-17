@@ -172,7 +172,9 @@ def test_outflow_cashflow_does_not_create_refund_event(seeded_db):
 
     assert flow.direction == "OUT"
     assert flow.category == "OTHER"
-    assert flow.accounting_attribute == "OPERATING_EXPENSE"
+    # 挂单流水默认落「其他支出」——工作室运营支出只属于工作室账簿，
+    # 订单资金明细不得误标（2026-11-18 口径，见 finance/attributes.py）。
+    assert flow.accounting_attribute == "OTHER_EXPENSE"
     assert seeded_db.scalar(
         select(OrderEvent.id).where(
             OrderEvent.order_id == order_id,

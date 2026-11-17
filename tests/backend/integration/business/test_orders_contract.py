@@ -27,10 +27,10 @@ from app.domain.enums import (
     OrderStatus,
 )
 from app.stocks.profile import create_account
-from app.value_added_services import create as inst_create
+from app.installments import create as inst_create
 from app.finance.rebates import create_rebate
-from app.parties.counterparties import create_counterparty
-from app.parties.customers import create_customer, set_customer_status
+from app.customer_center.counterparties import create_counterparty
+from app.customer_center.customers import create_customer, set_customer_status
 from app.domain.foundation import AuditLog
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink

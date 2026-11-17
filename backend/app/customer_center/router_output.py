@@ -4,8 +4,8 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.parties import schemas
-from app.parties._common import to_counterparty_out
+from app.customer_center import schemas
+from app.customer_center._common import to_counterparty_out
 from app.domain.parties import Customer
 from app.shared.form_values import get_extra_values, get_extra_values_bulk
 from app.shared.operation_operators import list_operation_operators_bulk

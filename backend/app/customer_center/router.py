@@ -29,9 +29,9 @@ from app.auth.session import (
 from app.domain.enums import AuditAction
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
-from app.parties import schemas
-from app.parties._common import to_counterparty_out, to_customer_out
-from app.parties.counterparties import (
+from app.customer_center import schemas
+from app.customer_center._common import to_counterparty_out, to_customer_out
+from app.customer_center.counterparties import (
     create_counterparty as parties_create_counterparty,
     count_counterparties as parties_count_counterparties,
     get_counterparty as parties_get_counterparty,
@@ -39,16 +39,16 @@ from app.parties.counterparties import (
     set_counterparty_status,
     update_counterparty as parties_update_counterparty,
 )
-from app.parties.customer_detail import (
+from app.customer_center.customer_detail import (
     get_customer_activity_summary,
     get_customer_detail as parties_get_customer_detail,
 )
-from app.parties.counterparty_detail import get_counterparty_detail as parties_get_counterparty_detail
-from app.parties.customer_merge import (
+from app.customer_center.counterparty_detail import get_counterparty_detail as parties_get_counterparty_detail
+from app.customer_center.customer_merge import (
     duplicate_candidates,
     merge_customers as parties_merge_customers,
 )
-from app.parties.customers import (
+from app.customer_center.customers import (
     count_customers,
     create_customer as parties_create_customer,
     get_customer as parties_get_customer,
@@ -58,7 +58,7 @@ from app.parties.customers import (
     update_customer as parties_update_customer,
 )
 from app.shared.form_values import get_extra_values, get_extra_values_bulk
-from app.parties.leads import (
+from app.customer_center.leads import (
     close_lead as parties_close_lead,
     convert_lead as parties_convert_lead,
     create_lead as parties_create_lead,

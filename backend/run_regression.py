@@ -364,7 +364,7 @@ def _groups_for_source_path(path: str) -> set[str]:
         selected.add("installments")
     if path.startswith("backend/app/finance/") or "finance" in path or "rebate" in path:
         selected.add("finance")
-    if any(t in path for t in ("parties", "leads")):
+    if any(t in path for t in ("customer_center", "parties", "leads")):
         selected.add("parties")
     if "report" in path:
         selected.add("reporting")
@@ -387,7 +387,7 @@ STRUCTURAL_PREFIXES = (
     "tests/config/catalog.py", "backend/scripts/promise_catalog.py",
     "conftest.py", "pytest.ini", "tests/conftest.py", "tests/backend/conftest.py",
     "backend/app/orders/amounts.py", "backend/app/reporting/",
-    "backend/app/value_added_services/",
+    "backend/app/installments/",
 )
 # 自动发版只改版本常量，不影响测试范围；本地 changed 遇到它也不该触发全量。
 NON_STRUCTURAL_FILES = {"backend/app/version.py"}

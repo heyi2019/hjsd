@@ -25,8 +25,8 @@ from app.finance.cashflows import create_cashflow
 from app.finance.rebates import create_rebate
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.parties.counterparties import create_counterparty
-from app.parties.customers import create_customer
+from app.customer_center.counterparties import create_counterparty
+from app.customer_center.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 

@@ -15,7 +15,7 @@ from app.shared.business_numbering import installment_no as order_installment_no
 from app.core.security import CurrentUser
 from app.domain.users import User
 from app.foundation.order_types import get_order_type_by_code
-from app.value_added_services.schemas import ScheduleCreate
+from app.installments.schemas import ScheduleCreate
 from app.shared.order_access import get_order
 from app.shared.order_amounts import order_amounts
 from app.shared.form_values import set_extra_values

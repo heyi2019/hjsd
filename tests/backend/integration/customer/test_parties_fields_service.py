@@ -10,7 +10,7 @@ import pytest
 from app.core.errors import NotFound, Validation
 from app.domain.trade import OrderFormField
 from app.shared import form_values as fields_module
-from app.parties.customers import create_customer
+from app.customer_center.customers import create_customer
 from app.shared.form_values import get_extra_values, get_extra_values_bulk, set_extra_values
 
 

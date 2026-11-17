@@ -17,9 +17,9 @@ from app.core.security import CurrentUser
 from app.domain.enums import Direction
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Installment, Order, OrderEvent
-from app.value_added_services import create as inst_create
-from app.value_added_services import recovery as inst_recovery
-from app.value_added_services import repayment as inst_repayment
+from app.installments import create as inst_create
+from app.installments import recovery as inst_recovery
+from app.installments import repayment as inst_repayment
 from app.orders import events
 from app.orders._shared import _audit_value
 from app.orders.create import create_order
@@ -27,8 +27,8 @@ from app.orders.events import post_event
 from app.orders.links import create_order_link
 from app.orders.mutations import update_order
 from app.orders.queries import list_orders
-from app.parties.counterparties import create_counterparty
-from app.parties.customers import create_customer
+from app.customer_center.counterparties import create_counterparty
+from app.customer_center.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 TODAY2 = date(2026, 10, 18)

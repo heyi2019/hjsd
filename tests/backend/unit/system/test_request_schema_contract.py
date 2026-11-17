@@ -35,7 +35,7 @@ from app.foundation.schemas import (
     PoolStatusUpdate,
     PoolUpdate,
 )
-from app.value_added_services.schemas import (
+from app.installments.schemas import (
     DefaultIn,
     DeliverIn,
     EarlySettlementIn,
@@ -46,7 +46,7 @@ from app.value_added_services.schemas import (
     ScheduleWaiveIn,
 )
 from app.orders.schemas import EventCreate
-from app.parties.schemas import (
+from app.customer_center.schemas import (
     CounterpartyCreate,
     CounterpartyUpdate,
     CustomerCreate,

@@ -48,10 +48,10 @@ from app.domain.enums import (
     ScheduleStatus,
 )
 from app.domain.trade import Cashflow, InstallmentSchedule, OrderEvent
-from app.value_added_services import create as inst_create
-from app.value_added_services import recovery as inst_recovery
-from app.value_added_services import repayment as inst_repayment
-from app.value_added_services import settlement as inst_settlement
+from app.installments import create as inst_create
+from app.installments import recovery as inst_recovery
+from app.installments import repayment as inst_repayment
+from app.installments import settlement as inst_settlement
 from app.orders.create import create_order
 from app.orders.events import post_event
 

@@ -11,10 +11,10 @@ from app.domain.enums import AuditAction, CustomerStatus
 from app.domain.foundation import AuditLog
 from app.domain.parties import Customer, OrderCustomerRole
 from app.domain.trade import Order, OrderFormField
-from app.parties._common import to_customer_out
-from app.parties.counterparties import assert_counterparty_usable, create_counterparty, set_counterparty_status
-from app.parties.customer_merge import assert_customer_usable, duplicate_candidates, merge_customers
-from app.parties.customers import create_customer, set_customer_status, update_customer
+from app.customer_center._common import to_customer_out
+from app.customer_center.counterparties import assert_counterparty_usable, create_counterparty, set_counterparty_status
+from app.customer_center.customer_merge import assert_customer_usable, duplicate_candidates, merge_customers
+from app.customer_center.customers import create_customer, set_customer_status, update_customer
 from app.shared.form_values import get_extra_values, get_extra_values_bulk, set_extra_values
 
 CUSTOMERS = "/api/v1/customers"

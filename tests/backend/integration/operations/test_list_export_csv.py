@@ -436,7 +436,7 @@ def test_stocks_export_passes_export_row_limit(seeded_client, headers, monkeypat
 
 def test_customers_export_passes_export_row_limit(seeded_client, headers, monkeypatch):
     """客户导出查询层传 EXPORT_ROW_LIMIT，不再 limit=None 拉全量。"""
-    from app.parties.customers import list_customers
+    from app.customer_center.customers import list_customers
 
     seen: dict[str, object] = {}
     original = list_customers
@@ -445,7 +445,7 @@ def test_customers_export_passes_export_row_limit(seeded_client, headers, monkey
         seen.update(kwargs)
         return original(db, **kwargs)
 
-    monkeypatch.setattr("app.parties.router.parties_list_customers", spy)
+    monkeypatch.setattr("app.customer_center.router.parties_list_customers", spy)
     resp = seeded_client.get("/api/v1/customers/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
     assert seen.get("limit") == EXPORT_ROW_LIMIT

@@ -17,8 +17,8 @@ from app.domain.trade import Account
 from app.domain.enums import AccountStatus
 from app.orders import router, schemas
 from app.orders.create import create_order
-from app.parties.counterparties import create_counterparty
-from app.parties.customers import create_customer
+from app.customer_center.counterparties import create_counterparty
+from app.customer_center.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 

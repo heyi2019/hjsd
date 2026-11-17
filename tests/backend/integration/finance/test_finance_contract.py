@@ -30,7 +30,7 @@ from app.finance.transfers import create_transfer, repair_transfer
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.finance.balances import pool_balance
-from app.parties.counterparties import create_counterparty, set_counterparty_status
+from app.customer_center.counterparties import create_counterparty, set_counterparty_status
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 
 TODAY = date(2026, 10, 4)

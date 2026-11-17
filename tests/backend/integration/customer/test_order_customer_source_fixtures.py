@@ -17,7 +17,7 @@ from sqlalchemy import select
 
 from app.domain.parties import Customer
 from app.domain.trade import Account, Order
-from app.parties.customers import create_customer
+from app.customer_center.customers import create_customer
 
 D = date(2026, 10, 4)
 

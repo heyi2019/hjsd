@@ -20,7 +20,7 @@ import pytest
 from app.stocks.profile import create_account
 from app.core.errors import Validation
 from app.finance.rebates import create_rebate
-from app.value_added_services import create as inst_create
+from app.installments import create as inst_create
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.policy import definitions as policy_definitions

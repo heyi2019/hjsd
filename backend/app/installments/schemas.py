@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.core.money import to_money
 from app.core.schemas import RequestModel
-from app.value_added_services import _shared as inst_shared
+from app.installments import _shared as inst_shared
 
 
 class ScheduleCreate(RequestModel):

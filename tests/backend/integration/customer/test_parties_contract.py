@@ -29,20 +29,20 @@ from app.domain.parties import (
     OrderCustomerRole,
 )
 from app.domain.trade import InstallmentSchedule, OrderFormField
-from app.value_added_services import create as inst_create
+from app.installments import create as inst_create
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.stocks.profile import create_account
-from app.parties.counterparties import (
+from app.customer_center.counterparties import (
     create_counterparty,
     get_counterparty,
     list_counterparties,
     set_counterparty_status,
     update_counterparty,
 )
-from app.parties.customer_detail import get_customer_activity_summary, get_customer_detail
-from app.parties.customer_merge import duplicate_candidates, merge_customers
-from app.parties.customers import create_customer, get_customer, list_customers, set_customer_status, update_customer
+from app.customer_center.customer_detail import get_customer_activity_summary, get_customer_detail
+from app.customer_center.customer_merge import duplicate_candidates, merge_customers
+from app.customer_center.customers import create_customer, get_customer, list_customers, set_customer_status, update_customer
 from app.shared.form_values import get_extra_values, set_extra_values
 
 CUSTOMERS = "/api/v1/customers"
@@ -915,7 +915,7 @@ def test_customer_detail_does_not_record_contact_read_audit(seeded_client, seede
 
 
 def test_validate_owner_id_rejects_non_positive_and_inactive(seeded_db):
-    from app.parties._common import _validate_owner_id
+    from app.customer_center._common import _validate_owner_id
     from app.domain.users import User
     from app.core.errors import Validation
 

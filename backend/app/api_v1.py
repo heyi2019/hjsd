@@ -28,11 +28,11 @@ from app.policy.router import router as policy_router
 from app.notifications.router import router as notifications_router
 from app.reporting.router import router as reporting_router
 from app.finance.router import router as finance_router
-from app.value_added_services.router import router as installments_router
+from app.installments.router import router as installments_router
 from app.orders.router import router as orders_router
 from app.orders.export_router import export_router as order_exports_router
 from app.orders.form_fields_router import router as order_form_fields_router
-from app.parties.router import router as parties_router
+from app.customer_center.router import router as parties_router
 from app.auth.router import router as auth_router, admin_router as users_router, teams_router
 from app.attachments.router import router as attachments_router
 from app.options.router import router as options_router

@@ -14,13 +14,13 @@ from app.domain.foundation import Pool
 from app.foundation.order_types import get_order_type_by_code
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
-from app.value_added_services import create as inst_create
-from app.value_added_services import recovery as inst_recovery
-from app.value_added_services import repayment as inst_repayment
+from app.installments import create as inst_create
+from app.installments import recovery as inst_recovery
+from app.installments import repayment as inst_repayment
 from app.orders.create import add_customer_role, create_order
 from app.orders.events import post_event
-from app.parties.counterparties import create_counterparty
-from app.parties.customers import create_customer, set_customer_status
+from app.customer_center.counterparties import create_counterparty
+from app.customer_center.customers import create_customer, set_customer_status
 
 TODAY = date(2026, 10, 4)
 TODAY2 = date(2026, 10, 18)

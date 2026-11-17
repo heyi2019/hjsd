@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser
 from app.domain.parties import Counterparty, Customer
-from app.parties.counterparties import create_counterparty
-from app.parties.customers import create_customer
+from app.customer_center.counterparties import create_counterparty
+from app.customer_center.customers import create_customer
 
 from .schemas import CounterpartyDraftInput, CustomerDraftInput
 

@@ -21,10 +21,10 @@ from app.domain.parties import (
 from app.domain.trade import Order, OrderEvent
 from app.domain.users import User
 from app.orders.create import create_order
-from app.parties.customer_detail import get_customer_activity_summary
-from app.parties.customer_merge import merge_customers
-from app.parties.customers import create_customer
-from app.parties.leads import close_lead, convert_lead, create_lead, get_lead, list_leads, update_lead
+from app.customer_center.customer_detail import get_customer_activity_summary
+from app.customer_center.customer_merge import merge_customers
+from app.customer_center.customers import create_customer
+from app.customer_center.leads import close_lead, convert_lead, create_lead, get_lead, list_leads, update_lead
 from app.policy.profit_allocation import service as policy_allocations
 from app.policy import definitions as policy_definitions
 from app.policy import versions as policy_versions

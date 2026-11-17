@@ -21,15 +21,15 @@ from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order
 from app.finance.deposits import create_deposit, return_deposit
 from app.finance.rebates import create_rebate
-from app.value_added_services import _shared as inst__shared
-from app.value_added_services import create as inst_create
-from app.value_added_services import recovery as inst_recovery
-from app.value_added_services import repayment as inst_repayment
+from app.installments import _shared as inst__shared
+from app.installments import create as inst_create
+from app.installments import recovery as inst_recovery
+from app.installments import repayment as inst_repayment
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.finance.balances import pool_balance
-from app.parties.counterparties import create_counterparty
-from app.parties.customers import create_customer
+from app.customer_center.counterparties import create_counterparty
+from app.customer_center.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 

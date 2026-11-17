@@ -40,4 +40,16 @@ export interface DocumentSequence {
 export interface AttachmentItem { id: number; attachment_no: string; file_name: string; size_bytes: number; created_by: string }
 
 
-export interface NotificationItem { id: number; notification_no?: string; notification_type?: string; title: string; message: string; entity_type: string; entity_id: string; read_at?: string | null }
+export interface NotificationItem {
+  id: number;
+  notification_no?: string;
+  recipient_user_id?: number;
+  notification_type?: string;
+  title: string;
+  message: string;
+  entity_type: string;
+  entity_id: string;
+  created_by?: string;
+  created_at?: string;
+  read_at?: string | null;
+}

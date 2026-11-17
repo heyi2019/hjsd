@@ -1,12 +1,14 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { act } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
 import { dashboardApi } from "@/shared/api/dashboard.api";
+import { notificationsApi } from "@/shared/api/misc.api";
+import { ordersApi } from "@/shared/api/orders.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
-import { dashboardSummary } from "@fixtures/api-responses";
+import { dashboardSummary, pageResponse } from "@fixtures/api-responses";
 /** 2026-10-13：工作台数据总览（资金账户/统计/入口卡）已迁至「经营中心 · 数据中心」
  *  （用例见 reporting/DataCenterPanel.test.tsx）。本文件只覆盖瘦身后的工作台：
  *  纯动作入口——新建业务卡 + 登记弹窗，以及「数据已迁走」的回归断言。 */
@@ -59,6 +61,115 @@ it("工作台展示业务总览指标和业务提醒", async () => {
     expect(within(alerts).getByText("库存订单入库超过 7 天 1 个")).toBeInTheDocument();
     expect(within(alerts).getByText("分润待配置 1 条")).toBeInTheDocument();
     expect(within(alerts).getByText("获得分润通知 1 条")).toBeInTheDocument();
+  });
+
+it("点击获得分润通知展示订单金额、分润配置人和库存回收信息", async () => {
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
+      notifications: { pending_profit_count: 0, allocated_profit_count: 1 },
+    }));
+    vi.mocked(notificationsApi.list).mockResolvedValue({
+      items: [{
+        id: 1,
+        notification_no: "NTF0001",
+        recipient_user_id: 2,
+        notification_type: "PROFIT_ALLOCATED",
+        title: "订单分润已配置",
+        message: "订单 TH0001 分润配置已保存，请到收益明细查看。",
+        entity_type: "order",
+        entity_id: "TH0001",
+        created_by: "admin",
+        read_at: null,
+      }],
+      total: 1,
+      unread_total: 1,
+    });
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{
+      id: 42,
+      order_no: "TH0001",
+      order_type: "TH",
+      trade_date: "2026-11-17",
+      status: "COMPLETED",
+      sale_amount: "300.00",
+      account_id: 7,
+      stock_no: "KU0007",
+    }]));
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+      account: {
+        id: 7,
+        stock_no: "KU0007",
+        inventory_entry_at: "2026-11-10T08:00:00",
+      },
+      orders: [],
+      finance_summary: {
+        cashflow_income: "300.00",
+        rebate_income: "0.00",
+        total_income: "300.00",
+        total_expense: "100.00",
+        net_amount: "200.00",
+      },
+      detail_view: {
+        execution_rows: [],
+        finance_rows: [],
+        operation_rows: [],
+        lifecycle: {
+          sold_at: "2026-11-17T10:00:00",
+          removed_at: "2026-11-17T12:30:00",
+          removed_platform: "平台A",
+          recovery_platform: "平台A",
+          sale_platform: "平台A",
+        },
+        order_notes: "",
+        parties: [],
+        extras: [],
+      },
+    } as never);
+    renderLight(<DashboardPage />, { user: "admin" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 1 条" }));
+    expect(await screen.findByText("订单分润通知详情")).toBeInTheDocument();
+    expect(screen.getByText("TH0001")).toBeInTheDocument();
+    expect(screen.getByText("300.00")).toBeInTheDocument();
+    expect(screen.getByText("admin")).toBeInTheDocument();
+    expect(screen.getByText("KU0007")).toBeInTheDocument();
+    expect(screen.getByText("库存入库时间")).toBeInTheDocument();
+    expect(screen.getByText("库存移出时间")).toBeInTheDocument();
+    expect(screen.getByText("2026-11-17 12:30")).toBeInTheDocument();
+  });
+
+it("点击分润待配置通知跳转到对应订单的分润配置入口", async () => {
+    const onDashboardNavigate = vi.fn();
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
+      notifications: { pending_profit_count: 1, allocated_profit_count: 0 },
+    }));
+    vi.mocked(notificationsApi.list).mockResolvedValue({
+      items: [{
+        id: 2,
+        notification_no: "NTF0002",
+        recipient_user_id: 2,
+        notification_type: "PROFIT_PENDING",
+        title: "订单分润待配置",
+        message: "订单 TH0002 已售出完成，请前往配置分润。",
+        entity_type: "order",
+        entity_id: "TH0002",
+        created_by: "system",
+        read_at: null,
+      }],
+      total: 1,
+      unread_total: 1,
+    });
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{
+      id: 43,
+      order_no: "TH0002",
+      order_type: "TH",
+      trade_date: "2026-11-17",
+      status: "COMPLETED",
+      account_id: 8,
+    }]));
+
+    renderLight(<DashboardPage onDashboardNavigate={onDashboardNavigate} />, { user: "admin" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "分润待配置 1 条" }));
+    await waitFor(() => expect(onDashboardNavigate).toHaveBeenCalledWith("/business/ledger?allocation_order_id=43"));
   });
 
 it("工作台按业务提醒配置计算库存阈值并控制提醒开关", async () => {

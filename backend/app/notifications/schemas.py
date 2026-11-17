@@ -17,6 +17,7 @@ class NotificationOut(BaseModel):
     message: str
     entity_type: str
     entity_id: str
+    created_by: str
     read_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

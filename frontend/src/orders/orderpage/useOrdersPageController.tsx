@@ -1,6 +1,6 @@
 
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Order } from "../../shared/api/types/orders";
 import { currentDevUser } from "../../shared/api/client";
 import type { BusinessOrderType } from "../CreateBusinessModal";
@@ -18,9 +18,10 @@ export function useOrdersPageController(params: {
   initialTab?: BusinessCenterEntryTab;
   initialMine?: boolean;
   initialLedgerFilters?: InitialLedgerFilters;
+  initialAllocationOrderId?: number;
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
 } = {}) {
-  const { active = true, initialTab, initialMine = false, initialLedgerFilters, onNavigate } = params;
+  const { active = true, initialTab, initialMine = false, initialLedgerFilters, initialAllocationOrderId, onNavigate } = params;
   const currentOperator = currentDevUser();
   const { role, username } = useSession();
   const canDeleteOrder = role === "admin";
@@ -85,6 +86,15 @@ export function useOrdersPageController(params: {
     openAllocations, openRefund,
     openOrderRebate, openOrderSale, openOrderConsignment, openOrderOffsale, openOrderDelete,
   } = actionModals;
+
+  const allocationDeepLinkOpened = useRef<number | null>(null);
+  useEffect(() => {
+    if (!active || activeTab !== "ledger" || !initialAllocationOrderId || allocationDeepLinkOpened.current === initialAllocationOrderId) return;
+    const target = orders.find((order) => order.id === initialAllocationOrderId);
+    if (!target) return;
+    allocationDeepLinkOpened.current = initialAllocationOrderId;
+    void openAllocations(target);
+  }, [active, activeTab, initialAllocationOrderId, openAllocations, orders]);
 
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
   const [installmentRefreshKey, setInstallmentRefreshKey] = useState(0);

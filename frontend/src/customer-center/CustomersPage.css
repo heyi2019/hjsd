@@ -2,3 +2,16 @@
 .customer-list-filters--separated {
   margin-block-start: var(--space-4);
 }
+
+.counterparty-detail-stats {
+  margin-block-start: var(--space-4);
+}
+
+.counterparty-detail-stats .ui-stat {
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+}
+
+.counterparty-detail-stats .ui-stat__value {
+  font-size: var(--fs-title-3);
+}

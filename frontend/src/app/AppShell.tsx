@@ -28,6 +28,7 @@ type PageProps = {
   initialTab?: BusinessCenterEntryTab;
   initialMine?: boolean;
   initialLedgerFilters?: InitialLedgerFilters;
+  initialAllocationOrderId?: number;
   initialInventoryAgeGtDays?: number;
   initialInstallmentStatus?: string;
   initialReportTab?: "commission" | "my-earnings";
@@ -73,6 +74,11 @@ export function AppShell() {
       tradeDateFrom: query.get("trade_date_from") || undefined,
       tradeDateTo: query.get("trade_date_to") || undefined,
     }
+    : undefined;
+  const parsedAllocationOrderId = Number(query.get("allocation_order_id"));
+  const initialAllocationOrderId = active === "business" && rawBizTab === "ledger"
+    && Number.isInteger(parsedAllocationOrderId) && parsedAllocationOrderId > 0
+    ? parsedAllocationOrderId
     : undefined;
   const parsedInventoryAgeGtDays = Number(query.get("age_gt_days"));
   const initialInventoryAgeGtDays = active === "business" && rawBizTab === "inventory"
@@ -291,6 +297,7 @@ export function AppShell() {
                         initialTab={key === "business" ? businessTab : undefined}
                         initialMine={key === "business" && active === "business" ? businessMine : undefined}
                         initialLedgerFilters={key === "business" && active === "business" ? initialLedgerFilters : undefined}
+                        initialAllocationOrderId={key === "business" && active === "business" ? initialAllocationOrderId : undefined}
                         initialInventoryAgeGtDays={key === "business" && active === "business" ? initialInventoryAgeGtDays : undefined}
                         initialInstallmentStatus={key === "business" && active === "business" ? initialInstallmentStatus : undefined}
                         initialReportTab={key === "operations" && active === "operations" ? initialReportTab : undefined}

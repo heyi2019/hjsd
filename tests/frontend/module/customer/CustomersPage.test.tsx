@@ -169,6 +169,13 @@ describe("CustomersPage：客户档案", () => {
     expect(await screen.findByText("合作方档案 · CP-0001")).toBeInTheDocument();
     expect(screen.getByText("订单数")).toBeInTheDocument();
     expect(screen.getByText("累计利润")).toBeInTheDocument();
+    const orderCountCard = screen.getByTestId("counterparty-detail-order-count");
+    const profitCard = screen.getByTestId("counterparty-detail-profit");
+    const ordersHeading = screen.getByRole("heading", { name: "成单明细" });
+    expect(orderCountCard.compareDocumentPosition(ordersHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(profitCard.compareDocumentPosition(ordersHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(orderCountCard.closest(".ui-stat")).toBeInTheDocument();
+    expect(profitCard.closest(".ui-stat")).toBeInTheDocument();
     expect(screen.getByText("成单明细")).toBeInTheDocument();
     expect(screen.getByText("TH-2026-0010")).toBeInTheDocument();
   });

@@ -12,7 +12,7 @@ import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { money } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
 import { useListViewColumns } from "../shared/lib/listColumns";
-import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatusTag } from "../shared/ui";
+import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { collectExtras } from "./CustomersPage.fragments";
 
@@ -349,12 +349,6 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
           <div role="status" aria-label="正在加载合作方详情"><Spin /></div>
         ) : detailData ? (
           <>
-          {detailData.overview ? (
-            <div className="ui-stat-grid">
-              <Card size="small"><Typography.Text type="secondary">订单数</Typography.Text><Typography.Title level={4}>{detailData.overview.order_count}</Typography.Title></Card>
-              <Card size="small"><Typography.Text type="secondary">累计利润</Typography.Text><Typography.Title level={4}>{money(detailData.overview.cumulative_profit)}</Typography.Title></Card>
-            </div>
-          ) : null}
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="合作方编号">{detailData.counterparty_no}</Descriptions.Item>
             <Descriptions.Item label="名称">{detailData.display_name}</Descriptions.Item>
@@ -367,6 +361,15 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
             <Descriptions.Item label="创建操作人">{detailData.created_by || "-"}</Descriptions.Item>
             <Descriptions.Item label="备注">{detailData.note || "-"}</Descriptions.Item>
           </Descriptions>
+          {detailData.overview ? (
+            <StatRow
+              className="counterparty-detail-stats"
+              items={[
+                { label: "订单数", kind: "count", amount: detailData.overview.order_count, testId: "counterparty-detail-order-count" },
+                { label: "累计利润", amount: detailData.overview.cumulative_profit, kind: "money", testId: "counterparty-detail-profit" },
+              ]}
+            />
+          ) : null}
           <Typography.Title level={5} className="ui-title-spaced">成单明细</Typography.Title>
           <DataTable
             columns={[

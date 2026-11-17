@@ -1,7 +1,11 @@
 /** 工作台：优先动作 + 当前登录用户的轻量关注卡片。
  * 经营中心保留全局经营总览与人员筛选，工作台只展示当前用户自己的订单/收益。 */
 import { useState } from "react";
+import { normalizeError } from "../shared/api/client";
+import { notificationsApi } from "../shared/api/misc.api";
+import { ordersApi } from "../shared/api/orders.api";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
+import { appMessage } from "../shared/ui/appFeedback";
 import { CreateBusinessModal, type BusinessOrderType } from "../orders/CreateBusinessModal";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 import { BusinessAlerts, BusinessOverview } from "./BusinessOverview";
@@ -35,6 +39,27 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
     return `${path}${separator}trade_date_from=${encodeURIComponent(period.from)}&trade_date_to=${encodeURIComponent(period.to)}`;
   };
   const openDashboardPath = (path: string) => onDashboardNavigate?.(path);
+  const openPendingProfitAllocation = async () => {
+    if (!onDashboardNavigate) return;
+    try {
+      const { items } = await notificationsApi.list({ limit: 200, unread_only: true });
+      const notification = items.find((item) => item.notification_type === "PROFIT_PENDING" && item.entity_type === "order");
+      if (!notification) {
+        appMessage.warning("没有找到待配置分润的订单");
+        return;
+      }
+      const page = await ordersApi.listPage({ keyword: notification.entity_id, limit: 20, offset: 0 });
+      const order = page.items.find((item) => item.order_no === notification.entity_id);
+      if (!order) {
+        appMessage.warning(`未找到订单 ${notification.entity_id}`);
+        return;
+      }
+      onDashboardNavigate(`/business/ledger?allocation_order_id=${order.id}`);
+      void notificationsApi.markRead(notification.id).then(() => void loadSummary());
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
+    }
+  };
   const openCreate = (orderType: BusinessOrderType) => {
     setCreateType(orderType);
     setCreateOpen(true);
@@ -122,7 +147,12 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
           onInventoryOverdueClick={() => openDashboardPath("/business/inventory?age_gt_days=30")}
         />
         <ErrorBanner error={earningsError} onRetry={() => void loadSummary()} />
-        <BusinessAlerts alerts={businessAlerts} loading={summaryLoading} />
+        <BusinessAlerts
+          alerts={businessAlerts}
+          loading={summaryLoading}
+          onPendingProfitNotificationsClick={() => void openPendingProfitAllocation()}
+          onProfitNotificationsRead={() => void loadSummary()}
+        />
       </div>
 
       <CreateBusinessModal

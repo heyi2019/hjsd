@@ -109,6 +109,29 @@ def test_action_rows_can_omit_company_when_company_rate_is_configured(seeded_db)
     assert company["allocation_rate"] == "40.00"
 
 
+def test_action_amount_rows_keep_configured_company_share(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    assert order is not None
+    order.form_extra = {"business_responsible_ids": [1], "delivery_responsible_ids": [1]}
+    order.policy_snapshot = {"COMMISSION": {"config": {"split": {"COMPANY": "40"}}}}
+    seeded_db.flush()
+
+    rows = policy_allocations.set_allocations(
+        seeded_db,
+        order_id,
+        items=[
+            {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_rate": "33.33", "allocation_amount": "100"},
+            {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_rate": "33.33", "allocation_amount": "100"},
+            {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_rate": "0", "allocation_amount": "0"},
+        ],
+    )
+
+    company = next(row for row in rows if row["allocation_type"] == "COMPANY")
+    assert company["allocation_rate"] == "0.00"
+    assert company["allocation_amount"] == "200.00"
+
+
 def test_person_mode_allows_same_user_in_two_roles(seeded_db):
     """同一人可担任多个角色（对齐 DB 唯一约束 uq_order_profit_alloc），但同角色不可重复。"""
     order_id = _order_with_profit(seeded_db)

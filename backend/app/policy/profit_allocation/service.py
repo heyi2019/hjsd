@@ -199,6 +199,30 @@ def _expand_action_form_rows(
                 "allocation_amount": None,
             },
         ]
+    # 金额模式下公司仍按规则固定占比，转换为公司金额参与同一金额口径校验；
+    # 否则隐藏的公司比例会和动作金额混成两种口径，落库时公司份额被清零。
+    has_action_amount = any(
+        str(row.get("allocation_amount") or "").strip()
+        for row in rows
+        if str(row.get("allocation_type") or "").upper() != "COMPANY"
+    )
+    if has_action_amount:
+        company_amount = (order_profit * company_rate / Decimal("100")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        rows = [
+            (
+                {
+                    **row,
+                    "allocation_rate": None,
+                    "allocation_amount": str(company_amount),
+                }
+                if str(row.get("allocation_type") or "").upper() == "COMPANY"
+                and not str(row.get("allocation_amount") or "").strip()
+                else row
+            )
+            for row in rows
+        ]
     required = {"BUY", "SELL", "OPERATION", "COMPANY"}
     by_type: dict[str, dict[str, Any]] = {}
     for row in rows:

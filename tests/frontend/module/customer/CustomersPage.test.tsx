@@ -87,6 +87,7 @@ beforeEach(() => {
       completed_order_count: 0,
       cancelled_order_count: 0,
       last_trade_date: "2026-10-18",
+      cumulative_profit: "250.00",
       installment_paid_total: "100.00",
       installment_receivable_total: "1000.00",
       installment_remaining_total: "900.00",
@@ -349,7 +350,7 @@ describe("CustomersPage：行内动作", () => {
   ];
   const detail = {
     customer: customers[0],
-    overview: { order_count: 1, active_order_count: 1, completed_order_count: 0, cancelled_order_count: 0, last_trade_date: "2026-10-18", installment_paid_total: "100.00", installment_receivable_total: "1000.00", installment_remaining_total: "900.00", overdue_period_count: 1 },
+    overview: { order_count: 1, active_order_count: 1, completed_order_count: 0, cancelled_order_count: 0, last_trade_date: "2026-10-18", cumulative_profit: "250.00", installment_paid_total: "100.00", installment_receivable_total: "1000.00", installment_remaining_total: "900.00", overdue_period_count: 1 },
     business: [{ order_id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "STOCK", status: "ACTIVE", trade_date: "2026-10-18", roles: ["BUYER"] }],
     installments: [{ id: 20, inst_no: "HS-2026-0010-INS01", order_id: 10, order_no: "HS-2026-0010", contract_type: "STOCK_SALE", status: "OVERDUE", principal: "1000.00", total_receivable: "1000.00", paid_amount: "100.00", remaining_amount: "900.00", overdue_periods: 1, first_due_on: "2026-10-17" }],
     audit: [],

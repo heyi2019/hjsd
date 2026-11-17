@@ -225,6 +225,7 @@ export function customerDetail(customer: Customer, overrides: Partial<Omit<Custo
       completed_order_count: 0,
       cancelled_order_count: 0,
       last_trade_date: null,
+      cumulative_profit: "0.00",
       installment_paid_total: "0.00",
       installment_receivable_total: "0.00",
       installment_remaining_total: "0.00",

@@ -31,6 +31,8 @@ from app.domain.parties import (
 from app.domain.trade import InstallmentSchedule, OrderFormField
 from app.value_added_services import create as inst_create
 from app.orders.create import create_order
+from app.orders.events import post_event
+from app.stocks.profile import create_account
 from app.parties.counterparties import (
     create_counterparty,
     get_counterparty,
@@ -290,6 +292,41 @@ class TestListAndGetCustomers:
         assert detail["installments"][0]["remaining_amount"] == 500
         assert any(item["action"] == AuditAction.CUSTOMER_CREATE.value for item in detail["audit"])
         assert any(item["request_id"] == request_id for item in detail["audit"])
+
+    def test_customer_detail_includes_cumulative_profit(self, seeded_db):
+        customer = _customer(seeded_db, "利润客户")
+        profitable_account = create_account(
+            seeded_db, game_account="customer-profit-account", business_mode="SELF",
+            inventory_type="RECOVERY", actor="pytest",
+        )
+        loss_account = create_account(
+            seeded_db, game_account="customer-loss-account", business_mode="SELF",
+            inventory_type="RECOVERY", actor="pytest",
+        )
+        profitable = create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=date(2026, 10, 10),
+            customer_roles=[(customer.id, "BUYER")],
+            actor="pytest",
+            account_id=profitable_account.id,
+        )
+        loss = create_order(
+            seeded_db,
+            order_type="HS",
+            trade_date=date(2026, 10, 11),
+            customer_roles=[(customer.id, "BUYER")],
+            actor="pytest",
+            account_id=loss_account.id,
+        )
+        post_event(seeded_db, profitable.id, event_type="BUY", amount=100, occurred_on=date(2026, 10, 10), actor="pytest", pool_id=1)
+        post_event(seeded_db, profitable.id, event_type="SELL", amount=400, occurred_on=date(2026, 10, 10), actor="pytest", pool_id=1)
+        post_event(seeded_db, loss.id, event_type="BUY", amount=200, occurred_on=date(2026, 10, 11), actor="pytest", pool_id=1)
+        post_event(seeded_db, loss.id, event_type="SELL", amount=150, occurred_on=date(2026, 10, 11), actor="pytest", pool_id=1)
+
+        detail = get_customer_detail(seeded_db, customer.id)
+
+        assert detail["overview"]["cumulative_profit"] == 250
 
     def test_customer_detail_applies_order_owner_scope(self, seeded_db):
         customer = _customer(seeded_db, "范围客户", owner_id=9)

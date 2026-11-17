@@ -44,6 +44,7 @@ export interface CustomerOverview {
   completed_order_count: number;
   cancelled_order_count: number;
   last_trade_date?: string | null;
+  cumulative_profit: string;
   installment_paid_total: string;
   installment_receivable_total: string;
   installment_remaining_total: string;

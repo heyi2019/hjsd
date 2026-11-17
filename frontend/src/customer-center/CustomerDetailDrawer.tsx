@@ -97,6 +97,7 @@ export function CustomerDetailDrawer({
                     { label: "关联订单", amount: detailData.overview.order_count, kind: "count" },
                     { label: "进行中订单", amount: detailData.overview.active_order_count, kind: "count" },
                     { label: "已完成订单", amount: detailData.overview.completed_order_count, kind: "count" },
+                    { label: "累计利润", amount: detailData.overview.cumulative_profit, kind: "money" },
                     { label: "分期已收", amount: detailData.overview.installment_paid_total, kind: "money" },
                     { label: "分期应收", amount: detailData.overview.installment_receivable_total, kind: "money" },
                     { label: "剩余应收", amount: detailData.overview.installment_remaining_total, kind: "money", tone: "warn" },

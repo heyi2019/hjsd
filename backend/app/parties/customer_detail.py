@@ -14,6 +14,7 @@ from app.domain.enums import OrderStatus, ScheduleStatus
 from app.domain.foundation import AuditLog
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Installment, InstallmentSchedule, Order, OrderEvent
+from app.orders.amounts import order_cashflow_profit_by_order
 from app.value_added_services import _shared as inst_shared
 
 from .customers import get_customer
@@ -197,6 +198,10 @@ def get_customer_detail(
     last_trade_date = max(
         (item["trade_date"] for item in orders), default=None
     )
+    cumulative_profit = sum(
+        order_cashflow_profit_by_order(session, order_ids=order_ids).values(),
+        Decimal("0.00"),
+    )
     return {
         "overview": {
             "order_count": len(orders),
@@ -212,6 +217,7 @@ def get_customer_detail(
                 item["status"] == OrderStatus.CANCELLED.value for item in orders
             ),
             "last_trade_date": last_trade_date,
+            "cumulative_profit": to_money(cumulative_profit),
             "installment_paid_total": paid_total,
             "installment_receivable_total": receivable_total,
             "installment_remaining_total": receivable_total - paid_total,

@@ -101,6 +101,7 @@ class CustomerOverviewOut(BaseModel):
     completed_order_count: int
     cancelled_order_count: int
     last_trade_date: date | None = None
+    cumulative_profit: Decimal
     installment_paid_total: Decimal
     installment_receivable_total: Decimal
     installment_remaining_total: Decimal

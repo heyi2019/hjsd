@@ -26,7 +26,7 @@ from app.auth.session import (
 )
 from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction, Nature
 from app.domain.trade import Account, OrderEvent
-from app.foundation.pools import require_default_pool
+from app.field_definitions.pools import require_default_pool
 from app.orders import schemas
 from app.shared.order_access import get_order as orders_get_order
 from app.orders.cancellation_model import cancel_order as orders_cancel_order

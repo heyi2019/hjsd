@@ -8,7 +8,7 @@ from app.core.security import CurrentUser
 from app.domain.trade import Cashflow, Order, OrderEvent
 from app.domain.enums import CashflowSourceType
 from app.domain.users import User
-from app.foundation.pools import assert_pool_usable
+from app.field_definitions.pools import assert_pool_usable
 
 from .schemas import ExecutionCashflowEditItem
 

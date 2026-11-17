@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from app.core.errors import ErrorCode
-from app.foundation.classification import classification_for_order_type
+from app.field_definitions.classification import classification_for_order_type
 
 ORDER_TYPES = "/api/v1/order-types"
 

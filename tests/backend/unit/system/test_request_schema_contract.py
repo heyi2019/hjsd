@@ -28,7 +28,7 @@ from app.finance.schemas import (
     TransferCreate,
     TransferRepair,
 )
-from app.foundation.schemas import (
+from app.field_definitions.schemas import (
     OrderTypeCreate,
     OrderTypeUpdate,
     PoolCreate,

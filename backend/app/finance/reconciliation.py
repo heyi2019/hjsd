@@ -18,7 +18,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, Direction, ReconciliationStatus
 from app.domain.trade import Cashflow, Reconciliation
 from app.shared.form_field_rules import validate_form_extra
-from app.foundation.pools import assert_pool_usable
+from app.field_definitions.pools import assert_pool_usable
 
 from ._common import _non_negative, _text
 

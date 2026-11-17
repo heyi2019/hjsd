@@ -12,8 +12,8 @@ from typing import Any
 from app.shared.audit import record_audit
 from app.core.security import CurrentUser
 from app.domain.users import User
-from app.foundation.order_types import get_order_type_by_code
-from app.foundation.sequences import next_order_no
+from app.field_definitions.order_types import get_order_type_by_code
+from app.field_definitions.sequences import next_order_no
 from app.shared.form_field_rules import validate_business_responsible, validate_form_extra
 from app.customer_center.counterparties import assert_counterparty_usable
 from app.customer_center.customer_merge import assert_customer_usable

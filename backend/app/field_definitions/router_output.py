@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.foundation import schemas
-from app.foundation.classification import classification_for_order_type
+from app.field_definitions import schemas
+from app.field_definitions.classification import classification_for_order_type
 from app.shared.form_values import get_extra_values
 
 

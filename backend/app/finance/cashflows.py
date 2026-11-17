@@ -37,7 +37,7 @@ from app.finance.attributes import (
     assert_order_cost_attribute,
     derive_manual_cashflow_nature,
 )
-from app.foundation.pools import assert_pool_usable
+from app.field_definitions.pools import assert_pool_usable
 from app.shared.order_access import get_order
 from app.shared.form_field_rules import validate_form_extra
 from app.shared.form_values import set_extra_values

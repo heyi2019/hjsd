@@ -21,9 +21,9 @@ from app.domain.enums import (
     PoolType,
     SequenceKey,
 )
-from app.foundation.game_types import create_game_type, list_game_types
-from app.foundation.order_types import create_order_type, get_order_type_by_code
-from app.foundation.pools import create_pool, get_default_pool, get_pool_by_code
+from app.field_definitions.game_types import create_game_type, list_game_types
+from app.field_definitions.order_types import create_order_type, get_order_type_by_code
+from app.field_definitions.pools import create_pool, get_default_pool, get_pool_by_code
 
 SEED_ACTOR = "system"
 

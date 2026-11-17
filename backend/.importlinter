@@ -10,7 +10,7 @@
 #   L2  shared     跨业务域共享原语：被 ≥2 个业务域引用、自身不属于任何
 #                  业务域、只依赖 L0+L1。依赖 L0+L1，**不依赖任何业务域**。
 #   L3  业务域     orders / customer_center / finance / stocks / policy /
-#                  installments / foundation / reporting / workbench /
+#                  installments / field_definitions / reporting / workbench /
 #                  lists / auth / audit / attachments / imports / options /
 #                  notifications。依赖 L0+L1+L2。
 #
@@ -37,7 +37,10 @@
 #   2026-11-18 域改名（方案 C：命名对齐前端口径；**API URL 一律不变**）：
 #     app/parties/              → app/customer_center/
 #     app/value_added_services/ → app/installments/
-#     （app/foundation/ 待拆为 pools + field_definitions）
+#     app/foundation/           → app/field_definitions/
+#     （后端 finance 保持不动：前端 pools/ 是「资金中心」页面，对应后端
+#       finance 域；foundation/pools.py 是「资金池主数据」，属设置，已随
+#       foundation 一并归入 field_definitions。）
 #
 #   底座纯化：
 #     core/database.py 的 Base + create_all → domain/base.py（Base 是 ORM 的东西）
@@ -48,7 +51,7 @@
 #
 #   reporting / workbench  → 各业务域（只读聚合层）
 #   finance / installments / policy → orders
-#   orders → customer_center / foundation / stocks / policy
+#   orders → customer_center / field_definitions / stocks / policy
 #
 # 运行：backend 目录下执行 lint-imports（CI lint-gate 同步强制）。
 # 纪律：整边豁免；归位一批、收紧一批，使豁免清单单调收紧。
@@ -78,7 +81,7 @@ forbidden_modules =
     app.stocks
     app.policy
     app.installments
-    app.foundation
+    app.field_definitions
     app.reporting
     app.workbench
     app.lists

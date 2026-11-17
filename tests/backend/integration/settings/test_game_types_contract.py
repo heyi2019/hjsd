@@ -9,14 +9,14 @@ from __future__ import annotations
 import pytest
 
 from app.core.errors import NotFound, Validation
-from app.foundation.game_types import (
+from app.field_definitions.game_types import (
     create_game_type,
     list_game_types,
     set_game_type_active,
     set_game_type_default,
     update_game_type,
 )
-from app.foundation.game_types import _get_game_type_or_404
+from app.field_definitions.game_types import _get_game_type_or_404
 
 
 class TestGameTypeService:

@@ -18,7 +18,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 from app.core.security import CurrentUser
-from app.foundation.classification import classification_for_order_type
+from app.field_definitions.classification import classification_for_order_type
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.domain.trade import Order

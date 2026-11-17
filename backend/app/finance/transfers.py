@@ -18,7 +18,7 @@ from app.domain.enums import AccountingAttribute, AuditAction, CashflowSourceTyp
 from app.domain.trade import Cashflow
 from app.shared.form_field_rules import validate_form_extra
 from app.finance.balances import pool_balance
-from app.foundation.pools import assert_pool_usable
+from app.field_definitions.pools import assert_pool_usable
 
 from ._common import _positive, _text
 

@@ -25,8 +25,8 @@ from app.auth.session import (
     get_current_user,
     require_permissions,
 )
-from app.foundation import schemas
-from app.foundation.game_types import (
+from app.field_definitions import schemas
+from app.field_definitions.game_types import (
     create_game_type as foundation_create_game_type,
     delete_game_type as foundation_delete_game_type,
     list_game_types as foundation_list_game_types,
@@ -34,20 +34,20 @@ from app.foundation.game_types import (
     set_game_type_default as foundation_set_game_type_default,
     update_game_type as foundation_update_game_type,
 )
-from app.foundation.order_types import (
+from app.field_definitions.order_types import (
     create_order_type as foundation_create_order_type,
     list_order_types as foundation_list_order_types,
     set_order_type_active as foundation_set_order_type_active,
     update_order_type as foundation_update_order_type,
 )
-from app.foundation.pools import (
+from app.field_definitions.pools import (
     create_pool as foundation_create_pool,
     delete_pool as foundation_delete_pool,
     list_pools as foundation_list_pools,
     set_pool_status as foundation_set_pool_status,
     update_pool as foundation_update_pool,
 )
-from app.foundation.sequences import list_sequences as foundation_list_sequences
+from app.field_definitions.sequences import list_sequences as foundation_list_sequences
 from app.shared.form_values import get_extra_values_bulk
 
 from app.core.actor import actor_name as _actor

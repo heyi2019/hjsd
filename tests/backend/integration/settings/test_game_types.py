@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.errors import Validation
-from app.foundation.game_types import (
+from app.field_definitions.game_types import (
     create_game_type,
     delete_game_type,
     list_game_types,

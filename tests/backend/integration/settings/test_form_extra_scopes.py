@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from app.core.errors import Validation
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
-from app.foundation.catalog_seed import seed_catalog
+from app.field_definitions.catalog_seed import seed_catalog
 from app.domain.form_scopes import FORM_SCOPES
 from app.shared.form_field_rules import validate_business_responsible, validate_form_extra
 from app.stocks.profile import update_account_profile
@@ -298,7 +298,7 @@ def test_sale_scopes_have_independent_field_sets(seeded_db):
     from sqlalchemy import func, select
 
     from app.domain.trade_models.form_config import OrderFormField
-    from app.foundation.catalog_seed import seed_catalog
+    from app.field_definitions.catalog_seed import seed_catalog
     from app.domain.form_scopes import SCOPE_CODES
 
     seed_catalog(seeded_db, actor="pytest")

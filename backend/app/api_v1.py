@@ -20,7 +20,7 @@ from app.core.errors import AppError, ErrorCode
 from app.core.settings import Settings, get_settings
 from app.core.request_context import reset_request_id, set_request_id
 from app.core.schemas import EngineInfoOut, HealthOut
-from app.foundation.router import router as foundation_router
+from app.field_definitions.router import router as foundation_router
 from app.stocks.router import router as stocks_router
 from app.audit.router import router as audit_router
 from app.imports.router import router as imports_router

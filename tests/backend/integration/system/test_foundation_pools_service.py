@@ -6,9 +6,9 @@ import pytest
 from app.core.errors import AppError, ErrorCode
 from app.domain.enums import AuditAction, PoolOwnership, PoolStatus
 from app.domain.foundation import AuditLog
-from app.foundation import pools as pools_service
-from app.foundation.order_types import list_order_types
-from app.foundation.pools import (
+from app.field_definitions import pools as pools_service
+from app.field_definitions.order_types import list_order_types
+from app.field_definitions.pools import (
     assert_pool_usable,
     create_pool,
     delete_pool,
@@ -16,7 +16,7 @@ from app.foundation.pools import (
     set_pool_status,
     update_pool,
 )
-from app.foundation.seeds import seed_foundation
+from app.field_definitions.seeds import seed_foundation
 
 
 class TestSeed:
@@ -129,7 +129,7 @@ class TestPools:
             captured["values"] = dict(values)
             return {}
 
-        monkeypatch.setattr("app.foundation.pools.set_extra_values", _spy)
+        monkeypatch.setattr("app.field_definitions.pools.set_extra_values", _spy)
         updated = update_pool(
             db, pool.id, actor="pytest", extra_values={"game": "王者"}
         )
@@ -151,7 +151,7 @@ class TestDefaultPoolAndLookup:
     """Task #5 补口：默认资金账户语义（2026-11-17 路由下线后）与代码查找分支。"""
 
     def test_require_pool_by_code_raises_resource_not_found(self, db):
-        from app.foundation.pools import require_pool_by_code
+        from app.field_definitions.pools import require_pool_by_code
 
         pool = create_pool(db, code="TMPLK", name="查找池", actor="pytest")
         db.commit()
@@ -163,7 +163,7 @@ class TestDefaultPoolAndLookup:
 
     def test_require_default_pool_raises_when_no_default(self, db):
         """两个活动池且无 is_default：无法确定唯一默认账户，须拒绝落账。"""
-        from app.foundation.pools import require_default_pool
+        from app.field_definitions.pools import require_default_pool
 
         create_pool(db, code="TMPD1", name="甲池", actor="pytest")
         create_pool(db, code="TMPD2", name="乙池", actor="pytest")

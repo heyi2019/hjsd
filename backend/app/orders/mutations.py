@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from typing import Any
 from app.shared.audit import record_audit
 from app.core.security import CurrentUser
-from app.foundation.order_types import get_order_type_by_code
+from app.field_definitions.order_types import get_order_type_by_code
 from app.shared.form_field_rules import validate_form_extra
 from app.shared.form_values import set_extra_values
 from app.shared.order_access import get_order

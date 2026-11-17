@@ -64,8 +64,8 @@ from app.domain import (  # noqa: E402
     trade,
     users,
 )
-from app.foundation.seeds import seed_foundation  # noqa: E402
-from app.foundation.catalog_seed import seed_catalog  # noqa: E402
+from app.field_definitions.seeds import seed_foundation  # noqa: E402
+from app.field_definitions.catalog_seed import seed_catalog  # noqa: E402
 
 __all__ = [
     "attachments", "foundation", "imports", "lists", "notifications",

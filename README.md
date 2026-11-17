@@ -80,7 +80,7 @@ cd frontend && npm run build
 |---|---|
 | `backend/app/core` | settings / database / money / errors / security / audit / numbering |
 | `backend/app/domain` | 当前 ORM 模型与领域对象 |
-| `backend/app` 领域包 | 20 个已挂载 router：`foundation` `customer_center` `orders` + `orders.form_fields` `installments` `finance` `stocks` `reporting` `policy` `notifications` `imports` `audit` `auth` + `auth.admin`（人员）+ `auth.teams` `attachments` `options` `lists`；`core`/`domain` 为基础设施与 ORM，`shared` 为跨域共享原语（无独立 router） |
+| `backend/app` 领域包 | 20 个已挂载 router：`field_definitions` `customer_center` `orders` + `orders.form_fields` `installments` `finance` `stocks` `reporting` `policy` `notifications` `imports` `audit` `auth` + `auth.admin`（人员）+ `auth.teams` `attachments` `options` `lists`；`core`/`domain` 为基础设施与 ORM，`shared` 为跨域共享原语（无独立 router） |
 | `backend/alembic/squashed_versions` | **活动迁移链**：只有 `0001_current_schema_baseline`，head = `0001`（`alembic.ini` 的 `version_locations` 只指向此目录；改 ORM 即改基线，不再加增量迁移） |
 | `backend/alembic/squashed_versions` | 唯一活动迁移基线 `0001`，用于全新 PostgreSQL 数据库初始化 |
 | `tests/backend` | 后端测试（pytest，111 个文件） |

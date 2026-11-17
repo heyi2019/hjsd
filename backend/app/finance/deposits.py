@@ -25,7 +25,7 @@ from app.domain.enums import (
     Nature,
 )
 from app.domain.trade import Cashflow, Deposit
-from app.foundation.pools import assert_pool_usable
+from app.field_definitions.pools import assert_pool_usable
 from app.shared.order_access import get_order
 from app.shared.form_field_rules import validate_form_extra
 from app.customer_center.counterparties import assert_counterparty_usable

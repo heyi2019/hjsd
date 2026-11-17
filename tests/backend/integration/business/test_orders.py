@@ -11,7 +11,7 @@ from app.stocks.profile import create_account
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
 from app.domain.foundation import Pool
-from app.foundation.order_types import get_order_type_by_code
+from app.field_definitions.order_types import get_order_type_by_code
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.installments import create as inst_create
@@ -323,7 +323,7 @@ class TestEventRules:
             )
 
     def test_disabled_pool_rejects_new_order_event(self, seeded_db):
-        from app.foundation.pools import set_pool_status
+        from app.field_definitions.pools import set_pool_status
 
         set_pool_status(seeded_db, 1, "DISABLED", actor="pytest")
         order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")

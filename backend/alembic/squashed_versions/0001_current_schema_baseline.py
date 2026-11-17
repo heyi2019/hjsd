@@ -2,7 +2,7 @@
 
 压平口径：
 - **基线 schema 随 ORM 走**：直接 `Base.metadata.create_all()` 建立压平时的 schema；后续需要保留数据的结构变化使用版本化 DDL 迁移；
-- **种子随 blob 走**：`option_sets` / `order_form_fields` 由 `app.foundation.catalog_seed`
+- **种子随 blob 走**：`option_sets` / `order_form_fields` 由 `app.field_definitions.catalog_seed`
   的内嵌 base64+zlib blob 提供，新增内置字段要更新 blob，而不是再加一条 seed 迁移；
 - 新数据库直接 ``alembic upgrade head`` 初始化；已有数据库按版本迁移。
 
@@ -15,8 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.domain.base import Base
 from app.domain import attachments, foundation, imports, lists, notifications, options, parties, trade, users  # noqa: F401
-from app.foundation.seeds import seed_foundation
-from app.foundation.catalog_seed import seed_catalog
+from app.field_definitions.seeds import seed_foundation
+from app.field_definitions.catalog_seed import seed_catalog
 
 # 导入模块会向 Base.metadata 注册全部当前模型；元组同时让该副作用显式可见。
 _DOMAIN_MODULES = (attachments, foundation, imports, lists, notifications, options, parties, trade, users)

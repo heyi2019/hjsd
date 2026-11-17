@@ -24,7 +24,7 @@ from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from app.core.settings import get_settings  # noqa: E402
-from app.foundation.seeds import seed_is_applied  # noqa: E402
+from app.field_definitions.seeds import seed_is_applied  # noqa: E402
 
 
 def run_migration() -> int:

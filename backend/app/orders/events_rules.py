@@ -13,8 +13,8 @@ from app.shared.audit import record_audit
 from app.shared.business_numbering import event_no as next_event_no
 from app.core.money import to_money
 from app.domain.foundation import Pool
-from app.foundation.order_types import get_order_type_by_code
-from app.foundation.pools import require_default_pool
+from app.field_definitions.order_types import get_order_type_by_code
+from app.field_definitions.pools import require_default_pool
 from ._common import _required_text
 from .cancellation_model import (
     apply_cancellation_account_effect,

@@ -23,7 +23,7 @@ from app.domain.enums import (
 )
 from app.domain.trade import Cashflow, OrderEvent, RebateRecord
 from app.domain.users import User
-from app.foundation.pools import require_default_pool
+from app.field_definitions.pools import require_default_pool
 from app.shared.order_access import get_order
 from app.orders.events import post_event
 from app.shared.form_field_rules import validate_form_extra

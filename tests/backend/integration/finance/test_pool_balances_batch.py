@@ -16,7 +16,7 @@ from decimal import Decimal
 
 from app.domain.enums import Direction, Nature, PoolOwnership
 from app.finance.cashflows import create_cashflow
-from app.foundation.pools import create_pool
+from app.field_definitions.pools import create_pool
 
 TODAY = date(2026, 10, 4)
 

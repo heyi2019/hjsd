@@ -1,7 +1,7 @@
 """MASTER-01 T20 / 选项词典（option_sets）API：只读查询 + 管理端点 + 死枚举防改。"""
 from __future__ import annotations
 
-from app.foundation.catalog_seed import seed_catalog
+from app.field_definitions.catalog_seed import seed_catalog
 
 OPTION_SETS = "/api/v1/option-sets"
 

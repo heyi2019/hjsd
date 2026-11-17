@@ -35,7 +35,7 @@ from app.domain.foundation import AuditLog
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
 from app.domain.users import User
-from app.foundation.order_types import get_order_type_by_code, set_order_type_active
+from app.field_definitions.order_types import get_order_type_by_code, set_order_type_active
 from app.orders import schemas
 from app.shared.order_access import get_order
 from app.orders.cancellation_model import cancel_order

@@ -1,7 +1,7 @@
 """按业务域 / 模块 / 测试类型执行后端分组回归，避免日常开发默认跑全量套件。
 
 三种执行维度（详见 docs/testing/测试规范.md）：
-  - 业务域分组（历史）：orders/finance/parties/foundation/... 保留可用。
+  - 业务域分组（历史）：orders/finance/customer_center/field_definitions/... 保留可用。
   - 模块分组：module A-F/SYS  —— 一个模块的全部后端(UT+IT) + 前端测试。
   - 测试类型：type ut/it/e2e  —— 单元 / 集成 / 端到端。
   - 跨模块：cross            —— FLOW-* 跨模块流程测试（B↔D 等）。
@@ -351,7 +351,7 @@ def _groups_for_source_path(path: str) -> set[str]:
     """源码路径 → 业务域组。规则与历史 groups_for_changes 完全一致，抽出来供
     选测与「结构性变更」判定共用，避免两份 token 规则各自漂移。"""
     selected: set[str] = set()
-    if path.startswith("backend/app/foundation/") or "foundation" in path \
+    if path.startswith("backend/app/field_definitions/") or "foundation" in path \
         or "order_type" in path or "pool" in path or "live_field" in path:
         selected.add("foundation")
     if "account" in path:

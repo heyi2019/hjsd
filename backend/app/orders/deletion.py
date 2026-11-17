@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import Validation
 from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, CashflowSourceType
@@ -31,7 +31,7 @@ from app.domain.trade import (
     RebateRecord,
 )
 
-from ._shared import get_order
+from app.shared.order_access import get_order
 
 
 @dataclass(frozen=True)

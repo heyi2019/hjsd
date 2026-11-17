@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.database import get_db
 from app.core.errors import NotFound
 from app.core.security import (
@@ -17,6 +17,8 @@ from app.core.security import (
     PERM_ORDER_UPDATE,
     PERM_ORDER_EVENT_POST,
     CurrentUser,
+)
+from app.auth.session import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
@@ -31,9 +33,9 @@ from app.value_added_services import settlement as inst_settlement
 from app.lists import service as list_columns_service
 from app.lists.export import build_list_csv, detail_json
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
-from app.parties.fields import get_extra_values_bulk
+from app.shared.form_values import get_extra_values_bulk
 from app.core.actor import actor_name as _actor
-from app.core.operation_operators import (
+from app.shared.operation_operators import (
     get_operation_operators,
     list_operation_operators_bulk,
     upsert_operation_operators,

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from typing import Any
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.domain.users import User
 from sqlalchemy import select
 from sqlalchemy.orm import Session

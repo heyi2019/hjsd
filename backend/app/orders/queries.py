@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import date
 from app.core.like_pattern import like_contains
 from app.core.security import CurrentUser
-from app.core.security import owner_scope_filter
+from app.shared.scope import owner_scope_filter
 from sqlalchemy import (
     cast,
     exists,

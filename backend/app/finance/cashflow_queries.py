@@ -23,7 +23,8 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
 from app.core.money import to_money
-from app.core.security import CurrentUser, owner_scope_filter
+from app.core.security import CurrentUser
+from app.shared.scope import owner_scope_filter
 from app.domain.enums import CashflowLedgerType, CashflowSourceType, Direction
 from app.domain.trade import Cashflow, Order
 from app.finance.attributes import (
@@ -31,7 +32,7 @@ from app.finance.attributes import (
     STUDIO_EXPENSE_ATTRIBUTE,
     STUDIO_INCOME_ATTRIBUTE,
 )
-from app.parties.fields import get_extra_values_bulk
+from app.shared.form_values import get_extra_values_bulk
 
 
 def _like_pattern(keyword: str) -> str:

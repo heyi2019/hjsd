@@ -10,8 +10,9 @@ from app.core.errors import AuthError, PermissionDenied, RateLimited
 from app.core.ratelimit import login_limiter
 from app.core.schemas import RequestModel
 from app.core.security import (
-    PERM_ORDER_CREATE, PERM_REPORT_READ, CurrentUser, build_access_token, get_current_user, decode_token, verify_password,
+    PERM_ORDER_CREATE, PERM_REPORT_READ, CurrentUser, build_access_token, decode_token, verify_password,
 )
+from app.auth.session import get_current_user
 from app.core.settings import get_settings
 from app.domain.users import Team, User
 from app.auth import service

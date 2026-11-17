@@ -12,6 +12,8 @@ from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
     CurrentUser,
+)
+from app.auth.session import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
@@ -23,7 +25,7 @@ from app.stocks.inventory import (
 )
 from app.stocks.deletion import delete_inventory as stocks_delete_inventory
 from app.stocks.export import build_inventory_ledger_csv
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import PermissionDenied
 
 from .schemas import (

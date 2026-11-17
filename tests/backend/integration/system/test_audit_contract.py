@@ -12,7 +12,7 @@ from datetime import date
 
 from sqlalchemy import select
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 

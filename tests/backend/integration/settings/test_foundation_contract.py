@@ -34,7 +34,7 @@ from app.foundation.pools import (
     set_pool_status,
     update_pool,
 )
-from app.core.numbering import ensure_sequence, peek_number
+from app.shared.numbering import ensure_sequence, peek_number
 from app.orders.create import create_order
 
 
@@ -285,7 +285,7 @@ class TestFoundationApi:
         设真实序列行到上限来触发分支，而不是 mock 路由层内部符号：
         这样断言的是对外行为，重构内部实现（如改为按已加载行直接格式化）不会误伤。
         """
-        from app.core.numbering import sequence_max
+        from app.shared.numbering import sequence_max
         from app.domain.foundation import DocumentSequence
 
         target = seeded_db.scalar(
@@ -328,7 +328,7 @@ class TestFoundationApi:
         self, seeded_client, seeded_db, headers
     ):
         """5 位序列真耗尽时占位文本写真实上限 99999（非硬编码 9999）。"""
-        from app.core.numbering import sequence_max
+        from app.shared.numbering import sequence_max
         from app.domain.enums import SequenceKey
         from app.domain.foundation import DocumentSequence
 

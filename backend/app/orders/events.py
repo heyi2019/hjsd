@@ -8,11 +8,11 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
-from app.core.business_numbering import event_no as next_event_no
+from app.shared.audit import record_audit
+from app.shared.business_numbering import event_no as next_event_no
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.money import to_money
-from app.core.numbering import allocate_flow_no
+from app.shared.numbering import allocate_flow_no
 from app.core.security import CurrentUser
 from app.core.time import now_second
 from app.core.state_machine import ORDER_TRANSITIONS, transition
@@ -31,7 +31,7 @@ from app.domain.enums import (
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.domain.users import User
 from app.domain.cashflow_attributes import accounting_attribute_for_order_event
-from app.orders.form_fields import validate_form_extra
+from app.shared.form_field_rules import validate_form_extra
 from ._common import (
     _non_negative_money,
     _positive_money,
@@ -97,7 +97,7 @@ def post_event(
     allow_installment_delivery: bool = False,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
-    from ._shared import get_order
+    from app.shared.order_access import get_order
 
     allow_installment_delivery = _required_bool(
         allow_installment_delivery, field="allow_installment_delivery"

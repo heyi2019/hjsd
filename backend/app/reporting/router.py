@@ -8,11 +8,13 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.security import (
     PERM_REPORT_EXPORT,
     PERM_REPORT_READ,
     CurrentUser,
+)
+from app.auth.session import (
     require_permissions,
 )
 from app.lists.export import build_list_csv

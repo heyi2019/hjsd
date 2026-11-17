@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from datetime import date
 from decimal import Decimal
 from typing import Any
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.security import CurrentUser
 from app.domain.enums import CashflowSourceType, Direction, Nature
 from app.domain.cashflow_attributes import accounting_attribute_for_order_event
@@ -22,7 +22,7 @@ from app.core.errors import (
     Validation,
 )
 from app.core.money import to_money
-from app.core.operation_operators import upsert_operation_operators
+from app.shared.operation_operators import upsert_operation_operators
 from app.core.state_machine import (
     INSTALLMENT_TRANSITIONS,
     ORDER_TRANSITIONS,

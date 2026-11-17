@@ -18,7 +18,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import EventType, OperationType
 from app.domain.trade import Cashflow, OrderEvent
 
-from ._shared import get_order
+from app.shared.order_access import get_order
 from .events import post_event as _post_event
 
 

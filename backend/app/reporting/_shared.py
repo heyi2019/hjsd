@@ -12,7 +12,7 @@ from typing import Any
 from app.core.errors import Validation
 from app.core.money import to_money_or_zero
 from app.core.security import CurrentUser
-from app.core.security import owner_scope_filter
+from app.shared.scope import owner_scope_filter
 from sqlalchemy import (
     and_,
     case,
@@ -25,7 +25,7 @@ from app.domain.trade import (
     Cashflow,
     Order,
 )
-from app.orders.amounts import (
+from app.shared.order_amounts import (
     business_cashflow_filter,
     order_profit_flow_by_order,
 )

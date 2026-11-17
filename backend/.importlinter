@@ -1,27 +1,90 @@
-# Import Linter 契约（2026-11-17 架构评估 P0-B 落地）
+# Import Linter 契约（2026-11-17 P0-B 落地；2026-11-18 重写为四层模型）
 #
-# 背景：orders 被五个域引用是最上游；但实测发现三处双向依赖（环），
-# 代码里已出现「函数内延迟 import」补丁（events.py:60 / router.py:249 / deletion.py:84），
-# 这是循环依赖的典型症状。本文件固化合法依赖方向：
+# ─────────────────────────────────────────────────────────────────────────
+# 分层模型（第一性原理：每个包只允许依赖它下面的层）
 #
-#   合法方向（下游 -> 上游实体域）：
-#     finance / value_added_services / policy / reporting / stocks -> orders
-#     reporting / value_added_services -> finance
+#   L0  core       纯技术底座：连接、金额、时间、令牌、权限常量、CSV。
+#                  **零 ORM 依赖**——不 import app.domain。
+#   L1  domain     ORM 模型 + 枚举 + 跨域共享的纯领域知识（会计属性映射、
+#                  表单作用域清单）。依赖 L0。
+#   L2  shared     跨业务域共享原语：被 ≥2 个业务域引用、自身不属于任何
+#                  业务域、只依赖 L0+L1。依赖 L0+L1，**不依赖任何业务域**。
+#   L3  业务域     orders / parties / finance / stocks / policy /
+#                  value_added_services / foundation / reporting / workbench /
+#                  lists / auth / audit / attachments / imports / options /
+#                  notifications。依赖 L0+L1+L2。
 #
-#   禁止的反向边（P0-A 已全部消灭，2026-11-18，三批归位）：
-#     orders -> finance          已归位：会计属性移 domain 层、余额端点移 finance 域、
-#                                初始成本挂账改 app/orders/collaboration.py 注册点
-#     orders -> value_added_services 已归位：SELL 回收联动改 collaboration 注册点
-#     stocks -> orders           已归位：FORM_SCOPES 移 domain 层（断 lists 间接环）；
-#                                导出/台账/删除联动改 app/stocks/collaboration.py 注册点
+# ─────────────────────────────────────────────────────────────────────────
+# 2026-11-18 实测（AST 静态分析 211 文件）与归位成果
+#
+#   归位前：2 环 5 个、3 环 16 个、4 环 22 个；门禁报「3 kept, 0 broken」
+#           却漏掉全部真实环——因为契约只锁了「已归位的那三条边」，
+#           没锁分层原则本身。
+#   归位后：**2 环 / 3 环 / 4 环 全部清零**。
+#
+#   共享原语归位（跨域原语原先藏在某个业务域内，导致该域被所有域反向依赖）：
+#     app/shared/order_amounts.py     ← orders/amounts.py      （利润口径唯一权威）
+#     app/shared/order_access.py       ← orders/_shared.py:get_order
+#     app/shared/form_values.py        ← parties/fields.py      （扩展字段读写）
+#     app/shared/form_field_rules.py   ← orders/form_field_rules.py
+#     app/shared/installment_amounts.py← value_added_services/_shared.py:total_receivable
+#     app/shared/audit.py              ← core/audit.py
+#     app/shared/numbering.py          ← core/numbering.py
+#     app/shared/business_numbering.py ← core/business_numbering.py
+#     app/shared/operation_operators.py← core/operation_operators.py
+#     app/shared/scope.py              ← auth/session.py:owner_scope_*
+#
+#   底座纯化：
+#     core/database.py 的 Base + create_all → domain/base.py（Base 是 ORM 的东西）
+#     core/security.py 的查库三段 → auth/session.py（认证本就是业务域）
+#
+# ─────────────────────────────────────────────────────────────────────────
+# 合法依赖方向（L3 业务域之间仍允许单向依赖，但不得成环）
+#
+#   reporting / workbench  → 各业务域（只读聚合层）
+#   finance / value_added_services / policy → orders
+#   orders → parties / foundation / stocks / policy
 #
 # 运行：backend 目录下执行 lint-imports（CI lint-gate 同步强制）。
-# 豁免纪律：整边豁免（行级豁免对延迟 import / 多符号 as 导入匹配不稳定）——
-#           归位一批、收紧一批，使豁免清单单调收紧（与 lint_baseline.txt 同一套方法论）。
+# 纪律：整边豁免；归位一批、收紧一批，使豁免清单单调收紧。
 
 [importlinter]
 root_package = app
 
+# ── L0 core：纯技术底座，不得触碰 ORM ───────────────────────────────────
+[importlinter:contract:core-not-import-domain]
+name = core 不得依赖 domain（core 是零 ORM 依赖的纯技术底座）
+type = forbidden
+source_modules =
+    app.core
+forbidden_modules =
+    app.domain
+
+# ── L2 shared：共享原语层，不得反向依赖任何业务域 ────────────────────────
+[importlinter:contract:shared-not-import-domains]
+name = shared 不得依赖任何业务域（共享原语只允许依赖 core + domain）
+type = forbidden
+source_modules =
+    app.shared
+forbidden_modules =
+    app.orders
+    app.parties
+    app.finance
+    app.stocks
+    app.policy
+    app.value_added_services
+    app.foundation
+    app.reporting
+    app.workbench
+    app.lists
+    app.auth
+    app.audit
+    app.attachments
+    app.imports
+    app.options
+    app.notifications
+
+# ── 业务域之间的既成禁止边（2026-11-18 P0-A 归位成果，保持不放松）────────
 [importlinter:contract:orders-not-import-finance]
 name = orders 不得依赖 finance（合法方向只有 finance -> orders）
 type = forbidden

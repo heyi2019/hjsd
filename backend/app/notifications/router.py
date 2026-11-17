@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import (
     CurrentUser,
+)
+from app.auth.session import (
     get_current_user,
 )
 from app.notifications import schemas, service

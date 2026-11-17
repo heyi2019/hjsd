@@ -10,6 +10,8 @@ from app.core.database import get_db
 from app.core.security import (
     PERM_IMPORT_MANAGE,
     CurrentUser,
+)
+from app.auth.session import (
     require_permissions,
 )
 from app.imports import schemas

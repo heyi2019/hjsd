@@ -29,7 +29,7 @@ from app.domain.trade import (
     InstallmentDisposition,
     OrderEvent,
 )
-from app.orders.amounts import (
+from app.shared.order_amounts import (
     ZERO,
     event_contribution,
     event_totals,

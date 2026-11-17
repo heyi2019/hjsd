@@ -11,7 +11,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import AuthError, Conflict, Validation
 from app.core.phone import assert_valid_phone, normalize_phone
 from app.core.security import ALL_ROLES, OWNER_SCOPES, hash_password, verify_password

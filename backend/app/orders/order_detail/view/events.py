@@ -10,7 +10,7 @@ from app.domain.enums import CashflowSourceType, EventType
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, OrderEvent
 from app.domain.users import User
-from app.orders.amounts import is_deposit_loss_flow
+from app.shared.order_amounts import is_deposit_loss_flow
 from app.orders.router_output import cancellable_by_event
 
 from .execution_schemas import ExecutionCashflowOut, ExecutionEventOut

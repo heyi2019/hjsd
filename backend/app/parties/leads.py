@@ -11,20 +11,21 @@ from typing import Any
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.like_pattern import like_contains
 from app.core.money import to_money
-from app.core.numbering import allocate_number
-from app.core.operation_operators import upsert_operation_operators
-from app.core.security import CurrentUser, owner_scope_filter
+from app.shared.numbering import allocate_number
+from app.shared.operation_operators import upsert_operation_operators
+from app.core.security import CurrentUser
+from app.shared.scope import owner_scope_filter
 from app.domain.enums import AuditAction, EntityType, LeadStatus, LeadType, SequenceKey
 from app.domain.parties import CustomerLead
 from app.domain.trade import Order
 
 from ._common import _UNSET, _normalize_extra_values, _required_text, _validate_owner_id
 from .customer_merge import assert_customer_usable
-from .fields import _validate_required_extras, set_extra_values
+from app.shared.form_values import _validate_required_extras, set_extra_values
 
 def _get_lead_for_user(
     session: Session, lead_id: int, user: CurrentUser | None = None

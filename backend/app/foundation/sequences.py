@@ -2,7 +2,7 @@
 from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.core.numbering import allocate_number
+from app.shared.numbering import allocate_number
 from app.domain.foundation import DocumentSequence, OrderTypeDef
 # ----------------------------------------------------------------------- 编号
 def next_order_no(session: Session, order_type: OrderTypeDef) -> str:

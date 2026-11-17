@@ -42,7 +42,7 @@ def company_rate_for_order(order: Order, order_profit: Decimal) -> Decimal:
 
 def order_profit_of(session: Session, order: Order) -> Decimal:
     """订单总利润（orders/amounts 同源）。"""
-    from app.orders.amounts import order_amounts
+    from app.shared.order_amounts import order_amounts
 
     return to_money(order_amounts(session, order.id)["PROFIT"])
 

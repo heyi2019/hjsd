@@ -1,8 +1,13 @@
-"""core.database：v1 独立库 engine / session / Base。
+"""core.database：v1 独立库 engine / session。
 
 约束：
 - v1 库地址只来自 `core.settings`；
 - 统一约束命名，保证 Alembic 在 PostgreSQL 上正确迁移。
+
+**Base 归属说明（2026-11-18 架构归位）**：
+`Base`（ORM 声明基类）与 `create_all` 已归位到 `app/domain/base.py`。
+它们是 ORM 层的东西；留在 core 会让 core 反向依赖 domain，形成
+`core ↔ domain` 双向环。本模块现在只做连接与事务，不认识任何模型。
 
 SQLite 通道已下线（2026-11-02）：生产与测试统一 PostgreSQL。原先挂在
 `Engine.connect` 上的连接级 PRAGMA、连接归还时的 `PRAGMA optimize`、以及
@@ -12,25 +17,11 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from sqlalchemy import MetaData, create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.settings import get_settings
-
-NAMING_CONVENTION = {
-    "ix": "ix_%(table_name)s_%(column_0_N_name)s",
-    "uq": "uq_%(table_name)s_%(column_0_N_name)s",
-    "ck": "ck_%(table_name)s_%(constraint_name)s",
-    "fk": "fk_%(table_name)s_%(column_0_N_name)s",
-    "pk": "pk_%(table_name)s",
-}
-
-
-class Base(DeclarativeBase):
-    """全部领域模型的基类。"""
-
-    metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
 def build_engine(url: str | None = None, *, echo: bool = False) -> Engine:
@@ -98,13 +89,6 @@ def get_db() -> Iterator[Session]:
         db.close()
 
 
-def create_all(url: str | None = None) -> Engine:
-    """仅供测试快速建库；生产结构一律走 Alembic。"""
-    engine = get_engine(url)
-    Base.metadata.create_all(bind=engine)
-    return engine
-
-
 def dispose_engine() -> None:
     global _engine, _session_factory
     if _engine is not None:
@@ -119,10 +103,7 @@ def describe_engine() -> dict[str, str]:
 
 
 __all__ = [
-    "Base",
-    "NAMING_CONVENTION",
     "build_engine",
-    "create_all",
     "describe_engine",
     "dispose_engine",
     "get_db",

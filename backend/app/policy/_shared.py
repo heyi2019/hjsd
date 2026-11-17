@@ -26,7 +26,7 @@ def _scoped_order(
     session: Session, order_id: int, user: CurrentUser | None = None
 ) -> Order:
     """策略相关订单读写必须复用订单统一的负责人范围规则。"""
-    from app.orders._shared import get_order
+    from app.shared.order_access import get_order
 
     return get_order(session, order_id, user)
 

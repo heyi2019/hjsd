@@ -16,7 +16,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 from app.core.security import CurrentUser
-from app.parties.fields import get_extra_values_bulk
+from app.shared.form_values import get_extra_values_bulk
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from app.domain.enums import RebateStatus

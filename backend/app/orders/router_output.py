@@ -34,7 +34,7 @@ from app.domain.trade import (
 from app.domain.users import User
 from app.orders import schemas
 from app.orders.links import list_order_links
-from app.orders.amounts import ZERO, event_totals, order_cashflow_profit_by_order
+from app.shared.order_amounts import ZERO, event_totals, order_cashflow_profit_by_order
 from .output_labels import _elapsed_label, _form_responsible_label, _selected_operator_label
 from app.core.actor import actor_name as _actor
 

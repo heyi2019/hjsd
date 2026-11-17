@@ -7,7 +7,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
-from app.core.security import CurrentUser, owner_scope_ids
+from app.core.security import CurrentUser
+from app.shared.scope import owner_scope_ids
 from app.domain.enums import (
     BusinessMode,
     InventoryAgeLevel,

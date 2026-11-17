@@ -8,11 +8,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import date, timedelta
 from typing import Any
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.security import CurrentUser
 from app.foundation.order_types import get_order_type_by_code
-from app.orders.form_fields import validate_form_extra
-from app.parties.fields import set_extra_values
+from app.shared.form_field_rules import validate_form_extra
+from app.shared.form_values import set_extra_values
+from app.shared.order_access import get_order
 from app.policy import versions as policy_versions
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -33,7 +34,7 @@ from app.domain.enums import (
     PolicyType,
 )
 
-from ._shared import _audit_value, get_order
+from ._shared import _audit_value
 
 _UNSET = object()
 

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.foundation import schemas
 from app.foundation.classification import classification_for_order_type
-from app.parties.fields import get_extra_values
+from app.shared.form_values import get_extra_values
 
 
 def _pool_output(db: Session, pool) -> schemas.PoolOut:

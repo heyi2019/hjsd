@@ -1,4 +1,4 @@
-"""core.numbering：编号分配器（BAS-02-04）。
+"""shared.numbering：编号分配器（BAS-02-04）。
 
 规则（PRD §2.1.1 / V19）：
 - 纯顺序号、不含日期；主业务按类型独立递增（HS/TH/DG 可并存同号）；

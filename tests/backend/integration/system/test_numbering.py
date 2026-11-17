@@ -8,9 +8,9 @@ from sqlalchemy import create_engine
 from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
-from app.core import numbering
+from app.shared import numbering
 from app.core.errors import AppError, ErrorCode, Validation
-from app.core.numbering import allocate_number, ensure_sequence, peek_number, sequence_max
+from app.shared.numbering import allocate_number, ensure_sequence, peek_number, sequence_max
 from app.domain.enums import SequenceKey
 from app.domain.foundation import DocumentSequence
 
@@ -120,7 +120,7 @@ def test_concurrent_allocation_is_unique():
     import random
     from urllib.parse import urlparse
 
-    from app.core.database import Base
+    from app.domain.base import Base
     from app.core.settings import get_settings
     from app.domain.foundation import DocumentSequence
 

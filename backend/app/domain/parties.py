@@ -27,7 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.domain.base import Base
 from app.domain.base import AuditMixin, TimestampMixin
 from app.core.money import Amount
 from app.domain.enums import (

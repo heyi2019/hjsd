@@ -8,11 +8,12 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.security import CurrentUser, owner_scope_filter
+from app.core.security import CurrentUser
+from app.shared.scope import owner_scope_filter
 from app.core.errors import Validation
 from app.domain.trade import Account, Order
 from app.domain.users import User
-from app.parties.fields import get_extra_values_bulk
+from app.shared.form_values import get_extra_values_bulk
 
 from .schemas import AccountOut
 from app.core.actor import actor_name as _actor

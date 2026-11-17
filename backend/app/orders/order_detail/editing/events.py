@@ -8,13 +8,13 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.trade import Account, Cashflow, Installment, OrderEvent, RebateRecord, Reconciliation
 from app.domain.enums import CashflowSourceType
 from app.domain.users import User
-from app.orders._shared import get_order
+from app.shared.order_access import get_order
 from app.orders.events import post_event
 
 from .schemas import ExecutionEditItem, ExecutionEditRequest, ExecutionOperationCreateItem

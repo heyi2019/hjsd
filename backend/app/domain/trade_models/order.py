@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.core.database import Base
+from app.domain.base import Base
 from app.core.money import Amount
 from app.domain.base import (
     AuditMixin,

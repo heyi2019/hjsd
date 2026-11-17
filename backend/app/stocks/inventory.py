@@ -14,7 +14,7 @@ from app.core.money import to_money
 from app.core.like_pattern import like_contains
 from app.core.security import CurrentUser
 from app.domain.trade import Account, Order
-from app.parties.fields import get_extra_values_bulk
+from app.shared.form_values import get_extra_values_bulk
 from ._common import (
     AGE_WARNING_MAX_DAYS,
     INVENTORY_STATUSES,

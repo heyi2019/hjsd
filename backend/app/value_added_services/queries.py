@@ -13,7 +13,8 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
-from app.core.security import CurrentUser, owner_scope_filter
+from app.core.security import CurrentUser
+from app.shared.scope import owner_scope_filter
 from app.domain.enums import InstallmentStatus
 from app.domain.trade import Installment, InstallmentDisposition, InstallmentSchedule, Order
 from app.domain.parties import Counterparty, Customer, OrderCounterpartyRole, OrderCustomerRole

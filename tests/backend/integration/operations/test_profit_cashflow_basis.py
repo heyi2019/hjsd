@@ -33,7 +33,7 @@ from app.domain.trade import (
 )
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.orders.amounts import event_totals, order_amounts
+from app.shared.order_amounts import event_totals, order_amounts
 from app.orders.router_output import _order_list_payload
 from app.policy.profit_allocation import service as policy_allocations
 from app.reporting.profit import order_profit_detail

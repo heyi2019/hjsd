@@ -45,7 +45,8 @@ if str(BACKEND_DIR) not in sys.path:
 from sqlalchemy import create_engine, text  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
-from app.core.database import Base, get_engine  # noqa: E402
+from app.core.database import get_engine  # noqa: E402
+from app.domain.base import Base
 from app.core.security import hash_password  # noqa: E402
 from app.core.settings import get_settings  # noqa: E402
 # 这些模块只为「导入即注册 ORM 表」：Base.metadata.create_all 只会建已 import 的

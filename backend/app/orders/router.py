@@ -20,13 +20,15 @@ from app.core.security import (
     PERM_ORDER_EVENT_POST,
     PERM_ORDER_UPDATE,
     CurrentUser,
+)
+from app.auth.session import (
     require_permissions,
 )
 from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction, Nature
 from app.domain.trade import Account, OrderEvent
 from app.foundation.pools import require_default_pool
 from app.orders import schemas
-from app.orders._shared import get_order as orders_get_order
+from app.shared.order_access import get_order as orders_get_order
 from app.orders.cancellation_model import cancel_order as orders_cancel_order
 from app.orders.consignment import post_consignment_operation
 from app.orders.deletion import delete_order as orders_delete_order

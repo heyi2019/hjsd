@@ -1,34 +1,29 @@
-"""core.security：认证会话、角色权限点、权限依赖（BAS-05-01）。
+"""core.security：角色权限点、权限依赖与令牌载荷校验（BAS-05-01）。
 
 两级授权：**角色权限 + 数据范围**（权限矩阵 §1）。接口必须二次鉴权，
 前端隐藏菜单不构成权限控制。查看者直接调用写接口返回 `403 PERMISSION_DENIED`。
 
-JWT 和密码摘要实现位于 `core.tokens`；本模块负责登录态与授权范围。
+JWT 和密码摘要实现位于 `core.tokens`；本模块负责角色权限矩阵与令牌载荷校验。
 开发/测试环境允许 `X-Dev-User` 直通，生产环境一律拒绝。
+
+**2026-11-18 架构归位**：需要查库的三段（`get_current_user`、
+`owner_scope_ids`、`owner_scope_filter`）已上移到 `app/auth/session.py`——
+它们依赖 `User` / `RevokedToken` ORM，留在 core 会形成 `core → domain`
+反向边（core ↔ domain 环）。本模块现在只依赖 core 自身，零 ORM 依赖。
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Sequence
 
-from fastapi import Depends, Header
-from sqlalchemy.sql.elements import ColumnElement
-from sqlalchemy.orm import Session
-
-from app.core.database import get_db
-from app.core.errors import AuthError, PermissionDenied
-from app.core.settings import Settings, get_settings
+from app.core.errors import AuthError
 from app.core.tokens import (
-    _b64url_decode,
-    _b64url_encode,
-    _sign,
     build_access_token,
     decode_token,
     encode_token,
     hash_password,
     verify_password,
 )
-from app.domain.users import RevokedToken, User
 
 # ------------------------------------------------------------------ 角色与权限点
 ROLE_ADMIN = "ADMIN"
@@ -196,34 +191,6 @@ class CurrentUser:
         return owner_id == self.id
 
 
-def owner_scope_ids(session: Any, user: CurrentUser) -> set[int] | None:
-    """Resolve the owner ids visible to a user, including TEAM membership.
-
-    Team membership is intentionally resolved in Python for now: the membership
-    list is stored as JSON during this incremental rollout and remains portable
-    across SQLite and PostgreSQL.
-    """
-    if user.is_admin or user.owner_scope == "ALL":
-        return None
-    if user.owner_scope != "TEAM" or not user.team_ids:
-        return {user.id}
-    from app.domain.users import User
-
-    visible = {user.id}
-    for owner_id, team_ids in session.query(User.id, User.team_ids).all():
-        if set(team_ids or []).intersection(user.team_ids):
-            visible.add(owner_id)
-    return visible
-
-
-def owner_scope_filter(column: ColumnElement, user: CurrentUser, session: Any | None = None) -> ColumnElement | None:
-    """Return a SQL predicate for owner-scoped tables; None means unrestricted."""
-    ids = owner_scope_ids(session, user) if session is not None else None
-    if ids is None and (user.is_admin or user.owner_scope == "ALL"):
-        return None
-    return column.in_(ids or {user.id})
-
-
 def user_from_payload(payload: dict[str, Any]) -> CurrentUser:
     try:
         raw_user_id = payload.get("sub", 0)
@@ -281,83 +248,6 @@ DEV_USERS: dict[str, CurrentUser] = {
 }
 
 
-def get_current_user(
-    authorization: str | None = Header(default=None, alias="Authorization"),
-    x_dev_user: str | None = Header(default=None, alias="X-Dev-User"),
-    settings: Settings = Depends(get_settings),
-    db: Session = Depends(get_db),
-) -> CurrentUser:
-    """解析当前登录用户；无凭证返回 401 `AUTH_REQUIRED`。"""
-    if authorization:
-        scheme, _, token = authorization.partition(" ")
-        if scheme.lower() != "bearer" or not token:
-            raise AuthError("登录凭证格式无效")
-        payload = decode_token(token, settings=settings)
-        jti = payload.get("jti")
-        if jti is not None and (not isinstance(jti, str) or not jti.strip()):
-            raise AuthError("登录凭证内容无效")
-        if jti and db.get(RevokedToken, jti):
-            raise AuthError("登录已退出，请重新登录")
-        try:
-            user_id = int(payload.get("sub", 0))
-        except (TypeError, ValueError) as error:
-            raise AuthError("登录凭证内容无效") from error
-        account = db.get(User, user_id)
-        if account is not None and account.username == payload.get("username"):
-            if not account.is_active:
-                raise AuthError("账号已停用，请联系管理员")
-            # JWT 只证明 token 曾由服务签发；角色、数据范围和池授权以当前
-            # 数据库记录为准，使停用/改权在旧 token 未过期时也立即生效。
-            return CurrentUser.build(
-                id=account.id,
-                username=account.username,
-                display_name=account.display_name,
-                roles=[account.role],
-                pool_ids=frozenset(account.pool_ids or []),
-                team_ids=frozenset(account.team_ids or []),
-                owner_scope=account.owner_scope,
-            )
-        if settings.is_development:
-            # 开发/测试环境允许用签名 token 模拟尚未落库的角色，便于权限链路验证。
-            return user_from_payload(payload)
-        raise AuthError("登录账号不存在或凭证已失效")
-
-    if settings.is_development and x_dev_user:
-        user = DEV_USERS.get(x_dev_user.strip().lower())
-        if user is None:
-            raise AuthError(f"未知的开发态用户 {x_dev_user}")
-        return user
-
-    raise AuthError("未登录或凭证已失效")
-
-
-def require_permissions(*codes: str, require_all: bool = True):
-    """权限依赖工厂：`user: CurrentUser = Depends(require_permissions("pool.manage"))`。"""
-
-    def dependency(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
-        missing = [code for code in codes if not user.has(code)]
-        should_fail = missing if require_all else len(missing) == len(codes)
-        if should_fail:
-            raise PermissionDenied(
-                "当前角色无权执行该操作",
-                details={"required": list(codes), "missing": missing},
-            )
-        return user
-
-    return Depends(dependency)
-
-
-def require_role(*roles: str):
-    """角色依赖工厂：只要命中任一角色即通过。"""
-
-    def dependency(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
-        if not any(role in user.roles for role in roles):
-            raise PermissionDenied("当前角色无权访问该资源", details={"required_roles": list(roles)})
-        return user
-
-    return Depends(dependency)
-
-
 __all__ = [
     "ALL_PERMISSIONS",
     "ALL_ROLES",
@@ -376,11 +266,7 @@ __all__ = [
     "build_access_token",
     "decode_token",
     "encode_token",
-    "get_current_user",
     "hash_password",
-    "owner_scope_filter",
-    "require_permissions",
-    "require_role",
     "user_from_payload",
     "verify_password",
 ]

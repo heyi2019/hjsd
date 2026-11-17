@@ -7,10 +7,11 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
-from app.core.business_numbering import rebate_no as order_rebate_no
+from app.shared.audit import record_audit
+from app.shared.business_numbering import rebate_no as order_rebate_no
 from app.core.errors import ErrorCode, NotFound, Validation
-from app.core.security import CurrentUser, owner_scope_filter
+from app.core.security import CurrentUser
+from app.shared.scope import owner_scope_filter
 from app.domain.enums import (
     AuditAction,
     CashflowSourceType,
@@ -23,9 +24,9 @@ from app.domain.enums import (
 from app.domain.trade import Cashflow, OrderEvent, RebateRecord
 from app.domain.users import User
 from app.foundation.pools import require_default_pool
-from app.orders._shared import get_order
+from app.shared.order_access import get_order
 from app.orders.events import post_event
-from app.orders.form_fields import validate_form_extra
+from app.shared.form_field_rules import validate_form_extra
 from ._common import _positive
 
 # --------------------------------------------------------------------- 返点

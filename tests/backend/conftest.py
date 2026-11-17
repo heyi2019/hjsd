@@ -224,7 +224,8 @@ if str(BACKEND_DIR) not in sys.path:
 os.environ.setdefault("APP_ENV", "development")
 
 from app.api_v1 import create_app  # noqa: E402
-from app.core.database import Base, get_db  # noqa: E402
+from app.core.database import get_db  # noqa: E402
+from app.domain.base import Base
 from app.core.security import CurrentUser, DEV_USERS, build_access_token  # noqa: E402
 from app.core.settings import get_settings  # noqa: E402
 from app.domain import attachments, foundation, imports, notifications, options, parties, trade, users  # noqa: E402,F401  注册全部 v1 表

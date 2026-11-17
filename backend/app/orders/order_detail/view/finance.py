@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.orders.amounts import is_deposit_loss_flow, order_profit_flow_by_order
+from app.shared.order_amounts import is_deposit_loss_flow, order_profit_flow_by_order
 
 from .execution_schemas import (
     ExecutionCashflowOut,

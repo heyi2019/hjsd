@@ -95,7 +95,7 @@ def test_deposit_linked_to_order_in_r2_direct_cost_same_source_as_profit(seeded_
     """用户裁决 C：挂单押金占用进 R2 直接成本、释放进收入；损失按「收入−支出」
     净额体现、不另记第二次现金流；R2 订单贡献与订单利润逐笔同源。"""
     from app.orders.create import create_order
-    from app.orders.amounts import order_cashflow_profit_by_order
+    from app.shared.order_amounts import order_cashflow_profit_by_order
 
     order = create_order(
         seeded_db, order_type="TH", owner_id=1, trade_date=TODAY, actor="pytest"
@@ -257,7 +257,7 @@ def test_deposit_loss_not_double_counted_in_funds_and_profit(seeded_db):
     损失=−利润=300，不另记第二次 OUT）；订单利润同口径；报表侧 cashflow_totals_by_order
     与利润明细同源。"""
     from app.orders.create import create_order
-    from app.orders.amounts import order_cashflow_profit_by_order
+    from app.shared.order_amounts import order_cashflow_profit_by_order
     from app.reporting._shared import cashflow_totals_by_order
 
     order = create_order(
@@ -341,7 +341,7 @@ def test_deposit_hold_available_not_deducted_twice(seeded_db):
 def test_deposit_loss_null_attribute_other_flows_not_dropped(seeded_db):
     """守卫 SQL 三值逻辑：business_cashflow_filter 不得误删 accounting_attribute=NULL 的普通流水。"""
     from app.orders.create import create_order
-    from app.orders.amounts import order_cashflow_profit_by_order
+    from app.shared.order_amounts import order_cashflow_profit_by_order
     order = create_order(
         seeded_db, order_type="TH", owner_id=1, trade_date=TODAY, actor="pytest"
     )

@@ -21,7 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.domain.base import Base
 from app.domain.base import AuditMixin, TimestampMixin
 from app.domain.enums import ImportBatchStatus, ImportRowStatus, ImportSourceKind
 

@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.attachments import schemas, service
 from app.core.database import get_db
-from app.core.security import CurrentUser, get_current_user
+from app.core.security import CurrentUser
+from app.auth.session import get_current_user
 
 router = APIRouter(tags=["SYS-01-03 订单详情附件"])
 

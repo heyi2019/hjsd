@@ -15,11 +15,12 @@ from typing import Any
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.like_pattern import like_contains
-from app.core.numbering import allocate_number
-from app.core.security import CurrentUser, owner_scope_filter, owner_scope_ids
+from app.shared.numbering import allocate_number
+from app.core.security import CurrentUser
+from app.shared.scope import owner_scope_filter, owner_scope_ids
 from app.domain.enums import AuditAction, CustomerStatus, EntityType, SequenceKey
 from app.domain.parties import Customer
 
@@ -29,7 +30,7 @@ from ._common import (
     _required_text,
     _validate_owner_id,
 )
-from .fields import _validate_extra_values, _validate_required_extras, set_extra_values
+from app.shared.form_values import _validate_extra_values, _validate_required_extras, set_extra_values
 
 def create_customer(
     session: Session,

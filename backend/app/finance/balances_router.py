@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.errors import NotFound
-from app.core.security import PERM_FINANCE_READ, CurrentUser, require_permissions
+from app.core.security import PERM_FINANCE_READ, CurrentUser
+from app.auth.session import require_permissions
 from app.finance import schemas
 from app.finance.balances import pool_balance, pool_balance_summary
 

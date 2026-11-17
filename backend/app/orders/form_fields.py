@@ -18,7 +18,7 @@ from .form_field_admin import (
     set_order_form_field_active,
     delete_order_form_field,
 )
-from .form_field_rules import (
+from app.shared.form_field_rules import (
     FIELD_TYPES,
     FIELD_SECTIONS,
     REQUIRED_WHEN_OPS,

@@ -19,7 +19,8 @@ from app.auth import router as auth_router
 from app.auth import service
 from app.core.errors import Validation
 from app.core.security import hash_password
-from app.core.security import CurrentUser, build_access_token, get_current_user, AuthError
+from app.core.security import CurrentUser, build_access_token, AuthError
+from app.auth.session import get_current_user
 from app.core.settings import Settings
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog

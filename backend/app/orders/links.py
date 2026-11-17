@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.security import CurrentUser
 from ._common import _positive_money
 from sqlalchemy import (
@@ -27,9 +27,7 @@ from app.domain.enums import (
     OrderLinkType,
 )
 
-from ._shared import (
-    get_order,
-)
+from app.shared.order_access import get_order
 
 def create_order_link(
     session: Session,

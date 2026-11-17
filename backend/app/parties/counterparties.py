@@ -10,9 +10,9 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
-from app.core.numbering import allocate_number
+from app.shared.numbering import allocate_number
 from app.domain.enums import (
     AuditAction,
     CounterpartyStatus,
@@ -28,7 +28,7 @@ from ._common import (
     _required_bool,
     _required_text,
 )
-from .fields import _validate_required_extras, set_extra_values
+from app.shared.form_values import _validate_required_extras, set_extra_values
 
 # --------------------------------------------------------------------- 合作方
 def create_counterparty(

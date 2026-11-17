@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.actor import actor_name as _actor
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.database import get_db
 from app.core.errors import PermissionDenied
 from app.core.schemas import PageOut
@@ -22,6 +22,8 @@ from app.core.security import (
     PERM_CUSTOMER_READ,
     PERM_CUSTOMER_UPDATE,
     CurrentUser,
+)
+from app.auth.session import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
@@ -55,7 +57,7 @@ from app.parties.customers import (
     set_customer_status,
     update_customer as parties_update_customer,
 )
-from app.parties.fields import get_extra_values, get_extra_values_bulk
+from app.shared.form_values import get_extra_values, get_extra_values_bulk
 from app.parties.leads import (
     close_lead as parties_close_lead,
     convert_lead as parties_convert_lead,

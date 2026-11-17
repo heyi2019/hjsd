@@ -14,12 +14,14 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.errors import Validation
-from app.core.numbering import format_next_number, sequence_max
+from app.shared.numbering import format_next_number, sequence_max
 from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_TYPE_MANAGE,
     PERM_POOL_MANAGE,
     CurrentUser,
+)
+from app.auth.session import (
     get_current_user,
     require_permissions,
 )
@@ -46,7 +48,7 @@ from app.foundation.pools import (
     update_pool as foundation_update_pool,
 )
 from app.foundation.sequences import list_sequences as foundation_list_sequences
-from app.parties.fields import get_extra_values_bulk
+from app.shared.form_values import get_extra_values_bulk
 
 from app.core.actor import actor_name as _actor
 from .router_output import _order_type_output, _pool_output

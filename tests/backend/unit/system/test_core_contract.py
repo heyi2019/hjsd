@@ -16,7 +16,7 @@ from app import api_v1
 from app.core.errors import AppError, ErrorCode, NotFound, TokenExpired, Validation, require_condition
 from app.core.money import Amount, to_money
 from app.core.ratelimit import RateLimiter
-from app.core.numbering import peek_number, sequence_max
+from app.shared.numbering import peek_number, sequence_max
 from app.core.security import (
     ROLE_ADMIN,
     ROLE_OPERATOR,
@@ -25,10 +25,14 @@ from app.core.security import (
     decode_token,
     user_from_payload,
     hash_password,
+    verify_password,
+)
+from app.auth.session import (
+    require_role,
+)
+from app.shared.scope import (
     owner_scope_filter,
     owner_scope_ids,
-    require_role,
-    verify_password,
 )
 from app.domain.foundation import DocumentSequence
 
@@ -112,7 +116,7 @@ class TestNumberingGuards:
 
     def test_format_next_number_uses_padding_specific_max(self):
         """预览层上限按 padding 算：5 位序列 9999→10000 不误报、99999→耗尽才报。"""
-        from app.core.numbering import format_next_number
+        from app.shared.numbering import format_next_number
 
         assert sequence_max(4) == 9999
         assert sequence_max(5) == 99999
@@ -284,7 +288,8 @@ class TestTokenGuards:
         raw_payload = payload if isinstance(payload, str) else json.dumps(payload)
         head = b64(json.dumps(header).encode())
         body = b64(raw_payload.encode())
-        from app.core.security import _sign, get_settings
+        from app.core.settings import get_settings
+        from app.core.tokens import _sign
 
         signature = _sign(f"{head}.{body}", get_settings().jwt_secret_key)
         return f"{head}.{body}.{signature}"
@@ -529,7 +534,10 @@ class TestDatabaseLifecycle:
             session.close()
 
     def test_create_all_is_idempotent_on_existing_schema(self, v1_engine):
-        engine = database.create_all(v1_engine.url)
+        # create_all 已归位到 app.domain.base（访问 Base.metadata，留在 core 会成环）
+        from app.domain.base import create_all
+
+        engine = create_all(v1_engine.url)
         try:
             from sqlalchemy import inspect
 

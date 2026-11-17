@@ -6,9 +6,10 @@ from typing import Any
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import ErrorCode, Validation
-from app.core.security import CurrentUser, owner_scope_filter
+from app.core.security import CurrentUser
+from app.shared.scope import owner_scope_filter
 from app.domain.enums import AuditAction, CustomerStatus
 from app.domain.parties import Customer, CustomerLead, OrderCustomerRole
 

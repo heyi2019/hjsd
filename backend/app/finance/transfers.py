@@ -8,15 +8,15 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
-from app.core.numbering import allocate_flow_no
-from app.core.operation_operators import upsert_operation_operators
+from app.shared.numbering import allocate_flow_no
+from app.shared.operation_operators import upsert_operation_operators
 from app.core.security import CurrentUser
 from app.domain.enums import AccountingAttribute, AuditAction, CashflowSourceType, Direction, Nature
 from app.domain.trade import Cashflow
-from app.orders.form_fields import validate_form_extra
+from app.shared.form_field_rules import validate_form_extra
 from app.finance.balances import pool_balance
 from app.foundation.pools import assert_pool_usable
 

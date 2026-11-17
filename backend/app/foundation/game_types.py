@@ -4,7 +4,7 @@ from __future__ import annotations
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.domain.enums import AuditAction
 from app.domain.foundation import GameTypeOption

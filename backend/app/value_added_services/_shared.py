@@ -9,8 +9,9 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, Protocol
 from app.core.security import CurrentUser
-from app.core.security import owner_scope_filter
-from app.orders.form_fields import validate_form_extra
+from app.shared.scope import owner_scope_filter
+from app.shared.form_field_rules import validate_form_extra
+from app.shared.installment_amounts import total_receivable as _shared_total_receivable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import (
@@ -20,7 +21,6 @@ from app.core.errors import (
 from app.core.money import (
     require_non_negative,
     require_positive,
-    to_money,
 )
 from app.domain.trade import (
     Installment,
@@ -73,7 +73,11 @@ def _add_months(base: date, months: int) -> date:
 
 
 class ReceivableLike(Protocol):
-    """总应收公式依赖的最小字段集：ORM 实体与 Pydantic 输出模型都满足。"""
+    """总应收公式依赖的最小字段集：ORM 实体与 Pydantic 输出模型都满足。
+
+    已归位到 `app/shared/installment_amounts.py`——parties 也用该口径，
+    留在 vas 会让 parties 反向依赖 vas。本处保留别名仅为兼容旧导入路径。
+    """
 
     down_payment: Any
     per_period: Any
@@ -85,15 +89,10 @@ class ReceivableLike(Protocol):
 def total_receivable(installment: ReceivableLike) -> Decimal:
     """总应收 = 首付 + 每期 × 期数 + 末期调整 − 减免（全站唯一口径）。
 
-    调用方既可以是 `Installment` ORM 实体，也可以是 `InstallmentOut` 输出模型；
-    两侧不得再各自复制公式，避免口径漂移。
+    实现已归位到 `app/shared/installment_amounts.py`；本处为再导出，
+    保持调用方与测试的旧路径可用，公式本体只有一份。
     """
-    return (
-        to_money(installment.down_payment)
-        + to_money(installment.per_period) * int(installment.periods)
-        + to_money(installment.final_period_adjustment or 0)
-        - to_money(installment.waived_amount)
-    )
+    return _shared_total_receivable(installment)
 
 def get_installment(
     session: Session, installment_id: int, user: CurrentUser | None = None

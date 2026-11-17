@@ -10,6 +10,8 @@ from app.core.security import (
     PERM_ORDER_CREATE,
     PERM_TRANSFER_POST,
     CurrentUser,
+)
+from app.auth.session import (
     require_permissions,
 )
 from app.finance import schemas

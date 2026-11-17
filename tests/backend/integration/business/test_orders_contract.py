@@ -16,7 +16,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, DEV_USERS, build_access_token
@@ -37,7 +37,7 @@ from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormFiel
 from app.domain.users import User
 from app.foundation.order_types import get_order_type_by_code, set_order_type_active
 from app.orders import schemas
-from app.orders._shared import get_order
+from app.shared.order_access import get_order
 from app.orders.cancellation_model import cancel_order
 from app.orders.create import create_order
 from app.orders.events import _opposite_direction, post_event

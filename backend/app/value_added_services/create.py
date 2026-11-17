@@ -10,15 +10,15 @@ from datetime import date
 from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 from typing import Any
 from pydantic import ValidationError as PydanticValidationError
-from app.core.audit import record_audit
-from app.core.business_numbering import installment_no as order_installment_no
+from app.shared.audit import record_audit
+from app.shared.business_numbering import installment_no as order_installment_no
 from app.core.security import CurrentUser
 from app.domain.users import User
 from app.foundation.order_types import get_order_type_by_code
 from app.value_added_services.schemas import ScheduleCreate
-from app.orders._shared import get_order
-from app.orders.amounts import order_amounts
-from app.parties.fields import set_extra_values
+from app.shared.order_access import get_order
+from app.shared.order_amounts import order_amounts
+from app.shared.form_values import set_extra_values
 from app.policy import versions as policy_versions
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ from app.core.errors import (
     Validation,
 )
 from app.core.money import to_money
-from app.core.operation_operators import upsert_operation_operators
+from app.shared.operation_operators import upsert_operation_operators
 from app.core.state_machine import (
     ACCOUNT_TRANSITIONS,
     ORDER_TRANSITIONS,

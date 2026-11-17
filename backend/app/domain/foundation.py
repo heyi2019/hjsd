@@ -27,7 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.domain.base import Base
 from app.core.time import now_second
 from app.domain.base import AuditMixin, TimestampMixin
 from app.domain.enums import PoolOwnership, PoolStatus, PoolType
@@ -108,7 +108,7 @@ class DocumentSequence(Base, TimestampMixin):
     """编号序列表：事务内递增，超出位数上限即报 `SEQUENCE_EXHAUSTED`（BAS-02-04）。
 
     位数上限 6 位（2026-10-28 放宽：资金流水按方向五位流水 ZC00001/SR00001）；
-    实际上限按 padding 计算（10^padding - 1），见 core.numbering。
+    实际上限按 padding 计算（10^padding - 1），见 shared.numbering。
     """
 
     __tablename__ = "document_sequences"

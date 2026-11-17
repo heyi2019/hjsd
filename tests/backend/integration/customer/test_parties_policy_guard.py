@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import Conflict, NotFound, Validation
-from app.core.operation_operators import list_operation_operators
+from app.shared.operation_operators import list_operation_operators
 from app.core.security import CurrentUser
 from app.domain.parties import (
     CustomerLead,

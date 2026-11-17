@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.domain.enums import OrderStatus
 from app.domain.parties import OrderCounterpartyRole
 from app.domain.trade import Order
-from app.orders.amounts import order_cashflow_profit_by_order
+from app.shared.order_amounts import order_cashflow_profit_by_order
 
 from .counterparties import get_counterparty
 

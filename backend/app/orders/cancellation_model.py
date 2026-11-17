@@ -17,7 +17,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
@@ -31,10 +31,10 @@ from app.domain.enums import (
     InventoryType,
 )
 from app.domain.trade import Account, Order, OrderEvent
-from app.orders.form_fields import validate_form_extra
+from app.shared.form_field_rules import validate_form_extra
 
 from ._common import _required_text
-from ._shared import get_order
+from app.shared.order_access import get_order
 
 
 _CANCELLABLE_EVENT_TYPES = frozenset({

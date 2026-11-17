@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import Validation
 from app.core.money import to_money
 from app.domain.enums import AllocationRole, AuditAction
@@ -77,7 +77,7 @@ def set_person_allocations(
         )
 
     if total_amount != 0:
-        from app.orders.amounts import order_amounts
+        from app.shared.order_amounts import order_amounts
 
         profit = order_amounts(session, order.id)["PROFIT"]
         # 金额方向必须与订单盈亏一致：盈利单填正数、亏损单填负数（负数=该人分担的亏损额）。

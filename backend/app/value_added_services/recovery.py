@@ -8,9 +8,9 @@ from collections.abc import Mapping
 from datetime import date
 from decimal import Decimal
 from typing import Any
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.security import CurrentUser
-from app.core.security import owner_scope_filter
+from app.shared.scope import owner_scope_filter
 from app.orders.events import post_event
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -21,7 +21,7 @@ from app.core.errors import (
     Validation,
 )
 from app.core.money import to_money
-from app.core.operation_operators import upsert_operation_operators
+from app.shared.operation_operators import upsert_operation_operators
 from app.core.state_machine import (
     ACCOUNT_TRANSITIONS,
     INSTALLMENT_TRANSITIONS,

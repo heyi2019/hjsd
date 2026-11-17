@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import PERM_ORDER_CREATE, PERM_POLICY_MANAGE, CurrentUser, require_permissions
+from app.core.security import PERM_ORDER_CREATE, PERM_POLICY_MANAGE, CurrentUser
+from app.auth.session import require_permissions
 from . import listing, schemas, service, terms
 
 router = APIRouter(tags=["policy"])

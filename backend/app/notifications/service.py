@@ -5,7 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound, Validation
-from app.core.numbering import allocate_number
+from app.shared.numbering import allocate_number
 from app.core.time import now_utc_second_naive
 from app.domain.enums import SequenceKey
 from app.domain.notifications import Notification

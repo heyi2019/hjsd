@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
@@ -43,7 +43,7 @@ from app.parties.counterparties import (
 from app.parties.customer_detail import get_customer_activity_summary, get_customer_detail
 from app.parties.customer_merge import duplicate_candidates, merge_customers
 from app.parties.customers import create_customer, get_customer, list_customers, set_customer_status, update_customer
-from app.parties.fields import get_extra_values, set_extra_values
+from app.shared.form_values import get_extra_values, set_extra_values
 
 CUSTOMERS = "/api/v1/customers"
 COUNTERPARTIES = "/api/v1/counterparties"

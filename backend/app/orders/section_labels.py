@@ -6,12 +6,12 @@ from collections.abc import Mapping
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import Validation
 from app.domain.enums import AuditAction
 from app.domain.trade import OrderFormSectionLabel
 
-from .form_field_rules import (
+from app.shared.form_field_rules import (
     ORDER_TYPE_CODE_PATTERN,
     _validate_section,
 )

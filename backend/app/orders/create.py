@@ -9,15 +9,16 @@ from collections.abc import Mapping
 from collections.abc import Sequence
 from datetime import date
 from typing import Any
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.security import CurrentUser
 from app.domain.users import User
 from app.foundation.order_types import get_order_type_by_code
 from app.foundation.sequences import next_order_no
-from app.orders.form_fields import validate_business_responsible, validate_form_extra
+from app.shared.form_field_rules import validate_business_responsible, validate_form_extra
 from app.parties.counterparties import assert_counterparty_usable
 from app.parties.customer_merge import assert_customer_usable
-from app.parties.fields import set_extra_values
+from app.shared.form_values import set_extra_values
+from app.shared.order_access import get_order
 from app.policy import versions as policy_versions
 from app.stocks.profile import get_account
 from sqlalchemy import select
@@ -46,7 +47,6 @@ from ._shared import (
     _normalize_commission_value,
     _validate_existing_account_context,
     _validate_participant_roles,
-    get_order,
 )
 
 

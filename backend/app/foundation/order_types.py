@@ -2,9 +2,9 @@
 from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
-from app.core.numbering import ensure_sequence
+from app.shared.numbering import ensure_sequence
 from app.domain.enums import AuditAction
 from app.domain.foundation import OrderTypeDef
 from ._common import SEQUENCE_PREFIX_PATTERN, _get_order_type_or_404, _non_negative_int, _normalize_code, _required_bool, _required_name, _snapshot

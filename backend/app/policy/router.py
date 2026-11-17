@@ -12,6 +12,8 @@ from app.core.security import (
     PERM_ORDER_CREATE,
     PERM_POLICY_MANAGE,
     CurrentUser,
+)
+from app.auth.session import (
     require_permissions,
 )
 from app.policy import schemas

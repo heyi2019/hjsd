@@ -22,7 +22,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AuditAction
 from app.domain.lists import ListColumnConfig, ListCustomColumn

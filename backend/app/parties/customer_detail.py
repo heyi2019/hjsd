@@ -9,13 +9,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
-from app.core.security import CurrentUser, owner_scope_filter
+from app.core.security import CurrentUser
+from app.shared.scope import owner_scope_filter
 from app.domain.enums import OrderStatus, ScheduleStatus
 from app.domain.foundation import AuditLog
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Installment, InstallmentSchedule, Order, OrderEvent
-from app.orders.amounts import order_cashflow_profit_by_order
-from app.value_added_services import _shared as inst_shared
+from app.shared.order_amounts import order_cashflow_profit_by_order
+from app.shared.installment_amounts import total_receivable
 
 from .customers import get_customer
 
@@ -146,7 +147,7 @@ def get_customer_detail(
     receivable_total = Decimal("0.00")
     overdue_period_count = 0
     for item in installments:
-        receivable = inst_shared.total_receivable(item)
+        receivable = total_receivable(item)
         paid = to_money(item.paid_amount)
         remaining = receivable - paid
         overdue_periods = overdue_by_installment.get(item.id, 0)

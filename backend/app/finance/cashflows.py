@@ -13,11 +13,11 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.time import now_second
 from app.core.money import to_money
-from app.core.numbering import allocate_flow_no
+from app.shared.numbering import allocate_flow_no
 from app.core.security import CurrentUser
 from app.domain.enums import (
     AccountingAttribute,
@@ -38,9 +38,9 @@ from app.finance.attributes import (
     derive_manual_cashflow_nature,
 )
 from app.foundation.pools import assert_pool_usable
-from app.orders._shared import get_order
-from app.orders.form_fields import validate_form_extra
-from app.parties.fields import set_extra_values
+from app.shared.order_access import get_order
+from app.shared.form_field_rules import validate_form_extra
+from app.shared.form_values import set_extra_values
 
 from ._common import _positive, _text
 

@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from app.parties import schemas
 from app.parties._common import to_counterparty_out
 from app.domain.parties import Customer
-from app.parties.fields import get_extra_values, get_extra_values_bulk
-from app.core.operation_operators import list_operation_operators_bulk
+from app.shared.form_values import get_extra_values, get_extra_values_bulk
+from app.shared.operation_operators import list_operation_operators_bulk
 
 
 def _lead_output(

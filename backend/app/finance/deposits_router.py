@@ -9,6 +9,8 @@ from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
     CurrentUser,
+)
+from app.auth.session import (
     require_permissions,
 )
 from app.domain.trade import Deposit

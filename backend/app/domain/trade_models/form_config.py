@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
-from app.core.database import Base
+from app.domain.base import Base
 from app.domain.base import AuditMixin
 from sqlalchemy import (
     Boolean,

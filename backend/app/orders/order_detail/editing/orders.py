@@ -2,11 +2,11 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import NotFound
 from app.core.security import CurrentUser
 from app.domain.trade import Order
-from app.orders.form_fields import validate_business_responsible
+from app.shared.form_field_rules import validate_business_responsible
 
 from .schemas import ExecutionOrderEditItem
 

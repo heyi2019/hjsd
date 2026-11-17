@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.stocks.profile import create_account
 from app.core.errors import NotFound, Validation
-from app.core.operation_operators import list_operation_operators
+from app.shared.operation_operators import list_operation_operators
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
 from app.domain.enums import CashflowSourceType

@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import Validation
 from app.core.money import to_money
 from app.domain.enums import AllocationRole, AuditAction
@@ -204,7 +204,7 @@ def set_action_allocations(
                 details={"total": str(total), "items": len(items)},
             )
     else:
-        from app.orders.amounts import order_amounts
+        from app.shared.order_amounts import order_amounts
 
         profit = to_money(order_amounts(session, order.id)["PROFIT"])
         if total != 0:

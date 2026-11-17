@@ -35,7 +35,7 @@ from app.domain.trade import (
     Order,
     RebateRecord,
 )
-from app.orders.amounts import business_cashflow_filter, order_profit_flow_by_date
+from app.shared.order_amounts import business_cashflow_filter, order_profit_flow_by_date
 
 from app.core.money import to_money_or_zero
 from ._shared import (

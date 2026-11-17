@@ -17,10 +17,12 @@ from app.core.errors import AppError, ErrorCode
 from app.core.security import (
     PERM_OPTION_SET_MANAGE,
     CurrentUser,
+)
+from app.auth.session import (
     get_current_user,
     require_permissions,
 )
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.domain.options import OptionSet
 from app.options import schemas
 

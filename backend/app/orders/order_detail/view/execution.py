@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.security import CurrentUser, PERM_AUDIT_READ
 from app.domain.foundation import AuditLog
 from app.domain.users import User
-from app.orders._shared import get_order
+from app.shared.order_access import get_order
 from app.stocks.profile import get_account
 from app.stocks.router_output import _account_outputs
 from .execution_schemas import AccountAuditOut, AccountExecutionDetailOut

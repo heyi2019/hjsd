@@ -4,12 +4,12 @@ from collections.abc import Mapping
 from typing import Any
 from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, PoolOwnership, PoolStatus, PoolType
 from app.domain.foundation import Pool
-from app.parties.fields import set_extra_values
+from app.shared.form_values import set_extra_values
 from ._common import _UNSET, _get_pool_or_404, _normalize_pool_code, _required_name, _required_pool_type, _snapshot
 # --------------------------------------------------------------------- 资金账户
 def list_pools(session: Session, *, include_disabled: bool = True, user: CurrentUser | None = None) -> list[Pool]:

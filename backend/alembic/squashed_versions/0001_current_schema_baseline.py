@@ -13,7 +13,7 @@ from __future__ import annotations
 from alembic import op
 from sqlalchemy.orm import Session
 
-from app.core.database import Base
+from app.domain.base import Base
 from app.domain import attachments, foundation, imports, lists, notifications, options, parties, trade, users  # noqa: F401
 from app.foundation.seeds import seed_foundation
 from app.foundation.catalog_seed import seed_catalog

@@ -4,12 +4,14 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.database import get_db
 from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
     CurrentUser,
+)
+from app.auth.session import (
     require_permissions,
 )
 from app.domain.enums import AuditAction

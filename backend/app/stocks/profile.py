@@ -6,13 +6,13 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import NotFound, Validation
-from app.core.numbering import allocate_number
+from app.shared.numbering import allocate_number
 from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus, AuditAction, InstallmentContractType, SequenceKey
 from app.domain.trade import Account
-from app.parties.fields import set_extra_values
+from app.shared.form_values import set_extra_values
 from ._common import (
     _UNSET,
     account_is_visible,

@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy import JSON, Boolean, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
+from app.domain.base import Base
 from app.domain.base import AuditMixin
 
 

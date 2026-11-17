@@ -14,7 +14,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import Direction, Nature, PoolOwnership
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Deposit
-from app.orders.amounts import business_cashflow_filter
+from app.shared.order_amounts import business_cashflow_filter
 
 
 def pool_balances(

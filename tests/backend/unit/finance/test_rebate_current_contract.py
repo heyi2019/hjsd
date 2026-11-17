@@ -6,8 +6,8 @@
 
 import importlib.util
 
-from app.core import business_numbering
-from app.core.database import Base
+from app.shared import business_numbering
+from app.domain.base import Base
 from app.domain import trade
 from app.finance import rebates, router, schemas
 

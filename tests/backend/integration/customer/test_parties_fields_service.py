@@ -9,9 +9,9 @@ import pytest
 
 from app.core.errors import NotFound, Validation
 from app.domain.trade import OrderFormField
-from app.parties import fields as fields_module
+from app.shared import form_values as fields_module
 from app.parties.customers import create_customer
-from app.parties.fields import get_extra_values, get_extra_values_bulk, set_extra_values
+from app.shared.form_values import get_extra_values, get_extra_values_bulk, set_extra_values
 
 
 def _add_field(seeded_db, field_key: str, *, field_type: str = "TEXT", options=None,

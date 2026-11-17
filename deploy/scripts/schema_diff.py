@@ -24,7 +24,7 @@ from alembic.migration import MigrationContext  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 
 import app.main  # noqa: E402,F401  导入以注册全部 ORM 到 Base.metadata
-from app.core.database import Base  # noqa: E402
+from app.domain.base import Base  # noqa: E402
 from app.core.settings import get_settings  # noqa: E402
 
 # 只允许比对演练临时库：防止手滑把参数写成 release / 生产库名后对着它跑比对。

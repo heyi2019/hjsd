@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
-from app.core.numbering import ensure_sequence
+from app.shared.audit import record_audit
+from app.shared.numbering import ensure_sequence
 from app.domain.enums import (
     AuditAction,
     PoolOwnership,

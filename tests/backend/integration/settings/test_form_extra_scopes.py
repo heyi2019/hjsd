@@ -16,7 +16,7 @@ from app.core.errors import Validation
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
 from app.foundation.catalog_seed import seed_catalog
 from app.domain.form_scopes import FORM_SCOPES
-from app.orders.form_fields import validate_business_responsible, validate_form_extra
+from app.shared.form_field_rules import validate_business_responsible, validate_form_extra
 from app.stocks.profile import update_account_profile
 
 

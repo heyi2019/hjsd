@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.errors import Validation
-from app.core.operation_operators import (
+from app.shared.operation_operators import (
     get_operation_operators,
     list_operation_operators,
     list_operation_operators_bulk,

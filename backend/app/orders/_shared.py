@@ -1,4 +1,7 @@
-"""orders._shared：订单服务共用的审计序列化、账号快照归一与订单读取。
+"""orders._shared：订单服务共用的审计序列化、账号快照归一与参与方角色校验。
+
+订单读取（get_order）已归位到 `app/shared/order_access.py`——它被 finance /
+policy / value_added_services 共用，留在 orders 会让 policy 反向依赖 orders。
 """
 
 from __future__ import annotations
@@ -9,19 +12,15 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 from pydantic import ValidationError as PydanticValidationError
-from app.core.security import CurrentUser
-from app.core.security import owner_scope_ids
 from app.orders.schemas import OrderAccountSnapshot
 from app.stocks.profile import create_account
 from sqlalchemy.orm import Session
 from app.core.errors import (
     ErrorCode,
-    NotFound,
     Validation,
 )
 from app.domain.trade import (
     Account,
-    Order,
 )
 from app.domain.enums import (
     BusinessMode,
@@ -205,14 +204,3 @@ def _normalize_commission_value(value: str | None, field: str) -> str | None:
         )
     cleaned = value.strip().upper()
     return cleaned or None
-
-
-def get_order(session: Session, order_id: int, user: CurrentUser | None = None) -> Order:
-    order = session.get(Order, order_id)
-    if order is None:
-        raise NotFound(f"订单 {order_id} 不存在", details={"order_id": order_id})
-    if user is not None and user.owner_scope != "ALL" and not user.is_admin:
-        visible_ids = owner_scope_ids(session, user)
-        if order.owner_id not in (visible_ids or set()):
-            raise NotFound(f"订单 {order_id} 不存在", details={"order_id": order_id})
-    return order

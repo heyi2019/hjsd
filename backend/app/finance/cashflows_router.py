@@ -5,7 +5,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.database import get_db
 from app.core.errors import Validation
 from app.core.security import (
@@ -14,6 +14,8 @@ from app.core.security import (
     PERM_ORDER_CREATE,
     PERM_ORDER_EVENT_POST,
     CurrentUser,
+)
+from app.auth.session import (
     require_permissions,
 )
 from app.domain.enums import AuditAction

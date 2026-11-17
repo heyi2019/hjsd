@@ -11,7 +11,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import NotFound, PermissionDenied, Validation
 from app.core.time import now_second
 from app.core.security import (
@@ -24,10 +24,12 @@ from app.core.security import (
     PERM_REPORT_READ,
     PERM_TRANSFER_POST,
     CurrentUser,
+)
+from app.auth.session import (
     owner_scope_filter,
 )
 from app.core.settings import get_settings
-from app.core.numbering import allocate_number
+from app.shared.numbering import allocate_number
 from app.domain.attachments import Attachment
 from app.domain.enums import AuditAction, SequenceKey
 from app.domain.trade import Cashflow, Installment, Order, OrderEvent

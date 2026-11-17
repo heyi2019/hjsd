@@ -14,6 +14,8 @@ from app.core.database import get_db
 from app.core.security import (
     PERM_FIELD_DEFINITION_MANAGE,
     CurrentUser,
+)
+from app.auth.session import (
     get_current_user,
     require_permissions,
 )

@@ -7,12 +7,12 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.audit import record_audit
+from app.shared.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AuditAction
 from app.domain.trade import OrderFormField
 
-from .form_field_rules import (
+from app.shared.form_field_rules import (
     FIELD_TYPES,
     FIELD_KEY_PATTERN,
     ORDER_TYPE_CODE_PATTERN,

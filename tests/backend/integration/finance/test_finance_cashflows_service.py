@@ -8,8 +8,8 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import NotFound, Validation
-from app.core.numbering import allocate_flow_no
-from app.core.operation_operators import list_operation_operators
+from app.shared.numbering import allocate_flow_no
+from app.shared.operation_operators import list_operation_operators
 from app.core.security import CurrentUser
 from app.domain.enums import CashflowLedgerType, CashflowSourceType
 from app.domain.foundation import Pool

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
+import { setAntdDateRange } from "@fixtures/antdRange";
 import { commissionResponse, poolBalancesResponse, reportResponse } from "@fixtures/api-responses";
 import { appMessage } from "@/shared/ui/appFeedback";
 
@@ -111,7 +112,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
   it("FE-051：共享日期区间传递到经营报表和订单利润", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
-    const setFrom = async (report: "operating" | "commission" | "profit") => {
+    const setRange = async (report: "operating" | "commission" | "profit") => {
       const labels = {
         operating: "经营损益",
         commission: "分润对账",
@@ -119,17 +120,16 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
       } as const;
       await gotoTab(labels[report]);
       const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-      const input = pane.querySelector<HTMLInputElement>(".ui-control-width-date")!;
-      await ui.clear(input);
-      await ui.type(input, "2026-10-01");
+      await setAntdDateRange(pane, ui, "2026-10-01", "2026-10-31");
     };
-    await setFrom("operating");
-    await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
-    await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
-    await setFrom("commission");
-    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", all_people: true }));
-    await setFrom("profit");
-    await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: undefined }));
+
+    await setRange("operating");
+    await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+    await setRange("commission");
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
+    await setRange("profit");
+    await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
   });
 
   it("FE-053：页内导出成功后创建下载锚点并显示结果反馈", async () => {
@@ -152,16 +152,15 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("经营损益");
     await screen.findAllByText("销售收入"); // MonthlyPnl StatRow + 列标题一定渲染
-    // 父级提升的日期输入无 label，按激活 Tab 面板内的 class 定位（避开导出区的日期输入）
+    // 父级提升的区间选择器无 label，按激活 Tab 面板内定位（避开导出区的日期输入）
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-    const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    await ui.type(dateInputs[0], "2026-01-01");
+    await setAntdDateRange(pane, ui, "2026-01-01", "2026-01-31");
     // 区间变化 → monthlyPnl 重新请求（deps 含 params.from）
     await waitFor(() =>
-      expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledWith({ from: "2026-01-01", to: undefined }),
+      expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledWith({ from: "2026-01-01", to: "2026-01-31" }),
     );
     await waitFor(() =>
-      expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenCalledWith({ from: "2026-01-01", to: undefined }),
+      expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenCalledWith({ from: "2026-01-01", to: "2026-01-31" }),
     );
   });
 
@@ -187,11 +186,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await gotoTab("经营损益");
     await screen.findByText("2026-11");
     let pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-    const r2Dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    await ui.clear(r2Dates[0]);
-    await ui.type(r2Dates[0], "2026-10-01");
-    await ui.clear(r2Dates[1]);
-    await ui.type(r2Dates[1], "2026-10-31");
+    await setAntdDateRange(pane, ui, "2026-10-01", "2026-10-31");
     await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
     await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
     await waitFor(() => expect(screen.queryByText("2026-11")).not.toBeInTheDocument());
@@ -210,11 +205,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await gotoTab("订单利润");
     await screen.findByText("HS-FE272");
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-    const dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    await ui.clear(dates[0]);
-    await ui.type(dates[0], "2026-10-01");
-    await ui.clear(dates[1]);
-    await ui.type(dates[1], "2026-10-31");
+    await setAntdDateRange(pane, ui, "2026-10-01", "2026-10-31");
     await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
     await waitFor(() => expect(screen.queryByText("HS-FE272")).not.toBeInTheDocument());
   });
@@ -233,11 +224,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await gotoTab("分润对账");
     await screen.findByText("HS-FE273");
     let pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-    const r3Dates = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    await ui.clear(r3Dates[0]);
-    await ui.type(r3Dates[0], "2026-10-01");
-    await ui.clear(r3Dates[1]);
-    await ui.type(r3Dates[1], "2026-10-31");
+    await setAntdDateRange(pane, ui, "2026-10-01", "2026-10-31");
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
     await waitFor(() => expect(screen.queryByText("HS-FE273")).not.toBeInTheDocument());
 

@@ -1,6 +1,9 @@
 /** 经营中心：经营损益 / 分润对账 / 数据中心（RPT-01）。
- * 各报表视图拆到 ./reports/*.tsx（导出按钮在各自页内），本文件只留 Tab 壳。 */
-import { Input, Space, Tabs, Typography } from "antd";
+ * 各报表视图拆到 ./reports/*.tsx（导出按钮在各自页内），本文件只留 Tab 壳。
+ * 统计周期用合并 RangePicker（与工作室经营/资金明细同款）；URL 只带 from 时
+ * 选择器显示为空但筛选仍生效（reportFrom 状态保留）。 */
+import { DatePicker, Space, Tabs, Typography } from "antd";
+import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import { DataCenterPanel } from "./DataCenterPanel";
 import { currentReportPeriod, previousReportPeriod } from "./reportPeriod";
@@ -32,9 +35,19 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab, initi
     params: { from: reportFrom || undefined, to: reportTo || undefined },
     picker: (
       <Space size="small">
-        <Input type="date" value={reportFrom} onChange={(event) => setReportFrom(event.target.value)} className="ui-control-width-date" />
-        <span className="muted">至</span>
-        <Input type="date" value={reportTo} onChange={(event) => setReportTo(event.target.value)} className="ui-control-width-date" />
+        <DatePicker.RangePicker
+          aria-label="报表日期区间"
+          placeholder={["开始日期", "结束日期"]}
+          format="YYYY-MM-DD"
+          size="small"
+          placement="bottomLeft"
+          classNames={{ popup: { root: "compact-date-range-picker" } }}
+          value={reportFrom && reportTo ? [dayjs(reportFrom), dayjs(reportTo)] : null}
+          onChange={(value) => {
+            setReportFrom(value?.[0] ? value[0].format("YYYY-MM-DD") : "");
+            setReportTo(value?.[1] ? value[1].format("YYYY-MM-DD") : "");
+          }}
+        />
         <Typography.Link role="button" tabIndex={0} onClick={() => applyReportPeriod(currentReportPeriod())}>本期</Typography.Link>
         <Typography.Link role="button" tabIndex={0} onClick={() => applyReportPeriod(previousReportPeriod())}>上期</Typography.Link>
       </Space>

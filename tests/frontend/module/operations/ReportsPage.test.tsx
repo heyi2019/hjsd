@@ -6,6 +6,7 @@ import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
+import { antdRangeValues, setAntdDateRange } from "@fixtures/antdRange";
 import { appMessage } from "@/shared/ui/appFeedback";
 import { commissionResponse, dataCenterSummary, orderLedgerSummary, poolBalancesResponse, reportResponse } from "@fixtures/api-responses";
 
@@ -87,10 +88,10 @@ describe("ReportsPage：经营中心报表", () => {
     renderLight(<ReportsPage />, { user: "admin" });
     expect(await screen.findByRole("button", { name: "本期" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "上期" })).toBeInTheDocument();
-    const dateInputs = document.querySelectorAll<HTMLInputElement>(".ant-tabs-tabpane-active .ui-control-width-date");
+    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
+    expect(pane.querySelectorAll(".ant-picker-input")).toHaveLength(2);
     await ui.click(screen.getByRole("button", { name: "本期" }));
-    expect(dateInputs[0]).toHaveValue(currentReportPeriod(dayjs()).from);
-    expect(dateInputs[1]).toHaveValue(currentReportPeriod(dayjs()).to);
+    expect(antdRangeValues(pane)).toEqual([currentReportPeriod(dayjs()).from, currentReportPeriod(dayjs()).to]);
   });
 
   it("我的收益只加载当前登录用户的分润记录", async () => {
@@ -190,7 +191,7 @@ describe("ReportsPage：经营中心报表", () => {
     renderLight(<ReportsPage onNavigate={onNavigate} />, { user: "admin" });
     await gotoTab("数据中心");
     expect(await screen.findByText("利润")).toBeInTheDocument();
-    expect(document.querySelectorAll(".ant-tabs-tabpane-active .ui-control-width-date")).toHaveLength(2);
+    expect(document.querySelectorAll(".ant-tabs-tabpane-active .ant-picker-input")).toHaveLength(2);
     await ui.click(screen.getByRole("button", { name: /订单总数/ }));
     expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
   });
@@ -199,11 +200,9 @@ describe("ReportsPage：经营中心报表", () => {
     vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("订单利润");
-    // 报表统计周期 picker：激活 Tab 面板内的两枚日期输入（父级提升、无独立 label）
+    // 报表统计周期 picker：激活 Tab 面板内的合并区间选择器（父级提升、无独立 label）
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-    const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    await ui.type(dateInputs[0], "2026-01-01");
-    await ui.type(dateInputs[1], "2026-01-31");
+    await setAntdDateRange(pane, ui, "2026-01-01", "2026-01-31");
     await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31" }));
   });
@@ -218,17 +217,15 @@ describe("ReportsPage：经营中心报表", () => {
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith("报表已导出"));
   });
 
-  it("导出日期反向（开始晚于结束）时拦截并给出错误提示，不发起导出", async () => {
-    const errorSpy = vi.spyOn(appMessage, "error").mockImplementation((() => undefined) as never);
+  it("反向选择日期时 RangePicker 自动换序为升序（导出拦截仅剩防御意义）", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("订单利润");
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-    const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    await ui.type(dateInputs[0], "2026-12-31");
-    await ui.type(dateInputs[1], "2026-01-01");
+    await setAntdDateRange(pane, ui, "2026-12-31", "2026-01-01");
+    // antd RangePicker 强制 start ≤ end：内部自动交换，UI 层不再产生反向区间。
+    expect(antdRangeValues(pane)).toEqual(["2026-01-01", "2026-12-31"]);
     await ui.click(screen.getByRole("button", { name: "导出" }));
-    await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("导出开始日期不能晚于结束日期"));
-    expect(vi.mocked(reportsApi.exportCsv)).not.toHaveBeenCalled();
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-12-31" }));
   });
 });
 

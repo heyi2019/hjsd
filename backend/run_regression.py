@@ -185,6 +185,9 @@ GROUPS = {
         "tests/backend/integration/business/test_orders_account_effects.py",
         "tests/backend/integration/business/test_orders_api.py",
         "tests/backend/integration/business/test_orders.py",
+        "tests/backend/integration/business/test_orders_flows.py",
+        "tests/backend/integration/business/test_orders_events.py",
+        "tests/backend/integration/business/test_orders_roles.py",
         "tests/backend/integration/business/test_installments_contract.py",
         "tests/backend/integration/business/test_installments_create.py",
         "tests/backend/integration/business/test_installments_lifecycle.py",
@@ -222,6 +225,9 @@ GROUPS = {
         "tests/backend/integration/business/test_orders_account_effects.py",
         "tests/backend/integration/business/test_orders_api.py",
         "tests/backend/integration/business/test_orders.py",
+        "tests/backend/integration/business/test_orders_flows.py",
+        "tests/backend/integration/business/test_orders_events.py",
+        "tests/backend/integration/business/test_orders_roles.py",
         "tests/backend/unit/business/test_orders_events_service.py",
         "tests/backend/unit/system/test_state_machine.py",
         "tests/backend/unit/system/test_api_contract.py",
@@ -287,6 +293,8 @@ GROUPS = {
     "parties": [
         "tests/backend/integration/customer/test_parties.py",
         "tests/backend/integration/customer/test_parties_contract.py",
+        "tests/backend/integration/customer/test_parties_customer_lifecycle.py",
+        "tests/backend/integration/customer/test_parties_counterparty_api.py",
         "tests/backend/integration/customer/test_parties_fields_service.py",
         "tests/backend/integration/customer/test_leads_contract.py",
         "tests/backend/integration/customer/test_parties_policy_guard.py",
@@ -304,6 +312,8 @@ GROUPS = {
     "policy": [
         "tests/backend/integration/settings/test_m5_policy.py",
         "tests/backend/integration/settings/test_policy_contract.py",
+        "tests/backend/integration/settings/test_policy_allocation.py",
+        "tests/backend/integration/settings/test_policy_versioning.py",
         "tests/backend/integration/settings/test_policy_rule_consumption.py",
     ],
     "governance": [

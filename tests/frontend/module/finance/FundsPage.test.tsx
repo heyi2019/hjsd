@@ -57,8 +57,8 @@ const deposits = [
   { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" },
 ];
 const cashflows = [
-  { id: 1, status: "APPROVED", flow_no: "ZC00001", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
-  { id: 2, status: "APPROVED", flow_no: "SR00001", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
+  { id: 1, flow_no: "ZC00001", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source_type: "ORDER_EVENT", source_id: "HS0001-EV-BUY-01", source: "ORDER_EVENT", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
+  { id: 2, flow_no: "SR00001", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source_type: "ORDER_EVENT", source_id: "HS0001-EV-SELL-01", source: "ORDER_EVENT", ledger_type: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
 ];
 
 beforeEach(() => {
@@ -135,25 +135,45 @@ describe("FundsPage：资金池卡片", () => {
     expect(screen.getByRole("button", { name: /资金池划转/ })).toBeDisabled();
   });
 
-  it("资金中心只展示实时资金池、余额、流水、对账和工作室支出", async () => {
+  it("资金中心将工作室运营、对账和押金作为一级入口", async () => {
     vi.mocked(cashflowsApi.list).mockResolvedValueOnce(cashflowPage([
-        { ...cashflows[0], id: 31, transfer_id: "TRF-PAIRED-01", direction: "OUT" },
-        { ...cashflows[0], id: 32, transfer_id: "TRF-PAIRED-01", direction: "IN", pool_id: 2 },
+        { ...cashflows[0], id: 31, source_type: "TRANSFER", source_id: "TRF-PAIRED-01", direction: "OUT" },
+        { ...cashflows[0], id: 32, source_type: "TRANSFER", source_id: "TRF-PAIRED-01", direction: "IN", pool_id: 2 },
       ]));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     expect(screen.getByRole("tab", { name: "总览" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "流水" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "资金明细" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "工作室运营" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "对账" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "工作室支出" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "异常" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "押金" })).toBeInTheDocument();
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    expect(screen.queryByRole("tab", { name: "全部明细" })).not.toBeInTheDocument();
+    await ui.click(screen.getByRole("tab", { name: "工作室运营" }));
+    expect(await screen.findByRole("button", { name: "记一笔" })).toBeInTheDocument();
+  });
+
+  it("资金明细按账簿列区分业务资金与工作室运营", async () => {
+    vi.mocked(cashflowsApi.list).mockResolvedValueOnce(cashflowPage([
+      cashflows[0],
+      { ...cashflows[1], id: 3, category: "房租", direction: "OUT", amount: "200.00", ledger_type: "STUDIO", source_type: "MANUAL", source_id: null, source: "MANUAL" },
+    ], { total_in: "800.00", total_out: "700.00" }));
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    expect(screen.getByText("业务资金")).toBeInTheDocument();
+    expect(screen.getAllByText("工作室运营").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByRole("combobox", { name: "流水状态" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "流水资金性质" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "状态" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "资金性质" })).not.toBeInTheDocument();
   });
 
   it("FE-229：资金流水失败时统计不可用、筛选和新增入口禁用", async () => {
     vi.mocked(cashflowsApi.list).mockRejectedValueOnce(new Error("cashflows down"));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
 
     expect(await screen.findByText("资金流水数据不可用，请点击“查询”或页面顶部的“重新加载”。")).toBeInTheDocument();
     expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("不可用");
@@ -183,24 +203,23 @@ describe("FundsPage：资金池卡片", () => {
 });
 
 describe("FundsPage：押金占用", () => {
-  it("删除独立押金页，押金逻辑并入工作室支出", async () => {
+  it("押金板块作为独立入口保留业务资金口径", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
 
-    expect(screen.queryByRole("tab", { name: "押金" })).not.toBeInTheDocument();
-    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
-    // 断言「押金占用」这一整块（卡片标题 + 新增入口）落在工作室支出面板内，而不是靠
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    // 断言「押金占用」这一整块（卡片标题 + 新增入口）落在资金中心独立入口内，而不是靠
     // 别处（如已卸载的总览 StatRow）凑出现次数。Tabs 开了 destroyOnHidden，未激活面板
     // 不会留在 DOM，故此处必须是面板内的唯一一份。
-    const studioPanel = await screen.findByRole("tabpanel");
-    expect(within(studioPanel).getByText("押金占用")).toBeInTheDocument();
-    expect(within(studioPanel).getByRole("button", { name: /新增占用/ })).toBeInTheDocument();
+    const depositPanel = await screen.findByRole("tabpanel", { name: "押金" });
+    expect(within(depositPanel).getByText("押金占用")).toBeInTheDocument();
+    expect(within(depositPanel).getByRole("button", { name: /新增占用/ })).toBeInTheDocument();
   });
 
   it("押金列表渲染金额与剩余（占用-已释放）", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
     expect(screen.queryByText("押金编号")).not.toBeInTheDocument();
     expect(screen.getAllByText("300.00").length).toBeGreaterThanOrEqual(1); // 500-200
   });
@@ -208,7 +227,7 @@ describe("FundsPage：押金占用", () => {
   it("押金明细展示对手方、来源订单和预计释放日", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
     expect(screen.getByText("#99")).toBeInTheDocument();
     expect(screen.getByText("#7")).toBeInTheDocument();
     expect(screen.getByText("2026-11-01")).toBeInTheDocument();
@@ -219,7 +238,7 @@ describe("FundsPage：资金流水", () => {
   it("资金流水日期筛选使用公共日期控件", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
 
     expect(screen.getByLabelText("流水开始日期").closest(".ant-picker")).toBeInTheDocument();
     expect(screen.getByLabelText("流水结束日期").closest(".ant-picker")).toBeInTheDocument();
@@ -228,7 +247,7 @@ describe("FundsPage：资金流水", () => {
   it("资金流水录入不再提供资金池账户选择", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
 
     expect(screen.queryByText("资金池账户")).not.toBeInTheDocument();
@@ -237,7 +256,7 @@ describe("FundsPage：资金流水", () => {
   it("资金流水录入显示操作人选择", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
 
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
@@ -248,12 +267,11 @@ describe("FundsPage：资金流水", () => {
   it("展示订单号、收支明细及总收入/总支出", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     expect(screen.getByText("ZC00001")).toBeInTheDocument();
     expect(screen.getAllByText("HS0001").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("总收入")).toBeInTheDocument();
     expect(screen.getByText("总支出")).toBeInTheDocument();
-    expect(screen.getAllByText("本方经营").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("回收成本")).toBeInTheDocument();
     expect(screen.getByText("自营收入")).toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
@@ -270,7 +288,7 @@ describe("FundsPage：资金流水", () => {
     }));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
 
     expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("123,456.78");
     expect(screen.getByText("总支出").closest(".ui-stat")).toHaveTextContent("87,654.32");
@@ -285,7 +303,7 @@ describe("FundsPage：资金流水", () => {
     ));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     const search = screen.getByLabelText("流水搜索");
     await ui.type(search, "SELL");
     await ui.click(screen.getByRole("button", { name: "查询" }));
@@ -302,7 +320,7 @@ describe("FundsPage：资金流水", () => {
     vi.mocked(cashflowsApi.exportCsv).mockResolvedValue(new Blob(["csv"]));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     await ui.type(screen.getByLabelText("流水搜索"), "SELL");
     await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.exportCsv)).toHaveBeenCalledWith(
@@ -319,7 +337,7 @@ describe("FundsPage：资金流水", () => {
     ));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     await ui.type(screen.getByLabelText("流水搜索"), "SELL");
     await ui.click(screen.getByRole("button", { name: "查询" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "SELL" })));
@@ -332,14 +350,14 @@ describe("FundsPage：资金流水", () => {
   it("流水合计完全由服务端汇总，不按本地收窄重算", async () => {
     // 1.005 + 0.005 的展示口径由服务端 Decimal 汇总决定；前端不再按当前已加载行二次运算。
     const rows = [
-      { ...cashflows[1], id: 21, amount: "1.005", order_no: "SE-A", direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
-      { ...cashflows[1], id: 22, amount: "0.005", order_no: "SE-B", direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
-      { ...cashflows[0], id: 23, amount: "9.00", order_no: "BUY-C", direction: "OUT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
+      { ...cashflows[1], id: 21, amount: "1.005", order_no: "SE-A", direction: "IN", accounting_attribute: "SELF_REVENUE" },
+      { ...cashflows[1], id: 22, amount: "0.005", order_no: "SE-B", direction: "IN", accounting_attribute: "SELF_REVENUE" },
+      { ...cashflows[0], id: 23, amount: "9.00", order_no: "BUY-C", direction: "OUT", accounting_attribute: "SELF_DIRECT_COST" },
     ];
     vi.mocked(cashflowsApi.list).mockResolvedValue(cashflowPage(rows, { total_in: "1.01", total_out: "9.00" }));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     // 关键词 "SE" 本地收窄出两条 IN（SE-A / SE-B），排除 BUY-C；
     // 即便当前页面已加载全部 3 条，合计仍使用服务端返回的 1.01。
     vi.mocked(cashflowsApi.list).mockImplementation(async (params) => cashflowPage(
@@ -361,7 +379,7 @@ describe("FundsPage：资金写路径", () => {
     resolveMockOnce(vi.mocked(depositsApi.create), { id: 12 });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
     await ui.click(await screen.findByRole("button", { name: /新增占用/ }));
     await waitFor(() => expect(screen.getByText("新增押金占用")).toBeInTheDocument());
     expect(document.querySelector(".deposit-modal")).toBeInTheDocument();
@@ -379,7 +397,7 @@ describe("FundsPage：资金写路径", () => {
   it("押金关联编号必须是正整数", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
     await ui.click(await screen.findByRole("button", { name: /新增占用/ }));
     const modal = await screen.findByText("新增押金占用");
     const content = modal.closest(".ant-modal-content") as HTMLElement;
@@ -397,7 +415,7 @@ describe("FundsPage：资金写路径", () => {
     resolveMockOnce(vi.mocked(depositsApi.update), { ...deposits[0], status: "PAID" });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
     const row = screen.getByText("#99").closest("tr") as HTMLElement;
     await ui.click(within(row).getByRole("button", { name: "编辑" }));
     expect(await screen.findByText("编辑押金占用")).toBeInTheDocument();
@@ -411,7 +429,7 @@ describe("FundsPage：资金写路径", () => {
     resolveMockOnce(vi.mocked(depositsApi.remove), undefined);
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
     const row = screen.getByText("#99").closest("tr") as HTMLElement;
     await ui.click(within(row).getByRole("button", { name: "删除" }));
     expect(await screen.findByText("删除押金占用")).toBeInTheDocument();
@@ -422,7 +440,7 @@ describe("FundsPage：资金写路径", () => {
   it("押金释放按 deposit.post 门控：finance 可见、operator 不可见", async () => {
     renderLight(<FundsPage />, { user: "finance" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
     await screen.findByText("300.00");
     expect(screen.getAllByRole("button", { name: /释\s*放/ }).length).toBeGreaterThanOrEqual(1);
   });
@@ -431,7 +449,7 @@ describe("FundsPage：资金写路径", () => {
     resolveMockOnce(vi.mocked(depositsApi.loss), { id: 91 });
     renderLight(<FundsPage />, { user: "finance" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
     await ui.click(await screen.findByRole("button", { name: /登记损失/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await ui.type(modal.querySelector("#amount") ?? modal, "100.00");
@@ -455,7 +473,7 @@ describe("FundsPage：资金写路径", () => {
     resolveMockOnce(vi.mocked(depositsApi.cancel), { id: 12 });
     renderLight(<FundsPage />, { user: "finance" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
     await ui.click(await screen.findByRole("button", { name: /取\s*消/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await waitFor(() => expect(modal).toBeTruthy());
@@ -504,8 +522,8 @@ describe("FundsPage：资金写路径", () => {
   });
 
   it("P1/FE-050：流水冲销成功后原流水不再显示重复冲销入口", async () => {
-    const original = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
-    const reversal = { ...original, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", reversal_of_id: 7 };
+    const original = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source_type: "MANUAL", source_id: null, source: "MANUAL", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" };
+    const reversal = { ...original, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", source_type: "REVERSAL", source_id: original.flow_no };
     let mainListCalls = 0;
     vi.mocked(poolsApi.list).mockResolvedValueOnce([
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
@@ -525,7 +543,7 @@ describe("FundsPage：资金写路径", () => {
     renderLight(<FundsPage />, { user: "admin" });
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await screen.findByText(/经营主池/);
-    await user.click(screen.getByRole("tab", { name: "流水" }));
+    await user.click(screen.getByRole("tab", { name: "资金明细" }));
     await screen.findByText("CF-A-07");
     await user.click(screen.getByRole("button", { name: /冲销/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;

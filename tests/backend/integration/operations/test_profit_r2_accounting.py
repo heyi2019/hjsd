@@ -21,7 +21,6 @@ from uuid import uuid4
 
 from app.core.money import to_money
 from app.domain.enums import (
-    CashflowStatus,
     LinkStatus,
     RebateStatus,
     RebateType,
@@ -61,18 +60,16 @@ def _add_rebate(seeded_db, order_id: int, amount: str, status: str) -> RebateRec
 
 
 def _flow(seeded_db, *, direction, nature, amount, accounting_attribute=None,
-          category="OTHER", order_id=None, status=CashflowStatus.APPROVED.value) -> Cashflow:
+          category="OTHER", order_id=None) -> Cashflow:
     flow = Cashflow(
         flow_no=f"CF-{uuid4().hex[:10]}",
         pool_id=1,
         occurred_on=D,
         nature=nature,
-        fund_nature="BUSINESS",
         accounting_attribute=accounting_attribute,
         category=category,
         direction=direction,
         amount=to_money(amount),
-        status=status,
         order_id=order_id,
         created_by="pytest",
         updated_by="pytest",
@@ -130,7 +127,7 @@ def test_r2_reversal_of_business_income_not_counted_as_operating(seeded_db):
 
     income = create_cashflow(
         seeded_db, pool_id=1, occurred_on=D, direction="IN", nature="BUSINESS_IN",
-        fund_nature="BUSINESS", accounting_attribute="SELF_REVENUE",
+        accounting_attribute="SELF_REVENUE",
         category="CUSTOMER_RECEIPT", amount=Decimal("800"), actor="pytest", note="经营收款",
     )
     reverse_cashflow(

@@ -8,21 +8,9 @@ from app.finance.attributes import derive_manual_cashflow_nature
 from app.finance.schemas import CashflowCreate
 
 
-@pytest.mark.parametrize(
-    ("fund_nature", "direction", "expected"),
-    [
-        ("EXTERNAL", "IN", "EXTERNAL_IN"),
-        ("EXTERNAL", "OUT", "BUSINESS_OUT"),
-        ("INTERNAL", "IN", "BUSINESS_IN"),
-        ("INTERNAL", "OUT", "BUSINESS_OUT"),
-        ("BUSINESS", "IN", "BUSINESS_IN"),
-        ("BUSINESS", "OUT", "BUSINESS_OUT"),
-    ],
-)
-def test_manual_cashflow_nature_is_derived_by_finance(
-    fund_nature: str, direction: str, expected: str
-) -> None:
-    assert derive_manual_cashflow_nature(fund_nature, direction) == expected
+@pytest.mark.parametrize(("direction", "expected"), [("IN", "BUSINESS_IN"), ("OUT", "BUSINESS_OUT")])
+def test_manual_cashflow_nature_is_derived_by_direction(direction: str, expected: str) -> None:
+    assert derive_manual_cashflow_nature(direction) == expected
 
 
 def test_finance_router_only_exposes_the_composed_router() -> None:
@@ -39,7 +27,6 @@ def test_manual_cashflow_request_does_not_require_derived_nature() -> None:
         pool_id=1,
         occurred_on="2026-11-16",
         direction="IN",
-        fund_nature="BUSINESS",
         accounting_attribute="SELF_REVENUE",
         category="OTHER",
         amount="1.00",

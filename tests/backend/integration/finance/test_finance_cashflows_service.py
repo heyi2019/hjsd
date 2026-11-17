@@ -10,6 +10,7 @@ from sqlalchemy import select
 from app.core.errors import NotFound, Validation
 from app.core.operation_operators import list_operation_operators
 from app.core.security import CurrentUser
+from app.domain.enums import CashflowLedgerType, CashflowSourceType
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Deposit
 from app.finance import cashflows, deposits
@@ -21,7 +22,7 @@ from app.finance import transfers
 TODAY = date(2026, 10, 17)
 
 
-def test_cashflows_module_creates_approved_cashflow(seeded_db):
+def test_cashflows_module_creates_cashflow_without_status(seeded_db):
     flow = cashflows.create_cashflow(
         seeded_db,
         pool_id=1,
@@ -35,8 +36,57 @@ def test_cashflows_module_creates_approved_cashflow(seeded_db):
     )
 
     assert flow.amount == Decimal("180.00")
-    assert flow.status == "APPROVED"
+    assert not hasattr(flow, "status")
     assert flow.category == "客户收款"
+
+
+def test_cashflow_uses_unified_source_reference(seeded_db):
+    flow = cashflows.create_cashflow(
+        seeded_db,
+        pool_id=1,
+        occurred_on=TODAY,
+        direction="OUT",
+        nature="BUSINESS_OUT",
+        category="房租",
+        amount=Decimal("300"),
+        actor="pytest",
+    )
+
+    assert flow.source_type == "MANUAL"
+    assert flow.source_id is None
+
+
+def test_cashflow_has_top_level_ledger_and_can_filter_business_or_studio(seeded_db):
+    business = cashflows.create_cashflow(
+        seeded_db,
+        pool_id=1,
+        occurred_on=TODAY,
+        direction="OUT",
+        nature="BUSINESS_OUT",
+        category="BUY",
+        amount=Decimal("10"),
+        actor="pytest",
+        ledger_type=CashflowLedgerType.BUSINESS.value,
+    )
+    studio = cashflows.create_cashflow(
+        seeded_db,
+        pool_id=1,
+        occurred_on=TODAY,
+        direction="OUT",
+        nature="BUSINESS_OUT",
+        category="房租",
+        amount=Decimal("20"),
+        actor="pytest",
+        ledger_type=CashflowLedgerType.STUDIO.value,
+    )
+
+    assert business.ledger_type == CashflowLedgerType.BUSINESS.value
+    assert studio.ledger_type == CashflowLedgerType.STUDIO.value
+    rows, total = cashflows.list_cashflows(
+        seeded_db, ledger_type=CashflowLedgerType.STUDIO.value
+    )
+    assert total == 1
+    assert rows[0]["id"] == studio.id
 
 
 def test_cashflow_and_deposit_entries_come_from_real_modules():
@@ -64,7 +114,11 @@ def test_update_deposit_updates_the_linked_hold_cashflow(seeded_db):
         actor="pytest",
     )
     hold = seeded_db.scalar(
-        select(Cashflow).where(Cashflow.deposit_id == deposit.id, Cashflow.category == "DEPOSIT_HOLD")
+        select(Cashflow).where(
+            Cashflow.source_type == CashflowSourceType.DEPOSIT.value,
+            Cashflow.source_id == str(deposit.id),
+            Cashflow.category == "DEPOSIT_HOLD",
+        )
     )
 
     assert updated.paid_amount == Decimal("25.00")
@@ -83,7 +137,10 @@ def test_delete_deposit_removes_its_hold_cashflow(seeded_db):
     deposits.delete_deposit(seeded_db, deposit.id, actor="pytest")
 
     assert seeded_db.get(Deposit, deposit.id) is None
-    assert seeded_db.scalar(select(Cashflow).where(Cashflow.deposit_id == deposit.id)) is None
+    assert seeded_db.scalar(select(Cashflow).where(
+        Cashflow.source_type == CashflowSourceType.DEPOSIT.value,
+        Cashflow.source_id == str(deposit.id),
+    )) is None
 
 
 def test_update_studio_cashflow_updates_the_manual_entry(seeded_db):
@@ -103,7 +160,6 @@ def test_update_studio_cashflow_updates_the_manual_entry(seeded_db):
         occurred_on=date(2026, 10, 20),
         direction="OUT",
         nature="BUSINESS_OUT",
-        fund_nature="BUSINESS",
         accounting_attribute="OPERATING_EXPENSE",
         category="房租",
         amount=Decimal("3200"),
@@ -145,7 +201,7 @@ def _all_scope_user() -> CurrentUser:
     )
 
 
-def _make_flow(seeded_db, *, direction, nature, fund_nature="BUSINESS",
+def _make_flow(seeded_db, *, direction, nature,
                accounting_attribute="OPERATING_EXPENSE", category="OTHER", amount="10",
                note="memo", order_id=None):
     return cashflows.create_cashflow(
@@ -154,7 +210,6 @@ def _make_flow(seeded_db, *, direction, nature, fund_nature="BUSINESS",
         occurred_on=TODAY,
         direction=direction,
         nature=nature,
-        fund_nature=fund_nature,
         accounting_attribute=accounting_attribute,
         category=category,
         amount=Decimal(amount),
@@ -190,17 +245,6 @@ def test_create_cashflow_rejects_in_nature_mismatch(seeded_db):
 def test_create_cashflow_rejects_out_nature_mismatch(seeded_db):
     with pytest.raises(Validation, match="支出流水的 nature 不匹配"):
         _make_flow(seeded_db, direction="OUT", nature="BUSINESS_IN")
-
-
-def test_create_cashflow_rejects_attr_mismatch(seeded_db):
-    with pytest.raises(Validation):
-        _make_flow(
-            seeded_db,
-            direction="OUT",
-            nature="BUSINESS_OUT",
-            fund_nature="EXTERNAL",
-            accounting_attribute="OPERATING_EXPENSE",
-        )
 
 
 def test_create_cashflow_rejects_external_in_without_note(seeded_db):
@@ -269,7 +313,10 @@ def test_reverse_cashflow_rejects_deposit_flow(seeded_db):
     deposit = deposits.create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
-    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.deposit_id == deposit.id))
+    flow = seeded_db.scalar(select(Cashflow).where(
+        Cashflow.source_type == CashflowSourceType.DEPOSIT.value,
+        Cashflow.source_id == str(deposit.id),
+    ))
     with pytest.raises(Validation, match="押金或划转现金流必须通过原业务流程冲销"):
         cashflows.reverse_cashflow(
             seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x"
@@ -404,20 +451,10 @@ def test_list_cashflows_filters(seeded_db):
     rows, _ = cashflows.list_cashflows(seeded_db, occurred_to=TODAY)
     assert any(r["id"] == flow.id for r in rows)
 
-    rows, _ = cashflows.list_cashflows(seeded_db, status="APPROVED")
-    assert any(r["id"] == flow.id for r in rows)
-
-    rows, _ = cashflows.list_cashflows(seeded_db, fund_nature="BUSINESS")
-    assert any(r["id"] == flow.id for r in rows)
     rows, _ = cashflows.list_cashflows(seeded_db, accounting_attribute="OPERATING_EXPENSE")
     assert any(r["id"] == flow.id for r in rows)
     rows, _ = cashflows.list_cashflows(seeded_db, created_by="pytest")
     assert any(r["id"] == flow.id for r in rows)
-
-
-def test_list_cashflows_rejects_bad_status(seeded_db):
-    with pytest.raises(Validation, match="status 必须为"):
-        cashflows.list_cashflows(seeded_db, status="BADSTATUS")
 
 
 def test_list_cashflows_transfer_source(seeded_db):
@@ -427,7 +464,6 @@ def test_list_cashflows_transfer_source(seeded_db):
         occurred_on=TODAY,
         direction="IN",
         nature="BUSINESS_IN",
-        fund_nature="BUSINESS",
         accounting_attribute="SELF_REVENUE",
         category="OTHER",
         amount=Decimal("100"),
@@ -438,7 +474,7 @@ def test_list_cashflows_transfer_source(seeded_db):
         amount=Decimal("10"), occurred_on=TODAY, actor="pytest",
     )
     rows, total = cashflows.list_cashflows(seeded_db)
-    transfer_rows = [r for r in rows if r["transfer_id"] is not None]
+    transfer_rows = [r for r in rows if r["source_type"] == CashflowSourceType.TRANSFER.value]
     assert transfer_rows
     assert all(r["source"] == "TRANSFER" for r in transfer_rows)
 
@@ -474,7 +510,7 @@ def test_list_cashflows_user_only_filter(seeded_db):
 def test_list_cashflows_deposit_source(seeded_db):
     deposits.create_deposit(seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest")
     rows, _ = cashflows.list_cashflows(seeded_db)
-    deposit_rows = [r for r in rows if r["deposit_id"] is not None]
+    deposit_rows = [r for r in rows if r["source_type"] == CashflowSourceType.DEPOSIT.value]
     assert deposit_rows
     assert all(r["source"] == "DEPOSIT" for r in deposit_rows)
 
@@ -505,7 +541,8 @@ def test_cancel_paid_deposit_writes_one_reversal(seeded_db):
     )
     rows = seeded_db.scalars(
         select(Cashflow).where(
-            Cashflow.deposit_id == deposit.id,
+                Cashflow.source_type == CashflowSourceType.DEPOSIT.value,
+                Cashflow.source_id == str(deposit.id),
             Cashflow.category == "DEPOSIT_CANCEL",
         )
     ).all()
@@ -571,7 +608,8 @@ def test_lose_deposit_marks_lost(seeded_db):
         seeded_db, deposit.id, amount=Decimal("10"), lost_on=TODAY,
         category="OFFICE", reason="x", actor="pytest",
     )
-    assert lost.deposit_id == deposit.id
+    assert lost.source_type == CashflowSourceType.DEPOSIT.value
+    assert lost.source_id == str(deposit.id)
 
 
 def test_create_deposit_rejects_unknown_source_order(seeded_db):
@@ -607,10 +645,10 @@ def _cashflow_row(**overrides):
     row = dict(
         id=1, flow_no="ZC00001", pool_id=1, occurred_on=TODAY,
         occurred_at=datetime(2026, 10, 17, 9, 0), nature="BUSINESS_IN",
-        fund_nature="BUSINESS", accounting_attribute="SELF_REVENUE",
-        category="SALE", direction="IN", amount=Decimal("10"), status="APPROVED",
-        reviewed_by=None, reviewed_at=None, reversal_of_id=None, order_id=None,
-        order_no=None, deposit_id=None, order_event_id=None, transfer_id=None,
+        ledger_type="BUSINESS", accounting_attribute="SELF_REVENUE",
+        category="SALE", direction="IN", amount=Decimal("10"),
+        reviewed_by=None, reviewed_at=None, source_type="MANUAL", source_id=None,
+        order_id=None, order_no=None,
         note=None, form_extra=None, operator="pytest", created_by="pytest",
     )
     row.update(overrides)
@@ -621,14 +659,17 @@ def test_cashflow_out_marks_order_event_source(seeded_db):
     """挂了订单事件就必须标 ORDER_EVENT —— 前端据此决定能否跳订单详情。"""
     from app.finance import router_output
 
-    assert router_output._cashflow_out(seeded_db, _cashflow_row(order_event_id=7)).source == (
+    assert router_output._cashflow_out(seeded_db, _cashflow_row(source_type="ORDER_EVENT", source_id="HS0001-EV-BUY-01")).source == (
         "ORDER_EVENT"
     )
 
 
-def test_cashflow_out_marks_rebate_settlement_source(seeded_db):
-    """返点类（含冲销）没有订单事件，来源必须落到 REBATE_SETTLEMENT 而不是 OTHER。"""
+def test_cashflow_out_marks_order_event_rebate_source(seeded_db):
+    """返点收入流水通过返点订单事件回指来源。"""
     from app.finance import router_output
 
-    out = router_output._cashflow_out(seeded_db, _cashflow_row(category="REBATE_REVERSAL"))
-    assert out.source == "REBATE_SETTLEMENT"
+    out = router_output._cashflow_out(
+        seeded_db,
+        _cashflow_row(category="REBATE", source_type="ORDER_EVENT", source_id="HS0001-EV-REBATE-01"),
+    )
+    assert out.source == "ORDER_EVENT"

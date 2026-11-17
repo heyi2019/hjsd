@@ -107,8 +107,8 @@ export interface OrderCashflow {
   category: string;
   direction: string;
   amount: string;
-  status: string;
-  order_event_id?: number | null;
+  source_type: string;
+  source_id?: string | null;
   note?: string | null;
   operator: string;
 }

@@ -20,7 +20,7 @@ from datetime import date
 
 from sqlalchemy import select
 
-from app.domain.enums import CashflowStatus, Direction, EventType
+from app.domain.enums import Direction, EventType
 from app.domain.foundation import Pool
 from app.domain.trade_models.cashflow import Cashflow
 from app.domain.trade import Account
@@ -94,7 +94,7 @@ def test_recycle_flow_buy_event_records_cashflow_and_updates_pool_balance(
         select(Cashflow).where(Cashflow.order_id == order_id)
     ).one()
     assert flow.direction == Direction.OUT.value
-    assert flow.status == CashflowStatus.APPROVED.value
+    assert not hasattr(flow, "status")
     assert flow.amount == 1000
     assert flow.pool_id == pool.id
 

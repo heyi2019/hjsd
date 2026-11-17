@@ -251,10 +251,10 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
         route_columns = _column_names(engine, "order_type_pools")
         assert "fund_nature" in route_columns
 
-        # 资金流水 CHECK：INTERNAL 必须绑定 transfer_id（跨方言只看约束语义）。
+        # 资金流水 CHECK：INTERNAL 必须绑定 TRANSFER 来源（跨方言只看约束语义）。
         cashflow_clause = _check_clauses(engine, "cashflow")
         assert "INTERNAL" in cashflow_clause
-        assert "transfer_id" in cashflow_clause
+        assert "source_type" in cashflow_clause
         assert "IS NOT NULL" in cashflow_clause
 
         pools = {row[0] for row in connection.execute(text("SELECT code FROM pools"))}

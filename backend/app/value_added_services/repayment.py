@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Any
 from app.core.audit import record_audit
 from app.core.security import CurrentUser
-from app.domain.enums import CashflowStatus, Direction, Nature
+from app.domain.enums import CashflowSourceType, Direction, FundNature, Nature
 from app.finance.attributes import accounting_attribute_for_order_event
 from app.finance.cashflows import create_cashflow, reverse_cashflow
 from app.orders.events_rules import _resolve_pool
@@ -101,9 +101,10 @@ def pay(
             details={"period_no": schedule.period_no, "outstanding": str(outstanding)},
         )
 
-    fund_nature, accounting_attribute = accounting_attribute_for_order_event(
+    accounting_attribute = accounting_attribute_for_order_event(
         order.order_type, EventType.SELL.value
     )
+    fund_nature = FundNature.BUSINESS.value
     resolved_pool_id = pool_id
     if resolved_pool_id is None:
         resolved_pool_id = _resolve_pool(
@@ -115,10 +116,11 @@ def pay(
         occurred_on=paid_on,
         direction=Direction.IN.value,
         nature=Nature.BUSINESS_IN.value,
-        fund_nature=fund_nature,
         accounting_attribute=accounting_attribute,
         category="INSTALLMENT_PAYMENT",
         amount=money,
+        source_type=CashflowSourceType.INSTALLMENT.value,
+        source_id=installment.inst_no,
         actor=actor,
         operator_user_ids=operator_user_ids,
         order_id=order.id,
@@ -223,21 +225,21 @@ def cancel_installment(
         .where(
             Cashflow.order_id == order.id,
             Cashflow.category == "INSTALLMENT_PAYMENT",
-            Cashflow.order_event_id.is_(None),
-            Cashflow.status == CashflowStatus.APPROVED.value,
+            Cashflow.source_type == CashflowSourceType.INSTALLMENT.value,
         )
         .order_by(Cashflow.id)
     ).all()
     if direct_cashflows:
-        reversed_cashflow_ids = set(
+        reversed_cashflow_nos = set(
             session.scalars(
-                select(Cashflow.reversal_of_id).where(
-                    Cashflow.reversal_of_id.in_([flow.id for flow in direct_cashflows])
+                select(Cashflow.source_id).where(
+                    Cashflow.source_type == CashflowSourceType.REVERSAL.value,
+                    Cashflow.source_id.in_([flow.flow_no for flow in direct_cashflows]),
                 )
             ).all()
         )
         for flow in direct_cashflows:
-            if flow.id in reversed_cashflow_ids:
+            if flow.flow_no in reversed_cashflow_nos:
                 continue
             reverse_cashflow(
                 session,
@@ -251,7 +253,7 @@ def cancel_installment(
             amount = to_money(flow.amount)
             refund_amount += amount
             reversed_amount += amount
-        direct_cashflows = [flow for flow in direct_cashflows if flow.id not in reversed_cashflow_ids]
+            direct_cashflows = [flow for flow in direct_cashflows if flow.flow_no not in reversed_cashflow_nos]
     order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
     installment.status = transition(
         INSTALLMENT_TRANSITIONS, installment.status, "CANCEL", entity="分期合约"

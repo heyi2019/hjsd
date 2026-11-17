@@ -12,9 +12,8 @@ export const cashflowsApi = {
     direction?: string;
     occurred_from?: string;
     occurred_to?: string;
-    status?: string;
     nature?: string;
-    fund_nature?: string;
+    ledger_type?: string;
     accounting_attribute?: string;
     category?: string;
     created_by?: string;
@@ -32,9 +31,8 @@ export const cashflowsApi = {
     direction?: string;
     occurred_from?: string;
     occurred_to?: string;
-    status?: string;
     nature?: string;
-    fund_nature?: string;
+    ledger_type?: string;
     accounting_attribute?: string;
     category?: string;
     created_by?: string;
@@ -46,9 +44,8 @@ export const cashflowsApi = {
     direction?: string;
     occurred_from?: string;
     occurred_to?: string;
-    status?: string;
     nature?: string;
-    fund_nature?: string;
+    ledger_type?: string;
     accounting_attribute?: string;
     category?: string;
     created_by?: string;

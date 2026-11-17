@@ -47,7 +47,6 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
   ],
   FUNDFLOW: [
     { key: "direction", label: "收支方向", type: "SELECT", options: [{ value: "IN", label: "收入" }, { value: "OUT", label: "支出" }] },
-    { key: "fund_nature", label: "资金性质", type: "SELECT", options: [{ value: "BUSINESS", label: "本方经营" }, { value: "EXTERNAL", label: "外部/受托" }, { value: "INTERNAL", label: "内部调拨" }] },
     {
       key: "accounting_attribute",
       label: "核算属性",

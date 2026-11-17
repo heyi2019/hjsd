@@ -15,7 +15,7 @@ from app.core.time import now_second
 from app.core.money import to_money
 from app.core.operation_operators import upsert_operation_operators
 from app.core.security import CurrentUser
-from app.domain.enums import AuditAction, CashflowStatus, Direction, ReconciliationStatus
+from app.domain.enums import AuditAction, Direction, ReconciliationStatus
 from app.domain.trade import Cashflow, Reconciliation
 from app.orders.form_fields import validate_form_extra
 from app.foundation.pools import assert_pool_usable
@@ -45,7 +45,6 @@ def _system_balance_as_of(session: Session, pool_id: int, reconciled_on: date) -
     conditions = [
             Cashflow.pool_id == pool_id,
             Cashflow.occurred_on <= reconciled_on,
-            Cashflow.status == CashflowStatus.APPROVED.value,
         ]
     value = session.scalar(select(func.coalesce(func.sum(signed_amount), 0)).where(*conditions))
     # 账户余额可能因历史支出而低于零，但资金快照本身仍必须能记录它。

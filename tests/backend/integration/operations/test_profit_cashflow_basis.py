@@ -16,7 +16,6 @@ import pytest
 from app.core.errors import Validation
 from app.core.money import to_money
 from app.domain.enums import (
-    CashflowStatus,
     InstallmentContractType,
     InstallmentDispositionAction,
     LinkStatus,
@@ -85,7 +84,6 @@ def _add_flow(seeded_db, order_id: int, direction: str, amount: str) -> None:
             direction=direction,
             category="OTHER",
             amount=to_money(amount),
-            status=CashflowStatus.APPROVED.value,
             order_id=order_id,
             created_by="pytest",
             updated_by="pytest",

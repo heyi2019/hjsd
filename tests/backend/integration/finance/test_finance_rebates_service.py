@@ -142,7 +142,10 @@ def test_rebate_creates_business_event_and_income_cashflow(seeded_db):
     )
     assert event is not None
     assert (event.form_extra or {}).get("rebate_record_id") == record.id
-    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_event_id == event.id))
+    flow = seeded_db.scalar(select(Cashflow).where(
+        Cashflow.source_type == "ORDER_EVENT",
+        Cashflow.source_id == event.event_no,
+    ))
     assert flow is not None
     assert flow.direction == "IN"
     assert flow.category == "REBATE"

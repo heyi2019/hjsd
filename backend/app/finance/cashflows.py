@@ -18,16 +18,16 @@ from app.core.security import CurrentUser, owner_scope_filter
 from app.domain.enums import (
     AccountingAttribute,
     AuditAction,
-    CashflowStatus,
+    CashflowLedgerType,
+    CashflowSourceType,
     Direction,
     Nature,
 )
 from app.domain.trade import Cashflow, Order, OrderEvent
 from app.domain.users import User
 from app.finance.attributes import (
-    accounting_attributes_for_manual_cashflow,
+    accounting_attribute_for_manual_cashflow,
     derive_manual_cashflow_nature,
-    validate_fund_accounting_attribute,
 )
 from app.foundation.pools import assert_pool_usable
 from app.orders._shared import get_order
@@ -79,14 +79,15 @@ def create_cashflow(
     occurred_on: date,
     direction: str,
     nature: str | None = None,
-    fund_nature: str | None = None,
     accounting_attribute: str | None = None,
     category: str,
     amount: Any,
     actor: str,
+    ledger_type: str = CashflowLedgerType.BUSINESS.value,
     operator_user_ids: list[int] | None = None,
     order_id: int | None = None,
-    order_event_id: int | None = None,
+    source_type: str | None = None,
+    source_id: str | None = None,
     note: str | None = None,
     extra_values: Mapping[str, Any] | None = None,
     form_extra: Mapping[str, Any] | None = None,
@@ -100,10 +101,9 @@ def create_cashflow(
         raise Validation(
             f"direction 必须为 {Direction.values()}", details={"field": "direction"}
         ) from exc
-    normalized_fund_nature = fund_nature.strip().upper() if fund_nature else None
     try:
         nature = Nature(
-            nature or derive_manual_cashflow_nature(normalized_fund_nature, direction)
+            nature or derive_manual_cashflow_nature(direction)
         ).value
     except ValueError as exc:
         raise Validation(
@@ -125,17 +125,10 @@ def create_cashflow(
         uppercase=True,
         type_message="category 必须为文本",
     )
-    default_fund_nature, default_accounting_attribute = (
-        accounting_attributes_for_manual_cashflow(
-            nature=nature, category=label, direction=direction
-        )
+    default_accounting_attribute = accounting_attribute_for_manual_cashflow(
+        nature=nature, category=label, direction=direction
     )
-    fund_nature = normalized_fund_nature or default_fund_nature
     accounting_attribute = accounting_attribute or default_accounting_attribute
-    try:
-        validate_fund_accounting_attribute(fund_nature, accounting_attribute)
-    except ValueError as exc:
-        raise Validation(str(exc), details={"fund_nature": fund_nature, "accounting_attribute": accounting_attribute}) from exc
     if nature == Nature.EXTERNAL_IN.value and (
         not isinstance(note, str) or not note.strip()
     ):
@@ -145,12 +138,34 @@ def create_cashflow(
     pool = assert_pool_usable(session, pool_id)
     if order_id is not None:
         get_order(session, order_id, user)
-    if order_event_id is not None:
-        from app.domain.trade import OrderEvent
-
-        event = session.get(OrderEvent, order_event_id)
+    try:
+        normalized_ledger_type = CashflowLedgerType(ledger_type).value
+    except ValueError as exc:
+        raise Validation(
+            f"ledger_type 必须为 {CashflowLedgerType.values()}",
+            details={"field": "ledger_type", "value": ledger_type},
+        ) from exc
+    try:
+        normalized_source_type = CashflowSourceType(
+            source_type or CashflowSourceType.MANUAL.value
+        ).value
+    except ValueError as exc:
+        raise Validation(
+            f"source_type 必须为 {CashflowSourceType.values()}",
+            details={"field": "source_type", "value": source_type},
+        ) from exc
+    if normalized_source_type == CashflowSourceType.ORDER_EVENT.value:
+        if not source_id:
+            raise Validation("订单事件流水必须填写 source_id")
+        event = session.scalar(select(OrderEvent).where(OrderEvent.event_no == source_id))
         if event is None or (order_id is not None and event.order_id != order_id):
             raise Validation("资金明细关联的业务事件不存在或不属于该订单")
+    elif normalized_source_type == CashflowSourceType.MANUAL.value and source_id is not None:
+        raise Validation("手工流水不能填写 source_id")
+    if normalized_ledger_type == CashflowLedgerType.STUDIO.value and (
+        normalized_source_type != CashflowSourceType.MANUAL.value or order_id is not None
+    ):
+        raise Validation("工作室运营账簿必须是无订单归属的手工流水")
     money = _positive(amount, field="amount")
     operator_ids = _validate_operator_user_ids(session, operator_user_ids)
     flow = Cashflow(
@@ -158,14 +173,14 @@ def create_cashflow(
         pool_id=pool.id,
         occurred_on=occurred_on,
         nature=nature,
-        fund_nature=fund_nature,
+        ledger_type=normalized_ledger_type,
         accounting_attribute=accounting_attribute,
         category=label,
         direction=direction,
         amount=money,
+        source_type=normalized_source_type,
+        source_id=source_id,
         order_id=order_id,
-        order_event_id=order_event_id,
-        status=CashflowStatus.APPROVED.value,
         note=note,
         form_extra=validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None,
         created_by=actor,
@@ -188,7 +203,6 @@ def create_cashflow(
         entity_id=flow.flow_no,
         actor=actor,
         after={
-            "status": flow.status,
             "pool_id": pool.id,
             "direction": direction,
             "nature": nature,
@@ -217,15 +231,21 @@ def reverse_cashflow(
         type_message="冲销流水必须填写原因",
     )
     flow = _get_cashflow(session, cashflow_id, user)
-    if flow.status != CashflowStatus.APPROVED.value:
-        raise Validation("只有已审核流水可以冲销", details={"cashflow_id": cashflow_id})
-    if flow.order_event_id is not None:
-        event = session.get(OrderEvent, flow.order_event_id)
+    if flow.source_type == CashflowSourceType.ORDER_EVENT.value:
+        event = session.scalar(select(OrderEvent).where(OrderEvent.event_no == flow.source_id))
         if event is None or event.event_type not in {"REBATE"}:
             raise Validation("业务事件现金流必须通过业务事件冲销")
-    if flow.deposit_id is not None or flow.transfer_id is not None:
+    if flow.source_type in {
+        CashflowSourceType.DEPOSIT.value,
+        CashflowSourceType.TRANSFER.value,
+    }:
         raise Validation("押金或划转现金流必须通过原业务流程冲销")
-    if session.scalar(select(Cashflow.id).where(Cashflow.reversal_of_id == flow.id)):
+    if session.scalar(
+        select(Cashflow.id).where(
+            Cashflow.source_type == CashflowSourceType.REVERSAL.value,
+            Cashflow.source_id == flow.flow_no,
+        )
+    ):
         raise Validation("该流水已冲销", details={"cashflow_id": cashflow_id})
 
     if flow.direction == Direction.OUT.value:
@@ -239,14 +259,13 @@ def reverse_cashflow(
         pool_id=flow.pool_id,
         occurred_on=reversed_on,
         nature=reverse_nature,
-        fund_nature=flow.fund_nature,
         accounting_attribute=AccountingAttribute.REVERSAL.value,
         category="REVERSAL",
         direction=reverse_direction,
         amount=to_money(flow.amount),
+        source_type=CashflowSourceType.REVERSAL.value,
+        source_id=flow.flow_no,
         order_id=flow.order_id,
-        status=CashflowStatus.APPROVED.value,
-        reversal_of_id=flow.id,
         reversal_reason=text_reason,
         note=f"冲销 {flow.flow_no}",
         form_extra=validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None,
@@ -292,9 +311,8 @@ def _apply_cashflow_filters(
     direction: str | None = None,
     occurred_from: date | None = None,
     occurred_to: date | None = None,
-    status: str | None = None,
     nature: str | None = None,
-    fund_nature: str | None = None,
+    ledger_type: str | None = None,
     accounting_attribute: str | None = None,
     category: str | None = None,
     created_by: str | None = None,
@@ -330,19 +348,17 @@ def _apply_cashflow_filters(
         stmt = stmt.where(Cashflow.occurred_on >= occurred_from)
     if occurred_to is not None:
         stmt = stmt.where(Cashflow.occurred_on <= occurred_to)
-    if status is not None:
-        try:
-            status = CashflowStatus(status).value
-        except ValueError as exc:
-            raise Validation(
-                f"status 必须为 {CashflowStatus.values()}",
-                details={"field": "status", "value": status},
-            ) from exc
-        stmt = stmt.where(Cashflow.status == status)
     if nature is not None:
         stmt = stmt.where(Cashflow.nature == nature)
-    if fund_nature is not None:
-        stmt = stmt.where(Cashflow.fund_nature == fund_nature)
+    if ledger_type is not None:
+        try:
+            ledger_type = CashflowLedgerType(ledger_type).value
+        except ValueError as exc:
+            raise Validation(
+                f"ledger_type 必须为 {CashflowLedgerType.values()}",
+                details={"field": "ledger_type", "value": ledger_type},
+            ) from exc
+        stmt = stmt.where(Cashflow.ledger_type == ledger_type)
     if accounting_attribute is not None:
         stmt = stmt.where(Cashflow.accounting_attribute == accounting_attribute)
     if category is not None:
@@ -364,20 +380,7 @@ def _apply_cashflow_filters(
 
 def _flow_row(flow: Cashflow, order_no: str | None) -> dict[str, Any]:
     """明细行的统一结构；列表与工作室面板共用，避免两处字段慢慢漂移。"""
-    if flow.order_event_id is not None:
-        source = "ORDER_EVENT"
-    elif flow.category in {"REBATE", "REBATE_REVERSAL"}:
-        source = "REBATE_SETTLEMENT"
-    elif flow.deposit_id is not None or flow.category in {
-        "DEPOSIT_HOLD",
-        "DEPOSIT_RELEASE",
-        "DEPOSIT_LOSS",
-    }:
-        source = "DEPOSIT"
-    elif flow.category == "TRANSFER":
-        source = "TRANSFER"
-    else:
-        source = "OTHER"
+    source = flow.source_type
     return {
         "id": flow.id,
         "flow_no": flow.flow_no,
@@ -385,20 +388,17 @@ def _flow_row(flow: Cashflow, order_no: str | None) -> dict[str, Any]:
         "occurred_on": flow.occurred_on,
         "occurred_at": flow.created_at,
         "nature": flow.nature,
-        "fund_nature": flow.fund_nature,
+        "ledger_type": flow.ledger_type,
         "accounting_attribute": flow.accounting_attribute,
         "category": flow.category,
         "direction": flow.direction,
         "amount": flow.amount,
-        "status": flow.status,
+        "source_type": flow.source_type,
+        "source_id": flow.source_id,
         "reviewed_by": flow.reviewed_by,
         "reviewed_at": flow.reviewed_at,
-        "reversal_of_id": flow.reversal_of_id,
         "order_id": flow.order_id,
         "order_no": order_no,
-        "deposit_id": flow.deposit_id,
-        "order_event_id": flow.order_event_id,
-        "transfer_id": flow.transfer_id,
         "source": source,
         "note": flow.note,
         "operator": flow.created_by,
@@ -432,9 +432,8 @@ def list_cashflows(
     direction: str | None = None,
     occurred_from: date | None = None,
     occurred_to: date | None = None,
-    status: str | None = None,
     nature: str | None = None,
-    fund_nature: str | None = None,
+    ledger_type: str | None = None,
     accounting_attribute: str | None = None,
     category: str | None = None,
     created_by: str | None = None,
@@ -459,9 +458,8 @@ def list_cashflows(
         direction=direction,
         occurred_from=occurred_from,
         occurred_to=occurred_to,
-        status=status,
         nature=nature,
-        fund_nature=fund_nature,
+        ledger_type=ledger_type,
         accounting_attribute=accounting_attribute,
         category=category,
         created_by=created_by,
@@ -490,9 +488,8 @@ def cashflow_totals(
     direction: str | None = None,
     occurred_from: date | None = None,
     occurred_to: date | None = None,
-    status: str | None = None,
     nature: str | None = None,
-    fund_nature: str | None = None,
+    ledger_type: str | None = None,
     accounting_attribute: str | None = None,
     category: str | None = None,
     created_by: str | None = None,
@@ -504,8 +501,7 @@ def cashflow_totals(
     为什么必须在服务端算：列表有 `limit` 上限（当前 2000），前端对当页求和会在流水
     超过上限时静默少算且没有任何提示；聚合走 SQL SUM 也避免前端用浮点累加金额。
 
-    合计只汇总 `amount`，不含任何状态过滤以外的口径：`status` 由调用方传入，传
-    什么算什么，与明细列表保持一致。
+    合计只汇总 `amount`，与明细列表保持一致。
     """
     if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
         return Decimal("0"), Decimal("0")
@@ -520,9 +516,8 @@ def cashflow_totals(
         direction=direction,
         occurred_from=occurred_from,
         occurred_to=occurred_to,
-        status=status,
         nature=nature,
-        fund_nature=fund_nature,
+        ledger_type=ledger_type,
         accounting_attribute=accounting_attribute,
         category=category,
         created_by=created_by,
@@ -541,7 +536,6 @@ def cashflow_totals(
 # 但它属于订单资金明细而非工作室手工收支，故 _studio_scope 额外排除 order_id。
 _MANUAL_EXCLUDED_CATEGORIES = (
     "REBATE",
-    "REBATE_REVERSAL",
     "DEPOSIT_HOLD",
     "DEPOSIT_RELEASE",
     "DEPOSIT_LOSS",
@@ -560,14 +554,9 @@ def _assert_editable_studio_cashflow(
     user: CurrentUser | None = None,
 ) -> Cashflow:
     flow = _get_cashflow(session, cashflow_id, user)
-    if flow.status != CashflowStatus.APPROVED.value:
-        raise Validation("只有已入账的工作室收支可编辑或删除", details={"cashflow_id": flow.id})
     if (
         flow.order_id is not None
-        or flow.order_event_id is not None
-        or flow.deposit_id is not None
-        or flow.transfer_id is not None
-        or flow.reversal_of_id is not None
+        or flow.source_type != CashflowSourceType.MANUAL.value
         or flow.category in _MANUAL_EXCLUDED_CATEGORIES
         or not (
             (flow.direction == Direction.OUT.value and flow.accounting_attribute == STUDIO_EXPENSE_ATTRIBUTE)
@@ -575,7 +564,12 @@ def _assert_editable_studio_cashflow(
         )
     ):
         raise Validation("仅工作室手工收支可编辑或删除", details={"cashflow_id": flow.id})
-    if session.scalar(select(Cashflow.id).where(Cashflow.reversal_of_id == flow.id)):
+    if session.scalar(
+        select(Cashflow.id).where(
+            Cashflow.source_type == CashflowSourceType.REVERSAL.value,
+            Cashflow.source_id == flow.flow_no,
+        )
+    ):
         raise Validation("已冲销的工作室收支不能编辑或删除", details={"cashflow_id": flow.id})
     return flow
 
@@ -584,7 +578,6 @@ def _normalize_studio_cashflow_fields(
     *,
     direction: str,
     nature: str | None,
-    fund_nature: str | None,
     accounting_attribute: str | None,
     category: str,
     amount: Any,
@@ -593,10 +586,9 @@ def _normalize_studio_cashflow_fields(
         normalized_direction = Direction(direction).value
     except ValueError as exc:
         raise Validation(f"direction 必须为 {Direction.values()}", details={"field": "direction"}) from exc
-    normalized_fund_nature = fund_nature.strip().upper() if fund_nature else None
     try:
         normalized_nature = Nature(
-            nature or derive_manual_cashflow_nature(normalized_fund_nature, normalized_direction)
+            nature or derive_manual_cashflow_nature(normalized_direction)
         ).value
     except ValueError as exc:
         raise Validation(f"nature 必须为 {Nature.values()}", details={"field": "nature"}) from exc
@@ -614,18 +606,10 @@ def _normalize_studio_cashflow_fields(
         uppercase=True,
         type_message="category 必须为文本",
     )
-    default_fund_nature, default_accounting_attribute = accounting_attributes_for_manual_cashflow(
+    default_accounting_attribute = accounting_attribute_for_manual_cashflow(
         nature=normalized_nature, category=label, direction=normalized_direction
     )
-    normalized_fund_nature = normalized_fund_nature or default_fund_nature
     normalized_accounting_attribute = accounting_attribute or default_accounting_attribute
-    try:
-        validate_fund_accounting_attribute(normalized_fund_nature, normalized_accounting_attribute)
-    except ValueError as exc:
-        raise Validation(
-            str(exc),
-            details={"fund_nature": normalized_fund_nature, "accounting_attribute": normalized_accounting_attribute},
-        ) from exc
     if normalized_direction == Direction.OUT.value and normalized_accounting_attribute != STUDIO_EXPENSE_ATTRIBUTE:
         raise Validation("工作室支出必须使用运营费用科目", details={"field": "accounting_attribute"})
     if normalized_direction == Direction.IN.value and normalized_accounting_attribute != STUDIO_INCOME_ATTRIBUTE:
@@ -635,7 +619,6 @@ def _normalize_studio_cashflow_fields(
     return (
         normalized_direction,
         normalized_nature,
-        normalized_fund_nature,
         normalized_accounting_attribute,
         label,
         _positive(amount, field="amount"),
@@ -650,7 +633,6 @@ def update_cashflow(
     occurred_on: date,
     direction: str,
     nature: str | None = None,
-    fund_nature: str | None = None,
     accounting_attribute: str | None = None,
     category: str,
     amount: Any,
@@ -667,14 +649,12 @@ def update_cashflow(
     (
         normalized_direction,
         normalized_nature,
-        normalized_fund_nature,
         normalized_accounting_attribute,
         label,
         money,
     ) = _normalize_studio_cashflow_fields(
         direction=direction,
         nature=nature,
-        fund_nature=fund_nature,
         accounting_attribute=accounting_attribute,
         category=category,
         amount=amount,
@@ -684,7 +664,6 @@ def update_cashflow(
         "occurred_on": flow.occurred_on.isoformat(),
         "direction": flow.direction,
         "nature": flow.nature,
-        "fund_nature": flow.fund_nature,
         "accounting_attribute": flow.accounting_attribute,
         "category": flow.category,
         "amount": str(to_money(flow.amount)),
@@ -694,7 +673,6 @@ def update_cashflow(
     flow.occurred_on = occurred_on
     flow.direction = normalized_direction
     flow.nature = normalized_nature
-    flow.fund_nature = normalized_fund_nature
     flow.accounting_attribute = normalized_accounting_attribute
     flow.category = label
     flow.amount = money
@@ -714,7 +692,6 @@ def update_cashflow(
             "occurred_on": occurred_on.isoformat(),
             "direction": flow.direction,
             "nature": flow.nature,
-            "fund_nature": flow.fund_nature,
             "accounting_attribute": flow.accounting_attribute,
             "category": flow.category,
             "amount": str(money),
@@ -754,13 +731,12 @@ def delete_cashflow(
 
 
 def _studio_scope() -> Any:
-    """「手工登记的工作室收支」的 SQL 条件，与列表里的 source=OTHER 等价。"""
+    """工作室运营账簿的顶层条件。"""
     return and_(
+        Cashflow.ledger_type == CashflowLedgerType.STUDIO.value,
         # 订单普通资金流水（挂 order_id 但无事件/押金/划转）属订单口径，不计入工作室收支。
         Cashflow.order_id.is_(None),
-        Cashflow.order_event_id.is_(None),
-        Cashflow.deposit_id.is_(None),
-        Cashflow.transfer_id.is_(None),
+        Cashflow.source_type == CashflowSourceType.MANUAL.value,
         or_(Cashflow.category.is_(None), Cashflow.category.notin_(_MANUAL_EXCLUDED_CATEGORIES)),
         or_(
             and_(
@@ -827,13 +803,13 @@ def studio_summary(
     ).all():
         rows.append(_flow_row(flow, order_no))
 
-    # 汇总只算已入账（APPROVED）：待审核/已驳回的不能进经营口径。
+    # 当前流水登记即生效，工作室汇总直接按统一口径聚合。
     totals_stmt = _apply_cashflow_filters(
         select(Cashflow.direction, func.sum(Cashflow.amount)).outerjoin(
             Order, Order.id == Cashflow.order_id
         ),
         **common,
-    ).where(_studio_scope(), Cashflow.status == CashflowStatus.APPROVED.value).group_by(Cashflow.direction)
+    ).where(_studio_scope()).group_by(Cashflow.direction)
     sums = _direction_sums(session, totals_stmt)
     income = sums.get(Direction.IN.value, Decimal("0.00"))
     expense = sums.get(Direction.OUT.value, Decimal("0.00"))

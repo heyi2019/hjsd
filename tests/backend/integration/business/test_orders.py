@@ -145,11 +145,9 @@ class TestA01HsStock:
         in_flows = _flows(seeded_db, profit.id)
         assert [str(flow.amount) for flow in out_flows] == ["1000.00"]
         assert all(flow.direction == Direction.OUT.value for flow in out_flows)
-        assert out_flows[0].fund_nature == "BUSINESS"
         assert out_flows[0].accounting_attribute == "SELF_DIRECT_COST"
         assert [str(flow.amount) for flow in in_flows] == ["1400.00"]
         assert in_flows[0].direction == Direction.IN.value
-        assert in_flows[0].fund_nature == "BUSINESS"
         assert in_flows[0].accounting_attribute == "SELF_REVENUE"
 
         events = seeded_db.scalars(
@@ -561,7 +559,9 @@ class TestEventRules:
         assert flow is None
         assert event.amount == Decimal("0.00")
         assert seeded_db.scalar(
-            select(Cashflow).where(Cashflow.order_event_id == event.id)
+            select(Cashflow).where(
+                Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == event.event_no
+            )
         ) is None
 
     def test_full_sale_can_record_sell_delivery_without_cashflow(self, seeded_db):
@@ -591,7 +591,9 @@ class TestEventRules:
         assert event.form_extra["delivery_direction"] == "SELL"
         assert flow is None
         assert seeded_db.scalar(
-            select(Cashflow).where(Cashflow.order_event_id == event.id)
+            select(Cashflow).where(
+                Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == event.event_no
+            )
         ) is None
 
     def test_dg_sale_can_record_sell_delivery_without_buy(self, seeded_db):

@@ -36,7 +36,8 @@ def test_events_module_posts_event_without_using_facade(seeded_db):
     assert event.order_id == order.id
     assert event.event_type == "BUY"
     assert flow is not None
-    assert flow.order_event_id == event.id
+    assert flow.source_type == "ORDER_EVENT"
+    assert flow.source_id == event.event_no
 
 
 def test_order_facade_re_exports_event_service():
@@ -64,5 +65,7 @@ def test_operate_event_records_business_action_without_cashflow(seeded_db):
     assert (event.form_extra or {}).get("operation_type") == "CONSIGNMENT"
     assert flow is None
     assert seeded_db.scalar(
-        select(Cashflow.id).where(Cashflow.order_event_id == event.id)
+        select(Cashflow.id).where(
+            Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == event.event_no
+        )
     ) is None

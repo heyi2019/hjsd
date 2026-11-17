@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.audit import record_audit
 from app.core.errors import Validation
 from app.core.security import CurrentUser
-from app.domain.enums import AuditAction
+from app.domain.enums import AuditAction, CashflowSourceType
 from app.domain.imports import ImportRow
 from app.domain.parties import CustomerLead, OrderCounterpartyRole, OrderCustomerRole
 from app.domain.trade import (
@@ -131,14 +131,17 @@ def _collect_cashflow_ids(
     event_ids: set[int],
     deposit_ids: set[int],
 ) -> set[int]:
-    # 冲销流水可能没有 order_id，但会通过 reversal_of_id 继续挂在本单流水上。
+    # 冲销流水可能没有 order_id，但会通过统一来源引用继续挂在本单流水上。
     flow_ids = set(
         session.scalars(
             select(Cashflow.id).where(
                 or_(
                     Cashflow.order_id == order_id,
-                    Cashflow.order_event_id.in_(event_ids) if event_ids else False,
-                    Cashflow.deposit_id.in_(deposit_ids) if deposit_ids else False,
+                    Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value if event_ids else False,
+                    (
+                        (Cashflow.source_type == CashflowSourceType.DEPOSIT.value)
+                        & Cashflow.source_id.in_([str(item) for item in deposit_ids])
+                    ) if deposit_ids else False,
                 )
             )
         ).all()
@@ -146,7 +149,12 @@ def _collect_cashflow_ids(
     while flow_ids:
         child_ids = set(
             session.scalars(
-                select(Cashflow.id).where(Cashflow.reversal_of_id.in_(flow_ids))
+                select(Cashflow.id).where(
+                    Cashflow.source_type == CashflowSourceType.REVERSAL.value,
+                    Cashflow.source_id.in_(
+                        select(Cashflow.flow_no).where(Cashflow.id.in_(flow_ids))
+                    ),
+                )
             ).all()
         ) - flow_ids
         if not child_ids:

@@ -25,7 +25,6 @@ from sqlalchemy import select
 from app.core.errors import Validation
 from app.core.money import to_money
 from app.domain.enums import (
-    CashflowStatus,
     Direction,
     InstallmentContractType,
     InstallmentDispositionAction,
@@ -79,12 +78,10 @@ def _posted_flow(seeded_db, *, occurred_on, direction, nature, pool_id=1, order_
         pool_id=pool_id,
         occurred_on=occurred_on,
         nature=nature,
-        fund_nature="BUSINESS",
         accounting_attribute=accounting_attribute,
         category="OTHER",
         direction=direction,
         amount=to_money("100"),
-        status=CashflowStatus.APPROVED.value,
         order_id=order_id,
         created_by="pytest",
         updated_by="pytest",

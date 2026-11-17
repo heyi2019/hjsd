@@ -15,7 +15,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import Validation
-from app.domain.enums import AccountingAttribute, Direction
+from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction
 from app.domain.foundation import Pool
 from app.finance.cashflows import create_cashflow, reverse_cashflow
 from app.orders import events
@@ -24,12 +24,12 @@ from app.orders.create import create_order
 TODAY = date(2026, 10, 17)
 
 
-def _make_flow(session, *, direction, nature, fund_nature="BUSINESS",
+def _make_flow(session, *, direction, nature,
                accounting_attribute="OPERATING_EXPENSE", category="OTHER", amount="10",
                note="memo", order_id=None, pool_id=1):
     return create_cashflow(
         session, pool_id=pool_id, occurred_on=TODAY, direction=direction, nature=nature,
-        fund_nature=fund_nature, accounting_attribute=accounting_attribute,
+        accounting_attribute=accounting_attribute,
         category=category, amount=Decimal(amount), actor="pytest", note=note, order_id=order_id,
     )
 
@@ -41,7 +41,7 @@ def _seed_recon(session):
     for amount in (Decimal("50"), Decimal("20")):
         create_cashflow(
             session, pool_id=pool.id, occurred_on=TODAY, direction="IN",
-            nature="BUSINESS_IN", fund_nature="BUSINESS",
+            nature="BUSINESS_IN",
             accounting_attribute="OPERATING_EXPENSE", category="OTHER",
             amount=amount, actor="pytest",
         )
@@ -56,7 +56,8 @@ def test_reverse_out_flow_creates_in_reversal(seeded_db):
     assert reversal.id != flow.id
     assert reversal.direction == Direction.IN.value
     assert reversal.accounting_attribute == AccountingAttribute.REVERSAL.value
-    assert reversal.reversal_of_id == flow.id
+    assert reversal.source_type == CashflowSourceType.REVERSAL.value
+    assert reversal.source_id == flow.flow_no
     assert reversal.amount == Decimal("120.00")
     # 正向流水金额不变，冲销另起一笔（冲销不修改原流水）。
     assert flow.amount == Decimal("120.00")
@@ -68,7 +69,8 @@ def test_reverse_in_flow_creates_out_reversal(seeded_db):
         seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="退款冲销",
     )
     assert reversal.direction == Direction.OUT.value
-    assert reversal.reversal_of_id == flow.id
+    assert reversal.source_type == CashflowSourceType.REVERSAL.value
+    assert reversal.source_id == flow.flow_no
 
 
 def test_reverse_requires_reason(seeded_db):
@@ -95,7 +97,7 @@ def test_reverse_rejects_business_event_flow(seeded_db):
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=TODAY, actor="pytest",
     )
-    assert flow.order_event_id is not None
+    assert flow.source_type == CashflowSourceType.ORDER_EVENT.value
     with pytest.raises(Validation, match="业务事件现金流必须通过业务事件冲销"):
         reverse_cashflow(
             seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x",

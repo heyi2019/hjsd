@@ -260,8 +260,7 @@ GROUPS = {
         "tests/backend/integration/finance/test_cashflow_totals.py",
         "tests/backend/integration/finance/test_pool_balances_batch.py",
         "tests/backend/integration/finance/test_studio_cashflow_summary.py",
-        # 2026-11-12 金额链路/裁决批次（返点退回、资金两方向、金额大类口径）
-        "tests/backend/integration/finance/test_rebate_return.py",
+        # 2026-11-12 金额链路/裁决批次（资金两方向、金额大类口径）
         "tests/backend/integration/finance/test_funds_direction_and_deposit.py",
         "tests/backend/unit/finance/test_finance_boundaries.py",
     ],

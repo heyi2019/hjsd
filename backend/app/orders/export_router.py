@@ -197,7 +197,6 @@ def export_orders_xlsx(
         (
             "ORDER_EVENT_TYPE",
             "FUND_FLOW_DIRECTION",
-            "FUND_FLOW_STATUS",
             "REBATE_TYPE",
             "ORDER_LINK_STATUS",
         ),
@@ -220,7 +219,6 @@ def export_orders_xlsx(
         value_labels={
             "category": option_labels.get("ORDER_EVENT_TYPE", {}),
             "direction": option_labels.get("FUND_FLOW_DIRECTION", {}),
-            "status": option_labels.get("FUND_FLOW_STATUS", {}),
         },
     )
     write_sheet(

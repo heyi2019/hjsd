@@ -170,7 +170,6 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_stock_intake_contract.py": "B04",
     "test_studio_cashflow_summary.py": "D05",
     # 金额与财务口径功能测试归属（首字母须与所在区域目录一致）。
-    "test_rebate_return.py": "D04",                       # finance — 返点退回挂单 OUT
     "test_order_financial_date_shift.py": "B03",          # business — 冲销与成交日期联动
     "test_funds_direction_and_deposit.py": "D05",         # finance — 收支方向与押金报表
     "test_profit_r2_accounting.py": "E01",                # reporting — 订单利润与 R2 归类

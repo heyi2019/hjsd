@@ -221,6 +221,13 @@ class FundNature(StrEnum):
     INTERNAL = "INTERNAL"
 
 
+class CashflowLedgerType(StrEnum):
+    """资金流水所属顶层账簿：公司业务或工作室运营。"""
+
+    BUSINESS = "BUSINESS"
+    STUDIO = "STUDIO"
+
+
 class AccountingAttribute(StrEnum):
     """资金在经营核算中的具体归类。"""
 
@@ -245,12 +252,17 @@ class Direction(StrEnum):
     OUT = "OUT"
 
 
-class CashflowStatus(StrEnum):
-    """独立资金流水审核状态；业务事件派生流水直接为 APPROVED。"""
+class CashflowSourceType(StrEnum):
+    """资金流水的统一业务来源。"""
 
-    PENDING = "PENDING"
-    APPROVED = "APPROVED"
-    REJECTED = "REJECTED"
+    MANUAL = "MANUAL"
+    ORDER = "ORDER"
+    ORDER_EVENT = "ORDER_EVENT"
+    INSTALLMENT = "INSTALLMENT"
+    REBATE = "REBATE"
+    DEPOSIT = "DEPOSIT"
+    TRANSFER = "TRANSFER"
+    REVERSAL = "REVERSAL"
 
 
 class AccountStatus(StrEnum):
@@ -509,9 +521,6 @@ class AuditAction(StrEnum):
     REBATE_SETTLE = "REBATE_SETTLE"
     REBATE_REVERSE = "REBATE_REVERSE"
     REBATE_VOID = "REBATE_VOID"
-    # 2026-11-12：返点作废/删除全撤后，已确认的返点要退回只能记真实 OUT 支出，
-    # 该动作独立留痕，勿复用已下线的 REBATE_REVERSE 历史语义。
-    REBATE_RETURN = "REBATE_RETURN"
     RECONCILIATION_CREATE = "RECONCILIATION_CREATE"
     RECONCILIATION_RESOLVE = "RECONCILIATION_RESOLVE"
     CASHFLOW_CREATE = "CASHFLOW_CREATE"
@@ -558,7 +567,8 @@ __all__ = [
     "AuditAction",
     "CapitalType",
     "AccountingAttribute",
-    "CashflowStatus",
+    "CashflowLedgerType",
+    "CashflowSourceType",
     "CounterpartyRole",
     "CounterpartyStatus",
     "CounterpartyType",

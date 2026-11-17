@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFound
 from app.core.money import to_money
 from app.core.security import CurrentUser
-from app.domain.enums import CashflowStatus, Direction, Nature, PoolOwnership
+from app.domain.enums import Direction, Nature, PoolOwnership
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Deposit
 from app.orders.amounts import business_cashflow_filter
@@ -43,7 +43,6 @@ def pool_balances(
         )
         .where(
             Cashflow.pool_id.in_(ids),
-            Cashflow.status == CashflowStatus.APPROVED.value,
             business_cashflow_filter(),
         )
         .group_by(

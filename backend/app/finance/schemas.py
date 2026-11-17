@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.core.money import to_money
 from app.core.schemas import RequestModel
+from app.domain.enums import CashflowLedgerType
 
 
 class DepositCreate(RequestModel):
@@ -102,20 +103,17 @@ class CashflowOut(BaseModel):
     occurred_on: date
     occurred_at: datetime
     nature: str
-    fund_nature: str
+    ledger_type: str
     accounting_attribute: str
     category: str
     direction: str
     amount: Decimal
-    status: str
+    source_type: str
+    source_id: str | None = None
     reviewed_by: str | None = None
     reviewed_at: datetime | None = None
-    reversal_of_id: int | None = None
     order_id: int | None = None
     order_no: str | None = None
-    deposit_id: int | None = None
-    order_event_id: int | None = None
-    transfer_id: str | None = None
     source: str
     note: str | None = None
     form_extra: dict[str, Any] | None = None
@@ -158,7 +156,7 @@ class CashflowCreate(RequestModel):
     direction: str
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     nature: str | None = None
-    fund_nature: str | None = None
+    ledger_type: str = CashflowLedgerType.BUSINESS.value
     accounting_attribute: str | None = None
     category: str
     amount: Decimal
@@ -177,7 +175,6 @@ class CashflowUpdate(RequestModel):
     occurred_on: date
     direction: str
     nature: str | None = None
-    fund_nature: str | None = None
     accounting_attribute: str | None = None
     category: str
     amount: Decimal
@@ -300,41 +297,6 @@ class RebateOut(BaseModel):
     operator: str
     operator_user_ids: list[int] | None = None
     form_extra: dict[str, Any] | None = None
-    # 累计已退由后端聚合下发（口径收敛，前端不再自行相减）；新返点为 0。
-    already_returned: Decimal = Decimal("0")
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def remaining(self) -> Decimal:
-        """可退余额 = 返点金额 - 累计已退，夹底 0（与押金 remaining_amount 同构）。"""
-        remaining = to_money(self.amount) - to_money(self.already_returned)
-        return remaining if remaining > 0 else Decimal("0.00")
-
-
-class RebateReturnIn(RequestModel):
-    """返点退回：金额必填、退回日必填（自然归期），可分多次部分退回。"""
-
-    amount: Decimal
-    returned_on: date
-    note: str | None = None
-
-
-class RebateReturnOut(BaseModel):
-    """退回结果：返点记录 + 退回形成的挂单 OUT 流水 + 累计已退。"""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    rebate: RebateOut
-    cashflow: CashflowOut
-    already_returned: Decimal
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def remaining(self) -> Decimal:
-        """退后可退余额直接取返点记录口径，避免两处各自相减。"""
-        return self.rebate.remaining
-
-
 __all__ = [
     "DepositCreate",
     "DepositOperationOperatorOut",
@@ -355,6 +317,4 @@ __all__ = [
     "TransferOut",
     "RebateCreate",
     "RebateOut",
-    "RebateReturnIn",
-    "RebateReturnOut",
 ]

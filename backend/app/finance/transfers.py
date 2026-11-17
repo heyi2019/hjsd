@@ -14,7 +14,7 @@ from app.core.money import to_money
 from app.core.numbering import allocate_flow_no
 from app.core.operation_operators import upsert_operation_operators
 from app.core.security import CurrentUser
-from app.domain.enums import AccountingAttribute, AuditAction, Direction, FundNature, Nature
+from app.domain.enums import AccountingAttribute, AuditAction, CashflowSourceType, Direction, Nature
 from app.domain.trade import Cashflow
 from app.orders.form_fields import validate_form_extra
 from app.finance.balances import pool_balance
@@ -55,13 +55,13 @@ def create_transfer(
                 "available": str(available),
             },
         )
-    # 两条流水通过 transfer_id 成对关联，流水号按收支方向进入全局序列。
+    # 两条流水通过统一来源引用成对关联，流水号按收支方向进入全局序列。
     transfer_id = f"TRF-{uuid4().hex[:20].upper()}"
     common = {
-        "transfer_id": transfer_id,
+        "source_type": CashflowSourceType.TRANSFER.value,
+        "source_id": transfer_id,
         "occurred_on": occurred_on,
         "nature": Nature.INTERNAL.value,
-        "fund_nature": FundNature.INTERNAL.value,
         "accounting_attribute": AccountingAttribute.INTERNAL_TRANSFER.value,
         "category": "TRANSFER",
         "amount": money,
@@ -144,7 +144,8 @@ def repair_transfer(
         session.scalars(
             select(Cashflow)
             .where(
-                Cashflow.transfer_id == transfer,
+                Cashflow.source_type == CashflowSourceType.TRANSFER.value,
+                Cashflow.source_id == transfer,
                 Cashflow.nature == Nature.INTERNAL.value,
             )
             .order_by(Cashflow.id)
@@ -175,13 +176,12 @@ def repair_transfer(
         pool_id=target.id,
         occurred_on=source.occurred_on,
         nature=Nature.INTERNAL.value,
-        fund_nature=FundNature.INTERNAL.value,
         accounting_attribute=AccountingAttribute.INTERNAL_TRANSFER.value,
         category="TRANSFER",
         direction=direction,
         amount=to_money(source.amount),
-        transfer_id=transfer,
-        status=source.status,
+        source_type=CashflowSourceType.TRANSFER.value,
+        source_id=transfer,
         reviewed_by=source.reviewed_by,
         reviewed_at=source.reviewed_at,
         note=f"修复划转 {transfer}: {text_reason}",

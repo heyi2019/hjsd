@@ -20,8 +20,10 @@ from app.core.state_machine import ORDER_TRANSITIONS, transition
 from app.domain.enums import (
     AccountingAttribute,
     AuditAction,
+    CashflowSourceType,
     Direction,
     EventType,
+    FundNature,
     Nature,
     OperationType,
     OrderStatus,
@@ -300,9 +302,10 @@ def post_event(
     accounting_attribute: str | None = None
     resolved_pool_id: int | None = None
     if has_cashflow:
-        fund_nature, accounting_attribute = accounting_attribute_for_order_event(
+        accounting_attribute = accounting_attribute_for_order_event(
             order.order_type, event_type
         )
+        fund_nature = FundNature.BUSINESS.value
         resolved_pool_id = (
             pool_id
             or (offset.pool_id if offset is not None else None)
@@ -386,13 +389,13 @@ def post_event(
             pool_id=event.pool_id,
             occurred_on=occurred_on,
             nature=nature,
-            fund_nature=fund_nature,
             accounting_attribute=accounting_attribute,
             category=category,
             direction=direction,
             amount=money,
+            source_type=CashflowSourceType.ORDER_EVENT.value,
+            source_id=event.event_no,
             order_id=order.id,
-            order_event_id=event.id,
             operator_user_ids=operator_user_ids,
             note=note,
             created_by=actor,

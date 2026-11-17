@@ -6,6 +6,7 @@ from app.core.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.trade import Cashflow, Order, OrderEvent
+from app.domain.enums import CashflowSourceType
 from app.domain.users import User
 from app.foundation.pools import assert_pool_usable
 
@@ -27,8 +28,8 @@ def apply_cashflow_edits(db: Session, account_id: int, target_order_id: int, ite
         if flow is None or not user.can_see_pool(flow.pool_id):
             raise NotFound("资金明细不存在")
         flow_order_id = flow.order_id
-        if flow_order_id is None and flow.order_event_id is not None:
-            flow_order_id = db.scalar(select(OrderEvent.order_id).where(OrderEvent.id == flow.order_event_id))
+        if flow_order_id is None and flow.source_type == CashflowSourceType.ORDER_EVENT.value:
+            flow_order_id = db.scalar(select(OrderEvent.order_id).where(OrderEvent.event_no == flow.source_id))
         if flow_order_id is None or flow_order_id != target_order_id or db.scalar(select(Order.id).where(Order.id == flow_order_id, Order.account_id == account_id)) is None:
             raise NotFound("资金明细不存在")
         before = {

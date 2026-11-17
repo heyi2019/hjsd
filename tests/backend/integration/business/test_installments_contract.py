@@ -436,7 +436,8 @@ def test_installment_payment_is_cashflow_only(seeded_db):
         )
     )
     assert payment_flow is not None
-    assert payment_flow.order_event_id is None
+    assert payment_flow.source_type == "INSTALLMENT"
+    assert payment_flow.source_id == contract.inst_no
 
 def test_installment_scope_follows_order_owner(seeded_db):
     scoped_user = CurrentUser.build(

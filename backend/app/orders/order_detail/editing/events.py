@@ -12,6 +12,7 @@ from app.core.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.trade import Account, Cashflow, Installment, OrderEvent, RebateRecord, Reconciliation
+from app.domain.enums import CashflowSourceType
 from app.domain.users import User
 from app.orders._shared import get_order
 from app.orders.events import post_event
@@ -87,7 +88,10 @@ def validate_event_edits(
                 raise Validation("操作人不能重复选择")
             if not set(ids).issubset(active_operator_ids):
                 raise Validation("所选操作人不存在或已停用")
-        flow = db.scalar(select(Cashflow).where(Cashflow.order_event_id == event.id).with_for_update())
+        flow = db.scalar(select(Cashflow).where(
+            Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value,
+            Cashflow.source_id == event.event_no,
+        ).with_for_update())
         if flow is not None and not user.can_see_pool(flow.pool_id):
             raise NotFound("关联资金流水不存在")
         if item.amount == Decimal(str(event.amount)):
@@ -101,9 +105,12 @@ def validate_event_edits(
             raise Validation("执行记录与关联流水金额不一致，请先核对")
         if (
             event.offset_event_id is not None
-            or flow.reversal_of_id is not None
+            or flow.source_type == CashflowSourceType.REVERSAL.value
             or db.scalar(select(OrderEvent.id).where(OrderEvent.offset_event_id == event.id)) is not None
-            or db.scalar(select(Cashflow.id).where(Cashflow.reversal_of_id == flow.id)) is not None
+            or db.scalar(select(Cashflow.id).where(
+                Cashflow.source_type == CashflowSourceType.REVERSAL.value,
+                Cashflow.source_id == flow.flow_no,
+            )) is not None
         ):
             raise Validation("已冲销或被冲销的记录不能直接修改")
         if db.scalar(select(Installment.id).where(Installment.order_id == order.id)) is not None:

@@ -22,7 +22,7 @@ from app.core.security import (
     CurrentUser,
     require_permissions,
 )
-from app.domain.enums import AccountingAttribute, Direction, FundNature, Nature
+from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction, FundNature, Nature
 from app.domain.trade import Account, OrderEvent
 from app.foundation.order_types import resolve_default_pool
 from app.orders import schemas
@@ -268,7 +268,6 @@ def create_order(
             occurred_on=cost.occurred_on,
             direction=Direction.OUT.value,
             nature=Nature.BUSINESS_OUT.value,
-            fund_nature=FundNature.BUSINESS.value,
             accounting_attribute=(
                 AccountingAttribute.SELF_DIRECT_COST.value
                 if order.order_type == "HS"
@@ -276,6 +275,8 @@ def create_order(
             ),
             category=cost.flow_category or "OTHER",
             amount=cost.amount,
+            source_type=CashflowSourceType.ORDER.value,
+            source_id=order.order_no,
             actor=_actor(user),
             order_id=order.id,
             note=cost.note,

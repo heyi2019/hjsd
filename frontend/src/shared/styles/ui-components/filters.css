@@ -133,21 +133,12 @@
 .studio-expense-card .studio-expense-filters {
   margin: 0;
 }
-.studio-expense-page-actions {
-  display: flex;
-  justify-content: flex-end;
-}
 .studio-expense-card .studio-expense-filters {
   align-items: center;
 }
 .studio-expense-filters--single-row {
   flex-wrap: nowrap;
 }
-.ui-control-width-studio-pool {
-  width: var(--col-w-280);
-  max-width: 100%;
-}
-
 @media (--bp-sm) {
   .studio-expense-filters--single-row {
     flex-wrap: wrap;

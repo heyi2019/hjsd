@@ -117,9 +117,13 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
   ];
 
   return <section className="ui-stack">
-    <ErrorBanner error={error} onRetry={() => void load()} />
-    <StatRow items={[{ label: "需求总数", kind: "count", amount: error ? null : String(summary?.total_count ?? 0) }, { label: "待跟进", kind: "count", amount: error ? null : String(summary?.open_count ?? 0), tone: "warn" }]} />
-    <Card className="glass" title="客户需求池" extra={<PermissionButton permission="customer.create" type="primary" loading={customersLoading} disabled={Boolean(error)} onClick={() => void openCreate()}>新增需求</PermissionButton>}>
+    <Card
+      className="glass customer-lead-shell"
+      title="客户需求池"
+      extra={<PermissionButton permission="customer.create" type="primary" loading={customersLoading} disabled={Boolean(error)} onClick={() => void openCreate()}>新增需求</PermissionButton>}
+    >
+      <ErrorBanner error={error} onRetry={() => void load()} />
+      <StatRow items={[{ label: "需求总数", kind: "count", amount: error ? null : String(summary?.total_count ?? 0) }, { label: "待跟进", kind: "count", amount: error ? null : String(summary?.open_count ?? 0), tone: "warn" }]} />
       <DataTable<Lead>
         columns={arrangeColumns(columns)}
         rows={rows}

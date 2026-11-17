@@ -27,7 +27,7 @@ export function useCashflowActions({ load, write }: CashflowActionsDeps) {
         pool_id: Number(values.pool_id),
         occurred_on: values.occurred_on as string,
         direction,
-        fund_nature: String(values.fund_nature ?? "BUSINESS"),
+        ledger_type: "BUSINESS",
         accounting_attribute: String(values.accounting_attribute ?? "OPERATING_EXPENSE"),
         category: values.category as string,
         amount: values.amount as string,

@@ -1,4 +1,4 @@
-"""返点登记、查询和退回 API。"""
+"""返点登记与查询 API。"""
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -19,15 +19,13 @@ from app.finance.rebates import (
     create_rebate as finance_create_rebate,
     get_rebate as finance_get_rebate,
     list_rebates as finance_list_rebates,
-    rebate_returned_totals,
-    return_rebate as finance_return_rebate,
     update_rebate as finance_update_rebate,
 )
 from app.lists.export import build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.orders._shared import get_order
 
-from .router_output import _actor, _cashflow_out, _rebate_out
+from .router_output import _actor, _rebate_out
 
 router = APIRouter(tags=["返点"])
 read_access = require_permissions(PERM_FINANCE_READ, PERM_ORDER_CREATE, require_all=False)
@@ -40,9 +38,7 @@ def list_rebates(
     _user: CurrentUser = read_access,
 ) -> list[schemas.RebateOut]:
     items = finance_list_rebates(db, source_order_id=source_order_id, user=_user)
-    # 已退金额一次批量聚合（order_id IN），避免逐笔子查询；列表口径与单查/退回同源。
-    returned = rebate_returned_totals(db, items)
-    return [_rebate_out(item, returned[item.id]) for item in items]
+    return [_rebate_out(item) for item in items]
 
 
 @router.get("/rebates/export.csv")
@@ -73,7 +69,7 @@ def get_rebate(
     user: CurrentUser = read_access,
 ) -> schemas.RebateOut:
     item = finance_get_rebate(db, rebate_id, user=user)
-    return _rebate_out(item, rebate_returned_totals(db, [item])[item.id])
+    return _rebate_out(item)
 
 
 @router.post("/rebates", response_model=schemas.RebateOut, status_code=201)
@@ -107,42 +103,7 @@ def update_rebate(
     user: CurrentUser = post_rebate,
 ) -> schemas.RebateOut:
     item = finance_update_rebate(db, rebate_id, actor=_actor(user), user=user, **payload.model_dump(exclude_unset=True))
-    return _rebate_out(item, rebate_returned_totals(db, [item])[item.id])
-
-
-@router.post("/rebates/{rebate_id}/return", response_model=schemas.RebateReturnOut)
-def return_rebate(
-    rebate_id: int,
-    payload: schemas.RebateReturnIn,
-    db: Session = Depends(get_db),
-    user: CurrentUser = post_rebate,
-) -> schemas.RebateReturnOut:
-    """返点退回：在来源订单记一笔真实 OUT 支出，冲减该订单利润。
-
-    发生日取真实退回日（自然归期），累计退回不得超过该笔返点金额；
-    返点登记即确认收入、不提供作废/删除，退回是唯一的冲减路径。
-    """
-    record, flow, already = finance_return_rebate(
-        db,
-        rebate_id=rebate_id,
-        amount=payload.amount,
-        returned_on=payload.returned_on,
-        note=payload.note,
-        actor=_actor(user),
-        user=user,
-    )
-    # remaining 由 RebateOut.remaining 计算字段派生，此处只回传 rebate 与累计已退。
-    return schemas.RebateReturnOut(
-        rebate=_rebate_out(record, already),
-        cashflow=_cashflow_out(db, flow),
-        already_returned=already,
-    )
-
-
-# 2026-11-12 裁决：返点登记即确认收入，不提供作废/删除接口。
-# 返点不再有 VOID 写入路径；确实要退回该笔钱时，走资金中心「录入流水」登记一笔
-# 真实 OUT 支出（有真实发生日、自然归期），不再用 date.today() 的作废冲销撕裂 R2。
-# RebateStatus.VOID 枚举与收入侧 `!= VOID` 过滤保留，兼容历史已作废数据。
+    return _rebate_out(item)
 
 
 __all__ = ["router"]

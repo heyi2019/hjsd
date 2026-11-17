@@ -54,11 +54,14 @@ export const POOL_OWNERSHIP_LABEL: Record<string, string> = {
 };
 
 export const FUND_FLOW_SOURCE_LABEL: Record<string, string> = {
+  MANUAL: "手工登记",
+  ORDER: "订单",
   ORDER_EVENT: "订单事件",
-  REBATE_SETTLEMENT: "返点结算",
+  INSTALLMENT: "分期收款",
+  REBATE: "返点",
   DEPOSIT: "押金",
   TRANSFER: "资金划转",
-  OTHER: "手工登记",
+  REVERSAL: "冲销",
 };
 
 export const USER_ROLE_LABEL: Record<string, string> = {
@@ -218,7 +221,6 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   DELIVER_CREATE: "登记交付",
   REBATE_CREATE: "登记返点",
   REBATE_UPDATE: "编辑返点",
-  REBATE_RETURN: "退回返点",
   REBATE_DELETE: "删除返点",
   REBATE_SETTLE: "返点结算",
   REBATE_REVERSE: "冲销返点",

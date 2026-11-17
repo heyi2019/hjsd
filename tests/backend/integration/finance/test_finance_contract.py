@@ -19,6 +19,7 @@ from app.core.errors import NotFound, Validation
 from app.core.operation_operators import list_operation_operators
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
+from app.domain.enums import CashflowSourceType
 from app.domain.trade import Cashflow, RebateRecord, Reconciliation
 from app.finance.cashflows import create_cashflow, list_cashflows, reverse_cashflow
 from app.finance.deposits import create_deposit, deposit_held_total, list_deposits, lose_deposit, return_deposit
@@ -93,7 +94,7 @@ class TestDepositQueries:
             seeded_db.flush()
         seeded_db.rollback()
 
-    def test_internal_cashflow_requires_transfer_id(self, seeded_db):
+    def test_internal_cashflow_requires_transfer_source(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         seeded_db.add(
             Cashflow(
@@ -104,7 +105,7 @@ class TestDepositQueries:
                 category="TRANSFER",
                 direction="IN",
                 amount=Decimal("1.00"),
-                status="APPROVED",
+                source_type=CashflowSourceType.MANUAL.value,
                 created_by="pytest",
                 updated_by="pytest",
             )
@@ -124,7 +125,6 @@ class TestDepositQueries:
                 category="INVALID",
                 direction="OUT",
                 amount=Decimal("1.00"),
-                status="APPROVED",
                 created_by="pytest",
                 updated_by="pytest",
             )
@@ -491,7 +491,7 @@ class TestCashflowLifecycle:
             actor="pytest",
             note="平台运营费",
         )
-        assert flow.status == "APPROVED"
+        assert not hasattr(flow, "status")
         after = pool_balance(seeded_db, invest.id)
         assert after["expense"] == before["expense"] + Decimal("120.00")
         assert after["cash_balance"] == before["cash_balance"] - Decimal("120.00")
@@ -512,8 +512,9 @@ class TestCashflowLifecycle:
         reversal = reverse_cashflow(
             seeded_db, flow.id, reversed_on=TODAY, actor="finance", reason="重复付款"
         )
-        assert reversal.reversal_of_id == flow.id
-        assert reversal.status == "APPROVED"
+        assert reversal.source_type == CashflowSourceType.REVERSAL.value
+        assert reversal.source_id == flow.flow_no
+        assert not hasattr(reversal, "status")
         assert pool_balance(seeded_db, invest.id)["cash_balance"] == 0
 
         with pytest.raises(Validation, match="已冲销"):
@@ -564,7 +565,6 @@ class TestReconciliation:
             category="OTHER",
             direction="IN",
             amount=Decimal("100.00"),
-            status="APPROVED",
             created_by="pytest",
             updated_by="pytest",
         )
@@ -654,7 +654,6 @@ class TestFinanceApi:
             category="OTHER",
             direction="IN",
             amount=Decimal("100.00"),
-            status="APPROVED",
             created_by="pytest",
             updated_by="pytest",
         )
@@ -715,7 +714,7 @@ class TestFinanceApi:
         )
         assert created.status_code == 201, created.text
         flow = created.json()
-        assert flow["status"] == "APPROVED"
+        assert "status" not in flow
 
         reversed_flow = seeded_client.post(
             f"/api/v1/cashflows/{flow['id']}/reverse",
@@ -723,7 +722,8 @@ class TestFinanceApi:
             headers=headers,
         )
         assert reversed_flow.status_code == 200, reversed_flow.text
-        assert reversed_flow.json()["reversal_of_id"] == flow["id"]
+        assert reversed_flow.json()["source_type"] == CashflowSourceType.REVERSAL.value
+        assert reversed_flow.json()["source_id"] == flow["flow_no"]
 
     def test_order_cashflow_endpoint_links_income_without_creating_event(
         self, seeded_client, seeded_db, headers
@@ -736,7 +736,6 @@ class TestFinanceApi:
                 "occurred_on": TODAY.isoformat(),
                 "direction": "IN",
                 "nature": "BUSINESS_IN",
-                "fund_nature": "BUSINESS",
                 "accounting_attribute": "SELF_REVENUE",
                 "category": "OTHER",
                 "amount": "100.00",
@@ -751,7 +750,7 @@ class TestFinanceApi:
         assert flow["category"] == "OTHER"
         assert seeded_db.scalar(
             select(Cashflow).where(Cashflow.id == flow["id"])
-        ).order_event_id is None
+        ).source_type == CashflowSourceType.MANUAL.value
 
     def test_pool_scoped_finance_user_cannot_transfer_or_read_other_pool(
         self, seeded_client, seeded_db
@@ -1143,7 +1142,6 @@ class TestFinanceApi:
             occurred_on=TODAY,
             direction="IN",
             nature="BUSINESS_IN",
-            fund_nature="BUSINESS",
             accounting_attribute="SELF_REVENUE",
             category="OTHER",
             amount="200.00",
@@ -1172,7 +1170,7 @@ class TestFinanceApi:
         assert len(payload["cashflows"]) == 2
         assert {row["nature"] for row in payload["cashflows"]} == {"INTERNAL"}
         assert {row["direction"] for row in payload["cashflows"]} == {"IN", "OUT"}
-        assert len({row["transfer_id"] for row in payload["cashflows"]}) == 1
+        assert len({row["source_id"] for row in payload["cashflows"]}) == 1
         source_balance = pool_balance(seeded_db, invest.id)
         target_balance = pool_balance(seeded_db, profit.id)
         assert source_balance["cash_balance"] == source_before["cash_balance"] - Decimal("125.50")
@@ -1218,7 +1216,8 @@ class TestFinanceApi:
                 category="TRANSFER",
                 direction="OUT",
                 amount=Decimal("80"),
-                transfer_id="TR-REPAIR",
+                source_type=CashflowSourceType.TRANSFER.value,
+                source_id="TR-REPAIR",
                 created_by="pytest",
                 updated_by="pytest",
             )
@@ -1236,7 +1235,10 @@ class TestFinanceApi:
 
         assert len(result["cashflows"]) == 2
         rows = seeded_db.scalars(
-            select(Cashflow).where(Cashflow.transfer_id == "TR-REPAIR")
+            select(Cashflow).where(
+                Cashflow.source_type == CashflowSourceType.TRANSFER.value,
+                Cashflow.source_id == "TR-REPAIR",
+            )
         ).all()
         assert {row.pool_id for row in rows} == {invest.id, profit.id}
         assert {row.direction for row in rows} == {"IN", "OUT"}
@@ -1263,7 +1265,8 @@ class TestFinanceApi:
                 category="TRANSFER",
                 direction="OUT",
                 amount=Decimal("45"),
-                transfer_id="TR-REPAIR-API",
+                source_type=CashflowSourceType.TRANSFER.value,
+                source_id="TR-REPAIR-API",
                 created_by="pytest",
                 updated_by="pytest",
             )

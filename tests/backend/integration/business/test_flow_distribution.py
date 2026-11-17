@@ -18,7 +18,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import Validation
-from app.domain.enums import AccountingAttribute, Direction, FundNature
+from app.domain.enums import AccountingAttribute, Direction
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Order
 from app.domain.trade_models.cashflow import Cashflow
@@ -58,7 +58,6 @@ def test_flow_c_th_distribution_fund_settlement(seeded_db):
     # 分销核算属性与自营 HS 区分开（TH_DIRECT_COST / TH_REVENUE，而非 SELF_*）。
     assert buy_flow.accounting_attribute == AccountingAttribute.TH_DIRECT_COST.value
     assert sell_flow.accounting_attribute == AccountingAttribute.TH_REVENUE.value
-    assert buy_flow.fund_nature == FundNature.BUSINESS.value
     assert buy_flow.direction == Direction.OUT.value
     assert sell_flow.direction == Direction.IN.value
 

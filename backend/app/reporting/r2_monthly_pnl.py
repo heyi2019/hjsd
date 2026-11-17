@@ -25,7 +25,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session
 from app.domain.enums import (
     AccountingAttribute,
-    CashflowStatus,
+    CashflowSourceType,
     Direction,
     Nature,
     RebateStatus,
@@ -126,13 +126,11 @@ def r2_monthly_pnl(
                 continue
             rebate_income[_month_key(occurred_on)] += to_money_or_zero(amount)
 
-    # 运营费用只认资金属性，避免依赖自由填写的流水类别。
+    # 运营费用只认核算属性，避免依赖自由填写的流水类别。
     op_stmt = select(Cashflow).where(
-        Cashflow.status == CashflowStatus.APPROVED.value,
-        Cashflow.order_event_id.is_(None),
+        Cashflow.source_type != CashflowSourceType.ORDER_EVENT.value,
         # 挂订单的支出归该单「支出大类」（成本），不再重复进期间运营费用。
         Cashflow.order_id.is_(None),
-        or_(Cashflow.fund_nature == "BUSINESS", Cashflow.category == "OPERATING_COST"),
         or_(
             Cashflow.accounting_attribute == "OPERATING_EXPENSE",
             Cashflow.accounting_attribute == "REVERSAL",
@@ -143,11 +141,15 @@ def r2_monthly_pnl(
     if pool_ids is not None:
         op_stmt = op_stmt.where(Cashflow.pool_id.in_(pool_ids))
     op_rows = session.scalars(op_stmt).all()
-    reversal_ids = {flow.reversal_of_id for flow in op_rows if flow.reversal_of_id is not None}
+    reversal_nos = {
+        flow.source_id
+        for flow in op_rows
+        if flow.source_type == CashflowSourceType.REVERSAL.value and flow.source_id
+    }
     original_flows = {
-        flow.id: flow
-        for flow in session.scalars(select(Cashflow).where(Cashflow.id.in_(reversal_ids))).all()
-    } if reversal_ids else {}
+        flow.flow_no: flow
+        for flow in session.scalars(select(Cashflow).where(Cashflow.flow_no.in_(reversal_nos))).all()
+    } if reversal_nos else {}
     operating: dict[str, Decimal] = defaultdict(lambda: ZERO)
     for flow in op_rows:
         occurred_on = flow.occurred_on
@@ -156,11 +158,11 @@ def r2_monthly_pnl(
         if to_date and occurred_on > to_date:
             continue
         amount = to_money_or_zero(flow.amount)
-        if flow.reversal_of_id is not None:
+        if flow.source_type == CashflowSourceType.REVERSAL.value:
             # 冲销流水先按「被冲销的原流水」归类，不能看冲销流水自身的方向 / 性质：
             # 冲销经营收入会生成 OUT/BUSINESS_OUT，按自身方向判断会被误记成运营费用。
             # 只有原流水确属运营费用（核算属性 / 类别），才冲减运营费用列。
-            original = original_flows.get(flow.reversal_of_id)
+            original = original_flows.get(flow.source_id)
             if original is not None and (
                 original.accounting_attribute == AccountingAttribute.OPERATING_EXPENSE.value
                 or original.category == "OPERATING_COST"

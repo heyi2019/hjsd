@@ -1946,7 +1946,7 @@ class TestOrdersApi:
 
         assert response.status_code == 200, response.text
         body = response.json()
-        assert body["cashflows"][0]["order_event_id"] is not None
+        assert body["cashflows"][0]["source_type"] == "ORDER_EVENT"
         assert body["cashflows"][0]["flow_no"]
         assert body["rebates"][0]["id"] == rebate.id
         assert body["installment"]["id"] == installment.id

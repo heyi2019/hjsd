@@ -16,10 +16,9 @@ export function useCashflowResources(active = true) {
   const [cashflowKeyword, setCashflowKeyword] = useState("");
   const [cashflowPoolId, setCashflowPoolId] = useState<number | undefined>();
   const [cashflowDirection, setCashflowDirection] = useState<string | undefined>();
-  const [cashflowStatus, setCashflowStatus] = useState<string | undefined>();
   const [cashflowFrom, setCashflowFrom] = useState("");
   const [cashflowTo, setCashflowTo] = useState("");
-  const [cashflowFundNature, setCashflowFundNature] = useState("");
+  const [cashflowLedgerType, setCashflowLedgerType] = useState("");
   const [cashflowAttribute, setCashflowAttribute] = useState("");
   const [cashflowCategory, setCashflowCategory] = useState("");
   const [cashflowExporting, setCashflowExporting] = useState(false);
@@ -32,10 +31,8 @@ export function useCashflowResources(active = true) {
   cashflowPoolIdRef.current = cashflowPoolId;
   const cashflowDirectionRef = useRef(cashflowDirection);
   cashflowDirectionRef.current = cashflowDirection;
-  const cashflowStatusRef = useRef(cashflowStatus);
-  cashflowStatusRef.current = cashflowStatus;
-  const cashflowFundNatureRef = useRef(cashflowFundNature);
-  cashflowFundNatureRef.current = cashflowFundNature;
+  const cashflowLedgerTypeRef = useRef(cashflowLedgerType);
+  cashflowLedgerTypeRef.current = cashflowLedgerType;
   const cashflowAttributeRef = useRef(cashflowAttribute);
   cashflowAttributeRef.current = cashflowAttribute;
   const cashflowCategoryRef = useRef(cashflowCategory);
@@ -52,8 +49,7 @@ export function useCashflowResources(active = true) {
       occurred_to: cashflowToRef.current || undefined,
       pool_id: cashflowPoolIdRef.current ?? undefined,
       direction: cashflowDirectionRef.current || undefined,
-      status: cashflowStatusRef.current || undefined,
-      fund_nature: cashflowFundNatureRef.current || undefined,
+      ledger_type: cashflowLedgerTypeRef.current || undefined,
       accounting_attribute: cashflowAttributeRef.current || undefined,
       category: cashflowCategoryRef.current.trim() || undefined,
       keyword: cashflowKeywordRef.current.trim() || undefined,
@@ -80,8 +76,7 @@ export function useCashflowResources(active = true) {
         occurred_to: cashflowTo || undefined,
         pool_id: cashflowPoolId,
         direction: cashflowDirection || undefined,
-        status: cashflowStatus || undefined,
-        fund_nature: cashflowFundNature || undefined,
+        ledger_type: cashflowLedgerType || undefined,
         accounting_attribute: cashflowAttribute || undefined,
         category: cashflowCategory.trim() || undefined,
         keyword: cashflowKeyword.trim() || undefined,
@@ -105,10 +100,9 @@ export function useCashflowResources(active = true) {
     cashflowCategory,
     cashflowDirection,
     cashflowFrom,
-    cashflowFundNature,
+    cashflowLedgerType,
     cashflowKeyword,
     cashflowPoolId,
-    cashflowStatus,
     cashflowTo,
   ]);
 
@@ -121,8 +115,7 @@ export function useCashflowResources(active = true) {
           occurred_to: cashflowToRef.current || undefined,
           pool_id: cashflowPoolIdRef.current ?? undefined,
           direction: cashflowDirectionRef.current || undefined,
-          status: cashflowStatusRef.current || undefined,
-          fund_nature: cashflowFundNatureRef.current || undefined,
+          ledger_type: cashflowLedgerTypeRef.current || undefined,
           accounting_attribute: cashflowAttributeRef.current || undefined,
           category: cashflowCategoryRef.current.trim() || undefined,
           keyword: cashflowKeywordRef.current.trim() || undefined,
@@ -147,21 +140,17 @@ export function useCashflowResources(active = true) {
     setCashflowPoolId,
     cashflowDirection,
     setCashflowDirection,
-    cashflowStatus,
-    setCashflowStatus,
     cashflowFrom,
     setCashflowFrom,
     cashflowTo,
     setCashflowTo,
-    cashflowFundNature,
-    setCashflowFundNature,
+    cashflowLedgerType,
+    setCashflowLedgerType,
     cashflowAttribute,
     setCashflowAttribute,
     cashflowCategory,
     setCashflowCategory,
     flowDirectionOptions: useOptionSet("FUND_FLOW_DIRECTION"),
-    flowStatusOptions: useOptionSet("FUND_FLOW_STATUS"),
-    flowFundNatureOptions: useOptionSet("FUND_FLOW_FUND_NATURE"),
     flowAttributeOptions: useOptionSet("FUND_FLOW_ACCOUNTING_ATTRIBUTE"),
     fetchCashflows,
     exportCashflows,

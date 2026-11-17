@@ -1,4 +1,4 @@
-/** StudioExpensePanel：工作室支出登记与资金池筛选。 */
+/** StudioExpensePanel：工作室支出登记。 */
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,12 +36,12 @@ const expenseFlows = [
   {
     id: 51, flow_no: "CF-001", pool_id: 1, occurred_on: "2026-10-20", nature: "BUSINESS_OUT",
     category: "房租", direction: "OUT", amount: "3000.00", source: "OTHER", status: "APPROVED",
-    fund_nature: "BUSINESS", accounting_attribute: "OPERATING_EXPENSE",
+    accounting_attribute: "OPERATING_EXPENSE",
   },
   {
     id: 52, flow_no: "CF-002", pool_id: 2, occurred_on: "2026-10-21", nature: "BUSINESS_OUT",
     category: "日用", direction: "OUT", amount: "100.00", source: "OTHER", status: "PENDING",
-    fund_nature: "BUSINESS", accounting_attribute: "OPERATING_EXPENSE",
+    accounting_attribute: "OPERATING_EXPENSE",
   },
 ];
 
@@ -91,27 +91,17 @@ async function pickDirection(modal: HTMLElement, label: "支出" | "收入") {
   await ui.click(item);
 }
 
-async function togglePoolFilter(title: RegExp) {
-  await ui.click(screen.getByRole("combobox", { name: "资金池筛选" }));
-  const dropdowns = document.querySelectorAll(".ant-select-dropdown");
-  const current = dropdowns[dropdowns.length - 1] as HTMLElement;
-  await ui.click(await within(current).findByTitle(title));
-}
-
 describe("StudioExpensePanel：工作室支出", () => {
-  it("资金池直接使用多选下拉筛选，不再显示复选框", async () => {
+  it("默认汇总全部资金池且不显示资金池筛选", async () => {
     mockOptionSets();
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
 
     expect(screen.queryByRole("button", { name: /配置承载池/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: /经营主池/ })).not.toBeInTheDocument();
-    expect(await screen.findByRole("combobox", { name: "资金池筛选" })).toBeInTheDocument();
-
-    await togglePoolFilter(/押金池/);
-    // 列表过滤在后端：取消押金池后请求只带 POOL-A
-    expect(vi.mocked(studioExpensesApi.summary)).toHaveBeenLastCalledWith(
-      expect.objectContaining({ pool_ids: "1" }),
-    );
+    expect(await screen.findByText("房租")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "资金池筛选" })).not.toBeInTheDocument();
+    expect(document.querySelector(".studio-expense-shell")).toBeTruthy();
+    expect(vi.mocked(studioExpensesApi.summary).mock.lastCall?.[0]).not.toHaveProperty("pool_ids");
   });
 
   it("记一笔按钮独立于筛选栏", async () => {
@@ -140,29 +130,6 @@ describe("StudioExpensePanel：工作室支出", () => {
     await screen.findByText("房租");
     expect(screen.queryByRole("combobox", { name: "工作室支出状态" })).not.toBeInTheDocument();
     expect(screen.queryByText("全部状态")).not.toBeInTheDocument();
-  });
-
-  it("未选择资金池时给出引导提示，且列表为空", async () => {
-    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
-    await screen.findByRole("combobox", { name: "资金池筛选" });
-    await togglePoolFilter(/经营主池/);
-    await togglePoolFilter(/押金池/);
-    expect(await screen.findByText(/尚未选择资金池/)).toBeInTheDocument();
-    expect(screen.getByText("暂无工作室收支")).toBeInTheDocument();
-  });
-
-  it("资金池筛选随请求下发 pool_ids，前端不再自行过滤", async () => {
-    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
-    expect(await screen.findByText("房租")).toBeInTheDocument();
-    // 默认勾选全部池
-    expect(vi.mocked(studioExpensesApi.summary)).toHaveBeenLastCalledWith(
-      expect.objectContaining({ pool_ids: "1,2" }),
-    );
-    await togglePoolFilter(/押金池/);
-    // 取消押金池后只剩 POOL-A；「只显示这些池的流水」由后端按 pool_ids 筛
-    expect(vi.mocked(studioExpensesApi.summary)).toHaveBeenLastCalledWith(
-      expect.objectContaining({ pool_ids: "1" }),
-    );
   });
 
   it("三个汇总数取服务端，不与当页明细相加", async () => {
@@ -264,7 +231,6 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(payload).toMatchObject({
       pool_id: 1,
       direction: "OUT",
-      fund_nature: "BUSINESS",
       accounting_attribute: "OPERATING_EXPENSE",
       category: "房租",
       amount: "3000.00",
@@ -297,7 +263,6 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(payload).toMatchObject({
       pool_id: 1,
       direction: "IN",
-      fund_nature: "BUSINESS",
       accounting_attribute: "SELF_REVENUE",
       category: "货款",
       amount: "800.00",

@@ -11,9 +11,9 @@ from app.domain.base import (
 from app.domain.enums import (
     AccountingAttribute,
     AllocationRole,
-    CashflowStatus,
+    CashflowLedgerType,
+    CashflowSourceType,
     Direction,
-    FundNature,
     Nature,
     ReconciliationStatus,
 )
@@ -48,8 +48,8 @@ class Cashflow(Base, AuditMixin):
             name="cashflow_nature_valid",
         ),
         CheckConstraint(
-            f"fund_nature IN {FundNature.values()!r}".replace("[", "(").replace("]", ")"),
-            name="cashflow_fund_nature_valid",
+            f"ledger_type IN {CashflowLedgerType.values()!r}".replace("[", "(").replace("]", ")"),
+            name="cashflow_ledger_type_valid",
         ),
         CheckConstraint(
             f"accounting_attribute IN {AccountingAttribute.values()!r}"
@@ -62,34 +62,31 @@ class Cashflow(Base, AuditMixin):
             name="cashflow_direction_valid",
         ),
         CheckConstraint(
-            f"status IN {CashflowStatus.values()!r}".replace("[", "(").replace("]", ")"),
-            name="cashflow_status_valid",
+            "nature != 'INTERNAL' OR "
+            "(source_type = 'TRANSFER' AND source_id IS NOT NULL)",
+            name="internal_transfer_source_valid",
         ),
         CheckConstraint(
-            "nature != 'INTERNAL' OR transfer_id IS NOT NULL",
-            name="internal_transfer_link_valid",
-        ),
-        CheckConstraint(
-            "(nature = 'INTERNAL' AND transfer_id IS NOT NULL) OR "
+            "(nature = 'INTERNAL' AND source_type = 'TRANSFER' AND source_id IS NOT NULL) OR "
             "(direction = 'IN' AND nature IN ('EXTERNAL_IN', 'BUSINESS_IN')) OR "
             "(direction = 'OUT' AND nature = 'BUSINESS_OUT') OR "
             "(category = 'CANCEL' AND nature = 'BUSINESS_IN' AND direction IN ('IN', 'OUT'))",
             name="cashflow_direction_nature_valid",
         ),
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
-        # 一笔订单事件可派生多笔资金流水（如售出拆分进不同资金池），
-        # 故不再对 order_event_id 设唯一约束；历史唯一约束由迁移 0065 在库中移除。
+        # 一笔订单事件可派生多笔资金流水（如售出拆分进不同资金池）。
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
         Index("ix_cashflow_order", "order_id"),
-        Index("ix_cashflow_deposit", "deposit_id"),
+        Index("ix_cashflow_source", "source_type", "source_id"),
         Index("ix_cashflow_nature", "nature"),
-        Index("ix_cashflow_fund_nature", "fund_nature"),
+        Index("ix_cashflow_ledger_type", "ledger_type"),
         Index("ix_cashflow_accounting_attribute", "accounting_attribute"),
-        Index("ix_cashflow_transfer", "transfer_id"),
         CheckConstraint("amount >= 0", name="amount_nonneg"),
         Index("ix_cashflow_occurred_on", "occurred_on"),
-        Index("ix_cashflow_status", "status"),
-        UniqueConstraint("reversal_of_id", name="uq_cashflow_reversal"),
+        CheckConstraint(
+            f"source_type IN {CashflowSourceType.values()!r}".replace("[", "(").replace("]", ")"),
+            name="cashflow_source_type_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -99,9 +96,9 @@ class Cashflow(Base, AuditMixin):
     )
     occurred_on: Mapped[date] = mapped_column(Date, nullable=False)
     nature: Mapped[str] = mapped_column(String(16), nullable=False)
-    fund_nature: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=FundNature.BUSINESS.value,
-        server_default=FundNature.BUSINESS.value,
+    ledger_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=CashflowLedgerType.BUSINESS.value,
+        server_default=CashflowLedgerType.BUSINESS.value,
     )
     accounting_attribute: Mapped[str] = mapped_column(
         String(32), nullable=False, default=AccountingAttribute.OPERATING_EXPENSE.value,
@@ -110,21 +107,13 @@ class Cashflow(Base, AuditMixin):
     category: Mapped[str] = mapped_column(String(32), nullable=False, default="OTHER")
     direction: Mapped[str] = mapped_column(String(8), nullable=False)
     amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=CashflowStatus.APPROVED.value
+    source_type: Mapped[str] = mapped_column(
+        String(24), nullable=False, default=CashflowSourceType.MANUAL.value,
+        server_default=CashflowSourceType.MANUAL.value,
     )
+    source_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     order_id: Mapped[int | None] = mapped_column(
         ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
-    )
-    deposit_id: Mapped[int | None] = mapped_column(
-        ForeignKey("deposits.id", ondelete="SET NULL"), nullable=True
-    )
-    order_event_id: Mapped[int | None] = mapped_column(
-        ForeignKey("order_events.id", ondelete="SET NULL"), nullable=True
-    )
-    transfer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    reversal_of_id: Mapped[int | None] = mapped_column(
-        ForeignKey("cashflow.id", ondelete="RESTRICT"), nullable=True
     )
     reviewed_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

@@ -321,8 +321,8 @@ class OrderCashflowOut(BaseModel):
     category: str
     direction: str
     amount: Decimal
-    status: str
-    order_event_id: int | None = None
+    source_type: str
+    source_id: str | None = None
     note: str | None = None
     operator: str
 

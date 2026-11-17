@@ -58,9 +58,9 @@ const deposits = [
   { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" },
 ];
 const cashflows = [
-  { id: 1, flow_no: "ZC00001", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
-  { id: 2, flow_no: "SR00001", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source: "ORDER_EVENT", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
-  { id: 3, flow_no: "ZC00002", pool_id: 1, occurred_on: "2026-10-18", nature: "BUSINESS_OUT", category: "CXL", direction: "OUT", amount: "500.00", order_no: "HS0001", source: "ORDER_EVENT", status: "APPROVED", reviewed_by: "admin", reviewed_at: "2026-10-18T09:30:00", reversal_of_id: 1, fund_nature: "BUSINESS", accounting_attribute: "REVERSAL" },
+  { id: 1, flow_no: "ZC00001", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source_type: "ORDER_EVENT", source_id: "HS0001-EV-BUY-01", source: "ORDER_EVENT", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
+  { id: 2, flow_no: "SR00001", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source_type: "ORDER_EVENT", source_id: "HS0001-EV-SELL-01", source: "ORDER_EVENT", ledger_type: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
+  { id: 3, flow_no: "ZC00002", pool_id: 1, occurred_on: "2026-10-18", nature: "BUSINESS_OUT", category: "CXL", direction: "OUT", amount: "500.00", order_no: "HS0001", source_type: "REVERSAL", source_id: "ZC00001", source: "REVERSAL", reviewed_by: "admin", reviewed_at: "2026-10-18T09:30:00", ledger_type: "BUSINESS", accounting_attribute: "REVERSAL" },
 ];
 
 beforeEach(() => {
@@ -98,7 +98,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     resolveMockOnce(vi.mocked(cashflowsApi.create), { id: 100 });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
     const modal = modalContent();
     await pickSelect(modal, 0, /经营主池/);
@@ -110,13 +110,12 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await waitFor(() => expect(vi.mocked(cashflowsApi.create)).toHaveBeenCalled());
     const payload = vi.mocked(cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload.nature).toBeUndefined();
-    expect(payload.fund_nature).toBe("BUSINESS");
   });
 
   it("独立流水选内部调拨 → 交由后端拒绝，不在前端复制业务规则", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
     const modal = modalContent();
     await pickSelect(modal, 0, /经营主池/);
@@ -135,11 +134,11 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
 
   it("已入账且无关联流水 → 冲销调用 cashflowsApi.reverse", async () => {
-    const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
+    const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source_type: "MANUAL", source_id: null, source: "MANUAL", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" }];
     resolveMock(vi.mocked(cashflowsApi.list), cashflowPage(approved, { total_in: "0.00", total_out: "300.00" }));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     await ui.click(await screen.findByRole("button", { name: /冲\s*销/ }));
     const modal = modalContent();
     await ui.type(modal.querySelector("#reversed_on") ?? modal, "2026-10-18");
@@ -152,14 +151,14 @@ describe("FundsPage：资金写路径深覆盖", () => {
   });
 
   it("冲销失败时保留弹窗和表单，并显示可重试错误", async () => {
-    const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
+    const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source_type: "MANUAL", source_id: null, source: "MANUAL", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" }];
     vi.mocked(cashflowsApi.list).mockImplementation(async (params) => params?.direction
       ? cashflowPage([], { total_in: "0.00", total_out: "0.00" })
       : cashflowPage(approved, { total_in: "0.00", total_out: "300.00" }));
     vi.mocked(cashflowsApi.reverse).mockRejectedValueOnce(new Error("冲销接口暂时不可用"));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     await screen.findByText("CF-A-07");
     await ui.click(await screen.findByRole("button", { name: /冲\s*销/ }));
     const modal = modalContent();
@@ -292,7 +291,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     resolveMockOnce(vi.mocked(depositsApi.release), { id: 11 });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "工作室支出" }));
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
     await ui.click(await screen.findByRole("button", { name: /释\s*放/ }));
     const modal = modalContent();
     await ui.type(modal.querySelector("#amount") ?? modal, "100.00");

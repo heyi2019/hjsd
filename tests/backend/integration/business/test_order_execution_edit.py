@@ -26,7 +26,9 @@ def test_order_edit_updates_event_flow_and_cost_without_changing_time(seeded_cli
     assert seeded_db.get(Account, account.id).cost_amount == Decimal("150")
     edited = seeded_db.get(OrderEvent, event.id)
     assert edited.amount == Decimal("150") and edited.note == "修改" and edited.occurred_on == original_time
-    flows = seeded_db.scalars(select(Cashflow).where(Cashflow.order_event_id == event.id)).all()
+    flows = seeded_db.scalars(select(Cashflow).where(
+        Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == event.event_no
+    )).all()
     assert len(flows) == 1 and flows[0].amount == Decimal("150") and flows[0].occurred_on == original_time
     assert seeded_db.scalar(select(AuditLog).where(AuditLog.entity_type == "inventory_event_edit", AuditLog.entity_id == str(event.id))) is not None
 
@@ -125,7 +127,9 @@ def test_edit_event_operator_updates_linked_cashflow_operators(seeded_client, se
     post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("200"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
-    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_event_id == event.id))
+    flow = seeded_db.scalar(select(Cashflow).where(
+        Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == event.event_no
+    ))
     assert flow is not None
 
     response = seeded_client.patch(
@@ -242,7 +246,9 @@ def test_operator_edit_does_not_change_existing_cashflow_amount(seeded_client, s
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
-    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_event_id == event.id))
+    flow = seeded_db.scalar(select(Cashflow).where(
+        Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == event.event_no
+    ))
     flow.amount = Decimal("90")
     seeded_db.commit()
     response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [1, 2]}]})

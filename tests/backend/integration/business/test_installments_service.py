@@ -145,7 +145,10 @@ def test_installment_sale_posts_sell_attribute_without_sale_cashflow(seeded_db):
     assert event.form_extra == {"sale_mode": "INSTALLMENT"}
     assert order.status == "ACTIVE"
     assert seeded_db.scalar(
-        select(Cashflow.id).where(Cashflow.order_event_id == event.id)
+        select(Cashflow.id).where(
+            Cashflow.source_type == "ORDER_EVENT",
+            Cashflow.source_id == event.event_no,
+        )
     ) is None
 
     contract = _contract(
@@ -175,7 +178,8 @@ def test_installment_sale_posts_sell_attribute_without_sale_cashflow(seeded_db):
         )
     )
     assert payment_flow is not None
-    assert payment_flow.order_event_id is None
+    assert payment_flow.source_type == "INSTALLMENT"
+    assert payment_flow.source_id == contract.inst_no
 
 def _posted_event(seeded_db, order_id: int, *, event_type: str, amount: str, offset_event_id=None):
     event = OrderEvent(
@@ -306,7 +310,7 @@ def test_cancel_reverses_direct_installment_cashflows(seeded_db):
         select(Cashflow.id).where(
             Cashflow.order_id == order.id,
             Cashflow.category == "REVERSAL",
-            Cashflow.reversal_of_id.is_not(None),
+            Cashflow.source_type == "REVERSAL",
         )
     ) is not None
 

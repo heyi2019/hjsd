@@ -25,7 +25,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from app.core.money import to_money
-from app.domain.enums import Nature
+from app.domain.enums import CashflowSourceType, Nature
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
 from app.finance.deposits import create_deposit, lose_deposit, return_deposit
@@ -44,16 +44,15 @@ def _pool(seeded_db, code: str) -> Pool:
 
 def _flow(
     seeded_db, *, pool_id, direction, nature, amount,
-    attribute=None, order_id=None, category="OTHER", transfer_id=None,
+    attribute=None, order_id=None, category="OTHER", source_type="MANUAL", source_id=None,
 ):
     seeded_db.add(Cashflow(
         flow_no=f"CF-{uuid4().hex[:10]}",
         pool_id=pool_id, occurred_on=TODAY, nature=nature,
-        fund_nature=("EXTERNAL" if nature == Nature.EXTERNAL_IN.value
-                     else "INTERNAL" if nature == Nature.INTERNAL.value else "BUSINESS"),
         accounting_attribute=attribute, category=category, direction=direction,
-        amount=to_money(amount), status="APPROVED", order_id=order_id,
-        transfer_id=transfer_id,
+        amount=to_money(amount), order_id=order_id,
+        source_type=source_type,
+        source_id=source_id,
         created_by="pytest", updated_by="pytest",
     ))
     seeded_db.flush()
@@ -238,9 +237,9 @@ def test_internal_transfer_is_expense_of_source_income_of_target(seeded_db):
     before_tgt = pool_balance(seeded_db, profit.id)
     tid = "TRF-TEST-001"
     _flow(seeded_db, pool_id=invest.id, direction="OUT", nature="INTERNAL",
-          amount="300", category="TRANSFER", transfer_id=tid)
+          amount="300", category="TRANSFER", source_type=CashflowSourceType.TRANSFER.value, source_id=tid)
     _flow(seeded_db, pool_id=profit.id, direction="IN", nature="INTERNAL",
-          amount="300", category="TRANSFER", transfer_id=tid)
+          amount="300", category="TRANSFER", source_type=CashflowSourceType.TRANSFER.value, source_id=tid)
     seeded_db.expire_all()
 
     after_src = pool_balance(seeded_db, invest.id)

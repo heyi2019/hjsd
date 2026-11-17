@@ -59,6 +59,9 @@ describe("CustomerLeadPanel：客户需求池", () => {
     expect(screen.getByText("找号")).toBeInTheDocument();
     expect(screen.getByText("需求总数")).toBeInTheDocument();
     expect(screen.getByText("待跟进")).toBeInTheDocument();
+    const shell = document.querySelector(".customer-lead-shell");
+    expect(shell).toBeTruthy();
+    expect(within(shell as HTMLElement).getByText("客户需求池")).toBeInTheDocument();
   });
 
   it("无需求时显示空态文案", async () => {

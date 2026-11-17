@@ -9,13 +9,17 @@ import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
 import {
   ACCOUNTING_ATTRIBUTE_LABEL,
-  FUND_NATURE_LABEL,
   FUND_FLOW_SOURCE_LABEL,
   POOL_OWNERSHIP_LABEL,
   RECONCILIATION_STATUS_LABEL,
 } from "../shared/lib/labels";
 import type { FundsPageController } from "./useFundsPageController";
 import type { Cashflow, Deposit, Pool, Reconciliation } from "../shared/api/types/finance";
+
+const LEDGER_TYPE_LABEL: Record<string, string> = {
+  BUSINESS: "业务资金",
+  STUDIO: "工作室运营",
+};
 
 export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
   const { pools, balances, totalCash, totalAvailable, totalDeposit, totalOwned, transferForm, setTransferOpen, loading, fundsReady, error } = ctrl;
@@ -70,25 +74,22 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
 export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
   const {
     cashflows, cashflowKeyword, setCashflowKeyword, pools, cashflowPoolId, setCashflowPoolId,
-    cashflowDirection, setCashflowDirection, cashflowStatus, setCashflowStatus, cashflowFundNature, setCashflowFundNature,
+    cashflowDirection, setCashflowDirection,
+    cashflowLedgerType, setCashflowLedgerType,
     cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, cashflowFrom, setCashflowFrom,
-    cashflowTo, setCashflowTo, flowDirectionOptions, flowStatusOptions, flowFundNatureOptions, flowAttributeOptions,
+    cashflowTo, setCashflowTo, flowDirectionOptions, flowAttributeOptions,
     fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, totalFlowIncome, totalFlowExpense,
     cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, loading, cashflowsReady, error,
   } = ctrl;
   const cashflowUnavailable = !cashflowsReady || Boolean(error);
   const { arrange: arrangeCashflowColumns } = useListViewColumns("CASHFLOW");
   const cashflowColumns: ColumnsType<Cashflow> = [
+    { title: "账簿", dataIndex: "ledger_type", render: (v: string) => LEDGER_TYPE_LABEL[v] ?? v },
     { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
     { title: "流水号", dataIndex: "flow_no" },
     { title: "日期", dataIndex: "occurred_on" },
     { title: "建立时间", dataIndex: "occurred_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     { title: "类别", dataIndex: "category" },
-    {
-      title: "资金性质",
-      dataIndex: "fund_nature",
-      render: (v: string | null | undefined, row) => FUND_NATURE_LABEL[v ?? (row.nature?.startsWith("EXTERNAL") ? "EXTERNAL" : "BUSINESS")] ?? v ?? "—",
-    },
     {
       title: "核算属性",
       dataIndex: "accounting_attribute",
@@ -101,7 +102,6 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
     },
     { title: "金额", dataIndex: "amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "来源", dataIndex: "source", render: (v: string | null | undefined) => configurableLabel("FUND_FLOW_SOURCE", v, FUND_FLOW_SOURCE_LABEL) },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("FUND_FLOW_STATUS", v, { APPROVED: "已入账" })} /> },
     { title: "操作人", dataIndex: "operator", render: (v: string | null | undefined) => v || "—" },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
     {
@@ -110,7 +110,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
       width: 170,
       render: (_v, row) => (
         <Space size={2}>
-          {row.status === "APPROVED" && !row.reversal_of_id && !cashflows.some((flow) => flow.reversal_of_id === row.id) && !row.order_id && !row.deposit_id && !row.transfer_id && !row.order_event_id && (
+          {row.source_type === "MANUAL" && !cashflows.some((flow) => flow.source_type === "REVERSAL" && flow.source_id === row.flow_no) && !row.order_id && (
             <PermissionButton
               permission="deposit.post"
               size="small"
@@ -129,8 +129,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
         <Input aria-label="流水搜索" allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注" onChange={(event) => setCashflowKeyword(event.target.value)} />
         <Select aria-label="流水资金池" allowClear disabled={cashflowUnavailable} value={cashflowPoolId} placeholder="全部资金池" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
         <Select aria-label="流水方向" allowClear disabled={cashflowUnavailable} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
-        <Select aria-label="流水状态" allowClear disabled={cashflowUnavailable} value={cashflowStatus} placeholder="全部状态" options={flowStatusOptions ?? []} onChange={setCashflowStatus} />
-        <Select aria-label="流水资金性质" allowClear disabled={cashflowUnavailable} value={cashflowFundNature || undefined} placeholder="全部资金性质" options={flowFundNatureOptions ?? []} onChange={(value) => setCashflowFundNature(value ?? "")} />
+        <Select aria-label="流水账簿" allowClear disabled={cashflowUnavailable} value={cashflowLedgerType || undefined} placeholder="全部账簿" options={Object.entries(LEDGER_TYPE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(value) => setCashflowLedgerType(value ?? "")} />
         <Select aria-label="流水核算属性" allowClear disabled={cashflowUnavailable} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
         <Input aria-label="流水中类别筛选" allowClear value={cashflowCategory} placeholder="类别，如冲销" onChange={(event) => setCashflowCategory(event.target.value)} />
         <DateField

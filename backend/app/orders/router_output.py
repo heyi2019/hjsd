@@ -14,7 +14,7 @@ from app.core.security import (
     PERM_AUDIT_READ,
     PERM_FINANCE_READ,
 )
-from app.domain.enums import AccountingAttribute, Direction
+from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction
 from app.domain.attachments import Attachment
 from app.domain.foundation import AuditLog
 from app.domain.parties import (
@@ -169,10 +169,13 @@ def _order_detail_output(
                     "category": item.category,
                     "direction": item.direction,
                     "amount": item.amount,
-                    "status": item.status,
-                    "order_event_id": item.order_event_id,
+                    "source_type": item.source_type,
+                    "source_id": item.source_id,
                     "note": item.note,
-                    "operator": _selected_operator_label(event_by_id.get(item.order_event_id), operator_names) or "-",
+                    "operator": _selected_operator_label(
+                        next((event for event in events if event.event_no == item.source_id), None),
+                        operator_names,
+                    ) or "-",
                 }
             )
             for item in cashflows
@@ -324,7 +327,7 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             select(Cashflow.order_id, func.coalesce(func.sum(Cashflow.amount), 0))
             .where(
                 Cashflow.order_id.in_(order_ids),
-                Cashflow.order_event_id.is_(None),
+                Cashflow.source_type != CashflowSourceType.ORDER_EVENT.value,
                 Cashflow.direction == Direction.OUT.value,
                 Cashflow.accounting_attribute.in_(
                     (

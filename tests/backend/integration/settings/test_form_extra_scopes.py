@@ -258,6 +258,7 @@ def test_cashflow_create_and_reverse_form_extra(seeded_client, seeded_db, header
     assert created.status_code == 201, created.text
     flow_id = created.json()["id"]
     row = seeded_db.get(Cashflow, flow_id)
+    flow_no = row.flow_no
     assert row.form_extra == {"landlord": "李某"}
 
     # 流水创建即已入账，直接冲销，冲销流水携带 form_extra
@@ -269,7 +270,7 @@ def test_cashflow_create_and_reverse_form_extra(seeded_client, seeded_db, header
     assert reversed_flow.status_code == 200, reversed_flow.text
     reversal = (
         seeded_db.query(Cashflow)
-        .filter(Cashflow.reversal_of_id == flow_id)
+        .filter(Cashflow.source_type == "REVERSAL", Cashflow.source_id == flow_no)
         .one()
     )
     assert reversal.form_extra == {"ticket": "RV-1"}

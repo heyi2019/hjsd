@@ -5,7 +5,7 @@
 这套口径散在组件里有三个问题：`limit` 截断会少算、浮点累加、属性配对规则改一次就漂。
 
 汇总搬后端后，这里守住：
-1. 只算 APPROVED（待审核不进经营口径）；
+1. 流水登记即生效，直接进入经营口径；
 2. 只算手工登记（返点/押金/划转/订单事件流水都不算工作室收支）；
 3. 支出认 OPERATING_EXPENSE、收入认 SELF_REVENUE，不能互相串；
 4. 汇总不受 items 的 limit 影响，净额由后端算。
@@ -45,6 +45,7 @@ def _flow(
         occurred_on=TODAY,
         direction=direction,
         nature="BUSINESS_OUT" if direction == "OUT" else "BUSINESS_IN",
+        ledger_type="STUDIO",
         accounting_attribute=attribute,
         category=category,
         amount=Decimal(amount),
@@ -80,16 +81,14 @@ def test_summary_counts_only_manual_flows(seeded_client, seeded_db, headers):
     assert Decimal(payload["net"]) == Decimal("500.00")
 
 
-def test_pending_flow_appears_in_items_but_not_in_summary(seeded_client, seeded_db, headers):
+def test_new_flow_appears_in_items_and_summary(seeded_client, seeded_db, headers):
     flow = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="120")
-    flow.status = "PENDING"
-    seeded_db.commit()
 
     payload = _summary(seeded_client, headers)
 
     assert [item["flow_no"] for item in payload["items"]] == [flow.flow_no]
-    assert Decimal(payload["expense"]) == Decimal("0.00")
-    assert Decimal(payload["net"]) == Decimal("0.00")
+    assert Decimal(payload["expense"]) == Decimal("120.00")
+    assert Decimal(payload["net"]) == Decimal("-120.00")
 
 
 def test_summary_ignores_item_limit(seeded_client, seeded_db, headers):
@@ -165,6 +164,7 @@ def test_summary_excludes_order_plain_cashflows(seeded_client, seeded_db, header
         direction="OUT",
         nature="BUSINESS_OUT",
         accounting_attribute="OPERATING_EXPENSE",
+        ledger_type="BUSINESS",
         category="房租",
         amount=Decimal("450"),
         actor="pytest",

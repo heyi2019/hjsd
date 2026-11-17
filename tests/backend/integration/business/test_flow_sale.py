@@ -16,7 +16,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.domain.enums import CashflowStatus, Direction, EventType
+from app.domain.enums import Direction, EventType
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Order
 from app.domain.trade_models.cashflow import Cashflow
@@ -94,12 +94,12 @@ def test_flow_b_hs_sell_end_to_end(seeded_client, headers, seeded_db):
         baseline + Decimal("1500.00") - Decimal("1000.00")
     )
 
-    # 现金流同源：OUT(1000) + IN(1500)，均 APPROVED
+    # 现金流同源：OUT(1000) + IN(1500)，登记即生效
     flows = seeded_db.scalars(
         select(Cashflow).where(Cashflow.order_id == order_id).order_by(Cashflow.id)
     ).all()
     assert [f.direction for f in flows] == [Direction.OUT.value, Direction.IN.value]
-    assert all(f.status == CashflowStatus.APPROVED.value for f in flows)
+    assert all(not hasattr(f, "status") for f in flows)
     assert [f.amount for f in flows] == [1000, 1500]
 
     # 报表口径一致：收入 1500 / 成本 1000 / 净利 500

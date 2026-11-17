@@ -70,27 +70,24 @@ export interface TransferResult {
 }
 
 export interface Cashflow {
-  status: string;
   id: number;
   flow_no: string;
   pool_id: number;
   occurred_on: string;
   occurred_at?: string | null;
   nature: string;
-  fund_nature?: string;
+  ledger_type: "BUSINESS" | "STUDIO" | string;
   accounting_attribute?: string;
   category: string;
   direction: "IN" | "OUT" | string;
   amount: string;
+  source_type: string;
+  source_id?: string | null;
   order_id?: number | null;
   order_no?: string | null;
-  deposit_id?: number | null;
-  order_event_id?: number | null;
-  transfer_id?: string | null;
   source: string;
   reviewed_by?: string | null;
   reviewed_at?: string | null;
-  reversal_of_id?: number | null;
   operator?: string;
   note?: string | null;
   form_extra?: Record<string, unknown> | null;
@@ -111,16 +108,6 @@ export interface Rebate {
   created_at?: string;
   operator?: string;
   operator_user_ids?: number[] | null;
-  /** 后端聚合下发的累计已退 / 可退余额（口径收敛，前端不自行相减）。 */
-  already_returned?: string;
-  remaining?: string;
-}
-
-export interface RebateReturnResult {
-  rebate: Rebate;
-  cashflow: Cashflow;
-  already_returned: string;
-  remaining: string;
 }
 
 export interface Reconciliation { id: number; pool_id: number; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string; reason?: string | null; note?: string | null; operator?: string | null; operation_operators?: DepositOperationOperator[] }

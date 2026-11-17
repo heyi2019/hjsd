@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domain.enums import EventType
+from app.domain.enums import CashflowSourceType, EventType
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, OrderEvent
 from app.domain.users import User
@@ -42,15 +42,18 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
         if event.event_type == EventType.REBATE.value
         and str((event.form_extra or {}).get("rebate_record_id", "")).isdigit()
     }
-    event_ids = [event.id for event in events]
+    event_nos = [event.event_no for event in events]
     event_cashflows: dict[int, ExecutionCashflowOut] = {}
     order_cashflows: dict[int, list[ExecutionCashflowOut]] = {}
     deposit_loss_flow_nos: set[str] = set()
-    if event_ids:
+    if event_nos:
         for flow, pool in db.execute(
             select(Cashflow, Pool)
             .join(Pool, Pool.id == Cashflow.pool_id)
-            .where(Cashflow.order_event_id.in_(event_ids))
+            .where(
+                Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value,
+                Cashflow.source_id.in_(event_nos),
+            )
         ).all():
             if is_deposit_loss_flow(
                 accounting_attribute=flow.accounting_attribute,
@@ -58,11 +61,14 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
                 category=flow.category,
             ):
                 deposit_loss_flow_nos.add(flow.flow_no)
-            event_cashflows[flow.order_event_id] = _cashflow_output(flow, pool)
+            event_cashflows[flow.source_id] = _cashflow_output(flow, pool)
     for flow, pool in db.execute(
         select(Cashflow, Pool)
         .join(Pool, Pool.id == Cashflow.pool_id)
-        .where(Cashflow.order_id.in_(order_ids), Cashflow.order_event_id.is_(None))
+        .where(
+            Cashflow.order_id.in_(order_ids),
+            Cashflow.source_type != CashflowSourceType.ORDER_EVENT.value,
+        )
         .order_by(Cashflow.occurred_on, Cashflow.id)
     ).all():
         if is_deposit_loss_flow(
@@ -111,7 +117,7 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
                 reason=event.reason,
                 note=event.note,
                 form_extra=dict(event.form_extra or {}),
-                cashflow=event_cashflows.get(event.id),
+                cashflow=event_cashflows.get(event.event_no),
                 operator="、".join(selected_operator_names) or "-",
                 operator_user_ids=event.operator_user_ids,
                 operator_names=selected_operator_names,

@@ -154,20 +154,17 @@ export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
   const { cashflowOpen, setCashflowOpen, cashflowForm, submitCashflow, write, pools, employees, cashflowAttributeOptions, flowDirectionOptions } = ctrl;
   return (
     <FundsActionModal
-      title="新增独立资金流水" fieldCount={8}
+      title="新增独立资金流水" fieldCount={7}
       open={cashflowOpen} onCancel={() => setCashflowOpen(false)}
       scope="FUNDFLOW" form={cashflowForm} onFinish={submitCashflow}
-      initialValues={{ occurred_on: today(), direction: "IN", fund_nature: "BUSINESS", accounting_attribute: "SELF_REVENUE" }}
+      initialValues={{ occurred_on: today(), direction: "IN", accounting_attribute: "SELF_REVENUE" }}
       write={write} permission="deposit.post" submitLabel="提交"
       employees={employees} showOperator
     >
       <CfgItem name="pool_id" label="资金池" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
       <CfgItem name="occurred_on" label="发生日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
       <CfgItem name="direction" label="收支方向" rules={[{ required: true }]}><Select options={flowDirectionOptions ?? []} aria-label="收支方向" /></CfgItem>
-      <CfgItem name="fund_nature" label="资金性质" rules={[{ required: true }]}>
-        <Select />
-      </CfgItem>
-      <CfgItem name="accounting_attribute" label="核算属性" rules={[{ required: true }]} help="可选范围由资金性质决定（与后端白名单一致）">
+      <CfgItem name="accounting_attribute" label="核算属性" rules={[{ required: true }]}>
         <Select options={cashflowAttributeOptions} />
       </CfgItem>
       <CfgItem name="category" label="类别" rules={[{ required: true }]}><Input /></CfgItem>
@@ -240,8 +237,8 @@ export function ReverseModal({ ctrl }: { ctrl: FundsPageController }) {
       write={write} permission="deposit.post" submitLabel="确认冲销" employees={employees} showOperator
       formIntro={
         <Typography.Paragraph type="secondary" className="ui-drawer-hint">
-          冲销会生成一笔方向相反、金额相同的流水：自动继承原流水的资金性质，核算属性固定为「冲销」，
-          状态直接为「已入账」——不经过审核流程，提交即入账。原流水保留并标记为已冲销，不可重复冲销。
+          冲销会生成一笔方向相反、金额相同的流水，核算属性固定为「冲销」，提交即入账。
+          原流水保留并标记为已冲销，不可重复冲销。
         </Typography.Paragraph>
       }
     >

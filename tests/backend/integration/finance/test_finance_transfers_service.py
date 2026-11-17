@@ -9,7 +9,7 @@ from sqlalchemy import select, text
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
-from app.domain.enums import AccountingAttribute, Direction, FundNature, Nature
+from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction, Nature
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
 from app.finance import transfers
@@ -31,11 +31,9 @@ def _seed_available_cash(seeded_db, pool):
             occurred_on=date(2026, 10, 16),
             nature=Nature.BUSINESS_IN.value,
             accounting_attribute=AccountingAttribute.SELF_REVENUE.value,
-            fund_nature=FundNature.BUSINESS.value,
             category="OTHER",
             direction=Direction.IN.value,
             amount=to_money("100.00"),
-            status="APPROVED",
             created_by="pytest",
             updated_by="pytest",
         )
@@ -213,7 +211,8 @@ def test_repair_transfer_rejects_multiple_rows_same_transfer(seeded_db):
         nature=Nature.INTERNAL.value,
         direction=Direction.OUT.value,
         amount=to_money("10"),
-        transfer_id=tid,
+        source_type=CashflowSourceType.TRANSFER.value,
+        source_id=tid,
     )
     seeded_db.add(third)
     seeded_db.flush()
@@ -246,11 +245,11 @@ def test_repair_transfer_rejects_invalid_direction(seeded_db):
             occurred_on=date(2026, 10, 17),
             nature=Nature.INTERNAL.value,
             accounting_attribute=AccountingAttribute.INTERNAL_TRANSFER.value,
-            fund_nature=FundNature.INTERNAL.value,
             category="TRANSFER",
             direction="ZZ",
             amount=to_money("10"),
-            transfer_id=bad_tid,
+            source_type=CashflowSourceType.TRANSFER.value,
+            source_id=bad_tid,
         )
         seeded_db.add(bad)
         seeded_db.flush()

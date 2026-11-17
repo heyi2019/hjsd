@@ -5,14 +5,13 @@ import { appMessage } from "../shared/ui/appFeedback";
  * - **入账复用「新增独立流水」**：支出 = OUT / BUSINESS_OUT / OPERATING_EXPENSE，
  *   收入 = IN / BUSINESS_IN / SELF_REVENUE，科目落在 `category`。只存在一套入账口径。
  * - **不走审核态**：提交即入账（后端独立流水直接 APPROVED，登记即计入损益，无需审核）。
- * - **资金池可直接筛选**：页面内选择池，不写入业务配置；费用科目仍落在
- *   `STUDIO_EXPENSE_ITEM` 词典，服务端存储 ⇒ 全员同步。
+ * - **统一汇总全部资金池**：工作室运营页不再按资金池拆分筛选；登记时仍需选择入账资金池。
  */
-import { Card, DatePicker, Form, Input, Segmented, Space, Typography } from "antd";
+import { Card, DatePicker, Form, Input, Segmented, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { cashflowsApi } from "../shared/api/cashflows.api";
 import { studioExpensesApi } from "../shared/api/studioExpenses.api";
 import { optionSetsApi } from "../shared/api/options.api";
@@ -38,7 +37,6 @@ import { ConfirmButton,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
-import { DepositSection } from "./FundsPage.tabs";
 import type { FundsPageController } from "./useFundsPageController";
 /** 弹窗视觉稿落地：作用域严格限定 .studio-ledger-modal（单一弹窗），不污染全站 .ant-modal。 */
 import "./StudioExpensePanel.css";
@@ -106,7 +104,6 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
     net: string;
     count: number;
   } | null>(null);
-  const [poolCodes, setPoolCodes] = useState<string[]>([]);
   const [expenseItems, setExpenseItems] = useState<OptionItem[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -125,19 +122,6 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
   const from = dateRange?.[0]?.format("YYYY-MM-DD") ?? "";
   const to = dateRange?.[1]?.format("YYYY-MM-DD") ?? "";
 
-  const selectedPools = useMemo(
-    () => pools.filter((pool) => poolCodes.includes(pool.code)),
-    [pools, poolCodes],
-  );
-
-  useEffect(() => {
-    setPoolCodes((current) => {
-      const available = new Set(pools.map((pool) => pool.code));
-      const retained = current.filter((code) => available.has(code));
-      return current.length === 0 && pools.length > 0 ? pools.map((pool) => pool.code) : retained;
-    });
-  }, [pools]);
-
   useEffect(() => {
     let cancelled = false;
     void Promise.resolve(employeesApi.list())
@@ -153,17 +137,9 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
     try {
       const savedItems = await readOptionSet(ITEM_SET_CODE);
       setExpenseItems(savedItems);
-      const allowedIds = pools.filter((pool) => poolCodes.includes(pool.code)).map((pool) => pool.id);
-      if (allowedIds.length === 0) {
-        setFlows([]);
-        setSummary(null);
-        setError(null);
-        return;
-      }
       // 明细与已入账汇总一次取回：什么算工作室收支、收入/支出/净额怎么加，全在
       // service.studio_summary 里。前端不再拉两次、不再按 source 过滤、不再 reduce。
       const result = await studioExpensesApi.summary({
-        pool_ids: allowedIds.join(","),
         occurred_from: from || undefined,
         occurred_to: to || undefined,
         category,
@@ -177,7 +153,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
     } finally {
       setLoading(false);
     }
-  }, [category, from, to, pools, poolCodes]);
+  }, [category, from, to]);
 
   useEffect(() => {
     void load();
@@ -191,7 +167,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
         pool_id: Number(values.pool_id),
         occurred_on: dateText(values.occurred_on),
         direction,
-        fund_nature: "BUSINESS",
+        ledger_type: "STUDIO",
         accounting_attribute: direction === "OUT" ? "OPERATING_EXPENSE" : "SELF_REVENUE",
         category: values.category as string,
         amount: values.amount as string,
@@ -305,9 +281,10 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
   ];
 
   return (
-    <section className="ui-stack">
-      <ErrorBanner error={error} onRetry={() => void load()} retrying={loading} />
-      <div className="studio-expense-page-actions">
+    <Card
+      className="glass studio-expense-shell"
+      title="工作室运营"
+      extra={
         <PermissionButton
           permission="deposit.post"
           type="primary"
@@ -316,7 +293,10 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
         >
           记一笔
         </PermissionButton>
-      </div>
+      }
+    >
+      <section className="ui-stack">
+      <ErrorBanner error={error} onRetry={() => void load()} retrying={loading} />
       <StatRow
         items={[
           // 失败态一律显示「—」（amount: null），不把未知状态当成可信 0
@@ -346,24 +326,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
             options={expenseItems}
             onChange={setCategory}
           />
-          <Typography.Text strong>资金池筛选</Typography.Text>
-          <Select
-            mode="multiple"
-            aria-label="资金池筛选"
-            allowClear
-            maxTagCount="responsive"
-            className="ui-control-width-studio-pool"
-            value={poolCodes}
-            placeholder="选择资金池"
-            options={pools.map((pool) => ({ value: pool.code, label: pool.name }))}
-            onChange={(values) => setPoolCodes(values as string[])}
-          />
         </div>
-        {selectedPools.length === 0 ? (
-          <Typography.Text type="warning">
-            尚未选择资金池：请在上方选择用于筛选工作室收支的资金池。
-          </Typography.Text>
-        ) : null}
         <DataTable<Cashflow>
           columns={columns}
           rows={flows}
@@ -376,8 +339,6 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
           onPageChange={() => undefined}
        />
       </Card>
-
-      {ctrl ? <DepositSection ctrl={ctrl} /> : null}
 
       {/* 6 个字段的操作弹窗：compact 560 宽比 full 1200 更贴合体量；
           studio-ledger-modal 是视觉稿的唯一作用域锚点（样式见 StudioExpensePanel.css）。 */}
@@ -403,8 +364,8 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
           <FieldConfigScope scope="STUDIOEXP" active={registerOpen}>
           <CfgItem name="pool_id" label="资金池" rules={[{ required: true, message: "请选择资金池" }]}>
             <Select
-              options={selectedPools.map((pool) => ({ value: pool.id, label: pool.name }))}
-              placeholder={selectedPools.length ? "选择资金池" : "请先在上方勾选资金池"}
+              options={pools.map((pool) => ({ value: pool.id, label: pool.name }))}
+              placeholder="选择资金池"
             />
           </CfgItem>
           <CfgItem name="occurred_on" label="日期" rules={[{ required: true, message: "请输入日期" }]}>
@@ -442,6 +403,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
         </BusinessRegistrationForm>
       </BusinessActionModal>
 
-    </section>
+      </section>
+    </Card>
   );
 }

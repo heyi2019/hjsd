@@ -1,8 +1,6 @@
 """finance.router_output：流水、押金、返点、对账与划转的输出装配。"""
 from __future__ import annotations
 
-from decimal import Decimal
-
 from sqlalchemy.orm import Session
 
 from app.core.operation_operators import list_operation_operators
@@ -23,9 +21,6 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
     category = value("category")
     direction = value("direction")
     order_id = value("order_id")
-    order_event_id = value("order_event_id")
-    transfer_id = value("transfer_id")
-    deposit_id = value("deposit_id")
     # 列表路径的 flow 来自 service 层 outerjoin 出的 dict，order_no 已在其中，
     # 不必再逐行 db.get(Order)（原实现每页多发 N 条 SQL）。非 dict 入参才回查。
     if isinstance(flow, dict):
@@ -33,20 +28,7 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
     else:
         order = db.get(Order, order_id) if order_id else None
         order_no = order.order_no if order else None
-    if order_event_id is not None:
-        source = "ORDER_EVENT"
-    elif category in {"REBATE", "REBATE_REVERSAL"}:
-        source = "REBATE_SETTLEMENT"
-    elif deposit_id is not None or category in {
-        "DEPOSIT_HOLD",
-        "DEPOSIT_RELEASE",
-        "DEPOSIT_LOSS",
-    }:
-        source = "DEPOSIT"
-    elif category == "TRANSFER":
-        source = "TRANSFER"
-    else:
-        source = "OTHER"
+    source = value("source_type")
     return schemas.CashflowOut(
         id=value("id"),
         flow_no=value("flow_no"),
@@ -54,20 +36,17 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         occurred_on=value("occurred_on"),
         occurred_at=value("occurred_at"),
         nature=nature,
-        fund_nature=value("fund_nature"),
+        ledger_type=value("ledger_type"),
         accounting_attribute=value("accounting_attribute"),
         category=category,
         direction=direction,
         amount=value("amount"),
-        status=value("status"),
+        source_type=value("source_type"),
+        source_id=value("source_id"),
         reviewed_by=value("reviewed_by"),
         reviewed_at=value("reviewed_at"),
-        reversal_of_id=value("reversal_of_id"),
         order_id=order_id,
         order_no=order_no,
-        deposit_id=deposit_id,
-        order_event_id=order_event_id,
-        transfer_id=transfer_id,
         source=source,
         note=value("note"),
         form_extra=value("form_extra"),
@@ -95,17 +74,13 @@ def _deposit_out(item: Deposit, db: Session | None = None) -> schemas.DepositOut
     )
 
 
-def _rebate_out(
-    item: RebateRecord, already_returned: Decimal | None = None
-) -> schemas.RebateOut:
+def _rebate_out(item: RebateRecord) -> schemas.RebateOut:
     payload = {
         **vars(item),
         "created_at": item.created_at,
         "operator": item.created_by,
         "operator_user_ids": item.operator_user_ids,
     }
-    if already_returned is not None:
-        payload["already_returned"] = already_returned
     return schemas.RebateOut.model_validate(payload)
 
 

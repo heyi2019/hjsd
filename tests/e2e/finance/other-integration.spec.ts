@@ -34,7 +34,7 @@ test("资金中心页面划转后生成一收一支的内部资金流水", async
   expect(result.status()).toBe(201);
   const body = await result.json();
   expect(body.cashflows).toHaveLength(2);
-  expect(body.cashflows.map((f: { direction: string; amount: string; fund_nature: string }) => [f.direction, Number(f.amount), f.fund_nature]).sort()).toEqual([["IN", 1, "INTERNAL"], ["OUT", 1, "INTERNAL"]]);
+  expect(body.cashflows.map((f: { direction: string; amount: string }) => [f.direction, Number(f.amount)]).sort()).toEqual([["IN", 1], ["OUT", 1]]);
   await expect(dialog).toBeHidden();
 });
 
@@ -104,13 +104,10 @@ test("资金流水页面新增即入账并在列表显示", async ({ page }) => 
   const created = await create;
   expect(created.status()).toBe(201);
   const flow = await created.json();
-  expect(flow.status).toBe("APPROVED");
+  expect(flow).not.toHaveProperty("status");
   await expect(dialog).toBeHidden();
   const row = page.getByRole("row").filter({ hasText: flow.flow_no });
-  // 状态文案取自 option_set FUND_FLOW_STATUS（APPROVED → 「已审核」）。
-  // 注：src 里 configurableLabel 的 fallback 写的是「已入账」，但配置优先，
-  // 故实际渲染为「已审核」；两者文案不一致属产品待统一项，此处按实际渲染断言。
-  await expect(row.getByText("已审核")).toBeVisible({ timeout: 5000 });
+  await expect(row).toBeVisible({ timeout: 5000 });
 });
 
 

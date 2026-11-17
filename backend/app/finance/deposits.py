@@ -19,10 +19,9 @@ from app.core.security import CurrentUser
 from app.domain.enums import (
     AccountingAttribute,
     AuditAction,
-    CashflowStatus,
+    CashflowSourceType,
     DepositStatus,
     Direction,
-    FundNature,
     Nature,
 )
 from app.domain.trade import Cashflow, Deposit
@@ -86,13 +85,13 @@ def create_deposit(
             pool_id=pool.id,
             occurred_on=paid_on,
             nature=Nature.BUSINESS_OUT.value,
-            fund_nature=FundNature.EXTERNAL.value,
             accounting_attribute=AccountingAttribute.DEPOSIT.value,
             category="DEPOSIT_HOLD",
             direction=Direction.OUT.value,
             amount=money,
             order_id=source_order_id,
-            deposit_id=deposit.id,
+            source_type=CashflowSourceType.DEPOSIT.value,
+            source_id=str(deposit.id),
             note="押金占用",
             created_by=actor,
             updated_by=actor,
@@ -175,7 +174,8 @@ def update_deposit(
 
     hold = session.scalar(
         select(Cashflow).where(
-            Cashflow.deposit_id == deposit.id,
+            Cashflow.source_type == CashflowSourceType.DEPOSIT.value,
+            Cashflow.source_id == str(deposit.id),
             Cashflow.category == "DEPOSIT_HOLD",
             Cashflow.direction == Direction.OUT.value,
         )
@@ -250,7 +250,10 @@ def delete_deposit(
         "amount": str(to_money(deposit.paid_amount)),
         "paid_on": deposit.paid_on.isoformat(),
     }
-    flows = list(session.scalars(select(Cashflow).where(Cashflow.deposit_id == deposit.id)).all())
+    flows = list(session.scalars(select(Cashflow).where(
+        Cashflow.source_type == CashflowSourceType.DEPOSIT.value,
+        Cashflow.source_id == str(deposit.id),
+    )).all())
     if any(flow.category != "DEPOSIT_HOLD" or flow.direction != Direction.OUT.value for flow in flows):
         raise Validation("押金已产生后续资金流水，不能直接删除", details={"deposit_id": deposit.id})
     for flow in flows:
@@ -318,13 +321,13 @@ def return_deposit(
             pool_id=deposit.pool_id,
             occurred_on=released_on,
             nature=Nature.BUSINESS_IN.value,
-            fund_nature=FundNature.EXTERNAL.value,
             accounting_attribute=AccountingAttribute.DEPOSIT.value,
             category="DEPOSIT_RELEASE",
             direction=Direction.IN.value,
             amount=money,
             order_id=deposit.source_order_id,
-            deposit_id=deposit.id,
+            source_type=CashflowSourceType.DEPOSIT.value,
+            source_id=str(deposit.id),
             note="押金释放",
             created_by=actor,
             updated_by=actor,
@@ -398,13 +401,13 @@ def cancel_deposit(
             pool_id=deposit.pool_id,
             occurred_on=cancelled_on,
             nature=Nature.BUSINESS_IN.value,
-            fund_nature=FundNature.EXTERNAL.value,
             accounting_attribute=AccountingAttribute.DEPOSIT.value,
             category="DEPOSIT_CANCEL",
             direction=Direction.IN.value,
             amount=money,
             order_id=deposit.source_order_id,
-            deposit_id=deposit.id,
+            source_type=CashflowSourceType.DEPOSIT.value,
+            source_id=str(deposit.id),
             note=f"押金取消冲正：{text}"[:200],
             created_by=actor,
             updated_by=actor,
@@ -489,14 +492,13 @@ def lose_deposit(
         pool_id=deposit.pool_id,
         occurred_on=lost_on,
         nature=Nature.BUSINESS_OUT.value,
-        fund_nature=FundNature.EXTERNAL.value,
         accounting_attribute=AccountingAttribute.DEPOSIT.value,
         category=label,
         direction=Direction.OUT.value,
         amount=money,
         order_id=deposit.source_order_id,
-        deposit_id=deposit.id,
-        status=CashflowStatus.APPROVED.value,
+        source_type=CashflowSourceType.DEPOSIT.value,
+        source_id=str(deposit.id),
         reviewed_by=actor,
         reviewed_at=now_second(),
         note=text_reason,

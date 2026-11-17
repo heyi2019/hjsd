@@ -1,12 +1,11 @@
-"""CASHFLOW-02 流水三轴属性（nature / fund_nature / accounting_attribute）取值受枚举约束。"""
+"""CASHFLOW-02 流水性质与核算属性映射。"""
 
 import pytest
 
-from app.domain.enums import AccountingAttribute, FundNature
+from app.domain.enums import AccountingAttribute
 from app.finance.attributes import (
     accounting_attribute_for_order_event,
-    accounting_attributes_for_manual_cashflow,
-    validate_fund_accounting_attribute,
+    accounting_attribute_for_manual_cashflow,
 )
 
 
@@ -24,13 +23,10 @@ from app.finance.attributes import (
 def test_order_event_accounting_attribute_is_business_mapped(
     order_type: str, event_type: str, expected: str
 ) -> None:
-    assert accounting_attribute_for_order_event(order_type, event_type) == (
-        FundNature.BUSINESS.value,
-        expected,
-    )
+    assert accounting_attribute_for_order_event(order_type, event_type) == expected
 
 
-def test_cashflow_stores_fund_nature_and_accounting_attribute() -> None:
+def test_cashflow_does_not_store_fund_nature() -> None:
     from datetime import date
     from decimal import Decimal
 
@@ -43,50 +39,27 @@ def test_cashflow_stores_fund_nature_and_accounting_attribute() -> None:
         nature="BUSINESS_OUT",
         direction="OUT",
         amount=Decimal("10.00"),
-        fund_nature=FundNature.BUSINESS.value,
         accounting_attribute=AccountingAttribute.TH_DIRECT_COST.value,
     )
-    assert flow.fund_nature == FundNature.BUSINESS.value
+    assert not hasattr(flow, "fund_nature")
     assert flow.accounting_attribute == AccountingAttribute.TH_DIRECT_COST.value
 
 
 @pytest.mark.parametrize(
     ("nature", "category", "direction", "expected"),
     [
-        ("EXTERNAL_IN", "OTHER", "IN", ("EXTERNAL", "EXTERNAL_FUNDING")),
-        ("BUSINESS_IN", "DEPOSIT_RELEASE", "IN", ("EXTERNAL", "DEPOSIT")),
-        ("INTERNAL", "TRANSFER", "IN", ("INTERNAL", "INTERNAL_TRANSFER")),
-        ("BUSINESS_OUT", "OFFICE", "OUT", ("BUSINESS", "OPERATING_EXPENSE")),
+        ("EXTERNAL_IN", "OTHER", "IN", "EXTERNAL_FUNDING"),
+        ("BUSINESS_IN", "DEPOSIT_RELEASE", "IN", "DEPOSIT"),
+        ("INTERNAL", "TRANSFER", "IN", "INTERNAL_TRANSFER"),
+        ("BUSINESS_OUT", "OFFICE", "OUT", "OPERATING_EXPENSE"),
     ],
 )
-def test_manual_cashflow_gets_default_fund_and_accounting_attributes(
-    nature: str, category: str, direction: str, expected: tuple[str, str]
+def test_manual_cashflow_gets_default_accounting_attribute(
+    nature: str, category: str, direction: str, expected: str
 ) -> None:
-    assert accounting_attributes_for_manual_cashflow(
+    assert accounting_attribute_for_manual_cashflow(
         nature=nature, category=category, direction=direction
     ) == expected
-
-
-@pytest.mark.parametrize(
-    ("fund_nature", "attribute"),
-    [
-        ("BUSINESS", "SELF_REVENUE"),
-        ("BUSINESS", "ADDITIONAL_INCOME"),
-        ("BUSINESS", "ADDITIONAL_EXPENSE"),
-        ("BUSINESS", "DG_DIRECT_COST"),
-        ("EXTERNAL", "DEPOSIT"),
-        ("INTERNAL", "INTERNAL_TRANSFER"),
-    ],
-)
-def test_fund_nature_and_accounting_attribute_valid_combinations(
-    fund_nature: str, attribute: str
-) -> None:
-    assert validate_fund_accounting_attribute(fund_nature, attribute) is None
-
-
-def test_fund_nature_rejects_cross_layer_attribute() -> None:
-    with pytest.raises(ValueError, match="资金性质与核算属性不匹配"):
-        validate_fund_accounting_attribute("EXTERNAL", "SELF_REVENUE")
 
 
 def test_order_event_accounting_attribute_undefined_raises() -> None:
@@ -101,18 +74,15 @@ def test_order_event_accounting_attribute_undefined_raises() -> None:
 @pytest.mark.parametrize(
     ("nature", "category", "direction", "expected"),
     [
-        ("BUSINESS_IN", "REBATE", "IN", ("BUSINESS", AccountingAttribute.ADDITIONAL_INCOME.value)),
-        ("BUSINESS_IN", "REBATE_REVERSAL", "IN", ("BUSINESS", AccountingAttribute.REVERSAL.value)),
-        ("BUSINESS_IN", "REVERSAL", "IN", ("BUSINESS", AccountingAttribute.REVERSAL.value)),
+        ("BUSINESS_IN", "REBATE", "IN", AccountingAttribute.ADDITIONAL_INCOME.value),
+        ("BUSINESS_IN", "REVERSAL", "IN", AccountingAttribute.REVERSAL.value),
     ],
 )
 def test_manual_cashflow_rebate_and_reversal_branches(
-    nature: str, category: str, direction: str, expected: tuple[str, str]
+    nature: str, category: str, direction: str, expected: str
 ) -> None:
-    from app.finance.attributes import accounting_attributes_for_manual_cashflow
-
     assert (
-        accounting_attributes_for_manual_cashflow(
+        accounting_attribute_for_manual_cashflow(
             nature=nature, category=category, direction=direction
         )
         == expected

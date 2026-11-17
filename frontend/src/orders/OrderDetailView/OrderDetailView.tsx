@@ -102,7 +102,7 @@ export function OrderDetailView({
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="INVEDIT" form={extraForm}>
           <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
-            <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onOrderEdit={onOrderEdit} onProfileChange={onProfileChange} />
+            <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onOrderEdit={onOrderEdit} onProfileChange={onProfileChange} operatorUsername={operatorUsername} />
             <OrderDetailOperationSection meta={meta} editing account={editing ?? account} eventDrafts={eventDrafts} operationDrafts={operationDrafts} onEventEdit={onEventEdit} onOperationEdit={onOperationEdit} onAddOperationRow={onAddOperationRow} onRemoveOperationRow={onRemoveOperationRow} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} operatorUsername={operatorUsername} />
           </FieldConfigScope>
         </BusinessRegistrationForm>
@@ -153,7 +153,7 @@ export function OrderDetailView({
   return (
     <div className="order-detail">
       <OrderDetailProfileSection meta={meta} detail={detail} account={account} />
-      <OrderDetailDeliverySection meta={meta} detail={detail} account={account} employees={employees} />
+      <OrderDetailDeliverySection meta={meta} detail={detail} account={account} employees={employees} operatorUsername={operatorUsername} />
         <OrderDetailOperationSection meta={meta} account={account} operationEvents={operationEvents} operatorUsername={operatorUsername} />
       <OrderDetailFinanceSection
         rows={financeRows}

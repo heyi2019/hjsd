@@ -227,6 +227,7 @@ describe("OrderDetail", () => {
         order_no: "HS0001",
         order_type: "HS",
         created_at: "2026-10-15T10:19:00",
+        extra_values: { delivery_responsible_ids: [] },
         events: [
           {
             id: 1,
@@ -269,6 +270,7 @@ describe("OrderDetail", () => {
     expect(screen.getByRole("combobox", { name: "编辑执行操作人" }).closest(".ant-select")?.textContent).toContain("管理员");
     expect(screen.getByRole("combobox", { name: "编辑上架平台操作人" }).closest(".ant-select")?.textContent).toContain("管理员");
     expect(screen.getByRole("combobox", { name: "编辑资金明细操作人 CF0001" }).closest(".ant-select")?.textContent).toContain("管理员");
+    expect(screen.getByRole("combobox", { name: "编辑交付操作人" }).closest(".ant-select")?.textContent).toContain("管理员");
   });
 
   it("入库执行行沿用建单业务操作人并支持多选编辑", async () => {

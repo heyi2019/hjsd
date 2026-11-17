@@ -5,6 +5,8 @@ import type { AccountExecutionDetail, AccountExecutionOrder } from "../../shared
 import type { Account } from "../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import type { OrderDraft } from "./editing/use-order-detail-editor";
+import { defaultOperatorUserIds } from "./editing/use-order-detail-editor";
+import { currentDevUser } from "../../shared/api/client";
 import { Select } from "../../shared/ui";
 import {
   buildFormExtraDisplay,
@@ -53,6 +55,7 @@ function DeliverySubSection({
   draft,
   onExtraChange,
   onProfileChange,
+  operatorUsername = currentDevUser(),
 }: {
   title: string;
   orderType?: string | null | undefined;
@@ -63,6 +66,7 @@ function DeliverySubSection({
   draft?: OrderDraft;
   onExtraChange?: (key: string, value: unknown) => void;
   onProfileChange?: (changes: Partial<Account>) => void;
+  operatorUsername?: string;
 }) {
   const { config } = useOrderFormConfig(orderType ?? undefined);
   const platformOptions = useOptionSet("INTERMEDIARY_PLATFORM");
@@ -75,6 +79,7 @@ function DeliverySubSection({
   };
   const extraValues = order?.extra_values;
   const editableValues = { ...(extraValues ?? {}), ...(draft?.form_extra ?? {}) };
+  const defaultOperatorIds = defaultOperatorUserIds(employees ?? [], operatorUsername) ?? [];
   const employeeNames = useMemo(
     () => new Map((employees ?? []).map((employee) => [employee.id, employee.display_name])),
     [employees],
@@ -124,18 +129,24 @@ function DeliverySubSection({
           .map((field) => (
             <Descriptions.Item key={field.key} label={fieldLabel(config, field.key, field.fallback)}>
               {editing && field.key === "delivery_responsible_ids" ? (
-                <Select
-                  mode="multiple"
-                  aria-label="编辑交付操作人"
-                  className="order-detail__delivery-responsible"
-                  value={Array.isArray(editableValues[field.key]) ? editableValues[field.key] : []}
-                  options={(employees ?? []).map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))}
-                  showSearch
-                  optionFilterProp="label"
-                  filterOption={(input, option) => String(option?.label ?? "").toLocaleLowerCase().includes(input.trim().toLocaleLowerCase())}
-                  placeholder="默认当前员工，可多选"
-                  onChange={(next) => onExtraChange?.(field.key, next)}
-                />
+                (() => {
+                  const storedIds = Array.isArray(editableValues[field.key]) ? editableValues[field.key] as number[] : [];
+                  const operatorIds = storedIds.length ? storedIds : defaultOperatorIds;
+                  return (
+                    <Select
+                      mode="multiple"
+                      aria-label="编辑交付操作人"
+                      className="order-detail__delivery-responsible"
+                      value={operatorIds}
+                      options={(employees ?? []).map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))}
+                      showSearch
+                      optionFilterProp="label"
+                      filterOption={(input, option) => String(option?.label ?? "").toLocaleLowerCase().includes(input.trim().toLocaleLowerCase())}
+                      placeholder="默认当前员工，可多选"
+                      onChange={(next) => onExtraChange?.(field.key, next.length ? next : operatorIds)}
+                    />
+                  );
+                })()
               ) : editing && ["intermediary_platform", "intermediary_type", "compensation_type"].includes(field.key) ? (
                 <Select
                   aria-label={`编辑${field.fallback}`}
@@ -191,6 +202,7 @@ export function OrderDetailDeliverySection({
   onOrderExtraChange,
   onOrderEdit,
   onProfileChange,
+  operatorUsername = currentDevUser(),
 }: {
   meta: OrderDetailMeta;
   editing?: boolean;
@@ -201,6 +213,7 @@ export function OrderDetailDeliverySection({
   onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
   onOrderEdit?: (orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) => void;
   onProfileChange?: (changes: Partial<Account>) => void;
+  operatorUsername?: string;
 }) {
   const creationOrder = useMemo(
     () => detail?.orders.find((order) => order.order_no === meta.sourceOrderNo),
@@ -218,8 +231,8 @@ export function OrderDetailDeliverySection({
       <div className="order-detail__section order-detail__section--delivery">
         <OrderSectionHeading title="交付信息" />
         <div className="order-detail__meta">
-          <DeliverySubSection title="买号交付" orderType={creationOrder?.order_type} order={creationOrder} account={account} employees={employees} editing draft={creationOrder ? orderDrafts?.[creationOrder.order_id] : undefined} onProfileChange={onProfileChange} onExtraChange={(key, value) => creationOrder && onOrderExtraChange?.(creationOrder.order_id, key, value)} />
-          {sellOrder ? <DeliverySubSection title="卖号交付" orderType={sellOrder.order_type} order={sellOrder} account={account} employees={employees} editing draft={orderDrafts?.[sellOrder.order_id]} onProfileChange={onProfileChange} onExtraChange={(key, value) => onOrderExtraChange?.(sellOrder.order_id, key, value)} /> : null}
+          <DeliverySubSection title="买号交付" orderType={creationOrder?.order_type} order={creationOrder} account={account} employees={employees} editing draft={creationOrder ? orderDrafts?.[creationOrder.order_id] : undefined} onProfileChange={onProfileChange} onExtraChange={(key, value) => creationOrder && onOrderExtraChange?.(creationOrder.order_id, key, value)} operatorUsername={operatorUsername} />
+          {sellOrder ? <DeliverySubSection title="卖号交付" orderType={sellOrder.order_type} order={sellOrder} account={account} employees={employees} editing draft={orderDrafts?.[sellOrder.order_id]} onProfileChange={onProfileChange} onExtraChange={(key, value) => onOrderExtraChange?.(sellOrder.order_id, key, value)} operatorUsername={operatorUsername} /> : null}
           {creationOrder ? (
             <Descriptions className="order-detail__meta-table" size="small" bordered column={1}>
               <Descriptions.Item label="订单备注">

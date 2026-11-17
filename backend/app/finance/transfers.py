@@ -55,7 +55,7 @@ def create_transfer(
                 "available": str(available),
             },
         )
-    # Cashflow.flow_no 长度为 32；保留可读前缀并控制两条流水编号不超列长度。
+    # 两条流水通过 transfer_id 成对关联，流水号按收支方向进入全局序列。
     transfer_id = f"TRF-{uuid4().hex[:20].upper()}"
     common = {
         "transfer_id": transfer_id,
@@ -70,14 +70,14 @@ def create_transfer(
         "form_extra": validate_form_extra(session, order_type_code="FUNDTRANSFER", values=form_extra) or None,
     }
     outgoing = Cashflow(
-        flow_no=f"{transfer_id}-OUT",
+        flow_no=allocate_flow_no(session, Direction.OUT.value),
         pool_id=source.id,
         direction=Direction.OUT.value,
         note=note,
         **common,
     )
     incoming = Cashflow(
-        flow_no=f"{transfer_id}-IN",
+        flow_no=allocate_flow_no(session, Direction.IN.value),
         pool_id=target.id,
         direction=Direction.IN.value,
         note=note,

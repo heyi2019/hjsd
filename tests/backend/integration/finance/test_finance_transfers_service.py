@@ -60,6 +60,23 @@ def _make_single_side(seeded_db, *, source, target):
     return result["transfer_id"]
 
 
+def test_create_transfer_uses_directional_global_flow_numbers(seeded_db):
+    invest, profit = _pools(seeded_db)
+    _seed_available_cash(seeded_db, invest)
+
+    result = transfers.create_transfer(
+        seeded_db,
+        source_pool_id=invest.id,
+        target_pool_id=profit.id,
+        amount=Decimal("10"),
+        occurred_on=date(2026, 10, 17),
+        actor="pytest",
+    )
+
+    assert result["cashflows"][0].flow_no == "ZC00001"
+    assert result["cashflows"][1].flow_no == "SR00001"
+
+
 def test_create_transfer_rejects_same_pool(seeded_db):
     invest, _ = _pools(seeded_db)
     with pytest.raises(Validation, match="转出池与转入池不能相同"):

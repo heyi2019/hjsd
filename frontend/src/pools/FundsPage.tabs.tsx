@@ -1,9 +1,9 @@
 /** 资金中心各 Tab 视图层：overview / cashflows / reconciliations / studio expenses。
  *  每个 Tab 通过 controller 消费 useFundsPageController 暴露的状态与处理器，自身只负责列定义与渲染。 */
-import { Card, Input, Space, Tooltip, Typography } from "antd";
+import { Card, DatePicker, Input, Space, Tooltip, Typography } from "antd";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
-import { ConfirmButton, DataTable, DateField, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
+import { ConfirmButton, DataTable, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
@@ -161,17 +161,18 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
           options={cashflowCategoryOptions}
           onChange={(value) => setCashflowCategory(value ?? "")}
         />
-        <DateField
-          aria-label="流水开始日期"
-          placeholder="开始日期"
-          value={cashflowFrom ? dayjs(cashflowFrom) : null}
-          onChange={(value) => setCashflowFrom(value?.format("YYYY-MM-DD") ?? "")}
-        />
-        <DateField
-          aria-label="流水结束日期"
-          placeholder="结束日期"
-          value={cashflowTo ? dayjs(cashflowTo) : null}
-          onChange={(value) => setCashflowTo(value?.format("YYYY-MM-DD") ?? "")}
+        <DatePicker.RangePicker
+          aria-label="流水日期区间"
+          placeholder={["开始日期", "结束日期"]}
+          format="YYYY-MM-DD"
+          size="small"
+          placement="bottomLeft"
+          classNames={{ popup: { root: "compact-date-range-picker" } }}
+          value={cashflowFrom && cashflowTo ? [dayjs(cashflowFrom), dayjs(cashflowTo)] : null}
+          onChange={(value) => {
+            setCashflowFrom(value?.[0] ? value[0].format("YYYY-MM-DD") : "");
+            setCashflowTo(value?.[1] ? value[1].format("YYYY-MM-DD") : "");
+          }}
         />
         <PermissionButton permission="finance.read" onClick={() => void fetchCashflows()}>查询</PermissionButton>
         <PermissionButton permission="finance.read" size="small" loading={cashflowExporting} onClick={() => void exportCashflows()}>

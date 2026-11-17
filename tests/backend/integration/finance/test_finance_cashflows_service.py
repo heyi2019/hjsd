@@ -14,6 +14,7 @@ from app.domain.enums import CashflowLedgerType, CashflowSourceType
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Deposit
 from app.finance import cashflows, deposits
+from app.finance.cashflow_queries import list_cashflows
 from app.finance.cashflows import create_cashflow
 from app.finance.deposits import create_deposit
 from app.finance import transfers
@@ -82,7 +83,7 @@ def test_cashflow_has_top_level_ledger_and_can_filter_business_or_studio(seeded_
 
     assert business.ledger_type == CashflowLedgerType.BUSINESS.value
     assert studio.ledger_type == CashflowLedgerType.STUDIO.value
-    rows, total = cashflows.list_cashflows(
+    rows, total = list_cashflows(
         seeded_db, ledger_type=CashflowLedgerType.STUDIO.value
     )
     assert total == 1
@@ -434,7 +435,7 @@ def test_list_cashflows_user_filter(seeded_db):
     _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
     # 无权资金账户一律返回空：明细为空、总数也为 0（返回值恒为 (rows, total) 二元组，
     # 原先这里返回裸 [] 会让调用方解包时报错，只是路由层提前拦住了才没暴露）。
-    rows, total = cashflows.list_cashflows(
+    rows, total = list_cashflows(
         seeded_db, pool_id=1, user=_restricted_user()
     )
     assert rows == [] and total == 0
@@ -443,17 +444,17 @@ def test_list_cashflows_user_filter(seeded_db):
 def test_list_cashflows_filters(seeded_db):
     flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
 
-    rows, total = cashflows.list_cashflows(seeded_db, direction="OUT")
+    rows, total = list_cashflows(seeded_db, direction="OUT")
     assert total >= 1 and all(r["direction"] == "OUT" for r in rows)
 
-    rows, _ = cashflows.list_cashflows(seeded_db, occurred_from=TODAY)
+    rows, _ = list_cashflows(seeded_db, occurred_from=TODAY)
     assert any(r["id"] == flow.id for r in rows)
-    rows, _ = cashflows.list_cashflows(seeded_db, occurred_to=TODAY)
+    rows, _ = list_cashflows(seeded_db, occurred_to=TODAY)
     assert any(r["id"] == flow.id for r in rows)
 
-    rows, _ = cashflows.list_cashflows(seeded_db, accounting_attribute="OPERATING_EXPENSE")
+    rows, _ = list_cashflows(seeded_db, accounting_attribute="OPERATING_EXPENSE")
     assert any(r["id"] == flow.id for r in rows)
-    rows, _ = cashflows.list_cashflows(seeded_db, created_by="pytest")
+    rows, _ = list_cashflows(seeded_db, created_by="pytest")
     assert any(r["id"] == flow.id for r in rows)
 
 
@@ -473,7 +474,7 @@ def test_list_cashflows_transfer_source(seeded_db):
         seeded_db, source_pool_id=1, target_pool_id=seeded_db.scalar(select(Pool).where(Pool.code == "HJ_PROFIT")).id,
         amount=Decimal("10"), occurred_on=TODAY, actor="pytest",
     )
-    rows, total = cashflows.list_cashflows(seeded_db)
+    rows, total = list_cashflows(seeded_db)
     transfer_rows = [r for r in rows if r["source_type"] == CashflowSourceType.TRANSFER.value]
     assert transfer_rows
     assert all(r["source"] == "TRANSFER" for r in transfer_rows)
@@ -497,19 +498,19 @@ def test_reverse_cashflow_rejects_already_reversed(seeded_db):
 
 def test_list_cashflows_pool_ids_filter(seeded_db):
     _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
-    rows, total = cashflows.list_cashflows(seeded_db, pool_ids=[1])
+    rows, total = list_cashflows(seeded_db, pool_ids=[1])
     assert total >= 1 and all(r["pool_id"] == 1 for r in rows)
 
 
 def test_list_cashflows_user_only_filter(seeded_db):
     _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
-    rows, total = cashflows.list_cashflows(seeded_db, user=_restricted_user())
+    rows, total = list_cashflows(seeded_db, user=_restricted_user())
     assert rows == [] and total == 0
 
 
 def test_list_cashflows_deposit_source(seeded_db):
     deposits.create_deposit(seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest")
-    rows, _ = cashflows.list_cashflows(seeded_db)
+    rows, _ = list_cashflows(seeded_db)
     deposit_rows = [r for r in rows if r["source_type"] == CashflowSourceType.DEPOSIT.value]
     assert deposit_rows
     assert all(r["source"] == "DEPOSIT" for r in deposit_rows)
@@ -633,7 +634,7 @@ def test_list_cashflows_by_pool_id_visible(seeded_db):
         direction="IN", nature="EXTERNAL_IN", category="客户收款",
         amount=Decimal("50"), actor="pytest", note="列表可见性测试",
     )
-    items, total = cashflows.list_cashflows(seeded_db, pool_id=1, user=_all_scope_user())
+    items, total = list_cashflows(seeded_db, pool_id=1, user=_all_scope_user())
     assert total >= 1
     assert all(item["pool_id"] == 1 for item in items)
 

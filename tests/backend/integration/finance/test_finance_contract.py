@@ -21,7 +21,8 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
 from app.domain.enums import CashflowSourceType
 from app.domain.trade import Cashflow, RebateRecord, Reconciliation
-from app.finance.cashflows import create_cashflow, list_cashflows, reverse_cashflow
+from app.finance.cashflow_queries import list_cashflows
+from app.finance.cashflows import create_cashflow, reverse_cashflow
 from app.finance.deposits import create_deposit, deposit_held_total, list_deposits, lose_deposit, return_deposit
 from app.finance.rebates import create_rebate, list_rebates
 from app.finance.reconciliation import create_reconciliation, resolve_reconciliation

@@ -18,13 +18,15 @@ from app.core.security import (
 )
 from app.domain.enums import AuditAction
 from app.finance import schemas
-from app.finance.cashflows import (
+from app.finance.cashflow_queries import (
     cashflow_totals,
+    list_cashflows as finance_list_cashflows,
+    studio_summary as finance_studio_summary,
+)
+from app.finance.cashflows import (
     create_cashflow as finance_create_cashflow,
     delete_cashflow as finance_delete_cashflow,
-    list_cashflows as finance_list_cashflows,
     reverse_cashflow as finance_reverse_cashflow,
-    studio_summary as finance_studio_summary,
     update_cashflow as finance_update_cashflow,
 )
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv

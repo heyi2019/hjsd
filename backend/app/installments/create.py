@@ -246,6 +246,41 @@ _CONTRACT_ALLOWED_ORDER_TYPES = {
 }
 
 
+def _assert_installment_amounts(
+    *,
+    down_payment_amount: Decimal,
+    principal_amount: Decimal,
+    total_schedule_amount: Decimal,
+    service_fee_amount: Decimal,
+    per_period_amount: Decimal,
+    adjust_final_period: bool,
+) -> Decimal:
+    """分期金额三条守卫：首付≤本金≤分期总额、末期调整不为负。返回末期调整额。"""
+    if down_payment_amount > principal_amount:
+        raise Validation(
+            "首付不能大于本金",
+            details={
+                "field": "down_payment",
+                "down_payment": str(down_payment_amount),
+                "principal": str(principal_amount),
+            },
+        )
+    if principal_amount > total_schedule_amount:
+        raise Validation(
+            "本金不能大于首付与分期总额",
+            details={
+                "field": "principal",
+                "principal": str(principal_amount),
+                "maximum": str(total_schedule_amount),
+            },
+        )
+
+    adjustment = principal_amount + service_fee_amount - total_schedule_amount if adjust_final_period else Decimal("0")
+    if per_period_amount + adjustment < 0:
+        raise Validation("每期金额过高，最后一期金额不能为负数", details={"field": "per_period"})
+    return adjustment
+
+
 def create_installment(
     session: Session,
     *,
@@ -403,28 +438,14 @@ def create_installment(
     service_fee_amount = _non_negative(resolved_service_fee, field="service_fee")
     per_period_amount = _non_negative(per_period, field="per_period")
     total_schedule_amount = down_payment_amount + per_period_amount * periods
-    if down_payment_amount > principal_amount:
-        raise Validation(
-            "首付不能大于本金",
-            details={
-                "field": "down_payment",
-                "down_payment": str(down_payment_amount),
-                "principal": str(principal_amount),
-            },
-        )
-    if principal_amount > total_schedule_amount:
-        raise Validation(
-            "本金不能大于首付与分期总额",
-            details={
-                "field": "principal",
-                "principal": str(principal_amount),
-                "maximum": str(total_schedule_amount),
-            },
-        )
-
-    adjustment = principal_amount + service_fee_amount - total_schedule_amount if adjust_final_period else Decimal("0")
-    if per_period_amount + adjustment < 0:
-        raise Validation("每期金额过高，最后一期金额不能为负数", details={"field": "per_period"})
+    adjustment = _assert_installment_amounts(
+        down_payment_amount=down_payment_amount,
+        principal_amount=principal_amount,
+        total_schedule_amount=total_schedule_amount,
+        service_fee_amount=service_fee_amount,
+        per_period_amount=per_period_amount,
+        adjust_final_period=adjust_final_period,
+    )
 
     # 分期合约号统一由业务订单号派生；一笔订单只允许一条分期合约。
     installment_no_value = order_installment_no(order.order_no)

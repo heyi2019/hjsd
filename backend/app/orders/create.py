@@ -103,6 +103,43 @@ def _assert_no_duplicate_inventory_account(
         )
 
 
+def _normalize_commission_context(
+    *,
+    commission_mode: str | None,
+    commission_payer: str | None,
+    order_type_code: str,
+) -> tuple[str | None, str | None]:
+    """佣金口径校验：仅 DG 可用、支付方式与承担方成对，DB CHECK 同口径。"""
+    # 佣金口径：仅 DG 代挂单可用，且支付方式与承担方必须成对出现（DB CHECK 同口径）。
+    normalized_commission_mode = _normalize_commission_value(commission_mode, "commission_mode")
+    normalized_commission_payer = _normalize_commission_value(commission_payer, "commission_payer")
+    if (normalized_commission_mode is None) != (normalized_commission_payer is None):
+        raise Validation(
+            "佣金支付方式与佣金承担方必须同时填写或同时留空",
+            details={
+                "commission_mode": normalized_commission_mode,
+                "commission_payer": normalized_commission_payer,
+            },
+        )
+    if normalized_commission_mode is not None:
+        if order_type_code != "DG":
+            raise Validation(
+                "只有 DG 代挂订单可以填写佣金口径",
+                details={"order_type": order_type_code},
+            )
+        if normalized_commission_mode not in CommissionMode.values():
+            raise Validation(
+                f"commission_mode 必须为 {CommissionMode.values()}",
+                details={"field": "commission_mode", "value": normalized_commission_mode},
+            )
+        if normalized_commission_payer not in CommissionPayer.values():
+            raise Validation(
+                f"commission_payer 必须为 {CommissionPayer.values()}",
+                details={"field": "commission_payer", "value": normalized_commission_payer},
+            )
+    return normalized_commission_mode, normalized_commission_payer
+
+
 def create_order(
     session: Session,
     *,
@@ -177,33 +214,11 @@ def create_order(
         form_extra = {
             key: value for key, value in form_extra.items() if key not in account_field_keys
         }
-    # 佣金口径：仅 DG 代挂单可用，且支付方式与承担方必须成对出现（DB CHECK 同口径）。
-    normalized_commission_mode = _normalize_commission_value(commission_mode, "commission_mode")
-    normalized_commission_payer = _normalize_commission_value(commission_payer, "commission_payer")
-    if (normalized_commission_mode is None) != (normalized_commission_payer is None):
-        raise Validation(
-            "佣金支付方式与佣金承担方必须同时填写或同时留空",
-            details={
-                "commission_mode": normalized_commission_mode,
-                "commission_payer": normalized_commission_payer,
-            },
-        )
-    if normalized_commission_mode is not None:
-        if definition.code != "DG":
-            raise Validation(
-                "只有 DG 代挂订单可以填写佣金口径",
-                details={"order_type": definition.code},
-            )
-        if normalized_commission_mode not in CommissionMode.values():
-            raise Validation(
-                f"commission_mode 必须为 {CommissionMode.values()}",
-                details={"field": "commission_mode", "value": normalized_commission_mode},
-            )
-        if normalized_commission_payer not in CommissionPayer.values():
-            raise Validation(
-                f"commission_payer 必须为 {CommissionPayer.values()}",
-                details={"field": "commission_payer", "value": normalized_commission_payer},
-            )
+    normalized_commission_mode, normalized_commission_payer = _normalize_commission_context(
+        commission_mode=commission_mode,
+        commission_payer=commission_payer,
+        order_type_code=definition.code,
+    )
     if account_id is not None:
         account = get_account(session, account_id, user)
         _validate_existing_account_context(

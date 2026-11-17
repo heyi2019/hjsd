@@ -70,35 +70,88 @@ def _auto_link_recovered_installment_sale(
     )
 
 # --------------------------------------------------------------------- 事件
-def post_event(
+def _assert_event_context(
     session: Session,
-    order_id: int,
+    order: Order,
     *,
     event_type: str,
-    sale_mode: str | None = None,
-    operation_type: str | None = None,
-    rebate_type: str | None = None,
-    amount: Any = 0,
-    occurred_on: date,
-    actor: str,
-    pool_id: int | None = None,
-    portion: str = "PRINCIPAL",
-    delivery_mode: str | None = None,
-    delivery_direction: str | None = None,
-    offset_event_id: int | None = None,
-    reason: str | None = None,
-    operator_user_ids: list[int] | None = None,
-    note: str | None = None,
-    bound_phone: str | None = None,
-    bound_phone_owner: str | None = None,
-    form_extra: Mapping[str, Any] | None = None,
-    form_extra_scope: str | None = None,
-    user: CurrentUser | None = None,
-    allow_installment_delivery: bool = False,
-) -> tuple[OrderEvent, Cashflow | None]:
-    """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
-    from app.shared.order_access import get_order
+    operator_user_ids: list[int] | None,
+    pool_id: int | None,
+    user: CurrentUser | None,
+) -> bool:
+    """操作人/资金池可见性与订单状态守卫：只读校验，判定口径与原内联版本一致。
 
+    返回 can_reopen_for_buy 供后续「已完成订单重开 BUY」分支复用。
+    """
+    if operator_user_ids is not None:
+        if len(set(operator_user_ids)) != len(operator_user_ids):
+            raise Validation("操作人不能重复选择", details={"field": "operator_user_ids"})
+        active_ids = set(
+            session.scalars(
+                select(User.id).where(User.id.in_(operator_user_ids), User.is_active.is_(True))
+            ).all()
+        )
+        if active_ids != set(operator_user_ids):
+            raise Validation("所选操作人不存在或已停用", details={"field": "operator_user_ids"})
+    if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
+        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
+    can_cancel_completed = (
+        event_type == EventType.CANCEL.value
+        and order.status == OrderStatus.COMPLETED.value
+    )
+    can_reopen_for_buy = (
+        event_type == EventType.BUY.value
+        and order.status == OrderStatus.COMPLETED.value
+        and order.order_type in {"HS", "TH"}
+        and session.scalar(
+            select(Installment.id).where(Installment.order_id == order.id)
+        )
+        is None
+    )
+    can_validate_completed_sell = (
+        event_type == EventType.SELL.value
+        and order.status == OrderStatus.COMPLETED.value
+        and session.scalar(
+            select(Installment.id).where(Installment.order_id == order.id)
+        )
+        is None
+    )
+    can_register_delivery = (
+        event_type == EventType.DELIVER.value
+        and order.status != OrderStatus.CANCELLED.value
+    )
+    can_register_action = (
+        event_type in {
+            EventType.OPERATE.value,
+            EventType.REBATE.value,
+        }
+        and order.status != OrderStatus.CANCELLED.value
+    )
+    if order.status not in {OrderStatus.ACTIVE.value, OrderStatus.INSTALLMENT.value} and not (
+        can_cancel_completed
+        or can_reopen_for_buy
+        or can_validate_completed_sell
+        or can_register_delivery
+        or can_register_action
+    ):
+        raise Conflict(
+            f"订单 {order.order_no} 当前状态 {order.status}，不能登记事件",
+            code=ErrorCode.ORDER_STATUS_CONFLICT,
+            details={"order_no": order.order_no, "current_status": order.status},
+        )
+    return can_reopen_for_buy
+
+
+def _normalize_event_input(
+    *,
+    event_type: str,
+    sale_mode: str | None,
+    operation_type: str | None,
+    rebate_type: str | None,
+    portion: str,
+    allow_installment_delivery: bool,
+) -> tuple[str | None, str | None, str | None, bool, str, bool]:
+    """事件入参校验与规范化：执行顺序与异常口径与原内联版本完全一致。"""
     allow_installment_delivery = _required_bool(
         allow_installment_delivery, field="allow_installment_delivery"
     )
@@ -162,64 +215,66 @@ def post_event(
             f"portion 必须为 {Portion.values()}",
             details={"field": "portion", "value": portion},
         ) from exc
+    return (
+        sale_mode, operation_type, rebate_type, installment_sale, portion,
+        allow_installment_delivery,
+    )
+
+
+def post_event(
+    session: Session,
+    order_id: int,
+    *,
+    event_type: str,
+    sale_mode: str | None = None,
+    operation_type: str | None = None,
+    rebate_type: str | None = None,
+    amount: Any = 0,
+    occurred_on: date,
+    actor: str,
+    pool_id: int | None = None,
+    portion: str = "PRINCIPAL",
+    delivery_mode: str | None = None,
+    delivery_direction: str | None = None,
+    offset_event_id: int | None = None,
+    reason: str | None = None,
+    operator_user_ids: list[int] | None = None,
+    note: str | None = None,
+    bound_phone: str | None = None,
+    bound_phone_owner: str | None = None,
+    form_extra: Mapping[str, Any] | None = None,
+    form_extra_scope: str | None = None,
+    user: CurrentUser | None = None,
+    allow_installment_delivery: bool = False,
+) -> tuple[OrderEvent, Cashflow | None]:
+    """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
+    from app.shared.order_access import get_order
+
+    (
+        sale_mode,
+        operation_type,
+        rebate_type,
+        installment_sale,
+        portion,
+        allow_installment_delivery,
+    ) = _normalize_event_input(
+        event_type=event_type,
+        sale_mode=sale_mode,
+        operation_type=operation_type,
+        rebate_type=rebate_type,
+        portion=portion,
+        allow_installment_delivery=allow_installment_delivery,
+    )
 
     order = get_order(session, order_id, user)
-    if operator_user_ids is not None:
-        if len(set(operator_user_ids)) != len(operator_user_ids):
-            raise Validation("操作人不能重复选择", details={"field": "operator_user_ids"})
-        active_ids = set(
-            session.scalars(
-                select(User.id).where(User.id.in_(operator_user_ids), User.is_active.is_(True))
-            ).all()
-        )
-        if active_ids != set(operator_user_ids):
-            raise Validation("所选操作人不存在或已停用", details={"field": "operator_user_ids"})
-    if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
-        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
-    can_cancel_completed = (
-        event_type == EventType.CANCEL.value
-        and order.status == OrderStatus.COMPLETED.value
+    can_reopen_for_buy = _assert_event_context(
+        session,
+        order,
+        event_type=event_type,
+        operator_user_ids=operator_user_ids,
+        pool_id=pool_id,
+        user=user,
     )
-    can_reopen_for_buy = (
-        event_type == EventType.BUY.value
-        and order.status == OrderStatus.COMPLETED.value
-        and order.order_type in {"HS", "TH"}
-        and session.scalar(
-            select(Installment.id).where(Installment.order_id == order.id)
-        )
-        is None
-    )
-    can_validate_completed_sell = (
-        event_type == EventType.SELL.value
-        and order.status == OrderStatus.COMPLETED.value
-        and session.scalar(
-            select(Installment.id).where(Installment.order_id == order.id)
-        )
-        is None
-    )
-    can_register_delivery = (
-        event_type == EventType.DELIVER.value
-        and order.status != OrderStatus.CANCELLED.value
-    )
-    can_register_action = (
-        event_type in {
-            EventType.OPERATE.value,
-            EventType.REBATE.value,
-        }
-        and order.status != OrderStatus.CANCELLED.value
-    )
-    if order.status not in {OrderStatus.ACTIVE.value, OrderStatus.INSTALLMENT.value} and not (
-        can_cancel_completed
-        or can_reopen_for_buy
-        or can_validate_completed_sell
-        or can_register_delivery
-        or can_register_action
-    ):
-        raise Conflict(
-            f"订单 {order.order_no} 当前状态 {order.status}，不能登记事件",
-            code=ErrorCode.ORDER_STATUS_CONFLICT,
-            details={"order_no": order.order_no, "current_status": order.status},
-        )
 
     _assert_event_allowed(
         session,

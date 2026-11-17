@@ -149,7 +149,7 @@ describe("OrderDetail", () => {
     expect(onPartyClick).toHaveBeenCalledWith({ id: 7, display_name: "买家A", role: "BUYER", entity_type: "customer", entityType: "customer" });
   });
 
-  it("把展开详情按基础信息、执行明细和资金明细分成独立视觉层", () => {
+  it("展开详情按基础/执行/资金分区，并保留信息表与四个运营动作", () => {
     render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
     const panel = document.querySelector(".order-detail") as HTMLElement;
     // 已移除的冗余分组不应再出现
@@ -163,20 +163,13 @@ describe("OrderDetail", () => {
     expect(panel.querySelector(".order-detail__section--execution")).toBeTruthy();
     expect(panel.querySelector(".order-detail__section--finance")).toBeTruthy();
     expect(panel.querySelector(".order-finance-summary__item--amount")).toBeTruthy();
-  });
 
-  it("给展开表格中的信息表保留独立留白", () => {
-    render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
-    const panel = document.querySelector(".order-detail") as HTMLElement;
     expect(panel.querySelector(".order-detail__meta-table")).toBeTruthy();
     const accountTable = panel.querySelector(".order-detail__section--profile .order-detail__meta-table");
     expect(within(panel).getByText("账号资料")).toBeInTheDocument();
     expect(accountTable?.querySelectorAll("tbody > tr").length).toBeGreaterThan(0);
-  });
 
-  it("运营信息只保留四个独立动作", () => {
-    render(<OrderDetail row={account} detail={{ orders: [] } as unknown as AccountExecutionDetail} loading={false} />);
-    const operationSection = document.querySelector(".order-detail__section--operation") as HTMLElement;
+    const operationSection = panel.querySelector(".order-detail__section--operation") as HTMLElement;
     expect(within(operationSection).getByText("上架平台")).toBeInTheDocument();
     expect(within(operationSection).getByText("下架平台")).toBeInTheDocument();
     expect(within(operationSection).getByText("描述")).toBeInTheDocument();

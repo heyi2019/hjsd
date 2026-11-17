@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  amountByBasisPoints,
-  basisPointsByAmount,
-  fromBasisPoints,
   fromCents,
   sumCents,
   sumMoney,
-  toBasisPoints,
   toCents,
 } from "@/shared/lib/money";
 
@@ -36,20 +32,4 @@ describe("shared/lib/money：前端金额一律按整数分运算", () => {
     expect(sumMoney([])).toBe("0.00");
   });
 
-  it("比率互算：30% 分 1000.00 → 300.00，反向回 30.00%", () => {
-    const profitCents = toCents("1000.00");
-    const amount = amountByBasisPoints(profitCents, toBasisPoints(30));
-    expect(fromCents(amount)).toBe("300.00");
-    expect(fromBasisPoints(basisPointsByAmount(profitCents, amount))).toBe("30.00");
-  });
-
-  it("比率互算：三分之一这类除不尽的，两头各自四舍五入到分/0.01%", () => {
-    const profitCents = toCents("100.00");
-    expect(fromBasisPoints(basisPointsByAmount(profitCents, toCents("33.33")))).toBe("33.33");
-    expect(fromCents(amountByBasisPoints(profitCents, toBasisPoints("33.33")))).toBe("33.33");
-  });
-
-  it("比率互算：总额为 0 时不算出 Infinity", () => {
-    expect(Number.isNaN(basisPointsByAmount(0, 500))).toBe(true);
-  });
 });

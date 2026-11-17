@@ -24,18 +24,6 @@ export function fromCents(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
-/** 百分比 → 基点（1% = 100bp）。用于「比率 × 金额」这类互算，避免比率本身带浮点。 */
-export function toBasisPoints(value: unknown): number {
-  if (value === null || value === undefined || value === "") return 0;
-  const numeric = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(numeric) ? Math.round(numeric * 100) : Number.NaN;
-}
-
-/** 基点 → 2 位小数字符串。 */
-export function fromBasisPoints(bp: number): string {
-  return (bp / 100).toFixed(2);
-}
-
 /** 多笔金额（元）求和，返回分。空值/非法值按 0 计（表单里空着就等于没填）。 */
 export function sumCents(values: Array<unknown>): number {
   return values.reduce<number>((sum, value) => {
@@ -47,15 +35,4 @@ export function sumCents(values: Array<unknown>): number {
 /** 多笔金额（元）求和，返回 2 位小数字符串。 */
 export function sumMoney(values: Array<unknown>): string {
   return fromCents(sumCents(values));
-}
-
-/** 按比率（基点）求金额：`金额 × 比率 / 100`，四舍五入到分。 */
-export function amountByBasisPoints(amountCents: number, bp: number): number {
-  return Math.round((amountCents * bp) / 10000);
-}
-
-/** 按金额求比率（基点）：`部分 / 总额 × 100`，四舍五入到 0.01%。总额为 0 时抛错由调用方判。 */
-export function basisPointsByAmount(totalCents: number, partCents: number): number {
-  if (!totalCents) return Number.NaN;
-  return Math.round((partCents * 10000) / totalCents);
 }

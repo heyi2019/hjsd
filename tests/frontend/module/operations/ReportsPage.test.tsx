@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
-import { resolveMock } from "@fixtures/mock-api";
+import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { appMessage } from "@/shared/ui/appFeedback";
 import { commissionResponse, dataCenterSummary, orderLedgerSummary, poolBalancesResponse, reportResponse } from "@fixtures/api-responses";
 
@@ -209,5 +209,48 @@ describe("ReportsPage：经营中心报表", () => {
     await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("导出开始日期不能晚于结束日期"));
     expect(vi.mocked(reportsApi.exportCsv)).not.toHaveBeenCalled();
+  });
+});
+
+// —— 原 ReportsPage.details.test.tsx ——
+// 同一报表页与同一份接口 mock，详情断言合并到主文件以避免重复启动 jsdom+antd。
+describe("ReportsPage：各报表渲染与错误态", () => {
+  it("经营损益：同时渲染月度趋势与业务拆分", async () => {
+    resolveMockOnce(vi.mocked(reportsApi.monthlyPnl), reportResponse([
+      { month: "2026-09", sales_income: "2000.00", cost: "500.00", operating_expense: "100.00", rebate_income: "50.00", operating_profit: "1450.00" },
+    ], {}));
+    resolveMock(vi.mocked(reportsApi.businessPnl), reportResponse([
+      { order_type: "HS", main_income: "800.00", cost: "300.00", main_profit: "500.00" },
+    ], {}));
+    renderLight(<ReportsPage />, { user: "admin" });
+    await gotoTab("经营损益");
+    expect(await screen.findByText("2026-09")).toBeInTheDocument();
+    expect(screen.getAllByText("2,000.00").length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByText(/HS/)).toBeInTheDocument();
+    expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("订单利润：渲染订单号与净额", async () => {
+    resolveMockOnce(vi.mocked(reportsApi.orderProfit), reportResponse([
+      { order_no: "HS-2026-0010", order_type: "HS", income: "600.00", cost: "450.00", rebate: "10.00", net_profit: "160.00" },
+    ], { income: "0", cost: "0", rebate: "0", net_profit: "0" }));
+    renderLight(<ReportsPage />, { user: "admin" });
+    await gotoTab("订单利润");
+    expect(await screen.findByText("HS-2026-0010")).toBeInTheDocument();
+    expect(screen.getAllByText("160.00").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("P1/FE-169：订单利润只展示统一成本口径且不展示旧口径说明", async () => {
+    vi.mocked(reportsApi.orderProfit).mockResolvedValueOnce(reportResponse([{
+      order_id: 11, order_no: "HS-2026-0011", order_type: "HS", trade_date: "2026-11-01", status: "COMPLETED", income: "600.00", cost: "450.00", rebate: "10.00", net_profit: "160.00",
+    }], { income: "600.00", cost: "450.00", rebate: "10.00", net_profit: "160.00" }) as never);
+    renderLight(<ReportsPage />, { user: "admin" });
+    await ui.click(await screen.findByRole("tab", { name: /订单利润/ }));
+    expect(await screen.findByText("HS-2026-0011")).toBeInTheDocument();
+    expect(screen.getAllByText("成本").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("账号采购成本")).not.toBeInTheDocument();
+    expect(screen.queryByText("直接成本")).not.toBeInTheDocument();
+    expect(screen.queryByText(/净利 = 所有收入 − 所有支出/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("450.00").length).toBeGreaterThanOrEqual(1);
   });
 });

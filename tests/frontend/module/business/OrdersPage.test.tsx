@@ -7,10 +7,11 @@ import { OrdersPage } from "@/orders/OrdersPage";
 import { installmentsApi } from "@/shared/api/installments.api";
 import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
+import { stocksApi } from "@/shared/api/stocks.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
-import { pageResponse } from "@fixtures/api-responses";
+import { inventoryLedgerResponse, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -645,4 +646,106 @@ describe("OrdersPage：四类订单台账", () => {
     expect(within(modal).queryByLabelText("入账账户")).toBeNull();
   });
 
+});
+
+// —— 原 OrdersPageAccountEdit.test.tsx ——
+// 同一订单台账页面与接口 mock，编辑专项只保留独立 fixture 作用域。
+describe("订单台账统一编辑入口（#15 需求1）", () => {
+  let accountUi: ReturnType<typeof userEvent.setup>;
+
+  const accountOrders = [
+    {
+      id: 1, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE", account_id: 99,
+      account_game_type: "原神", account_game_account: "seller-001", account_platform: "安卓", account_status: "WAITING", party_name: "卖家甲", party_source: "同行推荐",
+      sale_amount: "1234.00", last_event_type: "BUY", inventory_operator: "入库员", inventory_entry_at: "2026-10-01T09:30:00", sale_operator: "售卖员", sale_at: "2026-10-17T16:45:00",
+    },
+    { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
+  ];
+  const accountTypes = [{ id: 1, code: "HS", name: "回收", capital_type: "SELF", is_active: true }];
+
+  beforeEach(() => {
+    accountUi = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.clearAllMocks();
+    seedOptionSets();
+    seedOrderFormFields();
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse(accountOrders));
+    vi.mocked(ordersApi.ledgerSummary).mockResolvedValue(orderLedgerSummary({ total_count: accountOrders.length, status_counts: { ACTIVE: 1, COMPLETED: 1 }, type_counts: { HS: 1, TH: 1 } }));
+    vi.mocked(orderTypesApi.list).mockResolvedValue(accountTypes as never);
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([]) as never);
+    vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }]);
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+      account: { id: 99, stock_no: "KU_00001", game_account: "acc-99", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
+      orders: [{ order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE", events: [] }],
+      finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
+    } as never);
+  });
+
+  it("列表行只展示「编辑」，不再单列「编辑账号」", async () => {
+    renderLight(<OrdersPage />, { user: "admin" });
+    await accountUi.click(await screen.findByRole("tab", { name: "订单台账" }));
+    await waitFor(() => expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThanOrEqual(1));
+    const row = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))?.closest("tr");
+    expect(row).not.toBeNull();
+    await accountUi.click(within(row as HTMLElement).getByRole("button", { name: "编辑" }));
+    expect(await screen.findByRole("button", { name: "保存修改" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("编辑游戏账号/产品")).toBeNull();
+    expect(screen.queryByRole("button", { name: "编辑账号" })).toBeNull();
+  });
+
+  it("首次编辑只读取一次订单执行详情，并同时供展开区与编辑器使用", async () => {
+    renderLight(<OrdersPage />, { user: "admin" });
+    await accountUi.click(await screen.findByRole("tab", { name: "订单台账" }));
+    const row = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))?.closest("tr");
+    await accountUi.click(within(row as HTMLElement).getByRole("button", { name: "编辑" }));
+    await screen.findByRole("button", { name: "保存修改" });
+    expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1);
+    expect(ordersApi.executionDetail).toHaveBeenCalledWith(1);
+  });
+
+  it("只读订单详情加载员工列表并回显交付操作人", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+      account: { id: 99, stock_no: "KU_00001", game_account: "acc-99", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
+      orders: [{ order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE", extra_values: { delivery_responsible_ids: [1] }, events: [] }],
+      finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
+    } as never);
+    renderLight(<OrdersPage />, { user: "admin" });
+    await accountUi.click(await screen.findByRole("tab", { name: "订单台账" }));
+    const row = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))!.closest("tr")!;
+    fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);
+    await waitFor(() => expect(screen.getByText("管理员")).toBeInTheDocument());
+    expect(screen.queryByText("操作人信息加载中")).toBeNull();
+  });
+
+  it("详情请求未返回时展开后编辑也复用同一请求", async () => {
+    const detail = {
+      account: { id: 99, stock_no: "KU_00001", game_account: "acc-99", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
+      orders: [{ order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE", events: [] }],
+      finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
+    };
+    let resolveFirst: (value: unknown) => void = () => undefined;
+    const firstRequest = new Promise((resolve) => { resolveFirst = resolve; });
+    vi.mocked(ordersApi.executionDetail).mockImplementationOnce(() => firstRequest as never).mockResolvedValueOnce(detail as never);
+    renderLight(<OrdersPage />, { user: "admin" });
+    await accountUi.click(await screen.findByRole("tab", { name: "订单台账" }));
+    const row = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))!.closest("tr")!;
+    fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);
+    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1));
+    const refreshedRow = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))!.closest("tr")!;
+    await accountUi.click(within(refreshedRow).getByRole("button", { name: "编辑" }));
+    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1));
+    resolveFirst(detail);
+    await screen.findByRole("button", { name: "保存修改" });
+    expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1);
+  });
+
+  it("未关联库存账号的订单不显示「编辑账号」入口", async () => {
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([
+      { id: 1, order_no: "HS-2026-0001", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE", account_game_type: "原神", account_game_account: "seller-001", account_platform: "安卓", account_status: "WAITING" },
+      { id: 2, order_no: "TH-2026-0002", order_type: "TH", capital_type: "PEER", trade_date: "2026-10-02", status: "COMPLETED" },
+    ]) as never);
+    renderLight(<OrdersPage />);
+    await accountUi.click(await screen.findByRole("tab", { name: "订单台账" }));
+    await waitFor(() => expect(screen.getAllByText("TH-2026-0002").length).toBeGreaterThanOrEqual(1));
+    expect(screen.queryAllByRole("button", { name: "编辑账号" }).length).toBe(0);
+  });
 });

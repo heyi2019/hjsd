@@ -2,11 +2,9 @@
 
 import pytest
 
+from app.domain.cashflow_attributes import accounting_attribute_for_order_event
 from app.domain.enums import AccountingAttribute
-from app.finance.attributes import (
-    accounting_attribute_for_order_event,
-    accounting_attribute_for_manual_cashflow,
-)
+from app.finance.attributes import accounting_attribute_for_manual_cashflow
 
 
 @pytest.mark.parametrize(
@@ -63,7 +61,7 @@ def test_manual_cashflow_gets_default_accounting_attribute(
 
 
 def test_order_event_accounting_attribute_undefined_raises() -> None:
-    from app.finance.attributes import accounting_attribute_for_order_event
+    from app.domain.cashflow_attributes import accounting_attribute_for_order_event
 
     with pytest.raises(ValueError, match="未定义订单事件核算属性"):
         accounting_attribute_for_order_event("ZZ", "BUY")

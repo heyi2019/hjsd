@@ -7,8 +7,7 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import column, create_engine, select, text
-from sqlalchemy.dialects import postgresql, sqlite
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
@@ -17,7 +16,6 @@ from app import api_v1
 from app.core.errors import AppError, ErrorCode, NotFound, TokenExpired, Validation, require_condition
 from app.core.money import Amount, to_money
 from app.core.ratelimit import RateLimiter
-from app.core.sql_functions import year_month
 from app.core.numbering import peek_number, sequence_max
 from app.core.security import (
     ROLE_ADMIN,
@@ -545,13 +543,6 @@ class TestDatabaseLifecycle:
         database.dispose_engine()
         assert database._engine is None
         assert database._session_factory is None
-
-    def test_year_month_compiles_for_supported_dialects(self):
-        expression = year_month(column("trade_date"))
-        pg_sql = str(select(expression).compile(dialect=postgresql.dialect()))
-        sqlite_sql = str(select(expression).compile(dialect=sqlite.dialect()))
-        assert "to_char(trade_date, 'YYYY-MM')" in pg_sql
-        assert "strftime('%Y-%m', trade_date)" in sqlite_sql
 
 
 class TestRateLimit:

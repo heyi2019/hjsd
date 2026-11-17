@@ -172,8 +172,10 @@ def test_order_list_payload_includes_counterparty_role(seeded_db):
     assert payloads[0]["party_name"] == "同行乙"
     assert payloads[0]["party_role"] == "PEER"
 
-# ---- pool_balance：无池授权返回 NotFound（603-605） ----
+# ---- pool_balance：无池授权返回 NotFound（端点 2026-11-18 归位 finance/balances_router，URL 不变） ----
 
 def test_pool_balance_hidden_for_unauthorized_viewer(seeded_db):
+    from app.finance.balances_router import pool_balance_detail
+
     with pytest.raises(NotFound, match="资金账户不存在"):
-        router.pool_balance(1, db=seeded_db, _user=_viewer())
+        pool_balance_detail(1, db=seeded_db, _user=_viewer())

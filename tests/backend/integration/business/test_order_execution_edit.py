@@ -117,6 +117,32 @@ def test_edit_execution_operator_preserves_time_and_records_actual_editor(seeded
     assert shown["operator_names"] == ["种子用户1", "种子用户2"]
 
 
+def test_edit_event_operator_updates_linked_cashflow_operators(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="sale-operator-flow-sync", business_mode="DISTRIBUTION", inventory_type="PICKUP", actor="pytest")
+    order = create_order(seeded_db, order_type="TH", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
+    post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("200"), occurred_on=date(2026, 10, 1), actor="pytest")
+    seeded_db.commit()
+    event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_event_id == event.id))
+    assert flow is not None
+
+    response = seeded_client.patch(
+        f"/api/v1/orders/{order.id}/execution-edit",
+        headers=headers,
+        json={"events": [{"id": event.id, "expected_amount": "200.00", "amount": "200.00", "operator_user_ids": [1, 2]}]},
+    )
+
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(OrderEvent, event.id).operator_user_ids == [1, 2]
+    assert seeded_db.get(Cashflow, flow.id).operator_user_ids == [1, 2]
+    detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+    assert detail.status_code == 200
+    shown = detail.json()["detail_view"]["finance_rows"]
+    assert any(row["operator_user_ids"] == [1, 2] for row in shown)
+
+
 def test_order_detail_edit_updates_cashflow_operators(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="cashflow-operator-edit", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

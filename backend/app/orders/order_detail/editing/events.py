@@ -131,6 +131,7 @@ def apply_event_edits(db: Session, changes: list[tuple[OrderEvent, Cashflow | No
             "form_extra": jsonable_encoder(event.form_extra),
             "flow_amount": str(flow.amount) if flow else None,
             "flow_note": flow.note if flow else None,
+            "flow_operator_user_ids": flow.operator_user_ids if flow else None,
         }
         amount_changed = item.amount != Decimal(str(event.amount))
         event.amount = item.amount
@@ -160,6 +161,9 @@ def apply_event_edits(db: Session, changes: list[tuple[OrderEvent, Cashflow | No
                     event.form_extra = {**(event.form_extra or {}), "platform_unlisted_at": occurred_at.isoformat()}
         if item.operator_user_ids is not None:
             event.operator_user_ids = item.operator_user_ids
+            if flow is not None:
+                flow.operator_user_ids = item.operator_user_ids
+                flow.updated_by = actor
         event.updated_by = actor
         if flow is not None and amount_changed:
             flow.amount = item.amount
@@ -181,5 +185,6 @@ def apply_event_edits(db: Session, changes: list[tuple[OrderEvent, Cashflow | No
                 "form_extra": jsonable_encoder(event.form_extra),
                 "flow_amount": str(flow.amount) if flow else None,
                 "flow_note": flow.note if flow else None,
+                "flow_operator_user_ids": flow.operator_user_ids if flow else None,
             },
         )

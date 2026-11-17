@@ -54,10 +54,14 @@ def _auto_link_recovered_installment_sale(
     actor: str,
     note: str | None,
 ) -> None:
-    """库存中心完成出售后，自动关联该账号最近一次未转售的回收处置。"""
-    from app.value_added_services.create import link_recovered_sale
+    """库存中心完成出售后，自动关联该账号最近一次未转售的回收处置。
 
-    link_recovered_sale(
+    实际联动逻辑由 value_added_services 域经 collaboration 注册点注入
+    （orders 不得反向依赖 vas，见 backend/.importlinter）。
+    """
+    from .collaboration import run_post_sell_hooks
+
+    run_post_sell_hooks(
         session,
         order,
         occurred_on=occurred_on,

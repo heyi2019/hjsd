@@ -8,15 +8,15 @@
 #     finance / value_added_services / policy / reporting / stocks -> orders
 #     reporting / value_added_services -> finance
 #
-#   禁止的反向边（存量违规已在 ignore_imports 豁免，新增一行即红）：
-#     orders -> finance          （events.py 会计属性、router.py 池余额、挂流水）
-#     orders -> value_added_services（events.py 回收单联动）
-#     stocks -> orders           （库存导出/删除/列表反向引订单）
+#   禁止的反向边（P0-A 已消灭前两处存量环，2026-11-18）：
+#     orders -> finance          已归位：会计属性移 domain 层、余额端点移 finance 域、
+#                                初始成本挂账改 app/orders/collaboration.py 注册点
+#     orders -> value_added_services 已归位：SELL 回收联动改 collaboration 注册点
+#     stocks -> orders           存量环仍在豁免（导出/删除/列表三处，归位待后续批次）
 #
 # 运行：backend 目录下执行 lint-imports（CI lint-gate 同步强制）。
 # 豁免纪律：整边豁免（行级豁免对延迟 import / 多符号 as 导入匹配不稳定）——
-#           这些边正是后续「跨域原语归位」（P0-A）要消灭的，
-#           归位后同步删除对应豁免，使豁免清单单调收紧（与 lint_baseline.txt 同一套方法论）。
+#           归位一批、收紧一批，使豁免清单单调收紧（与 lint_baseline.txt 同一套方法论）。
 
 [importlinter]
 root_package = app
@@ -28,8 +28,6 @@ source_modules =
     app.orders
 forbidden_modules =
     app.finance
-ignore_imports =
-    app.orders.router -> app.finance.cashflows
 
 [importlinter:contract:orders-not-import-value-added-services]
 name = orders 不得依赖 value_added_services（合法方向只有 value_added_services -> orders）
@@ -38,8 +36,6 @@ source_modules =
     app.orders
 forbidden_modules =
     app.value_added_services
-ignore_imports =
-    app.orders.events -> app.value_added_services.create
 
 [importlinter:contract:stocks-not-import-orders]
 name = stocks 不得依赖 orders（合法方向只有 orders -> stocks）

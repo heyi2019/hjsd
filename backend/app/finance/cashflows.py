@@ -826,6 +826,13 @@ def studio_summary(
 
 
 
+# P0-A（2026-11-18）：orders 创建订单时的初始成本挂账经协作注册点注入，
+# 消灭 orders -> finance 反向依赖（backend/.importlinter 契约）。
+# 本模块由 api_v1 -> finance_router -> cashflows_router 链路必然加载，注册随之生效。
+from app.orders.collaboration import register_cost_flow_creator
+
+register_cost_flow_creator(create_cashflow)
+
 __all__ = [
     "STUDIO_EXPENSE_ATTRIBUTE",
     "STUDIO_INCOME_ATTRIBUTE",

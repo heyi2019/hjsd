@@ -535,3 +535,11 @@ def create_installment(
         occurred_at=installment.created_at,
     )
     return installment
+
+
+# P0-A（2026-11-18）：非分期 SELL 完成后的回收处置联动经协作注册点注入，
+# 消灭 orders -> value_added_services 反向依赖（backend/.importlinter 契约）。
+# 本模块由 api_v1 -> installments_router -> value_added_services.router 链路必然加载。
+from app.orders.collaboration import register_post_sell_hook
+
+register_post_sell_hook(link_recovered_sale)

@@ -136,7 +136,7 @@
 - `PICKUP_SALE` 只允许由 TH 提号订单发起；`CONSIGNMENT_SALE` 仅保留历史读取，不允许由 DG 代挂订单新建；
 - 错误组合必须由后端拒绝，前端只负责按字典提供可选项和提示。
 
-`capital_type`（`STOCK`、`ZERO`）是核算维度，不等同于业务、类型或增值服务：它决定资金和成本如何处理，允许按单覆盖，但不能改变产品分类。库存字段使用 `business_mode` 保存业务，使用 `inventory_type` 保存来源（`RECOVERY`、`PICKUP`、`CONSIGNMENT`）。
+`capital_type`（`STOCK`、`ZERO`）是业务定义层的核算维度标签，不等同于业务、类型或增值服务：它决定资金和成本如何路由，**不落在订单上、不支持按单覆盖**（2026-11-17 起订单层字段删除），也不能改变产品分类。库存字段使用 `business_mode` 保存业务，使用 `inventory_type` 保存来源（`RECOVERY`、`PICKUP`、`CONSIGNMENT`）。
 
 ### 4.1 工作台
 

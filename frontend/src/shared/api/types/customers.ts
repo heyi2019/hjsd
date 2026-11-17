@@ -55,7 +55,6 @@ export interface CustomerBusiness {
   order_id: number;
   order_no: string;
   order_type: string;
-  capital_type: string;
   status: string;
   trade_date: string;
   owner_id?: number | null;

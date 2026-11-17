@@ -10,7 +10,6 @@ const order = (overrides: Partial<Order> = {}): Order => ({
   id: 1,
   order_no: "HS-2026-0001",
   order_type: "HS",
-  capital_type: "SELF",
   trade_date: "2026-10-01",
   status: "ACTIVE",
   business_mode: "SELF",

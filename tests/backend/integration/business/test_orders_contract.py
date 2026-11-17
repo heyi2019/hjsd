@@ -23,7 +23,6 @@ from app.core.security import CurrentUser, DEV_USERS, build_access_token
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
-    CapitalType,
     CustomerStatus,
     OrderStatus,
 )
@@ -671,7 +670,6 @@ class TestCreateOrderValidation:
             Order(
                 order_no="HS-INVALID-LINK-STATUS",
                 order_type="HS",
-                capital_type=CapitalType.STOCK.value,
                 trade_date=D,
                 status=OrderStatus.ACTIVE.value,
                 link_status="AUTO_MATCHED",
@@ -689,24 +687,6 @@ class TestCreateOrderValidation:
                 seeded_db, order_type="ZZ", trade_date=D, actor="pytest"
             )
         assert "不存在" in str(exc.value)
-
-    def test_invalid_capital_type_rejected_before_database_constraint(self, seeded_db):
-        with pytest.raises(Validation, match="capital_type"):
-            create_order(
-                seeded_db,
-                order_type="HS",
-                trade_date=D,
-                actor="pytest",
-                capital_type="NOT_A_CAPITAL_TYPE",
-            )
-        with pytest.raises(Validation, match="capital_type"):
-            create_order(
-                seeded_db,
-                order_type="HS",
-                trade_date=D,
-                actor="pytest",
-                capital_type="",
-            )
 
     @pytest.mark.parametrize("field", ["event_type", "portion"])
     def test_event_enum_inputs_reject_unhashable_values_as_validation(

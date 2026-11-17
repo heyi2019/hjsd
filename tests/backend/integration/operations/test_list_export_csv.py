@@ -51,12 +51,10 @@ def _seed_order(
     order_no: str = "HS9901",
     form_extra: dict | None = None,
     order_type: str = "HS",
-    capital_type: str = "STOCK",
 ) -> Order:
     order = Order(
         order_no=order_no,
         order_type=order_type,
-        capital_type=capital_type,
         trade_date=date(2026, 1, 1),
         form_extra=form_extra,
         created_by="tester",
@@ -253,7 +251,6 @@ def test_orders_export_xlsx_splits_delivery_into_buy_and_sell_groups(seeded_clie
         seeded_db,
         order_no="DG9801",
         order_type="DG",
-        capital_type="ZERO",
         form_extra={"bound_phone": "13800000002"},
     )
 

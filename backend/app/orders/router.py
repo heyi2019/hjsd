@@ -220,7 +220,6 @@ def create_order(
         account_id=payload.account_id,
         confirm_repurchase=payload.confirm_repurchase,
         owner_id=owner_id,
-        capital_type=payload.capital_type,
         note=payload.note,
         commission_mode=payload.commission_mode,
         commission_payer=payload.commission_payer,

@@ -107,7 +107,6 @@ def get_customer_detail(
                 "order_id": order.id,
                 "order_no": order.order_no,
                 "order_type": order.order_type,
-                "capital_type": order.capital_type,
                 "status": order.status,
                 "trade_date": order.trade_date,
                 "owner_id": order.owner_id,

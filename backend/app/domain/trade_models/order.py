@@ -9,7 +9,6 @@ from app.domain.base import (
     TimestampMixin,
 )
 from app.domain.enums import (
-    CapitalType,
     CommissionMode,
     CommissionPayer,
     DeliveryMode,
@@ -56,10 +55,6 @@ class Order(Base, AuditMixin):
             f"status IN {OrderStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="order_status_valid",
         ),
-        CheckConstraint(
-            f"capital_type IN {CapitalType.values()!r}".replace("[", "(").replace("]", ")"),
-            name="order_capital_type_valid",
-        ),
         UniqueConstraint("order_no", name="uq_orders_no"),
         Index("ix_orders_type_date", "order_type", "trade_date"),
         Index("ix_orders_link_status", "link_status"),
@@ -94,7 +89,6 @@ class Order(Base, AuditMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     order_no: Mapped[str] = mapped_column(String(32), nullable=False)
     order_type: Mapped[str] = mapped_column(String(16), nullable=False)
-    capital_type: Mapped[str] = mapped_column(String(16), nullable=False)
     trade_date: Mapped[date] = mapped_column(Date, nullable=False)
     # listing_price / service_fee / expected_settlement_date 已删除（0024）：
     # ORM 有定义但 schema 从未暴露、前端零引用、486 行全 NULL 的死列；

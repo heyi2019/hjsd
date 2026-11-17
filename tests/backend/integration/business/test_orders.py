@@ -11,6 +11,7 @@ from app.stocks.profile import create_account
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
 from app.domain.foundation import Pool
+from app.foundation.order_types import resolve_default_pool
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.value_added_services import create as inst_create
@@ -241,8 +242,6 @@ class TestA02ThStock:
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
         seeded_db.commit()
-        # 提号按普通库存资金处理，不再要求 BUY/SELL 互相核销。
-        assert seeded_db.get(Order, order.id).capital_type == "STOCK"
 
 class TestA03DgZeroCapital:
     def test_service_income_routes_to_profit_pool(self, seeded_db):
@@ -256,7 +255,9 @@ class TestA03DgZeroCapital:
             customer_roles=[(consignor.id, "CONSIGNOR")],
         )
         seeded_db.commit()
-        assert seeded_db.get(Order, order.id).capital_type == "ZERO"
+        # 零本金由路由表达：DG 没有 PRINCIPAL 路由，因此无法登记本金支出。
+        assert resolve_default_pool(seeded_db, "DG", "PRINCIPAL") is None
+        assert resolve_default_pool(seeded_db, "DG", "PROFIT") is not None
 
         post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("200"),

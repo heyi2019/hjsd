@@ -376,7 +376,6 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "id": order.id,
             "order_no": order.order_no,
             "order_type": order.order_type,
-            "capital_type": order.capital_type,
             "trade_date": order.trade_date,
             "account_id": order.account_id,
             "status": order.status,

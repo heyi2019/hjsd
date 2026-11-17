@@ -30,7 +30,6 @@ export interface Order {
   id: number;
   order_no: string;
   order_type: string;
-  capital_type: string;
   business_mode?: string | null;
   business_type?: string | null;
   value_added_service?: string | null;

@@ -34,7 +34,6 @@ from app.domain.trade import (
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
-    CapitalType,
     CommissionMode,
     CommissionPayer,
     OrderStatus,
@@ -114,7 +113,6 @@ def create_order(
     account_id: int | None = None,
     confirm_repurchase: bool = False,
     owner_id: int | None = None,
-    capital_type: str | None = None,
     note: str | None = None,
     commission_mode: str | None = None,
     commission_payer: str | None = None,
@@ -179,14 +177,6 @@ def create_order(
         form_extra = {
             key: value for key, value in form_extra.items() if key not in account_field_keys
         }
-    selected_capital_type = (
-        definition.capital_type if capital_type is None else capital_type
-    )
-    if selected_capital_type not in CapitalType.values():
-        raise Validation(
-            f"capital_type 必须为 {CapitalType.values()}",
-            details={"field": "capital_type", "value": selected_capital_type},
-        )
     # 佣金口径：仅 DG 代挂单可用，且支付方式与承担方必须成对出现（DB CHECK 同口径）。
     normalized_commission_mode = _normalize_commission_value(commission_mode, "commission_mode")
     normalized_commission_payer = _normalize_commission_value(commission_payer, "commission_payer")
@@ -362,7 +352,6 @@ def create_order(
     order = Order(
         order_no=next_order_no(session, definition),
         order_type=definition.code,
-        capital_type=selected_capital_type,
         trade_date=trade_date,
         account_snapshot=order_account_snapshot,
         account_id=account_id,

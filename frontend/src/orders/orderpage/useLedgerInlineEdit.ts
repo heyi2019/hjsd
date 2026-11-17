@@ -37,8 +37,9 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
     if (!force && detailRequestsRef.current[orderId]) return detailRequestsRef.current[orderId];
     setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: true }));
     const request = ordersApi.executionDetail(orderId)
-      .then((detail) => {
+      .then(async (detail) => {
         setLedgerOrderDetails((current) => ({ ...current, [orderId]: detail }));
+        void orderDetailEditor.ensureEmployees();
         return detail;
       })
       .catch((error) => {

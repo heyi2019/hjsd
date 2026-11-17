@@ -93,6 +93,7 @@ export interface OrderDetailEditor {
   partyDrafts: Record<number, PartyAddition[]>;
   updatePartyDraft: (orderId: number, addition: PartyAddition) => void;
   employees: EmployeeOption[];
+  ensureEmployees: () => Promise<EmployeeOption[]>;
   invEditExtraForm: ReturnType<typeof Form.useForm>[0];
   savingAccount: boolean;
   openEditor: (account: Account) => Promise<void>;
@@ -125,6 +126,19 @@ export function useOrderDetailEditor(params: {
   const [invEditExtraForm] = Form.useForm();
   const [savingAccount, setSavingAccount] = useState(false);
 
+  async function ensureEmployees(): Promise<EmployeeOption[]> {
+    if (employees.length) return employees;
+    try {
+      const list = await employeesApi.list();
+      setEmployees(list);
+      return list;
+    } catch {
+      setEmployees([]);
+      // 员工列表加载失败不阻断编辑：事件操作人下拉可在保存前重试或留空由后端校验。
+      return [];
+    }
+  }
+
   async function openEditor(account: Account) {
     setEditingAccount({ ...account });
     setEventDrafts({});
@@ -132,15 +146,7 @@ export function useOrderDetailEditor(params: {
     setFinanceDrafts({});
     setOrderDrafts({});
     setPartyDrafts({});
-    if (!employees.length) {
-      try {
-        const list = await employeesApi.list();
-        setEmployees(list);
-      } catch {
-        setEmployees([]);
-        // 员工列表加载失败不阻断编辑：事件操作人下拉可在保存前重试或留空由后端校验。
-      }
-    }
+    await ensureEmployees();
     setInlineEditId(account.id);
   }
 
@@ -363,6 +369,7 @@ export function useOrderDetailEditor(params: {
     partyDrafts,
     updatePartyDraft,
     employees,
+    ensureEmployees,
     invEditExtraForm,
     savingAccount,
     openEditor,

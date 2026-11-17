@@ -105,6 +105,30 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
     expect(ordersApi.executionDetail).toHaveBeenCalledWith(1);
   });
 
+  it("只读订单详情加载员工列表并回显交付操作人", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+      account: { id: 99, stock_no: "KU_00001", game_account: "acc-99", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
+      orders: [{
+        order_id: 1,
+        order_no: "HS-2026-0001",
+        order_type: "HS",
+        trade_date: "2026-10-01",
+        status: "ACTIVE",
+        extra_values: { delivery_responsible_ids: [1] },
+        events: [],
+      }],
+      finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
+    } as never);
+
+    renderLight(<OrdersPage />, { user: "admin" });
+    await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
+    const row = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))!.closest("tr")!;
+    fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);
+
+    await waitFor(() => expect(screen.getByText("管理员")).toBeInTheDocument());
+    expect(screen.queryByText("操作人信息加载中")).toBeNull();
+  });
+
   it("详情请求未返回时展开后编辑也复用同一请求", async () => {
     const detail = {
       account: { id: 99, stock_no: "KU_00001", game_account: "acc-99", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },

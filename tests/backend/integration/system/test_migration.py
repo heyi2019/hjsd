@@ -337,7 +337,7 @@ def test_consignment_platform_field_is_operation_section(migration_db):
 
 
 def test_refund_form_is_reframed_as_cash_outflow(migration_db):
-    """资金收支表单移除责任方，补齐日期和固定支出流向（压平后逻辑并入 0002_squash）。"""
+    """资金收支表单保留当前基线中的责任方、日期和固定支出流向。"""
     engine, _target, _env = migration_db
     with engine.connect() as connection:
         rows = connection.execute(

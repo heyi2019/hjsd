@@ -3,6 +3,7 @@ import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { buildFormExtraDisplay, formatExtraDisplayValue } from "../orders/ConfigurableField";
 import { customersApi } from "../shared/api/customers.api";
+import { employeesApi } from "../shared/api/org.api";
 import { orderFormFieldsApi } from "../shared/api/orders.api";
 import type { Customer, CustomerDetail } from "../shared/api/types/customers";
 import type { OrderFormField } from "../shared/api/types/forms";
@@ -35,6 +36,8 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
   const [searchInput, setSearchInput] = useState("");
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [creatorFilter, setCreatorFilter] = useState<string[]>([]);
+  const [creatorOptions, setCreatorOptions] = useState<{ label: string; value: string }[] | null>(null);
   const customerStatusOptions = useOptionSet("CUSTOMER_STATUS");
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -51,6 +54,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
         await customersApi.exportCsv({
           ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
           ...(statusFilter ? { status: statusFilter } : {}),
+          ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
         }),
         `客户-${today()}.csv`,
       );
@@ -68,6 +72,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
       const params = {
         ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
+        ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
         limit: pageSize,
         offset: (page - 1) * pageSize,
       };
@@ -75,6 +80,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
         today_date: today(),
         ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
+        ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
       };
       const [customerPage, customerSummary] = await Promise.all([
         customersApi.page(params),
@@ -89,7 +95,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     } finally {
       setLoading(false);
     }
-  }, [keyword, page, pageSize, statusFilter]);
+  }, [creatorFilter, keyword, page, pageSize, statusFilter]);
 
   // 页面被 keep-alive 隐藏时不请求；重新激活、筛选、翻页都由同一个后端查询入口刷新。
   useEffect(() => {
@@ -102,6 +108,15 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
       .list("CUSTOMER", true)
       .then((rows) => setFieldDefs((rows ?? []).filter((row) => row.is_custom)))
       .catch(() => setFieldDefs([]));
+  }, []);
+
+  useEffect(() => {
+    Promise.resolve(employeesApi.list())
+      .then((items) => setCreatorOptions((items ?? []).filter((item) => item.is_active).map((item) => ({
+        label: item.display_name || item.username,
+        value: item.username,
+      }))))
+      .catch(() => setCreatorOptions([]));
   }, []);
 
   const openDetail = async (row: Customer) => {
@@ -308,6 +323,8 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     columns,
     createOpen,
     customerStatusOptions,
+    creatorFilter,
+    creatorOptions,
     detailData,
     detailLoading,
     detailTarget,
@@ -335,6 +352,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
     summary,
     searchInput,
     setCreateOpen,
+    setCreatorFilter,
     setKeyword,
     setPage,
     setPageSize,

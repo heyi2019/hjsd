@@ -80,6 +80,35 @@ def count_orders(
     return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
 
 
+def order_customer_count(
+    session: Session,
+    *,
+    trade_date_from: date | None = None,
+    trade_date_to: date | None = None,
+    user: CurrentUser | None = None,
+    mine: bool = False,
+) -> int:
+    """统计订单关联的去重客户数，口径与订单列表筛选保持一致。"""
+    order_stmt = _order_list_stmt(
+        order_type=None,
+        status=None,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        owner_id=None,
+        pool_id=None,
+        keyword=None,
+        user=user,
+        mine=mine,
+        session=session,
+    ).with_only_columns(Order.id, maintain_column_froms=True).subquery()
+    customer_stmt = (
+        select(func.count(func.distinct(OrderCustomerRole.customer_id)))
+        .select_from(OrderCustomerRole)
+        .join(order_stmt, order_stmt.c.id == OrderCustomerRole.order_id)
+    )
+    return int(session.scalar(customer_stmt) or 0)
+
+
 def order_status_counts(
     session: Session,
     *,
@@ -274,22 +303,17 @@ def _order_list_stmt(
             )
         )
     if mine and user is not None:
-        # 「我的订单」= 我负责的 + 我参与的。
-        # 每一笔订单事件的执行人都算参与，不限 SELL：买号、售出、运营消耗、
-        # 收付款、交付、取消、退款各自都有负责人，只认 SELL 会让买号/运营的人
-        # 在自己工作台看不到他做过单。`operator_user_ids` 是事件上的多操作人，
-        # 列类型是 json（不是 jsonb），PG 下必须先 cast 再用数组包含判断。
+        # 「我的订单」= 入库操作人是我，或出库/售出操作人是我。
+        # 两个条件都是针对同一订单的 OR；同一订单同时命中两边也只返回一行。
         stmt = stmt.where(
             or_(
-                Order.owner_id == user.id,
-                Order.created_by == user.username,
+                cast(Order.form_extra, JSONB).contains({"business_responsible_ids": [user.id]}),
                 exists(
                     select(OrderEvent.id).where(
                         OrderEvent.order_id == Order.id,
-                        or_(
-                            OrderEvent.created_by == user.username,
-                            cast(OrderEvent.operator_user_ids, JSONB).contains([user.id]),
-                        ),
+                        OrderEvent.event_type == "SELL",
+                        OrderEvent.is_posted.is_(True),
+                        cast(OrderEvent.operator_user_ids, JSONB).contains([user.id]),
                     )
                 ),
             )

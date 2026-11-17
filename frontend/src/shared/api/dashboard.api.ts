@@ -4,6 +4,7 @@ export interface DashboardSummary {
   period: { from: string; to: string };
   orders: { total_count: number; completed_count: number; active_count: number } | null;
   personal_orders: number | null;
+  personal_customers: number | null;
   personal_earnings: string | number | null;
   inventory: { account_count: number; aging_count: number; overdue_count: number } | null;
   installments: { total_count: number; overdue_count: number } | null;

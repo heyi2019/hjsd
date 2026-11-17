@@ -88,12 +88,10 @@ def test_orders_export_uses_chinese_visible_columns(seeded_client, headers, seed
 def test_orders_export_mine_only_includes_my_orders(seeded_client, headers, seeded_db):
     """「我的订单」视图导出必须走 mine 过滤，不能借导出绕过视图拿全量。
 
-    headers = X-Dev-User: admin → id=1；owner_id=1 是本人单，owner_id=2 是他人单。
+    headers = X-Dev-User: admin → id=1；入库操作人是本人，另一单的入库操作人是他人。
     """
-    mine = _seed_order(seeded_db, order_no="HSMINE01")
-    mine.owner_id = 1
-    foreign = _seed_order(seeded_db, order_no="HSFOREIGN01")
-    foreign.owner_id = 2
+    mine = _seed_order(seeded_db, order_no="HSMINE01", form_extra={"business_responsible_ids": [1]})
+    foreign = _seed_order(seeded_db, order_no="HSFOREIGN01", form_extra={"business_responsible_ids": [2]})
     seeded_db.flush()
 
     full = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text

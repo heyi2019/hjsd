@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from sqlalchemy import func, select
@@ -95,6 +95,7 @@ def list_counterparties(
     *,
     type: str | None = None,
     status: str | None = None,
+    created_by: Sequence[str] | None = None,
     limit: int | None = None,
     offset: int = 0,
 ) -> list[Counterparty]:
@@ -103,19 +104,24 @@ def list_counterparties(
         stmt = stmt.where(Counterparty.type == type)
     if status:
         stmt = stmt.where(Counterparty.status == status)
+    if created_by:
+        stmt = stmt.where(Counterparty.created_by.in_(created_by))
     if limit is not None:
         stmt = stmt.limit(limit).offset(offset)
     return list(session.scalars(stmt.order_by(Counterparty.id)).all())
 
 
 def count_counterparties(
-    session: Session, *, type: str | None = None, status: str | None = None
+    session: Session, *, type: str | None = None, status: str | None = None,
+    created_by: Sequence[str] | None = None,
 ) -> int:
     stmt = select(func.count(Counterparty.id))
     if type:
         stmt = stmt.where(Counterparty.type == type)
     if status:
         stmt = stmt.where(Counterparty.status == status)
+    if created_by:
+        stmt = stmt.where(Counterparty.created_by.in_(created_by))
     return int(session.scalar(stmt) or 0)
 
 

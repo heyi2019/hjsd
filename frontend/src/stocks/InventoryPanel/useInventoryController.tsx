@@ -8,13 +8,13 @@ import { useInventoryActions } from "./useInventoryActions";
 import { useInventoryColumns } from "./useInventoryColumns";
 import { mergeInventoryAccount } from "./types";
 
-export function useInventoryController({ refreshKey = 0, active = true, onNavigate }: { refreshKey?: number; active?: boolean; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
+export function useInventoryController({ refreshKey = 0, active = true, initialAgeGtDays, onNavigate }: { refreshKey?: number; active?: boolean; initialAgeGtDays?: number; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
   // 删除不可逆：按钮按系统角色显隐，后端仍做管理员二次鉴权。
   const { role, username } = useSession();
   const canDelete = role === "admin";
 
   // —— 列表域：加载 / 筛选 / 分页 / 排序 / 统计 / 派生行 / 导出 ——
-  const list = useInventoryList({ active, refreshKey });
+  const list = useInventoryList({ active, refreshKey, initialAgeGtDays });
   const {
   rows,
   setRows,
@@ -25,6 +25,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onNaviga
   setInventoryType,
   inventoryOperatorIds,
   setInventoryOperatorIds,
+  ageGtDays,
+  setAgeGtDays,
   gameTypeFilter,
   setGameTypeFilter,
   keyword,
@@ -211,6 +213,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onNaviga
     inventoryType,
     inventoryTypeOptions,
     inventoryOperatorIds,
+    ageGtDays,
     keyword,
     load,
     loadExecution,
@@ -246,6 +249,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onNaviga
     setGameTypeFilter,
     setInventoryType,
     setInventoryOperatorIds,
+    setAgeGtDays,
     setKeyword,
     setPage,
     setPageSize,

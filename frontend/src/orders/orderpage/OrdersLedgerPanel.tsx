@@ -34,6 +34,8 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     inventoryStatusOptions,
     inventoryOperatorIds,
     saleOperatorIds,
+    myOperator,
+    setMineOrders,
     keyword,
     ledgerColumns,
     ledgerOrderDetailLoading,
@@ -82,6 +84,12 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
   const typeCount = (key: BusinessFilterKey) => key === "all"
     ? Object.values(ledgerSummary?.type_counts ?? {}).reduce((sum, count) => sum + count, 0)
     : ledgerSummary?.type_counts[key] ?? 0;
+  const operatorOptions = [
+    ...employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.display_name })),
+    ...(myOperator && !employees.some((employee) => employee.id === myOperator.id)
+      ? [{ value: myOperator.id, label: myOperator.display_name }]
+      : []),
+  ];
 
   return (
     <section className="ui-stack orders-ledger-panel">
@@ -116,24 +124,24 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
           <Select
             mode="multiple"
             allowClear
-            maxTagCount="responsive"
+            maxTagCount={2}
             aria-label="入库负责人筛选"
             className="ui-filter-select"
             placeholder="入库负责人"
             value={inventoryOperatorIds}
-            options={employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.display_name }))}
-            onChange={(values) => { setInventoryOperatorIds((values as number[]).map(Number)); setPage(1); }}
+            options={operatorOptions}
+            onChange={(values) => { setMineOrders(false); setInventoryOperatorIds((values as number[]).map(Number)); setPage(1); }}
           />
           <Select
             mode="multiple"
             allowClear
-            maxTagCount="responsive"
+            maxTagCount={2}
             aria-label="售出操作人筛选"
             className="ui-filter-select"
             placeholder="售出操作人"
             value={saleOperatorIds}
-            options={employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.display_name }))}
-            onChange={(values) => { setSaleOperatorIds((values as number[]).map(Number)); setPage(1); }}
+            options={operatorOptions}
+            onChange={(values) => { setMineOrders(false); setSaleOperatorIds((values as number[]).map(Number)); setPage(1); }}
           />
           <Segmented
             value={orderTypeFilter}

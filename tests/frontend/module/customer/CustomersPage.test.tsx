@@ -9,6 +9,7 @@ import { renderLight } from "@fixtures/render";
 import { CustomersPage } from "@/customer-center/CustomersPage";
 
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
+import { employeesApi } from "@/shared/api/org.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { OrderFormField } from "@/shared/api/types/forms";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
@@ -159,6 +160,37 @@ describe("CustomersPage：客户档案", () => {
     await screen.findByText("CUS-0001");
     await user.click(screen.getByRole("combobox", { name: "客户状态" }));
     expect(await screen.findByText("已合并", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+  });
+
+  it("客户档案和合作方支持按创建操作人多选筛选", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(employeesApi.list).mockResolvedValue([
+      { id: 1, username: "admin", display_name: "管理员", is_active: true },
+      { id: 2, username: "alice", display_name: "小雅", is_active: true },
+    ]);
+    vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse(counterparties));
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+
+    await user.click(screen.getByRole("combobox", { name: "客户创建操作人筛选" }));
+    await user.click((await screen.findAllByText("管理员", { selector: ".ant-select-item-option-content" }))[0]);
+    await waitFor(() => expect(customersApi.page).toHaveBeenLastCalledWith({
+      created_by: ["admin"],
+      limit: 10,
+      offset: 0,
+    }));
+    expect(customersApi.summary).toHaveBeenLastCalledWith(expect.objectContaining({ created_by: ["admin"] }));
+
+    await user.click(screen.getByRole("tab", { name: /合作方/ }));
+    const panel = await screen.findByRole("tabpanel");
+    await user.click(within(panel).getByRole("combobox", { name: "合作方创建操作人筛选" }));
+    const creatorOptions = await screen.findAllByText("管理员", { selector: ".ant-select-item-option-content" });
+    await user.click(creatorOptions[creatorOptions.length - 1]);
+    await waitFor(() => expect(counterpartiesApi.page).toHaveBeenLastCalledWith({
+      created_by: ["admin"],
+      limit: 10,
+      offset: 0,
+    }));
   });
 
   it("后端不可达时显示错误条而不是空白页", async () => {

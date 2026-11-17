@@ -11,15 +11,19 @@ import { BUSINESS_CREATE_ITEMS } from "./orderpage/helpers";
 import { OrdersLedgerPanel } from "./orderpage/OrdersLedgerPanel";
 import { OrderModals } from "./orderpage/OrdersPage.modals";
 import { useOrdersPageController } from "./orderpage/useOrdersPageController";
+import type { InitialLedgerFilters } from "./orderpage/useLedgerList";
 import type { BusinessCenterEntryTab, BusinessCenterTab } from "./businessCenter";
 
-export function OrdersPage({ initialTab, initialMine = false, active = true, onNavigate }: {
+export function OrdersPage({ initialTab, initialMine = false, initialLedgerFilters, initialInstallmentStatus, initialInventoryAgeGtDays, active = true, onNavigate }: {
   initialTab?: BusinessCenterEntryTab;
   initialMine?: boolean;
+  initialLedgerFilters?: InitialLedgerFilters;
+  initialInstallmentStatus?: string;
+  initialInventoryAgeGtDays?: number;
   active?: boolean;
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
 } = {}) {
-  const controller = useOrdersPageController({ initialTab, initialMine, active, onNavigate });
+  const controller = useOrdersPageController({ initialTab, initialMine, initialLedgerFilters, active, onNavigate });
   const {
     activeTab,
     installmentRefreshKey,
@@ -78,7 +82,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
           {
             key: "inventory",
             label: "库存中心",
-            children: <InventoryPanel active={active} refreshKey={inventoryRefreshKey} onNavigate={onNavigate} />,
+            children: <InventoryPanel active={active} refreshKey={inventoryRefreshKey} initialAgeGtDays={initialInventoryAgeGtDays} onNavigate={onNavigate} />,
           },
           {
             key: "ledger",
@@ -88,7 +92,7 @@ export function OrdersPage({ initialTab, initialMine = false, active = true, onN
           {
             key: "collections",
             label: "分期与回款",
-            children: <InstallmentsPanel refreshKey={installmentRefreshKey} />,
+            children: <InstallmentsPanel refreshKey={installmentRefreshKey} initialStatus={initialInstallmentStatus} />,
           },
         ]}
       />

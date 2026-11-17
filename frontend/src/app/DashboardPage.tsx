@@ -7,12 +7,14 @@ import type { BusinessCenterEntryTab } from "../orders/businessCenter";
 import { BusinessAlerts, BusinessOverview } from "./BusinessOverview";
 import { useDashboardSummary } from "./useDashboardSummary";
 
-export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; onPersonalNavigate?: (view: "orders" | "earnings") => void; active?: boolean }) {
+export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavigate, active = true }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; onPersonalNavigate?: (view: "orders" | "earnings") => void; onDashboardNavigate?: (path: string) => void; active?: boolean }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<BusinessOrderType>("HS");
   const {
     orderSummary,
+    period,
     personalOrders,
+    personalCustomers,
     summaryError,
     summaryLoading,
     personalOrdersError,
@@ -27,6 +29,12 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
     businessAlerts,
     loadSummary,
   } = useDashboardSummary(active);
+  const withPeriod = (path: string) => {
+    if (!period) return path;
+    const separator = path.includes("?") ? "&" : "?";
+    return `${path}${separator}trade_date_from=${encodeURIComponent(period.from)}&trade_date_to=${encodeURIComponent(period.to)}`;
+  };
+  const openDashboardPath = (path: string) => onDashboardNavigate?.(path);
   const openCreate = (orderType: BusinessOrderType) => {
     setCreateType(orderType);
     setCreateOpen(true);
@@ -96,11 +104,22 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, active = true }:
           ordersError={Boolean(summaryError)}
           loading={summaryLoading}
           personalOrders={personalOrders}
+          personalCustomers={personalCustomers}
           personalOrdersError={Boolean(personalOrdersError)}
-          onPersonalOrdersClick={() => onPersonalNavigate?.("orders")}
+          onPersonalOrdersClick={() => onDashboardNavigate ? openDashboardPath(withPeriod("/business/ledger?mine=true")) : onPersonalNavigate?.("orders")}
+          onPersonalCustomersClick={() => onDashboardNavigate ? openDashboardPath("/customers") : undefined}
           personalEarnings={personalEarnings}
           personalEarningsError={Boolean(earningsError)}
-          onPersonalEarningsClick={() => onPersonalNavigate?.("earnings")}
+          onPersonalEarningsClick={() => onDashboardNavigate
+            ? openDashboardPath(period
+              ? `/operations?tab=my-earnings&from=${encodeURIComponent(period.from)}&to=${encodeURIComponent(period.to)}`
+              : "/operations?tab=my-earnings")
+            : onPersonalNavigate?.("earnings")}
+          onInventoryClick={() => openDashboardPath("/business/inventory")}
+          onOrdersClick={() => openDashboardPath(withPeriod("/business/ledger"))}
+          onInstallmentsClick={() => openDashboardPath("/business/collections")}
+          onOverdueInstallmentsClick={() => openDashboardPath("/business/collections?status=OVERDUE")}
+          onInventoryOverdueClick={() => openDashboardPath("/business/inventory?age_gt_days=30")}
         />
         <ErrorBanner error={earningsError} onRetry={() => void loadSummary()} />
         <BusinessAlerts alerts={businessAlerts} loading={summaryLoading} />

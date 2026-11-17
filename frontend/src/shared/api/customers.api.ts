@@ -2,16 +2,17 @@ import { api } from "./client";
 import type { PageResponse } from "./types/common";
 import type { Counterparty, Customer, CustomerDetail, CustomerSummary, DuplicateCandidate, Lead, LeadSummary } from "./types/customers";
 
-type CustomerListParams = { keyword?: string; status?: string; limit?: number; offset?: number };
+type CustomerListParams = { keyword?: string; status?: string; created_by?: string[]; limit?: number; offset?: number };
 
 const customerPage = (params?: CustomerListParams) =>
   api.get<PageResponse<Customer>>("/customers", {
     params: { limit: 10, offset: 0, ...params },
+    paramsSerializer: { indexes: null },
   }).then((r) => r.data);
 
 export const customersApi = {
-  summary: (params: { today_date: string; keyword?: string; status?: string }) =>
-    api.get<CustomerSummary>("/customers/summary", { params }).then((r) => r.data),
+  summary: (params: { today_date: string; keyword?: string; status?: string; created_by?: string[] }) =>
+    api.get<CustomerSummary>("/customers/summary", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
   /** 返回一个后端分页窗口，默认只请求当前列表页。 */
   page: (params?: CustomerListParams) => customerPage(params),
   /** 仅供下拉选择器读取一个有界选项窗口。 */
@@ -29,21 +30,23 @@ export const customersApi = {
     api.patch<Customer>(`/customers/${id}/status`, { status }).then((r) => r.data),
   merge: (id: number, target_customer_id: number, reason: string) =>
     api.post<Customer>(`/customers/${id}/merge`, { target_customer_id, reason }).then((r) => r.data),
-  exportCsv: (params?: { keyword?: string; status?: string }) =>
+  exportCsv: (params?: { keyword?: string; status?: string; created_by?: string[] }) =>
     api
       .get<Blob>("/customers/export.csv", {
         params: { ...params, _t: Date.now() },
+        paramsSerializer: { indexes: null },
         responseType: "blob",
       })
       .then((r) => r.data),
 };
 
 export const counterpartiesApi = {
-  list: (params?: { type?: string; status?: string }) =>
-    api.get<Counterparty[]>("/counterparties", { params }).then((r) => r.data),
-  page: (params?: { type?: string; status?: string; limit?: number; offset?: number }) =>
+  list: (params?: { type?: string; status?: string; created_by?: string[] }) =>
+    api.get<Counterparty[]>("/counterparties", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
+  page: (params?: { type?: string; status?: string; created_by?: string[]; limit?: number; offset?: number }) =>
     api.get<PageResponse<Counterparty>>("/counterparties/page", {
       params: { limit: 10, offset: 0, ...params },
+      paramsSerializer: { indexes: null },
     }).then((r) => r.data),
   create: (payload: Partial<Counterparty>) =>
     api.post<Counterparty>("/counterparties", payload).then((r) => r.data),

@@ -20,8 +20,8 @@ import { useSession } from "../shared/state/session";
 import { SCHEDULE_STATUS_LABEL } from "./InstallmentsPanel.fragments";
 import type { Permission } from "../shared/state/session";
 
-export function useContractTableController(params: { contractType: string; reloadKey: number; dateRange?: [string, string] | null }) {
-  const { contractType, reloadKey, dateRange } = params;
+export function useContractTableController(params: { contractType: string; reloadKey: number; dateRange?: [string, string] | null; status?: string }) {
+  const { contractType, reloadKey, dateRange, status } = params;
   // 上层每次渲染都会新建 [from, to] 数组，直接当 useCallback 依赖会每次变化 →
   // load 变 → useEffect 触发 → 无限重拉。这里只依赖两个原始字符串。
   const dateFrom = dateRange?.[0] ?? "";
@@ -80,6 +80,7 @@ export function useContractTableController(params: { contractType: string; reloa
       // 日期区间、合约类型与合计都走服务端：列表与合计同条件，前端不再本地筛/本地求和。
       const rangeParams = {
         contract_type: contractType,
+        status: status || undefined,
         trade_date_from: dateFrom || undefined,
         trade_date_to: dateTo || undefined,
       };
@@ -95,7 +96,7 @@ export function useContractTableController(params: { contractType: string; reloa
     } finally {
       setLoading(false);
     }
-  }, [contractType, dateFrom, dateTo]);
+  }, [contractType, dateFrom, dateTo, status]);
 
   useEffect(() => {
     void load();

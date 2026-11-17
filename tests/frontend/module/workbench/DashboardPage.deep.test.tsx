@@ -42,21 +42,23 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     await waitFor(() => expect(dashboardApi.summary).toHaveBeenCalledTimes(2));
   });
 
-  it("业务总览计数：订单总量与完成订单量", async () => {
+  it("业务总览计数：订单总量与我的当期客户数", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
       orders: { total_count: 3, completed_count: 2, active_count: 1 },
+      personal_customers: 2,
     }));
     renderLight(<DashboardPage />, { user: "admin" });
     const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
-    const doneCard = (await screen.findByText("完成订单量")).closest(".ui-stat") as HTMLElement;
+    const customerCard = (await screen.findByText("我的当期客户数")).closest(".ui-stat") as HTMLElement;
     expect(within(totalCard).getByText("3")).toBeInTheDocument();
-    expect(within(doneCard).getByText("2")).toBeInTheDocument();
+    expect(within(customerCard).getByText("2")).toBeInTheDocument();
   });
 
   it("我的当期卡片展示当前登录用户的订单数与分润收益", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
       orders: { total_count: 3, completed_count: 1, active_count: 2 },
       personal_orders: 2,
+      personal_customers: 2,
       personal_earnings: "123.45",
     }));
     renderLight(<DashboardPage />, { user: "operator" });
@@ -68,7 +70,36 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     expect(within(orderCard).getByText("2")).toBeInTheDocument();
     expect(within(totalCard).getByText("3")).toBeInTheDocument();
     expect(within(earningsCard).getByText("123.45")).toBeInTheDocument();
+    expect(within(earningsCard).getByText("当期 · 本人分润基数")).toBeInTheDocument();
     expect(within(earningsCard).queryByText("999.99")).toBeNull();
+  });
+
+  it("业务总览卡片跳转到对应明细并携带当前周期与状态", async () => {
+    const onDashboardNavigate = vi.fn();
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
+      period: { from: "2026-11-01", to: "2026-11-16" },
+    }));
+    renderLight(<DashboardPage onDashboardNavigate={onDashboardNavigate} />, { user: "admin" });
+
+    await ui.click((await screen.findByText("我的当期订单")).closest(".ui-stat") as HTMLElement);
+    await ui.click(screen.getByText("我的当期收益").closest(".ui-stat") as HTMLElement);
+    await ui.click((await screen.findByText("在库账号")).closest(".ui-stat") as HTMLElement);
+    await ui.click(screen.getByText("订单总量").closest(".ui-stat") as HTMLElement);
+    await ui.click(screen.getByText("我的当期客户数").closest(".ui-stat") as HTMLElement);
+    await ui.click(screen.getByText("分期合约").closest(".ui-stat") as HTMLElement);
+    await ui.click(screen.getByText("逾期合约").closest(".ui-stat") as HTMLElement);
+    await ui.click(screen.getByText("在库超期账号").closest(".ui-stat") as HTMLElement);
+
+    expect(onDashboardNavigate.mock.calls).toEqual([
+      ["/business/ledger?mine=true&trade_date_from=2026-11-01&trade_date_to=2026-11-16"],
+      ["/operations?tab=my-earnings&from=2026-11-01&to=2026-11-16"],
+      ["/business/inventory"],
+      ["/business/ledger?trade_date_from=2026-11-01&trade_date_to=2026-11-16"],
+      ["/customers"],
+      ["/business/collections"],
+      ["/business/collections?status=OVERDUE"],
+      ["/business/inventory?age_gt_days=30"],
+    ]);
   });
 
   it("订单汇总接口失败时业务总览显示占位「-」而非 0", async () => {
@@ -76,12 +107,12 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     vi.mocked(dashboardApi.summary).mockRejectedValue(new Error("dashboard down"));
     renderLight(<DashboardPage />, { user: "admin" });
     const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
-    const doneCard = (await screen.findByText("完成订单量")).closest(".ui-stat") as HTMLElement;
+    const customerCard = (await screen.findByText("我的当期客户数")).closest(".ui-stat") as HTMLElement;
     expect(within(totalCard).getByText("-")).toBeInTheDocument();
-    expect(within(doneCard).getByText("-")).toBeInTheDocument();
+    expect(within(customerCard).getByText("-")).toBeInTheDocument();
     // 反证：失败态绝不允许回落到 0 计数（改回 String(...length) 本例会红）
     expect(within(totalCard).queryByText("0")).toBeNull();
-    expect(within(doneCard).queryByText("0")).toBeNull();
+    expect(within(customerCard).queryByText("0")).toBeNull();
   });
 
   it("点「代挂」卡打开代挂登记弹窗", async () => {

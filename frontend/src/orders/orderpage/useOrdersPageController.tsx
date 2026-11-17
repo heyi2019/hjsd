@@ -6,6 +6,7 @@ import { currentDevUser } from "../../shared/api/client";
 import type { BusinessOrderType } from "../CreateBusinessModal";
 import { DEFAULT_BUSINESS_CENTER_TAB, type BusinessCenterEntryTab, type BusinessCenterTab } from "../businessCenter";
 import { useLedgerList } from "./useLedgerList";
+import type { InitialLedgerFilters } from "./useLedgerList";
 import { useLedgerColumns } from "./useLedgerColumns";
 import { useOrderCancellation } from "./useOrderCancellation";
 import { useOrderActionModals } from "./useOrderActionModals";
@@ -16,9 +17,10 @@ export function useOrdersPageController(params: {
   active?: boolean;
   initialTab?: BusinessCenterEntryTab;
   initialMine?: boolean;
+  initialLedgerFilters?: InitialLedgerFilters;
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
 } = {}) {
-  const { active = true, initialTab, initialMine = false, onNavigate } = params;
+  const { active = true, initialTab, initialMine = false, initialLedgerFilters, onNavigate } = params;
   const currentOperator = currentDevUser();
   const { role, username } = useSession();
   const canDeleteOrder = role === "admin";
@@ -30,7 +32,7 @@ export function useOrdersPageController(params: {
   }, [normalizedInitialTab]);
 
   // —— 列表域：加载 / 筛选 / 分页 / 排序 / 导出 / 选项词典 / 派生 filteredOrders ——
-  const list = useLedgerList({ active: active && activeTab === "ledger", initialMine });
+  const list = useLedgerList({ active: active && activeTab === "ledger", initialMine, initialFilters: initialLedgerFilters });
   const {
     orders, setOrders, types, setTypes, loadError, setLoadError, loading, setLoading,
     page, setPage, pageSize, setPageSize,
@@ -38,7 +40,7 @@ export function useOrdersPageController(params: {
     exportLedger, exportLedgerXlsx,
     orderTypeFilter, setOrderTypeFilter, businessModeFilter, setBusinessModeFilter,
     gameTypeFilter, setGameTypeFilter, inventoryStatusFilter, setInventoryStatusFilter,
-    inventoryOperatorIds, setInventoryOperatorIds, saleOperatorIds, setSaleOperatorIds,
+    inventoryOperatorIds, setInventoryOperatorIds, saleOperatorIds, setSaleOperatorIds, myOperator, mineOrders, setMineOrders,
     dateRange, setDateRange, keyword, setKeyword,
     orderBusinessOptions, orderBusinessModeOptions, inventoryStatusOptions,
     gameTypeOptions, typeNames, filteredOrders, pageTotal, ledgerSummary, summaryLoading, summaryError, load,
@@ -178,6 +180,9 @@ export function useOrdersPageController(params: {
     setOrderTypeFilter: setOrderTypeFilter,
     saleOperatorIds: saleOperatorIds,
     setSaleOperatorIds: setSaleOperatorIds,
+    myOperator: myOperator,
+    mineOrders: mineOrders,
+    setMineOrders: setMineOrders,
     setOrders: setOrders,
     setPage: setPage,
     setPageSize: setPageSize,

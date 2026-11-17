@@ -17,14 +17,17 @@ import { ContractModals } from "./InstallmentsPanel.modals";
 function ContractTable({
   contractType,
   reloadKey,
+  initialStatus,
 }: {
   contractType: string;
   reloadKey: number;
+  initialStatus?: string;
 }) {
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const controller = useContractTableController({
     contractType,
     reloadKey,
+    status: initialStatus,
     dateRange: dateRange ? [dateRange[0].format("YYYY-MM-DD"), dateRange[1].format("YYYY-MM-DD")] : null,
   });
   const {
@@ -217,9 +220,9 @@ function ContractTable({
 }
 
 
-export function InstallmentsPanel({ refreshKey = 0 }: { refreshKey?: number }) {
+export function InstallmentsPanel({ refreshKey = 0, initialStatus }: { refreshKey?: number; initialStatus?: string }) {
   // refreshKey：外部建单/标记逾期生成新合约后由上层递增，触发合约列表重拉。
   // 面板内不再有「刷新/标记逾期」按钮：逾期标记是全局动作，入口在订单页「分期与回款」Tab 右上角。
-  return <ContractTable contractType="STOCK_SALE" reloadKey={refreshKey} />;
+  return <ContractTable contractType="STOCK_SALE" reloadKey={refreshKey} initialStatus={initialStatus} />;
 }
 

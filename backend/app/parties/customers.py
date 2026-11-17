@@ -98,9 +98,12 @@ def create_customer(
 
 def list_customers(
     session: Session, *, keyword: str | None = None, status: str | None = None,
-    user: CurrentUser | None = None, limit: int | None = None, offset: int = 0,
+    created_by: Sequence[str] | None = None, user: CurrentUser | None = None,
+    limit: int | None = None, offset: int = 0,
 ) -> list[Customer]:
-    stmt = _customer_list_stmt(keyword=keyword, status=status, user=user, session=session)
+    stmt = _customer_list_stmt(
+        keyword=keyword, status=status, created_by=created_by, user=user, session=session
+    )
     if limit is not None:
         stmt = stmt.limit(limit).offset(offset)
     return list(session.scalars(stmt.order_by(Customer.id)).all())
@@ -108,9 +111,11 @@ def list_customers(
 
 def count_customers(
     session: Session, *, keyword: str | None = None, status: str | None = None,
-    user: CurrentUser | None = None,
+    created_by: Sequence[str] | None = None, user: CurrentUser | None = None,
 ) -> int:
-    stmt = _customer_list_stmt(keyword=keyword, status=status, user=user, session=session)
+    stmt = _customer_list_stmt(
+        keyword=keyword, status=status, created_by=created_by, user=user, session=session
+    )
     return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
 
 
@@ -120,6 +125,7 @@ def summarize_customers(
     today_date: date,
     keyword: str | None = None,
     status: str | None = None,
+    created_by: Sequence[str] | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, int]:
     """Summarize the same customer scope as the list, using the caller's local date."""
@@ -129,7 +135,7 @@ def summarize_customers(
     month_start_at = datetime.combine(month_start, time.min)
 
     scope = _customer_list_stmt(
-        keyword=keyword, status=status, user=user, session=session
+        keyword=keyword, status=status, created_by=created_by, user=user, session=session
     ).subquery()
     created_at = scope.c.created_at
     month_count, today_count = session.execute(
@@ -170,11 +176,14 @@ def summarize_customers(
 
 
 def _customer_list_stmt(
-    *, keyword: str | None, status: str | None, user: CurrentUser | None, session: Session
+    *, keyword: str | None, status: str | None, created_by: Sequence[str] | None,
+    user: CurrentUser | None, session: Session
 ):
     stmt = select(Customer)
     if status:
         stmt = stmt.where(Customer.status == status)
+    if created_by:
+        stmt = stmt.where(Customer.created_by.in_(created_by))
     if keyword:
         pattern, escape = like_contains(keyword)
         stmt = stmt.where(

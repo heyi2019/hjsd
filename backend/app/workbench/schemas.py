@@ -46,6 +46,7 @@ class DashboardSummaryOut(BaseModel):
     period: DashboardPeriodOut
     orders: DashboardOrdersOut | None
     personal_orders: int | None
+    personal_customers: int | None
     personal_earnings: Decimal | None
     inventory: DashboardInventoryOut | None
     installments: DashboardInstallmentsOut | None

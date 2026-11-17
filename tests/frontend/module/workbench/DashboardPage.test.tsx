@@ -46,7 +46,7 @@ it("工作台展示业务总览指标和业务提醒", async () => {
     for (const [label, value] of [
       ["在库账号", "1"],
       ["订单总量", "2"],
-      ["完成订单量", "1"],
+      ["我的当期客户数", "0"],
       ["分期合约", "1"],
       ["逾期合约", "1"],
       ["在库超期账号", "1"],
@@ -121,6 +121,7 @@ it("订单请求完成时不产生未包裹 act 的异步更新警告", async ()
       period: { from: "2026-11-01", to: "2026-11-16" },
       orders: { total_count: 0, completed_count: 0, active_count: 0 },
       personal_orders: 0,
+      personal_customers: 0,
       personal_earnings: "0.00",
       inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
       installments: { total_count: 0, overdue_count: 0 },

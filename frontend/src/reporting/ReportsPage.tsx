@@ -9,12 +9,12 @@ import { OrderProfit } from "./reports/OrderProfitReport";
 import { OperatingPnl } from "./reports/OperatingPnlReport";
 import { type ReportRange, ReportsActiveContext } from "./reports/shared";
 
-export function ReportsPage({ onNavigate, active = true, initialReportTab }: { onNavigate?: (key: string) => void; active?: boolean; initialReportTab?: "commission" | "my-earnings" }) {
+export function ReportsPage({ onNavigate, active = true, initialReportTab, initialReportFrom, initialReportTo }: { onNavigate?: (key: string) => void; active?: boolean; initialReportTab?: "commission" | "my-earnings"; initialReportFrom?: string; initialReportTo?: string }) {
   const [myEarnings, setMyEarnings] = useState(initialReportTab === "my-earnings");
   const [activeTab, setActiveTab] = useState(initialReportTab === "commission" || myEarnings ? "r3" : "pnl");
   // 报表视图统计周期：提升到父级，避免切换 Tab（非挂载）后筛选条件丢失。
-  const [reportFrom, setReportFrom] = useState("");
-  const [reportTo, setReportTo] = useState("");
+  const [reportFrom, setReportFrom] = useState(initialReportFrom ?? "");
+  const [reportTo, setReportTo] = useState(initialReportTo ?? "");
   const applyReportPeriod = (period: { from: string; to: string }) => {
     setReportFrom(period.from);
     setReportTo(period.to);
@@ -24,8 +24,10 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab }: { o
     // 重新激活后再按 URL 入口决定是「我的收益」还是完整分润对账。
     if (!active) return;
     setMyEarnings(initialReportTab === "my-earnings");
+    setReportFrom(initialReportFrom ?? "");
+    setReportTo(initialReportTo ?? "");
     if (initialReportTab === "commission" || initialReportTab === "my-earnings") setActiveTab("r3");
-  }, [active, initialReportTab]);
+  }, [active, initialReportTab, initialReportFrom, initialReportTo]);
   const reportRange: ReportRange = {
     params: { from: reportFrom || undefined, to: reportTo || undefined },
     picker: (

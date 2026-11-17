@@ -366,6 +366,32 @@ describe("OrdersPage：四类订单台账", () => {
     expect(within(ledger).getAllByText("TH-2026-0003").length).toBeGreaterThan(0);
   });
 
+  it("订单台账深链按状态和日期加载", async () => {
+    renderLight(
+      <OrdersPage
+        initialTab="ledger"
+        initialLedgerFilters={{ status: "COMPLETED", tradeDateFrom: "2026-11-01", tradeDateTo: "2026-11-16" }}
+      />,
+    );
+
+    await waitFor(() => expect(vi.mocked(ordersApi.listPage)).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "COMPLETED", trade_date_from: "2026-11-01", trade_date_to: "2026-11-16" }),
+    ));
+  });
+
+  it("我的订单深链展示当前入库和售出操作人", async () => {
+    renderLight(<OrdersPage initialTab="ledger" initialMine />, { user: "admin" });
+
+    await waitFor(() => expect(vi.mocked(ordersApi.listPage)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ mine: true }),
+    ));
+    await waitFor(() => {
+      for (const label of ["入库负责人筛选", "售出操作人筛选"]) {
+        expect(screen.getByRole("combobox", { name: label }).closest(".ant-select")?.textContent).toContain("管理员");
+      }
+    });
+  });
+
   it("订单台账提供入库负责人和售出操作人多选筛选", async () => {
     await openLedger();
 
@@ -378,7 +404,8 @@ describe("OrdersPage：四类订单台账", () => {
 
     const saleOperatorFilter = screen.getByRole("combobox", { name: "售出操作人筛选" });
     await ui.click(saleOperatorFilter);
-    const saleOperatorOption = screen.getAllByText("管理员", { selector: ".ant-select-item-option-content" }).at(-1);
+    const saleOperatorOptions = screen.getAllByText("管理员", { selector: ".ant-select-item-option-content" });
+    const saleOperatorOption = saleOperatorOptions[saleOperatorOptions.length - 1];
     expect(saleOperatorOption).toBeDefined();
     await ui.click(saleOperatorOption!);
     await waitFor(() => expect(vi.mocked(ordersApi.listPage)).toHaveBeenLastCalledWith(
@@ -602,7 +629,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("加载失败时展示错误条", async () => {
-    vi.mocked(ordersApi.listPage).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(ordersApi.listPage).mockRejectedValue({ isAxiosError: true, message: "Network Error" });
     renderLight(<OrdersPage />);
     await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());

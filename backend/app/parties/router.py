@@ -82,13 +82,14 @@ manage_counterparties = require_permissions(PERM_COUNTERPARTY_MANAGE)
 def list_customers(
     keyword: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    created_by: list[str] | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> PageOut[schemas.CustomerOut]:
     customers = parties_list_customers(
-        db, keyword=keyword, status=status, user=user, limit=limit, offset=offset
+        db, keyword=keyword, status=status, created_by=created_by, user=user, limit=limit, offset=offset
     )
     extras = get_extra_values_bulk(
         db, entity_type="customer", entity_ids=[item.id for item in customers]
@@ -105,7 +106,7 @@ def list_customers(
             )
             for item in customers
         ],
-        total=count_customers(db, keyword=keyword, status=status, user=user),
+        total=count_customers(db, keyword=keyword, status=status, created_by=created_by, user=user),
         limit=limit,
         offset=offset,
     )
@@ -116,11 +117,12 @@ def customer_summary(
     today_date: date = Query(...),
     keyword: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    created_by: list[str] | None = Query(default=None),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> schemas.CustomerSummaryOut:
     return schemas.CustomerSummaryOut(**parties_summarize_customers(
-        db, today_date=today_date, keyword=keyword, status=status, user=user
+        db, today_date=today_date, keyword=keyword, status=status, created_by=created_by, user=user
     ))
 
 
@@ -128,12 +130,13 @@ def customer_summary(
 def export_customers_csv(
     keyword: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    created_by: list[str] | None = Query(default=None),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> Response:
     """客户按可见列导出 CSV：同 /customers 筛选口径，上限 EXPORT_ROW_LIMIT。"""
     customers = parties_list_customers(
-        db, keyword=keyword, status=status, user=user, limit=EXPORT_ROW_LIMIT, offset=0
+        db, keyword=keyword, status=status, created_by=created_by, user=user, limit=EXPORT_ROW_LIMIT, offset=0
     )
     extras = get_extra_values_bulk(
         db, entity_type="customer", entity_ids=[item.id for item in customers]
@@ -447,10 +450,11 @@ def close_lead(
 def list_counterparties(
     type: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    created_by: list[str] | None = Query(default=None),
     db: Session = Depends(get_db),
     user: CurrentUser = read_counterparties,
 ) -> list[schemas.CounterpartyOut]:
-    items = parties_list_counterparties(db, type=type, status=status)
+    items = parties_list_counterparties(db, type=type, status=status, created_by=created_by)
     extras = get_extra_values_bulk(
         db, entity_type="counterparty", entity_ids=[item.id for item in items]
     )
@@ -468,13 +472,14 @@ def list_counterparties(
 def list_counterparties_page(
     type: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    created_by: list[str] | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user: CurrentUser = read_counterparties,
 ) -> PageOut[schemas.CounterpartyOut]:
     items = parties_list_counterparties(
-        db, type=type, status=status, limit=limit, offset=offset
+        db, type=type, status=status, created_by=created_by, limit=limit, offset=offset
     )
     extras = get_extra_values_bulk(
         db, entity_type="counterparty", entity_ids=[item.id for item in items]
@@ -486,7 +491,7 @@ def list_counterparties_page(
             )
             for item in items
         ],
-        total=parties_count_counterparties(db, type=type, status=status),
+        total=parties_count_counterparties(db, type=type, status=status, created_by=created_by),
         limit=limit,
         offset=offset,
     )

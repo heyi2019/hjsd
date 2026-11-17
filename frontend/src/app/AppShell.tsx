@@ -10,6 +10,7 @@ import { LoginPage } from "../auth/LoginPage";
 import { ChangePasswordPage } from "../auth/ChangePasswordPage";
 import type { ComponentType } from "react";
 import type { BusinessCenterEntryTab } from "../orders/businessCenter";
+import type { InitialLedgerFilters } from "../orders/orderpage/useLedgerList";
 import { ConfirmButton } from "../shared/ui";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 
@@ -26,7 +27,12 @@ type PageProps = {
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
   initialTab?: BusinessCenterEntryTab;
   initialMine?: boolean;
+  initialLedgerFilters?: InitialLedgerFilters;
+  initialInventoryAgeGtDays?: number;
+  initialInstallmentStatus?: string;
   initialReportTab?: "commission" | "my-earnings";
+  initialReportFrom?: string;
+  initialReportTo?: string;
   /** keep-alive 下当前页是否处于激活态：非激活仅隐藏不卸载，页面可据此在重新激活时重拉数据。 */
   active?: boolean;
   /** Customer Center deep-link focus, passed from the shell so standalone page tests need no Router context. */
@@ -59,8 +65,26 @@ export function AppShell() {
   const focusCustomerId = Number.isInteger(parsedCustomerFocusId) && parsedCustomerFocusId > 0 ? parsedCustomerFocusId : undefined;
   const focusCounterpartyId = Number.isInteger(parsedCounterpartyFocusId) && parsedCounterpartyFocusId > 0 ? parsedCounterpartyFocusId : undefined;
   const rawBizTab = (segments[1] as BusinessCenterEntryTab | undefined) ?? undefined;
-  const businessMine = active === "business" && new URLSearchParams(location.search).get("mine") === "true";
-  const reportTab = active === "operations" ? new URLSearchParams(location.search).get("tab") : null;
+  const query = new URLSearchParams(location.search);
+  const businessMine = active === "business" && query.get("mine") === "true";
+  const initialLedgerFilters: InitialLedgerFilters | undefined = active === "business" && rawBizTab === "ledger"
+    ? {
+      status: query.get("status") || undefined,
+      tradeDateFrom: query.get("trade_date_from") || undefined,
+      tradeDateTo: query.get("trade_date_to") || undefined,
+    }
+    : undefined;
+  const parsedInventoryAgeGtDays = Number(query.get("age_gt_days"));
+  const initialInventoryAgeGtDays = active === "business" && rawBizTab === "inventory"
+    && Number.isInteger(parsedInventoryAgeGtDays) && parsedInventoryAgeGtDays > 0
+    ? parsedInventoryAgeGtDays
+    : undefined;
+  const initialInstallmentStatus = active === "business" && rawBizTab === "collections"
+    ? query.get("status") || undefined
+    : undefined;
+  const reportTab = active === "operations" ? query.get("tab") : null;
+  const initialReportFrom = active === "operations" ? query.get("from") || undefined : undefined;
+  const initialReportTo = active === "operations" ? query.get("to") || undefined : undefined;
   const initialReportTab = reportTab === "commission" || reportTab === "my-earnings" ? reportTab : undefined;
   // 业务中心只保留作业页；未指定子页时默认进入库存中心。
   const businessTab = active === "business" ? (rawBizTab ?? "inventory") : undefined;
@@ -84,6 +108,7 @@ export function AppShell() {
     }
     navigate("/operations?tab=my-earnings");
   };
+  const navigateToDashboardPath = (path: string) => navigate(path);
   // 空路径 / 或 "" 统一重定向到工作台，保证默认落点稳定。
   useEffect(() => {
     if (location.pathname === "/" || location.pathname === "") {
@@ -259,13 +284,18 @@ export function AppShell() {
                       当前页底部（2026-11-03 实测库存/订单/分期/资金/报表/设置六处全现）。 */}
                   <ErrorBoundary name={key}>
                     {key === "dashboard" ? (
-                      <DashboardPage onNavigate={navigateTo} onPersonalNavigate={navigateToPersonalView} />
+                      <DashboardPage onNavigate={navigateTo} onPersonalNavigate={navigateToPersonalView} onDashboardNavigate={navigateToDashboardPath} />
                     ) : (
                       <PageComponent
                         onNavigate={navigateTo}
                         initialTab={key === "business" ? businessTab : undefined}
                         initialMine={key === "business" && active === "business" ? businessMine : undefined}
+                        initialLedgerFilters={key === "business" && active === "business" ? initialLedgerFilters : undefined}
+                        initialInventoryAgeGtDays={key === "business" && active === "business" ? initialInventoryAgeGtDays : undefined}
+                        initialInstallmentStatus={key === "business" && active === "business" ? initialInstallmentStatus : undefined}
                         initialReportTab={key === "operations" && active === "operations" ? initialReportTab : undefined}
+                        initialReportFrom={key === "operations" && active === "operations" ? initialReportFrom : undefined}
+                        initialReportTo={key === "operations" && active === "operations" ? initialReportTo : undefined}
                         active={isActive}
                         focusCustomerId={key === "customers" ? focusCustomerId : undefined}
                         focusCounterpartyId={key === "customers" ? focusCounterpartyId : undefined}

@@ -4,11 +4,12 @@ import { InventoryView } from "./InventoryPanel/InventoryView";
 import { useInventoryController } from "./InventoryPanel/useInventoryController";
 import "./InventoryPanel.css";
 
-export function InventoryPanel({ refreshKey = 0, active = true, onNavigate }: {
+export function InventoryPanel({ refreshKey = 0, active = true, initialAgeGtDays, onNavigate }: {
   refreshKey?: number;
   active?: boolean;
+  initialAgeGtDays?: number;
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
 }) {
-  const controller = useInventoryController({ refreshKey, active, onNavigate });
+  const controller = useInventoryController({ refreshKey, active, initialAgeGtDays, onNavigate });
   return <InventoryView controller={controller} />;
 }

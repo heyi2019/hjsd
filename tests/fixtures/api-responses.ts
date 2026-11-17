@@ -201,6 +201,7 @@ export function dashboardSummary(overrides: Partial<DashboardSummary> = {}): Das
     period: { from: "2026-11-01", to: "2026-11-16" },
     orders: { total_count: 0, completed_count: 0, active_count: 0 },
     personal_orders: 0,
+    personal_customers: 0,
     personal_earnings: "0.00",
     inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
     installments: { total_count: 0, overdue_count: 0 },

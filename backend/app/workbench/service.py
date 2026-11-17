@@ -15,7 +15,7 @@ from app.core.security import (
 )
 from app.domain.options import OptionSet
 from app.notifications import service as notification_service
-from app.orders.queries import order_status_counts
+from app.orders.queries import order_customer_count, order_status_counts
 from app.reporting.r3_commission import r3_commission_reconciliation
 from app.stocks.inventory import dashboard_inventory_summary
 from app.value_added_services import queries as installment_queries
@@ -58,6 +58,7 @@ def dashboard_summary(session: Session, *, user: CurrentUser) -> dict[str, Any]:
 
     orders = None
     personal_orders = None
+    personal_customers = None
     inventory = None
     installments = None
     if can_orders:
@@ -80,6 +81,13 @@ def dashboard_summary(session: Session, *, user: CurrentUser) -> dict[str, Any]:
             "active_count": counts.get("ACTIVE", 0) + counts.get("INSTALLMENT", 0),
         }
         personal_orders = sum(personal_counts.values())
+        personal_customers = order_customer_count(
+            session,
+            trade_date_from=month_start,
+            trade_date_to=today,
+            user=user,
+            mine=True,
+        )
         inventory = dashboard_inventory_summary(
             session,
             reminder_days=reminders["inventory_aging_days"],
@@ -107,6 +115,7 @@ def dashboard_summary(session: Session, *, user: CurrentUser) -> dict[str, Any]:
         "period": {"from": month_start, "to": today},
         "orders": orders,
         "personal_orders": personal_orders,
+        "personal_customers": personal_customers,
         "personal_earnings": personal_earnings,
         "inventory": inventory,
         "installments": installments,

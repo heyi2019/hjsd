@@ -114,6 +114,7 @@ describe("测试夹具隔离", () => {
       period: { from: "2026-11-01", to: "2026-11-16" },
       orders: { total_count: 0, completed_count: 0, active_count: 0 },
       personal_orders: 2,
+      personal_customers: 0,
       personal_earnings: "3.00",
       inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
       installments: { total_count: 0, overdue_count: 0 },

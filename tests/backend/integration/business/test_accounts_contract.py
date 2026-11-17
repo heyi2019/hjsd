@@ -6,7 +6,7 @@
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -74,6 +74,19 @@ class TestCreateAccountGuards:
         result = inventory_ledger(seeded_db, inventory_operator_ids=[users[0].id])
 
         assert [order.id for _account_row, order in result["items"]] == [hit_order.id]
+
+    def test_inventory_ledger_filters_by_age(self, seeded_db):
+        old_account = _account(seeded_db, "inventory-age-old")
+        fresh_account = _account(seeded_db, "inventory-age-fresh")
+        create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=old_account.id)
+        create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=fresh_account.id)
+        old_account.inventory_entry_at = datetime.combine(date.today() - timedelta(days=45), datetime.min.time())
+        fresh_account.inventory_entry_at = datetime.combine(date.today() - timedelta(days=10), datetime.min.time())
+        seeded_db.flush()
+
+        result = inventory_ledger(seeded_db, age_gt_days=30)
+
+        assert [account.id for account, _order in result["items"]] == [old_account.id]
 
     def test_pickup_inventory_type_can_be_created_for_th(self, seeded_db):
         account = create_account(

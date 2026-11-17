@@ -89,6 +89,21 @@ def test_customer_keyword_search_escapes_like_wildcards(seeded_client, seeded_db
     assert by_percent.json()["items"][0]["id"] == hit.id
 
 
+def test_customer_list_query_filters_by_created_by(seeded_client, seeded_db):
+    mine = create_customer(seeded_db, display_name="接口创建人甲", actor="alice")
+    create_customer(seeded_db, display_name="接口创建人乙", actor="bob")
+
+    response = seeded_client.get(
+        CUSTOMERS,
+        params=[("created_by", "alice")],
+        headers={"X-Dev-User": "admin"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 1
+    assert response.json()["items"][0]["id"] == mine.id
+
+
 def _scoped_user() -> CurrentUser:
     """非 admin、SELF 作用域用户（可见集只有自己）。"""
     return CurrentUser.build(
@@ -186,6 +201,14 @@ class TestCreateCustomerGuards:
 
 # ------------------------------------------------------------------ 客户查询
 class TestListAndGetCustomers:
+    def test_list_filters_by_created_by(self, seeded_db):
+        mine = create_customer(seeded_db, display_name="创建人甲", actor="alice")
+        create_customer(seeded_db, display_name="创建人乙", actor="bob")
+
+        filtered = list_customers(seeded_db, created_by=["alice"])
+
+        assert [customer.id for customer in filtered] == [mine.id]
+
     def test_list_filters_keyword_status_and_scope(self, seeded_db):
         mine = _customer(seeded_db, "阿甲", phone="13800001111", owner_id=9)
         other = _customer(seeded_db, "阿乙", phone="13900002222", owner_id=1)
@@ -661,6 +684,36 @@ class TestCounterpartyGuards:
             seeded_db, status=CounterpartyStatus.ACTIVE.value
         )
         assert [p.id for p in by_status] == [peer.id]
+
+    def test_list_filters_counterparties_by_created_by(self, seeded_db):
+        mine = create_counterparty(
+            seeded_db, display_name="创建人甲", type="PEER", actor="alice"
+        )
+        create_counterparty(
+            seeded_db, display_name="创建人乙", type="SUPPLIER", actor="bob"
+        )
+
+        filtered = list_counterparties(seeded_db, created_by=["alice"])
+
+        assert [counterparty.id for counterparty in filtered] == [mine.id]
+
+    def test_counterparty_page_query_filters_by_created_by(self, seeded_client, seeded_db):
+        mine = create_counterparty(
+            seeded_db, display_name="接口创建人甲", type="PEER", actor="alice"
+        )
+        create_counterparty(
+            seeded_db, display_name="接口创建人乙", type="SUPPLIER", actor="bob"
+        )
+
+        response = seeded_client.get(
+            f"{COUNTERPARTIES}/page",
+            params=[("created_by", "alice")],
+            headers={"X-Dev-User": "admin"},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["total"] == 1
+        assert response.json()["items"][0]["id"] == mine.id
 
     def test_get_counterparty_notfound(self, seeded_db):
         with pytest.raises(NotFound):

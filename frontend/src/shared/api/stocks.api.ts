@@ -11,6 +11,7 @@ export const stocksApi = {
     date_from?: string;
     date_to?: string;
     inventory_operator_ids?: number[];
+    age_gt_days?: number;
     sort_desc?: boolean;
     limit: number;
     offset: number;
@@ -30,6 +31,7 @@ export const stocksApi = {
     date_from?: string;
     date_to?: string;
     inventory_operator_ids?: number[];
+    age_gt_days?: number;
     sort_desc?: boolean;
   }): Promise<{ blob: Blob; failedDetailCount: number }> => {
     const response = await api.get<Blob>("/stocks/inventory/ledger/export.csv", {

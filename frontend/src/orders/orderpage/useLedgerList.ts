@@ -1,24 +1,36 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Dayjs } from "dayjs";
+import dayjs, { type Dayjs } from "dayjs";
 import { orderTypesApi, ordersApi } from "../../shared/api/orders.api";
+import { employeesApi } from "../../shared/api/org.api";
 import type { Order, OrderType } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import { downloadBlob } from "../../shared/api/download";
 import { ACCOUNT_STATUS_LABEL, today } from "../../shared/lib/format";
 import { filterRetiredOrderTypeOptions } from "../../shared/lib/retiredProducts";
 import { useOptionSet } from "../../shared/lib/optionSets";
+import { useSession } from "../../shared/state/session";
 import { appMessage } from "../../shared/ui/appFeedback";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 
 type Opt = { value: string; label: string };
+
+export interface InitialLedgerFilters {
+  status?: string;
+  tradeDateFrom?: string;
+  tradeDateTo?: string;
+}
 
 /**
  * 订单台账「列表域」：数据加载、筛选、分页、排序、导出与选项词典，以及派生的 filteredOrders。
  * 从 useOrdersPageController 拆出，保持纯参数入 / 扁平返回出，不持有任何 modal / 账号动作状态。
  * 这样主 hook 只保留跨域共享枢纽（selectedOrder / actionOrder / users / loadLedgerDetail）与动作编排。
  */
-export function useLedgerList(params: { active: boolean; initialMine: boolean }) {
-  const { active, initialMine } = params;
+export function useLedgerList(params: { active: boolean; initialMine: boolean; initialFilters?: InitialLedgerFilters }) {
+  const { active, initialMine, initialFilters } = params;
+  const { username } = useSession();
+  const initialStatus = initialFilters?.status;
+  const initialTradeDateFrom = initialFilters?.tradeDateFrom;
+  const initialTradeDateTo = initialFilters?.tradeDateTo;
   const [orders, setOrders] = useState<Order[]>([]);
   const [ledgerSummary, setLedgerSummary] = useState<Awaited<ReturnType<typeof ordersApi.ledgerSummary>> | null>(null);
   const [pageTotal, setPageTotal] = useState(0);
@@ -60,12 +72,19 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
   };
 
   const [orderTypeFilter, setOrderTypeFilter] = useState<BusinessFilterKey>("all");
+  const [orderStatusFilter, setOrderStatusFilter] = useState(initialStatus ?? "all");
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
   const [gameTypeFilter, setGameTypeFilter] = useState("all");
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState("all");
   const [inventoryOperatorIds, setInventoryOperatorIds] = useState<number[]>([]);
   const [saleOperatorIds, setSaleOperatorIds] = useState<number[]>([]);
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const [myOperatorId, setMyOperatorId] = useState<number | undefined>();
+  const [myOperator, setMyOperator] = useState<{ id: number; display_name: string } | undefined>();
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(() => (
+    initialTradeDateFrom && initialTradeDateTo
+      ? [dayjs(initialTradeDateFrom), dayjs(initialTradeDateTo)]
+      : null
+  ));
   // 业务类型、业务模式、责任方和关联关系均来自后端选项词典。
   const orderBusinessOptions: Opt[] = filterRetiredOrderTypeOptions(useOptionSet("ORDER_BUSINESS") ?? []);
   const orderBusinessModeOptions: Opt[] = useOptionSet("ORDER_BUSINESS_MODE") ?? [];
@@ -82,17 +101,18 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
   const queryFilters = useMemo(() => ({
     mine: mineOrders,
     ...(orderTypeFilter !== "all" ? { order_type: orderTypeFilter } : {}),
+    ...(orderStatusFilter !== "all" ? { status: orderStatusFilter } : {}),
     ...(businessModeFilter !== "all" ? { business_mode: businessModeFilter } : {}),
     ...(gameTypeFilter !== "all" ? { game_type: gameTypeFilter } : {}),
     ...(inventoryStatusFilter !== "all" ? { account_status: inventoryStatusFilter } : {}),
-    ...(inventoryOperatorIds.length ? { inventory_operator_ids: inventoryOperatorIds } : {}),
-    ...(saleOperatorIds.length ? { sale_operator_ids: saleOperatorIds } : {}),
+    ...(!mineOrders && inventoryOperatorIds.length ? { inventory_operator_ids: inventoryOperatorIds } : {}),
+    ...(!mineOrders && saleOperatorIds.length ? { sale_operator_ids: saleOperatorIds } : {}),
     ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
     ...(dateRange ? {
       trade_date_from: dateRange[0].format("YYYY-MM-DD"),
       trade_date_to: dateRange[1].format("YYYY-MM-DD"),
     } : {}),
-  }), [mineOrders, orderTypeFilter, businessModeFilter, gameTypeFilter, inventoryStatusFilter, inventoryOperatorIds, saleOperatorIds, keyword, dateRange]);
+  }), [mineOrders, orderTypeFilter, orderStatusFilter, businessModeFilter, gameTypeFilter, inventoryStatusFilter, inventoryOperatorIds, saleOperatorIds, keyword, dateRange]);
 
   const load = useCallback(async () => {
     const requestId = ++requestSequence.current;
@@ -118,9 +138,35 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
   useEffect(() => {
     if (active) {
       setMineOrders(initialMine);
+      setOrderStatusFilter(initialStatus ?? "all");
+      setDateRange(initialTradeDateFrom && initialTradeDateTo ? [dayjs(initialTradeDateFrom), dayjs(initialTradeDateTo)] : null);
+      const mineOperatorIds = initialMine && myOperatorId !== undefined ? [myOperatorId] : [];
+      setInventoryOperatorIds(mineOperatorIds);
+      setSaleOperatorIds(mineOperatorIds);
       setPage(1);
     }
-  }, [active, initialMine]);
+  }, [active, initialMine, initialStatus, initialTradeDateFrom, initialTradeDateTo, myOperatorId]);
+
+  useEffect(() => {
+    if (!active || !initialMine) {
+      setMyOperatorId(undefined);
+      setMyOperator(undefined);
+      return;
+    }
+    let cancelled = false;
+    void employeesApi.list().then((employees) => {
+      if (cancelled) return;
+      const employee = employees.find((item) => item.is_active && item.username === username);
+      setMyOperatorId(employee?.id);
+      setMyOperator(employee ? { id: employee.id, display_name: employee.display_name } : undefined);
+    }).catch(() => {
+      if (!cancelled) {
+        setMyOperatorId(undefined);
+        setMyOperator(undefined);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [active, initialMine, username]);
 
   useEffect(() => {
     if (!active) return;
@@ -186,6 +232,8 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
     setLedgerSortDesc,
     ledgerExporting,
     setLedgerExporting,
+    mineOrders,
+    setMineOrders,
     exportLedger,
     exportLedgerXlsx,
     orderTypeFilter,
@@ -200,6 +248,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
     setInventoryOperatorIds,
     saleOperatorIds,
     setSaleOperatorIds,
+    myOperator,
     dateRange,
     setDateRange,
     keyword,

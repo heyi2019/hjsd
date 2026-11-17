@@ -22,6 +22,8 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
     columns,
     createOpen,
     customerStatusOptions,
+    creatorFilter,
+    creatorOptions,
     detailData,
     detailLoading,
     detailTarget,
@@ -48,6 +50,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
     summary,
     searchInput,
     setCreateOpen,
+    setCreatorFilter,
     setKeyword,
     setPage,
     setPageSize,
@@ -124,6 +127,20 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
           options={customerStatusOptions ?? []}
           onChange={(value) => {
             setStatusFilter(value);
+            setPage(1);
+          }}
+        />
+        <Select
+          mode="multiple"
+          aria-label="客户创建操作人筛选"
+          allowClear
+          placeholder="创建操作人"
+          value={creatorFilter}
+          disabled={Boolean(error) || rows === null || creatorOptions === null}
+          options={creatorOptions ?? []}
+          maxTagCount={2}
+          onChange={(value) => {
+            setCreatorFilter(value as string[]);
             setPage(1);
           }}
         />

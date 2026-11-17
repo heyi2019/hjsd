@@ -8,6 +8,7 @@ import { buildDashboardAlertMessages } from "./dashboardSummary";
 export function useDashboardSummary(active = true) {
   const [orderSummary, setOrderSummary] = useState<{ total_count: number; completed_count: number } | null>(null);
   const [personalOrders, setPersonalOrders] = useState(0);
+  const [personalCustomers, setPersonalCustomers] = useState(0);
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [personalOrdersError, setPersonalOrdersError] = useState<{ message: string; code?: string } | null>(null);
@@ -21,6 +22,7 @@ export function useDashboardSummary(active = true) {
   const [pendingProfitCount, setPendingProfitCount] = useState<number | null>(null);
   const [allocatedProfitCount, setAllocatedProfitCount] = useState<number | null>(null);
   const [businessReminderConfig, setBusinessReminderConfig] = useState<BusinessReminderConfig>(DEFAULT_BUSINESS_REMINDER_CONFIG);
+  const [period, setPeriod] = useState<{ from: string; to: string } | null>(null);
   const mountedRef = useRef(true);
 
   const loadSummary = async () => {
@@ -28,6 +30,7 @@ export function useDashboardSummary(active = true) {
     try {
       const summary = await dashboardApi.summary();
       if (!mountedRef.current) return;
+      setPeriod(summary.period);
       setOrderSummary(summary.orders ? {
         total_count: summary.orders.total_count,
         completed_count: summary.orders.completed_count,
@@ -35,6 +38,7 @@ export function useDashboardSummary(active = true) {
       setSummaryError(null);
       setPersonalOrders(summary.personal_orders ?? 0);
       setPersonalOrdersError(null);
+      setPersonalCustomers(summary.personal_customers ?? 0);
       setPersonalEarnings(summary.personal_earnings == null ? null : String(summary.personal_earnings));
       setEarningsError(null);
       setInventoryCount(summary.inventory?.account_count ?? null);
@@ -53,8 +57,10 @@ export function useDashboardSummary(active = true) {
       if (!mountedRef.current) return;
       const error = normalizeError(err);
       setOrderSummary(null);
+      setPeriod(null);
       setSummaryError(error);
       setPersonalOrdersError(error);
+      setPersonalCustomers(0);
       setPersonalEarnings(null);
       setEarningsError(null);
       setInventoryCount(null);
@@ -86,7 +92,9 @@ export function useDashboardSummary(active = true) {
 
   return {
     orderSummary,
+    period,
     personalOrders,
+    personalCustomers,
     summaryError,
     summaryLoading,
     personalOrdersError,

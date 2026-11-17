@@ -24,6 +24,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     inventoryType,
     inventoryTypeOptions,
     inventoryOperatorIds,
+    ageGtDays,
     inlineEditId,
     invEditExtraForm,
     keyword,
@@ -36,6 +37,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     setGameTypeFilter,
     setInventoryType,
     setInventoryOperatorIds,
+    setAgeGtDays,
     setPage,
     setPageSize,
     setSortDesc,
@@ -102,6 +104,13 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
           value={inventoryOperatorIds}
           options={employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.display_name }))}
           onChange={(values) => { setInventoryOperatorIds((values as number[]).map(Number)); setPage(1); }}
+        />
+        <Select
+          aria-label="库存库龄筛选"
+          className="ui-filter-select"
+          value={ageGtDays ?? "all"}
+          options={[{ value: "all", label: "全部库龄" }, { value: 7, label: "超过 7 天" }, { value: 30, label: "超过 30 天" }]}
+          onChange={(value) => { setAgeGtDays(value === "all" ? undefined : Number(value)); setPage(1); }}
         />
         <Segmented
           aria-label="库存类型筛选"

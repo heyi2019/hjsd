@@ -84,6 +84,7 @@ def inventory_ledger(
     keyword: str | None = None, date_from: date | None = None,
     date_to: date | None = None, sort_desc: bool = True,
     inventory_operator_ids: list[int] | None = None,
+    age_gt_days: int | None = None,
     limit: int = 10, offset: int = 0, user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """服务端筛选、排序、分页库存台账，并返回分页所需统计。"""
@@ -121,6 +122,8 @@ def inventory_ledger(
                 cast(Order.form_extra, JSONB).contains({"business_responsible_ids": [operator_id]})
                 for operator_id in inventory_operator_ids
             )))
+        if age_gt_days is not None:
+            query = query.where(entry_day < date.today() - timedelta(days=age_gt_days))
         if include_search_date:
             if keyword and keyword.strip():
                 pattern, escape = like_contains(keyword.strip())

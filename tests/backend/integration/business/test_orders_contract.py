@@ -32,6 +32,7 @@ from app.finance.rebates import create_rebate
 from app.parties.counterparties import create_counterparty
 from app.parties.customers import create_customer, set_customer_status
 from app.domain.foundation import AuditLog
+from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
 from app.domain.users import User
 from app.foundation.order_types import get_order_type_by_code, set_order_type_active
@@ -43,7 +44,7 @@ from app.orders.events import _opposite_direction, post_event
 from app.orders.links import create_order_link, delete_order_link, list_order_links
 from app.orders.mutations import update_order
 from app.finance.balances import pool_balance
-from app.orders.queries import list_orders
+from app.orders.queries import list_orders, order_customer_count
 from app.orders.router_output import _order_list_payload
 
 D = date(2026, 10, 4)
@@ -66,6 +67,7 @@ def test_workbench_summary_exposes_one_backend_aggregate(seeded_client, headers)
         "period",
         "orders",
         "personal_orders",
+        "personal_customers",
         "personal_earnings",
         "inventory",
         "installments",
@@ -1163,35 +1165,39 @@ class TestGetAndListOrders:
         assert {order.id for order in list_orders(seeded_db, sale_operator_ids=[users[0].id])} == {sale_hit.id}
         assert inventory_miss.id not in {order.id for order in list_orders(seeded_db, inventory_operator_ids=[users[0].id])}
 
-    def test_list_orders_mine_includes_created_owner_and_sold_orders(self, seeded_db):
-        created_by_me = create_order(
-            seeded_db, order_type="HS", trade_date=D, actor="operator", owner_id=1,
-        )
-        owned_by_me = _order(seeded_db, owner_id=9)
-        sold_by_me = _order(seeded_db, owner_id=1)
+    def test_list_orders_mine_uses_inventory_or_sale_operator(self, seeded_db):
+        users = list(seeded_db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id)).all())
+        inventory_by_me = _order(seeded_db, form_extra={"business_responsible_ids": [users[0].id]})
+        sold_by_me = _order(seeded_db)
         post_event(
             seeded_db, sold_by_me.id, event_type="BUY", amount="50.00",
             occurred_on=D, actor="pytest",
         )
         post_event(
             seeded_db, sold_by_me.id, event_type="SELL", amount="100.00",
-            occurred_on=D, actor="operator",
+            occurred_on=D, actor="operator", operator_user_ids=[users[0].id],
         )
-        foreign = _order(seeded_db, owner_id=1)
+        both_by_me = _order(seeded_db, form_extra={"business_responsible_ids": [users[0].id]})
+        post_event(
+            seeded_db, both_by_me.id, event_type="BUY", amount="50.00",
+            occurred_on=D, actor="pytest",
+        )
+        post_event(
+            seeded_db, both_by_me.id, event_type="SELL", amount="100.00",
+            occurred_on=D, actor="operator", operator_user_ids=[users[0].id],
+        )
+        foreign = _order(seeded_db, owner_id=users[0].id)
 
         operator = CurrentUser.build(
-            id=9, username="operator", roles=["ADMIN"], owner_scope="ALL"
+            id=users[0].id, username=users[0].username, roles=["ADMIN"], owner_scope="ALL"
         )
         personal = list_orders(seeded_db, user=operator, mine=True)
         personal_ids = {order.id for order in personal}
-        assert {created_by_me.id, owned_by_me.id, sold_by_me.id}.issubset(personal_ids)
+        assert {inventory_by_me.id, sold_by_me.id, both_by_me.id}.issubset(personal_ids)
         assert foreign.id not in personal_ids
 
-    def test_list_orders_mine_covers_every_event_operator_not_only_sell(self, seeded_db):
-        """每一笔事件都有负责人：非 SELL 事件的执行人、被指派操作人也算「我参与的」。
-
-        旧口径只认 SELL 执行人，买号 / 运营消耗的人在自己工作台看不到他做过的单。
-        """
+    def test_list_orders_mine_ignores_non_inventory_and_non_sale_operators(self, seeded_db):
+        """我的订单只认入库和售出两个操作人，不把其他事件参与人算进来。"""
         users = list(
             seeded_db.scalars(
                 select(User).where(User.is_active.is_(True)).order_by(User.id)
@@ -1214,6 +1220,7 @@ class TestGetAndListOrders:
             seeded_db, foreign.id, event_type="BUY", amount="70.00",
             occurred_on=D, actor="pytest",
         )
+        inventory_by_me = _order(seeded_db, owner_id=other.id, form_extra={"business_responsible_ids": [me.id]})
 
         operator = CurrentUser.build(
             id=me.id, username=me.username, roles=["OPERATOR"], owner_scope="ALL"
@@ -1221,9 +1228,23 @@ class TestGetAndListOrders:
         personal_ids = {
             order.id for order in list_orders(seeded_db, user=operator, mine=True)
         }
-        assert buy_by_me.id in personal_ids
-        assert assigned_as_operator.id in personal_ids
+        assert buy_by_me.id not in personal_ids
+        assert assigned_as_operator.id not in personal_ids
+        assert inventory_by_me.id in personal_ids
         assert foreign.id not in personal_ids
+
+    def test_order_customer_count_deduplicates_customers_for_mine_orders(self, seeded_db):
+        users = list(seeded_db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id)).all())
+        customer_a = create_customer(seeded_db, display_name="客户A", actor=users[0].username)
+        customer_b = create_customer(seeded_db, display_name="客户B", actor=users[0].username)
+        first = _order(seeded_db, form_extra={"business_responsible_ids": [users[0].id]})
+        second = _order(seeded_db, form_extra={"business_responsible_ids": [users[0].id]})
+        for order in (first, second):
+            seeded_db.add(OrderCustomerRole(order_id=order.id, customer_id=customer_a.id, role="BUYER"))
+        seeded_db.add(OrderCustomerRole(order_id=second.id, customer_id=customer_b.id, role="BUYER"))
+        seeded_db.flush()
+        operator = CurrentUser.build(id=users[0].id, username=users[0].username, roles=["ADMIN"], owner_scope="ALL")
+        assert order_customer_count(seeded_db, user=operator, mine=True) == 2
 
     def test_list_orders_supports_workbench_date_owner_keyword_filters(
         self, seeded_client, seeded_db, headers

@@ -117,6 +117,7 @@ def inventory_ledger(
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
     inventory_operator_ids: list[int] | None = Query(default=None),
+    age_gt_days: int | None = Query(default=None, gt=0),
     sort_desc: bool = Query(default=True),
     limit: int = Query(default=10, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
@@ -128,6 +129,7 @@ def inventory_ledger(
         db, business_mode=business_mode, inventory_type=inventory_type,
         game_type=game_type, keyword=keyword, date_from=date_from,
         date_to=date_to, inventory_operator_ids=inventory_operator_ids,
+        age_gt_days=age_gt_days,
         sort_desc=sort_desc, limit=limit, offset=offset, user=user,
     )
     pairs = result["items"]
@@ -152,6 +154,7 @@ def export_inventory_ledger_csv(
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
     inventory_operator_ids: list[int] | None = Query(default=None),
+    age_gt_days: int | None = Query(default=None, gt=0),
     sort_desc: bool = Query(default=True),
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
@@ -166,6 +169,7 @@ def export_inventory_ledger_csv(
         date_from=date_from,
         date_to=date_to,
         inventory_operator_ids=inventory_operator_ids,
+        age_gt_days=age_gt_days,
         sort_desc=sort_desc,
         limit=EXPORT_ROW_LIMIT,
         offset=0,

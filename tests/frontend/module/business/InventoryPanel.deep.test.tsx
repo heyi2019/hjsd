@@ -182,6 +182,15 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     ));
   });
 
+  it("库存超期深链按库龄筛选", async () => {
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([]) as never);
+    renderLight(<InventoryPanel initialAgeGtDays={30} />, { user: "admin" });
+
+    await waitFor(() => expect(vi.mocked(stocksApi.inventoryLedger)).toHaveBeenCalledWith(
+      expect.objectContaining({ age_gt_days: 30 }),
+    ));
+  });
+
   it("运营 → 描述：打开描述编辑弹窗", async () => {
     await openPanel([inStockRow]);
     await clickOperation(rowOf(1), "描述");

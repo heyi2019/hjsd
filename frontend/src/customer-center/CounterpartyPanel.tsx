@@ -3,6 +3,7 @@ import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { buildFormExtraDisplay, CfgItem, CustomFieldSection, FieldConfigScope, formatExtraDisplayValue } from "../orders/ConfigurableField";
 import { counterpartiesApi } from "../shared/api/customers.api";
+import { employeesApi } from "../shared/api/org.api";
 import { orderFormFieldsApi } from "../shared/api/orders.api";
 import type { Counterparty } from "../shared/api/types/customers";
 import type { OrderFormField } from "../shared/api/types/forms";
@@ -17,6 +18,8 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [creatorFilter, setCreatorFilter] = useState<string[]>([]);
+  const [creatorOptions, setCreatorOptions] = useState<{ label: string; value: string }[] | null>(null);
   const [rows, setRows] = useState<Counterparty[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -43,6 +46,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
     try {
       const response = await counterpartiesApi.page({
         ...(statusFilter ? { status: statusFilter } : {}),
+        ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
         limit: pageSize,
         offset: (page - 1) * pageSize,
       });
@@ -52,7 +56,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
     } catch (err) {
       setError(normalizeError(err));
     }
-  }, [page, pageSize, statusFilter]);
+  }, [creatorFilter, page, pageSize, statusFilter]);
 
   // 页面被 keep-alive 隐藏时不请求；重新激活或状态筛选变化都从后端刷新。
   useEffect(() => {
@@ -63,6 +67,15 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
     orderFormFieldsApi.list("COUNTERPARTY", true)
       .then((items) => setFieldDefs((items ?? []).filter((item) => item.is_custom)))
       .catch(() => setFieldDefs([]));
+  }, []);
+
+  useEffect(() => {
+    Promise.resolve(employeesApi.list())
+      .then((items) => setCreatorOptions((items ?? []).filter((item) => item.is_active).map((item) => ({
+        label: item.display_name || item.username,
+        value: item.username,
+      }))))
+      .catch(() => setCreatorOptions([]));
   }, []);
 
   const openDetail = async (row: Counterparty, loadedDetail?: Counterparty) => {
@@ -186,6 +199,7 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Space wrap className="counterparty-filter-bar">
         <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? []} disabled={counterpartyStatusOptions === null || rows === null} onChange={(value) => { setStatusFilter(value); setPage(1); }} />
+        <Select mode="multiple" allowClear placeholder="创建操作人" aria-label="合作方创建操作人筛选" value={creatorFilter} options={creatorOptions ?? []} maxTagCount={2} disabled={creatorOptions === null || rows === null} onChange={(value) => { setCreatorFilter(value as string[]); setPage(1); }} />
       </Space>
       <DataTable<Counterparty>
         columns={arrangeColumns(columns)}

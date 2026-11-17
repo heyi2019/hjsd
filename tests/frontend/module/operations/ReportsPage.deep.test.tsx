@@ -86,6 +86,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     expect(screen.queryByText("分润基数")).toBeNull();
     await ui.click(screen.getByRole("button", { name: /展开.*HS-2026-0010/ }));
     expect(await screen.findByText("分润基数")).toBeInTheDocument();
+    expect(document.querySelector(".commission-detail-container")).toBeInTheDocument();
     expect(screen.getByText("张三")).toBeInTheDocument();
     expect(screen.getByText("李四")).toBeInTheDocument();
     expect(screen.getAllByText("0.10")).toHaveLength(2); // 展开明细的费率列

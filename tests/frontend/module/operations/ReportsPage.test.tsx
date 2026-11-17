@@ -102,6 +102,26 @@ describe("ReportsPage：经营中心报表", () => {
     expect(vi.mocked(reportsApi.monthlyPnl)).not.toHaveBeenCalled();
   });
 
+  it("我的收益显示分润人员的真实姓名", async () => {
+    resolveMockOnce(vi.mocked(reportsApi.commission), commissionResponse([{
+      order_id: 1,
+      order_no: "HS-2026-0001",
+      profit_base: "100.00",
+      orders: [{
+        user_id: 7,
+        order_id: 1,
+        order_no: "HS-2026-0001",
+        profit_base: "100.00",
+        rate: "100.00",
+      }],
+    }], { order_count: 1, profit_base: "100.00" }));
+
+    renderLight(<ReportsPage initialReportTab="my-earnings" />, { user: "admin" });
+
+    expect(await screen.findByText("业务同事")).toBeInTheDocument();
+    expect(screen.queryByText("人员7")).not.toBeInTheDocument();
+  });
+
   it("我的收益导出带 mine=true，与列表同口径", async () => {
     vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage initialReportTab="my-earnings" />, { user: "admin" });

@@ -2,7 +2,7 @@
 
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useState } from "react";
 import { employeesApi } from "../../shared/api/org.api";
 import { reportsApi } from "../../shared/api/reports.api";
 import type { CommissionOrderGroup, CommissionReport, CommissionRow } from "../../shared/api/types/reporting";
@@ -11,6 +11,7 @@ import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, Select, StatRow } from "../../shared/ui";
 import { Note, type ReportRange, useReport } from "./shared";
 import { ReportExportButton } from "./ReportExportButton";
+import "./CommissionReport.css";
 
 export function Commission({ range, mine = false }: { range: ReportRange; mine?: boolean }) {
   const { params, picker } = range;
@@ -18,7 +19,6 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
   const [employeeError, setEmployeeError] = useState<{ message: string; code?: string } | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<number>(0);
   useEffect(() => {
-    if (mine) return;
     let mounted = true;
     employeesApi.list()
       .then((items) => {
@@ -81,6 +81,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
         ]}
       />
       <DataTable<CommissionOrderGroup>
+         className="commission-table"
          columns={arrangeCommission(columns)}
          rows={orderRows}
          loading={loading}
@@ -89,32 +90,22 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
          total={data?.total.order_count ?? 0}
          rowKey="order_id"
          expandable={{
+           expandRowByClick: true,
            expandedRowRender: (row) => (
-             <table className="commission-detail-table">
-               <thead><tr><th>分润人员</th><th>分润基数</th><th>费率</th></tr></thead>
-               <tbody>
-                 {row.orders.map((detail, index) => (
-                   <tr key={`${row.order_id}-${detail.user_id ?? "company"}-${index}`}>
-                     <td>{personName(detail)}</td>
-                     <td><MoneyText value={detail.profit_base} /></td>
-                     <td>{detail.rate}</td>
-                   </tr>
-                 ))}
-               </tbody>
-             </table>
-           ),
-           expandIcon: ({ expanded, onExpand, record }) => (
-             <span
-               role="button"
-               tabIndex={0}
-               aria-label={`${expanded ? "收起" : "展开"}${record.order_no}分润明细`}
-               onClick={(event) => onExpand(record, event)}
-               onKeyDown={(event) => {
-                 if (event.key === "Enter" || event.key === " ") onExpand(record, event as unknown as MouseEvent<HTMLElement>);
-               }}
-             >
-               {expanded ? "收起" : "展开"}
-             </span>
+             <div className="commission-detail-container">
+               <table className="commission-detail-table">
+                 <thead><tr><th>分润人员</th><th>分润基数</th><th>费率</th></tr></thead>
+                 <tbody>
+                   {row.orders.map((detail, index) => (
+                     <tr key={`${row.order_id}-${detail.user_id ?? "company"}-${index}`}>
+                       <td>{personName(detail)}</td>
+                       <td><MoneyText value={detail.profit_base} /></td>
+                       <td>{detail.rate}</td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
            ),
          }}
          emptyText="所选区间无分润记录"

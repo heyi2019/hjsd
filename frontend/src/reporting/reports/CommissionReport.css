@@ -1,0 +1,65 @@
+.commission-table .ant-table-tbody > tr.ant-table-expanded-row > td {
+  padding: var(--space-3) var(--space-4) !important;
+  background: transparent !important;
+  border-bottom: 0;
+}
+
+.commission-detail-container {
+  width: min(100%, 1000px);
+  max-width: min(calc(100% - var(--space-6) * 2), 1000px);
+  box-sizing: border-box;
+  margin: var(--space-2) 0;
+  padding: var(--space-4);
+  border: var(--border-w) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  overflow-x: auto;
+}
+
+.commission-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.commission-detail-table th,
+.commission-detail-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-w) solid var(--color-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.commission-detail-table th {
+  background: var(--soft);
+  color: var(--color-text-primary);
+  font: var(--font-table-header);
+}
+
+.commission-detail-table td {
+  color: var(--color-text-primary);
+  font: var(--font-body-s);
+}
+
+.commission-detail-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.commission-detail-table th:nth-child(2),
+.commission-detail-table td:nth-child(2),
+.commission-detail-table th:nth-child(3),
+.commission-detail-table td:nth-child(3) {
+  text-align: right;
+}
+
+@media (max-width: 767px) {
+  .commission-table .ant-table-tbody > tr.ant-table-expanded-row > td {
+    padding: var(--space-2) var(--space-3) !important;
+  }
+
+  .commission-detail-container {
+    max-width: calc(100% - var(--space-3) * 2);
+    padding: var(--space-3);
+  }
+}

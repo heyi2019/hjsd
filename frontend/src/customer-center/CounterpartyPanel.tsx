@@ -9,6 +9,8 @@ import type { Counterparty } from "../shared/api/types/customers";
 import type { OrderFormField } from "../shared/api/types/forms";
 import { normalizeError } from "../shared/api/client";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
+import { money } from "../shared/lib/format";
+import { orderTypeLabel } from "../shared/lib/labels";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
@@ -150,7 +152,21 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
 
   const { arrange: arrangeColumns } = useListViewColumns("COUNTERPARTY");
   const columns: ColumnsType<Counterparty> = [
-    { title: "编号", dataIndex: "counterparty_no" },
+    {
+      title: "编号",
+      dataIndex: "counterparty_no",
+      render: (value: string, row) => (
+        <Typography.Link
+          href="#"
+          onClick={(event) => {
+            event.preventDefault();
+            void openDetail(row);
+          }}
+        >
+          {value}
+        </Typography.Link>
+      ),
+    },
     { title: "名称", dataIndex: "display_name" },
     { title: "类型", dataIndex: "type", render: (v: string) => configurableLabel("COUNTERPARTY_TYPE", v) },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="COUNTERPARTY_STATUS" /> },
@@ -333,6 +349,12 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
           <div role="status" aria-label="正在加载合作方详情"><Spin /></div>
         ) : detailData ? (
           <>
+          {detailData.overview ? (
+            <div className="ui-stat-grid">
+              <Card size="small"><Typography.Text type="secondary">订单数</Typography.Text><Typography.Title level={4}>{detailData.overview.order_count}</Typography.Title></Card>
+              <Card size="small"><Typography.Text type="secondary">累计利润</Typography.Text><Typography.Title level={4}>{money(detailData.overview.cumulative_profit)}</Typography.Title></Card>
+            </div>
+          ) : null}
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="合作方编号">{detailData.counterparty_no}</Descriptions.Item>
             <Descriptions.Item label="名称">{detailData.display_name}</Descriptions.Item>
@@ -345,6 +367,24 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
             <Descriptions.Item label="创建操作人">{detailData.created_by || "-"}</Descriptions.Item>
             <Descriptions.Item label="备注">{detailData.note || "-"}</Descriptions.Item>
           </Descriptions>
+          <Typography.Title level={5} className="ui-title-spaced">成单明细</Typography.Title>
+          <DataTable
+            columns={[
+              { title: "订单", dataIndex: "order_no" },
+              { title: "业务", render: (_value, row) => orderTypeLabel(row.order_type) },
+              { title: "角色", render: (_value, row) => row.roles.map((role) => configurableLabel("COUNTERPARTY_TYPE", role)).join("、") || "-" },
+              { title: "状态", render: (_value, row) => <StatusTag status={row.status} optionSet="ORDER_STATUS" /> },
+              { title: "日期", dataIndex: "trade_date" },
+              { title: "利润", render: (_value, row) => money(row.profit) },
+            ]}
+            rows={detailData.orders ?? []}
+            page={1}
+            pageSize={detailData.orders?.length || 1}
+            total={detailData.orders?.length ?? 0}
+            onPageChange={() => undefined}
+            pagination={false}
+            emptyText="暂无成单明细"
+          />
           <Typography.Title level={5} className="ui-title-spaced">扩展字段</Typography.Title>
           {(() => {
             const items = buildFormExtraDisplay(detailData.extra_values, fieldDefs);

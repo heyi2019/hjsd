@@ -148,6 +148,31 @@ describe("CustomersPage：客户档案", () => {
     expect(screen.getAllByText("已拉黑").length).toBeGreaterThanOrEqual(1); // DISABLED
   });
 
+  it("客户编号和合作方编号点击后打开详情", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse(counterparties));
+    vi.mocked(counterpartiesApi.get).mockResolvedValue({
+      ...counterparties[0],
+      overview: { order_count: 2, active_order_count: 1, completed_order_count: 1, cumulative_profit: "350.00" },
+      orders: [{ order_id: 10, order_no: "TH-2026-0010", order_type: "TH", status: "COMPLETED", trade_date: "2026-10-18", roles: ["PEER"], profit: "350.00" }],
+    });
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+
+    await user.click(screen.getByRole("link", { name: "CUS-0001" }));
+    expect(await screen.findByText("客户档案 · CUS-0001")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("tab", { name: /合作方/ }));
+    const panel = await screen.findByRole("tabpanel");
+    await user.click(within(panel).getByRole("link", { name: "CP-0001" }));
+    expect(await screen.findByText("合作方档案 · CP-0001")).toBeInTheDocument();
+    expect(screen.getByText("订单数")).toBeInTheDocument();
+    expect(screen.getByText("累计利润")).toBeInTheDocument();
+    expect(screen.getByText("成单明细")).toBeInTheDocument();
+    expect(screen.getByText("TH-2026-0010")).toBeInTheDocument();
+  });
+
   it("客户搜索按钮不嵌套 button，保持合法且可访问的 DOM 结构", async () => {
     renderLight(<CustomersPage />);
     await screen.findByText("CUS-0001");

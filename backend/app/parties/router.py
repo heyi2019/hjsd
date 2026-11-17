@@ -41,6 +41,7 @@ from app.parties.customer_detail import (
     get_customer_activity_summary,
     get_customer_detail as parties_get_customer_detail,
 )
+from app.parties.counterparty_detail import get_counterparty_detail as parties_get_counterparty_detail
 from app.parties.customer_merge import (
     duplicate_candidates,
     merge_customers as parties_merge_customers,
@@ -504,7 +505,12 @@ def get_counterparty(
     user: CurrentUser = read_counterparties,
 ) -> schemas.CounterpartyOut:
     item = parties_get_counterparty(db, counterparty_id)
-    return _counterparty_output(db, item)
+    detail = parties_get_counterparty_detail(db, counterparty_id)
+    return schemas.CounterpartyOut.model_validate({
+        **_counterparty_output(db, item).model_dump(),
+        "overview": detail["overview"],
+        "orders": detail["orders"],
+    })
 
 
 @router.post("/counterparties", response_model=schemas.CounterpartyOut, status_code=201)

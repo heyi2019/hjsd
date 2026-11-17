@@ -351,6 +351,39 @@ class TestListAndGetCustomers:
 
         assert detail["overview"]["cumulative_profit"] == 250
 
+    def test_counterparty_detail_includes_order_summary_profit_and_order_rows(self, seeded_client, seeded_db):
+        counterparty = seeded_client.post(
+            COUNTERPARTIES,
+            json={"display_name": "成单同行", "type": "PEER"},
+            headers={"X-Dev-User": "admin"},
+        ).json()
+        order = create_order(
+            seeded_db,
+            order_type="TH",
+            trade_date=date(2026, 10, 18),
+            counterparty_roles=[(counterparty["id"], "PEER")],
+            actor="pytest",
+        )
+        post_event(
+            seeded_db, order.id, event_type="BUY", amount=100, occurred_on=date(2026, 10, 18), actor="pytest", pool_id=1
+        )
+        post_event(
+            seeded_db, order.id, event_type="SELL", amount=450, occurred_on=date(2026, 10, 18), actor="pytest", pool_id=1
+        )
+
+        response = seeded_client.get(
+            f"{COUNTERPARTIES}/{counterparty['id']}", headers={"X-Dev-User": "employee"}
+        )
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["overview"]["order_count"] == 1
+        assert body["overview"]["completed_order_count"] == 1
+        assert body["overview"]["cumulative_profit"] == "350.00"
+        assert body["orders"][0]["order_no"] == order.order_no
+        assert body["orders"][0]["roles"] == ["PEER"]
+        assert body["orders"][0]["profit"] == "350.00"
+
     def test_customer_detail_applies_order_owner_scope(self, seeded_db):
         customer = _customer(seeded_db, "范围客户", owner_id=9)
         mine = create_order(

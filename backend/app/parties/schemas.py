@@ -254,6 +254,23 @@ class CounterpartyUpdate(RequestModel):
     extra_values: dict[str, Any] | None = None
 
 
+class CounterpartyOverviewOut(BaseModel):
+    order_count: int
+    active_order_count: int
+    completed_order_count: int
+    cumulative_profit: Decimal
+
+
+class CounterpartyOrderOut(BaseModel):
+    order_id: int
+    order_no: str
+    order_type: str
+    status: str
+    trade_date: date
+    roles: list[str]
+    profit: Decimal
+
+
 class CounterpartyOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -271,6 +288,8 @@ class CounterpartyOut(BaseModel):
     created_at: datetime
     created_by: str | None = None
     extra_values: dict[str, Any] = Field(default_factory=dict)
+    overview: CounterpartyOverviewOut | None = None
+    orders: list[CounterpartyOrderOut] = Field(default_factory=list)
 
 
 class ExtraValueIn(RequestModel):
@@ -280,7 +299,9 @@ class ExtraValueIn(RequestModel):
 
 __all__ = [
     "CounterpartyCreate",
+    "CounterpartyOrderOut",
     "CounterpartyOut",
+    "CounterpartyOverviewOut",
     "CounterpartyUpdate",
     "CustomerCreate",
     "CustomerAuditOut",

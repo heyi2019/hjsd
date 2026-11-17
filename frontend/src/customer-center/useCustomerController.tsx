@@ -1,4 +1,4 @@
-import { Form, Space } from "antd";
+import { Form, Space, Typography } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { buildFormExtraDisplay, formatExtraDisplayValue } from "../orders/ConfigurableField";
@@ -231,7 +231,21 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
 
   const { arrange: arrangeColumns } = useListViewColumns("CUSTOMER");
   const columns: ColumnsType<Customer> = [
-    { title: "客户编号", dataIndex: "customer_no" },
+    {
+      title: "客户编号",
+      dataIndex: "customer_no",
+      render: (value: string, row) => (
+        <Typography.Link
+          href="#"
+          onClick={(event) => {
+            event.preventDefault();
+            void openDetail(row);
+          }}
+        >
+          {value}
+        </Typography.Link>
+      ),
+    },
     { title: "名字", dataIndex: "display_name" },
     { title: "手机", key: "phone", render: (_v, row) => renderContact(row, "phone") },
     { title: "微信", key: "wechat", render: (_v, row) => renderContact(row, "wechat") },

@@ -108,6 +108,25 @@ export interface Counterparty {
   created_by?: string | null;
   extra_values?: Record<string, unknown>;
   extra_fields?: Array<{ key: string; label: string; section: string; value: unknown }>;
+  overview?: CounterpartyOverview | null;
+  orders?: CounterpartyOrder[];
+}
+
+export interface CounterpartyOverview {
+  order_count: number;
+  active_order_count: number;
+  completed_order_count: number;
+  cumulative_profit: string;
+}
+
+export interface CounterpartyOrder {
+  order_id: number;
+  order_no: string;
+  order_type: string;
+  status: string;
+  trade_date: string;
+  roles: string[];
+  profit: string;
 }
 
 export interface Lead {

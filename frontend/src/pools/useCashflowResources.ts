@@ -5,7 +5,13 @@ import type { Cashflow } from "../shared/api/types/finance";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { today } from "../shared/lib/format";
-import { useOptionSet } from "../shared/lib/optionSets";
+import { ACCOUNTING_ATTRIBUTE_LABEL } from "../shared/lib/labels";
+
+/** 收支方向固定两项（Direction 枚举），不依赖词典。 */
+const FLOW_DIRECTION_OPTIONS = [
+  { value: "IN", label: "收入" },
+  { value: "OUT", label: "支出" },
+];
 
 /** 资金流水查询域：筛选、服务端汇总、导出和列表状态集中在这里。 */
 export function useCashflowResources(active = true) {
@@ -150,8 +156,13 @@ export function useCashflowResources(active = true) {
     setCashflowAttribute,
     cashflowCategory,
     setCashflowCategory,
-    flowDirectionOptions: useOptionSet("FUND_FLOW_DIRECTION"),
-    flowAttributeOptions: useOptionSet("FUND_FLOW_ACCOUNTING_ATTRIBUTE"),
+    // 筛选选项用代码事实源（与后端枚举/新建流水表单同源），不用孤儿词典：
+    // FUND_FLOW_ACCOUNTING_ATTRIBUTE 词典后端无种子代码，数据漂移（缺 DG_DIRECT_COST、
+    // TH label 误导性合并），改走 ACCOUNTING_ATTRIBUTE_LABEL（14 项与枚举一一对应）。
+    flowDirectionOptions: FLOW_DIRECTION_OPTIONS,
+    flowAttributeOptions: Object.entries(ACCOUNTING_ATTRIBUTE_LABEL).map(
+      ([value, label]) => ({ value, label }),
+    ),
     fetchCashflows,
     exportCashflows,
     cashflowExporting,

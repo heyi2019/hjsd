@@ -18,7 +18,8 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import AccountStatus, AuditAction
 from app.domain.foundation import AuditLog, Pool
 from app.domain.trade import Account
-from app.stocks.inventory import inventory, list_accounts, total_inventory_cost
+from app.domain.users import User
+from app.stocks.inventory import inventory, inventory_ledger, list_accounts, total_inventory_cost
 from app.stocks.profile import create_account, get_account, update_account_profile
 from app.finance.cashflows import create_cashflow
 from app.finance.rebates import create_rebate
@@ -62,6 +63,17 @@ class TestCreateAccountGuards:
 
         assert account.inventory_entry_at is not None
         assert account.inventory_entry_at.microsecond == 0
+
+    def test_inventory_ledger_filters_by_inventory_operator(self, seeded_db):
+        users = list(seeded_db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id)).all())
+        hit = _account(seeded_db, "inventory-operator-hit")
+        miss = _account(seeded_db, "inventory-operator-miss")
+        hit_order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=hit.id, form_extra={"business_responsible_ids": [users[0].id]})
+        create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=miss.id, form_extra={"business_responsible_ids": [users[1].id]})
+
+        result = inventory_ledger(seeded_db, inventory_operator_ids=[users[0].id])
+
+        assert [order.id for _account_row, order in result["items"]] == [hit_order.id]
 
     def test_pickup_inventory_type_can_be_created_for_th(self, seeded_db):
         account = create_account(

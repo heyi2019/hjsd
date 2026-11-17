@@ -1148,6 +1148,21 @@ class TestGetAndListOrders:
         # 无 user 不过滤：两张单都可见
         assert len(list_orders(seeded_db)) == 2
 
+    def test_list_orders_filters_by_inventory_and_sale_operators(self, seeded_db):
+        users = list(seeded_db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id)).all())
+        inventory_hit = _order(seeded_db, form_extra={"business_responsible_ids": [users[0].id]})
+        inventory_miss = _order(seeded_db, form_extra={"business_responsible_ids": [users[1].id]})
+        sale_hit = _order(seeded_db)
+        sale_miss = _order(seeded_db)
+        post_event(seeded_db, sale_hit.id, event_type="BUY", amount="80.00", occurred_on=D, actor="pytest")
+        post_event(seeded_db, sale_hit.id, event_type="SELL", amount="100.00", occurred_on=D, actor="pytest", operator_user_ids=[users[0].id])
+        post_event(seeded_db, sale_miss.id, event_type="BUY", amount="80.00", occurred_on=D, actor="pytest")
+        post_event(seeded_db, sale_miss.id, event_type="SELL", amount="100.00", occurred_on=D, actor="pytest", operator_user_ids=[users[1].id])
+
+        assert {order.id for order in list_orders(seeded_db, inventory_operator_ids=[users[0].id])} == {inventory_hit.id}
+        assert {order.id for order in list_orders(seeded_db, sale_operator_ids=[users[0].id])} == {sale_hit.id}
+        assert inventory_miss.id not in {order.id for order in list_orders(seeded_db, inventory_operator_ids=[users[0].id])}
+
     def test_list_orders_mine_includes_created_owner_and_sold_orders(self, seeded_db):
         created_by_me = create_order(
             seeded_db, order_type="HS", trade_date=D, actor="operator", owner_id=1,

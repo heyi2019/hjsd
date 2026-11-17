@@ -14,6 +14,8 @@ export interface OrderListParams {
   game_type?: string;
   account_status?: string;
   keyword?: string;
+  inventory_operator_ids?: number[];
+  sale_operator_ids?: number[];
   sort_desc?: boolean;
   mine?: boolean;
   limit?: number;
@@ -66,14 +68,16 @@ export const ordersApi = {
     game_type?: string;
     account_status?: string;
     keyword?: string;
+    inventory_operator_ids?: number[];
+    sale_operator_ids?: number[];
   }) => api.get<{
     total_count: number;
     status_counts: Record<string, number>;
     type_counts: Record<string, number>;
     game_types: string[];
-  }>("/orders/ledger-summary", { params }).then((r) => r.data),
+  }>("/orders/ledger-summary", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
   listPage: (params?: OrderListParams) =>
-    api.get<PageResponse<Order>>("/orders", { params }).then((r) => r.data),
+    api.get<PageResponse<Order>>("/orders", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
   /** 导出必须与当前视图同口径：「我的订单」视图传 mine=true，由后端按 operator_user_ids 过滤。 */
   exportCsv: (params?: { mine?: boolean }) =>
     api

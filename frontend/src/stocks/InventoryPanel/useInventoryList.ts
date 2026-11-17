@@ -26,6 +26,7 @@ export function useInventoryList({ active = true, refreshKey = 0 }: { active?: b
   const [businessMode, setBusinessMode] = useState<string | undefined>();
   const [inventoryType, setInventoryType] = useState<string | undefined>();
   const [gameTypeFilter, setGameTypeFilter] = useState<string | undefined>();
+  const [inventoryOperatorIds, setInventoryOperatorIds] = useState<number[]>([]);
   const [keyword, setKeyword] = useState("");
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
@@ -43,11 +44,12 @@ export function useInventoryList({ active = true, refreshKey = 0 }: { active?: b
     business_mode: businessMode,
     inventory_type: inventoryType,
     game_type: gameTypeFilter,
+    ...(inventoryOperatorIds.length ? { inventory_operator_ids: inventoryOperatorIds } : {}),
     keyword: keyword.trim() || undefined,
     date_from: dateRange?.[0].format("YYYY-MM-DD"),
     date_to: dateRange?.[1].format("YYYY-MM-DD"),
     sort_desc: sortDesc,
-  }), [businessMode, inventoryType, gameTypeFilter, keyword, dateRange, sortDesc]);
+  }), [businessMode, inventoryType, gameTypeFilter, inventoryOperatorIds, keyword, dateRange, sortDesc]);
 
   const load = useCallback(async () => {
     try {
@@ -96,6 +98,7 @@ export function useInventoryList({ active = true, refreshKey = 0 }: { active?: b
   return {
     rows, setRows, inventoryStats, businessMode, setBusinessMode,
     inventoryType, setInventoryType, gameTypeFilter, setGameTypeFilter,
+    inventoryOperatorIds, setInventoryOperatorIds,
     keyword, setKeyword, dateRange, setDateRange, sortDesc, setSortDesc,
     page, setPage, pageSize, setPageSize, error, setError,
     businessOptions, inventoryTypeOptions, gameTypeOptions, load,

@@ -170,6 +170,18 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     expect(within(card as HTMLElement).getByText("1")).toBeInTheDocument();
   });
 
+  it("库存中心提供入库负责人多选筛选", async () => {
+    await openPanel([inStockRow]);
+
+    const filter = screen.getByRole("combobox", { name: "入库负责人筛选" });
+    await ui.click(filter);
+    await ui.click(screen.getByText("管理员", { selector: ".ant-select-item-option-content" }));
+
+    await waitFor(() => expect(vi.mocked(stocksApi.inventoryLedger)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ inventory_operator_ids: [1] }),
+    ));
+  });
+
   it("运营 → 描述：打开描述编辑弹窗", async () => {
     await openPanel([inStockRow]);
     await clickOperation(rowOf(1), "描述");

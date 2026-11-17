@@ -366,6 +366,26 @@ describe("OrdersPage：四类订单台账", () => {
     expect(within(ledger).getAllByText("TH-2026-0003").length).toBeGreaterThan(0);
   });
 
+  it("订单台账提供入库负责人和售出操作人多选筛选", async () => {
+    await openLedger();
+
+    const inventoryOperatorFilter = screen.getByRole("combobox", { name: "入库负责人筛选" });
+    await ui.click(inventoryOperatorFilter);
+    await ui.click(screen.getByText("管理员", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(vi.mocked(ordersApi.listPage)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ inventory_operator_ids: [1] }),
+    ));
+
+    const saleOperatorFilter = screen.getByRole("combobox", { name: "售出操作人筛选" });
+    await ui.click(saleOperatorFilter);
+    const saleOperatorOption = screen.getAllByText("管理员", { selector: ".ant-select-item-option-content" }).at(-1);
+    expect(saleOperatorOption).toBeDefined();
+    await ui.click(saleOperatorOption!);
+    await waitFor(() => expect(vi.mocked(ordersApi.listPage)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ inventory_operator_ids: [1], sale_operator_ids: [1] }),
+    ));
+  });
+
   it("行展开直接复用库存中心的订单详情", async () => {
     setupLedgerApi([
       { ...orders[0], account_id: 1 },

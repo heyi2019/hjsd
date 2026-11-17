@@ -63,6 +63,8 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
   const [businessModeFilter, setBusinessModeFilter] = useState<BusinessModeFilterKey>("all");
   const [gameTypeFilter, setGameTypeFilter] = useState("all");
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState("all");
+  const [inventoryOperatorIds, setInventoryOperatorIds] = useState<number[]>([]);
+  const [saleOperatorIds, setSaleOperatorIds] = useState<number[]>([]);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   // 业务类型、业务模式、责任方和关联关系均来自后端选项词典。
   const orderBusinessOptions: Opt[] = filterRetiredOrderTypeOptions(useOptionSet("ORDER_BUSINESS") ?? []);
@@ -83,12 +85,14 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
     ...(businessModeFilter !== "all" ? { business_mode: businessModeFilter } : {}),
     ...(gameTypeFilter !== "all" ? { game_type: gameTypeFilter } : {}),
     ...(inventoryStatusFilter !== "all" ? { account_status: inventoryStatusFilter } : {}),
+    ...(inventoryOperatorIds.length ? { inventory_operator_ids: inventoryOperatorIds } : {}),
+    ...(saleOperatorIds.length ? { sale_operator_ids: saleOperatorIds } : {}),
     ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
     ...(dateRange ? {
       trade_date_from: dateRange[0].format("YYYY-MM-DD"),
       trade_date_to: dateRange[1].format("YYYY-MM-DD"),
     } : {}),
-  }), [mineOrders, orderTypeFilter, businessModeFilter, gameTypeFilter, inventoryStatusFilter, keyword, dateRange]);
+  }), [mineOrders, orderTypeFilter, businessModeFilter, gameTypeFilter, inventoryStatusFilter, inventoryOperatorIds, saleOperatorIds, keyword, dateRange]);
 
   const load = useCallback(async () => {
     const requestId = ++requestSequence.current;
@@ -192,6 +196,10 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean })
     setGameTypeFilter,
     inventoryStatusFilter,
     setInventoryStatusFilter,
+    inventoryOperatorIds,
+    setInventoryOperatorIds,
+    saleOperatorIds,
+    setSaleOperatorIds,
     dateRange,
     setDateRange,
     keyword,

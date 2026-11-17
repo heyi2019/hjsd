@@ -32,6 +32,8 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     handleLedgerExpand,
     inventoryStatusFilter,
     inventoryStatusOptions,
+    inventoryOperatorIds,
+    saleOperatorIds,
     keyword,
     ledgerColumns,
     ledgerOrderDetailLoading,
@@ -51,6 +53,8 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     setDateRange,
     setGameTypeFilter,
     setInventoryStatusFilter,
+    setInventoryOperatorIds,
+    setSaleOperatorIds,
     setKeyword,
     setLedgerSortDesc,
     setOrderTypeFilter,
@@ -109,6 +113,28 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
           />
           <Select aria-label="游戏类型筛选" className="ui-filter-select" value={gameTypeFilter} options={gameTypeOptions} onChange={(value) => { setGameTypeFilter(value); setPage(1); }} />
           <Select aria-label="库存状态筛选" className="ui-filter-select" value={inventoryStatusFilter} options={inventoryStatusOptions} onChange={(value) => { setInventoryStatusFilter(value); setPage(1); }} />
+          <Select
+            mode="multiple"
+            allowClear
+            maxTagCount="responsive"
+            aria-label="入库负责人筛选"
+            className="ui-filter-select"
+            placeholder="入库负责人"
+            value={inventoryOperatorIds}
+            options={employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.display_name }))}
+            onChange={(values) => { setInventoryOperatorIds((values as number[]).map(Number)); setPage(1); }}
+          />
+          <Select
+            mode="multiple"
+            allowClear
+            maxTagCount="responsive"
+            aria-label="售出操作人筛选"
+            className="ui-filter-select"
+            placeholder="售出操作人"
+            value={saleOperatorIds}
+            options={employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.display_name }))}
+            onChange={(values) => { setSaleOperatorIds((values as number[]).map(Number)); setPage(1); }}
+          />
           <Segmented
             value={orderTypeFilter}
             options={[

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useSession } from "../../shared/state/session";
 import { type BusinessCenterEntryTab } from "../../orders/businessCenter";
 import { useOrderDetailEditor } from "../../orders/OrderDetailView/editing/use-order-detail-editor";
@@ -22,6 +23,8 @@ export function useInventoryController({ refreshKey = 0, active = true, onNaviga
   setBusinessMode,
   inventoryType,
   setInventoryType,
+  inventoryOperatorIds,
+  setInventoryOperatorIds,
   gameTypeFilter,
   setGameTypeFilter,
   keyword,
@@ -79,6 +82,9 @@ export function useInventoryController({ refreshKey = 0, active = true, onNaviga
       void load();
     },
   });
+  useEffect(() => {
+    if (active) void orderDetailEditor.ensureEmployees();
+  }, [active]);
   const {
     editingAccount,
     inlineEditId,
@@ -204,6 +210,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onNaviga
     inventoryStats,
     inventoryType,
     inventoryTypeOptions,
+    inventoryOperatorIds,
     keyword,
     load,
     loadExecution,
@@ -238,6 +245,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onNaviga
     setExecutionDetails,
     setGameTypeFilter,
     setInventoryType,
+    setInventoryOperatorIds,
     setKeyword,
     setPage,
     setPageSize,

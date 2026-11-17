@@ -31,6 +31,8 @@ def list_orders(
     owner_id: int | None = None,
     pool_id: int | None = None,
     keyword: str | None = None,
+    inventory_operator_ids: list[int] | None = None,
+    sale_operator_ids: list[int] | None = None,
     business_mode: str | None = None,
     game_type: str | None = None,
     account_status: str | None = None,
@@ -43,7 +45,8 @@ def list_orders(
     stmt = _order_list_stmt(
         order_type=order_type, status=status, trade_date_from=trade_date_from,
         trade_date_to=trade_date_to, owner_id=owner_id, pool_id=pool_id,
-        keyword=keyword, business_mode=business_mode, game_type=game_type,
+        keyword=keyword, inventory_operator_ids=inventory_operator_ids,
+        sale_operator_ids=sale_operator_ids, business_mode=business_mode, game_type=game_type,
         account_status=account_status, user=user, mine=mine, session=session,
     )
     ordering = (
@@ -62,14 +65,16 @@ def count_orders(
     session: Session, *, order_type: str | None = None, status: str | None = None,
     trade_date_from: date | None = None, trade_date_to: date | None = None,
     owner_id: int | None = None, pool_id: int | None = None,
-    keyword: str | None = None, business_mode: str | None = None,
+    keyword: str | None = None, inventory_operator_ids: list[int] | None = None,
+    sale_operator_ids: list[int] | None = None, business_mode: str | None = None,
     game_type: str | None = None, account_status: str | None = None,
     user: CurrentUser | None = None, mine: bool = False,
 ) -> int:
     stmt = _order_list_stmt(
         order_type=order_type, status=status, trade_date_from=trade_date_from,
         trade_date_to=trade_date_to, owner_id=owner_id, pool_id=pool_id,
-        keyword=keyword, business_mode=business_mode, game_type=game_type,
+        keyword=keyword, inventory_operator_ids=inventory_operator_ids,
+        sale_operator_ids=sale_operator_ids, business_mode=business_mode, game_type=game_type,
         account_status=account_status, user=user, mine=mine, session=session,
     )
     return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
@@ -111,6 +116,8 @@ def order_ledger_summary(
     game_type: str | None = None,
     account_status: str | None = None,
     keyword: str | None = None,
+    inventory_operator_ids: list[int] | None = None,
+    sale_operator_ids: list[int] | None = None,
     trade_date_from: date | None = None,
     trade_date_to: date | None = None,
     user: CurrentUser | None = None,
@@ -125,6 +132,8 @@ def order_ledger_summary(
         owner_id=None,
         pool_id=None,
         keyword=keyword,
+        inventory_operator_ids=inventory_operator_ids,
+        sale_operator_ids=sale_operator_ids,
         business_mode=business_mode,
         game_type=game_type,
         account_status=account_status,
@@ -174,6 +183,8 @@ def _order_list_stmt(
     *, order_type: str | None, status: str | None,
     trade_date_from: date | None, trade_date_to: date | None,
     owner_id: int | None, pool_id: int | None, keyword: str | None,
+    inventory_operator_ids: list[int] | None = None,
+    sale_operator_ids: list[int] | None = None,
     business_mode: str | None = None, game_type: str | None = None,
     account_status: str | None = None,
     user: CurrentUser | None, mine: bool, session: Session,
@@ -197,6 +208,23 @@ def _order_list_stmt(
         )
     if account_status:
         stmt = stmt.where(Account.status == account_status)
+    if inventory_operator_ids:
+        stmt = stmt.where(or_(*(
+            cast(Order.form_extra, JSONB).contains({"business_responsible_ids": [operator_id]})
+            for operator_id in inventory_operator_ids
+        )))
+    if sale_operator_ids:
+        stmt = stmt.where(exists(
+            select(OrderEvent.id).where(
+                OrderEvent.order_id == Order.id,
+                OrderEvent.event_type == "SELL",
+                OrderEvent.is_posted.is_(True),
+                or_(*(
+                    cast(OrderEvent.operator_user_ids, JSONB).contains([operator_id])
+                    for operator_id in sale_operator_ids
+                )),
+            )
+        ))
     if owner_id is not None:
         stmt = stmt.where(Order.owner_id == owner_id)
     if pool_id is not None:

@@ -38,6 +38,7 @@ export function useOrdersPageController(params: {
     exportLedger, exportLedgerXlsx,
     orderTypeFilter, setOrderTypeFilter, businessModeFilter, setBusinessModeFilter,
     gameTypeFilter, setGameTypeFilter, inventoryStatusFilter, setInventoryStatusFilter,
+    inventoryOperatorIds, setInventoryOperatorIds, saleOperatorIds, setSaleOperatorIds,
     dateRange, setDateRange, keyword, setKeyword,
     orderBusinessOptions, orderBusinessModeOptions, inventoryStatusOptions,
     gameTypeOptions, typeNames, filteredOrders, pageTotal, ledgerSummary, summaryLoading, summaryError, load,
@@ -55,7 +56,10 @@ export function useOrdersPageController(params: {
         : order));
     },
   });
-  const { loadLedgerDetail, openLedgerEditor } = inlineEdit;
+  const { loadLedgerDetail, openLedgerEditor, ensureEmployees } = inlineEdit;
+  useEffect(() => {
+    if (active && activeTab === "ledger") void ensureEmployees();
+  }, [active, activeTab]);
 
   // —— 冲销 / 取消域：分笔冲销、原路退款、分期合约取消 ——
   const cancellation = useOrderCancellation({ selectedOrder, setSelectedOrder, load });
@@ -129,6 +133,7 @@ export function useOrdersPageController(params: {
     installmentRefreshKey: installmentRefreshKey,
     inventoryRefreshKey: inventoryRefreshKey,
     inventoryStatusFilter: inventoryStatusFilter,
+    inventoryOperatorIds: inventoryOperatorIds,
     inventoryStatusOptions: inventoryStatusOptions,
     keyword: keyword,
     ledgerColumns: visibleLedgerColumns,
@@ -164,12 +169,15 @@ export function useOrdersPageController(params: {
     setInstallmentRefreshKey: setInstallmentRefreshKey,
     setInventoryRefreshKey: setInventoryRefreshKey,
     setInventoryStatusFilter: setInventoryStatusFilter,
+    setInventoryOperatorIds: setInventoryOperatorIds,
     setKeyword: setKeyword,
     setLedgerExporting: setLedgerExporting,
     setLedgerSortDesc: setLedgerSortDesc,
     setLoadError: setLoadError,
     setLoading: setLoading,
     setOrderTypeFilter: setOrderTypeFilter,
+    saleOperatorIds: saleOperatorIds,
+    setSaleOperatorIds: setSaleOperatorIds,
     setOrders: setOrders,
     setPage: setPage,
     setPageSize: setPageSize,

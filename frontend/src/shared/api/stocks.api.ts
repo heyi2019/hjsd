@@ -10,6 +10,7 @@ export const stocksApi = {
     keyword?: string;
     date_from?: string;
     date_to?: string;
+    inventory_operator_ids?: number[];
     sort_desc?: boolean;
     limit: number;
     offset: number;
@@ -20,7 +21,7 @@ export const stocksApi = {
     type_counts: Record<string, number>;
     game_types: string[];
     stats: InventoryStats;
-  }>("/stocks/inventory/ledger", { params }).then((r) => r.data),
+  }>("/stocks/inventory/ledger", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
   inventoryLedgerExport: async (params: {
     business_mode?: string;
     inventory_type?: string;
@@ -28,10 +29,12 @@ export const stocksApi = {
     keyword?: string;
     date_from?: string;
     date_to?: string;
+    inventory_operator_ids?: number[];
     sort_desc?: boolean;
   }): Promise<{ blob: Blob; failedDetailCount: number }> => {
     const response = await api.get<Blob>("/stocks/inventory/ledger/export.csv", {
       params: { ...params, _t: Date.now() },
+      paramsSerializer: { indexes: null },
       responseType: "blob",
     });
     return {

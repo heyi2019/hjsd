@@ -23,6 +23,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     handleExport,
     inventoryType,
     inventoryTypeOptions,
+    inventoryOperatorIds,
     inlineEditId,
     invEditExtraForm,
     keyword,
@@ -34,6 +35,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
     setBusinessMode,
     setGameTypeFilter,
     setInventoryType,
+    setInventoryOperatorIds,
     setPage,
     setPageSize,
     setSortDesc,
@@ -89,6 +91,17 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
           value={gameTypeFilter ?? "all"}
           options={[{ value: "all", label: "全部游戏类型" }, ...gameTypeOptions]}
           onChange={(value) => { setGameTypeFilter(value === "all" ? undefined : value); setPage(1); }}
+        />
+        <Select
+          mode="multiple"
+          allowClear
+          maxTagCount="responsive"
+          aria-label="入库负责人筛选"
+          className="ui-filter-select"
+          placeholder="入库负责人"
+          value={inventoryOperatorIds}
+          options={employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.display_name }))}
+          onChange={(values) => { setInventoryOperatorIds((values as number[]).map(Number)); setPage(1); }}
         />
         <Segmented
           aria-label="库存类型筛选"

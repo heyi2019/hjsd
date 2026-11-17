@@ -34,6 +34,7 @@ from app.finance.attributes import (
     STUDIO_EXPENSE_ATTRIBUTE,
     STUDIO_INCOME_ATTRIBUTE,
     accounting_attribute_for_manual_cashflow,
+    assert_order_cost_attribute,
     derive_manual_cashflow_nature,
 )
 from app.foundation.pools import assert_pool_usable
@@ -144,7 +145,9 @@ def create_cashflow(
         raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     pool = assert_pool_usable(session, pool_id)
     if order_id is not None:
-        get_order(session, order_id, user)
+        order = get_order(session, order_id, user)
+        # 成本科目白名单：回收成本只归 HS、提号成本只归 TH，DG 两者皆禁（其余科目不设限）。
+        assert_order_cost_attribute(order, accounting_attribute)
     try:
         normalized_ledger_type = CashflowLedgerType(ledger_type).value
     except ValueError as exc:

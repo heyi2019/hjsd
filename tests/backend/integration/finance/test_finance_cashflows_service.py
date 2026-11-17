@@ -304,6 +304,72 @@ def test_get_cashflow_checks_order_visible(seeded_db):
     assert fetched.id == flow.id
 
 
+# ----------------------------------------------------------- 订单成本科目白名单
+
+
+def _make_order(seeded_db, order_type):
+    from app.orders.create import create_order
+
+    kwargs: dict = {"order_type": order_type, "trade_date": TODAY, "actor": "pytest"}
+    if order_type == "DG":
+        kwargs["account_snapshot"] = {
+            "game_account": "cost-guard-dg-001", "game_type": "王者荣耀",
+        }
+    return create_order(seeded_db, **kwargs)
+
+
+def test_order_cashflow_rejects_cost_attribute_on_dg(seeded_db):
+    order = _make_order(seeded_db, "DG")
+    with pytest.raises(Validation, match="代挂订单无成本科目"):
+        _make_flow(
+            seeded_db, direction="OUT", nature="BUSINESS_OUT",
+            accounting_attribute="SELF_DIRECT_COST", order_id=order.id,
+        )
+
+
+def test_order_cashflow_rejects_mismatched_cost_attribute(seeded_db):
+    hs = _make_order(seeded_db, "HS")
+    with pytest.raises(Validation, match="成本科目与订单类型不匹配"):
+        _make_flow(
+            seeded_db, direction="OUT", nature="BUSINESS_OUT",
+            accounting_attribute="TH_DIRECT_COST", order_id=hs.id,
+        )
+    th = _make_order(seeded_db, "TH")
+    with pytest.raises(Validation, match="成本科目与订单类型不匹配"):
+        _make_flow(
+            seeded_db, direction="OUT", nature="BUSINESS_OUT",
+            accounting_attribute="SELF_DIRECT_COST", order_id=th.id,
+        )
+
+
+def test_order_cashflow_allows_matching_cost_attribute(seeded_db):
+    hs = _make_order(seeded_db, "HS")
+    hs_flow = _make_flow(
+        seeded_db, direction="OUT", nature="BUSINESS_OUT",
+        accounting_attribute="SELF_DIRECT_COST", order_id=hs.id,
+    )
+    assert hs_flow.accounting_attribute == "SELF_DIRECT_COST"
+    th = _make_order(seeded_db, "TH")
+    th_flow = _make_flow(
+        seeded_db, direction="OUT", nature="BUSINESS_OUT",
+        accounting_attribute="TH_DIRECT_COST", order_id=th.id,
+    )
+    assert th_flow.accounting_attribute == "TH_DIRECT_COST"
+
+
+def test_order_cashflow_allows_non_cost_attributes_on_dg(seeded_db):
+    """DG 与回收/提号同权：非成本科目一视同仁。"""
+    order = _make_order(seeded_db, "DG")
+    out_flow = _make_flow(
+        seeded_db, direction="OUT", nature="BUSINESS_OUT", order_id=order.id
+    )
+    assert out_flow.accounting_attribute == "OPERATING_EXPENSE"
+    in_flow = _make_flow(
+        seeded_db, direction="IN", nature="BUSINESS_IN", order_id=order.id
+    )
+    assert in_flow.accounting_attribute == "OPERATING_EXPENSE"
+
+
 # ----------------------------------------------------------- reverse
 
 

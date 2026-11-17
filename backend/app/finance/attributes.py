@@ -5,7 +5,42 @@ orders / vas 双方引用 domain 不再有反向依赖）；本文件只保留 f
 """
 from __future__ import annotations
 
+from typing import Any
+
+from app.core.errors import Validation
 from app.domain.enums import AccountingAttribute, Nature
+
+# ------------------------------------------------------------- 订单成本科目白名单
+# （2026-11-18 口径：成本科目必须匹配订单类型——回收成本只归回收、提号成本只归提号；
+# DG 与回收/提号同权但无专属成本科目，两种成本科目均禁用。）
+
+COST_ATTRIBUTES_BY_ORDER_TYPE: dict[str, str] = {
+    "HS": AccountingAttribute.SELF_DIRECT_COST.value,
+    "TH": AccountingAttribute.TH_DIRECT_COST.value,
+}
+
+_COST_ATTRIBUTE_LABELS: dict[str, str] = {
+    AccountingAttribute.SELF_DIRECT_COST.value: "回收成本",
+    AccountingAttribute.TH_DIRECT_COST.value: "提号成本",
+}
+
+
+def assert_order_cost_attribute(order: Any, accounting_attribute: str) -> None:
+    """挂单流水校验：成本科目必须与订单类型匹配（非成本科目不设限）。"""
+    if accounting_attribute not in _COST_ATTRIBUTE_LABELS:
+        return
+    order_type = getattr(order, "order_type", None)
+    if order_type not in COST_ATTRIBUTES_BY_ORDER_TYPE:
+        raise Validation(
+            "成本科目仅适用于回收/提号订单，代挂订单无成本科目",
+            details={"field": "accounting_attribute", "order_type": order_type},
+        )
+    if COST_ATTRIBUTES_BY_ORDER_TYPE[order_type] != accounting_attribute:
+        raise Validation(
+            f"成本科目与订单类型不匹配：{_COST_ATTRIBUTE_LABELS[accounting_attribute]}"
+            "不能挂在非对应类型订单上",
+            details={"field": "accounting_attribute", "order_type": order_type},
+        )
 
 # ------------------------------------------------------------- 工作室口径常量
 # （2026-11-18 P2 从 cashflows.py 归位：写路径与查询层共用，属会计口径知识）
@@ -51,9 +86,11 @@ def accounting_attribute_for_manual_cashflow(
 
 
 __all__ = [
+    "COST_ATTRIBUTES_BY_ORDER_TYPE",
     "MANUAL_EXCLUDED_CATEGORIES",
     "STUDIO_EXPENSE_ATTRIBUTE",
     "STUDIO_INCOME_ATTRIBUTE",
+    "assert_order_cost_attribute",
     "accounting_attribute_for_manual_cashflow",
     "derive_manual_cashflow_nature",
 ]

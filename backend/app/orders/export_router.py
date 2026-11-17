@@ -14,7 +14,13 @@ from app.core.security import (
 )
 from app.domain.enums import AuditAction
 from app.lists import service as list_columns_service
-from app.lists.export import EXPORT_ROW_LIMIT, UI_ONLY_KEYS, build_list_csv, inject_custom_columns
+from app.lists.export import (
+    EXPORT_ROW_LIMIT,
+    UI_ONLY_KEYS,
+    build_list_csv,
+    inject_custom_columns,
+    merge_static_value_labels,
+)
 from app.lists.file_response import CSV_MEDIA_TYPE, XLSX_MEDIA_TYPE, file_response
 from app.lists.xlsx import new_workbook, write_sheet, xlsx_bytes
 from app.orders.queries import list_orders as orders_list_orders
@@ -36,7 +42,23 @@ from app.orders.export_fields import (
     _order_event_export_rows,
     _pool_name_map,
     _rebate_export_rows,
+    user_name_map,
 )
+
+# 订单类型 → 库存业务类型：与前端 InventoryPanel.inventoryTypeOfOrder 的
+# 「无账号时按订单类型兜底」同口径（HS 回收 / TH 提号 / DG 代挂）。
+_INVENTORY_TYPE_BY_ORDER_TYPE = {"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}
+
+
+def _detail_value_labels(db: Session) -> dict[str, dict[str, str]]:
+    """明细 JSON 列额外的动态字典：按 JSON 字段键取 option_sets 选项词典翻译。
+
+    首批只接包赔类型（COMPENSATION_TYPE，管理员可编辑）；明细键翻译的静态部分
+    由 lists.export_labels 承担，动态字典优先于静态表。
+    """
+    labels = list_columns_service.option_labels_by_code(db, ("COMPENSATION_TYPE",))
+    compensation = labels.get("COMPENSATION_TYPE")
+    return {"compensation_type": compensation} if compensation else {}
 
 export_router = APIRouter(tags=["ORD-01/02 订单与事件"])
 read_orders = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
@@ -72,15 +94,23 @@ def export_orders_csv(
         user=_user,
     )
     rows = _order_list_payload(db, orders)
-    value_labels = list_columns_service.get_value_labels(db, "LEDGER")
+    value_labels = {
+        **list_columns_service.get_value_labels(db, "LEDGER"),
+        **_detail_value_labels(db),
+    }
+    names = user_name_map(db)
     for row, order in zip(rows, orders, strict=True):
         detail = _order_detail_output(db, order, _user).model_dump(mode="json")
-        row.update(_order_detail_export_fields(detail, value_labels))
-    # 注册表的 `party` 列是前端由 party_name/party_source 合成的派生列，导出前补齐
-    for row in rows:
+        row.update(_order_detail_export_fields(detail, value_labels, names))
+        # 注册表的 `party` 列是前端由 party_name/party_source 合成的派生列，导出前补齐
         row["party"] = " · ".join(
             part for part in (row.get("party_name"), row.get("party_source")) if part
         )
+        # 注册表的 `business_mode` / `inventory_type` 列，前端由账号字段/订单类型
+        # 渲染函数合成；行数据只有 account_business_mode，导出前补齐同名派生列，
+        # 中文文案由静态列字典统一翻译。
+        row["business_mode"] = row.get("account_business_mode")
+        row["inventory_type"] = _INVENTORY_TYPE_BY_ORDER_TYPE.get(order.order_type)
     csv_text, meta = build_list_csv(
         db,
         "LEDGER",
@@ -131,12 +161,21 @@ def export_orders_xlsx(
         user=_user,
     )
     rows = _order_list_payload(db, orders)
-    value_labels = list_columns_service.get_value_labels(db, "LEDGER")
+    value_labels = merge_static_value_labels(
+        {
+            **list_columns_service.get_value_labels(db, "LEDGER"),
+            **_detail_value_labels(db),
+        }
+    )
+    names = user_name_map(db)
     # 注册表的 `party` 列是前端由 party_name/party_source 合成的派生列，导出前补齐
-    for row in rows:
+    for row, order in zip(rows, orders, strict=True):
         row["party"] = " · ".join(
             part for part in (row.get("party_name"), row.get("party_source")) if part
         )
+        # `business_mode` / `inventory_type` 派生列：口径同 CSV 导出
+        row["business_mode"] = row.get("account_business_mode")
+        row["inventory_type"] = _INVENTORY_TYPE_BY_ORDER_TYPE.get(order.order_type)
     detail_rows: list[dict[str, object]] = []
     event_rows: list[dict[str, object]] = []
     cashflow_rows: list[dict[str, object]] = []
@@ -146,7 +185,7 @@ def export_orders_xlsx(
         detail = _order_detail_output(db, order, _user).model_dump(mode="json")
         order_no = row.get("order_no")
         detail_rows.append(
-            {"order_no": order_no, **_order_detail_export_fields(detail, value_labels)}
+            {"order_no": order_no, **_order_detail_export_fields(detail, value_labels, names)}
         )
         event_rows.extend(
             _order_event_export_rows(order_no, detail, row.get("account_platform"))

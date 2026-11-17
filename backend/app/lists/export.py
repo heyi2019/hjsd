@@ -18,14 +18,42 @@ from sqlalchemy.orm import Session
 
 from app.core.report_csv import report_csv
 from app.lists import service as list_columns_service
+from app.lists.export_labels import (
+    COLUMN_VALUE_LABELS,
+    DETAIL_KEY_LABELS,
+    DETAIL_PRUNED_KEYS,
+    NESTED_VALUE_LABELS,
+)
 
 UI_ONLY_KEYS = frozenset({"actions"})
 # 导出行数上限：主列表导出一次性拉全量，防误操作拖垮库；超过时按列表接口同口径截断。
 EXPORT_ROW_LIMIT = 10_000
 
 
+def merge_static_value_labels(
+    value_labels: dict[str, dict[str, str]] | None,
+) -> dict[str, dict[str, str]]:
+    """把闭集系统枚举的静态文案并入动态字典表。
+
+    动态（option_sets / 自定义列快照）优先：管理员改了字典，导出口径跟着变；
+    静态表只补没有字典行的列（业务模式 / 业务类型 / 库存状态 / 行标记等）。
+    """
+    merged: dict[str, dict[str, str]] = {
+        key: dict(mapping) for key, mapping in COLUMN_VALUE_LABELS.items()
+    }
+    for key, mapping in (value_labels or {}).items():
+        merged.setdefault(key, {}).update(mapping)
+    return merged
+
+
 def detail_json(value: Any, value_labels: dict[str, dict[str, str]] | None = None) -> str:
-    """把详情完整保留为同一 CSV 单元格，并复用列表导出的字典翻译。"""
+    """把详情完整保留为同一 CSV 单元格，并复用列表导出的字典翻译。
+
+    明细 JSON 中文化（2026-11-18）：
+    - 字典键按 `DETAIL_KEY_LABELS` 翻中文，`DETAIL_PRUNED_KEYS` 里的系统内部字段剔除；
+    - 字典值按「列字典 → 字段级 `NESTED_VALUE_LABELS` → 全局合并字典」的顺序翻译，
+      布尔值翻成 是/否；未知键与未知代码值一律保留原样。
+    """
     labels = value_labels or {}
     global_labels = {
         raw: translated
@@ -35,17 +63,32 @@ def detail_json(value: Any, value_labels: dict[str, dict[str, str]] | None = Non
 
     def translate(item: Any, key: str | None = None) -> Any:
         if isinstance(item, dict):
-            return {name: translate(child, name) for name, child in item.items()}
+            result: dict[str, Any] = {}
+            for name, child in item.items():
+                if name in DETAIL_PRUNED_KEYS or child is None:
+                    # 系统内部字段与空值（null）都不进导出，减少明细 JSON 噪音
+                    continue
+                result[DETAIL_KEY_LABELS.get(name, name)] = translate(child, name)
+            return result
         if isinstance(item, list):
             return [translate(child, key) for child in item]
-        mapping = labels.get(key or "")
-        if mapping and isinstance(item, str):
-            return mapping.get(item, item)
+        if isinstance(item, bool):
+            return "是" if item else "否"
         if isinstance(item, str):
+            mapping = labels.get(key or "")
+            if mapping and item in mapping:
+                return mapping[item]
+            nested = NESTED_VALUE_LABELS.get(key or "")
+            if nested and item in nested:
+                return nested[item]
             return global_labels.get(item, item)
         return item
 
-    return json.dumps(translate(value), ensure_ascii=False, separators=(",", ":"), default=str)
+    translated = translate(value)
+    # 顶层标量（如已翻成姓名的经办人列表）直接返回原文，不再包一层 JSON 引号
+    if isinstance(translated, str):
+        return translated
+    return json.dumps(translated, ensure_ascii=False, separators=(",", ":"), default=str)
 
 
 def inject_custom_columns(
@@ -110,9 +153,13 @@ def build_list_csv(
     csv_text = report_csv(
         report,
         columns=columns,
-        value_labels=list_columns_service.get_value_labels(db, scope_code),
+        value_labels=merge_static_value_labels(
+            list_columns_service.get_value_labels(db, scope_code)
+        ),
         # 主列表空数据也要完整表头（报表保持旧行为：只导出现过的键）
         force_registered_keys=True,
+        # 机器行标记翻中文（明细/合计），与业务人员看到的界面同语言
+        row_type_label="行类型",
     )
     return csv_text, {
         "column_count": sum(1 for _key, _label, visible in columns if visible),

@@ -373,7 +373,7 @@ class TestR3Commission:
             assert response.status_code == 200, response.text
             rows = list(csv.reader(io.StringIO(response.content.decode("utf-8-sig"))))
             person_index = rows[0].index("人员 ID")
-            return {int(row[person_index]) for row in rows[1:] if row[0] == "ITEM"}
+            return {int(row[person_index]) for row in rows[1:] if row[0] == "明细"}
 
         assert exported_user_ids({"all_people": "true"}, headers) == {7, 8}
         # 指定员工：修复前 user_id 被导出接口忽略，仍导出两人。
@@ -461,7 +461,7 @@ class TestReportsApiDateParams:
         assert exported.headers["content-type"].startswith("text/csv")
         assert "attachment" in exported.headers["content-disposition"]
         header = exported.content.decode("utf-8-sig").splitlines()[0].split(",")
-        assert header[0] == "row_type"
+        assert header[0] == "行类型"
         # 2026-10-29 起表头用「列表字段」的中文列名：已登记列不再出现英文键。
         # 该用例的时间窗内无订单明细，表头由合计行字段构成，故只断言中文口径。
         assert "收入" in header

@@ -14,7 +14,9 @@ lists.export 与 stocks 台账导出只依赖 core，环断。
 - `force_registered_keys`：True 时可见登记列无论行里是否出现过都进表头
   （主列表导出空数据也要完整表头）。
 - `value_labels` = {列 key: {代码值: 中文}}：只翻译「字符串且命中字典」的单元格；
-  row_type 是导出专用机器标记（ITEM / TOTAL），保持英文。
+  row_type 是导出专用机器标记（ITEM / TOTAL）：取值可经 value_labels["row_type"] 翻中文，
+  表头文案由 `row_type_label` 控制（默认保持 "row_type"，主列表导出走 build_list_csv
+  统一翻成「行类型 / 明细 / 合计」）。
 """
 from __future__ import annotations
 
@@ -24,22 +26,26 @@ import json
 from typing import Any
 
 
+ROW_TYPE_KEY = "row_type"
+
+
 def report_csv(
     report: dict[str, Any],
     *,
     columns: list[tuple[str, str, bool]] | None = None,
     value_labels: dict[str, dict[str, str]] | None = None,
     force_registered_keys: bool = False,
+    row_type_label: str = ROW_TYPE_KEY,
 ) -> str:
     """将报表 items 与 total 统一导出为 UTF-8 CSV，嵌套字段保留为 JSON。"""
     items = report.get("items") if isinstance(report.get("items"), list) else []
     total = report.get("total") if isinstance(report.get("total"), dict) else None
     rows: list[dict[str, Any]] = [
-        {"row_type": "ITEM", **item} for item in items if isinstance(item, dict)
+        {ROW_TYPE_KEY: "ITEM", **item} for item in items if isinstance(item, dict)
     ]
     if total is not None:
-        rows.append({"row_type": "TOTAL", **total})
-    keys: list[str] = ["row_type"]
+        rows.append({ROW_TYPE_KEY: "TOTAL", **total})
+    keys: list[str] = [ROW_TYPE_KEY]
     for row in rows:
         for key in row:
             if key not in keys:
@@ -61,11 +67,11 @@ def report_csv(
     else:
         labels = {key: label for key, label, _visible in columns}
         registered = {key for key, _label, _visible in columns}
-        fieldnames = ["row_type"]
+        fieldnames = [ROW_TYPE_KEY]
         for key, _label, visible in columns:
             if (
                 visible
-                and key != "row_type"
+                and key != ROW_TYPE_KEY
                 and (force_registered_keys or key in keys)
                 and key not in fieldnames
             ):
@@ -74,7 +80,10 @@ def report_csv(
         for key in total_only_keys:
             if key not in fieldnames and key not in registered:
                 fieldnames.append(key)
-        header = ["row_type" if key == "row_type" else labels.get(key, key) for key in fieldnames]
+        header = [
+            row_type_label if key == ROW_TYPE_KEY else labels.get(key, key)
+            for key in fieldnames
+        ]
 
     def normalize(value: Any) -> Any:
         if value is None:

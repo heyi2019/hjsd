@@ -12,7 +12,11 @@ from sqlalchemy.orm import Session
 
 from app.core.money import to_money
 from app.domain.foundation import Pool
+from app.domain.users import User
 from app.lists.export import detail_json
+
+# 订单表单里的经办人字段：存用户 id 数组，导出前翻成姓名。
+RESPONSIBLE_ID_KEYS = ("business_responsible_ids", "delivery_responsible_ids", "operation_responsible_ids")
 
 ORDER_DETAIL_EXPORT_COLUMNS = [
     ("detail_account_channel_region", "渠道 / 区服", True),
@@ -178,6 +182,32 @@ def _pool_name_map(db: Session) -> dict[int, str]:
     return {pool.id: pool.name for pool in db.scalars(select(Pool)).all()}
 
 
+def user_name_map(db: Session) -> dict[int, str]:
+    """全量用户 {id: 显示名}：用户量级很小，导出时一次取回翻经办人字段。"""
+    return {
+        user.id: user.display_name or user.username
+        for user in db.scalars(select(User)).all()
+    }
+
+
+def _translate_responsible_ids(
+    form_extra: dict[str, object], user_names: dict[int, str] | None
+) -> dict[str, object]:
+    """把 form_extra 里的经办人 id 数组原位翻成姓名（未提供映射时保留原值）。"""
+    if not user_names:
+        return form_extra
+    translated = dict(form_extra)
+    for key in RESPONSIBLE_ID_KEYS:
+        ids = translated.get(key)
+        if isinstance(ids, list):
+            translated[key] = "、".join(
+                user_names.get(item, str(item))
+                for item in ids
+                if isinstance(item, int)
+            ) or None
+    return translated
+
+
 def _event_platform(event: dict, detail: dict, account_platform: str | None) -> str | None:
     """事件的「平台」列，与库存视角的执行明细同口径。
 
@@ -270,20 +300,32 @@ def _delivery_direction(detail: dict) -> str:
     return "买号交付"
 
 
-def _delivery_export_fields(detail: dict, value_labels: dict[str, dict[str, str]]) -> dict[str, str | None]:
+def _delivery_export_fields(
+    detail: dict, value_labels: dict[str, dict[str, str]],
+    form_extra: dict[str, object] | None = None,
+) -> dict[str, str | None]:
     """把同一套交付字段按订单角色归入「买号交付」或「卖号交付」，另一组整组留空。
 
     交付字段都存在订单自己的 `form_extra` 里，语义随订单角色变化：
     买入未成交的单是对卖家的交接，卖出过的单与 DG 代挂单是对买家的交接。
     两组并存而非只标方向，是为了让人一眼看出这张单属于哪种交付。
+    `form_extra` 允许传入已做经办人翻译的副本（导出前统一处理），缺省读详情原值。
     """
-    form_extra = detail.get("form_extra") or {}
+    if form_extra is None:
+        form_extra = detail.get("form_extra") or {}
+    compensation = form_extra.get("compensation_type")
+    # 包赔类型是 option_sets 词典（COMPENSATION_TYPE，管理员可编辑）：
+    # 导出按同一套「代码值 → 中文」翻译，未命中保留原值
+    compensation_labels = value_labels.get("compensation_type") or {}
     values: dict[str, str | None] = {
         "phone": form_extra.get("bound_phone"),
         "owner": form_extra.get("bound_phone_owner"),
         "platform": form_extra.get("intermediary_platform"),
         "type": form_extra.get("intermediary_type"),
-        "compensation": form_extra.get("compensation_type"),
+        "compensation": (
+            compensation_labels.get(compensation, compensation)
+            if isinstance(compensation, str) else compensation
+        ),
         "responsible": detail_json(
             form_extra.get("delivery_responsible_ids") or [], value_labels
         ),
@@ -297,18 +339,23 @@ def _delivery_export_fields(detail: dict, value_labels: dict[str, dict[str, str]
     }
 
 
-def _order_detail_export_fields(detail: dict, value_labels: dict[str, dict[str, str]]) -> dict[str, str | None]:
+def _order_detail_export_fields(
+    detail: dict, value_labels: dict[str, dict[str, str]],
+    user_names: dict[int, str] | None = None,
+) -> dict[str, str | None]:
     account = detail.get("account_snapshot") or {}
-    form_extra = detail.get("form_extra") or {}
+    form_extra = _translate_responsible_ids(detail.get("form_extra") or {}, user_names)
+    has_secondary = account.get("has_secondary")
+    images = account.get("account_images") or []
     return {
         "detail_account_channel_region": account.get("channel_region"),
         "detail_account_bound_phone": account.get("bound_phone"),
-        "detail_account_secondary": account.get("has_secondary"),
+        "detail_account_secondary": None if has_secondary is None else ("有" if has_secondary else "无"),
         "detail_account_description": account.get("account_description"),
-        "detail_account_images": detail_json(account.get("account_images") or [], value_labels),
+        "detail_account_images": f"{len(images)}张" if images else "",
         "detail_order_note": detail.get("note"),
         "detail_order_extra": detail_json(form_extra, value_labels),
-        **_delivery_export_fields(detail, value_labels),
+        **_delivery_export_fields(detail, value_labels, form_extra),
         "detail_events": detail_json(detail.get("events") or [], value_labels),
         "detail_cashflows": detail_json(detail.get("cashflows") or [], value_labels),
         "detail_rebates": detail_json(detail.get("rebates") or [], value_labels),
@@ -330,6 +377,7 @@ __all__ = [
     "DETAIL_COLUMNS_MOVED_TO_SHEETS",
     "_REBATE_STATUS_LABELS",
     "_pool_name_map",
+    "user_name_map",
     "_event_platform",
     "_order_event_export_rows",
     "_cashflow_export_rows",

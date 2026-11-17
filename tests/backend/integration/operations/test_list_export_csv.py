@@ -66,7 +66,7 @@ def _seed_order(
 
 
 def _headers(text: str) -> list[str]:
-    # 导出带 UTF-8 BOM，表头首列实际是 "\ufeffrow_type"；CSV 恒为单行表头
+    # 导出带 UTF-8 BOM，表头首列实际是 "\ufeff行类型"；CSV 恒为单行表头
     return text.splitlines()[0].lstrip("\ufeff").split(",")
 
 
@@ -78,7 +78,7 @@ def test_orders_export_uses_chinese_visible_columns(seeded_client, headers, seed
     body = response.text
     assert body.startswith("\ufeff")  # BOM
     header = _headers(body)
-    assert header[0] == "row_type"
+    assert header[0] == "行类型"
     assert "订单号" in header
     assert "游戏/产品类型" in header
     assert "操作" not in header  # UI 列不导出
@@ -126,10 +126,10 @@ def test_orders_export_keeps_single_row_header(seeded_client, headers, seeded_db
     body = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text
     first = body.splitlines()[0].lstrip("\ufeff").split(",")
 
-    assert first[0] == "row_type"
+    assert first[0] == "行类型"
     assert "订单号" in first
     assert "台账信息" not in first  # 不存在分组行
-    assert body.splitlines()[1].startswith("ITEM")  # 第二行即数据
+    assert body.splitlines()[1].startswith("明细")  # 第二行即数据
 
 
 def test_orders_export_appends_full_detail_in_the_same_csv_table(seeded_client, headers, seeded_db):
@@ -376,14 +376,14 @@ def test_cashflows_export_chinese_header(seeded_client, headers, seeded_db):
     response = seeded_client.get("/api/v1/cashflows/export.csv", headers=headers)
     assert response.status_code == 200, response.text
     header = _headers(response.text)
-    assert header[0] == "row_type"
+    assert header[0] == "行类型"
 
 
 def test_rebates_export_chinese_header(seeded_client, headers, seeded_db):
     response = seeded_client.get("/api/v1/rebates/export.csv", headers=headers)
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith("text/csv")
-    assert _headers(response.text)[0] == "row_type"
+    assert _headers(response.text)[0] == "行类型"
 
 
 def test_export_writes_list_export_audit(seeded_client, headers, seeded_db):

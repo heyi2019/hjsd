@@ -9,6 +9,7 @@ import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
 import {
   ACCOUNTING_ATTRIBUTE_LABEL,
+  CASHFLOW_CATEGORY_LABEL,
   FUND_FLOW_SOURCE_LABEL,
   POOL_OWNERSHIP_LABEL,
   RECONCILIATION_STATUS_LABEL,
@@ -89,7 +90,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
     { title: "流水号", dataIndex: "flow_no" },
     { title: "日期", dataIndex: "occurred_on" },
     { title: "建立时间", dataIndex: "occurred_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
-    { title: "类别", dataIndex: "category" },
+    { title: "类别", dataIndex: "category", render: (v: string) => CASHFLOW_CATEGORY_LABEL[v] ?? v },
     {
       title: "核算属性",
       dataIndex: "accounting_attribute",

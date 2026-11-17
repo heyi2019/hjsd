@@ -151,6 +151,21 @@ export const RECONCILIATION_STATUS_LABEL: Record<string, string> = {
   RESOLVED: "已核销",
 };
 
+/** 资金流水系统类别中文：仅覆盖后端写路径写死的固定值（events.py EVENT_FLOW_MAP、
+ *  deposits/rebates/cashflows 固定 category）；手工流水的类别是用户自填文本，不在表内原样显示。 */
+export const CASHFLOW_CATEGORY_LABEL: Record<string, string> = {
+  BUY: "买入",
+  SELL: "售出",
+  CANCEL: "取消退款",
+  REBATE: "返点",
+  DEPOSIT_HOLD: "押金占用",
+  DEPOSIT_RELEASE: "押金退回",
+  DEPOSIT_CANCEL: "押金取消",
+  INSTALLMENT_PAYMENT: "分期还款",
+  TRANSFER: "划转",
+  REVERSAL: "冲销",
+};
+
 /** 审计动作中文名：与 backend/app/domain/enums.py AuditAction 对齐（随枚举增补）。
  *  后端 option_sets 的 AUDIT_ACTION 为只读死字典，未覆盖的新动作由本表兜底翻译。 */
 export const AUDIT_ACTION_LABEL: Record<string, string> = {

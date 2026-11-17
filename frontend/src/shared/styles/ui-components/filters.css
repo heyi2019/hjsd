@@ -168,10 +168,20 @@
   max-width: var(--col-w-140);
 }
 .funds-cashflow-filters .ant-select { width: 100%; }
+/* 日期范围控件（与工作室经营同款）：140px 放不下两个日期输入，按 240px 档收敛。 */
+.funds-cashflow-filters .ant-picker-range {
+  flex: 0 1 var(--col-w-240);
+  max-width: var(--col-w-240);
+  width: 100%;
+}
 
 @media (--bp-md) {
   .funds-cashflow-filters > * {
     flex: 1 1 100%;
+    max-width: none;
+  }
+  .funds-cashflow-filters .ant-picker-range {
+    flex-basis: 100%;
     max-width: none;
   }
 }

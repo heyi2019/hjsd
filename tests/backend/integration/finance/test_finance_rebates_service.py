@@ -10,11 +10,13 @@ from sqlalchemy import select
 from app.stocks.profile import create_account
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
+from app.core.tokens import hash_password
+from app.domain.users import User
 from app.finance import rebates
 from app.finance import cashflows
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.domain.trade import Cashflow, OrderEvent
+from app.domain.trade import Cashflow, Order, OrderEvent
 
 
 TODAY = date(2026, 10, 17)
@@ -245,3 +247,131 @@ def test_get_rebate_scope_hidden(seeded_db):
 def test_get_rebate_unknown(seeded_db):
     with pytest.raises(NotFound):
         rebates.get_rebate(seeded_db, 999999)  # 571-573
+
+
+# ----------------------------------------------------- create_rebate 护栏
+def test_create_rebate_rejects_cancelled_order(seeded_db):
+    order_id = _order_with_buy(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    order.status = "CANCELLED"
+    seeded_db.flush()
+    with pytest.raises(Validation, match="不可作为返点来源"):
+        rebates.create_rebate(
+            seeded_db, source_order_id=order_id, rebate_type="BUY",
+            amount=Decimal("1000"), collected_on=TODAY, actor="pytest",
+        )
+
+
+def test_create_rebate_rejects_duplicate_operators(seeded_db):
+    order_id = _order_with_buy(seeded_db)
+    with pytest.raises(Validation, match="操作人不能重复选择"):
+        rebates.create_rebate(
+            seeded_db, source_order_id=order_id, rebate_type="BUY",
+            amount=Decimal("1000"), collected_on=TODAY, actor="pytest",
+            operator_user_ids=[1, 1],
+        )
+
+
+def test_create_rebate_rejects_missing_operator(seeded_db):
+    order_id = _order_with_buy(seeded_db)
+    with pytest.raises(Validation, match="所选操作人不存在或已停用"):
+        rebates.create_rebate(
+            seeded_db, source_order_id=order_id, rebate_type="BUY",
+            amount=Decimal("1000"), collected_on=TODAY, actor="pytest",
+            operator_user_ids=[99999],
+        )
+
+
+def _operator_user(seeded_db, username: str, *, is_active: bool = True) -> User:
+    user = User(
+        username=username,
+        display_name=username.upper(),
+        password_hash=hash_password("op-pass-123"),
+        role="OPERATOR",
+        owner_scope="SELF",
+        pool_ids=[],
+        team_ids=[],
+        is_active=is_active,
+    )
+    seeded_db.add(user)
+    seeded_db.flush()
+    return user
+
+
+def test_create_rebate_rejects_inactive_operator(seeded_db):
+    user = _operator_user(seeded_db, "rb-inactive", is_active=False)
+    order_id = _order_with_buy(seeded_db)
+    with pytest.raises(Validation, match="所选操作人不存在或已停用"):
+        rebates.create_rebate(
+            seeded_db, source_order_id=order_id, rebate_type="BUY",
+            amount=Decimal("1000"), collected_on=TODAY, actor="pytest",
+            operator_user_ids=[user.id],
+        )
+
+
+def test_create_rebate_accepts_active_operator(seeded_db):
+    user = _operator_user(seeded_db, "rb-active")
+    order_id = _order_with_buy(seeded_db)
+    record = rebates.create_rebate(
+        seeded_db, source_order_id=order_id, rebate_type="BUY",
+        amount=Decimal("1000"), collected_on=TODAY, actor="pytest",
+        operator_user_ids=[user.id],
+    )
+    assert record.operator_user_ids == [user.id]
+
+
+# ----------------------------------------------------- update_rebate 编辑同步
+def test_update_rebate_syncs_event_and_flow(seeded_db):
+    user = _operator_user(seeded_db, "rb-editor")
+    order_id = _order_with_buy(seeded_db)
+    record = rebates.create_rebate(
+        seeded_db, source_order_id=order_id, rebate_type="BUY",
+        amount=Decimal("800"), collected_on=TODAY, actor="pytest", note="旧备注",
+    )
+    new_day = date(2026, 10, 20)
+    updated = rebates.update_rebate(
+        seeded_db, record.id, actor="pytest",
+        amount=Decimal("500"), collected_on=new_day, note="新备注",
+        operator_user_ids=[user.id], form_extra={"对接渠道": "支付宝"},
+    )
+    assert updated.amount == Decimal("500")
+    assert updated.collected_on == new_day
+    assert updated.note == "新备注"
+    assert updated.operator_user_ids == [user.id]
+    # 事件与资金流水同步：报表同源（三账一致）
+    event = seeded_db.scalar(
+        select(OrderEvent).where(
+            OrderEvent.order_id == order_id, OrderEvent.event_type == "REBATE",
+        )
+    )
+    assert event.amount == Decimal("500")
+    assert event.occurred_on == new_day
+    assert event.note == "新备注"
+    flow = seeded_db.scalar(select(Cashflow).where(
+        Cashflow.source_type == "ORDER_EVENT",
+        Cashflow.source_id == event.event_no,
+    ))
+    assert flow.amount == Decimal("500.00")
+    assert flow.occurred_on == new_day
+
+
+def test_update_rebate_without_action_event_still_updates_record(seeded_db):
+    """旧模型记录没有 REBATE 事件回指：编辑只更新返点记录本身，走兼容口径。"""
+    order_id = _order_with_buy(seeded_db)
+    record = rebates.create_rebate(
+        seeded_db, source_order_id=order_id, rebate_type="BUY",
+        amount=Decimal("800"), collected_on=TODAY, actor="pytest",
+    )
+    event = seeded_db.scalar(
+        select(OrderEvent).where(
+            OrderEvent.order_id == order_id, OrderEvent.event_type == "REBATE",
+        )
+    )
+    event.form_extra = None  # 拆掉 rebate_record_id 回指，模拟旧记录
+    seeded_db.flush()
+    updated = rebates.update_rebate(
+        seeded_db, record.id, actor="pytest", amount=Decimal("300"),
+    )
+    assert updated.amount == Decimal("300")
+    # 事件金额未被联动（无回指），流水保持原值
+    assert event.amount == Decimal("800")

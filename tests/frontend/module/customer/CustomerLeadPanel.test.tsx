@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { CustomerLeadPanel } from "@/customer-center/CustomerLeadPanel";
 import { customersApi, leadsApi } from "@/shared/api/customers.api";
+import { employeesApi } from "@/shared/api/org.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { Customer, Lead } from "@/shared/api/types/customers";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
@@ -43,6 +44,9 @@ beforeEach(() => {
   vi.mocked(leadsApi.create).mockResolvedValue(leads[0]);
   vi.mocked(leadsApi.close).mockResolvedValue(leads[0]);
   vi.mocked(leadsApi.convert).mockResolvedValue(leads[0]);
+  vi.mocked(employeesApi.list).mockResolvedValue([
+    { id: 1, username: "admin", display_name: "管理员", is_active: true },
+  ]);
   vi.spyOn(message, "success").mockReturnValue(undefined as never);
   vi.spyOn(message, "error").mockReturnValue(undefined as never);
 });
@@ -152,7 +156,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
     const modal = screen.getByText("关闭客户需求").closest(".ant-modal-content") as HTMLElement;
     await ui.type(within(modal).getByLabelText("关闭原因"), "已成交");
     await ui.click(within(modal).getByRole("button", { name: /确认关闭/ }));
-    await waitFor(() => expect(leadsApi.close).toHaveBeenCalledWith(1, "已成交", undefined));
+    await waitFor(() => expect(leadsApi.close).toHaveBeenCalledWith(1, "已成交", undefined, [1]));
   });
 
   it("点击行内转单打开弹窗并提交调用 leadsApi.convert", async () => {
@@ -162,7 +166,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
     const modal = screen.getByText("需求转单").closest(".ant-modal-content") as HTMLElement;
     await ui.type(within(modal).getByLabelText("订单编号"), "99");
     await ui.click(within(modal).getByRole("button", { name: /确认转单/ }));
-    await waitFor(() => expect(leadsApi.convert).toHaveBeenCalledWith(1, 99, undefined));
+    await waitFor(() => expect(leadsApi.convert).toHaveBeenCalledWith(1, 99, undefined, [1]));
   });
 
   it("转单订单编号必须是正整数", async () => {
@@ -187,7 +191,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
     const modal = screen.getByText("关闭客户需求").closest(".ant-modal-content") as HTMLElement;
     await waitFor(() => expect(within(modal).queryByLabelText("关闭原因")).toBeNull());
     await ui.click(within(modal).getByRole("button", { name: /确认关闭/ }));
-    await waitFor(() => expect(leadsApi.close).toHaveBeenCalledWith(1, undefined, undefined));
+    await waitFor(() => expect(leadsApi.close).toHaveBeenCalledWith(1, undefined, undefined, [1]));
   });
 
   it("转单弹窗「订单编号」标签取配置值", async () => {

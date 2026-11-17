@@ -142,7 +142,7 @@ export function OrderConsignmentModal(props: {
           <CfgItem name="listed_at" label="上架时间" rules={[{ required: true, message: "请选择上架时间" }]}>
             <DatePicker aria-label="上架时间" showTime={{ format: "HH:mm" }} format="YYYY-MM-DD HH:mm" minuteStep={1} />
           </CfgItem>
-          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} required />
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <p className="muted">每次确认只登记一个平台；可继续选择下一个平台并填写其上架时间。</p>
           <section aria-label="已上架记录">
             <h4>已上架记录</h4>

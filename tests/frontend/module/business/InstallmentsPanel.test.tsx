@@ -9,6 +9,7 @@ import { InstallmentsPanel } from "@/installments/InstallmentsPanel";
 
 import { installmentsApi } from "@/shared/api/installments.api";
 import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { pageResponse } from "@fixtures/api-responses";
 vi.mock("@/shared/api/cashflows.api");
@@ -83,6 +84,9 @@ beforeEach(() => {
     total_count: 2,
   }));
   vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", capital_type: "SELF", trade_date: "2026-10-01", status: "ACTIVE" }], { limit: 500 }) as never);
+  vi.mocked(employeesApi.list).mockResolvedValue([
+    { id: 1, username: "admin", display_name: "管理员", is_active: true },
+  ]);
 });
 
 describe("InstallmentsPanel：分期合约", () => {
@@ -473,7 +477,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
       await ui.click(within(modal).getByRole("button", { name: /确认回收/ }));
       await waitFor(() => expect(vi.mocked(installmentsApi.recover)).toHaveBeenCalledWith(
         1,
-        { occurred_on: "2026-10-15", note: "逾期未付" },
+        { occurred_on: "2026-10-15", note: "逾期未付", form_extra: undefined, operator_user_ids: [1] },
       ));
       expect(successSpy).toHaveBeenCalledWith("逾期账号已登记回收");
     });
@@ -502,7 +506,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
       await ui.click(within(modal).getByRole("button", { name: /确认登记违约/ }));
       await waitFor(() => expect(vi.mocked(installmentsApi.markDefault)).toHaveBeenCalledWith(
         1,
-        { reason: "长期失联" },
+        { reason: "长期失联", form_extra: undefined, operator_user_ids: [1] },
       ));
       expect(successSpy).toHaveBeenCalledWith("已登记违约，合约进入 DEFAULTED");
     });
@@ -597,7 +601,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
       await ui.click(within(modal).getByRole("button", { name: /确认登记/ }));
       await waitFor(() => expect(vi.mocked(installmentsApi.resale)).toHaveBeenCalledWith(
         1,
-        { resale_order_id: 20, occurred_on: "2026-10-20", note: "转售给下家" },
+        { resale_order_id: 20, occurred_on: "2026-10-20", note: "转售给下家", form_extra: undefined, operator_user_ids: [1] },
       ));
       expect(successSpy).toHaveBeenCalledWith("已登记出售，原分期与出售订单的利润关联保留");
     });

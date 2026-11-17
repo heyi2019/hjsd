@@ -77,6 +77,7 @@ beforeEach(() => {
   vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
+    { id: 2, username: "finance", display_name: "财务", is_active: true },
   ]);
 });
 async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
@@ -443,6 +444,7 @@ describe("FundsPage：资金写路径", () => {
       lost_on: expect.any(String),
       category: "违约损失",
       reason: "对手方未按约返还",
+      operator_user_ids: [2],
     }]);
   });
 
@@ -463,6 +465,7 @@ describe("FundsPage：资金写路径", () => {
     expect(vi.mocked(depositsApi.cancel).mock.calls[0]).toEqual([12, {
       cancelled_on: expect.any(String),
       reason: "押金登记有误",
+      operator_user_ids: [2],
     }]);
   });
 

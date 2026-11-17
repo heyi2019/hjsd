@@ -144,7 +144,7 @@ export function OrderPlatformOffsaleModal(props: {
           <CfgItem name="reason" label="下架原因" rules={[{ required: true, message: "请填写下架原因" }]}>
             <Input aria-label="下架原因" placeholder="请输入平台下架原因" />
           </CfgItem>
-          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} required />
+          <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="inv-platform-offsale" />
         </BusinessRegistrationForm>
       </FieldConfigContext.Provider>

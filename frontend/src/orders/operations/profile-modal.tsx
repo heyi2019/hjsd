@@ -126,7 +126,7 @@ export function OrderProfileModal({
     >
       <InlineError error={validationError} />
       <BusinessRegistrationForm layout="horizontal" labelAlign="left" labelCol={{ flex: "108px" }} wrapperCol={{ flex: "auto" }} form={form}>
-        <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} required />
+        <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
       </BusinessRegistrationForm>
       {target.mode === "images" ? (
         <Space className="order-profile-description-editor" direction="vertical" size="middle">

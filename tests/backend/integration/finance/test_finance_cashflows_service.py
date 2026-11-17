@@ -358,16 +358,18 @@ def test_order_cashflow_allows_matching_cost_attribute(seeded_db):
 
 
 def test_order_cashflow_allows_non_cost_attributes_on_dg(seeded_db):
-    """DG 与回收/提号同权：非成本科目一视同仁。"""
+    """DG 与回收/提号同权：非成本科目一视同仁；挂单默认落其他收支（非运营支出）。"""
     order = _make_order(seeded_db, "DG")
     out_flow = _make_flow(
-        seeded_db, direction="OUT", nature="BUSINESS_OUT", order_id=order.id
+        seeded_db, direction="OUT", nature="BUSINESS_OUT", order_id=order.id,
+        accounting_attribute=None,
     )
-    assert out_flow.accounting_attribute == "OPERATING_EXPENSE"
+    assert out_flow.accounting_attribute == "OTHER_EXPENSE"
     in_flow = _make_flow(
-        seeded_db, direction="IN", nature="BUSINESS_IN", order_id=order.id
+        seeded_db, direction="IN", nature="BUSINESS_IN", order_id=order.id,
+        accounting_attribute=None,
     )
-    assert in_flow.accounting_attribute == "OPERATING_EXPENSE"
+    assert in_flow.accounting_attribute == "OTHER_INCOME"
 
 
 # ----------------------------------------------------------- reverse

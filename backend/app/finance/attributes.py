@@ -69,9 +69,13 @@ def derive_manual_cashflow_nature(direction: str) -> str:
 
 
 def accounting_attribute_for_manual_cashflow(
-    *, nature: str, category: str, direction: str
+    *, nature: str, category: str, direction: str, order_attached: bool = False
 ) -> str:
-    """为独立录入流水提供保守的默认核算属性。"""
+    """为独立录入流水提供保守的默认核算属性。
+
+    挂单流水（order_attached=True）默认落「其他收入/其他支出」——
+    工作室运营支出只属于工作室账簿，订单资金明细不得误标（2026-11-18 口径）。
+    """
     if nature == Nature.INTERNAL.value or category == "TRANSFER":
         return AccountingAttribute.INTERNAL_TRANSFER.value
     if nature == "EXTERNAL_IN":
@@ -82,6 +86,12 @@ def accounting_attribute_for_manual_cashflow(
         return AccountingAttribute.DEPOSIT.value
     if category == "REVERSAL":
         return AccountingAttribute.REVERSAL.value
+    if order_attached:
+        return (
+            AccountingAttribute.OTHER_INCOME.value
+            if direction.upper() == "IN"
+            else AccountingAttribute.OTHER_EXPENSE.value
+        )
     return AccountingAttribute.OPERATING_EXPENSE.value
 
 

@@ -134,7 +134,8 @@ def create_cashflow(
         type_message="category 必须为文本",
     )
     default_accounting_attribute = accounting_attribute_for_manual_cashflow(
-        nature=nature, category=label, direction=direction
+        nature=nature, category=label, direction=direction,
+        order_attached=order_id is not None,
     )
     accounting_attribute = accounting_attribute or default_accounting_attribute
     if nature == Nature.EXTERNAL_IN.value and (

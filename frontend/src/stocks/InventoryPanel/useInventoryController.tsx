@@ -96,6 +96,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onNaviga
     partyDrafts,
     updatePartyDraft,
     employees,
+    pools,
     invEditExtraForm,
     savingAccount,
   } = orderDetailEditor;
@@ -182,6 +183,7 @@ export function useInventoryController({ refreshKey = 0, active = true, onNaviga
     dropExecutionCache,
     editingAccount,
     employees,
+    pools,
     error,
     eventDrafts,
     operationDrafts,

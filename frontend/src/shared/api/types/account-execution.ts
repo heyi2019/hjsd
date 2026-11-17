@@ -6,6 +6,7 @@ import type { Account } from "./accounts";
 
 export interface AccountExecutionCashflow {
   flow_no: string;
+  pool_id?: number | null;
   pool_name?: string | null;
   occurred_on: string;
   occurred_at?: string | null;
@@ -108,6 +109,7 @@ export interface OrderDetailFinanceRow {
   direction: string;
   amount: string;
   occurred_at?: string | null;
+  pool_id?: number | null;
   pool_name: string;
   note: string;
   operator: string;

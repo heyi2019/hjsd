@@ -35,6 +35,8 @@ class ExecutionOperationCreateItem(RequestModel):
 
 class ExecutionCashflowEditItem(RequestModel):
     flow_no: str = Field(min_length=1, max_length=32)
+    amount: Decimal | None = Field(default=None, ge=0, max_digits=18, decimal_places=2)
+    pool_id: int | None = Field(default=None, gt=0)
     occurred_at: datetime | None = None
     note: str | None = None
     operator: str | None = Field(default=None, max_length=64)

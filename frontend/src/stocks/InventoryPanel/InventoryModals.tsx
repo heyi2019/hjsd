@@ -22,6 +22,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     detailTarget,
     editingAccount,
     employees,
+    pools,
     operatorUsername,
     eventDrafts,
     financeDrafts,
@@ -191,6 +192,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           onOrderExtraChange={(orderId, key, value) => updateOrderDraft(orderId, { form_extra: { [key]: value } })}
           onPartyEdit={updatePartyDraft}
           employees={employees}
+          pools={pools}
           operatorUsername={operatorUsername}
           extraForm={invEditExtraForm}
           onSave={saveInline}

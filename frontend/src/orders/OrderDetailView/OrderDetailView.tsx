@@ -2,6 +2,7 @@ import { Space } from "antd";
 import type { FormInstance } from "antd";
 import type { AccountExecutionDetail, AccountExecutionEvent } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
+import type { Pool } from "../../shared/api/types/finance";
 import { BusinessRegistrationForm, PermissionButton } from "../../shared/ui";
 import { FieldConfigScope } from "../ConfigurableField";
 import { OrderDetailDeliverySection } from "./OrderDetailDeliverySection";
@@ -49,6 +50,7 @@ type OrderDetailViewProps = {
   onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
   onPartyEdit?: (orderId: number, addition: PartyAddition) => void;
   employees: OrderEmployeeOption[];
+  pools?: Pool[];
   operatorUsername?: string;
   extraForm?: FormInstance;
   /** 编辑态底部操作：保存 / 取消。不传则编辑态不渲染底部按钮（纯展示用）。 */
@@ -79,6 +81,7 @@ export function OrderDetailView({
   onOrderExtraChange,
   onPartyEdit,
   employees,
+  pools = [],
   operatorUsername,
   executionRows,
   operationEvents,
@@ -119,6 +122,7 @@ export function OrderDetailView({
           onOrderExtraChange={meta.orderId == null ? undefined : (key, value) => onOrderExtraChange?.(meta.orderId!, key, value)}
           employees={employees}
           operatorUsername={operatorUsername}
+          pools={pools}
           editing
         />
         <OrderDetailPartySection
@@ -162,6 +166,7 @@ export function OrderDetailView({
         incomeCount={incomeCount}
         totalExpense={totalExpense}
         totalIncome={totalIncome}
+        pools={pools}
       />
       <OrderDetailPartySection meta={meta} />
       <OrderDetailExecutionSection rows={executionRows} employees={employees} operatorUsername={operatorUsername} />

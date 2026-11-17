@@ -557,6 +557,41 @@ describe("OrderDetail", () => {
     expect(screen.getByLabelText("编辑资金明细备注 CF0036")).toHaveValue("旧备注");
   });
 
+  it("编辑态资金明细时间完整显示，并可修改金额和资金账户", async () => {
+    const onFinanceEdit = vi.fn();
+    const detail = {
+      orders: [{ order_id: 37, order_no: "HS0037", order_type: "HS", created_at: "2026-10-15T10:19:00", events: [] }],
+      detail_view: {
+        operation_rows: [],
+        execution_rows: [],
+        finance_rows: [{ key: "CF0037", flow_no: "CF0037", type: "回收成本", direction: "支出", amount: "100.00", occurred_at: "2026-10-15T10:20:00", pool_id: 1, pool_name: "经营荷包", note: "旧备注", operator: "admin", operator_user_ids: [1] }],
+        lifecycle: {},
+        order_notes: "-",
+        parties: [],
+        extras: [],
+      },
+      finance_summary: { total_expense: "100.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={37} loading={false} editing={account} employees={[{ id: 1, username: "admin", display_name: "管理员", is_active: true }]} pools={[
+      { id: 1, code: "HJ_INVEST", name: "经营荷包", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
+      { id: 2, code: "HJ_PROFIT", name: "利润荷包", pool_type: "PROFIT", ownership: "OWNED", status: "ACTIVE" },
+    ]} onFinanceEdit={onFinanceEdit} />);
+    await settleFieldConfig();
+
+    const timeInput = screen.getByLabelText("编辑资金明细时间 CF0037");
+    expect(timeInput).toHaveValue("2026-10-15 10:20");
+    expect(timeInput.closest(".order-finance-time-input")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("编辑资金明细金额 CF0037"), { target: { value: "88.50" } });
+    expect(onFinanceEdit).toHaveBeenCalledWith("CF0037", { amount: "88.50" });
+
+    const poolSelect = screen.getByRole("combobox", { name: "编辑资金明细资金账户 CF0037" });
+    await userEvent.click(poolSelect);
+    await userEvent.click(await screen.findByText("利润荷包", { selector: ".ant-select-item-option-content" }));
+    expect(onFinanceEdit).toHaveBeenCalledWith("CF0037", { pool_id: 2 });
+  });
+
   it("没有事件记录时操作明细备注仍可编辑", async () => {
     const detail = {
       account,

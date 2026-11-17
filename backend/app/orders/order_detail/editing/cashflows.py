@@ -7,6 +7,7 @@ from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.trade import Cashflow, Order, OrderEvent
 from app.domain.users import User
+from app.foundation.pools import assert_pool_usable
 
 from .schemas import ExecutionCashflowEditItem
 
@@ -30,7 +31,20 @@ def apply_cashflow_edits(db: Session, account_id: int, target_order_id: int, ite
             flow_order_id = db.scalar(select(OrderEvent.order_id).where(OrderEvent.id == flow.order_event_id))
         if flow_order_id is None or flow_order_id != target_order_id or db.scalar(select(Order.id).where(Order.id == flow_order_id, Order.account_id == account_id)) is None:
             raise NotFound("资金明细不存在")
-        before = {"note": flow.note, "occurred_at": flow.created_at.isoformat() if flow.created_at else None, "operator": flow.created_by, "operator_user_ids": flow.operator_user_ids}
+        before = {
+            "pool_id": flow.pool_id,
+            "amount": str(flow.amount),
+            "note": flow.note,
+            "occurred_at": flow.created_at.isoformat() if flow.created_at else None,
+            "operator": flow.created_by,
+            "operator_user_ids": flow.operator_user_ids,
+        }
+        if "pool_id" in item.model_fields_set and item.pool_id is not None:
+            if not user.can_see_pool(item.pool_id):
+                raise NotFound("资金池不存在", details={"pool_id": item.pool_id})
+            flow.pool_id = assert_pool_usable(db, item.pool_id).id
+        if "amount" in item.model_fields_set and item.amount is not None:
+            flow.amount = item.amount
         if "note" in item.model_fields_set:
             flow.note = item.note
         if "operator" in item.model_fields_set:
@@ -47,4 +61,19 @@ def apply_cashflow_edits(db: Session, account_id: int, target_order_id: int, ite
             flow.occurred_on = occurred_at.date()
             flow.created_at = occurred_at
         flow.updated_by = user.username
-        record_audit(db, action="ORDER_UPDATE", entity_type="inventory_cashflow_edit", entity_id=flow.flow_no, actor=user.username, before=before, after={"note": flow.note, "occurred_at": flow.created_at.isoformat() if flow.created_at else None, "operator": flow.created_by, "operator_user_ids": flow.operator_user_ids})
+        record_audit(
+            db,
+            action="ORDER_UPDATE",
+            entity_type="inventory_cashflow_edit",
+            entity_id=flow.flow_no,
+            actor=user.username,
+            before=before,
+            after={
+                "pool_id": flow.pool_id,
+                "amount": str(flow.amount),
+                "note": flow.note,
+                "occurred_at": flow.created_at.isoformat() if flow.created_at else None,
+                "operator": flow.created_by,
+                "operator_user_ids": flow.operator_user_ids,
+            },
+        )

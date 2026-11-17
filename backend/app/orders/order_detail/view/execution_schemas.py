@@ -12,6 +12,7 @@ from .schemas import OrderDetailViewOut
 
 class ExecutionCashflowOut(BaseModel):
     flow_no: str
+    pool_id: int | None = None
     pool_name: str | None = None
     occurred_on: date
     occurred_at: datetime

@@ -20,6 +20,7 @@ export type OrderFinanceRow = {
   direction: "支出" | "收入";
   amount: string;
   occurredAt: string;
+  poolId?: number | null;
   poolName: string;
   note: string;
   operator: string;

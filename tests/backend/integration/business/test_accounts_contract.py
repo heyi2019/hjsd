@@ -529,6 +529,7 @@ class TestAccountsApi:
         assert order_payload["cashflows"] == [
             {
                 "flow_no": flow.flow_no,
+                "pool_id": pool.id,
                 "pool_name": pool.name,
                 "occurred_on": TODAY.isoformat(),
                 "occurred_at": order_payload["cashflows"][0]["occurred_at"],

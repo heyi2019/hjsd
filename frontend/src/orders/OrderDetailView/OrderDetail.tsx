@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { AccountExecutionDetail, AccountExecutionEvent } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../shared/api/types/org";
+import type { Pool } from "../../shared/api/types/finance";
 import { formatDateTimeMinute } from "../../shared/lib/format";
 import { currentDevUser } from "../../shared/api/client";
 import {
@@ -67,6 +68,7 @@ export function OrderDetail({
   onPartyEdit,
   onPartyClick,
   employees = [],
+  pools = [],
   operatorUsername = currentDevUser(),
   extraForm,
   onSave,
@@ -93,6 +95,7 @@ export function OrderDetail({
   onOrderExtraChange?: (orderId: number, key: string, value: unknown) => void;
   onPartyEdit?: (orderId: number, addition: PartyAddition) => void;
   employees?: EmployeeOption[];
+  pools?: Pool[];
   operatorUsername?: string;
   onPartyClick?: (party: OrderPartyLink) => void;
   extraForm?: FormInstance;
@@ -140,6 +143,7 @@ export function OrderDetail({
     direction: row.direction === "支出" ? "支出" : "收入",
     amount: row.amount,
     occurredAt: formatDateTimeMinute(row.occurred_at),
+    poolId: row.pool_id,
     poolName: row.pool_name,
     note: row.note,
     operator: row.operator,
@@ -245,6 +249,7 @@ export function OrderDetail({
       onOrderExtraChange={onOrderExtraChange}
       onPartyEdit={onPartyEdit}
       employees={employees}
+      pools={pools}
       operatorUsername={operatorUsername}
       executionRows={executionRows}
       operationEvents={operationEvents}

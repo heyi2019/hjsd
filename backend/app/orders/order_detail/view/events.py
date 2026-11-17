@@ -129,6 +129,7 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
 def _cashflow_output(flow: Cashflow, pool: Pool) -> ExecutionCashflowOut:
     return ExecutionCashflowOut(
         flow_no=flow.flow_no,
+        pool_id=pool.id,
         pool_name=pool.name,
         occurred_on=flow.occurred_on,
         occurred_at=flow.created_at,

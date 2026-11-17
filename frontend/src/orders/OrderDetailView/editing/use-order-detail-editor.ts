@@ -6,6 +6,8 @@ import { useSession } from "../../../shared/state/session";
 import type { AccountExecutionDetail, AccountExecutionEvent } from "../../../shared/api/types/account-execution";
 import type { Account } from "../../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../../shared/api/types/org";
+import type { Pool } from "../../../shared/api/types/finance";
+import { poolsApi } from "../../../shared/api/pools.api";
 import { normalizeError } from "../../../shared/api/client";
 import { appMessage } from "../../../shared/ui/appFeedback";
 import { buildEventEdits, buildOperationEventCreates, type ExecutionEventDraft } from "./execution-edit-payload";
@@ -15,6 +17,8 @@ export type EventDraft = ExecutionEventDraft;
 export type OperationDraft = OrderOperationDraft;
 export type FinanceDraft = {
   flow_no: string;
+  amount?: string;
+  pool_id?: number;
   occurred_at: string;
   note: string;
   operator_user_ids?: number[];
@@ -93,6 +97,7 @@ export interface OrderDetailEditor {
   partyDrafts: Record<number, PartyAddition[]>;
   updatePartyDraft: (orderId: number, addition: PartyAddition) => void;
   employees: EmployeeOption[];
+  pools: Pool[];
   ensureEmployees: () => Promise<EmployeeOption[]>;
   invEditExtraForm: ReturnType<typeof Form.useForm>[0];
   savingAccount: boolean;
@@ -123,6 +128,7 @@ export function useOrderDetailEditor(params: {
   const [orderDrafts, setOrderDrafts] = useState<Record<number, OrderDraft>>({});
   const [partyDrafts, setPartyDrafts] = useState<Record<number, PartyAddition[]>>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [pools, setPools] = useState<Pool[]>([]);
   const [invEditExtraForm] = Form.useForm();
   const [savingAccount, setSavingAccount] = useState(false);
 
@@ -139,6 +145,19 @@ export function useOrderDetailEditor(params: {
     }
   }
 
+  async function ensurePools(): Promise<Pool[]> {
+    if (pools.length) return pools;
+    try {
+      const list = await poolsApi.list();
+      const visiblePools = Array.isArray(list) ? list : [];
+      setPools(visiblePools);
+      return visiblePools;
+    } catch {
+      setPools([]);
+      return [];
+    }
+  }
+
   async function openEditor(account: Account) {
     setEditingAccount({ ...account });
     setEventDrafts({});
@@ -146,7 +165,7 @@ export function useOrderDetailEditor(params: {
     setFinanceDrafts({});
     setOrderDrafts({});
     setPartyDrafts({});
-    await ensureEmployees();
+    await Promise.all([ensureEmployees(), ensurePools()]);
     setInlineEditId(account.id);
   }
 
@@ -292,13 +311,17 @@ export function useOrderDetailEditor(params: {
       const cashflows = Object.values(financeDrafts).filter((draft) => {
         const original = originalFinanceRows.find((row) => row.flow_no === draft.flow_no);
         return original && (
-          draft.occurred_at !== (original.occurred_at ?? "")
+          draft.amount !== undefined && draft.amount !== original.amount
+          || draft.pool_id !== undefined && draft.pool_id !== original.pool_id
+          || draft.occurred_at !== (original.occurred_at ?? "")
           || draft.note !== (original.note ?? "")
           || draft.operator_user_ids !== undefined
             && JSON.stringify(draft.operator_user_ids) !== JSON.stringify(original.operator_user_ids ?? [])
         );
       }).map((draft) => ({
         flow_no: draft.flow_no,
+        ...(draft.amount !== undefined ? { amount: draft.amount } : {}),
+        ...(draft.pool_id !== undefined ? { pool_id: draft.pool_id } : {}),
         ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
         note: draft.note,
         ...(draft.operator_user_ids !== undefined ? { operator_user_ids: draft.operator_user_ids } : {}),
@@ -369,6 +392,7 @@ export function useOrderDetailEditor(params: {
     partyDrafts,
     updatePartyDraft,
     employees,
+    pools,
     ensureEmployees,
     invEditExtraForm,
     savingAccount,

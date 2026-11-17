@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from app.stocks.profile import create_account
 from app.domain.foundation import AuditLog
+from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
 from app.orders.create import create_order
 from app.orders.events import post_event
@@ -163,6 +164,33 @@ def test_order_detail_edit_updates_cashflow_operators(seeded_client, seeded_db, 
     assert detail.status_code == 200
     shown = detail.json()["detail_view"]["finance_rows"][0]
     assert shown["operator_user_ids"] == [1, 2]
+
+
+def test_order_detail_edit_updates_cashflow_amount_and_pool(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="cashflow-amount-pool-edit", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
+    seeded_db.commit()
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == order.id))
+    target_pool = seeded_db.scalar(select(Pool).where(Pool.id != flow.pool_id, Pool.status == "ACTIVE").order_by(Pool.id))
+    assert flow is not None and target_pool is not None
+
+    response = seeded_client.patch(
+        f"/api/v1/orders/{order.id}/execution-edit",
+        headers=headers,
+        json={"events": [], "cashflows": [{"flow_no": flow.flow_no, "amount": "88.50", "pool_id": target_pool.id}]},
+    )
+
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    edited = seeded_db.get(Cashflow, flow.id)
+    assert edited.amount == Decimal("88.50")
+    assert edited.pool_id == target_pool.id
+    detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+    assert detail.status_code == 200
+    shown = detail.json()["detail_view"]["finance_rows"][0]
+    assert shown["amount"] == "88.50"
+    assert shown["pool_id"] == target_pool.id
 
 
 def test_edit_execution_operator_can_clear_all_selected_users(seeded_client, seeded_db, headers):

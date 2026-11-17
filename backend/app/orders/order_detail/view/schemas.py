@@ -31,6 +31,7 @@ class DetailFinanceRowOut(BaseModel):
     direction: str
     amount: Decimal
     occurred_at: datetime | None = None
+    pool_id: int | None = None
     pool_name: str
     note: str
     operator: str

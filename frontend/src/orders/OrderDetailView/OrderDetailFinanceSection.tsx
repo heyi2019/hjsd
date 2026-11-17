@@ -2,8 +2,9 @@ import { Descriptions, Input, Typography } from "antd";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import { useMemo } from "react";
-import { DataTable, DateField, MoneyText, Select } from "../../shared/ui";
+import { DataTable, DateField, MoneyInput, MoneyText, Select } from "../../shared/ui";
 import type { EmployeeOption } from "../../shared/api/types/org";
+import type { Pool } from "../../shared/api/types/finance";
 import type { OrderFinanceRow, OrderDetailMeta } from "./OrderDetail.shared";
 import type { FinanceDraft, OrderDraft } from "./editing/use-order-detail-editor";
 import { defaultOperatorUserIds } from "./editing/use-order-detail-editor";
@@ -12,11 +13,12 @@ import { currentDevUser } from "../../shared/api/client";
 const FINANCE_SECTION_TITLE = "费用与资金补充信息";
 
 const FINANCE_COLUMNS: ColumnsType<OrderFinanceRow> = [
-  { title: "类型", dataIndex: "type", key: "type" },
+  { title: "类型", dataIndex: "type", key: "type", width: "15%" },
   {
     title: "方向",
     dataIndex: "direction",
     key: "direction",
+    width: "8%",
     render: (value: OrderFinanceRow["direction"]) => (
       <Typography.Text type={value === "收入" ? "success" : "danger"}>{value}</Typography.Text>
     ),
@@ -25,19 +27,21 @@ const FINANCE_COLUMNS: ColumnsType<OrderFinanceRow> = [
     title: "金额",
     dataIndex: "amount",
     key: "amount",
+    width: "12%",
     align: "right",
     render: (value: string) => <div className="order-detail__cell-amount"><MoneyText value={value} /></div>,
   },
-  { title: "时间", dataIndex: "occurredAt", key: "occurredAt" },
-  { title: "操作人", dataIndex: "operator", key: "operator" },
-  { title: "资金池", dataIndex: "poolName", key: "poolName" },
-  { title: "备注", dataIndex: "note", key: "note" },
+  { title: "时间", dataIndex: "occurredAt", key: "occurredAt", width: "22%" },
+  { title: "操作人", dataIndex: "operator", key: "operator", width: "16%" },
+  { title: "资金账户", dataIndex: "poolName", key: "poolName", width: "15%" },
+  { title: "备注", dataIndex: "note", key: "note", width: "12%" },
 ];
 
 function editableFinanceColumns(
   drafts: Record<string, FinanceDraft> | undefined,
   onEdit: ((flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void) | undefined,
   employees: EmployeeOption[],
+  pools: Pool[],
   defaultOperatorIds: number[],
 ): ColumnsType<OrderFinanceRow> {
   return FINANCE_COLUMNS.map((column) => {
@@ -47,7 +51,28 @@ function editableFinanceColumns(
         render: (_value: string, row: OrderFinanceRow) => {
           const draft = drafts?.[row.flowNo];
           const value = draft?.occurred_at ?? row.occurredAt;
-          return <DateField showTime={{ format: "HH:mm" }} format="YYYY-MM-DD HH:mm" minuteStep={1} aria-label={`编辑资金明细时间 ${row.flowNo}`} value={value === "-" ? null : dayjs(value)} onChange={(next) => onEdit?.(row.flowNo, { occurred_at: next?.format("YYYY-MM-DDTHH:mm:ss") ?? "" })} />;
+          return <DateField className="order-finance-time-input" showTime={{ format: "HH:mm" }} format="YYYY-MM-DD HH:mm" minuteStep={1} aria-label={`编辑资金明细时间 ${row.flowNo}`} value={value === "-" ? null : dayjs(value)} onChange={(next) => onEdit?.(row.flowNo, { occurred_at: next?.format("YYYY-MM-DDTHH:mm:ss") ?? "" })} />;
+        },
+      };
+    }
+    if (column.key === "amount") {
+      return {
+        ...column,
+        render: (_value: string, row: OrderFinanceRow) => {
+          if (row.poolId == null) return <MoneyText value={row.amount} />;
+          const value = drafts?.[row.flowNo]?.amount ?? row.amount;
+          return (
+            <MoneyInput
+              className="order-finance-amount-input"
+              aria-label={`编辑资金明细金额 ${row.flowNo}`}
+              value={value}
+              status={/^\d*(\.\d{0,2})?$/.test(value) ? undefined : "error"}
+              onChange={(event) => {
+                const next = event.target.value;
+                if (next === "" || /^\d*(\.\d{0,2})?$/.test(next)) onEdit?.(row.flowNo, { amount: next });
+              }}
+            />
+          );
         },
       };
     }
@@ -75,6 +100,31 @@ function editableFinanceColumns(
       return {
         ...column,
         render: (_value: string, row: OrderFinanceRow) => <Input aria-label={`编辑资金明细备注 ${row.flowNo}`} value={drafts?.[row.flowNo]?.note ?? row.note} onChange={(event) => onEdit?.(row.flowNo, { note: event.target.value })} />,
+      };
+    }
+    if (column.key === "poolName") {
+      return {
+        ...column,
+        render: (_value: string, row: OrderFinanceRow) => {
+          if (row.poolId == null) return row.poolName;
+          const currentPoolId = drafts?.[row.flowNo]?.pool_id ?? row.poolId;
+          const currentPool = pools.find((pool) => pool.id === currentPoolId);
+          const options = pools
+            .filter((pool) => pool.status === "ACTIVE" || pool.id === currentPoolId)
+            .map((pool) => ({ value: pool.id, label: pool.name, disabled: pool.status !== "ACTIVE" }));
+          if (currentPool && !options.some((option) => option.value === currentPool.id)) {
+            options.unshift({ value: currentPool.id, label: currentPool.name, disabled: true });
+          }
+          return (
+            <Select
+              className="order-finance-pool-select"
+              aria-label={`编辑资金明细资金账户 ${row.flowNo}`}
+              value={currentPoolId}
+              options={options}
+              onChange={(poolId) => onEdit?.(row.flowNo, { pool_id: poolId as number })}
+            />
+          );
+        },
       };
     }
     return column;
@@ -125,6 +175,7 @@ export function OrderDetailFinanceSection({
   orderDraft,
   onOrderExtraChange,
   employees = [],
+  pools = [],
   operatorUsername = currentDevUser(),
 }: {
   rows: OrderFinanceRow[];
@@ -139,6 +190,7 @@ export function OrderDetailFinanceSection({
   orderDraft?: OrderDraft;
   onOrderExtraChange?: (key: string, value: unknown) => void;
   employees?: EmployeeOption[];
+  pools?: Pool[];
   operatorUsername?: string;
 }) {
   const defaultOperatorIds = defaultOperatorUserIds(employees, operatorUsername) ?? [];
@@ -159,7 +211,7 @@ export function OrderDetailFinanceSection({
           <div className="order-finance-summary__item order-finance-summary__item--amount"><span>总支出</span><MoneyText value={totalExpense} /></div>
           <div className="order-finance-summary__item order-finance-summary__item--amount"><span>总收入</span><MoneyText value={totalIncome} /></div>
         </div>
-        <DataTable className="order-detail__data-table order-finance-table" columns={editing ? editableFinanceColumns(financeDrafts, onFinanceEdit, employees, defaultOperatorIds) : FINANCE_COLUMNS} rows={rows} page={1} pageSize={10} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
+        <DataTable className="order-detail__data-table order-finance-table" columns={editing ? editableFinanceColumns(financeDrafts, onFinanceEdit, employees, pools, defaultOperatorIds) : FINANCE_COLUMNS} rows={rows} page={1} pageSize={10} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
       </div>
     </div>
   );

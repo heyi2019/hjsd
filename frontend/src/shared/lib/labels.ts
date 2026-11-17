@@ -126,17 +126,21 @@ export function orderTypeLabel(code: string | null | undefined, names?: Record<s
   return names?.[code] ?? ORDER_TYPE_LABEL[code] ?? code;
 }
 
-/** 核算属性：与 backend/app/domain/enums.py AccountingAttribute 一致。 */
+/** 核算属性：与 backend/app/domain/enums.py AccountingAttribute 一致。
+ *  2026-11-18 口径改版：自营→回收、附加收入/支出概念废弃、返点/代挂收入独立。
+ *  分组顺序：直接成本 → 收入 → 其他收支 → 工作室运营 → 押金 → 资金修正。 */
 export const ACCOUNTING_ATTRIBUTE_LABEL: Record<string, string> = {
-  SELF_REVENUE: "自营收入",
   SELF_DIRECT_COST: "回收成本",
+  SELF_REVENUE: "回收收入",
   TH_DIRECT_COST: "提号成本",
+  TH_REVENUE: "提号收入",
   DG_DIRECT_COST: "代挂成本",
-  TH_REVENUE: "提号/代挂收入",
-  SERVICE_REVENUE: "增值服务收入",
-  ADDITIONAL_INCOME: "附加收入",
-  ADDITIONAL_EXPENSE: "附加支出",
-  OPERATING_EXPENSE: "运营费用",
+  DG_REVENUE: "代挂收入",
+  SERVICE_REVENUE: "增值服务费收入",
+  REBATE_INCOME: "返点收入",
+  OTHER_INCOME: "其他收入",
+  OTHER_EXPENSE: "其他支出",
+  OPERATING_EXPENSE: "工作室运营支出",
   DEPOSIT: "押金/保证金",
   EXTERNAL_FUNDING: "外部资金",
   INTERNAL_TRANSFER: "内部调拨",

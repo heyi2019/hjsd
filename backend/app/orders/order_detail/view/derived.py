@@ -192,7 +192,7 @@ def _finance_type(
     labels = {
         "SELL": "售出收入", "INSTALLMENT_PAYMENT": "分期回款",
         "REBATE": "返点收入", "REFUND": "退款支出", "CANCEL": "取消冲销",
-        "OPERATING_EXPENSE": "运营费用", "ADDITIONAL_INCOME": "附加收入", "ADDITIONAL_EXPENSE": "附加支出",
+        "OPERATING_EXPENSE": "运营费用",
     }
     return labels.get(event_type) or labels.get(category or "") or ("其他收入" if direction == "IN" else "其他支出")
 

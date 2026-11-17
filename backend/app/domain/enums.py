@@ -216,20 +216,24 @@ class CashflowLedgerType(StrEnum):
 class AccountingAttribute(StrEnum):
     """资金在经营核算中的具体归类。"""
 
-    SELF_REVENUE = "SELF_REVENUE"
-    SELF_DIRECT_COST = "SELF_DIRECT_COST"
-    TH_DIRECT_COST = "TH_DIRECT_COST"
-    DG_DIRECT_COST = "DG_DIRECT_COST"
-    TH_REVENUE = "TH_REVENUE"
-    SERVICE_REVENUE = "SERVICE_REVENUE"
-    ADDITIONAL_INCOME = "ADDITIONAL_INCOME"  # 附加收入：返点(category=REBATE)与其他(TIP/PENALTY)
-    ADDITIONAL_EXPENSE = "ADDITIONAL_EXPENSE"  # 附加支出：同行分成等成交环节的附加费用
-    OPERATING_EXPENSE = "OPERATING_EXPENSE"
-    DEPOSIT = "DEPOSIT"
-    EXTERNAL_FUNDING = "EXTERNAL_FUNDING"
-    INTERNAL_TRANSFER = "INTERNAL_TRANSFER"
-    REVERSAL = "REVERSAL"
-    REFUND = "REFUND"
+    # 2026-11-18 口径改版：自营→回收、附加收入/附加支出概念废弃，
+    # 返点收入(REBATE_INCOME)/代挂收入(DG_REVENUE)/其他收支(OTHER_*)独立成值。
+    SELF_REVENUE = "SELF_REVENUE"  # 回收收入（HS 售出；工作室收入同用此属性）
+    SELF_DIRECT_COST = "SELF_DIRECT_COST"  # 回收成本（HS 买入）
+    TH_DIRECT_COST = "TH_DIRECT_COST"  # 提号成本
+    DG_DIRECT_COST = "DG_DIRECT_COST"  # 代挂成本
+    TH_REVENUE = "TH_REVENUE"  # 提号收入
+    DG_REVENUE = "DG_REVENUE"  # 代挂收入（DG 售出与分期收款）
+    SERVICE_REVENUE = "SERVICE_REVENUE"  # 增值服务费收入
+    REBATE_INCOME = "REBATE_INCOME"  # 返点收入（category=REBATE）
+    OTHER_INCOME = "OTHER_INCOME"  # 其他收入（TIP/PENALTY 等非返点收入）
+    OTHER_EXPENSE = "OTHER_EXPENSE"  # 其他支出
+    OPERATING_EXPENSE = "OPERATING_EXPENSE"  # 工作室运营支出
+    DEPOSIT = "DEPOSIT"  # 押金/保证金
+    EXTERNAL_FUNDING = "EXTERNAL_FUNDING"  # 外部资金
+    INTERNAL_TRANSFER = "INTERNAL_TRANSFER"  # 内部调拨
+    REVERSAL = "REVERSAL"  # 冲销
+    REFUND = "REFUND"  # 退款
 
 
 class Direction(StrEnum):

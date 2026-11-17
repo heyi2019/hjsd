@@ -22,8 +22,8 @@ MANUAL_EXCLUDED_CATEGORIES: tuple[str, ...] = (
     "TRANSFER",
 )
 
-# 工作室口径：支出只认「运营消耗」，收入只认「自营收入」——两者是不同的归类，
-# 所以不能用一个属性过滤同时拿到两个方向。
+# 工作室口径：支出只认「运营消耗」，收入只认「回收收入」（SELF_REVENUE）——
+# 两者是不同的归类，所以不能用一个属性过滤同时拿到两个方向。
 STUDIO_EXPENSE_ATTRIBUTE = AccountingAttribute.OPERATING_EXPENSE.value
 STUDIO_INCOME_ATTRIBUTE = AccountingAttribute.SELF_REVENUE.value
 
@@ -42,8 +42,7 @@ def accounting_attribute_for_manual_cashflow(
     if nature == "EXTERNAL_IN":
         return AccountingAttribute.EXTERNAL_FUNDING.value
     if category == "REBATE":
-        attribute = AccountingAttribute.ADDITIONAL_INCOME.value
-        return attribute
+        return AccountingAttribute.REBATE_INCOME.value
     if category in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE", "DEPOSIT_LOSS"}:
         return AccountingAttribute.DEPOSIT.value
     if category == "REVERSAL":

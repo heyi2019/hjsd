@@ -868,7 +868,7 @@ def test_update_cashflow_rejects_studio_expense_attribute(seeded_db):
 
 def test_update_cashflow_rejects_studio_income_attribute(seeded_db):
     flow = _studio_flow(seeded_db)
-    with pytest.raises(Validation, match="工作室收入必须使用自营收入科目"):
+    with pytest.raises(Validation, match="工作室收入必须使用回收收入科目"):
         _assert_update_fail(
             seeded_db, flow, direction="IN",
             accounting_attribute="OPERATING_EXPENSE",

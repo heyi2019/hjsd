@@ -130,7 +130,7 @@ describe("库存导出", () => {
           finance_rows: [{
             key: "cashflow-income-1",
             flow_no: "SR-SUM-01",
-            type: "附加收入",
+            type: "其他收入",
             direction: "收入",
             amount: "500.00",
             occurred_at: "2026-11-02T10:00:00",

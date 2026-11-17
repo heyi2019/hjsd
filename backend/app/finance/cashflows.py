@@ -361,7 +361,7 @@ def _normalize_studio_cashflow_fields(
     if normalized_direction == Direction.OUT.value and normalized_accounting_attribute != STUDIO_EXPENSE_ATTRIBUTE:
         raise Validation("工作室支出必须使用运营费用科目", details={"field": "accounting_attribute"})
     if normalized_direction == Direction.IN.value and normalized_accounting_attribute != STUDIO_INCOME_ATTRIBUTE:
-        raise Validation("工作室收入必须使用自营收入科目", details={"field": "accounting_attribute"})
+        raise Validation("工作室收入必须使用回收收入科目", details={"field": "accounting_attribute"})
     if label in MANUAL_EXCLUDED_CATEGORIES:
         raise Validation("该科目不属于工作室手工收支", details={"field": "category"})
     return (

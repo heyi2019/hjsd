@@ -187,7 +187,7 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     await dialog.getByLabel("发生日期").fill("2026-10-21");
     await pickSelect(page, dialog, "收支方向", "收入");
     await pickSelect(page, dialog, "资金性质", "本方经营");
-    await pickSelect(page, dialog, "核算属性", "自营收入");
+    await pickSelect(page, dialog, "核算属性", "回收收入");
     await dialog.getByLabel("类别").fill("E2E_UI_FLOW");
     await dialog.getByLabel("金额").fill("10.00");
     await dialog.getByLabel("摘要").fill("E2E 独立流水 UI");

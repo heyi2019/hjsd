@@ -14,7 +14,7 @@ from app.finance.attributes import accounting_attribute_for_manual_cashflow
         ("HS", "SELL", AccountingAttribute.SELF_REVENUE.value),
         ("TH", "BUY", AccountingAttribute.TH_DIRECT_COST.value),
         ("TH", "SELL", AccountingAttribute.TH_REVENUE.value),
-        ("DG", "SELL", AccountingAttribute.SERVICE_REVENUE.value),
+        ("DG", "SELL", AccountingAttribute.DG_REVENUE.value),
         ("HS", "CANCEL", AccountingAttribute.REVERSAL.value),
     ],
 )
@@ -72,7 +72,7 @@ def test_order_event_accounting_attribute_undefined_raises() -> None:
 @pytest.mark.parametrize(
     ("nature", "category", "direction", "expected"),
     [
-        ("BUSINESS_IN", "REBATE", "IN", AccountingAttribute.ADDITIONAL_INCOME.value),
+        ("BUSINESS_IN", "REBATE", "IN", AccountingAttribute.REBATE_INCOME.value),
         ("BUSINESS_IN", "REVERSAL", "IN", AccountingAttribute.REVERSAL.value),
     ],
 )

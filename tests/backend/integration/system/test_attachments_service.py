@@ -130,7 +130,7 @@ def test_load_target_cashflow_success(seeded_db):
     flow = Cashflow(
         flow_no="CF-TEST-1", pool_id=1, occurred_on=D,
         nature="BUSINESS_IN", direction="IN", amount=to_money("10"),
-        accounting_attribute="ADDITIONAL_INCOME",
+        accounting_attribute="REBATE_INCOME",
         category="REBATE",
     )
     seeded_db.add(flow)

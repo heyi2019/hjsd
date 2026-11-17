@@ -3,7 +3,7 @@
 业务链路（项目跨模块测试·流程 C）
 -------------------------------
 TH（提号）/ DG（代挂）订单同属分销 business_mode，但其资金结算口径与自营 HS 不同：
-- 核算属性区分自营(SELF_*)与分销(TH_*/SERVICE_REVENUE)；
+- 核算属性区分回收(SELF_*)与提号/代挂(TH_*/DG_*)；
 - BUY/SELL 落入同一默认业务池，同一池余额 = 收入 − 支出；
 - DG 不允许 BUY（仅全款），且其 SELL 未配置默认 PRINCIPAL 资金账户路由，必须显式 pool_id。
 
@@ -96,12 +96,12 @@ def test_flow_c_dg_consignment_sell_and_buy_rejected(seeded_db):
             occurred_on=TODAY, actor="pytest", pool_id=pool.id,
         )
 
-    # DG SELL 核算属性为 SERVICE_REVENUE；必须显式 pool_id（无默认 PRINCIPAL 路由）。
+    # DG SELL 核算属性为 DG_REVENUE（2026-11-18 口径改版，原 SERVICE_REVENUE）；必须显式 pool_id（无默认 PRINCIPAL 路由）。
     _sell_evt, sell_flow = events.post_event(
         seeded_db, dg.id, event_type="SELL", amount=Decimal("900"),
         occurred_on=TODAY, actor="pytest", pool_id=pool.id,
     )
-    assert sell_flow.accounting_attribute == AccountingAttribute.SERVICE_REVENUE.value
+    assert sell_flow.accounting_attribute == AccountingAttribute.DG_REVENUE.value
     assert sell_flow.direction == Direction.IN.value
     assert sell_flow.pool_id == pool.id
 

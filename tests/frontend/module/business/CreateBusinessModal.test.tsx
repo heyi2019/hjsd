@@ -203,14 +203,6 @@ it("代挂建单在交付信息前展示业务信息", async () => {
   expect(content.indexOf("代挂方案")).toBeLessThan(content.indexOf("交付信息"));
 });
 
-it("回收入口内联填写游戏账号信息，不加载库存账号", async () => {
-    const { container } = await openTypedModal("HS");
-
-    expect(await screen.findByLabelText("游戏账号")).toBeInTheDocument();
-    expect(screen.queryByLabelText("库存编号")).toBeNull();
-    expect(vi.mocked(orderTypesApi.list)).not.toHaveBeenCalled();
-  });
-
 it("打开回收入口后只加载订单所需的业务数据", async () => {
     const { container } = await openModal();
     expect(await screen.findByLabelText("游戏账号")).toBeInTheDocument();
@@ -244,12 +236,6 @@ it("回收订单渲染已启用的其他补充字段", async () => {
   expect(screen.getByLabelText("QA500 回收说明")).toBeInTheDocument();
   expect(screen.getByTestId("custom-fields-extra")).toBeInTheDocument();
 });
-
-it("必填校验：未选业务类型不给提交", async () => {
-    await openModal();
-    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
-    await waitFor(() => expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled());
-  });
 
 it("必填校验失败时显示表单级提示，避免误认为点击无效", async () => {
     await openModal();

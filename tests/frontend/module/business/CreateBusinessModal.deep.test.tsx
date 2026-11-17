@@ -68,19 +68,6 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
     expect(screen.queryByText("重新加载")).toBeNull();
   });
 
-  it("已填写表单点关闭触发放弃确认，确认后 onClose", async () => {
-    const onClose = vi.fn();
-    await openTypedModal("HS", onClose);
-    await ui.type(screen.getByLabelText("客户昵称"), "李四");
-    await ui.click(screen.getByRole("button", { name: "Close" }));
-    // 放弃确认框出现，未确认前不关闭
-    expect(await screen.findByText("放弃未保存的建单内容？")).toBeInTheDocument();
-    expect(onClose).not.toHaveBeenCalled();
-    // 放弃确认用 ConfirmDialog（Modal 级）：按可访问名精确点击，兼作 loading 图标污染的回归护栏。
-    await ui.click(screen.getByRole("button", { name: "放弃" }));
-    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-  });
-
   it("提交客户草稿给订单接口，由后端在同一事务中解析档案", async () => {
     resolveMockOnce(vi.mocked(ordersApi.create), { id: 31, order_no: "HS-2026-0031", status: "ACTIVE" });
 

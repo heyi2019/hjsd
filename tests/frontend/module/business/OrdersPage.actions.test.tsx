@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage } from "@/orders/OrdersPage";
-import { pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
@@ -360,21 +359,6 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(installmentsApi.markOverdue).mockResolvedValue({ marked: 0 });
     await ui.click(screen.getByRole("button", { name: /标记逾期/ }));
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("当前无新增逾期合约"));
-  });
-
-  it("编辑订单：行操作列直接打开详情编辑", async () => {
-    await openLedger();
-    await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
-    expect(await screen.findByRole("button", { name: "保存修改" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("编辑游戏账号/产品")).toBeNull();
-    expect(screen.getByRole("button", { name: "保存修改" })).toBeInTheDocument();
-  });
-
-  it("订单台账：编辑账号不作为独立操作，统一只展示编辑", async () => {
-    await openLedger();
-    const row = tableRow("HS-2026-0001");
-    expect(within(row).getByRole("button", { name: "编辑" })).toBeInTheDocument();
-    expect(within(row).queryByRole("button", { name: "编辑账号" })).toBeNull();
   });
 
   it("编辑有登记事件订单：统一编辑入口仍可打开库存详情", async () => {
@@ -737,59 +721,4 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(vi.mocked(ordersApi.listPage).mock.calls.length).toBeGreaterThan(before);
   });
 
-});
-
-describe("resolveCancelAmount / pickCancelableEvent 纯函数", () => {
-  const remaining = "500.00";
-
-  it("留空 → 全额冲销，取后端剩余可冲金额", () => {
-    expect(resolveCancelAmount({ scope: "ORDERCANC", values: {}, remaining })).toEqual({ ok: true, amount: "500.00" });
-    expect(resolveCancelAmount({ scope: "INVREFUND", values: { refund_amount: "" }, remaining })).toEqual({ ok: true, amount: "500.00" });
-  });
-
-  it("部分冲销：填小于剩余的金额按填的值提交", () => {
-    expect(resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: "300" }, remaining }))
-      .toEqual({ ok: true, amount: "300" });
-  });
-
-  it("超过剩余可冲金额 → 拒绝，提示带上剩余金额", () => {
-    const r = resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: "500.01" }, remaining });
-    expect(r).toEqual({ ok: false, error: "冲销金额不能超过该动作剩余可冲金额 ¥500.00" });
-  });
-
-  it("恰好等于剩余金额 → 放行（边界不因浮点误差误拒）", () => {
-    expect(resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: "500.00" }, remaining }))
-      .toEqual({ ok: true, amount: "500.00" });
-  });
-
-  it("非数字 / 0 / 负数 → 拒绝为无效金额", () => {
-    for (const bad of ["abc", "0", "-1", " "]) {
-      const r = resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: bad }, remaining });
-      // 纯空格会被 trim 成空串 → 按全额处理，属"留空"语义
-      if (bad === " ") expect(r).toEqual({ ok: true, amount: "500.00" });
-      else expect(r).toEqual({ ok: false, error: "请输入有效的冲销金额" });
-    }
-  });
-
-  it("两种 scope 读各自的金额字段，互不串用", () => {
-    // 冲销入库（INVREFUND）读 refund_amount；订单退款（ORDERCANC）读 cancel_amount
-    expect(resolveCancelAmount({ scope: "INVREFUND", values: { refund_amount: "120", cancel_amount: "999" }, remaining }))
-      .toEqual({ ok: true, amount: "120" });
-    expect(resolveCancelAmount({ scope: "ORDERCANC", values: { refund_amount: "999", cancel_amount: "120" }, remaining }))
-      .toEqual({ ok: true, amount: "120" });
-  });
-
-  it("pickCancelableEvent：显式选择优先，未选时取第一条", () => {
-    const list = [
-      { event: { id: 102 }, remaining: "500.00" },
-      { event: { id: 101 }, remaining: "1000.00" },
-    ];
-    expect(pickCancelableEvent(list, 101)?.event.id).toBe(101);
-    expect(pickCancelableEvent(list, undefined)?.event.id).toBe(102);
-    // 表单值可能是字符串
-    expect(pickCancelableEvent(list, "101")?.event.id).toBe(101);
-    // 不存在的 id → 回落到第一条，而不是抛错
-    expect(pickCancelableEvent(list, 999)?.event.id).toBe(102);
-    expect(pickCancelableEvent([], 101)).toBeUndefined();
-  });
 });

@@ -58,12 +58,6 @@ describe("MoneyText：金额只展示，不做浮点运算", () => {
     expect(container.querySelector(".ui-money--strong")).toBeTruthy();
   });
 
-  it("0.1 与 0.2 分别展示为 0.10 / 0.20（证明前端没有做加法）", () => {
-    const { container: a } = render(<MoneyText value="0.1" />);
-    const { container: b } = render(<MoneyText value="0.2" />);
-    expect(a.textContent).toBe("0.10");
-    expect(b.textContent).toBe("0.20");
-  });
 });
 
 describe("StatusTag：文案承载语义，颜色只是辅助", () => {

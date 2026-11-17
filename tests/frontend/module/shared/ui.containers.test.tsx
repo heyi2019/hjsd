@@ -340,16 +340,6 @@ describe("DataTable：三态一致（加载 / 空 / 有数据）", () => {
     expect(screen.getByText("第1行")).toBeInTheDocument();
   });
 
-  it("前端分页尊重调用方 pageSize（初值取 props.pageSize，不再硬编码 10）", () => {
-    // 修复前：const [innerSize] = useState(10) 忽略 props.pageSize，传 20 仍只渲染 10 行。
-    // 修复后：初值取 props.pageSize ?? 10，rows 共 12 行 < 20 应全渲染。
-    const { container } = render(
-      <DataTable columns={tableColumns} rows={tableRows} page={1} pageSize={20} total={12} onPageChange={() => {}} />,
-    );
-    expect(container.querySelectorAll(".ant-table-row").length).toBe(12);
-    expect(screen.getByText("第11行")).toBeInTheDocument();
-  });
-
   it("前端分页 pageSize=20 时首屏精确渲染 20 行（非硬编码 10）", () => {
     const big: TableRow[] = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, name: `R${i + 1}` }));
     const { container } = render(

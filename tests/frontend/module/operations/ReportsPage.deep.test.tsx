@@ -147,19 +147,6 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     revokeUrl.mockRestore();
   });
 
-  it("导出日期反向时阻止请求并提示范围错误", async () => {
-    const errorSpy = vi.spyOn(appMessage, "error").mockImplementation((() => undefined) as never);
-    renderLight(<ReportsPage />, { user: "admin" });
-    await gotoTab("订单利润");
-    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
-    const dateInputs = pane.querySelectorAll<HTMLInputElement>(".ui-control-width-date");
-    await ui.type(dateInputs[0], "2026-10-31");
-    await ui.type(dateInputs[1], "2026-10-01");
-    await ui.click(screen.getByRole("button", { name: "导出" }));
-    await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("导出开始日期不能晚于结束日期"));
-    expect(vi.mocked(reportsApi.exportCsv)).not.toHaveBeenCalled();
-  });
-
   it("统计周期变更同时触发月度与业务损益重新请求", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("经营损益");

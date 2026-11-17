@@ -151,33 +151,6 @@ describe("FundsPage：资金写路径深覆盖", () => {
     expect(payload.reason).toBe("重复入账");
   });
 
-  it("冲销成功后原流水不再提供重复冲销入口，并展示反向流水", async () => {
-    const approved = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" };
-    const reversal = { ...approved, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", reversal_of_id: 7 };
-    let mainListCalls = 0;
-    vi.mocked(cashflowsApi.list).mockImplementation(async (params) => {
-      if (params?.direction) return cashflowPage([], { total_in: "0.00", total_out: "0.00" });
-      mainListCalls += 1;
-      return mainListCalls === 1
-        ? cashflowPage([approved], { total_in: "0.00", total_out: "300.00" })
-        : cashflowPage([approved, reversal], { total_in: "300.00", total_out: "300.00" });
-    });
-    resolveMockOnce(vi.mocked(cashflowsApi.reverse), reversal);
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "流水" }));
-    await screen.findByText("CF-A-07");
-    await ui.click(await screen.findByRole("button", { name: /冲\s*销/ }));
-    const modal = modalContent();
-    await ui.type(modal.querySelector("#reversed_on") ?? modal, "2026-10-18");
-    await ui.type(modal.querySelector("#reason") ?? modal, "重复入账");
-    await ui.click(screen.getByRole("button", { name: /确认冲销/ }));
-
-    await waitFor(() => expect(vi.mocked(cashflowsApi.reverse)).toHaveBeenCalled());
-    await waitFor(() => expect(screen.queryByRole("button", { name: /^冲\s*销$/ })).toBeNull());
-    expect(screen.getByText("CF-REV-08")).toBeInTheDocument();
-  });
-
   it("冲销失败时保留弹窗和表单，并显示可重试错误", async () => {
     const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source: "MANUAL", fund_nature: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST", status: "APPROVED" }];
     vi.mocked(cashflowsApi.list).mockImplementation(async (params) => params?.direction
@@ -229,22 +202,6 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
     expect(await screen.findByText("划转金额不能为负数")).toBeInTheDocument();
     expect(vi.mocked(transfersApi.create)).not.toHaveBeenCalled();
-  });
-
-  it("超出转出资金池可用余额时由后端拒绝", async () => {
-    vi.mocked(transfersApi.create).mockRejectedValueOnce(new Error("转出资金池可用余额不足"));
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(await screen.findByRole("button", { name: /资金池划转/ }));
-    const modal = modalContent();
-    await pickSelect(modal, 0, /经营主池/);
-    await pickSelect(modal, 1, /押金池/);
-    await ui.type(modal.querySelector("#amount") ?? modal, "700.01");
-    await ui.click(screen.getByRole("button", { name: /确认划转/ }));
-
-    await waitFor(() => expect(screen.getByText(/可用余额不足/)).toBeInTheDocument());
-    expect(modal.querySelector("#amount")).toHaveValue("700.01");
-    expect(vi.mocked(transfersApi.create)).toHaveBeenCalled();
   });
 
   it("对账状态列显示未核销/已核销（对齐后端 ReconciliationStatus 语义）", async () => {

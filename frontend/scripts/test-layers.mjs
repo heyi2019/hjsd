@@ -25,6 +25,7 @@ export const fastTests = [
   // 业务纯逻辑
   "tests/frontend/unit/business/inventory-export.test.ts",
   "tests/frontend/unit/business/inventory-logic.test.ts",
+  "tests/frontend/unit/business/orderpage-helpers.test.ts",
   // 共享层 API 客户端与工具函数
   "tests/frontend/unit/shared/catalog.orders.test.ts",
   "tests/frontend/unit/shared/catalog.test.ts",

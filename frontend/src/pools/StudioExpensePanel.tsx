@@ -22,7 +22,7 @@ import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError, type NormalizedError } from "../shared/api/client";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { requiredMoneyRules } from "../shared/lib/validators";
-import { FUND_FLOW_SOURCE_LABEL } from "../shared/lib/labels";
+import { FUND_FLOW_SOURCE_LABEL, STUDIO_EXPENSE_ITEM_SET, STUDIO_INCOME_ITEMS } from "../shared/lib/labels";
 import { ConfirmButton,
   DataTable,
   BusinessActionModal,
@@ -41,14 +41,10 @@ import type { FundsPageController } from "./useFundsPageController";
 /** 弹窗视觉稿落地：作用域严格限定 .studio-ledger-modal（单一弹窗），不污染全站 .ant-modal。 */
 import "./StudioExpensePanel.css";
 
-/** 费用科目词典。 */
-const ITEM_SET_CODE = "STUDIO_EXPENSE_ITEM";
+/** 费用科目词典与收入科目已抽到 shared/lib/labels.ts（资金明细类别筛选共用同一事实源）。 */
+const ITEM_SET_CODE = STUDIO_EXPENSE_ITEM_SET;
 
-const INCOME_ITEMS: OptionItem[] = [
-  { value: "货款", label: "货款" },
-  // 「退款」已随订单售后退款专用链路下线（退款统一并入普通支出）：收入科目不再保留退款。
-  { value: "其他", label: "其他" },
-];
+const INCOME_ITEMS: OptionItem[] = [...STUDIO_INCOME_ITEMS];
 
 /** 单次拉取上限：按日期区间查询，200 条覆盖月度收支足够。 */
 const FETCH_LIMIT = 200;

@@ -6,13 +6,15 @@ import type { ColumnsType } from "antd/es/table";
 import { ConfirmButton, DataTable, DateField, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
-import { configurableLabel } from "../shared/lib/optionSets";
+import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import {
   ACCOUNTING_ATTRIBUTE_LABEL,
   CASHFLOW_CATEGORY_LABEL,
   FUND_FLOW_SOURCE_LABEL,
   POOL_OWNERSHIP_LABEL,
   RECONCILIATION_STATUS_LABEL,
+  STUDIO_EXPENSE_ITEM_SET,
+  STUDIO_INCOME_ITEMS,
 } from "../shared/lib/labels";
 import type { FundsPageController } from "./useFundsPageController";
 import type { Cashflow, Deposit, Pool, Reconciliation } from "../shared/api/types/finance";
@@ -84,6 +86,22 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
   } = ctrl;
   const cashflowUnavailable = !cashflowsReady || Boolean(error);
   const { arrange: arrangeCashflowColumns } = useListViewColumns("CASHFLOW");
+  // 类别筛选下拉：业务类别=系统固定枚举；工作室类别=支出科目词典（可配置）+ 固定收入科目。
+  // value 用 category 原文，与后端精确匹配（Cashflow.category == category）对齐。
+  const studioExpenseItems = useOptionSet(STUDIO_EXPENSE_ITEM_SET);
+  const cashflowCategoryOptions = [
+    {
+      label: "业务类别",
+      options: Object.entries(CASHFLOW_CATEGORY_LABEL).map(([value, label]) => ({ value, label })),
+    },
+    {
+      label: "工作室类别",
+      options: [
+        ...(studioExpenseItems ?? []).map((item) => ({ value: item.value, label: item.label })),
+        ...STUDIO_INCOME_ITEMS.map((item) => ({ value: item.value, label: item.label })),
+      ],
+    },
+  ];
   const cashflowColumns: ColumnsType<Cashflow> = [
     { title: "账簿", dataIndex: "ledger_type", render: (v: string) => LEDGER_TYPE_LABEL[v] ?? v },
     { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
@@ -132,7 +150,17 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
         <Select aria-label="流水方向" allowClear disabled={cashflowUnavailable} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
         <Select aria-label="流水账簿" allowClear disabled={cashflowUnavailable} value={cashflowLedgerType || undefined} placeholder="全部账簿" options={Object.entries(LEDGER_TYPE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(value) => setCashflowLedgerType(value ?? "")} />
         <Select aria-label="流水核算属性" allowClear disabled={cashflowUnavailable} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
-        <Input aria-label="流水中类别筛选" allowClear value={cashflowCategory} placeholder="类别，如冲销" onChange={(event) => setCashflowCategory(event.target.value)} />
+        <Select
+          aria-label="流水中类别筛选"
+          showSearch
+          optionFilterProp="label"
+          allowClear
+          disabled={cashflowUnavailable}
+          value={cashflowCategory || undefined}
+          placeholder="全部类别"
+          options={cashflowCategoryOptions}
+          onChange={(value) => setCashflowCategory(value ?? "")}
+        />
         <DateField
           aria-label="流水开始日期"
           placeholder="开始日期"

@@ -167,6 +167,16 @@ export const CASHFLOW_CATEGORY_LABEL: Record<string, string> = {
   OTHER: "其他",
 };
 
+/** 工作室运营账簿的科目词典 code（可配置 option set，设置页可增删支出科目）。 */
+export const STUDIO_EXPENSE_ITEM_SET = "STUDIO_EXPENSE_ITEM";
+
+/** 工作室收入科目（固定两项）：与支出科目词典分开维护。
+ *  「退款」已随订单售后退款专用链路下线（退款统一并入普通支出）：收入科目不再保留退款。 */
+export const STUDIO_INCOME_ITEMS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "货款", label: "货款" },
+  { value: "其他", label: "其他" },
+];
+
 /** 审计动作中文名：与 backend/app/domain/enums.py AuditAction 对齐（随枚举增补）。
  *  后端 option_sets 的 AUDIT_ACTION 为只读死字典，未覆盖的新动作由本表兜底翻译。 */
 export const AUDIT_ACTION_LABEL: Record<string, string> = {

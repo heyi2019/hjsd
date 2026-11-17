@@ -69,7 +69,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
         <Input
           allowClear
           value={keyword}
-          placeholder="搜索游戏账号/产品 / 游戏/产品类型 / 平台"
+          placeholder="搜索游戏账号/产品 / 游戏/产品类型 / 渠道区服"
           aria-label="搜索库存账号"
           className="ui-ledger-search"
           onChange={(event) => { controller.setKeyword(event.target.value); setPage(1); }}

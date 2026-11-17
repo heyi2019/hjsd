@@ -31,7 +31,6 @@ def _contract(seeded_db, *, trade_date: date, paid: str = "0", down: str = "200.
         account = create_account(
             seeded_db,
             game_account=f"totals-stock-{trade_date.isoformat()}",
-            platform="王者",
             business_mode="SELF",
             inventory_type="RECOVERY",
             actor="pytest",

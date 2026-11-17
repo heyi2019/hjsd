@@ -116,7 +116,6 @@ def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
     account = create_account(
         seeded_db,
         game_account="studio-summary-acc",
-        platform="王者",
         actor="pytest",
         business_mode="SELF",
         inventory_type="RECOVERY",
@@ -149,7 +148,6 @@ def test_summary_excludes_order_plain_cashflows(seeded_client, seeded_db, header
     account = create_account(
         seeded_db,
         game_account="studio-summary-plain-acc",
-        platform="王者",
         actor="pytest",
         business_mode="SELF",
         inventory_type="RECOVERY",

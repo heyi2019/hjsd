@@ -75,7 +75,6 @@ export interface AccountExecutionOrder {
   trade_date: string;
   created_at?: string | null;
   status: string;
-  account_platform?: string | null;
   note?: string | null;
   extra_values?: Record<string, unknown>;
   extra_fields?: Array<{ key: string; label: string; section: string; value: unknown }>;

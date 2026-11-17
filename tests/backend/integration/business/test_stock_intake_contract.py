@@ -38,7 +38,6 @@ def _make_account(session, *, game_account: str, game_type: str, status: str) ->
     account = Account(
         game_account=game_account,
         game_type=game_type,
-        platform="微信",
         business_mode="SELF",
         inventory_type="RECOVERY",
         status=status,

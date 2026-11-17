@@ -12,7 +12,7 @@ from app.stocks.schemas import AccountOut
 
 
 INVENTORY_EXPORT_HEADERS = (
-    "订单号", "业务", "类型", "游戏/产品类型", "营地账号", "库存编号", "平台", "成本", "库存状态", "在手时间",
+    "订单号", "业务", "类型", "游戏/产品类型", "营地账号", "库存编号", "成本", "库存状态", "在手时间",
     "建档操作人", "登记时间", "出售时间", "下架时间", "寄售时间", "寄售平台",
     "渠道 / 区服", "绑定手机号", "有无二次", "账号描述", "账号图片", "备注", "执行明细", "资金明细",
     "支出笔数", "收入笔数", "总支出", "总收入",
@@ -91,7 +91,6 @@ def _row(account: AccountOut, detail_text: dict[str, Any]) -> list[Any]:
         account.game_type or "",
         account.camp_account or "",
         account.stock_no or "",
-        account.platform or "",
         account.cost_amount,
         INVENTORY_STATUS_LABEL.get(account.inventory_status, account.inventory_status),
         "" if account.inventory_age_days is None else f"{account.inventory_age_days}天",

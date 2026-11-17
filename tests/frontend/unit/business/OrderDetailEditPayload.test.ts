@@ -78,7 +78,6 @@ describe("详情编辑保存载荷", () => {
       account_id: 9,
       account_game_type: "旧类型",
       account_game_account: "旧账号",
-      account_platform: "旧平台",
       account_status: "WAITING",
       cost_amount: "10.00",
     };
@@ -87,7 +86,6 @@ describe("详情编辑保存载荷", () => {
         id: 9,
         game_type: "新类型",
         game_account: "新账号",
-        platform: "新平台",
         status: "SOLD",
         cost_amount: "20.00",
       },
@@ -97,7 +95,6 @@ describe("详情编辑保存载荷", () => {
       id: 7,
       account_game_type: "新类型",
       account_game_account: "新账号",
-      account_platform: "新平台",
       account_status: "SOLD",
       cost_amount: "20.00",
     });

@@ -70,7 +70,6 @@ def _account(
     return create_account(
         seeded_db,
         game_account=game_account,
-        platform="王者",
         business_mode=business_mode,
         inventory_type=inventory_type,
         actor="pytest",

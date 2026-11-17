@@ -94,7 +94,6 @@ def _account(seeded_db, game_account: str, *, days_ago: int):
     account = create_account(
         seeded_db,
         game_account=game_account,
-        platform="王者",
         actor="pytest",
         business_mode="SELF",
         inventory_type="RECOVERY",

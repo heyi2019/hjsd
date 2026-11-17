@@ -187,9 +187,7 @@ def export_orders_xlsx(
         detail_rows.append(
             {"order_no": order_no, **_order_detail_export_fields(detail, value_labels, names)}
         )
-        event_rows.extend(
-            _order_event_export_rows(order_no, detail, row.get("account_platform"))
-        )
+        event_rows.extend(_order_event_export_rows(order_no, detail))
         cashflow_rows.extend(_cashflow_export_rows(order_no, detail, pool_names))
         rebate_rows.extend(_rebate_export_rows(order_no, detail))
 

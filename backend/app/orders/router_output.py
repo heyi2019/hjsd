@@ -389,7 +389,6 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "account_game_account": (account.game_account if account else None) or snapshot.get("game_account"),
             "account_channel_region": (account.channel_region if account else None) or snapshot.get("channel_region"),
             "account_business_mode": account.business_mode if account else None,
-            "account_platform": account.platform if account else snapshot.get("platform"),
             "account_status": account.status if account else None,
             "party_name": party[0] if party else None,
             "party_role": party[1] if party else None,

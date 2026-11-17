@@ -27,7 +27,7 @@ export function filterInventoryRows(rows: InventoryOrderRow[], options: Inventor
       if (!date || Number.isNaN(date.getTime()) || date < options.dateRange[0].startOf("day").toDate() || date > options.dateRange[1].endOf("day").toDate()) return false;
     }
     if (!keyword) return true;
-    return [row.account_game_account, row.account_game_type, row.account_channel_region, row.account_platform]
+    return [row.account_game_account, row.account_game_type, row.account_channel_region]
       .filter(Boolean)
       .join(" ")
       .toLowerCase()

@@ -75,7 +75,6 @@ class OrderAccountSnapshot(BaseModel):
     secondary_images: list[str] | None = Field(default=None, max_length=3)
     wallet_realname: str | None = Field(default=None, max_length=16)
     wallet_realname_images: list[str] | None = Field(default=None, max_length=3)
-    platform: str | None = Field(default=None, max_length=64)
     purchase_price: str | None = Field(default=None, max_length=32, description="账号号价（全款基础价格）")
     note: str | None = None
     # 账号／产品板块的自定义字段，随建单内联写入库存账号扩展资料。

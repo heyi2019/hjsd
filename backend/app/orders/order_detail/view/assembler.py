@@ -44,7 +44,6 @@ def build_order_outputs(
                 trade_date=order.trade_date,
                 created_at=order.created_at,
                 status=order.status,
-                account_platform=(order.account_snapshot or {}).get("platform"),
                 note=order.note,
                 extra_values=extra_values,
                 extra_fields=extra_fields,

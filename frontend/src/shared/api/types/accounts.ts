@@ -29,7 +29,6 @@ export interface Account {
   account_images?: string[] | null;
   extra_values?: Record<string, unknown>;
   note?: string | null;
-  platform?: string | null;
   status: string;
   inventory_status?: string;
   inventory_entry_at?: string | null;

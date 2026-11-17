@@ -42,7 +42,6 @@ def _account(seeded_db, game_account: str):
     return create_account(
         seeded_db,
         game_account=game_account,
-        platform="王者",
         business_mode="SELF",
         inventory_type="RECOVERY",
         actor="pytest",
@@ -247,7 +246,6 @@ class TestA05HsStockSale:
         account = create_account(
             seeded_db,
             game_account="hs-acc-stock-sale",
-            platform="王者",
             business_mode="SELF",
             inventory_type="RECOVERY",
             actor="pytest",
@@ -366,7 +364,6 @@ class TestM2Api:
         account = create_account(
             seeded_db,
             game_account="api-acc",
-            platform="王者",
             business_mode="SELF",
             inventory_type="RECOVERY",
             actor="pytest",
@@ -437,7 +434,6 @@ class TestM2Api:
         account = create_account(
             seeded_db,
             game_account="inv-acc",
-            platform="王者",
             business_mode="SELF",
             inventory_type="RECOVERY",
             actor="pytest",

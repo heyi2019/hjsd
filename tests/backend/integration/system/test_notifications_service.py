@@ -108,7 +108,6 @@ def _uid(seeded_db, username: str) -> int:
 def _account(seeded_db, suffix: str) -> Account:
     acc = Account(
         game_account=f"b6n-{suffix}",
-        platform="王者",
         business_mode="SELF",
         inventory_type="RECOVERY",
         status="WAITING",

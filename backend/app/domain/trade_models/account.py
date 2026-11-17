@@ -91,7 +91,6 @@ class Account(Base, AuditMixin):
     wallet_realname: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # 钱包实名已注销的佐证图（data URL 数组，最多 3 张）；只作交付资料，不参与核算。
     wallet_realname_images: Mapped[list | None] = mapped_column(JSON, nullable=True)
-    platform: Mapped[str | None] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=AccountStatus.WAITING.value
     )

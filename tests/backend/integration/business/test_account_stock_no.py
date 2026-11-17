@@ -31,7 +31,6 @@ def _make(db, game_account, inventory_type="RECOVERY", **kw):
         business_mode=business_mode,
         inventory_type=inventory_type,
         game_account=game_account,
-        platform="王者",
         actor="pytest",
         **kw,
     )

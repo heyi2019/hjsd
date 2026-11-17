@@ -208,35 +208,31 @@ def _translate_responsible_ids(
     return translated
 
 
-def _event_platform(event: dict, detail: dict, account_platform: str | None) -> str | None:
-    """事件的「平台」列，与库存视角的执行明细同口径。
+def _event_platform(event: dict, detail: dict) -> str | None:
+    """事件的「平台」列（寄售平台口径），与库存视角的执行明细同口径。
 
-    - 非下架事件：订单自身账号所在平台；
+    - 非下架事件：无寄售平台语义，记「-」；
     - 下架（CANCEL）事件按「下架方式」区分：系统下架记「本系统」，平台下架记寄售平台，
-      缺寄售平台时回落到账号平台。
-    库存视角还会跨单判断「账号内是否存在 SYSTEM 下架单」，订单粒度拿不到同账号其它订单，
-    这里不做该兜底，落单更常见的一档。
+      缺寄售平台时记「-」。
     """
     if event.get("event_type") != "CANCEL":
-        return account_platform
+        return "-"
     extra = detail.get("form_extra") or {}
     if extra.get("platform_unlist_scope") == "SYSTEM":
         return "本系统"
     configured = extra.get("consignment_platforms")
     if isinstance(configured, list):
         configured = "、".join(str(item).strip() for item in configured if str(item).strip())
-    return configured or account_platform
+    return configured or "-"
 
 
-def _order_event_export_rows(
-    order_no: str, detail: dict, account_platform: str | None
-) -> list[dict[str, object]]:
+def _order_event_export_rows(order_no: str, detail: dict) -> list[dict[str, object]]:
     return [
         {
             "order_no": order_no,
             "operation_category": _operation_category(event.get("event_type")),
             "event_type": event.get("event_type"),
-            "platform": _event_platform(event, detail, account_platform),
+            "platform": _event_platform(event, detail),
             "occurred_on": event.get("occurred_on"),
             "operator": event.get("operator"),
             "amount": _money_or_none(event.get("amount")),

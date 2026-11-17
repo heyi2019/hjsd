@@ -31,7 +31,6 @@ export interface Order {
   account_game_account?: string | null;
   account_channel_region?: string | null;
   account_business_mode?: string | null;
-  account_platform?: string | null;
   account_status?: string | null;
   party_name?: string | null;
   party_role?: string | null;
@@ -78,7 +77,6 @@ export interface Order {
     wallet_realname?: string | null;
     /** 钱包实名已注销佐证图（data URL，最多 3 张）。 */
     wallet_realname_images?: string[] | null;
-    platform?: string | null;
     purchase_price?: string | null;
     note?: string | null;
   } | null;

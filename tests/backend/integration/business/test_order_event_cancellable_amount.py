@@ -33,7 +33,7 @@ def _order_with_buy(seeded_db, *, amount: str):
         trade_date=TODAY,
         actor="pytest",
         # HS 买入必须能定位到游戏账号：快照带 game_account 才会自动建库存账号。
-        account_snapshot={"game_account": f"evt-{amount}", "platform": "王者"},
+        account_snapshot={"game_account": f"evt-{amount}"},
     )
     buy, _flow = post_event(
         seeded_db,

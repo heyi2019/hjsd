@@ -37,7 +37,6 @@ TODAY2 = date(2026, 10, 18)
 def _new_account(seeded_db, *, game_account: str = "guard-acc") -> Account:
     account = Account(
         game_account=game_account,
-        platform="王者",
         business_mode="SELF",
         inventory_type="RECOVERY",
         status="WAITING",

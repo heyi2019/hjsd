@@ -12,7 +12,6 @@ export function mergeLedgerOrderWithDetail(order: Order, detail: Pick<AccountExe
     ...order,
     account_game_type: account.game_type ?? order.account_game_type,
     account_game_account: account.game_account ?? order.account_game_account,
-    account_platform: account.platform ?? order.account_platform,
     account_status: account.status ?? order.account_status,
     cost_amount: account.cost_amount ?? order.cost_amount,
     stock_no: account.stock_no ?? order.stock_no,

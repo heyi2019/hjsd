@@ -28,7 +28,6 @@ TODAY2 = date(2026, 10, 18)
 def _new_account(seeded_db, *, game_account: str = "acc-001") -> Account:
     account = Account(
         game_account=game_account,
-        platform="王者",
         business_mode="SELF" if game_account != "th-stock-acc" else "DISTRIBUTION",
         inventory_type="RECOVERY" if game_account != "th-stock-acc" else "PICKUP",
         status=AccountStatus.WAITING.value,
@@ -804,7 +803,6 @@ class TestOrdersApi:
 def _account(seeded_db, *, game_account: str = "b4-acc", status: str = "WAITING") -> Account:
     acc = Account(
         game_account=game_account,
-        platform="王者",
         business_mode="SELF",
         inventory_type="RECOVERY",
         status=status,

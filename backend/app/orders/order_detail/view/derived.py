@@ -62,7 +62,7 @@ def _event_action(event: Any, order_type: str) -> str:
 
 
 def _platform_values(order: AccountExecutionOrderOut) -> list[str]:
-    values = [order.account_platform]
+    values: list[str] = []
     values.extend(
         party.display_name
         for party in order.counterparties
@@ -83,9 +83,9 @@ def _consignment_platform(order: AccountExecutionOrderOut) -> str:
 def _event_platform(order: AccountExecutionOrderOut, event: Any, has_system_unlisted: bool) -> str:
     if event.event_type == "OPERATE":
         platform = _platform_text(event.form_extra)
-        return platform or order.account_platform or "-"
+        return platform or "-"
     if event.event_type != "CANCEL":
-        return order.account_platform or "-"
+        return "-"
     scope = order.extra_values.get("platform_unlist_scope")
     if scope == "SYSTEM" or (scope is None and has_system_unlisted):
         return "本系统"
@@ -159,7 +159,7 @@ def _execution_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailExecut
                 operator=order.operator or "-",
                 operator_user_ids=order.operator_user_ids,
                 note="-",
-                platform=order.account_platform or "-",
+                platform="-",
             ))
         rows.extend(
             DetailExecutionRowOut(

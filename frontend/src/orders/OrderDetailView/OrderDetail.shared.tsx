@@ -106,7 +106,6 @@ export type OrderDetailMeta = {
   gameType?: string | null;
   gameAccount?: string | null;
   campAccount?: string | null;
-  platform?: string | null;
   cost?: string | null;
   businessMode?: string | null;
   inventoryType?: string | null;

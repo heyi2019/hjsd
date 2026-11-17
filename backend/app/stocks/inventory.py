@@ -65,7 +65,6 @@ def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict
             "game_account": row.game_account,
             "business_mode": row.business_mode,
             "inventory_type": row.inventory_type,
-            "platform": row.platform,
             "status": row.status,
             "inventory_status": row.inventory_status,
             "inventory_entry_at": row.inventory_entry_at,
@@ -131,7 +130,6 @@ def inventory_ledger(
                     func.coalesce(Account.game_account, Order.account_snapshot["game_account"].as_string()).ilike(pattern, escape=escape),
                     game_type_expr.ilike(pattern, escape=escape),
                     func.coalesce(Account.channel_region, Order.account_snapshot["channel_region"].as_string()).ilike(pattern, escape=escape),
-                    func.coalesce(Account.platform, Order.account_snapshot["platform"].as_string()).ilike(pattern, escape=escape),
                 ))
             if date_from:
                 query = query.where(entry_day >= date_from)

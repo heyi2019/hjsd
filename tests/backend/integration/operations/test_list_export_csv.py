@@ -326,25 +326,25 @@ def test_orders_export_xlsx_splits_detail_json_into_columns(seeded_client, heade
 
 
 def test_event_platform_follows_unlist_scope():
-    """操作明细「平台」列：普通事件用账号平台，下架事件按下架方式区分系统/平台。
+    """操作明细「平台」列是寄售平台口径：普通事件记「-」，下架事件按下架方式区分系统/平台。
 
-    与库存视角的执行明细同口径，避免同一个人在两处看到不同的平台名。
+    账号自身平台概念已删除；寄售平台缺数据时记「-」，与库存执行明细同口径。
     """
     plain = {"event_type": "BUY"}
-    assert _event_platform(plain, {}, "安卓QQ区") == "安卓QQ区"
+    assert _event_platform(plain, {}) == "-"
 
     canceled_system = {"event_type": "CANCEL"}
     assert (
-        _event_platform(canceled_system, {"form_extra": {"platform_unlist_scope": "SYSTEM"}}, "安卓QQ区")
+        _event_platform(canceled_system, {"form_extra": {"platform_unlist_scope": "SYSTEM"}})
         == "本系统"
     )
 
     canceled_platform = {"event_type": "CANCEL"}
     detail = {"form_extra": {"platform_unlist_scope": "PLATFORM", "consignment_platforms": ["交易猫"]}}
-    assert _event_platform(canceled_platform, detail, "安卓QQ区") == "交易猫"
+    assert _event_platform(canceled_platform, detail) == "交易猫"
 
-    # 平台下架但没填寄售平台时回落到账号平台，不留空
-    assert _event_platform(canceled_platform, {"form_extra": {}}, "安卓QQ区") == "安卓QQ区"
+    # 平台下架但没填寄售平台时记「-」，不留空
+    assert _event_platform(canceled_platform, {"form_extra": {}}) == "-"
 
 
 def test_orders_export_xlsx_writes_list_export_audit(seeded_client, headers, seeded_db):

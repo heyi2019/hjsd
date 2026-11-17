@@ -38,7 +38,7 @@ def _account(seeded_db, game_account: str, **kwargs):
     )
     kwargs.setdefault("inventory_type", inventory_type)
     return create_account(
-        seeded_db, game_account=game_account, platform="王者", actor="pytest", **kwargs
+        seeded_db, game_account=game_account, actor="pytest", **kwargs
     )
 
 def _invest_pool(seeded_db) -> Pool:
@@ -452,7 +452,6 @@ class TestAccountsApi:
         account = create_account(
             seeded_db,
             game_account="scope-source-account",
-            platform="王者",
             business_mode="SELF",
             inventory_type="RECOVERY",
             actor="operator",

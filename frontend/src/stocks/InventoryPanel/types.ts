@@ -26,7 +26,6 @@ export function mergeInventoryAccount(row: InventoryOrderRow, account: Account):
     account_game_account: account.game_account,
     account_channel_region: account.channel_region,
     account_business_mode: account.business_mode,
-    account_platform: account.platform,
     account_status: account.status,
     inventory_entry_at: account.inventory_entry_at,
     inventory_operator: account.inventory_operator,

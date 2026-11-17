@@ -123,7 +123,6 @@ const order1: Order = {
   business_mode: "SELF",
   account_game_type: "原神",
   account_game_account: "seller-001",
-  account_platform: "安卓",
   account_status: "WAITING",
   party_name: "卖家甲",
   party_source: "同行推荐",

@@ -132,7 +132,6 @@ def _inventory_snapshot(inventory: Account) -> dict[str, object]:
         "business_mode": inventory.business_mode,
         "inventory_type": inventory.inventory_type,
         "value_added_service": inventory.value_added_service,
-        "platform": inventory.platform,
         "status": inventory.status,
         "inventory_status": inventory.inventory_status,
         "cost_amount": str(inventory.cost_amount),

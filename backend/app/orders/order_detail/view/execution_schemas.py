@@ -82,7 +82,6 @@ class AccountExecutionOrderOut(BaseModel):
     trade_date: date
     created_at: datetime
     status: str
-    account_platform: str | None = None
     note: str | None = None
     extra_values: dict[str, object] = Field(default_factory=dict)
     extra_fields: list[dict[str, object]] = Field(default_factory=list)

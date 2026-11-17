@@ -1,5 +1,5 @@
 import { CopyOutlined } from "@ant-design/icons";
-import { Descriptions, Input, Space, Tooltip } from "antd";
+import { Descriptions, Input, Tooltip } from "antd";
 import { useMemo } from "react";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
@@ -49,7 +49,7 @@ function fallbackValue(value: string | null | undefined, fallback = "-") {
 }
 
 function channelRegionValue({ account }: AccountProfileValueSource) {
-  return [account.platform, account.channel_region].filter(Boolean).join(" / ") || "-";
+  return account.channel_region || "-";
 }
 
 const COPYABLE_PROFILE_KEYS = new Set<AccountProfileKey>(["gameAccount", "campAccount", "password"]);
@@ -259,10 +259,7 @@ function EditableProfileField({
   }
   if (field.key === "channelRegion") {
     return (
-      <Space.Compact block>
-        <Input aria-label="编辑平台" value={account?.platform ?? ""} placeholder="平台" onChange={(event) => onChange?.({ platform: event.target.value })} />
-        <Input aria-label="编辑渠道区服" value={account?.channel_region ?? ""} placeholder="渠道 / 区服" onChange={(event) => onChange?.({ channel_region: event.target.value })} />
-      </Space.Compact>
+      <Input aria-label="编辑渠道区服" value={account?.channel_region ?? ""} placeholder="渠道 / 区服" onChange={(event) => onChange?.({ channel_region: event.target.value })} />
     );
   }
   const value = field.key === "gameType"

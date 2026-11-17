@@ -286,7 +286,6 @@ def _post_deliver(
                 "game_password": account.game_password,
                 "channel_region": account.channel_region,
                 "has_secondary": account.has_secondary,
-                "platform": account.platform,
                 "note": account.note,
             })
         if normalized_bound_phone is not None:

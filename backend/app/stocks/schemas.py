@@ -30,7 +30,6 @@ class AccountOut(BaseModel):
     secondary_images: list[str] | None = None
     wallet_realname: str | None = None
     wallet_realname_images: list[str] | None = None
-    platform: str | None = None
     note: str | None = None
     account_description: str | None = None
     account_images: list[str] | None = None
@@ -72,7 +71,6 @@ class AccountProfileUpdate(RequestModel):
     secondary_images: list[str] | None = Field(default=None, max_length=3)
     wallet_realname: str | None = Field(default=None, max_length=16)
     wallet_realname_images: list[str] | None = Field(default=None, max_length=3)
-    platform: str | None = Field(default=None, max_length=64)
     account_description: str | None = Field(default=None, max_length=2000)
     account_images: list[str] | None = Field(default=None, max_length=9)
     note: str | None = None

@@ -43,7 +43,6 @@ def _new_account(
 ) -> Account:
     account = Account(
         game_account=game_account,
-        platform="王者",
         business_mode=business_mode,
         inventory_type=inventory_type,
         status=AccountStatus.WAITING.value,

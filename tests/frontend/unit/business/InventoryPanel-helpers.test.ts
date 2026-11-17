@@ -32,7 +32,6 @@ const row = (overrides: {
     account_game_type: account.game_type,
     account_game_account: account.game_account,
     account_channel_region: null,
-    account_platform: null,
     inventory_entry_at: account.inventory_entry_at,
     inventory_type: account.inventory_type,
     account,

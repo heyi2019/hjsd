@@ -46,7 +46,6 @@ const orders = [
     account_business_mode: "SELF",
     account_game_type: "原神",
     account_game_account: "seller-001",
-    account_platform: "安卓",
     account_status: "WAITING",
     party_name: "卖家甲",
     party_source: "同行推荐",
@@ -704,7 +703,7 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
   const accountOrders = [
     {
       id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE", account_id: 99,
-      account_game_type: "原神", account_game_account: "seller-001", account_platform: "安卓", account_status: "WAITING", party_name: "卖家甲", party_source: "同行推荐",
+      account_game_type: "原神", account_game_account: "seller-001", account_status: "WAITING", party_name: "卖家甲", party_source: "同行推荐",
       sale_amount: "1234.00", last_event_type: "BUY", inventory_operator: "入库员", inventory_entry_at: "2026-10-01T09:30:00", sale_operator: "售卖员", sale_at: "2026-10-17T16:45:00",
     },
     { id: 2, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-02", status: "COMPLETED" },
@@ -788,7 +787,7 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
 
   it("未关联库存账号的订单不显示「编辑账号」入口", async () => {
     vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([
-      { id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE", account_game_type: "原神", account_game_account: "seller-001", account_platform: "安卓", account_status: "WAITING" },
+      { id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE", account_game_type: "原神", account_game_account: "seller-001", account_status: "WAITING" },
       { id: 2, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-02", status: "COMPLETED" },
     ]) as never);
     renderLight(<OrdersPage />);

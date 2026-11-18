@@ -1,25 +1,17 @@
-import { Form, Space } from "antd";
-import { appMessage } from "../shared/ui/appFeedback";
-import type { ColumnsType } from "antd/es/table";
+import { Form } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { installmentsApi } from "../shared/api/installments.api";
-import { ordersApi } from "../shared/api/orders.api";
 import { employeesApi } from "../shared/api/org.api";
 import type { Installment, InstallmentTotals, Schedule } from "../shared/api/types/installments";
 import type { Order } from "../shared/api/types/orders";
 import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError } from "../shared/api/client";
-import { downloadBlob } from "../shared/api/download";
-import { INSTALLMENT_STATUS_LABEL, installmentDisplayStatus, money, today } from "../shared/lib/format";
-import { orderTypeLabel, BUSINESS_MODE_LABEL, ORDER_TYPE_LABEL } from "../shared/lib/labels";
-import { configurableLabel } from "../shared/lib/optionSets";
-import { MoneyText, PermissionButton, StatusTag } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { useSession } from "../shared/state/session";
-import { SCHEDULE_STATUS_LABEL } from "./InstallmentsPanel.fragments";
 import type { Permission } from "../shared/state/session";
 import { useContractActions } from "./useContractActions";
+import { buildContractColumns } from "./contractColumns";
 
 export function useContractTableController(params: { contractType: string; reloadKey: number; dateRange?: [string, string] | null; status?: string }) {
   const { contractType, reloadKey, dateRange, status } = params;
@@ -134,234 +126,18 @@ export function useContractTableController(params: { contractType: string; reloa
     return () => { cancelled = true; };
   }, []);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
   // 总应收 / 剩余应收都只采用后端下发值（含「不小于 0」的 clamp），前端不再自行推导。
-
-  // 合计直接取服务端（Decimal）；日期区间已在后端筛，列表不再二次过滤。
   const totalReceivable = totals?.total_receivable ?? "0.00";
   const totalPaid = totals?.total_paid ?? "0.00";
   const overdueCount = totals?.overdue_count ?? 0;
 
   const { arrange: arrangeColumns } = useListViewColumns("INSTALLMENT");
-  const columns: ColumnsType<Installment> = [
-    { title: "合约号", dataIndex: "inst_no" },
-    {
-      title: "订单",
-      key: "order",
-      render: (_v, row) => row.order.order_no,
-    },
-    {
-      title: "业务",
-      key: "business",
-      render: (_v, row) => BUSINESS_MODE_LABEL[row.order.account_business_mode ?? ""] || "-",
-    },
-    {
-      title: "类型",
-      key: "order_type",
-      render: (_v, row) => {
-        return orderTypeLabel(row.order.order_type, { ...ORDER_TYPE_LABEL });
-      },
-    },
-    {
-      title: "产品",
-      key: "product",
-      render: (_v, row) => {
-        return [row.order.account_game_type, row.order.account_game_account].filter(Boolean).join(" / ") || "-";
-      },
-    },
-    {
-      title: "对方",
-      key: "party",
-      render: (_v, row) => row.order.party_name || "-",
-    },
-    {
-      title: "总应收",
-      key: "receivable",
-      align: "right",
-      dataIndex: "total_receivable",
-      render: (value: string) => <MoneyText value={value} />,
-    },
-    {
-      title: "服务费",
-      dataIndex: "service_fee",
-      align: "right",
-      render: (v: string) => <MoneyText value={v ?? "0"} />,
-    },
-    {
-      title: "每期服务费",
-      dataIndex: "per_period_service_fee",
-      align: "right",
-      render: (v: string) => <MoneyText value={v ?? "0"} />,
-    },
-    {
-      title: "已收",
-      dataIndex: "paid_amount",
-      align: "right",
-      render: (v: string) => <MoneyText value={v} />,
-    },
-    {
-      title: "坏账",
-      key: "bad_debt",
-      dataIndex: "bad_debt_amount",
-      align: "right",
-      render: (v: string | undefined) => <MoneyText value={v ?? "0"} />,
-    },
-    {
-      title: "剩余",
-      key: "remaining",
-      align: "right",
-      dataIndex: "remaining_receivable",
-      render: (value: string) => <MoneyText value={value ?? "0.00"} />,
-    },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={installmentDisplayStatus(v)} label={configurableLabel("INSTALLMENT_STATUS", installmentDisplayStatus(v), INSTALLMENT_STATUS_LABEL)} /> },
-    { title: "操作人", key: "operator", dataIndex: "operator", render: (v: string | null | undefined) => v || "-" },
-    {
-      title: "操作",
-      key: "actions",
-      render: (_v, row) => (
-        <Space size={2}>
-          <PermissionButton
-            permission="order.event.post"
-            size="small"
-            disabled={["SETTLED", "DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
-            onClick={() => { payForm.resetFields(); setPayTarget(row); payForm.setFieldsValue({ paid_on: today() }); }}
-          >
-            登记收款
-          </PermissionButton>
-          <PermissionButton
-            permission="order.event.post"
-            size="small"
-            type="primary"
-            disabled={row.status !== "SETTLED"}
-            onClick={() => openDeliver(row)}
-          >
-            换绑交付
-          </PermissionButton>
-          <PermissionButton
-            permission="order.update"
-            size="small"
-            disabled={
-              !(["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status)) ||
-              row.dispositions.some((item) => item.action === "RECOVER")
-            }
-            onClick={() => { recoverForm.resetFields(); setRecoverTarget(row); recoverForm.setFieldsValue({ occurred_on: today() }); }}
-          >
-            登记回收
-          </PermissionButton>
-          <PermissionButton
-            permission="order.event.post"
-            size="small"
-            danger
-            disabled={!(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status))}
-            onClick={() => { cancelForm.resetFields(); setCancelTarget(row); cancelForm.setFieldsValue({ cancelled_on: today() }); }}
-          >
-            终止分期并退款
-          </PermissionButton>
-          <PermissionButton
-            permission={settlePermission}
-            size="small"
-            disabled={!(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status))}
-            onClick={() => { settleForm.resetFields(); setSettleTarget(row); settleForm.setFieldsValue({ paid_on: today() }); }}
-          >
-            提前结清
-          </PermissionButton>
-          <PermissionButton
-            permission="order.update"
-            size="small"
-            danger
-            disabled={!(["ACTIVE", "OVERDUE"].includes(row.status))}
-            onClick={() => { defaultForm.resetFields(); setDefaultTarget(row); }}
-          >
-            登记违约
-          </PermissionButton>
-          {["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status) &&
-            row.dispositions.some((item) => item.action === "RECOVER") &&
-            !row.dispositions.some((item) => item.action === "RESELL") && (
-              <PermissionButton
-                permission="order.update"
-                size="small"
-                onClick={() => void openResale(row)}
-              >
-                登记出售
-              </PermissionButton>
-            )}
-        </Space>
-      ),
-    },
-  ];
-
-  const scheduleColumns: ColumnsType<Schedule> = [
-    { title: "期次", render: (_v, s) => (s.period_no === 0 ? "首付" : `第 ${s.period_no} 期`) },
-    { title: "到期日", dataIndex: "due_on" },
-    {
-      title: "应收",
-      dataIndex: "due_amount",
-      align: "right",
-      render: (v: string) => <MoneyText value={v} />,
-    },
-    {
-      title: "已收",
-      dataIndex: "received_amount",
-      align: "right",
-      render: (v: string) => <MoneyText value={v} />,
-    },
-    {
-      title: "已减免",
-      dataIndex: "waived_amount",
-      align: "right",
-      render: (v: string | undefined) => <MoneyText value={v ?? "0"} />,
-    },
-    {
-      title: "服务费率",
-      dataIndex: "service_fee_rate",
-      align: "right",
-      render: (v: string | undefined) => (v == null || v === "" ? "—" : `${v}%`),
-    },
-    { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} label={configurableLabel("SCHEDULE_STATUS", v, SCHEDULE_STATUS_LABEL)} /> },
-    {
-      title: "操作",
-      render: (_v, schedule) => (
-        <Space size={2}>
-          <PermissionButton
-            permission="order.update"
-            size="small"
-            disabled={["PAID", "WAIVED"].includes(schedule.status)}
-            onClick={() => {
-              waiveForm.resetFields();
-              setWaiveTarget(schedule);
-              waiveForm.setFieldsValue({ waived_on: today() });
-            }}
-          >
-            减免
-          </PermissionButton>
-          <PermissionButton
-            permission="order.update"
-            size="small"
-            disabled={["PAID", "WAIVED"].includes(schedule.status)}
-            onClick={() => {
-              extendForm.resetFields();
-              setExtendTarget(schedule);
-            }}
-          >
-            展期
-          </PermissionButton>
-        </Space>
-      ),
-    },
-  ];
-
+  // 表格列定义是纯渲染配置，逐字提取到 contractColumns 工厂；依赖由本 controller 注入。
+  const { columns, scheduleColumns } = buildContractColumns({
+    payForm, recoverForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
+    setPayTarget, setRecoverTarget, setCancelTarget, setSettleTarget, setDefaultTarget,
+    setWaiveTarget, setExtendTarget, openDeliver, openResale, settlePermission,
+  });
 
   return {
     rows,

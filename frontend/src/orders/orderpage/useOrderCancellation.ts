@@ -9,6 +9,7 @@ import type { Installment } from "../../shared/api/types/installments";
 import type { Order } from "../../shared/api/types/orders";
 import { currentDevUser, currentUser, normalizeError } from "../../shared/api/client";
 import { money, today } from "../../shared/lib/format";
+import { cancelRefundSuccess } from "../../shared/lib/cancellationCopy";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { pickCancelableEvent, resolveCancelAmount, type CancelFormScope } from "./helpers";
 
@@ -114,12 +115,7 @@ export function useOrderCancellation(params: {
     try {
       if (installment) {
         const result = await installmentsApi.cancel(installment.id, values);
-        const refundSummary = `退款已登记：¥${money(result.refund_amount)}`;
-        appMessage.success(
-          installment.contract_type === "PICKUP_SALE"
-            ? `${refundSummary}，提号交易已结束`
-            : `${refundSummary}，账号已回到库存`,
-        );
+        appMessage.success(cancelRefundSuccess(result.refund_amount, installment.contract_type));
         if (result.order_status === "CANCELLED") await load();
       } else {
         if (!order) return;

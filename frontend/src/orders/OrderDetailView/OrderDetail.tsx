@@ -21,6 +21,7 @@ import {
   type OrderPartyLink,
   type OrderFinanceRow,
   PARTY_ROLE_LABEL,
+  OPERATION_TYPE_BY_KEY,
 } from "./OrderDetail.shared";
 import type { FinanceDraft } from "./editing/use-order-detail-editor";
 import type { OrderDraft } from "./editing/use-order-detail-editor";
@@ -169,9 +170,8 @@ export function OrderDetail({
     event: operation.event_id == null ? undefined : eventById.get(operation.event_id),
   }));
   const operationEvents = useMemo(() => {
-    const typeByKey: Record<string, string> = { consignment: "CONSIGNMENT", unlist: "UNLIST", description: "DESCRIPTION", images: "IMAGE" };
     const events = (scopedDetail?.orders ?? []).flatMap((order) => order.events);
-    return Object.fromEntries(Object.entries(typeByKey).map(([key, operationType]) => [
+    return Object.fromEntries(Object.entries(OPERATION_TYPE_BY_KEY).map(([key, operationType]) => [
       key,
       events
         .filter((event) => event.event_type === "OPERATE" && event.operation_type === operationType)

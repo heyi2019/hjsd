@@ -3,6 +3,7 @@ import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableFi
 import { DateField, MoneyInput, Select, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { executionActionLabel, money, today } from "../../shared/lib/format";
+import { cancelRefundIntro } from "../../shared/lib/cancellationCopy";
 import { requiredMoneyRules } from "../../shared/lib/validators";
 import { InventoryCancellationDialog } from "../../stocks/InventoryCancellationDialog";
 import { type OrdersPageController } from "./useOrdersPageController";
@@ -73,9 +74,7 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
           <FieldConfigScope scope={cancelInstallmentTarget ? "INVCANCEL" : cancelScope} active={Boolean(cancelOrderTarget || cancelInstallmentTarget)}>
           <Typography.Paragraph type="secondary">
             {cancelInstallmentTarget
-              ? cancelInstallmentTarget.contract_type === "PICKUP_SALE"
-                ? "按已收款原资金账户退款，提号取消后交易直接结束。"
-                : "按已收款原资金账户退款，取消后账号回到库存。"
+              ? cancelRefundIntro(cancelInstallmentTarget.contract_type)
               : cancelScope === "INVREFUND"
                 ? "冲销入库流水，金额进入公司钱包；可按原资金账户入账，也可做部分冲销。"
                 : "冲销售出流水，金额退还客户；可按原资金账户退款，也可做部分冲销。"}

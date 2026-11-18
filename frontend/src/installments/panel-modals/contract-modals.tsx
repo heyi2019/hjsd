@@ -1,6 +1,7 @@
 import { Input, Typography } from "antd";
 import { CfgItem, CustomFieldSection } from "../../orders/ConfigurableField";
 import { DateField, Select, dateValueFromEvent, dateValueProps } from "../../shared/ui";
+import { cancelRefundIntro } from "../../shared/lib/cancellationCopy";
 import type { ContractTableController } from "../useContractTableController";
 import { InstallmentActionModal } from "./_shared";
 
@@ -155,9 +156,7 @@ export function CancelModal({ controller }: { controller: ContractTableControlle
       employees={employees}
       intro={
         <Typography.Paragraph type="secondary">
-          {cancelTarget?.contract_type === "PICKUP_SALE"
-            ? "按已收款原资金账户退款，提号取消后账号直接结束。"
-            : "按已收款原资金账户退款，取消后账号回到库存。"}
+          {cancelRefundIntro(cancelTarget?.contract_type)}
         </Typography.Paragraph>
       }
       testIdSuffix="installment-cancel"

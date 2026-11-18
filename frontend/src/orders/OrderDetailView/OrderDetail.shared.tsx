@@ -151,11 +151,19 @@ export type OrderEventDraft = {
   operator_user_ids?: number[];
 };
 export type OrderOperationKey = "consignment" | "unlist" | "description" | "images";
+export type OrderOperationType = "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST";
 export type OrderOperationDraft = {
   occurred_at: string;
   form_extra: Record<string, unknown>;
   operator_user_ids?: number[];
-  operation_type?: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST";
+  operation_type?: OrderOperationType;
+};
+/** 运营动作 key ↔ 事件 operation_type 映射唯一源：父组件筛事件、子组件编辑草稿共用。 */
+export const OPERATION_TYPE_BY_KEY: Record<OrderOperationKey, OrderOperationType> = {
+  consignment: "CONSIGNMENT", unlist: "UNLIST", description: "DESCRIPTION", images: "IMAGE",
+};
+export const OPERATION_KEY_BY_TYPE: Record<OrderOperationType, OrderOperationKey> = {
+  CONSIGNMENT: "consignment", UNLIST: "unlist", DESCRIPTION: "description", IMAGE: "images",
 };
 export type OrderEmployeeOption = EmployeeOption;
 

@@ -9,7 +9,8 @@ import type { Installment, Schedule } from "../shared/api/types/installments";
 import type { Order } from "../shared/api/types/orders";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
-import { money, today } from "../shared/lib/format";
+import { today } from "../shared/lib/format";
+import { cancelRefundSuccess } from "../shared/lib/cancellationCopy";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 
 export function useContractActions(params: {
@@ -163,12 +164,7 @@ export function useContractActions(params: {
           operator_user_ids: values.operator_user_ids as number[] | undefined,
           form_extra: values.form_extra as Record<string, unknown> | undefined,
         });
-        const refundSummary = `退款已登记：¥${money(result.refund_amount)}`;
-        appMessage.success(
-          cancelTarget.contract_type === "PICKUP_SALE"
-            ? `${refundSummary}，提号账号已结束`
-            : `${refundSummary}，账号已回到库存`,
-        );
+        appMessage.success(cancelRefundSuccess(result.refund_amount, cancelTarget.contract_type));
         setCancelTarget(null);
         cancelForm.resetFields();
         await load();

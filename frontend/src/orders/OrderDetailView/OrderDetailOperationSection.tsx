@@ -10,7 +10,7 @@ import type { Account } from "../../shared/api/types/accounts";
 import type { OrderEventDraft, OrderOperationDraft, OrderOperationKey, OrderOperationRow } from "./OrderDetail.shared";
 import { OrderDetailImageGallery } from "./OrderDetailImageGallery";
 import { useOptionSet } from "../../shared/lib/optionSets";
-import { OrderSectionHeading, type OrderDetailMeta } from "./OrderDetail.shared";
+import { OrderSectionHeading, OPERATION_KEY_BY_TYPE, OPERATION_TYPE_BY_KEY, type OrderDetailMeta } from "./OrderDetail.shared";
 import { defaultOperatorUserIds } from "./editing/use-order-detail-editor";
 import { currentDevUser } from "../../shared/api/client";
 
@@ -20,13 +20,6 @@ const OPERATION_COLUMNS: ColumnsType<OrderOperationRow> = [
   { title: "时间", dataIndex: "occurredAt", key: "occurredAt", width: 142 },
   { title: "操作人", dataIndex: "operator", key: "operator", width: 82 },
 ];
-
-const OPERATION_TYPE_BY_KEY: Record<OrderOperationKey, NonNullable<OrderOperationDraft["operation_type"]>> = {
-  consignment: "CONSIGNMENT", unlist: "UNLIST", description: "DESCRIPTION", images: "IMAGE",
-};
-const OPERATION_KEY_BY_TYPE: Record<NonNullable<OrderOperationDraft["operation_type"]>, OrderOperationKey> = {
-  CONSIGNMENT: "consignment", UNLIST: "unlist", DESCRIPTION: "description", IMAGE: "images",
-};
 
 function operationPlatforms(extra: Record<string, unknown>): string[] {
   return Array.isArray(extra.consignment_platforms)

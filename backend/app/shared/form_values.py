@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from datetime import date
 from typing import Any
 
 from sqlalchemy import select
@@ -20,6 +19,8 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFound, Validation
 from app.domain.parties import Counterparty, Customer, CustomerLead
 from app.domain.trade import Account, OrderFormField
+from app.shared.form_field_value import _option_values as _shared_option_values
+from app.shared.form_field_value import validate_field_value
 
 # 客户字段定义来自 CUSTOMER 作用域；建单账号字段由订单字段配置筛选后写入账号扩展 JSON。
 _EXTRA_DEFINITION_SCOPES: dict[str, tuple[str, ...]] = {
@@ -59,99 +60,13 @@ def _extra_definitions(
 
 
 def _option_values(definition: OrderFormField) -> list[str]:
-    """读取规范化后的字段选项对象。"""
-    values: list[str] = []
-    for item in definition.options or []:
-        if not isinstance(item, Mapping):
-            raise Validation("字段选项须为对象", details={"field": "options"})
-        text = str(item.get("value") or "").strip()
-        if not text:
-            raise Validation("字段选项 value 不能为空", details={"field": "options"})
-        values.append(text)
-    return values
+    """读取规范化后的字段选项对象（严格域口径，委托共享原语）。"""
+    return _shared_option_values(definition, strict=True)
 
 
 def _validate_extra_value(definition: OrderFormField, value: Any) -> Any:
-    """按字段类型校验扩展值；SELECT/MULTI_SELECT 必须在选项内（BAS-04）。"""
-    if value is None:
-        return None
-    kind = definition.field_type
-    if kind == "NUMBER":
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise Validation(
-                f"字段 {definition.label} 必须为数字",
-                details={"field_key": definition.field_key, "value": str(value)[:64]},
-            )
-        return value
-    if kind == "BOOLEAN":
-        if not isinstance(value, bool):
-            raise Validation(
-                f"字段 {definition.label} 必须为布尔值",
-                details={"field_key": definition.field_key},
-            )
-        return value
-    if kind == "DATE":
-        text = str(value).strip()
-        try:
-            date.fromisoformat(text)
-        except ValueError as exc:
-            raise Validation(
-                f"字段 {definition.label} 必须为 YYYY-MM-DD 日期",
-                details={"field_key": definition.field_key},
-            ) from exc
-        return text
-    if kind == "SELECT":
-        if not isinstance(value, str):
-            raise Validation(
-                f"字段 {definition.label} 必须为字符串",
-                details={"field_key": definition.field_key},
-            )
-        options = _option_values(definition)
-        if not options:
-            raise Validation(
-                f"字段 {definition.label} 未配置有效选项",
-                details={"field_key": definition.field_key},
-            )
-        if value not in options:
-            raise Validation(
-                f"字段 {definition.label} 的取值必须在选项内",
-                details={"field_key": definition.field_key, "value": str(value)[:64]},
-            )
-        return value
-    if kind == "MULTI_SELECT":
-        if not isinstance(value, list):
-            raise Validation(
-                f"字段 {definition.label} 必须为数组",
-                details={"field_key": definition.field_key},
-            )
-        if any(not isinstance(item, str) for item in value):
-            raise Validation(
-                f"字段 {definition.label} 的选项必须为字符串",
-                details={"field_key": definition.field_key},
-            )
-        options = _option_values(definition)
-        if not options:
-            raise Validation(
-                f"字段 {definition.label} 未配置有效选项",
-                details={"field_key": definition.field_key},
-            )
-        if len(set(value)) != len(value) or any(item not in options for item in value):
-            raise Validation(
-                f"字段 {definition.label} 的取值必须在选项内",
-                details={"field_key": definition.field_key},
-            )
-        return value
-    if kind == "TEXT":
-        if not isinstance(value, str):
-            raise Validation(
-                f"字段 {definition.label} 必须为字符串",
-                details={"field_key": definition.field_key},
-            )
-        return value
-    raise Validation(
-        f"字段类型不支持：{kind}",
-        details={"field": definition.field_key, "field_type": kind},
-    )
+    """按字段类型严格校验扩展值（BAS-04），委托跨域唯一原语。"""
+    return validate_field_value(definition, value, strict=True)
 
 
 def _validate_required_extras(

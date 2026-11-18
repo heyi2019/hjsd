@@ -110,6 +110,10 @@ def test_validate_date(seeded_db):
     with pytest.raises(Validation, match="YYYY-MM-DD"):
         fields_module._validate_extra_value(field, "2026/10/01")
     assert fields_module._validate_extra_value(field, " 2026-10-01 ") == "2026-10-01"
+    # DATE 口径统一（FORM-01）：两域共用 normalize_date_value，带时间后缀的
+    # 历史脏数据归一化为 YYYY-MM-DD，不再出现「客户域拒绝/订单域截前 10 位」漂移。
+    assert fields_module._validate_extra_value(field, "2026-10-01T12:30:00") == "2026-10-01"
+    assert fields_module._validate_extra_value(field, "2026-10-01 12:30:00") == "2026-10-01"
 
 
 def test_validate_select(seeded_db):

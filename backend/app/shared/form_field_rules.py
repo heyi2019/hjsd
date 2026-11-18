@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import date
 from typing import Any
 
 import re
@@ -13,6 +12,7 @@ from app.core.errors import Validation
 from app.domain.trade import OrderFormField
 from app.domain.users import User
 from app.domain.form_scopes import SCOPE_CODES
+from app.shared.form_field_value import validate_field_value
 
 FIELD_TYPES = ("TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT")
 
@@ -184,30 +184,11 @@ def validate_form_extra(
     for field_key, value in normalized.items():
         definition = definitions.get(field_key)
         if definition is None:
+            # 已删除/停用字段的历史键允许保留（宽松域契约）。
             continue
-        if definition.field_type == "NUMBER":
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                raise Validation(f"字段 {definition.label} 必须为数字", details={"field_key": field_key})
-        elif definition.field_type == "BOOLEAN":
-            if not isinstance(value, bool):
-                raise Validation(f"字段 {definition.label} 必须为布尔值", details={"field_key": field_key})
-        elif definition.field_type == "TEXT":
-            if not isinstance(value, str):
-                raise Validation(f"字段 {definition.label} 必须为字符串", details={"field_key": field_key})
-        elif definition.field_type == "DATE":
-            if not isinstance(value, str):
-                raise Validation(f"字段 {definition.label} 必须为日期字符串", details={"field_key": field_key})
-            try:
-                date.fromisoformat(value[:10])
-            except ValueError as exc:
-                raise Validation(f"字段 {definition.label} 必须为 YYYY-MM-DD 日期", details={"field_key": field_key}) from exc
-        elif definition.field_type in {"SELECT", "MULTI_SELECT"}:
-            options = {str(item.get("value")) for item in (definition.options or []) if isinstance(item, Mapping)}
-            if definition.field_type == "SELECT":
-                if not isinstance(value, str) or (options and value not in options):
-                    raise Validation(f"字段 {definition.label} 的取值不合法", details={"field_key": field_key})
-            elif not isinstance(value, list) or any(not isinstance(item, str) or (options and item not in options) for item in value):
-                raise Validation(f"字段 {definition.label} 的取值不合法", details={"field_key": field_key})
+        # 宽松口径：空选项放行（运行期动态字段）、未知类型原样返回，校验结果
+        # 不写回——本域保留提交原值。三处策略差异由 strict=False 固化。
+        validate_field_value(definition, value, strict=False)
 
     def filled(value: Any) -> bool:
         return value is not None and value != "" and value != []

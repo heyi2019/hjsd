@@ -77,7 +77,6 @@ def _order_detail_output(
                     "rebate_type": item.rebate_type,
                     "channel": item.channel,
                     "amount": item.amount,
-                    "status": item.status,
                     "collected_on": item.collected_on,
                     "note": item.note,
                     "created_at": item.created_at,

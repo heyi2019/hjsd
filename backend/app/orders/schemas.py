@@ -306,7 +306,6 @@ class OrderRebateOut(BaseModel):
     rebate_type: str
     channel: str | None = None
     amount: Decimal
-    status: str
     collected_on: date
     note: str | None = None
     created_at: datetime

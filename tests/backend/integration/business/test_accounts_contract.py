@@ -676,7 +676,6 @@ class TestAccountsApi:
             "rebate_type": "BUY",
             "channel": "买号返点",
             "amount": "300.00",
-            "status": "SETTLED",
             "collected_on": TODAY.isoformat(),
             "collected_at": rebate.created_at.isoformat(),
         }]

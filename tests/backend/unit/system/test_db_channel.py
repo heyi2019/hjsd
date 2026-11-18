@@ -23,7 +23,9 @@ from _repo import BE_TESTS
 
 # db 用例数基线：只允许上升。派生机制被删除、v1_engine 被改名时，数字会塌下来。
 # 要下调这条基线，必须同时证明「确实有用例不再需要数据库」，不能图省事直接改数。
-DB_BASELINE = 1360
+# 2026-11-19 据实下调 1360 → 1267：f6e8b690 五档清理收口删除 8 个测试文件（3260 行），
+# 全量收集数 1672 → 1521，随删掉的 db 用例同步减少；派生规则未削弱（1267/1521 ≈ 83%）。
+DB_BASELINE = 1267
 
 # 允许在模块级手工声明 db 的文件。派生机制覆盖不到的只能是「自建引擎并连接」这类，
 # 每新增一个都必须在这里登记——否则「手工标记」就成了绕过守卫的后门。
@@ -54,7 +56,7 @@ def test_db_marker_is_derived_from_fixtures(pytestconfig) -> None:
     )
     db_count, total = stats
     assert db_count < total, "全部用例都被标 db，快速通道为空，派生规则把范围放大了"
-    if total >= 1000:  # 全量收集（当前 1672），基线才有意义
+    if total >= 1000:  # 全量收集（当前 1521），基线才有意义
         assert db_count > 0, "没有任何用例被标 db，派生规则已失效"
         assert db_count >= DB_BASELINE, (
             f"db 用例数 {db_count} 低于基线 {DB_BASELINE}："

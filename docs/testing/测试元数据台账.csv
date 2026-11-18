@@ -51,7 +51,7 @@ PROMISE,,,,,,,,RECON-01,L0,后端,对账判重键 = pool_id + reconciled_on + ac
 PROMISE,,,,,,,,DEPOSIT-01,L0,后端,押金剩余 = 实收−已退−已损失，不得为负,退超，直接资金损失,test_deposit_remaining.py;test_finance_api.py;test_finance_deposits.py;test_finance_rebates_guards.py;test_finance_reconciliation.py,已覆盖,DEP-01,
 PROMISE,,,,,,,,REBATE-01,L0,后端,返点按规则快照计算；结算不改原规则定义,返点争议，历史单无法复算,test_finance_rebates_service.py;test_rebate_current_contract.py,待核,,需确认快照而非实时规则
 PROMISE,,,,,,,,INSTALLMENT-01,L0,后端,减免累加 waived_amount，不改原应收金额,应收被篡改，客户对账争议,test_installment_remaining.py,已覆盖,,
-PROMISE,,,,,,,,INSTALLMENT-02,L0,后端,末期 final_period_adjustment 吸收尾差，分期合计必须闭合,分期不平，尾差长期挂账,test_installments_service.py,待核,,需确认末期尾差断言
+PROMISE,,,,,,,,INSTALLMENT-02,L0,后端,末期 final_period_adjustment 吸收尾差，分期合计必须闭合,分期不平，尾差长期挂账,test_installments_service.py;test_installments_service_write_paths.py;test_installments_service_defensive.py,待核,,需确认末期尾差断言
 PROMISE,,,,,,,,IDEMPOTENCY-01,L0,后端,重复提交不得产生第二笔流水,重复扣款/重复入账,,缺失（当前行为存在重复记账风险，旧用例已删除）,,待实现事件幂等后新增正向守卫
 PROMISE,,,,,,,,NUMBER-01,L1,后端,单号唯一且分配后不可修改（HS/TH/DG+4、KU_+5、ZC/SR+5）,重号，对外凭证失效,test_numbering.py,已覆盖,,
 PROMISE,,,,,,,,INVENTORY-01,L1,后端,同 game_account + game_type 未售不得重复入库（422）,幽灵库存，资产虚增,test_stock_intake_contract.py;test_order_duplicate_account.py,已覆盖,,

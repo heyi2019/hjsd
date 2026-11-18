@@ -262,6 +262,8 @@ GROUPS = {
         "tests/backend/integration/business/test_installments_api_class.py",
         "tests/backend/integration/business/test_m2.py",
         "tests/backend/integration/business/test_installments_service.py",
+        "tests/backend/integration/business/test_installments_service_write_paths.py",
+        "tests/backend/integration/business/test_installments_service_defensive.py",
         "tests/backend/integration/business/test_flow_installment.py",
         "tests/backend/integration/business/test_installment_remaining.py",
         "tests/backend/integration/business/test_installment_totals.py",

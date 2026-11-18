@@ -160,20 +160,20 @@ def _profit_flow_rows(
     """
     rows: list[tuple[int, date, Decimal, Decimal]] = []
 
-    action_model_stmt = select(OrderEvent.form_extra).where(
+    action_model_stmt = select(OrderEvent.source_id).where(
         OrderEvent.event_type == EventType.REBATE.value,
+        OrderEvent.source_type == "REBATE",
         OrderEvent.is_posted.is_(True),
     )
     if order_ids is not None:
         action_model_stmt = action_model_stmt.where(OrderEvent.order_id.in_(order_ids))
-    action_model_rebate_ids = {
-        int((extra or {}).get("rebate_record_id"))
-        for extra in session.scalars(action_model_stmt).all()
-        if isinstance(extra, dict)
-        and str((extra or {}).get("rebate_record_id", "")).isdigit()
+    action_model_rebate_nos = {
+        source_id
+        for source_id in session.scalars(action_model_stmt).all()
+        if source_id
     }
     rebate_stmt = select(
-        RebateRecord.id,
+        RebateRecord.rebate_no,
         RebateRecord.source_order_id,
         RebateRecord.collected_on,
         RebateRecord.amount,
@@ -184,8 +184,8 @@ def _profit_flow_rows(
         rebate_stmt = rebate_stmt.where(RebateRecord.collected_on >= from_date)
     if to_date is not None:
         rebate_stmt = rebate_stmt.where(RebateRecord.collected_on <= to_date)
-    for rebate_id, order_id, occurred_on, amount in session.execute(rebate_stmt).all():
-        if rebate_id in action_model_rebate_ids:
+    for rebate_no, order_id, occurred_on, amount in session.execute(rebate_stmt).all():
+        if rebate_no in action_model_rebate_nos:
             continue
         rows.append((int(order_id), occurred_on, to_money_or_zero(amount), ZERO))
 

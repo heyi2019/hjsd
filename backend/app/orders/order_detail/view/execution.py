@@ -73,13 +73,13 @@ def load_order_execution_detail(
     )
     return AccountExecutionDetailOut(
         account=_account_outputs(db, [account], user)[0],
-        finance_summary=build_finance_summary(db, order_ids=[order.id], event_cashflows=context.event_cashflows, order_cashflows=context.order_cashflows, order_rebates=relations.rebates_by_order, action_model_rebate_ids=context.action_model_rebate_ids, deposit_loss_flow_nos=context.deposit_loss_flow_nos),
+        finance_summary=build_finance_summary(db, order_ids=[order.id], event_cashflows=context.event_cashflows, order_cashflows=context.order_cashflows, order_rebates=relations.rebates_by_order, action_model_rebate_nos=context.action_model_rebate_nos, deposit_loss_flow_nos=context.deposit_loss_flow_nos),
         orders=outputs,
         detail_view=build_detail_view(
             outputs,
             account_description=account.account_description,
             account_images=account.account_images or [],
-            action_model_rebate_ids=context.action_model_rebate_ids,
+            action_model_rebate_nos=context.action_model_rebate_nos,
         ),
         audit=audit,
     )

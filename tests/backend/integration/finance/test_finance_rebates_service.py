@@ -143,7 +143,8 @@ def test_rebate_creates_business_event_and_income_cashflow(seeded_db):
         )
     )
     assert event is not None
-    assert (event.form_extra or {}).get("rebate_record_id") == record.id
+    assert event.source_type == "REBATE"
+    assert event.source_id == record.rebate_no
     flow = seeded_db.scalar(select(Cashflow).where(
         Cashflow.source_type == "ORDER_EVENT",
         Cashflow.source_id == event.event_no,
@@ -358,7 +359,7 @@ def test_update_rebate_syncs_event_and_flow(seeded_db):
 
 
 def test_update_rebate_without_action_event_still_updates_record(seeded_db):
-    """旧模型记录没有 REBATE 事件回指：编辑只更新返点记录本身，走兼容口径。"""
+    """事件未回指返点记录（source_id 为空）：编辑只更新返点记录本身。"""
     order_id = _order_with_buy(seeded_db)
     record = rebates.create_rebate(
         seeded_db, source_order_id=order_id, rebate_type="BUY",
@@ -369,11 +370,11 @@ def test_update_rebate_without_action_event_still_updates_record(seeded_db):
             OrderEvent.order_id == order_id, OrderEvent.event_type == "REBATE",
         )
     )
-    event.form_extra = None  # 拆掉 rebate_record_id 回指，模拟旧记录
+    event.source_id = None  # 拆掉 source_id 回指
     seeded_db.flush()
     updated = rebates.update_rebate(
         seeded_db, record.id, actor="pytest", amount=Decimal("300"),
     )
     assert updated.amount == Decimal("300")
-    # 事件金额未被联动（无回指），流水保持原值
+    # 无回指则事件金额未被联动，流水保持原值
     assert event.amount == Decimal("800")

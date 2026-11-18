@@ -22,7 +22,7 @@ class DetailEventContext:
     event_cashflows: dict[int, ExecutionCashflowOut]
     order_cashflows: dict[int, list[ExecutionCashflowOut]]
     deposit_loss_flow_nos: set[str]
-    action_model_rebate_ids: set[int]
+    action_model_rebate_nos: set[str]
 
 
 def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
@@ -36,11 +36,12 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
             .order_by(OrderEvent.occurred_on, OrderEvent.id)
         ).all()
     )
-    action_model_rebate_ids = {
-        int((event.form_extra or {}).get("rebate_record_id"))
+    action_model_rebate_nos = {
+        event.source_id
         for event in events
         if event.event_type == EventType.REBATE.value
-        and str((event.form_extra or {}).get("rebate_record_id", "")).isdigit()
+        and event.source_type == CashflowSourceType.REBATE.value
+        and event.source_id
     }
     event_nos = [event.event_no for event in events]
     event_cashflows: dict[int, ExecutionCashflowOut] = {}
@@ -128,7 +129,7 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
         event_cashflows=event_cashflows,
         order_cashflows=order_cashflows,
         deposit_loss_flow_nos=deposit_loss_flow_nos,
-        action_model_rebate_ids=action_model_rebate_ids,
+        action_model_rebate_nos=action_model_rebate_nos,
     )
 
 

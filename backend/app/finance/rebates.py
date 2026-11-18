@@ -115,11 +115,10 @@ def create_rebate(
         operator_user_ids=operator_ids,
         form_extra_scope="INVREBATE",
         form_extra=form_extra,
+        source_type=CashflowSourceType.REBATE.value,
+        source_id=record.rebate_no,
         user=user,
     )
-    event_extra = dict(event.form_extra or {})
-    event_extra["rebate_record_id"] = record.id
-    event.form_extra = event_extra
     pool = require_default_pool(session)
     from app.finance.cashflows import create_cashflow
 
@@ -137,7 +136,7 @@ def create_rebate(
         source_id=event.event_no,
         operator_user_ids=operator_ids,
         note=note or f"{rebate_type} 返点",
-        form_extra={**(form_extra or {}), "rebate_record_id": record.id},
+        form_extra=form_extra,
         form_extra_scope="INVREBATE",
         user=user,
     )
@@ -245,20 +244,18 @@ def update_rebate(
 
 
 def _rebate_action_event(session: Session, record: RebateRecord) -> OrderEvent | None:
-    """查找新动作模型的返点事件；旧记录没有该事件，继续走兼容口径。
+    """按显式来源 source_type=REBATE + source_id=rebate_no 定位返点事件。
 
     供 update_rebate 编辑时同步事件与资金流水的金额/日期，保持报表同源。
     """
-    events = session.scalars(
+    return session.scalar(
         select(OrderEvent).where(
             OrderEvent.order_id == record.source_order_id,
             OrderEvent.event_type == "REBATE",
+            OrderEvent.source_type == CashflowSourceType.REBATE.value,
+            OrderEvent.source_id == record.rebate_no,
         )
-    ).all()
-    for event in events:
-        if (event.form_extra or {}).get("rebate_record_id") == record.id:
-            return event
-    return None
+    )
 
 
 __all__ = [

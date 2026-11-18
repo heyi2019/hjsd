@@ -21,7 +21,7 @@ def build_finance_summary(
     event_cashflows: dict[int, ExecutionCashflowOut],
     order_cashflows: dict[int, list[ExecutionCashflowOut]],
     order_rebates: dict[int, list[ExecutionRebateOut]],
-    action_model_rebate_ids: set[int],
+    action_model_rebate_nos: set[str],
     deposit_loss_flow_nos: set[str],
 ) -> ExecutionFinanceSummaryOut:
     """按详情明细计算收入、支出与净额。
@@ -45,7 +45,7 @@ def build_finance_summary(
             rebate.amount
             for rebates in order_rebates.values()
             for rebate in rebates
-            if rebate.id not in action_model_rebate_ids
+            if rebate.rebate_no not in action_model_rebate_nos
         ),
         zero,
     )

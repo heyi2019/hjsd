@@ -69,10 +69,16 @@ def post_event(
     bound_phone_owner: str | None = None,
     form_extra: Mapping[str, Any] | None = None,
     form_extra_scope: str | None = None,
+    source_type: str | None = None,
+    source_id: str | None = None,
     user: CurrentUser | None = None,
     allow_installment_delivery: bool = False,
 ) -> tuple[OrderEvent, Cashflow | None]:
-    """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。"""
+    """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。
+
+    ``source_type``/``source_id`` 是可选的显式业务来源配对（如返点事件回指
+    RebateRecord）；不传时事件无来源，行为与改造前一致。
+    """
     from app.shared.order_access import get_order
 
     (
@@ -195,6 +201,8 @@ def post_event(
         operator_user_ids=operator_user_ids,
         note=note,
         form_extra=event_form_extra or None,
+        source_type=source_type,
+        source_id=source_id,
         is_posted=True,
         posted_at=now_second(),
         created_by=actor,

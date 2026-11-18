@@ -188,6 +188,7 @@ class OrderEvent(Base, AuditMixin):
             name="event_delivery_mode_valid",
         ),
         Index("ix_order_events_occurred_on", "occurred_on"),
+        Index("ix_order_events_source", "source_type", "source_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -213,6 +214,10 @@ class OrderEvent(Base, AuditMixin):
     posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 显式业务来源：source_type/source_id 配对，与 Cashflow 同构；
+    # 返点事件以 source_type=REBATE + source_id=rebate_no 回指返点记录。
+    source_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    source_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # 表单字段配置体系：订单操作类作用域（ORDERCANC/REFUND/INVREFUND/INVOID 等）
     # 的自定义字段值（与 Order.form_extra 同构）。
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)

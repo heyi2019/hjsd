@@ -1,8 +1,9 @@
 """STATE-01 orders 域覆盖收口（批2 安全子集）：events.py + service.py 的异常/校验分支守门用例。
 
 仅覆盖 WIP 未触碰的稳定文件（events.py / service.py）；orders/router.py 因 WIP 在改，留待 WIP 落定。
-部分内部守卫（_assert_sellable_order / _assert_event_allowed / _get_offset_event / _resolve_pool /
-_audit_value / _opposite_direction）直接调用，与 test_orders_common.py 对 _common 的手法一致。
+部分内部守卫直接调用：`_assert_sellable_order` / `_assert_event_allowed` 经 events 命名空间，
+`_get_offset_event`（cancellation_model）/ `_resolve_pool`（events_rules）直连真实定义模块；
+与 test_orders_common.py 对 _common 的手法一致。
 """
 from __future__ import annotations
 
@@ -22,8 +23,10 @@ from app.installments import recovery as inst_recovery
 from app.installments.repayments.pay import pay as inst_pay
 from app.orders import events
 from app.orders._shared import _audit_value
+from app.orders.cancellation_model import get_cancellation_offset as _get_offset_event
 from app.orders.create import create_order
 from app.orders.events import post_event
+from app.orders.events_rules import _resolve_pool
 from app.orders.links import create_order_link
 from app.orders.mutations import update_order
 from app.orders.queries import list_orders
@@ -279,7 +282,7 @@ def test_get_offset_event_rejects_unposted(seeded_db):
     seeded_db.add(unposted)
     seeded_db.flush()
     with pytest.raises(Validation, match="只能冲销已登记事件"):
-        events._get_offset_event(seeded_db, unposted.id, order_id=order.id)
+        _get_offset_event(seeded_db, unposted.id, order_id=order.id)
 
 
 def test_get_offset_event_rejects_non_money_event(seeded_db):
@@ -293,7 +296,7 @@ def test_get_offset_event_rejects_non_money_event(seeded_db):
     seeded_db.add(deliver_ev)
     seeded_db.flush()
     with pytest.raises(Validation, match="只能冲销有金额的业务事件"):
-        events._get_offset_event(seeded_db, deliver_ev.id, order_id=order.id)
+        _get_offset_event(seeded_db, deliver_ev.id, order_id=order.id)
 
 
 def test_resolve_pool_requires_default_pool(seeded_db):
@@ -303,7 +306,7 @@ def test_resolve_pool_requires_default_pool(seeded_db):
         seeded_db.delete(pool)
     seeded_db.flush()
     with pytest.raises(Validation, match="默认资金账户"):
-        events._resolve_pool(seeded_db, unknown_order, "PRINCIPAL")
+        _resolve_pool(seeded_db, unknown_order, "PRINCIPAL")
 
 
 # --------------------------------------------------------------------- service.py

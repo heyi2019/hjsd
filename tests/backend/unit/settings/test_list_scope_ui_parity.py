@@ -9,9 +9,10 @@
 历史事故（2026-11-03 人工审计，21 个作用域查出 4 处）：客户「建立时间」、流水「建立时间」、
 订单利润「账号采购成本」漏登记；返点「状态」是幽灵列。
 
-做法：静态解析前端面板源码 —— 定位 `useListViewColumns("<SCOPE>")` 之后的第一处
- `= [` 数组字面量，按顶层逗号切成列定义，取 `key:`（优先，派生列的 key 与 dataIndex 不同）
-否则 `dataIndex:`，取 `title:` 作中文名；然后与注册表**逐列比对 key 与中文名**。
+做法：静态解析前端面板源码 —— 定位 `useListViewColumns("<SCOPE>")` 锚点（可能与列数组
+分居两个文件，如列定义拆到工厂时），再找之后的第一处 `= [` 数组字面量，按顶层逗号切成列定义，
+取 `key:`（优先，派生列的 key 与 dataIndex 不同）否则 `dataIndex:`，取 `title:` 作中文名；
+然后与注册表**逐列比对 key 与中文名**。
 
 刻意不覆盖的部分：**自定义列**（`list_custom_columns`）是运行时数据，源码里没有，
 按设计只存在于库与接口返回中，不参与本守卫。
@@ -29,20 +30,26 @@ import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
 _FRONTEND_SRC = _repo.FRONTEND_DIR / "src"
 
-# 作用域 → 渲染该列表的面板源文件（相对 frontend/src）。
-# 同一文件承载多个列表时（资金中心 5 个、报表 7 个），靠 useListViewColumns 标记定位各自的列数组。
-PANEL_SOURCES: dict[str, str] = {
+# 作用域 → 渲染该列表的面板源文件（相对 frontend/src），或 (锚点文件, 列数组文件) 二元组。
+# 同一文件承载多个列表时（报表 7 个），靠 useListViewColumns 标记定位各自的列数组；
+# 列数组被拆到独立工厂且锚点仍留在调用方时（INSTALLMENT），用二元组分别指定两处。
+PANEL_SOURCES: dict[str, str | tuple[str, str]] = {
     # 前四轮拆分把列定义下沉到专用 hook 文件；面板壳只剩编排，标记必须跟随列数组。
     "LEDGER": "orders/orderpage/useLedgerColumns.tsx",
     "INVENTORY": "stocks/InventoryPanel/useInventoryColumns.tsx",
-    "INSTALLMENT": "installments/useContractTableController.tsx",
+    # 列数组拆到 contractColumns 工厂，useListViewColumns 锚点仍在 controller —— 两文件分离。
+    "INSTALLMENT": (
+        "installments/useContractTableController.tsx",
+        "installments/contractColumns.tsx",
+    ),
     "CUSTOMER": "customer-center/useCustomerController.tsx",
     "COUNTERPARTY": "customer-center/CounterpartyPanel.tsx",
     "LEAD": "customer-center/CustomerLeadPanel.tsx",
-    "CASHFLOW": "pools/FundsPage.tabs.tsx",
-    "FUND_POOLS": "pools/FundsPage.tabs.tsx",
-    "DEPOSITS": "pools/FundsPage.tabs.tsx",
-    "RECONCILIATIONS": "pools/FundsPage.tabs.tsx",
+    # 资金中心 5 个 Tab 已拆到 funds-tabs/ 子文件，锚点与列数组同处各自 Tab。
+    "CASHFLOW": "pools/funds-tabs/cashflow.tsx",
+    "FUND_POOLS": "pools/funds-tabs/overview.tsx",
+    "DEPOSITS": "pools/funds-tabs/deposit.tsx",
+    "RECONCILIATIONS": "pools/funds-tabs/reconciliation.tsx",
     "AUDIT_LOG": "audit/AuditPanel.tsx",
     # 报表视图已从 ReportsPage.tsx 拆到 ./reports/*.tsx（壳文件只剩 Tab 与批量导出），
     # 列定义在各子文件里，映射必须落到子文件，否则这条守卫对 7 张报表形同不存在。
@@ -140,13 +147,17 @@ def panel_columns(scope: str) -> list[tuple[str, str | None]]:
     锚点后可能有非列数组（如筛选下拉的分组选项），逐个尝试：
     跳过解析不出列键的数组，取第一个全部条目都带 key/dataIndex 的。
     """
-    relative = PANEL_SOURCES[scope]
-    text = (_FRONTEND_SRC / relative).read_text(encoding="utf-8")
+    source = PANEL_SOURCES[scope]
+    anchor_file, columns_file = source if isinstance(source, tuple) else (source, source)
+    anchor_text = (_FRONTEND_SRC / anchor_file).read_text(encoding="utf-8")
     marker = f'useListViewColumns("{scope}")'
-    anchor = text.find(marker)
-    assert anchor >= 0, f"{relative} 里没有 {marker}：作用域改名或面板换实现时要同步本测试"
+    anchor = anchor_text.find(marker)
+    assert anchor >= 0, f"{anchor_file} 里没有 {marker}：作用域改名或面板换实现时要同步本测试"
+    # 列数组与锚点同文件时从锚点后找；分离时列数组文件从头找。
+    text = anchor_text if columns_file == anchor_file else (_FRONTEND_SRC / columns_file).read_text(encoding="utf-8")
+    search_from = anchor if columns_file == anchor_file else 0
     errors: list[str] = []
-    for declaration in _ARRAY_DECL.finditer(text, anchor):
+    for declaration in _ARRAY_DECL.finditer(text, search_from):
         found: list[tuple[str, str | None]] = []
         try:
             _collect_columns(_split_items(_array_body(text, declaration.end() - 1)), found)
@@ -155,7 +166,7 @@ def panel_columns(scope: str) -> list[tuple[str, str | None]]:
             continue
         if found:
             return found
-    assert False, f"{relative} 里 {marker} 之后没找到可解析的列数组；最近一次解析错误：{errors[-1] if errors else '无'}"
+    assert False, f"{columns_file} 里 {marker} 之后没找到可解析的列数组；最近一次解析错误：{errors[-1] if errors else '无'}"
 
 
 def test_frontend_source_available() -> None:

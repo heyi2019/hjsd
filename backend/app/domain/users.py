@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint,
+    Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 

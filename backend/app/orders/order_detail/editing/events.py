@@ -1,7 +1,6 @@
 """订单详情中的执行事件编辑。"""
 from __future__ import annotations
 
-from datetime import datetime
 from decimal import Decimal
 
 from fastapi.encoders import jsonable_encoder

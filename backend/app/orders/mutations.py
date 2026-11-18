@@ -30,7 +30,6 @@ from app.domain.trade import (
 )
 from app.domain.enums import (
     AuditAction,
-    OrderStatus,
     PolicyType,
 )
 

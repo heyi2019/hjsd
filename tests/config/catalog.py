@@ -312,7 +312,6 @@ FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "ReportsPage.deep.test.tsx":           "E01",
     "ReportsPage.details.test.tsx":        "E01",
     "ReportsPage.test.tsx":                "E01",
-    "inventory-export.test.ts":            "E02",
     "ImportWorkbench.test.tsx":            "E03",
     "ConfigCenterPanel.test.tsx":          "F01",
     "PolicySettingsPanel.test.tsx":        "F01",

@@ -153,7 +153,7 @@ npm run test:full            # fast + quick + react，轻量层并发、重层�
 npm run test:full:all        # 再加 react-deep（发版前），约 182s
 npm run test:panel business  # 只跑某区域：tests/frontend/<unit|module>/business
 npm run test:changed         # 按 git 变更自动选区域（改 src/orders → business）
-npm run test:e2e             # Playwright + 真实后端 + 独立库 heijin_erp_e2e（15 spec / 62 例）
+npm run test:e2e             # Playwright + 真实后端 + 独立库 heijin_erp_e2e（16 spec / 57 例，与 manifest 一致）
 ```
 
 CI（`frontend-gate`）默认按变更选测：`workflow_dispatch` 传 `full_suite=true` → `test:ci` 全量（发版收口）；

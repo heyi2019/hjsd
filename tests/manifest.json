@@ -24,7 +24,7 @@
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
         "files": 136,
-        "cases": 1729,
+        "cases": 1718,
         "kinds": {
           "unit": {
             "files": 31,
@@ -40,7 +40,7 @@
           },
           "integration": {
             "files": 105,
-            "cases": 1419,
+            "cases": 1408,
             "byArea": {
               "business": 39,
               "customer": 8,
@@ -151,11 +151,11 @@
       "config": "frontend/playwright.config.ts",
       "expected": {
         "files": 16,
-        "cases": 58,
+        "cases": 57,
         "byArea": {
           "system": 7,
           "finance": 1,
-          "cross": 8
+          "cross": 7
         }
       },
       "budgets": {

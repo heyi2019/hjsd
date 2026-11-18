@@ -237,7 +237,6 @@ def export_orders_xlsx(
             "ORDER_EVENT_TYPE",
             "FUND_FLOW_DIRECTION",
             "REBATE_TYPE",
-            "ORDER_LINK_STATUS",
         ),
     )
     # 操作明细：事件类型是「动作」，不再有金额归属（本金/利润/总额）这类系统口径列
@@ -267,7 +266,6 @@ def export_orders_xlsx(
         columns=REBATE_EXPORT_COLUMNS,
         value_labels={
             "rebate_type": option_labels.get("REBATE_TYPE", {}),
-            "link_status": option_labels.get("ORDER_LINK_STATUS", {}),
             "status": _REBATE_STATUS_LABELS,
         },
     )

@@ -27,7 +27,6 @@ from app.orders.cancellation_model import get_cancellation_offset as _get_offset
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.orders.events_rules import _resolve_pool
-from app.orders.links import create_order_link
 from app.orders.mutations import update_order
 from app.orders.queries import list_orders
 from app.customer_center.counterparties import create_counterparty
@@ -370,17 +369,6 @@ def test_create_order_rejects_invalid_owner_id(seeded_db):
         create_order(
             seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
             owner_id=-1, user=None,
-        )
-
-
-def test_create_order_link_rejects_split_ratio_over_100(seeded_db):
-    o1 = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
-    o2 = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
-    seeded_db.commit()
-    with pytest.raises(Validation):
-        create_order_link(
-            seeded_db, o1.id, related_order_id=o2.id, relation_type="SOURCE",
-            split_ratio=Decimal("150"), actor="pytest",
         )
 
 

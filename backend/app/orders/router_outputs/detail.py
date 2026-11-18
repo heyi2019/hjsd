@@ -15,7 +15,6 @@ from app.domain.trade import (
     RebateRecord,
 )
 from app.orders import schemas
-from app.orders.links import list_order_links
 from app.orders.output_labels import _selected_operator_label
 from app.orders.router_outputs._shared import (
     _apply_common_output,
@@ -39,10 +38,6 @@ def _order_detail_output(
     operator_names = _operator_names(db, events)
     cancellable = cancellable_by_event(list(events))
     output.events = [_event_output(event, operator_names, cancellable) for event in events]
-    output.links = [
-        schemas.OrderLinkOut.model_validate(item)
-        for item in list_order_links(db, order.id, user)
-    ]
     if user.has(PERM_FINANCE_READ):
         cashflows = db.scalars(
             select(Cashflow)
@@ -83,7 +78,6 @@ def _order_detail_output(
                     "rebate_type": item.rebate_type,
                     "channel": item.channel,
                     "amount": item.amount,
-                    "link_status": item.link_status,
                     "status": item.status,
                     "collected_on": item.collected_on,
                     "note": item.note,

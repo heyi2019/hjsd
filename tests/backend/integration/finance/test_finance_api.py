@@ -756,7 +756,6 @@ class TestFinanceApi:
         assert response.json()[0]["rebate_no"].startswith("HS")
         assert "rebate_group_no" not in response.json()[0]
         assert response.json()[0]["channel"] == "买号返点"
-        assert response.json()[0]["link_status"] == "LINKED"
         assert response.json()[0]["note"] == "回收买号返点"
         assert response.json()[0]["operator"] == "pytest"
         assert response.json()[0]["created_at"]

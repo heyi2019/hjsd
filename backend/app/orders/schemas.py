@@ -141,18 +141,6 @@ class OrderUpdate(BaseModel):
     form_extra: dict[str, object] | None = None
 
 
-class OrderLinkCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    related_order_id: int = Field(gt=0)
-    relation_type: str = Field(min_length=1, max_length=16)
-    split_ratio: Decimal | None = Field(default=None, gt=0, le=100)
-    split_amount: Decimal | None = Field(default=None, gt=0)
-    note: str | None = None
-    # 表单字段配置体系（ORDERLINK 作用域）：自定义字段值落 OrderLink.form_extra。
-    form_extra: dict[str, object] | None = None
-
-
 class OrderCancelIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -182,7 +170,6 @@ class OrderOut(BaseModel):
     account_snapshot: dict | None = None
     account_id: int | None = None
     status: str
-    link_status: str
     owner_id: int | None = None
     note: str | None = None
     commission_mode: str | None = None
@@ -299,7 +286,6 @@ class OrderDetailOut(OrderOut):
 
     form_extra: dict[str, object] | None = None
     events: list[EventOut] = Field(default_factory=list)
-    links: list["OrderLinkOut"] = Field(default_factory=list)
     cashflows: list["OrderCashflowOut"] = Field(default_factory=list)
     rebates: list["OrderRebateOut"] = Field(default_factory=list)
     installment: "OrderInstallmentOut | None" = None
@@ -332,7 +318,6 @@ class OrderRebateOut(BaseModel):
     rebate_type: str
     channel: str | None = None
     amount: Decimal
-    link_status: str
     status: str
     collected_on: date
     note: str | None = None
@@ -389,21 +374,6 @@ class OrderAuditOut(BaseModel):
     occurred_at: datetime
 
 
-class OrderLinkOut(BaseModel):
-    id: int
-    source_order_id: int
-    source_order_no: str
-    target_order_id: int
-    target_order_no: str
-    relation_type: str
-    direction: str
-    split_ratio: Decimal | None = None
-    split_amount: Decimal | None = None
-    note: str | None = None
-    form_extra: dict[str, object] | None = None
-    created_at: datetime
-
-
 class EventPostResult(BaseModel):
     event: EventOut
     cashflow_no: str | None = None
@@ -422,11 +392,9 @@ __all__ = [
     "OrderCreate",
     "OrderCancelIn",
     "OrderDeleteIn",
-    "OrderLinkCreate",
     "OrderOut",
     "OrderDetailOut",
     "OrderListOut",
-    "OrderLinkOut",
     "OrderUpdate",
     "OrderFormFieldOut",
     "OrderFormFieldCreate",

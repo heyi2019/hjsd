@@ -73,15 +73,6 @@ class SequenceKey(StrEnum):
     STOCK_NO = "STOCK_NO"
 
 
-class LinkStatus(StrEnum):
-    """关联状态：禁止 AUTO_MATCHED（V22）。"""
-
-    LINKED = "LINKED"
-    UNLINKED = "UNLINKED"
-    ORPHAN = "ORPHAN"
-    UNLINKED_TRANSFER = "UNLINKED_TRANSFER"
-
-
 # ---------------------------------------------------------------- 客户 / 合作方
 class CustomerStatus(StrEnum):
     """客户状态：停用与已合并均不可作为新订单参与方（CUS-01）。"""
@@ -154,13 +145,6 @@ class OrderStatus(StrEnum):
     INSTALLMENT = "INSTALLMENT"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
-
-
-class OrderLinkType(StrEnum):
-    """订单关联方向：当前订单的来源单或后续单。"""
-
-    SOURCE = "SOURCE"
-    FOLLOW_UP = "FOLLOW_UP"
 
 
 class EventType(StrEnum):
@@ -463,8 +447,6 @@ class AuditAction(StrEnum):
     ORDER_UPDATE = "ORDER_UPDATE"
     ORDER_DELETE = "ORDER_DELETE"
     ORDER_CANCEL = "ORDER_CANCEL"
-    ORDER_LINK_CREATE = "ORDER_LINK_CREATE"
-    ORDER_LINK_DELETE = "ORDER_LINK_DELETE"
     LIST_COLUMNS_UPDATE = "LIST_COLUMNS_UPDATE"  # 列表列显示/顺序配置变更
     LIST_COLUMNS_RESET = "LIST_COLUMNS_RESET"  # 列表列配置恢复默认（清空该列表全部配置行）
     LIST_COLUMN_ADD = "LIST_COLUMN_ADD"  # 列表新增自定义列（绑定表单自定义字段）
@@ -562,11 +544,9 @@ __all__ = [
     "InstallmentDispositionAction",
     "InstallmentStatus",
     "InventoryAgeLevel",
-    "LinkStatus",
     "LeadStatus",
     "LeadType",
     "Nature",
-    "OrderLinkType",
     "OrderStatus",
     "PolicyStatus",
     "PoolOwnership",

@@ -52,21 +52,6 @@ export interface OrderEvent {
   cancellable_amount: string;
 }
 
-export interface OrderLink {
-  id: number;
-  source_order_id: number;
-  source_order_no: string;
-  target_order_id: number;
-  target_order_no: string;
-  relation_type: string;
-  /** 以当前订单视角给出方向：outgoing=本单是来源单，incoming=本单是后续单。 */
-  direction: string;
-  split_ratio?: string | null;
-  split_amount?: string | null;
-  note?: string | null;
-  created_at?: string;
-}
-
 export interface EventPostResult {
   event: OrderEvent;
   cashflow_no: string | null;

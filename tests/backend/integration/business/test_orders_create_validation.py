@@ -28,7 +28,7 @@ from app.customer_center.counterparties import create_counterparty
 from app.customer_center.customers import create_customer, set_customer_status
 from app.domain.foundation import AuditLog
 from app.domain.parties import OrderCustomerRole
-from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
+from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField
 from app.domain.users import User
 from app.field_definitions.order_types import get_order_type_by_code, set_order_type_active
 from app.orders import schemas
@@ -36,7 +36,6 @@ from app.shared.order_access import get_order
 from app.orders.cancellation_model import cancel_order
 from app.orders.create import create_order
 from app.orders.events import _opposite_direction, post_event
-from app.orders.links import create_order_link, delete_order_link, list_order_links
 from app.orders.mutations import update_order
 from app.finance.balances import pool_balance
 from app.orders.queries import list_orders, order_customer_count
@@ -89,122 +88,6 @@ class TestCreateOrderValidation:
                 owner_id=owner.id,
                 actor="pytest",
             )
-
-    def test_order_links_record_source_follow_up_and_split_share(self, seeded_db):
-        source = _order(seeded_db, order_type="HS")
-        follow_up = _order(seeded_db, order_type="HS")
-
-        link = create_order_link(
-            seeded_db,
-            follow_up.id,
-            related_order_id=source.id,
-            relation_type="SOURCE",
-            split_ratio=Decimal("50"),
-            split_amount=Decimal("400"),
-            note="来源订单",
-            actor="pytest",
-        )
-
-        assert link.source_order_id == source.id
-        assert link.target_order_id == follow_up.id
-        listed = list_order_links(seeded_db, follow_up.id)
-        assert listed[0]["direction"] == "SOURCE"
-        assert listed[0]["source_order_no"] == source.order_no
-        assert listed[0]["split_ratio"] == Decimal("50.00")
-
-        with pytest.raises(Validation, match="订单关联已存在"):
-            create_order_link(
-                seeded_db,
-                source.id,
-                related_order_id=follow_up.id,
-                relation_type="FOLLOW_UP",
-                actor="pytest",
-            )
-
-    def test_order_link_rejects_self_and_invalid_relation(self, seeded_db):
-        order = _order(seeded_db, order_type="HS")
-        with pytest.raises(Validation, match="不能关联自身"):
-            create_order_link(
-                seeded_db,
-                order.id,
-                related_order_id=order.id,
-                relation_type="SOURCE",
-                actor="pytest",
-            )
-        with pytest.raises(Validation, match="关联方向无效"):
-            create_order_link(
-                seeded_db,
-                order.id,
-                related_order_id=999999,
-                relation_type="UNKNOWN",
-                actor="pytest",
-            )
-
-    def test_order_link_delete_removes_link_and_writes_audit(self, seeded_db):
-        source = _order(seeded_db, order_type="HS")
-        follow_up = _order(seeded_db, order_type="HS")
-        link = create_order_link(
-            seeded_db,
-            follow_up.id,
-            related_order_id=source.id,
-            relation_type="SOURCE",
-            split_ratio=Decimal("50"),
-            split_amount=Decimal("400"),
-            note="来源订单",
-            actor="pytest",
-        )
-
-        delete_order_link(seeded_db, follow_up.id, link.id, actor="pytest")
-
-        assert seeded_db.scalar(select(OrderLink).where(OrderLink.id == link.id)) is None
-        assert list_order_links(seeded_db, follow_up.id) == []
-        assert list_order_links(seeded_db, source.id) == []
-        audit = seeded_db.scalar(
-            select(AuditLog)
-            .where(
-                AuditLog.action == AuditAction.ORDER_LINK_DELETE.value,
-                AuditLog.entity_id == str(link.id),
-            )
-            .order_by(AuditLog.id.desc())
-        )
-        assert audit is not None
-        assert audit.before_json["relation_type"] == "SOURCE"
-        assert audit.before_json["split_amount"] == "400.00"
-        # 删除后同一对订单可重新建立关联（唯一约束不阻挡重建）。
-        # 注意：SQLite rowid 是 max+1 复用语义（AUTOINCREMENT 关键字未生成），
-        # 删掉最大行后重建可能拿回同一 id —— 这是 DB 固有语义，不是缺陷。
-        again = create_order_link(
-            seeded_db,
-            follow_up.id,
-            related_order_id=source.id,
-            relation_type="SOURCE",
-            actor="pytest",
-        )
-        assert again.id is not None
-        relisted = list_order_links(seeded_db, follow_up.id)
-        assert [item["id"] for item in relisted] == [again.id]
-
-    def test_order_link_delete_rejects_foreign_and_missing(self, seeded_db):
-        source = _order(seeded_db, order_type="HS")
-        follow_up = _order(seeded_db, order_type="HS")
-        bystander = _order(seeded_db, order_type="HS")
-        link = create_order_link(
-            seeded_db,
-            follow_up.id,
-            related_order_id=source.id,
-            relation_type="SOURCE",
-            actor="pytest",
-        )
-        # 无关订单视角删除 → 404（不泄露关联存在性）
-        with pytest.raises(NotFound, match="不存在"):
-            delete_order_link(seeded_db, bystander.id, link.id, actor="pytest")
-        assert seeded_db.scalar(select(OrderLink).where(OrderLink.id == link.id)) is not None
-        # 对端（source 方）视角允许删除
-        delete_order_link(seeded_db, source.id, link.id, actor="pytest")
-        assert seeded_db.scalar(select(OrderLink).where(OrderLink.id == link.id)) is None
-        # 重复删除 → 404
-        with pytest.raises(NotFound, match="不存在"):
-            delete_order_link(seeded_db, follow_up.id, link.id, actor="pytest")
 
     def test_installment_gate_flags_must_be_boolean_in_service(self, seeded_db):
         order = _order(seeded_db, order_type="HS")
@@ -344,22 +227,6 @@ class TestCreateOrderValidation:
                 portion="GROSS",
                 occurred_on=D,
                 delivery_mode="UNKNOWN",
-            )
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
-    def test_order_link_status_is_closed_at_database_boundary(self, seeded_db):
-        seeded_db.add(
-            Order(
-                order_no="HS-INVALID-LINK-STATUS",
-                order_type="HS",
-                trade_date=D,
-                status=OrderStatus.ACTIVE.value,
-                link_status="AUTO_MATCHED",
-                created_by="pytest",
-                updated_by="pytest",
             )
         )
         with pytest.raises(IntegrityError):

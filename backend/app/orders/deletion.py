@@ -26,7 +26,6 @@ from app.domain.trade import (
     InstallmentSchedule,
     Order,
     OrderEvent,
-    OrderLink,
     OrderProfitAllocation,
     RebateRecord,
 )
@@ -203,9 +202,6 @@ def _delete_order_dependents(
             Installment.id.in_(dependencies.installment_ids)
         ).delete(synchronize_session=False)
 
-    session.query(OrderLink).filter(
-        or_(OrderLink.source_order_id == order_id, OrderLink.target_order_id == order_id)
-    ).delete(synchronize_session=False)
     session.query(OrderCustomerRole).filter(
         OrderCustomerRole.order_id == order_id
     ).delete(synchronize_session=False)

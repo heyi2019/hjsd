@@ -2,7 +2,7 @@
  * 由原 shared/api/types.ts 按领域拆分；对外仍从 `./types` 统一导入。
  * 金额一律以字符串传输，前端不做浮点数计算。 */
 
-import type { OrderAttachment, OrderAuditEntry, OrderEvent, OrderLink } from "./order-events";
+import type { OrderAttachment, OrderAuditEntry, OrderEvent } from "./order-events";
 
 export interface OrderType {
   id: number;
@@ -53,7 +53,6 @@ export interface Order {
   installment_periods?: number | null;
   installment_status?: string | null;
   events?: OrderEvent[];
-  links?: OrderLink[];
   cashflows?: OrderCashflow[];
   rebates?: OrderRebate[];
   installment?: OrderInstallment | null;
@@ -80,8 +79,6 @@ export interface Order {
     purchase_price?: string | null;
     note?: string | null;
   } | null;
-  /** 关联完整性：NORMAL / ORPHAN / UNLINKED_TRANSFER（后端 orders/schemas.py）。 */
-  link_status?: string;
 }
 
 export interface OrderCashflow {
@@ -106,7 +103,6 @@ export interface OrderRebate {
   channel?: string | null;
   rate: string;
   amount: string;
-  link_status: string;
   status: string;
   collected_on: string;
   note?: string | null;

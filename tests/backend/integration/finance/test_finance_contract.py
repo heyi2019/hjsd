@@ -64,22 +64,4 @@ def _active_order(seeded_db) -> int:
     return order.id
 
 
-class TestRebateValidation:
-    def test_rebate_link_status_is_closed_at_database_boundary(self, seeded_db):
-        seeded_db.add(
-            RebateRecord(
-                rebate_no="RB-INVALID-LINK-STATUS",
-                source_order_id=_active_order(seeded_db),
-                amount=Decimal("500"),
-                status="OPEN",
-                link_status="AUTO_MATCHED",
-                collected_on=TODAY,
-                created_by="pytest",
-                updated_by="pytest",
-            )
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
 

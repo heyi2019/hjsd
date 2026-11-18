@@ -48,9 +48,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "ORDER_STATUS", label: "订单状态", group: "ORDER", editable: false, options: [
     { value: "ACTIVE", label: "进行中" }, { value: "INSTALLMENT", label: "分期中" }, { value: "COMPLETED", label: "已完成" }, { value: "CANCELLED", label: "已取消" },
   ] },
-  { code: "ORDER_LINK_STATUS", label: "订单关联状态", group: "ORDER", editable: false, options: [
-    { value: "LINKED", label: "已关联" }, { value: "UNLINKED", label: "未关联" }, { value: "ORPHAN", label: "孤儿单" }, { value: "UNLINKED_TRANSFER", label: "单边划转未关联" },
-  ] },
   { code: "REFUND_RESPONSIBILITY", label: "退款责任方", group: "ORDER", editable: true, options: [
     { value: "COMPANY", label: "公司" }, { value: "CUSTOMER", label: "客户" }, { value: "CONSIGNOR", label: "寄售方" }, { value: "PLATFORM", label: "平台" }, { value: "OTHER", label: "其他" },
   ] },
@@ -59,9 +56,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   ] },
   { code: "ORDER_BUSINESS_MODE", label: "订单业务模式", group: "ORDER", editable: false, options: [
     { value: "SELF", label: "自营" }, { value: "DISTRIBUTION", label: "分销" },
-  ] },
-  { code: "ORDER_RELATION_TYPE", label: "订单关联关系", group: "ORDER", editable: false, options: [
-    { value: "SOURCE", label: "本单为其来源单（拆分出去的下游单）" }, { value: "FOLLOW_UP", label: "本单为其后续单（承接来源单）" },
   ] },
   { code: "INSTALLMENT_CONTRACT_TYPE", label: "分期合约类型", group: "INSTALLMENT", editable: false, options: [
     { value: "STOCK_SALE", label: "分期出售" }, { value: "PICKUP_SALE", label: "分期出售" }, { value: "CONSIGNMENT_SALE", label: "分期出售" },
@@ -182,8 +176,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "ORDER_CREATE", label: "新建订单" },
     { value: "ORDER_UPDATE", label: "编辑订单" },
     { value: "ORDER_CANCEL", label: "取消" },
-    { value: "ORDER_LINK_CREATE", label: "新建订单关联" },
-    { value: "ORDER_LINK_DELETE", label: "删除订单关联" },
     { value: "EVENT_CREATE", label: "登记订单事件" },
     { value: "EVENT_POST", label: "过账订单事件" },
     { value: "DEPOSIT_CREATE", label: "登记押金占用" },

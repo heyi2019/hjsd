@@ -1,6 +1,6 @@
 import { api } from "../client";
 import type { PageResponse } from "../types/common";
-import type { EventPostResult, OrderLink } from "../types/order-events";
+import type { EventPostResult } from "../types/order-events";
 import type { Order } from "../types/orders";
 import type { AccountExecutionDetail } from "../types/account-execution";
 
@@ -86,21 +86,6 @@ export const ordersApi = {
     api.get<AccountExecutionDetail>(`/orders/${orderId}/execution-detail`).then((r) => r.data),
   updateExecution: (orderId: number, payload: OrderExecutionEditPayload) =>
     api.patch<{ ok: boolean }>(`/orders/${orderId}/execution-edit`, payload).then((r) => r.data),
-  links: (orderId: number) =>
-    api.get<OrderLink[]>(`/orders/${orderId}/links`).then((r) => r.data),
-  createLink: (
-    orderId: number,
-    payload: {
-      related_order_id: number;
-      relation_type: "SOURCE" | "FOLLOW_UP";
-      split_ratio?: string;
-      split_amount?: string;
-      note?: string;
-      form_extra?: Record<string, unknown>;
-    },
-  ) => api.post<OrderLink>(`/orders/${orderId}/links`, payload).then((r) => r.data),
-  deleteLink: (orderId: number, linkId: number) =>
-    api.delete<void>(`/orders/${orderId}/links/${linkId}`).then((r) => r.data),
   cancel: (orderId: number, payload: { reason: string; form_extra?: Record<string, unknown>; form_extra_scope?: string }) =>
     api.post<Order>(`/orders/${orderId}/cancel`, payload).then((r) => r.data),
   deleteOrder: (orderId: number, reason: string) =>

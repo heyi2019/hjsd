@@ -103,7 +103,6 @@ export interface Rebate {
   rebate_type: "BUY" | "SELL" | "UNSPECIFIED" | string;
   channel?: string | null;
   amount: string;
-  link_status?: string;
   status: string;
   collected_on: string;
   note?: string | null;

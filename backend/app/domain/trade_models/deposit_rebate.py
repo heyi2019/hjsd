@@ -7,7 +7,6 @@ from app.core.money import Amount
 from app.domain.base import AuditMixin
 from app.domain.enums import (
     DepositStatus,
-    LinkStatus,
     RebateStatus,
     RebateType,
 )
@@ -95,10 +94,6 @@ class RebateRecord(Base, AuditMixin):
             "amount >= 0",
             name="amount_nonneg",
         ),
-        CheckConstraint(
-            f"link_status IN {LinkStatus.values()!r}".replace("[", "(").replace("]", ")"),
-            name="rebate_link_status_valid",
-        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -118,9 +113,6 @@ class RebateRecord(Base, AuditMixin):
         ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True
     )
     policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    link_status: Mapped[str] = mapped_column(
-        String(24), nullable=False, default=LinkStatus.LINKED.value
-    )
     status: Mapped[str] = mapped_column(
         String(24), nullable=False, default=RebateStatus.OPEN.value
     )

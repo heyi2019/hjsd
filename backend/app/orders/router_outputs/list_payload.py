@@ -135,7 +135,6 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
             "trade_date": order.trade_date,
             "account_id": order.account_id,
             "status": order.status,
-            "link_status": order.link_status,
             "owner_id": order.owner_id,
             "note": order.note,
             "extra_values": extra_values.get(order.id, {}),

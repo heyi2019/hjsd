@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import Validation
-from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
+from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField
 from app.field_definitions.catalog_seed import seed_catalog
 from app.domain.form_scopes import FORM_SCOPES
 from app.shared.form_field_rules import validate_business_responsible, validate_form_extra
@@ -185,28 +185,6 @@ def test_cancel_order_merges_form_extra_into_order(seeded_client, seeded_db, hea
     assert cancel.status_code == 200, cancel.text
     order = seeded_db.get(Order, order_id)
     assert order.form_extra == {"approved_by": "何一"}
-
-
-def test_create_order_link_persists_form_extra(seeded_client, seeded_db, headers):
-    first = _create_order(seeded_client, headers)
-    second = seeded_client.post(
-        "/api/v1/orders",
-        json={"order_type": "HS", "trade_date": D, "account_snapshot": {"game_account": f"link-extra-{D}"}},
-        headers=headers,
-    )
-    assert second.status_code == 201, second.text
-    response = seeded_client.post(
-        f"/api/v1/orders/{second.json()['id']}/links",
-        json={
-            "related_order_id": first["id"],
-            "relation_type": "FOLLOW_UP",
-            "form_extra": {"deal_group": "G-9"},
-        },
-        headers=headers,
-    )
-    assert response.status_code == 201, response.text
-    link = seeded_db.get(OrderLink, response.json()["id"])
-    assert link.form_extra == {"deal_group": "G-9"}
 
 
 def test_patch_order_merges_form_extra(seeded_client, seeded_db, headers):

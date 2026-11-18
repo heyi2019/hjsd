@@ -42,7 +42,6 @@ DETAIL_KEY_LABELS: dict[str, str] = {
     # 返点（返点明细）
     "rebate_no": "返点单号",
     "channel": "渠道",
-    "link_status": "关联状态",
     "collected_on": "收到日期",
     # 通用
     "amount": "金额",
@@ -61,9 +60,6 @@ DETAIL_KEY_LABELS: dict[str, str] = {
     # 关联订单
     "source_order_no": "来源订单号",
     "target_order_no": "后续订单号",
-    "relation_type": "关联方向",
-    "split_ratio": "拆分比例",
-    "split_amount": "拆分金额",
     # 分期合约 / 期次
     "inst_no": "合约号",
     "contract_type": "合约类型",
@@ -168,13 +164,6 @@ NESTED_VALUE_LABELS: dict[str, dict[str, str]] = {
     },
     # RebateType（后端 orders/order_detail/view/derived.py 的 _rebate_type 同文案）
     "rebate_type": {"BUY": "买号返点", "SELL": "卖号返点"},
-    # 关联状态（domain.enums LinkStatus）
-    "link_status": {
-        "LINKED": "已关联",
-        "UNLINKED": "未关联",
-        "ORPHAN": "孤儿数据",
-        "UNLINKED_TRANSFER": "单边划转",
-    },
     # 合约 / 期次 / 返点状态混排：取值域无冲突，合并一张表
     "status": {
         "OPEN": "未结算",
@@ -198,8 +187,6 @@ NESTED_VALUE_LABELS: dict[str, dict[str, str]] = {
         "PICKUP_SALE": "分期出售",
         "CONSIGNMENT_SALE": "分期出售",
     },
-    # 订单关联方向（domain.enums OrderLinkType）
-    "relation_type": {"SOURCE": "来源单", "FOLLOW_UP": "后续单"},
     # 下架方式（form_extra platform_unlist_scope）
     "platform_unlist_scope": {"SYSTEM": "本系统", "PLATFORM": "平台"},
     # 审计对象类型（前端 labels.ts ENTITY_TYPE_LABEL + 写点补充）
@@ -263,8 +250,6 @@ NESTED_VALUE_LABELS: dict[str, dict[str, str]] = {
         "ORDER_CREATE": "新建订单",
         "ORDER_UPDATE": "编辑订单",
         "ORDER_CANCEL": "取消",
-        "ORDER_LINK_CREATE": "新建订单关联",
-        "ORDER_LINK_DELETE": "删除关联",
         "LIST_EXPORT": "导出列表",
         "EVENT_CREATE": "登记订单事件",
         "EVENT_POST": "过账订单事件",

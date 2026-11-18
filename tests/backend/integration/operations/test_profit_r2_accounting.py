@@ -21,7 +21,6 @@ from uuid import uuid4
 
 from app.core.money import to_money
 from app.domain.enums import (
-    LinkStatus,
     RebateStatus,
     RebateType,
 )
@@ -50,7 +49,6 @@ def _add_rebate(seeded_db, order_id: int, amount: str, status: str) -> RebateRec
         amount=to_money(amount),
         collected_on=D,
         status=status,
-        link_status=LinkStatus.LINKED.value,
         created_by="pytest",
         updated_by="pytest",
     )

@@ -483,7 +483,6 @@ class TestReportsApiDateParams:
                 rebate_type="SELL",
                 amount=to_money("500"),
                 status=RebateStatus.OPEN.value,
-                link_status="UNLINKED",
                 collected_on=D,
                 created_by="pytest",
                 updated_by="pytest",

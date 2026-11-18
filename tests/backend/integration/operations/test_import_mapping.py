@@ -15,7 +15,7 @@ import pytest
 from sqlalchemy import func
 
 from app.core.money import to_money
-from app.domain.enums import ImportRowStatus, LinkStatus, Portion
+from app.domain.enums import ImportRowStatus, Portion
 from app.domain.trade import Order, OrderEvent
 import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
@@ -232,7 +232,7 @@ class TestIdempotency:
 
 
 class TestNoAutoMatch:
-    """导入实体一律 UNLINKED，绝不自动关联。"""
+    """导入实体不自动关联账号，account_id 一律留空。"""
 
     def test_orders_are_unlinked_with_null_account(self, mapper, seeded_db):
         _seed_order_rows(
@@ -241,7 +241,6 @@ class TestNoAutoMatch:
         )
         mapper.map_orders(seeded_db, dry_run=False)
         order = seeded_db.query(Order).one()
-        assert order.link_status == LinkStatus.UNLINKED.value
         assert order.account_id is None
         assert order.owner_id is None
 

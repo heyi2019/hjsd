@@ -33,7 +33,7 @@ from app.customer_center.counterparties import create_counterparty
 from app.customer_center.customers import create_customer, set_customer_status
 from app.domain.foundation import AuditLog
 from app.domain.parties import OrderCustomerRole
-from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
+from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField
 from app.domain.users import User
 from app.field_definitions.order_types import get_order_type_by_code, set_order_type_active
 from app.orders import schemas
@@ -41,7 +41,6 @@ from app.shared.order_access import get_order
 from app.orders.cancellation_model import cancel_order
 from app.orders.create import create_order
 from app.orders.events import _opposite_direction, post_event
-from app.orders.links import create_order_link, delete_order_link, list_order_links
 from app.orders.mutations import update_order
 from app.finance.balances import pool_balance
 from app.orders.queries import list_orders, order_customer_count

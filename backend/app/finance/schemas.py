@@ -289,7 +289,6 @@ class RebateOut(BaseModel):
     rebate_type: str
     channel: str | None = None
     amount: Decimal
-    link_status: str
     status: str
     collected_on: date
     note: str | None = None

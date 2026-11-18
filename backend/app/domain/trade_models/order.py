@@ -6,15 +6,12 @@ from app.domain.base import Base
 from app.core.money import Amount
 from app.domain.base import (
     AuditMixin,
-    TimestampMixin,
 )
 from app.domain.enums import (
     CommissionMode,
     CommissionPayer,
     DeliveryMode,
     EventType,
-    LinkStatus,
-    OrderLinkType,
     OrderStatus,
     Portion,
 )
@@ -57,12 +54,7 @@ class Order(Base, AuditMixin):
         ),
         UniqueConstraint("order_no", name="uq_orders_no"),
         Index("ix_orders_type_date", "order_type", "trade_date"),
-        Index("ix_orders_link_status", "link_status"),
         Index("ix_orders_trade_date", "trade_date"),
-        CheckConstraint(
-            f"link_status IN {LinkStatus.values()!r}".replace("[", "(").replace("]", ")"),
-            name="order_link_status_valid",
-        ),
         CheckConstraint(
             f"commission_mode IS NULL OR commission_mode IN {CommissionMode.values()!r}",
             name="order_commission_mode_valid",
@@ -113,9 +105,6 @@ class Order(Base, AuditMixin):
         ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True
     )
     policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    link_status: Mapped[str] = mapped_column(
-        String(24), nullable=False, default=LinkStatus.LINKED.value
-    )
     owner_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -123,46 +112,6 @@ class Order(Base, AuditMixin):
     # 建单表单「自定义字段」值存放处（与统一表单字段配置解耦，不违反治理约束）。
     # key 为 OrderFormField.field_key，value 为按 field_type 归一化后的值。
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-
-
-class OrderLink(Base, TimestampMixin):
-    """订单上下游关联与拆分份额（ORD-01-05）。"""
-
-    __tablename__ = "order_links"
-    __table_args__ = (
-        UniqueConstraint(
-            "source_order_id", "target_order_id", name="uq_order_links_pair"
-        ),
-        CheckConstraint("source_order_id <> target_order_id", name="order_link_not_self"),
-        CheckConstraint(
-            f"relation_type IN {OrderLinkType.values()!r}".replace("[", "(").replace("]", ")"),
-            name="order_link_type_valid",
-        ),
-        CheckConstraint(
-            "split_ratio IS NULL OR (split_ratio > 0 AND split_ratio <= 100)",
-            name="order_link_ratio_valid",
-        ),
-        CheckConstraint("split_amount IS NULL OR split_amount > 0", name="order_link_amount_valid"),
-        Index("ix_order_links_source", "source_order_id"),
-        Index("ix_order_links_target", "target_order_id"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    source_order_id: Mapped[int] = mapped_column(
-        ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False
-    )
-    target_order_id: Mapped[int] = mapped_column(
-        ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False
-    )
-    # 保留创建时的方向语义，查询时也会按当前订单返回 direction。
-    relation_type: Mapped[str] = mapped_column(String(16), nullable=False)
-    split_ratio: Mapped[object | None] = mapped_column(Amount, nullable=True)
-    split_amount: Mapped[object | None] = mapped_column(Amount, nullable=True)
-    note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # 表单字段配置体系：ORDERLINK 作用域自定义字段值（与 Order.form_extra 同构）。
-    form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_by: Mapped[str] = mapped_column(String(64), nullable=False, default="system")
-    updated_by: Mapped[str] = mapped_column(String(64), nullable=False, default="system")
 
 
 class OrderEvent(Base, AuditMixin):

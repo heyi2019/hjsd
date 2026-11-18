@@ -19,7 +19,7 @@ from .trade_models.installment import (
     InstallmentDisposition,
     InstallmentSchedule,
 )
-from .trade_models.order import Order, OrderEvent, OrderLink
+from .trade_models.order import Order, OrderEvent
 
 __all__ = [
     "Account",
@@ -32,7 +32,6 @@ __all__ = [
     "OrderEvent",
     "OrderFormField",
     "OrderFormSectionLabel",
-    "OrderLink",
     "OrderProfitAllocation",
     "RebateRecord",
     "Reconciliation",

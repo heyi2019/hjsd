@@ -217,8 +217,6 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   ORDER_CREATE: "新建订单",
   ORDER_UPDATE: "编辑订单",
   ORDER_CANCEL: "取消",
-  ORDER_LINK_CREATE: "新建订单关联",
-  ORDER_LINK_DELETE: "删除关联",
   LIST_EXPORT: "导出列表",
   EVENT_CREATE: "登记订单事件",
   EVENT_POST: "过账订单事件",

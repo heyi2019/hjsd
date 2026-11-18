@@ -68,7 +68,6 @@ from app.core.money import to_money  # noqa: E402
 from app.domain.foundation import OrderTypeDef, Pool  # noqa: E402
 from app.domain.enums import (  # noqa: E402
     ImportRowStatus,
-    LinkStatus,
     Portion,
 )
 from app.orders.create import create_order  # noqa: E402
@@ -219,8 +218,6 @@ def map_orders(session: Any, *, dry_run: bool) -> dict[str, Any]:
             ),
             actor=ACTOR,
         )
-        # 导入数据一律标 UNLINKED：没有任何自动匹配
-        order.link_status = LinkStatus.UNLINKED.value
 
         # 份额事件：源「回款账户」决定哪些份额落哪个池
         pools = _pools_in(raw)

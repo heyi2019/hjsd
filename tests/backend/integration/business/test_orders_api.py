@@ -28,7 +28,7 @@ from app.customer_center.counterparties import create_counterparty
 from app.customer_center.customers import create_customer, set_customer_status
 from app.domain.foundation import AuditLog
 from app.domain.parties import OrderCustomerRole
-from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField, OrderLink
+from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField
 from app.domain.users import User
 from app.field_definitions.order_types import get_order_type_by_code, set_order_type_active
 from app.orders import schemas
@@ -36,7 +36,6 @@ from app.shared.order_access import get_order
 from app.orders.cancellation_model import cancel_order
 from app.orders.create import create_order
 from app.orders.events import _opposite_direction, post_event
-from app.orders.links import create_order_link, delete_order_link, list_order_links
 from app.orders.mutations import update_order
 from app.finance.balances import pool_balance
 from app.orders.queries import list_orders, order_customer_count
@@ -342,82 +341,6 @@ class TestOrdersApi:
             item for item in body["audit"] if item["request_id"] == request_id
         )
         assert order_audit["request_id"] == request_id
-
-    def test_order_link_endpoints_and_detail_links(self, seeded_client, seeded_db, headers):
-        source = _order(seeded_db, order_type="HS")
-        target = _order(seeded_db, order_type="HS")
-
-        created = seeded_client.post(
-            f"/api/v1/orders/{target.id}/links",
-            json={
-                "related_order_id": source.id,
-                "relation_type": "SOURCE",
-                "split_ratio": "50",
-                "split_amount": "400",
-                "note": "来源单",
-            },
-            headers=headers,
-        )
-
-        assert created.status_code == 201, created.text
-        assert created.json()["source_order_no"] == source.order_no
-        assert created.json()["direction"] == "SOURCE"
-        listed = seeded_client.get(
-            f"/api/v1/orders/{target.id}/links", headers=headers
-        )
-        assert listed.status_code == 200, listed.text
-        assert listed.json()[0]["target_order_no"] == target.order_no
-        detail = seeded_client.get(f"/api/v1/orders/{target.id}", headers=headers)
-        assert detail.status_code == 200, detail.text
-        assert detail.json()["links"][0]["id"] == created.json()["id"]
-
-    def test_order_link_delete_endpoint(self, seeded_client, seeded_db, headers):
-        source = _order(seeded_db, order_type="HS")
-        target = _order(seeded_db, order_type="HS")
-        created = seeded_client.post(
-            f"/api/v1/orders/{target.id}/links",
-            json={
-                "related_order_id": source.id,
-                "relation_type": "SOURCE",
-                "note": "来源单",
-            },
-            headers=headers,
-        )
-        assert created.status_code == 201, created.text
-        link_id = created.json()["id"]
-
-        deleted = seeded_client.delete(
-            f"/api/v1/orders/{target.id}/links/{link_id}", headers=headers
-        )
-        assert deleted.status_code == 204, deleted.text
-        listed = seeded_client.get(
-            f"/api/v1/orders/{target.id}/links", headers=headers
-        )
-        assert listed.status_code == 200, listed.text
-        assert listed.json() == []
-        detail = seeded_client.get(f"/api/v1/orders/{target.id}", headers=headers)
-        assert detail.json()["links"] == []
-
-        # 重复删除 → 404
-        again = seeded_client.delete(
-            f"/api/v1/orders/{target.id}/links/{link_id}", headers=headers
-        )
-        assert again.status_code == 404, again.text
-
-    def test_order_link_delete_requires_update_permission(self, seeded_client, seeded_db, headers, viewer_headers):
-        source = _order(seeded_db, order_type="HS")
-        target = _order(seeded_db, order_type="HS")
-        created = seeded_client.post(
-            f"/api/v1/orders/{target.id}/links",
-            json={"related_order_id": source.id, "relation_type": "SOURCE"},
-            headers=headers,
-        )
-        assert created.status_code == 201, created.text
-        response = seeded_client.delete(
-            f"/api/v1/orders/{target.id}/links/{created.json()['id']}",
-            headers=viewer_headers,
-        )
-        assert response.status_code == 403, response.text
 
     def test_pool_balance_endpoint_scope_forbidden(self, seeded_client, viewer_headers):
         # viewer 有 finance.read 但无池授权 → 越权池返回 404（不泄露存在性）

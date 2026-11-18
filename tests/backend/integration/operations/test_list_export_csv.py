@@ -306,7 +306,7 @@ def test_orders_export_xlsx_splits_detail_json_into_columns(seeded_client, heade
     expected = {
         "操作明细": ["订单号", "操作分类", "动作", "平台", "动作时间", "操作人", "金额", "备注"],
             "资金明细": ["订单号", "业务类别", "方向", "金额", "时间", "操作人", "资金账户", "备注"],
-        "返点明细": ["订单号", "返点单号", "返点类型", "渠道", "返点金额", "关联状态", "状态", "收到日期", "操作人", "备注"],
+        "返点明细": ["订单号", "返点单号", "返点类型", "渠道", "返点金额", "状态", "收到日期", "操作人", "备注"],
     }
     for title, columns in expected.items():
         sheet = workbook[title]

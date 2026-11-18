@@ -10,13 +10,11 @@ const config: ListScopeConfig = {
   columns: [
     { key: "trade_date", label: "日期", locked: false, is_visible: true, sort_order: 0 },
     { key: "order_no", label: "订单号", locked: true, is_visible: true, sort_order: 10 },
-    { key: "link_status", label: "关联", locked: false, is_visible: false, sort_order: 20 },
   ],
 };
 
 const columns = [
   { dataIndex: "order_no" },
-  { dataIndex: "link_status" },
   { dataIndex: "trade_date" },
   { dataIndex: "unknown_new" },
 ];

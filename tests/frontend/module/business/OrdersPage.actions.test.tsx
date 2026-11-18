@@ -18,7 +18,6 @@ import { orderLedgerSummary, pageResponse, profitAllocationResponse } from "@fix
 import { today } from "@/shared/lib/format";
 import * as client from "@/shared/api/client";
 import type { Installment, InstallmentCancelResult } from "@/shared/api/types/installments";
-import type { OrderLink } from "@/shared/api/types/order-events";
 import type { Order } from "@/shared/api/types/orders";
 import type { ProfitAllocation } from "@/shared/api/types/policy";
 
@@ -151,19 +150,6 @@ const order3: Order = {
   installment_periods: 6,
 };
 const orders = [order1, order2];
-const link1: OrderLink = {
-  id: 77,
-  source_order_id: 2,
-  source_order_no: "DG-2026-0002",
-  target_order_id: 1,
-  target_order_no: "HS-2026-0001",
-  relation_type: "SOURCE",
-  direction: "SOURCE",
-  split_ratio: "50",
-  split_amount: null,
-  note: "来源单",
-  created_at: "2026-10-01T10:00:00",
-};
 const types = [{ id: 1, code: "HS", name: "回收", is_active: true }];
 
 const installment: Installment = {
@@ -234,8 +220,6 @@ beforeEach(() => {
     orders: [{ order_id: order1.id, order_no: order1.order_no, order_type: order1.order_type, trade_date: order1.trade_date, status: order1.status, events: [] }],
     finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
   } as never);
-  vi.mocked(ordersApi.links).mockResolvedValue([link1]);
-  vi.mocked(ordersApi.deleteLink).mockResolvedValue(undefined);
   vi.mocked(ordersApi.cancel).mockResolvedValue({ ...order1, status: "CANCELLED" });
   vi.mocked(ordersApi.postEvent).mockResolvedValue({
     event: { id: 2, event_no: "EV-2", order_id: 1, event_type: "CANCEL", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "0.00" },

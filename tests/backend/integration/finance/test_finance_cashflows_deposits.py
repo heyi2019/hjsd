@@ -14,10 +14,12 @@ from app.core.security import CurrentUser
 from app.domain.enums import CashflowLedgerType, CashflowSourceType
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Deposit
-from app.finance import cashflows, deposits
+from app.finance import cashflows
 from app.finance.cashflow_queries import list_cashflows
 from app.finance.cashflows import create_cashflow
-from app.finance.deposits import create_deposit
+from app.finance.deposits.writes import create_deposit
+from app.finance.deposits.lifecycle import cancel_deposit, lose_deposit, return_deposit
+from app.finance.deposits.reads import list_deposits
 from app.finance import transfers
 
 
@@ -130,20 +132,20 @@ def _pool1_user() -> CurrentUser:
     )
 
 def test_lose_deposit_rejects_system_category(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
     with pytest.raises(Validation, match="押金损失费用分类不能使用系统分类"):
-        deposits.lose_deposit(
+        lose_deposit(
             seeded_db, deposit.id, amount=Decimal("5"), lost_on=TODAY,
             category="DEPOSIT_HOLD", reason="x", actor="pytest",
         )
 
 def test_list_deposits_user_filter(seeded_db):
-    deposits.create_deposit(
+    create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
-    assert deposits.list_deposits(seeded_db, pool_id=1, user=_restricted_user()) == []
+    assert list_deposits(seeded_db, pool_id=1, user=_restricted_user()) == []
 
 def test_list_cashflows_user_filter(seeded_db):
     _make_flow(seeded_db, direction="OUT")
@@ -214,7 +216,7 @@ def test_list_cashflows_user_only_filter(seeded_db):
     assert rows == [] and total == 0
 
 def test_list_cashflows_deposit_source(seeded_db):
-    deposits.create_deposit(seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest")
+    create_deposit(seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest")
     rows, _ = list_cashflows(seeded_db)
     deposit_rows = [r for r in rows if r["source_type"] == CashflowSourceType.DEPOSIT.value]
     assert deposit_rows
@@ -222,24 +224,24 @@ def test_list_cashflows_deposit_source(seeded_db):
 
 def test_return_deposit_rejects_unknown(seeded_db):
     with pytest.raises(NotFound, match="押金 999999 不存在"):
-        deposits.return_deposit(
+        return_deposit(
             seeded_db, 999999, amount=Decimal("5"), released_on=TODAY, actor="pytest"
         )
 
 def test_return_deposit_rejects_exceeds(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
     with pytest.raises(Validation, match="退还金额超过未释放余额"):
-        deposits.return_deposit(
+        return_deposit(
             seeded_db, deposit.id, amount=Decimal("20"), released_on=TODAY, actor="pytest"
         )
 
 def test_cancel_paid_deposit_writes_one_reversal(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("300"), paid_on=TODAY, actor="pytest"
     )
-    cancelled = deposits.cancel_deposit(
+    cancelled = cancel_deposit(
         seeded_db, deposit.id, cancelled_on=TODAY, reason="登记有误", actor="pytest"
     )
     rows = seeded_db.scalars(
@@ -255,53 +257,53 @@ def test_cancel_paid_deposit_writes_one_reversal(seeded_db):
 
 def test_cancel_unknown_deposit_not_found(seeded_db):
     with pytest.raises(NotFound, match="押金.*不存在"):
-        deposits.cancel_deposit(
+        cancel_deposit(
             seeded_db, 999999, cancelled_on=TODAY, reason="x", actor="pytest"
         )
 
 def test_cancel_returned_deposit_rejected(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("300"), paid_on=TODAY, actor="pytest"
     )
-    deposits.return_deposit(
+    return_deposit(
         seeded_db, deposit.id, amount=Decimal("100"), released_on=TODAY, actor="pytest"
     )
     with pytest.raises(Validation):
-        deposits.cancel_deposit(
+        cancel_deposit(
             seeded_db, deposit.id, cancelled_on=TODAY,
             reason="已有退还不可取消", actor="pytest",
         )
 
 def test_create_deposit_rejects_negative_amount(seeded_db):
     with pytest.raises(Validation):
-        deposits.create_deposit(
+        create_deposit(
             seeded_db, pool_id=1, amount=Decimal("-100"), paid_on=TODAY, actor="pytest"
         )
 
 def test_return_deposit_partial(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
-    returned = deposits.return_deposit(
+    returned = return_deposit(
         seeded_db, deposit.id, amount=Decimal("4"), released_on=TODAY, actor="pytest"
     )
     assert returned.status == "PARTIALLY_RETURNED"
 
 def test_lose_deposit_rejects_exceeds(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
     with pytest.raises(Validation, match="损失金额超过未释放余额"):
-        deposits.lose_deposit(
+        lose_deposit(
             seeded_db, deposit.id, amount=Decimal("20"), lost_on=TODAY,
             category="OFFICE", reason="x", actor="pytest",
         )
 
 def test_lose_deposit_marks_lost(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
-    lost = deposits.lose_deposit(
+    lost = lose_deposit(
         seeded_db, deposit.id, amount=Decimal("10"), lost_on=TODAY,
         category="OFFICE", reason="x", actor="pytest",
     )
@@ -310,16 +312,16 @@ def test_lose_deposit_marks_lost(seeded_db):
 
 def test_create_deposit_rejects_unknown_source_order(seeded_db):
     with pytest.raises(NotFound, match="来源订单 999999 不存在"):
-        deposits.create_deposit(
+        create_deposit(
             seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest",
             source_order_id=999999,
         )
 
 def test_list_deposits_user_only_filter(seeded_db):
-    deposits.create_deposit(
+    create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
-    assert deposits.list_deposits(seeded_db, user=_restricted_user()) == []
+    assert list_deposits(seeded_db, user=_restricted_user()) == []
 
 def test_list_cashflows_by_pool_id_visible(seeded_db):
     cashflows.create_cashflow(

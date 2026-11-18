@@ -28,7 +28,8 @@ from app.core.money import to_money
 from app.domain.enums import CashflowSourceType
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
-from app.finance.deposits import create_deposit, lose_deposit, return_deposit
+from app.finance.deposits.writes import create_deposit
+from app.finance.deposits.lifecycle import lose_deposit, return_deposit
 from app.finance.balances import pool_balance
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from sqlalchemy import select

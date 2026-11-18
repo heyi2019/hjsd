@@ -19,7 +19,8 @@ from app.domain.enums import (
 )
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order
-from app.finance.deposits import create_deposit, return_deposit
+from app.finance.deposits.writes import create_deposit
+from app.finance.deposits.lifecycle import return_deposit
 from app.finance.rebates import create_rebate
 from app.shared.installment_amounts import total_receivable
 from app.installments import create as inst_create

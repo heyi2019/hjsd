@@ -34,6 +34,7 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
     setDepositEditTarget(target);
     depositForm.setFieldsValue({
       pool_id: target.pool_id,
+      ledger_type: target.ledger_type ?? "BUSINESS",
       amount: target.paid_amount,
       paid_on: target.paid_on,
       counterparty_id: target.counterparty_id ?? undefined,
@@ -54,12 +55,15 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
   const submitDeposit = async (values: Record<string, unknown>) => {
     const editing = depositEditTarget;
     await write.run(async () => {
+      const ledgerType = (values.ledger_type as string) || "BUSINESS";
       const payload = {
         pool_id: Number(values.pool_id),
         amount: values.amount as string,
         paid_on: values.paid_on as string,
+        ledger_type: ledgerType,
         counterparty_id: values.counterparty_id ? Number(values.counterparty_id) : undefined,
-        source_order_id: values.source_order_id ? Number(values.source_order_id) : undefined,
+        // 工作室运营押金不属于订单，前端也剔除来源订单避免后端校验拦截。
+        source_order_id: ledgerType === "STUDIO" ? undefined : values.source_order_id ? Number(values.source_order_id) : undefined,
         expected_release_on: values.expected_release_on as string | undefined,
         note: values.note as string,
         operator_user_ids: values.operator_user_ids as number[] | undefined,

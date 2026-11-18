@@ -19,7 +19,9 @@ from app.domain.enums import CashflowSourceType
 from app.domain.trade import Cashflow, RebateRecord, Reconciliation
 from app.finance.cashflow_queries import list_cashflows
 from app.finance.cashflows import create_cashflow, reverse_cashflow
-from app.finance.deposits import create_deposit, deposit_held_total, list_deposits, lose_deposit, return_deposit
+from app.finance.deposits.writes import create_deposit
+from app.finance.deposits.lifecycle import lose_deposit, return_deposit
+from app.finance.deposits.reads import deposit_held_total, list_deposits
 from app.finance.rebates import create_rebate, list_rebates
 from app.finance.reconciliation import create_reconciliation, resolve_reconciliation
 from app.finance.transfers import create_transfer, repair_transfer
@@ -349,5 +351,90 @@ class TestDepositQueries:
                 reason="超额",
                 actor="finance",
             )
+
+
+class TestDepositLedgerType:
+    """两类押金账簿：业务押金 BUSINESS / 工作室押金 STUDIO（2026-11-19）。"""
+
+    @staticmethod
+    def _flows(seeded_db, deposit_id: int, category: str) -> list[Cashflow]:
+        return list(
+            seeded_db.scalars(
+                select(Cashflow).where(
+                    Cashflow.source_type == CashflowSourceType.DEPOSIT.value,
+                    Cashflow.source_id == str(deposit_id),
+                    Cashflow.category == category,
+                )
+            ).all()
+        )
+
+    def test_business_deposit_defaults_to_business_ledger(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        deposit = create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+        )
+        assert deposit.ledger_type == "BUSINESS"
+        holds = self._flows(seeded_db, deposit.id, "DEPOSIT_HOLD")
+        assert len(holds) == 1 and holds[0].ledger_type == "BUSINESS"
+
+    def test_studio_deposit_lands_in_studio_ledger(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        deposit = create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("200"), paid_on=TODAY,
+            actor="pytest", ledger_type="STUDIO",
+        )
+        assert deposit.ledger_type == "STUDIO"
+        holds = self._flows(seeded_db, deposit.id, "DEPOSIT_HOLD")
+        assert len(holds) == 1 and holds[0].ledger_type == "STUDIO"
+
+    def test_studio_deposit_rejects_source_order(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        order_id = _active_order(seeded_db)
+        with pytest.raises(Validation, match="不能挂来源订单"):
+            create_deposit(
+                seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY,
+                actor="pytest", ledger_type="STUDIO", source_order_id=order_id,
+            )
+
+    def test_invalid_ledger_type_rejected(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        with pytest.raises(Validation, match="押金账簿"):
+            create_deposit(
+                seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY,
+                actor="pytest", ledger_type="BOGUS",
+            )
+
+    def test_studio_deposit_release_and_loss_flows_inherit_ledger(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        deposit = create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("300"), paid_on=TODAY,
+            actor="pytest", ledger_type="STUDIO",
+        )
+        return_deposit(
+            seeded_db, deposit.id, amount=Decimal("100"), released_on=TODAY, actor="pytest"
+        )
+        lose_deposit(
+            seeded_db, deposit.id, amount=Decimal("50"), lost_on=TODAY,
+            category="OPERATING_COST", reason="工作室押金损失", actor="pytest",
+        )
+        releases = self._flows(seeded_db, deposit.id, "DEPOSIT_RELEASE")
+        losses = self._flows(seeded_db, deposit.id, "OPERATING_COST")
+        assert len(releases) == 1 and releases[0].ledger_type == "STUDIO"
+        assert len(losses) == 1 and losses[0].ledger_type == "STUDIO"
+
+    def test_update_ledger_type_syncs_hold_flow(self, seeded_db):
+        from app.finance.deposits.writes import update_deposit
+        invest = _pool(seeded_db, "HJ_INVEST")
+        deposit = create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+        )
+        update_deposit(
+            seeded_db, deposit.id, pool_id=invest.id, amount=Decimal("100"),
+            paid_on=TODAY, actor="pytest", ledger_type="STUDIO",
+        )
+        seeded_db.refresh(deposit)
+        assert deposit.ledger_type == "STUDIO"
+        holds = self._flows(seeded_db, deposit.id, "DEPOSIT_HOLD")
+        assert len(holds) == 1 and holds[0].ledger_type == "STUDIO"
 
 

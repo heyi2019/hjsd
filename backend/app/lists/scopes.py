@@ -190,6 +190,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         code="DEPOSITS",
         label="资金中心·押金占用",
         columns=(
+            ListColumn("ledger_type", "押金性质"),
             ListColumn("paid_amount", "占用金额"),
             ListColumn("counterparty", "对手方"),
             ListColumn("source_order", "来源订单"),

@@ -11,6 +11,7 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
   const { deposits, employees, openDepositCreate, openDepositEdit, deleteDeposit, returnForm, setReturnTarget, lossForm, setLossTarget, cancelForm, setCancelTarget, loading } = ctrl;
   const { arrange: arrangeDepositColumns } = useListViewColumns("DEPOSITS");
   const depositColumns: ColumnsType<Deposit> = [
+    { title: "押金性质", dataIndex: "ledger_type", width: 120, render: (v: string) => v === "STUDIO" ? "工作室运营押金" : "业务押金" },
     { title: "占用金额", dataIndex: "paid_amount", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "对手方", key: "counterparty", render: (_v, row) => row.counterparty_id == null ? "—" : `#${row.counterparty_id}` },
     { title: "来源订单", key: "source_order", render: (_v, row) => row.source_order_id == null ? "—" : `#${row.source_order_id}` },

@@ -16,6 +16,7 @@ class DepositCreate(RequestModel):
     pool_id: int
     amount: Decimal
     paid_on: date
+    ledger_type: str = CashflowLedgerType.BUSINESS.value
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     counterparty_id: int | None = None
     source_order_id: int | None = None
@@ -65,6 +66,7 @@ class DepositOut(BaseModel):
 
     id: int
     pool_id: int
+    ledger_type: str
     counterparty_id: int | None = None
     source_order_id: int | None = None
     paid_amount: Decimal

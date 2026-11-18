@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 
 from app.domain.trade import Deposit
-from app.finance.deposits import _status_after_loss, _status_after_return
+from app.finance.deposits._shared import _status_after_loss, _status_after_return
 from app.finance.schemas import CashflowCreate
 from app.shared.order_amounts import is_deposit_loss_flow
 

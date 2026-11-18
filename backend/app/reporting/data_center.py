@@ -12,7 +12,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus
 from app.domain.trade import Account, Order
 from app.finance.cashflow_queries import studio_summary
-from app.finance.deposits import deposit_held_total
+from app.finance.deposits.reads import deposit_held_total
 from app.orders.queries import order_status_counts
 from app.stocks.inventory import inventory_cost_by_entry_date
 

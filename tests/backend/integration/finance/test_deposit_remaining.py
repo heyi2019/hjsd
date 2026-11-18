@@ -15,7 +15,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.trade import Deposit
-from app.finance.deposits import create_deposit
+from app.finance.deposits.writes import create_deposit
 
 TODAY = date(2026, 10, 4)
 
@@ -62,6 +62,7 @@ def test_remaining_never_negative():
     row = DepositOut(
         id=1,
         pool_id=1,
+        ledger_type="BUSINESS",
         paid_amount=Decimal("300.00"),
         returned_amount=Decimal("250.00"),
         lost_amount=Decimal("100.00"),

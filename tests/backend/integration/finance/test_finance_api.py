@@ -19,7 +19,9 @@ from app.domain.enums import CashflowSourceType
 from app.domain.trade import Cashflow, RebateRecord, Reconciliation
 from app.finance.cashflow_queries import list_cashflows
 from app.finance.cashflows import create_cashflow, reverse_cashflow
-from app.finance.deposits import create_deposit, deposit_held_total, list_deposits, lose_deposit, return_deposit
+from app.finance.deposits.writes import create_deposit
+from app.finance.deposits.lifecycle import lose_deposit, return_deposit
+from app.finance.deposits.reads import deposit_held_total, list_deposits
 from app.finance.rebates import create_rebate, list_rebates
 from app.finance.reconciliation import create_reconciliation, resolve_reconciliation
 from app.finance.transfers import create_transfer, repair_transfer

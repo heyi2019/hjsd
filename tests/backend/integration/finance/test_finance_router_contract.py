@@ -13,7 +13,7 @@ import pytest
 from app.stocks.profile import create_account
 from app.core.errors import NotFound
 from app.core.security import CurrentUser
-from app.finance import deposits
+from app.finance.deposits.writes import create_deposit
 from app.finance import rebates
 from app.finance import schemas
 from app.finance.cashflows_router import list_cashflows
@@ -40,7 +40,7 @@ def test_cancel_deposit_endpoint_rejects_unknown_deposit(seeded_db):
 
 
 def test_cancel_deposit_endpoint_returns_cancelled_deposit(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
     out = cancel_deposit(
@@ -156,7 +156,7 @@ def test_router_return_deposit_not_found(seeded_db):
 
 
 def test_router_return_deposit_not_visible(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
     )
     with pytest.raises(NotFound):
@@ -181,7 +181,7 @@ def test_router_lose_deposit_not_found(seeded_db):
 
 
 def test_router_lose_deposit_not_visible(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
     )
     with pytest.raises(NotFound):
@@ -414,7 +414,7 @@ def test_resolve_reconciliation_with_form_extra(seeded_db):
 
 
 def test_router_update_deposit_endpoint(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
     )
     out = update_deposit_endpoint(
@@ -429,7 +429,7 @@ def test_router_update_deposit_endpoint(seeded_db):
 
 
 def test_router_delete_deposit_endpoint(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
     )
     assert delete_deposit_endpoint(deposit.id, db=seeded_db, user=_all_scope_user()) is None

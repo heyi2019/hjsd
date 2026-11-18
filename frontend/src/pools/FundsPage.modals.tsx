@@ -1,7 +1,7 @@
 /** 资金中心各弹窗（Modal）视图层：新增押金/流水/划转/对账，以及冲销、释放、损失、取消、修复、核销。
  *  全部通过 controller 消费 useFundsPageController 暴露的表单、目标状态与写处理器。
  *  9 个表单弹窗共用 FundsActionModal 骨架。 */
-import { Input, Typography } from "antd";
+import { Form, Input, Typography } from "antd";
 import type { FormInstance } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { ReactNode } from "react";
@@ -119,16 +119,22 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
   const { depositOpen, depositEditTarget, closeDeposit, depositForm, submitDeposit, write, pools, employees } = ctrl;
   return (
     <FundsActionModal
-      title={depositEditTarget ? "编辑押金占用" : "新增押金占用"} fieldCount={8} wrapClassName="deposit-modal"
+      title={depositEditTarget ? "编辑押金占用" : "新增押金占用"} fieldCount={9} wrapClassName="deposit-modal"
       open={depositOpen} onCancel={closeDeposit}
       scope="FUNDDEPOSIT" form={depositForm} onFinish={submitDeposit}
-      initialValues={{ paid_on: today() }}
+      initialValues={{ paid_on: today(), ledger_type: "BUSINESS" }}
       write={write} permission="deposit.post" submitLabel={depositEditTarget ? "保存修改" : "提交"}
       employees={employees} showOperator
     >
       <CfgItem name="pool_id" label="资金账户" rules={[{ required: true }]}>
         <Select aria-label="资金账户" options={poolOptions(pools)} />
       </CfgItem>
+      <Form.Item name="ledger_type" label="押金性质" rules={[{ required: true }]}>
+        <Select aria-label="押金性质" options={[
+          { value: "BUSINESS", label: "业务押金" },
+          { value: "STUDIO", label: "工作室运营押金" },
+        ]} />
+      </Form.Item>
       <CfgItem name="amount" label="占用金额" rules={requiredMoneyRules("占用金额")}>
         <MoneyInput />
       </CfgItem>

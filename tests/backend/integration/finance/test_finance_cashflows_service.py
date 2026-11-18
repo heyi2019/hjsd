@@ -14,10 +14,11 @@ from app.core.security import CurrentUser
 from app.domain.enums import CashflowLedgerType, CashflowSourceType
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Deposit
-from app.finance import cashflows, deposits
+from app.finance import cashflows
 from app.finance.cashflow_queries import list_cashflows
 from app.finance.cashflows import create_cashflow
-from app.finance.deposits import create_deposit
+from app.finance.deposits.writes import create_deposit, delete_deposit, update_deposit
+from app.finance.deposits.lifecycle import lose_deposit, return_deposit
 from app.finance import transfers
 
 
@@ -194,7 +195,7 @@ def test_cashflow_and_deposit_entries_come_from_real_modules():
     import importlib.util
 
     assert create_cashflow is cashflows.create_cashflow
-    assert create_deposit is deposits.create_deposit
+    assert create_deposit.__module__ == "app.finance.deposits.writes"
     assert importlib.util.find_spec("app.finance.service") is None
 
 def test_update_deposit_updates_the_linked_hold_cashflow(seeded_db):
@@ -202,7 +203,7 @@ def test_update_deposit_updates_the_linked_hold_cashflow(seeded_db):
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
 
-    updated = deposits.update_deposit(
+    updated = update_deposit(
         seeded_db,
         deposit.id,
         pool_id=1,
@@ -232,7 +233,7 @@ def test_delete_deposit_removes_its_hold_cashflow(seeded_db):
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
 
-    deposits.delete_deposit(seeded_db, deposit.id, actor="pytest")
+    delete_deposit(seeded_db, deposit.id, actor="pytest")
 
     assert seeded_db.get(Deposit, deposit.id) is None
     assert seeded_db.scalar(select(Cashflow).where(
@@ -362,7 +363,7 @@ def test_reverse_cashflow_rejects_deposit_flow(seeded_db):
 
     from app.domain.trade import Cashflow
 
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
     flow = seeded_db.scalar(select(Cashflow).where(
@@ -383,36 +384,36 @@ def test_reverse_cashflow_in_direction(seeded_db):
 
 def test_create_deposit_rejects_user_not_visible(seeded_db):
     with pytest.raises(NotFound, match="资金账户不存在"):
-        deposits.create_deposit(
+        create_deposit(
             seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest",
             user=_restricted_user(),
         )
 
 def test_return_deposit_rejects_user_not_visible(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
     with pytest.raises(NotFound, match="押金 1 不存在"):
-        deposits.return_deposit(
+        return_deposit(
             seeded_db, deposit.id, amount=Decimal("5"), released_on=TODAY, actor="pytest",
             user=_restricted_user(),
         )
 
 def test_return_deposit_marks_lost(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
     )
-    deposits.lose_deposit(
+    lose_deposit(
         seeded_db, deposit.id, amount=Decimal("30"), lost_on=TODAY,
         category="OFFICE", reason="x", actor="pytest",
     )
-    returned = deposits.return_deposit(
+    returned = return_deposit(
         seeded_db, deposit.id, amount=Decimal("70"), released_on=TODAY, actor="pytest"
     )
     assert returned.status == "LOST"
 
 def test_deposit_actions_persist_action_operators(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db,
         pool_id=1,
         amount=Decimal("100"),
@@ -420,7 +421,7 @@ def test_deposit_actions_persist_action_operators(seeded_db):
         actor="pytest",
         operator_user_ids=[1, 2],
     )
-    deposits.return_deposit(
+    return_deposit(
         seeded_db,
         deposit.id,
         amount=Decimal("20"),
@@ -441,11 +442,11 @@ def test_deposit_actions_persist_action_operators(seeded_db):
     }
 
 def test_lose_deposit_rejects_user_not_visible(seeded_db):
-    deposit = deposits.create_deposit(
+    deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
     with pytest.raises(NotFound, match="押金 1 不存在"):
-        deposits.lose_deposit(
+        lose_deposit(
             seeded_db, deposit.id, amount=Decimal("5"), lost_on=TODAY,
             category="OFFICE", reason="x", actor="pytest", user=_restricted_user(),
         )

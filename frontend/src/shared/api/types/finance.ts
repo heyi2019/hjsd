@@ -36,6 +36,8 @@ export interface PoolBalanceTotals {
 export interface Deposit {
   id: number;
   pool_id: number;
+  /** 押金所属账簿：BUSINESS 业务押金 / STUDIO 工作室运营押金。 */
+  ledger_type: "BUSINESS" | "STUDIO" | string;
   counterparty_id?: number | null;
   source_order_id?: number | null;
   paid_amount: string;

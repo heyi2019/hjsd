@@ -15,13 +15,15 @@ from app.auth.session import (
 )
 from app.domain.trade import Deposit
 from app.finance import schemas
-from app.finance.deposits import (
+from app.finance.deposits.lifecycle import (
     cancel_deposit as finance_cancel_deposit,
-    create_deposit as finance_create_deposit,
-    delete_deposit as finance_delete_deposit,
-    list_deposits as finance_list_deposits,
     lose_deposit as finance_lose_deposit,
     return_deposit as finance_return_deposit,
+)
+from app.finance.deposits.reads import list_deposits as finance_list_deposits
+from app.finance.deposits.writes import (
+    create_deposit as finance_create_deposit,
+    delete_deposit as finance_delete_deposit,
     update_deposit as finance_update_deposit,
 )
 
@@ -64,6 +66,7 @@ def create_deposit(
         amount=payload.amount,
         paid_on=payload.paid_on,
         actor=_actor(user),
+        ledger_type=payload.ledger_type,
         counterparty_id=payload.counterparty_id,
         source_order_id=payload.source_order_id,
         expected_release_on=payload.expected_release_on,
@@ -89,6 +92,7 @@ def update_deposit(
         amount=payload.amount,
         paid_on=payload.paid_on,
         actor=_actor(user),
+        ledger_type=payload.ledger_type,
         counterparty_id=payload.counterparty_id,
         source_order_id=payload.source_order_id,
         expected_release_on=payload.expected_release_on,

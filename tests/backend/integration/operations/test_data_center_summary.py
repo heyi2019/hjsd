@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.domain.foundation import Pool
 from app.finance.cashflows import create_cashflow
-from app.finance.deposits import create_deposit
+from app.finance.deposits.writes import create_deposit
 from app.orders import events
 from app.orders.create import create_order
 from app.stocks.profile import create_account

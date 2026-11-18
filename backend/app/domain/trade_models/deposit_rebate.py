@@ -6,6 +6,7 @@ from app.domain.base import Base
 from app.core.money import Amount
 from app.domain.base import AuditMixin
 from app.domain.enums import (
+    CashflowLedgerType,
     DepositStatus,
     RebateType,
 )
@@ -46,11 +47,22 @@ class Deposit(Base, AuditMixin):
             "returned_amount + lost_amount <= paid_amount",
             name="released_amount_within_paid",
         ),
+        CheckConstraint(
+            f"ledger_type IN {CashflowLedgerType.values()!r}".replace("[", "(").replace("]", ")"),
+            name="deposit_ledger_type_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     pool_id: Mapped[int] = mapped_column(
         ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
+    )
+    # 押金所属顶层账簿：BUSINESS 业务押金（挂合作方/平台/房租）或 STUDIO 工作室运营押金。
+    # 决定占用/释放/损失/取消四条派生的 Cashflow.ledger_type，押金不进损益的口径不变。
+    ledger_type: Mapped[str] = mapped_column(
+        String(16), nullable=False,
+        default=CashflowLedgerType.BUSINESS.value,
+        server_default=CashflowLedgerType.BUSINESS.value,
     )
     counterparty_id: Mapped[int | None] = mapped_column(
         ForeignKey("counterparties.id", ondelete="SET NULL"), nullable=True

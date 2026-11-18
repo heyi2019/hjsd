@@ -23,7 +23,6 @@ export const fastTests = [
   // 全量回归层调度守卫：确认轻量层并行且保留失败结果。
   "tests/frontend/unit/system/test-full-sharded-scheduling.test.ts",
   // 业务纯逻辑
-  "tests/frontend/unit/business/inventory-export.test.ts",
   "tests/frontend/unit/business/inventory-logic.test.ts",
   "tests/frontend/unit/business/InventoryPanel-helpers.test.ts",
   "tests/frontend/unit/business/OrderDetailEditPayload.test.ts",

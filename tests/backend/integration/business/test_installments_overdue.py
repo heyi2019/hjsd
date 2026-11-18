@@ -22,7 +22,7 @@ from app.domain.enums import (
 from app.domain.foundation import AuditLog
 from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order, OrderEvent
 from app.domain.users import User
-from app.installments import _shared as inst__shared
+from app.shared.installment_amounts import total_receivable
 from app.installments import create as inst_create
 from app.installments import queries as inst_queries
 from app.installments import recovery as inst_recovery
@@ -321,7 +321,7 @@ class TestMarkOverdue:
         assert schedule.due_amount == Decimal("300.00")
         assert schedule.waived_amount == Decimal("300.00")
         assert contract.waived_amount == Decimal("300.00")
-        assert inst__shared.total_receivable(contract) == Decimal("100.00")
+        assert total_receivable(contract) == Decimal("100.00")
         with pytest.raises(Validation, match="超过剩余应收"):
             inst_pay(
                 seeded_db, contract.id, amount=Decimal("301"), paid_on=TODAY,

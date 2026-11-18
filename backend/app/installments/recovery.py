@@ -48,8 +48,8 @@ from ._shared import (
     _merge_form_extra,
     _required_text,
     get_installment,
-    total_receivable,
 )
+from app.shared.installment_amounts import total_receivable
 
 def recover_account(
     session: Session,

@@ -1,4 +1,4 @@
-"""value_added_services.create：分期合约建档、回收出售关联与合约列表（BAS-03）。
+"""installments.create：分期合约建档、回收出售关联与合约列表（BAS-03）。
 
 建档只落合约与期次计划，金额与状态后续由还款/交付动作推进。
 """
@@ -57,8 +57,8 @@ from app.domain.trade import (
 from ._shared import (
     _add_months,
     _non_negative,
-    total_receivable,
 )
+from app.shared.installment_amounts import total_receivable
 
 
 def sale_installment_plan(
@@ -559,8 +559,8 @@ def create_installment(
 
 
 # P0-A（2026-11-18）：非分期 SELL 完成后的回收处置联动经协作注册点注入，
-# 消灭 orders -> value_added_services 反向依赖（backend/.importlinter 契约）。
-# 本模块由 api_v1 -> installments_router -> value_added_services.router 链路必然加载。
+# 消灭 orders -> installments 反向依赖（backend/.importlinter 契约）。
+# 本模块由 api_v1 -> installments_router -> installments.router 链路必然加载。
 from app.orders.collaboration import register_post_sell_hook
 
 register_post_sell_hook(link_recovered_sale)

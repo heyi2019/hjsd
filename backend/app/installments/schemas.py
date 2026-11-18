@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.core.money import to_money
 from app.core.schemas import RequestModel
-from app.installments import _shared as inst_shared
+from app.shared.installment_amounts import total_receivable
 
 
 class ScheduleCreate(RequestModel):
@@ -161,10 +161,10 @@ class InstallmentOut(BaseModel):
     def total_receivable(self) -> Decimal:
         """总应收（口径唯一来源，前端只读不再自行计算）。
 
-        与 _shared.total_receivable 同源（直接调用，不再复制公式）：
+        与 shared.installment_amounts 同源（直接调用，不再复制公式）：
         首付 + 每期 × 期数 + 末期调整 − 减免。
         """
-        return inst_shared.total_receivable(self)
+        return total_receivable(self)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

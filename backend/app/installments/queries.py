@@ -1,4 +1,4 @@
-"""value_added_services.queries：分期合约列表与合计的只读查询（无写事务）。
+"""installments.queries：分期合约列表与合计的只读查询（无写事务）。
 
 `_apply_installment_filters` 是列表与合计**同一份**筛选条件，保证两处口径不漂移；
 从 create.py 拆出后，建档写事务与只读查询各自内聚。

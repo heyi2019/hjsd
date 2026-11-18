@@ -26,6 +26,7 @@ from app.domain.foundation import AuditLog
 from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order, OrderEvent
 from app.domain.users import User
 from app.installments import _shared as inst__shared
+from app.shared.installment_amounts import total_receivable
 from app.installments import create as inst_create
 from app.installments import queries as inst_queries
 from app.installments import recovery as inst_recovery
@@ -161,7 +162,7 @@ def test_final_period_absorbs_rounding_difference(seeded_db):
     contract = _contract(seeded_db, order.id, principal="1000", down_payment="0", periods=3, per_period="333.34", adjust_final_period=True)
     schedules = seeded_db.scalars(select(InstallmentSchedule).where(InstallmentSchedule.installment_id == contract.id).order_by(InstallmentSchedule.period_no)).all()
     assert [item.due_amount for item in schedules] == [Decimal("0"), Decimal("333.34"), Decimal("333.34"), Decimal("333.32")]
-    assert inst__shared.total_receivable(contract) == Decimal("1000.00")
+    assert total_receivable(contract) == Decimal("1000.00")
     for number, amount in [(1, "333.34"), (2, "333.34"), (3, "333.32")]:
         inst_pay(seeded_db, contract.id, amount=amount, paid_on=TODAY, period_no=number, actor="pytest")
     assert contract.status == InstallmentStatus.SETTLED.value

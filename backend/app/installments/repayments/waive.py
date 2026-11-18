@@ -14,7 +14,8 @@ from app.shared.operation_operators import upsert_operation_operators
 from app.core.state_machine import INSTALLMENT_TRANSITIONS, transition
 from app.domain.enums import AuditAction, InstallmentStatus, ScheduleStatus
 from app.domain.trade import InstallmentSchedule
-from .._shared import _merge_form_extra, _positive, _required_text, get_installment, total_receivable
+from .._shared import _merge_form_extra, _positive, _required_text, get_installment
+from app.shared.installment_amounts import total_receivable
 
 def waive_schedule(
     session: Session,

@@ -21,7 +21,7 @@ from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order
 from app.finance.deposits import create_deposit, return_deposit
 from app.finance.rebates import create_rebate
-from app.installments import _shared as inst__shared
+from app.shared.installment_amounts import total_receivable
 from app.installments import create as inst_create
 from app.installments import recovery as inst_recovery
 from app.installments.repayments.pay import pay as inst_pay
@@ -84,7 +84,7 @@ class TestA04DistributionInstallmentSale:
         seeded_db.commit()
         # 分期合约号由业务订单号派生：一个订单只有一个分期合约号。
         assert contract.inst_no == f"{order.order_no}-FQ"
-        assert inst__shared.total_receivable(contract) == Decimal("1200.00")
+        assert total_receivable(contract) == Decimal("1200.00")
 
         inst_pay(
             seeded_db, contract.id, amount=Decimal("200"), paid_on=TODAY,

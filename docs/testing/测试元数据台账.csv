@@ -59,7 +59,7 @@ PROMISE,,,,,,,,INVENTORY-02,L1,后端,仅当无已过账资金事件时，取消
 PROMISE,,,,,,,,STATE-01,L1,后端,非法状态流转必须拒绝，不得静默落库,脏状态，后续流程全乱,test_state_machine.py;test_order_status_contract.py,已覆盖,,
 PROMISE,,,,,,,,EVENT-01,L1,后端,订单事件只追加，不可改不可删,业务事实被篡改,test_orders_events_service.py,待核,,需确认无 update/delete 路径
 PROMISE,,,,,,,,ORDER-01,L1,后端,删单按 source 显式级联，不依赖数据库级联猜测,孤儿数据，统计口径污染,test_orders.py;test_orders_flows.py;test_orders_events.py;test_orders_roles.py,待核,,需逐 source 造数验证
-PROMISE,,,,,,,,AUTH-01,L2,双端,越权访问必须 403，不依赖前端隐藏按钮,跨客户数据越界,test_auth_contract.py,已覆盖,,
+PROMISE,,,,,,,,AUTH-01,L2,双端,越权访问必须 403，不依赖前端隐藏按钮,跨客户数据越界,test_auth_contract.py;test_auth_users.py;test_auth_teams.py,已覆盖,,
 PROMISE,,,,,,,,CONTACT-01,L2,双端,客户与合作方联系方式按已建档原值展示,联系方式口径不一致,test_parties_masking.py,已覆盖,,
 PROMISE,,,,,,,,AUDIT-01,L2,后端,关键写路径必须留审计记录（record_audit）,无法追责,test_audit_contract.py,待核,,需按写路径清单逐条核对
 PROMISE,,,,,,,,TESTING-01,L2,双端,每个测试文件必须归属一条已登记承诺；清单证据文件必须真实存在,测试资产腐烂：不知在守什么，也无法判断哪条承诺无人守,test_promise_declaration.py,已覆盖,,

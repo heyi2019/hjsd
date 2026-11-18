@@ -27,7 +27,7 @@ from app.domain.enums import (
     SaleMode,
 )
 from app.domain.trade import Account, Installment, Order, OrderEvent
-from app.domain.users import User
+from app.shared.operation_operators import validate_optional_operator_ids
 from app.shared.form_field_rules import validate_form_extra
 
 from ._common import _required_bool
@@ -74,16 +74,8 @@ def _assert_event_context(
 
     返回 can_reopen_for_buy 供后续「已完成订单重开 BUY」分支复用。
     """
-    if operator_user_ids is not None:
-        if len(set(operator_user_ids)) != len(operator_user_ids):
-            raise Validation("操作人不能重复选择", details={"field": "operator_user_ids"})
-        active_ids = set(
-            session.scalars(
-                select(User.id).where(User.id.in_(operator_user_ids), User.is_active.is_(True))
-            ).all()
-        )
-        if active_ids != set(operator_user_ids):
-            raise Validation("所选操作人不存在或已停用", details={"field": "operator_user_ids"})
+    # 操作人校验委托共享原语（None 跳过、重复/停用拒绝），消除与资金/返点域的副本。
+    validate_optional_operator_ids(session, operator_user_ids)
     if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     can_cancel_completed = (

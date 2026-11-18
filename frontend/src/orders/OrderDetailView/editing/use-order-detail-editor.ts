@@ -10,101 +10,9 @@ import type { Pool } from "../../../shared/api/types/finance";
 import { poolsApi } from "../../../shared/api/pools.api";
 import { normalizeError } from "../../../shared/api/client";
 import { appMessage } from "../../../shared/ui/appFeedback";
-import { buildEventEdits, buildOperationEventCreates, type ExecutionEventDraft } from "./execution-edit-payload";
-import type { OrderOperationDraft } from "../OrderDetail.shared";
-
-export type EventDraft = ExecutionEventDraft;
-export type OperationDraft = OrderOperationDraft;
-export type FinanceDraft = {
-  flow_no: string;
-  amount?: string;
-  pool_id?: number;
-  occurred_at: string;
-  note: string;
-  operator_user_ids?: number[];
-};
-export type OrderDraft = {
-  order_id: number;
-  occurred_at: string;
-  note: string;
-  form_extra: Record<string, unknown>;
-};
-
-const SHARED_ORDER_FORM_EXTRA_KEYS = new Set(["bound_phone_owner"]);
-
-/** 新增详情动作行沿用建单口径：默认当前会话对应的在职员工。 */
-export function defaultOperatorUserIds(employees: EmployeeOption[], username: string): number[] | undefined {
-  const employee = employees.find((item) => item.is_active && item.username === username);
-  return employee ? [employee.id] : undefined;
-}
-
-/** 把订单详情内的共享交付字段投影到当前详情涉及的全部订单草稿。 */
-export function propagateSharedOrderExtra(
-  drafts: Record<number, OrderDraft>,
-  orderIds: number[],
-  changes: Record<string, unknown>,
-): Record<number, OrderDraft> {
-  const sharedChanges = Object.fromEntries(
-    Object.entries(changes).filter(([key]) => SHARED_ORDER_FORM_EXTRA_KEYS.has(key)),
-  );
-  if (!Object.keys(sharedChanges).length) return drafts;
-
-  const next = { ...drafts };
-  orderIds.forEach((orderId) => {
-    const current = next[orderId] ?? {
-      order_id: orderId,
-      occurred_at: "",
-      note: "",
-      form_extra: {},
-    };
-    next[orderId] = {
-      ...current,
-      form_extra: { ...current.form_extra, ...sharedChanges },
-    };
-  });
-  return next;
-}
-
-/** 解析共享字段需要同步的订单，避免在 React 状态更新回调里读取详情缓存。 */
-export function sharedOrderIdsForEdit(
-  detail: Pick<AccountExecutionDetail, "orders"> | undefined,
-  fallbackOrderId: number,
-): number[] {
-  return detail?.orders.map((order) => order.order_id) ?? [fallbackOrderId];
-}
-
-export type PartyAddition = {
-  entity_type: "customer" | "counterparty";
-  entity_id: number;
-  role: string;
-  operation?: "add" | "remove";
-};
-
-export interface OrderDetailEditor {
-  editingAccount: Account | null;
-  inlineEditId: number | null;
-  eventDrafts: Record<number, EventDraft>;
-  updateEventDraft: (event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
-  operationDrafts: Partial<Record<string, OperationDraft>>;
-  updateOperationDraft: (key: string, changes: Partial<OperationDraft>) => void;
-  addOperationDraft: (operationType: NonNullable<OperationDraft["operation_type"]>) => void;
-  removeOperationDraft: (key: string) => void;
-  financeDrafts: Record<string, FinanceDraft>;
-  updateFinanceDraft: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
-  updateEditingAccount: (changes: Partial<Account>) => void;
-  orderDrafts: Record<number, OrderDraft>;
-  updateOrderDraft: (orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) => void;
-  partyDrafts: Record<number, PartyAddition[]>;
-  updatePartyDraft: (orderId: number, addition: PartyAddition) => void;
-  employees: EmployeeOption[];
-  pools: Pool[];
-  ensureEmployees: () => Promise<EmployeeOption[]>;
-  invEditExtraForm: ReturnType<typeof Form.useForm>[0];
-  savingAccount: boolean;
-  openEditor: (account: Account) => Promise<void>;
-  cancelInlineEdit: () => void;
-  saveInline: () => Promise<void>;
-}
+import { buildEventEdits, buildOperationEventCreates } from "./execution-edit-payload";
+import type { EventDraft, OperationDraft, FinanceDraft, OrderDraft, PartyAddition, OrderDetailEditor } from "./editor-types";
+import { defaultOperatorUserIds, propagateSharedOrderExtra, sharedOrderIdsForEdit } from "./editor-utils";
 
 /**
  * 订单详情编辑器状态机：库存中心和订单台账共用同一份订单级编辑状态。
@@ -399,3 +307,7 @@ export function useOrderDetailEditor(params: {
     saveInline,
   };
 }
+
+/** 类型与纯函数出口：保持拆分前 use-order-detail-editor 的全部导出符号不变。 */
+export type { EventDraft, OperationDraft, FinanceDraft, OrderDraft, PartyAddition, OrderDetailEditor } from "./editor-types";
+export { defaultOperatorUserIds, propagateSharedOrderExtra, sharedOrderIdsForEdit } from "./editor-utils";

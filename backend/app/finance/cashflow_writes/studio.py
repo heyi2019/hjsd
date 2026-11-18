@@ -12,14 +12,13 @@ from app.shared.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
-from app.domain.enums import AuditAction, CashflowSourceType, Direction, Nature
+from app.domain.enums import AuditAction, CashflowSourceType, Direction
 from app.domain.trade import Cashflow
 from app.finance.attributes import (
     MANUAL_EXCLUDED_CATEGORIES,
     STUDIO_EXPENSE_ATTRIBUTE,
     STUDIO_INCOME_ATTRIBUTE,
     accounting_attribute_for_manual_cashflow,
-    derive_manual_cashflow_nature,
 )
 from app.field_definitions.pools import assert_pool_usable
 from app.shared.form_field_rules import validate_form_extra
@@ -56,28 +55,14 @@ def _assert_editable_studio_cashflow(
 def _normalize_studio_cashflow_fields(
     *,
     direction: str,
-    nature: str | None,
     accounting_attribute: str | None,
     category: str,
     amount: Any,
-) -> tuple[str, str, str, str, str]:
+) -> tuple[str, str, str, str]:
     try:
         normalized_direction = Direction(direction).value
     except ValueError as exc:
         raise Validation(f"direction 必须为 {Direction.values()}", details={"field": "direction"}) from exc
-    try:
-        normalized_nature = Nature(
-            nature or derive_manual_cashflow_nature(normalized_direction)
-        ).value
-    except ValueError as exc:
-        raise Validation(f"nature 必须为 {Nature.values()}", details={"field": "nature"}) from exc
-    if normalized_direction == Direction.IN.value and normalized_nature not in {
-        Nature.EXTERNAL_IN.value,
-        Nature.BUSINESS_IN.value,
-    }:
-        raise Validation("收入流水的 nature 不匹配", details={"direction": normalized_direction, "nature": normalized_nature})
-    if normalized_direction == Direction.OUT.value and normalized_nature != Nature.BUSINESS_OUT.value:
-        raise Validation("支出流水的 nature 不匹配", details={"direction": normalized_direction, "nature": normalized_nature})
     label = _text(
         category,
         field="category",
@@ -86,7 +71,7 @@ def _normalize_studio_cashflow_fields(
         type_message="category 必须为文本",
     )
     default_accounting_attribute = accounting_attribute_for_manual_cashflow(
-        nature=normalized_nature, category=label, direction=normalized_direction
+        category=label, direction=normalized_direction
     )
     normalized_accounting_attribute = accounting_attribute or default_accounting_attribute
     if normalized_direction == Direction.OUT.value and normalized_accounting_attribute != STUDIO_EXPENSE_ATTRIBUTE:
@@ -97,7 +82,6 @@ def _normalize_studio_cashflow_fields(
         raise Validation("该科目不属于工作室手工收支", details={"field": "category"})
     return (
         normalized_direction,
-        normalized_nature,
         normalized_accounting_attribute,
         label,
         _positive(amount, field="amount"),
@@ -111,7 +95,6 @@ def update_cashflow(
     pool_id: int,
     occurred_on: date,
     direction: str,
-    nature: str | None = None,
     accounting_attribute: str | None = None,
     category: str,
     amount: Any,
@@ -127,13 +110,11 @@ def update_cashflow(
     pool = assert_pool_usable(session, pool_id)
     (
         normalized_direction,
-        normalized_nature,
         normalized_accounting_attribute,
         label,
         money,
     ) = _normalize_studio_cashflow_fields(
         direction=direction,
-        nature=nature,
         accounting_attribute=accounting_attribute,
         category=category,
         amount=amount,
@@ -142,7 +123,6 @@ def update_cashflow(
         "pool_id": flow.pool_id,
         "occurred_on": flow.occurred_on.isoformat(),
         "direction": flow.direction,
-        "nature": flow.nature,
         "accounting_attribute": flow.accounting_attribute,
         "category": flow.category,
         "amount": str(to_money(flow.amount)),
@@ -151,7 +131,6 @@ def update_cashflow(
     flow.pool_id = pool.id
     flow.occurred_on = occurred_on
     flow.direction = normalized_direction
-    flow.nature = normalized_nature
     flow.accounting_attribute = normalized_accounting_attribute
     flow.category = label
     flow.amount = money
@@ -170,7 +149,6 @@ def update_cashflow(
             "pool_id": flow.pool_id,
             "occurred_on": occurred_on.isoformat(),
             "direction": flow.direction,
-            "nature": flow.nature,
             "accounting_attribute": flow.accounting_attribute,
             "category": flow.category,
             "amount": str(money),

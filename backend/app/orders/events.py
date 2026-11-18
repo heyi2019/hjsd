@@ -19,7 +19,6 @@ from app.domain.enums import (
     CashflowSourceType,
     Direction,
     EventType,
-    Nature,
 )
 from app.domain.trade import Cashflow, OrderEvent
 from ._common import _non_negative_money, _positive_money
@@ -38,11 +37,11 @@ from .events_rules import (
     _post_deliver,
 )
 
-# 事件 → 现金流方向 / 性质 / 分类
-EVENT_FLOW_MAP: dict[str, tuple[str, str, str]] = {
-    EventType.BUY.value: (Direction.OUT.value, Nature.BUSINESS_OUT.value, "BUY"),
-    EventType.SELL.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "SELL"),
-    EventType.CANCEL.value: (Direction.IN.value, Nature.BUSINESS_IN.value, "CANCEL"),
+# 事件 → 现金流方向 / 分类
+EVENT_FLOW_MAP: dict[str, tuple[str, str]] = {
+    EventType.BUY.value: (Direction.OUT.value, "BUY"),
+    EventType.SELL.value: (Direction.IN.value, "SELL"),
+    EventType.CANCEL.value: (Direction.IN.value, "CANCEL"),
 }
 
 
@@ -59,7 +58,6 @@ def post_event(
     actor: str,
     pool_id: int | None = None,
     portion: str = "PRINCIPAL",
-    delivery_mode: str | None = None,
     delivery_direction: str | None = None,
     offset_event_id: int | None = None,
     reason: str | None = None,
@@ -121,7 +119,6 @@ def post_event(
             order,
             occurred_on=occurred_on,
             actor=actor,
-            delivery_mode=delivery_mode,
             delivery_direction=delivery_direction,
             note=note,
             bound_phone=bound_phone,
@@ -140,7 +137,7 @@ def post_event(
                 f"{event_type} 业务动作不直接选择资金账户",
                 details={"field": "pool_id", "event_type": event_type},
             )
-    direction, nature, category = EVENT_FLOW_MAP.get(event_type, (None, None, None))
+    direction, category = EVENT_FLOW_MAP.get(event_type, (None, None))
     # 初始买入(BUY)对应的号价/成本允许为 0：提号表单将该字段设为选填时前端以 0 兜底，
     # 此处需放行 0；其余资金事件金额必须为正数，以保持账务完整。
     if not has_cashflow:
@@ -213,15 +210,6 @@ def post_event(
 
     if event_type == EventType.CANCEL.value:
         direction = cancel_direction
-        # nature 必须随反转后的 direction 走，否则会产出 OUT/BUSINESS_IN（或
-        # IN/BUSINESS_OUT）这种自相矛盾的流水：余额按方向变了，但资金账户收支卡片
-        # 与资金日报发生额列按 (direction, nature) 取数，两边都不体现，账对不上。
-        # 与 finance/cashflows.py::reverse_cashflow 的反向约定保持一致。
-        nature = (
-            Nature.BUSINESS_IN.value
-            if direction == Direction.IN.value
-            else Nature.BUSINESS_OUT.value
-        )
 
     flow: Cashflow | None = None
     if has_cashflow:
@@ -229,7 +217,6 @@ def post_event(
             flow_no=allocate_flow_no(session, direction),
             pool_id=event.pool_id,
             occurred_on=occurred_on,
-            nature=nature,
             accounting_attribute=accounting_attribute,
             category=category,
             direction=direction,

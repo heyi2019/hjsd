@@ -86,7 +86,6 @@ export interface OrderCashflow {
   pool_id: number;
   occurred_on: string;
   occurred_at?: string | null;
-  nature: string;
   category: string;
   direction: string;
   amount: string;
@@ -103,7 +102,6 @@ export interface OrderRebate {
   channel?: string | null;
   rate: string;
   amount: string;
-  status: string;
   collected_on: string;
   note?: string | null;
   created_at?: string;
@@ -125,7 +123,6 @@ export interface OrderInstallment {
   waived_amount: string;
   bad_debt_amount: string;
   status: string;
-  delivery_mode?: string | null;
   delivered_on?: string | null;
   first_due_on?: string | null;
   note?: string | null;

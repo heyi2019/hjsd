@@ -42,7 +42,7 @@ def _all_scope_user() -> CurrentUser:
         pool_ids=frozenset(),
     )
 
-def _make_flow(seeded_db, *, direction, nature,
+def _make_flow(seeded_db, *, direction,
                accounting_attribute="OPERATING_EXPENSE", category="OTHER", amount="10",
                note="memo", order_id=None):
     return cashflows.create_cashflow(
@@ -50,7 +50,6 @@ def _make_flow(seeded_db, *, direction, nature,
         pool_id=1,
         occurred_on=TODAY,
         direction=direction,
-        nature=nature,
         accounting_attribute=accounting_attribute,
         category=category,
         amount=Decimal(amount),
@@ -75,8 +74,7 @@ def _cashflow_row(**overrides):
 
     row = dict(
         id=1, flow_no="ZC00001", pool_id=1, occurred_on=TODAY,
-        occurred_at=datetime(2026, 10, 17, 9, 0), nature="BUSINESS_IN",
-        ledger_type="BUSINESS", accounting_attribute="SELF_REVENUE",
+        occurred_at=datetime(2026, 10, 17, 9, 0), ledger_type="BUSINESS", accounting_attribute="SELF_REVENUE",
         category="SALE", direction="IN", amount=Decimal("10"),
         reviewed_by=None, reviewed_at=None, source_type="MANUAL", source_id=None,
         order_id=None, order_no=None,
@@ -108,7 +106,6 @@ def _studio_flow(seeded_db, *, direction="OUT", category="房租", amount="20"):
     return cashflows.create_cashflow(
         seeded_db, pool_id=1, occurred_on=TODAY,
         direction=direction,
-        nature="BUSINESS_OUT" if direction == "OUT" else "BUSINESS_IN",
         category=category, amount=Decimal(amount), actor="pytest",
         ledger_type=CashflowLedgerType.STUDIO.value,
     )
@@ -138,7 +135,6 @@ def test_cashflows_module_creates_cashflow_without_status(seeded_db):
         pool_id=1,
         occurred_on=TODAY,
         direction="IN",
-        nature="EXTERNAL_IN",
         category="客户收款",
         amount=Decimal("180"),
         actor="pytest",
@@ -155,7 +151,6 @@ def test_cashflow_uses_unified_source_reference(seeded_db):
         pool_id=1,
         occurred_on=TODAY,
         direction="OUT",
-        nature="BUSINESS_OUT",
         category="房租",
         amount=Decimal("300"),
         actor="pytest",
@@ -170,7 +165,6 @@ def test_cashflow_has_top_level_ledger_and_can_filter_business_or_studio(seeded_
         pool_id=1,
         occurred_on=TODAY,
         direction="OUT",
-        nature="BUSINESS_OUT",
         category="BUY",
         amount=Decimal("10"),
         actor="pytest",
@@ -181,7 +175,6 @@ def test_cashflow_has_top_level_ledger_and_can_filter_business_or_studio(seeded_
         pool_id=1,
         occurred_on=TODAY,
         direction="OUT",
-        nature="BUSINESS_OUT",
         category="房租",
         amount=Decimal("20"),
         actor="pytest",
@@ -251,7 +244,6 @@ def test_update_studio_cashflow_updates_the_manual_entry(seeded_db):
     flow = _make_flow(
         seeded_db,
         direction="OUT",
-        nature="BUSINESS_OUT",
         category="房租",
         amount="3000",
         note="10月房租",
@@ -263,7 +255,6 @@ def test_update_studio_cashflow_updates_the_manual_entry(seeded_db):
         pool_id=1,
         occurred_on=date(2026, 10, 20),
         direction="OUT",
-        nature="BUSINESS_OUT",
         accounting_attribute="OPERATING_EXPENSE",
         category="房租",
         amount=Decimal("3200"),
@@ -276,7 +267,7 @@ def test_update_studio_cashflow_updates_the_manual_entry(seeded_db):
     assert updated.note == "修正后的房租"
 
 def test_delete_studio_cashflow_removes_the_manual_entry(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT", category="日用")
+    flow = _make_flow(seeded_db, direction="OUT", category="日用")
 
     cashflows.delete_cashflow(seeded_db, flow.id, actor="pytest")
 
@@ -284,37 +275,7 @@ def test_delete_studio_cashflow_removes_the_manual_entry(seeded_db):
 
 def test_create_cashflow_rejects_bad_direction(seeded_db):
     with pytest.raises(Validation, match="direction 必须为"):
-        _make_flow(seeded_db, direction="SIDEWAYS", nature="BUSINESS_OUT")
-
-def test_create_cashflow_rejects_bad_nature(seeded_db):
-    with pytest.raises(Validation, match="nature 必须为"):
-        _make_flow(seeded_db, direction="OUT", nature="NOPE")
-
-def test_create_cashflow_rejects_internal(seeded_db):
-    with pytest.raises(Validation, match="独立现金流不能使用 INTERNAL"):
-        _make_flow(seeded_db, direction="OUT", nature="INTERNAL")
-
-def test_create_cashflow_rejects_in_nature_mismatch(seeded_db):
-    with pytest.raises(Validation, match="收入流水的 nature 不匹配"):
-        _make_flow(seeded_db, direction="IN", nature="BUSINESS_OUT")
-
-def test_create_cashflow_rejects_out_nature_mismatch(seeded_db):
-    with pytest.raises(Validation, match="支出流水的 nature 不匹配"):
-        _make_flow(seeded_db, direction="OUT", nature="BUSINESS_IN")
-
-def test_create_cashflow_rejects_external_in_without_note(seeded_db):
-    with pytest.raises(Validation, match="独立收款必须填写摘要"):
-        cashflows.create_cashflow(
-            seeded_db,
-            pool_id=1,
-            occurred_on=TODAY,
-            direction="IN",
-            nature="EXTERNAL_IN",
-            category="OTHER",
-            amount=Decimal("10"),
-            actor="pytest",
-            note=None,
-        )
+        _make_flow(seeded_db, direction="SIDEWAYS")
 
 def test_create_cashflow_rejects_user_not_visible(seeded_db):
     with pytest.raises(NotFound, match="资金账户不存在"):
@@ -323,7 +284,6 @@ def test_create_cashflow_rejects_user_not_visible(seeded_db):
             pool_id=1,
             occurred_on=TODAY,
             direction="OUT",
-            nature="BUSINESS_OUT",
             category="OTHER",
             amount=Decimal("10"),
             actor="pytest",
@@ -335,7 +295,7 @@ def test_get_cashflow_rejects_unknown(seeded_db):
         cashflows._get_cashflow(seeded_db, 999999)
 
 def test_get_cashflow_rejects_user_not_visible(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
+    flow = _make_flow(seeded_db, direction="OUT")
     with pytest.raises(NotFound):
         cashflows._get_cashflow(seeded_db, flow.id, user=_restricted_user())
 
@@ -346,7 +306,7 @@ def test_get_cashflow_checks_order_visible(seeded_db):
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest"
     )
     flow = _make_flow(
-        seeded_db, direction="OUT", nature="BUSINESS_OUT", order_id=order.id
+        seeded_db, direction="OUT", order_id=order.id
     )
     # owner_scope=ALL 的用户既能通过池可见性，又不触发订单 owner 校验
     fetched = cashflows._get_cashflow(seeded_db, flow.id, user=_all_scope_user())
@@ -356,35 +316,30 @@ def test_order_cashflow_rejects_cost_attribute_on_dg(seeded_db):
     order = _make_order(seeded_db, "DG")
     with pytest.raises(Validation, match="代挂订单无成本科目"):
         _make_flow(
-            seeded_db, direction="OUT", nature="BUSINESS_OUT",
-            accounting_attribute="SELF_DIRECT_COST", order_id=order.id,
+            seeded_db, direction="OUT", accounting_attribute="SELF_DIRECT_COST", order_id=order.id,
         )
 
 def test_order_cashflow_rejects_mismatched_cost_attribute(seeded_db):
     hs = _make_order(seeded_db, "HS")
     with pytest.raises(Validation, match="成本科目与订单类型不匹配"):
         _make_flow(
-            seeded_db, direction="OUT", nature="BUSINESS_OUT",
-            accounting_attribute="TH_DIRECT_COST", order_id=hs.id,
+            seeded_db, direction="OUT", accounting_attribute="TH_DIRECT_COST", order_id=hs.id,
         )
     th = _make_order(seeded_db, "TH")
     with pytest.raises(Validation, match="成本科目与订单类型不匹配"):
         _make_flow(
-            seeded_db, direction="OUT", nature="BUSINESS_OUT",
-            accounting_attribute="SELF_DIRECT_COST", order_id=th.id,
+            seeded_db, direction="OUT", accounting_attribute="SELF_DIRECT_COST", order_id=th.id,
         )
 
 def test_order_cashflow_allows_matching_cost_attribute(seeded_db):
     hs = _make_order(seeded_db, "HS")
     hs_flow = _make_flow(
-        seeded_db, direction="OUT", nature="BUSINESS_OUT",
-        accounting_attribute="SELF_DIRECT_COST", order_id=hs.id,
+        seeded_db, direction="OUT", accounting_attribute="SELF_DIRECT_COST", order_id=hs.id,
     )
     assert hs_flow.accounting_attribute == "SELF_DIRECT_COST"
     th = _make_order(seeded_db, "TH")
     th_flow = _make_flow(
-        seeded_db, direction="OUT", nature="BUSINESS_OUT",
-        accounting_attribute="TH_DIRECT_COST", order_id=th.id,
+        seeded_db, direction="OUT", accounting_attribute="TH_DIRECT_COST", order_id=th.id,
     )
     assert th_flow.accounting_attribute == "TH_DIRECT_COST"
 
@@ -392,12 +347,12 @@ def test_order_cashflow_allows_non_cost_attributes_on_dg(seeded_db):
     """DG 与回收/提号同权：非成本科目一视同仁；挂单默认落其他收支（非运营支出）。"""
     order = _make_order(seeded_db, "DG")
     out_flow = _make_flow(
-        seeded_db, direction="OUT", nature="BUSINESS_OUT", order_id=order.id,
+        seeded_db, direction="OUT", order_id=order.id,
         accounting_attribute=None,
     )
     assert out_flow.accounting_attribute == "OTHER_EXPENSE"
     in_flow = _make_flow(
-        seeded_db, direction="IN", nature="BUSINESS_IN", order_id=order.id,
+        seeded_db, direction="IN", order_id=order.id,
         accounting_attribute=None,
     )
     assert in_flow.accounting_attribute == "OTHER_INCOME"
@@ -420,12 +375,11 @@ def test_reverse_cashflow_rejects_deposit_flow(seeded_db):
         )
 
 def test_reverse_cashflow_in_direction(seeded_db):
-    flow = _make_flow(seeded_db, direction="IN", nature="BUSINESS_IN")
+    flow = _make_flow(seeded_db, direction="IN")
     reversal = cashflows.reverse_cashflow(
         seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x"
     )
     assert reversal.direction == "OUT"
-    assert reversal.nature == "BUSINESS_OUT"
 
 def test_create_deposit_rejects_user_not_visible(seeded_db):
     with pytest.raises(NotFound, match="资金账户不存在"):

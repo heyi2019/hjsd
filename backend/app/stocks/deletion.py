@@ -13,7 +13,6 @@ from app.shared.audit import record_audit
 from app.core.errors import Validation
 from app.core.security import CurrentUser
 from app.domain.enums import AuditAction
-from app.domain.imports import ImportRow
 from app.domain.trade import Account, InstallmentDisposition, Order
 
 from .profile import get_account
@@ -29,7 +28,7 @@ def delete_inventory(
 ) -> None:
     """删除及其全部绑定订单从属数据，保留审计记录。
 
-    客户、合作方、导入批次等共享主数据不属于库存删除范围；库存关联的订单、
+    客户、合作方等共享主数据不属于库存删除范围；库存关联的订单、
     事件、资金流水、分润、分期、返点、押金、订单关系和映射全部清理。
     """
     inventory = get_account(session, inventory_id, user)
@@ -80,12 +79,6 @@ def delete_inventory_record(
 
     before = _inventory_snapshot(inventory)
 
-    # 导入原始行是共享历史数据，只解除库存映射，不删除原始行。
-    import_row_count = (
-        session.query(ImportRow)
-        .filter(ImportRow.mapped_account_id == inventory_id)
-        .update({ImportRow.mapped_account_id: None}, synchronize_session=False)
-    )
     session.delete(inventory)
     session.flush()
 
@@ -103,7 +96,6 @@ def delete_inventory_record(
                 if deleted_order
                 else []
             ),
-            "unlinked_import_rows": import_row_count,
         },
         reason=cleaned_reason,
     )

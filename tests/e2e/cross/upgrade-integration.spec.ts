@@ -21,7 +21,7 @@ test("已交付分期订单可从页面登记退款", async ({ page, request }) 
   const contract = await installment.json();
   const payment = await request.post(`${base}/installments/${contract.id}/payments`, { headers, data: { amount: "100", paid_on: "2026-10-17", period_no: 1 } });
   expect(payment.status()).toBe(200);
-  const delivered = await request.post(`${base}/installments/${contract.id}/deliver`, { headers, data: { delivery_mode: "CUSTOMER_SELF", delivered_on: "2026-10-17", note: "联调交付凭证" } });
+  const delivered = await request.post(`${base}/installments/${contract.id}/deliver`, { headers, data: { delivered_on: "2026-10-17", note: "联调交付凭证" } });
   expect(delivered.status()).toBe(200);
   await page.goto("/");
   await navItem(page, "业务中心").click();

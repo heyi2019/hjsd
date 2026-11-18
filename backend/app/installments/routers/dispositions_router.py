@@ -106,7 +106,6 @@ def deliver_installment(
     item = inst_recovery.deliver(
         db,
         installment_id,
-        delivery_mode=payload.delivery_mode,
         delivered_on=payload.delivered_on,
         note=payload.note,
         bound_phone=payload.bound_phone,

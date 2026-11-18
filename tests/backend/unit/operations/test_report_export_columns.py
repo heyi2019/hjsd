@@ -2,7 +2,7 @@
 
 规则：
 - 导出列 = 该报表对应 `RPT_*` 作用域的可见列，顺序与界面一致；
-- 表头用注册表中文名，不再是英文键（此前导出的表头是 order_no / fund_nature 这类键名）；
+- 表头用注册表中文名，不再是原始英文键名；
 - 「已登记但被隐藏」的列一律不导 —— 隐藏列不能以英文键回填成新列；
 - 唯一例外：**完全未登记**的键（如合计行独有字段）追加末尾，避免合计信息丢失；
 - 枚举列的值按 `option_sets` 字典翻成中文（列注册表用 value_set 声明归属），
@@ -91,28 +91,28 @@ def test_report_csv_translates_enum_values_and_keeps_row_type():
     """值中文：命中的码翻译，row_type / 金额保持原样。"""
     report = {
         "items": [
-            {"fund_nature": "BUSINESS", "direction": "IN", "status": "COMPLETED", "amount": "100.00"},
-            {"fund_nature": "EXTERNAL", "direction": "OUT", "status": "ACTIVE", "amount": "40.00"},
+            {"biz_kind": "STOCK", "direction": "IN", "status": "COMPLETED", "amount": "100.00"},
+            {"biz_kind": "CONSIGN", "direction": "OUT", "status": "ACTIVE", "amount": "40.00"},
         ],
         "total": None,
     }
     lines = report_csv(
         report,
         columns=[
-            ("fund_nature", "资金性质", True),
+            ("biz_kind", "业务类型", True),
             ("direction", "现金方向", True),
             ("status", "状态", True),
             ("amount", "发生额", True),
         ],
         value_labels={
-            "fund_nature": {"BUSINESS": "本方经营", "EXTERNAL": "外部/受托"},
+            "biz_kind": {"STOCK": "回收现货", "CONSIGN": "代挂寄售"},
             "direction": {"IN": "收入", "OUT": "支出"},
             "status": {"COMPLETED": "已完成", "ACTIVE": "进行中"},
         },
     ).lstrip("\ufeff").splitlines()
-    assert lines[0] == "row_type,资金性质,现金方向,状态,发生额"
-    assert lines[1] == "ITEM,本方经营,收入,已完成,100.00"
-    assert lines[2] == "ITEM,外部/受托,支出,进行中,40.00"
+    assert lines[0] == "row_type,业务类型,现金方向,状态,发生额"
+    assert lines[1] == "ITEM,回收现货,收入,已完成,100.00"
+    assert lines[2] == "ITEM,代挂寄售,支出,进行中,40.00"
 
 
 def test_report_csv_translates_custom_column_value():

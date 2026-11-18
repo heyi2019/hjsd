@@ -5,12 +5,12 @@ import { attachmentsApi, gameTypesApi, notificationsApi, sequencesApi } from "@/
 import { optionSetsApi } from "@/shared/api/options.api";
 import { listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi, teamsApi, usersApi } from "@/shared/api/org.api";
-import { policyApi } from "@/shared/api/policy.api";
+import { profitAllocationApi } from "@/shared/api/profitAllocation.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reconciliationsApi } from "@/shared/api/reconciliations.api";
 import { transfersApi } from "@/shared/api/transfers.api";
 import { rebatesApi } from "@/shared/api/rebates.api";
-import { auditApi, importsApi, reportsApi } from "@/shared/api/reports.api";
+import { auditApi, reportsApi } from "@/shared/api/reports.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { screen, waitFor, within, fireEvent, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -29,7 +29,7 @@ vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
-vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/profitAllocation.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/reconciliations.api");
 vi.mock("@/shared/api/rebates.api");
@@ -43,7 +43,7 @@ import { MemoryRouter } from "react-router-dom";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
-const __allApi = { dashboardApi, cashflowsApi, orderCashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, employeesApi, teamsApi, usersApi, policyApi, poolsApi, reconciliationsApi, transfersApi, rebatesApi, auditApi, importsApi, reportsApi, stocksApi };
+const __allApi = { dashboardApi, cashflowsApi, orderCashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, employeesApi, teamsApi, usersApi, profitAllocationApi, poolsApi, reconciliationsApi, transfersApi, rebatesApi, auditApi, reportsApi, stocksApi };
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
@@ -78,7 +78,7 @@ const { deepStub, OBJECT_SHAPED } = vi.hoisted(() => {
       },
     });
   }
-  const OBJECT_SHAPED = new Set(["dashboardApi", "reportsApi", "auditApi", "importsApi", "policyApi"]);
+  const OBJECT_SHAPED = new Set(["dashboardApi", "reportsApi", "auditApi", "profitAllocationApi"]);
   return { deepStub, OBJECT_SHAPED };
 });
 

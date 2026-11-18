@@ -5,7 +5,6 @@
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
 from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy.orm import Session
@@ -15,25 +14,15 @@ from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.trade import Order
 
-from .._shared import _scoped_order
+from ._shared import _scoped_order
 
 DEFAULT_PROFIT_COMPANY_RATE = Decimal("40")
 DEFAULT_LOSS_COMPANY_RATE = Decimal("50")
 
 
 def company_rate_for_order(order: Order, order_profit: Decimal) -> Decimal:
-    """读取订单创建时固化的公司分润比例，盈利与亏损使用不同配置。"""
-    snapshot = order.policy_snapshot if isinstance(order.policy_snapshot, Mapping) else {}
-    commission = snapshot.get("COMMISSION")
-    commission_config = commission.get("config") if isinstance(commission, Mapping) else {}
-    config = commission_config if isinstance(commission_config, Mapping) else {}
-    split = config.get("split")
-    split_config = split if isinstance(split, Mapping) else {}
-    raw = (
-        config.get("loss_company_rate", split_config.get("LOSS_COMPANY", DEFAULT_LOSS_COMPANY_RATE))
-        if order_profit < 0
-        else split_config.get("COMPANY", DEFAULT_PROFIT_COMPANY_RATE)
-    )
+    """公司分润比例：盈利/亏损使用默认配置（规则域已下线，原快照全为空转）。"""
+    raw = DEFAULT_LOSS_COMPANY_RATE if order_profit < 0 else DEFAULT_PROFIT_COMPANY_RATE
     rate = to_money(raw or 0)
     if rate < 0 or rate > 100:
         raise Validation("公司分润比例必须在 0% 到 100% 之间", details={"company_rate": str(rate)})

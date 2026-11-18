@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.shared.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.security import CurrentUser
-from app.domain.enums import AuditAction, PoolOwnership, PoolStatus, PoolType
+from app.domain.enums import AuditAction, PoolStatus, PoolType
 from app.domain.foundation import Pool
 from app.shared.form_values import set_extra_values
 from ._common import _UNSET, _get_pool_or_404, _normalize_pool_code, _required_name, _required_pool_type, _snapshot
@@ -73,7 +73,6 @@ def create_pool(
     name: str,
     actor: str,
     pool_type: str = PoolType.OTHER.value,
-    ownership: str = PoolOwnership.OWNED.value,
     is_default: bool = False,
     note: str | None = None,
     extra_values: Mapping[str, Any] | None = None,
@@ -87,15 +86,10 @@ def create_pool(
             code=ErrorCode.DUPLICATE_CODE,
             details={"code": normalized},
         )
-    if ownership not in PoolOwnership.values():
-        raise Validation(
-            "ownership 取值非法", details={"ownership": ownership, "allowed": PoolOwnership.values()}
-        )
     pool = Pool(
         code=normalized,
         name=normalized_name,
         pool_type=_required_pool_type(pool_type),
-        ownership=ownership,
         status=PoolStatus.ACTIVE.value,
         is_default=False,
         note=note,
@@ -119,7 +113,7 @@ def create_pool(
         entity_type="Pool",
         entity_id=pool.id,
         actor=actor,
-        after=_snapshot(pool, ("code", "name", "pool_type", "ownership", "status", "is_default")),
+        after=_snapshot(pool, ("code", "name", "pool_type", "status", "is_default")),
     )
     return pool
 def update_pool(
@@ -130,28 +124,22 @@ def update_pool(
     name: str | None = None,
     note: str | None = None,
     pool_type: str | None = None,
-    ownership: str | None = None,
     is_default: bool | None = None,
     extra_values: Mapping[str, Any] | None | object = _UNSET,
 ) -> Pool:
-    """V18：`code` 永久不可修改，只有显示名/备注/用途/归属可更新。"""
+    """V18：`code` 永久不可修改，只有显示名/备注/用途可更新。"""
     pool = _get_pool_or_404(session, pool_id)
     next_name = _required_name(name, field="name") if name is not None else pool.name
     next_pool_type = (
         _required_pool_type(pool_type) if pool_type is not None else pool.pool_type
     )
-    next_ownership = ownership if ownership is not None else pool.ownership
-    if next_ownership not in PoolOwnership.values():
-        raise Validation("ownership 取值非法", details={"ownership": next_ownership})
-    before = _snapshot(pool, ("name", "note", "pool_type", "ownership", "is_default"))
+    before = _snapshot(pool, ("name", "note", "pool_type", "is_default"))
     if name is not None:
         pool.name = next_name
     if note is not None:
         pool.note = note
     if pool_type is not None:
         pool.pool_type = next_pool_type
-    if ownership is not None:
-        pool.ownership = next_ownership
     if is_default is not None:
         if is_default:
             _switch_default_pool(session, pool)
@@ -173,7 +161,7 @@ def update_pool(
         entity_id=pool.id,
         actor=actor,
         before=before,
-        after=_snapshot(pool, ("name", "note", "pool_type", "ownership", "is_default")),
+        after=_snapshot(pool, ("name", "note", "pool_type", "is_default")),
     )
     return pool
 def set_pool_status(session: Session, pool_id: int, status: str, *, actor: str) -> Pool:

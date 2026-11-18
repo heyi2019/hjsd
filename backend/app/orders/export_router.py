@@ -38,7 +38,6 @@ from app.orders.export_fields import (
     ORDER_DETAIL_EXPORT_COLUMNS,
     ORDER_EVENT_EXPORT_COLUMNS,
     REBATE_EXPORT_COLUMNS,
-    _REBATE_STATUS_LABELS,
     _cashflow_export_rows,
     _order_detail_export_fields,
     _order_event_export_rows,
@@ -248,7 +247,7 @@ def export_orders_xlsx(
         value_labels={"event_type": option_labels.get("ORDER_EVENT_TYPE", {})},
     )
     # 资金明细：类别使用资金原因编码（SALE/INSTALLMENT_PAYMENT 等），不复用订单事件编码；
-    # 现金性质与方向重复，已从列里移除，不再需要 CASHFLOW_NATURE
+    # 现金性质与方向重复，已从列里移除，不再需要该枚举
     write_sheet(
         workbook,
         title="资金明细",
@@ -266,7 +265,6 @@ def export_orders_xlsx(
         columns=REBATE_EXPORT_COLUMNS,
         value_labels={
             "rebate_type": option_labels.get("REBATE_TYPE", {}),
-            "status": _REBATE_STATUS_LABELS,
         },
     )
     content = xlsx_bytes(workbook)

@@ -7,7 +7,6 @@ from app.core.money import Amount
 from app.domain.base import AuditMixin
 from app.domain.enums import (
     DepositStatus,
-    RebateStatus,
     RebateType,
 )
 from datetime import date
@@ -79,11 +78,6 @@ class RebateRecord(Base, AuditMixin):
 
     __tablename__ = "rebate_records"
     __table_args__ = (
-        Index("ix_rebate_records_policy_version_id", "policy_version_id"),
-        CheckConstraint(
-            f"status IN {RebateStatus.values()!r}".replace("[", "(").replace("]", ")"),
-            name="rebate_status_valid",
-        ),
         CheckConstraint(
             f"rebate_type IN {RebateType.values()!r}".replace("[", "(").replace("]", ")"),
             name="rebate_type_valid",
@@ -107,15 +101,6 @@ class RebateRecord(Base, AuditMixin):
     channel: Mapped[str | None] = mapped_column(String(64), nullable=True)
     amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     # BAS-06-04 规则快照：创建时固化当时生效的规则版本与参数。
-    # 「改未来费率不会改写已发生订单的利润」这条红线靠它兜底 ——
-    # 规则版本改了也不回写快照，历史利润永远按当时口径。
-    policy_version_id: Mapped[int | None] = mapped_column(
-        ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True
-    )
-    policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    status: Mapped[str] = mapped_column(
-        String(24), nullable=False, default=RebateStatus.OPEN.value
-    )
     collected_on: Mapped[date] = mapped_column(Date, nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 返点业务操作人：可多选；created_by 仍保留为审计操作者。

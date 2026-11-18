@@ -1,4 +1,4 @@
-"""domain.parties：客户、合作方、表单扩展字段与经营规则表。
+"""domain.parties：客户、合作方与表单扩展字段主数据。
 
 表结构以本模块 ORM 定义为准，与 `alembic/squashed_versions` 基线保持同步。
 功能编号：BAS-02-05 / BAS-04 / BAS-06 / CUS-01。
@@ -11,13 +11,9 @@
 """
 from __future__ import annotations
 
-from datetime import date, datetime
-
 from sqlalchemy import (
     JSON,
     CheckConstraint,
-    Date,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -37,82 +33,8 @@ from app.domain.enums import (
     CustomerStatus,
     LeadStatus,
     LeadType,
-    PolicyStatus,
-    PolicyScopeType,
     CounterpartyRole,
 )
-
-
-# ------------------------------------------------------------------ 经营规则
-class PolicyDefinition(Base, AuditMixin):
-    """经营规则定义（BAS-06）：定义类型与范围，不保存业务快照。"""
-
-    __tablename__ = "policy_definitions"
-    __table_args__ = (
-        CheckConstraint(
-            f"status IN {PolicyStatus.values()!r}".replace("[", "(").replace("]", ")"),
-            name="policy_status_valid",
-        ),
-        CheckConstraint(
-            f"scope_type IN {PolicyScopeType.values()!r}".replace("[", "(").replace("]", ")"),
-            name="policy_scope_type_valid",
-        ),
-        CheckConstraint(
-            "(scope_type = 'GLOBAL' AND scope_id IS NULL) OR "
-            "(scope_type <> 'GLOBAL' AND scope_id IS NOT NULL)",
-            name="policy_scope_link_valid",
-        ),
-        UniqueConstraint(
-            "policy_code", "scope_type", "scope_id",
-            name="uq_policy_definitions_scope_code",
-        ),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    policy_code: Mapped[str] = mapped_column(String(32), nullable=False)
-    name: Mapped[str] = mapped_column(String(128), nullable=False)
-    scope_type: Mapped[str] = mapped_column(String(32), nullable=False, default="GLOBAL")
-    scope_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=PolicyStatus.DRAFT.value
-    )
-
-
-class PolicyVersion(Base, AuditMixin):
-    """规则版本：已被引用不可更新或删除，只能新建版本（BAS-06-02）。"""
-
-    __tablename__ = "policy_versions"
-    __table_args__ = (
-        UniqueConstraint(
-            "policy_definition_id", "version", "effective_from",
-            name="uq_policy_versions_scope",
-        ),
-        CheckConstraint(
-            f"status IN {PolicyStatus.values()!r}".replace("[", "(").replace("]", ")"),
-            name="policy_version_status_valid",
-        ),
-        CheckConstraint("version > 0", name="version_positive"),
-        CheckConstraint(
-            "effective_to IS NULL OR effective_to > effective_from",
-            name="effective_range_valid",
-        ),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    policy_definition_id: Mapped[int] = mapped_column(
-        ForeignKey("policy_definitions.id", ondelete="RESTRICT"), nullable=False
-    )
-    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    effective_from: Mapped[date] = mapped_column(Date, nullable=False)
-    effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
-    config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=PolicyStatus.DRAFT.value
-    )
-    approved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 # ------------------------------------------------------------------ 客户
@@ -291,6 +213,4 @@ __all__ = [
     "CustomerLead",
     "OrderCounterpartyRole",
     "OrderCustomerRole",
-    "PolicyDefinition",
-    "PolicyVersion",
 ]

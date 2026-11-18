@@ -252,13 +252,13 @@ def test_router_list_cashflow_totals_empty_pool_ids(seeded_db):
 def test_router_list_cashflow_totals_scoped_pool_ids(seeded_db):
     cashflow_service.create_cashflow(
         seeded_db, pool_id=1, occurred_on=TODAY,
-        direction="IN", nature="EXTERNAL_IN", category="客户收款",
+        direction="IN", category="客户收款",
         amount=Decimal("80"), actor="pytest", note="合计可见性",
     )
     totals = list_cashflow_totals(
         pool_id=None, db=seeded_db, user=_pool1_user(),
         order_id=None, direction=None, occurred_from=None, occurred_to=None,
-        nature=None, ledger_type=None, accounting_attribute=None, category=None,
+        ledger_type=None, accounting_attribute=None, category=None,
         created_by=None, keyword=None,
     )
     assert totals.total_in == Decimal("80")
@@ -267,18 +267,18 @@ def test_router_list_cashflow_totals_scoped_pool_ids(seeded_db):
 def test_router_list_cashflow_totals_main_path(seeded_db):
     cashflow_service.create_cashflow(
         seeded_db, pool_id=1, occurred_on=TODAY,
-        direction="IN", nature="EXTERNAL_IN", category="客户收款",
+        direction="IN", category="客户收款",
         amount=Decimal("100"), actor="pytest", note="端点合计",
     )
     cashflow_service.create_cashflow(
         seeded_db, pool_id=1, occurred_on=TODAY,
-        direction="OUT", nature="BUSINESS_OUT", category="OTHER",
+        direction="OUT", category="OTHER",
         amount=Decimal("30"), actor="pytest",
     )
     totals = list_cashflow_totals(
         pool_id=None, db=seeded_db, user=_all_scope_user(),
         order_id=None, direction=None, occurred_from=None, occurred_to=None,
-        nature=None, ledger_type=None, accounting_attribute=None, category=None,
+        ledger_type=None, accounting_attribute=None, category=None,
         created_by=None, keyword=None,
     )
     assert totals.total_in == Decimal("100")
@@ -301,7 +301,6 @@ def _studio_flow(seeded_db, *, direction="OUT", category="房租", amount="20"):
     return cashflow_service.create_cashflow(
         seeded_db, pool_id=1, occurred_on=TODAY,
         direction=direction,
-        nature="BUSINESS_OUT" if direction == "OUT" else "BUSINESS_IN",
         category=category, amount=Decimal(amount), actor="pytest",
         ledger_type=CashflowLedgerType.STUDIO.value,
     )
@@ -360,7 +359,7 @@ def test_cashflow_totals_pool_not_visible(seeded_db):
 def test_studio_summary_filters_pool_scope(seeded_db):
     cashflow_service.create_cashflow(
         seeded_db, pool_id=1, occurred_on=TODAY,
-        direction="OUT", nature="BUSINESS_OUT", category="房租",
+        direction="OUT", category="房租",
         amount=Decimal("20"), actor="pytest",
         ledger_type=CashflowLedgerType.STUDIO.value,
     )

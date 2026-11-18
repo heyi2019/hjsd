@@ -16,18 +16,16 @@ from app.shared.audit import record_audit
 from app.shared.business_numbering import installment_no as order_installment_no
 from app.core.security import CurrentUser
 from app.domain.users import User
-from app.field_definitions.order_types import get_order_type_by_code
 from app.shared.order_access import get_order
 from app.shared.form_values import set_extra_values
-from app.policy import versions as policy_versions
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import Conflict, ErrorCode, Validation
 from app.shared.operation_operators import upsert_operation_operators
 from app.core.state_machine import ACCOUNT_TRANSITIONS, ORDER_TRANSITIONS, transition
 from app.domain.enums import (
-    AccountStatus, AuditAction, DeliveryMode, EventType,
-    InstallmentContractType, InstallmentStatus, PolicyType, ScheduleStatus,
+    AccountStatus, AuditAction, EventType,
+    InstallmentContractType, InstallmentStatus, ScheduleStatus,
 )
 from app.domain.trade import (
     Account, Installment, InstallmentSchedule, Order, OrderEvent, OrderProfitAllocation,
@@ -39,7 +37,6 @@ from app.installments.create_details.link import link_recovered_sale
 from app.installments.create_details.plan import (
     _assert_installment_amounts,
     _normalize_schedule,
-    _service_fee_from_snapshot,
     sale_installment_plan,
 )
 
@@ -66,7 +63,6 @@ def create_installment(
     per_period: Any = 0,
     first_due_on: date,
     actor: str,
-    delivery_mode: str | None = None,
     note: str | None = None,
     schedule: list[dict[str, Any]] | None = None,
     extra_values: Mapping[str, Any] | None = None,
@@ -174,39 +170,13 @@ def create_installment(
         schedule_dates[period_no] = item["due_on"]
         schedule_rates[period_no] = _non_negative(item.get("service_fee_rate", 0), field="service_fee_rate")
 
-    if delivery_mode is not None:
-        try:
-            DeliveryMode(delivery_mode)
-        except ValueError as exc:
-            raise Validation(
-                f"交付方式必须为 {DeliveryMode.values()}",
-                code=ErrorCode.DELIVERY_CONDITION_UNMET,
-                details={"delivery_mode": delivery_mode},
-            ) from exc
-
     principal_amount = _non_negative(principal, field="principal")
     down_payment_amount = _non_negative(down_payment, field="down_payment")
     per_period_service_fee_amount = _non_negative(
         per_period_service_fee, field="per_period_service_fee"
     )
-    # BAS-06-04：签约日固化分期规则（期数/首付/利率），改版不影响历史合约。
-    # 提前到金额计算之前，服务费省略时才能按规则补算。
-    order_type_definition = get_order_type_by_code(
-        session, order.order_type
-    )
-    policy_version_id, policy_snapshot = policy_versions.make_snapshot(
-        session,
-        policy_code=PolicyType.INSTALLMENT.value,
-        on=first_due_on,
-        scope_type="ORDER_TYPE",
-        scope_id=order_type_definition.id if order_type_definition else None,
-    )
-    # 显式传值优先（含显式 0 = 不收服务费）；省略（None）才按规则费率补算。
-    resolved_service_fee = service_fee
-    if resolved_service_fee is None:
-        resolved_service_fee = _service_fee_from_snapshot(
-            session, policy_snapshot, order, principal_amount
-        )
+    # 显式传值优先（含显式 0 = 不收服务费）；省略（None）按不收服务费处理。
+    resolved_service_fee = service_fee if service_fee is not None else Decimal("0")
     service_fee_amount = _non_negative(resolved_service_fee, field="service_fee")
     per_period_amount = _non_negative(per_period, field="per_period")
     total_schedule_amount = down_payment_amount + per_period_amount * periods
@@ -225,8 +195,6 @@ def create_installment(
         inst_no=installment_no_value,
         order_id=order.id,
         contract_type=contract_type,
-        policy_version_id=policy_version_id,
-        policy_snapshot=policy_snapshot,
         principal=principal_amount,
         down_payment=down_payment_amount,
         service_fee=service_fee_amount,
@@ -239,7 +207,6 @@ def create_installment(
         bad_debt_amount=Decimal("0"),
         status=InstallmentStatus.PENDING.value,
         first_due_on=first_due_on,
-        delivery_mode=delivery_mode,
         note=note,
         created_by=actor,
         updated_by=actor,
@@ -343,5 +310,4 @@ __all__ = [
     "sale_installment_plan",
     "_assert_installment_amounts",
     "_normalize_schedule",
-    "_service_fee_from_snapshot",
 ]

@@ -4,13 +4,11 @@ import type { ColumnsType } from "antd/es/table";
 import { DataTable, MoneyText, PermissionButton, StatRow, StatusTag } from "../../shared/ui";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { today } from "../../shared/lib/format";
-import { configurableLabel } from "../../shared/lib/optionSets";
-import { POOL_OWNERSHIP_LABEL } from "../../shared/lib/labels";
 import type { FundsPageController } from "../useFundsPageController";
 import type { Pool } from "../../shared/api/types/finance";
 
 export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
-  const { pools, balances, totalCash, totalAvailable, totalDeposit, totalOwned, transferForm, setTransferOpen, loading, fundsReady, error } = ctrl;
+  const { pools, balances, totalCash, totalAvailable, totalDeposit, transferForm, setTransferOpen, loading, fundsReady, error } = ctrl;
   const { arrange: arrangeFundPoolColumns } = useListViewColumns("FUND_POOLS");
   const poolColumns: ColumnsType<Pool> = [
     {
@@ -21,7 +19,6 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
       className: "ui-col-wrap",
       onCell: () => ({ className: "ui-col-wrap" }),
     },
-    { title: "归属", dataIndex: "ownership", render: (v: string) => configurableLabel("POOL_OWNERSHIP", v, POOL_OWNERSHIP_LABEL) },
     { title: "状态", dataIndex: "status", width: 100, render: (v: string) => <StatusTag status={v} optionSet="POOL_STATUS" /> },
     { title: "收入", key: "income", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.income} /> },
     { title: "支出", key: "expense", align: "right", render: (_v, row) => <MoneyText value={balances[row.id]?.expense} /> },
@@ -43,7 +40,6 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
           { label: "现金头寸合计", amount: totalCash },
           { label: "可用余额合计", amount: totalAvailable },
           { label: "押金占用", amount: totalDeposit },
-          { label: "自有权益合计", amount: totalOwned },
         ]}
       />
       <DataTable<Pool>

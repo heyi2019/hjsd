@@ -21,26 +21,24 @@ vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
-vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/profitAllocation.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
 const pools = [
-  { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
-  { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
+  { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", status: "ACTIVE" },
+  { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", status: "ACTIVE" },
 ];
 
 const expenseFlows = [
   {
-    id: 51, flow_no: "CF-001", pool_id: 1, occurred_on: "2026-10-20", nature: "BUSINESS_OUT",
-    category: "房租", direction: "OUT", amount: "3000.00", source: "OTHER", status: "APPROVED",
+    id: 51, flow_no: "CF-001", pool_id: 1, occurred_on: "2026-10-20", category: "房租", direction: "OUT", amount: "3000.00", source: "OTHER", status: "APPROVED",
     accounting_attribute: "OPERATING_EXPENSE",
   },
   {
-    id: 52, flow_no: "CF-002", pool_id: 2, occurred_on: "2026-10-21", nature: "BUSINESS_OUT",
-    category: "日用", direction: "OUT", amount: "100.00", source: "OTHER", status: "PENDING",
+    id: 52, flow_no: "CF-002", pool_id: 2, occurred_on: "2026-10-21", category: "日用", direction: "OUT", amount: "100.00", source: "OTHER", status: "PENDING",
     accounting_attribute: "OPERATING_EXPENSE",
   },
 ];
@@ -215,7 +213,7 @@ describe("StudioExpensePanel：工作室支出", () => {
     await waitFor(() => expect(vi.mocked(cashflowsApi.remove)).toHaveBeenCalledWith(51));
   });
 
-  it("登记支出：提交即入账（OUT / BUSINESS_OUT / OPERATING_EXPENSE）", async () => {
+  it("登记支出：提交即入账（OUT / OPERATING_EXPENSE）", async () => {
     mockOptionSets();
     resolveMockOnce(vi.mocked(cashflowsApi.create), { id: 61 });
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
@@ -248,7 +246,7 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(screen.getByText(/流水读取失败/)).toBeInTheDocument();
   });
 
-  it("登记收入：IN / BUSINESS_IN / SELF_REVENUE，同样自动入账", async () => {
+  it("登记收入：IN / SELF_REVENUE，同样自动入账", async () => {
     mockOptionSets();
     resolveMockOnce(vi.mocked(cashflowsApi.create), { id: 62 });
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });

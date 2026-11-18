@@ -179,7 +179,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         label="资金中心·资金账户",
         columns=(
             ListColumn("pool_code", "资金账户"),
-            ListColumn("ownership", "归属"),
             ListColumn("status", "状态", value_set="POOL_STATUS"),
             ListColumn("income", "收入"),
             ListColumn("expense", "支出"),

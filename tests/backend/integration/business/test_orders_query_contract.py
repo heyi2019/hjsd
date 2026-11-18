@@ -445,13 +445,13 @@ class TestPostEventValidation:
         with pytest.raises(Validation) as exc:
             post_event(
                 seeded_db, order.id, event_type="DELIVER",
-                occurred_on=D, actor="pytest", delivery_mode="CUSTOMER_SELF",
+                occurred_on=D, actor="pytest",
             )
         assert "凭证" in str(exc.value)
         with pytest.raises(Validation, match="凭证"):
             post_event(
                 seeded_db, order.id, event_type="DELIVER",
-                occurred_on=D, actor="pytest", delivery_mode="CUSTOMER_SELF",
+                occurred_on=D, actor="pytest",
                 note=123,
             )
 

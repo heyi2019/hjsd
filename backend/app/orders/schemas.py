@@ -110,13 +110,6 @@ class OrderCreate(BaseModel):
     )
     owner_id: int | None = None
     note: str | None = None
-    # 佣金口径（BAS：仅 DG 代挂单可用；两者必须同时填写或同时留空）
-    commission_mode: str | None = Field(
-        default=None, max_length=32, description="DEDUCT_FROM_SETTLEMENT / SEPARATE_PAYMENT"
-    )
-    commission_payer: str | None = Field(
-        default=None, max_length=16, description="BUYER / CONSIGNOR / PLATFORM"
-    )
     extra_values: dict[str, object] = Field(default_factory=dict)
     # 建单表单自定义字段值（由 OrderFormField 配置驱动），独立存储于订单 form_extra。
     form_extra: dict[str, object] | None = None
@@ -172,8 +165,6 @@ class OrderOut(BaseModel):
     status: str
     owner_id: int | None = None
     note: str | None = None
-    commission_mode: str | None = None
-    commission_payer: str | None = None
     extra_values: dict[str, object] = Field(default_factory=dict)
     created_at: datetime
 
@@ -238,7 +229,6 @@ class EventCreate(BaseModel):
     occurred_on: date
     pool_id: int | None = Field(default=None, description="显式池优先于默认路由")
     portion: str = "PRINCIPAL"
-    delivery_mode: str | None = None
     delivery_direction: str | None = None
     offset_event_id: int | None = None
     reason: str | None = None
@@ -266,7 +256,6 @@ class EventOut(BaseModel):
     pool_id: int | None = None
     offset_event_id: int | None = None
     portion: str
-    delivery_mode: str | None = None
     delivery_direction: str | None = None
     is_posted: bool
     posted_at: datetime | None = None
@@ -300,7 +289,6 @@ class OrderCashflowOut(BaseModel):
     flow_no: str
     pool_id: int
     occurred_on: date
-    nature: str
     category: str
     direction: str
     amount: Decimal
@@ -342,7 +330,6 @@ class OrderInstallmentOut(BaseModel):
     waived_amount: Decimal
     bad_debt_amount: Decimal
     status: str
-    delivery_mode: str | None = None
     delivered_on: date | None = None
     first_due_on: date | None = None
     note: str | None = None

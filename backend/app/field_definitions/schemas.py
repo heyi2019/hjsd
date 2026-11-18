@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.schemas import RequestModel
-from app.domain.enums import PoolOwnership, PoolStatus, PoolType
+from app.domain.enums import PoolStatus, PoolType
 
 
 class PoolCreate(RequestModel):
@@ -20,7 +20,6 @@ class PoolCreate(RequestModel):
     name: str = Field(min_length=1, max_length=128)
     # pool_type 是可扩展注册值，不锁死在首批枚举。
     pool_type: str = Field(default=PoolType.OTHER.value, min_length=1, max_length=32)
-    ownership: PoolOwnership = PoolOwnership.OWNED
     # 默认资金账户：未显式指定 pool_id 的流水落这里（全局唯一）。
     is_default: bool = False
     note: str | None = None
@@ -34,7 +33,6 @@ class PoolUpdate(RequestModel):
     note: str | None = None
     # pool_type 是可扩展注册值，不锁死在首批枚举。
     pool_type: str | None = Field(default=None, min_length=1, max_length=32)
-    ownership: PoolOwnership | None = None
     is_default: bool | None = None
     extra_values: dict[str, Any] | None = None
 
@@ -50,7 +48,6 @@ class PoolOut(BaseModel):
     code: str
     name: str
     pool_type: str
-    ownership: str
     status: str
     is_default: bool
     note: str | None = None

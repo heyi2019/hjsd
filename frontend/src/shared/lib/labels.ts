@@ -42,12 +42,6 @@ export const POOL_TYPE_LABEL: Record<string, string> = {
   OTHER: "其他",
 };
 
-export const POOL_OWNERSHIP_LABEL: Record<string, string> = {
-  OWNED: "自有",
-  CUSTODY: "代管",
-  THIRD_PART: "第三方",
-};
-
 export const FUND_FLOW_SOURCE_LABEL: Record<string, string> = {
   MANUAL: "手工登记",
   ORDER: "订单",
@@ -83,7 +77,7 @@ export const PERMISSION_LABEL: Record<string, string> = {
   "deposit.post": "登记押金",
   "finance.transfer": "资金划转",
   "finance.order.event.post": "过账订单资金事件",
-  "policy.manage": "管理经营规则",
+  "policy.manage": "管理分润配置",
   "field-definition.manage": "管理字段配置",
   "audit.read": "查看审计记录",
   "pool.manage": "管理资金账户",
@@ -91,7 +85,6 @@ export const PERMISSION_LABEL: Record<string, string> = {
   "option-set.manage": "管理选项词典",
   "report.read": "查看报表",
   "report.export": "导出报表",
-  "import.manage": "管理导入",
   "user.manage": "管理用户",
 };
 
@@ -265,14 +258,6 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   REPORT_EXPORT: "导出报表",
   ATTACHMENT_UPLOAD: "上传附件",
   ATTACHMENT_DELETE: "删除附件",
-  IMPORT_LAND: "导入落库",
-  IMPORT_COMMIT: "确认导入批次",
-  IMPORT_REJECT: "驳回导入批次",
-  IMPORT_MAP: "映射导入行",
-  IMPORT_SKIP: "跳过导入行",
-  IMPORT_MARK_UNLINKED: "标记单边划转",
-  IMPORT_ROLLBACK: "回滚导入批次",
-  IMPORT_CORRECTION: "更正导入批次",
   OPTION_SET_CREATE: "新建选项词典",
   OPTION_SET_UPDATE: "编辑选项词典",
   OPTION_SET_DELETE: "删除选项词典",

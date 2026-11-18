@@ -2,9 +2,9 @@
 
 口径锚点：利润=收入大类−支出大类；资金中心每个资金账户的所有资金流动只按
 收入(IN)/支出(OUT)两个方向呈现，业务名词都是大类下的「子类型 / 其中项」：
-- 收入大类：售出价(SELL)、返点(REBATE)、外部注入(EXTERNAL_IN)、押金释放、其他流入；
+- 收入大类：售出价(SELL)、返点(REBATE)、外部注入、押金释放、其他流入；
 - 支出大类：回收价/提号价(BUY)、押金占用、直接费用、分期坏账、其他流出。
-子类型不单列、不另立大类；资金中心只按 (direction, nature) 分箱进 income/expense。
+子类型不单列、不另立大类；资金中心只按 (direction) 分箱进 income/expense。
 
 验证范围（2026-11-12 资金中心两方向 + 押金完整走业务口径 C）：
 - #10 押金占用进 expense、释放/取消进 income（原为从经营收支卡片剔除）；
@@ -25,7 +25,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from app.core.money import to_money
-from app.domain.enums import CashflowSourceType, Nature
+from app.domain.enums import CashflowSourceType
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
 from app.finance.deposits import create_deposit, lose_deposit, return_deposit
@@ -43,13 +43,12 @@ def _pool(seeded_db, code: str) -> Pool:
 
 
 def _flow(
-    seeded_db, *, pool_id, direction, nature, amount,
+    seeded_db, *, pool_id, direction, amount,
     attribute=None, order_id=None, category="OTHER", source_type="MANUAL", source_id=None,
 ):
     seeded_db.add(Cashflow(
         flow_no=f"CF-{uuid4().hex[:10]}",
-        pool_id=pool_id, occurred_on=TODAY, nature=nature,
-        accounting_attribute=attribute, category=category, direction=direction,
+        pool_id=pool_id, occurred_on=TODAY, accounting_attribute=attribute, category=category, direction=direction,
         amount=to_money(amount), order_id=order_id,
         source_type=source_type,
         source_id=source_id,
@@ -174,8 +173,7 @@ def test_order_linked_normal_expense_still_in_r2_direct_cost(seeded_db):
     before_cost = oct_before["cost"] if oct_before else Decimal("0.00")
 
     # accounting_attribute=None 的挂单支出，验证 != DEPOSIT 的 NULL 放行
-    _flow(seeded_db, pool_id=invest.id, direction="OUT", nature="BUSINESS_OUT",
-          amount="300", attribute=None, order_id=order.id)
+    _flow(seeded_db, pool_id=invest.id, direction="OUT", amount="300", attribute=None, order_id=order.id)
     after = r2_monthly_pnl(seeded_db)
     oct_item = next(r for r in after["items"] if r["month"] == "2026-10")
     assert oct_item["cost"] == before_cost + Decimal("300.00")
@@ -187,7 +185,7 @@ def test_external_in_updates_income(seeded_db):
     invest = _pool(seeded_db, "HJ_INVEST")
     before = pool_balance(seeded_db, invest.id)
     _flow(seeded_db, pool_id=invest.id, direction="IN",
-          nature=Nature.EXTERNAL_IN.value, amount="5000")
+          amount="5000")
 
     after = pool_balance(seeded_db, invest.id)
     assert after["income"] == before["income"] + Decimal("5000.00")
@@ -195,17 +193,15 @@ def test_external_in_updates_income(seeded_db):
 
 # ------------------------ 售出价 / 返点是收入子类型：进 income，不单列（2026-11-12 裁决）
 def test_sale_and_rebate_are_income_subtypes_not_separate_columns(seeded_db):
-    """售出(SELL)/返点(REBATE)流水源头都是 IN/BUSINESS_IN，进收入方向不单列。
+    """售出(SELL)/返点(REBATE)流水源头都是 IN，进收入方向不单列。
 
-    返点流水源头见 finance/rebates.py:168-174（IN/BUSINESS_IN/category=REBATE）；
-    售出见 orders/events.py:50（IN/BUSINESS_IN/"SELL"）。
+    返点流水源头见 finance/rebates.py（IN/category=REBATE）；
+    售出见 orders/events.py（IN/"SELL"）。
     """
     invest = _pool(seeded_db, "HJ_INVEST")
     before = pool_balance(seeded_db, invest.id)
-    _flow(seeded_db, pool_id=invest.id, direction="IN", nature="BUSINESS_IN",
-          amount="8000", category="SELL")
-    _flow(seeded_db, pool_id=invest.id, direction="IN", nature="BUSINESS_IN",
-          amount="500", category="REBATE")
+    _flow(seeded_db, pool_id=invest.id, direction="IN", amount="8000", category="SELL")
+    _flow(seeded_db, pool_id=invest.id, direction="IN", amount="500", category="REBATE")
 
     after = pool_balance(seeded_db, invest.id)
     assert after["income"] == before["income"] + Decimal("8500.00")
@@ -213,16 +209,14 @@ def test_sale_and_rebate_are_income_subtypes_not_separate_columns(seeded_db):
 
 # ------------------------ 回收价 / 提号价是支出子类型：进 expense，不单列（2026-11-12 裁决）
 def test_buy_amounts_are_expense_subtypes_not_separate_columns(seeded_db):
-    """回收(HS)/提号(TH)买入流水源头都是 OUT/BUSINESS_OUT，进支出方向不单列。
+    """回收(HS)/提号(TH)买入流水源头都是 OUT，进支出方向不单列。
 
-    BUY 源头见 orders/events.py:49（OUT/BUSINESS_OUT/"BUY"）。
+    BUY 源头见 orders/events.py（OUT/"BUY"）。
     """
     invest = _pool(seeded_db, "HJ_INVEST")
     before = pool_balance(seeded_db, invest.id)
-    _flow(seeded_db, pool_id=invest.id, direction="OUT", nature="BUSINESS_OUT",
-          amount="3000", category="BUY")
-    _flow(seeded_db, pool_id=invest.id, direction="OUT", nature="BUSINESS_OUT",
-          amount="2000", category="BUY")
+    _flow(seeded_db, pool_id=invest.id, direction="OUT", amount="3000", category="BUY")
+    _flow(seeded_db, pool_id=invest.id, direction="OUT", amount="2000", category="BUY")
 
     after = pool_balance(seeded_db, invest.id)
     assert after["expense"] == before["expense"] + Decimal("5000.00")
@@ -236,10 +230,8 @@ def test_internal_transfer_is_expense_of_source_income_of_target(seeded_db):
     before_src = pool_balance(seeded_db, invest.id)
     before_tgt = pool_balance(seeded_db, profit.id)
     tid = "TRF-TEST-001"
-    _flow(seeded_db, pool_id=invest.id, direction="OUT", nature="INTERNAL",
-          amount="300", category="TRANSFER", source_type=CashflowSourceType.TRANSFER.value, source_id=tid)
-    _flow(seeded_db, pool_id=profit.id, direction="IN", nature="INTERNAL",
-          amount="300", category="TRANSFER", source_type=CashflowSourceType.TRANSFER.value, source_id=tid)
+    _flow(seeded_db, pool_id=invest.id, direction="OUT", amount="300", category="TRANSFER", source_type=CashflowSourceType.TRANSFER.value, source_id=tid)
+    _flow(seeded_db, pool_id=profit.id, direction="IN", amount="300", category="TRANSFER", source_type=CashflowSourceType.TRANSFER.value, source_id=tid)
     seeded_db.expire_all()
 
     after_src = pool_balance(seeded_db, invest.id)
@@ -349,8 +341,7 @@ def test_deposit_loss_null_attribute_other_flows_not_dropped(seeded_db):
     before = pool_balance(seeded_db, invest.id)
     # 无属性的挂单支出（普通经营流水）：accounting_attribute=NULL
     # SQL 中 NULL != 'DEPOSIT' 为假，若过滤写成 != 会误删本行——正向条件须放行 NULL。
-    _flow(seeded_db, pool_id=invest.id, direction="OUT", nature="BUSINESS_OUT",
-          amount="250", attribute=None, order_id=order.id)
+    _flow(seeded_db, pool_id=invest.id, direction="OUT", amount="250", attribute=None, order_id=order.id)
     seeded_db.expire_all()
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == Decimal("-250.00")
     after = pool_balance(seeded_db, invest.id)

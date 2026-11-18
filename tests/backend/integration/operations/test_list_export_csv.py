@@ -316,7 +316,7 @@ def test_orders_export_xlsx_splits_detail_json_into_columns(seeded_client, heade
         assert sheet.freeze_panes == "B2"
 
     # 系统内部字段不得混进业务明细表：它们在界面上看不到，导出里也没有对应用户语义
-    system_only = {"事件号", "流水号", "是否过账", "现金性质", "比例", "金额归属", "portion", "nature"}
+    system_only = {"事件号", "流水号", "是否过账", "比例", "金额归属", "portion"}
     for title in ("操作明细", "资金明细"):
         header = {
             workbook[title].cell(row=1, column=index).value

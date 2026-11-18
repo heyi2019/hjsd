@@ -109,8 +109,7 @@ async function enterApp(page: Page) {
 
 /**
  * 动态读取「设置」页真实渲染的 Tab 清单：可见 Tab + 溢出收纳到「更多 ⌄」下拉的 Tab，
- * 一并返回。避免硬编码 10 Tab 过时（如「表单字段/导入」曾错写成旧字段/标准导入，
- * 且漏掉权限门控的编号序列）。
+ * 一并返回。避免硬编码 Tab 清单过时（如「表单字段」曾错写成旧字段，且漏掉权限门控的编号序列）。
  *
  * 选标签用 textContent 并压平空白——antd 会给中文 Tab 插空格（与「退 出」同源）；
  * textContent 不受滚动/可见性影响，竖向（tabPosition=left）或横向溢出都读到全量。
@@ -163,7 +162,7 @@ for (const center of CENTERS) {
       await expect(tab).toHaveAttribute("aria-selected", "true");
 
       // 激活面板可见：不能直接用 .ant-tabs-tabpane-active——页面存在嵌套 Tabs
-      // （如「标准导入」内部还有 原始行/映射预览/导入对账 子 Tab），类选择器会
+      // （如设置面板内部还有嵌套子 Tab），类选择器会
       // 命中多个触发 strict mode violation。按 tabpanel 的 accessible name
       // （aria-labelledby → 外层 tab）定位，天然限定到被点的这个叶子。
       const pane = page.getByRole("tabpanel", {

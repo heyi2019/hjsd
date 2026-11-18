@@ -17,7 +17,6 @@ from app.shared.audit import record_audit
 from app.shared.numbering import ensure_sequence
 from app.domain.enums import (
     AuditAction,
-    PoolOwnership,
     PoolType,
     SequenceKey,
 )
@@ -27,10 +26,10 @@ from app.field_definitions.pools import create_pool, get_default_pool, get_pool_
 
 SEED_ACTOR = "system"
 
-# (code, name, pool_type, ownership)
-SEED_POOLS: tuple[tuple[str, str, str, str], ...] = (
-    ("HJ_INVEST", "投资款荷包", PoolType.INVEST.value, PoolOwnership.OWNED.value),
-    ("HJ_PROFIT", "利润荷包", PoolType.PROFIT.value, PoolOwnership.OWNED.value),
+# (code, name, pool_type)
+SEED_POOLS: tuple[tuple[str, str, str], ...] = (
+    ("HJ_INVEST", "投资款荷包", PoolType.INVEST.value),
+    ("HJ_PROFIT", "利润荷包", PoolType.PROFIT.value),
 )
 
 # (code, name, is_zero_principal, sort_order, description)
@@ -54,7 +53,6 @@ SEED_SEQUENCES: tuple[tuple[str, str, int], ...] = (
     # 资金流水按方向独立递增（2026-10-28 口径）：支出 ZC+五位、收入 SR+五位。
     (SequenceKey.CASHFLOW_OUT.value, "ZC", 5),
     (SequenceKey.CASHFLOW_IN.value, "SR", 5),
-    (SequenceKey.IMPORT.value, "IMP", 4),
     (SequenceKey.ATTACHMENT.value, "ATT", 4),
     # 库存编号（KU_ 序列，2026-10-28 口径）：KU_ + 五位流水（KU_00001…），
     # 独立于业务订单，账号创建时自动发放。
@@ -75,7 +73,7 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
         "game_types_skipped": 0,
     }
 
-    for code, name, pool_type, ownership in SEED_POOLS:
+    for code, name, pool_type in SEED_POOLS:
         if get_pool_by_code(session, code) is not None:
             stats["pools_skipped"] += 1
             continue
@@ -85,7 +83,6 @@ def seed_foundation(session: Session, *, actor: str = SEED_ACTOR) -> dict[str, i
             name=name,
             actor=actor,
             pool_type=pool_type,
-            ownership=ownership,
             note="M0 系统种子",
         )
         stats["pools_created"] += 1

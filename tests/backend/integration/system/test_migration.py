@@ -235,18 +235,6 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
         ).scalar_one()
         assert legacy_rebate_action_fields == 0
 
-        # source_kind 通过 CHECK 约束限定为 5 种标准导入类型，LEGACY_ORDER 已下线。
-        source_kind_clause = _check_clauses(engine, "import_batches")
-        for source_kind in (
-            "STANDARD_ORDER",
-            "STANDARD_ACCOUNT",
-            "STANDARD_CASHFLOW",
-            "STANDARD_INSTALLMENT",
-            "STANDARD_LEAD",
-        ):
-            assert source_kind in source_kind_clause
-        assert "LEGACY_ORDER" not in source_kind_clause
-
         # 库存唯一索引必须是业务键（KU_+5），旧 uq_stocks_inventory_no 已退役。
         assert "uq_stocks_inventory_no" not in _unique_index_names(engine, "stocks")
 

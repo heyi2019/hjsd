@@ -29,7 +29,6 @@ from app.core.state_machine import (
 )
 from app.domain.enums import (
     AuditAction,
-    DeliveryMode,
     EventType,
     InstallmentDispositionAction,
     InstallmentStatus,
@@ -243,7 +242,6 @@ def deliver(
     session: Session,
     installment_id: int,
     *,
-    delivery_mode: str,
     delivered_on: date,
     note: str,
     bound_phone: str | None = None,
@@ -262,14 +260,6 @@ def deliver(
             code=ErrorCode.DELIVERY_CONDITION_UNMET,
             details={"inst_no": installment.inst_no, "status": installment.status},
         )
-    try:
-        DeliveryMode(delivery_mode)
-    except ValueError as exc:
-        raise Validation(
-            f"交付方式必须为 {DeliveryMode.values()}",
-            code=ErrorCode.DELIVERY_CONDITION_UNMET,
-            details={"delivery_mode": delivery_mode},
-        ) from exc
     if not note:
         raise Validation(
             "交付必须记录换绑凭证", code=ErrorCode.DELIVERY_CONDITION_UNMET,
@@ -282,7 +272,6 @@ def deliver(
         event_type=EventType.DELIVER.value,
         occurred_on=delivered_on,
         actor=actor,
-        delivery_mode=delivery_mode,
         note=note,
         bound_phone=bound_phone,
         bound_phone_owner=bound_phone_owner,
@@ -294,7 +283,6 @@ def deliver(
     installment.status = transition(
         INSTALLMENT_TRANSITIONS, installment.status, "DELIVER", entity="分期合约"
     )
-    installment.delivery_mode = delivery_mode
     installment.delivered_on = delivered_on
     installment.updated_by = actor
     session.flush()
@@ -304,7 +292,7 @@ def deliver(
         entity_type="installment",
         entity_id=installment.inst_no,
         actor=actor,
-        after={"delivery_mode": delivery_mode, "delivered_on": delivered_on.isoformat()},
+        after={"delivered_on": delivered_on.isoformat()},
     )
     upsert_operation_operators(
         session,

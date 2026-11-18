@@ -9,7 +9,6 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { gameTypesApi } from "@/shared/api/misc.api";
-import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { PoolsPanel } from "@/field-definitions/panels/PoolsPanel";
 import { GameTypeSettingsPanel } from "@/field-definitions/panels/GameTypeSettingsPanel";
@@ -22,7 +21,7 @@ vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
-vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/profitAllocation.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
@@ -31,15 +30,13 @@ vi.mock("@/shared/api/stocks.api");;
 let ui: ReturnType<typeof userEvent.setup>;
 
 const pools = [
-  { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
+  { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", status: "ACTIVE" },
 ];
 
 beforeEach(() => {
   vi.clearAllMocks();
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(poolsApi).list.mockResolvedValue(pools);
-  vi.mocked(policyApi).list.mockResolvedValue(listResponse([]));
-  vi.mocked(policyApi).versions.mockResolvedValue(listResponse([]));
   vi.mocked(gameTypesApi).list.mockResolvedValue([
     { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
     { id: 2, name: "原神", sort_order: 20, is_active: true, is_default: false },
@@ -62,7 +59,7 @@ describe("设置面板：资金账户", () => {
     expect(screen.queryByRole("button", { name: /新增资金账户/ })).toBeNull();
   });
 
-  it("admin 可编辑资金账户名称、用途和归属", async () => {
+  it("admin 可编辑资金账户名称和用途", async () => {
     vi.mocked(poolsApi).update.mockResolvedValue({ ...pools[0], name: "新托管池" });
     renderLight(<PoolsPanel />, { user: "admin" });
     expect(await screen.findByText("HJ_CUSTODY")).toBeInTheDocument();
@@ -72,7 +69,7 @@ describe("设置面板：资金账户", () => {
     await ui.clear(name);
     await ui.type(name, "新托管池");
     await ui.click(within(dialog).getByRole("button", { name: /保存/ }));
-    await waitFor(() => expect(vi.mocked(poolsApi).update).toHaveBeenCalledWith(1, expect.objectContaining({ name: "新托管池", pool_type: "OTHER", ownership: "OWNED" })));
+    await waitFor(() => expect(vi.mocked(poolsApi).update).toHaveBeenCalledWith(1, expect.objectContaining({ name: "新托管池", pool_type: "OTHER" })));
   });
 });
 

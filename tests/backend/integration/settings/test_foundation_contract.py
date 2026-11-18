@@ -10,12 +10,11 @@
 from __future__ import annotations
 
 import pytest
-from datetime import date
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import NotFound, Validation
-from app.domain.enums import PoolOwnership, PoolStatus
+from app.domain.enums import PoolStatus
 from app.domain.foundation import OrderTypeDef
 from app.field_definitions import seeds
 from app.field_definitions.order_types import (
@@ -35,7 +34,6 @@ from app.field_definitions.pools import (
     update_pool,
 )
 from app.shared.numbering import ensure_sequence, peek_number
-from app.orders.create import create_order
 
 
 def _pool(seeded_db, code: str, **kwargs):
@@ -86,25 +84,21 @@ class TestPoolGuards:
         pool = _pool(seeded_db, "TMPUPD")
         updated = update_pool(
             seeded_db, pool.id, actor="pytest", note="改备注",
-            pool_type="PROFIT", ownership=PoolOwnership.CUSTODY.value,
+            pool_type="PROFIT",
         )
         assert updated.note == "改备注"
         assert updated.pool_type == "PROFIT"
-        assert updated.ownership == PoolOwnership.CUSTODY.value
-        with pytest.raises(Validation) as exc:
-            update_pool(seeded_db, pool.id, actor="pytest", ownership="MARS")
-        assert "ownership 取值非法" in str(exc.value)
 
     def test_update_pool_validates_all_fields_before_mutating(self, seeded_db):
         pool = _pool(seeded_db, "TMPATOMIC")
 
-        with pytest.raises(Validation, match="ownership"):
+        with pytest.raises(Validation, match="pool_type 不能为空"):
             update_pool(
                 seeded_db,
                 pool.id,
                 actor="operator",
                 name="不应保存的新名称",
-                ownership="INVALID",
+                pool_type="",
             )
 
         seeded_db.commit()
@@ -348,14 +342,3 @@ class TestFoundationApi:
         )
         assert row["next_number"] == "<已达上限 99999>"
 
-    def test_update_pool_endpoint_applies_ownership_enum_to_value(
-        self, seeded_client, seeded_db, headers
-    ):
-        pool = _pool(seeded_db, "TMPOWN")
-        response = seeded_client.patch(
-            f"/api/v1/pools/{pool.id}",
-            json={"ownership": "CUSTODY"},
-            headers=headers,
-        )
-        assert response.status_code == 200, response.text
-        assert response.json()["ownership"] == "CUSTODY"

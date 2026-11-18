@@ -7,7 +7,6 @@ export interface Pool {
   code: string;
   name: string;
   pool_type: string;
-  ownership: string;
   status: string;
   /** 默认资金账户：未显式指定资金账户的流水落这里（全局唯一）。 */
   is_default?: boolean;
@@ -32,8 +31,6 @@ export interface PoolBalanceTotals {
   cash_balance: string;
   available: string;
   deposit_held: string;
-  /** 自有权益：仅 ownership=OWNED 的池，按现金头寸计。 */
-  owned_cash_balance: string;
 }
 
 export interface Deposit {
@@ -77,7 +74,6 @@ export interface Cashflow {
   pool_id: number;
   occurred_on: string;
   occurred_at?: string | null;
-  nature: string;
   ledger_type: "BUSINESS" | "STUDIO" | string;
   accounting_attribute?: string;
   category: string;

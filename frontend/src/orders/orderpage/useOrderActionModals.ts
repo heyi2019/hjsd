@@ -5,7 +5,7 @@ import { currentDevUser, normalizeError } from "../../shared/api/client";
 import type { CashflowTarget } from "../../finance/cashflow";
 import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
-import { policyApi } from "../../shared/api/policy.api";
+import { profitAllocationApi } from "../../shared/api/profitAllocation.api";
 import { poolsApi } from "../../shared/api/pools.api";
 import type { Account } from "../../shared/api/types/accounts";
 import type { Pool } from "../../shared/api/types/finance";
@@ -72,7 +72,7 @@ export function useOrderActionModals({
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
       if (!order) return;
       const [result, userResult] = await Promise.all([
-        policyApi.allocations(order.id),
+        profitAllocationApi.allocations(order.id),
         employeesApi.list(),
       ]);
       const currentEmployee = userResult.find((item) => item.is_active && item.username === username)

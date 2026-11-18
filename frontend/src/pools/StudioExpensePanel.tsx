@@ -2,8 +2,8 @@ import { appMessage } from "../shared/ui/appFeedback";
 /** 工作室收支：在指定资金账户上快速登记日常开销与零星收入（房租 / 日用 / 水电 …）。
  *
  * 设计约束（刻意不新增后端表）：
- * - **入账复用「新增独立流水」**：支出 = OUT / BUSINESS_OUT / OPERATING_EXPENSE，
- *   收入 = IN / BUSINESS_IN / SELF_REVENUE，科目落在 `category`。只存在一套入账口径。
+ * - **入账复用「新增独立流水」**：支出 = OUT / OPERATING_EXPENSE，
+ *   收入 = IN / SELF_REVENUE，科目落在 `category`。只存在一套入账口径。
  * - **不走审核态**：提交即入账（后端独立流水直接 APPROVED，登记即计入损益，无需审核）。
  * - **统一汇总全部资金账户**：工作室运营页不再按资金账户拆分筛选；登记时仍需选择入账资金账户。
  */

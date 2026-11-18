@@ -13,7 +13,6 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
-    DeliveryMode,
     EventType,
     InstallmentContractType,
     InstallmentStatus,
@@ -177,7 +176,6 @@ class TestPayGuards:
         inst_recovery.deliver(
             seeded_db,
             contract.id,
-            delivery_mode="CUSTOMER_SELF",
             delivered_on=TODAY,
             note="全额减免后交付凭证",
             actor="pytest",
@@ -214,7 +212,7 @@ class TestPayGuards:
     def test_pay_on_delivered_contract_conflicts(self, seeded_db):
         order, contract = self._settled_dg(seeded_db, "paid-delivered")
         inst_recovery.deliver(
-            seeded_db, contract.id, delivery_mode=DeliveryMode.PLATFORM_OPERATOR.value,
+            seeded_db, contract.id,
             delivered_on=TODAY, note="平台操作换绑凭证", actor="pytest",
         )
         with pytest.raises(Conflict) as exc:
@@ -278,21 +276,11 @@ class TestDeliverGuards:
         )
         return contract
 
-    def test_deliver_invalid_mode_rejected(self, seeded_db):
-        contract = self._settled(seeded_db, "bad-mode")
-        with pytest.raises(Validation) as exc:
-            inst_recovery.deliver(
-                seeded_db, contract.id, delivery_mode="BOGUS",
-                delivered_on=TODAY, note="凭证", actor="pytest",
-            )
-        assert "交付方式" in str(exc.value)
-
     def test_delivery_updates_contract_operator(self, seeded_db):
         contract = self._settled(seeded_db, "delivery-operator")
         inst_recovery.deliver(
             seeded_db,
             contract.id,
-            delivery_mode=DeliveryMode.CUSTOMER_SELF.value,
             delivered_on=TODAY,
             note="交付凭证",
             actor="delivery",
@@ -304,7 +292,6 @@ class TestDeliverGuards:
         with pytest.raises(Validation) as exc:
             inst_recovery.deliver(
                 seeded_db, contract.id,
-                delivery_mode=DeliveryMode.CUSTOMER_SELF.value,
                 delivered_on=TODAY, note="", actor="pytest",
             )
         assert "换绑凭证" in str(exc.value)

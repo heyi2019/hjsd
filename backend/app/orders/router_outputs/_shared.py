@@ -92,7 +92,6 @@ def _event_output(
             "pool_id": event.pool_id,
             "offset_event_id": event.offset_event_id,
             "portion": event.portion,
-            "delivery_mode": event.delivery_mode,
             "delivery_direction": (event.form_extra or {}).get("delivery_direction"),
             "is_posted": event.is_posted,
             "posted_at": event.posted_at,

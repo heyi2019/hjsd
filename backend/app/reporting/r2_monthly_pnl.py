@@ -27,8 +27,6 @@ from app.domain.enums import (
     AccountingAttribute,
     CashflowSourceType,
     Direction,
-    Nature,
-    RebateStatus,
 )
 from app.domain.trade import (
     Cashflow,
@@ -116,7 +114,6 @@ def r2_monthly_pnl(
             select(RebateRecord.collected_on, RebateRecord.amount)
             .where(
                 RebateRecord.source_order_id.in_(scoped_order_ids),
-                RebateRecord.status != RebateStatus.VOID.value,
             )
         ).all()
         for occurred_on, amount in rebate_rows:
@@ -159,8 +156,8 @@ def r2_monthly_pnl(
             continue
         amount = to_money_or_zero(flow.amount)
         if flow.source_type == CashflowSourceType.REVERSAL.value:
-            # 冲销流水先按「被冲销的原流水」归类，不能看冲销流水自身的方向 / 性质：
-            # 冲销经营收入会生成 OUT/BUSINESS_OUT，按自身方向判断会被误记成运营费用。
+            # 冲销流水先按「被冲销的原流水」归类，不能看冲销流水自身的方向：
+            # 冲销经营收入会生成 OUT，按自身方向判断会被误记成运营费用。
             # 只有原流水确属运营费用（核算属性 / 类别），才冲减运营费用列。
             original = original_flows.get(flow.source_id)
             if original is not None and (
@@ -170,7 +167,7 @@ def r2_monthly_pnl(
                 operating[_month_key(occurred_on)] -= amount
         elif (
             flow.direction == Direction.OUT.value
-            and flow.nature == Nature.BUSINESS_OUT.value
+            and flow.source_type != CashflowSourceType.TRANSFER.value
         ):
             operating[_month_key(occurred_on)] += amount
 

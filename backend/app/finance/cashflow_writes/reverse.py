@@ -19,7 +19,6 @@ from app.domain.enums import (
     AuditAction,
     CashflowSourceType,
     Direction,
-    Nature,
 )
 from app.domain.trade import Cashflow, OrderEvent
 from app.shared.form_field_rules import validate_form_extra
@@ -66,15 +65,12 @@ def reverse_cashflow(
 
     if flow.direction == Direction.OUT.value:
         reverse_direction = Direction.IN.value
-        reverse_nature = Nature.BUSINESS_IN.value
     else:
         reverse_direction = Direction.OUT.value
-        reverse_nature = Nature.BUSINESS_OUT.value
     reversal = Cashflow(
         flow_no=allocate_flow_no(session, reverse_direction),
         pool_id=flow.pool_id,
         occurred_on=reversed_on,
-        nature=reverse_nature,
         accounting_attribute=AccountingAttribute.REVERSAL.value,
         category="REVERSAL",
         direction=reverse_direction,

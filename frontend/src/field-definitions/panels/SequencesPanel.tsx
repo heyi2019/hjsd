@@ -22,7 +22,6 @@ const SEQUENCE_KEY_LABEL: Record<string, string> = {
   NOTIFICATION: "通知",
   CASHFLOW_OUT: "支出流水",
   CASHFLOW_IN: "收入流水",
-  IMPORT: "导入批次",
   ATTACHMENT: "附件",
 };
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.core.errors import Validation
-from app.domain.enums import AccountingAttribute, Nature
+from app.domain.enums import AccountingAttribute
 
 # ------------------------------------------------------------- 订单成本科目白名单
 # （2026-11-18 口径：成本科目必须匹配订单类型——回收成本只归回收、提号成本只归提号；
@@ -63,23 +63,16 @@ STUDIO_EXPENSE_ATTRIBUTE = AccountingAttribute.OPERATING_EXPENSE.value
 STUDIO_INCOME_ATTRIBUTE = AccountingAttribute.SELF_REVENUE.value
 
 
-def derive_manual_cashflow_nature(direction: str) -> str:
-    """按收支方向生成手工流水的默认性质。"""
-    return Nature.BUSINESS_OUT.value if direction.upper() == "OUT" else Nature.BUSINESS_IN.value
-
-
 def accounting_attribute_for_manual_cashflow(
-    *, nature: str, category: str, direction: str, order_attached: bool = False
+    *, category: str, direction: str, order_attached: bool = False
 ) -> str:
     """为独立录入流水提供保守的默认核算属性。
 
     挂单流水（order_attached=True）默认落「其他收入/其他支出」——
     工作室运营支出只属于工作室账簿，订单资金明细不得误标（2026-11-18 口径）。
     """
-    if nature == Nature.INTERNAL.value or category == "TRANSFER":
+    if category == "TRANSFER":
         return AccountingAttribute.INTERNAL_TRANSFER.value
-    if nature == "EXTERNAL_IN":
-        return AccountingAttribute.EXTERNAL_FUNDING.value
     if category == "REBATE":
         return AccountingAttribute.REBATE_INCOME.value
     if category in {"DEPOSIT_HOLD", "DEPOSIT_RELEASE", "DEPOSIT_LOSS"}:
@@ -102,5 +95,4 @@ __all__ = [
     "STUDIO_INCOME_ATTRIBUTE",
     "assert_order_cost_attribute",
     "accounting_attribute_for_manual_cashflow",
-    "derive_manual_cashflow_nature",
 ]

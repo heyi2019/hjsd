@@ -50,7 +50,6 @@ def create_pool(
         name=payload.name,
         actor=_actor(user),
         pool_type=payload.pool_type,
-        ownership=payload.ownership.value,
         is_default=payload.is_default,
         note=payload.note,
         extra_values=payload.extra_values,
@@ -66,8 +65,6 @@ def update_pool(
     user: CurrentUser = manage_pools,
 ) -> schemas.PoolOut:
     changes = payload.model_dump(exclude_unset=True)
-    if "ownership" in changes and changes["ownership"] is not None:
-        changes["ownership"] = changes["ownership"].value
     pool = foundation_update_pool(db, pool_id, actor=_actor(user), **changes)
     return _pool_output(db, pool)
 

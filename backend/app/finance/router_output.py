@@ -17,7 +17,6 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         if key == "occurred_at":
             return flow.created_at
         return getattr(flow, key)
-    nature = value("nature")
     category = value("category")
     direction = value("direction")
     order_id = value("order_id")
@@ -35,7 +34,6 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         pool_id=value("pool_id"),
         occurred_on=value("occurred_on"),
         occurred_at=value("occurred_at"),
-        nature=nature,
         ledger_type=value("ledger_type"),
         accounting_attribute=value("accounting_attribute"),
         category=category,

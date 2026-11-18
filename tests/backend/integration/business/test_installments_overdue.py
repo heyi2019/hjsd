@@ -13,7 +13,6 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
-    DeliveryMode,
     EventType,
     InstallmentContractType,
     InstallmentStatus,

@@ -315,12 +315,8 @@ GROUPS = {
         "tests/backend/integration/operations/test_profit_r2_accounting.py",
         "tests/backend/integration/operations/test_data_center_summary.py",
     ],
-    "policy": [
-        "tests/backend/integration/settings/test_m5_policy.py",
-        "tests/backend/integration/settings/test_policy_contract.py",
+    "profit-allocation": [
         "tests/backend/integration/settings/test_policy_allocation.py",
-        "tests/backend/integration/settings/test_policy_versioning.py",
-        "tests/backend/integration/settings/test_policy_rule_consumption.py",
     ],
     "governance": [
         "tests/backend/unit/system/test_notifications_contract.py",
@@ -329,11 +325,7 @@ GROUPS = {
         "tests/backend/integration/system/test_attachments_service.py",
         "tests/backend/integration/system/test_notifications_service.py",
     ],
-    "imports": [
-        "tests/backend/unit/operations/test_import_landing.py",
-        "tests/backend/integration/operations/test_import_mapping.py",
-        "tests/backend/integration/operations/test_imports_contract.py",
-        "tests/backend/integration/operations/test_import_lifecycle.py",
+    "migration": [
         "tests/backend/integration/system/test_migration.py",
     ],
     # 跨域基建板块：列表列/导出、部署脚本、覆盖率与迁移基线——改动常横跨多域。
@@ -406,12 +398,12 @@ def _groups_for_source_path(path: str) -> set[str]:
         selected.add("parties")
     if "report" in path:
         selected.add("reporting")
-    if "policy" in path:
-        selected.add("policy")
+    if "profit-allocation" in path:
+        selected.add("profit-allocation")
     if any(t in path for t in ("notifications", "attachments", "audit")):
         selected.add("governance")
-    if any(t in path for t in ("import", "migration", "history")):
-        selected.add("imports")
+    if any(t in path for t in ("migration", "history")):
+        selected.add("migration")
     if any(t in path for t in ("auth", "backup_restore", "main_contract", "settings")):
         selected.add("auth")
     return selected

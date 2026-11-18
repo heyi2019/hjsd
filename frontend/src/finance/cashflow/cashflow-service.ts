@@ -31,7 +31,6 @@ export async function createOrderCashflow(orderId: number, values: CashflowFormV
     pool_id: values.pool_id,
     occurred_on: occurredOn,
     direction,
-    nature: direction === "IN" ? "BUSINESS_IN" : "BUSINESS_OUT",
     accounting_attribute: direction === "IN" ? "SELF_REVENUE" : "OPERATING_EXPENSE",
     // 当前业务只区分收入/支出，后台分类统一落 OTHER；后续需要细分类别时再扩展表单。
     category: "OTHER",

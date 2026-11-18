@@ -9,9 +9,9 @@
 #                  表单作用域清单）。依赖 L0。
 #   L2  shared     跨业务域共享原语：被 ≥2 个业务域引用、自身不属于任何
 #                  业务域、只依赖 L0+L1。依赖 L0+L1，**不依赖任何业务域**。
-#   L3  业务域     orders / customer_center / finance / stocks / policy /
+#   L3  业务域     orders / customer_center / finance / stocks /
 #                  installments / field_definitions / reporting / workbench /
-#                  lists / auth / audit / attachments / imports / options /
+#                  lists / auth / audit / attachments / options /
 #                  notifications。依赖 L0+L1+L2。
 #
 # ─────────────────────────────────────────────────────────────────────────
@@ -50,8 +50,8 @@
 # 合法依赖方向（L3 业务域之间仍允许单向依赖，但不得成环）
 #
 #   reporting / workbench  → 各业务域（只读聚合层）
-#   finance / installments / policy → orders
-#   orders → customer_center / field_definitions / stocks / policy
+#   finance / installments → orders
+#   orders → customer_center / field_definitions / stocks
 #
 # 运行：backend 目录下执行 lint-imports（CI lint-gate 同步强制）。
 # 纪律：整边豁免；归位一批、收紧一批，使豁免清单单调收紧。
@@ -79,7 +79,6 @@ forbidden_modules =
     app.customer_center
     app.finance
     app.stocks
-    app.policy
     app.installments
     app.field_definitions
     app.reporting
@@ -88,7 +87,6 @@ forbidden_modules =
     app.auth
     app.audit
     app.attachments
-    app.imports
     app.options
     app.notifications
 

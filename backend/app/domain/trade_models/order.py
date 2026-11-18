@@ -8,9 +8,6 @@ from app.domain.base import (
     AuditMixin,
 )
 from app.domain.enums import (
-    CommissionMode,
-    CommissionPayer,
-    DeliveryMode,
     EventType,
     OrderStatus,
     Portion,
@@ -43,7 +40,6 @@ class Order(Base, AuditMixin):
     __tablename__ = "orders"
     __table_args__ = (
         Index("ix_orders_owner_id", "owner_id"),
-        Index("ix_orders_policy_version_id", "policy_version_id"),
         Index("ix_orders_account_id", "account_id"),
         # 订单号与库存编号是一一对应：一个库存账号只能作为一个订单的账号主档。
         # 多个 NULL 仍允许（不含账号资料的非库存类订单）。
@@ -55,22 +51,6 @@ class Order(Base, AuditMixin):
         UniqueConstraint("order_no", name="uq_orders_no"),
         Index("ix_orders_type_date", "order_type", "trade_date"),
         Index("ix_orders_trade_date", "trade_date"),
-        CheckConstraint(
-            f"commission_mode IS NULL OR commission_mode IN {CommissionMode.values()!r}",
-            name="order_commission_mode_valid",
-        ),
-        CheckConstraint(
-            f"commission_payer IS NULL OR commission_payer IN {CommissionPayer.values()!r}",
-            name="order_commission_payer_valid",
-        ),
-        CheckConstraint(
-            "(commission_mode IS NULL) = (commission_payer IS NULL)",
-            name="order_commission_pair_valid",
-        ),
-        CheckConstraint(
-            "order_type = 'DG' OR (commission_mode IS NULL AND commission_payer IS NULL)",
-            name="order_commission_type_valid",
-        ),
         CheckConstraint(
             "account_snapshot IS NULL OR CAST(account_snapshot AS TEXT) = 'null' "
             "OR order_type IN ('HS', 'TH', 'DG')",
@@ -85,8 +65,6 @@ class Order(Base, AuditMixin):
     # listing_price / service_fee / expected_settlement_date 已删除（0024）：
     # ORM 有定义但 schema 从未暴露、前端零引用、486 行全 NULL 的死列；
     # 分期场景的 service_fee 走 installments.service_fee（活列），勿混淆。
-    commission_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    commission_payer: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # HS/TH/DG 建单时的账号文本快照统一存于 account_snapshot。
     account_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     account_id: Mapped[int | None] = mapped_column(
@@ -99,12 +77,6 @@ class Order(Base, AuditMixin):
         String(16), nullable=False, default=OrderStatus.ACTIVE.value
     )
     # BAS-06-04 规则快照：创建时固化当时生效的规则版本与参数。
-    # 「改未来费率不会改写已发生订单的利润」这条红线靠它兜底 ——
-    # 规则版本改了也不回写快照，历史利润永远按当时口径。
-    policy_version_id: Mapped[int | None] = mapped_column(
-        ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True
-    )
-    policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     owner_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -132,10 +104,6 @@ class OrderEvent(Base, AuditMixin):
         UniqueConstraint("event_no", name="uq_order_events_no"),
         Index("ix_order_events_order", "order_id", "event_type", "occurred_on"),
         CheckConstraint("amount >= 0", name="amount_nonneg"),
-        CheckConstraint(
-            f"delivery_mode IS NULL OR delivery_mode IN {DeliveryMode.values()!r}",
-            name="event_delivery_mode_valid",
-        ),
         Index("ix_order_events_occurred_on", "occurred_on"),
         Index("ix_order_events_source", "source_type", "source_id"),
     )
@@ -158,7 +126,6 @@ class OrderEvent(Base, AuditMixin):
     offset_event_id: Mapped[int | None] = mapped_column(
         ForeignKey("order_events.id", ondelete="SET NULL"), nullable=True
     )
-    delivery_mode: Mapped[str | None] = mapped_column(String(24), nullable=True)
     is_posted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)

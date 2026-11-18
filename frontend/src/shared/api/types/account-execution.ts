@@ -11,7 +11,6 @@ export interface AccountExecutionCashflow {
   occurred_on: string;
   occurred_at?: string | null;
   direction: string;
-  nature: string;
   category: string;
   amount: string;
   note?: string | null;
@@ -33,7 +32,6 @@ export interface AccountExecutionEvent {
   pool_id?: number | null;
   offset_event_id?: number | null;
   portion: string;
-  delivery_mode?: string | null;
   delivery_direction?: "BUY" | "SELL" | null;
   is_posted: boolean;
   note?: string | null;

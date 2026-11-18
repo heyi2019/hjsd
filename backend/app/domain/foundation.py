@@ -4,7 +4,6 @@
 表结构以本模块 ORM 定义为准：
 
 - `pools.code` 创建后不可改（V18）；有流水只能停用不能删（V17）；
-- `ownership` 决定是否计入权益（V30）；
 - 资金账户不分业务：登记流水一律进唯一活动池（2026-11-17 删除业务↔池路由）；
 - 业务类型用 `is_zero_principal` 标记零本金型（DG），不垫付本金；
 - 编号由 `document_sequences` 事务内递增，创建后不可改、不可复用（V19）。
@@ -30,7 +29,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.domain.base import Base
 from app.core.time import now_second
 from app.domain.base import AuditMixin, TimestampMixin
-from app.domain.enums import PoolOwnership, PoolStatus, PoolType
+from app.domain.enums import PoolStatus, PoolType
 
 
 class Pool(Base, AuditMixin):
@@ -38,10 +37,6 @@ class Pool(Base, AuditMixin):
 
     __tablename__ = "pools"
     __table_args__ = (
-        CheckConstraint(
-            f"ownership IN {PoolOwnership.values()!r}".replace("[", "(").replace("]", ")"),
-            name="ownership_valid",
-        ),
         CheckConstraint(
             f"status IN {PoolStatus.values()!r}".replace("[", "(").replace("]", ")"),
             name="status_valid",
@@ -54,9 +49,6 @@ class Pool(Base, AuditMixin):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     pool_type: Mapped[str] = mapped_column(
         String(32), nullable=False, default=PoolType.OTHER.value
-    )
-    ownership: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=PoolOwnership.OWNED.value
     )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=PoolStatus.ACTIVE.value

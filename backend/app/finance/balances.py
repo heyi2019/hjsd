@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFound
 from app.core.money import to_money
 from app.core.security import CurrentUser
-from app.domain.enums import Direction, Nature, PoolOwnership
+from app.domain.enums import CashflowSourceType, Direction
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Deposit
 from app.shared.order_amounts import business_cashflow_filter
@@ -32,12 +32,12 @@ def pool_balances(
         if pool_id not in pools or (user is not None and not user.can_see_pool(pool_id)):
             raise NotFound(f"资金账户 {pool_id} 不存在", details={"pool_id": pool_id})
 
-    cells: dict[int, dict[tuple[str, str, str | None], Decimal]] = {}
-    for pool_id, direction, nature, attribute, amount in session.execute(
+    cells: dict[int, dict[tuple[str, str | None, str | None], Decimal]] = {}
+    for pool_id, direction, source_type, attribute, amount in session.execute(
         select(
             Cashflow.pool_id,
             Cashflow.direction,
-            Cashflow.nature,
+            Cashflow.source_type,
             Cashflow.accounting_attribute,
             func.coalesce(func.sum(Cashflow.amount), 0),
         )
@@ -48,11 +48,11 @@ def pool_balances(
         .group_by(
             Cashflow.pool_id,
             Cashflow.direction,
-            Cashflow.nature,
+            Cashflow.source_type,
             Cashflow.accounting_attribute,
         )
     ):
-        cells.setdefault(pool_id, {})[(direction, nature, attribute)] = to_money(amount or 0)
+        cells.setdefault(pool_id, {})[(direction, source_type, attribute)] = to_money(amount or 0)
 
     deposits = {
         pool_id: to_money(amount or 0)
@@ -77,13 +77,13 @@ def pool_balances(
     for pool_id in ids:
         bucket = cells.get(pool_id, {})
 
-        def total(direction: str, nature: str | None = None) -> Decimal:
+        def total(direction: str, source_type: str | None = None) -> Decimal:
             return sum(
                 (
                     amount
-                    for (item_direction, item_nature, _attribute), amount in bucket.items()
+                    for (item_direction, item_source_type, _attribute), amount in bucket.items()
                     if item_direction == direction
-                    and (nature is None or item_nature == nature)
+                    and (source_type is None or item_source_type == source_type)
                 ),
                 Decimal("0.00"),
             )
@@ -97,8 +97,8 @@ def pool_balances(
             "pool_name": pool.name,
             "income": income,
             "expense": expense,
-            "transfer_in": total(Direction.IN.value, Nature.INTERNAL.value),
-            "transfer_out": total(Direction.OUT.value, Nature.INTERNAL.value),
+            "transfer_in": total(Direction.IN.value, CashflowSourceType.TRANSFER.value),
+            "transfer_out": total(Direction.OUT.value, CashflowSourceType.TRANSFER.value),
             "cash_balance": income - expense,
             "deposit_held": deposits.get(pool_id, Decimal("0.00")),
             "available": income - expense,
@@ -121,16 +121,12 @@ def pool_balance_summary(
     visible = [pool for pool in pools if user is None or user.can_see_pool(pool.id)]
     balances = pool_balances(session, [pool.id for pool in visible], user=user) if visible else {}
     items = [balances[pool.id] for pool in visible]
-    owned_ids = {pool.id for pool in visible if pool.ownership == PoolOwnership.OWNED.value}
     zero = Decimal("0.00")
     totals = {
         "pool_count": len(visible),
         "cash_balance": sum((item["cash_balance"] for item in items), zero),
         "available": sum((item["available"] for item in items), zero),
         "deposit_held": sum((item["deposit_held"] for item in items), zero),
-        "owned_cash_balance": sum(
-            (balances[pool_id]["cash_balance"] for pool_id in owned_ids), zero
-        ),
     }
     return items, totals
 

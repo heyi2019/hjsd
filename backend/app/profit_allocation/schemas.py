@@ -42,7 +42,6 @@ class ProfitAllocationOut(BaseModel):
     allocation_type: str | None = None
     allocation_rate: Decimal
     allocation_amount: Decimal = Decimal("0")
-    policy_version_id: int | None = None
     total_rate: Decimal
     total_amount: Decimal = Decimal("0")
 

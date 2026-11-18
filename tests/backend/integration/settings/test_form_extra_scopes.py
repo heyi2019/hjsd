@@ -225,7 +225,6 @@ def test_cashflow_create_and_reverse_form_extra(seeded_client, seeded_db, header
             "pool_id": pool_id,
             "occurred_on": D,
             "direction": "OUT",
-            "nature": "BUSINESS_OUT",
             "category": "房租",
             "amount": "500",
             "note": "工作室月租",

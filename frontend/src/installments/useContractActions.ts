@@ -86,7 +86,6 @@ export function useContractActions(params: {
     if (!deliverTarget) return;
     await write.run(async () => {
         await installmentsApi.deliver(deliverTarget.id, {
-          delivery_mode: values.delivery_mode as string,
           delivered_on: values.delivered_on as string,
           note: values.note as string,
           bound_phone: values.bound_phone ? String(values.bound_phone) : undefined,

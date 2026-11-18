@@ -18,8 +18,6 @@ from app.core.money import to_money
 from app.domain.enums import (
     InstallmentContractType,
     InstallmentDispositionAction,
-    Nature,
-    RebateStatus,
     RebateType,
 )
 from app.domain.trade import (
@@ -39,7 +37,7 @@ from app.shared.order_amounts import (
 )
 from app.reporting._shared import cashflow_totals_by_order
 from app.orders.router_output import _order_list_payload
-from app.policy.profit_allocation import service as policy_allocations
+from app.profit_allocation import service as policy_allocations
 from app.reporting.profit import order_profit_detail
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from app.reporting.r3_commission import r3_commission_reconciliation
@@ -84,7 +82,6 @@ def _add_flow(seeded_db, order_id: int, direction: str, amount: str) -> None:
             flow_no=f"CF-PROFIT-{uuid4().hex[:10]}",
             pool_id=1,
             occurred_on=D,
-            nature=Nature.BUSINESS_IN.value if direction == "IN" else Nature.BUSINESS_OUT.value,
             direction=direction,
             category="OTHER",
             amount=to_money(amount),
@@ -105,7 +102,6 @@ def _add_rebate(seeded_db, order_id: int, amount: str) -> None:
             rebate_type=RebateType.SELL.value,
             amount=to_money(amount),
             collected_on=D,
-            status=RebateStatus.SETTLED.value,
             created_by="pytest",
             updated_by="pytest",
         )

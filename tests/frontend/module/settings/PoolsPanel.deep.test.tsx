@@ -13,15 +13,15 @@ vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
-vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/profitAllocation.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
 const pools = [
-  { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE", note: "x" },
-  { id: 2, code: "HJ_PROFIT", name: "利润池", pool_type: "PROFIT", ownership: "CUSTODY", status: "DISABLED", note: null },
+  { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "INVEST", status: "ACTIVE", note: "x" },
+  { id: 2, code: "HJ_PROFIT", name: "利润池", pool_type: "PROFIT", status: "DISABLED", note: null },
 ];
 
 let ui: ReturnType<typeof userEvent.setup>;
@@ -35,15 +35,12 @@ beforeEach(() => {
 });
 
 describe("PoolsPanel.deep", () => {
-  it("渲染：类型标签 / 归属标签 / 状态", async () => {
+  it("渲染：类型标签 / 状态", async () => {
     renderLight(<PoolsPanel />, { user: "admin" });
     expect(await screen.findByText("托管池")).toBeInTheDocument();
     // POOL_TYPE_LABEL
     expect(screen.getByText("投资款")).toBeInTheDocument();
     expect(screen.getByText("利润")).toBeInTheDocument();
-    // POOL_OWNERSHIP_LABEL
-    expect(screen.getByText("自有")).toBeInTheDocument();
-    expect(screen.getByText("代管")).toBeInTheDocument();
   });
 
   it("新建资金账户成功：提交 create + 重新加载", async () => {
@@ -57,7 +54,6 @@ describe("PoolsPanel.deep", () => {
         code: "NEW_POOL",
         name: "新池",
         pool_type: "OTHER",
-        ownership: "OWNED",
         is_default: false,
       }),
     );
@@ -87,7 +83,7 @@ describe("PoolsPanel.deep", () => {
     await waitFor(() =>
       expect(vi.mocked(poolsApi.update)).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({ name: "托管池改", pool_type: "INVEST", ownership: "OWNED" }),
+        expect.objectContaining({ name: "托管池改", pool_type: "INVEST" }),
       ),
     );
     expect(message.success).toHaveBeenCalledWith("资金账户已更新");

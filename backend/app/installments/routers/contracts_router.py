@@ -127,7 +127,6 @@ def export_installments_csv(
         schedules = schedules_by_installment.get(output.id, [])
         dispositions = dispositions_by_installment.get(output.id, [])
         row["installment_note"] = row.get("note")
-        row["installment_delivery_mode"] = row.get("delivery_mode")
         row["installment_delivered_on"] = row.get("delivered_on")
         row["installment_first_due_on"] = row.get("first_due_on")
         row["installment_extra_values"] = detail_json(row.get("extra_values") or {}, value_labels)
@@ -176,7 +175,6 @@ def create_installment(
         first_due_on=payload.first_due_on,
         actor=_actor(user),
         user=user,
-        delivery_mode=payload.delivery_mode,
         note=payload.note,
         schedule=[item.model_dump() for item in payload.schedule] if payload.schedule else None,
         extra_values=payload.extra_values,

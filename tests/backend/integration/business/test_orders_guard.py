@@ -90,7 +90,7 @@ def _delivered_hs_order(seeded_db):
     order = _settled_hs_installment(seeded_db)
     contract = seeded_db.scalar(select(Installment).where(Installment.order_id == order.id))
     inst_recovery.deliver(
-        seeded_db, contract.id, delivery_mode="PLATFORM_OPERATOR",
+        seeded_db, contract.id,
         delivered_on=TODAY, note="换绑凭证", actor="pytest",
     )
     seeded_db.commit()
@@ -227,7 +227,7 @@ def test_deliver_requires_prior_business_event(seeded_db):
     with pytest.raises(Validation, match="登记卖号交付前必须先登记售出"):
         post_event(
             seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY, actor="pytest",
-            delivery_mode="PLATFORM_OPERATOR", note="voucher",
+            note="voucher",
         )
 
 
@@ -250,7 +250,7 @@ def test_deliver_requires_settled_installment(seeded_db):
     with pytest.raises(Validation, match="未结清"):
         post_event(
             seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY, actor="pytest",
-            delivery_mode="PLATFORM_OPERATOR", note="voucher",
+            note="voucher",
         )
 
 

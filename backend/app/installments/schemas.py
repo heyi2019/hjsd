@@ -77,7 +77,6 @@ class InstallmentCreate(RequestModel):
     per_period: Decimal = Decimal("0")
     adjust_final_period: bool = False
     first_due_on: date
-    delivery_mode: str | None = None
     note: str | None = None
     schedule: list[ScheduleCreate] | None = None
     extra_values: dict[str, Any] | None = None
@@ -147,7 +146,6 @@ class InstallmentOut(BaseModel):
     final_period_adjustment: Decimal = Decimal("0")
     status: str
     operator: str | None = None
-    delivery_mode: str | None = None
     delivered_on: date | None = None
     first_due_on: date | None = None
     note: str | None = None
@@ -246,7 +244,6 @@ class ScheduleExtendIn(RequestModel):
 
 
 class DeliverIn(RequestModel):
-    delivery_mode: str
     delivered_on: date
     note: str = Field(min_length=1, description="换绑凭证说明")
     bound_phone: str | None = Field(default=None, max_length=64)

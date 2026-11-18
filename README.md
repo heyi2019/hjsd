@@ -80,10 +80,10 @@ cd frontend && npm run build
 |---|---|
 | `backend/app/core` | settings / database / money / errors / security / audit / numbering |
 | `backend/app/domain` | 当前 ORM 模型与领域对象 |
-| `backend/app` 领域包 | 20 个已挂载 router：`field_definitions` `customer_center` `orders` + `orders.form_fields` `installments` `finance` `stocks` `reporting` `policy` `notifications` `imports` `audit` `auth` + `auth.admin`（人员）+ `auth.teams` `attachments` `options` `lists`；`core`/`domain` 为基础设施与 ORM，`shared` 为跨域共享原语（无独立 router） |
+| `backend/app` 领域包 | 20 个已挂载 router：`field_definitions` `customer_center` `orders` + `orders.form_fields` `installments` `finance` `stocks` `reporting` `profit_allocation` `notifications` `audit` `auth` + `auth.admin`（人员）+ `auth.teams` `attachments` `options` `lists`；`core`/`domain` 为基础设施与 ORM，`shared` 为跨域共享原语（无独立 router） |
 | `backend/alembic/squashed_versions` | **活动迁移链**：只有 `0001_current_schema_baseline`，head = `0001`（`alembic.ini` 的 `version_locations` 只指向此目录；改 ORM 即改基线，不再加增量迁移） |
 | `backend/alembic/squashed_versions` | 唯一活动迁移基线 `0001`，用于全新 PostgreSQL 数据库初始化 |
-| `tests/backend` | 后端测试（pytest，111 个文件） |
+| `tests/backend` | 后端测试（pytest，按实际磁盘文件数维护） |
 | `frontend/src` | 按业务域拆分（`orders/` `stocks/` `customers/` `installments/` `pools/` `rebates/` `reporting/` 等 20 个目录），无 `pages/`；`shared/` 为 UI 与 API 基础层 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |
 | `docs` | 当前有效文档：顶层事实源 / 工程文档 + `testing/` 测试体系；**全仓文档地图见 `docs/README.md`**；`archive/` 只保留 ux-audit 的 E2E 证据（JSON 与截图），历史文档已于 2026-11-11 全部清退 |
@@ -94,10 +94,8 @@ cd frontend && npm run build
 
 写代码前必看 `docs/PRD.md` 与 `docs/数据字典.md`（旧功能规格 F01 已下线，编号体系见 `docs/testing/测试元数据台账.csv`（`FEATURE` 记录）），几条最容易踩的：
 
-- **规则快照**（BAS-06-04）：订单 / 返点 / 分期创建时固化当时生效的规则版本与参数
-  （`policy_version_id` + `policy_snapshot`）。改未来费率**不会**改写已发生业务的利润。
-  已发布或已被引用的规则版本不可改，只能新建版本。
-- **有效区间** `[effective_from, effective_to)` 左闭右开，`NULL` = 至今。
+- **分润比例**：公司分润比例固定为盈利 40% / 亏损 50%；规则快照字段已下线，
+  订单 / 返点 / 分期不再保存规则版本与参数快照。
   同一定义下区间不得重叠——两个都无失效日的版本必然重叠，必须拒绝。
 - **金额** 一律 `core.money.Amount`（DECIMAL(18,2)）+ `to_money()`，禁止 float 参与计算。
 - **写路径** 一律走 Service 事务 + `core.audit.record_audit`，路由层不直接改模型。

@@ -169,7 +169,6 @@ def _post_deliver(
     *,
     occurred_on: date,
     actor: str,
-    delivery_mode: str | None,
     delivery_direction: str | None,
     note: str | None,
     bound_phone: str | None,
@@ -177,19 +176,12 @@ def _post_deliver(
     form_extra: Mapping[str, Any] | None,
     allow_installment_delivery: bool,
 ) -> tuple[OrderEvent, None]:
-    """`DELIVER`：无金额、无现金流，必须记录交付方式与凭证（A04 / A05）。"""
-    modes = ("PLATFORM_OPERATOR", "CUSTOMER_SELF")
+    """`DELIVER`：无金额、无现金流，必须记录交付方向、凭证与账号绑定（A04 / A05）。"""
     direction = (delivery_direction or "SELL").strip().upper()
     if direction not in {"BUY", "SELL"}:
         raise Validation(
             "DELIVER 的 delivery_direction 必须为 BUY 或 SELL",
             details={"field": "delivery_direction", "value": delivery_direction},
-        )
-    if delivery_mode not in modes:
-        raise Validation(
-            f"DELIVER 必须提供 delivery_mode，取值 {modes}",
-            code=ErrorCode.DELIVERY_CONDITION_UNMET,
-            details={"field": "delivery_mode", "value": delivery_mode},
         )
     if not isinstance(note, str) or not note.strip():
         raise Validation(
@@ -262,7 +254,6 @@ def _post_deliver(
         amount=Decimal("0"),
         occurred_on=occurred_on,
         pool_id=None,
-        delivery_mode=delivery_mode,
         is_posted=True,
         posted_at=now_second(),
         note=note,
@@ -322,7 +313,7 @@ def _post_deliver(
         entity_type="order_event",
         entity_id=event.event_no,
         actor=actor,
-        after={"order_no": order.order_no, "delivery_mode": delivery_mode},
+        after={"order_no": order.order_no},
     )
     return event, None
 

@@ -14,14 +14,13 @@ from app.core.money import to_money
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
     OrderStatus,
-    RebateStatus,
 )
 from app.domain.foundation import Pool
 from app.domain.trade import Account, RebateRecord
 from app.finance.cashflows import create_cashflow
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy.profit_allocation import service as policy_allocations
+from app.profit_allocation import service as policy_allocations
 from app.reporting.profit import order_profit_detail
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from app.reporting.r3_commission import r3_commission_reconciliation
@@ -84,7 +83,6 @@ def _direct_cost(seeded_db, order_id: int, amount: str, occurred_on: date) -> No
         pool_id=pool.id,
         occurred_on=occurred_on,
         direction="OUT",
-        nature="BUSINESS_OUT",
         accounting_attribute="SELF_DIRECT_COST",
         category="OTHER",
         amount=Decimal(amount),
@@ -482,7 +480,6 @@ class TestReportsApiDateParams:
                 source_order_id=foreign_order.id,
                 rebate_type="SELL",
                 amount=to_money("500"),
-                status=RebateStatus.OPEN.value,
                 collected_on=D,
                 created_by="pytest",
                 updated_by="pytest",
@@ -530,7 +527,6 @@ class TestReports:
             pool_id=pool.id,
             occurred_on=date(2026, 10, 4),
             direction="OUT",
-            nature="BUSINESS_OUT",
             accounting_attribute="SELF_DIRECT_COST",
             category="OTHER",
             amount=Decimal("300.00"),
@@ -640,8 +636,7 @@ def test_r2_pool_scope_and_date_window_filters(seeded_db):
     ):
         create_cashflow(
             seeded_db, pool_id=pool_id, occurred_on=occurred_on,
-            direction="OUT", nature="BUSINESS_OUT",
-            accounting_attribute="OPERATING_EXPENSE", category="OFFICE",
+            direction="OUT", accounting_attribute="OPERATING_EXPENSE", category="OFFICE",
             amount=amount, actor="pytest",
         )
     data = r2_monthly_pnl(

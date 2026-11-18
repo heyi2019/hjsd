@@ -74,7 +74,7 @@ def test_flow_d_installment_full_lifecycle(seeded_db):
     assert inst.status == InstallmentStatus.SETTLED.value
 
     inst = deliver(
-        seeded_db, inst.id, delivery_mode="PLATFORM_OPERATOR",
+        seeded_db, inst.id,
         delivered_on=TODAY, note="换绑交付凭证", actor="pytest",
     )
     assert inst.status == InstallmentStatus.DELIVERED.value

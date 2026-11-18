@@ -16,10 +16,7 @@
   绝不再加回净利。
   资金走向不以「有没有生成 cashflow 行」为界：生成流水走流水汇总；不生成流水的
   （返点登记即收入确认 / 分期坏账回收确认）在各源自成口径补入。
-- 作废 ≠ 结算进度：RebateStatus 的 OPEN / PARTIALLY_SETTLED / SETTLED 是结算进度，
-  按「登记即计入」都要算收入；**VOID 是作废、不代表任何资金走向，收入侧一律排除**。
-  新模型返点作废靠 reverse_cashflow 冲销流水自动减收入，旧模型返点无流水只能靠 status
-  排除——两条路径必须让作废返点都不计收入（一致性修复，不是给返点开特例）。
+- 返点登记即收入确认；后续作废走 reverse_cashflow 冲销流水自动减收入。
 """
 
 from __future__ import annotations
@@ -38,7 +35,6 @@ from app.domain.enums import (
     Direction,
     EventType,
     InstallmentDispositionAction,
-    RebateStatus,
 )
 from app.domain.trade import (
     Cashflow,
@@ -156,7 +152,7 @@ def _profit_flow_rows(
 
     结算进度状态（OPEN / PARTIALLY_SETTLED / SETTLED）不过滤、登记即计入收入；
     VOID 是作废、不代表资金走向，排除（与新模型返点作废 reverse_cashflow 后净额归零同口径）。
-    资金性质不改收入 / 支出归属——资金走向只有这两个大类。
+    收入 / 支出归属只按资金走向判定——只有这两个大类。
     """
     rows: list[tuple[int, date, Decimal, Decimal]] = []
 
@@ -177,7 +173,7 @@ def _profit_flow_rows(
         RebateRecord.source_order_id,
         RebateRecord.collected_on,
         RebateRecord.amount,
-    ).where(RebateRecord.status != RebateStatus.VOID.value)
+    )
     if order_ids is not None:
         rebate_stmt = rebate_stmt.where(RebateRecord.source_order_id.in_(order_ids))
     if from_date is not None:
@@ -348,7 +344,7 @@ def order_cashflow_profit(session: Session, order_id: int) -> Decimal:
     """订单利润：所有收入 − 所有支出（可正、可负、可为 0）。
 
     收入 = 资金流水 IN 合计 + 返点记录金额；支出 = 资金流水 OUT 合计 + 分期坏账。
-    不过滤审核状态与资金性质；冲销流水本身是反向流水，自然被计入。
+    不过滤审核状态；冲销流水本身是反向流水，自然被计入。
     """
     return order_cashflow_profit_by_order(session, order_ids=[order_id]).get(order_id, ZERO)
 

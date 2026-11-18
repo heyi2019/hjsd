@@ -56,7 +56,7 @@ export const installmentsApi = {
     api.post<Schedule>(`/installments/${id}/schedules/${periodNo}/extend`, payload).then((r) => r.data),
   markOverdue: (asOf?: string) =>
     api.post<{ marked: number }>("/installments/mark-overdue", undefined, { params: asOf ? { as_of: asOf } : undefined }).then((r) => r.data),
-  deliver: (id: number, payload: { delivery_mode: string; delivered_on: string; note: string; bound_phone?: string; bound_phone_owner?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) =>
+  deliver: (id: number, payload: { delivered_on: string; note: string; bound_phone?: string; bound_phone_owner?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) =>
     api.post<Installment>(`/installments/${id}/deliver`, payload).then((r) => r.data),
 };
 

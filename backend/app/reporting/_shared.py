@@ -53,7 +53,7 @@ def cashflow_totals_by_order(
     2026-11-05 用户裁决：利润 = 单订单所有收入 − 所有支出，可正可负可 0；
     资金走向只有收入 / 支出两种，不以「是否生成 cashflow 行」为界。
     本函数是报表侧唯一取数口，与分润基数 `order_cashflow_profit` 同源：
-    不看审核状态或已删除的资金性质字段，冲销流水本身是反向流水自然计入；
+    不看审核状态，收支性质由方向表达；冲销流水本身是反向流水自然计入；
     返点记录（收入）与分期坏账（支出）由 `order_profit_flow_by_order` 补齐。
     押金损失是「已占用押金转费用」的定性转换、非第二次现金流出，由
     `business_cashflow_filter` 排除，与订单利润明细 `order_cashflow_profit_by_order` 同源。

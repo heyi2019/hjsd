@@ -20,13 +20,12 @@ from app.shared.form_field_rules import validate_business_responsible, validate_
 from app.customer_center.counterparties import assert_counterparty_usable
 from app.customer_center.customer_merge import assert_customer_usable
 from app.shared.form_values import set_extra_values
-from app.policy import versions as policy_versions
 from app.stocks.profile import get_account
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import ErrorCode, Validation
 from app.domain.trade import Account, Order, OrderFormField
-from app.domain.enums import AuditAction, OrderStatus, PolicyType
+from app.domain.enums import AuditAction, OrderStatus
 
 from app.orders._shared import (
     _create_inline_inventory_account,
@@ -36,7 +35,6 @@ from app.orders._shared import (
 )
 from app.orders.create_roles.guards import (
     _assert_no_duplicate_inventory_account,
-    _normalize_commission_context,
 )
 from app.orders.create_roles.roles import (
     _counterparty_role,
@@ -56,8 +54,6 @@ def create_order(
     confirm_repurchase: bool = False,
     owner_id: int | None = None,
     note: str | None = None,
-    commission_mode: str | None = None,
-    commission_payer: str | None = None,
     customer_roles: Sequence[tuple[int, str]] = (),
     counterparty_roles: Sequence[tuple[int, str]] = (),
     extra_values: Mapping[str, Any] | None = None,
@@ -119,11 +115,6 @@ def create_order(
         form_extra = {
             key: value for key, value in form_extra.items() if key not in account_field_keys
         }
-    normalized_commission_mode, normalized_commission_payer = _normalize_commission_context(
-        commission_mode=commission_mode,
-        commission_payer=commission_payer,
-        order_type_code=definition.code,
-    )
     if account_id is not None:
         account = get_account(session, account_id, user)
         _validate_existing_account_context(
@@ -186,25 +177,6 @@ def create_order(
                 "订单负责人必须是启用用户",
                 details={"field": "owner_id", "owner_id": owner_id},
             )
-
-    # BAS-06-04 规则快照：按成交日固化当时生效的分润规则。
-    # 规则改版不回写这里，历史订单永远按当时口径计算。
-    snapshot: dict[str, Any] = {}
-    primary_version_id: int | None = None
-    for code in (PolicyType.COMMISSION.value,):
-        version_id, snap = policy_versions.make_snapshot(
-            session,
-            policy_code=code,
-            on=trade_date,
-            scope_type="ORDER_TYPE",
-            scope_id=definition.id,
-        )
-        if snap is None:
-            continue
-        snapshot[code] = snap
-        # policy_version_id 保存当前订单的主规则版本，完整参数在 policy_snapshot 里
-        if primary_version_id is None:
-            primary_version_id = version_id
 
     # 快照是建单和内联建库的单一事实源；订单行只落快照，不再写平铺列。
     game_account = game_type = game_password = channel_region = None
@@ -276,12 +248,8 @@ def create_order(
         account_snapshot=order_account_snapshot,
         account_id=account_id,
         status=OrderStatus.ACTIVE.value,
-        policy_version_id=primary_version_id,
-        policy_snapshot=snapshot or None,
         owner_id=owner_id,
         note=note,
-        commission_mode=normalized_commission_mode,
-        commission_payer=normalized_commission_payer,
         form_extra=dict(form_extra) if form_extra else None,
         created_by=actor,
         updated_by=actor,
@@ -331,7 +299,6 @@ __all__ = [
     "add_customer_role",
     "add_counterparty_role",
     "_assert_no_duplicate_inventory_account",
-    "_normalize_commission_context",
     "_customer_role",
     "_counterparty_role",
 ]

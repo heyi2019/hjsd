@@ -28,7 +28,7 @@ vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
-vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/profitAllocation.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
@@ -102,7 +102,7 @@ beforeEach(() => {
         is_posted: true,
         operator: "admin",
         note: "回收登记",
-        cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", nature: "BUSINESS_OUT", category: "BUY", amount: "100.00" },
+        cashflow: { flow_no: "CF0001", pool_name: "利润池", occurred_on: "2026-10-15", direction: "OUT", category: "BUY", amount: "100.00" },
       }, {
         id: 33,
         event_no: "EV0003",

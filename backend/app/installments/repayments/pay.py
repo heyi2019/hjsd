@@ -6,7 +6,7 @@ from datetime import date
 from typing import Any
 from app.shared.audit import record_audit
 from app.core.security import CurrentUser
-from app.domain.enums import CashflowSourceType, Direction, Nature
+from app.domain.enums import CashflowSourceType, Direction
 from app.domain.cashflow_attributes import accounting_attribute_for_order_event
 from app.finance.cashflows import create_cashflow
 from app.orders.events_rules import _resolve_pool
@@ -88,7 +88,6 @@ def pay(
         pool_id=resolved_pool_id,
         occurred_on=paid_on,
         direction=Direction.IN.value,
-        nature=Nature.BUSINESS_IN.value,
         accounting_attribute=accounting_attribute,
         category="INSTALLMENT_PAYMENT",
         amount=money,

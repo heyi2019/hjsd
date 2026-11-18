@@ -30,7 +30,7 @@ const orderTypes = [
 ] as unknown as import("@/shared/api/types/orders").OrderType[];
 
 const pools = [
-  { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
+  { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", status: "ACTIVE" },
 ] as unknown as import("@/shared/api/types/finance").Pool[];
 
 // 复用现有 SettingsPage.test 的 client 桩，避免挂载面板时真实网络请求。

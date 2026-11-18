@@ -13,7 +13,6 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
-    DeliveryMode,
     EventType,
     InstallmentContractType,
     InstallmentStatus,
@@ -327,12 +326,6 @@ class TestCreateInstallmentValidation:
         order = _order(seeded_db)
         with pytest.raises(Validation, match="首期应还日期必填"):
             _contract(seeded_db, order.id, first_due_on=None)
-
-    def test_invalid_delivery_mode_rejected(self, seeded_db):
-        order = _order(seeded_db)
-        with pytest.raises(Validation) as exc:
-            _contract(seeded_db, order.id, delivery_mode="BOGUS")
-        assert "交付方式" in str(exc.value)
 
     def test_schedule_rejects_unknown_fields_in_service(self, seeded_db):
         order = _order(seeded_db)

@@ -574,8 +574,8 @@ describe("OrderDetail", () => {
     } as unknown as AccountExecutionDetail;
 
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={37} loading={false} editing={account} employees={[{ id: 1, username: "admin", display_name: "管理员", is_active: true }]} pools={[
-      { id: 1, code: "HJ_INVEST", name: "经营荷包", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
-      { id: 2, code: "HJ_PROFIT", name: "利润荷包", pool_type: "PROFIT", ownership: "OWNED", status: "ACTIVE" },
+      { id: 1, code: "HJ_INVEST", name: "经营荷包", pool_type: "INVEST", status: "ACTIVE" },
+      { id: 2, code: "HJ_PROFIT", name: "利润荷包", pool_type: "PROFIT", status: "ACTIVE" },
     ]} onFinanceEdit={onFinanceEdit} />);
     await settleFieldConfig();
 
@@ -766,7 +766,6 @@ describe("OrderDetail", () => {
           occurred_on: "2026-11-02",
           occurred_at: "2026-11-02T10:00:00",
           direction: "IN",
-          nature: "BUSINESS_IN",
           category: "OTHER",
           amount: "500.00",
           operator: "admin",

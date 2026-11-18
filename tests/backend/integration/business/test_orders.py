@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.stocks.profile import create_account
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
-from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
+from app.domain.enums import AccountStatus, Direction, EventType, OrderStatus
 from app.domain.foundation import Pool
 from app.field_definitions.order_types import get_order_type_by_code
 from app.domain.parties import OrderCustomerRole

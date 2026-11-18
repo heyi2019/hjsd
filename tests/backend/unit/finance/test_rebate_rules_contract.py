@@ -52,7 +52,6 @@ def test_rebate_amount_is_explicit(seeded_db):
     )
 
     assert record.amount == Decimal("1000.00")
-    assert record.status == "SETTLED"
 
 
 def test_rebate_expected_arrival_route_removed(app):

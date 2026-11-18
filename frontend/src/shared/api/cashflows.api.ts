@@ -12,7 +12,6 @@ export const cashflowsApi = {
     direction?: string;
     occurred_from?: string;
     occurred_to?: string;
-    nature?: string;
     ledger_type?: string;
     accounting_attribute?: string;
     category?: string;
@@ -31,7 +30,6 @@ export const cashflowsApi = {
     direction?: string;
     occurred_from?: string;
     occurred_to?: string;
-    nature?: string;
     ledger_type?: string;
     accounting_attribute?: string;
     category?: string;
@@ -44,7 +42,6 @@ export const cashflowsApi = {
     direction?: string;
     occurred_from?: string;
     occurred_to?: string;
-    nature?: string;
     ledger_type?: string;
     accounting_attribute?: string;
     category?: string;

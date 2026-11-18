@@ -69,12 +69,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "DEPOSIT_STATUS", label: "押金状态", group: "INSTALLMENT", editable: false, options: [
     { value: "PAID", label: "已付" }, { value: "PARTIALLY_RETURNED", label: "部分退还" }, { value: "RETURNED", label: "已退" }, { value: "LOST", label: "已损失" }, { value: "CANCELLED", label: "已取消" },
   ] },
-  { code: "IMPORT_BATCH_STATUS", label: "导入批次状态", group: "IMPORT", editable: false, options: [
-    { value: "DRAFT", label: "草稿" }, { value: "MAPPED", label: "已映射" }, { value: "COMMITTED", label: "已确认" }, { value: "REJECTED", label: "已拒绝" }, { value: "ROLLED_BACK", label: "已回滚" }, { value: "CORRECTED", label: "已更正" },
-  ] },
-  { code: "IMPORT_SOURCE_KIND", label: "导入数据类型", group: "IMPORT", editable: false, options: [
-    { value: "STANDARD_ORDER", label: "订单" }, { value: "STANDARD_ACCOUNT", label: "账号" }, { value: "STANDARD_CASHFLOW", label: "资金流水" }, { value: "STANDARD_INSTALLMENT", label: "分期" }, { value: "STANDARD_LEAD", label: "需求" },
-  ] },
   { code: "POLICY_STATUS", label: "规则版本状态", group: "POLICY", editable: false, options: [
     { value: "DRAFT", label: "草稿" }, { value: "ACTIVE", label: "已发布" }, { value: "EXPIRED", label: "已失效" }, { value: "SUPERSEDED", label: "已被取代" },
   ] },
@@ -96,18 +90,9 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   { code: "OWNER_SCOPE", label: "数据可见范围", group: "SYSTEM", editable: false, options: [
     { value: "SELF", label: "本人" }, { value: "TEAM", label: "团队" }, { value: "ALL", label: "全部" },
   ] },
-  /* ── 0009 补种：资金账户主数据 / 佣金 / 订单角色 / 违约处置 / 导入行 / 字段元数据 ── */
+  /* ── 0009 补种：资金账户主数据 / 订单角色 / 违约处置 / 字段元数据 ── */
   { code: "POOL_TYPE", label: "资金账户用途类型", group: "FUND", editable: false, options: [
     { value: "INVEST", label: "投资款" }, { value: "PROFIT", label: "利润" }, { value: "OTHER", label: "其他" },
-  ] },
-  { code: "POOL_OWNERSHIP", label: "资金账户归属", group: "FUND", editable: false, options: [
-    { value: "OWNED", label: "自有" }, { value: "CUSTODY", label: "代管" }, { value: "THIRD_PART", label: "第三方" },
-  ] },
-  { code: "COMMISSION_PAYER", label: "佣金承担方", group: "ORDER", editable: false, options: [
-    { value: "BUYER", label: "买方" }, { value: "CONSIGNOR", label: "寄售方" }, { value: "PLATFORM", label: "平台" },
-  ] },
-  { code: "COMMISSION_MODE", label: "佣金支付方式", group: "ORDER", editable: false, options: [
-    { value: "DEDUCT_FROM_SETTLEMENT", label: "结算扣减" }, { value: "SEPARATE_PAYMENT", label: "单独支付" },
   ] },
   { code: "ORDER_CUSTOMER_ROLE", label: "订单客户角色", group: "ORDER", editable: false, options: [
     { value: "SELLER", label: "卖方" }, { value: "BUYER", label: "买方" }, { value: "CONSIGNOR", label: "寄售方" }, { value: "INSTALLMENT_CUSTOMER", label: "分期客户" },
@@ -117,9 +102,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
   ] },
   { code: "INSTALLMENT_DISPOSITION", label: "违约处置方式", group: "INSTALLMENT", editable: false, options: [
     { value: "RECOVER", label: "回收" }, { value: "RESELL", label: "出售" },
-  ] },
-  { code: "IMPORT_ROW_STATUS", label: "导入行状态", group: "IMPORT", editable: false, options: [
-    { value: "PENDING", label: "待映射" }, { value: "MAPPED", label: "已映射" }, { value: "UNMAPPED", label: "未映射" }, { value: "IMPORTED", label: "已导入" }, { value: "SKIPPED", label: "已跳过" }, { value: "ROLLED_BACK", label: "已回滚" },
   ] },
   { code: "ENTITY_TYPE", label: "实体类型", group: "SYSTEM", editable: false, options: [
     { value: "order", label: "订单" },
@@ -136,7 +118,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "transfer", label: "资金划转" },
     { value: "report_export", label: "报表导出" },
     { value: "policy_version", label: "规则版本" },
-    { value: "import_batch", label: "导入批次" },
     { value: "rebate_record", label: "返点记录" },
     { value: "OrderTypeDef", label: "业务类型" },
     { value: "counterparty", label: "合作方" },
@@ -219,17 +200,9 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "REPORT_EXPORT", label: "导出报表" },
     { value: "ATTACHMENT_UPLOAD", label: "上传附件" },
     { value: "ATTACHMENT_DELETE", label: "删除附件" },
-    { value: "IMPORT_LAND", label: "导入落库" },
-    { value: "IMPORT_COMMIT", label: "确认导入批次" },
-    { value: "IMPORT_REJECT", label: "驳回导入批次" },
-    { value: "IMPORT_MAP", label: "映射导入行" },
-    { value: "IMPORT_SKIP", label: "跳过导入行" },
-    { value: "IMPORT_MARK_UNLINKED", label: "标记单边划转" },
-    { value: "IMPORT_ROLLBACK", label: "回滚导入批次" },
     { value: "OPTION_SET_CREATE", label: "新建选项词典" },
     { value: "OPTION_SET_UPDATE", label: "编辑选项词典" },
     { value: "OPTION_SET_DELETE", label: "删除选项词典" },
-    { value: "IMPORT_CORRECTION", label: "更正导入批次" },
   ] },
   { code: "ORDER_EVENT_TYPE", label: "订单事件类型", group: "ORDER", editable: false, options: [
     { value: "BUY", label: "买号" },
@@ -239,16 +212,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "DELIVER", label: "交付" },
     { value: "CANCEL", label: "取消" },
     { value: "REFUND", label: "退款" },
-  ] },
-  { code: "CASHFLOW_NATURE", label: "资金流向", group: "FUND", editable: false, options: [
-    { value: "EXTERNAL_IN", label: "外部流入" },
-    { value: "BUSINESS_IN", label: "本方流入" },
-    { value: "BUSINESS_OUT", label: "本方流出" },
-    { value: "INTERNAL", label: "内部调拨" },
-  ] },
-  { code: "DELIVERY_MODE", label: "交付方式", group: "ORDER", editable: false, options: [
-    { value: "PLATFORM_OPERATOR", label: "平台/本方操作换绑" },
-    { value: "CUSTOMER_SELF", label: "客户自行换绑" },
   ] },
   { code: "REBATE_TYPE", label: "返点类型", group: "FUND", editable: false, options: [
     { value: "BUY", label: "买号返点（对应回收/提号）" },
@@ -265,7 +228,6 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "NOTIFICATION", label: "通知" },
     { value: "CASHFLOW_OUT", label: "支出流水" },
     { value: "CASHFLOW_IN", label: "收入流水" },
-    { value: "IMPORT", label: "导入批次" },
     { value: "ATTACHMENT", label: "附件" },
   ] },
   { code: "POLICY_TYPE", label: "规则编码", group: "POLICY", editable: false, options: [

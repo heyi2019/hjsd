@@ -16,7 +16,7 @@ from app.notifications import triggers
 from app.notifications import service as notification_service
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy.profit_allocation import service as policy_allocations
+from app.profit_allocation import service as policy_allocations
 
 
 def _make_unread(seeded_db, **kwargs):

@@ -38,7 +38,6 @@ export interface OrderEvent {
   occurred_on: string;
   pool_id?: number | null;
   portion?: string;
-  delivery_mode?: string | null;
   delivery_direction?: "BUY" | "SELL" | null;
   offset_event_id?: number | null;
   reason?: string | null;

@@ -209,30 +209,6 @@ class TestCreateOrderValidation:
                 actor="pytest",
             )
 
-    def test_order_commission_fields_are_closed_at_database_boundary(self, seeded_db):
-        order = _order(seeded_db, order_type="DG")
-        order.commission_mode = "UNKNOWN"
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
-    def test_event_delivery_mode_is_closed_at_database_boundary(self, seeded_db):
-        order = _order(seeded_db)
-        seeded_db.add(
-            OrderEvent(
-                event_no="HS-DB-DELIVERY",
-                order_id=order.id,
-                event_type="BUY",
-                amount=Decimal("0"),
-                portion="GROSS",
-                occurred_on=D,
-                delivery_mode="UNKNOWN",
-            )
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
     def test_unknown_order_type_rejected(self, seeded_db):
         with pytest.raises(Validation) as exc:
             create_order(
@@ -416,56 +392,6 @@ class TestCreateOrderValidation:
     def test_order_owner_must_exist_in_service(self, seeded_db):
         with pytest.raises(Validation, match="订单负责人不存在"):
             _order(seeded_db, owner_id=999999)
-
-    def test_dg_service_accepts_commission_terms(self, seeded_db):
-        """佣金口径只属于 DG 代挂单：支付方式与承担方成对落库（DB CHECK 同口径）。
-
-        入参小写也要归一成大写，否则会被 `order_commission_mode_valid` 拒绝。
-        """
-        order = create_order(
-            seeded_db,
-            order_type="DG",
-            trade_date=D,
-            actor="pytest",
-            commission_mode="deduct_from_settlement",
-            commission_payer="consignor",
-        )
-        assert (order.commission_mode, order.commission_payer) == (
-            "DEDUCT_FROM_SETTLEMENT",
-            "CONSIGNOR",
-        )
-
-    def test_commission_terms_reject_incomplete_pair(self, seeded_db):
-        with pytest.raises(Validation, match="同时填写或同时留空"):
-            create_order(
-                seeded_db,
-                order_type="DG",
-                trade_date=D,
-                actor="pytest",
-                commission_mode="SEPARATE_PAYMENT",
-            )
-
-    def test_commission_terms_reject_unknown_value(self, seeded_db):
-        with pytest.raises(Validation, match="commission_mode"):
-            create_order(
-                seeded_db,
-                order_type="DG",
-                trade_date=D,
-                actor="pytest",
-                commission_mode="WHATEVER",
-                commission_payer="BUYER",
-            )
-
-    def test_commission_terms_reject_non_dg_order_type(self, seeded_db):
-        with pytest.raises(Validation, match="只有 DG 代挂订单"):
-            create_order(
-                seeded_db,
-                order_type="HS",
-                trade_date=D,
-                actor="pytest",
-                commission_mode="SEPARATE_PAYMENT",
-                commission_payer="BUYER",
-            )
 
     def test_th_links_pickup_inventory_account_without_snapshot(self, seeded_db):
         account = create_account(

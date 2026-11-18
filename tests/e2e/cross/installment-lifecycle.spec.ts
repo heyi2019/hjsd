@@ -112,7 +112,7 @@ test("分期合约：金额口径 + 状态机 PENDING→ACTIVE→SETTLED→DELIV
   // 交付 → DELIVERED，订单进入完成态
   const deliver = await request.post(`${base}/installments/${inst.id}/deliver`, {
     headers: ADMIN,
-    data: { delivery_mode: "PLATFORM_OPERATOR", delivered_on: TRADE_DATE, note: "E2E 换绑交付凭证" },
+    data: { delivered_on: TRADE_DATE, note: "E2E 换绑交付凭证" },
   });
   expect(deliver.status()).toBe(200);
   expect((await deliver.json()).status).toBe("DELIVERED");

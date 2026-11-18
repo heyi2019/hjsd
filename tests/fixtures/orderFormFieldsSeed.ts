@@ -76,9 +76,7 @@ const SCOPE_SEED: Record<string, SeedDef[]> = {
   INVREBATE: [
     { key: "rebate_type", label: "返点类型", type: "SELECT", options: [{ value: "BUY", label: "买号返点" }, { value: "SELL", label: "卖号返点" }] },
   ],
-  INSTDELIVER: [
-    { key: "delivery_mode", label: "交付方式", type: "SELECT", options: [{ value: "PLATFORM_OPERATOR", label: "平台/本方操作换绑" }, { value: "CUSTOMER_SELF", label: "客户自行换绑" }] },
-  ],
+  INSTDELIVER: [],
 };
 
 /** 展开为全部 OrderFormField 行（按 scope 维度），供测试默认种子使用。 */

@@ -24,12 +24,11 @@ from app.orders.create import create_order
 TODAY = date(2026, 10, 17)
 
 
-def _make_flow(session, *, direction, nature,
+def _make_flow(session, *, direction,
                accounting_attribute="OPERATING_EXPENSE", category="OTHER", amount="10",
                note="memo", order_id=None, pool_id=1):
     return create_cashflow(
-        session, pool_id=pool_id, occurred_on=TODAY, direction=direction, nature=nature,
-        accounting_attribute=accounting_attribute,
+        session, pool_id=pool_id, occurred_on=TODAY, direction=direction, accounting_attribute=accounting_attribute,
         category=category, amount=Decimal(amount), actor="pytest", note=note, order_id=order_id,
     )
 
@@ -41,7 +40,6 @@ def _seed_recon(session):
     for amount in (Decimal("50"), Decimal("20")):
         create_cashflow(
             session, pool_id=pool.id, occurred_on=TODAY, direction="IN",
-            nature="BUSINESS_IN",
             accounting_attribute="OPERATING_EXPENSE", category="OTHER",
             amount=amount, actor="pytest",
         )
@@ -49,7 +47,7 @@ def _seed_recon(session):
 
 
 def test_reverse_out_flow_creates_in_reversal(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT", amount="120")
+    flow = _make_flow(seeded_db, direction="OUT", amount="120")
     reversal = reverse_cashflow(
         seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="录错冲销",
     )
@@ -64,7 +62,7 @@ def test_reverse_out_flow_creates_in_reversal(seeded_db):
 
 
 def test_reverse_in_flow_creates_out_reversal(seeded_db):
-    flow = _make_flow(seeded_db, direction="IN", nature="BUSINESS_IN", amount="80")
+    flow = _make_flow(seeded_db, direction="IN", amount="80")
     reversal = reverse_cashflow(
         seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="退款冲销",
     )
@@ -74,13 +72,13 @@ def test_reverse_in_flow_creates_out_reversal(seeded_db):
 
 
 def test_reverse_requires_reason(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT", amount="10")
+    flow = _make_flow(seeded_db, direction="OUT", amount="10")
     with pytest.raises(Validation, match="冲销流水必须填写原因"):
         reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="   ")
 
 
 def test_reverse_rejects_already_reversed(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT", amount="10")
+    flow = _make_flow(seeded_db, direction="OUT", amount="10")
     reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="第一次")
     with pytest.raises(Validation, match="该流水已冲销"):
         reverse_cashflow(

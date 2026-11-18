@@ -5,7 +5,7 @@ import { useCallback, useState } from "react";
 import { poolsApi } from "../../shared/api/pools.api";
 import type { Pool } from "../../shared/api/types/finance";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
-import { POOL_OWNERSHIP_LABEL, POOL_TYPE_LABEL } from "../../shared/lib/labels";
+import { POOL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { BusinessActionModal, BusinessRegistrationForm, Select } from "../../shared/ui";
@@ -16,16 +16,10 @@ const POOL_TYPE_FALLBACK = [
   { value: "PROFIT", label: "利润" },
   { value: "OTHER", label: "其他" },
 ];
-const POOL_OWNERSHIP_FALLBACK = [
-  { value: "OWNED", label: "自有" },
-  { value: "CUSTODY", label: "代管" },
-  { value: "THIRD_PART", label: "第三方" },
-];
 import { ConfirmButton, DataTable, ErrorBanner, InlineError, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 
 export function PoolsPanel() {
   const poolTypeOptions = useOptionSet("POOL_TYPE") ?? POOL_TYPE_FALLBACK;
-  const ownershipOptions = useOptionSet("POOL_OWNERSHIP") ?? POOL_OWNERSHIP_FALLBACK;
   const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -45,7 +39,6 @@ export function PoolsPanel() {
         code: (values.code as string).toUpperCase(),
         name: values.name as string,
         pool_type: (values.pool_type as string) ?? "OTHER",
-        ownership: (values.ownership as string) ?? "OWNED",
         is_default: Boolean(values.is_default),
       });
       appMessage.success("资金账户已创建");
@@ -79,7 +72,6 @@ export function PoolsPanel() {
       await poolsApi.update(editing.id, {
         name: values.name as string,
         pool_type: values.pool_type as string,
-        ownership: values.ownership as string,
         is_default: Boolean(values.is_default),
         note: (values.note as string) || null,
       });
@@ -96,7 +88,6 @@ export function PoolsPanel() {
     { title: "代码", dataIndex: "code" },
     { title: "名称", dataIndex: "name" },
     { title: "类型", dataIndex: "pool_type", render: (v: string) => configurableLabel("POOL_TYPE", v, POOL_TYPE_LABEL) },
-    { title: "归属", dataIndex: "ownership", render: (v: string) => configurableLabel("POOL_OWNERSHIP", v, POOL_OWNERSHIP_LABEL) },
     { title: "默认", dataIndex: "is_default", width: 70, render: (v: boolean | undefined) => (v ? <StatusTag status="ACTIVE" label="默认" /> : null) },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="POOL_STATUS" /> },
     { title: "操作", render: (_v, row) => <Space size={2}><PermissionButton permission="pool.manage" size="small" onClick={() => { setEditing(row); editForm.setFieldsValue(row); }}>{"编辑"}</PermissionButton><ConfirmButton
@@ -166,7 +157,6 @@ export function PoolsPanel() {
           <Form.Item label="代码"><Input value={editing?.code} disabled /></Form.Item>
           <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="pool_type" label="用途类型" rules={[{ required: true }]}><Select options={poolTypeOptions} /></Form.Item>
-          <Form.Item name="ownership" label="资金归属" rules={[{ required: true }]}><Select options={ownershipOptions} /></Form.Item>
           <Form.Item name="is_default" label="默认账户" valuePropName="checked" extra="未指定资金账户的流水进默认账户"><Switch checkedChildren="是" unCheckedChildren="否" /></Form.Item>
           <Form.Item name="note" label="备注"><Input.TextArea rows={3} /></Form.Item>
         </BusinessRegistrationForm>

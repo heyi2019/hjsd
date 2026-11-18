@@ -4,13 +4,7 @@ import importlib
 
 import pytest
 
-from app.finance.attributes import derive_manual_cashflow_nature
 from app.finance.schemas import CashflowCreate
-
-
-@pytest.mark.parametrize(("direction", "expected"), [("IN", "BUSINESS_IN"), ("OUT", "BUSINESS_OUT")])
-def test_manual_cashflow_nature_is_derived_by_direction(direction: str, expected: str) -> None:
-    assert derive_manual_cashflow_nature(direction) == expected
 
 
 def test_finance_router_only_exposes_the_composed_router() -> None:
@@ -22,7 +16,7 @@ def test_finance_router_only_exposes_the_composed_router() -> None:
     assert not hasattr(finance_router, "update_rebate")
 
 
-def test_manual_cashflow_request_does_not_require_derived_nature() -> None:
+def test_manual_cashflow_request_accepts_minimal_payload() -> None:
     payload = CashflowCreate(
         pool_id=1,
         occurred_on="2026-11-16",
@@ -31,8 +25,6 @@ def test_manual_cashflow_request_does_not_require_derived_nature() -> None:
         category="OTHER",
         amount="1.00",
     )
-
-    assert payload.nature is None
 
 
 def test_pool_balance_projection_belongs_to_finance() -> None:

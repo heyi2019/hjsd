@@ -29,13 +29,13 @@ const ADMIN = { "X-Dev-User": "admin" };
 
 /**
  * 按表单项的**标签**精确定位（而非 hasText 整项匹配），避免 help 文案含同名子串时
- * 误命中相邻字段。典型坑：资金性质 与 核算属性（help="可选范围由资金性质决定..."）——
- * 若用整项 hasText 会同时命中两项触发 strict violation；按 label 匹配只命中「资金性质」本身。
+ * 误命中相邻字段。典型坑：核算属性 的 help 文案含业务名词子串——
+ * 若用整项 hasText 会同时命中多个字段触发 strict violation；按 label 匹配只命中目标本身。
  */
 function formItemByLabel(dialog: Locator, label: string): Locator {
   // 按表单项的**标签**精确定位（而非整项 hasText），避免 help 文案含同名子串时误命中相邻字段。
-  // 例：资金性质 与 核算属性（help="可选范围由资金性质决定..."）整项 hasText 会同时命中两项；
-  // 仅匹配「label 文本」只命中「资金性质」本身。用 CSS :has() 单次选择器（廉价、点击稳定），
+  // 例：核算属性 的 help 文案含业务名词子串，整项 hasText 会同时命中多项；
+  // 仅匹配「label 文本」只命中目标本身。用 CSS :has() 单次选择器（廉价、点击稳定），
   // 不取 .filter({has})（嵌套 JS 查询在重载下反复求值，导致 .ant-select-selector 迟迟不 actionable）。
   return dialog.locator(`.ant-form-item:has(.ant-form-item-label:has-text(${JSON.stringify(label)}))`);
 }
@@ -186,7 +186,6 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     await pickSelect(page, dialog, "资金账户", /投资款荷包/);
     await dialog.getByLabel("发生日期").fill("2026-10-21");
     await pickSelect(page, dialog, "收支方向", "收入");
-    await pickSelect(page, dialog, "资金性质", "本方经营");
     await pickSelect(page, dialog, "核算属性", "回收收入");
     await dialog.getByLabel("类别").fill("E2E_UI_FLOW");
     await dialog.getByLabel("金额").fill("10.00");
@@ -219,7 +218,6 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
         pool_id: invest!.id,
         occurred_on: "2026-10-21",
         direction: "IN",
-        nature: "EXTERNAL_IN",
         category: "E2E_TRANSFER_FUNDING",
         amount: "100000.00",
         note: "E2E 划转用例前置充值",

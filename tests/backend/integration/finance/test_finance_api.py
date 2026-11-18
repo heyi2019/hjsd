@@ -69,7 +69,6 @@ class TestFinanceApi:
             flow_no="CF-RECON-API-1",
             pool_id=invest.id,
             occurred_on=TODAY,
-            nature="BUSINESS_IN",
             category="OTHER",
             direction="IN",
             amount=Decimal("100.00"),
@@ -124,7 +123,6 @@ class TestFinanceApi:
                 "pool_id": 1,
                 "occurred_on": TODAY.isoformat(),
                 "direction": "OUT",
-                "nature": "BUSINESS_OUT",
                 "category": "OPERATING",
                 "amount": "25.00",
                 "note": "接口测试费用",
@@ -154,7 +152,6 @@ class TestFinanceApi:
                 "pool_id": 1,
                 "occurred_on": TODAY.isoformat(),
                 "direction": "IN",
-                "nature": "BUSINESS_IN",
                 "accounting_attribute": "SELF_REVENUE",
                 "category": "OTHER",
                 "amount": "100.00",
@@ -322,17 +319,17 @@ class TestFinanceApi:
             [
                 Cashflow(
                     flow_no="CF-PAGE-1", pool_id=1, occurred_on=date(2026, 10, 1),
-                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("1"),
+                    category="OTHER", direction="IN", amount=Decimal("1"),
                     created_by="pytest", updated_by="pytest",
                 ),
                 Cashflow(
                     flow_no="CF-PAGE-2", pool_id=2, occurred_on=date(2026, 10, 2),
-                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("2"),
+                    category="OTHER", direction="IN", amount=Decimal("2"),
                     created_by="pytest", updated_by="pytest",
                 ),
                 Cashflow(
                     flow_no="CF-PAGE-3", pool_id=1, occurred_on=date(2026, 10, 3),
-                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("3"),
+                    category="OTHER", direction="IN", amount=Decimal("3"),
                     created_by="pytest", updated_by="pytest",
                 ),
             ]
@@ -363,17 +360,17 @@ class TestFinanceApi:
             [
                 Cashflow(
                     flow_no="CF-TOTAL-1", pool_id=1, occurred_on=date(2026, 10, 1),
-                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("1"),
+                    category="OTHER", direction="IN", amount=Decimal("1"),
                     created_by="pytest", updated_by="pytest",
                 ),
                 Cashflow(
                     flow_no="CF-TOTAL-2", pool_id=2, occurred_on=date(2026, 10, 2),
-                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("2"),
+                    category="OTHER", direction="IN", amount=Decimal("2"),
                     created_by="pytest", updated_by="pytest",
                 ),
                 Cashflow(
                     flow_no="CF-TOTAL-3", pool_id=1, occurred_on=date(2026, 10, 3),
-                    nature="BUSINESS_IN", category="OTHER", direction="IN", amount=Decimal("3"),
+                    category="OTHER", direction="IN", amount=Decimal("3"),
                     created_by="pytest", updated_by="pytest",
                 ),
             ]
@@ -435,7 +432,6 @@ class TestFinanceApi:
                     flow_no="CF-SCOPE-OWN",
                     pool_id=1,
                     occurred_on=TODAY,
-                    nature="BUSINESS_IN",
                     category="OTHER",
                     direction="IN",
                     amount=Decimal("10"),
@@ -447,7 +443,6 @@ class TestFinanceApi:
                     flow_no="CF-SCOPE-OTHER",
                     pool_id=1,
                     occurred_on=TODAY,
-                    nature="BUSINESS_IN",
                     category="OTHER",
                     direction="IN",
                     amount=Decimal("20"),
@@ -560,7 +555,6 @@ class TestFinanceApi:
             pool_id=invest.id,
             occurred_on=TODAY,
             direction="IN",
-            nature="BUSINESS_IN",
             accounting_attribute="SELF_REVENUE",
             category="OTHER",
             amount="200.00",
@@ -587,7 +581,6 @@ class TestFinanceApi:
         assert payload["operator"] == "admin"
         assert payload["created_at"]
         assert len(payload["cashflows"]) == 2
-        assert {row["nature"] for row in payload["cashflows"]} == {"INTERNAL"}
         assert {row["direction"] for row in payload["cashflows"]} == {"IN", "OUT"}
         assert len({row["source_id"] for row in payload["cashflows"]}) == 1
         source_balance = pool_balance(seeded_db, invest.id)
@@ -631,7 +624,6 @@ class TestFinanceApi:
                 flow_no="TR-REPAIR-OUT",
                 pool_id=invest.id,
                 occurred_on=TODAY,
-                nature="INTERNAL",
                 category="TRANSFER",
                 direction="OUT",
                 amount=Decimal("80"),
@@ -680,7 +672,6 @@ class TestFinanceApi:
                 flow_no="TR-REPAIR-API-OUT",
                 pool_id=invest.id,
                 occurred_on=TODAY,
-                nature="INTERNAL",
                 category="TRANSFER",
                 direction="OUT",
                 amount=Decimal("45"),

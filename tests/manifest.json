@@ -23,30 +23,30 @@
       ],
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
-        "files": 136,
-        "cases": 1718,
+        "files": 128,
+        "cases": 1521,
         "kinds": {
           "unit": {
-            "files": 31,
-            "cases": 297,
+            "files": 30,
+            "cases": 284,
             "byArea": {
               "business": 7,
               "customer": 1,
               "finance": 4,
-              "operations": 2,
+              "operations": 1,
               "settings": 2,
               "system": 15
             }
           },
           "integration": {
-            "files": 105,
-            "cases": 1408,
+            "files": 98,
+            "cases": 1224,
             "byArea": {
               "business": 39,
               "customer": 8,
               "finance": 20,
-              "operations": 10,
-              "settings": 17,
+              "operations": 7,
+              "settings": 13,
               "system": 11
             }
           }
@@ -64,24 +64,24 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 90,
+        "files": 87,
         "layers": {
-          "fast": 27,
-          "quick": 8,
-          "react": 43,
+          "fast": 26,
+          "quick": 7,
+          "react": 42,
           "deep": 12
         },
         "cases": {
-          "fast": 156,
-          "quick": 93,
-          "react": 596,
-          "deep": 89
+          "fast": 150,
+          "quick": 79,
+          "react": 587,
+          "deep": 88
         },
         "byArea": {
           "unit": {
             "workbench": 1,
             "business": 9,
-            "settings": 2,
+            "settings": 1,
             "shared": 10,
             "system": 5
           },
@@ -90,8 +90,8 @@
             "business": 18,
             "customer": 2,
             "finance": 4,
-            "operations": 4,
-            "settings": 16,
+            "operations": 3,
+            "settings": 15,
             "shared": 8,
             "system": 5
           }

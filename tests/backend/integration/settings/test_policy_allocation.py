@@ -1,4 +1,4 @@
-"""POLICY-01 T19 / T20：经营规则版本化与快照固化（BAS-06-01~04）。
+"""POLICY-01 T20：订单利润分润配置与角色守卫（BAS-06-03）。
 
 核心红线（BAS-06-04）：
 > 改未来费率不会改写已发生订单的利润
@@ -12,38 +12,13 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import Validation
 from app.core.money import to_money
-from app.domain.enums import PolicyStatus, PolicyType
-from app.domain.parties import PolicyVersion
 from app.domain.trade import OrderEvent, OrderProfitAllocation
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy.profit_allocation import service as policy_allocations
-from app.policy.profit_allocation.listing import list_allocations
-from app.policy import definitions as policy_definitions
-from app.policy import versions as policy_versions
+from app.profit_allocation import service as policy_allocations
+from app.profit_allocation.listing import list_allocations
 
 
-
-def _make_policy(seeded_db, *, code="COMMISSION", name="分润规则") -> dict:
-    return policy_definitions.create_definition(
-        seeded_db,
-        policy_code=code,
-        name=name,
-        scope_type="GLOBAL",
-        description="测试用规则",
-        actor="pytest",
-    )
-
-def _publish(seeded_db, definition, *, frm, to=None, config, approve=True):
-    version = policy_versions.create_version(
-        seeded_db,
-        definition["id"],
-        effective_from=frm,
-        effective_to=to,
-        config=config,
-        actor="pytest",
-    )
-    return version
 
 @pytest.fixture()
 def json_headers(headers):
@@ -402,15 +377,3 @@ class TestProfitAllocation:
         items = list_allocations(seeded_db, order.id)
         assert len(items) == 4
         assert next(item for item in items if item["allocation_type"] == "OPERATION")["user_id"] == 3
-
-    def test_allocation_inherits_order_policy_version(self, seeded_db):
-        definition = _make_policy(seeded_db)
-        _publish(seeded_db, definition, frm=date(2026, 1, 1), config={"rate": "5"})
-        order = self._sold_order(seeded_db)
-        items = policy_allocations.set_allocations(
-            seeded_db,
-            order.id,
-            items=[{"allocation_type": kind, "user_id": 1 if kind == "OPERATION" else None, "role": "OWNER", "allocation_rate": "100" if kind == "OPERATION" else "0"} for kind in ("BUY", "SELL", "OPERATION", "COMPANY")],
-            actor="pytest",
-        )
-        assert items[0]["policy_version_id"] == order.policy_version_id

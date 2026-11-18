@@ -42,7 +42,7 @@ def _all_scope_user() -> CurrentUser:
         pool_ids=frozenset(),
     )
 
-def _make_flow(seeded_db, *, direction, nature,
+def _make_flow(seeded_db, *, direction,
                accounting_attribute="OPERATING_EXPENSE", category="OTHER", amount="10",
                note="memo", order_id=None):
     return cashflows.create_cashflow(
@@ -50,7 +50,6 @@ def _make_flow(seeded_db, *, direction, nature,
         pool_id=1,
         occurred_on=TODAY,
         direction=direction,
-        nature=nature,
         accounting_attribute=accounting_attribute,
         category=category,
         amount=Decimal(amount),
@@ -75,8 +74,7 @@ def _cashflow_row(**overrides):
 
     row = dict(
         id=1, flow_no="ZC00001", pool_id=1, occurred_on=TODAY,
-        occurred_at=datetime(2026, 10, 17, 9, 0), nature="BUSINESS_IN",
-        ledger_type="BUSINESS", accounting_attribute="SELF_REVENUE",
+        occurred_at=datetime(2026, 10, 17, 9, 0), ledger_type="BUSINESS", accounting_attribute="SELF_REVENUE",
         category="SALE", direction="IN", amount=Decimal("10"),
         reviewed_by=None, reviewed_at=None, source_type="MANUAL", source_id=None,
         order_id=None, order_no=None,
@@ -108,7 +106,6 @@ def _studio_flow(seeded_db, *, direction="OUT", category="房租", amount="20"):
     return cashflows.create_cashflow(
         seeded_db, pool_id=1, occurred_on=TODAY,
         direction=direction,
-        nature="BUSINESS_OUT" if direction == "OUT" else "BUSINESS_IN",
         category=category, amount=Decimal(amount), actor="pytest",
         ledger_type=CashflowLedgerType.STUDIO.value,
     )
@@ -149,7 +146,7 @@ def test_list_deposits_user_filter(seeded_db):
     assert deposits.list_deposits(seeded_db, pool_id=1, user=_restricted_user()) == []
 
 def test_list_cashflows_user_filter(seeded_db):
-    _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
+    _make_flow(seeded_db, direction="OUT")
     # 无权资金账户一律返回空：明细为空、总数也为 0（返回值恒为 (rows, total) 二元组，
     # 原先这里返回裸 [] 会让调用方解包时报错，只是路由层提前拦住了才没暴露）。
     rows, total = list_cashflows(
@@ -158,7 +155,7 @@ def test_list_cashflows_user_filter(seeded_db):
     assert rows == [] and total == 0
 
 def test_list_cashflows_filters(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
+    flow = _make_flow(seeded_db, direction="OUT")
 
     rows, total = list_cashflows(seeded_db, direction="OUT")
     assert total >= 1 and all(r["direction"] == "OUT" for r in rows)
@@ -179,7 +176,6 @@ def test_list_cashflows_transfer_source(seeded_db):
         pool_id=1,
         occurred_on=TODAY,
         direction="IN",
-        nature="BUSINESS_IN",
         accounting_attribute="SELF_REVENUE",
         category="OTHER",
         amount=Decimal("100"),
@@ -195,26 +191,25 @@ def test_list_cashflows_transfer_source(seeded_db):
     assert all(r["source"] == "TRANSFER" for r in transfer_rows)
 
 def test_reverse_cashflow_out_direction(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
+    flow = _make_flow(seeded_db, direction="OUT")
     reversal = cashflows.reverse_cashflow(
         seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x"
     )
     assert reversal.direction == "IN"
-    assert reversal.nature == "BUSINESS_IN"
 
 def test_reverse_cashflow_rejects_already_reversed(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
+    flow = _make_flow(seeded_db, direction="OUT")
     cashflows.reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x")
     with pytest.raises(Validation, match="该流水已冲销"):
         cashflows.reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x")
 
 def test_list_cashflows_pool_ids_filter(seeded_db):
-    _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
+    _make_flow(seeded_db, direction="OUT")
     rows, total = list_cashflows(seeded_db, pool_ids=[1])
     assert total >= 1 and all(r["pool_id"] == 1 for r in rows)
 
 def test_list_cashflows_user_only_filter(seeded_db):
-    _make_flow(seeded_db, direction="OUT", nature="BUSINESS_OUT")
+    _make_flow(seeded_db, direction="OUT")
     rows, total = list_cashflows(seeded_db, user=_restricted_user())
     assert rows == [] and total == 0
 
@@ -329,7 +324,7 @@ def test_list_deposits_user_only_filter(seeded_db):
 def test_list_cashflows_by_pool_id_visible(seeded_db):
     cashflows.create_cashflow(
         seeded_db, pool_id=1, occurred_on=TODAY,
-        direction="IN", nature="EXTERNAL_IN", category="客户收款",
+        direction="IN", category="客户收款",
         amount=Decimal("50"), actor="pytest", note="列表可见性测试",
     )
     items, total = list_cashflows(seeded_db, pool_id=1, user=_all_scope_user())
@@ -358,7 +353,7 @@ def test_create_cashflow_rejects_duplicate_operators(seeded_db):
     with pytest.raises(Validation, match="操作人不能重复选择"):
         cashflows.create_cashflow(
             seeded_db, pool_id=1, occurred_on=TODAY,
-            direction="OUT", nature="BUSINESS_OUT", category="OTHER",
+            direction="OUT", category="OTHER",
             amount=Decimal("10"), actor="pytest",
             operator_user_ids=[1, 1],
         )
@@ -367,7 +362,7 @@ def test_create_cashflow_rejects_missing_operator(seeded_db):
     with pytest.raises(Validation, match="所选操作人不存在或已停用"):
         cashflows.create_cashflow(
             seeded_db, pool_id=1, occurred_on=TODAY,
-            direction="OUT", nature="BUSINESS_OUT", category="OTHER",
+            direction="OUT", category="OTHER",
             amount=Decimal("10"), actor="pytest",
             operator_user_ids=[99999],
         )
@@ -376,7 +371,7 @@ def test_create_cashflow_rejects_bad_ledger_type(seeded_db):
     with pytest.raises(Validation, match="ledger_type 必须为"):
         cashflows.create_cashflow(
             seeded_db, pool_id=1, occurred_on=TODAY,
-            direction="OUT", nature="BUSINESS_OUT", category="OTHER",
+            direction="OUT", category="OTHER",
             amount=Decimal("10"), actor="pytest", ledger_type="NOPE",
         )
 
@@ -384,7 +379,7 @@ def test_create_cashflow_rejects_bad_source_type(seeded_db):
     with pytest.raises(Validation, match="source_type 必须为"):
         cashflows.create_cashflow(
             seeded_db, pool_id=1, occurred_on=TODAY,
-            direction="OUT", nature="BUSINESS_OUT", category="OTHER",
+            direction="OUT", category="OTHER",
             amount=Decimal("10"), actor="pytest", source_type="NOPE",
         )
 
@@ -392,7 +387,7 @@ def test_create_cashflow_order_event_requires_source_id(seeded_db):
     with pytest.raises(Validation, match="订单事件流水必须填写 source_id"):
         cashflows.create_cashflow(
             seeded_db, pool_id=1, occurred_on=TODAY,
-            direction="OUT", nature="BUSINESS_OUT", category="OTHER",
+            direction="OUT", category="OTHER",
             amount=Decimal("10"), actor="pytest",
             source_type=CashflowSourceType.ORDER_EVENT.value,
         )

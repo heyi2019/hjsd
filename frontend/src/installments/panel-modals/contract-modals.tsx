@@ -113,9 +113,6 @@ export function DeliverModal({ controller }: { controller: ContractTableControll
         </Typography.Paragraph>
       }
     >
-      <CfgItem name="delivery_mode" label="交付方式" rules={[{ required: true }]}>
-        <Select />
-      </CfgItem>
       <CfgItem name="bound_phone" label="换绑手机号">
         <Input placeholder="可选填，默认带出建单信息" />
       </CfgItem>

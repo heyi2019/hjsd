@@ -102,7 +102,6 @@ class CashflowOut(BaseModel):
     pool_id: int
     occurred_on: date
     occurred_at: datetime
-    nature: str
     ledger_type: str
     accounting_attribute: str
     category: str
@@ -155,7 +154,6 @@ class CashflowCreate(RequestModel):
     occurred_on: date
     direction: str
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
-    nature: str | None = None
     ledger_type: str = CashflowLedgerType.BUSINESS.value
     accounting_attribute: str | None = None
     category: str
@@ -174,7 +172,6 @@ class CashflowUpdate(RequestModel):
     pool_id: int
     occurred_on: date
     direction: str
-    nature: str | None = None
     accounting_attribute: str | None = None
     category: str
     amount: Decimal
@@ -289,7 +286,6 @@ class RebateOut(BaseModel):
     rebate_type: str
     channel: str | None = None
     amount: Decimal
-    status: str
     collected_on: date
     note: str | None = None
     created_at: datetime
@@ -316,8 +312,6 @@ class PoolBalanceTotalsOut(BaseModel):
     # 可用余额 = 现金余额；押金占用已在 expense 扣过一次，不再二次减 deposit_held。
     available: Decimal
     deposit_held: Decimal  # 其中项：押金占用，仅展示不参与 available 计算
-    # 自有权益口径：仅 ownership=OWNED 的池、按现金头寸计（押金占用已进 expense）。
-    owned_cash_balance: Decimal
 
 
 class PoolBalanceListOut(BaseModel):

@@ -19,9 +19,9 @@ from sqlalchemy.orm import Session
 from app.core.errors import Validation
 from app.core.security import CurrentUser
 from app.domain.enums import OrderStatus
-from app.policy.profit_allocation.schemas import ProfitAllocationItem
+from app.profit_allocation.schemas import ProfitAllocationItem
 
-from .._shared import _scoped_order
+from ._shared import _scoped_order
 from .action import set_action_allocations
 from .action_rows import expand_action_form_rows
 from .person import set_person_allocations

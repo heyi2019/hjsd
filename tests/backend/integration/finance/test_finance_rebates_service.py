@@ -163,7 +163,6 @@ def test_outflow_cashflow_does_not_create_refund_event(seeded_db):
         pool_id=2,
         occurred_on=TODAY,
         direction="OUT",
-        nature="BUSINESS_OUT",
         category="OTHER",
         amount=Decimal("200"),
         actor="pytest",

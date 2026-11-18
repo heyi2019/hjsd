@@ -23,7 +23,6 @@ export interface Installment {
   remaining_receivable: string;
   status: string;
   operator?: string | null;
-  delivery_mode?: string | null;
   delivered_on?: string | null;
   note?: string | null;
   order: InstallmentOrderContext;

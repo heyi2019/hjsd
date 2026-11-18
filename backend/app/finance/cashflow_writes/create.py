@@ -17,13 +17,11 @@ from app.domain.enums import (
     CashflowLedgerType,
     CashflowSourceType,
     Direction,
-    Nature,
 )
 from app.domain.trade import Cashflow, OrderEvent
 from app.finance.attributes import (
     accounting_attribute_for_manual_cashflow,
     assert_order_cost_attribute,
-    derive_manual_cashflow_nature,
 )
 from app.field_definitions.pools import assert_pool_usable
 from app.shared.order_access import get_order
@@ -39,7 +37,6 @@ def create_cashflow(
     pool_id: int,
     occurred_on: date,
     direction: str,
-    nature: str | None = None,
     accounting_attribute: str | None = None,
     category: str,
     amount: Any,
@@ -62,23 +59,6 @@ def create_cashflow(
         raise Validation(
             f"direction 必须为 {Direction.values()}", details={"field": "direction"}
         ) from exc
-    try:
-        nature = Nature(
-            nature or derive_manual_cashflow_nature(direction)
-        ).value
-    except ValueError as exc:
-        raise Validation(
-            f"nature 必须为 {Nature.values()}", details={"field": "nature"}
-        ) from exc
-    if nature == Nature.INTERNAL.value:
-        raise Validation("独立现金流不能使用 INTERNAL，请使用池间划转")
-    if direction == Direction.IN.value and nature not in {
-        Nature.EXTERNAL_IN.value,
-        Nature.BUSINESS_IN.value,
-    }:
-        raise Validation("收入流水的 nature 不匹配", details={"direction": direction, "nature": nature})
-    if direction == Direction.OUT.value and nature != Nature.BUSINESS_OUT.value:
-        raise Validation("支出流水的 nature 不匹配", details={"direction": direction, "nature": nature})
     label = _text(
         category,
         field="category",
@@ -87,14 +67,10 @@ def create_cashflow(
         type_message="category 必须为文本",
     )
     default_accounting_attribute = accounting_attribute_for_manual_cashflow(
-        nature=nature, category=label, direction=direction,
+        category=label, direction=direction,
         order_attached=order_id is not None,
     )
     accounting_attribute = accounting_attribute or default_accounting_attribute
-    if nature == Nature.EXTERNAL_IN.value and (
-        not isinstance(note, str) or not note.strip()
-    ):
-        raise Validation("独立收款必须填写摘要", details={"field": "note"})
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     pool = assert_pool_usable(session, pool_id)
@@ -136,7 +112,6 @@ def create_cashflow(
         flow_no=allocate_flow_no(session, direction),
         pool_id=pool.id,
         occurred_on=occurred_on,
-        nature=nature,
         ledger_type=normalized_ledger_type,
         accounting_attribute=accounting_attribute,
         category=label,
@@ -169,7 +144,6 @@ def create_cashflow(
         after={
             "pool_id": pool.id,
             "direction": direction,
-            "nature": nature,
             "amount": str(money),
         },
     )

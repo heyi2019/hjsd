@@ -2,7 +2,7 @@ import type { PageResponse } from "@/shared/api/types/common";
 import type { InventoryStats } from "@/shared/api/types/accounts";
 import type { PoolBalance, PoolBalanceTotals } from "@/shared/api/types/finance";
 import type { InstallmentTotals } from "@/shared/api/types/installments";
-import type { ProfitAllocation, ProfitAllocationList } from "@/shared/api/types/policy";
+import type { ProfitAllocation, ProfitAllocationList } from "@/shared/api/types/profitAllocation";
 import type { DataCenterSummary } from "@/shared/api/types/reporting";
 import type { DashboardSummary } from "@/shared/api/dashboard.api";
 import type { Customer, CustomerDetail, CustomerSummary } from "@/shared/api/types/customers";

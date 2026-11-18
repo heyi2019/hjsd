@@ -14,7 +14,6 @@ from app.domain.enums import (
     CashflowLedgerType,
     CashflowSourceType,
     Direction,
-    Nature,
     ReconciliationStatus,
 )
 from datetime import (
@@ -44,10 +43,6 @@ class Cashflow(Base, AuditMixin):
     __tablename__ = "cashflow"
     __table_args__ = (
         CheckConstraint(
-            f"nature IN {Nature.values()!r}".replace("[", "(").replace("]", ")"),
-            name="cashflow_nature_valid",
-        ),
-        CheckConstraint(
             f"ledger_type IN {CashflowLedgerType.values()!r}".replace("[", "(").replace("]", ")"),
             name="cashflow_ledger_type_valid",
         ),
@@ -62,23 +57,14 @@ class Cashflow(Base, AuditMixin):
             name="cashflow_direction_valid",
         ),
         CheckConstraint(
-            "nature != 'INTERNAL' OR "
-            "(source_type = 'TRANSFER' AND source_id IS NOT NULL)",
-            name="internal_transfer_source_valid",
-        ),
-        CheckConstraint(
-            "(nature = 'INTERNAL' AND source_type = 'TRANSFER' AND source_id IS NOT NULL) OR "
-            "(direction = 'IN' AND nature IN ('EXTERNAL_IN', 'BUSINESS_IN')) OR "
-            "(direction = 'OUT' AND nature = 'BUSINESS_OUT') OR "
-            "(category = 'CANCEL' AND nature = 'BUSINESS_IN' AND direction IN ('IN', 'OUT'))",
-            name="cashflow_direction_nature_valid",
+            "source_type != 'TRANSFER' OR source_id IS NOT NULL",
+            name="transfer_source_required",
         ),
         UniqueConstraint("flow_no", name="uq_cashflow_no"),
         # 一笔订单事件可派生多笔资金流水（如售出拆分进不同资金账户）。
         Index("ix_cashflow_pool_date", "pool_id", "occurred_on"),
         Index("ix_cashflow_order", "order_id"),
         Index("ix_cashflow_source", "source_type", "source_id"),
-        Index("ix_cashflow_nature", "nature"),
         Index("ix_cashflow_ledger_type", "ledger_type"),
         Index("ix_cashflow_accounting_attribute", "accounting_attribute"),
         CheckConstraint("amount >= 0", name="amount_nonneg"),
@@ -95,7 +81,6 @@ class Cashflow(Base, AuditMixin):
         ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
     )
     occurred_on: Mapped[date] = mapped_column(Date, nullable=False)
-    nature: Mapped[str] = mapped_column(String(16), nullable=False)
     ledger_type: Mapped[str] = mapped_column(
         String(16), nullable=False, default=CashflowLedgerType.BUSINESS.value,
         server_default=CashflowLedgerType.BUSINESS.value,
@@ -179,7 +164,6 @@ class OrderProfitAllocation(Base, TimestampMixin):
 
     __tablename__ = "order_profit_allocations"
     __table_args__ = (
-        Index("ix_order_profit_allocations_policy_version_id", "policy_version_id"),
         Index("ix_order_profit_allocations_user_id", "user_id"),
         UniqueConstraint("order_id", "allocation_type", "user_id", "role", name="uq_order_profit_alloc"),
         CheckConstraint(
@@ -206,6 +190,3 @@ class OrderProfitAllocation(Base, TimestampMixin):
     # 否则回退 利润 × allocation_rate / 100。判据用 != 而非 > 0，否则负金额会被
     # 误判成「未填」而回退比例，亏损分润就算错。
     allocation_amount: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
-    policy_version_id: Mapped[int | None] = mapped_column(
-        ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True
-    )

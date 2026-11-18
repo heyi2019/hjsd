@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.stocks.profile import create_account
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
-from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
+from app.domain.enums import AccountStatus, Direction, EventType, OrderStatus
 from app.domain.foundation import Pool
 from app.field_definitions.order_types import get_order_type_by_code
 from app.domain.parties import OrderCustomerRole
@@ -391,7 +391,6 @@ class TestEventRules:
         inst_recovery.deliver(
             seeded_db,
             contract.id,
-            delivery_mode="CUSTOMER_SELF",
             delivered_on=TODAY,
             note="客户自行换绑凭证",
             actor="pytest",
@@ -433,7 +432,6 @@ class TestEventRules:
             order.id,
             event_type="DELIVER",
             delivery_direction="SELL",
-            delivery_mode="CUSTOMER_SELF",
             occurred_on=TODAY,
             actor="pytest",
             note="客户自行换绑凭证",
@@ -460,7 +458,6 @@ class TestEventRules:
             order.id,
             event_type="DELIVER",
             delivery_direction="SELL",
-            delivery_mode="PLATFORM_OPERATOR",
             occurred_on=TODAY,
             actor="pytest",
             note="代挂订单交付凭证",
@@ -477,7 +474,6 @@ class TestEventRules:
                 event_type=EventType.DELIVER.value,
                 occurred_on=TODAY,
                 actor="pytest",
-                delivery_mode="CUSTOMER_SELF",
                 note="客户自行换绑凭证",
             )
 

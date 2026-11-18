@@ -92,9 +92,9 @@ describe("测试夹具隔离", () => {
       game_types: [],
       stats: { account_count: 0, occupied_cost: "0.00", over_7d_count: 0, over_30d_count: 0 },
     });
-    expect(poolBalancesResponse([{ pool_id: 1 } as never], { pool_count: 1, cash_balance: "10.00", available: "8.00", deposit_held: "2.00", owned_cash_balance: "10.00" })).toEqual({
+    expect(poolBalancesResponse([{ pool_id: 1 } as never], { pool_count: 1, cash_balance: "10.00", available: "8.00", deposit_held: "2.00" })).toEqual({
       items: [{ pool_id: 1 }],
-      totals: { pool_count: 1, cash_balance: "10.00", available: "8.00", deposit_held: "2.00", owned_cash_balance: "10.00" },
+      totals: { pool_count: 1, cash_balance: "10.00", available: "8.00", deposit_held: "2.00" },
     });
     expect(studioExpenseSummary([{ id: 1 } as never], { income: "3.00", expense: "1.00", net: "2.00" })).toEqual({
       items: [{ id: 1 }],

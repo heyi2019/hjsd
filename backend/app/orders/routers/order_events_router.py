@@ -88,7 +88,6 @@ def post_event(
             actor=_actor(user),
             pool_id=payload.pool_id,
             portion=payload.portion,
-            delivery_mode=payload.delivery_mode,
             delivery_direction=payload.delivery_direction,
             offset_event_id=payload.offset_event_id,
             reason=payload.reason,

@@ -54,14 +54,11 @@ export function useFundsResources(active = true) {
   useReloadOnActive(active, load);
 
   // 四张统计卡全部取服务端汇总（Decimal 聚合）：前端不再对卡片浮点累加，也不再有 N+1。
-  // 自有权益口径（domain/enums.py PoolOwnership：OWNED 计入权益，CUSTODY/THIRD_PART 只计现金头寸）
-  // 由后端按资金账户主数据判定，权益按现金头寸计、不扣押金占用。
   const unavailableAmount = error ? "不可用" : "—";
   const balanceTotals = poolResources.balanceTotals;
   const totalCash = fundsReady && balanceTotals ? balanceTotals.cash_balance : unavailableAmount;
   const totalAvailable = fundsReady && balanceTotals ? balanceTotals.available : unavailableAmount;
   const totalDeposit = fundsReady && balanceTotals ? balanceTotals.deposit_held : unavailableAmount;
-  const totalOwned = fundsReady && balanceTotals ? balanceTotals.owned_cash_balance : unavailableAmount;
 
   const totalFlowIncome = cashflow.cashflowTotals.income;
   const totalFlowExpense = cashflow.cashflowTotals.expense;
@@ -81,7 +78,6 @@ export function useFundsResources(active = true) {
     totalCash,
     totalAvailable,
     totalDeposit,
-    totalOwned,
     totalFlowIncome,
     totalFlowExpense,
   };

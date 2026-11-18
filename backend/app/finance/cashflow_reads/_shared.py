@@ -40,7 +40,6 @@ def _apply_cashflow_filters(
     direction: str | None = None,
     occurred_from: date | None = None,
     occurred_to: date | None = None,
-    nature: str | None = None,
     ledger_type: str | None = None,
     accounting_attribute: str | None = None,
     category: str | None = None,
@@ -77,8 +76,6 @@ def _apply_cashflow_filters(
         stmt = stmt.where(Cashflow.occurred_on >= occurred_from)
     if occurred_to is not None:
         stmt = stmt.where(Cashflow.occurred_on <= occurred_to)
-    if nature is not None:
-        stmt = stmt.where(Cashflow.nature == nature)
     if ledger_type is not None:
         try:
             ledger_type = CashflowLedgerType(ledger_type).value
@@ -116,7 +113,6 @@ def _flow_row(flow: Cashflow, order_no: str | None) -> dict[str, Any]:
         "pool_id": flow.pool_id,
         "occurred_on": flow.occurred_on,
         "occurred_at": flow.created_at,
-        "nature": flow.nature,
         "ledger_type": flow.ledger_type,
         "accounting_attribute": flow.accounting_attribute,
         "category": flow.category,

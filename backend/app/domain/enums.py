@@ -1,7 +1,7 @@
 """domain.enums：v1 封闭枚举与编号域。
 
 取值以本模块定义为唯一来源，数据库 CHECK 约束与之同步：
-- `portion`、`ownership`、业务 code 等核算枚举保持封闭；
+- `portion`、业务 code 等核算枚举保持封闭；
 - `pool_type` 是**注册表**（V31），扩展登记新值即可，不改表。
 """
 from __future__ import annotations
@@ -21,14 +21,6 @@ class StrEnum(str, Enum):
 
 
 # ---------------------------------------------------------------- 资金 / 主数据
-class PoolOwnership(StrEnum):
-    """资金归属：决定是否计入权益（PRD §1.2、V30）。"""
-
-    OWNED = "OWNED"  # 自有，计入权益
-    CUSTODY = "CUSTODY"  # 代管，只计现金头寸
-    THIRD_PART = "THIRD_PART"  # 第三方，只计现金头寸
-
-
 class PoolStatus(StrEnum):
     ACTIVE = "ACTIVE"
     DISABLED = "DISABLED"
@@ -67,7 +59,6 @@ class SequenceKey(StrEnum):
     # 资金流水按方向独立递增（用户口径 2026-10-28）：支出 ZC+五位流水、收入 SR+五位流水。
     CASHFLOW_OUT = "CASHFLOW_OUT"
     CASHFLOW_IN = "CASHFLOW_IN"
-    IMPORT = "IMPORT"
     ATTACHMENT = "ATTACHMENT"
     # 库存编号：账号台账唯一编码，KU_ + 五位流水（KU_00001…），系统生成不可手改。
     STOCK_NO = "STOCK_NO"
@@ -170,13 +161,6 @@ class OperationType(StrEnum):
     DESCRIPTION = "DESCRIPTION"
     CONSIGNMENT = "CONSIGNMENT"
     UNLIST = "UNLIST"
-
-
-class Nature(StrEnum):
-    EXTERNAL_IN = "EXTERNAL_IN"
-    BUSINESS_IN = "BUSINESS_IN"
-    BUSINESS_OUT = "BUSINESS_OUT"
-    INTERNAL = "INTERNAL"
 
 
 class CashflowLedgerType(StrEnum):
@@ -282,22 +266,6 @@ class InstallmentContractType(StrEnum):
     CONSIGNMENT_SALE = "CONSIGNMENT_SALE"
 
 
-class DeliveryMode(StrEnum):
-    PLATFORM_OPERATOR = "PLATFORM_OPERATOR"
-    CUSTOMER_SELF = "CUSTOMER_SELF"
-
-
-class CommissionMode(StrEnum):
-    DEDUCT_FROM_SETTLEMENT = "DEDUCT_FROM_SETTLEMENT"
-    SEPARATE_PAYMENT = "SEPARATE_PAYMENT"
-
-
-class CommissionPayer(StrEnum):
-    BUYER = "BUYER"
-    CONSIGNOR = "CONSIGNOR"
-    PLATFORM = "PLATFORM"
-
-
 class InstallmentStatus(StrEnum):
     PENDING = "PENDING"
     ACTIVE = "ACTIVE"
@@ -330,33 +298,6 @@ class DepositStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
-class PolicyStatus(StrEnum):
-    DRAFT = "DRAFT"
-    ACTIVE = "ACTIVE"
-    EXPIRED = "EXPIRED"
-    SUPERSEDED = "SUPERSEDED"  # 已被新版本取代（BAS-06-02：已引用版本不可改，只能新建）
-
-
-class PolicyScopeType(StrEnum):
-    """规则适用范围（BAS-06-01：可按规则、范围、版本、生效期管理）。"""
-
-    GLOBAL = "GLOBAL"  # 全局
-    ORDER_TYPE = "ORDER_TYPE"  # 按业务类型（scope_id = order_type_defs.id）
-    USER = "USER"  # 按人员（scope_id = users.id）
-    POOL = "POOL"  # 按资金账户（scope_id = pools.id）
-
-
-class PolicyType(StrEnum):
-    """可配置经营参数（BAS-06-01 列举的六类）。"""
-
-    REBATE = "REBATE"  # 返点
-    COMMISSION = "COMMISSION"  # 提成
-    INSTALLMENT = "INSTALLMENT"  # 分期
-    WRITE_DOWN = "WRITE_DOWN"  # 跌价
-    REFUND = "REFUND"  # 退款
-    DG_MIXED = "DG_MIXED"  # DG 混合单默认策略
-
-
 class AllocationRole(StrEnum):
     """订单利润分配角色（BAS-06-03：固定结构化比例与人员角色）。"""
 
@@ -364,43 +305,6 @@ class AllocationRole(StrEnum):
     BUYER = "BUYER"  # 采买
     SALES = "SALES"  # 销售
     SERVICE = "SERVICE"  # 服务
-
-
-class ImportBatchStatus(StrEnum):
-    """标准导入批次：导入只落「原始行 + 映射」，绝不自动匹配（MIG-01）。"""
-
-    DRAFT = "DRAFT"
-    MAPPED = "MAPPED"
-    COMMITTED = "COMMITTED"
-    REJECTED = "REJECTED"
-    ROLLED_BACK = "ROLLED_BACK"  # 整批逻辑回滚（MIG-01-07），原始文件与日志保留
-    CORRECTED = "CORRECTED"  # 已确认批次的冲销/更正（MIG-01-08），不删原始记录
-
-
-class ImportSourceKind(StrEnum):
-    """标准导入来源类型；不再接受 LEGACY_* 或任意自定义值。"""
-
-    ORDER = "STANDARD_ORDER"
-    ACCOUNT = "STANDARD_ACCOUNT"
-    CASHFLOW = "STANDARD_CASHFLOW"
-    INSTALLMENT = "STANDARD_INSTALLMENT"
-    LEAD = "STANDARD_LEAD"
-
-
-class ImportRowStatus(StrEnum):
-    PENDING = "PENDING"
-    MAPPED = "MAPPED"
-    UNMAPPED = "UNMAPPED"
-    IMPORTED = "IMPORTED"
-    SKIPPED = "SKIPPED"
-    ROLLED_BACK = "ROLLED_BACK"  # 随批次回滚（MIG-01-07）
-
-
-class RebateStatus(StrEnum):
-    OPEN = "OPEN"
-    PARTIALLY_SETTLED = "PARTIALLY_SETTLED"
-    SETTLED = "SETTLED"
-    VOID = "VOID"
 
 
 class RebateType(StrEnum):
@@ -505,19 +409,9 @@ class AuditAction(StrEnum):
     REPORT_EXPORT = "REPORT_EXPORT"
     ATTACHMENT_UPLOAD = "ATTACHMENT_UPLOAD"
     ATTACHMENT_DELETE = "ATTACHMENT_DELETE"
-    # 标准导入（MIG-01）：与 EXCEPTION_APPROVE 分开，避免「导入」被误读为「异常审批」。
-    # audit_logs.action 无 CHECK 约束，新增枚举值不需要迁移。
-    IMPORT_LAND = "IMPORT_LAND"  # 原始行落地（只存原文，不做字段推断）
-    IMPORT_COMMIT = "IMPORT_COMMIT"  # 映射确认后生成业务实体
-    IMPORT_REJECT = "IMPORT_REJECT"  # 未确认批次整批驳回（终态，不可再提交）
-    IMPORT_MAP = "IMPORT_MAP"  # 人工指派某行的订单/账号映射
-    IMPORT_SKIP = "IMPORT_SKIP"  # 人工跳过导入行并留存理由
-    IMPORT_MARK_UNLINKED = "IMPORT_MARK_UNLINKED"  # 标记为未关联划转
-    IMPORT_ROLLBACK = "IMPORT_ROLLBACK"  # 整批逻辑回滚（原始行与日志保留）
     OPTION_SET_CREATE = "OPTION_SET_CREATE"  # 新建选项词典
     OPTION_SET_UPDATE = "OPTION_SET_UPDATE"  # 编辑选项词典
     OPTION_SET_DELETE = "OPTION_SET_DELETE"  # 删除选项词典
-    IMPORT_CORRECTION = "IMPORT_CORRECTION"  # 建冲销/更正批次
 
 
 __all__ = [
@@ -531,12 +425,9 @@ __all__ = [
     "CounterpartyType",
     "CustomerRole",
     "CustomerStatus",
-    "DeliveryMode",
     "DepositStatus",
     "Direction",
     "EntityType",
-    "ImportBatchStatus",
-    "ImportRowStatus",
     "EventType",
     "SaleMode",
     "OperationType",
@@ -546,14 +437,10 @@ __all__ = [
     "InventoryAgeLevel",
     "LeadStatus",
     "LeadType",
-    "Nature",
     "OrderStatus",
-    "PolicyStatus",
-    "PoolOwnership",
     "PoolStatus",
     "PoolType",
     "Portion",
-    "RebateStatus",
     "RebateType",
     "ReconciliationStatus",
     "ScheduleStatus",

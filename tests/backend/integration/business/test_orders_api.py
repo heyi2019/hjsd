@@ -201,24 +201,6 @@ class TestOrdersApi:
         assert response.status_code == 422, response.text
         assert "Extra inputs are not permitted" in response.text
 
-    def test_dg_creation_persists_commission_terms(
-        self, seeded_client, seeded_db, headers
-    ):
-        response = seeded_client.post(
-            "/api/v1/orders",
-            json={
-                "order_type": "DG",
-                "trade_date": D.isoformat(),
-                "commission_mode": "DEDUCT_FROM_SETTLEMENT",
-                "commission_payer": "CONSIGNOR",
-            },
-            headers=headers,
-        )
-        assert response.status_code == 201, response.text
-        body = response.json()
-        assert body["commission_mode"] == "DEDUCT_FROM_SETTLEMENT"
-        assert body["commission_payer"] == "CONSIGNOR"
-
     def test_embedded_installment_schedule_rejects_unknown_fields(
         self, seeded_client, headers
     ):

@@ -112,11 +112,6 @@ describe("StatusTag：文案承载语义，颜色只是辅助", () => {
     expect(container).toBeTruthy();
   });
 
-  it("导入批次状态（MIG-01）有中文文案", () => {
-    render(<StatusTag status="UNMAPPED" />);
-    expect(screen.getByText("未映射")).toBeInTheDocument();
-  });
-
   it("金额相关状态不影响渲染（组件不参与金额计算）", () => {
     renderLight(<StatusTag status="PARTIALLY_SETTLED" />);
     expect(screen.getByText("部分结算")).toBeInTheDocument();

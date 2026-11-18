@@ -73,7 +73,7 @@ export function buildActionAllocationCandidates(
   const operationEventIds = operatorIds(order, operationTypes);
   return {
     BUY: firstNonEmpty(ids(formExtra.business_responsible_ids), operatorIds(order, new Set(["BUY"]))),
-    SELL: firstNonEmpty(sellIds, ids(formExtra.delivery_responsible_ids), defaultOperatorId ? [defaultOperatorId] : []),
+    SELL: firstNonEmpty(ids(formExtra.delivery_responsible_ids), sellIds, defaultOperatorId ? [defaultOperatorId] : []),
     OPERATION: firstNonEmpty(ids(formExtra.operation_responsible_ids), operationEventIds, ids(formExtra.business_responsible_ids)),
     COMPANY: [],
   };

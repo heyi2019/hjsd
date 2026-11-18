@@ -137,7 +137,6 @@ REBATE_EXPORT_COLUMNS = [
     ("rebate_type", "返点类型", True),
     ("channel", "渠道", True),
     ("amount", "返点金额", True),
-    ("status", "状态", True),
     ("collected_on", "收到日期", True),
     ("operator", "操作人", True),
     ("note", "备注", True),
@@ -148,15 +147,6 @@ REBATE_EXPORT_COLUMNS = [
 DETAIL_COLUMNS_MOVED_TO_SHEETS = frozenset(
     {"detail_events", "detail_cashflows", "detail_rebates"}
 )
-
-# 返点状态码没有对应的 option_sets 字典项（RebateStatus 是闭集枚举），
-# 这里按枚举给中文，与前端状态标签保持同一套文案。
-_REBATE_STATUS_LABELS = {
-    "OPEN": "未结算",
-    "PARTIALLY_SETTLED": "部分结算",
-    "SETTLED": "已结清",
-    "VOID": "失效",
-}
 
 # 操作分类与前端执行明细同规则：BUY 账号入库 / SELL 账号出库 / 其余账号运营。
 _OPERATION_CATEGORY_BY_EVENT = {"BUY": "账号入库", "SELL": "账号出库"}
@@ -269,7 +259,6 @@ def _rebate_export_rows(order_no: str, detail: dict) -> list[dict[str, object]]:
                 "rebate_type": rebate.get("rebate_type"),
                 "channel": rebate.get("channel"),
                 "amount": _money_or_none(rebate.get("amount")),
-                "status": rebate.get("status"),
                 "collected_on": rebate.get("collected_on"),
                 "operator": rebate.get("operator"),
                 "note": rebate.get("note"),
@@ -369,7 +358,6 @@ __all__ = [
     "CASHFLOW_EXPORT_COLUMNS",
     "REBATE_EXPORT_COLUMNS",
     "DETAIL_COLUMNS_MOVED_TO_SHEETS",
-    "_REBATE_STATUS_LABELS",
     "_pool_name_map",
     "user_name_map",
     "_event_platform",

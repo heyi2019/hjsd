@@ -24,9 +24,8 @@ from app.domain.foundation import AuditLog
 from app.domain.trade import Order
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.policy.profit_allocation import service as policy_allocations
-from app.policy.profit_allocation.terms import allocation_terms
-from app.policy import definitions as policy_definitions
+from app.profit_allocation import service as policy_allocations
+from app.profit_allocation.terms import allocation_terms
 from app.reporting.r3_commission import r3_commission_reconciliation
 
 D = date(2026, 10, 17)
@@ -64,12 +63,6 @@ def test_allocation_terms_use_profit_and_loss_company_rates(seeded_db):
     order_id = _order_with_profit(seeded_db)
     order = seeded_db.get(Order, order_id)
     assert order is not None
-    order.policy_snapshot = {
-        "COMMISSION": {
-            "config": {"split": {"COMPANY": "40"}, "loss_company_rate": "50"},
-        },
-    }
-    seeded_db.flush()
 
     profit_terms = allocation_terms(seeded_db, order_id)
     assert profit_terms == {
@@ -81,8 +74,6 @@ def test_allocation_terms_use_profit_and_loss_company_rates(seeded_db):
     loss_order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
     loss_order = seeded_db.get(Order, loss_order_id)
     assert loss_order is not None
-    loss_order.policy_snapshot = order.policy_snapshot
-    seeded_db.flush()
     loss_terms = allocation_terms(seeded_db, loss_order_id)
     assert loss_terms["company_rate"] == Decimal("50.00")
     assert loss_terms["allocatable_profit"] == Decimal("-250.00")
@@ -93,8 +84,6 @@ def test_action_rows_can_omit_company_when_company_rate_is_configured(seeded_db)
     order = seeded_db.get(Order, order_id)
     assert order is not None
     order.form_extra = {"business_responsible_ids": [1], "delivery_responsible_ids": [1]}
-    order.policy_snapshot = {"COMMISSION": {"config": {"split": {"COMPANY": "40"}}}}
-    seeded_db.flush()
 
     rows = policy_allocations.set_allocations(
         seeded_db,
@@ -115,8 +104,6 @@ def test_action_amount_rows_keep_configured_company_share(seeded_db):
     order = seeded_db.get(Order, order_id)
     assert order is not None
     order.form_extra = {"business_responsible_ids": [1], "delivery_responsible_ids": [1]}
-    order.policy_snapshot = {"COMMISSION": {"config": {"split": {"COMPANY": "40"}}}}
-    seeded_db.flush()
 
     rows = policy_allocations.set_allocations(
         seeded_db,
@@ -296,21 +283,6 @@ def test_person_allocation_writes_dedicated_audit_action(seeded_db):
     assert entry is not None
     assert entry.action == AuditAction.PROFIT_ALLOCATION_SET.value
     assert entry.action != AuditAction.EXCEPTION_APPROVE.value
-
-
-def test_policy_definition_creation_audits_as_policy_change(seeded_db):
-    """政策定义/版本属「变更经营规则」，不是「审批异常」。"""
-    definition = policy_definitions.create_definition(
-        seeded_db,
-        policy_code="AUDIT_PROBE",
-        name="审计动作探针",
-        scope_type="GLOBAL",
-        actor="pytest",
-    )
-
-    entry = _latest_audit(seeded_db, "policy_definition", int(definition["id"]))
-    assert entry is not None
-    assert entry.action == AuditAction.POLICY_CHANGE.value
 
 
 def test_commission_report_uses_amount_as_payable_base(seeded_db):

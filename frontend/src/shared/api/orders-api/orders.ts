@@ -114,9 +114,6 @@ export const ordersApi = {
     confirm_repurchase?: boolean;
     owner_id?: number;
     note?: string;
-    /** 佣金口径：仅 DG 代挂单可用，两者必须同时填写或同时留空。 */
-    commission_mode?: string;
-    commission_payer?: string;
     form_extra?: Record<string, unknown>;
     form_extra_scope?: string;
     customer_roles?: { customer_id: number; role: string }[];
@@ -168,7 +165,6 @@ export const ordersApi = {
       per_period_service_fee: string;
       per_period: string;
       first_due_on: string;
-      delivery_mode?: string;
       note?: string;
       schedule?: { period_no: number; due_on: string }[];
     };
@@ -184,7 +180,6 @@ export const ordersApi = {
       occurred_on: string;
       pool_id?: number;
       portion?: string;
-      delivery_mode?: string;
       delivery_direction?: "BUY" | "SELL";
       offset_event_id?: number;
       reason?: string;

@@ -89,7 +89,7 @@ test("自营分期出售：买入、分期收款、结清后交付", async ({ re
   }
   const delivery = await request.post(`${apiBase}/installments/${installment.id}/deliver`, {
     headers,
-    data: { delivery_mode: "PLATFORM_OPERATOR", delivered_on: "2026-10-17", note: "E2E 测试换绑凭证" },
+    data: { delivered_on: "2026-10-17", note: "E2E 测试换绑凭证" },
   });
   expect(delivery.status()).toBe(200);
   expect((await delivery.json()).status).toBe("DELIVERED");
@@ -111,7 +111,6 @@ test("资金闭环：独立流水审核冲销、资金账户划转与日对账",
       pool_id: source,
       occurred_on: "2026-10-17",
       direction: "IN",
-      nature: "EXTERNAL_IN",
       category: "E2E_TEST",
       amount: "10.00",
       note: "E2E 独立收款摘要",

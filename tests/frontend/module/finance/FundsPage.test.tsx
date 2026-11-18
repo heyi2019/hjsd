@@ -32,7 +32,7 @@ vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
-vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/profitAllocation.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/reconciliations.api");
 vi.mock("@/shared/api/reports.api");
@@ -41,8 +41,8 @@ vi.mock("@/shared/api/transfers.api");
 vi.mock("@/shared/api/studioExpenses.api");
 
 const pools = [
-  { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
-  { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
+  { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", status: "ACTIVE" },
+  { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", status: "ACTIVE" },
 ];
 const balance = {
   income: "1000.00",
@@ -57,8 +57,8 @@ const deposits = [
   { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" },
 ];
 const cashflows = [
-  { id: 1, flow_no: "ZC00001", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source_type: "ORDER_EVENT", source_id: "HS0001-EV-BUY-01", source: "ORDER_EVENT", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
-  { id: 2, flow_no: "SR00001", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_IN", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source_type: "ORDER_EVENT", source_id: "HS0001-EV-SELL-01", source: "ORDER_EVENT", ledger_type: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
+  { id: 1, flow_no: "ZC00001", pool_id: 1, occurred_on: "2026-10-17", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source_type: "ORDER_EVENT", source_id: "HS0001-EV-BUY-01", source: "ORDER_EVENT", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
+  { id: 2, flow_no: "SR00001", pool_id: 1, occurred_on: "2026-10-17", category: "SELL", direction: "IN", amount: "800.00", order_no: "HS0001", source_type: "ORDER_EVENT", source_id: "HS0001-EV-SELL-01", source: "ORDER_EVENT", ledger_type: "BUSINESS", accounting_attribute: "SELF_REVENUE" },
 ];
 
 beforeEach(() => {
@@ -68,7 +68,7 @@ beforeEach(() => {
   // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
   resolveMock(vi.mocked(poolsApi.balances), poolBalancesResponse(
     pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
-    { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" },
+    { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00" },
   ));
   resolveMock(vi.mocked(depositsApi.list), deposits);
   resolveMock(vi.mocked(cashflowsApi.list), cashflowPage(cashflows, { total_in: "800.00", total_out: "500.00" }));
@@ -492,13 +492,13 @@ describe("FundsPage：资金写路径", () => {
 
   it("P1/FE-049：超出转出资金账户可用余额时由后端拒绝", async () => {
     vi.mocked(poolsApi.list).mockResolvedValueOnce([
-      { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
-      { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", ownership: "SELF", status: "ACTIVE" },
+      { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", status: "ACTIVE" },
+      { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", status: "ACTIVE" },
     ] as never);
   vi.mocked(poolsApi.balances).mockResolvedValue(poolBalancesResponse([
     { ...balance, pool_id: 1, pool_code: "POOL-A" },
     { ...balance, pool_id: 2, pool_code: "POOL-B" },
-  ], { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" }));
+  ], { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00" }));
     vi.mocked(depositsApi.list).mockResolvedValueOnce([] as never);
     vi.mocked(cashflowsApi.list).mockResolvedValueOnce(cashflowPage([]));
     vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([] as never);
@@ -525,16 +525,16 @@ describe("FundsPage：资金写路径", () => {
   });
 
   it("P1/FE-050：流水冲销成功后原流水不再显示重复冲销入口", async () => {
-    const original = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", nature: "BUSINESS_OUT", category: "BUY", direction: "OUT", amount: "300.00", source_type: "MANUAL", source_id: null, source: "MANUAL", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" };
+    const original = { id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", category: "BUY", direction: "OUT", amount: "300.00", source_type: "MANUAL", source_id: null, source: "MANUAL", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" };
     const reversal = { ...original, id: 8, flow_no: "CF-REV-08", category: "REVERSAL", direction: "IN", accounting_attribute: "REVERSAL", source_type: "REVERSAL", source_id: original.flow_no };
     let mainListCalls = 0;
     vi.mocked(poolsApi.list).mockResolvedValueOnce([
-      { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", ownership: "SELF", status: "ACTIVE" },
+      { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", status: "ACTIVE" },
     ] as never);
   vi.mocked(poolsApi.balances).mockResolvedValue(poolBalancesResponse([
     { ...balance, pool_id: 1, pool_code: "POOL-A" },
     { ...balance, pool_id: 2, pool_code: "POOL-B" },
-  ], { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00", owned_cash_balance: "1600.00" }));
+  ], { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00" }));
     vi.mocked(cashflowsApi.list).mockImplementation(async (params) => {
       if (params?.direction) return cashflowPage([]);
       mainListCalls += 1;

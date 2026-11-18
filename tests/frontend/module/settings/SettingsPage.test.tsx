@@ -1,7 +1,6 @@
 import { gameTypesApi } from "@/shared/api/misc.api";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { orderFormFieldsApi, orderTypesApi } from "@/shared/api/orders.api";
-import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import type { Pool } from "@/shared/api/types/finance";
 import type { OrderType } from "@/shared/api/types/orders";
@@ -12,7 +11,7 @@ vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
-vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/profitAllocation.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
@@ -44,7 +43,7 @@ const orderTypes = [
 ] as unknown as import("@/shared/api/types/orders").OrderType[];
 
 const pools = [
-  { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
+  { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", status: "ACTIVE" },
 ] as unknown as import("@/shared/api/types/finance").Pool[];
 
 beforeEach(() => {
@@ -54,7 +53,6 @@ beforeEach(() => {
   vi.mocked(optionSetsApi.list).mockResolvedValue(optionSetList());
   vi.mocked(gameTypesApi.list).mockResolvedValue([]);
   vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
-  vi.mocked(policyApi.list).mockResolvedValue(listResponse([]));
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
 });
 

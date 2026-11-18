@@ -232,7 +232,6 @@ def set_action_allocations(
             allocation_type=allocation_type,
             allocation_rate=to_money(item.get("allocation_rate") or 0),
             allocation_amount=to_money(item.get("allocation_amount") or 0),
-            policy_version_id=order.policy_version_id,
         )
         session.add(row)
         created.append(row)

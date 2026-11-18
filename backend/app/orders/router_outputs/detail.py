@@ -50,7 +50,6 @@ def _order_detail_output(
                     "flow_no": item.flow_no,
                     "pool_id": item.pool_id,
                     "occurred_on": item.occurred_on,
-                    "nature": item.nature,
                     "category": item.category,
                     "direction": item.direction,
                     "amount": item.amount,

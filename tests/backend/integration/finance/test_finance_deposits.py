@@ -72,37 +72,17 @@ class TestDepositQueries:
             seeded_db.flush()
         seeded_db.rollback()
 
-    def test_internal_cashflow_requires_transfer_source(self, seeded_db):
+    def test_transfer_cashflow_requires_source_id(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         seeded_db.add(
             Cashflow(
-                flow_no="CF-INTERNAL-WITHOUT-TRANSFER",
+                flow_no="CF-TRANSFER-WITHOUT-SOURCE-ID",
                 pool_id=invest.id,
                 occurred_on=TODAY,
-                nature="INTERNAL",
                 category="TRANSFER",
                 direction="IN",
                 amount=Decimal("1.00"),
-                source_type=CashflowSourceType.MANUAL.value,
-                created_by="pytest",
-                updated_by="pytest",
-            )
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
-    def test_cashflow_direction_and_nature_must_match(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        seeded_db.add(
-            Cashflow(
-                flow_no="CF-INVALID-DIRECTION-NATURE",
-                pool_id=invest.id,
-                occurred_on=TODAY,
-                nature="EXTERNAL_IN",
-                category="INVALID",
-                direction="OUT",
-                amount=Decimal("1.00"),
+                source_type=CashflowSourceType.TRANSFER.value,
                 created_by="pytest",
                 updated_by="pytest",
             )
@@ -151,7 +131,6 @@ class TestDepositQueries:
             pool_id=invest.id,
             occurred_on=TODAY,
             direction="IN",
-            nature="EXTERNAL_IN",
             category="CUSTOMER_RECEIPT",
             amount=Decimal("100"),
             note="第一笔",
@@ -162,7 +141,6 @@ class TestDepositQueries:
             pool_id=invest.id,
             occurred_on=TODAY,
             direction="OUT",
-            nature="BUSINESS_OUT",
             category="OPERATING_COST",
             amount=Decimal("20"),
             note="第二笔",
@@ -172,7 +150,7 @@ class TestDepositQueries:
 
         response = seeded_client.get(
             "/api/v1/cashflows",
-            params={"nature": "EXTERNAL_IN", "category": "CUSTOMER_RECEIPT"},
+            params={"category": "CUSTOMER_RECEIPT"},
             headers=headers,
         )
 
@@ -199,7 +177,6 @@ class TestDepositQueries:
                 pool_id=invest.id,
                 occurred_on=TODAY,
                 direction="IN",
-                nature="BUSINESS_IN",
                 category=123,
                 amount=Decimal("1"),
                 actor="finance",

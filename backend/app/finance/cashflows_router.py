@@ -93,7 +93,6 @@ def list_cashflows(
     direction: str | None = Query(default=None),
     occurred_from: date | None = Query(default=None),
     occurred_to: date | None = Query(default=None),
-    nature: str | None = Query(default=None),
     ledger_type: str | None = Query(default=None),
     accounting_attribute: str | None = Query(default=None),
     category: str | None = Query(default=None),
@@ -122,7 +121,6 @@ def list_cashflows(
         "direction": direction,
         "occurred_from": occurred_from,
         "occurred_to": occurred_to,
-        "nature": nature.strip().upper() if nature else None,
         "ledger_type": ledger_type.strip().upper() if ledger_type else None,
         "accounting_attribute": (
             accounting_attribute.strip().upper() if accounting_attribute else None
@@ -150,7 +148,6 @@ def list_cashflow_totals(
     direction: str | None = Query(default=None),
     occurred_from: date | None = Query(default=None),
     occurred_to: date | None = Query(default=None),
-    nature: str | None = Query(default=None),
     ledger_type: str | None = Query(default=None),
     accounting_attribute: str | None = Query(default=None),
     category: str | None = Query(default=None),
@@ -175,7 +172,6 @@ def list_cashflow_totals(
         direction=direction,
         occurred_from=occurred_from,
         occurred_to=occurred_to,
-        nature=nature.strip().upper() if nature else None,
         ledger_type=ledger_type.strip().upper() if ledger_type else None,
         accounting_attribute=accounting_attribute.strip().upper() if accounting_attribute else None,
         category=category.strip().upper() if category else None,
@@ -193,7 +189,6 @@ def export_cashflows_csv(
     direction: str | None = Query(default=None),
     occurred_from: date | None = Query(default=None),
     occurred_to: date | None = Query(default=None),
-    nature: str | None = Query(default=None),
     ledger_type: str | None = Query(default=None),
     accounting_attribute: str | None = Query(default=None),
     category: str | None = Query(default=None),
@@ -210,7 +205,6 @@ def export_cashflows_csv(
         direction=direction,
         occurred_from=occurred_from,
         occurred_to=occurred_to,
-        nature=nature,
         ledger_type=ledger_type,
         accounting_attribute=accounting_attribute,
         category=category,
@@ -245,7 +239,6 @@ def create_cashflow(
         pool_id=payload.pool_id,
         occurred_on=payload.occurred_on,
         direction=payload.direction.strip().upper(),
-        nature=payload.nature.strip().upper() if payload.nature else None,
         ledger_type=payload.ledger_type.strip().upper(),
         accounting_attribute=(
             payload.accounting_attribute.strip().upper()
@@ -284,7 +277,6 @@ def create_order_cashflow(
         pool_id=payload.pool_id,
         occurred_on=payload.occurred_on,
         direction=payload.direction.strip().upper(),
-        nature=payload.nature.strip().upper() if payload.nature else None,
         ledger_type=payload.ledger_type.strip().upper(),
         accounting_attribute=(
             payload.accounting_attribute.strip().upper()
@@ -318,7 +310,6 @@ def update_cashflow(
         pool_id=payload.pool_id,
         occurred_on=payload.occurred_on,
         direction=payload.direction.strip().upper(),
-        nature=payload.nature.strip().upper() if payload.nature else None,
         accounting_attribute=payload.accounting_attribute.strip().upper() if payload.accounting_attribute else None,
         category=payload.category,
         amount=payload.amount,

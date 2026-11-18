@@ -71,7 +71,6 @@ def load_relations(db: Session, orders: list[Order]) -> DetailRelations:
                 rebate_type=rebate.rebate_type,
                 channel=rebate.channel,
                 amount=rebate.amount,
-                status=rebate.status,
                 collected_on=rebate.collected_on,
                 collected_at=rebate.created_at,
             )

@@ -1,13 +1,13 @@
 """REVERSAL-01 冲销流水与订单日期变更的财务一致性。
 
 口径锚点：资金走向只有收入/支出两个大类；冲销流水必须 direction/nature 自洽，
-否则余额按方向变了、资金账户收支卡片与资金日报发生额列按 (direction, nature)
+否则余额按方向变了、资金账户收支卡片与资金日报发生额列按 (direction)
 取数却都不体现，账对不上。平移成交日期时，凡按各自日期归期的子类型
 （事件/流水/分期坏账/旧模型返点/账号买号日）必须一起平移，否则跨期撕裂。
 
 验证范围：
-- #1 冲销 SELL 生成 OUT/BUSINESS_OUT（不再是矛盾的 OUT/BUSINESS_IN）；
-  冲销 BUY 仍是 IN/BUSINESS_IN。
+- #1 冲销 SELL 生成 OUT（方向反转自洽）；
+  冲销 BUY 仍是 IN。
 - #6 成交日期平移同步 InstallmentDisposition.occurred_on（坏账归期）。
 - #7 成交日期平移同步旧模型 RebateRecord.collected_on（返点归期）。
 - #18 平移同步 Account.buy_date（仅本单有已过账 BUY 事件时）。
@@ -29,9 +29,7 @@ from app.domain.enums import (
     InstallmentContractType,
     InstallmentDispositionAction,
     InstallmentStatus,
-    Nature,
     ReconciliationStatus,
-    RebateStatus,
     RebateType,
 )
 from app.domain.foundation import Pool
@@ -70,13 +68,12 @@ def _recovery_order(seeded_db, *, trade_date: date = D1) -> tuple[Order, Account
     return order, account
 
 
-def _posted_flow(seeded_db, *, occurred_on, direction, nature, pool_id=1, order_id=None,
+def _posted_flow(seeded_db, *, occurred_on, direction, pool_id=1, order_id=None,
                  accounting_attribute=None) -> Cashflow:
     flow = Cashflow(
         flow_no=f"CF-{uuid4().hex[:10]}",
         pool_id=pool_id,
         occurred_on=occurred_on,
-        nature=nature,
         accounting_attribute=accounting_attribute,
         category="OTHER",
         direction=direction,
@@ -90,9 +87,9 @@ def _posted_flow(seeded_db, *, occurred_on, direction, nature, pool_id=1, order_
     return flow
 
 
-# --------------------------------------------------------------- #1 CANCEL nature 自洽
-def test_cancel_sell_flow_is_out_business_out(seeded_db):
-    """冲销 SELL：direction 反转为 OUT，nature 必须同步为 BUSINESS_OUT。"""
+# --------------------------------------------------------------- #1 CANCEL 方向自洽
+def test_cancel_sell_flow_is_out(seeded_db):
+    """冲销 SELL：direction 反转为 OUT。"""
     order, _account = _recovery_order(seeded_db)
     post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
@@ -108,18 +105,15 @@ def test_cancel_sell_flow_is_out_business_out(seeded_db):
         offset_event_id=sell_event.id, reason="冲销售出",
     )
     assert cancel_flow.direction == Direction.OUT.value
-    assert cancel_flow.nature == Nature.BUSINESS_OUT.value, (
-        f"[BUG] 冲销 SELL 的流水 nature={cancel_flow.nature}，OUT 却标 BUSINESS_IN"
-    )
-    # 资金账户收支卡片：OUT/BUSINESS_OUT 计入 expense，账与余额自洽。
+    # 资金账户收支卡片：OUT 计入 expense，账与余额自洽。
     from app.finance.balances import pool_balances
     balances = pool_balances(seeded_db, [1])
     # 主 SELL(IN 200) + BUY(OUT 100) + CANCEL(OUT 200) → expense 应含 BUY 100 + CANCEL 200
     assert balances[1]["expense"] >= Decimal("300.00")
 
 
-def test_cancel_buy_flow_stays_in_business_in(seeded_db):
-    """守卫：冲销 BUY 生成 IN/BUSINESS_IN，修复不应影响它。"""
+def test_cancel_buy_flow_stays_in(seeded_db):
+    """守卫：冲销 BUY 生成 IN，修复不应影响它。"""
     order, _account = _recovery_order(seeded_db)
     buy_event, _buy_flow = post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
@@ -131,7 +125,6 @@ def test_cancel_buy_flow_stays_in_business_in(seeded_db):
         offset_event_id=buy_event.id, reason="冲销买入",
     )
     assert cancel_flow.direction == Direction.IN.value
-    assert cancel_flow.nature == Nature.BUSINESS_IN.value
 
 
 # --------------------------------------------------------------- #6/#7/#18 平移归期同源
@@ -148,7 +141,7 @@ def test_shift_moves_bad_debt_rebate_and_buy_date(seeded_db):
     seeded_db.add(RebateRecord(
         rebate_no=f"REB-{uuid4().hex[:10]}", source_order_id=order.id,
         rebate_type=RebateType.SELL.value,
-        amount=to_money("200"), collected_on=D1, status=RebateStatus.SETTLED.value,
+        amount=to_money("200"), collected_on=D1,
         created_by="pytest", updated_by="pytest",
     ))
     # 分期坏账：回收处置日 = D1

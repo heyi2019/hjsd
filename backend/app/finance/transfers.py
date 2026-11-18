@@ -14,7 +14,7 @@ from app.core.money import to_money
 from app.shared.numbering import allocate_flow_no
 from app.shared.operation_operators import upsert_operation_operators
 from app.core.security import CurrentUser
-from app.domain.enums import AccountingAttribute, AuditAction, CashflowSourceType, Direction, Nature
+from app.domain.enums import AccountingAttribute, AuditAction, CashflowSourceType, Direction
 from app.domain.trade import Cashflow
 from app.shared.form_field_rules import validate_form_extra
 from app.finance.balances import pool_balance
@@ -61,7 +61,6 @@ def create_transfer(
         "source_type": CashflowSourceType.TRANSFER.value,
         "source_id": transfer_id,
         "occurred_on": occurred_on,
-        "nature": Nature.INTERNAL.value,
         "accounting_attribute": AccountingAttribute.INTERNAL_TRANSFER.value,
         "category": "TRANSFER",
         "amount": money,
@@ -146,7 +145,6 @@ def repair_transfer(
             .where(
                 Cashflow.source_type == CashflowSourceType.TRANSFER.value,
                 Cashflow.source_id == transfer,
-                Cashflow.nature == Nature.INTERNAL.value,
             )
             .order_by(Cashflow.id)
         ).all()
@@ -175,7 +173,6 @@ def repair_transfer(
         flow_no=allocate_flow_no(session, direction),
         pool_id=target.id,
         occurred_on=source.occurred_on,
-        nature=Nature.INTERNAL.value,
         accounting_attribute=AccountingAttribute.INTERNAL_TRANSFER.value,
         category="TRANSFER",
         direction=direction,

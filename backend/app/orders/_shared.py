@@ -188,19 +188,3 @@ def _create_inline_inventory_account(session: Session, *, order_type: str, game_
         wallet_realname_images=wallet_realname_images,
         extra_values=extra_values,
     )
-
-
-def _normalize_commission_value(value: str | None, field: str) -> str | None:
-    """佣金口径入参归一：空串 / 非字符串一律视作「未填」，其余去空格并大写。
-
-    大写是硬要求——`orders` 上有 CHECK 约束 `order_commission_mode_valid` /
-    `order_commission_payer_valid`，小写会被数据库直接拒绝。
-    """
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise Validation(
-            f"{field} 必须为字符串", details={"field": field, "value": value}
-        )
-    cleaned = value.strip().upper()
-    return cleaned or None

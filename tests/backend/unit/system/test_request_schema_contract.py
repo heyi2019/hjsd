@@ -85,7 +85,7 @@ from app.customer_center.schemas import (
         (ScheduleExtendIn, {"new_due_on": date(2026, 10, 2), "reason": "客户申请"}),
         (
             DeliverIn,
-            {"delivery_mode": "CUSTOMER_SELF", "delivered_on": date(2026, 10, 1), "note": "已确认"},
+            {"delivered_on": date(2026, 10, 1), "note": "已确认"},
         ),
         (CustomerCreate, {"display_name": "客户"}),
         (CustomerUpdate, {}),
@@ -102,7 +102,7 @@ from app.customer_center.schemas import (
         ),
         (
             CashflowCreate,
-            {"pool_id": 1, "occurred_on": date(2026, 10, 1), "direction": "IN", "nature": "BUSINESS_IN", "category": "OTHER", "amount": "1.00"},
+            {"pool_id": 1, "occurred_on": date(2026, 10, 1), "direction": "IN", "category": "OTHER", "amount": "1.00"},
         ),
         (CashflowReverse, {"reversed_on": date(2026, 10, 1), "reason": "重复"}),
         (

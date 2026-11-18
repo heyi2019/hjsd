@@ -11,7 +11,7 @@ from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.trade import Order, OrderProfitAllocation
 
-from .._shared import _scoped_order
+from ._shared import _scoped_order
 
 
 def list_allocations(
@@ -42,7 +42,6 @@ def collect_allocations(session: Session, order: Order) -> list[dict[str, Any]]:
                 "allocation_type": row.allocation_type,
                 "allocation_rate": str(to_money(row.allocation_rate)),
                 "allocation_amount": str(to_money(row.allocation_amount)),
-                "policy_version_id": row.policy_version_id,
             }
         )
     return [

@@ -10,7 +10,7 @@ import {
 } from "../../shared/ui";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
-import { policyApi } from "../../shared/api/policy.api";
+import { profitAllocationApi } from "../../shared/api/profitAllocation.api";
 import { moneyRules, percentRules } from "../../shared/lib/validators";
 import { EmployeeSelectControl } from "../ResponsibleEmployeeSelect";
 import type { OrdersPageController } from "./useOrdersPageController";
@@ -77,7 +77,7 @@ function AllocationFields({
     invalidateConversion(row);
     const version = conversionVersion.current[row];
     if (!value.trim()) return;
-    void policyApi.convertAllocation(orderId, direction, value).then((result) => {
+    void profitAllocationApi.convert(orderId, direction, value).then((result) => {
       if (conversionVersion.current[row] !== version) return;
       allocationForm.setFieldValue(["allocations", row, target], result.value ?? "");
     }).catch(() => undefined);
@@ -214,7 +214,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
         allocation_rate: item.allocation_rate?.trim() ? item.allocation_rate : null,
         allocation_amount: item.allocation_amount?.trim() ? item.allocation_amount : null,
       }));
-      await policyApi.setAllocations(actionOrder.id, payloadRows, sourceFormExtra);
+      await profitAllocationApi.set(actionOrder.id, payloadRows, sourceFormExtra);
       appMessage.success("分润已保存");
       await load();
       if (actionOrder.account_id != null) await loadLedgerDetail(actionOrder, true);
@@ -258,7 +258,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
           )}
         />
         <Typography.Paragraph type="secondary">
-          按操作分配：买号、售出、运营三项可多选人员，公司比例按经营规则自动计入。每项只填写一次比例或金额，确认后由系统在该项人员中平分，并同步更新来源处操作人。
+          按操作分配：买号、售出、运营三项可多选人员，公司比例按固定口径自动计入。每项只填写一次比例或金额，确认后由系统在该项人员中平分，并同步更新来源处操作人。
         </Typography.Paragraph>
         <AllocationFields
           allocationCandidates={allocationCandidates}

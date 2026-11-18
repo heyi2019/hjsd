@@ -10,11 +10,9 @@ from datetime import date, timedelta
 from typing import Any
 from app.shared.audit import record_audit
 from app.core.security import CurrentUser
-from app.field_definitions.order_types import get_order_type_by_code
 from app.shared.form_field_rules import validate_form_extra
 from app.shared.form_values import set_extra_values
 from app.shared.order_access import get_order
-from app.policy import versions as policy_versions
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import Validation
@@ -30,7 +28,6 @@ from app.domain.trade import (
 )
 from app.domain.enums import (
     AuditAction,
-    PolicyType,
 )
 
 from ._shared import _audit_value
@@ -123,25 +120,6 @@ def _shift_accounting_dates(
             account.buy_date = account.buy_date + shift
             account.updated_by = actor
 
-    definition = get_order_type_by_code(session, order.order_type)
-    if definition is not None:
-        snapshot: dict[str, Any] = {}
-        primary_version_id: int | None = None
-        for code in (PolicyType.COMMISSION.value,):
-            version_id, snap = policy_versions.make_snapshot(
-                session,
-                policy_code=code,
-                on=new_trade_date,
-                scope_type="ORDER_TYPE",
-                scope_id=definition.id,
-            )
-            if snap is None:
-                continue
-            snapshot[code] = snap
-            if primary_version_id is None:
-                primary_version_id = version_id
-        order.policy_version_id = primary_version_id
-        order.policy_snapshot = snapshot or None
     return {
         "shifted_days": delta,
         "shifted_events": len(events),
@@ -191,7 +169,6 @@ def update_order(
         "trade_date": order.trade_date,
         "account_snapshot": order.account_snapshot,
         "note": order.note,
-        "policy_version_id": order.policy_version_id,
     }
     shift_info: dict[str, int] = {}
     if trade_date is not _UNSET and trade_date != order.trade_date:
@@ -228,8 +205,7 @@ def update_order(
             "trade_date": order.trade_date,
             "account_snapshot": order.account_snapshot,
             "note": order.note,
-            "policy_version_id": order.policy_version_id,
-            **shift_info,
+                **shift_info,
         }),
     )
     return order

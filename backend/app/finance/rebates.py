@@ -16,9 +16,7 @@ from app.domain.enums import (
     AuditAction,
     CashflowSourceType,
     Direction,
-    Nature,
     OrderStatus,
-    RebateStatus,
     RebateType,
 )
 from app.domain.trade import Cashflow, OrderEvent, RebateRecord
@@ -91,8 +89,6 @@ def create_rebate(
         channel=channel,
         amount=amount,
         collected_on=collected_on,
-        # 返点登记即完成收入确认，不再走后续结算/冲销状态机。
-        status=RebateStatus.SETTLED.value,
         note=note,
         operator_user_ids=operator_ids,
         form_extra=validate_form_extra(session, order_type_code="INVREBATE", values=form_extra) or None,
@@ -127,7 +123,6 @@ def create_rebate(
         pool_id=pool.id,
         occurred_on=collected_on,
         direction=Direction.IN.value,
-        nature=Nature.BUSINESS_IN.value,
         category="REBATE",
         amount=amount,
         actor=actor,

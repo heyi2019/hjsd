@@ -28,7 +28,7 @@ describe("PoolsAndRoutesPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(poolsApi.list).mockResolvedValue([
-      { id: 1, code: "HJ_CUSTODY", name: "托管账户", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE", is_default: true },
+      { id: 1, code: "HJ_CUSTODY", name: "托管账户", pool_type: "OTHER", status: "ACTIVE", is_default: true },
     ] as never);
   });
 

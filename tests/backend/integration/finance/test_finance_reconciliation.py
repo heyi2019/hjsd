@@ -84,7 +84,6 @@ class TestReconciliation:
             flow_no="CF-RECON-1",
             pool_id=invest.id,
             occurred_on=TODAY,
-            nature="BUSINESS_IN",
             category="OTHER",
             direction="IN",
             amount=Decimal("100.00"),

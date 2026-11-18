@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gameTypesApi, sequencesApi } from "@/shared/api/misc.api";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { listColumnsApi, orderTypesApi } from "@/shared/api/orders.api";
-import { policyApi } from "@/shared/api/policy.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import type { OrderType } from "@/shared/api/types/orders";
 import { optionSet, optionSetList } from "@fixtures/api-responses";
@@ -15,7 +14,7 @@ vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
-vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/profitAllocation.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
@@ -41,12 +40,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(orderTypesApi.list).mockResolvedValue(orderTypes);
   vi.mocked(poolsApi.list).mockResolvedValue([
-    { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", ownership: "OWNED", status: "ACTIVE" },
+    { id: 1, code: "HJ_CUSTODY", name: "托管池", pool_type: "OTHER", status: "ACTIVE" },
   ] as never);
   vi.mocked(gameTypesApi.list).mockResolvedValue([] as never);
   vi.mocked(optionSetsApi.list).mockResolvedValue(optionSetList() as never);
   vi.mocked(optionSetsApi.get).mockResolvedValue(optionSet() as never);
-  vi.mocked(policyApi.list).mockResolvedValue({ items: [], total: 0 } as never);
   vi.mocked(listColumnsApi.all).mockResolvedValue([] as never);
   vi.mocked(sequencesApi.list).mockResolvedValue([] as never);
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });

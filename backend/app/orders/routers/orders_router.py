@@ -22,7 +22,7 @@ from app.core.security import (
 from app.auth.session import (
     require_permissions,
 )
-from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction, Nature
+from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction
 from app.domain.trade import Account
 from app.field_definitions.pools import require_default_pool
 from app.orders import schemas
@@ -185,8 +185,6 @@ def create_order(
         confirm_repurchase=payload.confirm_repurchase,
         owner_id=owner_id,
         note=payload.note,
-        commission_mode=payload.commission_mode,
-        commission_payer=payload.commission_payer,
         customer_roles=customer_roles,
         counterparty_roles=counterparty_roles,
         extra_values=payload.extra_values,
@@ -225,7 +223,6 @@ def create_order(
             pool_id=pool_id,
             occurred_on=cost.occurred_on,
             direction=Direction.OUT.value,
-            nature=Nature.BUSINESS_OUT.value,
             accounting_attribute=initial_cost_attribute,
             category=cost.flow_category or "OTHER",
             amount=cost.amount,

@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.stocks.profile import create_account
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
-from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
+from app.domain.enums import AccountStatus, Direction, EventType, OrderStatus
 from app.domain.foundation import Pool
 from app.field_definitions.order_types import get_order_type_by_code
 from app.domain.parties import OrderCustomerRole
@@ -173,7 +173,7 @@ def test_deliver_sell_rejects_void_account(seeded_db):
     with pytest.raises(Validation, match="已作废"):
         post_event(
             seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY2,
-            actor="pytest", delivery_mode="PLATFORM_OPERATOR", note="换绑凭证",
+            actor="pytest", note="换绑凭证",
         )
 
 def test_deliver_sell_uses_state_machine_for_non_sold_account(seeded_db):
@@ -188,7 +188,7 @@ def test_deliver_sell_uses_state_machine_for_non_sold_account(seeded_db):
     seeded_db.commit()
     post_event(
         seeded_db, order.id, event_type="DELIVER", occurred_on=TODAY2,
-        actor="pytest", delivery_mode="PLATFORM_OPERATOR", note="换绑凭证",
+        actor="pytest", note="换绑凭证",
     )
     seeded_db.refresh(acc)
     assert acc.status == "SOLD"

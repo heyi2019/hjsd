@@ -17,7 +17,6 @@ class ExecutionCashflowOut(BaseModel):
     occurred_on: date
     occurred_at: datetime
     direction: str
-    nature: str
     category: str
     amount: Decimal
     note: str | None = None
@@ -40,7 +39,6 @@ class ExecutionEventOut(BaseModel):
     pool_id: int | None = None
     offset_event_id: int | None = None
     portion: str
-    delivery_mode: str | None = None
     delivery_direction: str | None = None
     is_posted: bool
     reason: str | None = None
@@ -70,7 +68,6 @@ class ExecutionRebateOut(BaseModel):
     rebate_type: str
     channel: str | None = None
     amount: Decimal
-    status: str
     collected_on: date
     collected_at: datetime
 

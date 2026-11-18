@@ -108,7 +108,7 @@ class TestA04DistributionInstallmentSale:
         assert flows_before
 
         inst_recovery.deliver(
-            seeded_db, contract.id, delivery_mode="PLATFORM_OPERATOR",
+            seeded_db, contract.id,
             delivered_on=TODAY, note="平台操作换绑凭证IMG_02", actor="pytest",
         )
         seeded_db.commit()
@@ -141,7 +141,7 @@ class TestA04DistributionInstallmentSale:
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
             inst_recovery.deliver(
-                seeded_db, contract.id, delivery_mode="CUSTOMER_SELF",
+                seeded_db, contract.id,
                 delivered_on=TODAY, note="凭证", actor="pytest",
             )
         assert exc.value.code == ErrorCode.DELIVERY_CONDITION_UNMET
@@ -235,7 +235,7 @@ class TestA05HsStockSale:
         assert seeded_db.get(type(account), account.id).status == AccountStatus.SOLD.value
 
         inst_recovery.deliver(
-            seeded_db, contract.id, delivery_mode="CUSTOMER_SELF",
+            seeded_db, contract.id,
             delivered_on=TODAY, note="客户自行换绑凭证", actor="admin",
         )
         seeded_db.commit()

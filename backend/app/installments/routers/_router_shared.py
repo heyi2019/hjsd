@@ -17,7 +17,6 @@ from app.shared.operation_operators import (
 
 INSTALLMENT_DETAIL_EXPORT_COLUMNS = [
     ("installment_note", "备注", True),
-    ("installment_delivery_mode", "交付方式", True),
     ("installment_delivered_on", "交付时间", True),
     ("installment_first_due_on", "首期到期日", True),
     ("installment_extra_values", "合约扩展字段", True),

@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.errors import AppError, ErrorCode
-from app.domain.enums import AuditAction, PoolOwnership, PoolStatus
+from app.domain.enums import AuditAction, PoolStatus
 from app.domain.foundation import AuditLog
 from app.field_definitions import pools as pools_service
 from app.field_definitions.order_types import list_order_types
@@ -38,7 +38,6 @@ class TestSeed:
         invest = get_pool_by_code(seeded_db, "HJ_INVEST")
         profit = get_pool_by_code(seeded_db, "HJ_PROFIT")
         assert invest is not None and profit is not None
-        assert invest.ownership == PoolOwnership.OWNED.value
         assert invest.pool_type == "INVEST"
         assert profit.pool_type == "PROFIT"
 
@@ -58,7 +57,7 @@ class TestSeed:
 class TestPools:
     def test_create_pool_and_duplicate_code(self, db):
         pool = create_pool(
-            db, code="hj_custody", name="代客保管池", actor="pytest", ownership="CUSTODY"
+            db, code="hj_custody", name="代客保管池", actor="pytest"
         )
         db.commit()
         assert pool.code == "HJ_CUSTODY"
@@ -74,10 +73,6 @@ class TestPools:
         updated = update_pool(db, pool.id, actor="pytest", name="临时池改名")
         assert updated.code == "TMP1"
         assert updated.name == "临时池改名"
-
-    def test_invalid_ownership_rejected(self, db):
-        with pytest.raises(AppError):
-            create_pool(db, code="TMP2", name="坏池", actor="pytest", ownership="MARS")
 
     def test_delete_blocked_when_pool_has_cashflow(self, db, monkeypatch):
         pool = create_pool(db, code="TMP3", name="带流水池", actor="pytest")

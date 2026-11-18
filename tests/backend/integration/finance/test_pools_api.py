@@ -30,12 +30,11 @@ def test_viewer_can_read_but_not_write(client, viewer_headers):
 
 
 def test_create_and_list_pool(client, headers):
-    payload = {"code": "hj_custody", "name": "代客保管池", "ownership": "CUSTODY", "pool_type": "OTHER"}
+    payload = {"code": "hj_custody", "name": "代客保管池", "pool_type": "OTHER"}
     created = client.post(POOLS, json=payload, headers=headers)
     assert created.status_code == 201, created.text
     body = created.json()
     assert body["code"] == "HJ_CUSTODY"
-    assert body["ownership"] == "CUSTODY"
     assert body["status"] == "ACTIVE"
 
     listed = client.get(POOLS, headers=headers).json()

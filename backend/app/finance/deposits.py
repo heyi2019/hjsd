@@ -22,7 +22,6 @@ from app.domain.enums import (
     CashflowSourceType,
     DepositStatus,
     Direction,
-    Nature,
 )
 from app.domain.trade import Cashflow, Deposit
 from app.field_definitions.pools import assert_pool_usable
@@ -147,7 +146,6 @@ def create_deposit(
             flow_no=allocate_flow_no(session, Direction.OUT.value),
             pool_id=pool.id,
             occurred_on=paid_on,
-            nature=Nature.BUSINESS_OUT.value,
             accounting_attribute=AccountingAttribute.DEPOSIT.value,
             category="DEPOSIT_HOLD",
             direction=Direction.OUT.value,
@@ -365,7 +363,6 @@ def return_deposit(
             flow_no=allocate_flow_no(session, Direction.IN.value),
             pool_id=deposit.pool_id,
             occurred_on=released_on,
-            nature=Nature.BUSINESS_IN.value,
             accounting_attribute=AccountingAttribute.DEPOSIT.value,
             category="DEPOSIT_RELEASE",
             direction=Direction.IN.value,
@@ -445,7 +442,6 @@ def cancel_deposit(
             flow_no=allocate_flow_no(session, Direction.IN.value),
             pool_id=deposit.pool_id,
             occurred_on=cancelled_on,
-            nature=Nature.BUSINESS_IN.value,
             accounting_attribute=AccountingAttribute.DEPOSIT.value,
             category="DEPOSIT_CANCEL",
             direction=Direction.IN.value,
@@ -528,7 +524,6 @@ def lose_deposit(
         flow_no=allocate_flow_no(session, Direction.OUT.value),
         pool_id=deposit.pool_id,
         occurred_on=lost_on,
-        nature=Nature.BUSINESS_OUT.value,
         accounting_attribute=AccountingAttribute.DEPOSIT.value,
         category=label,
         direction=Direction.OUT.value,

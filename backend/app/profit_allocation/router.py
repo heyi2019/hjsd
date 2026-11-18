@@ -14,7 +14,7 @@ from app.core.security import PERM_ORDER_CREATE, PERM_POLICY_MANAGE, CurrentUser
 from app.auth.session import require_permissions
 from . import listing, schemas, service, terms
 
-router = APIRouter(tags=["policy"])
+router = APIRouter(tags=["profit-allocation"])
 manage_access = require_permissions(PERM_POLICY_MANAGE)
 read_access = require_permissions(PERM_ORDER_CREATE)
 

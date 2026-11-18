@@ -16,7 +16,6 @@ from app.shared.audit import record_audit
 from app.core.errors import Validation
 from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, CashflowSourceType
-from app.domain.imports import ImportRow
 from app.domain.parties import CustomerLead, OrderCounterpartyRole, OrderCustomerRole
 from app.domain.trade import (
     Cashflow,
@@ -211,9 +210,6 @@ def _delete_order_dependents(
     session.query(CustomerLead).filter(
         CustomerLead.converted_order_id == order_id
     ).update({CustomerLead.converted_order_id: None}, synchronize_session=False)
-    session.query(ImportRow).filter(
-        ImportRow.mapped_order_id == order_id
-    ).update({ImportRow.mapped_order_id: None}, synchronize_session=False)
 
 
 def _order_snapshot(order: Order, dependencies: _OrderDependencies) -> dict[str, object]:

@@ -38,7 +38,6 @@ def test_transfer_module_creates_symmetric_cashflows(seeded_db):
         pool_id=pools[0].id,
         occurred_on=TODAY,
         direction="IN",
-        nature="BUSINESS_IN",
         accounting_attribute="SELF_REVENUE",
         category="OTHER",
         amount=Decimal("100"),

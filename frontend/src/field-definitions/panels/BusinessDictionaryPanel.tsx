@@ -167,7 +167,7 @@ export function BusinessDictionaryPanel() {
             </div>
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
               <span className="business-dictionary__tertiary"><strong>已结清</strong></span>
-              <span className="business-dictionary__action-detail">应收收齐或受控减免；选交付方式并交付→已交付，取消→已取消。</span>
+              <span className="business-dictionary__action-detail">应收收齐或受控减免；换绑交付→已交付，取消→已取消。</span>
             </div>
             <div className="business-dictionary__action-line business-dictionary__action-line--category-start">
               <span className="business-dictionary__tertiary"><strong>已交付</strong></span>

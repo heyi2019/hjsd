@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.stocks.profile import create_account
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
-from app.domain.enums import AccountStatus, Direction, EventType, Nature, OrderStatus
+from app.domain.enums import AccountStatus, Direction, EventType, OrderStatus
 from app.domain.foundation import Pool
 from app.field_definitions.order_types import get_order_type_by_code
 from app.domain.parties import OrderCustomerRole
@@ -210,7 +210,6 @@ class TestA01HsStock:
             seeded_db.scalar(
                 select(Installment).where(Installment.order_id == order.id)
             ).id,
-            delivery_mode="PLATFORM_OPERATOR",
             delivered_on=TODAY,
             note="换绑截图IMG_01",
             actor="pytest",
@@ -307,4 +306,3 @@ class TestA03DgZeroCapital:
         flows = _flows(seeded_db, default_pool.id)
         assert len(flows) == 1
         assert str(flows[0].amount) == "200.00"
-        assert flows[0].nature == Nature.BUSINESS_IN.value

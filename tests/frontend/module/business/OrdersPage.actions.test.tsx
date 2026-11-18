@@ -10,7 +10,7 @@ import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
 import { installmentsApi } from "@/shared/api/installments.api";
 import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
-import { policyApi } from "@/shared/api/policy.api";
+import { profitAllocationApi } from "@/shared/api/profitAllocation.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { allFormFields, seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
@@ -19,7 +19,7 @@ import { today } from "@/shared/lib/format";
 import * as client from "@/shared/api/client";
 import type { Installment, InstallmentCancelResult } from "@/shared/api/types/installments";
 import type { Order } from "@/shared/api/types/orders";
-import type { ProfitAllocation } from "@/shared/api/types/policy";
+import type { ProfitAllocation } from "@/shared/api/types/profitAllocation";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -31,7 +31,7 @@ vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
-vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/profitAllocation.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
@@ -212,7 +212,7 @@ beforeEach(() => {
   }));
   vi.mocked(orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(poolsApi.list).mockResolvedValue([
-    { id: 7, code: "HJ_INVEST", name: "投资款荷包", pool_type: "INVEST", ownership: "OWNED", status: "ACTIVE" },
+    { id: 7, code: "HJ_INVEST", name: "投资款荷包", pool_type: "INVEST", status: "ACTIVE" },
   ]);
   vi.mocked(ordersApi.get).mockResolvedValue(order1);
   vi.mocked(ordersApi.executionDetail).mockResolvedValue({
@@ -227,8 +227,8 @@ beforeEach(() => {
     cash_flows: [],
     warnings: [],
   } as never);
-  vi.mocked(policyApi.allocations).mockResolvedValue(profitAllocationResponse(allocationRows, { order_profit: "5000.00" }));
-  vi.mocked(policyApi.setAllocations).mockResolvedValue(profitAllocationResponse(allocationRows, { order_profit: "5000.00" }));
+  vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse(allocationRows, { order_profit: "5000.00" }));
+  vi.mocked(profitAllocationApi.set).mockResolvedValue(profitAllocationResponse(allocationRows, { order_profit: "5000.00" }));
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 9, username: "lisi", display_name: "李四", is_active: true },
     { id: 11, username: "recovery", display_name: "回收员", is_active: true },
@@ -398,7 +398,7 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   it("分润：只展示可分配动作，公司比例由规则配置补入", async () => {
     // 空分润 → 只展示买号、售出、运营；公司 40% 隐藏并由规则配置自动补入。
-    vi.mocked(policyApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00", allocatable_profit: "3000.00", company_rate: "40.00" }));
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00", allocatable_profit: "3000.00", company_rate: "40.00" }));
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       form_extra: {
@@ -428,7 +428,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
   it("分润：一个动作多人时提交动作合计，均分由后端处理", async () => {
     // 前端只提交动作合计和人员名单；按人数均分由后端保存服务统一处理。
-    vi.mocked(policyApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00" }));
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00" }));
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       form_extra: {
@@ -455,22 +455,22 @@ describe("OrdersPage：操作与筛选分支", () => {
     fireEvent.change(rates[1], { target: { value: "30" } });
 
     await clickModalOk(modal);
-    await waitFor(() => expect(policyApi.setAllocations).toHaveBeenCalled());
-    const [, payload] = vi.mocked(policyApi.setAllocations).mock.calls[0];
+    await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalled());
+    const [, payload] = vi.mocked(profitAllocationApi.set).mock.calls[0];
     const buyRows = payload.filter((item) => item.allocation_type === "BUY");
     expect(buyRows).toEqual([{ allocation_type: "BUY", employee_ids: [11, 22], role: "BUYER", allocation_rate: "30", allocation_amount: null }]);
     expect(payload).toHaveLength(4);
   });
 
   it("分润：按操作四项提交时带上 allocation_type 与比例", async () => {
-    vi.mocked(policyApi.allocations).mockResolvedValue(profitAllocationResponse(actionAllocationRows, { order_profit: "5000.00", allocatable_profit: "3000.00", company_rate: "40.00" }));
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse(actionAllocationRows, { order_profit: "5000.00", allocatable_profit: "3000.00", company_rate: "40.00" }));
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(within(modal).getAllByLabelText("比例")).toHaveLength(3);
     await clickModalOk(modal);
-    await waitFor(() => expect(policyApi.setAllocations).toHaveBeenCalled());
-    const [, payload] = vi.mocked(policyApi.setAllocations).mock.calls[0];
+    await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalled());
+    const [, payload] = vi.mocked(profitAllocationApi.set).mock.calls[0];
     expect(payload).toHaveLength(4);
     expect(payload.map((item) => item.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
     expect(payload.find((item) => item.allocation_type === "OPERATION")).toMatchObject({ employee_ids: [9], role: "SERVICE" });

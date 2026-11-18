@@ -42,7 +42,7 @@ def _all_scope_user() -> CurrentUser:
         pool_ids=frozenset(),
     )
 
-def _make_flow(seeded_db, *, direction, nature,
+def _make_flow(seeded_db, *, direction,
                accounting_attribute="OPERATING_EXPENSE", category="OTHER", amount="10",
                note="memo", order_id=None):
     return cashflows.create_cashflow(
@@ -50,7 +50,6 @@ def _make_flow(seeded_db, *, direction, nature,
         pool_id=1,
         occurred_on=TODAY,
         direction=direction,
-        nature=nature,
         accounting_attribute=accounting_attribute,
         category=category,
         amount=Decimal(amount),
@@ -75,8 +74,7 @@ def _cashflow_row(**overrides):
 
     row = dict(
         id=1, flow_no="ZC00001", pool_id=1, occurred_on=TODAY,
-        occurred_at=datetime(2026, 10, 17, 9, 0), nature="BUSINESS_IN",
-        ledger_type="BUSINESS", accounting_attribute="SELF_REVENUE",
+        occurred_at=datetime(2026, 10, 17, 9, 0), ledger_type="BUSINESS", accounting_attribute="SELF_REVENUE",
         category="SALE", direction="IN", amount=Decimal("10"),
         reviewed_by=None, reviewed_at=None, source_type="MANUAL", source_id=None,
         order_id=None, order_no=None,
@@ -108,7 +106,6 @@ def _studio_flow(seeded_db, *, direction="OUT", category="房租", amount="20"):
     return cashflows.create_cashflow(
         seeded_db, pool_id=1, occurred_on=TODAY,
         direction=direction,
-        nature="BUSINESS_OUT" if direction == "OUT" else "BUSINESS_IN",
         category=category, amount=Decimal(amount), actor="pytest",
         ledger_type=CashflowLedgerType.STUDIO.value,
     )
@@ -136,7 +133,7 @@ def test_create_cashflow_order_event_unknown_source_id(seeded_db):
     with pytest.raises(Validation, match="业务事件不存在或不属于该订单"):
         cashflows.create_cashflow(
             seeded_db, pool_id=1, occurred_on=TODAY,
-            direction="OUT", nature="BUSINESS_OUT", category="OTHER",
+            direction="OUT", category="OTHER",
             amount=Decimal("10"), actor="pytest",
             source_type=CashflowSourceType.ORDER_EVENT.value,
             source_id="SR99999",
@@ -146,7 +143,7 @@ def test_create_cashflow_manual_rejects_source_id(seeded_db):
     with pytest.raises(Validation, match="手工流水不能填写 source_id"):
         cashflows.create_cashflow(
             seeded_db, pool_id=1, occurred_on=TODAY,
-            direction="OUT", nature="BUSINESS_OUT", category="OTHER",
+            direction="OUT", category="OTHER",
             amount=Decimal("10"), actor="pytest", source_id="SR00001",
         )
 
@@ -155,7 +152,7 @@ def test_create_cashflow_studio_ledger_requires_manual_without_order(seeded_db):
     with pytest.raises(Validation, match="工作室运营账簿必须是无订单归属的手工流水"):
         cashflows.create_cashflow(
             seeded_db, pool_id=1, occurred_on=TODAY,
-            direction="OUT", nature="BUSINESS_OUT", category="OTHER",
+            direction="OUT", category="OTHER",
             amount=Decimal("10"), actor="pytest",
             ledger_type=CashflowLedgerType.STUDIO.value,
             source_type=CashflowSourceType.ORDER_EVENT.value,
@@ -165,7 +162,7 @@ def test_create_cashflow_studio_ledger_requires_manual_without_order(seeded_db):
 def test_update_cashflow_rejects_non_studio_flow(seeded_db):
     flow = cashflows.create_cashflow(
         seeded_db, pool_id=1, occurred_on=TODAY,
-        direction="IN", nature="BUSINESS_IN", category="REBATE",
+        direction="IN", category="REBATE",
         amount=Decimal("50"), actor="pytest",
     )
     with pytest.raises(Validation, match="仅工作室手工收支可编辑或删除"):
@@ -190,7 +187,7 @@ def test_update_cashflow_rejects_reversed_studio_flow(seeded_db):
 def test_delete_cashflow_rejects_non_studio_flow(seeded_db):
     flow = cashflows.create_cashflow(
         seeded_db, pool_id=1, occurred_on=TODAY,
-        direction="IN", nature="BUSINESS_IN", category="REBATE",
+        direction="IN", category="REBATE",
         amount=Decimal("50"), actor="pytest",
     )
     with pytest.raises(Validation, match="仅工作室手工收支可编辑或删除"):
@@ -200,21 +197,6 @@ def test_update_cashflow_rejects_bad_direction(seeded_db):
     flow = _studio_flow(seeded_db)
     with pytest.raises(Validation, match="direction 必须为"):
         _assert_update_fail(seeded_db, flow, direction="SIDEWAYS")
-
-def test_update_cashflow_rejects_bad_nature(seeded_db):
-    flow = _studio_flow(seeded_db)
-    with pytest.raises(Validation, match="nature 必须为"):
-        _assert_update_fail(seeded_db, flow, nature="NOPE")
-
-def test_update_cashflow_rejects_in_nature_mismatch(seeded_db):
-    flow = _studio_flow(seeded_db)
-    with pytest.raises(Validation, match="收入流水的 nature 不匹配"):
-        _assert_update_fail(seeded_db, flow, direction="IN", nature="BUSINESS_OUT")
-
-def test_update_cashflow_rejects_out_nature_mismatch(seeded_db):
-    flow = _studio_flow(seeded_db)
-    with pytest.raises(Validation, match="支出流水的 nature 不匹配"):
-        _assert_update_fail(seeded_db, flow, direction="OUT", nature="EXTERNAL_IN")
 
 def test_update_cashflow_rejects_studio_expense_attribute(seeded_db):
     flow = _studio_flow(seeded_db)
@@ -331,7 +313,7 @@ def test_delete_deposit_rejects_with_subsequent_flows(seeded_db):
     # 状态干净的押金 + 一笔非占用的押金来源流水（模拟历史脏数据/孤儿流水）
     seeded_db.add(Cashflow(
         flow_no=allocate_flow_no(seeded_db, "IN"), pool_id=1, occurred_on=TODAY,
-        nature="BUSINESS_IN", accounting_attribute="DEPOSIT",
+        accounting_attribute="DEPOSIT",
         category="DEPOSIT_RELEASE", direction="IN", amount=Decimal("1"),
         source_type=CashflowSourceType.DEPOSIT.value, source_id=str(deposit.id),
         created_by="pytest", updated_by="pytest",

@@ -32,7 +32,7 @@ vi.mock("@/shared/api/misc.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
-vi.mock("@/shared/api/policy.api");
+vi.mock("@/shared/api/profitAllocation.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
@@ -64,7 +64,7 @@ beforeEach(() => {
   // 数据中心面板（同页挂载）：空池空单——本文件只关心报表 Tab，桩位兜底即可。
   vi.mocked(poolsApi.list).mockResolvedValue([]);
   // 空池 → 批量余额返回空 items 与零汇总（服务端聚合）。
-  resolveMock(vi.mocked(poolsApi.balances), poolBalancesResponse([], { pool_count: 0, cash_balance: "0.00", available: "0.00", deposit_held: "0.00", owned_cash_balance: "0.00" }));
+  resolveMock(vi.mocked(poolsApi.balances), poolBalancesResponse([], { pool_count: 0, cash_balance: "0.00", available: "0.00", deposit_held: "0.00" }));
 });
 
 async function gotoTab(label: string) {

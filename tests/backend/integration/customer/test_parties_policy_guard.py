@@ -25,9 +25,7 @@ from app.customer_center.customer_detail import get_customer_activity_summary
 from app.customer_center.customer_merge import merge_customers
 from app.customer_center.customers import create_customer
 from app.customer_center.leads import close_lead, convert_lead, create_lead, get_lead, list_leads, update_lead
-from app.policy.profit_allocation import service as policy_allocations
-from app.policy import definitions as policy_definitions
-from app.policy import versions as policy_versions
+from app.profit_allocation import service as policy_allocations
 
 
 # ───────────────────────────── 共用辅助 ─────────────────────────────
@@ -346,50 +344,6 @@ class TestPartiesLeadGuards:
         seeded_db.commit()
         with pytest.raises(Conflict):
             close_lead(seeded_db, lead.id, reason="再关闭", actor="pytest")
-
-
-# ───────────────────────────── policy.service ─────────────────────────────
-
-class TestPolicyDefinitionGuards:
-    def test_create_definition_global_with_scope_id(self, seeded_db):
-        # 146: GLOBAL 范围不能指定 scope_id
-        with pytest.raises(Validation):
-            policy_definitions.create_definition(
-                seeded_db, policy_code="X1", name="X1", scope_type="GLOBAL",
-                scope_id=1, actor="pytest",
-            )
-
-    def test_create_definition_target_missing(self, seeded_db):
-        # 163: 关联对象不存在
-        with pytest.raises(Validation):
-            policy_definitions.create_definition(
-                seeded_db, policy_code="X2", name="X2", scope_type="ORDER_TYPE",
-                scope_id=99999, actor="pytest",
-            )
-
-
-class TestPolicyResolveVersionGuards:
-    def test_invalid_scope_type(self, seeded_db):
-        # 397: scope_type 非法
-        with pytest.raises(Validation):
-            policy_versions.resolve_version(
-                seeded_db, policy_code="X", on=date.today(), scope_type="BAD"
-            )
-
-    def test_global_with_scope_id(self, seeded_db):
-        # 403: GLOBAL 范围不能指定 scope_id
-        with pytest.raises(Validation):
-            policy_versions.resolve_version(
-                seeded_db, policy_code="X", on=date.today(),
-                scope_type="GLOBAL", scope_id=1,
-            )
-
-    def test_scoped_requires_scope_id(self, seeded_db):
-        # 407: 非 GLOBAL 必须指定 scope_id
-        with pytest.raises(Validation):
-            policy_versions.resolve_version(
-                seeded_db, policy_code="X", on=date.today(), scope_type="ORDER_TYPE"
-            )
 
 
 class TestPolicyAllocationGuards:

@@ -13,7 +13,6 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
     AccountStatus,
     AuditAction,
-    DeliveryMode,
     EventType,
     InstallmentContractType,
     InstallmentStatus,
@@ -212,7 +211,6 @@ class TestInstallmentsApi:
         response = seeded_client.post(
             f"/api/v1/installments/{contract.id}/deliver",
             json={
-                "delivery_mode": "PLATFORM_OPERATOR",
                 "delivered_on": TODAY.isoformat(),
                 "note": "平台操作换绑凭证",
                 "bound_phone": "13800000000",

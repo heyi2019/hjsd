@@ -9,7 +9,6 @@ from app.domain.base import (
     TimestampMixin,
 )
 from app.domain.enums import (
-    DeliveryMode,
     InstallmentContractType,
     InstallmentDispositionAction,
     InstallmentStatus,
@@ -38,7 +37,6 @@ class Installment(Base, AuditMixin):
 
     __tablename__ = "installments"
     __table_args__ = (
-        Index("ix_installments_policy_version_id", "policy_version_id"),
         CheckConstraint(
             f"contract_type IN {InstallmentContractType.values()!r}"
             .replace("[", "(").replace("]", ")"),
@@ -64,10 +62,6 @@ class Installment(Base, AuditMixin):
             name="principal_lte_schedule_total",
         ),
         CheckConstraint("periods > 0", name="periods_positive"),
-        CheckConstraint(
-            f"delivery_mode IS NULL OR delivery_mode IN {DeliveryMode.values()!r}",
-            name="installment_delivery_mode_valid",
-        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -76,11 +70,6 @@ class Installment(Base, AuditMixin):
         ForeignKey("orders.id", ondelete="RESTRICT"), nullable=False
     )
     contract_type: Mapped[str] = mapped_column(String(24), nullable=False)
-    # BAS-06-04 规则快照：分期利率/期数等参数在签约时固化，规则改版不回写历史合约。
-    policy_version_id: Mapped[int | None] = mapped_column(
-        ForeignKey("policy_versions.id", ondelete="SET NULL"), nullable=True
-    )
-    policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     principal: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     down_payment: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
     service_fee: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
@@ -94,7 +83,6 @@ class Installment(Base, AuditMixin):
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=InstallmentStatus.PENDING.value
     )
-    delivery_mode: Mapped[str | None] = mapped_column(String(24), nullable=True)
     delivered_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     first_due_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)

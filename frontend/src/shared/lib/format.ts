@@ -46,6 +46,7 @@ export function formatElapsedTime(
   return parts.join("");
 }
 
+// ---- 状态文案：与后端枚举一一对应，键集合由 format.test.ts 锁定 ----
 export const ORDER_STATUS_LABEL: Record<string, string> = {
   ACTIVE: "进行中",
   INSTALLMENT: "分期中",
@@ -74,17 +75,17 @@ export const ACCOUNT_STATUS_LABEL: Record<string, string> = {
   VOID: "失效",
 };
 
+// ---- 执行动作文案 ----
+const INVENTORY_ENTRY_ACTION_LABEL: Record<string, string> = {
+  HS: "回收入库",
+  TH: "提号入库",
+  DG: "代挂入库",
+};
 const EXECUTION_ACTION_LABEL: Record<string, string> = {
   DELIVER: "交付",
   CANCEL: "取消",
   OPERATE: "运营",
   REBATE: "返点",
-};
-
-const INVENTORY_ENTRY_ACTION_LABEL: Record<string, string> = {
-  HS: "回收入库",
-  TH: "提号入库",
-  DG: "代挂入库",
 };
 
 export function executionActionLabel(
@@ -95,40 +96,21 @@ export function executionActionLabel(
   if (!eventType) return "-";
   if (eventType === "BUY") return INVENTORY_ENTRY_ACTION_LABEL[orderType ?? ""] ?? "账号入库";
   if (eventType === "SELL") return "账号售出";
-  if (eventType === "DELIVER") {
-    return deliveryDirection === "BUY" ? "买号交付" : "卖号交付";
-  }
+  if (eventType === "DELIVER") return deliveryDirection === "BUY" ? "买号交付" : "卖号交付";
   return EXECUTION_ACTION_LABEL[eventType] ?? "运营";
 }
 
-/** 状态 → antd Tag 颜色；不使用颜色单独承载紧急程度。 */
+// ---- 状态 → antd Tag 颜色：表驱动，新增状态只改一处；颜色不单独承载紧急程度 ----
+const STATUS_COLOR_GROUPS: ReadonlyArray<readonly [string, readonly string[]]> = [
+  ["green", ["ACTIVE", "PAID", "SETTLED", "IN_STOCK", "WAITING"]],
+  ["blue", ["DRAFT", "PENDING", "PARTIALLY_RETURNED", "PARTIALLY_SETTLED", "INSTALLMENT"]],
+  ["red", ["OVERDUE", "DEFAULTED", "LOST", "DISABLED", "VOID", "SOLD"]],
+  ["cyan", ["COMPLETED", "DELIVERED", "RETURNED"]],
+];
+const STATUS_COLOR: Record<string, string> = Object.fromEntries(
+  STATUS_COLOR_GROUPS.flatMap(([color, statuses]) => statuses.map((status) => [status, color])),
+);
+
 export function statusColor(status: string): string {
-  switch (status) {
-    case "ACTIVE":
-    case "PAID":
-    case "SETTLED":
-    case "IN_STOCK":
-    case "WAITING":
-      return "green";
-    case "DRAFT":
-    case "PENDING":
-    case "PARTIALLY_RETURNED":
-    case "PARTIALLY_SETTLED":
-    case "INSTALLMENT":
-      return "blue";
-    case "OVERDUE":
-    case "DEFAULTED":
-    case "LOST":
-    case "DISABLED":
-    case "VOID":
-      return "red";
-    case "COMPLETED":
-    case "DELIVERED":
-    case "RETURNED":
-      return "cyan";
-    case "SOLD":
-      return "red";
-    default:
-      return "default";
-  }
+  return STATUS_COLOR[status] ?? "default";
 }

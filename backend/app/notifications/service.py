@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound, Validation
 from app.shared.numbering import allocate_number
-from app.core.time import now_utc_second_naive
+from app.core.time import now_second
 from app.domain.enums import SequenceKey
 from app.domain.notifications import Notification
 
@@ -152,8 +152,8 @@ def mark_read(
     if notification is None:
         raise NotFound("通知不存在")
     if notification.read_at is None:
-        # 数据库当前模型使用无时区 DateTime，写入 UTC 的无时区值以保持与既有时间字段一致。
-        notification.read_at = now_utc_second_naive()
+        # 与全库其余写入路径统一：本地无时区时间，精确到秒。
+        notification.read_at = now_second()
         notification.updated_by = actor
         session.flush()
     return notification

@@ -69,7 +69,15 @@ def _admin_engine() -> Engine:
     return create_engine(base, isolation_level="AUTOCOMMIT")
 
 
-_TEMPLATE_DB = "heijin_erp_migration_tpl"
+def _template_db_name() -> str:
+    """xdist 下每个 worker 一个独立模板库；串行时保持原名，行为零变化。
+
+    固定名 `heijin_erp_migration_tpl` 会被 4 个 worker 的会话级 fixture 同时
+    DROP+CREATE，互相拆台（实测 -n4 时 7 个迁移用例报库被 drop）。加 worker
+    后缀与 conftest 的 `heijin_erp_test_gwN` 隔离策略一致。
+    """
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+    return f"heijin_erp_migration_tpl_{worker}" if worker else "heijin_erp_migration_tpl"
 
 
 @pytest.fixture(scope="session")
@@ -87,27 +95,28 @@ def _migration_template() -> str:
     """
     from app.core.settings import get_settings
 
+    template_db = _template_db_name()
     base = get_settings().alembic_url
     parsed = urlparse(base)
     admin = _admin_engine()
     try:
         with admin.connect() as conn:
-            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{_TEMPLATE_DB}" WITH (FORCE)')
-            conn.exec_driver_sql(f'CREATE DATABASE "{_TEMPLATE_DB}"')
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{template_db}" WITH (FORCE)')
+            conn.exec_driver_sql(f'CREATE DATABASE "{template_db}"')
     finally:
         admin.dispose()
 
-    target = base.replace(f"/{parsed.path.lstrip('/')}", f"/{_TEMPLATE_DB}")
+    target = base.replace(f"/{parsed.path.lstrip('/')}", f"/{template_db}")
     env = {"DATABASE_URL": target, "APP_ENV": "development"}
     result = _alembic(env, "upgrade", "head")
     assert result.returncode == 0, result.stdout + result.stderr
 
-    yield _TEMPLATE_DB
+    yield template_db
 
     admin = _admin_engine()
     try:
         with admin.connect() as conn:
-            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{_TEMPLATE_DB}" WITH (FORCE)')
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{template_db}" WITH (FORCE)')
     finally:
         admin.dispose()
 

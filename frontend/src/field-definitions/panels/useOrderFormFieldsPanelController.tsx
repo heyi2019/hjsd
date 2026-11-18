@@ -180,22 +180,31 @@ export function useOrderFormFieldsPanelController({
     setSectionDraft({ value: "", label: "" });
   };
 
+  // 切换业务类型会重新触发 load / loadSectionLabels；各自用独立请求序号丢弃过期
+  // 响应，避免旧类型的数据后到覆盖新类型的字段与板块标题。
+  const loadSeqRef = useRef(0);
   const load = useCallback(async (code: string) => {
+    const seq = ++loadSeqRef.current;
     try {
-      setRows(await orderFormFieldsApi.list(code, true));
+      const rows = await orderFormFieldsApi.list(code, true);
+      if (seq !== loadSeqRef.current) return;
+      setRows(rows);
       setError(null);
     } catch (err) {
-      setError(normalizeError(err));
+      if (seq === loadSeqRef.current) setError(normalizeError(err));
     }
   }, []);
 
   // 板块标题（覆盖映射）以业务类型为单位从后端读取，与建单表单共享同一份配置。
+  const sectionLabelsSeqRef = useRef(0);
   const loadSectionLabels = useCallback(async (code: string) => {
+    const seq = ++sectionLabelsSeqRef.current;
     try {
       const labels = await orderFormFieldsApi.listSectionLabels(code);
+      if (seq !== sectionLabelsSeqRef.current) return;
       setSectionLabels(labels ?? {});
     } catch {
-      setSectionLabels({});
+      if (seq === sectionLabelsSeqRef.current) setSectionLabels({});
     }
   }, []);
 

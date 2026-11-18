@@ -11,7 +11,7 @@ import { Card, DatePicker, Form, Input, Segmented, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cashflowsApi } from "../shared/api/cashflows.api";
 import { studioExpensesApi } from "../shared/api/studioExpenses.api";
 import { optionSetsApi } from "../shared/api/options.api";
@@ -128,10 +128,15 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
     return () => { cancelled = true; };
   }, []);
 
+  // 筛选条件变化会重新触发 load；用请求序号丢弃过期响应，避免切类目/改日期后
+  // 旧请求后到覆盖新结果（与 useLedgerList 同一范式）。
+  const loadSeqRef = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     try {
       const savedItems = await readOptionSet(ITEM_SET_CODE);
+      if (seq !== loadSeqRef.current) return;
       setExpenseItems(savedItems);
       // 明细与已入账汇总一次取回：什么算工作室收支、收入/支出/净额怎么加，全在
       // service.studio_summary 里。前端不再拉两次、不再按 source 过滤、不再 reduce。
@@ -141,13 +146,14 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
         category,
         limit: FETCH_LIMIT,
       });
+      if (seq !== loadSeqRef.current) return;
       setFlows(result.items);
       setSummary(result);
       setError(null);
     } catch (err) {
-      setError(normalizeError(err));
+      if (seq === loadSeqRef.current) setError(normalizeError(err));
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
   }, [category, from, to]);
 

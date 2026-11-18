@@ -74,7 +74,11 @@ export function useImportWorkbenchController({
     void loadBatches();
   }, [loadBatches]);
 
+  // 切换批次会重新触发 loadDetail；用独立请求序号丢弃旧批次的响应（三个请求
+  // Promise.all 并发，慢批次后到会覆盖新批次的明细/预览/对账）。
+  const detailSeqRef = useRef(0);
   const loadDetail = useCallback(async () => {
+    const seq = ++detailSeqRef.current;
     if (batchId === null) {
       setRows([]);
       setPreview(null);
@@ -88,14 +92,15 @@ export function useImportWorkbenchController({
         importsApi.preview(batchId),
         importsApi.reconciliation(batchId),
       ]);
+      if (seq !== detailSeqRef.current) return;
       setRows(rowData.items);
       setPreview(previewData);
       setReport(reportData);
       setError(null);
     } catch (err) {
-      setError(normalizeError(err));
+      if (seq === detailSeqRef.current) setError(normalizeError(err));
     } finally {
-      setLoading(false);
+      if (seq === detailSeqRef.current) setLoading(false);
     }
   }, [batchId]);
 

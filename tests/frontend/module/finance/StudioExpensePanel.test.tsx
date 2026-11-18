@@ -271,4 +271,32 @@ describe("StudioExpensePanel：工作室支出", () => {
     });
   });
 
+  it("旧筛选请求后到不覆盖新筛选结果（请求竞态保护）", async () => {
+    // 第一次（全部科目）请求卡住，第二次（切到「房租」）立即返回新数据；
+    // 随后 resolve 第一次旧请求——若没有序号保护，旧数据会覆盖新数据。
+    let resolveFirst!: (value: ReturnType<typeof studioExpenseSummary>) => void;
+    const first = new Promise<ReturnType<typeof studioExpenseSummary>>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const freshFlows = [{ ...expenseFlows[0], id: 99, flow_no: "CF-NEW", category: "新科目的流水" }];
+    vi.mocked(studioExpensesApi.summary)
+      .mockImplementationOnce(() => first)
+      .mockResolvedValueOnce(
+        studioExpenseSummary(freshFlows as never, { expense: "1.00", net: "-1.00", count: 1 }),
+      );
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+
+    // 等第二次请求（切科目）完成，显示新数据。
+    await ui.click(screen.getByRole("combobox", { name: "工作室支出科目" }));
+    await ui.click(await screen.findByTitle("房租"));
+    await screen.findByText("新科目的流水");
+
+    // 旧请求此时才返回：不得覆盖新筛选结果。
+    resolveFirst(studioExpenseSummary(expenseFlows as never, { expense: "3000.00" }));
+    await waitFor(() => expect(screen.getByText("新科目的流水")).toBeInTheDocument());
+    // 旧数据的两行不应出现——若旧响应覆盖了新结果，这里就会失败。
+    expect(document.querySelector('tr[data-row-key="51"]')).toBeNull();
+    expect(document.querySelector('tr[data-row-key="52"]')).toBeNull();
+  });
+
 });

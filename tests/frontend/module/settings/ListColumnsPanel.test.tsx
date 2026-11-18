@@ -163,6 +163,41 @@ describe("ListColumnsPanel", () => {
     expect(screen.queryByText("对方 / 来源")).not.toBeInTheDocument();
   });
 
+  it("保存后切走再切回，仍显示刚保存的列配置（不被首次加载快照覆盖）", async () => {
+    // 后端保存结果：party 被隐藏。首次 all() 仍是旧快照（party 可见）。
+    const savedLedger: ListScopeConfig = {
+      ...ledger,
+      columns: ledger.columns.map((column) =>
+        column.key === "party" ? { ...column, is_visible: false } : column,
+      ),
+    };
+    vi.mocked(listColumnsApi.all).mockResolvedValue([ledger, inventory]);
+    vi.mocked(listColumnsApi.save).mockResolvedValue(savedLedger);
+    renderLight(<ListColumnsPanel />, { user: "admin" });
+    await waitFor(() => expect(screen.getByText("订单号")).toBeInTheDocument());
+
+    // 隐藏 party 并保存，回填后该行应显示「已隐藏」。
+    await userEvent.click(screen.getByRole("button", { name: "显示_party" }));
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(
+        within(screen.getByText("对方 / 来源").closest("tr") as HTMLElement).getByText("已隐藏"),
+      ).toBeInTheDocument(),
+    );
+
+    const master = screen.getByTestId("list-columns-master");
+    // 切到库存中心。
+    await userEvent.click(within(master).getByRole("combobox"));
+    await userEvent.click(await screen.findByTitle("库存中心"));
+    await waitFor(() => expect(screen.getByText("库存编号")).toBeInTheDocument());
+    // 切回订单台账：应仍是刚保存的「已隐藏」，而非回退成首次快照的「显示」。
+    await userEvent.click(within(master).getByRole("combobox"));
+    await userEvent.click(await screen.findByTitle("订单台账"));
+    await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());
+    const partyRow = screen.getByText("对方 / 来源").closest("tr") as HTMLElement;
+    expect(within(partyRow).getByText("已隐藏")).toBeInTheDocument();
+  });
+
   it("固定列：选中后随整表提交", async () => {
     renderLight(<ListColumnsPanel />);
     await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());

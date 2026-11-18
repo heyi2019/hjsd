@@ -76,7 +76,11 @@ export function useContractTableController(params: { contractType: string; reloa
   const [waiveForm] = Form.useForm();
   const [extendForm] = Form.useForm();
 
+  // 筛选条件/reloadKey 变化会重新触发 load；用请求序号丢弃过期响应，避免旧请求
+  // 后到覆盖新筛选的列表与合计（与 useLedgerList 同一范式）。
+  const loadSeqRef = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     try {
       // 日期区间、合约类型与合计都走服务端：列表与合计同条件，前端不再本地筛/本地求和。
@@ -90,13 +94,14 @@ export function useContractTableController(params: { contractType: string; reloa
         installmentsApi.list(rangeParams),
         installmentsApi.totals(rangeParams),
       ]);
+      if (seq !== loadSeqRef.current) return;
       setRows(list);
       setTotals(summary);
       setError(null);
     } catch (err) {
-      setError(normalizeError(err));
+      if (seq === loadSeqRef.current) setError(normalizeError(err));
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
   }, [contractType, dateFrom, dateTo, status]);
 

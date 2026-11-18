@@ -76,9 +76,15 @@ export function ListColumnsPanel() {
   const { data: loadedScopes, loading, error: loadError, reload } = useSettingsResource(load);
   const error = mutationError ?? loadError;
 
+  // 切 scope 由 switchScope 自己 setRows；effect 只在首次加载 / reload 时用服务端
+  // 数据重建快照。若把 activeScope 列进 effect 依赖，切换时会用 useSettingsResource
+  // 的旧 data 覆盖 applySaved 刚写入的配置（切走再切回即丢改动）。用 ref 读当前
+  // scope，既保留 reload 时「停在当前列表」的行为，也不会因 scope 变化重跑 effect。
+  const activeScopeRef = useRef(activeScope);
+  activeScopeRef.current = activeScope;
   useEffect(() => {
-    if (loadedScopes) applyScopes(loadedScopes, activeScope || undefined);
-  }, [activeScope, applyScopes, loadedScopes]);
+    if (loadedScopes) applyScopes(loadedScopes, activeScopeRef.current || undefined);
+  }, [applyScopes, loadedScopes]);
 
   const reloadPanel = useCallback(async () => {
     setMutationError(null);

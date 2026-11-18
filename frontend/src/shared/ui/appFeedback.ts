@@ -29,10 +29,10 @@ interface MsgFacade {
 }
 
 export const appMessage: MsgFacade = {
-  success: ((...a: any[]) => (resolveMsg() as any).success(...a)) as Msg["success"],
-  error: ((...a: any[]) => (resolveMsg() as any).error(...a)) as Msg["error"],
-  warning: ((...a: any[]) => (resolveMsg() as any).warning(...a)) as Msg["warning"],
-  info: ((...a: any[]) => (resolveMsg() as any).info(...a)) as Msg["info"],
-  open: ((...a: any[]) => (resolveMsg() as any).open(...a)) as Msg["open"],
-  destroy: ((...a: any[]) => (resolveMsg() as any).destroy(...a)) as Msg["destroy"],
+  success: (...args: Parameters<Msg["success"]>) => resolveMsg().success(...args),
+  error: (...args: Parameters<Msg["error"]>) => resolveMsg().error(...args),
+  warning: (...args: Parameters<Msg["warning"]>) => resolveMsg().warning(...args),
+  info: (...args: Parameters<Msg["info"]>) => resolveMsg().info(...args),
+  open: (...args: Parameters<Msg["open"]>) => resolveMsg().open(...args),
+  destroy: (...args: Parameters<Msg["destroy"]>) => resolveMsg().destroy(...args),
 };

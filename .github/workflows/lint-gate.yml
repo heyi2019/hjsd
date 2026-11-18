@@ -49,3 +49,9 @@ jobs:
         # stocks 不得依赖 orders。四层模型 0 豁免，新增违规 import 即红。
         working-directory: backend
         run: lint-imports
+
+      - name: Run shared layer gate
+        # shared 防膨胀：新模块须在 scripts/check_shared_layer.py 的 REGISTRY 登记
+        # 归位理由，且被 ≥2 业务域直接或传递引用，防止 shared 退化成垃圾桶层。
+        working-directory: backend
+        run: python scripts/check_shared_layer.py

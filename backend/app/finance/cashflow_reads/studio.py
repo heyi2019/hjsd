@@ -98,6 +98,14 @@ def studio_summary(
     income = sums.get(Direction.IN.value, Decimal("0.00"))
     expense = sums.get(Direction.OUT.value, Decimal("0.00"))
 
+    # 笔数按与明细同一套筛选条件做 SQL COUNT，不吃 items 的 limit（与 list_cashflows
+    # 的 total 同范式）。不能用 len(rows)：rows 来自 .limit(limit)，会让超过上限时漏算。
+    count_stmt = _apply_cashflow_filters(
+        select(Cashflow.id).outerjoin(Order, Order.id == Cashflow.order_id),
+        **common,
+    ).where(_studio_scope())
+    count = session.scalar(select(func.count()).select_from(count_stmt.subquery())) or 0
+
     _attach_extra_values(session, rows)
 
     return {
@@ -105,5 +113,5 @@ def studio_summary(
         "income": income,
         "expense": expense,
         "net": income - expense,
-        "count": len(rows),
+        "count": count,
     }

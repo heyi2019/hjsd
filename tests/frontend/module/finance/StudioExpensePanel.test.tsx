@@ -132,13 +132,14 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(screen.queryByText("全部状态")).not.toBeInTheDocument();
   });
 
-  it("三个汇总数取服务端，不与当页明细相加", async () => {
-    // 故意让后端汇总与两条明细（3000 + 100）对不上：卡片必须显示后端值。
+  it("金额与笔数都取服务端，不与当页明细条数相加", async () => {
+    // 故意让后端汇总与两条明细（3000 + 100）对不上：卡片必须显示后端值，
+    // 笔数用后端全量 count（42）而非当页 items.length（2），避免 limit 截断漏算。
     vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary(expenseFlows as never, {
       income: "888.88",
       expense: "777.77",
       net: "111.11",
-      count: 2,
+      count: 42,
     }));
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     await screen.findByText("房租");
@@ -148,6 +149,7 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(within(cardOf("收入")).getByText("888.88")).toBeInTheDocument();
     expect(within(cardOf("支出")).getByText("777.77")).toBeInTheDocument();
     expect(within(cardOf("净额")).getByText("111.11")).toBeInTheDocument();
+    expect(within(cardOf("笔数")).getByText("42")).toBeInTheDocument();
   });
 
   it("日期筛选和登记日期复用库存中心的日期选择器", async () => {

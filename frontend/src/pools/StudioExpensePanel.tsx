@@ -223,10 +223,11 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
     registerForm.resetFields();
   };
 
-  // 三个数都取服务端（Decimal 聚合，含净额），前端只负责显示。
+  // 三个金额与笔数都取服务端（Decimal 聚合 / 全量 COUNT），前端只负责显示。
   const income = summary?.income ?? "0.00";
   const expense = summary?.expense ?? "0.00";
   const netTotal = summary?.net ?? "0.00";
+  const flowCount = summary?.count ?? 0;
 
   const columns: ColumnsType<Cashflow> = [
     { title: "流水号", dataIndex: "flow_no" },
@@ -299,7 +300,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
           { label: "收入", amount: error ? null : income },
           { label: "支出", amount: error ? null : expense },
           { label: "净额", amount: error ? null : netTotal },
-          { label: "笔数", kind: "count", amount: error ? null : flows.length },
+          { label: "笔数", kind: "count", amount: error ? null : flowCount },
         ]}
       />
       <Card className="glass studio-expense-card">
@@ -328,7 +329,7 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
           rows={flows}
           page={1}
           pageSize={10}
-          total={flows.length}
+          total={flowCount}
           emptyText="暂无工作室收支"
           loading={loading}
           pagination={error ? false : undefined}

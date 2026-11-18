@@ -104,8 +104,9 @@ def test_summary_ignores_item_limit(seeded_client, seeded_db, headers):
     payload = _summary(seeded_client, headers, limit=1)
 
     assert len(payload["items"]) == 1
-    # 汇总走 SQL SUM，不吃 limit：三条 100 仍是 300。
+    # 汇总走 SQL SUM/COUNT，不吃 limit：三条 100 仍是 300，笔数仍是 3（不是当页 1 条）。
     assert Decimal(payload["expense"]) == Decimal("300.00")
+    assert payload["count"] == 3
 
 
 def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):

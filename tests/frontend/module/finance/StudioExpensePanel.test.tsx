@@ -274,8 +274,9 @@ describe("StudioExpensePanel：工作室支出", () => {
   it("旧筛选请求后到不覆盖新筛选结果（请求竞态保护）", async () => {
     // 第一次（全部科目）请求卡住，第二次（切到「房租」）立即返回新数据；
     // 随后 resolve 第一次旧请求——若没有序号保护，旧数据会覆盖新数据。
-    let resolveFirst!: (value: ReturnType<typeof studioExpenseSummary>) => void;
-    const first = new Promise<ReturnType<typeof studioExpenseSummary>>((resolve) => {
+    type SummaryResponse = Awaited<ReturnType<typeof studioExpensesApi.summary>>;
+    let resolveFirst!: (value: SummaryResponse) => void;
+    const first = new Promise<SummaryResponse>((resolve) => {
       resolveFirst = resolve;
     });
     const freshFlows = [{ ...expenseFlows[0], id: 99, flow_no: "CF-NEW", category: "新科目的流水" }];

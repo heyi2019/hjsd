@@ -141,16 +141,30 @@ def test_no_stray_backend_files_when_partitioned() -> None:
 
 
 def test_case_total_matches_manifest(request: pytest.FixtureRequest) -> None:
-    """用例总数与 manifest 一致。
+    """用例总数与 manifest 一致，只在全量收集时校验。
 
-    只在全量收集时校验：单跑本文件时 total 很小，硬比会误报。
-    （这是上一轮踩过的坑：基线断言必须先判断收集规模。）
+    判据用「本次收集的后端测试文件数 == manifest 登记数」，而不是写死用例数阈值。
+    早期版本用 ``total < 1000`` 判断全量：测试一旦缩水到 1000 以下，守卫反而
+    静默 skip，恰好在最该报警时失效。文件数判据没有这个盲区——
+    - 文件级缩水（文件被删/搬丢）由 test_backend_file_count_matches_manifest 抓；
+    - 文件内用例级缩水（文件数没变、用例少了）由本测试的总数对账抓。
+    两者互补，不引入新的魔法数字。
     """
+    expected_files = _manifest()["layers"]["backend"]["expected"]["files"]
+    collected = {
+        p.resolve()
+        for p in (
+            Path(str(getattr(item, "path", ""))) for item in request.session.items
+        )
+        if str(p) != "." and p.is_relative_to(BE_TESTS)
+    }
+    if len(collected) < expected_files:
+        pytest.skip(
+            f"本次收集覆盖 {len(collected)}/{expected_files} 个后端测试文件，非全量运行，跳过总数对账"
+        )
+    expected_cases = _manifest()["layers"]["backend"]["expected"]["cases"]
     total = len(request.session.items)
-    if total < 1000:
-        pytest.skip(f"当前只收集到 {total} 条用例，非全量运行，跳过总数校验")
-    expected = _manifest()["layers"]["backend"]["expected"]["cases"]
-    assert total == expected, f"用例总数 {total}，manifest 记 {expected}"
+    assert total == expected_cases, f"用例总数 {total}，manifest 记 {expected_cases}"
 
 
 def test_guards_declare_area() -> None:

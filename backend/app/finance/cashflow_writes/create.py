@@ -30,7 +30,7 @@ from app.shared.order_access import get_order
 from app.shared.form_field_rules import validate_form_extra
 from app.shared.form_values import set_extra_values
 from app.finance._common import _positive, _text
-from app.finance.cashflow_writes._shared import _validate_operator_user_ids
+from app.shared.operation_operators import validate_optional_operator_ids as _validate_operator_user_ids
 
 
 def create_cashflow(

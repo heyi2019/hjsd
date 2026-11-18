@@ -22,9 +22,9 @@ from app.domain.enums import (
     RebateType,
 )
 from app.domain.trade import Cashflow, OrderEvent, RebateRecord
-from app.domain.users import User
 from app.field_definitions.pools import require_default_pool
 from app.shared.order_access import get_order
+from app.shared.operation_operators import validate_optional_operator_ids
 from app.orders.events import post_event
 from app.shared.form_field_rules import validate_form_extra
 from ._common import _positive
@@ -83,7 +83,7 @@ def create_rebate(
 
     rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
     amount = _positive(amount, field="amount")
-    operator_ids = _validate_operator_user_ids(session, operator_user_ids)
+    operator_ids = validate_optional_operator_ids(session, operator_user_ids)
     record = RebateRecord(
         rebate_no=rebate_no,
         source_order_id=order.id,
@@ -157,17 +157,6 @@ def create_rebate(
     return record
 
 
-def _validate_operator_user_ids(session: Session, operator_user_ids: list[int] | None) -> list[int] | None:
-    if operator_user_ids is None:
-        return None
-    if len(set(operator_user_ids)) != len(operator_user_ids):
-        raise Validation("操作人不能重复选择", details={"field": "operator_user_ids"})
-    active_ids = set(session.scalars(select(User.id).where(User.id.in_(operator_user_ids), User.is_active.is_(True))))
-    if active_ids != set(operator_user_ids):
-        raise Validation("所选操作人不存在或已停用", details={"field": "operator_user_ids"})
-    return operator_user_ids
-
-
 def list_rebates(
     session: Session,
     *,
@@ -231,7 +220,7 @@ def update_rebate(
     if note is not None:
         record.note = note
     if operator_user_ids is not None:
-        record.operator_user_ids = _validate_operator_user_ids(session, operator_user_ids)
+        record.operator_user_ids = validate_optional_operator_ids(session, operator_user_ids)
     if form_extra is not None:
         record.form_extra = validate_form_extra(session, order_type_code="INVREBATE", values=form_extra) or None
     action_event = _rebate_action_event(session, record)

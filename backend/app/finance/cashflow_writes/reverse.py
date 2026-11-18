@@ -24,7 +24,8 @@ from app.domain.enums import (
 from app.domain.trade import Cashflow, OrderEvent
 from app.shared.form_field_rules import validate_form_extra
 from app.finance._common import _text
-from app.finance.cashflow_writes._shared import _get_cashflow, _validate_operator_user_ids
+from app.finance.cashflow_writes._shared import _get_cashflow
+from app.shared.operation_operators import validate_optional_operator_ids as _validate_operator_user_ids
 
 
 def reverse_cashflow(

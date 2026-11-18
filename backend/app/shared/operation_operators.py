@@ -12,6 +12,29 @@ from app.domain.foundation import BusinessOperationOperator
 from app.domain.users import User
 
 
+def validate_optional_operator_ids(
+    session: Session, operator_user_ids: list[int] | None
+) -> list[int] | None:
+    """校验「可选」操作人：None 直接透传，提供时去重 + 在职校验。
+
+    与 ``_resolve_operator_ids`` 的区别：本函数**不**注入默认当前人、**不**拒绝空
+    列表——用于返点/流水/事件登记等「不填则沿用默认、填了才校验」的登记场景。
+    空列表查询 ``in_([])`` 自然返回空集，与 ``set([])`` 相等故放行，保持既有行为。
+    """
+    if operator_user_ids is None:
+        return None
+    if len(set(operator_user_ids)) != len(operator_user_ids):
+        raise Validation("操作人不能重复选择", details={"field": "operator_user_ids"})
+    active_ids = set(
+        session.scalars(
+            select(User.id).where(User.id.in_(operator_user_ids), User.is_active.is_(True))
+        )
+    )
+    if active_ids != set(operator_user_ids):
+        raise Validation("所选操作人不存在或已停用", details={"field": "operator_user_ids"})
+    return operator_user_ids
+
+
 def _resolve_operator_ids(
     session: Session,
     *,

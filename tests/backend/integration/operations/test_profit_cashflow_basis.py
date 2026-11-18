@@ -33,7 +33,12 @@ from app.domain.trade import (
 )
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.shared.order_amounts import event_totals, order_amounts
+from app.shared.order_amounts import (
+    event_totals,
+    order_amounts,
+    order_cashflow_profit_by_order,
+)
+from app.reporting._shared import cashflow_totals_by_order
 from app.orders.router_output import _order_list_payload
 from app.policy.profit_allocation import service as policy_allocations
 from app.reporting.profit import order_profit_detail
@@ -393,3 +398,28 @@ def test_execution_summary_counts_rebate_income_and_bad_debt_expense(
     assert Decimal(summary["total_income"]) == Decimal("1600.00")
     assert Decimal(summary["total_expense"]) == Decimal("1400.00")
     assert Decimal(summary["net_amount"]) == Decimal("200.00")
+
+
+def test_profit_and_report_totals_share_same_cashflow_basis(seeded_db):
+    """利润权威取数口与报表取数口数值同源（PROFIT-02 / REPORT-01 铁律）。
+
+    ``order_cashflow_profit_by_order``（分润基数/订单列表）与
+    ``cashflow_totals_by_order``（报表 R1-R5）是两条独立 SQL 聚合，但必须共用
+    同一口径：收入 IN + 返点、支出 OUT + 坏账，押金损失重分类流水排除。
+    本用例覆盖全部四类来源，锁定二者数值恒等，防止任一处口径漂移。
+    """
+    order_id = _order_with_events(seeded_db, buy="1000", sell="1500")
+    _add_flow(seeded_db, order_id, "IN", "80")      # 额外流入
+    _add_flow(seeded_db, order_id, "OUT", "30")     # 额外流出
+    _add_rebate(seeded_db, order_id, "100")         # 返点收入
+    _add_bad_debt(seeded_db, order_id, "50")        # 坏账支出
+
+    profits = order_cashflow_profit_by_order(seeded_db, order_ids=[order_id])
+    totals = cashflow_totals_by_order(seeded_db, order_ids=[order_id])
+
+    by_order = totals[order_id]
+    assert profits[order_id] == by_order[0] - by_order[1]
+    # 独立核对金额（IN 1500+80 + 返点100；OUT 1000+30 + 坏账50）
+    assert profits[order_id] == Decimal("600.00")
+    assert by_order[0] == Decimal("1680.00")
+    assert by_order[1] == Decimal("1080.00")

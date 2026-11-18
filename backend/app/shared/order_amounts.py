@@ -29,7 +29,7 @@ from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money, to_money_or_zero
@@ -242,6 +242,65 @@ def order_profit_flow_by_order(
     return {key: (value[0], value[1]) for key, value in totals.items()}
 
 
+def cashflow_buckets_by_order(
+    session: Session,
+    *,
+    order_ids: Iterable[int] | None = None,
+    from_date: date | None = None,
+    to_date: date | None = None,
+) -> dict[int, tuple[Decimal, Decimal, Decimal]]:
+    """按订单汇总三大现金流桶：`{order_id: (所有收入, 所有支出, 其中账号成本)}`。
+
+    这是分润基数（``order_cashflow_profit_by_order``）与报表取数
+    （``reporting._shared.cashflow_totals_by_order``）共用的**唯一聚合原语**——
+    两者从同一个 bucket 投影，杜绝「利润说 100、报表说 90」的口径漂移（PROFIT-02 /
+    REPORT-01 铁律）。口径：收入 = 流水 IN + 返点记录；支出 = 流水 OUT + 分期坏账；
+    其中账号成本 = category=BUY 的 OUT 流水（仅作报表「其中项」展示，不参与净额）。
+    押金损失重分类流水由 ``business_cashflow_filter`` 排除；冲销是反向流水自然计入。
+    """
+    ids = _resolved_ids(order_ids)
+    if ids is not None and not ids:
+        return {}
+    income_case = case(
+        (Cashflow.direction == Direction.IN.value, Cashflow.amount), else_=0
+    )
+    expense_case = case(
+        (Cashflow.direction == Direction.OUT.value, Cashflow.amount), else_=0
+    )
+    account_cost_case = case(
+        (and_(Cashflow.direction == Direction.OUT.value, Cashflow.category == "BUY"),
+         Cashflow.amount),
+        else_=0,
+    )
+    stmt = (
+        select(
+            Cashflow.order_id,
+            func.coalesce(func.sum(income_case), 0),
+            func.coalesce(func.sum(expense_case), 0),
+            func.coalesce(func.sum(account_cost_case), 0),
+        )
+        .where(Cashflow.order_id.is_not(None), business_cashflow_filter())
+        .group_by(Cashflow.order_id)
+    )
+    if ids is not None:
+        stmt = stmt.where(Cashflow.order_id.in_(ids))
+    if from_date is not None:
+        stmt = stmt.where(Cashflow.occurred_on >= from_date)
+    if to_date is not None:
+        stmt = stmt.where(Cashflow.occurred_on <= to_date)
+    buckets: dict[int, list[Decimal]] = {
+        int(order_id): [to_money_or_zero(income), to_money_or_zero(expense), to_money_or_zero(cost)]
+        for order_id, income, expense, cost in session.execute(stmt).all()
+    }
+    for order_id, (rebate_income, bad_debt_expense) in order_profit_flow_by_order(
+        session, order_ids=ids, from_date=from_date, to_date=to_date
+    ).items():
+        row = buckets.setdefault(order_id, [ZERO, ZERO, ZERO])
+        row[0] += rebate_income
+        row[1] += bad_debt_expense
+    return {key: tuple(value) for key, value in buckets.items()}
+
+
 def order_cashflow_profit_by_order(
     session: Session,
     *,
@@ -255,37 +314,13 @@ def order_cashflow_profit_by_order(
     ids = _resolved_ids(order_ids)
     if ids is not None and not ids:
         return {}
-
-    stmt = (
-        select(
-            Cashflow.order_id,
-            Cashflow.direction,
-            func.coalesce(func.sum(Cashflow.amount), 0),
-        )
-        .where(Cashflow.order_id.is_not(None), business_cashflow_filter())
-        .group_by(Cashflow.order_id, Cashflow.direction)
-    )
-    if ids is not None:
-        stmt = stmt.where(Cashflow.order_id.in_(ids))
-
-    totals: dict[int, list[Decimal]] = defaultdict(lambda: [ZERO, ZERO])
-    for order_id, direction, total in session.execute(stmt).all():
-        bucket = totals[int(order_id)]
-        if direction == Direction.IN.value:
-            bucket[0] += to_money_or_zero(total)
-        else:
-            bucket[1] += to_money_or_zero(total)
-
-    for order_id, (rebate_income, bad_debt_expense) in order_profit_flow_by_order(
-        session, order_ids=ids
-    ).items():
-        bucket = totals.setdefault(order_id, [ZERO, ZERO])
-        bucket[0] += rebate_income
-        bucket[1] += bad_debt_expense
-
+    # 与报表取数共用唯一聚合原语，从同一个 bucket 投影净额（PROFIT-02 铁律）。
+    # 本函数不按日期过滤（历史契约），故不传 from_date/to_date。
     return {
         order_id: to_money(income - expense)
-        for order_id, (income, expense) in totals.items()
+        for order_id, (income, expense, _account_cost) in cashflow_buckets_by_order(
+            session, order_ids=ids
+        ).items()
     }
 
 

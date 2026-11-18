@@ -15,6 +15,11 @@ import { MoneyText, PermissionButton, StatusTag } from "../shared/ui";
 import type { Permission } from "../shared/state/session";
 import { SCHEDULE_STATUS_LABEL } from "./InstallmentsPanel.fragments";
 
+// 可用动作 key 由后端 action_availability 下发（InstallmentOut/ScheduleOut.available_actions）。
+// 前端只回显，不再按 status/dispositions 拼白名单——口径收敛到后端唯一来源。
+const can = (row: { available_actions: string[] }, key: string) =>
+  row.available_actions.includes(key);
+
 export type ContractColumnsDeps = {
   payForm: FormInstance;
   recoverForm: FormInstance;
@@ -125,7 +130,7 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
           <PermissionButton
             permission="order.event.post"
             size="small"
-            disabled={["SETTLED", "DELIVERED", "CLOSED", "CANCELLED"].includes(row.status)}
+            disabled={!can(row, "pay")}
             onClick={() => { payForm.resetFields(); setPayTarget(row); payForm.setFieldsValue({ paid_on: today() }); }}
           >
             登记收款
@@ -134,7 +139,7 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
             permission="order.event.post"
             size="small"
             type="primary"
-            disabled={row.status !== "SETTLED"}
+            disabled={!can(row, "deliver")}
             onClick={() => openDeliver(row)}
           >
             换绑交付
@@ -142,10 +147,7 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
           <PermissionButton
             permission="order.update"
             size="small"
-            disabled={
-              !(["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status)) ||
-              row.dispositions.some((item) => item.action === "RECOVER")
-            }
+            disabled={!can(row, "recover")}
             onClick={() => { recoverForm.resetFields(); setRecoverTarget(row); recoverForm.setFieldsValue({ occurred_on: today() }); }}
           >
             登记回收
@@ -154,7 +156,7 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
             permission="order.event.post"
             size="small"
             danger
-            disabled={!(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status))}
+            disabled={!can(row, "cancel")}
             onClick={() => { cancelForm.resetFields(); setCancelTarget(row); cancelForm.setFieldsValue({ cancelled_on: today() }); }}
           >
             终止分期并退款
@@ -162,7 +164,7 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
           <PermissionButton
             permission={settlePermission}
             size="small"
-            disabled={!(["PENDING", "ACTIVE", "OVERDUE"].includes(row.status))}
+            disabled={!can(row, "settle_early")}
             onClick={() => { settleForm.resetFields(); setSettleTarget(row); settleForm.setFieldsValue({ paid_on: today() }); }}
           >
             提前结清
@@ -171,14 +173,12 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
             permission="order.update"
             size="small"
             danger
-            disabled={!(["ACTIVE", "OVERDUE"].includes(row.status))}
+            disabled={!can(row, "default")}
             onClick={() => { defaultForm.resetFields(); setDefaultTarget(row); }}
           >
             登记违约
           </PermissionButton>
-          {["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status) &&
-            row.dispositions.some((item) => item.action === "RECOVER") &&
-            !row.dispositions.some((item) => item.action === "RESELL") && (
+          {can(row, "resale") && (
               <PermissionButton
                 permission="order.update"
                 size="small"
@@ -227,7 +227,7 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
           <PermissionButton
             permission="order.update"
             size="small"
-            disabled={["PAID", "WAIVED"].includes(schedule.status)}
+            disabled={!can(schedule, "waive")}
             onClick={() => {
               waiveForm.resetFields();
               setWaiveTarget(schedule);
@@ -239,7 +239,7 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
           <PermissionButton
             permission="order.update"
             size="small"
-            disabled={["PAID", "WAIVED"].includes(schedule.status)}
+            disabled={!can(schedule, "extend")}
             onClick={() => {
               extendForm.resetFields();
               setExtendTarget(schedule);

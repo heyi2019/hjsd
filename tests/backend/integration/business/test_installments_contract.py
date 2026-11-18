@@ -210,3 +210,54 @@ def test_list_dispositions_endpoint_returns_records(seeded_client, seeded_db, he
     assert response.status_code == 200, response.text
     assert any(item["action"] == "RECOVER" for item in response.json())
 
+
+# —— F5 available_actions 下发契约（等价搬运前端原 9 处判定，行为零变化）——
+def test_available_actions_match_legacy_frontend_rules():
+    """后端纯函数逐状态/处置穷举，与改造前前端 contractColumns.tsx 判定一致。"""
+    from app.installments import action_availability as av
+
+    def legacy_inst(status, disps):
+        acts = []
+        if status not in {"SETTLED", "DELIVERED", "CLOSED", "CANCELLED"}:
+            acts.append("pay")
+        if status == "SETTLED":
+            acts.append("deliver")
+        has_rec, has_resell = "RECOVER" in disps, "RESELL" in disps
+        if status in {"CLOSED", "OVERDUE", "DEFAULTED"} and not has_rec:
+            acts.append("recover")
+        if status in {"PENDING", "ACTIVE", "OVERDUE"}:
+            acts += ["cancel", "settle_early"]
+        if status in {"ACTIVE", "OVERDUE"}:
+            acts.append("default")
+        if status in {"CLOSED", "OVERDUE", "DEFAULTED"} and has_rec and not has_resell:
+            acts.append("resale")
+        return acts
+
+    for status in InstallmentStatus:
+        for disps in ([], ["RECOVER"], ["RESELL"], ["RECOVER", "RESELL"]):
+            assert av.available_installment_actions(status.value, disps) == legacy_inst(status.value, disps)
+    for status in ScheduleStatus:
+        expected = [] if status in {ScheduleStatus.PAID, ScheduleStatus.WAIVED} else ["waive", "extend"]
+        assert av.available_schedule_actions(status.value) == expected
+
+
+def test_list_endpoint_emits_available_actions(seeded_client, seeded_db, headers):
+    """列表接口真实下发合约级 + 期次级 available_actions；前端只回显。"""
+    account = _account(seeded_db, "avail-actions-account")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id, amount="800")
+    contract = _contract(
+        seeded_db, order.id,
+        contract_type=InstallmentContractType.STOCK_SALE.value,
+        principal="1000", down_payment="100", periods=1,
+        per_period="900", first_due_on=TODAY,
+    )
+    response = seeded_client.get("/api/v1/installments", headers=headers)
+    assert response.status_code == 200, response.text
+    row = next(item for item in response.json() if item["id"] == contract.id)
+    # PENDING 合约：可收款/终止/提前结清，不可交付/回收/违约/出售
+    assert set(row["available_actions"]) == {"pay", "cancel", "settle_early"}
+    assert row["schedules"], "合约应带期次明细"
+    # PENDING 期次：可减免/展期
+    assert set(row["schedules"][0]["available_actions"]) == {"waive", "extend"}
+

@@ -190,6 +190,7 @@ const installment: Installment = {
   },
   schedules: [],
   dispositions: [],
+  available_actions: ["pay", "cancel", "settle_early", "default"],
 };
 const installmentCancelResult: InstallmentCancelResult = {
   installment,

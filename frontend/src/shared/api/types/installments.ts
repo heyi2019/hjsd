@@ -30,6 +30,8 @@ export interface Installment {
   schedules: Schedule[];
   dispositions: InstallmentDisposition[];
   operation_operators: InstallmentOperationOperator[];
+  /** 后端下发的合约级可用动作（pay/deliver/recover/cancel/settle_early/default/resale）；前端只回显，不自行判定 */
+  available_actions: string[];
 }
 
 export interface InstallmentOperationOperator {
@@ -83,6 +85,8 @@ export interface Schedule {
   received_amount: string;
   waived_amount?: string;
   status: string;
+  /** 后端下发的期次可用动作（waive/extend）；前端只回显 */
+  available_actions: string[];
 }
 
 export interface InstallmentDisposition { id: number; installment_id: number; account_id: number; action: string; occurred_on: string; related_order_id?: number | null; note: string }

@@ -97,6 +97,8 @@ class ScheduleOut(BaseModel):
     received_amount: Decimal
     waived_amount: Decimal
     status: str
+    # 后端下发的期次可用动作（waive/extend）；前端只回显，不再按 status 判定
+    available_actions: list[str] = Field(default_factory=list)
 
 
 class DispositionOut(BaseModel):
@@ -155,6 +157,9 @@ class InstallmentOut(BaseModel):
     schedules: list[ScheduleOut] = Field(default_factory=list)
     dispositions: list[DispositionOut] = Field(default_factory=list)
     operation_operators: list[OperationOperatorOut] = Field(default_factory=list)
+    # 后端下发的合约级可用动作（pay/deliver/recover/cancel/settle_early/default/resale）；
+    # 等价搬运自前端原状态判定，前端只回显，不再自行拼状态白名单
+    available_actions: list[str] = Field(default_factory=list)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.domain.trade import Order
 from app.installments import schemas
 from app.installments import queries as inst_queries
+from app.installments import action_availability as actions
 from app.shared.form_values import get_extra_values_bulk
 from app.shared.operation_operators import (
     list_operation_operators_bulk,
@@ -59,12 +60,22 @@ def _installment_outputs(
             "operator": item.created_by,
             "extra_values": extras.get(item.id, {}),
             "order": order_context[item.order_id],
-            "schedules": [schemas.ScheduleOut.model_validate(row) for row in schedules_by_installment.get(item.id, [])],
+            "schedules": [
+                schemas.ScheduleOut.model_validate({
+                    **row.__dict__,
+                    "available_actions": actions.available_schedule_actions(row.status),
+                })
+                for row in schedules_by_installment.get(item.id, [])
+            ],
             "dispositions": [schemas.DispositionOut.model_validate(row) for row in dispositions_by_installment.get(item.id, [])],
             "operation_operators": [
                 schemas.OperationOperatorOut.model_validate(row)
                 for row in operator_rows_by_installment.get(item.inst_no, [])
             ],
+            "available_actions": actions.available_installment_actions(
+                item.status,
+                [row.action for row in dispositions_by_installment.get(item.id, [])],
+            ),
         })
         for item in items
     ]

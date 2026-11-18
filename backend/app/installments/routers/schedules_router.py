@@ -24,7 +24,8 @@ from app.domain.enums import AuditAction
 from app.domain.trade import InstallmentSchedule
 from app.installments import schemas
 from app.installments import _shared as inst__shared
-from app.installments import repayment as inst_repayment
+from app.installments.repayments.waive import waive_schedule as inst_waive
+from app.installments.repayments.extend import extend_schedule as inst_extend
 from app.core.actor import actor_name as _actor
 from app.shared.operation_operators import (
     get_operation_operators,
@@ -111,7 +112,7 @@ def waive_schedule(
     db: Session = Depends(get_db),
     user: CurrentUser = default_manage,
 ) -> schemas.ScheduleOut:
-    item = inst_repayment.waive_schedule(
+    item = inst_waive(
         db,
         installment_id,
         period_no=period_no,
@@ -136,7 +137,7 @@ def extend_schedule(
     db: Session = Depends(get_db),
     user: CurrentUser = default_manage,
 ) -> schemas.ScheduleOut:
-    item = inst_repayment.extend_schedule(
+    item = inst_extend(
         db,
         installment_id,
         period_no=period_no,

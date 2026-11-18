@@ -19,7 +19,7 @@ from app.domain.foundation import Pool
 from app.domain.trade import Account, Installment, Order, OrderEvent
 from app.installments import create as inst_create
 from app.installments import recovery as inst_recovery
-from app.installments import repayment as inst_repayment
+from app.installments.repayments.pay import pay as inst_pay
 from app.orders import events
 from app.orders._shared import _audit_value
 from app.orders.create import create_order
@@ -75,10 +75,10 @@ def _settled_hs_installment(seeded_db):
     contract_id = seeded_db.scalar(
         select(Installment).where(Installment.order_id == order.id)
     ).id
-    inst_repayment.pay(
+    inst_pay(
         seeded_db, contract_id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="pytest"
     )
-    inst_repayment.pay(
+    inst_pay(
         seeded_db, contract_id, amount=Decimal("500"), paid_on=TODAY, period_no=1, actor="pytest"
     )
     return order

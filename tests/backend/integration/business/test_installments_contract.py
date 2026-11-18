@@ -29,7 +29,8 @@ from app.installments import _shared as inst__shared
 from app.installments import create as inst_create
 from app.installments import queries as inst_queries
 from app.installments import recovery as inst_recovery
-from app.installments import repayment as inst_repayment
+from app.installments.repayments.pay import pay as inst_pay
+from app.installments.repayments.cancel import cancel_installment as inst_cancel
 from app.installments import settlement as inst_settlement
 from app.orders.create import create_order
 from app.orders.events import post_event
@@ -117,7 +118,7 @@ def test_cancel_distribution_installment_uses_business_specific_account_result(
         per_period="100",
     )
 
-    inst_repayment.cancel_installment(
+    inst_cancel(
         seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="取消分期"
     )
 
@@ -127,7 +128,7 @@ def test_cancel_distribution_installment_uses_business_specific_account_result(
 def test_installment_payment_is_cashflow_only(seeded_db):
     order = _order(seeded_db)
     contract = _contract(seeded_db, order.id, down_payment="0", periods=1, per_period="100", principal="100")
-    inst_repayment.pay(
+    inst_pay(
         seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=1, actor="pytest"
     )
     payment_flow = seeded_db.scalar(
@@ -162,7 +163,7 @@ def test_final_period_absorbs_rounding_difference(seeded_db):
     assert [item.due_amount for item in schedules] == [Decimal("0"), Decimal("333.34"), Decimal("333.34"), Decimal("333.32")]
     assert inst__shared.total_receivable(contract) == Decimal("1000.00")
     for number, amount in [(1, "333.34"), (2, "333.34"), (3, "333.32")]:
-        inst_repayment.pay(seeded_db, contract.id, amount=amount, paid_on=TODAY, period_no=number, actor="pytest")
+        inst_pay(seeded_db, contract.id, amount=amount, paid_on=TODAY, period_no=number, actor="pytest")
     assert contract.status == InstallmentStatus.SETTLED.value
     assert contract.paid_amount == Decimal("1000.00")
 

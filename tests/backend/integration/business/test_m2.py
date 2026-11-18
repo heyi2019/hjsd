@@ -24,7 +24,7 @@ from app.finance.rebates import create_rebate
 from app.installments import _shared as inst__shared
 from app.installments import create as inst_create
 from app.installments import recovery as inst_recovery
-from app.installments import repayment as inst_repayment
+from app.installments.repayments.pay import pay as inst_pay
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.finance.balances import pool_balance
@@ -86,15 +86,15 @@ class TestA04DistributionInstallmentSale:
         assert contract.inst_no == f"{order.order_no}-FQ"
         assert inst__shared.total_receivable(contract) == Decimal("1200.00")
 
-        inst_repayment.pay(
+        inst_pay(
             seeded_db, contract.id, amount=Decimal("200"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
-        inst_repayment.pay(
+        inst_pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=1, actor="pytest",
         )
-        inst_repayment.pay(
+        inst_pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=2, actor="pytest",
         )
@@ -165,7 +165,7 @@ class TestA04DistributionInstallmentSale:
         )
         seeded_db.commit()
         with pytest.raises(Exception) as exc:
-            inst_repayment.pay(
+            inst_pay(
                 seeded_db, contract.id, amount=Decimal("600"), paid_on=TODAY,
                 period_no=1, actor="pytest",
             )
@@ -212,11 +212,11 @@ class TestA05HsStockSale:
         assert len(buys) == 1
         assert str(buys[0].amount) == "800.00"
 
-        inst_repayment.pay(
+        inst_pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
-        inst_repayment.pay(
+        inst_pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=1, actor="pytest",
         )
@@ -225,7 +225,7 @@ class TestA05HsStockSale:
         assert contract.status == InstallmentStatus.ACTIVE.value
         assert contract.paid_amount == Decimal("600.00")
 
-        inst_repayment.pay(
+        inst_pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=2, actor="pytest",
         )

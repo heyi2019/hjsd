@@ -16,7 +16,7 @@ from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
 from app.installments import create as inst_create
 from app.installments import recovery as inst_recovery
-from app.installments import repayment as inst_repayment
+from app.installments.repayments.pay import pay as inst_pay
 from app.orders.create import add_customer_role, create_order
 from app.orders.events import post_event
 from app.customer_center.counterparties import create_counterparty
@@ -74,11 +74,11 @@ def _settled_hs_installment(seeded_db):
         first_due_on=TODAY,
         actor="pytest",
     )
-    inst_repayment.pay(
+    inst_pay(
         seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
         period_no=0, actor="pytest",
     )
-    inst_repayment.pay(
+    inst_pay(
         seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
         period_no=1, actor="pytest",
     )

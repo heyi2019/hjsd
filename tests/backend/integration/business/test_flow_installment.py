@@ -25,7 +25,7 @@ from app.orders import events
 from app.orders.create import create_order
 from app.installments.create import create_installment
 from app.installments.recovery import deliver
-from app.installments.repayment import pay
+from app.installments.repayments.pay import pay
 
 TODAY = date(2026, 10, 7)
 

@@ -26,7 +26,9 @@ from app.installments import _shared as inst__shared
 from app.installments import create as inst_create
 from app.installments import queries as inst_queries
 from app.installments import recovery as inst_recovery
-from app.installments import repayment as inst_repayment
+from app.installments.repayments.pay import pay as inst_pay
+from app.installments.repayments.waive import waive_schedule as inst_waive
+from app.installments.repayments.extend import extend_schedule as inst_extend
 from app.installments import settlement as inst_settlement
 from app.orders.create import create_order
 from app.orders.events import post_event
@@ -148,7 +150,7 @@ class TestMarkOverdue:
             first_due_on=PAST,
         )
         # 收过首付 → 合约 ACTIVE（区别于 PENDING 分支）
-        inst_repayment.pay(
+        inst_pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
@@ -184,7 +186,7 @@ class TestMarkOverdue:
             periods=2,
             per_period="300",
         )
-        inst_repayment.pay(
+        inst_pay(
             seeded_db,
             contract.id,
             amount=Decimal("100"),
@@ -220,7 +222,7 @@ class TestMarkOverdue:
             per_period="300",
             first_due_on=PAST,
         )
-        inst_repayment.pay(
+        inst_pay(
             seeded_db,
             contract.id,
             amount=Decimal("100"),
@@ -275,7 +277,7 @@ class TestMarkOverdue:
             seeded_db, contract.id, actor="risk", reason="逾期未还"
         )
 
-        paid, _schedule = inst_repayment.pay(
+        paid, _schedule = inst_pay(
             seeded_db,
             contract.id,
             amount=Decimal("300"),
@@ -304,7 +306,7 @@ class TestMarkOverdue:
             seeded_db, order.id, down_payment="100", periods=1, per_period="300"
         )
 
-        schedule = inst_repayment.waive_schedule(
+        schedule = inst_waive(
             seeded_db,
             contract.id,
             period_no=1,
@@ -321,7 +323,7 @@ class TestMarkOverdue:
         assert contract.waived_amount == Decimal("300.00")
         assert inst__shared.total_receivable(contract) == Decimal("100.00")
         with pytest.raises(Validation, match="超过剩余应收"):
-            inst_repayment.pay(
+            inst_pay(
                 seeded_db, contract.id, amount=Decimal("301"), paid_on=TODAY,
                 period_no=1, actor="pytest",
             )
@@ -329,12 +331,12 @@ class TestMarkOverdue:
     def test_waive_received_schedule_is_rejected(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id, periods=1, per_period="300")
-        inst_repayment.pay(
+        inst_pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
         with pytest.raises(Validation, match="已收期"):
-            inst_repayment.waive_schedule(
+            inst_waive(
                 seeded_db,
                 contract.id,
                 period_no=0,
@@ -360,7 +362,7 @@ class TestMarkOverdue:
         assert schedule is not None
         original_due_on = schedule.due_on
 
-        extended = inst_repayment.extend_schedule(
+        extended = inst_extend(
             seeded_db,
             contract.id,
             period_no=1,

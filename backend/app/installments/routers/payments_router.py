@@ -18,7 +18,8 @@ from app.auth.session import (
     require_permissions,
 )
 from app.installments import schemas
-from app.installments import repayment as inst_repayment
+from app.installments.repayments.pay import pay as inst_pay
+from app.installments.repayments.cancel import cancel_installment as inst_cancel
 from app.installments import settlement as inst_settlement
 from app.core.actor import actor_name as _actor
 
@@ -44,7 +45,7 @@ def pay_installment(
     db: Session = Depends(get_db),
     user: CurrentUser = post_payment,
 ) -> schemas.PaymentResult:
-    installment, schedule = inst_repayment.pay(
+    installment, schedule = inst_pay(
         db,
         installment_id,
         amount=payload.amount,
@@ -72,7 +73,7 @@ def cancel_installment(
     db: Session = Depends(get_db),
     user: CurrentUser = post_payment,
 ) -> schemas.InstallmentCancelResult:
-    result = inst_repayment.cancel_installment(
+    result = inst_cancel(
         db,
         installment_id,
         cancelled_on=payload.cancelled_on,

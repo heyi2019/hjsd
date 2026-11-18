@@ -30,7 +30,7 @@ from app.domain.trade import (
     InstallmentSchedule,
 )
 
-from .repayment import pay
+from .repayments.pay import pay
 
 from ._shared import (
     _merge_form_extra,

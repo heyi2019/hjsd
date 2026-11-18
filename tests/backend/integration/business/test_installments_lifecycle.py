@@ -26,7 +26,9 @@ from app.installments import _shared as inst__shared
 from app.installments import create as inst_create
 from app.installments import queries as inst_queries
 from app.installments import recovery as inst_recovery
-from app.installments import repayment as inst_repayment
+from app.installments.repayments.pay import pay as inst_pay
+from app.installments.repayments.pay import _pick_schedule as inst_pick
+from app.installments.repayments.waive import waive_schedule as inst_waive
 from app.installments import settlement as inst_settlement
 from app.orders.create import create_order
 from app.orders.events import post_event
@@ -113,7 +115,7 @@ class TestPayGuards:
             seeded_db, order.id, down_payment="100", periods=1, per_period="300"
         )
         with pytest.raises(NotFound):
-            inst_repayment.pay(
+            inst_pay(
                 seeded_db,
                 contract.id,
                 amount=Decimal("100"),
@@ -140,7 +142,7 @@ class TestPayGuards:
     def test_payment_updates_contract_operator(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id)
-        inst_repayment.pay(
+        inst_pay(
             seeded_db,
             contract.id,
             amount=Decimal("100"),
@@ -161,7 +163,7 @@ class TestPayGuards:
             principal="100",
         )
 
-        inst_repayment.waive_schedule(
+        inst_waive(
             seeded_db,
             contract.id,
             period_no=1,
@@ -186,7 +188,7 @@ class TestPayGuards:
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id)
         with pytest.raises(Validation, match="必须大于 0"):
-            inst_repayment.pay(
+            inst_pay(
                 seeded_db,
                 contract.id,
                 amount=Decimal("0"),
@@ -199,11 +201,11 @@ class TestPayGuards:
         contract = _contract(
             seeded_db, order.id, down_payment="100", periods=1, per_period="500"
         )
-        inst_repayment.pay(
+        inst_pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
-        inst_repayment.pay(
+        inst_pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=1, actor="pytest",
         )
@@ -216,7 +218,7 @@ class TestPayGuards:
             delivered_on=TODAY, note="平台操作换绑凭证", actor="pytest",
         )
         with pytest.raises(Conflict) as exc:
-            inst_repayment.pay(
+            inst_pay(
                 seeded_db, contract.id, amount=Decimal("1"), paid_on=TODAY,
                 actor="pytest",
             )
@@ -226,7 +228,7 @@ class TestPayGuards:
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id, periods=1)
         with pytest.raises(NotFound) as exc:
-            inst_repayment.pay(
+            inst_pay(
                 seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
                 period_no=99, actor="pytest",
             )
@@ -238,13 +240,13 @@ class TestPayGuards:
             seeded_db, order.id, down_payment="100", periods=2, per_period="300"
         )
         # 未指定期次：按到期日顺序取第一笔未收满 → 期次 0（首付）
-        _, first = inst_repayment.pay(
+        _, first = inst_pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             actor="pytest",
         )
         assert first.period_no == 0
         # 期次 0 收满后自动落到期次 1
-        _, second = inst_repayment.pay(
+        _, second = inst_pay(
             seeded_db, contract.id, amount=Decimal("50"), paid_on=TODAY,
             actor="pytest",
         )
@@ -256,7 +258,7 @@ class TestPayGuards:
         # 直调私有函数覆盖"所有期次已收满"防御分支
         _, contract = self._settled_dg(seeded_db, "allpaid")
         with pytest.raises(Validation) as exc:
-            inst_repayment._pick_schedule(seeded_db, contract, None, TODAY)
+            inst_pick(seeded_db, contract, None, TODAY)
         assert "所有期次已收满" in str(exc.value)
 
 # ------------------------------------------------------------------ 交付守卫
@@ -266,11 +268,11 @@ class TestDeliverGuards:
         contract = _contract(
             seeded_db, order.id, down_payment="100", periods=1, per_period="500"
         )
-        inst_repayment.pay(
+        inst_pay(
             seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
             period_no=0, actor="pytest",
         )
-        inst_repayment.pay(
+        inst_pay(
             seeded_db, contract.id, amount=Decimal("500"), paid_on=TODAY,
             period_no=1, actor="pytest",
         )

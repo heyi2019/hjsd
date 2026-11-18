@@ -84,7 +84,7 @@ export function markMobileHiddenColumns<T extends { key?: unknown; dataIndex?: u
         const cellClass = typeof cell.className === "string" ? cell.className : "";
         return { ...cell, className: [cellClass, MOBILE_HIDE_CLASS].filter(Boolean).join(" ") };
       },
-    } as unknown as T;
+    } as T;
   });
 }
 
@@ -181,18 +181,22 @@ function buildCustomColumns<T extends { key?: unknown; dataIndex?: unknown }>(
 ): T[] {
   return config.columns
     .filter((column) => column.custom && column.source_key)
-    .map(
-      (column) =>
-        ({
-          key: column.key,
-          title: column.label,
-          render: (_value: unknown, row: unknown) =>
-            formatCustomValue(
-              readCustomValue(row, column.source_key as string),
-              column.value_labels,
-            ),
-        }) as unknown as T,
-    );
+    .map((column) => {
+      // 从零构造的列对象不继承任何 T 的字段，而 T 可能是嵌套 ColumnsType，
+      // 故此处必须经 unknown 中转（as T 会报 TS2352 无足够重叠）。这是泛型边界
+      // 的必要断言，与下方 markMobileHiddenColumns / applyColumnConfig 的 spread
+      // 后可安全 as T 不同——那两处结果继承 T 字段，双重断言是多余的。
+      const custom = {
+        key: column.key,
+        title: column.label,
+        render: (_value: unknown, row: unknown) =>
+          formatCustomValue(
+            readCustomValue(row, column.source_key as string),
+            column.value_labels,
+          ),
+      };
+      return custom as unknown as T;
+    });
 }
 
 /** 纯函数：按配置过滤 + 排序 + 覆盖固定态（便于单测；hook 只是数据来源包装）。
@@ -226,7 +230,7 @@ export function applyColumnConfig<T extends { key?: unknown; dataIndex?: unknown
           : ({
               ...column,
               ...(fixedOverride ? { fixed: fixedOverride } : {}),
-            } as unknown as T);
+            } as T);
       return { column: merged, index, key };
     })
     .filter((item) => visible.get(item.key) ?? true);

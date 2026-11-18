@@ -9,6 +9,7 @@ import pytest
 from app.domain.trade import Deposit
 from app.finance.deposits import _status_after_loss, _status_after_return
 from app.finance.schemas import CashflowCreate
+from app.shared.order_amounts import is_deposit_loss_flow
 
 
 def test_finance_router_only_exposes_the_composed_router() -> None:
@@ -72,3 +73,32 @@ def test_status_after_loss_partial_keeps_original_status() -> None:
 
 def test_status_after_loss_full_is_lost() -> None:
     assert _status_after_loss(_deposit("300", returned="250", lost="50")) == "LOST"
+
+
+@pytest.mark.parametrize(
+    ("attribute", "direction", "category", "expected"),
+    [
+        # 唯一的押金损失流水：DEPOSIT + OUT + 非 HOLD（净额为负重分类，须被聚合排除）
+        ("DEPOSIT", "OUT", "DEPOSIT_LOSS", True),
+        ("DEPOSIT", "OUT", None, True),
+        # 交押金 OUT + HOLD、退押金 IN 都是真实资金流，不是损失
+        ("DEPOSIT", "OUT", "DEPOSIT_HOLD", False),
+        ("DEPOSIT", "IN", "DEPOSIT_RELEASE", False),
+        ("DEPOSIT", "IN", None, False),
+        # 非押金属性一律不是押金损失（含 NULL，规避 SQL 三值逻辑误删）
+        (None, "OUT", "OTHER", False),
+        (None, "OUT", None, False),
+        ("SELF_REVENUE", "OUT", "OTHER", False),
+        ("DEPOSIT", "IN", "DEPOSIT_HOLD", False),
+    ],
+)
+def test_is_deposit_loss_flow_mirrors_sql_predicate(
+    attribute: str | None, direction: str, category: str | None, expected: bool
+) -> None:
+    """押金损失判定的 Python 版须与 business_cashflow_filter 的排除项严格镜像。
+
+    尤其 attribute=NULL 不得误判为损失——SQL 谓词正向写法正是为规避此三值逻辑陷阱。
+    """
+    assert is_deposit_loss_flow(
+        accounting_attribute=attribute, direction=direction, category=category
+    ) is expected

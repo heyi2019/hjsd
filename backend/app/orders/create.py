@@ -1,14 +1,16 @@
 """orders.create：订单建档与参与方写入（ORD-01）。
 
 建单只落订单主档与参与关系，金额一律由后续事件派生，不在建档时写汇总。
-"""
 
+实现已拆至 `orders/create_roles/`（guards / roles）；本文件保留
+`create_order` 编排与整合出口，调用方无需改动。
+"""
 from __future__ import annotations
 
-from collections.abc import Mapping
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any
+
 from app.shared.audit import record_audit
 from app.core.security import CurrentUser
 from app.domain.users import User
@@ -18,127 +20,30 @@ from app.shared.form_field_rules import validate_business_responsible, validate_
 from app.customer_center.counterparties import assert_counterparty_usable
 from app.customer_center.customer_merge import assert_customer_usable
 from app.shared.form_values import set_extra_values
-from app.shared.order_access import get_order
 from app.policy import versions as policy_versions
 from app.stocks.profile import get_account
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.core.errors import (
-    ErrorCode,
-    Validation,
-)
-from app.domain.trade import (
-    Account,
-    Order,
-    OrderFormField,
-)
-from app.domain.enums import (
-    AccountStatus,
-    AuditAction,
-    CommissionMode,
-    CommissionPayer,
-    OrderStatus,
-    PolicyType,
-)
+from app.core.errors import ErrorCode, Validation
+from app.domain.trade import Account, Order, OrderFormField
+from app.domain.enums import AuditAction, OrderStatus, PolicyType
 
-from ._shared import (
+from app.orders._shared import (
     _create_inline_inventory_account,
     _normalize_account_snapshot,
-    _normalize_commission_value,
     _validate_existing_account_context,
     _validate_participant_roles,
 )
-
-
-def _assert_no_duplicate_inventory_account(
-    session: Session,
-    *,
-    game_account: str,
-    game_type: str | None,
-    confirm_repurchase: bool,
-) -> None:
-    """建单判重：同一游戏账号 + 游戏类型不得重复进入库存。
-
-    口径（原前端建单弹窗的逻辑，现由后端统一判定）：
-
-    - 已有**未售出**账号（除 ``SOLD`` / ``VOID`` 外的任何状态）→ 直接拒绝；
-    - 仅**已售出**记录 → 视为复购回流，需 ``confirm_repurchase`` 显式确认；
-    - ``VOID``（已取消/作废）不参与判重，取消后可用同一账号重新建单。
-
-    缺 ``game_type`` 时按账号单键判重，避免调用方通过省略产品类型绕过库存保护。
-    """
-    filters = [
-        Account.game_account == game_account,
-        Account.status != AccountStatus.VOID.value,
-    ]
-    if game_type:
-        filters.append(Account.game_type == game_type)
-    rows = list(
-        session.scalars(
-            select(Account).where(*filters)
-        ).all()
-    )
-    if not rows:
-        return
-    unsold = [row for row in rows if row.status != AccountStatus.SOLD.value]
-    reported = unsold or rows
-    details = {
-        "field": "game_account",
-        "game_account": game_account,
-        "game_type": game_type,
-        "account_ids": [row.id for row in reported],
-        "stock_nos": [row.stock_no for row in reported],
-    }
-    if unsold:
-        raise Validation(
-            f"已有未售出库存账号「{game_account}」，请先售出后再建单",
-            code=ErrorCode.INVENTORY_ACCOUNT_IN_STOCK,
-            details=details,
-        )
-    if not confirm_repurchase:
-        raise Validation(
-            f"历史库存账号「{game_account}」已售出，请确认是否为复购回流订单",
-            code=ErrorCode.REPURCHASE_CONFIRM_REQUIRED,
-            details=details,
-        )
-
-
-def _normalize_commission_context(
-    *,
-    commission_mode: str | None,
-    commission_payer: str | None,
-    order_type_code: str,
-) -> tuple[str | None, str | None]:
-    """佣金口径校验：仅 DG 可用、支付方式与承担方成对，DB CHECK 同口径。"""
-    # 佣金口径：仅 DG 代挂单可用，且支付方式与承担方必须成对出现（DB CHECK 同口径）。
-    normalized_commission_mode = _normalize_commission_value(commission_mode, "commission_mode")
-    normalized_commission_payer = _normalize_commission_value(commission_payer, "commission_payer")
-    if (normalized_commission_mode is None) != (normalized_commission_payer is None):
-        raise Validation(
-            "佣金支付方式与佣金承担方必须同时填写或同时留空",
-            details={
-                "commission_mode": normalized_commission_mode,
-                "commission_payer": normalized_commission_payer,
-            },
-        )
-    if normalized_commission_mode is not None:
-        if order_type_code != "DG":
-            raise Validation(
-                "只有 DG 代挂订单可以填写佣金口径",
-                details={"order_type": order_type_code},
-            )
-        if normalized_commission_mode not in CommissionMode.values():
-            raise Validation(
-                f"commission_mode 必须为 {CommissionMode.values()}",
-                details={"field": "commission_mode", "value": normalized_commission_mode},
-            )
-        if normalized_commission_payer not in CommissionPayer.values():
-            raise Validation(
-                f"commission_payer 必须为 {CommissionPayer.values()}",
-                details={"field": "commission_payer", "value": normalized_commission_payer},
-            )
-    return normalized_commission_mode, normalized_commission_payer
-
+from app.orders.create_roles.guards import (
+    _assert_no_duplicate_inventory_account,
+    _normalize_commission_context,
+)
+from app.orders.create_roles.roles import (
+    _counterparty_role,
+    _customer_role,
+    add_counterparty_role,
+    add_customer_role,
+)
 
 def create_order(
     session: Session,
@@ -421,67 +326,12 @@ def create_order(
     return order
 
 
-def _customer_role(order_id: int, customer_id: int, role: str):
-    from app.domain.parties import OrderCustomerRole
-
-    return OrderCustomerRole(order_id=order_id, customer_id=customer_id, role=role)
-
-
-def add_customer_role(
-    session: Session, order_id: int, customer_id: int, role: str, *,
-    actor: str, user: CurrentUser | None = None,
-) -> Order:
-    """向已有订单追加客户角色（按 order_id+customer_id+role 去重）；
-
-    用于库存售出时把买家挂到来源单——来源单在入库时已建档，售出不再新建订单。
-    """
-    order = get_order(session, order_id, user)
-    # 与建单同一套参与方护栏：角色合法、符合订单类型白名单、客户仍可用。
-    # 缺任一校验都会让「售后追挂买家」绕过停用/合并客户与角色白名单。
-    _validate_participant_roles(order.order_type, [(customer_id, role)], [])
-    assert_customer_usable(session, customer_id, user=user)
-    from app.domain.parties import OrderCustomerRole
-    from sqlalchemy import select
-
-    existing = session.scalar(
-        select(OrderCustomerRole.id).where(
-            OrderCustomerRole.order_id == order_id,
-            OrderCustomerRole.customer_id == customer_id,
-            OrderCustomerRole.role == role,
-        )
-    )
-    if existing is None:
-        session.add(_customer_role(order_id, customer_id, role))
-        session.flush()
-    return order
-
-
-def add_counterparty_role(
-    session: Session, order_id: int, counterparty_id: int, role: str, *,
-    actor: str, user: CurrentUser | None = None,
-) -> Order:
-    """向已有订单追加合作方角色（详情编辑使用）。"""
-    order = get_order(session, order_id, user)
-    _validate_participant_roles(order.order_type, [], [(counterparty_id, role)])
-    assert_counterparty_usable(session, counterparty_id, expected_type=role)
-    from app.domain.parties import OrderCounterpartyRole
-
-    existing = session.scalar(
-        select(OrderCounterpartyRole.id).where(
-            OrderCounterpartyRole.order_id == order_id,
-            OrderCounterpartyRole.counterparty_id == counterparty_id,
-            OrderCounterpartyRole.role == role,
-        )
-    )
-    if existing is None:
-        session.add(_counterparty_role(order_id, counterparty_id, role))
-        session.flush()
-    return order
-
-
-def _counterparty_role(order_id: int, counterparty_id: int, role: str):
-    from app.domain.parties import OrderCounterpartyRole
-
-    return OrderCounterpartyRole(
-        order_id=order_id, counterparty_id=counterparty_id, role=role
-    )
+__all__ = [
+    "create_order",
+    "add_customer_role",
+    "add_counterparty_role",
+    "_assert_no_duplicate_inventory_account",
+    "_normalize_commission_context",
+    "_customer_role",
+    "_counterparty_role",
+]

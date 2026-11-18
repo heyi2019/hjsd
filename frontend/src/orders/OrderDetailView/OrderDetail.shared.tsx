@@ -48,13 +48,6 @@ export const OPERATION_CATEGORY_LABEL: Record<OrderExecutionCategory, string> = 
   OUTBOUND: "账号出库",
 };
 
-/** 操作明细按账号生命周期归类：入库 / 运营 / 出库。 */
-export function classifyEventCategory(eventType: string | null | undefined): OrderExecutionCategory {
-  if (eventType === "BUY") return "INBOUND";
-  if (eventType === "SELL") return "OUTBOUND";
-  return "OPERATING";
-}
-
 export type OrderExecutionRow = {
   key: string;
   orderId: number;

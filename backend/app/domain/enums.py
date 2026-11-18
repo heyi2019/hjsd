@@ -146,17 +146,6 @@ class EntityType(StrEnum):
     COUNTERPARTY = "counterparty"
 
 
-class FieldType(StrEnum):
-    """表单扩展字段支持的值类型；前后端与数据库共用同一封闭集合。"""
-
-    TEXT = "TEXT"
-    NUMBER = "NUMBER"
-    DATE = "DATE"
-    BOOLEAN = "BOOLEAN"
-    SELECT = "SELECT"
-    MULTI_SELECT = "MULTI_SELECT"
-
-
 # ---------------------------------------------------------------- 订单 / 事件
 class OrderStatus(StrEnum):
     """订单生命周期：普通处理中、分期中、已完成或已取消。"""

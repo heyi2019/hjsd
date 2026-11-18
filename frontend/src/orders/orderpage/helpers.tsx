@@ -183,10 +183,3 @@ export function filterBusinessOrders(
     && (!normalizedKeyword || orderSearchText(order).includes(normalizedKeyword))
   ));
 }
-
-export function countBusinessOrders(orders: Order[], type: BusinessFilterKey, mode: BusinessModeFilterKey): number {
-  return orders.filter((order) => (
-    (type === "all" || order.order_type === type)
-    && orderMatchesBusinessMode(order, mode)
-  )).length;
-}

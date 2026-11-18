@@ -83,9 +83,3 @@ export function isConsignmentListing(order: AccountExecutionOrder): boolean {
 export function isActiveConsignmentListing(order: AccountExecutionOrder): boolean {
   return activeConsignmentListings(order).length > 0;
 }
-
-export function hasUnlistedConsignment(order: AccountExecutionOrder): boolean {
-  const hasEventHistory = (order.events ?? []).some((event) => event.event_type === "OPERATE" && event.operation_type === "CONSIGNMENT");
-  const hasUnlistEvent = (order.events ?? []).some((event) => event.event_type === "OPERATE" && event.operation_type === "UNLIST");
-  return hasEventHistory && hasUnlistEvent;
-}

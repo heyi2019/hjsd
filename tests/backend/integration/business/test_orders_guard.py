@@ -157,7 +157,7 @@ def test_hs_sell_blocked_when_installment_exists(seeded_db):
 def test_hs_sell_requires_recovered_account(seeded_db):
     order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
     seeded_db.commit()
-    with pytest.raises(Validation, match="自营账号售出必须关联已回收账号"):
+    with pytest.raises(Validation, match="回收账号售出必须关联已回收的库存账号"):
         post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("100"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",

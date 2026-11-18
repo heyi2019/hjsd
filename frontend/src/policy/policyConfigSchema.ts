@@ -6,7 +6,7 @@
  *   多行费率表），表单完全由 schema 驱动，新增规则参数只改本文件，不碰 UI 代码。
  *
  * 关键事实（勿凭直觉改）：
- * - 后端只校验 config 是**非空对象**（app/policy/service.py:86，契约测试
+ * - 后端只校验 config 是**非空对象**（app/policy/_shared.py 的 _normalize_policy_config，契约测试
  *   test_create_version_notfound_and_empty_config 锁死），不校验 key 集合。
  * - 后端引擎消费规则的是 COMMISSION：订单分润弹窗按订单快照读取公司比例，
  *      盈利使用 split.COMPANY，亏损使用 loss_company_rate；动作人员仍在订单分润弹窗录入。

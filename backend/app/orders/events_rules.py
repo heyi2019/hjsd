@@ -74,7 +74,7 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
         raise Validation("HS 已建立分期合约，必须通过分期收款并在结清后交付")
     if order.account_id is None:
         raise Validation(
-            "自营账号售出必须关联已回收账号",
+            "回收账号售出必须关联已回收的库存账号",
             details={"order_type": order.order_type, "account_id": None},
         )
 

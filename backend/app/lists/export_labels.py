@@ -166,7 +166,7 @@ NESTED_VALUE_LABELS: dict[str, dict[str, str]] = {
         "REVERSAL": "冲销",
         "OTHER": "其他",
     },
-    # RebateType（前端 derived.py _rebate_type 同文案）
+    # RebateType（后端 orders/order_detail/view/derived.py 的 _rebate_type 同文案）
     "rebate_type": {"BUY": "买号返点", "SELL": "卖号返点"},
     # 关联状态（domain.enums LinkStatus）
     "link_status": {

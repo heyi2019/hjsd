@@ -109,7 +109,7 @@ export function PolicyVersionEditorModal({
       }
     }
     const config = fieldsToConfig(code, rest);
-    // 后端拒绝空 config（app/policy/service.py:86），这里先拦住并说明，避免 422 弹错。
+    // 后端拒绝空 config（app/policy/_shared.py 的 _normalize_policy_config），这里先拦住并说明，避免 422 弹错。
     if (Object.keys(config).length === 0) {
       setFormError("请至少填写一项规则参数后再保存。");
       return;

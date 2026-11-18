@@ -4,7 +4,7 @@ import { InventoryModals } from "./InventoryModals";
 import type { InventoryController } from "./useInventoryController";
 
 export function InventoryView({ controller }: { controller: InventoryController }) {
-  // 金额与库龄档位由后端汇总（口径见 backend tests/v1/test_inventory_stats.py）；
+  // 金额与库龄档位由后端汇总（口径见 tests/backend/integration/business/test_inventory_stats.py）；
   // 行数是这张表当前渲染的条数，属于视图事实，不额外绕一次请求。
   const stats = controller.inventoryStats;
 

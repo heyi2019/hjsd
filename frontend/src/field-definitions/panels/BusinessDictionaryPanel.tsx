@@ -64,7 +64,7 @@ export function BusinessDictionaryPanel() {
         <Descriptions.Item label="增值服务">
           <EntryLine
             name="分期服务"
-            desc="本方账号售出后，买家分期支付售卖款。账号售出后建立自营分期合约，按期登记买家回款；收齐后完成账号交付，每笔回款归集到原售出订单及其分期合约。"
+            desc="本方账号售出后，买家分期支付售卖款。账号售出后建立分期出售合约，按期登记买家回款；收齐后完成账号交付，每笔回款归集到原售出订单及其分期合约。"
           />
         </Descriptions.Item>
         <Descriptions.Item label="业务动作">

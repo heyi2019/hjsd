@@ -1,4 +1,4 @@
-"""foundation.router 输出装配 helper（资金账户 / 业务类型）。"""
+"""field_definitions.router 输出装配 helper（资金账户 / 业务类型）。"""
 from __future__ import annotations
 
 from sqlalchemy.orm import Session

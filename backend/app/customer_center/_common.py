@@ -1,4 +1,4 @@
-"""parties 领域共用的字段规则和客户输出转换。"""
+"""customer_center 领域共用的字段规则和客户输出转换。"""
 from __future__ import annotations
 
 from collections.abc import Mapping

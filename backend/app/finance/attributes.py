@@ -1,7 +1,7 @@
 """现金方向与核算属性的业务映射。
 
 订单事件核算属性映射已归位到 app/domain/cashflow_attributes.py（2026-11-18 P0-A，
-orders / vas 双方引用 domain 不再有反向依赖）；本文件只保留 finance 域内的映射。
+orders / installments 双方引用 domain 不再有反向依赖）；本文件只保留 finance 域内的映射。
 """
 from __future__ import annotations
 

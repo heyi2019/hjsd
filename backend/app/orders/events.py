@@ -56,8 +56,8 @@ def _auto_link_recovered_installment_sale(
 ) -> None:
     """库存中心完成出售后，自动关联该账号最近一次未转售的回收处置。
 
-    实际联动逻辑由 value_added_services 域经 collaboration 注册点注入
-    （orders 不得反向依赖 vas，见 backend/.importlinter）。
+    实际联动逻辑由 installments 域经 collaboration 注册点注入
+    （orders 不得反向依赖 installments，见 backend/.importlinter）。
     """
     from .collaboration import run_post_sell_hooks
 

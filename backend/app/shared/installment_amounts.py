@@ -1,8 +1,8 @@
 """shared.installment_amounts：分期总应收口径（全站唯一公式）。
 
-原在 `app/value_added_services/_shared.py::total_receivable`，被 value_added_services
-与 parties 两个域直接引用。放在 vas 下导致 parties 反向依赖 vas
-（形成 `parties ↔ value_added_services` 双向环）。
+原在 `app/installments/_shared.py::total_receivable`，被 installments
+与 customer_center 两个域直接引用。放在 installments 下导致 customer_center 反向依赖 installments
+（形成 `customer_center ↔ installments` 双向环）。
 
 归位理由（满足 shared 层三条判据）：
 1. 被 ≥2 个业务域直接引用；

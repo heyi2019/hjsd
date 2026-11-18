@@ -1,4 +1,4 @@
-"""parties.customers：客户档案的建档、查询、变更、合并与参与方校验。
+"""customer_center.customers：客户档案的建档、查询、变更、合并与参与方校验。
 
 规则来源：CUS-01。
 

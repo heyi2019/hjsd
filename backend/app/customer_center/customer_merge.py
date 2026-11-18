@@ -1,4 +1,4 @@
-"""parties.customer_merge：重复候选、客户合并与参与方可用性校验。"""
+"""customer_center.customer_merge：重复候选、客户合并与参与方可用性校验。"""
 from __future__ import annotations
 
 from typing import Any

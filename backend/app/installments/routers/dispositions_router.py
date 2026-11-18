@@ -1,4 +1,4 @@
-"""value_added_services.router：分期合约、收款、交付与逾期标记（HS-01-06）。"""
+"""installments.router：分期合约、收款、交付与逾期标记（HS-01-06）。"""
 from __future__ import annotations
 
 from datetime import date

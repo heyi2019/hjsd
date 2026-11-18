@@ -1,4 +1,4 @@
-"""foundation.seeds：M0 基础主数据种子（**幂等**，可重复执行）。
+"""field_definitions.seeds：M0 基础主数据种子（**幂等**，可重复执行）。
 
 种子内容包括：
 - 资金账户 `HJ_INVEST`（投资款荷包）/ `HJ_PROFIT`（利润荷包）（PRD §1.2）；

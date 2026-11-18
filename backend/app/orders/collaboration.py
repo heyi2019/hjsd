@@ -1,12 +1,12 @@
 """orders 域的跨域协作注册点（composition root 回调注册表）。
 
 背景（2026-11-18 P0-A）：orders 是最上游域，禁止反向依赖 finance /
-value_added_services（backend/.importlinter 契约）。但两处业务行为天然横跨
+installments（backend/.importlinter 契约）。但两处业务行为天然横跨
 域边界、且必须与订单写入同事务完成——
 
 1. 订单创建时的「初始成本挂账」：orders/router 内联调用 finance 的
    create_cashflow 写一条支出流水；
-2. 非分期 SELL 完成后的「回收处置联动」：orders/events 调用 vas 的
+2. 非分期 SELL 完成后的「回收处置联动」：orders/events 调用 installments 的
    link_recovered_sale 关联最近一次未转售回收。
 
 解决方案是回调注册：orders 在本模块定义注册点（orders 不 import 任何下游域）；
@@ -14,7 +14,7 @@ value_added_services（backend/.importlinter 契约）。但两处业务行为�
 
 加载链保证注册生效：
 - 生产：api_v1 import finance_router / installments_router
-  -> finance/cashflows.py、value_added_services/create.py 被 import -> 注册执行；
+  -> finance/cashflows.py、installments/create.py 被 import -> 注册执行；
 - 测试：tests/backend/conftest.py 模块级 import app.api_v1.create_app，
   收集阶段即完成注册。
 """
@@ -31,7 +31,7 @@ _cost_flow_creator: Callable[..., Any] | None = None
 
 
 def register_post_sell_hook(hook: Callable[..., Any]) -> None:
-    """注册 SELL 完成联动钩子（由 value_added_services 等下游域调用）。"""
+    """注册 SELL 完成联动钩子（由 installments 等下游域调用）。"""
     _post_sell_hooks.append(hook)
 
 

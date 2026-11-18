@@ -1,7 +1,7 @@
 """orders._shared：订单服务共用的审计序列化、账号快照归一与参与方角色校验。
 
 订单读取（get_order）已归位到 `app/shared/order_access.py`——它被 finance /
-policy / value_added_services 共用，留在 orders 会让 policy 反向依赖 orders。
+policy / installments 共用，留在 orders 会让 policy 反向依赖 orders。
 """
 
 from __future__ import annotations

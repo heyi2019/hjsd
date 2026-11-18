@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * value_added_services 包（HS-01 分期合约域）功能流 E2E（真实后端联调）。
+ * installments 包（HS-01 分期合约域）功能流 E2E（真实后端联调）。
  *
  * C 档「以功能为纲」第二步：按真实代码包建功能流，验证业务行为与状态机，
  * 而非逐字段断言。本文件覆盖 business-write.spec.ts 未触及的分期合约特有规则：

@@ -1,4 +1,4 @@
-"""parties.leads：客户需求（线索）的建档、编辑、转单与关闭。
+"""customer_center.leads：客户需求（线索）的建档、编辑、转单与关闭。
 
 规则来源：CUS-01。转单只允许 `OPEN` 状态，转单后写入 `converted_order_id`。
 """

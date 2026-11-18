@@ -1,7 +1,7 @@
-"""订单事件核算属性映射（orders / finance / value_added_services 共享的领域知识）。
+"""订单事件核算属性映射（orders / finance / installments 共享的领域知识）。
 
 原在 app/finance/attributes.py；2026-11-18 P0-A 归位到 domain 层：
-orders 落账（orders/events.py）、vas 分期收款（value_added_services/repayment.py）
+orders 落账（orders/events.py）、installments 分期收款（installments/repayments/）
 都需要查询该映射，而 domain 是双方都合法引用的最低层——
 归位后消灭 orders -> finance 的反向依赖（backend/.importlinter 契约随之收紧）。
 """

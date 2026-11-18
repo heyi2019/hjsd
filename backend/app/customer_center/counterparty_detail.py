@@ -1,4 +1,4 @@
-"""parties.counterparty_detail：合作方详情中的经营汇总与成单明细。"""
+"""customer_center.counterparty_detail：合作方详情中的经营汇总与成单明细。"""
 from __future__ import annotations
 
 from collections import OrderedDict

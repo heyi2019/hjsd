@@ -1,7 +1,7 @@
 """shared.order_access：带负责人范围校验的订单读取（跨域共享原语）。
 
 原在 `app/orders/_shared.py::get_order`，被 orders / finance / policy /
-value_added_services 四个域直接引用。放在 orders 下导致 policy 反向依赖 orders
+installments 四个域直接引用。放在 orders 下导致 policy 反向依赖 orders
 （形成 `orders ↔ policy` 双向环）。
 
 归位理由（满足 shared 层三条判据）：

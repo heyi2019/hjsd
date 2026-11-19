@@ -12,7 +12,7 @@
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -88,6 +88,20 @@ def test_new_flow_appears_in_items_and_summary(seeded_client, seeded_db, headers
     assert [item["flow_no"] for item in payload["items"]] == [flow.flow_no]
     assert Decimal(payload["expense"]) == Decimal("120.00")
     assert Decimal(payload["net"]) == Decimal("-120.00")
+
+
+def test_reversed_flag_survives_date_direction_and_page_filters(seeded_client, seeded_db, headers):
+    reversed_flow = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="100")
+    live_flow = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="200")
+    reverse_cashflow(seeded_db, reversed_flow.id, reversed_on=TODAY + timedelta(days=1), actor="pytest", reason="登记有误")
+    params = {"occurred_from": TODAY.isoformat(), "occurred_to": TODAY.isoformat()}
+    studio = _summary(seeded_client, headers, **params)
+    by_no = {item["flow_no"]: item for item in studio["items"]}
+    assert by_no[reversed_flow.flow_no]["is_reversed"] is True
+    assert by_no[live_flow.flow_no]["is_reversed"] is False
+    listing = seeded_client.get("/api/v1/cashflows", headers=headers, params={**params, "direction": "OUT", "keyword": reversed_flow.flow_no, "limit": 1})
+    assert listing.status_code == 200, listing.text
+    assert listing.json()["items"][0]["is_reversed"] is True
 
 
 def test_reversal_offsets_expense_and_income(seeded_client, seeded_db, headers):

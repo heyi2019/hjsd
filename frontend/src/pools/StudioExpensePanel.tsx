@@ -267,9 +267,8 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
       title: "操作",
       width: 150,
       render: (_v, row) => (
-        // 冲销流水（REVERSAL）用于抵消原流水、不可编辑或删除；后端对这类流水直接拒绝写操作，
-        // 前端不渲染按钮，避免出现「点了就报错」的死操作。
-        row.source_type === "REVERSAL" ? null : (
+        // 冲销流水及已冲销的原流水均不可编辑或删除。
+        row.source_type !== "MANUAL" || row.is_reversed ? null : (
           <Space size={2}>
             <PermissionButton permission="deposit.post" size="small" onClick={() => openEdit(row)}>
               编辑

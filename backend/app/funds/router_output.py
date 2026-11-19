@@ -1,16 +1,27 @@
 """finance.router_output：流水、押金、返点、对账与划转的输出装配。"""
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.shared.operation_operators import list_operation_operators
-from app.domain.trade import Deposit, Order, RebateRecord
+from app.domain.trade import Cashflow, Deposit, Order, RebateRecord
+from app.domain.enums import CashflowSourceType
 from app.funds import schemas
 from app.shared.form_values import get_extra_values
 from app.core.actor import actor_name as _actor
 
 
-def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
+def _cashflow_outputs(db: Session, flows: list) -> list[schemas.CashflowOut]:
+    numbers = [flow.get("flow_no") if isinstance(flow, dict) else flow.flow_no for flow in flows]
+    reversed_numbers = set(db.scalars(select(Cashflow.source_id).where(
+        Cashflow.source_type == CashflowSourceType.REVERSAL.value,
+        Cashflow.source_id.in_(numbers),
+    )).all()) if numbers else set()
+    return [_cashflow_out(db, flow, reversed_numbers=reversed_numbers) for flow in flows]
+
+
+def _cashflow_out(db: Session, flow, *, reversed_numbers: set | None = None) -> schemas.CashflowOut:
     def value(key: str):
         if isinstance(flow, dict):
             return flow.get(key)
@@ -28,6 +39,11 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         order = db.get(Order, order_id) if order_id else None
         order_no = order.order_no if order else None
     source = value("source_type")
+    if reversed_numbers is None:
+        reversed_numbers = set(db.scalars(select(Cashflow.source_id).where(
+            Cashflow.source_type == CashflowSourceType.REVERSAL.value,
+            Cashflow.source_id == value("flow_no"),
+        )).all())
     return schemas.CashflowOut(
         id=value("id"),
         flow_no=value("flow_no"),
@@ -41,6 +57,7 @@ def _cashflow_out(db: Session, flow) -> schemas.CashflowOut:
         amount=value("amount"),
         source_type=value("source_type"),
         source_id=value("source_id"),
+        is_reversed=value("flow_no") in reversed_numbers,
         reviewed_by=value("reviewed_by"),
         reviewed_at=value("reviewed_at"),
         order_id=order_id,
@@ -109,12 +126,13 @@ def _transfer_out(db: Session, result: dict) -> schemas.TransferOut:
         operation_operators=list_operation_operators(
             db, entity_type="transfer", entity_id=result["transfer_id"]
         ),
-        cashflows=[_cashflow_out(db, flow) for flow in flows],
+        cashflows=_cashflow_outputs(db, flows),
     )
 
 __all__ = [
     "_actor",
     "_cashflow_out",
+    "_cashflow_outputs",
     "_deposit_out",
     "_rebate_out",
     "_reconciliation_out",

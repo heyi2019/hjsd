@@ -157,9 +157,9 @@ export function cashflowTotals(overrides: Partial<CashflowTotals> = {}): Cashflo
 }
 
 /** 构造资金流水分页响应，统一携带服务端聚合的收入/支出总额。 */
-export function cashflowPage<T>(items: T[], overrides: Partial<Omit<CashflowPage<T>, "items" | "total">> & { total?: number } = {}): CashflowPage<T> {
+export function cashflowPage<T extends object>(items: T[], overrides: Partial<Omit<CashflowPage<T>, "items" | "total">> & { total?: number } = {}): CashflowPage<T & { is_reversed: boolean }> {
   return {
-    items,
+    items: items.map((item) => ({ is_reversed: false, ...item })),
     total: items.length,
     ...cashflowTotals(),
     ...overrides,

@@ -14,7 +14,6 @@ import {
   ReconciliationModal,
   ReleaseModal,
   ResolveModal,
-  ReverseModal,
   TransferModal,
 } from "./FundsPage.modals";
 export function FundsPage({ active = true }: { active?: boolean } = {}) {
@@ -48,7 +47,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
       <TransferModal ctrl={ctrl} />
       <ReconciliationModal ctrl={ctrl} />
       <ResolveModal ctrl={ctrl} />
-      <ReverseModal ctrl={ctrl} />
       <ReleaseModal ctrl={ctrl} />
       <LossModal ctrl={ctrl} />
       <CancelModal ctrl={ctrl} />

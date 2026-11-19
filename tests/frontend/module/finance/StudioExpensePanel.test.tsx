@@ -34,11 +34,11 @@ const pools = [
 
 const expenseFlows = [
   {
-    id: 51, flow_no: "CF-001", pool_id: 1, occurred_on: "2026-10-20", category: "房租", direction: "OUT", amount: "3000.00", source: "OTHER", status: "APPROVED",
+    id: 51, flow_no: "CF-001", pool_id: 1, occurred_on: "2026-10-20", category: "房租", direction: "OUT", amount: "3000.00", source: "OTHER", source_type: "MANUAL", is_reversed: false, status: "APPROVED",
     accounting_attribute: "OPERATING_EXPENSE",
   },
   {
-    id: 52, flow_no: "CF-002", pool_id: 2, occurred_on: "2026-10-21", category: "日用", direction: "OUT", amount: "100.00", source: "OTHER", status: "PENDING",
+    id: 52, flow_no: "CF-002", pool_id: 2, occurred_on: "2026-10-21", category: "日用", direction: "OUT", amount: "100.00", source: "OTHER", source_type: "MANUAL", is_reversed: false, status: "PENDING",
     accounting_attribute: "OPERATING_EXPENSE",
   },
 ];
@@ -91,6 +91,13 @@ async function pickDirection(modal: HTMLElement, label: "支出" | "收入") {
 }
 
 describe("StudioExpensePanel：工作室支出", () => {
+  it("已冲销原流水在筛选结果中不显示编辑和删除", async () => {
+    vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary([{ ...expenseFlows[0], source_type: "MANUAL", ledger_type: "STUDIO", is_reversed: true }] as never));
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    const row = (await screen.findByText("CF-001")).closest("tr") as HTMLElement;
+    expect(within(row).queryByRole("button", { name: "编辑" })).toBeNull();
+    expect(within(row).queryByRole("button", { name: "删除" })).toBeNull();
+  });
   it("默认汇总全部资金账户且不显示资金账户筛选", async () => {
     mockOptionSets();
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });

@@ -1,7 +1,7 @@
 /** 资金明细 Tab：从 FundsPage.tabs.tsx 拆出，函数体与拆前逐字等价。 */
-import { Card, Input, Space, Typography } from "antd";
+import { Card, Input, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { ConfirmButton, DataTable, ErrorBanner, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../../shared/ui";
+import { DataTable, ErrorBanner, MoneyText, PermissionButton, Select, StatRow } from "../../shared/ui";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { formatDateTimeMinute, today } from "../../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
@@ -29,7 +29,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
     cashflowLedgerType, setCashflowLedgerType,
     cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, flowDirectionOptions, flowAttributeOptions,
     fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, totalFlowIncome, totalFlowExpense,
-    cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, loading, cashflowsReady, cashflowLoading, cashflowError, error,
+    cashflowForm, setCashflowOpen, loading, cashflowsReady, cashflowLoading, cashflowError, error,
   } = ctrl;
   const cashflowUnavailable = !cashflowsReady || Boolean(error) || Boolean(cashflowError);
   const filtersDisabled = Boolean(error) || Boolean(cashflowError) || (!cashflowsReady && !cashflowLoading);
@@ -71,24 +71,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
     { title: "来源", dataIndex: "source", render: (v: string | null | undefined) => configurableLabel("FUND_FLOW_SOURCE", v, FUND_FLOW_SOURCE_LABEL) },
     { title: "操作人", dataIndex: "operator", render: (v: string | null | undefined) => v || "—" },
     { title: "备注", dataIndex: "note", render: (v: string | null) => v || "—" },
-    {
-      title: "操作",
-      key: "actions",
-      width: 170,
-      render: (_v, row) => (
-        <Space size={2}>
-          {row.source_type === "MANUAL" && !cashflows.some((flow) => flow.source_type === "REVERSAL" && flow.source_id === row.flow_no) && !row.order_id && (
-            <PermissionButton
-              permission="deposit.post"
-              size="small"
-              onClick={() => { reverseForm.setFieldsValue({ reversed_on: today() }); setReverseTarget(row); }}
-            >
-              冲销
-            </PermissionButton>
-          )}
-        </Space>
-      ),
-    },
+
   ];
   return (
     <Card className="glass" title="资金明细" extra={<PermissionButton permission="deposit.post" type="primary" disabled={cashflowUnavailable || loading || !flowDirectionOptions} onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>

@@ -2,7 +2,6 @@ import { Form } from "antd";
 import { useState } from "react";
 import { appMessage } from "../shared/ui/appFeedback";
 import { cashflowsApi } from "../shared/api/cashflows.api";
-import type { Cashflow } from "../shared/api/types/finance";
 import { ACCOUNTING_ATTRIBUTE_LABEL } from "../shared/lib/labels";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 
@@ -11,12 +10,10 @@ interface CashflowActionsDeps {
   write: ReturnType<typeof useAsyncAction>;
 }
 
-/** 资金流水写路径：登记独立流水与冲销流水。 */
+/** 资金流水写路径：登记独立流水。 */
 export function useCashflowActions({ load, write }: CashflowActionsDeps) {
   const [cashflowOpen, setCashflowOpen] = useState(false);
-  const [reverseTarget, setReverseTarget] = useState<Cashflow | null>(null);
   const [cashflowForm] = Form.useForm();
-  const [reverseForm] = Form.useForm();
   const cashflowAttributeOptions = Object.entries(ACCOUNTING_ATTRIBUTE_LABEL)
     .map(([value, label]) => ({ value, label }));
 
@@ -41,31 +38,11 @@ export function useCashflowActions({ load, write }: CashflowActionsDeps) {
     });
   };
 
-  const reverseCashflow = async (values: Record<string, unknown>) => {
-    if (!reverseTarget) return;
-    const targetId = reverseTarget.id;
-    await write.run(async () => {
-      await cashflowsApi.reverse(targetId, {
-        reversed_on: values.reversed_on as string,
-        reason: values.reason as string,
-        operator_user_ids: values.operator_user_ids as number[] | undefined,
-      });
-      appMessage.success("流水已冲销");
-      setReverseTarget(null);
-      reverseForm.resetFields();
-      await load();
-    });
-  };
-
   return {
     cashflowOpen,
     setCashflowOpen,
-    reverseTarget,
-    setReverseTarget,
     cashflowAttributeOptions,
     cashflowForm,
-    reverseForm,
     submitCashflow,
-    reverseCashflow,
   };
 }

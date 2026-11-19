@@ -83,6 +83,7 @@ export interface Cashflow {
   amount: string;
   source_type: string;
   source_id?: string | null;
+  is_reversed: boolean;
   order_id?: number | null;
   order_no?: string | null;
   source: string;

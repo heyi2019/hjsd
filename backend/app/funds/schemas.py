@@ -111,6 +111,7 @@ class CashflowOut(BaseModel):
     amount: Decimal
     source_type: str
     source_id: str | None = None
+    is_reversed: bool
     reviewed_by: str | None = None
     reviewed_at: datetime | None = None
     order_id: int | None = None

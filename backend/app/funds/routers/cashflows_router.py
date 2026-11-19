@@ -33,7 +33,7 @@ from app.funds.cashflows import (
 )
 from app.settings.lists.export import EXPORT_ROW_LIMIT, build_list_csv
 from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
-from ..router_output import _actor, _cashflow_out
+from ..router_output import _actor, _cashflow_out, _cashflow_outputs
 
 router = APIRouter(tags=["资金流水"])
 read_access = require_permissions(PERM_FINANCE_READ, PERM_ORDER_CREATE, require_all=False)
@@ -78,7 +78,7 @@ def studio_summary(
         user=user,
     )
     return schemas.StudioSummaryOut(
-        items=[_cashflow_out(db, item) for item in result["items"]],
+        items=_cashflow_outputs(db, result["items"]),
         income=result["income"],
         expense=result["expense"],
         net=result["net"],
@@ -134,7 +134,7 @@ def list_cashflows(
     # 合计与明细同条件、同源：前端不再对当页求和，超 limit 也不会少算。
     total_in, total_out = cashflow_totals(db, **filters)
     return schemas.CashflowListOut(
-        items=[_cashflow_out(db, item) for item in items],
+        items=_cashflow_outputs(db, items),
         total=total,
         total_in=total_in,
         total_out=total_out,

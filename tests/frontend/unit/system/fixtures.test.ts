@@ -52,7 +52,7 @@ describe("测试夹具隔离", () => {
     });
     expect(cashflowTotals({ total_in: "12.00" })).toEqual({ total_in: "12.00", total_out: "0.00" });
     expect(cashflowPage([{ id: 1 }], { total_in: "12.00", total_out: "3.00" })).toEqual({
-      items: [{ id: 1 }],
+      items: [{ id: 1, is_reversed: false }],
       total: 1,
       total_in: "12.00",
       total_out: "3.00",

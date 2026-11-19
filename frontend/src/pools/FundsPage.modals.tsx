@@ -233,31 +233,6 @@ export function ResolveModal({ ctrl }: { ctrl: FundsPageController }) {
   );
 }
 
-export function ReverseModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { reverseTarget, setReverseTarget, reverseForm, reverseCashflow, write, employees } = ctrl;
-  return (
-    <FundsActionModal
-      title="冲销资金流水" fieldCount={3}
-      open={Boolean(reverseTarget)} onCancel={() => setReverseTarget(null)}
-      scope="FUNDREVERSE" form={reverseForm} onFinish={reverseCashflow}
-      write={write} permission="deposit.post" submitLabel="确认冲销" employees={employees} showOperator
-      formIntro={
-        <Typography.Paragraph type="secondary" className="ui-drawer-hint">
-          冲销会生成一笔方向相反、金额相同的流水，核算属性固定为「冲销」，提交即入账。
-          原流水保留并标记为已冲销，不可重复冲销。
-        </Typography.Paragraph>
-      }
-    >
-      <CfgItem name="reversed_on" label="冲销日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}>
-        <DateField />
-      </CfgItem>
-      <CfgItem name="reason" label="冲销原因" rules={[{ required: true }]}>
-        <Input.TextArea rows={3} />
-      </CfgItem>
-    </FundsActionModal>
-  );
-}
-
 export function ReleaseModal({ ctrl }: { ctrl: FundsPageController }) {
   const { returnTarget, setReturnTarget, returnForm, submitReturn, write, employees } = ctrl;
   return (

@@ -32,7 +32,6 @@ export function useFundsFormActions({ load, reconciliations, write }: FundsFormA
     transfer.transferOpen,
     reconciliation.reconciliationOpen,
     reconciliation.resolveTarget,
-    cashflow.reverseTarget,
     deposit.returnTarget,
     deposit.lossTarget,
     deposit.cancelTarget,

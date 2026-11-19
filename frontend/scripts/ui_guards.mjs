@@ -103,9 +103,7 @@ const labelKeys = labelBlockM
   : [];
 // 这些枚举的值会直接进 StatusTag，必须全部有中文标签
 const STATUS_ENUMS = [
-  "OrderStatus", "InstallmentStatus", "AccountStatus", "RebateStatus",
-  "ImportBatchStatus", "ImportRowStatus",
-  "PoolStatus", "DepositStatus", "PolicyStatus",
+  "OrderStatus", "InstallmentStatus", "AccountStatus", "PoolStatus", "DepositStatus",
 ];
 /** 取枚举块。注意：传给 new RegExp 的模式里反斜杠必须双写（`\\(`），
  *  否则 JS 字符串会把 `\(` 变成空转义 `(`，整条规则静默失效。 */

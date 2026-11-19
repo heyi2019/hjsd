@@ -58,23 +58,24 @@ def r3_commission_reconciliation(
 ) -> dict[str, Any]:
     """分润对账：按订单汇总，展开订单查看人员明细。"""
     _validate_date_range(from_date, to_date)
-    order_scope = None if all_people else user
+    personal_scope = mine and user is not None
+    order_scope = None if all_people or personal_scope else user
+    stmt = (
+        select(OrderProfitAllocation, Order)
+        .join(Order, Order.id == OrderProfitAllocation.order_id)
+        .where(Order.status.in_([
+            OrderStatus.COMPLETED.value,
+            OrderStatus.INSTALLMENT.value,
+            OrderStatus.ACTIVE.value,
+        ]))
+    )
+    if personal_scope:
+        # 只允许查看本人有分润的订单；先取整单分配行统一处理尾差，输出时仍仅保留本人。
+        stmt = stmt.where(Order.id.in_(
+            select(OrderProfitAllocation.order_id).where(OrderProfitAllocation.user_id == user.id)
+        ))
     rows = session.execute(
-        _apply_order_scope(
-            select(OrderProfitAllocation, Order)
-            .join(Order, Order.id == OrderProfitAllocation.order_id)
-            .where(
-                Order.status.in_(
-                    [
-                        OrderStatus.COMPLETED.value,
-                        OrderStatus.INSTALLMENT.value,
-                        OrderStatus.ACTIVE.value,
-                    ]
-                )
-            ),
-            order_scope,
-            session,
-        )
+        _apply_order_scope(stmt, order_scope, session)
     ).all()
     order_ids = {order.id for _, order in rows}
     account_ids = {order.account_id for _, order in rows if order.account_id is not None}

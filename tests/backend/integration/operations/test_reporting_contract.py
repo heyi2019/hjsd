@@ -200,9 +200,9 @@ class TestR3Commission:
         order = create_order(
             seeded_db,
             order_type="HS",
-            trade_date=D,
+            trade_date=date.today(),
             actor="seeduser7",
-            owner_id=7,
+            owner_id=8,
             account_snapshot={"game_account": "my-commission-account"},
         )
         post_event(
@@ -226,7 +226,8 @@ class TestR3Commission:
         user = CurrentUser.build(
             id=7,
             username="seeduser7",
-            roles=["ADMIN"],
+            roles=["OPERATOR"],
+            owner_scope="SELF",
             display_name="种子用户7",
         )
         data = r3_commission_reconciliation(
@@ -236,6 +237,10 @@ class TestR3Commission:
         assert {item["user_id"] for item in _commission_details(data)} == {7}
         assert data["total"]["order_count"] == 1
         assert data["total"]["profit_base"] == Decimal("150.00")
+        assert r3_commission_reconciliation(seeded_db, user=user)["total"]["order_count"] == 0
+        assert r3_commission_reconciliation(seeded_db, user=user, mine=True, user_id=8)["total"]["order_count"] == 0
+        from app.dashboard.service import dashboard_summary
+        assert dashboard_summary(seeded_db, user=user)["personal_earnings"] == Decimal("150.00")
 
     def test_all_people_commission_can_be_filtered_back_to_one_person(self, seeded_db):
         order = _order(seeded_db)

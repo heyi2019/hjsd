@@ -1,9 +1,9 @@
 import { appMessage } from "../../../shared/ui/appFeedback";
 import { Form } from "antd";
+import dayjs from "dayjs";
 import { useState, type Key, type Dispatch, type SetStateAction } from "react";
 import { employeesApi } from "../../../shared/api/org.api";
 import { ordersApi } from "../../../shared/api/orders.api";
-import { unlistAndCancelConsignmentOrders } from "../../operations";
 import { poolsApi } from "../../../shared/api/pools.api";
 import type { AccountExecutionDetail } from "../../../shared/api/types/account-execution";
 import type { Account } from "../../../shared/api/types/accounts";
@@ -168,24 +168,15 @@ export function useInventoryActions(params: {
     try {
       // 系统下架先在原订单上登记所有寄售记录的 UNLIST，再冲销买入，
       // 避免出现 ERP 已下架但平台记录仍有效的中间结果。
-      const detail = executionDetails[voidTarget.account.id] ?? await ordersApi.executionDetail(voidTarget.orderId);
-      const records = consignmentRecords(detail.orders);
-      await unlistAndCancelConsignmentOrders({
-        records,
-        note: "系统下架同步取消寄售平台上架",
-        reason: "系统下架同步取消寄售平台上架",
-        occurredOn: today(),
-      });
-      await ordersApi.postEvent(voidTarget.orderId, {
-        event_type: "CANCEL",
+      await ordersApi.inventoryOffsale(voidTarget.orderId, {
         amount: values.amount,
         occurred_on: today(),
+        unlisted_at: dayjs().format("YYYY-MM-DDTHH:mm"),
         pool_id: Number(values.pool_id),
         portion: voidTarget.portion,
         offset_event_id: voidTarget.eventId,
         reason: values.reason.trim(),
         form_extra: values.form_extra,
-        note: "账号下架，冲销买入",
       });
       appMessage.success("账号已下架");
       // 下架后账号转 VOID 并退出在库统计，与售出同理，只丢缓存。

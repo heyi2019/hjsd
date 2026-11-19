@@ -5,7 +5,7 @@ import { currentDevUser, normalizeError } from "../../../shared/api/client";
 import { ordersApi } from "../../../shared/api/orders.api";
 import { InventoryCancellationDialog } from "../InventoryCancellationDialog";
 import { InventoryDeleteDialog } from "./InventoryDeleteDialog";
-import { OrderConsignmentModal, OrderPlatformOffsaleModal, OrderProfileModal, unlistAndCancelConsignmentOrders } from "../../operations";
+import { OrderConsignmentModal, OrderPlatformOffsaleModal, OrderProfileModal } from "../../operations";
 import { InventoryRebateModal } from "../rebate";
 import { CashflowModal } from "../../../finance/cashflow";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../sale";
@@ -139,17 +139,14 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         onClose={() => setPlatformOffsaleTarget(null)}
         onSystemOffsale={async ({ reason, unlisted_at, operator_user_ids, form_extra }) => {
           const target = platformOffsaleTarget;
-          if (!target || (!target.records.length && !target.account.source_order_id)) throw new Error("当前账号没有可出库的来源订单");
+          if (!target?.account.source_order_id) throw new Error("当前账号没有可出库的来源订单");
           try {
-            await unlistAndCancelConsignmentOrders({
-              records: target.records,
-              cancelOrderIds: target.records.length ? target.records.map((record) => record.orderId) : [target.account.source_order_id!],
-              note: `系统下架：${reason}`,
+            await ordersApi.inventoryOffsale(target.account.source_order_id, {
               reason,
-              operatorUserIds: operator_user_ids,
-              occurredOn: unlisted_at.slice(0, 10),
-              unlistedAt: unlisted_at,
-              formExtra: form_extra,
+              operator_user_ids,
+              occurred_on: unlisted_at.slice(0, 10),
+              unlisted_at,
+              form_extra,
             });
             appMessage.success("寄售记录已下架，账号已出库");
             setPlatformOffsaleTarget(null);

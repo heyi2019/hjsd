@@ -12,7 +12,7 @@ import type { Pool } from "../../shared/api/types/finance";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import type { Order } from "../../shared/api/types/orders";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { consignmentRecords, type ActiveConsignment, unlistAndCancelConsignmentOrders } from "../operations";
+import { consignmentRecords, type ActiveConsignment } from "../operations";
 import type { OrderProfileTarget } from "../operations";
 import { buildCashflowDisplayItems } from "../../finance/cashflow";
 import {
@@ -207,15 +207,12 @@ export function useOrderActionModals({
     const target = orderOffsaleTarget;
     if (!target) return;
     try {
-      await unlistAndCancelConsignmentOrders({
-        records: target.records,
-        cancelOrderIds: target.records.length ? target.records.map((record) => record.orderId) : [target.account.source_order_id ?? target.orderId],
-        note: `系统下架：${payload.reason}`,
+      await ordersApi.inventoryOffsale(target.account.source_order_id ?? target.orderId, {
         reason: payload.reason,
-        operatorUserIds: payload.operator_user_ids,
-        occurredOn: payload.unlisted_at.slice(0, 10),
-        unlistedAt: payload.unlisted_at,
-        formExtra: payload.form_extra,
+        operator_user_ids: payload.operator_user_ids,
+        occurred_on: payload.unlisted_at.slice(0, 10),
+        unlisted_at: payload.unlisted_at,
+        form_extra: payload.form_extra,
       });
       appMessage.success("寄售记录已下架，账号已出库");
       setOrderOffsaleTarget(null);

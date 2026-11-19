@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.errors import PermissionDenied
+from app.core.errors import PermissionDenied, Validation
 from app.core.security import (
     PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
@@ -20,12 +20,13 @@ from app.core.security import (
 from app.settings.auth.session import (
     require_permissions,
 )
-from app.domain.trade import OrderEvent
+from app.domain.trade import Order, OrderEvent
 from app.business import schemas
 from app.shared.order_access import get_order as orders_get_order
 from app.business.consignment import post_consignment_operation
 from app.business.create import add_customer_role
 from app.business.events import post_event as orders_post_event
+from app.business.cancellation_model import cancel_order as orders_cancel_order
 
 from ..router_output import (
     _actor,
@@ -45,6 +46,55 @@ post_events = require_permissions(
 )
 update_orders = require_permissions(PERM_ORDER_UPDATE)
 edit_order_detail = require_permissions(PERM_ORDER_UPDATE)
+
+@router.post("/orders/{order_id}/inventory-offsale")
+def inventory_offsale(
+    order_id: int,
+    payload: schemas.InventoryOffsaleIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = update_orders,
+) -> dict[str, bool]:
+    """平台下架与库存出库共用一次请求事务。"""
+    order = orders_get_order(db, order_id, user)
+    order = db.execute(
+        select(Order).where(Order.id == order.id).with_for_update().execution_options(populate_existing=True)
+    ).scalar_one()
+    if order.account_id is None:
+        raise Validation("订单未关联库存账号")
+    if payload.unlisted_at.tzinfo is not None or payload.unlisted_at.date() != payload.occurred_on:
+        raise Validation("下架时间须为本地时间且日期须与业务日期一致")
+    if not user.has(PERM_ORDER_EVENT_POST):
+        raise PermissionDenied("当前角色无权登记库存下架事件")
+    events = list(db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id)).all())
+    unlisted: set[tuple[str, str]] = set()
+    for event in events:
+        extra = event.form_extra or {}
+        if event.event_type == "OPERATE" and extra.get("operation_type") == "UNLIST":
+            for platform in extra.get("consignment_platforms") or []:
+                unlisted.add((str(extra.get("consignment_event_id")), str(platform)))
+    extra_base = {**(payload.form_extra or {}), "platform_unlist_scope": "SYSTEM", "platform_unlisted_at": payload.unlisted_at.isoformat(timespec="minutes")}
+    for event in events:
+        extra = event.form_extra or {}
+        if event.event_type != "OPERATE" or extra.get("operation_type") != "CONSIGNMENT":
+            continue
+        for platform in extra.get("consignment_platforms") or []:
+            if (str(event.id), str(platform)) in unlisted:
+                continue
+            orders_post_event(db, order.id, event_type="OPERATE", operation_type="UNLIST",
+                occurred_on=payload.occurred_on, actor=_actor(user), operator_user_ids=payload.operator_user_ids,
+                note="系统下架同步取消寄售平台上架", form_extra_scope="INVOID",
+                form_extra={**extra_base, "consignment_event_id": event.id, "consignment_platforms": [platform]}, user=user)
+    if order.order_type == "DG":
+        orders_cancel_order(db, order.id, actor=_actor(user), reason=payload.reason,
+            form_extra=extra_base, form_extra_scope="INVOID", user=user)
+    else:
+        if payload.amount is None or payload.pool_id is None or payload.offset_event_id is None:
+            raise Validation("回收库存出库必须提供冲销金额、资金账户和原事件")
+        orders_post_event(db, order.id, event_type="CANCEL", amount=payload.amount,
+            occurred_on=payload.occurred_on, actor=_actor(user), pool_id=payload.pool_id,
+            portion=payload.portion, offset_event_id=payload.offset_event_id, reason=payload.reason,
+            form_extra=payload.form_extra, note="账号下架，冲销买入", user=user)
+    return {"ok": True}
 
 @router.post("/orders/{order_id}/events", response_model=schemas.EventPostResult, status_code=201)
 def post_event(

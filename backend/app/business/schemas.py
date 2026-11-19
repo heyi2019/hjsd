@@ -144,6 +144,20 @@ class OrderCancelIn(BaseModel):
     form_extra_scope: str | None = Field(default=None, min_length=2, max_length=16)
 
 
+class InventoryOffsaleIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(min_length=1, max_length=500)
+    occurred_on: date
+    unlisted_at: datetime
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
+    form_extra: dict[str, object] | None = None
+    amount: Decimal | None = Field(default=None, ge=0)
+    pool_id: int | None = Field(default=None, gt=0)
+    portion: str = "PRINCIPAL"
+    offset_event_id: int | None = Field(default=None, gt=0)
+
+
 class OrderDeleteIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

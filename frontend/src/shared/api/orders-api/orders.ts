@@ -88,6 +88,10 @@ export const ordersApi = {
     api.patch<{ ok: boolean }>(`/orders/${orderId}/execution-edit`, payload).then((r) => r.data),
   cancel: (orderId: number, payload: { reason: string; form_extra?: Record<string, unknown>; form_extra_scope?: string }) =>
     api.post<Order>(`/orders/${orderId}/cancel`, payload).then((r) => r.data),
+  inventoryOffsale: (orderId: number, payload: {
+    reason: string; occurred_on: string; unlisted_at: string; operator_user_ids?: number[];
+    form_extra?: Record<string, unknown>; amount?: string; pool_id?: number; portion?: string; offset_event_id?: number;
+  }) => api.post<{ ok: boolean }>(`/orders/${orderId}/inventory-offsale`, payload).then((r) => r.data),
   deleteOrder: (orderId: number, reason: string) =>
     api.delete<void>(`/orders/${orderId}`, { data: { reason } }).then((r) => r.data),
   create: (payload: {

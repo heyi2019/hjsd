@@ -5,7 +5,6 @@ import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/business/stocks/InventoryPanel";
 import { consignmentRecords } from "@/business/operations/offsale";
-import { unlistAndCancelConsignmentOrders } from "@/business/operations/offsale-service";
 import { installmentsApi } from "@/shared/api/installments.api";
 import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
@@ -74,6 +73,7 @@ const installmentDetail = {
 
 const consignmentRow = {
   ...inStockRow,
+  source_order_id: 88,
   inventory_type: "CONSIGNMENT",
 } as unknown as Account;
 
@@ -144,6 +144,7 @@ beforeEach(() => {
   vi.mocked(installmentsApi.list).mockResolvedValue([contract]);
   vi.mocked(installmentsApi.cancel).mockResolvedValue({} as never);
   vi.mocked(ordersApi.postEvent).mockResolvedValue({} as never);
+  vi.mocked(ordersApi.inventoryOffsale).mockResolvedValue({ ok: true });
   vi.mocked(ordersApi.executionDetail).mockResolvedValue(sellDetail);
   vi.mocked(stocksApi.inventoryLedgerExport).mockResolvedValue({ blob: new Blob(["csv"]), failedDetailCount: 0 });
   vi.spyOn(message, "success").mockImplementation((() => undefined) as never);
@@ -239,9 +240,9 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await ui.type(within(modal).getByLabelText("取消原因"), "取消");
     await ui.click(within(modal).getByRole("button", { name: /确认下架/ }));
 
-    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(
       21,
-      expect.objectContaining({ amount: "80", pool_id: 3, event_type: "CANCEL" }),
+      expect.objectContaining({ amount: "80", pool_id: 3, offset_event_id: 31 }),
     ));
   });
 
@@ -266,7 +267,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await ui.type(within(modal).getByLabelText("取消原因"), "系统下架回归");
     await ui.click(within(modal).getByRole("button", { name: /确认下架/ }));
 
-    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(21, expect.objectContaining({ event_type: "CANCEL", amount: "80", pool_id: 3 })));
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(21, expect.objectContaining({ amount: "80", pool_id: 3 })));
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("账号已下架"));
   });
 
@@ -306,12 +307,11 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await waitFor(() => expect(screen.getByRole("combobox", { name: "操作人" }).closest(".ant-select")).toHaveTextContent("管理员"));
     await ui.click(screen.getByRole("button", { name: "确认出库" }));
 
-    await waitFor(() => expect(ordersApi.cancel).toHaveBeenCalledWith(
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(
       88,
       expect.objectContaining({
         reason: "代挂结束",
-        form_extra_scope: "INVOID",
-        form_extra: expect.objectContaining({ platform_unlist_scope: "SYSTEM" }),
+        unlisted_at: expect.any(String),
       }),
     ));
   });
@@ -331,22 +331,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await ui.click(await screen.findByText(/本系统（上架于/, { selector: ".ant-select-item-option-content" }));
     await ui.type(screen.getByLabelText("下架原因"), "代挂结束");
     await ui.click(screen.getByRole("button", { name: "确认出库" }));
-    await waitFor(() => expect(ordersApi.cancel).toHaveBeenCalledWith(88, expect.objectContaining({ reason: "代挂结束" })));
-  });
-
-  it("系统出库将选择的时间同时写入下架事件和取消订单", async () => {
-    const records = consignmentRecords(consignmentDetail.orders);
-    await unlistAndCancelConsignmentOrders({
-      records, cancelOrderIds: [88], note: "系统下架", reason: "代挂结束",
-      occurredOn: "2026-10-20", unlistedAt: "2026-10-20T15:30",
-    });
-    expect(ordersApi.postEvent).toHaveBeenCalledWith(88, expect.objectContaining({
-      occurred_on: "2026-10-20",
-      form_extra: expect.objectContaining({ platform_unlisted_at: "2026-10-20T15:30" }),
-    }));
-    expect(ordersApi.cancel).toHaveBeenCalledWith(88, expect.objectContaining({
-      form_extra: expect.objectContaining({ platform_unlisted_at: "2026-10-20T15:30" }),
-    }));
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(88, expect.objectContaining({ reason: "代挂结束" })));
   });
 
   it("导出：读取明细并提示失败条数", async () => {

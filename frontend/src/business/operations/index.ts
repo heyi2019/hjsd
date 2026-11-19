@@ -36,7 +36,6 @@ export { OFFSALE_OPERATION } from "./offsale";
 export { OrderProfileModal } from "./profile-modal";
 export { DESCRIPTION_OPERATION } from "./description";
 export { IMAGES_OPERATION } from "./images";
-export { unlistAndCancelConsignmentOrders } from "./offsale-service";
 export type { ActiveConsignment } from "./offsale";
 export type { OrderProfileTarget } from "./profile-modal";
 export type { OrderOperationContext, OrderOperationItem, OrderOperationKey } from "./types";

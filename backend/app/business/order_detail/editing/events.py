@@ -19,6 +19,16 @@ from app.business.events import post_event
 from .schemas import ExecutionEditItem, ExecutionEditRequest, ExecutionOperationCreateItem
 
 
+def _linked_unlistings(db: Session, listing: OrderEvent) -> list[OrderEvent]:
+    events = db.scalars(select(OrderEvent).where(
+        OrderEvent.order_id == listing.order_id,
+        OrderEvent.event_type == "OPERATE",
+        OrderEvent.is_posted.is_(True),
+    ).with_for_update()).all()
+    return [event for event in events if (event.form_extra or {}).get("operation_type") == "UNLIST"
+        and str((event.form_extra or {}).get("consignment_event_id") or "") == str(listing.id)]
+
+
 def apply_operation_event_creates(
     db: Session,
     order_id: int,
@@ -81,6 +91,15 @@ def validate_event_edits(
             raise NotFound("执行记录不存在")
         if Decimal(str(event.amount)) != item.expected_amount:
             raise Conflict("执行记录已被修改，请刷新后重试")
+        if event.event_type == "OPERATE" and (event.form_extra or {}).get("operation_type") == "CONSIGNMENT" and item.form_extra is not None:
+            old_platforms = (event.form_extra or {}).get("consignment_platforms") or []
+            new_platforms = item.form_extra.get("consignment_platforms") or []
+            if old_platforms != new_platforms:
+                linked = _linked_unlistings(db, event)
+                if linked and (len(old_platforms) != 1 or len(new_platforms) != 1):
+                    raise Validation("已有下架记录的多平台上架不能直接修改平台，请先核对历史记录")
+                if linked and any(other.id in {e.id for e in linked} for other in payload.events):
+                    raise Validation("修改上架平台时不能同时编辑关联下架记录，请分开保存")
         if item.operator_user_ids is not None:
             ids = item.operator_user_ids
             if len(set(ids)) != len(ids):
@@ -156,6 +175,19 @@ def apply_event_edits(db: Session, changes: list[tuple[OrderEvent, Cashflow | No
                 flow.occurred_on = occurred_at.date()
                 flow.created_at = occurred_at
         if item.form_extra is not None:
+            old_extra = event.form_extra or {}
+            old_platforms = old_extra.get("consignment_platforms") or []
+            new_platforms = item.form_extra.get("consignment_platforms") or []
+            if event.event_type == "OPERATE" and old_extra.get("operation_type") == "CONSIGNMENT" and old_platforms != new_platforms and len(old_platforms) == len(new_platforms) == 1:
+                for linked in _linked_unlistings(db, event):
+                    linked_extra = linked.form_extra or {}
+                    platforms = linked_extra.get("consignment_platforms") or []
+                    if old_platforms[0] in platforms:
+                        before_extra = jsonable_encoder(linked_extra)
+                        linked.form_extra = {**linked_extra, "consignment_platforms": [new_platforms[0] if value == old_platforms[0] else value for value in platforms]}
+                        linked.updated_by = actor
+                        record_audit(db, action="ORDER_UPDATE", entity_type="inventory_event_edit", entity_id=linked.id,
+                            actor=actor, before={"form_extra": before_extra}, after={"form_extra": jsonable_encoder(linked.form_extra)})
             # 前端提交的是该事件当前完整草稿；使用替换才能真正删除已清空的平台、价格等字段。
             event.form_extra = item.form_extra
             # 同时修改平台与时间时，时间字段仍以时间控件为准，避免完整草稿里的旧值覆盖新时间。

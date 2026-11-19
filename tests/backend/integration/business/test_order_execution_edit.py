@@ -378,3 +378,24 @@ def test_order_detail_edit_keeps_new_time_when_platform_and_time_change_together
     assert edited.form_extra["consignment_platforms"] == ["新平台"]
     assert edited.form_extra["listed_at"] == "2026-10-02T11:20:00"
     assert edited.posted_at.isoformat() == "2026-10-02T11:20:00"
+
+
+def test_edit_single_listed_platform_updates_linked_unlist(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="edit-linked-platform", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["旧平台"]})
+    unlisting, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_event_id": listing.id, "consignment_platforms": ["旧平台"], "platform_unlist_scope": "PLATFORM"})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["新平台"]}}]})
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(OrderEvent, unlisting.id).form_extra["consignment_platforms"] == ["新平台"]
+
+
+def test_cannot_reduce_partially_unlisted_multi_platform_record(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="edit-multi-platform", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲", "平台乙"]})
+    post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_event_id": listing.id, "consignment_platforms": ["平台甲"], "platform_unlist_scope": "PLATFORM"})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["平台乙"]}}]})
+    assert response.status_code == 422, response.text
+    assert seeded_db.get(OrderEvent, listing.id).form_extra["consignment_platforms"] == ["平台甲", "平台乙"]

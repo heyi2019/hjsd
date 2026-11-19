@@ -41,7 +41,7 @@ function eventIsUnlisted(order: AccountExecutionOrder, listingEvent: AccountExec
     event.event_type === "OPERATE"
     && event.operation_type === "UNLIST"
     && String(eventExtra(event).consignment_event_id ?? "") === String(listingEvent.id)
-    && (eventExtra(event).platform_unlist_scope === "SYSTEM" || eventPlatforms(listingEvent).length === 1 || platformValues(eventExtra(event).consignment_platforms).includes(platform))
+    && (eventExtra(event).platform_unlist_scope === "SYSTEM" || platformValues(eventExtra(event).consignment_platforms).includes(platform))
   ));
 }
 

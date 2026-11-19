@@ -57,10 +57,10 @@ describe("代挂寄售记录口径", () => {
     expect(isActiveConsignmentListing(unlisted)).toBe(false);
   });
 
-  it("单平台上架改名后仍按关联事件识别已下架", () => {
+  it("单平台上架改名后关联下架平台同步时仍识别已下架", () => {
     const edited = order({ events: [
       event({ id: 7, operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["新平台"] } }),
-      event({ id: 8, operation_type: "UNLIST", form_extra: { consignment_event_id: 7, consignment_platforms: ["旧平台"], platform_unlist_scope: "PLATFORM" } }),
+      event({ id: 8, operation_type: "UNLIST", form_extra: { consignment_event_id: 7, consignment_platforms: ["新平台"], platform_unlist_scope: "PLATFORM" } }),
     ] });
     expect(consignmentListings([edited])).toEqual([]);
   });
@@ -68,6 +68,14 @@ describe("代挂寄售记录口径", () => {
   it("多平台上架仅移除对应平台", () => {
     const listed = order({ events: [
       event({ id: 7, operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["平台甲", "平台乙"] } }),
+      event({ id: 8, operation_type: "UNLIST", form_extra: { consignment_event_id: 7, consignment_platforms: ["平台甲"], platform_unlist_scope: "PLATFORM" } }),
+    ] });
+    expect(consignmentListings([listed]).map((item) => item.platform)).toEqual(["平台乙"]);
+  });
+
+  it("只剩一个平台时不能把其他平台的下架当成该平台下架", () => {
+    const listed = order({ events: [
+      event({ id: 7, operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["平台乙"] } }),
       event({ id: 8, operation_type: "UNLIST", form_extra: { consignment_event_id: 7, consignment_platforms: ["平台甲"], platform_unlist_scope: "PLATFORM" } }),
     ] });
     expect(consignmentListings([listed]).map((item) => item.platform)).toEqual(["平台乙"]);

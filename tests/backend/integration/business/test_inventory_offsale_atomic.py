@@ -46,7 +46,7 @@ def test_system_offsale_cancels_order_and_unlists_platform(seeded_db):
     assert seeded_db.get(Account, order.account_id).status == "VOID"
 
 
-def test_renamed_single_platform_is_not_unlisted_twice(seeded_db):
+def test_other_platform_unlisting_does_not_hide_remaining_platform(seeded_db):
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 11, 1),
         actor="pytest", account_snapshot={"game_account": "renamed-platform", "game_type": "王者荣耀"})
     listing, _ = register_consignment(seeded_db, order.id, occurred_on=date(2026, 11, 1), actor="pytest",
@@ -58,7 +58,7 @@ def test_renamed_single_platform_is_not_unlisted_twice(seeded_db):
     payload = schemas.InventoryOffsaleIn(reason="结束代挂", occurred_on=date(2026, 11, 2), unlisted_at="2026-11-02T12:00")
     inventory_offsale(order.id, payload, seeded_db, DEV_USERS["admin"])
     events = seeded_db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id)).all()
-    assert sum((event.form_extra or {}).get("operation_type") == "UNLIST" for event in events) == 1
+    assert sum((event.form_extra or {}).get("operation_type") == "UNLIST" for event in events) == 2
 
 
 def test_recovery_offsale_rolls_back_unlisting_when_refund_invalid(seeded_db):

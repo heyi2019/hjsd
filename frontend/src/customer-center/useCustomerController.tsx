@@ -14,6 +14,7 @@ import { useListViewColumns } from "../shared/lib/listColumns";
 import { useOptionSet } from "../shared/lib/optionSets";
 import { ConfirmButton, PermissionButton, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
+import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { collectExtras } from "./CustomersPage.fragments";
 
 /** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
@@ -30,7 +31,8 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const [detailData, setDetailData] = useState<CustomerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
-  const [actionError, setActionError] = useState<{ message: string; code?: string } | null>(null);
+  const [candidateError, setCandidateError] = useState<{ message: string; code?: string } | null>(null);
+  const write = useAsyncAction();
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -178,8 +180,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   };
 
   const submitCreate = async (values: Record<string, unknown>) => {
-    try {
-      setActionError(null);
+    await write.run(async () => {
       const extraValues = collectExtras(values, activeDefs);
       const result = await customersApi.create({
         display_name: values.display_name as string,
@@ -198,15 +199,12 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       setCreateOpen(false);
       form.resetFields();
       await load();
-    } catch (err) {
-      setActionError(normalizeError(err));
-    }
+    });
   };
 
   const submitEdit = async (values: Record<string, unknown>) => {
     if (!editTarget) return;
-    try {
-      setActionError(null);
+    await write.run(async () => {
       const extraValues = collectExtras(values, activeDefs, { includeEmpty: true });
       await customersApi.patch(editTarget.id, {
         display_name: values.display_name as string,
@@ -221,15 +219,12 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       setEditTarget(null);
       editForm.resetFields();
       await load();
-    } catch (err) {
-      setActionError(normalizeError(err));
-    }
+    });
   };
 
   const submitMerge = async (values: Record<string, unknown>) => {
     if (!mergeTarget) return;
-    try {
-      setActionError(null);
+    await write.run(async () => {
       await customersApi.merge(
         mergeTarget.id,
         Number(values.target_customer_id),
@@ -239,9 +234,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       setMergeTarget(null);
       mergeForm.resetFields();
       await load();
-    } catch (err) {
-      setActionError(normalizeError(err));
-    }
+    });
   };
 
   const { arrange: arrangeColumns } = useListViewColumns("CUSTOMER");
@@ -324,7 +317,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const newThisMonthCount = summary?.month_count;
   const newTodayCount = summary?.today_count;
   // —— 弹窗收口：原 JSX 内联的状态更新收为方法，供展示组件回调（语义逐字等价）——
-  const clearActionError = () => setActionError(null);
+  const clearActionError = () => { write.clearError(); setCandidateError(null); };
   const cancelEdit = () => { clearActionError(); setEditTarget(null); editForm.resetFields(); };
   const closeDetail = () => { setDetailTarget(null); setDetailData(null); };
   const requestEdit = (target: Customer) => { clearActionError(); setEditTarget(target); setDetailTarget(null); };
@@ -340,14 +333,15 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       const customerPage = await customersApi.page({ status: "ACTIVE", limit: 500, offset: 0 });
       setMergeCandidates(customerPage.items);
     } catch (err) {
-      setActionError(normalizeError(err));
+      setCandidateError(normalizeError(err));
       setMergeCandidates([]);
     }
   };
 
   return {
     activeDefs,
-    actionError,
+    actionError: write.error ?? candidateError,
+    actionPending: write.pending,
     arrangeColumns,
     cancelEdit,
     cancelMerge,

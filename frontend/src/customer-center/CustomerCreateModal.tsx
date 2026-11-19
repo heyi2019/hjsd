@@ -12,6 +12,7 @@ export function CustomerCreateModal({
   activeDefs,
   form,
   error,
+  pending,
   onCancel,
   onSubmit,
 }: {
@@ -19,6 +20,7 @@ export function CustomerCreateModal({
   activeDefs: OrderFormField[];
   form: FormInstance;
   error?: { message: string; code?: string } | null;
+  pending?: boolean;
   onCancel: () => void;
   onSubmit: (values: Record<string, unknown>) => void;
 }) {
@@ -30,7 +32,7 @@ export function CustomerCreateModal({
         wrapClassName="customer-create-modal"
         fieldCount={5 + activeDefs.length}
         footer={(
-          <PermissionButton permission="customer.create" type="primary" htmlType="submit" form={CUSTOMER_CREATE_FORM_ID}>
+          <PermissionButton permission="customer.create" type="primary" htmlType="submit" form={CUSTOMER_CREATE_FORM_ID} loading={pending}>
             建档
           </PermissionButton>
         )}

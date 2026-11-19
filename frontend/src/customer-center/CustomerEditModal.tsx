@@ -10,6 +10,7 @@ export function CustomerEditModal({
   activeDefs,
   editForm,
   error,
+  pending,
   onCancel,
   onSubmit,
 }: {
@@ -17,6 +18,7 @@ export function CustomerEditModal({
   activeDefs: OrderFormField[];
   editForm: FormInstance;
   error?: { message: string; code?: string } | null;
+  pending?: boolean;
   onCancel: () => void;
   onSubmit: (values: Record<string, unknown>) => void;
 }) {
@@ -89,7 +91,7 @@ export function CustomerEditModal({
               <ExtraFieldControl def={def} />
             </Form.Item>
           ))}
-          <PermissionButton permission="customer.update" type="primary" htmlType="submit">
+          <PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={pending}>
             保存
           </PermissionButton>
         </BusinessRegistrationForm>

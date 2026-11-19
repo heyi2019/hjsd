@@ -8,6 +8,7 @@ export function CustomerMergeModal({
   candidates,
   mergeForm,
   error,
+  pending,
   onCancel,
   onSubmit,
 }: {
@@ -15,6 +16,7 @@ export function CustomerMergeModal({
   candidates: Customer[] | null;
   mergeForm: FormInstance;
   error?: { message: string; code?: string } | null;
+  pending?: boolean;
   onCancel: () => void;
   onSubmit: (values: Record<string, unknown>) => void;
 }) {
@@ -42,7 +44,7 @@ export function CustomerMergeModal({
             <Input.TextArea rows={2} />
           </Form.Item>
           <CompactActions>
-            <PermissionButton permission="customer.merge" type="primary" danger htmlType="submit">
+            <PermissionButton permission="customer.merge" type="primary" danger htmlType="submit" loading={pending}>
               确认合并
             </PermissionButton>
           </CompactActions>

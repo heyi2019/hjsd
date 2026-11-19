@@ -19,6 +19,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
   const {
     activeDefs,
     actionError,
+    actionPending,
     arrangeColumns,
     cancelEdit,
     cancelMerge,
@@ -175,6 +176,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
         activeDefs={activeDefs}
         form={form}
         error={actionError}
+        pending={actionPending}
         onCancel={() => { clearActionError(); setCreateOpen(false); }}
         onSubmit={submitCreate}
       />
@@ -183,6 +185,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
         activeDefs={activeDefs}
         editForm={editForm}
         error={actionError}
+        pending={actionPending}
         onCancel={cancelEdit}
         onSubmit={submitEdit}
       />
@@ -200,6 +203,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
         candidates={mergeCandidates}
         mergeForm={mergeForm}
         error={actionError}
+        pending={actionPending}
         onCancel={cancelMerge}
         onSubmit={submitMerge}
       />

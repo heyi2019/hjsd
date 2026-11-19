@@ -507,6 +507,40 @@ describe("CustomersPage：行内动作", () => {
   });
 
   describe("CustomersPage：客户与合作方操作流", () => {
+    it("客户建档请求未完成时不能重复提交", async () => {
+      let finish!: (value: Awaited<ReturnType<typeof customersApi.create>>) => void;
+      const pending = new Promise<Awaited<ReturnType<typeof customersApi.create>>>((resolve) => { finish = resolve; });
+      vi.mocked(customersApi.create).mockReturnValueOnce(pending);
+      renderLight(<CustomersPage />, { user: "admin" });
+      await screen.findByText("CUS-0001");
+      await ui.click(screen.getByRole("button", { name: "新建客户" }));
+      const modal = await screen.findByRole("dialog");
+      await ui.type(within(modal).getByLabelText("名字"), "测试客户");
+      const button = within(modal).getByRole("button", { name: "建档" });
+      await ui.click(button);
+      await waitFor(() => expect(customersApi.create).toHaveBeenCalledTimes(1));
+      await ui.click(button);
+      expect(customersApi.create).toHaveBeenCalledTimes(1);
+      await act(async () => { finish({ customer: customers[0], duplicate_candidates: [] } as never); await pending; });
+    });
+
+    it("合作方建档请求未完成时不能重复提交", async () => {
+      let finish!: (value: Awaited<ReturnType<typeof counterpartiesApi.create>>) => void;
+      const pending = new Promise<Awaited<ReturnType<typeof counterpartiesApi.create>>>((resolve) => { finish = resolve; });
+      vi.mocked(counterpartiesApi.create).mockReturnValueOnce(pending);
+      renderLight(<CustomersPage />, { user: "admin" });
+      await screen.findByText("CUS-0001");
+      await ui.click(screen.getByRole("tab", { name: /合作方/ }));
+      await ui.click(await screen.findByRole("button", { name: "新建合作方" }));
+      const modal = await screen.findByRole("dialog");
+      await ui.type(within(modal).getByLabelText("名称"), "测试合作方");
+      const button = within(modal).getByRole("button", { name: "建档" });
+      await ui.click(button);
+      await waitFor(() => expect(counterpartiesApi.create).toHaveBeenCalledTimes(1));
+      await ui.click(button);
+      expect(counterpartiesApi.create).toHaveBeenCalledTimes(1);
+      await act(async () => { finish(counterparties[0] as never); await pending; });
+    });
     it("新建客户失败在弹窗显示原因", async () => {
       vi.mocked(customersApi.create).mockRejectedValueOnce(new Error("客户建档失败"));
       renderLight(<CustomersPage />, { user: "admin" });

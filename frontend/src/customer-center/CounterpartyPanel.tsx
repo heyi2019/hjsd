@@ -15,6 +15,7 @@ import { orderTypeLabel } from "../shared/lib/labels";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, InlineError, ConfirmButton, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
+import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { collectExtras } from "./CustomersPage.fragments";
 
 export function CounterpartyPanel({ active = true, focusId, createdPeriod, createdPicker }: { active?: boolean; focusId?: number; createdPeriod?: { from: string; to: string } | null; createdPicker?: ReactNode }) {
@@ -36,7 +37,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
   const [detailData, setDetailData] = useState<Counterparty | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
-  const [actionError, setActionError] = useState<{ message: string; code?: string } | null>(null);
+  const write = useAsyncAction();
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
 
@@ -121,8 +122,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
   }, [focusId, rows]);
 
   const submit = async (values: Record<string, unknown>) => {
-    try {
-      setActionError(null);
+    await write.run(async () => {
       await counterpartiesApi.create({
         display_name: values.display_name as string,
         type: values.type as string,
@@ -137,15 +137,12 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
       setOpen(false);
       form.resetFields();
       await load();
-    } catch (err) {
-      setActionError(normalizeError(err));
-    }
+    });
   };
 
   const submitEdit = async (values: Record<string, unknown>) => {
     if (!editTarget) return;
-    try {
-      setActionError(null);
+    await write.run(async () => {
       await counterpartiesApi.patch(editTarget.id, {
         display_name: values.display_name as string,
         contact_name: values.contact_name as string,
@@ -159,9 +156,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
       setEditTarget(null);
       editForm.resetFields();
       await load();
-    } catch (err) {
-      setActionError(normalizeError(err));
-    }
+    });
   };
 
   const { arrange: arrangeColumns } = useListViewColumns("COUNTERPARTY");
@@ -193,7 +188,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
           <PermissionButton permission="counterparty.read" size="small" onClick={() => void openDetail(row)}>
             详情
           </PermissionButton>
-          <PermissionButton permission="counterparty.manage" size="small" disabled={row.status !== "ACTIVE"} onClick={() => { setActionError(null); setEditTarget(row); }}>
+          <PermissionButton permission="counterparty.manage" size="small" disabled={row.status !== "ACTIVE"} onClick={() => { write.clearError(); setEditTarget(row); }}>
             编辑
           </PermissionButton>
           <ConfirmButton
@@ -221,7 +216,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
       className="glass"
       title="合作方"
       extra={
-        <PermissionButton permission="counterparty.manage" type="primary" disabled={Boolean(error) || rows === null || !counterpartyTypeOptions} onClick={() => { setActionError(null); setOpen(true); }}>
+        <PermissionButton permission="counterparty.manage" type="primary" disabled={Boolean(error) || rows === null || !counterpartyTypeOptions} onClick={() => { write.clearError(); setOpen(true); }}>
           新建合作方
         </PermissionButton>
       }
@@ -243,8 +238,8 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
         emptyText={error ? "合作方数据不可用，请点击重新加载" : "暂无合作方"}
         onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
      />
-      <BusinessActionModal title="新建合作方" fieldCount={5} open={open} onCancel={() => { setActionError(null); setOpen(false); }} footer={null}>
-        <InlineError error={actionError} />
+      <BusinessActionModal title="新建合作方" fieldCount={5} open={open} onCancel={() => { write.clearError(); setOpen(false); }} footer={null}>
+        <InlineError error={write.error} />
         <FieldConfigScope scope="COUNTERPARTY" active={open}>
         <BusinessRegistrationForm
           layout="horizontal"
@@ -267,7 +262,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
             <Input />
           </CfgItem>
           <CustomFieldSection testIdSuffix="counterparty-create" />
-          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit" disabled={Boolean(error) || !counterpartyTypeOptions}>
+          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit" loading={write.pending} disabled={Boolean(error) || !counterpartyTypeOptions}>
             建档
           </PermissionButton>
         </BusinessRegistrationForm>
@@ -279,14 +274,14 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
         fieldCount={6}
         open={Boolean(editTarget)}
         onCancel={() => {
-          setActionError(null);
+          write.clearError();
           setEditTarget(null);
           editForm.resetFields();
         }}
         footer={null}
         destroyOnHidden
       >
-        <InlineError error={actionError} />
+        <InlineError error={write.error} />
         <FieldConfigScope scope="COUNTERPARTY" active={Boolean(editTarget)}>
         <BusinessRegistrationForm
           layout="horizontal"
@@ -333,7 +328,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
             <Input.TextArea rows={3} />
           </Form.Item>
           <CustomFieldSection testIdSuffix="counterparty-edit" />
-          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit">
+          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit" loading={write.pending}>
             保存
           </PermissionButton>
         </BusinessRegistrationForm>
@@ -355,7 +350,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
               permission="counterparty.manage"
               size="small"
               onClick={() => {
-                setActionError(null);
+                write.clearError();
                 setEditTarget(detailTarget);
                 setDetailTarget(null);
               }}

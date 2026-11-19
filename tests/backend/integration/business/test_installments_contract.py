@@ -194,6 +194,22 @@ def test_cancel_installment_then_resell_in_installments(seeded_client, seeded_db
     assert response.status_code == 200, response.text
     assert response.json()["installment"]["id"] == second.id
 
+
+def test_cancelling_new_installment_only_refunds_its_own_payments(seeded_db):
+    account = _account(seeded_db, "separate-installment-refunds")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id, "100")
+    first = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="200", down_payment="0", periods=1, per_period="200")
+    inst_cancel(seeded_db, first.id, cancelled_on=TODAY, actor="pytest", reason="取消旧合约")
+    old_flow = Cashflow(flow_no="CF-OLD-INSTALLMENT-PAY", pool_id=1, occurred_on=TODAY, direction="IN", category="INSTALLMENT_PAYMENT", amount=Decimal("30"), source_type="INSTALLMENT", source_id=first.inst_no, order_id=order.id, created_by="pytest", updated_by="pytest")
+    seeded_db.add(old_flow)
+    seeded_db.flush()
+    second = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="250", down_payment="50", periods=1, per_period="200")
+    inst_pay(seeded_db, second.id, amount=Decimal("50"), paid_on=TODAY, period_no=0, actor="pytest")
+    result = inst_cancel(seeded_db, second.id, cancelled_on=TODAY, actor="pytest", reason="取消新合约")
+    assert result["refund_amount"] == Decimal("50")
+    assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.source_type == "REVERSAL", Cashflow.source_id == old_flow.flow_no)) is None
+
 def test_installment_scope_follows_order_owner(seeded_db):
     scoped_user = CurrentUser.build(
         id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"

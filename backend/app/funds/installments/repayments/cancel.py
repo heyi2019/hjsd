@@ -67,6 +67,7 @@ def cancel_installment(
             Cashflow.order_id == order.id,
             Cashflow.category == "INSTALLMENT_PAYMENT",
             Cashflow.source_type == CashflowSourceType.INSTALLMENT.value,
+            Cashflow.source_id == installment.inst_no,
         )
         .order_by(Cashflow.id)
     ).all()

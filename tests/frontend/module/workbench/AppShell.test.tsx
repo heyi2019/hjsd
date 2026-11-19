@@ -39,7 +39,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");
 vi.mock("@/shared/api/transfers.api");
 import { renderApp } from "@fixtures/render";
-import { cashflowPage, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
+import { cashflowPage, customerSummary, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
 import { AppShell } from "@/app/AppShell";
 import { navigation } from "@/app/navigation";
 import { MemoryRouter } from "react-router-dom";
@@ -119,6 +119,11 @@ beforeEach(() => {
   vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([]));
   vi.mocked(ordersApi.ledgerSummary).mockResolvedValue(orderLedgerSummary());
   vi.mocked(orderTypesApi.list).mockResolvedValue([]);
+  vi.mocked(customersApi.page).mockResolvedValue(pageResponse([]));
+  vi.mocked(customersApi.summary).mockResolvedValue(customerSummary());
+  vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse([]));
+  vi.mocked(leadsApi.page).mockResolvedValue(pageResponse([]));
+  vi.mocked(leadsApi.summary).mockResolvedValue({ total_count: 0, open_count: 0 });
   vi.mocked(optionSetsApi.get).mockImplementation(async (code) => code === "BUSINESS_PERIOD"
     ? { code, options: [{ value: "start_day", label: "16" }] } as never
     : [] as never);
@@ -199,6 +204,7 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
       expect(active?.textContent).toContain(item.label);
       expect(within(nav).getByText(item.label)).toBeTruthy();
     }
+    expect(document.querySelectorAll(".page-error-boundary")).toHaveLength(0);
   });
 
   it("当前页签带 aria-current=page", async () => {

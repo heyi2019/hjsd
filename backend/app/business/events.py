@@ -187,6 +187,17 @@ def post_event(
         user=user,
     )
 
+    historical_sale_refund = False
+    if event_type == EventType.CANCEL.value and offset is not None and offset.event_type == EventType.SELL.value:
+        latest_sell_id = session.scalar(
+            select(OrderEvent.id).where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.event_type == EventType.SELL.value,
+                OrderEvent.is_posted.is_(True),
+            ).order_by(OrderEvent.id.desc()).limit(1)
+        )
+        historical_sale_refund = latest_sell_id != offset.id
+
     event_form_extra = _build_event_form_extra(
         session,
         order,
@@ -249,7 +260,7 @@ def post_event(
         )
         session.add(flow)
 
-    if event_type in {
+    if not historical_sale_refund and event_type in {
         EventType.BUY.value,
         EventType.SELL.value,
         EventType.CANCEL.value,
@@ -281,7 +292,7 @@ def post_event(
         order.status = transition(
             ORDER_TRANSITIONS, order.status, "BUY", entity="订单"
         )
-    if event_type == EventType.CANCEL.value and (
+    if event_type == EventType.CANCEL.value and not historical_sale_refund and (
         (offset is None or cancel_fully_consumed)
     ):
         # 冲销事件闭环：订单进入 CANCELLED，此后不再接受任何新事件

@@ -138,7 +138,10 @@ def post_event(
         order = db.execute(select(Order).where(Order.id == order.id).with_for_update().execution_options(populate_existing=True)).scalar_one()
         offset = db.get(OrderEvent, payload.offset_event_id) if payload.offset_event_id else None
         account = db.scalar(select(Account).where(Account.id == order.account_id).with_for_update()) if order.account_id else None
-        if order.order_type not in {"HS", "TH"} or event_type != "CANCEL" or offset is None or offset.order_id != order.id or offset.event_type != "SELL" or not offset.is_posted or account is None or account.status != "SOLD" or order.status != "COMPLETED":
+        latest_sell_id = db.scalar(select(OrderEvent.id).where(
+            OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL", OrderEvent.is_posted.is_(True),
+        ).order_by(OrderEvent.id.desc()).limit(1))
+        if order.order_type not in {"HS", "TH"} or event_type != "CANCEL" or offset is None or offset.order_id != order.id or offset.event_type != "SELL" or not offset.is_posted or offset.id != latest_sell_id or account is None or account.status != "SOLD" or order.status != "COMPLETED":
             raise Validation("取消售出必须选择该订单已售出的流水")
     if user.has(PERM_FINANCE_ORDER_EVENT_POST) and not user.has(PERM_ORDER_EVENT_POST):
         if event_type not in {"BUY", "SELL"}:

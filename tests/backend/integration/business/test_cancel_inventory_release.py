@@ -165,3 +165,15 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
     item = next(item for item in response.json()["items"] if item["id"] == order.id)
     assert Decimal(str(item["sale_amount"])) == Decimal("220")
     assert Decimal(str(item["profit_base"])) == Decimal("170")
+
+    old_refund = {"event_type": "CANCEL", "amount": "50", "occurred_on": "2026-11-01", "offset_event_id": sell.id, "pool_id": sell.pool_id, "reason": "补退首次售出余款"}
+    response = seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json={**old_refund, "finalize_sale_cancel": True})
+    assert response.status_code == 422, response.text
+    response = seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json=old_refund)
+    assert response.status_code == 201, response.text
+    seeded_db.refresh(order)
+    account = seeded_db.get(Account, order.account_id)
+    seeded_db.refresh(account)
+    assert order.status == "COMPLETED"
+    assert (account.status, account.inventory_status) == ("SOLD", "OUT_OF_STOCK")
+    assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == 120

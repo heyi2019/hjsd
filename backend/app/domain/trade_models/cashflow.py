@@ -159,6 +159,31 @@ class Reconciliation(Base, AuditMixin):
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
+class BalanceSnapshot(Base, AuditMixin):
+    """资金账户日终余额快照（FIN-01-05）：随日对账固化，不可篡改。
+
+    同一资金账户同一天只固化一份系统余额（与 account_label 无关）；同日多账户
+    对账保留首次快照，不回改——快照是历史台账而非可变投影。余额可为负
+    （历史支出可能透支），故不设非负约束。
+    """
+
+    __tablename__ = "balance_snapshots"
+    __table_args__ = (
+        UniqueConstraint("pool_id", "snapshot_on", name="uq_balance_snapshots_scope"),
+        Index("ix_balance_snapshots_pool_date", "pool_id", "snapshot_on"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    pool_id: Mapped[int] = mapped_column(
+        ForeignKey("pools.id", ondelete="RESTRICT"), nullable=False
+    )
+    snapshot_on: Mapped[date] = mapped_column(Date, nullable=False)
+    balance: Mapped[object] = mapped_column(Amount, nullable=False, default=0)
+    reconciliation_id: Mapped[int] = mapped_column(
+        ForeignKey("reconciliations.id", ondelete="RESTRICT"), nullable=False
+    )
+
+
 class OrderProfitAllocation(Base, TimestampMixin):
     """多人利润分配：同订单有效比例合计必须为 100%（BAS-06-03）。"""
 

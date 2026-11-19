@@ -11,7 +11,12 @@
 from __future__ import annotations
 
 from .trade_models.account import Account
-from .trade_models.cashflow import Cashflow, OrderProfitAllocation, Reconciliation
+from .trade_models.cashflow import (
+    BalanceSnapshot,
+    Cashflow,
+    OrderProfitAllocation,
+    Reconciliation,
+)
 from .trade_models.deposit_rebate import Deposit, RebateRecord
 from .trade_models.form_config import OrderFormField, OrderFormSectionLabel
 from .trade_models.installment import (
@@ -23,6 +28,7 @@ from .trade_models.order import Order, OrderEvent
 
 __all__ = [
     "Account",
+    "BalanceSnapshot",
     "Cashflow",
     "Deposit",
     "Installment",

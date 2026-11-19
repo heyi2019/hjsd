@@ -17,6 +17,7 @@ from app.auth.session import (
 from app.finance import schemas
 from app.finance.reconciliation import (
     create_reconciliation as finance_create_reconciliation,
+    list_balance_snapshots as finance_list_balance_snapshots,
     list_reconciliations as finance_list_reconciliations,
     resolve_reconciliation as finance_resolve_reconciliation,
 )
@@ -49,6 +50,19 @@ def list_reconciliations(
         user=user,
     )
     return [_reconciliation_out(item, db) for item in items]
+
+
+@router.get("/balance-snapshots", response_model=list[schemas.BalanceSnapshotOut])
+def list_balance_snapshots(
+    pool_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> list[schemas.BalanceSnapshotOut]:
+    """FIN-01-05：查询随对账固化的日终余额快照（只读历史台账）。"""
+    if pool_id is not None and not user.can_see_pool(pool_id):
+        return []
+    items = finance_list_balance_snapshots(db, pool_id=pool_id, user=user)
+    return [schemas.BalanceSnapshotOut.model_validate(item) for item in items]
 
 
 @router.post("/reconciliations", response_model=schemas.ReconciliationOut, status_code=201)

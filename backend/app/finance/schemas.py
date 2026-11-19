@@ -209,6 +209,17 @@ class ReconciliationResolve(RequestModel):
     form_extra: dict[str, Any] | None = None
 
 
+class BalanceSnapshotOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    pool_id: int
+    snapshot_on: date
+    balance: Decimal
+    reconciliation_id: int
+    created_at: datetime
+
+
 class ReconciliationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -335,6 +346,7 @@ __all__ = [
     "CashflowCreate",
     "CashflowUpdate",
     "CashflowReverse",
+    "BalanceSnapshotOut",
     "ReconciliationCreate",
     "ReconciliationResolve",
     "ReconciliationOut",

@@ -9,6 +9,8 @@ from sqlalchemy import select
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.foundation import Pool
+from app.domain.trade import BalanceSnapshot
+from app.finance.balances import pool_balance
 from app.finance.cashflows import create_cashflow
 from app.finance.reconciliation import (
     _get_reconciliation,
@@ -326,3 +328,90 @@ def test_create_reconciliation_allows_same_label_distinct_date(seeded_db):
         account_label="x", statement_balance=Decimal("70"), actor="pytest",
     )
     assert a.id != b.id
+
+
+def test_reconciliation_system_balance_excludes_deposit_loss(seeded_db):
+    """押金损失重分类流水不被重复扣减：对账系统余额 == 总览现金余额。"""
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    create_cashflow(
+        seeded_db, pool_id=pool.id, occurred_on=date(2026, 10, 17),
+        direction="IN", accounting_attribute="OTHER_INCOME", category="OTHER",
+        amount=Decimal("1000"), actor="pytest",
+    )
+    # 押金损失重分类流水：DEPOSIT + OUT + 非 HOLD，应被 business_cashflow_filter 排除
+    create_cashflow(
+        seeded_db, pool_id=pool.id, occurred_on=date(2026, 10, 17),
+        direction="OUT", accounting_attribute="DEPOSIT", category="DEPOSIT_LOSS",
+        amount=Decimal("300"), actor="pytest",
+    )
+    seeded_db.flush()
+    overview_balance = pool_balance(seeded_db, pool.id)["cash_balance"]
+
+    item = create_reconciliation(
+        seeded_db, pool_id=pool.id, reconciled_on=date(2026, 10, 17),
+        account_label="押金损失口径", statement_balance=Decimal("1000"), actor="pytest",
+    )
+
+    assert item.system_balance == overview_balance == Decimal("1000.00")
+    assert item.difference == Decimal("0.00")
+
+
+def test_reconciliation_creates_balance_snapshot(seeded_db):
+    """对账自动生成当日余额快照，balance 与 system_balance 同源。"""
+    pool = _seed_recon(seeded_db)  # 两笔 IN = 70
+    item = create_reconciliation(
+        seeded_db, pool_id=pool.id, reconciled_on=date(2026, 10, 17),
+        account_label="快照生成", statement_balance=Decimal("70"), actor="pytest",
+    )
+    snapshot = seeded_db.scalar(
+        select(BalanceSnapshot).where(
+            BalanceSnapshot.pool_id == pool.id,
+            BalanceSnapshot.snapshot_on == date(2026, 10, 17),
+        )
+    )
+    assert snapshot is not None
+    assert snapshot.balance == Decimal("70.00")
+    assert snapshot.reconciliation_id == item.id
+    assert snapshot.created_by == "pytest"
+
+
+def test_balance_snapshot_idempotent_same_pool_date(seeded_db):
+    """同池同日多账户对账只固化一份快照（台账不可篡改，保留首次）。"""
+    pool = _seed_recon(seeded_db)
+    first = create_reconciliation(
+        seeded_db, pool_id=pool.id, reconciled_on=date(2026, 10, 17),
+        account_label="账户A", statement_balance=Decimal("70"), actor="pytest",
+    )
+    create_reconciliation(
+        seeded_db, pool_id=pool.id, reconciled_on=date(2026, 10, 17),
+        account_label="账户B", statement_balance=Decimal("70"), actor="pytest",
+    )
+    snapshots = seeded_db.scalars(
+        select(BalanceSnapshot).where(BalanceSnapshot.pool_id == pool.id)
+    ).all()
+    assert len(snapshots) == 1
+    assert snapshots[0].reconciliation_id == first.id
+
+
+def test_balance_snapshot_excludes_deposit_loss(seeded_db):
+    """快照余额排除押金损失重分类流水，与对账口径一致。"""
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    create_cashflow(
+        seeded_db, pool_id=pool.id, occurred_on=date(2026, 10, 17),
+        direction="IN", accounting_attribute="OTHER_INCOME", category="OTHER",
+        amount=Decimal("1000"), actor="pytest",
+    )
+    create_cashflow(
+        seeded_db, pool_id=pool.id, occurred_on=date(2026, 10, 17),
+        direction="OUT", accounting_attribute="DEPOSIT", category="DEPOSIT_LOSS",
+        amount=Decimal("300"), actor="pytest",
+    )
+    seeded_db.flush()
+    create_reconciliation(
+        seeded_db, pool_id=pool.id, reconciled_on=date(2026, 10, 17),
+        account_label="快照口径", statement_balance=Decimal("1000"), actor="pytest",
+    )
+    snapshot = seeded_db.scalar(
+        select(BalanceSnapshot).where(BalanceSnapshot.pool_id == pool.id)
+    )
+    assert snapshot.balance == Decimal("1000.00")

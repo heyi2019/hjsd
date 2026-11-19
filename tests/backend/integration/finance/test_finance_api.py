@@ -8,28 +8,22 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 from app.stocks.profile import create_account
 from app.core.errors import NotFound, Validation
-from app.shared.operation_operators import list_operation_operators
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
 from app.domain.enums import CashflowSourceType
-from app.domain.trade import Cashflow, RebateRecord, Reconciliation
+from app.domain.trade import Cashflow
 from app.finance.cashflow_queries import list_cashflows
-from app.finance.cashflows import create_cashflow, reverse_cashflow
+from app.finance.cashflows import create_cashflow
 from app.finance.deposits.writes import create_deposit
-from app.finance.deposits.lifecycle import lose_deposit, return_deposit
-from app.finance.deposits.reads import deposit_held_total, list_deposits
-from app.finance.rebates import create_rebate, list_rebates
-from app.finance.reconciliation import create_reconciliation, resolve_reconciliation
+from app.finance.deposits.reads import list_deposits
+from app.finance.rebates import create_rebate
 from app.finance.transfers import create_transfer, repair_transfer
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.finance.balances import pool_balance
-from app.customer_center.counterparties import create_counterparty, set_counterparty_status
-from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 
 TODAY = date(2026, 10, 4)
 
@@ -115,6 +109,45 @@ class TestFinanceApi:
         )
         assert resolved.status_code == 200, resolved.text
         assert resolved.json()["status"] == "RESOLVED"
+
+    def test_balance_snapshot_endpoint(self, seeded_client, seeded_db, headers):
+        """FIN-01-05：对账后可从只读端点查到当日固化余额。"""
+        invest = _pool(seeded_db, "HJ_INVEST")
+        seeded_db.add(
+            Cashflow(
+                flow_no="CF-SNAPSHOT-API-1",
+                pool_id=invest.id,
+                occurred_on=TODAY,
+                category="OTHER",
+                direction="IN",
+                amount=Decimal("500.00"),
+                created_by="pytest",
+                updated_by="pytest",
+            )
+        )
+        seeded_db.flush()
+        created = seeded_client.post(
+            "/api/v1/reconciliations",
+            json={
+                "pool_id": invest.id,
+                "reconciled_on": TODAY.isoformat(),
+                "account_label": "快照端点测试",
+                "statement_balance": "500.00",
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+
+        snaps = seeded_client.get(
+            "/api/v1/balance-snapshots",
+            params={"pool_id": invest.id},
+            headers=headers,
+        )
+        assert snaps.status_code == 200, snaps.text
+        rows = [s for s in snaps.json() if s["snapshot_on"] == TODAY.isoformat()]
+        assert len(rows) == 1
+        assert rows[0]["balance"] == "500.00"
+        assert rows[0]["reconciliation_id"] == created.json()["id"]
 
     def test_manual_cashflow_review_and_reverse_endpoints(
         self, seeded_client, seeded_db, headers

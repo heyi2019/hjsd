@@ -74,4 +74,5 @@ def test_every_json_api_route_declares_response_model(app):
     # 注：public_routes 在豁免判断之前 +1，故豁免路由（含已删的 DELETE /rebates）也计数。
     # → 178（2026-11-17 删除资金账户路由的 3 个端点）。
     # → 153（2026-11-19 f6e8b690 五档字段与子系统清理收口，-25：下线能力整域移除）。
-    assert public_routes == 153
+    # → 154（2026-11-19 FIN-01-05 余额快照：+GET /balance-snapshots 只读端点）。
+    assert public_routes == 154

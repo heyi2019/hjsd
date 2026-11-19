@@ -10,13 +10,14 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
+from app.shared.order_amounts import business_cashflow_filter
 from app.core.errors import NotFound, Validation
 from app.core.time import now_second
 from app.core.money import to_money
 from app.shared.operation_operators import upsert_operation_operators
 from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, Direction, ReconciliationStatus
-from app.domain.trade import Cashflow, Reconciliation
+from app.domain.trade import BalanceSnapshot, Cashflow, Reconciliation
 from app.shared.form_field_rules import validate_form_extra
 from app.field_definitions.pools import assert_pool_usable
 
@@ -45,6 +46,9 @@ def _system_balance_as_of(session: Session, pool_id: int, reconciled_on: date) -
     conditions = [
             Cashflow.pool_id == pool_id,
             Cashflow.occurred_on <= reconciled_on,
+            # 与资金总览 pool_balances 同源：排除押金损失重分类流水，
+            # 避免押金损失被重复扣减（FIN-01-05 快照口径前提）。
+            business_cashflow_filter(),
         ]
     value = session.scalar(select(func.coalesce(func.sum(signed_amount), 0)).where(*conditions))
     # 账户余额可能因历史支出而低于零，但资金快照本身仍必须能记录它。
@@ -153,6 +157,27 @@ def create_reconciliation(
     )
     session.add(item)
     session.flush()
+    # FIN-01-05：随对账固化当日系统余额快照。同池同日多账户对账只保留首次
+    # 快照（快照是历史台账、不回改）；balance 与本次对账 system_balance 同源，
+    # 已排除押金损失重分类流水。
+    existing_snapshot = session.scalar(
+        select(BalanceSnapshot.id).where(
+            BalanceSnapshot.pool_id == pool.id,
+            BalanceSnapshot.snapshot_on == reconciled_on,
+        )
+    )
+    if existing_snapshot is None:
+        session.add(
+            BalanceSnapshot(
+                pool_id=pool.id,
+                snapshot_on=reconciled_on,
+                balance=system_balance,
+                reconciliation_id=item.id,
+                created_by=actor,
+                updated_by=actor,
+            )
+        )
+        session.flush()
     record_audit(
         session,
         action=AuditAction.RECONCILIATION_CREATE,
@@ -256,8 +281,30 @@ def resolve_reconciliation(
     return item
 
 
+def list_balance_snapshots(
+    session: Session,
+    *,
+    pool_id: int | None = None,
+    user: CurrentUser | None = None,
+) -> list[BalanceSnapshot]:
+    """查询已固化的日终余额快照（FIN-01-05），按日期倒序。"""
+    stmt = select(BalanceSnapshot)
+    if pool_id is not None:
+        if user is not None and not user.can_see_pool(pool_id):
+            return []
+        stmt = stmt.where(BalanceSnapshot.pool_id == pool_id)
+    elif user is not None and not (user.is_admin or user.owner_scope == "ALL"):
+        stmt = stmt.where(BalanceSnapshot.pool_id.in_(sorted(user.pool_ids)))
+    return list(
+        session.scalars(
+            stmt.order_by(BalanceSnapshot.snapshot_on.desc(), BalanceSnapshot.id.desc())
+        ).all()
+    )
+
+
 __all__ = [
     "create_reconciliation",
+    "list_balance_snapshots",
     "list_reconciliations",
     "resolve_reconciliation",
 ]

@@ -13,7 +13,7 @@ import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { money } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
 import { useListViewColumns } from "../shared/lib/listColumns";
-import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, ConfirmButton, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
+import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, InlineError, ConfirmButton, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { collectExtras } from "./CustomersPage.fragments";
 
@@ -36,6 +36,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
   const [detailData, setDetailData] = useState<Counterparty | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [actionError, setActionError] = useState<{ message: string; code?: string } | null>(null);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
 
@@ -121,6 +122,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
 
   const submit = async (values: Record<string, unknown>) => {
     try {
+      setActionError(null);
       await counterpartiesApi.create({
         display_name: values.display_name as string,
         type: values.type as string,
@@ -136,13 +138,14 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
       form.resetFields();
       await load();
     } catch (err) {
-      setError(normalizeError(err));
+      setActionError(normalizeError(err));
     }
   };
 
   const submitEdit = async (values: Record<string, unknown>) => {
     if (!editTarget) return;
     try {
+      setActionError(null);
       await counterpartiesApi.patch(editTarget.id, {
         display_name: values.display_name as string,
         contact_name: values.contact_name as string,
@@ -157,7 +160,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
       editForm.resetFields();
       await load();
     } catch (err) {
-      setError(normalizeError(err));
+      setActionError(normalizeError(err));
     }
   };
 
@@ -190,7 +193,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
           <PermissionButton permission="counterparty.read" size="small" onClick={() => void openDetail(row)}>
             详情
           </PermissionButton>
-          <PermissionButton permission="counterparty.manage" size="small" disabled={row.status !== "ACTIVE"} onClick={() => setEditTarget(row)}>
+          <PermissionButton permission="counterparty.manage" size="small" disabled={row.status !== "ACTIVE"} onClick={() => { setActionError(null); setEditTarget(row); }}>
             编辑
           </PermissionButton>
           <ConfirmButton
@@ -218,7 +221,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
       className="glass"
       title="合作方"
       extra={
-        <PermissionButton permission="counterparty.manage" type="primary" disabled={Boolean(error) || rows === null || !counterpartyTypeOptions} onClick={() => setOpen(true)}>
+        <PermissionButton permission="counterparty.manage" type="primary" disabled={Boolean(error) || rows === null || !counterpartyTypeOptions} onClick={() => { setActionError(null); setOpen(true); }}>
           新建合作方
         </PermissionButton>
       }
@@ -240,7 +243,8 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
         emptyText={error ? "合作方数据不可用，请点击重新加载" : "暂无合作方"}
         onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
      />
-      <BusinessActionModal title="新建合作方" fieldCount={5} open={open} onCancel={() => setOpen(false)} footer={null}>
+      <BusinessActionModal title="新建合作方" fieldCount={5} open={open} onCancel={() => { setActionError(null); setOpen(false); }} footer={null}>
+        <InlineError error={actionError} />
         <FieldConfigScope scope="COUNTERPARTY" active={open}>
         <BusinessRegistrationForm
           layout="horizontal"
@@ -275,12 +279,14 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
         fieldCount={6}
         open={Boolean(editTarget)}
         onCancel={() => {
+          setActionError(null);
           setEditTarget(null);
           editForm.resetFields();
         }}
         footer={null}
         destroyOnHidden
       >
+        <InlineError error={actionError} />
         <FieldConfigScope scope="COUNTERPARTY" active={Boolean(editTarget)}>
         <BusinessRegistrationForm
           layout="horizontal"
@@ -349,6 +355,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
               permission="counterparty.manage"
               size="small"
               onClick={() => {
+                setActionError(null);
                 setEditTarget(detailTarget);
                 setDetailTarget(null);
               }}

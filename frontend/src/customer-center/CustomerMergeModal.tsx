@@ -1,18 +1,20 @@
 import { Form, Input } from "antd";
 import type { FormInstance } from "antd";
 import type { Customer } from "../shared/api/types/customers";
-import { BusinessActionModal, BusinessRegistrationForm, CompactActions, PermissionButton, Select } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, CompactActions, InlineError, PermissionButton, Select } from "../shared/ui";
 
 export function CustomerMergeModal({
   mergeTarget,
   candidates,
   mergeForm,
+  error,
   onCancel,
   onSubmit,
 }: {
   mergeTarget: Customer | null;
   candidates: Customer[] | null;
   mergeForm: FormInstance;
+  error?: { message: string; code?: string } | null;
   onCancel: () => void;
   onSubmit: (values: Record<string, unknown>) => void;
 }) {
@@ -23,6 +25,7 @@ export function CustomerMergeModal({
         onCancel={onCancel}
         footer={null}
       >
+        <InlineError error={error} />
         <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"

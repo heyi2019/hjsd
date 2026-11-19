@@ -507,6 +507,61 @@ describe("CustomersPage：行内动作", () => {
   });
 
   describe("CustomersPage：客户与合作方操作流", () => {
+    it("新建客户失败在弹窗显示原因", async () => {
+      vi.mocked(customersApi.create).mockRejectedValueOnce(new Error("客户建档失败"));
+      renderLight(<CustomersPage />, { user: "admin" });
+      await screen.findByText("CUS-0001");
+      await ui.click(screen.getByRole("button", { name: "新建客户" }));
+      const modal = await screen.findByRole("dialog");
+      await ui.type(within(modal).getByLabelText("名字"), "待建客户");
+      await ui.click(within(modal).getByRole("button", { name: "建档" }));
+      expect(await within(modal).findByText(/客户建档失败/)).toBeVisible();
+      expect(within(modal).getByLabelText("名字")).toHaveValue("待建客户");
+    });
+
+    it("新建合作方失败在弹窗显示原因", async () => {
+      vi.mocked(counterpartiesApi.create).mockRejectedValueOnce(new Error("合作方建档失败"));
+      renderLight(<CustomersPage />, { user: "admin" });
+      await screen.findByText("CUS-0001");
+      await ui.click(screen.getByRole("tab", { name: /合作方/ }));
+      await ui.click(await screen.findByRole("button", { name: "新建合作方" }));
+      const modal = await screen.findByRole("dialog");
+      await ui.type(within(modal).getByLabelText("名称"), "待建合作方");
+      await ui.click(within(modal).getByRole("button", { name: "建档" }));
+      expect(await within(modal).findByText(/合作方建档失败/)).toBeVisible();
+      expect(within(modal).getByLabelText("名称")).toHaveValue("待建合作方");
+    });
+    it("客户编辑失败在弹窗显示原因并可重试", async () => {
+      vi.mocked(customersApi.patch).mockRejectedValueOnce(new Error("客户保存失败"));
+      renderLight(<CustomersPage />, { user: "admin" });
+      await screen.findByText("CUS-0001");
+      await ui.click((await screen.findAllByRole("button", { name: /详情/ }))[0]);
+      await ui.click(within(await screen.findByRole("dialog")).getByRole("button", { name: /编辑/ }));
+      const modal = (await screen.findByText("编辑客户 · CUS-0001")).closest(".ant-modal-content") as HTMLElement;
+      await ui.clear(within(modal).getByLabelText("名字"));
+      await ui.type(within(modal).getByLabelText("名字"), "新名字");
+      await ui.click(within(modal).getByRole("button", { name: "保存" }));
+      expect(await within(modal).findByText(/客户保存失败/)).toBeVisible();
+      expect(within(modal).getByLabelText("名字")).toHaveValue("新名字");
+      await ui.click(within(modal).getByRole("button", { name: "保存" }));
+      await waitFor(() => expect(customersApi.patch).toHaveBeenCalledTimes(2));
+    });
+
+    it("合作方编辑失败在弹窗显示原因并可重试", async () => {
+      vi.mocked(counterpartiesApi.patch).mockRejectedValueOnce(new Error("合作方保存失败"));
+      renderLight(<CustomersPage />, { user: "admin" });
+      await screen.findByText("CUS-0001");
+      await ui.click(screen.getByRole("tab", { name: /合作方/ }));
+      await ui.click(within(await screen.findByRole("tabpanel")).getByRole("button", { name: "编辑" }));
+      const modal = (await screen.findByText("编辑合作方 · CP-0001")).closest(".ant-modal-content") as HTMLElement;
+      await ui.clear(within(modal).getByLabelText("名称"));
+      await ui.type(within(modal).getByLabelText("名称"), "合作方新名称");
+      await ui.click(within(modal).getByRole("button", { name: "保存" }));
+      expect(await within(modal).findByText(/合作方保存失败/)).toBeVisible();
+      expect(within(modal).getByLabelText("名称")).toHaveValue("合作方新名称");
+      await ui.click(within(modal).getByRole("button", { name: "保存" }));
+      await waitFor(() => expect(counterpartiesApi.patch).toHaveBeenCalledTimes(2));
+    });
     it("拉黑 ACTIVE 客户：确认后调用 setStatus(DISABLED) 并提示", async () => {
       renderLight(<CustomersPage />, { user: "admin" });
       await screen.findByText("CUS-0001");

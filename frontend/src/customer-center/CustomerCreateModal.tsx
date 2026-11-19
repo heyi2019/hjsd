@@ -2,7 +2,7 @@ import { Form, Input, Typography } from "antd";
 import type { FormInstance } from "antd";
 import { CfgItem, FieldConfigScope } from "../business/ConfigurableField";
 import type { OrderFormField } from "../shared/api/types/forms";
-import { BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, dateValueFromEvent, dateValueProps, PermissionButton } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, dateValueFromEvent, dateValueProps, InlineError, PermissionButton } from "../shared/ui";
 import { ExtraFieldControl } from "./CustomersPage.fragments";
 
 const CUSTOMER_CREATE_FORM_ID = "customer-create-form";
@@ -11,12 +11,14 @@ export function CustomerCreateModal({
   createOpen,
   activeDefs,
   form,
+  error,
   onCancel,
   onSubmit,
 }: {
   createOpen: boolean;
   activeDefs: OrderFormField[];
   form: FormInstance;
+  error?: { message: string; code?: string } | null;
   onCancel: () => void;
   onSubmit: (values: Record<string, unknown>) => void;
 }) {
@@ -33,6 +35,7 @@ export function CustomerCreateModal({
           </PermissionButton>
         )}
       >
+        <InlineError error={error} />
         <FieldConfigScope scope="CUSTOMER" active={createOpen}>
           <BusinessRegistrationForm
             id={CUSTOMER_CREATE_FORM_ID}

@@ -18,10 +18,12 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
   const { username } = useSession();
   const {
     activeDefs,
+    actionError,
     arrangeColumns,
     cancelEdit,
     cancelMerge,
     closeDetail,
+    clearActionError,
     columns,
     createOpen,
     customerStatusOptions,
@@ -81,7 +83,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
           >
             导出
           </PermissionButton>
-          <PermissionButton permission="customer.create" type="primary" disabled={Boolean(error) || rows === null} onClick={() => setCreateOpen(true)}>
+          <PermissionButton permission="customer.create" type="primary" disabled={Boolean(error) || rows === null} onClick={() => { clearActionError(); setCreateOpen(true); }}>
             新建客户
           </PermissionButton>
         </Space>
@@ -172,13 +174,15 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
         createOpen={createOpen}
         activeDefs={activeDefs}
         form={form}
-        onCancel={() => setCreateOpen(false)}
+        error={actionError}
+        onCancel={() => { clearActionError(); setCreateOpen(false); }}
         onSubmit={submitCreate}
       />
       <CustomerEditModal
         editTarget={editTarget}
         activeDefs={activeDefs}
         editForm={editForm}
+        error={actionError}
         onCancel={cancelEdit}
         onSubmit={submitEdit}
       />
@@ -195,6 +199,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
         mergeTarget={mergeTarget}
         candidates={mergeCandidates}
         mergeForm={mergeForm}
+        error={actionError}
         onCancel={cancelMerge}
         onSubmit={submitMerge}
       />

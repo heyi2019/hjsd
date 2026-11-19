@@ -30,6 +30,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const [detailData, setDetailData] = useState<CustomerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [actionError, setActionError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -178,6 +179,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
 
   const submitCreate = async (values: Record<string, unknown>) => {
     try {
+      setActionError(null);
       const extraValues = collectExtras(values, activeDefs);
       const result = await customersApi.create({
         display_name: values.display_name as string,
@@ -197,13 +199,14 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       form.resetFields();
       await load();
     } catch (err) {
-      setError(normalizeError(err));
+      setActionError(normalizeError(err));
     }
   };
 
   const submitEdit = async (values: Record<string, unknown>) => {
     if (!editTarget) return;
     try {
+      setActionError(null);
       const extraValues = collectExtras(values, activeDefs, { includeEmpty: true });
       await customersApi.patch(editTarget.id, {
         display_name: values.display_name as string,
@@ -219,13 +222,14 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       editForm.resetFields();
       await load();
     } catch (err) {
-      setError(normalizeError(err));
+      setActionError(normalizeError(err));
     }
   };
 
   const submitMerge = async (values: Record<string, unknown>) => {
     if (!mergeTarget) return;
     try {
+      setActionError(null);
       await customersApi.merge(
         mergeTarget.id,
         Number(values.target_customer_id),
@@ -236,7 +240,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       mergeForm.resetFields();
       await load();
     } catch (err) {
-      setError(normalizeError(err));
+      setActionError(normalizeError(err));
     }
   };
 
@@ -320,13 +324,15 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const newThisMonthCount = summary?.month_count;
   const newTodayCount = summary?.today_count;
   // —— 弹窗收口：原 JSX 内联的状态更新收为方法，供展示组件回调（语义逐字等价）——
-  const cancelEdit = () => { setEditTarget(null); editForm.resetFields(); };
+  const clearActionError = () => setActionError(null);
+  const cancelEdit = () => { clearActionError(); setEditTarget(null); editForm.resetFields(); };
   const closeDetail = () => { setDetailTarget(null); setDetailData(null); };
-  const requestEdit = (target: Customer) => { setEditTarget(target); setDetailTarget(null); };
+  const requestEdit = (target: Customer) => { clearActionError(); setEditTarget(target); setDetailTarget(null); };
   // 合并弹窗复用同一 Form 实例：取消或再次打开都必须清空，避免上次选的目标客户与原因残留
   // 导致把 A 客户误合并到 B 客户上次选的目标上（#13）。
-  const cancelMerge = () => { setMergeTarget(null); setMergeCandidates(null); mergeForm.resetFields(); };
+  const cancelMerge = () => { clearActionError(); setMergeTarget(null); setMergeCandidates(null); mergeForm.resetFields(); };
   const requestMerge = async (target: Customer) => {
+    clearActionError();
     mergeForm.resetFields();
     setMergeTarget(target);
     setMergeCandidates(null);
@@ -334,17 +340,19 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       const customerPage = await customersApi.page({ status: "ACTIVE", limit: 500, offset: 0 });
       setMergeCandidates(customerPage.items);
     } catch (err) {
-      setError(normalizeError(err));
+      setActionError(normalizeError(err));
       setMergeCandidates([]);
     }
   };
 
   return {
     activeDefs,
+    actionError,
     arrangeColumns,
     cancelEdit,
     cancelMerge,
     closeDetail,
+    clearActionError,
     columns,
     createOpen,
     customerStatusOptions,

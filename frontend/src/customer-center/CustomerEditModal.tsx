@@ -2,19 +2,21 @@ import { Form, Input } from "antd";
 import type { FormInstance } from "antd";
 import type { Customer } from "../shared/api/types/customers";
 import type { OrderFormField } from "../shared/api/types/forms";
-import { BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps, PermissionButton } from "../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps, InlineError, PermissionButton } from "../shared/ui";
 import { ExtraFieldControl } from "./CustomersPage.fragments";
 
 export function CustomerEditModal({
   editTarget,
   activeDefs,
   editForm,
+  error,
   onCancel,
   onSubmit,
 }: {
   editTarget: Customer | null;
   activeDefs: OrderFormField[];
   editForm: FormInstance;
+  error?: { message: string; code?: string } | null;
   onCancel: () => void;
   onSubmit: (values: Record<string, unknown>) => void;
 }) {
@@ -27,6 +29,7 @@ export function CustomerEditModal({
         footer={null}
         destroyOnHidden
       >
+        <InlineError error={error} />
         <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"

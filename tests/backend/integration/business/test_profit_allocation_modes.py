@@ -266,6 +266,18 @@ def test_person_mode_amount_cannot_exceed_order_profit(seeded_db):
                 {"user_id": 2, "role": "OWNER", "allocation_amount": negative_amount},
                 {"user_id": None, "role": "OWNER", "allocation_rate": "100" if negative_amount == "-600" else "0"},
             ])
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(seeded_db, order_id, items=[
+            {"user_id": 1, "role": "OWNER", "allocation_amount": "400"},
+            {"user_id": 2, "role": "OWNER", "allocation_rate": "80"},
+        ])
+    policy_allocations.set_allocations(seeded_db, order_id, items=[
+        {"user_id": 1, "role": "OWNER", "allocation_amount": "100"},
+        {"user_id": 2, "role": "OWNER", "allocation_rate": "80"},
+    ])
+    report = r3_commission_reconciliation(seeded_db)
+    group = next(group for group in report["order_groups"] if group["order_id"] == order_id)
+    assert group["profit_base"] == Decimal("500.00")
 
 
 def test_person_mode_amount_requires_positive_profit(seeded_db):
@@ -391,6 +403,11 @@ def test_person_mode_rejects_positive_amount_on_loss_order(seeded_db):
                 {"user_id": 2, "role": "OWNER", "allocation_amount": positive_amount},
                 {"user_id": None, "role": "OWNER", "allocation_rate": "100" if positive_amount == "600" else "0"},
             ])
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(seeded_db, order_id, items=[
+            {"user_id": 1, "role": "OWNER", "allocation_amount": "-400"},
+            {"user_id": 2, "role": "OWNER", "allocation_rate": "80"},
+        ])
 
 
 def test_person_mode_rejects_over_shared_loss(seeded_db):

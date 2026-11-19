@@ -2,7 +2,7 @@
  * 从 ReportsPage.tsx 拆出：报表本身分文件，壳留在这里避免每个报表重复 try/catch。 */
 
 import { Typography } from "antd";
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { normalizeError } from "../../shared/api/client";
 
 /** 报表视图共用的统计周期筛选：提升到父级，使各带区间筛选的报表在 Tab 切换（非挂载）后仍保留筛选条件。 */
@@ -17,19 +17,22 @@ export function useReport<T>(load: () => Promise<T>, deps: readonly unknown[]) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const requestRef = useRef(0);
 
   const reload = useCallback(() => {
+    const request = ++requestRef.current;
     setLoading(true);
     setError(null);
     load()
-      .then(setData)
-      .catch((err) => setError(normalizeError(err)))
-      .finally(() => setLoading(false));
+      .then((value) => { if (request === requestRef.current) setData(value); })
+      .catch((err) => { if (request === requestRef.current) setError(normalizeError(err)); })
+      .finally(() => { if (request === requestRef.current) setLoading(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   useEffect(() => {
     if (pageActive) reload();
+    return () => { requestRef.current += 1; };
   }, [pageActive, reload]);
 
   return { data, loading, error, reload };

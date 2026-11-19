@@ -16,6 +16,7 @@ import { poolsApi } from "@/shared/api/pools.api";
 import { reportsApi } from "@/shared/api/reports.api";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { useBusinessPeriod } from "@/shared/state/businessPeriod";
+import { useReport } from "@/reporting/reports/shared";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -74,6 +75,23 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：经营中心报表", () => {
+  it("切换日期后旧报表请求晚返回时不会覆盖新结果", async () => {
+    let finishOld!: (value: string) => void;
+    let finishNew!: (value: string) => void;
+    const oldRequest = new Promise<string>((resolve) => { finishOld = resolve; });
+    const newRequest = new Promise<string>((resolve) => { finishNew = resolve; });
+    const { result, rerender } = renderHook(({ period }) => useReport(
+      () => period === "old" ? oldRequest : newRequest,
+      [period],
+    ), { initialProps: { period: "old" } });
+    rerender({ period: "new" });
+    await act(async () => { finishNew("新周期数据"); await newRequest; });
+    expect(result.current.data).toBe("新周期数据");
+    await act(async () => { finishOld("旧周期数据"); await oldRequest; });
+    expect(result.current.data).toBe("新周期数据");
+    expect(result.current.loading).toBe(false);
+  });
+
   it("跳转传入本期日期后跨月仍自动滚期", async () => {
     vi.useFakeTimers();
     try {

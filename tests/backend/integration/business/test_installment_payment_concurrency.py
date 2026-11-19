@@ -14,6 +14,7 @@ from app.domain.users import User
 from app.funds.installments.create import create_installment
 from app.funds.installments.repayments.cancel import cancel_installment
 from app.funds.installments.repayments.pay import pay
+from app.funds.installments.repayments.waive import waive_schedule
 from app.settings.field_definitions.seeds import seed_foundation
 
 
@@ -107,6 +108,36 @@ def test_installment_payment_and_cancellation_are_serialized(v1_engine):
             assert waiting.wait(10)
             first.commit()
             assert future.result(timeout=10) == 50
+
+        with factory() as session:
+            order = create_order(session, order_type="TH", trade_date=date(2026, 11, 1), actor="pytest")
+            contract = create_installment(session, order_id=order.id, contract_type="PICKUP_SALE", principal="100", down_payment="0", periods=1, per_period="100", first_due_on=date(2026, 11, 1), actor="pytest")
+            contract_id = contract.id
+            session.commit()
+        waiting.clear()
+
+        def waive_after_payment():
+            with factory() as session:
+                connection = session.connection()
+                def observe(_conn, _cursor, statement, _parameters, _context, _executemany):
+                    sql = statement.lower()
+                    if ("for update" in sql and "installments" in sql) or "update installment_schedules" in sql:
+                        waiting.set()
+                event.listen(connection, "before_cursor_execute", observe)
+                try:
+                    waive_schedule(session, contract_id, period_no=1, amount="60", waived_on=date(2026, 11, 2), actor="pytest", reason="减免")
+                    session.commit()
+                    return "accepted"
+                except AppError:
+                    session.rollback()
+                    return "rejected"
+
+        with factory() as first, ThreadPoolExecutor(max_workers=1) as executor:
+            pay(first, contract_id, amount="50", paid_on=date(2026, 11, 2), period_no=1, actor="pytest")
+            future = executor.submit(waive_after_payment)
+            assert waiting.wait(10)
+            first.commit()
+            assert future.result(timeout=10) == "rejected"
     finally:
         engine.dispose()
         with admin.connect() as connection:

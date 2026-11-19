@@ -95,12 +95,12 @@ def available_installment_actions(
     return actions
 
 
-def available_schedule_actions(status: str) -> list[str]:
+def available_schedule_actions(status: str, contract_status: str | None = None) -> list[str]:
     """期次级可用动作（等价搬运前端 waive/extend 两处判定）。
 
     仅看期次 status；PAID / WAIVED 不可减免展期，其余一律可用。
     """
-    if status in _SCHEDULE_BLOCKED:
+    if contract_status == InstallmentStatus.CANCELLED.value or status in _SCHEDULE_BLOCKED:
         return []
     return [WAIVE, EXTEND]
 

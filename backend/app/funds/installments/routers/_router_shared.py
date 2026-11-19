@@ -62,7 +62,7 @@ def _installment_outputs(
             "schedules": [
                 schemas.ScheduleOut.model_validate({
                     **row.__dict__,
-                    "available_actions": actions.available_schedule_actions(row.status),
+                    "available_actions": actions.available_schedule_actions(row.status, item.status),
                 })
                 for row in schedules_by_installment.get(item.id, [])
             ],

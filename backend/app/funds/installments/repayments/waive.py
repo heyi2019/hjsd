@@ -32,13 +32,15 @@ def waive_schedule(
 ) -> InstallmentSchedule:
     """登记经授权的期次减免，不改写原应收金额。"""
     text_reason = _required_text(reason, field="reason", message="减免必须填写原因")
-    installment = get_installment(session, installment_id, user)
+    installment = get_installment(session, installment_id, user, for_update=True)
+    if installment.status == InstallmentStatus.CANCELLED.value:
+        raise Validation("已取消的分期合约不能减免")
     _merge_form_extra(session, installment, scope="INSTWAIVE", values=form_extra)
     schedule = session.scalar(
         select(InstallmentSchedule).where(
             InstallmentSchedule.installment_id == installment.id,
             InstallmentSchedule.period_no == period_no,
-        )
+        ).execution_options(populate_existing=True)
     )
     if schedule is None:
         raise NotFound(f"期次 {period_no} 不存在", details={"period_no": period_no})

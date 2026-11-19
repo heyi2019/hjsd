@@ -362,3 +362,20 @@ def test_list_endpoint_emits_available_actions(seeded_client, seeded_db, headers
     # PENDING 期次：可减免/展期
     assert set(row["schedules"][0]["available_actions"]) == {"waive", "extend"}
 
+
+def test_cancelled_installment_schedules_cannot_be_waived_or_extended(seeded_client, seeded_db, headers):
+    account = _account(seeded_db, "cancelled-schedule-actions")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id, "100")
+    contract = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="200", down_payment="0", periods=1, per_period="200")
+    inst_cancel(seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="取消售出")
+    row = next(row for row in seeded_client.get("/api/v1/installments", headers=headers).json() if row["id"] == contract.id)
+    assert all(not schedule["available_actions"] for schedule in row["schedules"])
+    base = f"/api/v1/installments/{contract.id}/schedules/1"
+    waive = seeded_client.post(f"{base}/waive", headers=headers, json={"amount": "10", "waived_on": "2026-10-13", "reason": "减免"})
+    extend = seeded_client.post(f"{base}/extend", headers=headers, json={"new_due_on": "2026-12-12", "reason": "展期"})
+    assert waive.status_code in (400, 409, 422), waive.text
+    assert extend.status_code in (400, 409, 422), extend.text
+    seeded_db.refresh(contract)
+    assert contract.waived_amount == 0
+

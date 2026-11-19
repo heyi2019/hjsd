@@ -29,6 +29,21 @@ def test_new_unlisting_requires_valid_active_listing_and_stores_event_id(seeded_
     assert sum((e.form_extra or {}).get("operation_type") == "UNLIST" for e in events) == 1
 
 
+def test_detail_unlisting_normalizes_platform_before_saving(seeded_client, seeded_db, headers):
+    from app.business.listing_state import active_listings
+    account = create_account(seeded_db, game_account="whitespace-platform-unlisting", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
+    url = f"/api/v1/orders/{order.id}/execution-edit"
+    def submit(platform):
+        return seeded_client.patch(url, headers=headers, json={"events": [], "new_events": [{"operation_type": "UNLIST", "occurred_at": "2026-10-02T11:00:00", "form_extra": {"platform_unlist_scope": "PLATFORM", "consignment_event_id": listing.id, "consignment_platforms": [platform]}}]})
+    assert submit(" 平台甲 ").status_code == 200
+    event = next(event for event in seeded_db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id)).all() if (event.form_extra or {}).get("operation_type") == "UNLIST")
+    assert event.form_extra["consignment_platforms"] == ["平台甲"]
+    assert active_listings(seeded_db, order.id) == set()
+    assert submit("平台甲").status_code == 422
+
+
 def test_cannot_relist_platform_before_it_is_unlisted(seeded_db):
     from app.core.errors import Validation
     account = create_account(seeded_db, game_account="duplicate-platform", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")

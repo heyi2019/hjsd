@@ -51,6 +51,7 @@ def apply_operation_event_creates(
                 if not isinstance(listing_id, int) or isinstance(listing_id, bool) or not isinstance(platforms, list) or len(platforms) != 1 or not isinstance(platforms[0], str) or (listing_id, platforms[0].strip()) not in active_listings(db, order_id):
                     raise Validation("请选择当前订单仍在上架的具体平台记录")
                 form_extra["platform_unlist_scope"] = "PLATFORM"
+                form_extra["consignment_platforms"] = [platforms[0].strip()]
             form_extra["platform_unlisted_at"] = occurred_at.isoformat()
             form_extra_scope = "INVOID"
         else:

@@ -306,3 +306,13 @@ def test_sell_api_creates_notification_visible_in_seller_inbox(seeded_client, se
         "分润" in (item.get("title", "") + item.get("message", ""))
         for item in body["items"]
     )
+    _make_unread(seeded_db, recipient_user_id=seller_id, notification_type="OTHER", entity_id="newer")
+    filtered = seeded_client.get(
+        "/api/v1/notifications",
+        params={"unread_only": "true", "notification_type": "PROFIT_PENDING", "limit": 1},
+        headers={"Authorization": f"Bearer {build_access_token(seller)}"},
+    )
+    assert filtered.status_code == 200, filtered.text
+    assert filtered.json()["total"] == 1
+    assert filtered.json()["unread_total"] == 2
+    assert filtered.json()["items"][0]["notification_type"] == "PROFIT_PENDING"

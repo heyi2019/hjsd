@@ -127,6 +127,7 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
 
     fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 1 条" }));
     expect(await screen.findByText("订单分润通知详情")).toBeInTheDocument();
+    expect(notificationsApi.list).toHaveBeenCalledWith({ limit: 200, unread_only: true, notification_type: "PROFIT_ALLOCATED" });
     expect(screen.getByText("TH0001")).toBeInTheDocument();
     expect(screen.getByText("300.00")).toBeInTheDocument();
     expect(screen.getByText("admin")).toBeInTheDocument();
@@ -170,6 +171,7 @@ it("点击分润待配置通知跳转到对应订单的分润配置入口", asyn
 
     fireEvent.click(await screen.findByRole("button", { name: "分润待配置 1 条" }));
     await waitFor(() => expect(onDashboardNavigate).toHaveBeenCalledWith("/business/ledger?allocation_order_id=43"));
+    expect(notificationsApi.list).toHaveBeenCalledWith({ limit: 200, unread_only: true, notification_type: "PROFIT_PENDING" });
   });
 
 it("工作台按业务提醒配置计算库存阈值并控制提醒开关", async () => {

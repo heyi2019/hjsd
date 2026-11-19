@@ -28,6 +28,6 @@ export const attachmentsApi = {
 };
 
 export const notificationsApi = {
-  list: (params: { limit: number; unread_only?: boolean }) => api.get<{ items: NotificationItem[]; total?: number; unread_total: number }>("/notifications", { params }).then(r => r.data),
+  list: (params: { limit: number; unread_only?: boolean; notification_type?: string }) => api.get<{ items: NotificationItem[]; total?: number; unread_total: number }>("/notifications", { params }).then(r => r.data),
   markRead: (id: number) => api.post<NotificationItem>(`/notifications/${id}/read`).then(r => r.data),
 };

@@ -93,7 +93,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
     setLoading(true);
     setError(null);
     setDetails([]);
-    void notificationsApi.list({ limit: 200, unread_only: true })
+    void notificationsApi.list({ limit: 200, unread_only: true, notification_type: "PROFIT_ALLOCATED" })
       .then(async ({ items }) => {
         const profitNotifications = items.filter((item) => item.notification_type === "PROFIT_ALLOCATED" && item.entity_type === "order");
         const loaded = await Promise.all(profitNotifications.map(async (notification) => {

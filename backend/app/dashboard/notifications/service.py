@@ -88,6 +88,7 @@ def list_notifications(
     *,
     recipient_user_id: int,
     unread_only: bool = False,
+    notification_type: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Notification], int]:
@@ -95,6 +96,9 @@ def list_notifications(
     count_stmt = select(func.count(Notification.id)).where(
         Notification.recipient_user_id == recipient_user_id
     )
+    if notification_type:
+        stmt = stmt.where(Notification.notification_type == notification_type)
+        count_stmt = count_stmt.where(Notification.notification_type == notification_type)
     if unread_only:
         stmt = stmt.where(Notification.read_at.is_(None))
         count_stmt = count_stmt.where(Notification.read_at.is_(None))

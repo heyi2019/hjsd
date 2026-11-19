@@ -19,6 +19,7 @@ router = APIRouter(tags=["SYS-01-04 系统通知"])
 @router.get("/notifications", response_model=schemas.NotificationListOut)
 def list_my_notifications(
     unread_only: bool = Query(default=False),
+    notification_type: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -28,6 +29,7 @@ def list_my_notifications(
         db,
         recipient_user_id=user.id,
         unread_only=unread_only,
+        notification_type=notification_type,
         limit=limit,
         offset=offset,
     )

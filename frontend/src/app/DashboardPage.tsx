@@ -42,7 +42,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
   const openPendingProfitAllocation = async () => {
     if (!onDashboardNavigate) return;
     try {
-      const { items } = await notificationsApi.list({ limit: 200, unread_only: true });
+      const { items } = await notificationsApi.list({ limit: 200, unread_only: true, notification_type: "PROFIT_PENDING" });
       const notification = items.find((item) => item.notification_type === "PROFIT_PENDING" && item.entity_type === "order");
       if (!notification) {
         appMessage.warning("没有找到待配置分润的订单");

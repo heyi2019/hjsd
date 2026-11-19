@@ -5,12 +5,12 @@ import type { ReactNode } from "react";
 import { BusinessRegistrationGroup, BusinessRegistrationSection } from "../../shared/ui";
 import "./RecoveryCustomerSection.css";
 
-export function RecoveryCustomerSection(props: { customerExtras?: ReactNode; title?: string } = {}) {
+export function RecoveryCustomerSection(props: { customerExtras?: ReactNode; title?: string; customerOptional?: boolean } = {}) {
   const configuredTitle = sectionLabel("PARTICIPANT", "客户信息");
   const title = props.title ?? configuredTitle;
   return (
     <BusinessRegistrationSection className="customer-section" title={title}>
-      <CfgItem name="customer_nickname" label="客户昵称" rules={[{ required: true, message: "请输入客户昵称" }]}><Input placeholder="请输入客户昵称" /></CfgItem>
+      <CfgItem name="customer_nickname" label="客户昵称" rules={props.customerOptional ? [] : [{ required: true, message: "请输入客户昵称" }]}><Input placeholder="请输入客户昵称" /></CfgItem>
       <CustomerSourceFields name="customer_source" otherName="customer_source_other" />
       <BusinessRegistrationGroup className="customer-contacts" title="联系方式">
         <CfgNestedItem name="customer_contact_name" label="姓名"><Input placeholder="可选填" /></CfgNestedItem>

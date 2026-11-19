@@ -63,6 +63,10 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const resolvedType = inventoryType;
   const isConsignment = resolvedType === "CONSIGNMENT";
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customersReady, setCustomersReady] = useState(false);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [customerError, setCustomerError] = useState<{ message: string; code?: string } | null>(null);
+  const [customerRetry, setCustomerRetry] = useState(0);
   const [pools, setPools] = useState<Pool[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -140,20 +144,35 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    void Promise.all([loadCustomers(), poolsApi.list(), employeesApi.list()])
-      .then(([customerList, poolList, employeeList]) => {
+    setCustomersReady(false);
+    setCustomersLoading(true);
+    setCustomerError(null);
+    void loadCustomers().then((customerList) => {
+      if (cancelled) return;
+      setCustomers(customerList);
+      setCustomersReady(true);
+      setCustomerError(null);
+    }).catch((cause) => {
+      if (!cancelled) setCustomerError(normalizeError(cause));
+    }).finally(() => {
+      if (!cancelled) setCustomersLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [open, customerRetry]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void Promise.all([poolsApi.list(), employeesApi.list()])
+      .then(([poolList, employeeList]) => {
         if (cancelled) return;
-        setCustomers(customerList);
         setPools(poolList.filter((pool) => pool.status === "ACTIVE"));
         setEmployees(employeeList);
-        setError(null);
       })
       .catch((cause) => {
         if (!cancelled) setError(normalizeError(cause));
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [open]);
 
   useEffect(() => {
@@ -163,6 +182,11 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
 
   const submit = async (values: Record<string, unknown>) => {
     if (!props.account) return;
+    const customerNickname = String(values.customer_nickname ?? "").trim();
+    if (customerNickname && !customersReady) {
+      if (!customerError) setCustomerError({ message: "客户名单正在加载，请稍后重试" });
+      return;
+    }
     const sourceOrderId = props.account.source_order_id;
     if (sourceOrderId == null) {
       setError({ message: "该库存账号未关联到入库订单，无法在其上登记售出" });
@@ -192,36 +216,37 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
     setSubmitting(true);
     // 售出 = 原买入订单上的卖出动作（SELL），不再新建订单；买家建档后挂到来源单。
     try {
-      const customerNickname = String(values.customer_nickname ?? "").trim();
-      const customerPhone = values.customer_phone as string | undefined;
-      const customerWechat = values.customer_wechat as string | undefined;
-      const existingCustomer = customers.find((customer) =>
-        customer.display_name === customerNickname
-        && ((customerPhone && customer.phone === customerPhone)
-          || (customerWechat && customer.wechat === customerWechat)
-          || (!customerPhone && !customerWechat)),
-      );
-      const customer = existingCustomer ?? (await customersApi.create({
-        display_name: customerNickname,
-        contact_name: values.customer_contact_name as string | undefined,
-        phone: customerPhone,
-        wechat: customerWechat,
-        qq: values.customer_qq as string | undefined,
-        source: values.customer_source as string | undefined,
-        note: values.note as string | undefined,
-      })).customer;
-      if (customer.status === "DISABLED" || customer.status === "MERGED") {
-        setError({
-          message: customer.status === "MERGED"
-            ? "客户已合并，不能作为售出买家"
-            : "客户已拉黑，不能作为售出买家",
+      if (customerNickname) {
+        const customerPhone = values.customer_phone as string | undefined;
+        const customerWechat = values.customer_wechat as string | undefined;
+        const existingCustomer = customers.find((customer) =>
+          customer.display_name === customerNickname
+          && ((customerPhone && customer.phone === customerPhone)
+            || (customerWechat && customer.wechat === customerWechat)
+            || (!customerPhone && !customerWechat)),
+        );
+        const customer = existingCustomer ?? (await customersApi.create({
+          display_name: customerNickname,
+          contact_name: values.customer_contact_name as string | undefined,
+          phone: customerPhone,
+          wechat: customerWechat,
+          qq: values.customer_qq as string | undefined,
+          source: values.customer_source as string | undefined,
+          note: values.note as string | undefined,
+        })).customer;
+        if (customer.status === "DISABLED" || customer.status === "MERGED") {
+          setError({
+            message: customer.status === "MERGED"
+              ? "客户已合并，不能作为售出买家"
+              : "客户已拉黑，不能作为售出买家",
+          });
+          return;
+        }
+        await ordersApi.addCustomerRole(sourceOrderId, {
+          customer_id: customer.id,
+          role: buyerRoleOf(resolvedType),
         });
-        return;
       }
-      await ordersApi.addCustomerRole(sourceOrderId, {
-        customer_id: customer.id,
-        role: buyerRoleOf(resolvedType),
-      });
 
       if (values.payment_method === "INSTALLMENT") {
         await collectInstallmentPayment({ sourceOrderId, values });
@@ -268,6 +293,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
       }
     >
       <ErrorBanner error={error} />
+      <ErrorBanner error={customerError} onRetry={!customersLoading ? () => setCustomerRetry((value) => value + 1) : undefined} />
       <InventoryAccountSummary account={props.account} />
       <FieldConfigScope scope={saleScope ?? ""} active={open && Boolean(saleScope)}>
         <BusinessRegistrationForm
@@ -275,7 +301,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope={saleScope ?? ""} form={form} onFinish={submit}>
-          <RecoveryCustomerSection title={buyerInfoTitle} />
+          <RecoveryCustomerSection title={buyerInfoTitle} customerOptional />
           <DeliveryInfoSection showIntermediary employees={employees} showSaleOperator />
           <SaleFinanceCard
             isConsignment={isConsignment}

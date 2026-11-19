@@ -679,6 +679,37 @@ beforeEach(() => {
   seedOrderFormFields();
 });
 
+it("不填写客户时，客户名单加载中仍可售出", async () => {
+  vi.mocked(customersApi.page).mockReturnValueOnce(new Promise(() => {}));
+  const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+  await saleUi.type(await screen.findByLabelText("售出金额"), "350");
+  await saleUi.click(screen.getByLabelText("资金账户"));
+  await saleUi.click(await screen.findByText(/利润池/));
+  await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
+  await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(21, expect.objectContaining({ event_type: "SELL", amount: "350" })));
+  expect(customersApi.create).not.toHaveBeenCalled();
+  expect(ordersApi.addCustomerRole).not.toHaveBeenCalled();
+});
+
+it("填写客户时，名单加载失败可重试后再售出", async () => {
+  vi.mocked(customersApi.page).mockRejectedValueOnce(new Error("客户读取失败"));
+  const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+  expect(await screen.findByText(/客户读取失败/)).toBeInTheDocument();
+  await saleUi.type(screen.getByLabelText("客户昵称"), "买家A");
+  await saleUi.type(screen.getByLabelText("售出金额"), "350");
+  await saleUi.click(screen.getByLabelText("资金账户"));
+  await saleUi.click(await screen.findByText(/利润池/));
+  await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
+  expect(customersApi.create).not.toHaveBeenCalled();
+  expect(ordersApi.postEvent).not.toHaveBeenCalled();
+  await saleUi.click(screen.getByRole("button", { name: "重新加载" }));
+  await waitFor(() => expect(screen.queryByText(/客户读取失败/)).not.toBeInTheDocument());
+  await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
+  await waitFor(() => expect(ordersApi.addCustomerRole).toHaveBeenCalledWith(21, { customer_id: 7, role: "BUYER" }));
+});
+
 it("售出时匹配第500条以后的已有客户", async () => {
   const first = Array.from({ length: 500 }, (_, index) => ({ id: index + 1, display_name: `客户${index + 1}`, status: "ACTIVE" }));
   const last = { id: 501, display_name: "末尾买家", status: "ACTIVE" };

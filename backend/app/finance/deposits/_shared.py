@@ -47,6 +47,21 @@ def _status_after_loss(deposit: Deposit) -> str:
     return deposit.status
 
 
+def _assert_returnable(deposit: Deposit, action: str) -> None:
+    """退还/损失动作的状态守卫：仅未结清押金可再操作。
+
+    CANCELLED 押金由 cancel_deposit 写反向流水（DEPOSIT_CANCEL）冲平，已视为结清；
+    RETURNED/LOST 是终态。前端靠按钮 disabled 挡住正常点击，但 API 可被直调，
+    故服务端必须拦截，否则 CANCELLED 押金可再次释放造成重复入账。
+    """
+    allowed = (DepositStatus.PAID.value, DepositStatus.PARTIALLY_RETURNED.value)
+    if deposit.status not in allowed:
+        raise Validation(
+            f"{action}仅适用于未结清的押金",
+            details={"deposit_id": deposit.id, "status": deposit.status},
+        )
+
+
 def _normalize_ledger_type(ledger_type: str, *, source_order_id: int | None) -> str:
     """押金账簿归一化：BUSINESS 业务押金 / STUDIO 工作室运营押金。
 

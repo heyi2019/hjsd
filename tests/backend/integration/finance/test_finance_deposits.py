@@ -20,7 +20,7 @@ from app.domain.trade import Cashflow, RebateRecord, Reconciliation
 from app.finance.cashflow_queries import list_cashflows
 from app.finance.cashflows import create_cashflow, reverse_cashflow
 from app.finance.deposits.writes import create_deposit
-from app.finance.deposits.lifecycle import lose_deposit, return_deposit
+from app.finance.deposits.lifecycle import cancel_deposit, lose_deposit, return_deposit
 from app.finance.deposits.reads import deposit_held_total, list_deposits
 from app.finance.rebates import create_rebate, list_rebates
 from app.finance.reconciliation import create_reconciliation, resolve_reconciliation
@@ -436,5 +436,74 @@ class TestDepositLedgerType:
         assert deposit.ledger_type == "STUDIO"
         holds = self._flows(seeded_db, deposit.id, "DEPOSIT_HOLD")
         assert len(holds) == 1 and holds[0].ledger_type == "STUDIO"
+
+    # ---- 取消结清后的台账勾稽与重复入账防线（回归）----
+    def test_cancel_syncs_held_to_zero_and_keeps_balance(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        before_balance = pool_balance(seeded_db, invest.id)["cash_balance"]
+        before_held = deposit_held_total(seeded_db, pool_id=invest.id)
+        deposit = create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY, actor="pytest"
+        )
+        after_create = pool_balance(seeded_db, invest.id)["cash_balance"]
+        cancel_deposit(
+            seeded_db, deposit.id, cancelled_on=TODAY, reason="租约取消未实际占用", actor="pytest"
+        )
+        seeded_db.refresh(deposit)
+        # 台账：取消后在押与未释放余额均归零，与反向流水勾稽。
+        assert deposit.returned_amount == Decimal("1000.00")
+        assert deposit_held_total(seeded_db, pool_id=invest.id) == before_held
+        # 资金：反向流水冲平，余额回到创建前（占用 OUT + 取消 IN 相抵）。
+        assert pool_balance(seeded_db, invest.id)["cash_balance"] == before_balance
+        assert after_create == before_balance - Decimal("1000.00")
+
+    def test_cancel_blocks_further_return(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        deposit = create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY, actor="pytest"
+        )
+        cancel_deposit(
+            seeded_db, deposit.id, cancelled_on=TODAY, reason="审查防线", actor="pytest"
+        )
+        before_balance = pool_balance(seeded_db, invest.id)["cash_balance"]
+        with pytest.raises(Validation, match="未结清"):
+            return_deposit(
+                seeded_db, deposit.id, amount=Decimal("1000"), released_on=TODAY, actor="pytest"
+            )
+        assert pool_balance(seeded_db, invest.id)["cash_balance"] == before_balance
+        assert len(self._flows(seeded_db, deposit.id, "DEPOSIT_RELEASE")) == 0
+
+    def test_cancel_blocks_further_loss(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        deposit = create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY, actor="pytest"
+        )
+        cancel_deposit(
+            seeded_db, deposit.id, cancelled_on=TODAY, reason="审查防线", actor="pytest"
+        )
+        with pytest.raises(Validation, match="未结清"):
+            lose_deposit(
+                seeded_db, deposit.id, amount=Decimal("300"), lost_on=TODAY,
+                category="OPERATING_COST", reason="审查防线", actor="pytest",
+            )
+        assert len(self._flows(seeded_db, deposit.id, "OPERATING_COST")) == 0
+
+    def test_returned_and_lost_are_terminal_for_return(self, seeded_db):
+        invest = _pool(seeded_db, "HJ_INVEST")
+        deposit = create_deposit(
+            seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
+        )
+        return_deposit(
+            seeded_db, deposit.id, amount=Decimal("100"), released_on=TODAY, actor="pytest"
+        )
+        with pytest.raises(Validation, match="未结清"):
+            return_deposit(
+                seeded_db, deposit.id, amount=Decimal("1"), released_on=TODAY, actor="pytest"
+            )
+        with pytest.raises(Validation, match="未结清"):
+            lose_deposit(
+                seeded_db, deposit.id, amount=Decimal("1"), lost_on=TODAY,
+                category="OPERATING_COST", reason="终态拒绝", actor="pytest",
+            )
 
 

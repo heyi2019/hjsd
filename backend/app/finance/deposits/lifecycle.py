@@ -26,6 +26,7 @@ from app.shared.form_field_rules import validate_form_extra
 
 from .._common import _positive, _text
 from ._shared import (
+    _assert_returnable,
     _can_see_pool,
     _deposit_not_found,
     _outstanding,
@@ -48,6 +49,7 @@ def return_deposit(
     deposit = session.get(Deposit, deposit_id)
     if deposit is None or not _can_see_pool(user, deposit.pool_id):
         raise _deposit_not_found(deposit_id)
+    _assert_returnable(deposit, "退还")
     money = _positive(amount, field="amount")
     outstanding = _outstanding(deposit)
     if money > outstanding:
@@ -139,6 +141,10 @@ def cancel_deposit(
     text = _text(reason, field="reason", message="取消押金必须填写理由")
     money = to_money(deposit.paid_amount)
     deposit.status = DepositStatus.CANCELLED.value
+    # 反向流水 DEPOSIT_CANCEL（IN）已把资金余额冲平；台账侧同步回填已退金额，
+    # 使「未释放余额 = 实缴 − 已退 − 已损失」与「在押合计」同归零，与流水勾稽。
+    # 不回填会导致 CANCELLED 押金 outstanding 仍为实缴额，API 直调可再次释放重复入账。
+    deposit.returned_amount = money
     deposit.released_on = cancelled_on
     deposit.updated_by = actor
     if form_extra:
@@ -168,8 +174,12 @@ def cancel_deposit(
         entity_type="deposit",
         entity_id=str(deposit.id),
         actor=actor,
-        before={"status": DepositStatus.PAID.value},
-        after={"status": deposit.status, "reversed_amount": str(money)},
+        before={"status": DepositStatus.PAID.value, "returned_amount": "0.00"},
+        after={
+            "status": deposit.status,
+            "reversed_amount": str(money),
+            "returned_amount": str(money),
+        },
         reason=text,
     )
     upsert_operation_operators(
@@ -200,6 +210,7 @@ def lose_deposit(
     deposit = session.get(Deposit, deposit_id)
     if deposit is None or not _can_see_pool(user, deposit.pool_id):
         raise _deposit_not_found(deposit_id)
+    _assert_returnable(deposit, "登记损失")
     text_reason = _text(
         reason,
         field="reason",

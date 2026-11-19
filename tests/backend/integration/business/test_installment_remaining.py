@@ -150,3 +150,16 @@ def test_installment_export_uses_same_status_type_and_date_filters_as_list(seede
     assert [item["id"] for item in listing.json()] == [matching.id]
     assert matching.inst_no in exported.text
     assert all(item.inst_no not in exported.text for item in (wrong_date, wrong_type, wrong_status))
+
+
+def test_workbench_installment_cards_match_visible_contract_type(seeded_client, seeded_db, headers):
+    visible = _contract(seeded_db)
+    other_type = _contract(seeded_db)
+    visible.contract_type = "STOCK_SALE"
+    visible.status = "OVERDUE"
+    other_type.status = "OVERDUE"
+    seeded_db.flush()
+    dashboard = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+    totals = seeded_client.get("/api/v1/installments/totals", params={"contract_type": "STOCK_SALE"}, headers=headers)
+    assert dashboard.status_code == totals.status_code == 200
+    assert dashboard.json()["installments"] == {"total_count": totals.json()["total_count"], "overdue_count": totals.json()["overdue_count"]} == {"total_count": 1, "overdue_count": 1}

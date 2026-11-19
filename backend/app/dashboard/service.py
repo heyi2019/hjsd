@@ -14,6 +14,7 @@ from app.core.security import (
     CurrentUser,
 )
 from app.domain.options import OptionSet
+from app.domain.enums import InstallmentContractType
 from app.dashboard.notifications import service as notification_service
 from app.business.queries import order_customer_count, order_status_counts
 from app.operations.r3_commission import r3_commission_reconciliation
@@ -98,7 +99,9 @@ def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | 
             today=today,
             user=user,
         )
-        installment_totals = installment_queries.installment_totals(session, user=user)
+        installment_totals = installment_queries.installment_totals(
+            session, user=user, contract_type=InstallmentContractType.STOCK_SALE.value,
+        )
         installments = {
             "total_count": installment_totals["total_count"],
             "overdue_count": installment_totals["overdue_count"],

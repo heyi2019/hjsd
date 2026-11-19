@@ -22,11 +22,11 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab, initi
     // 重新激活后再按 URL 入口决定是「我的收益」还是完整分润对账。
     if (!active) return;
     setMyEarnings(initialReportTab === "my-earnings");
-    if (initialReportFrom && initialReportTo && dayjs(initialReportFrom).isValid() && dayjs(initialReportTo).isValid() && initialReportFrom <= initialReportTo) {
+    if (periodState.ready && initialReportFrom && initialReportTo && dayjs(initialReportFrom).isValid() && dayjs(initialReportTo).isValid() && initialReportFrom <= initialReportTo) {
       periodState.setPeriod({ from: initialReportFrom, to: initialReportTo });
     }
     if (initialReportTab === "commission" || initialReportTab === "my-earnings") setActiveTab("r3");
-  }, [active, initialReportTab, initialReportFrom, initialReportTo]);
+  }, [active, initialReportTab, initialReportFrom, initialReportTo, periodState.ready]);
   const reportRange: ReportRange = {
     params: periodState.period,
     picker: <BusinessPeriodPicker label="报表日期区间" state={periodState} />,

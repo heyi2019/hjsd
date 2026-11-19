@@ -119,6 +119,9 @@ beforeEach(() => {
   vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([]));
   vi.mocked(ordersApi.ledgerSummary).mockResolvedValue(orderLedgerSummary());
   vi.mocked(orderTypesApi.list).mockResolvedValue([]);
+  vi.mocked(optionSetsApi.get).mockImplementation(async (code) => code === "BUSINESS_PERIOD"
+    ? { code, options: [{ value: "start_day", label: "16" }] } as never
+    : [] as never);
 });
 
 async function renderShell(options: { user?: string; initialPath?: string } = {}) {
@@ -251,7 +254,7 @@ describe("AppShell：角色展示与退出", () => {
     await ui.click(screen.getByTestId("dashboard-personal-earnings"));
     const commissionTab = await screen.findByRole("tab", { name: "分润对账" });
     expect(commissionTab).toHaveAttribute("aria-selected", "true");
-    expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith(expect.objectContaining({ mine: true }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith(expect.objectContaining({ mine: true })));
   });
 
   it("顶栏用户中心入口可打开弹窗", async () => {

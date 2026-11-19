@@ -70,7 +70,10 @@ function usePeriodState(enabled = true): PeriodState {
     ready,
     error,
     retry: () => setRetryCount((value) => value + 1),
-    setPeriod: setSelection,
+    setPeriod: (period) => {
+      const current = currentReportPeriod(dayjs(), startDay);
+      setSelection(period.from === current.from && period.to === current.to ? null : period);
+    },
     useCurrentPeriod: () => setSelection(null),
     usePreviousPeriod: () => setSelection(previousReportPeriod(dayjs(), startDay)),
   };

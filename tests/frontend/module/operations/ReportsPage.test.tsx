@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import dayjs from "dayjs";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,6 +14,8 @@ import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reportsApi } from "@/shared/api/reports.api";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { useBusinessPeriod } from "@/shared/state/businessPeriod";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -72,6 +74,27 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：经营中心报表", () => {
+  it("跳转传入本期日期后跨月仍自动滚期", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2026, 10, 20, 12));
+      vi.mocked(optionSetsApi.get).mockResolvedValue({ options: [{ value: "start_day", label: "16" }] } as never);
+      const { result, unmount } = renderHook(() => useBusinessPeriod());
+      await act(async () => { await Promise.resolve(); });
+      act(() => result.current.setPeriod({ from: "2026-11-16", to: "2026-12-15" }));
+      vi.setSystemTime(new Date(2026, 11, 16, 12));
+      await act(async () => { window.dispatchEvent(new Event("focus")); await Promise.resolve(); });
+      expect(result.current.period).toEqual({ from: "2026-12-16", to: "2027-01-15" });
+      act(() => result.current.setPeriod({ from: "2026-10-16", to: "2026-11-15" }));
+      vi.setSystemTime(new Date(2027, 0, 16, 12));
+      await act(async () => { window.dispatchEvent(new Event("focus")); await Promise.resolve(); });
+      expect(result.current.period).toEqual({ from: "2026-10-16", to: "2026-11-15" });
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("初始加载合并后的经营损益，不提前加载隐藏 Tab", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "经营损益" });

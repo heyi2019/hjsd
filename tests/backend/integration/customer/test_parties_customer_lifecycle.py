@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -597,3 +598,71 @@ class TestMergeGuards:
         assert get_extra_values(
             seeded_db, entity_type="customer", entity_id=source.id
         ) == {"preferred_platform": "王者荣耀"}
+
+
+class TestCustomerDetailRemaining:
+    """客户详情「剩余应收」口径：与分期域 remaining_receivable 同源。"""
+
+    @staticmethod
+    def _installment(seeded_db, customer, *, paid, waived=0, bad_debt=0):
+        order = create_order(
+            seeded_db,
+            order_type="TH",
+            trade_date=date(2026, 11, 10),
+            customer_roles=[(customer.id, "BUYER")],
+            actor="pytest",
+        )
+        inst = inst_create.create_installment(
+            seeded_db,
+            order_id=order.id,
+            contract_type="PICKUP_SALE",
+            principal=1200,
+            down_payment=200,
+            periods=1,
+            per_period=1000,
+            first_due_on=date(2026, 11, 15),
+            actor="pytest",
+        )
+        inst.paid_amount = Decimal(paid)
+        inst.waived_amount = Decimal(waived)
+        inst.bad_debt_amount = Decimal(bad_debt)
+        seeded_db.flush()
+        return inst
+
+    def test_customer_detail_remaining_clamps_after_waiver(self, seeded_db):
+        """先收后减免：合约级与汇总级都夹底 0，不出现负数。"""
+        customer = _customer(seeded_db, "减免客户")
+        # 总应收 700（1200−减免500），已收 900 → 权威 0，裸减法 −200
+        self._installment(seeded_db, customer, paid="900", waived="500")
+
+        detail = get_customer_detail(seeded_db, customer.id)
+
+        assert detail["installments"][0]["remaining_amount"] == Decimal("0.00")
+        assert detail["overview"]["installment_remaining_total"] == Decimal("0.00")
+
+    def test_customer_detail_remaining_subtracts_bad_debt(self, seeded_db):
+        """坏账场景：合约级与汇总级都减坏账，不多算。"""
+        customer = _customer(seeded_db, "坏账客户")
+        # 总应收 1200，已收 300，坏账 100 → 权威 800，裸减法 900
+        self._installment(seeded_db, customer, paid="300", bad_debt="100")
+
+        detail = get_customer_detail(seeded_db, customer.id)
+
+        assert detail["installments"][0]["remaining_amount"] == Decimal("800.00")
+        assert detail["overview"]["installment_remaining_total"] == Decimal("800.00")
+
+    def test_customer_detail_remaining_sums_clamped_per_contract(self, seeded_db):
+        """多合约：逐合约夹底后求和（对齐 totals），不先汇总再夹底。"""
+        customer = _customer(seeded_db, "多合约客户")
+        # 合约 A：总应收 1200，已收 1300 → 夹底 0
+        self._installment(seeded_db, customer, paid="1300")
+        # 合约 B：总应收 1200，已收 300，坏账 100 → 800
+        self._installment(seeded_db, customer, paid="300", bad_debt="100")
+
+        detail = get_customer_detail(seeded_db, customer.id)
+
+        remaining = sorted(
+            item["remaining_amount"] for item in detail["installments"]
+        )
+        assert remaining == [Decimal("0.00"), Decimal("800.00")]
+        assert detail["overview"]["installment_remaining_total"] == Decimal("800.00")

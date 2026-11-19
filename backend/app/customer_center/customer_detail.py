@@ -145,14 +145,20 @@ def get_customer_detail(
     installment_items: list[dict[str, Any]] = []
     paid_total = Decimal("0.00")
     receivable_total = Decimal("0.00")
+    remaining_total = Decimal("0.00")
     overdue_period_count = 0
     for item in installments:
         receivable = total_receivable(item)
         paid = to_money(item.paid_amount)
-        remaining = receivable - paid
+        # 与分期域 InstallmentOut.remaining_receivable 同源：减坏账、夹底 0
+        remaining = max(
+            receivable - paid - to_money(item.bad_debt_amount or 0),
+            Decimal("0.00"),
+        )
         overdue_periods = overdue_by_installment.get(item.id, 0)
         paid_total += paid
         receivable_total += receivable
+        remaining_total += remaining
         overdue_period_count += overdue_periods
         installment_items.append(
             {
@@ -220,7 +226,7 @@ def get_customer_detail(
             "cumulative_profit": to_money(cumulative_profit),
             "installment_paid_total": paid_total,
             "installment_receivable_total": receivable_total,
-            "installment_remaining_total": receivable_total - paid_total,
+            "installment_remaining_total": remaining_total,
             "overdue_period_count": overdue_period_count,
         },
         "business": orders,

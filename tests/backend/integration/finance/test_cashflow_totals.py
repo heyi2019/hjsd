@@ -98,6 +98,28 @@ def test_keyword_wildcards_are_escaped(seeded_client, headers):
     assert Decimal(str(body["total_in"])) == Decimal("0")
 
 
+def test_cashflow_list_and_export_display_selected_operator_names(seeded_client, headers):
+    payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "ledger_type": "STUDIO",
+               "direction": "OUT", "accounting_attribute": "OPERATING_EXPENSE",
+               "category": "房租", "amount": "100", "operator_user_ids": [1, 2]}
+    created = seeded_client.post("/api/v1/cashflows", json=payload, headers=headers)
+    assert created.status_code == 201, created.text
+    flow_no = created.json()["flow_no"]
+    assert created.json()["operator"] == "种子用户1、种子用户2"
+    listing = seeded_client.get("/api/v1/cashflows", params={"keyword": flow_no}, headers=headers)
+    assert listing.status_code == 200, listing.text
+    assert listing.json()["items"][0]["operator"] == "种子用户1、种子用户2"
+    exported = seeded_client.get("/api/v1/cashflows/export.csv", params={"keyword": flow_no}, headers=headers)
+    assert exported.status_code == 200, exported.text
+    assert "种子用户1、种子用户2" in exported.text
+    updated = seeded_client.put(f"/api/v1/cashflows/{created.json()['id']}", json={**payload, "operator_user_ids": [2]}, headers=headers)
+    assert updated.status_code == 200, updated.text
+    listing = seeded_client.get("/api/v1/cashflows", params={"keyword": flow_no}, headers=headers)
+    assert listing.json()["items"][0]["operator"] == "种子用户2"
+    legacy = _create(seeded_client, headers, direction="IN", amount="10", note="未选操作人")
+    assert legacy["operator"] == "admin"
+
+
 def test_export_accepts_keyword_instead_of_leaking_query_object(seeded_client, headers):
     """导出路由曾漏传 keyword：路由默认值 `Query(None)` 被原样带进 SQL 条件 → 500。
 

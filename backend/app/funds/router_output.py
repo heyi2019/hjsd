@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.shared.operation_operators import list_operation_operators
 from app.domain.trade import Cashflow, Deposit, Order, RebateRecord
+from app.domain.users import User
 from app.domain.enums import CashflowSourceType
 from app.funds import schemas
 from app.shared.form_values import get_extra_values
@@ -14,14 +15,22 @@ from app.core.actor import actor_name as _actor
 
 def _cashflow_outputs(db: Session, flows: list) -> list[schemas.CashflowOut]:
     numbers = [flow.get("flow_no") if isinstance(flow, dict) else flow.flow_no for flow in flows]
+    operator_ids = {
+        user_id for flow in flows
+        for user_id in ((flow.get("operator_user_ids") if isinstance(flow, dict) else flow.operator_user_ids) or [])
+    }
+    operator_names = {
+        user.id: user.display_name or user.username
+        for user in db.scalars(select(User).where(User.id.in_(operator_ids))).all()
+    } if operator_ids else {}
     reversed_numbers = set(db.scalars(select(Cashflow.source_id).where(
         Cashflow.source_type == CashflowSourceType.REVERSAL.value,
         Cashflow.source_id.in_(numbers),
     )).all()) if numbers else set()
-    return [_cashflow_out(db, flow, reversed_numbers=reversed_numbers) for flow in flows]
+    return [_cashflow_out(db, flow, reversed_numbers=reversed_numbers, operator_names=operator_names) for flow in flows]
 
 
-def _cashflow_out(db: Session, flow, *, reversed_numbers: set | None = None) -> schemas.CashflowOut:
+def _cashflow_out(db: Session, flow, *, reversed_numbers: set | None = None, operator_names: dict[int, str] | None = None) -> schemas.CashflowOut:
     def value(key: str):
         if isinstance(flow, dict):
             return flow.get(key)
@@ -39,6 +48,15 @@ def _cashflow_out(db: Session, flow, *, reversed_numbers: set | None = None) -> 
         order = db.get(Order, order_id) if order_id else None
         order_no = order.order_no if order else None
     source = value("source_type")
+    operator_ids = value("operator_user_ids") or []
+    if operator_names is None:
+        operator_names = {
+            user.id: user.display_name or user.username
+            for user in db.scalars(select(User).where(User.id.in_(operator_ids))).all()
+        } if operator_ids else {}
+    operator = "、".join(operator_names.get(user_id, f"用户 {user_id}") for user_id in operator_ids)
+    if not operator:
+        operator = (value("operator") or value("created_by")) if isinstance(flow, dict) else flow.created_by
     if reversed_numbers is None:
         reversed_numbers = set(db.scalars(select(Cashflow.source_id).where(
             Cashflow.source_type == CashflowSourceType.REVERSAL.value,
@@ -65,9 +83,7 @@ def _cashflow_out(db: Session, flow, *, reversed_numbers: set | None = None) -> 
         source=source,
         note=value("note"),
         form_extra=value("form_extra"),
-        operator=(value("operator") or value("created_by"))
-        if isinstance(flow, dict)
-        else flow.created_by,
+        operator=operator,
         operator_user_ids=value("operator_user_ids"),
         extra_values=get_extra_values(
             db, entity_type="cashflow", entity_id=value("id")

@@ -8,7 +8,7 @@
 """
 from __future__ import annotations
 
-from app.finance.cashflow_writes._shared import _get_cashflow  # noqa: F401（测试契约引用）
+from app.finance.cashflow_writes._shared import _get_cashflow  # 测试契约引用，见 __all__
 from app.finance.cashflow_writes.create import create_cashflow
 from app.finance.cashflow_writes.reverse import reverse_cashflow
 from app.finance.cashflow_writes.studio import delete_cashflow, update_cashflow
@@ -21,6 +21,7 @@ from app.orders.collaboration import register_cost_flow_creator  # noqa: E402
 register_cost_flow_creator(create_cashflow)
 
 __all__ = [
+    "_get_cashflow",
     "create_cashflow",
     "delete_cashflow",
     "reverse_cashflow",

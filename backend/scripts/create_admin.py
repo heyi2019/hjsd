@@ -17,8 +17,11 @@ from sqlalchemy import select  # noqa: E402
 from app.core.database import get_engine, get_session_factory  # noqa: E402
 from app.domain.base import Base
 from app.core.security import hash_password  # noqa: E402
-from app.domain import foundation, parties, trade, users  # noqa: E402,F401
+from app.domain import foundation, parties, trade, users  # noqa: E402
 from app.domain.users import User  # noqa: E402
+
+# pyflakes 不认 `# noqa`，用 __all__ 声明这些副作用导入是有意保留的（触发 ORM 模型注册）。
+__all__ = ["foundation", "parties", "trade", "users"]
 
 
 def main() -> None:

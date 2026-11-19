@@ -228,8 +228,19 @@ from app.core.database import get_db  # noqa: E402
 from app.domain.base import Base
 from app.core.security import CurrentUser, DEV_USERS, build_access_token  # noqa: E402
 from app.core.settings import get_settings  # noqa: E402
-from app.domain import attachments, foundation, notifications, options, parties, trade, users  # noqa: E402,F401  注册全部 v1 表
+from app.domain import attachments, foundation, notifications, options, parties, trade, users  # noqa: E402  注册全部 v1 表
 from app.field_definitions.seeds import seed_foundation  # noqa: E402
+
+# pyflakes 不认 `# noqa`，用 __all__ 声明这些副作用导入是有意保留的（触发 ORM 模型注册进 Base.metadata）。
+__all__ = [
+    "attachments",
+    "foundation",
+    "notifications",
+    "options",
+    "parties",
+    "trade",
+    "users",
+]
 
 
 def seed_default_users(db: Session) -> None:

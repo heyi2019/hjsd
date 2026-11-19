@@ -13,7 +13,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.errors import AppError, ErrorCode
+from app.core.errors import AppError, ErrorCode, Validation
+from app.shared.business_period import PERIOD_CONFIG_CODE
 from app.core.security import (
     PERM_OPTION_SET_MANAGE,
     CurrentUser,
@@ -108,6 +109,13 @@ def update_option_set(
     row = db.scalars(select(OptionSet).where(OptionSet.code == code)).first()
     if row is None:
         raise HTTPException(status_code=404, detail="选项词典不存在")
+    if code == PERIOD_CONFIG_CODE:
+        if payload.editable is not None and payload.editable:
+            raise Validation("当期设置不能改为可删除选项")
+        if payload.options is not None:
+            options = payload.options
+            if len(options) != 1 or options[0].value != "start_day" or not options[0].label.isascii() or not options[0].label.isdigit() or not 1 <= int(options[0].label) <= 31:
+                raise Validation("每月起始日必须为 1 至 31 的整数")
     before = {
         "label": row.label,
         "group": row.group,
@@ -166,6 +174,8 @@ def delete_option_set(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = _write_access,
 ) -> Response:
+    if code == PERIOD_CONFIG_CODE:
+        raise Validation("当期设置不可删除")
     row = db.scalars(select(OptionSet).where(OptionSet.code == code)).first()
     if row is None:
         raise HTTPException(status_code=404, detail="选项词典不存在")

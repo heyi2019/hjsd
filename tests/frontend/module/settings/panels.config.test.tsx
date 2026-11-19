@@ -7,6 +7,7 @@ import { optionSetsApi } from "@/shared/api/options.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { SequencesPanel } from "@/settings/panels/SequencesPanel";
 import { BusinessReminderSettingsPanel } from "@/settings/panels/BusinessReminderSettingsPanel";
+import { BusinessPeriodSettingsPanel } from "@/settings/panels/BusinessPeriodSettingsPanel";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
@@ -130,5 +131,23 @@ describe("BusinessReminderSettingsPanel", () => {
     await waitFor(() => expect(optionSetsApi.update).toHaveBeenCalledWith("BUSINESS_OVERVIEW_REMINDERS", expect.objectContaining({
       options: expect.arrayContaining([{ value: "profit_notifications_enabled", label: "1" }]),
     })));
+  });
+});
+
+describe("BusinessPeriodSettingsPanel", () => {
+  it("保存每月起始日并更新统一周期", async () => {
+    vi.mocked(optionSetsApi.get).mockResolvedValue({ options: [{ value: "start_day", label: "16" }] } as never);
+    vi.mocked(optionSetsApi.update).mockResolvedValue(undefined as never);
+    const changed = vi.fn();
+    window.addEventListener("business-period-config-changed", changed);
+    renderLight(<BusinessPeriodSettingsPanel />, { user: "admin" });
+    const input = await screen.findByRole("spinbutton", { name: "每月起始日" });
+    await waitFor(() => expect(input).toHaveValue("16"));
+    fireEvent.change(input, { target: { value: "10" } });
+    fireEvent.blur(input);
+    fireEvent.click(screen.getByRole("button", { name: "保存当期设置" }));
+    await waitFor(() => expect(optionSetsApi.update).toHaveBeenCalledWith("BUSINESS_PERIOD", { options: [{ value: "start_day", label: "10" }] }));
+    expect(changed).toHaveBeenCalled();
+    window.removeEventListener("business-period-config-changed", changed);
   });
 });

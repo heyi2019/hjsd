@@ -17,5 +17,5 @@ export interface DashboardSummary {
 }
 
 export const dashboardApi = {
-  summary: () => api.get<DashboardSummary>("/dashboard/summary").then((response) => response.data),
+  summary: (period?: { from: string; to: string }) => api.get<DashboardSummary>("/dashboard/summary", { params: period }).then((response) => response.data),
 };

@@ -35,6 +35,7 @@ SYSTEM_FORM_FIELDS = {
     "SYSFIELD": [("field_key", "字段键", "TEXT", True), ("label", "标签", "TEXT", True), ("field_type", "类型", "SELECT", False), ("section", "归属板块", "SELECT", False), ("flow_direction", "资金流向性质", "SELECT", False), ("options", "选项（值 / 展示名）", "MULTI_SELECT", False), ("required", "必填", "BOOLEAN", False), ("cond_field", "条件必填·依赖字段", "SELECT", False), ("cond_op", "条件", "SELECT", False), ("cond_values", "触发值", "MULTI_SELECT", False), ("sort_order", "排序", "NUMBER", False)],
     "SYSORDER": [("code", "代码", "TEXT", True), ("name", "名称", "TEXT", True), ("is_zero_principal", "零本金", "BOOLEAN", False), ("sequence_prefix", "编号前缀", "TEXT", False), ("sort_order", "排序", "NUMBER", False), ("description", "说明", "TEXT", False)],
     "SYSPOOL": [("code", "代码", "TEXT", True), ("name", "名称", "TEXT", True), ("pool_type", "用途类型", "SELECT", True), ("is_default", "默认账户", "BOOLEAN", False), ("note", "备注", "TEXT", False)],
+    "SYSPERIOD": [("start_day", "每月起始日", "NUMBER", True)],
 }
 
 
@@ -291,6 +292,10 @@ def _normalized_option_set(values: dict) -> dict:
 
 
 def seed_catalog(session: Session, *, actor: str = "system") -> None:
+    if session.scalar(select(OptionSet).where(OptionSet.code == "BUSINESS_PERIOD")) is None:
+        session.add(OptionSet(code="BUSINESS_PERIOD", label="当期设置", group="BUSINESS", editable=False,
+            options=[{"value": "start_day", "label": "16"}], description="每月周期起始日",
+            created_by=actor, updated_by=actor))
     data = json.loads(zlib.decompress(base64.b64decode(_CATALOG_BLOB)))
     for raw_values in data["option_sets"]:
         values = _normalized_option_set(raw_values)

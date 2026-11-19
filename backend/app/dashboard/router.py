@@ -1,7 +1,8 @@
 """工作台聚合接口。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from datetime import date
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -16,7 +17,9 @@ router = APIRouter(tags=["工作台"])
 def dashboard_summary(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
 ) -> schemas.DashboardSummaryOut:
     return schemas.DashboardSummaryOut.model_validate(
-        service.dashboard_summary(db, user=user)
+        service.dashboard_summary(db, user=user, from_date=from_date, to_date=to_date)
     )

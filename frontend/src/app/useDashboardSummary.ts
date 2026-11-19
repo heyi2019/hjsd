@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { normalizeError } from "../shared/api/client";
-import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { dashboardApi } from "../shared/api/dashboard.api";
 import { DEFAULT_BUSINESS_REMINDER_CONFIG, type BusinessReminderConfig } from "./businessReminderConfig";
 import { buildDashboardAlertMessages } from "./dashboardSummary";
 
-export function useDashboardSummary(active = true) {
+export function useDashboardSummary(active = true, selectedPeriod?: { from: string; to: string }) {
   const [orderSummary, setOrderSummary] = useState<{ total_count: number; completed_count: number } | null>(null);
   const [personalOrders, setPersonalOrders] = useState(0);
   const [personalCustomers, setPersonalCustomers] = useState(0);
@@ -24,12 +23,14 @@ export function useDashboardSummary(active = true) {
   const [businessReminderConfig, setBusinessReminderConfig] = useState<BusinessReminderConfig>(DEFAULT_BUSINESS_REMINDER_CONFIG);
   const [period, setPeriod] = useState<{ from: string; to: string } | null>(null);
   const mountedRef = useRef(true);
+  const requestRef = useRef(0);
 
   const loadSummary = async () => {
+    const request = ++requestRef.current;
     setSummaryLoading(true);
     try {
-      const summary = await dashboardApi.summary();
-      if (!mountedRef.current) return;
+      const summary = await dashboardApi.summary(selectedPeriod);
+      if (!mountedRef.current || request !== requestRef.current) return;
       setPeriod(summary.period);
       setOrderSummary(summary.orders ? {
         total_count: summary.orders.total_count,
@@ -54,7 +55,7 @@ export function useDashboardSummary(active = true) {
         overdueInstallmentsEnabled: summary.reminders.overdue_installments_enabled,
       });
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || request !== requestRef.current) return;
       const error = normalizeError(err);
       setOrderSummary(null);
       setPeriod(null);
@@ -71,14 +72,19 @@ export function useDashboardSummary(active = true) {
       setPendingProfitCount(null);
       setAllocatedProfitCount(null);
     } finally {
-      if (mountedRef.current) setSummaryLoading(false);
+      if (mountedRef.current && request === requestRef.current) setSummaryLoading(false);
     }
   };
 
   useEffect(() => () => {
     mountedRef.current = false;
   }, []);
-  useReloadOnActive(active, loadSummary);
+  useEffect(() => {
+    if (active) void loadSummary();
+    return () => { requestRef.current += 1; };
+  // 仅在激活或日期变化时重查；loadSummary 本身每次渲染都会重建。
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, selectedPeriod?.from, selectedPeriod?.to]);
 
   const businessAlerts = buildDashboardAlertMessages({
     inventoryAgingCount,

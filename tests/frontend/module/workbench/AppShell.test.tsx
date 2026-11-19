@@ -43,6 +43,8 @@ import { cashflowPage, orderLedgerSummary, pageResponse } from "@fixtures/api-re
 import { AppShell } from "@/app/AppShell";
 import { navigation } from "@/app/navigation";
 import { MemoryRouter } from "react-router-dom";
+import dayjs from "dayjs";
+import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -217,6 +219,22 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
 });
 
 describe("AppShell：角色展示与退出", () => {
+  it("工作台与经营中心共用已配置的周期和临时日期选择", async () => {
+    vi.mocked(optionSetsApi.get).mockResolvedValue({ code: "BUSINESS_PERIOD", options: [{ value: "start_day", label: "10" }] } as never);
+    await renderShell({ user: "admin" });
+    const dashboard = document.querySelector(".dashboard-page") as HTMLElement;
+    await waitFor(() => expect(dashboardApi.summary).toHaveBeenCalledWith(currentReportPeriod(dayjs(), 10)));
+    await ui.click(within(dashboard).getByRole("button", { name: "上期" }));
+    const previous = previousReportPeriod(dayjs(), 10);
+    await waitFor(() => expect(dashboardApi.summary).toHaveBeenLastCalledWith(previous));
+    const nav = screen.getByRole("navigation", { name: "主导航" });
+    await ui.click(within(nav).getByRole("button", { name: "经营中心" }));
+    await waitFor(() => expect(reportsApi.monthlyPnl).toHaveBeenCalledWith(previous));
+    await ui.click(screen.getByRole("button", { name: "本期" }));
+    await ui.click(within(nav).getByRole("button", { name: "工作台" }));
+    await waitFor(() => expect(dashboardApi.summary).toHaveBeenLastCalledWith(currentReportPeriod(dayjs(), 10)));
+  });
+
   it("工作台个人卡片提供我的当期订单和我的当期收益入口，并进入对应业务视图", async () => {
     await renderShell({ user: "admin" });
     const topbar = document.querySelector(".topbar") as HTMLElement;

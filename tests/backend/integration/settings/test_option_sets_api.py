@@ -24,6 +24,14 @@ def test_seeded_order_event_dictionary_excludes_retired_cost(seeded_client, seed
         "OPERATE",
         "REBATE",
     ]
+    period = next(item for item in body["items"] if item["code"] == "BUSINESS_PERIOD")
+    assert period["options"] == [{"value": "start_day", "label": "16"}]
+    for bad in ("0", "32", "abc", "1.5"):
+        response = seeded_client.put(f"{OPTION_SETS}/BUSINESS_PERIOD", json={"options": [{"value": "start_day", "label": bad}]}, headers=headers)
+        assert response.status_code == 422
+    response = seeded_client.put(f"{OPTION_SETS}/BUSINESS_PERIOD", json={"options": [{"value": "start_day", "label": "10"}]}, headers=headers)
+    assert response.status_code == 200
+    assert seeded_client.delete(f"{OPTION_SETS}/BUSINESS_PERIOD", headers=headers).status_code == 422
 
 
 def test_read_requires_login(client):

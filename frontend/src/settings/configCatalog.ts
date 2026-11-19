@@ -96,6 +96,14 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     entityTypes: ["option_set"],
   },
   {
+    key: "business-period",
+    label: "当期设置",
+    summary: "设置工作台和经营中心共用的每月周期起始日",
+    group: "BUSINESS",
+    permission: "option-set.manage",
+    entityTypes: [],
+  },
+  {
     key: "organization",
     label: "人员与团队",
     summary: "用户账号、角色权限、团队与资金可见范围",

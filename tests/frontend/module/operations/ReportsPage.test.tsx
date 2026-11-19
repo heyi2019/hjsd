@@ -75,7 +75,7 @@ describe("ReportsPage：经营中心报表", () => {
   it("初始加载合并后的经营损益，不提前加载隐藏 Tab", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "经营损益" });
-    expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledTimes(1));
     expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(reportsApi.commission)).not.toHaveBeenCalled();
     expect(vi.mocked(reportsApi.orderProfit)).not.toHaveBeenCalled();
@@ -85,6 +85,10 @@ describe("ReportsPage：经营中心报表", () => {
   it("日期筛选提供本期和上期快捷入口，账期按每月16日至次月15日计算", async () => {
     expect(currentReportPeriod(dayjs("2026-11-16"))).toEqual({ from: "2026-11-16", to: "2026-12-15" });
     expect(previousReportPeriod(dayjs("2026-11-16"))).toEqual({ from: "2026-10-16", to: "2026-11-15" });
+    expect(currentReportPeriod(dayjs("2026-11-20"), 10)).toEqual({ from: "2026-11-10", to: "2026-12-09" });
+    expect(currentReportPeriod(dayjs("2028-02-28"), 31)).toEqual({ from: "2028-01-31", to: "2028-02-28" });
+    expect(currentReportPeriod(dayjs("2028-02-29"), 31)).toEqual({ from: "2028-02-29", to: "2028-03-30" });
+    expect(previousReportPeriod(dayjs("2028-02-29"), 31)).toEqual({ from: "2028-01-31", to: "2028-02-28" });
     renderLight(<ReportsPage />, { user: "admin" });
     expect(await screen.findByRole("button", { name: "本期" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "上期" })).toBeInTheDocument();
@@ -99,7 +103,7 @@ describe("ReportsPage：经营中心报表", () => {
     const commissionTab = await screen.findByRole("tab", { name: "分润对账" });
     expect(commissionTab).toHaveAttribute("aria-selected", "true");
     expect((await screen.findAllByText("我的收益")).length).toBeGreaterThan(0);
-    expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith({ mine: true });
+    expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith(expect.objectContaining({ mine: true, ...currentReportPeriod() }));
     expect(vi.mocked(reportsApi.monthlyPnl)).not.toHaveBeenCalled();
   });
 
@@ -141,14 +145,14 @@ describe("ReportsPage：经营中心报表", () => {
   it("FE-260：分润对账可以按人员筛选并传递 user_id", async () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await ui.click(screen.getByRole("tab", { name: "分润对账" }));
-    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith(expect.objectContaining({ all_people: true, ...currentReportPeriod() })));
     await waitFor(() => expect(vi.mocked(employeesApi.list)).toHaveBeenCalled());
     const personComboboxes = await screen.findAllByRole("combobox");
     const personFilter = personComboboxes[personComboboxes.length - 1] as HTMLElement;
     await ui.click(personFilter);
     expect(await screen.findByText("全部", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
     await ui.click(await screen.findByText("业务同事", { selector: ".ant-select-item-option-content" }));
-    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith(expect.objectContaining({ all_people: true, user_id: 7, ...currentReportPeriod() })));
   });
 
   it("指定员工导出带 user_id，与列表同口径", async () => {
@@ -159,7 +163,7 @@ describe("ReportsPage：经营中心报表", () => {
     const personComboboxes = await screen.findAllByRole("combobox");
     await ui.click(personComboboxes[personComboboxes.length - 1] as HTMLElement);
     await ui.click(await screen.findByText("业务同事", { selector: ".ant-select-item-option-content" }));
-    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ all_people: true, user_id: 7 }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith(expect.objectContaining({ all_people: true, user_id: 7, ...currentReportPeriod() })));
     await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith(
       "commission",
@@ -213,7 +217,7 @@ describe("ReportsPage：经营中心报表", () => {
     await gotoTab("经营损益");
     const monthlyCard = screen.getByText("月度经营损益").closest(".ant-card") as HTMLElement;
     await ui.click(within(monthlyCard).getByRole("button", { name: "导出" }));
-    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", currentReportPeriod()));
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith("报表已导出"));
   });
 

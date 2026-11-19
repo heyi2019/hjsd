@@ -39,6 +39,7 @@ FORM_SCOPES: list[FormScope] = [
     FormScope("SYSFIELD", "表单字段编辑", GROUP_SYSTEM),
     FormScope("SYSORDER", "业务类型设置", GROUP_SYSTEM),
     FormScope("SYSPOOL", "资金账户设置", GROUP_SYSTEM),
+    FormScope("SYSPERIOD", "当期设置", GROUP_SYSTEM),
     # -- 订单表单 --
     FormScope("HS", "回收建单", GROUP_ORDER),
     FormScope("TH", "提号建单", GROUP_ORDER),

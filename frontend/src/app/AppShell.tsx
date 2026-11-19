@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { MOBILE_NAV_ORDER, navigation } from "./navigation";
 import { DEV_ROLES, useSession } from "../shared/state/session";
 import { useTheme } from "../shared/state/theme";
+import { BusinessPeriodProvider } from "../shared/state/businessPeriod";
 import { loadOptionSets } from "../shared/lib/optionSets";
 import { DashboardPage } from "./DashboardPage";
 import { LoginPage } from "../auth/LoginPage";
@@ -96,7 +97,7 @@ export function AppShell() {
   const businessTab = active === "business" ? (rawBizTab ?? "inventory") : undefined;
   const [userCenterOpen, setUserCenterOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const { role, authenticated, mustChangePassword, logout, can } = useSession();
+  const { role, username, authenticated, mustChangePassword, logout, can } = useSession();
   const { mode, setMode } = useTheme();
   const item = navigation.find((entry) => entry.key === active);
   const navigateTo = (key: string, tab?: BusinessCenterEntryTab) => {
@@ -268,7 +269,7 @@ export function AppShell() {
             </ConfirmButton>
           </Space>
         </header>
-        <main className="page-content">
+        <BusinessPeriodProvider key={username}><main className="page-content">
           {/* 路由化 + keep-alive：
               1) 落点由 URL 决定（深链/刷新/前进后退可用），见 navigateTo。
               2) 访问过的页面持续挂载，仅非激活态 display:none，避免切导航重挂载丢状态（原 key={active} 的副作用）。
@@ -290,7 +291,7 @@ export function AppShell() {
                       当前页底部（2026-11-03 实测库存/订单/分期/资金/报表/设置六处全现）。 */}
                   <ErrorBoundary name={key}>
                     {key === "dashboard" ? (
-                      <DashboardPage onNavigate={navigateTo} onPersonalNavigate={navigateToPersonalView} onDashboardNavigate={navigateToDashboardPath} />
+                      <DashboardPage active={isActive} onNavigate={navigateTo} onPersonalNavigate={navigateToPersonalView} onDashboardNavigate={navigateToDashboardPath} />
                     ) : (
                       <PageComponent
                         onNavigate={navigateTo}
@@ -313,7 +314,7 @@ export function AppShell() {
               );
             })}
           </Suspense>
-        </main>
+        </main></BusinessPeriodProvider>
       </div>
       <Modal
         open={userCenterOpen}

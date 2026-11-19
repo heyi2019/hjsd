@@ -19,6 +19,8 @@ from app.business.queries import order_customer_count, order_status_counts
 from app.operations.r3_commission import r3_commission_reconciliation
 from app.business.stocks.inventory import dashboard_inventory_summary
 from app.funds.installments import queries as installment_queries
+from app.shared.business_period import business_period, period_start_day
+from app.core.errors import Validation
 
 REMINDER_CODE = "BUSINESS_OVERVIEW_REMINDERS"
 DEFAULT_REMINDERS = {
@@ -49,9 +51,11 @@ def _reminder_config(session: Session) -> dict[str, Any]:
     }
 
 
-def dashboard_summary(session: Session, *, user: CurrentUser) -> dict[str, Any]:
+def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | None = None, to_date: date | None = None) -> dict[str, Any]:
     today = date.today()
-    month_start = today.replace(day=1)
+    if (from_date is None) != (to_date is None) or (from_date is not None and to_date is not None and from_date > to_date):
+        raise Validation("请选择有效的开始和结束日期")
+    period_from, period_to = (from_date, to_date) if from_date is not None else business_period(today, period_start_day(session))
     reminders = _reminder_config(session)
     can_orders = user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ))
     can_reports = user.has(PERM_REPORT_READ)
@@ -64,14 +68,14 @@ def dashboard_summary(session: Session, *, user: CurrentUser) -> dict[str, Any]:
     if can_orders:
         counts = order_status_counts(
             session,
-            trade_date_from=month_start,
-            trade_date_to=today,
+            trade_date_from=period_from,
+            trade_date_to=period_to,
             user=user,
         )
         personal_counts = order_status_counts(
             session,
-            trade_date_from=month_start,
-            trade_date_to=today,
+            trade_date_from=period_from,
+            trade_date_to=period_to,
             user=user,
             mine=True,
         )
@@ -83,8 +87,8 @@ def dashboard_summary(session: Session, *, user: CurrentUser) -> dict[str, Any]:
         personal_orders = sum(personal_counts.values())
         personal_customers = order_customer_count(
             session,
-            trade_date_from=month_start,
-            trade_date_to=today,
+            trade_date_from=period_from,
+            trade_date_to=period_to,
             user=user,
             mine=True,
         )
@@ -104,15 +108,15 @@ def dashboard_summary(session: Session, *, user: CurrentUser) -> dict[str, Any]:
     if can_reports:
         commission = r3_commission_reconciliation(
             session,
-            from_date=month_start,
-            to_date=today,
+            from_date=period_from,
+            to_date=period_to,
             user=user,
             mine=True,
         )
         personal_earnings = commission["total"]["profit_base"]
 
     return {
-        "period": {"from": month_start, "to": today},
+        "period": {"from": period_from, "to": period_to},
         "orders": orders,
         "personal_orders": personal_orders,
         "personal_customers": personal_customers,

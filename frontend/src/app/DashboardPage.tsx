@@ -10,8 +10,11 @@ import { CreateBusinessModal, type BusinessOrderType } from "../business/CreateB
 import type { BusinessCenterEntryTab } from "../business/businessCenter";
 import { BusinessAlerts, BusinessOverview } from "./BusinessOverview";
 import { useDashboardSummary } from "./useDashboardSummary";
+import { useBusinessPeriod } from "../shared/state/businessPeriod";
+import { BusinessPeriodPicker } from "../shared/ui/BusinessPeriodPicker";
 
 export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavigate, active = true }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; onPersonalNavigate?: (view: "orders" | "earnings") => void; onDashboardNavigate?: (path: string) => void; active?: boolean }) {
+  const periodState = useBusinessPeriod();
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<BusinessOrderType>("HS");
   const {
@@ -32,7 +35,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
     businessReminderConfig,
     businessAlerts,
     loadSummary,
-  } = useDashboardSummary(active);
+  } = useDashboardSummary(active && periodState.ready, periodState.period);
   const withPeriod = (path: string) => {
     if (!period) return path;
     const separator = path.includes("?") ? "&" : "?";
@@ -115,6 +118,8 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
 
       <div className="dashboard-summary">
         <h2 id="dashboard-summary-title" className="dashboard-summary__title">我的业务总览</h2>
+        <BusinessPeriodPicker state={periodState} />
+        <ErrorBanner error={periodState.error ? { message: periodState.error } : null} onRetry={periodState.retry} />
         <ErrorBanner error={summaryError} onRetry={() => void loadSummary()} />
         <BusinessOverview
           orderSummary={orderSummary}

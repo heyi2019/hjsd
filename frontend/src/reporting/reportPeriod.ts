@@ -5,20 +5,24 @@ export interface ReportPeriod {
   to: string;
 }
 
-function currentPeriodStart(reference: Dayjs): Dayjs {
-  const month = reference.date() >= 16
-    ? reference.startOf("month")
-    : reference.subtract(1, "month").startOf("month");
-  return month.date(16);
+function periodStart(month: Dayjs, startDay: number): Dayjs {
+  return month.startOf("month").date(Math.min(startDay, month.daysInMonth()));
 }
 
-export function currentReportPeriod(reference: Dayjs = dayjs()): ReportPeriod {
-  const from = currentPeriodStart(reference);
-  return { from: from.format("YYYY-MM-DD"), to: from.add(1, "month").date(15).format("YYYY-MM-DD") };
+function currentPeriodStart(reference: Dayjs, startDay: number): Dayjs {
+  const month = reference.startOf("month");
+  const start = periodStart(month, startDay);
+  return reference.startOf("day").isBefore(start) ? periodStart(month.subtract(1, "month"), startDay) : start;
 }
 
-export function previousReportPeriod(reference: Dayjs = dayjs()): ReportPeriod {
-  const currentFrom = currentPeriodStart(reference);
-  const from = currentFrom.subtract(1, "month").date(16);
+export function currentReportPeriod(reference: Dayjs = dayjs(), startDay = 16): ReportPeriod {
+  const from = currentPeriodStart(reference, startDay);
+  const next = periodStart(from.startOf("month").add(1, "month"), startDay);
+  return { from: from.format("YYYY-MM-DD"), to: next.subtract(1, "day").format("YYYY-MM-DD") };
+}
+
+export function previousReportPeriod(reference: Dayjs = dayjs(), startDay = 16): ReportPeriod {
+  const currentFrom = currentPeriodStart(reference, startDay);
+  const from = periodStart(currentFrom.startOf("month").subtract(1, "month"), startDay);
   return { from: from.format("YYYY-MM-DD"), to: currentFrom.subtract(1, "day").format("YYYY-MM-DD") };
 }

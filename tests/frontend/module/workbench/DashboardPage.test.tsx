@@ -55,7 +55,7 @@ it("工作台展示业务总览指标和业务提醒", async () => {
     ]) {
       const card = within(overview).getByText(label).closest(".ui-stat") as HTMLElement | null;
       expect(card).not.toBeNull();
-      expect(within(card!).getByText(value)).toBeInTheDocument();
+      expect(await within(card!).findByText(value)).toBeInTheDocument();
     }
     const alerts = await screen.findByRole("region", { name: "我的消息" });
     expect(within(alerts).getByText("库存订单入库超过 7 天 1 个")).toBeInTheDocument();

@@ -106,8 +106,14 @@ def test_workbench_personal_earnings_uses_commission_profit_base(
     assert response.json()["personal_earnings"] == "123.45"
 
 
-def test_workbench_order_cards_use_the_current_period(seeded_client, headers, monkeypatch):
+def test_workbench_order_cards_use_the_current_period(seeded_client, seeded_db, headers, monkeypatch):
     calls = []
+    class FixedDate(date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 11, 20)
+
+    monkeypatch.setattr("app.dashboard.service.date", FixedDate)
 
     def fake_order_status_counts(session, **kwargs):
         calls.append(kwargs)
@@ -119,14 +125,30 @@ def test_workbench_order_cards_use_the_current_period(seeded_client, headers, mo
 
     assert response.status_code == 200, response.text
     assert len(calls) == 2
-    today = date.today()
-    expected = {"trade_date_from": today.replace(day=1), "trade_date_to": today}
+    expected = {"trade_date_from": date(2026, 11, 16), "trade_date_to": date(2026, 12, 15)}
     assert calls[0]["trade_date_from"] == expected["trade_date_from"]
     assert calls[0]["trade_date_to"] == expected["trade_date_to"]
     assert calls[0].get("mine", False) is False
     assert calls[1]["trade_date_from"] == expected["trade_date_from"]
     assert calls[1]["trade_date_to"] == expected["trade_date_to"]
     assert calls[1]["mine"] is True
+    calls.clear()
+    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers, params={"from": "2026-01-02", "to": "2026-02-04"})
+    assert response.status_code == 200, response.text
+    assert response.json()["period"] == {"from": "2026-01-02", "to": "2026-02-04"}
+    assert all(call["trade_date_from"] == date(2026, 1, 2) and call["trade_date_to"] == date(2026, 2, 4) for call in calls)
+    assert seeded_client.get("/api/v1/dashboard/summary", headers=headers, params={"from": "2026-02-04", "to": "2026-01-02"}).status_code == 422
+    assert seeded_client.get("/api/v1/dashboard/summary", headers=headers, params={"from": "2026-01-02"}).status_code == 422
+    from app.domain.options import OptionSet
+    setting = OptionSet(code="BUSINESS_PERIOD", label="当期设置", group="BUSINESS", editable=False, options=[{"value": "start_day", "label": "10"}], created_by="pytest", updated_by="pytest")
+    seeded_db.add(setting)
+    seeded_db.flush()
+    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["period"] == {"from": "2026-11-10", "to": "2026-12-09"}
+    from app.shared.business_period import business_period
+    assert business_period(date(2028, 2, 28), 31) == (date(2028, 1, 31), date(2028, 2, 28))
+    assert business_period(date(2028, 2, 29), 31) == (date(2028, 2, 29), date(2028, 3, 30))
 
 def test_order_create_validates_active_custom_field_values(seeded_db):
     field = OrderFormField(

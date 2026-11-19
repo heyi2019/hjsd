@@ -696,6 +696,31 @@ beforeEach(() => {
   seedOrderFormFields();
 });
 
+it.each([RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal])("已选售出操作人时无需等待人员重查，提交期间防止重复操作", async (SaleModal) => {
+  vi.mocked(employeesApi.list).mockResolvedValueOnce([{ id: 2, username: "bob", display_name: "小红", is_active: true }]);
+  const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<SaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+  const amountLabel = SaleModal === ConsignmentSaleModal ? "利润" : "售出金额";
+  await saleUi.type(await screen.findByLabelText(amountLabel), "350");
+  await saleUi.click(screen.getByLabelText("资金账户"));
+  await saleUi.click(await screen.findByText(/利润池/));
+  await waitFor(() => expect(employeesApi.list).toHaveBeenCalledTimes(1));
+  await saleUi.click(screen.getByLabelText("售出操作人"));
+  await saleUi.click(await screen.findByText("小红", { selector: ".ant-select-item-option-content" }));
+  await saleUi.click(screen.getByLabelText("交付操作人"));
+  const employeeOptions = screen.getAllByText("小红", { selector: ".ant-select-item-option-content" });
+  await saleUi.click(employeeOptions[employeeOptions.length - 1]);
+  vi.mocked(employeesApi.list).mockReturnValue(new Promise(() => {}));
+  vi.mocked(ordersApi.postEvent).mockReturnValue(new Promise(() => {}));
+  const form = screen.getByLabelText(amountLabel).closest("form")!;
+  fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+  await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledTimes(1));
+  fireEvent.submit(form);
+  expect(employeesApi.list).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: /确认售出/ })).toHaveClass("ant-btn-loading");
+  expect(ordersApi.postEvent).toHaveBeenCalledTimes(1);
+});
+
 it("不填写客户时，客户名单加载中仍可售出", async () => {
   vi.mocked(customersApi.page).mockReturnValueOnce(new Promise(() => {}));
   const saleUi = userEvent.setup({ pointerEventsCheck: 0 });

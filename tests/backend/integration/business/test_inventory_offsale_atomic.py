@@ -1,3 +1,5 @@
+"""INVENTORY-04 库存下架与关联平台事件保持原子性。"""
+
 from datetime import date
 
 import pytest

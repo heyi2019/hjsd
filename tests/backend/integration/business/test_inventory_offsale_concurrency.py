@@ -1,8 +1,11 @@
+"""INVENTORY-04 库存下架并发操作保持原子性。"""
+
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from threading import Barrier, Event
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import sessionmaker
 
@@ -16,6 +19,8 @@ from app.core.security import DEV_USERS
 from app.domain.base import Base
 from app.domain.trade import Account, OrderEvent
 from app.settings.field_definitions.seeds import seed_foundation
+
+pytestmark = pytest.mark.db
 
 
 def test_simultaneous_offsale_has_one_result(v1_engine):

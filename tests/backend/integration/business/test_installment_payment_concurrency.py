@@ -1,8 +1,11 @@
+"""INSTALLMENT-03 分期资金及处置并发操作保持一致。"""
+
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from threading import Event
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import create_engine, event, select, text, update
 from sqlalchemy.orm import sessionmaker
 
@@ -18,6 +21,8 @@ from app.funds.installments.repayments.pay import pay
 from app.funds.installments.repayments.waive import waive_schedule
 from app.funds.installments.recovery import mark_overdue, recover_account
 from app.settings.field_definitions.seeds import seed_foundation
+
+pytestmark = pytest.mark.db
 
 
 def test_installment_payment_and_cancellation_are_serialized(v1_engine):

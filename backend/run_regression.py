@@ -247,6 +247,8 @@ GROUPS = {
         "tests/backend/integration/business/test_flow_config_driven.py",
         "tests/backend/integration/business/test_stock_intake_contract.py",
         "tests/backend/integration/business/test_cancel_inventory_release.py",
+        "tests/backend/integration/business/test_inventory_offsale_atomic.py",
+        "tests/backend/integration/business/test_inventory_offsale_concurrency.py",
         "tests/backend/integration/business/test_order_duplicate_account.py",
         "tests/backend/integration/business/test_order_event_cancellable_amount.py",
         # 2026-11-12 金额链路
@@ -255,6 +257,7 @@ GROUPS = {
         "tests/backend/unit/business/test_operation_operators.py",
     ],
     "installments": [
+        "tests/backend/integration/business/test_installment_payment_concurrency.py",
         "tests/backend/integration/business/test_installments_contract.py",
         "tests/backend/integration/business/test_installments_create.py",
         "tests/backend/integration/business/test_installments_lifecycle.py",

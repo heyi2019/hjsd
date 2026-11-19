@@ -52,6 +52,7 @@ PROMISE,,,,,,,,DEPOSIT-01,L0,后端,押金剩余 = 实收−已退−已损失�
 PROMISE,,,,,,,,REBATE-01,L0,后端,返点按规则快照计算；结算不改原规则定义,返点争议，历史单无法复算,test_finance_rebates_service.py;test_rebate_current_contract.py,待核,,需确认快照而非实时规则
 PROMISE,,,,,,,,INSTALLMENT-01,L0,后端,减免累加 waived_amount，不改原应收金额,应收被篡改，客户对账争议,test_installment_remaining.py,已覆盖,,
 PROMISE,,,,,,,,INSTALLMENT-02,L0,后端,末期 final_period_adjustment 吸收尾差，分期合计必须闭合,分期不平，尾差长期挂账,test_installments_service.py;test_installments_service_write_paths.py;test_installments_service_defensive.py,待核,,需确认末期尾差断言
+PROMISE,,,,,,,,INSTALLMENT-03,L0,后端,分期收款与取消减免回收等并发操作保持一致,并发操作导致重复记账或合约状态错误,test_installment_payment_concurrency.py,已覆盖,,
 PROMISE,,,,,,,,IDEMPOTENCY-01,L0,后端,重复提交不得产生第二笔流水,重复扣款/重复入账,,缺失（当前行为存在重复记账风险，旧用例已删除）,,待实现事件幂等后新增正向守卫
 PROMISE,,,,,,,,NUMBER-01,L1,后端,单号唯一且分配后不可修改（HS/TH/DG+4、KU_+5、ZC/SR+5）,重号，对外凭证失效,test_numbering.py,已覆盖,,
 PROMISE,,,,,,,,INVENTORY-01,L1,后端,同 game_account + game_type 未售不得重复入库（422）,幽灵库存，资产虚增,test_stock_intake_contract.py;test_order_duplicate_account.py,已覆盖,,
@@ -89,5 +90,6 @@ PROMISE,,,,,,,,TESTING-04,L2,双端,测试内 vi.mock 的模块标识必须是 @
 PROMISE,,,,,,,,TESTING-05,L2,后端,"快速通道（pytest -m ""not db""）内不得出现任何连库用例；db 标记由 v1_engine 夹具依赖派生，自建连接的文件必须显式声明",快通道静默连库：慢、依赖外部服务，极端情况下连错库或污染数据,test_db_channel.py,已覆盖,,"判据来自死端口实验：DATABASE_URL 指向不可达端口后跑 -m ""not db""，曾暴露 test_migration 12 错误 + test_numbering 1 失败"
 PROMISE,,,,,,,,TESTING-06,L2,双端,磁盘上的测试文件集合、区域归属与分层归属必须与 tests/manifest.json 一致；任一端少收、多收或归错层即失败,测试文件搬走后扫描仍只认旧目录，用例整批从用例库与报告消失却不报错（已在 workspace 扫描、GROUPS 反查、record 落键三处各发生过一次）,test_manifest_parity.py;tests/frontend/unit/system/manifest-parity.test.ts,已覆盖,,manifest 只存「应该收到多少」，不存文件名清单；文件集合永远扫磁盘，避免第二份清单腐烂
 PROMISE,,,,,,,,INVENTORY-03,L1,后端,账号删除仅管理员可执行且原因必填：物理删账号行，订单/事件/流水/返点全部保留并显式解绑，账号快照与原因写入审计；有分期处置记录（RESTRICT）必须 409 拒绝,关联单据被连带删除或留下悬空 account_id，历史核算与对账不可逆失真,test_account_delete.py,已覆盖,,2026-11-05 裁决
+PROMISE,,,,,,,,INVENTORY-04,L1,后端,库存下架及关联平台事件原子提交并防止并发重复操作,下架失败后留下部分事件或并发产生重复资金流水,test_inventory_offsale_atomic.py;test_inventory_offsale_concurrency.py,已覆盖,,
 PROMISE,,,,,,,,PROFIT-02,L0,后端,分润基数=该订单所有收入−所有支出，可正可负可 0；收入含返点记录金额、支出含分期坏账金额，二者不生成 cashflow 也不得排除；不得按 SELL−BUY−COST 推导,利润虚高/虚低，分润与报表同源代码不同数，经营数据失真,test_profit_cashflow_basis.py,已覆盖,,2026-11-05 用户裁决；唯一权威 orders/amounts.py::order_cashflow_profit
 PROMISE,,,,,,,,NOTIFY-01,L2,后端,分润两段式通知闭环：售出完成通知本次SELL执行人去录分润；分润保存完成通知利润接收人，两次均须幂等去重,分润无人认领或重复提醒导致执行链断裂,test_notifications_service.py,已覆盖,,2026-11-12 用户裁决

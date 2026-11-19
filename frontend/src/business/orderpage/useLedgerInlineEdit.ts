@@ -60,6 +60,12 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
       ));
       params.onDetailSaved?.(detail);
     },
+    onRefreshFailed: (accountId) => {
+      setLedgerOrderDetails((current) => Object.fromEntries(
+        Object.entries(current).filter(([, cached]) => cached.account.id !== accountId),
+      ));
+      setExpandedOrderIds([]);
+    },
   });
 
   const openLedgerEditor = async (order: Order) => {

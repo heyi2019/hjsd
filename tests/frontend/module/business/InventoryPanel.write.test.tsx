@@ -7,6 +7,7 @@ import { RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/busi
 import { InventoryRebateModal } from "@/business/stocks/rebate";
 import { OrderConsignmentModal } from "@/business/operations/consignment";
 import { OrderDetailDeliverySection } from "@/business/OrderDetailView/OrderDetailDeliverySection";
+import { useOrderDetailEditor } from "@/business/OrderDetailView/editing/use-order-detail-editor";
 
 import type { Account } from "@/shared/api/types/accounts";
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
@@ -120,6 +121,55 @@ beforeEach(() => {
   vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 describe("InventoryPanel：写入与长路径", () => {
+  it("详情保存成功但刷新失败时清除已保存草稿并作废旧详情", async () => {
+    const detail = { account: accounts[0], orders: [], detail_view: { finance_rows: [] } } as never;
+    const refreshFailed = vi.fn();
+    vi.mocked(ordersApi.updateExecution).mockResolvedValue({ ok: true });
+    vi.mocked(ordersApi.executionDetail).mockRejectedValue(new Error("刷新失败"));
+    function EditorProbe() {
+      const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved: vi.fn(), onRefreshFailed: refreshFailed });
+      return <>
+        <button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑</button>
+        <button onClick={() => editor.addOperationDraft("DESCRIPTION")}>新增描述</button>
+        <button onClick={() => editor.updateOperationDraft(Object.keys(editor.operationDrafts)[0], { occurred_at: "2026-11-20T10:00:00" })}>填写时间</button>
+        <button onClick={() => void editor.saveInline()}>保存</button>
+        <span>{editor.inlineEditId == null ? "未编辑" : "编辑中"}</span>
+        <span>{Object.keys(editor.operationDrafts).length}</span>
+      </>;
+    }
+    renderLight(<EditorProbe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑" }));
+    await screen.findByText("编辑中");
+    await ui.click(screen.getByRole("button", { name: "新增描述" }));
+    await ui.click(screen.getByRole("button", { name: "填写时间" }));
+    await ui.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(refreshFailed).toHaveBeenCalledWith(1, 21));
+    expect(screen.getByText("未编辑")).toBeInTheDocument();
+    expect(screen.getByText("0")).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "保存" }));
+    expect(ordersApi.updateExecution).toHaveBeenCalledTimes(1);
+  });
+  it("详情写入失败时保留草稿供重试", async () => {
+    const detail = { account: accounts[0], orders: [], detail_view: { finance_rows: [] } } as never;
+    const refreshFailed = vi.fn();
+    vi.mocked(ordersApi.updateExecution).mockRejectedValueOnce(new Error("保存失败"));
+    function EditorProbe() {
+      const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved: vi.fn(), onRefreshFailed: refreshFailed });
+      return <>
+        <button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑</button>
+        <button onClick={() => editor.updateEditingAccount({ account_description: "修改的描述" })}>修改</button>
+        <button onClick={() => void editor.saveInline()}>保存</button>
+        <span>{editor.editingAccount?.account_description ?? "无草稿"}</span>
+      </>;
+    }
+    renderLight(<EditorProbe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑" }));
+    await ui.click(screen.getByRole("button", { name: "修改" }));
+    await ui.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalledTimes(1));
+    expect(screen.getByText("修改的描述")).toBeInTheDocument();
+    expect(refreshFailed).not.toHaveBeenCalled();
+  });
   it("代挂在库账号不再提供独立取消入口", async () => {
     vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([{
       account: { ...accounts[0], inventory_type: "CONSIGNMENT" },

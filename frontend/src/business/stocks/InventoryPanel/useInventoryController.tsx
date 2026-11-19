@@ -83,6 +83,16 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
       setRows((current) => current.map((row) => row.account.id === accountId ? mergeInventoryAccount(row, detail.account) : row));
       void load();
     },
+    onRefreshFailed: (accountId) => {
+      setExecutionDetails((current) => Object.fromEntries(
+        Object.entries(current).filter(([id]) => Number(id) !== accountId),
+      ));
+      setOrderExecutionDetails((current) => Object.fromEntries(
+        Object.entries(current).filter(([, detail]) => detail.account.id !== accountId),
+      ));
+      setDetailTarget(null);
+      void load();
+    },
   });
   useEffect(() => {
     if (active) void orderDetailEditor.ensureEmployees();

@@ -24,8 +24,9 @@ import { defaultOperatorUserIds, propagateSharedOrderExtra, sharedOrderIdsForEdi
 export function useOrderDetailEditor(params: {
   getExecutionDetail: (accountId: number) => AccountExecutionDetail | undefined;
   onSaved: (accountId: number, detail: AccountExecutionDetail) => void;
+  onRefreshFailed: (accountId: number, orderId: number) => void;
 }): OrderDetailEditor {
-  const { getExecutionDetail, onSaved } = params;
+  const { getExecutionDetail, onSaved, onRefreshFailed } = params;
   const { username } = useSession();
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [inlineEditId, setInlineEditId] = useState<number | null>(null);
@@ -261,9 +262,11 @@ export function useOrderDetailEditor(params: {
         const detail = await ordersApi.executionDetail(sourceOrderId);
         onSaved(id, detail);
       } catch (refreshError) {
+        cancelInlineEdit();
+        onRefreshFailed(id, sourceOrderId);
         appMessage.warning("修改已保存，但刷新明细失败，请重新加载");
         console.warn("reload execution detail after save failed", normalizeError(refreshError).message);
-        throw refreshError;
+        return;
       }
       setEditingAccount(null);
       setEventDrafts({});

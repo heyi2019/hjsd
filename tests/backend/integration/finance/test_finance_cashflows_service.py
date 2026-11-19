@@ -42,12 +42,13 @@ def _all_scope_user() -> CurrentUser:
 
 def _make_flow(seeded_db, *, direction,
                accounting_attribute="OPERATING_EXPENSE", category="OTHER", amount="10",
-               note="memo", order_id=None):
+               note="memo", order_id=None, ledger_type="BUSINESS"):
     return cashflows.create_cashflow(
         seeded_db,
         pool_id=1,
         occurred_on=TODAY,
         direction=direction,
+        ledger_type=ledger_type,
         accounting_attribute=accounting_attribute,
         category=category,
         amount=Decimal(amount),
@@ -245,6 +246,7 @@ def test_update_studio_cashflow_updates_the_manual_entry(seeded_db):
         category="房租",
         amount="3000",
         note="10月房租",
+        ledger_type="STUDIO",
     )
 
     updated = cashflows.update_cashflow(
@@ -265,7 +267,7 @@ def test_update_studio_cashflow_updates_the_manual_entry(seeded_db):
     assert updated.note == "修正后的房租"
 
 def test_delete_studio_cashflow_removes_the_manual_entry(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT", category="日用")
+    flow = _make_flow(seeded_db, direction="OUT", category="日用", ledger_type="STUDIO")
 
     cashflows.delete_cashflow(seeded_db, flow.id, actor="pytest")
 

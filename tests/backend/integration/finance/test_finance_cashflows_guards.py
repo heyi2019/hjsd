@@ -190,6 +190,26 @@ def test_delete_cashflow_rejects_non_studio_flow(seeded_db):
     with pytest.raises(Validation, match="仅工作室手工收支可编辑或删除"):
         cashflows.delete_cashflow(seeded_db, flow.id, actor="pytest")
 
+
+@pytest.mark.parametrize(("direction", "attribute"), [("OUT", "OPERATING_EXPENSE"), ("IN", "SELF_REVENUE")])
+def test_studio_actions_reject_business_ledger_cashflows(seeded_client, seeded_db, headers, direction, attribute):
+    flow = cashflows.create_cashflow(
+        seeded_db, pool_id=1, occurred_on=TODAY, direction=direction,
+        ledger_type="BUSINESS", accounting_attribute=attribute, category="房租",
+        amount=Decimal("50"), actor="pytest",
+    )
+    payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "direction": direction,
+               "accounting_attribute": attribute, "category": "房租", "amount": "80"}
+    response = seeded_client.put(f"/api/v1/cashflows/{flow.id}", headers=headers, json=payload)
+    assert response.status_code == 422, response.text
+    response = seeded_client.delete(f"/api/v1/cashflows/{flow.id}", headers=headers)
+    assert response.status_code == 422, response.text
+    seeded_db.expire_all()
+    saved = seeded_db.get(Cashflow, flow.id)
+    assert saved is not None
+    assert saved.ledger_type == "BUSINESS"
+    assert saved.amount == Decimal("50.00")
+
 def test_update_cashflow_rejects_bad_direction(seeded_db):
     flow = _studio_flow(seeded_db)
     with pytest.raises(Validation, match="direction 必须为"):

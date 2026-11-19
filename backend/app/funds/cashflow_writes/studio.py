@@ -12,7 +12,7 @@ from app.shared.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
-from app.domain.enums import AuditAction, CashflowSourceType, Direction
+from app.domain.enums import AuditAction, CashflowLedgerType, CashflowSourceType, Direction
 from app.domain.trade import Cashflow
 from app.funds.attributes import (
     MANUAL_EXCLUDED_CATEGORIES,
@@ -34,7 +34,8 @@ def _assert_editable_studio_cashflow(
 ) -> Cashflow:
     flow = _get_cashflow(session, cashflow_id, user)
     if (
-        flow.order_id is not None
+        flow.ledger_type != CashflowLedgerType.STUDIO.value
+        or flow.order_id is not None
         or flow.source_type != CashflowSourceType.MANUAL.value
         or flow.category in MANUAL_EXCLUDED_CATEGORIES
         or not (

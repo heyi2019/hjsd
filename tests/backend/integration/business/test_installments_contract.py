@@ -138,6 +138,16 @@ def test_installment_payment_is_cashflow_only(seeded_db):
     assert payment_flow.source_id == contract.inst_no
 
 
+def test_settle_early_keeps_submitted_form_extra(seeded_db):
+    from app.funds.installments.settlement import settle_early
+    order = _order(seeded_db)
+    contract = _contract(seeded_db, order.id, principal="100", down_payment="0", periods=1, per_period="100")
+    result = settle_early(seeded_db, contract.id, paid_on=TODAY, actor="pytest", form_extra={"settlement_reference": "结清备注"})
+    seeded_db.flush()
+    seeded_db.refresh(result)
+    assert result.form_extra["settlement_reference"] == "结清备注"
+
+
 def test_cancelled_installment_can_be_replaced_without_losing_history(seeded_client, seeded_db, headers):
     from app.core.errors import Conflict
     from app.domain.attachments import Attachment

@@ -63,7 +63,7 @@ def recover_account(
 ) -> InstallmentDisposition:
     """登记账号回收并关闭原分期，不改写原分期应收。"""
     text_note = _required_text(note, field="note", message="回收必须填写说明")
-    installment = get_installment(session, installment_id, user)
+    installment = get_installment(session, installment_id, user, for_update=True)
     _merge_form_extra(session, installment, scope="INSTRECOVER", values=form_extra)
     if installment.status not in {
         InstallmentStatus.OVERDUE.value,

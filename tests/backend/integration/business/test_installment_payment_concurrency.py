@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, event, select, text
 from sqlalchemy.orm import sessionmaker
 
 from app.business.create import create_order
+from app.business.events import post_event
 from app.core.errors import AppError
 from app.domain.base import Base
 from app.domain.trade import Cashflow, Installment
@@ -15,6 +16,7 @@ from app.funds.installments.create import create_installment
 from app.funds.installments.repayments.cancel import cancel_installment
 from app.funds.installments.repayments.pay import pay
 from app.funds.installments.repayments.waive import waive_schedule
+from app.funds.installments.recovery import recover_account
 from app.settings.field_definitions.seeds import seed_foundation
 
 
@@ -36,6 +38,8 @@ def test_installment_payment_and_cancellation_are_serialized(v1_engine):
             contract_id = contract.id
             session.commit()
         waiting = Event()
+        errors = []
+        payment_amount = "100"
 
         def second_payment():
             with factory() as session:
@@ -47,10 +51,11 @@ def test_installment_payment_and_cancellation_are_serialized(v1_engine):
                         waiting.set()
                 event.listen(connection, "before_cursor_execute", observe)
                 try:
-                    pay(session, contract_id, amount="100", paid_on=date(2026, 11, 2), period_no=1, actor="pytest")
+                    pay(session, contract_id, amount=payment_amount, paid_on=date(2026, 11, 2), period_no=1, actor="pytest")
                     session.commit()
                     return "accepted"
-                except AppError:
+                except AppError as exc:
+                    errors.append(str(exc))
                     session.rollback()
                     return "rejected"
 
@@ -138,6 +143,55 @@ def test_installment_payment_and_cancellation_are_serialized(v1_engine):
             assert waiting.wait(10)
             first.commit()
             assert future.result(timeout=10) == "rejected"
+
+        with factory() as session:
+            order = create_order(session, order_type="HS", trade_date=date(2026, 11, 1), actor="pytest", account_snapshot={"game_account": "concurrent-recovery", "game_type": "王者荣耀"})
+            post_event(session, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 11, 1), actor="pytest")
+            contract = create_installment(session, order_id=order.id, contract_type="STOCK_SALE", principal="100", down_payment="0", periods=1, per_period="100", first_due_on=date(2026, 11, 1), actor="pytest")
+            contract.status = "OVERDUE"
+            contract_id = contract.id
+            session.commit()
+        waiting.clear()
+
+        def recover_after_payment():
+            with factory() as session:
+                connection = session.connection()
+                def observe(_conn, _cursor, statement, _parameters, _context, _executemany):
+                    sql = statement.lower()
+                    if ("for update" in sql and "installments" in sql) or "update installments" in sql or "update accounts" in sql:
+                        waiting.set()
+                event.listen(connection, "before_cursor_execute", observe)
+                recover_account(session, contract_id, occurred_on=date(2026, 11, 2), actor="pytest", note="违约回收")
+                amount = session.get(Installment, contract_id).bad_debt_amount
+                session.commit()
+                return amount
+
+        with factory() as first, ThreadPoolExecutor(max_workers=1) as executor:
+            pay(first, contract_id, amount="50", paid_on=date(2026, 11, 2), period_no=1, actor="pytest")
+            future = executor.submit(recover_after_payment)
+            assert waiting.wait(10)
+            first.commit()
+            assert future.result(timeout=10) == 50
+
+        with factory() as session:
+            order = create_order(session, order_type="HS", trade_date=date(2026, 11, 1), actor="pytest", account_snapshot={"game_account": "recovered-no-payment", "game_type": "王者荣耀"})
+            post_event(session, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 11, 1), actor="pytest")
+            contract = create_installment(session, order_id=order.id, contract_type="STOCK_SALE", principal="100", down_payment="0", periods=1, per_period="100", first_due_on=date(2026, 11, 1), actor="pytest")
+            contract.status = "OVERDUE"
+            contract_id = contract.id
+            session.commit()
+        waiting.clear()
+        payment_amount = "50"
+        with factory() as first, ThreadPoolExecutor(max_workers=1) as executor:
+            recover_account(first, contract_id, occurred_on=date(2026, 11, 2), actor="pytest", note="违约回收")
+            future = executor.submit(second_payment)
+            assert waiting.wait(10)
+            first.commit()
+            assert future.result(timeout=10) == "rejected"
+            assert "不可收款" in errors[-1]
+        with factory() as session:
+            contract = session.get(Installment, contract_id)
+            assert contract.status == "CLOSED" and contract.paid_amount == 0 and contract.bad_debt_amount == 100
     finally:
         engine.dispose()
         with admin.connect() as connection:

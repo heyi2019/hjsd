@@ -44,6 +44,7 @@ def pay(
     if installment.status in (
         InstallmentStatus.CANCELLED.value,
         InstallmentStatus.DELIVERED.value,
+        InstallmentStatus.CLOSED.value,
     ):
         raise Conflict(
             f"合约 {installment.inst_no} 状态 {installment.status}，不可收款",

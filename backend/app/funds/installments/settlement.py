@@ -51,18 +51,21 @@ def settle_early(
     user: CurrentUser | None = None,
 ) -> Installment:
     """提前收清剩余应收，逐期生成分期收入资金明细并关闭未来计划。"""
-    installment = get_installment(session, installment_id, user)
+    installment = get_installment(session, installment_id, user, for_update=True)
     _merge_form_extra(session, installment, scope="INSTSETTLE", values=form_extra)
     if installment.status in (
         InstallmentStatus.CANCELLED.value,
         InstallmentStatus.DELIVERED.value,
         InstallmentStatus.SETTLED.value,
+        InstallmentStatus.CLOSED.value,
     ):
         raise Conflict(
             f"合约 {installment.inst_no} 状态 {installment.status}，不可提前结清",
             code=ErrorCode.ORDER_STATUS_CONFLICT,
             details={"inst_no": installment.inst_no, "status": installment.status},
         )
+    # pay() 会刷新同一合约；先在当前事务中写入表单值，避免刷新覆盖待保存的修改。
+    session.flush()
     rows = session.scalars(
         select(InstallmentSchedule)
         .where(
@@ -138,7 +141,7 @@ def mark_default(
     text_reason = _required_text(
         reason, field="reason", message="违约处置必须填写原因"
     )
-    installment = get_installment(session, installment_id, user)
+    installment = get_installment(session, installment_id, user, for_update=True)
     _merge_form_extra(session, installment, scope="INSTDEFAULT", values=form_extra)
     if installment.status != InstallmentStatus.OVERDUE.value:
         raise Validation(

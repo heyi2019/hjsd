@@ -72,7 +72,7 @@ def _add_months(base: date, months: int) -> date:
 
 
 def get_installment(
-    session: Session, installment_id: int, user: CurrentUser | None = None
+    session: Session, installment_id: int, user: CurrentUser | None = None, *, for_update: bool = False
 ) -> Installment:
     item = session.get(Installment, installment_id)
     if item is None:
@@ -89,4 +89,11 @@ def get_installment(
                 f"分期合约 {installment_id} 不存在",
                 details={"installment_id": installment_id},
             )
+    if for_update:
+        item = session.execute(
+            select(Installment).where(Installment.id == installment_id)
+            .with_for_update().execution_options(populate_existing=True)
+        ).scalar_one_or_none()
+        if item is None:
+            raise NotFound(f"分期合约 {installment_id} 不存在", details={"installment_id": installment_id})
     return item

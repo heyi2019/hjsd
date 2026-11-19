@@ -33,7 +33,7 @@ def cancel_installment(
 ) -> dict[str, Any]:
     """终止交付前分期并冲销已登记的收款资金明细。"""
     text_reason = _required_text(reason, field="reason", message="取消分期必须填写原因")
-    installment = get_installment(session, installment_id, user)
+    installment = get_installment(session, installment_id, user, for_update=True)
     cancellable = {
         InstallmentStatus.PENDING.value,
         InstallmentStatus.ACTIVE.value,

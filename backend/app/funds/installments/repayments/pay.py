@@ -36,7 +36,7 @@ def pay(
     user: CurrentUser | None = None,
 ) -> tuple[Installment, InstallmentSchedule]:
     """收款：直接登记收入资金明细，不创建订单业务事件。"""
-    installment = get_installment(session, installment_id, user)
+    installment = get_installment(session, installment_id, user, for_update=True)
     order = session.get(Order, installment.order_id)
     if order is None:
         raise NotFound("分期合约所属订单不存在", details={"order_id": installment.order_id})
@@ -159,7 +159,7 @@ def _pick_schedule(
             select(InstallmentSchedule).where(
                 InstallmentSchedule.installment_id == installment.id,
                 InstallmentSchedule.period_no == period_no,
-            )
+            ).execution_options(populate_existing=True)
         )
         if schedule is None:
             raise NotFound(
@@ -175,6 +175,7 @@ def _pick_schedule(
             < InstallmentSchedule.due_amount,
         )
         .order_by(InstallmentSchedule.period_no)
+        .execution_options(populate_existing=True)
     ).first()
     if schedule is None:
         raise Validation(

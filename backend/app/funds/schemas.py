@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
@@ -175,6 +175,8 @@ class CashflowUpdate(RequestModel):
     pool_id: int
     occurred_on: date
     direction: str
+    ledger_type: Literal["STUDIO"] = "STUDIO"
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
     accounting_attribute: str | None = None
     category: str
     amount: Decimal

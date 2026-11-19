@@ -22,6 +22,7 @@ from app.funds.attributes import (
 )
 from app.settings.field_definitions.pools import assert_pool_usable
 from app.shared.form_field_rules import validate_form_extra
+from app.shared.operation_operators import validate_optional_operator_ids
 from app.funds._common import _positive, _text
 from app.funds.cashflow_writes._shared import _get_cashflow
 
@@ -99,6 +100,7 @@ def update_cashflow(
     category: str,
     amount: Any,
     note: str | None = None,
+    operator_user_ids: list[int] | None = None,
     form_extra: Mapping[str, Any] | None = None,
     form_extra_scope: str = "STUDIOEXP",
     actor: str,
@@ -119,6 +121,7 @@ def update_cashflow(
         category=category,
         amount=amount,
     )
+    operator_ids = validate_optional_operator_ids(session, operator_user_ids)
     before = {
         "pool_id": flow.pool_id,
         "occurred_on": flow.occurred_on.isoformat(),
@@ -127,6 +130,7 @@ def update_cashflow(
         "category": flow.category,
         "amount": str(to_money(flow.amount)),
         "note": flow.note,
+        "operator_user_ids": flow.operator_user_ids,
     }
     flow.pool_id = pool.id
     flow.occurred_on = occurred_on
@@ -135,6 +139,8 @@ def update_cashflow(
     flow.category = label
     flow.amount = money
     flow.note = note
+    if operator_ids is not None:
+        flow.operator_user_ids = operator_ids
     flow.form_extra = validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None
     flow.updated_by = actor
     session.flush()
@@ -153,6 +159,7 @@ def update_cashflow(
             "category": flow.category,
             "amount": str(money),
             "note": note,
+            "operator_user_ids": flow.operator_user_ids,
         },
     )
     return flow

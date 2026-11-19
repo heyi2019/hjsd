@@ -314,6 +314,7 @@ def update_cashflow(
         category=payload.category,
         amount=payload.amount,
         note=payload.note,
+        operator_user_ids=payload.operator_user_ids,
         form_extra=payload.form_extra,
         form_extra_scope=payload.form_extra_scope,
         actor=_actor(user),

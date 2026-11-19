@@ -17,7 +17,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.domain.foundation import Pool
+from app.domain.foundation import AuditLog, Pool
 from app.funds.cashflows import create_cashflow, reverse_cashflow
 
 TODAY = date(2026, 10, 4)
@@ -88,6 +88,41 @@ def test_new_flow_appears_in_items_and_summary(seeded_client, seeded_db, headers
     assert [item["flow_no"] for item in payload["items"]] == [flow.flow_no]
     assert Decimal(payload["expense"]) == Decimal("120.00")
     assert Decimal(payload["net"]) == Decimal("-120.00")
+
+
+def test_edit_studio_cashflow_saves_operator_and_rejects_invalid_operator(seeded_client, seeded_db, headers):
+    flow = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="120")
+    payload = {
+        "pool_id": flow.pool_id,
+        "occurred_on": TODAY.isoformat(),
+        "direction": "OUT",
+        "ledger_type": "STUDIO",
+        "accounting_attribute": "OPERATING_EXPENSE",
+        "category": "房租",
+        "amount": "150.00",
+        "note": "调整",
+        "operator_user_ids": [1, 2],
+    }
+    response = seeded_client.put(f"/api/v1/cashflows/{flow.id}", headers=headers, json=payload)
+    assert response.status_code == 200, response.text
+    assert response.json()["operator_user_ids"] == [1, 2]
+    assert _summary(seeded_client, headers)["items"][0]["operator_user_ids"] == [1, 2]
+    audit = seeded_db.scalar(select(AuditLog).where(
+        AuditLog.entity_type == "cashflow", AuditLog.entity_id == flow.flow_no,
+        AuditLog.action == "CASHFLOW_UPDATE",
+    ))
+    assert audit is not None
+    assert audit.before_json["operator_user_ids"] is None
+    assert audit.after_json["operator_user_ids"] == [1, 2]
+
+    response = seeded_client.put(
+        f"/api/v1/cashflows/{flow.id}", headers=headers,
+        json={**payload, "operator_user_ids": [999999], "amount": "999"},
+    )
+    assert response.status_code == 422, response.text
+    saved = _summary(seeded_client, headers)["items"][0]
+    assert saved["operator_user_ids"] == [1, 2]
+    assert Decimal(saved["amount"]) == Decimal("150.00")
 
 
 def test_reversed_flag_survives_date_direction_and_page_filters(seeded_client, seeded_db, headers):

@@ -106,7 +106,11 @@ def notify_profit_recipients(session: Session, order: Order, *, actor: str, new_
         select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order.id)
     ).all()
     created = 0
-    recipient_ids = {row.user_id for row in rows if row.user_id is not None and (row.allocation_type or "").upper() != "COMPANY"}
+    recipient_ids = {
+        row.user_id for row in rows
+        if row.user_id is not None and (row.allocation_type or "").upper() != "COMPANY"
+        and (row.allocation_rate != 0 or row.allocation_amount != 0)
+    }
     if new_revision:
         previous = session.scalars(select(Notification).where(
             Notification.notification_type == PROFIT_ALLOCATED,

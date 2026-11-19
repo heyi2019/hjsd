@@ -278,10 +278,14 @@ def test_set_allocations_repeat_is_idempotent(seeded_db):
     _set_person_allocations(seeded_db, order, [{"user_id": replacement_id, "role": "OWNER", "allocation_rate": "100"}])
     assert all(row.read_at is not None for row in _notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED))
     assert len([row for row in _notifs(seeded_db, replacement_id, triggers.PROFIT_ALLOCATED) if row.read_at is None]) == 1
+    _set_person_allocations(seeded_db, order, [{"user_id": replacement_id, "role": "OWNER", "allocation_rate": "0"},
+                                               {"user_id": None, "role": "OWNER", "allocation_rate": "100"}])
+    assert all(row.read_at is not None for row in _notifs(seeded_db, replacement_id, triggers.PROFIT_ALLOCATED))
 
 def test_company_allocation_is_not_notified(seeded_db):
     """公司归属（user_id 为空）不通知，只通知绑定的利润接收人。"""
     recipient_id = _uid(seeded_db, "seeduser2")
+    zero_share_id = _uid(seeded_db, "seeduser3")
     order = _order(seeded_db, "p3")
     _buy(seeded_db, order)
     _sell(seeded_db, order, operator_ids=[_uid(seeded_db, "seeduser1")])
@@ -290,6 +294,7 @@ def test_company_allocation_is_not_notified(seeded_db):
         order,
         [
             {"user_id": recipient_id, "role": "OWNER", "allocation_rate": "70"},
+            {"user_id": zero_share_id, "role": "OWNER", "allocation_rate": "0"},
             {"user_id": None, "role": "OWNER", "allocation_rate": "30"},
         ],
     )
@@ -302,6 +307,12 @@ def test_company_allocation_is_not_notified(seeded_db):
     )
     assert len(allocated) == 1
     assert allocated[0].recipient_user_id == recipient_id
+    assert not _notifs(seeded_db, zero_share_id, triggers.PROFIT_ALLOCATED)
+    loss_order = _order(seeded_db, "p3loss")
+    post_event(seeded_db, loss_order.id, event_type="BUY", amount="1000", occurred_on=TODAY, actor="pytest")
+    _sell(seeded_db, loss_order, operator_ids=[_uid(seeded_db, "seeduser1")])
+    _set_person_allocations(seeded_db, loss_order, [{"user_id": zero_share_id, "role": "OWNER", "allocation_amount": "-100"}])
+    assert len(_notifs(seeded_db, zero_share_id, triggers.PROFIT_ALLOCATED)) == 1
 
 def test_sell_api_creates_notification_visible_in_seller_inbox(seeded_client, seeded_db):
     """端到端：SELL 端点登记后，售出人工作台未读通知能查到「分润」提醒。"""

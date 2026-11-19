@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -331,6 +331,31 @@ it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单"
       expect.objectContaining({ confirm_repurchase: true }),
     );
   });
+
+it.each(["HS", "TH", "DG"])("%s 建单等待时显示进度且重复提交只发一次", async (orderType) => {
+    let finish!: (value: never) => void;
+    const pending = new Promise<never>((resolve) => { finish = resolve; });
+    vi.mocked(ordersApi.create).mockReturnValueOnce(pending);
+    const { container } = await openTypedModal(orderType);
+    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await ui.type(screen.getByLabelText("游戏账号"), `account-${orderType}`);
+    await ui.type(screen.getByLabelText("账号密码"), "secret");
+    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    if (orderType === "TH") await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
+    if (orderType !== "TH") await ui.type(screen.getByLabelText("客户昵称"), "客户甲");
+    if (orderType !== "DG") {
+      await ui.type(screen.getAllByPlaceholderText("请输入金额")[0], "1000");
+      await pickMainPool();
+    }
+    const form = container.querySelector("form")!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(ordersApi.create).toHaveBeenCalledTimes(1));
+    fireEvent.submit(form);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(ordersApi.create).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /创建中/ })).toBeInTheDocument();
+    await act(async () => { finish({ id: 31 } as never); await pending; });
+});
 
 it("订单已创建后不等待列表刷新，提交按钮立即结束 loading", async () => {
     resolveMockOnce(vi.mocked(ordersApi.create), { id: 31, order_no: "TH-2026-0031", status: "ACTIVE" });

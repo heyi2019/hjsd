@@ -54,6 +54,7 @@ export function CreateBusinessModal(props: {
     setLoadError,
   } = useCreateBusinessLookups();
   const [submitting, setSubmitting] = useState(false);
+  const submitInFlight = useRef(false);
   const [form] = Form.useForm();
   const repurchaseConfirmedFor = useRef<string | null>(null);
   const submitErrorVisible = useRef(false);
@@ -94,6 +95,8 @@ export function CreateBusinessModal(props: {
   }, [form, gameTypes, isRecovery, isTh, orderType, props.open]);
 
   const submit = async (values: Record<string, unknown>) => {
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
     setSubmitting(true);
     try {
       const gameAccount = String(values.game_account ?? "").trim();
@@ -142,6 +145,7 @@ export function CreateBusinessModal(props: {
       submitErrorVisible.current = true;
       setLoadError(normalized);
     } finally {
+      submitInFlight.current = false;
       setSubmitting(false);
     }
   };
@@ -169,8 +173,8 @@ export function CreateBusinessModal(props: {
         }
       }}
       footer={(
-        <PermissionButton permission="order.create" type="primary" htmlType="submit" form={formId} loading={submitting}>
-          创建订单
+        <PermissionButton permission="order.create" type="primary" htmlType="submit" form={formId} loading={submitting} disabled={submitting}>
+          {submitting ? "创建中…" : "创建订单"}
         </PermissionButton>
       )}
       width={1200}

@@ -125,6 +125,20 @@ beforeEach(() => {
 });
 
 describe("InstallmentsPanel：分期合约", () => {
+  it("显示逾期入口筛选并可切回全部合约", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(installmentsApi.exportCsv).mockResolvedValue(new Blob(["csv"]));
+    renderLight(<InstallmentsPanel initialStatus="OVERDUE" />, { user: "admin" });
+    await waitFor(() => expect(installmentsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: "OVERDUE" })));
+    expect(screen.getByText("合约状态：逾期")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "查看全部合约" }));
+    await waitFor(() => expect(installmentsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: undefined })));
+    expect(installmentsApi.totals).toHaveBeenLastCalledWith(expect.objectContaining({ status: undefined }));
+    expect(screen.queryByText("合约状态：逾期")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "导出分期与回款数据" }));
+    expect(installmentsApi.exportCsv).toHaveBeenLastCalledWith(expect.objectContaining({ status: undefined }));
+  });
+
   it("导出使用当前合约类型、状态和日期筛选", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(installmentsApi.exportCsv).mockResolvedValue(new Blob(["csv"]));

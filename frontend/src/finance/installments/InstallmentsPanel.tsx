@@ -1,11 +1,11 @@
 /** 分期：按业务合约类型分列，展示库存分期出售的收款、交付和风险处理。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
 import { Button, Card, DatePicker, Segmented, Space, Typography } from "antd";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Dayjs } from "dayjs";
 import { installmentsApi } from "../../shared/api/installments.api";
 import type { Installment, Schedule } from "../../shared/api/types/installments";
-import { today } from "../../shared/lib/format";
+import { INSTALLMENT_STATUS_LABEL, today } from "../../shared/lib/format";
 import { configurableLabel } from "../../shared/lib/optionSets";
 import { DataTable, ErrorBanner, PermissionButton, Select, StatRow } from "../../shared/ui";
 
@@ -24,10 +24,12 @@ function ContractTable({
   initialStatus?: string;
 }) {
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const [status, setStatus] = useState(initialStatus);
+  useEffect(() => { setStatus(initialStatus); }, [initialStatus]);
   const controller = useContractTableController({
     contractType,
     reloadKey,
-    status: initialStatus,
+    status,
     dateRange: dateRange ? [dateRange[0].format("YYYY-MM-DD"), dateRange[1].format("YYYY-MM-DD")] : null,
   });
   const {
@@ -101,7 +103,13 @@ function ContractTable({
       <Card
         className="glass"
         extra={
-          <Space size={8}>
+          <Space size={8} wrap>
+            {status ? <Space size={4}>
+              <Typography.Text>合约状态：{configurableLabel("INSTALLMENT_STATUS", status, INSTALLMENT_STATUS_LABEL)}</Typography.Text>
+              <Typography.Link role="button" tabIndex={0} onClick={() => setStatus(undefined)} onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setStatus(undefined); }
+              }}>查看全部合约</Typography.Link>
+            </Space> : null}
             <DatePicker.RangePicker
               aria-label="分期日期区间"
               placeholder={["开始日期", "结束日期"]}

@@ -306,6 +306,23 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(screen.getByText(/流水读取失败/)).toBeInTheDocument();
   });
 
+  it("切换科目请求失败时隐藏旧流水，重试后显示当前结果", async () => {
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("CF-001");
+    vi.mocked(studioExpensesApi.summary).mockRejectedValueOnce(new Error("筛选读取失败"));
+    await ui.click(screen.getByRole("combobox", { name: "工作室收支科目" }));
+    await ui.click(await screen.findByText("日用", { selector: ".ant-select-item-option-content" }));
+    expect(await screen.findByText(/筛选读取失败/)).toBeVisible();
+    expect(screen.queryByText("CF-001")).toBeNull();
+    expect(screen.queryByRole("button", { name: "编辑" })).toBeNull();
+    expect(screen.getByText("工作室收支数据不可用，请点击重新加载")).toBeInTheDocument();
+    vi.mocked(studioExpensesApi.summary).mockResolvedValueOnce(studioExpenseSummary([expenseFlows[1]] as never));
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(await screen.findByText("CF-002")).toBeInTheDocument();
+    expect(screen.queryByText("CF-001")).toBeNull();
+    expect(vi.mocked(studioExpensesApi.summary)).toHaveBeenLastCalledWith(expect.objectContaining({ category: "日用" }));
+  });
+
   it("登记收入：IN / SELF_REVENUE，同样自动入账", async () => {
     mockOptionSets();
     resolveMockOnce(vi.mocked(cashflowsApi.create), { id: 62 });

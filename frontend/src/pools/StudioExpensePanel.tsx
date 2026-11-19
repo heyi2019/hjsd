@@ -348,12 +348,12 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
         </div>
         <DataTable<Cashflow>
           columns={columns}
-          rows={flows}
+          rows={error ? [] : flows}
           page={page}
           pageSize={pageSize}
           total={flowCount}
           controlledPaging
-          emptyText="暂无工作室收支"
+          emptyText={error ? "工作室收支数据不可用，请点击重新加载" : "暂无工作室收支"}
           loading={loading}
           pagination={error ? false : undefined}
           onPageChange={(nextPage, nextPageSize) => setPaging({ filterKey, page: nextPageSize === pageSize ? nextPage : 1, pageSize: nextPageSize })}

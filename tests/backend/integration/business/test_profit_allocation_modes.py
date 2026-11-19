@@ -148,6 +148,20 @@ def test_action_amount_rows_keep_configured_company_share(seeded_db):
     company = next(row for row in rows if row["allocation_type"] == "COMPANY")
     assert company["allocation_rate"] == "0.00"
     assert company["allocation_amount"] == "200.00"
+    for negative_amount in ("-100", "-600"):
+        with pytest.raises(Validation):
+            policy_allocations.set_allocations(seeded_db, order_id, items=[
+                {"allocation_type": "BUY", "user_id": 1, "role": "BUYER", "allocation_amount": "600"},
+                {"allocation_type": "SELL", "user_id": 1, "role": "SALES", "allocation_amount": negative_amount},
+                {"allocation_type": "OPERATION", "user_id": 1, "role": "SERVICE", "allocation_amount": "0"},
+                {"allocation_type": "COMPANY", "role": "OWNER", "allocation_rate": "100" if negative_amount == "-600" else "0"},
+            ])
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(seeded_db, order_id, items=[
+            {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_amount": "600"},
+            {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_amount": "-100"},
+            {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_amount": "0"},
+        ])
 
 
 def test_person_mode_allows_same_user_in_two_roles(seeded_db):
@@ -245,6 +259,13 @@ def test_person_mode_amount_cannot_exceed_order_profit(seeded_db):
             order_id,
             items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "600"}],
         )
+    for negative_amount in ("-100", "-600"):
+        with pytest.raises(Validation):
+            policy_allocations.set_allocations(seeded_db, order_id, items=[
+                {"user_id": 1, "role": "OWNER", "allocation_amount": "600"},
+                {"user_id": 2, "role": "OWNER", "allocation_amount": negative_amount},
+                {"user_id": None, "role": "OWNER", "allocation_rate": "100" if negative_amount == "-600" else "0"},
+            ])
 
 
 def test_person_mode_amount_requires_positive_profit(seeded_db):
@@ -363,6 +384,13 @@ def test_person_mode_rejects_positive_amount_on_loss_order(seeded_db):
             order_id,
             items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "300"}],
         )
+    for positive_amount in ("100", "600"):
+        with pytest.raises(Validation):
+            policy_allocations.set_allocations(seeded_db, order_id, items=[
+                {"user_id": 1, "role": "OWNER", "allocation_amount": "-600"},
+                {"user_id": 2, "role": "OWNER", "allocation_amount": positive_amount},
+                {"user_id": None, "role": "OWNER", "allocation_rate": "100" if positive_amount == "600" else "0"},
+            ])
 
 
 def test_person_mode_rejects_over_shared_loss(seeded_db):

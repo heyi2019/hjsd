@@ -20,6 +20,12 @@ DEFAULT_PROFIT_COMPANY_RATE = Decimal("40")
 DEFAULT_LOSS_COMPANY_RATE = Decimal("50")
 
 
+def validate_amount_directions(amounts: list[Decimal], profit: Decimal) -> None:
+    """每笔金额均须与订单盈亏方向一致，禁止正负互抵掩盖超额分配。"""
+    if any((profit > 0 and amount < 0) or (profit < 0 and amount > 0) or (profit == 0 and amount != 0) for amount in amounts):
+        raise Validation("每笔分润金额方向必须与订单利润一致")
+
+
 def company_rate_for_order(order: Order, order_profit: Decimal) -> Decimal:
     """公司分润比例：盈利/亏损使用默认配置（规则域已下线，原快照全为空转）。"""
     raw = DEFAULT_LOSS_COMPANY_RATE if order_profit < 0 else DEFAULT_PROFIT_COMPANY_RATE

@@ -15,6 +15,7 @@ from app.domain.trade import Order, OrderProfitAllocation
 from app.domain.users import User
 
 from .listing import collect_allocations
+from .terms import validate_amount_directions
 
 
 def set_person_allocations(
@@ -76,10 +77,12 @@ def set_person_allocations(
             details={"field": "items.user_id", "missing": missing_user_ids},
         )
 
-    if total_amount != 0:
+    amounts = [to_money(item.get("allocation_amount") or 0) for item in items]
+    if any(amount != 0 for amount in amounts):
         from app.shared.order_amounts import order_amounts
 
         profit = order_amounts(session, order.id)["PROFIT"]
+        validate_amount_directions(amounts, profit)
         # 金额方向必须与订单盈亏一致：盈利单填正数、亏损单填负数（负数=该人分担的亏损额）。
         # 方向反了等于把亏损记成收益，故直接拒绝而不是取绝对值。
         if profit > 0 and total_amount < 0:

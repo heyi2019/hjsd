@@ -9,6 +9,7 @@ from typing import Any
 
 from app.core.errors import Validation
 from app.core.money import to_money
+from .terms import validate_amount_directions
 
 ACTION_TYPES = {"BUY", "SELL", "OPERATION", "COMPANY"}
 
@@ -97,6 +98,7 @@ def expand_action_form_rows(
             raise Validation("运营收益必须绑定人员")
         parsed[kind] = {"row": row, "rate": rate, "amount": amount, "people": people}
 
+    validate_amount_directions([item["amount"] for item in parsed.values()], order_profit)
     if has_rate_only and has_amount_only:
         raise Validation("同一单的四项要么都按比例、要么都按金额，不能混填")
     use_rate = abs(rate_total - Decimal("100")) <= Decimal("0.001") or amount_total == 0

@@ -16,6 +16,7 @@ from app.domain.users import User
 
 from .action_rows import ACTION_TYPES
 from .listing import collect_allocations
+from .terms import validate_amount_directions
 
 
 def _resolve_action_actor_ids(
@@ -198,7 +199,8 @@ def set_action_allocations(
             details={"field": "items.user_id", "missing": missing_user_ids},
         )
 
-    if total_amount == 0:
+    amounts = [to_money(item.get("allocation_amount") or 0) for item in normalized_items]
+    if not any(amount != 0 for amount in amounts):
         if total != Decimal("100.00"):
             raise Validation(
                 "有效分配比例合计必须为 100%",
@@ -208,6 +210,7 @@ def set_action_allocations(
         from app.shared.order_amounts import order_amounts
 
         profit = to_money(order_amounts(session, order.id)["PROFIT"])
+        validate_amount_directions(amounts, profit)
         if total != 0:
             raise Validation("按金额分润时比例必须为 0")
         if (profit > 0 and total_amount < 0) or (profit < 0 and total_amount > 0):

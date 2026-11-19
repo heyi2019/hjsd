@@ -132,7 +132,7 @@ export function InventoryCancellationDialog<T extends InventoryCancellationValue
             </CfgItem>
             {props.employees ? <ResponsibleEmployeeSelect name="operator_user_ids" label={operatorLabel} employees={props.employees} className="order-cancel-employee" /> : null}
           </AdaptiveFormGrid>
-          <CfgItem alwaysActive name="reason" label="取消原因" fixedLabel="取消原因" rules={[{ required: true, message: "请填写取消原因" }]}>
+          <CfgItem alwaysActive name="reason" label="取消原因" fixedLabel="取消原因" rules={[{ required: true, whitespace: true, message: "请填写取消原因" }]}>
             <Input.TextArea aria-label="取消原因" rows={3} placeholder="请输入取消原因" />
           </CfgItem>
           <CustomFieldSection testIdSuffix={props.scope === "INVOID" ? "inv-void" : props.scope === "INVREFUND" ? "inv-refund" : "order-cancel"} />

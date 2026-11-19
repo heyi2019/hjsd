@@ -237,6 +237,11 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await ui.type(amount, "80");
     await ui.click(account.closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
     await ui.click(await screen.findByText("利润池", { selector: ".ant-select-item-option-content" }));
+    await ui.type(within(modal).getByLabelText("取消原因"), "   ");
+    await ui.click(within(modal).getByRole("button", { name: /确认下架/ }));
+    expect(await within(modal).findByText("请填写取消原因")).toBeInTheDocument();
+    expect(ordersApi.inventoryOffsale).not.toHaveBeenCalled();
+    await ui.clear(within(modal).getByLabelText("取消原因"));
     await ui.type(within(modal).getByLabelText("取消原因"), "取消");
     await ui.click(within(modal).getByRole("button", { name: /确认下架/ }));
 
@@ -326,6 +331,19 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await ui.type(screen.getByLabelText("下架原因"), "平台停售");
     await ui.click(screen.getByRole("button", { name: "确认下架" }));
     await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(88, expect.objectContaining({ reason: "平台停售" })));
+  });
+
+  it("平台下架原因不能只填写空格", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(consignmentDetail);
+    await openPanel([consignmentRow]);
+    await clickOperation(rowOf(1), "下架");
+    const modal = await screen.findByRole("dialog");
+    await ui.click(modal.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(await screen.findByText(/千寻（上架于/, { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("下架原因"), "   ");
+    await ui.click(screen.getByRole("button", { name: "确认下架" }));
+    expect(await screen.findByText("请填写下架原因")).toBeInTheDocument();
+    expect(ordersApi.postEvent).not.toHaveBeenCalled();
   });
 
   it("代挂没有外部上架记录时仍可出库来源订单", async () => {

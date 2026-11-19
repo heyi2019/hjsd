@@ -63,22 +63,27 @@ def convert_action_allocation(
     value: Decimal,
     user: CurrentUser | None = None,
 ) -> Decimal | None:
-    """Convert a grouped action share using the server's canonical order profit."""
+    """Convert a grouped action share using the server's canonical order profit.
+
+    比例分母与落库/对账统一为**订单总利润**：四项（买号/售出/运营/公司）合计
+    100%、公司占其中 40%/50%，故每一项的 rate 本就是相对总利润的百分比。
+    换算若改用「可分配利润（扣公司后）」做基数，同一比例会算出偏小的金额
+    （如利润 1000、公司 40%、BUY 20% → 换算 120 但对账 200），前端展示与
+    实际应付对不上，故此处必须用 order_profit_of 的原值。
+    """
     order = _scoped_order(session, order_id, user)
     order_profit = order_profit_of(session, order)
-    company_rate = company_rate_for_order(order, order_profit)
-    profit = allocatable_profit_for(order_profit, company_rate)
     input_value = to_money(value)
     if direction == "RATE_TO_AMOUNT":
         if input_value < 0 or input_value > 100:
             raise Validation("分润比例必须在 0% 到 100% 之间")
-        return (profit * input_value / Decimal("100")).quantize(
+        return (order_profit * input_value / Decimal("100")).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
     if direction == "AMOUNT_TO_RATE":
-        if profit == 0:
+        if order_profit == 0:
             return None
-        return (input_value * Decimal("100") / profit).quantize(
+        return (input_value * Decimal("100") / order_profit).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
     raise Validation("不支持的分润换算方向")

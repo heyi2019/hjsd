@@ -11,7 +11,7 @@ import {
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { profitAllocationApi } from "../../shared/api/profitAllocation.api";
-import { moneyRules, percentRules } from "../../shared/lib/validators";
+import { moneyRules } from "../../shared/lib/validators";
 import { EmployeeSelectControl } from "../ResponsibleEmployeeSelect";
 import type { OrdersPageController } from "./useOrdersPageController";
 import {
@@ -136,14 +136,11 @@ function AllocationFields({
                 <Form.Item
                   name={[field.name, "allocation_rate"]}
                   label="比例"
-                  rules={percentRules("比例")}
                 >
                   <Input
                     suffix="%"
-                    inputMode="decimal"
+                    readOnly
                     className="ui-control-width-120"
-                    onChange={() => invalidateConversion(field.name)}
-                    onBlur={(event) => convertValue(field.name, "RATE_TO_AMOUNT", event.target.value, "allocation_amount")}
                   />
                 </Form.Item>
                 <Form.Item
@@ -207,12 +204,17 @@ export function AllocationModal({ controller }: { controller: AllocationControll
           .filter((item) => item.allocation_type === "OPERATION")
           .flatMap((item) => item.employee_ids ?? []))],
       };
+      // 前端只 submit 金额：比例框已改为只读展示（由金额经 convert 反算），
+      // 不再是输入口径。落库与对账都走金额，避免「展示比例」与「存库比例」两套口径并存。
+      // 公司行金额留空，由后端按公司固定比例自动补金额参与合计校验。
       const payloadRows = rows.map((item) => ({
         allocation_type: item.allocation_type,
         employee_ids: item.employee_ids ?? [],
         role: item.role ?? "OWNER",
-        allocation_rate: item.allocation_rate?.trim() ? item.allocation_rate : null,
-        allocation_amount: item.allocation_amount?.trim() ? item.allocation_amount : null,
+        allocation_rate: null,
+        allocation_amount: item.allocation_type === "COMPANY"
+          ? null
+          : (item.allocation_amount?.trim() ? item.allocation_amount : null),
       }));
       await profitAllocationApi.set(actionOrder.id, payloadRows, sourceFormExtra);
       appMessage.success("分润已保存");
@@ -258,7 +260,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
           )}
         />
         <Typography.Paragraph type="secondary">
-          按操作分配：买号、售出、运营三项可多选人员，公司比例按固定口径自动计入。每项只填写一次比例或金额，确认后由系统在该项人员中平分，并同步更新来源处操作人。
+          按操作分配：买号、售出、运营三项可多选人员，公司份额由系统按固定口径自动计入。只需填写金额，比例按占总利润自动换算供参考；确认后由系统在该项人员中平分，并同步更新来源处操作人。
         </Typography.Paragraph>
         <AllocationFields
           allocationCandidates={allocationCandidates}

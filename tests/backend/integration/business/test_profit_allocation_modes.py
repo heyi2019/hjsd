@@ -25,7 +25,7 @@ from app.domain.trade import Order
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.profit_allocation import service as policy_allocations
-from app.profit_allocation.terms import allocation_terms
+from app.profit_allocation.terms import allocation_terms, convert_action_allocation
 from app.reporting.r3_commission import r3_commission_reconciliation
 
 D = date(2026, 10, 17)
@@ -77,6 +77,36 @@ def test_allocation_terms_use_profit_and_loss_company_rates(seeded_db):
     loss_terms = allocation_terms(seeded_db, loss_order_id)
     assert loss_terms["company_rate"] == Decimal("50.00")
     assert loss_terms["allocatable_profit"] == Decimal("-250.00")
+
+
+def test_convert_uses_total_profit_base_not_allocatable(seeded_db):
+    """换算比例↔金额的基数必须是对账口径的总利润，不是扣公司后的可分配利润。
+
+    回归锁：利润 500、公司 40%，BUY 20% 应为 100（总利润×20%），
+    而不是 60（可分配利润 300×20%）。两者差额正是公司那 40% 份额。
+    """
+    order_id = _order_with_profit(seeded_db)  # 利润 500
+    # 比例→金额：20% × 500 = 100（若误用可分配利润 300 会得到 60）
+    assert convert_action_allocation(
+        seeded_db, order_id, direction="RATE_TO_AMOUNT", value=Decimal("20")
+    ) == Decimal("100.00")
+    # 金额→比例：100 / 500 = 20%（若误用可分配利润 300 会得到 33.33）
+    assert convert_action_allocation(
+        seeded_db, order_id, direction="AMOUNT_TO_RATE", value=Decimal("100")
+    ) == Decimal("20.00")
+
+
+def test_convert_on_loss_order_keeps_negative_direction(seeded_db):
+    """亏损单换算同样以总利润为基数，方向随利润为负。"""
+    order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")  # 利润 -500
+    # 亏损单 20% × -500 = -100
+    assert convert_action_allocation(
+        seeded_db, order_id, direction="RATE_TO_AMOUNT", value=Decimal("20")
+    ) == Decimal("-100.00")
+    # 反向：-100 / -500 = 20%
+    assert convert_action_allocation(
+        seeded_db, order_id, direction="AMOUNT_TO_RATE", value=Decimal("-100")
+    ) == Decimal("20.00")
 
 
 def test_action_rows_can_omit_company_when_company_rate_is_configured(seeded_db):

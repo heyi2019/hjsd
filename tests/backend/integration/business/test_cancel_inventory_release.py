@@ -14,6 +14,7 @@ from sqlalchemy import select
 from app.core.errors import Validation
 from app.domain.enums import AccountStatus
 from app.domain.trade import Account
+from app.domain.notifications import Notification
 from app.domain.users import User
 from app.business.cancellation_model import cancel_order
 from app.business.create import create_order
@@ -159,6 +160,8 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
     response = seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json={"event_type": "CANCEL", "amount": "150", "occurred_on": "2026-11-01", "offset_event_id": sell.id, "pool_id": sell.pool_id, "reason": "取消售出", "finalize_sale_cancel": True})
     assert response.status_code == 201, response.text
     seeded_db.flush()
+    pending = seeded_db.scalar(select(Notification).where(Notification.recipient_user_id == previous_operator.id, Notification.notification_type == "PROFIT_PENDING", Notification.entity_id == order.order_no))
+    assert pending.read_at is not None
     assert seeded_db.get(Account, order.account_id).status == "WAITING"
     assert order.status == "ACTIVE"
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == -50
@@ -188,3 +191,5 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
     assert order.status == "COMPLETED"
     assert (account.status, account.inventory_status) == ("SOLD", "OUT_OF_STOCK")
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == 120
+    current_pending = seeded_db.scalar(select(Notification).where(Notification.recipient_user_id == operator.id, Notification.notification_type == "PROFIT_PENDING", Notification.entity_id == order.order_no))
+    assert current_pending.read_at is None

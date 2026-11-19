@@ -176,6 +176,14 @@ def test_sell_completed_notifies_seller_to_allocate(seeded_db):
     assert rows[0].entity_type == "order"
     assert rows[0].entity_id == order.order_no
     assert not _notifs(seeded_db, seller_id, triggers.PROFIT_ALLOCATED)
+    sell_event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
+    post_event(seeded_db, order.id, event_type="CANCEL", amount="800", occurred_on=TODAY2,
+               actor="pytest", offset_event_id=sell_event.id, reason="取消售出")
+    assert rows[0].read_at is not None
+    other_id = _uid(seeded_db, "seeduser2")
+    _sell(seeded_db, order, operator_ids=[other_id])
+    assert len([row for row in _notifs(seeded_db, seller_id, triggers.PROFIT_PENDING) if row.read_at is None]) == 0
+    assert len([row for row in _notifs(seeded_db, other_id, triggers.PROFIT_PENDING) if row.read_at is None]) == 1
 
 def test_sell_pending_notification_is_idempotent(seeded_db):
     """同一售出人同一订单重复触发也只提醒一次。"""

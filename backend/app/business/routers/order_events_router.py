@@ -195,6 +195,9 @@ def post_event(
         order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL_SELL", entity="订单")
         account.status = transition(ACCOUNT_TRANSITIONS, account.status, "CANCEL_SELL", entity="账号")
         order.updated_by = account.updated_by = _actor(user)
+        from app.dashboard.notifications.triggers import close_pending_profit_for_order
+
+        close_pending_profit_for_order(db, order, actor=_actor(user))
         record_audit(db, action="ORDER_CANCEL", entity_type="sale_cancel", entity_id=order.order_no,
             actor=_actor(user), before=before, after={"order_status": order.status, "account_status": account.status}, reason=payload.reason)
     # 刚提交的事件要能立刻显示「还能冲多少」：把同订单事件一并取出算余额。

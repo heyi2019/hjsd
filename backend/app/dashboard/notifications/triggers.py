@@ -28,6 +28,19 @@ def _valid_user_ids(session: Session, candidates: set[int]) -> set[int]:
     return set(session.scalars(select(User.id).where(User.id.in_(candidates))).all())
 
 
+def close_pending_profit_for_order(session: Session, order: Order, *, actor: str) -> None:
+    """售出取消后关闭该订单所有尚未处理的分润待办。"""
+    notifications = session.scalars(select(Notification).where(
+        Notification.notification_type == PROFIT_PENDING,
+        Notification.entity_type == "order",
+        Notification.entity_id == order.order_no,
+        Notification.read_at.is_(None),
+    )).all()
+    for notification in notifications:
+        notification.read_at = now_second()
+        notification.updated_by = actor
+
+
 def notify_seller_to_allocate(
     session: Session, order: Order, event: OrderEvent, *, actor: str, new_sale: bool = False
 ) -> int:

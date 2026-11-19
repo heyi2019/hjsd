@@ -15,6 +15,9 @@ import io
 from datetime import date
 from decimal import Decimal
 from uuid import uuid4
+from sqlalchemy import select
+
+from app.domain.foundation import Pool
 
 TODAY = date(2026, 10, 4)
 
@@ -143,6 +146,15 @@ def test_export_accepts_keyword_instead_of_leaking_query_object(seeded_client, h
     )
     assert miss.status_code == 200, miss.text
     assert created["flow_no"] not in miss.text
+
+
+def test_cashflow_export_includes_fund_account_name(seeded_client, seeded_db, headers):
+    created = _create(seeded_client, headers, direction="OUT", amount="20", note="资金账户导出")
+    pool = seeded_db.scalar(select(Pool).where(Pool.id == 1))
+    response = seeded_client.get("/api/v1/cashflows/export.csv", headers=headers, params={"keyword": created["flow_no"]})
+    assert response.status_code == 200, response.text
+    rows = list(csv.reader(io.StringIO(response.text.lstrip("\ufeff"))))
+    assert rows[1][rows[0].index("资金账户")] == pool.name
 
 
 def test_export_has_no_row_cap_and_respects_date_range(seeded_client, headers, monkeypatch):

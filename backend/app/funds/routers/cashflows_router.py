@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
@@ -22,6 +23,7 @@ from app.settings.auth.session import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
+from app.domain.foundation import Pool
 from app.funds import schemas
 from app.funds.cashflow_queries import (
     cashflow_totals,
@@ -217,6 +219,13 @@ def export_cashflows_csv(
                 limit=CASHFLOW_EXPORT_BATCH_SIZE, offset=offset, db=db, user=user,
             )
             rows = [item.model_dump() for item in result.items]
+            pool_ids = {row["pool_id"] for row in rows}
+            pool_names = (
+                dict(db.execute(select(Pool.id, Pool.name).where(Pool.id.in_(pool_ids))).all())
+                if pool_ids else {}
+            )
+            for row in rows:
+                row["pool_name"] = pool_names.get(row["pool_id"], f"账户 {row['pool_id']}")
             csv_text, meta = build_list_csv(
                 db, "CASHFLOW", rows, include_header=offset == 0, enforce_row_limit=False,
             )

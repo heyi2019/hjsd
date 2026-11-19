@@ -160,6 +160,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         label="资金流水",
         columns=(
             ListColumn("ledger_type", "账簿"),
+            ListColumn("pool_name", "资金账户"),
             ListColumn("order_no", "订单号"),
             ListColumn("flow_no", "流水号"),
             ListColumn("occurred_on", "日期"),

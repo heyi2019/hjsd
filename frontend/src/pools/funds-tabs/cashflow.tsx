@@ -52,6 +52,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
   ];
   const cashflowColumns: ColumnsType<Cashflow> = [
     { title: "账簿", dataIndex: "ledger_type", render: (v: string) => LEDGER_TYPE_LABEL[v] ?? v },
+    { title: "资金账户", key: "pool_name", render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? `账户 ${row.pool_id}` },
     { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
     { title: "流水号", dataIndex: "flow_no" },
     { title: "日期", dataIndex: "occurred_on" },

@@ -353,6 +353,14 @@ describe("FundsPage：押金占用", () => {
 });
 
 describe("FundsPage：资金流水", () => {
+  it("资金明细显示每笔流水的资金账户", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    const row = (await screen.findByText("ZC00001")).closest("tr") as HTMLElement;
+    expect(screen.getByRole("columnheader", { name: "资金账户" })).toBeInTheDocument();
+    expect(within(row).getByText("经营主池")).toBeInTheDocument();
+  });
   it("资金明细按页读取全部流水，筛选变化后回到第一页", async () => {
     vi.mocked(cashflowsApi.list).mockImplementation(async (params) => {
       const row = params?.offset === 10 ? { ...cashflows[1], flow_no: "FLOW-PAGE-2" } : cashflows[0];

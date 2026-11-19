@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from datetime import date
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
@@ -16,11 +17,12 @@ from app.core.time import now_second
 from app.core.state_machine import ORDER_TRANSITIONS, transition
 from app.domain.enums import (
     AuditAction,
+    AccountStatus,
     CashflowSourceType,
     Direction,
     EventType,
 )
-from app.domain.trade import Cashflow, OrderEvent
+from app.domain.trade import Account, Cashflow, Order, OrderEvent
 from ._common import _non_negative_money, _positive_money
 from .cancellation_model import opposite_cancellation_direction as _opposite_direction
 from .events_helpers import (
@@ -96,6 +98,15 @@ def post_event(
     )
 
     order = get_order(session, order_id, user)
+    order = session.execute(
+        select(Order).where(Order.id == order.id).with_for_update().execution_options(populate_existing=True)
+    ).scalar_one()
+    if event_type == EventType.OPERATE.value and operation_type == "CONSIGNMENT" and order.account_id is not None:
+        account = session.execute(
+            select(Account).where(Account.id == order.account_id).execution_options(populate_existing=True)
+        ).scalar_one_or_none()
+        if account is not None and account.status == AccountStatus.VOID.value:
+            raise Validation("账号已出库，不能登记寄售上架")
     can_reopen_for_buy = _assert_event_context(
         session,
         order,

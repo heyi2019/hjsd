@@ -160,3 +160,8 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == -50
     resold, _ = post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("220"), occurred_on=D, actor="pytest")
     assert resold.event_type == "SELL"
+    response = seeded_client.get("/api/v1/orders", headers=headers, params={"keyword": order.order_no})
+    assert response.status_code == 200, response.text
+    item = next(item for item in response.json()["items"] if item["id"] == order.id)
+    assert Decimal(str(item["sale_amount"])) == Decimal("220")
+    assert Decimal(str(item["profit_base"])) == Decimal("170")

@@ -8,6 +8,7 @@ from app.core.like_pattern import like_contains
 from app.core.security import CurrentUser
 from app.shared.scope import owner_scope_filter
 from sqlalchemy import (
+    case,
     cast,
     exists,
     func,
@@ -15,7 +16,7 @@ from sqlalchemy import (
     select,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from app.domain.parties import Counterparty, Customer, OrderCounterpartyRole, OrderCustomerRole
 from app.domain.trade import (
     Account,
@@ -243,11 +244,22 @@ def _order_list_stmt(
             for operator_id in inventory_operator_ids
         )))
     if sale_operator_ids:
+        sale = aliased(OrderEvent)
+        latest_sale_id = (
+            select(sale.id)
+            .where(sale.order_id == Order.id, sale.event_type == "SELL", sale.is_posted.is_(True))
+            .order_by(
+                case((Order.order_type.in_(("HS", "TH")), None), else_=sale.occurred_on).desc(),
+                sale.id.desc(),
+            )
+            .limit(1)
+            .correlate(Order)
+            .scalar_subquery()
+        )
         stmt = stmt.where(exists(
             select(OrderEvent.id).where(
                 OrderEvent.order_id == Order.id,
-                OrderEvent.event_type == "SELL",
-                OrderEvent.is_posted.is_(True),
+                OrderEvent.id == latest_sale_id,
                 or_(*(
                     cast(OrderEvent.operator_user_ids, JSONB).contains([operator_id])
                     for operator_id in sale_operator_ids

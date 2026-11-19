@@ -494,6 +494,23 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(payload.find((item) => item.allocation_type === "COMPANY")).toMatchObject({ allocation_rate: null, allocation_amount: null });
   });
 
+  it("资金收支登记期间显示进度并防止重复写入", async () => {
+    vi.mocked(orderCashflowsApi.create).mockReturnValue(new Promise(() => {}));
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "资金收支");
+    const modal = await modalOf(/资金收支 · HS-2026-0001/);
+    await waitFor(() => expect(within(modal).getByRole("combobox", { name: "操作人" }).closest(".ant-select")).toHaveTextContent("李四"));
+    await ui.type(within(modal).getByLabelText("金额"), "500");
+    await ui.type(within(modal).getByLabelText("收支备注"), "客户取消");
+    const form = within(modal).getByLabelText("金额").closest("form")!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledTimes(1));
+    fireEvent.submit(form);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(orderCashflowsApi.create).toHaveBeenCalledTimes(1);
+    expect(within(modal).getByRole("button", { name: /确定/ })).toHaveClass("ant-btn-loading");
+  });
+
   it("资金收支：退款已并入普通支出，登记为 OTHER 支出明细", async () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "资金收支");

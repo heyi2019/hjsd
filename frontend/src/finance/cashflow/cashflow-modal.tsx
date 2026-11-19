@@ -1,5 +1,5 @@
 import { Form, Input, Typography } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../../business/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../../business/ResponsibleEmployeeSelect";
 import { currentDevUser, normalizeError } from "../../shared/api/client";
@@ -23,6 +23,7 @@ export function CashflowModal({
 }: CashflowModalProps) {
   const [form] = Form.useForm<CashflowFormValues>();
   const [submitting, setSubmitting] = useState(false);
+  const submitInFlight = useRef(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const open = Boolean(target);
   const { username } = useSession();
@@ -48,7 +49,8 @@ export function CashflowModal({
   }, [form, open, username, users]);
 
   const submit = async (values: CashflowFormValues) => {
-    if (!target) return;
+    if (!target || submitInFlight.current) return;
+    submitInFlight.current = true;
     setSubmitting(true);
     setError(null);
     try {
@@ -62,6 +64,7 @@ export function CashflowModal({
       setError(normalized);
       appMessage.error(normalized.message);
     } finally {
+      submitInFlight.current = false;
       setSubmitting(false);
     }
   };

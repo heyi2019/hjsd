@@ -1,6 +1,6 @@
 import { CalendarOutlined } from "@ant-design/icons";
 import { Form, InputNumber } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CfgItem, FieldConfigScope } from "../../business/ConfigurableField";
 import { currentReportPeriod } from "../../reporting/reportPeriod";
 import { optionSetsApi } from "../../shared/api/options.api";
@@ -15,6 +15,8 @@ export function BusinessPeriodSettingsPanel() {
   const [form] = Form.useForm<{ start_day: number }>();
   const startDay = Form.useWatch("start_day", form);
   const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
+  const [saving, setSaving] = useState(false);
+  const saveInFlight = useRef(false);
   const load = useCallback(async () => {
     const config = await optionSetsApi.get(BUSINESS_PERIOD_CODE);
     const start = Number(config.options?.find((item) => item.value === "start_day")?.label);
@@ -26,6 +28,9 @@ export function BusinessPeriodSettingsPanel() {
   const preview = Number.isInteger(startDay) && startDay >= 1 && startDay <= 31 ? currentReportPeriod(undefined, startDay) : null;
   useEffect(() => { if (data != null) form.setFieldsValue({ start_day: data }); }, [data, form]);
   const save = async ({ start_day }: { start_day: number }) => {
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
+    setSaving(true);
     try {
       await optionSetsApi.update(BUSINESS_PERIOD_CODE, { options: [{ value: "start_day", label: String(start_day) }] });
       announceBusinessPeriodChange(start_day);
@@ -33,6 +38,7 @@ export function BusinessPeriodSettingsPanel() {
       appMessage.success("当期设置已保存");
       await reload();
     } catch (err) { setMutationError(normalizeError(err)); }
+    finally { saveInFlight.current = false; setSaving(false); }
   };
   return <section className="business-period-settings">
     <ErrorBanner error={error} onRetry={() => { setMutationError(null); void reload(); }} retrying={loading} />
@@ -62,7 +68,7 @@ export function BusinessPeriodSettingsPanel() {
             </div>
           </div>
           <div className="business-period-settings__actions">
-            <PermissionButton permission="option-set.manage" type="primary" htmlType="submit">保存当期设置</PermissionButton>
+            <PermissionButton permission="option-set.manage" type="primary" htmlType="submit" loading={saving}>保存当期设置</PermissionButton>
           </div>
         </BusinessRegistrationForm>
       </FieldConfigScope>

@@ -1,7 +1,7 @@
 import { appMessage } from "../../../shared/ui/appFeedback";
 import { configurableLabel } from "../../../shared/lib/optionSets";
 import { Form, Input, Radio, Space, Spin, Typography } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { employeesApi } from "../../../shared/api/org.api";
 import { ordersApi } from "../../../shared/api/orders.api";
 import { rebatesApi } from "../../../shared/api/rebates.api";
@@ -40,6 +40,7 @@ export function InventoryRebateModal(props: {
   const [detail, setDetail] = useState<AccountExecutionDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const submitInFlight = useRef(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [rebates, setRebates] = useState<Rebate[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
@@ -97,7 +98,8 @@ export function InventoryRebateModal(props: {
     if (!props.account) return;
     const kind = values.rebate_type;
     const order = kind ? sourceOrder(detail, props.account.source_order_id, kind) : undefined;
-    if (!kind || !order) return;
+    if (!kind || !order || submitInFlight.current) return;
+    submitInFlight.current = true;
     setSubmitting(true);
     try {
       await rebatesApi.create({
@@ -117,6 +119,7 @@ export function InventoryRebateModal(props: {
     } catch (cause) {
       setError(normalizeError(cause));
     } finally {
+      submitInFlight.current = false;
       setSubmitting(false);
     }
   };

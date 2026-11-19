@@ -135,6 +135,21 @@ describe("BusinessReminderSettingsPanel", () => {
 });
 
 describe("BusinessPeriodSettingsPanel", () => {
+  it("保存当期设置时显示进度并阻止重复提交", async () => {
+    vi.clearAllMocks();
+    vi.mocked(optionSetsApi.get).mockResolvedValue({ options: [{ value: "start_day", label: "16" }] } as never);
+    vi.mocked(optionSetsApi.update).mockReturnValue(new Promise(() => {}));
+    renderLight(<BusinessPeriodSettingsPanel />, { user: "admin" });
+    const input = await screen.findByRole("spinbutton", { name: "每月起始日" });
+    await waitFor(() => expect(input).toHaveValue("16"));
+    const form = input.closest("form")!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(optionSetsApi.update).toHaveBeenCalledTimes(1));
+    fireEvent.submit(form);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByRole("button", { name: /保存当期设置/ })).toHaveClass("ant-btn-loading");
+    expect(optionSetsApi.update).toHaveBeenCalledTimes(1);
+  });
   it("保存每月起始日并更新统一周期", async () => {
     vi.mocked(optionSetsApi.get).mockResolvedValue({ options: [{ value: "start_day", label: "16" }] } as never);
     vi.mocked(optionSetsApi.update).mockResolvedValue(undefined as never);

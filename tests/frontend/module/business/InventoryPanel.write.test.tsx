@@ -214,6 +214,21 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
   });
 
+  it("返点登记进行中不能重复提交", async () => {
+    vi.mocked(rebatesApi.create).mockReturnValue(new Promise(() => {}));
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "返点" }));
+    await ui.type(await screen.findByLabelText("返点金额"), "350");
+    const form = screen.getByLabelText("返点金额").closest("form")!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(rebatesApi.create).toHaveBeenCalledTimes(1));
+    fireEvent.submit(form);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(rebatesApi.create).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "确认登记" })).toHaveClass("ant-btn-loading");
+  });
+
   it("返点按买入与售出订单区分类型并登记", async () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<InventoryPanel />, { user: "admin" });

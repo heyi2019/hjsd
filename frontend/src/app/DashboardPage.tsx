@@ -55,7 +55,6 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
         return;
       }
       onDashboardNavigate(`/business/ledger?allocation_order_id=${order.id}`);
-      void notificationsApi.markRead(notification.id).then(() => void loadSummary());
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }

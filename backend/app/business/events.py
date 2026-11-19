@@ -300,12 +300,11 @@ def post_event(
         order.status = transition(ORDER_TRANSITIONS, order.status, action, entity="订单")
     session.flush()
 
-    # 售出完成后提醒本次 SELL 执行人配置分润；通知通过
-    # recipient+type+entity 幂等去重，重复售出不重复打扰。
+    # 每次售出完成后提醒本次 SELL 执行人检查分润。
     if event_type == EventType.SELL.value and not installment_sale:
         from app.dashboard.notifications.triggers import notify_seller_to_allocate
 
-        notify_seller_to_allocate(session, order, event, actor=actor)
+        notify_seller_to_allocate(session, order, event, actor=actor, new_sale=True)
 
     record_audit(
         session,

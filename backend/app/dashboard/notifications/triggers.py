@@ -4,19 +4,21 @@
   ① 售出完成 → 通知本次 SELL 事件执行人「去配置分润」（PROFIT_PENDING，待办提醒）；
   ② 分润配置保存完成 → 通知利润接收人「分润已配置」（PROFIT_ALLOCATED，结果通知）。
 
-两段均复用 service.ensure_notification 的幂等口径（recipient + type + entity），
-同一人同一订单同一阶段只提醒一次。本模块只做「谁该收到什么」的映射，不承载业务事实。
+售出事件每次生成新的待办并关闭同一接收人的旧待办；其他重复触发按
+recipient + type + entity 去重。本模块只做「谁该收到什么」的映射，不承载业务事实。
 """
 from __future__ import annotations
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.time import now_second
 from app.domain.enums import OrderStatus
+from app.domain.notifications import Notification
 from app.domain.trade import Order, OrderEvent, OrderProfitAllocation
 from app.domain.users import User
 
-from .service import PROFIT_ALLOCATED, PROFIT_PENDING, ensure_notification
+from .service import PROFIT_ALLOCATED, PROFIT_PENDING, create_notification, ensure_notification
 
 
 def _valid_user_ids(session: Session, candidates: set[int]) -> set[int]:
@@ -27,7 +29,7 @@ def _valid_user_ids(session: Session, candidates: set[int]) -> set[int]:
 
 
 def notify_seller_to_allocate(
-    session: Session, order: Order, event: OrderEvent, *, actor: str
+    session: Session, order: Order, event: OrderEvent, *, actor: str, new_sale: bool = False
 ) -> int:
     """段①：售出闭环后提醒本次 SELL 执行人去配置分润，返回新建条数。
 
@@ -47,6 +49,25 @@ def notify_seller_to_allocate(
             candidates.add(int(actor_id))
     created = 0
     for uid in sorted(_valid_user_ids(session, candidates)):
+        if new_sale:
+            # 每次真实售出都是新的待办；旧提醒保留历史，但不再重复计入未读。
+            previous = session.scalars(select(Notification).where(
+                Notification.recipient_user_id == uid,
+                Notification.notification_type == PROFIT_PENDING,
+                Notification.entity_type == "order",
+                Notification.entity_id == order.order_no,
+                Notification.read_at.is_(None),
+            )).all()
+            for notification in previous:
+                notification.read_at = now_second()
+                notification.updated_by = actor
+            create_notification(
+                session, recipient_user_id=uid, notification_type=PROFIT_PENDING,
+                title="订单分润待配置", message=f"订单 {order.order_no} 已售出完成，请前往配置分润。",
+                entity_type="order", entity_id=order.order_no, actor=actor,
+            )
+            created += 1
+            continue
         _row, is_new = ensure_notification(
             session,
             recipient_user_id=uid,

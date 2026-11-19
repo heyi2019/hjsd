@@ -192,6 +192,18 @@ def test_sell_pending_notification_is_idempotent(seeded_db):
     )
     triggers.notify_seller_to_allocate(seeded_db, order, sell_event, actor="pytest")
     assert len(_notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)) == 1
+    notification = _notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)[0]
+    notification_service.mark_read(seeded_db, notification.id, recipient_user_id=seller_id, actor="pytest")
+    triggers.notify_seller_to_allocate(seeded_db, order, sell_event, actor="pytest")
+    assert notification.read_at is not None
+
+    post_event(seeded_db, order.id, event_type="CANCEL", amount="800", occurred_on=TODAY2,
+               actor="pytest", offset_event_id=sell_event.id, reason="取消售出")
+    _sell(seeded_db, order, operator_ids=[seller_id])
+    rows = _notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)
+    assert len(rows) == 2
+    assert notification.read_at is not None
+    assert sum(row.read_at is None for row in rows) == 1
 
 def test_sell_without_operator_ids_falls_back_to_actor(seeded_db):
     """事件未标操作人时，回退到 actor 对应的用户（seeduser3）。"""

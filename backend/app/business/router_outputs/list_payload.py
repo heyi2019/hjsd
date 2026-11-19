@@ -116,7 +116,12 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         income, event_cost, additional_cost = event_totals(events)
         total_cost = event_cost + additional_cost + unlinked_cost_by_order.get(order.id, ZERO)
         latest = events[0] if events else None
-        sale_event = next((event for event in events if event.event_type == "SELL"), None)
+        sale_events = [event for event in events if event.event_type == "SELL"]
+        sale_event = (
+            max(sale_events, key=lambda event: event.id)
+            if sale_events and order.order_type in {"HS", "TH"}
+            else next(iter(sale_events), None)
+        )
         party = parties.get(order.id)
         installment = installments.get(order.id)
         # 售卖时间取卖出事件的业务发生日（occurred_on），不用记录创建时刻 created_at；

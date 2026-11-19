@@ -40,10 +40,10 @@ def _sale_amount(order_type: str, events: list[OrderEvent]) -> Decimal | None:
     sell_events = [event for event in events if event.event_type == "SELL"]
     if not sell_events:
         return None
-    # 回收/提号售出取消后可再次售出；列表按业务日期和事件编号倒序传入。
-    # 展示最近一次成交金额，历史资金流水仍单独参与利润计算。
+    # 回收/提号可取消售出后重新售出；补录日期可能早于前次，按事件编号识别本次。
+    # 历史资金流水仍单独参与利润计算。
     if order_type in ("HS", "TH"):
-        return to_money(sell_events[0].amount)
+        return to_money(max(sell_events, key=lambda event: event.id).amount)
     if order_type == "DG":
         recorded = [
             to_money_or_zero((event.form_extra or {}).get("sale_amount"))

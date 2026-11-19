@@ -9,10 +9,12 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 
 from app.core.errors import Validation
 from app.domain.enums import AccountStatus
 from app.domain.trade import Account
+from app.domain.users import User
 from app.business.cancellation_model import cancel_order
 from app.business.create import create_order
 from app.business.events import post_event
@@ -158,12 +160,15 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
     assert seeded_db.get(Account, order.account_id).status == "WAITING"
     assert order.status == "ACTIVE"
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == -50
-    resold, _ = post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("220"), occurred_on=D, actor="pytest")
+    operator = seeded_db.scalar(select(User).order_by(User.id).limit(1))
+    resold, _ = post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("220"), occurred_on=date(2026, 10, 31), actor="pytest", operator_user_ids=[operator.id])
     assert resold.event_type == "SELL"
     response = seeded_client.get("/api/v1/orders", headers=headers, params={"keyword": order.order_no})
     assert response.status_code == 200, response.text
     item = next(item for item in response.json()["items"] if item["id"] == order.id)
     assert Decimal(str(item["sale_amount"])) == Decimal("220")
+    assert item["sale_at"].startswith("2026-10-31")
+    assert item["sale_operator"] == (operator.display_name or operator.username)
     assert Decimal(str(item["profit_base"])) == Decimal("170")
 
     old_refund = {"event_type": "CANCEL", "amount": "50", "occurred_on": "2026-11-01", "offset_event_id": sell.id, "pool_id": sell.pool_id, "reason": "补退首次售出余款"}

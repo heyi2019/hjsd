@@ -170,6 +170,8 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
       if (seq === loadSeqRef.current) setLoading(false);
     }
   }, [category, from, to, filterKey, page, pageSize]);
+  const loadRef = useRef(load);
+  loadRef.current = load;
 
   useEffect(() => {
     if (periodState.ready && (ctrl?.active ?? true)) void load();
@@ -202,7 +204,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
       setRegisterOpen(false);
       setEditTarget(null);
       registerForm.resetFields();
-      await Promise.all([load(), ctrl?.load()]);
+      await Promise.all([loadRef.current(), ctrl?.load()]);
     });
   };
 
@@ -210,7 +212,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
     await write.run(async () => {
       await cashflowsApi.remove(cashflowId);
       appMessage.success("工作室收支已删除");
-      await Promise.all([load(), ctrl?.load()]);
+      await Promise.all([loadRef.current(), ctrl?.load()]);
     });
   };
 

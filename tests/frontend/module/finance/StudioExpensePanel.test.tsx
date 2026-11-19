@@ -1,5 +1,5 @@
 /** StudioExpensePanel：工作室支出登记。 */
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -247,6 +247,25 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(cashflowsApi.remove).not.toHaveBeenCalled();
     await ui.click(screen.getByRole("button", { name: "确认删除" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.remove)).toHaveBeenCalledWith(51));
+  });
+
+  it("删除期间切换科目，完成后仍按最新科目刷新", async () => {
+    let finishDelete!: () => void;
+    const pending = new Promise<never>((resolve) => { finishDelete = () => resolve(undefined as never); });
+    vi.mocked(cashflowsApi.remove).mockReturnValueOnce(pending);
+    vi.mocked(studioExpensesApi.summary).mockImplementation(async (params) =>
+      studioExpenseSummary(params?.category === "日用" ? [expenseFlows[1]] as never : expenseFlows as never));
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    const row = (await screen.findByText("CF-001")).closest("tr") as HTMLElement;
+    await ui.click(within(row).getByRole("button", { name: "删除" }));
+    await ui.click(await screen.findByRole("button", { name: "确认删除" }));
+    await ui.click(screen.getByRole("combobox", { name: "工作室收支科目" }));
+    await ui.click(await screen.findByText("日用", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(studioExpensesApi.summary).toHaveBeenLastCalledWith(expect.objectContaining({ category: "日用" })));
+    await act(async () => { finishDelete(); await pending; });
+    await waitFor(() => expect(studioExpensesApi.summary).toHaveBeenLastCalledWith(expect.objectContaining({ category: "日用" })));
+    expect(await screen.findByText("CF-002")).toBeInTheDocument();
+    expect(screen.queryByText("CF-001")).toBeNull();
   });
 
   it("删除失败在列表显示原因，打开登记时不残留错误", async () => {

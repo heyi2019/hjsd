@@ -28,6 +28,8 @@ export function OrderConsignmentModal(props: {
   const [submitting, setSubmitting] = useState(false);
   const [listed, setListed] = useState<ListedPlatform[]>([]);
   const [listingReady, setListingReady] = useState(false);
+  const [listingLoading, setListingLoading] = useState(false);
+  const [listingError, setListingError] = useState<{ message: string; code?: string } | null>(null);
   const requestGeneration = useRef(0);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [sourceOrderId, setSourceOrderId] = useState<number | null>(props.orderId ?? props.account?.source_order_id ?? null);
@@ -53,17 +55,32 @@ export function OrderConsignmentModal(props: {
     setListingReady(Boolean(sourceOrder) && detail.account.status !== "VOID");
   };
 
+  const reloadListed = async (orderId: number): Promise<boolean> => {
+    const generation = ++requestGeneration.current;
+    setListingLoading(true);
+    try {
+      await refreshListed(orderId, generation);
+      if (generation === requestGeneration.current) setListingError(null);
+      return true;
+    } catch (cause) {
+      if (generation === requestGeneration.current) setListingError(normalizeError(cause));
+      return false;
+    } finally {
+      if (generation === requestGeneration.current) setListingLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!open) return;
-    const generation = ++requestGeneration.current;
     setError(null);
+    setListingError(null);
     setListed([]);
     setListingReady(false);
     setSourceOrderId(props.orderId ?? props.account?.source_order_id ?? null);
     form.setFieldsValue({ listed_at: dayjs().second(0).millisecond(0) });
     void employeesApi.list().then((items) => setEmployees(items.filter((item) => item.is_active))).catch((cause) => setError(normalizeError(cause)));
     const orderId = props.orderId ?? props.account?.source_order_id;
-    if (orderId != null) void refreshListed(orderId, generation).catch((cause) => { if (generation === requestGeneration.current) setError(normalizeError(cause)); });
+    if (orderId != null) void reloadListed(orderId);
     return () => { requestGeneration.current += 1; };
   }, [form, open, props.account, props.orderId]);
 
@@ -97,10 +114,11 @@ export function OrderConsignmentModal(props: {
       // 上架已成功；列表刷新与通知父页面并行，避免详情慢时弹窗一直停在确认状态。
       // 刷新完成前暂不可再次选平台，防止重复上架。
       setListingReady(false);
-      await Promise.all([
-        refreshListed(sourceOrderId, requestGeneration.current),
+      const [listingRefreshed] = await Promise.all([
+        reloadListed(sourceOrderId),
         Promise.resolve().then(() => props.onCreated()),
       ]);
+      if (!listingRefreshed) appMessage.warning("已上架，但上架记录刷新失败，请重新加载");
     } catch (cause) {
       setError(normalizeError(cause));
     } finally {
@@ -123,6 +141,7 @@ export function OrderConsignmentModal(props: {
       }
     >
       <ErrorBanner error={error} />
+      <ErrorBanner error={listingError} onRetry={sourceOrderId != null ? () => void reloadListed(sourceOrderId) : undefined} retrying={listingLoading} />
       <InventoryAccountSummary account={props.account} />
       <FieldConfigContext.Provider value={config}>
         <BusinessRegistrationForm

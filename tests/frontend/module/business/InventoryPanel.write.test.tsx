@@ -472,6 +472,21 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
     );
   }
 
+  it("上架记录读取失败后可在弹窗内重试", async () => {
+    vi.mocked(ordersApi.executionDetail).mockRejectedValueOnce(new Error("上架记录读取失败"));
+    vi.mocked(ordersApi.executionDetail).mockResolvedValueOnce({
+      account: { id: 1, status: "WAITING" },
+      orders: [{ order_id: 22, status: "ACTIVE", events: [] }],
+    } as never);
+    renderConsignment();
+    expect(await screen.findByText(/上架记录读取失败/)).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "寄售平台" })).toBeDisabled();
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.queryByText(/上架记录读取失败/)).not.toBeInTheDocument());
+    expect(screen.getByRole("combobox", { name: "寄售平台" })).toBeEnabled();
+    expect(ordersApi.executionDetail).toHaveBeenCalledTimes(2);
+  });
+
   it("原订单寄售事件的已上架记录展示平台名", async () => {
     vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: { id: 1, status: "IN_STOCK" },

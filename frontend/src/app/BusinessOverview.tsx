@@ -82,6 +82,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<ProfitNotificationDetail[]>([]);
   const [unavailableCount, setUnavailableCount] = useState(0);
+  const [readFailureCount, setReadFailureCount] = useState(0);
   const onReadRef = useRef(onRead);
 
   useEffect(() => {
@@ -95,6 +96,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
     setError(null);
     setDetails([]);
     setUnavailableCount(0);
+    setReadFailureCount(0);
     void notificationsApi.list({ limit: 200, unread_only: true, notification_type: "PROFIT_ALLOCATED" })
       .then(async ({ items }) => {
         const profitNotifications = items.filter((item) => item.notification_type === "PROFIT_ALLOCATED" && item.entity_type === "order");
@@ -111,7 +113,11 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
         setUnavailableCount(profitNotifications.length - available.length);
         setLoading(false);
         if (available.length) {
-          void Promise.all(available.map((item) => notificationsApi.markRead(item.notification.id))).then(() => onReadRef.current?.());
+          void Promise.allSettled(available.map((item) => notificationsApi.markRead(item.notification.id))).then((results) => {
+            const failed = results.filter((result) => result.status === "rejected").length;
+            if (!cancelled) setReadFailureCount(failed);
+            if (failed < results.length) onReadRef.current?.();
+          });
         }
       })
       .catch((reason) => {
@@ -129,6 +135,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
       {loading ? <div className="dashboard-notification-detail__loading"><Spin /></div> : null}
       {error ? <Typography.Text type="danger">{error}</Typography.Text> : null}
       {!loading && !error && unavailableCount > 0 ? <Typography.Text type="warning">{unavailableCount} 条通知暂时无法查看，已保留未读。</Typography.Text> : null}
+      {!loading && !error && readFailureCount > 0 ? <Typography.Text type="warning">{readFailureCount} 条通知未能标为已读，请稍后重试。</Typography.Text> : null}
       {!loading && !error && details.length === 0 ? <Typography.Text type="secondary">暂无可查看的分润通知</Typography.Text> : null}
       <div className="dashboard-notification-detail-list">
         {details.map(({ notification, order, execution }) => {

@@ -91,6 +91,7 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
       total: 3,
       unread_total: 3,
     });
+    vi.mocked(notificationsApi.markRead).mockRejectedValueOnce(new Error("网络不可用"));
     vi.mocked(ordersApi.listPage).mockImplementation(async (params) => {
       if (params?.keyword === "TH-ERROR") throw new Error("订单查询失败");
       return pageResponse([{
@@ -153,6 +154,7 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
     expect(screen.getByText("2026-11-17 12:30")).toBeInTheDocument();
     expect(screen.getByText(/2 条通知暂时无法查看/)).toBeInTheDocument();
     await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledWith(1));
+    expect(await screen.findByText(/1 条通知未能标为已读/)).toBeInTheDocument();
     expect(notificationsApi.markRead).not.toHaveBeenCalledWith(2);
     expect(notificationsApi.markRead).not.toHaveBeenCalledWith(3);
   });

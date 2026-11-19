@@ -21,6 +21,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 # Excel 单元格字符上限 32767；留余量后截断，超限内容单格塞不进去（openpyxl 会抛错）。
+EXCEL_SHEET_ROW_LIMIT = 1_048_576
 EXCEL_CELL_LIMIT = 32_000
 TRUNCATED_SUFFIX = "…（已截断）"
 
@@ -139,6 +140,37 @@ def _write_group_rows(
 
 
 def write_sheet(
+    workbook: Workbook,
+    *,
+    title: str,
+    rows: list[dict[str, Any]],
+    columns: list[tuple[str, str, bool]],
+    value_labels: dict[str, dict[str, str]] | None = None,
+    header_groups: dict[str, str] | None = None,
+    sub_header_groups: dict[str, str] | None = None,
+    freeze_key_column: bool = True,
+) -> Worksheet:
+    """按 Excel 的单表容量自动续表，返回首张工作表。"""
+    header_rows = 1 + bool(header_groups) + bool(header_groups and sub_header_groups)
+    capacity = EXCEL_SHEET_ROW_LIMIT - header_rows
+    if capacity <= 0:
+        raise ValueError("工作表容量不足以容纳表头")
+    first_sheet: Worksheet | None = None
+    for index, start in enumerate(range(0, max(len(rows), 1), capacity), start=1):
+        suffix = f"（{index}）" if index > 1 else ""
+        sheet_title = f"{title[:31 - len(suffix)]}{suffix}"
+        sheet = _write_single_sheet(
+            workbook, title=sheet_title, rows=rows[start:start + capacity], columns=columns,
+            value_labels=value_labels, header_groups=header_groups,
+            sub_header_groups=sub_header_groups, freeze_key_column=freeze_key_column,
+        )
+        if first_sheet is None:
+            first_sheet = sheet
+    assert first_sheet is not None
+    return first_sheet
+
+
+def _write_single_sheet(
     workbook: Workbook,
     *,
     title: str,

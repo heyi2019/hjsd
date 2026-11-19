@@ -18,7 +18,6 @@ from app.funds.attributes import (
     MANUAL_EXCLUDED_CATEGORIES,
     STUDIO_EXPENSE_ATTRIBUTE,
     STUDIO_INCOME_ATTRIBUTE,
-    accounting_attribute_for_manual_cashflow,
 )
 from app.settings.field_definitions.pools import assert_pool_usable
 from app.shared.form_field_rules import validate_form_extra
@@ -72,8 +71,8 @@ def _normalize_studio_cashflow_fields(
         uppercase=True,
         type_message="category 必须为文本",
     )
-    default_accounting_attribute = accounting_attribute_for_manual_cashflow(
-        category=label, direction=normalized_direction
+    default_accounting_attribute = (
+        STUDIO_EXPENSE_ATTRIBUTE if normalized_direction == Direction.OUT.value else STUDIO_INCOME_ATTRIBUTE
     )
     normalized_accounting_attribute = accounting_attribute or default_accounting_attribute
     if normalized_direction == Direction.OUT.value and normalized_accounting_attribute != STUDIO_EXPENSE_ATTRIBUTE:

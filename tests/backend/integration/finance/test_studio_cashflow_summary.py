@@ -65,10 +65,13 @@ def _summary(seeded_client, headers, **params) -> dict:
 def test_summary_counts_only_manual_flows(seeded_client, seeded_db, headers):
     expense = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="300")
     income = _flow(seeded_db, direction="IN", attribute="SELF_REVENUE", amount="800")
-    # 返点结算流水：category=REBATE，属于返点来源，不是手工登记的工作室收支。
-    _flow(seeded_db, direction="IN", attribute="SELF_REVENUE", amount="50", category="REBATE")
-    # 属性不配对：收入 + 运营消耗，不能进收入合计。
-    _flow(seeded_db, direction="IN", attribute="OPERATING_EXPENSE", amount="70")
+    # 模拟历史异常数据：保留对旧记录的查询隔离验证。
+    legacy_rebate = _flow(seeded_db, direction="IN", attribute="SELF_REVENUE", amount="50")
+    legacy_rebate.category = "REBATE"
+    # 历史属性不配对：收入 + 运营消耗，不能进收入合计。
+    legacy_mismatch = _flow(seeded_db, direction="IN", attribute="SELF_REVENUE", amount="70")
+    legacy_mismatch.accounting_attribute = "OPERATING_EXPENSE"
+    seeded_db.flush()
 
     payload = _summary(seeded_client, headers)
 
@@ -89,6 +92,25 @@ def test_new_flow_appears_in_items_and_summary(seeded_client, seeded_db, headers
     assert [item["flow_no"] for item in payload["items"]] == [flow.flow_no]
     assert Decimal(payload["expense"]) == Decimal("120.00")
     assert Decimal(payload["net"]) == Decimal("-120.00")
+
+
+def test_studio_create_rejects_invisible_flows_and_defaults_income_attribute(seeded_client, seeded_db, headers):
+    payload = {"pool_id": _pool(seeded_db).id, "occurred_on": TODAY.isoformat(),
+               "ledger_type": "STUDIO", "direction": "IN", "category": "货款", "amount": "100"}
+    for changes in (
+        {"accounting_attribute": "OPERATING_EXPENSE"},
+        {"direction": "OUT", "accounting_attribute": "SELF_REVENUE"},
+        {"category": "REBATE", "accounting_attribute": "SELF_REVENUE"},
+    ):
+        response = seeded_client.post("/api/v1/cashflows", headers=headers, json={**payload, **changes})
+        assert response.status_code == 422, response.text
+    assert _summary(seeded_client, headers)["count"] == 0
+    response = seeded_client.post("/api/v1/cashflows", headers=headers, json=payload)
+    assert response.status_code == 201, response.text
+    assert response.json()["accounting_attribute"] == "SELF_REVENUE"
+    summary = _summary(seeded_client, headers)
+    assert [item["flow_no"] for item in summary["items"]] == [response.json()["flow_no"]]
+    assert Decimal(summary["income"]) == Decimal("100.00")
 
 
 def test_studio_create_and_edit_use_studio_custom_field_rules(seeded_client, seeded_db, headers):

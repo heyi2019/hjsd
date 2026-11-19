@@ -28,6 +28,7 @@ from app.shared.order_access import get_order
 from app.shared.form_field_rules import validate_form_extra
 from app.shared.form_values import set_extra_values
 from app.funds._common import _positive, _text
+from app.funds.cashflow_writes.studio import _normalize_studio_cashflow_fields
 from app.shared.operation_operators import validate_optional_operator_ids as _validate_operator_user_ids
 
 
@@ -70,6 +71,7 @@ def create_cashflow(
         category=label, direction=direction,
         order_attached=order_id is not None,
     )
+    requested_accounting_attribute = accounting_attribute
     accounting_attribute = accounting_attribute or default_accounting_attribute
     if user is not None and not user.can_see_pool(pool_id):
         raise NotFound("资金账户不存在", details={"pool_id": pool_id})
@@ -106,7 +108,13 @@ def create_cashflow(
         normalized_source_type != CashflowSourceType.MANUAL.value or order_id is not None
     ):
         raise Validation("工作室运营账簿必须是无订单归属的手工流水")
-    money = _positive(amount, field="amount")
+    if normalized_ledger_type == CashflowLedgerType.STUDIO.value:
+        direction, accounting_attribute, label, money = _normalize_studio_cashflow_fields(
+            direction=direction, accounting_attribute=requested_accounting_attribute,
+            category=label, amount=amount,
+        )
+    else:
+        money = _positive(amount, field="amount")
     operator_ids = _validate_operator_user_ids(session, operator_user_ids)
     flow = Cashflow(
         flow_no=allocate_flow_no(session, direction),

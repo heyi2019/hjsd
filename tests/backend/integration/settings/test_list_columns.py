@@ -43,6 +43,13 @@ def test_list_scopes_match_registry(seeded_client, headers):
     assert ledger["columns"][0]["locked"] is False
 
 
+def test_cashflow_settings_only_offer_columns_present_on_page(seeded_client, headers):
+    columns = _scope(seeded_client, headers, "CASHFLOW")["columns"]
+    keys = {column["key"] for column in columns}
+    assert "pool_name" in keys
+    assert "actions" not in keys
+
+
 def test_save_hides_column_and_reorders(seeded_client, headers, seeded_db):
     ledger = _scope(seeded_client, headers, "LEDGER")
     columns = ledger["columns"]

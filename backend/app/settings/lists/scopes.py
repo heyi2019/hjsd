@@ -172,7 +172,6 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("source", "来源"),
             ListColumn("operator", "操作人"),
             ListColumn("note", "备注"),
-            ListColumn("actions", "操作"),
         ),
     ),
     ListScope(

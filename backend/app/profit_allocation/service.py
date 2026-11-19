@@ -1,12 +1,22 @@
-"""订单分润配置服务（BAS-06-03）——编排入口。
+"""利润分配主体服务（BAS-06-03）——分润域唯一编排入口与总调度。
 
-2026-11-18 从 718 行单文件按职责拆分：
-- 公司比例与口径换算：terms.py
-- 按动作表单行展开：action_rows.py
-- 按人分润写路径：person.py
-- 按动作分润写路径：action.py
-- 查询与按动作汇总：listing.py
-本文件只保留整单保存的编排与两种录入口径的分流。
+本模块是外部调用本域的**唯一主体服务**，对外提供三个主编排入口：
+
+- set_allocations()    写路径：整单保存、售出守卫、两种录入口径分流、
+                       form_extra 回滚与利润接收人通知
+- get_allocations_view() 读路径：明细 + 口径 + 按动作汇总的响应组装
+- convert_value()      比例↔金额换算
+
+其余模块为被本服务调动的职责单元，不对外暴露入口：
+
+- terms.py       公司比例与口径换算（含比例↔金额 convert）
+- action_rows.py 按动作表单行展开与校验（纯函数）
+- person.py      按人分润写路径
+- action.py      按动作分润写路径
+- listing.py     查询与按动作汇总（读路径）
+
+2026-11-18 从 718 行单文件按职责拆分；包级 __init__ 不再重导出符号，
+调用方直连本服务或上述真实模块。
 """
 from __future__ import annotations
 
@@ -24,8 +34,15 @@ from app.profit_allocation.schemas import ProfitAllocationItem
 from ._shared import _scoped_order
 from .action import set_action_allocations
 from .action_rows import expand_action_form_rows
+from .listing import list_allocations as _list_allocations
+from .listing import summarize_allocations_by_type
 from .person import set_person_allocations
-from .terms import company_rate_for_order, order_profit_of
+from .terms import (
+    allocation_terms,
+    company_rate_for_order,
+    convert_action_allocation,
+    order_profit_of,
+)
 
 
 def _normalize_allocation_item(value: Any) -> dict[str, Any]:
@@ -101,4 +118,37 @@ def set_allocations(
     return result
 
 
-__all__ = ["set_allocations"]
+def get_allocations_view(
+    session: Session,
+    order_id: int,
+    *,
+    user: CurrentUser | None = None,
+) -> dict[str, Any]:
+    """读路径主编排：分润明细 + 口径 + 按动作汇总，一次性组好响应数据。
+
+    HTTP 层只负责把结果映射到响应契约；查询、口径与汇总的编排都在此主体服务。
+    """
+    items = _list_allocations(session, order_id, user=user)
+    return {
+        "items": items,
+        "total": len(items),
+        "totals_by_type": summarize_allocations_by_type(items),
+        **allocation_terms(session, order_id, user=user),
+    }
+
+
+def convert_value(
+    session: Session,
+    order_id: int,
+    *,
+    direction: str,
+    value: Any,
+    user: CurrentUser | None = None,
+) -> Any:
+    """换算主编排：比例↔金额换算统一从本主体服务进出。"""
+    return convert_action_allocation(
+        session, order_id, direction=direction, value=value, user=user
+    )
+
+
+__all__ = ["set_allocations", "get_allocations_view", "convert_value"]

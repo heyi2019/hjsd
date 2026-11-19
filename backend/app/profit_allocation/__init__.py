@@ -1,10 +1,8 @@
-"""订单分润配置：配置契约与整单保存服务。
+"""订单分润配置域。
 
-真实实现按职责分模块：terms（口径）/ action_rows（表单行展开）/
-person+action（写路径）/ listing（查询汇总）；service 只做编排。
+唯一编排主体是 :mod:`app.profit_allocation.service`（整单保存与两种录入口径分流），
+其余模块为被它调动的职责单元：terms（口径换算）/ action_rows（表单行展开）/
+action + person（写路径）/ listing（查询汇总）/ schemas（契约）/ router（HTTP 接口）。
+
+本包不提供符号重导出；调用方直连上述真实模块。
 """
-
-from .listing import list_allocations
-from .service import set_allocations
-
-__all__ = ["list_allocations", "set_allocations"]

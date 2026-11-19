@@ -1,6 +1,7 @@
-"""订单分润配置接口。
+"""订单分润配置 HTTP 接口（薄壳）。
 
-接口只保存利润归属配置，不创建资金流水。
+接口只保存利润归属配置，不创建资金流水。所有业务编排收敛在主体服务
+:mod:`app.profit_allocation.service`；本模块只做鉴权、入参/响应契约映射。
 """
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import PERM_ORDER_CREATE, PERM_POLICY_MANAGE, CurrentUser
 from app.auth.session import require_permissions
-from . import listing, schemas, service, terms
+from . import schemas, service
 
 router = APIRouter(tags=["profit-allocation"])
 manage_access = require_permissions(PERM_POLICY_MANAGE)
@@ -25,15 +26,14 @@ def list_allocations(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = read_access,
 ) -> schemas.ProfitAllocationListOut:
-    items = listing.list_allocations(db, order_id, user=user)
-    terms_result = terms.allocation_terms(db, order_id, user=user)
+    view = service.get_allocations_view(db, order_id, user=user)
     return schemas.ProfitAllocationListOut(
-        items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
-        total=len(items),
-        order_profit=terms_result["order_profit"],
-        company_rate=terms_result["company_rate"],
-        allocatable_profit=terms_result["allocatable_profit"],
-        totals_by_type=listing.summarize_allocations_by_type(items),
+        items=[schemas.ProfitAllocationOut.model_validate(item) for item in view["items"]],
+        total=view["total"],
+        order_profit=view["order_profit"],
+        company_rate=view["company_rate"],
+        allocatable_profit=view["allocatable_profit"],
+        totals_by_type=view["totals_by_type"],
     )
 
 
@@ -47,7 +47,7 @@ def convert_allocation_value(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
 ) -> schemas.ProfitAllocationConvertOut:
-    converted = terms.convert_action_allocation(
+    converted = service.convert_value(
         db,
         order_id,
         direction=payload.direction,
@@ -64,7 +64,7 @@ def set_allocations(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
 ) -> schemas.ProfitAllocationListOut:
-    items = service.set_allocations(
+    service.set_allocations(
         db,
         order_id,
         items=[item.model_dump() for item in payload.items],
@@ -72,14 +72,14 @@ def set_allocations(
         form_extra=payload.form_extra,
         user=user,
     )
-    terms_result = terms.allocation_terms(db, order_id, user=user)
+    view = service.get_allocations_view(db, order_id, user=user)
     return schemas.ProfitAllocationListOut(
-        items=[schemas.ProfitAllocationOut.model_validate(item) for item in items],
-        total=len(items),
-        order_profit=terms_result["order_profit"],
-        company_rate=terms_result["company_rate"],
-        allocatable_profit=terms_result["allocatable_profit"],
-        totals_by_type=listing.summarize_allocations_by_type(items),
+        items=[schemas.ProfitAllocationOut.model_validate(item) for item in view["items"]],
+        total=view["total"],
+        order_profit=view["order_profit"],
+        company_rate=view["company_rate"],
+        allocatable_profit=view["allocatable_profit"],
+        totals_by_type=view["totals_by_type"],
     )
 
 

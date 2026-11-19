@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
 from app.core.database import get_db
+from app.core.errors import PermissionDenied
 from app.core.security import (
     PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
@@ -23,6 +24,8 @@ from app.domain.enums import AuditAction
 from app.funds.installments import schemas
 from app.funds.installments import create as inst_create
 from app.funds.installments import queries as inst_queries
+from app.funds.installments.repayments.pay import pay as inst_pay
+from app.business.events import post_event as orders_post_event
 from app.settings.lists import service as list_columns_service
 from app.settings.lists.export import build_list_csv, detail_json
 from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
@@ -157,6 +160,35 @@ def export_installments_csv(
         after={"rows": len(rows), "column_count": meta["column_count"]},
     )
     return file_response(csv_text, f"分期与回款-{date.today().isoformat()}.csv", CSV_MEDIA_TYPE)
+
+@router.post("/installments/stock-sale", response_model=schemas.InstallmentOut, status_code=201)
+def create_stock_sale(
+    payload: schemas.StockSaleIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = manage,
+) -> schemas.InstallmentOut:
+    """售出、建立合约与首付款在同一个请求事务中完成。"""
+    if not (user.has(PERM_ORDER_EVENT_POST) or user.has(PERM_FINANCE_ORDER_EVENT_POST)):
+        raise PermissionDenied("当前角色无权登记售出及分期收款")
+    orders_post_event(
+        db, payload.order_id, event_type="SELL", sale_mode="INSTALLMENT",
+        amount=payload.principal, occurred_on=payload.paid_on, actor=_actor(user),
+        portion="PROFIT", operator_user_ids=payload.operator_user_ids, note=payload.note, user=user,
+    )
+    item = inst_create.create_installment(
+        db, order_id=payload.order_id, contract_type="STOCK_SALE", principal=payload.principal,
+        down_payment=payload.down_payment, service_fee=payload.service_fee, periods=payload.periods,
+        per_period_service_fee=payload.per_period_service_fee, per_period=payload.per_period,
+        adjust_final_period=payload.adjust_final_period, first_due_on=payload.first_due_on,
+        actor=_actor(user), user=user, note=payload.note,
+        schedule=[entry.model_dump() for entry in payload.schedule] if payload.schedule else None,
+        extra_values=payload.extra_values, operator_user_ids=payload.operator_user_ids,
+    )
+    if payload.down_payment > 0:
+        inst_pay(db, item.id, amount=payload.down_payment, paid_on=payload.paid_on, period_no=0,
+                 pool_id=payload.pool_id, actor=_actor(user), operator_user_ids=payload.operator_user_ids, user=user)
+    return _installment_output(db, item)
+
 
 @router.post("/installments", response_model=schemas.InstallmentOut, status_code=201)
 def create_installment(

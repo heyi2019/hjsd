@@ -930,16 +930,13 @@ describe("库存售出三表单分支", () => {
     expect(screen.getByLabelText("第 2 期到期日")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
 
-    await waitFor(() => expect(vi.mocked(installmentsApi.create)).toHaveBeenCalledWith(expect.objectContaining({
-      order_id: 21, contract_type: "STOCK_SALE", principal: "1200", down_payment: "300",
+    await waitFor(() => expect(vi.mocked(installmentsApi.stockSale)).toHaveBeenCalledWith(expect.objectContaining({
+      order_id: 21, principal: "1200", down_payment: "300", pool_id: 3, operator_user_ids: [1],
     })));
-    await waitFor(() => expect(vi.mocked(installmentsApi.pay)).toHaveBeenCalledWith(
-      41, expect.objectContaining({ amount: "300", period_no: 0, pool_id: 3 }),
-    ));
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
-    expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
-      event_type: "SELL", sale_mode: "INSTALLMENT", amount: "1200", operator_user_ids: [1],
-    }));
+    expect(vi.mocked(ordersApi.postEvent)).not.toHaveBeenCalled();
+    expect(vi.mocked(installmentsApi.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(installmentsApi.pay)).not.toHaveBeenCalled();
   });
 
   it("库存中心不为售出单提供取消入口", async () => {

@@ -34,6 +34,8 @@ export const installmentsApi = {
       .then((r) => r.data),
   create: (payload: Partial<Installment> & { first_due_on: string; adjust_final_period?: boolean; schedule?: InstallmentScheduleInput[]; operator_user_ids?: number[] }) =>
     api.post<Installment>("/installments", payload).then((r) => r.data),
+  stockSale: (payload: Partial<Installment> & { order_id: number; first_due_on: string; paid_on: string; pool_id?: number; adjust_final_period?: boolean; schedule?: InstallmentScheduleInput[]; operator_user_ids?: number[] }) =>
+    api.post<Installment>("/installments/stock-sale", payload).then((r) => r.data),
   pay: (
     id: number,
     payload: { amount: string; paid_on: string; period_no?: number; pool_id?: number; note?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> },

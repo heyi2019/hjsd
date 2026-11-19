@@ -51,16 +51,7 @@ export async function collectInstallmentPayment(input: Omit<CollectPaymentInput,
       : today(),
   );
   const firstDueOn = schedule[0]?.due_on ?? today();
-  await ordersApi.postEvent(sourceOrderId, {
-    event_type: "SELL",
-    sale_mode: "INSTALLMENT",
-    amount: String(values.amount ?? 0),
-    occurred_on: today(),
-    portion: "PROFIT",
-    operator_user_ids: values.operator_user_ids as number[] | undefined,
-    note: values.note as string | undefined,
-  });
-  const installment = await installmentsApi.create({
+  await installmentsApi.stockSale({
     order_id: sourceOrderId,
     adjust_final_period: true,
     // 提号账号进入库存后，分期售出统一按库存分期出售处理（代挂售出仅全款，不在本表单分期）。
@@ -72,19 +63,10 @@ export async function collectInstallmentPayment(input: Omit<CollectPaymentInput,
     per_period_service_fee: String(values.per_period_service_fee ?? 0),
     per_period: String(values.per_period ?? 0),
     first_due_on: firstDueOn,
+    paid_on: today(),
+    pool_id: values.pool_id as number | undefined,
     schedule,
     note: values.note as string | undefined,
     operator_user_ids: values.operator_user_ids as number[] | undefined,
   });
-  // 分期计划确立时即收首付：首付是期次 0，登记一笔 INSTALLMENT_PAYMENT 收入资金明细。
-  // 无首付（首付为 0）则不产生收款事件，仅建合同。
-  const downPayment = Number(values.down_payment ?? 0);
-  if (downPayment > 0) {
-    await installmentsApi.pay(installment.id, {
-      amount: String(downPayment),
-      period_no: 0,
-      paid_on: today(),
-      pool_id: values.pool_id as number | undefined,
-    });
-  }
 }

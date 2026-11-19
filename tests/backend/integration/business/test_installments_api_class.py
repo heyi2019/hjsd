@@ -12,6 +12,9 @@ from app.domain.enums import (
     InstallmentStatus,
     ScheduleStatus)
 from app.domain.trade import Installment, InstallmentSchedule, OrderEvent
+from app.domain.trade import Cashflow, Account
+from app.domain.foundation import Pool
+from app.core.database import get_db
 from app.funds.installments import create as inst_create
 from app.funds.installments import recovery as inst_recovery
 from app.funds.installments.repayments.pay import pay as inst_pay
@@ -73,6 +76,97 @@ def _contract(
 
 
 class TestInstallmentsApi:
+    def test_stock_sale_commits_event_contract_and_down_payment_together(self, seeded_client, seeded_db, headers):
+        account = _account(seeded_db, "atomic-sale-success")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, "100")
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        seeded_db.commit()
+        def transactional_db():
+            try:
+                yield seeded_db
+                seeded_db.commit()
+            except Exception:
+                seeded_db.rollback()
+                raise
+        seeded_client.app.dependency_overrides[get_db] = transactional_db
+        response = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+            "order_id": order.id, "principal": "200", "down_payment": "50", "periods": 1,
+            "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
+            "pool_id": pool.id, "operator_user_ids": [1],
+        })
+        assert response.status_code == 201, response.text
+        contract = seeded_db.scalar(select(Installment).where(Installment.order_id == order.id))
+        assert contract is not None and contract.paid_amount == Decimal("50")
+        assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
+        flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == order.id, Cashflow.category == "INSTALLMENT_PAYMENT"))
+        assert flow is not None and flow.amount == Decimal("50") and flow.pool_id == pool.id
+
+    def test_stock_sale_rolls_back_when_down_payment_fails(self, seeded_client, seeded_db, headers):
+        account = _account(seeded_db, "atomic-sale-rollback")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, "100")
+        order_id, account_id = order.id, account.id
+        seeded_db.commit()
+        def transactional_db():
+            try:
+                yield seeded_db
+                seeded_db.commit()
+            except Exception:
+                seeded_db.rollback()
+                raise
+        seeded_client.app.dependency_overrides[get_db] = transactional_db
+        response = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+            "order_id": order_id, "principal": "200", "down_payment": "50", "periods": 1,
+            "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
+            "pool_id": 999999999, "operator_user_ids": [1],
+        })
+        assert response.status_code in (400, 404, 409, 422), response.text
+        seeded_db.expire_all()
+        assert seeded_db.get(Account, account_id).status == "WAITING"
+        assert seeded_db.scalar(select(Installment.id).where(Installment.order_id == order_id)) is None
+        assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "SELL")) is None
+        assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.order_id == order_id, Cashflow.category == "INSTALLMENT_PAYMENT")) is None
+
+    def test_stock_sale_rolls_back_when_contract_plan_is_invalid(self, seeded_client, seeded_db, headers):
+        account = _account(seeded_db, "atomic-sale-invalid-plan")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, "100")
+        order_id, account_id = order.id, account.id
+        seeded_db.commit()
+        def transactional_db():
+            try:
+                yield seeded_db
+                seeded_db.commit()
+            except Exception:
+                seeded_db.rollback()
+                raise
+        seeded_client.app.dependency_overrides[get_db] = transactional_db
+        response = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+            "order_id": order_id, "principal": "200", "down_payment": "250", "periods": 1,
+            "per_period": "0", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
+            "operator_user_ids": [1],
+        })
+        assert response.status_code in (400, 409, 422), response.text
+        seeded_db.expire_all()
+        assert seeded_db.get(Account, account_id).status == "WAITING"
+        assert seeded_db.scalar(select(Installment.id).where(Installment.order_id == order_id)) is None
+        assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "SELL")) is None
+
+    def test_stock_sale_with_zero_down_payment_creates_no_cashflow(self, seeded_client, seeded_db, headers):
+        from app.business.stocks.profile import create_account
+        account = create_account(seeded_db, game_account="atomic-sale-zero-down", business_mode="DISTRIBUTION", inventory_type="PICKUP", actor="pytest")
+        order = _order(seeded_db, order_type="TH", account_id=account.id)
+        _buy(seeded_db, order.id, "100")
+        response = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+            "order_id": order.id, "principal": "200", "down_payment": "0", "periods": 1,
+            "per_period": "200", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
+            "operator_user_ids": [1],
+        })
+        assert response.status_code == 201, response.text
+        assert seeded_db.scalar(select(Installment.id).where(Installment.order_id == order.id))
+        assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.order_id == order.id, Cashflow.category == "INSTALLMENT_PAYMENT")) is None
+
     def test_scoped_user_cannot_read_or_pay_other_order_contract(
         self, seeded_client, seeded_db
     ):

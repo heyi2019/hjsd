@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
@@ -82,6 +82,12 @@ class InstallmentCreate(RequestModel):
     extra_values: dict[str, Any] | None = None
     form_extra: dict[str, Any] | None = None
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
+
+
+class StockSaleIn(InstallmentCreate):
+    contract_type: Literal["STOCK_SALE"] = "STOCK_SALE"
+    paid_on: date
+    pool_id: int | None = Field(default=None, gt=0)
 
 
 class ScheduleOut(BaseModel):

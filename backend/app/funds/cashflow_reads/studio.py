@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 from sqlalchemy import and_, case, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from app.core.security import CurrentUser
 from app.domain.enums import (
     AccountingAttribute, CashflowLedgerType, CashflowSourceType, Direction,
@@ -91,14 +91,26 @@ def studio_summary(
         "pool_ids": visible_pool_ids,
         "occurred_from": occurred_from,
         "occurred_to": occurred_to,
-        "category": category,
         "user": user,
     }
+
+    conditions = [_studio_scope()]
+    if category is not None:
+        # 冲销行的科目固定为 REVERSAL，按原流水科目筛选才能正确抵消金额。
+        original = aliased(Cashflow)
+        original_matches = select(original.id).where(
+            original.flow_no == Cashflow.source_id,
+            original.category == category,
+        ).exists()
+        conditions.append(or_(
+            Cashflow.category == category,
+            and_(Cashflow.source_type == CashflowSourceType.REVERSAL.value, original_matches),
+        ))
 
     list_stmt = _apply_cashflow_filters(
         select(Cashflow, Order.order_no).outerjoin(Order, Order.id == Cashflow.order_id),
         **common,
-    ).where(_studio_scope())
+    ).where(*conditions)
     rows: list[dict[str, Any]] = []
     for flow, order_no in session.execute(
         list_stmt.order_by(Cashflow.occurred_on.desc(), Cashflow.id.desc()).limit(limit).offset(offset)
@@ -129,7 +141,7 @@ def studio_summary(
             Order, Order.id == Cashflow.order_id
         ),
         **common,
-    ).where(_studio_scope()).group_by(effective_direction)
+    ).where(*conditions).group_by(effective_direction)
     sums = _direction_sums(session, totals_stmt)
     income = sums.get(Direction.IN.value, Decimal("0.00"))
     expense = sums.get(Direction.OUT.value, Decimal("0.00"))
@@ -139,7 +151,7 @@ def studio_summary(
     count_stmt = _apply_cashflow_filters(
         select(Cashflow.id).outerjoin(Order, Order.id == Cashflow.order_id),
         **common,
-    ).where(_studio_scope())
+    ).where(*conditions)
     count = session.scalar(select(func.count()).select_from(count_stmt.subquery())) or 0
 
     _attach_extra_values(session, rows)

@@ -195,6 +195,24 @@ def test_reversal_offsets_expense_and_income(seeded_client, seeded_db, headers):
     assert after["count"] == 4
 
 
+def test_category_filter_includes_reversals_of_that_category(seeded_client, seeded_db, headers):
+    rent = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="100", category="房租")
+    sale = _flow(seeded_db, direction="IN", attribute="SELF_REVENUE", amount="250", category="货款")
+    rent_reverse = reverse_cashflow(seeded_db, rent.id, reversed_on=TODAY + timedelta(days=1), actor="pytest", reason="冲销房租")
+    sale_reverse = reverse_cashflow(seeded_db, sale.id, reversed_on=TODAY + timedelta(days=1), actor="pytest", reason="冲销货款")
+
+    rent_result = _summary(seeded_client, headers, category="房租")
+    assert {item["flow_no"] for item in rent_result["items"]} == {rent.flow_no, rent_reverse.flow_no}
+    assert rent_result["count"] == 2
+    assert Decimal(rent_result["expense"]) == Decimal("0.00")
+    sale_result = _summary(seeded_client, headers, category="货款")
+    assert {item["flow_no"] for item in sale_result["items"]} == {sale.flow_no, sale_reverse.flow_no}
+    assert Decimal(sale_result["income"]) == Decimal("0.00")
+    next_day = _summary(seeded_client, headers, category="房租", occurred_from=(TODAY + timedelta(days=1)).isoformat())
+    assert [item["flow_no"] for item in next_day["items"]] == [rent_reverse.flow_no]
+    assert Decimal(next_day["expense"]) == Decimal("-100.00")
+
+
 def test_business_reversal_not_in_studio_scope(seeded_client, seeded_db, headers):
     """业务账簿手工流水被冲销，冲销流水不进工作室面板（账簿隔离）。"""
     biz = create_cashflow(

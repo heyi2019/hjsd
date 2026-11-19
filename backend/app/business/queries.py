@@ -222,6 +222,29 @@ def _visible_game_types(session: Session, *, user: CurrentUser | None, mine: boo
     return list(session.scalars(stmt.order_by(game_type)).all())
 
 
+def _latest_sale_operator_matches(operator_ids: list[int]):
+    """与订单台账展示一致：回收/提号按事件编号，其余按发生日期取最近售出。"""
+    sale = aliased(OrderEvent)
+    latest_sale_id = (
+        select(sale.id)
+        .where(sale.order_id == Order.id, sale.event_type == "SELL", sale.is_posted.is_(True))
+        .order_by(
+            case((Order.order_type.in_(("HS", "TH")), None), else_=sale.occurred_on).desc(),
+            sale.id.desc(),
+        )
+        .limit(1)
+        .correlate(Order)
+        .scalar_subquery()
+    )
+    return exists(
+        select(OrderEvent.id).where(
+            OrderEvent.order_id == Order.id,
+            OrderEvent.id == latest_sale_id,
+            or_(*(cast(OrderEvent.operator_user_ids, JSONB).contains([operator_id]) for operator_id in operator_ids)),
+        )
+    )
+
+
 def _order_list_stmt(
     *, order_type: str | None, status: str | None,
     trade_date_from: date | None, trade_date_to: date | None,
@@ -257,28 +280,7 @@ def _order_list_stmt(
             for operator_id in inventory_operator_ids
         )))
     if sale_operator_ids:
-        sale = aliased(OrderEvent)
-        latest_sale_id = (
-            select(sale.id)
-            .where(sale.order_id == Order.id, sale.event_type == "SELL", sale.is_posted.is_(True))
-            .order_by(
-                case((Order.order_type.in_(("HS", "TH")), None), else_=sale.occurred_on).desc(),
-                sale.id.desc(),
-            )
-            .limit(1)
-            .correlate(Order)
-            .scalar_subquery()
-        )
-        stmt = stmt.where(exists(
-            select(OrderEvent.id).where(
-                OrderEvent.order_id == Order.id,
-                OrderEvent.id == latest_sale_id,
-                or_(*(
-                    cast(OrderEvent.operator_user_ids, JSONB).contains([operator_id])
-                    for operator_id in sale_operator_ids
-                )),
-            )
-        ))
+        stmt = stmt.where(_latest_sale_operator_matches(sale_operator_ids))
     if owner_id is not None:
         stmt = stmt.where(Order.owner_id == owner_id)
     if pool_id is not None:
@@ -333,14 +335,7 @@ def _order_list_stmt(
         stmt = stmt.where(
             or_(
                 cast(Order.form_extra, JSONB).contains({"business_responsible_ids": [user.id]}),
-                exists(
-                    select(OrderEvent.id).where(
-                        OrderEvent.order_id == Order.id,
-                        OrderEvent.event_type == "SELL",
-                        OrderEvent.is_posted.is_(True),
-                        cast(OrderEvent.operator_user_ids, JSONB).contains([user.id]),
-                    )
-                ),
+                _latest_sale_operator_matches([user.id]),
             )
         )
     elif user is not None:

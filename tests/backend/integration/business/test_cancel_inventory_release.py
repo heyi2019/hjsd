@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import Validation
+from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus
 from app.domain.trade import Account
 from app.domain.notifications import Notification
@@ -19,6 +20,7 @@ from app.domain.users import User
 from app.business.cancellation_model import cancel_order
 from app.business.create import create_order
 from app.business.events import post_event
+from app.business.queries import list_orders, order_status_counts
 from app.business.stocks import inventory as inventory_service
 
 D = date(2026, 11, 1)
@@ -188,6 +190,10 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
         assert filtered.status_code == 200, filtered.text
         assert filtered.json()["total"] == expected_total
         assert len(filtered.json()["items"]) == expected_total
+        personal_user = CurrentUser.build(id=selected.id, username=selected.username, roles=["OPERATOR"], owner_scope="ALL")
+        personal = list_orders(seeded_db, keyword=order.order_no, user=personal_user, mine=True)
+        assert len(personal) == expected_total
+        assert sum(order_status_counts(seeded_db, user=personal_user, mine=True, trade_date_from=D, trade_date_to=D).values()) == expected_total
 
     old_refund = {"event_type": "CANCEL", "amount": "50", "occurred_on": "2026-11-01", "offset_event_id": sell.id, "pool_id": sell.pool_id, "reason": "补退首次售出余款"}
     response = seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json={**old_refund, "finalize_sale_cancel": True})

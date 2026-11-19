@@ -55,6 +55,17 @@ def test_cannot_relist_platform_before_it_is_unlisted(seeded_db):
     post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 3), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
 
 
+def test_duplicate_platforms_in_single_listing_rejected_on_create_and_edit(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="duplicate-single-listing", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    duplicate = ["平台甲", " 平台甲 "]
+    create = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [], "new_events": [{"operation_type": "CONSIGNMENT", "occurred_at": "2026-10-02T11:00:00", "form_extra": {"consignment_platforms": duplicate}}]})
+    assert create.status_code == 422, create.text
+    listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台乙"]})
+    edit = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": duplicate}}]})
+    assert edit.status_code == 422, edit.text
+
+
 def test_edit_listing_cannot_change_to_another_active_platform(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="edit-duplicate-listing", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

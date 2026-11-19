@@ -2,7 +2,15 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.errors import Validation
 from app.domain.trade import OrderEvent
+
+
+def validate_unique_platforms(platforms: object) -> None:
+    if isinstance(platforms, list):
+        names = [value.strip() for value in platforms if isinstance(value, str) and value.strip()]
+        if len(names) != len(set(names)):
+            raise Validation("同一上架记录不能重复选择平台")
 
 
 def active_listings(db: Session, order_id: int) -> set[tuple[int, str]]:

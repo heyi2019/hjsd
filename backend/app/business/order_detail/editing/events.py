@@ -15,7 +15,7 @@ from app.domain.enums import CashflowSourceType
 from app.domain.users import User
 from app.shared.order_access import get_order
 from app.business.events import post_event
-from app.business.listing_state import active_listings
+from app.business.listing_state import active_listings, validate_unique_platforms
 
 from .schemas import ExecutionEditItem, ExecutionEditRequest, ExecutionOperationCreateItem
 
@@ -113,6 +113,7 @@ def validate_event_edits(
         if event.event_type == "OPERATE" and (event.form_extra or {}).get("operation_type") == "CONSIGNMENT" and item.form_extra is not None:
             old_platforms = (event.form_extra or {}).get("consignment_platforms") or []
             new_platforms = item.form_extra.get("consignment_platforms") or []
+            validate_unique_platforms(new_platforms)
             if old_platforms != new_platforms:
                 active = active_listings(db, order_id)
                 other_active = {platform for listing_id, platform in active if listing_id != event.id}

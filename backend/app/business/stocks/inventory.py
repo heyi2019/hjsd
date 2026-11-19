@@ -92,7 +92,7 @@ def inventory_ledger(
     date_to: date | None = None, sort_desc: bool = True,
     inventory_operator_ids: list[int] | None = None,
     age_gt_days: int | None = None,
-    limit: int = 10, offset: int = 0, user: CurrentUser | None = None,
+    limit: int | None = 10, offset: int = 0, user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """服务端筛选、排序、分页库存台账，并返回分页所需统计。"""
     type_expr = func.coalesce(

@@ -186,7 +186,6 @@ def get_customer_detail(
             AuditLog.entity_id == customer.customer_no,
         )
         .order_by(AuditLog.id.desc())
-        .limit(100)
     ).all()
     audit_items = [
         {

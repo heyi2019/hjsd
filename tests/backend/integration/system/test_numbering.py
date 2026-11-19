@@ -1,4 +1,4 @@
-"""NUMBER-01 T03 / BAS-02-04：编号分配（分业务独立递增、不可复用、超限报错）。"""
+"""NUMBER-01 T03 / BAS-02-04：编号分配（分业务独立递增、不可复用、自动增位）。"""
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.shared import numbering
 from app.core.errors import AppError, ErrorCode, Validation
-from app.shared.numbering import allocate_number, ensure_sequence, peek_number, sequence_max
+from app.shared.numbering import allocate_number, ensure_sequence, peek_number
 from app.domain.enums import SequenceKey
 from app.domain.foundation import DocumentSequence
 
@@ -54,17 +54,12 @@ def test_number_is_not_reused_after_rollback(db):
     assert allocate_number(db, SequenceKey.ORDER_HS) == "HS0001"  # 空洞：HS0001 未被回收
 
 
-def test_sequence_exhausted_raises_instead_of_silent_overflow(db):
-    ensure_sequence(db, SequenceKey.CUSTOMER, "CUS", 4)
-    db.commit()
+def test_sequence_automatically_expands_beyond_padding(db):
     sequence = ensure_sequence(db, SequenceKey.CUSTOMER, "CUS", 4)
-    sequence.current_value = sequence_max(4)
+    sequence.current_value = 9999
     db.commit()
-
-    with pytest.raises(AppError) as exc:
-        allocate_number(db, SequenceKey.CUSTOMER)
-    assert exc.value.code == ErrorCode.SEQUENCE_EXHAUSTED
-    assert exc.value.http_status == 422
+    assert peek_number(db, SequenceKey.CUSTOMER) == "CUS10000"
+    assert allocate_number(db, SequenceKey.CUSTOMER) == "CUS10000"
 
 
 def test_five_digit_sequence_allocates_past_9999(db):
@@ -79,18 +74,19 @@ def test_five_digit_sequence_allocates_past_9999(db):
     db.commit()
 
 
-def test_five_digit_sequence_exhausted_at_99999(db):
-    """5 位序列真到 99999 才耗尽（对齐 10^padding−1，而非硬编码 9999）。"""
-    ensure_sequence(db, SequenceKey.CASHFLOW_IN, "SR", 5)
-    db.commit()
+def test_five_digit_sequence_expands_past_99999(db):
     sequence = ensure_sequence(db, SequenceKey.CASHFLOW_IN, "SR", 5)
     sequence.current_value = 99999
     db.commit()
+    assert peek_number(db, SequenceKey.CASHFLOW_IN) == "SR100000"
+    assert allocate_number(db, SequenceKey.CASHFLOW_IN) == "SR100000"
 
-    with pytest.raises(AppError) as exc:
-        allocate_number(db, SequenceKey.CASHFLOW_IN)
-    assert exc.value.code == ErrorCode.SEQUENCE_EXHAUSTED
-    assert exc.value.details["max"] == 99999
+
+def test_sequence_grows_beyond_32bit_value(db):
+    sequence = ensure_sequence(db, SequenceKey.ORDER_HS, "HS", 4)
+    sequence.current_value = 2_147_483_647
+    db.commit()
+    assert allocate_number(db, SequenceKey.ORDER_HS) == "HS2147483648"
 
 
 def test_peek_does_not_consume(db):

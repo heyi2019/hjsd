@@ -48,6 +48,15 @@ describe("AuditPanel：审计记录", () => {
     await waitFor(() => expect(vi.mocked(auditApi.actions)).toHaveBeenCalledTimes(1));
   });
 
+  it("审计记录可翻页查看超过当前页的数据", async () => {
+    vi.mocked(auditApi.list).mockImplementation(async (params) => ({ items: [{ ...rows[0], id: (params?.offset ?? 0) + 1, actor: (params?.offset ?? 0) === 0 ? "首页操作人" : "后续操作人" }], total: 250 }));
+    renderLight(<AuditPanel />, { user: "admin" });
+    expect(await screen.findByText("首页操作人")).toBeInTheDocument();
+    await ui.click(screen.getByTitle("2"));
+    expect(await screen.findByText("后续操作人")).toBeInTheDocument();
+    expect(auditApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 20, offset: 20 }));
+  });
+
   it("加载并展示审计行", async () => {
     renderLight(<AuditPanel />, { user: "admin" });
     expect(await screen.findByText("admin")).toBeInTheDocument();

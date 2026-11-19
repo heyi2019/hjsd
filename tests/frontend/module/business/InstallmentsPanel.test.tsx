@@ -642,6 +642,19 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
       expect(await screen.findByRole("button", { name: /登记出售/ })).toBeInTheDocument();
     });
 
+    it("登记出售可选择第500条以后的订单", async () => {
+      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "CLOSED", dispositions: [{ id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" }] }]));
+      const first = Array.from({ length: 500 }, (_, index) => ({ ...order, id: index + 100, order_no: `HS${index + 100}` }));
+      vi.mocked(ordersApi.listPage).mockImplementation(async (params) => params?.offset ? pageResponse([resaleOrder], { total: 501, limit: 500, offset: 500 }) as never : pageResponse(first, { total: 501, limit: 500, offset: 0 }) as never);
+      renderLight(<InstallmentsPanel />, { user: "admin" });
+      await ui.click(await screen.findByRole("button", { name: /登记出售/ }));
+      const modal = openModal("登记出售");
+      const select = within(modal).getByRole("combobox", { name: /出售订单/ });
+      await ui.click(select);
+      await ui.type(select, "HS-2026-0020");
+      expect(await within(document.body).findByText("HS-2026-0020 · 李四", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    });
+
     it("登记出售：选择出售订单并填写后调用 resale 关联", async () => {
       vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([
         {

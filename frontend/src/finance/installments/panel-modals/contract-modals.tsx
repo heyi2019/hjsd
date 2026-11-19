@@ -67,6 +67,8 @@ export function ResaleModal({ controller }: { controller: ContractTableControlle
         <Select
           showSearch
           placeholder="请选择售出订单"
+          virtual={resaleOrders.length > 100}
+          popupMatchSelectWidth={resaleOrders.length > 100}
           optionFilterProp="label"
           options={resaleOrders
             .filter((item) => item.id !== resaleTarget?.order_id)

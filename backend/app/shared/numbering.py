@@ -3,7 +3,7 @@
 规则（PRD §2.1.1 / V19）：
 - 纯顺序号、不含日期；主业务按类型独立递增（HS/TH/DG 可并存同号）；
 - 事务内递增，取消不回收，编号永不修改、永不复用；
-- 上限按位数算 10^padding − 1（4 位 9999 / 5 位 99999），超出即抛 `SEQUENCE_EXHAUSTED`，**禁止静默进位**；分配层与预览层须共用 `sequence_max`。
+- padding 仅为最小位数，超过后自动增加位数。
 """
 from __future__ import annotations
 
@@ -16,15 +16,6 @@ from app.domain.enums import Direction, SequenceKey
 from app.domain.foundation import DocumentSequence
 
 DEFAULT_PADDING = 4
-
-
-def sequence_max(padding: int) -> int:
-    """按序列位数算真实发号上限（10^padding − 1）：4 位 9999、5 位 99999。
-
-    分配层 allocate_number 与预览层 format_next_number/list_sequences 必须共用本函数，
-    否则 5 位高频序列（ZC/SR/KU_）到 9999 时预览会提前误报「已达上限」。
-    """
-    return 10**padding - 1
 
 
 def ensure_sequence(
@@ -73,7 +64,6 @@ def allocate_number(session: Session, key: str | SequenceKey) -> str:
     同一个 current_value，各自发同一个号，后提交者撞 `orders.order_no` 唯一约束直接 500。
     改为相对递增（`current_value + 1`）后由数据库自己串行化：PG 在行锁上排队，
     后到者的 UPDATE 等前者提交后才执行，读到的是 +1 之后的值。
-    上限校验放进 WHERE：超限时语句零命中、不消耗任何号，语义与旧版一致。
     """
     key_value = key.value if isinstance(key, SequenceKey) else key
     config = session.execute(
@@ -88,22 +78,16 @@ def allocate_number(session: Session, key: str | SequenceKey) -> str:
             details={"sequence_key": key_value},
         )
     prefix, padding = config
-    max_value = sequence_max(padding)
     allocated = session.execute(
         update(DocumentSequence)
         .where(
             DocumentSequence.sequence_key == key_value,
-            DocumentSequence.current_value < max_value,
         )
         .values(current_value=DocumentSequence.current_value + 1)
         .returning(DocumentSequence.current_value)
     ).scalar()
     if allocated is None:
-        raise Validation(
-            f"编号已超出 {max_value} 上限，禁止静默进位，请联系管理员裁决",
-            code=ErrorCode.SEQUENCE_EXHAUSTED,
-            details={"sequence_key": key_value, "max": max_value},
-        )
+        raise Validation("编号序列不存在", code=ErrorCode.VALIDATION_ERROR, details={"sequence_key": key_value})
     return f"{prefix}{allocated:0{padding}d}"
 
 
@@ -115,15 +99,7 @@ def format_next_number(
     `peek_number` 与列表页共用同一份格式化口径：调用方若已持有序列行，
     直接用本函数即可，无需再逐行回查数据库。
     """
-    candidate = current_value + 1
-    limit = sequence_max(padding)
-    if candidate > limit:
-        raise Validation(
-            "编号已达上限",
-            code=ErrorCode.SEQUENCE_EXHAUSTED,
-            details={"sequence_key": sequence_key, "max": limit},
-        )
-    return f"{prefix}{candidate:0{padding}d}"
+    return f"{prefix}{current_value + 1:0{padding}d}"
 
 
 def peek_number(session: Session, key: str | SequenceKey) -> str:
@@ -157,5 +133,4 @@ __all__ = [
     "ensure_sequence",
     "format_next_number",
     "peek_number",
-    "sequence_max",
 ]

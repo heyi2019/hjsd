@@ -162,8 +162,7 @@ class TestAuditLogApi:
 class TestAuditStatsApi:
     """/audit-logs/stats：按 entity_type 汇总真实累计数。
 
-    存在理由：既有 /audit-logs 的 total 是「当前页行数」，limit=1 时恒为 1，
-    不能用来表示累计改动次数。本端点直接 COUNT(*)。
+    与审计列表一致，统计结果不受分页大小影响。
     """
 
     def test_stats_routes_publish_typed_response_model(self, app):
@@ -185,14 +184,14 @@ class TestAuditStatsApi:
             )
         seeded_db.flush()
 
-        # 对照组：list 端点的 total 是当前页行数，limit=1 时恒为 1
+        # 列表 total 表示筛选后的总数，而非当前页行数
         listed = seeded_client.get(
             "/api/v1/audit-logs",
             params={"entity_type": "cfg_probe_count", "limit": 1},
             headers=headers,
         )
         assert listed.status_code == 200, listed.text
-        assert listed.json()["total"] == 1
+        assert listed.json()["total"] == 3
 
         response = seeded_client.get(
             "/api/v1/audit-logs/stats",

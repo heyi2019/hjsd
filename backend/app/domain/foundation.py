@@ -15,6 +15,7 @@ from datetime import datetime
 from sqlalchemy import (
     JSON,
     Boolean,
+    BigInteger,
     CheckConstraint,
     DateTime,
     Integer,
@@ -97,11 +98,7 @@ class GameTypeOption(Base, AuditMixin):
     channel_regions: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
 class DocumentSequence(Base, TimestampMixin):
-    """编号序列表：事务内递增，超出位数上限即报 `SEQUENCE_EXHAUSTED`（BAS-02-04）。
-
-    位数上限 6 位（2026-10-28 放宽：资金流水按方向五位流水 ZC00001/SR00001）；
-    实际上限按 padding 计算（10^padding - 1），见 shared.numbering。
-    """
+    """编号序列表：事务内递增，位数不足时自动扩展。"""
 
     __tablename__ = "document_sequences"
     __table_args__ = (
@@ -109,7 +106,6 @@ class DocumentSequence(Base, TimestampMixin):
         CheckConstraint("padding > 0", name="padding_positive"),
         CheckConstraint("padding <= 6", name="padding_max"),
         CheckConstraint("current_value >= 0", name="current_value_nonneg"),
-        CheckConstraint("current_value <= 999999", name="current_value_max"),
         CheckConstraint("length(trim(sequence_key)) > 0", name="sequence_key_nonempty"),
         CheckConstraint("length(trim(prefix)) > 0", name="prefix_nonempty"),
     )
@@ -118,7 +114,7 @@ class DocumentSequence(Base, TimestampMixin):
     sequence_key: Mapped[str] = mapped_column(String(64), nullable=False)
     prefix: Mapped[str] = mapped_column(String(16), nullable=False)
     padding: Mapped[int] = mapped_column(Integer, nullable=False, default=4)
-    current_value: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    current_value: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
 
 
 

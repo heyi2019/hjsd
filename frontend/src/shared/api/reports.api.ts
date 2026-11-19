@@ -29,9 +29,7 @@ export const auditApi = {
   }) =>
     api.get<{ items: AuditLogRow[]; total: number }>("/audit-logs", { params }).then((r) => r.data),
   actions: () => api.get<{ items: string[] }>("/audit-logs/actions").then((r) => r.data.items),
-  /** 按 entity_type 汇总真实累计数。
-   *  ⚠️ 不要用 list 的 `total` 当累计数——它的语义是「当前页行数」，
-   *  limit=1 时恒等于 1（见 backend/app/audit/router.py）。 */
+  /** 按 entity_type 汇总真实累计数。 */
   stats: (entityTypes: string[]) =>
     api
       .get<{ items: AuditEntityStat[] }>("/audit-logs/stats", {

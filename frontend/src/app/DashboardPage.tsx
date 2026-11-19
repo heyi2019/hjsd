@@ -2,8 +2,7 @@
  * 经营中心保留全局经营总览与人员筛选，工作台只展示当前用户自己的订单/收益。 */
 import { useState } from "react";
 import { normalizeError } from "../shared/api/client";
-import { notificationsApi } from "../shared/api/misc.api";
-import { ordersApi } from "../shared/api/orders.api";
+import { findOrderByNumber, loadProfitNotifications } from "./notificationLookup";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { CreateBusinessModal, type BusinessOrderType } from "../business/CreateBusinessModal";
@@ -45,14 +44,13 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
   const openPendingProfitAllocation = async () => {
     if (!onDashboardNavigate) return;
     try {
-      const { items } = await notificationsApi.list({ limit: 200, unread_only: true, notification_type: "PROFIT_PENDING" });
+      const items = await loadProfitNotifications("PROFIT_PENDING");
       const notification = items.find((item) => item.notification_type === "PROFIT_PENDING" && item.entity_type === "order");
       if (!notification) {
         appMessage.warning("没有找到待配置分润的订单");
         return;
       }
-      const page = await ordersApi.listPage({ keyword: notification.entity_id, limit: 20, offset: 0 });
-      const order = page.items.find((item) => item.order_no === notification.entity_id);
+      const order = await findOrderByNumber(notification.entity_id);
       if (!order) {
         appMessage.warning(`未找到订单 ${notification.entity_id}`);
         return;

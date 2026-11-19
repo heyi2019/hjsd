@@ -1,7 +1,8 @@
-import { Card, Descriptions, List, Modal, Spin, Typography } from "antd";
+import { Card, Descriptions, List, Modal, Pagination, Spin, Typography } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { notificationsApi } from "../shared/api/misc.api";
 import { ordersApi } from "../shared/api/orders.api";
+import { findOrderByNumber, loadProfitNotifications } from "./notificationLookup";
 import type { AccountExecutionDetail } from "../shared/api/types/account-execution";
 import type { NotificationItem } from "../shared/api/types/common";
 import type { Order } from "../shared/api/types/orders";
@@ -73,6 +74,14 @@ export function BusinessOverview({
   );
 }
 
+async function settleInBatches<T, R>(items: T[], action: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = [];
+  for (let index = 0; index < items.length; index += 10) {
+    results.push(...await Promise.allSettled(items.slice(index, index + 10).map(action)));
+  }
+  return results;
+}
+
 type ProfitNotificationDetail = {
   notification: NotificationItem;
   order: Order;
@@ -85,6 +94,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
   const [details, setDetails] = useState<ProfitNotificationDetail[]>([]);
   const [unavailableCount, setUnavailableCount] = useState(0);
   const [readFailureCount, setReadFailureCount] = useState(0);
+  const [detailPage, setDetailPage] = useState(1);
   const onReadRef = useRef(onRead);
 
   useEffect(() => {
@@ -99,23 +109,23 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
     setDetails([]);
     setUnavailableCount(0);
     setReadFailureCount(0);
-    void notificationsApi.list({ limit: 200, unread_only: true, notification_type: "PROFIT_ALLOCATED" })
-      .then(async ({ items }) => {
+    setDetailPage(1);
+    void loadProfitNotifications("PROFIT_ALLOCATED")
+      .then(async (items) => {
         const profitNotifications = items.filter((item) => item.notification_type === "PROFIT_ALLOCATED" && item.entity_type === "order");
-        const loaded = await Promise.allSettled(profitNotifications.map(async (notification) => {
-          const page = await ordersApi.listPage({ keyword: notification.entity_id, limit: 20, offset: 0 });
-          const order = page.items.find((item) => item.order_no === notification.entity_id);
+        const loaded = await settleInBatches(profitNotifications, async (notification) => {
+          const order = await findOrderByNumber(notification.entity_id);
           if (!order) return null;
           const execution = await ordersApi.executionDetail(order.id);
           return { notification, order, execution };
-        }));
+        });
         if (cancelled) return;
         const available = loaded.flatMap((item) => item.status === "fulfilled" && item.value !== null ? [item.value] : []);
         setDetails(available);
         setUnavailableCount(profitNotifications.length - available.length);
         setLoading(false);
         if (available.length) {
-          void Promise.allSettled(available.map((item) => notificationsApi.markRead(item.notification.id))).then((results) => {
+          void settleInBatches(available, (item) => notificationsApi.markRead(item.notification.id)).then((results) => {
             const failed = results.filter((result) => result.status === "rejected").length;
             if (!cancelled) setReadFailureCount(failed);
             if (failed < results.length) onReadRef.current?.();
@@ -140,7 +150,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
       {!loading && !error && readFailureCount > 0 ? <Typography.Text type="warning">{readFailureCount} 条通知未能标为已读，请稍后重试。</Typography.Text> : null}
       {!loading && !error && details.length === 0 ? <Typography.Text type="secondary">暂无可查看的分润通知</Typography.Text> : null}
       <div className="dashboard-notification-detail-list">
-        {details.map(({ notification, order, execution }) => {
+        {details.slice((detailPage - 1) * 10, detailPage * 10).map(({ notification, order, execution }) => {
           const recoveryRow = execution.detail_view.execution_rows.find((row) => row.category === "INBOUND");
           const inventoryEntryLabel = order.order_type === "HS" ? "回收入库时间" : "库存入库时间";
           return (
@@ -162,6 +172,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
           );
         })}
       </div>
+      {details.length > 10 ? <Pagination current={detailPage} pageSize={10} total={details.length} showSizeChanger={false} onChange={setDetailPage} /> : null}
     </Modal>
   );
 }

@@ -2,7 +2,7 @@
 import { Card, Input } from "antd";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { auditApi } from "../shared/api/reports.api";
 import type { AuditLogRow } from "../shared/api/types/ops";
 import { normalizeError } from "../shared/api/client";
@@ -34,6 +34,11 @@ export function AuditPanel() {
   // ENTITY_TYPE 词典已被历史数据污染（混入 OrderTypePool/Seed 等类名 28 值），不可作选项源。
   const entityTypeOptions = ENTITY_TYPE_FALLBACK;
   const [rows, setRows] = useState<AuditLogRow[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const requestRef = useRef(0);
   const [configItem, setConfigItem] = useState("");
   const [entityType, setEntityType] = useState("");
   const [entityId, setEntityId] = useState("");
@@ -44,6 +49,8 @@ export function AuditPanel() {
   const [actionOptions, setActionOptions] = useState<string[]>(Object.keys(AUDIT_ACTION_LABEL));
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const load = useCallback(async () => {
+    const request = ++requestRef.current;
+    setLoading(true);
     try {
       const result = await auditApi.list({
         entity_type: configItem || entityType || undefined,
@@ -52,15 +59,21 @@ export function AuditPanel() {
         actor: actor || undefined,
         from: fromDate || undefined,
         to: toDate || undefined,
-        limit: 200,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
       });
+      if (request !== requestRef.current) return;
       setRows(result.items);
+      setTotal(result.total);
       setError(null);
     } catch (err) {
-      setError(normalizeError(err));
+      if (request === requestRef.current) setError(normalizeError(err));
+    } finally {
+      if (request === requestRef.current) setLoading(false);
     }
-  }, [configItem, entityType, entityId, action, actor, fromDate, toDate]);
-  useEffect(() => { void load(); }, [load]);
+  }, [configItem, entityType, entityId, action, actor, fromDate, toDate, page, pageSize]);
+  useEffect(() => { setPage(1); }, [configItem, entityType, entityId, action, actor, fromDate, toDate]);
+  useEffect(() => { void load(); return () => { requestRef.current += 1; }; }, [load]);
   useEffect(() => {
     auditApi.actions().then(setActionOptions).catch(() => undefined);
   }, []);
@@ -136,7 +149,7 @@ export function AuditPanel() {
             onChange={(value) => setToDate(value?.format("YYYY-MM-DD") ?? "")}
           />
         </div>
-        <DataTable<AuditLogRow> columns={arrangeColumns(columns)} rows={rows} page={1} pageSize={20} total={rows.length} emptyText="暂无审计记录" onPageChange={() => undefined}/>
+        <DataTable<AuditLogRow> columns={arrangeColumns(columns)} rows={rows} loading={loading} page={page} pageSize={pageSize} total={total} controlledPaging emptyText="暂无审计记录" onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}/>
       </Card>
     </section>
   );

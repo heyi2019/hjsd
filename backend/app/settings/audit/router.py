@@ -51,6 +51,7 @@ def list_audit_logs(
         stmt = stmt.where(AuditLog.occurred_at >= datetime.combine(from_date, datetime.min.time()))
     if to_date:
         stmt = stmt.where(AuditLog.occurred_at <= datetime.combine(to_date, datetime.max.time()))
+    total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
     rows = db.scalars(stmt.order_by(AuditLog.id.desc()).limit(limit).offset(offset)).all()
     return schemas.AuditLogListOut(
         items=[
@@ -68,7 +69,7 @@ def list_audit_logs(
             )
             for row in rows
         ],
-        total=len(rows),
+        total=total,
     )
 
 
@@ -79,10 +80,6 @@ def stats_audit_logs(
     entity_types: str = Query(default="", description="逗号分隔的 entity_type 清单"),
 ) -> schemas.AuditEntityStatsOut:
     """按 entity_type 汇总**真实**累计条数与最近一条改动。
-
-    为什么单开一个端点：`AuditLogListOut.total` 的语义是「当前页行数」（= len(items)），
-    limit=1 时它恒等于 1，把它当累计数会得到错误数字。这里直接 COUNT(*)。
-    不改既有 /audit-logs 的 total —— 经营中心审计页的分页依赖现有行为，改它需另行裁决。
 
     entity_types 走逗号分隔而非 FastAPI 重复参数：前端 axios 默认把数组序列化成
     `key[]=v`，与重复参数约定不兼容，逗号串更简单稳定。

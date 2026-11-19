@@ -17,7 +17,6 @@ from app.settings.auth.session import (
 from app.domain.enums import AuditAction
 from app.settings.lists import service as list_columns_service
 from app.settings.lists.export import (
-    EXPORT_ROW_LIMIT,
     UI_ONLY_KEYS,
     build_list_csv,
     inject_custom_columns,
@@ -90,7 +89,7 @@ def export_orders_csv(
         pool_id=pool_id,
         keyword=keyword,
         mine=mine,
-        limit=EXPORT_ROW_LIMIT,
+        limit=None,
         offset=0,
         user=_user,
     )
@@ -144,7 +143,7 @@ def export_orders_xlsx(
 ) -> Response:
     """订单台账导出 Excel：Sheet「主订单信息」= 列表可见列，Sheet「详情信息」= 订单详情全字段。
 
-    与 /orders/export.csv 同筛选口径、同全量不分页上限；两个 sheet 靠「订单号」关联，
+    与 /orders/export.csv 同筛选口径、同全量不分页口径；两个 sheet 靠「订单号」关联，
     故详情 sheet 首列固定带订单号。详情 sheet 用两级表头，一级板块为真合并单元格。
     """
     orders = orders_list_orders(
@@ -157,7 +156,7 @@ def export_orders_xlsx(
         pool_id=pool_id,
         keyword=keyword,
         mine=mine,
-        limit=EXPORT_ROW_LIMIT,
+        limit=None,
         offset=0,
         user=_user,
     )

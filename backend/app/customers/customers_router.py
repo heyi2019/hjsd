@@ -23,7 +23,7 @@ from app.core.security import (
 )
 from app.settings.auth.session import require_permissions
 from app.domain.enums import AuditAction
-from app.settings.lists.export import EXPORT_ROW_LIMIT, build_list_csv
+from app.settings.lists.export import build_list_csv
 from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.customers import schemas
 from app.customers._common import to_customer_out
@@ -125,9 +125,9 @@ def export_customers_csv(
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> Response:
-    """客户按可见列导出 CSV：同 /customers 筛选口径，上限 EXPORT_ROW_LIMIT。"""
+    """客户按可见列导出 CSV：同 /customers 筛选口径。"""
     customers = parties_list_customers(
-        db, keyword=keyword, status=status, created_by=created_by, user=user, limit=EXPORT_ROW_LIMIT, offset=0, **order_filter, **created_filter
+        db, keyword=keyword, status=status, created_by=created_by, user=user, limit=None, offset=0, **order_filter, **created_filter
     )
     extras = get_extra_values_bulk(
         db, entity_type="customer", entity_ids=[item.id for item in customers]

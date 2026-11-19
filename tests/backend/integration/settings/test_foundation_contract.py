@@ -273,27 +273,15 @@ class TestFoundationApi:
         assert response.status_code == 200, response.text
         assert response.json()["name"] == "代挂API"
 
-    def test_sequences_endpoint_marks_exhausted(self, seeded_client, seeded_db, headers):
-        """序列耗尽时 next_number 渲染为占位提示。
-
-        设真实序列行到上限来触发分支，而不是 mock 路由层内部符号：
-        这样断言的是对外行为，重构内部实现（如改为按已加载行直接格式化）不会误伤。
-        """
-        from app.shared.numbering import sequence_max
+    def test_sequences_endpoint_expands_at_padding_boundary(self, seeded_client, seeded_db, headers):
         from app.domain.foundation import DocumentSequence
-
-        target = seeded_db.scalar(
-            select(DocumentSequence).order_by(DocumentSequence.sequence_key)
-        )
-        target.current_value = sequence_max(4)
+        target = seeded_db.scalar(select(DocumentSequence).order_by(DocumentSequence.sequence_key))
+        target.current_value = 10 ** target.padding - 1
         seeded_db.commit()
-
         response = seeded_client.get("/api/v1/sequences", headers=headers)
         assert response.status_code == 200, response.text
-        row = next(
-            item for item in response.json() if item["sequence_key"] == target.sequence_key
-        )
-        assert row["next_number"] == f"<已达上限 {sequence_max(4)}>"
+        row = next(item for item in response.json() if item["sequence_key"] == target.sequence_key)
+        assert row["next_number"] == f"{target.prefix}{10 ** target.padding}"
 
     def test_sequences_endpoint_five_digit_not_exhausted_at_9999(
         self, seeded_client, seeded_db, headers
@@ -318,11 +306,10 @@ class TestFoundationApi:
         )
         assert row["next_number"] == "ZC10000"
 
-    def test_sequences_endpoint_five_digit_exhausted_text(
+    def test_sequences_endpoint_five_digit_expands(
         self, seeded_client, seeded_db, headers
     ):
-        """5 位序列真耗尽时占位文本写真实上限 99999（非硬编码 9999）。"""
-        from app.shared.numbering import sequence_max
+        """5 位序列达到 99999 后预览自动增位。"""
         from app.domain.enums import SequenceKey
         from app.domain.foundation import DocumentSequence
 
@@ -332,7 +319,7 @@ class TestFoundationApi:
             )
         )
         assert target.padding == 5
-        target.current_value = sequence_max(target.padding)  # 99999
+        target.current_value = 99999
         seeded_db.commit()
 
         response = seeded_client.get("/api/v1/sequences", headers=headers)
@@ -340,5 +327,5 @@ class TestFoundationApi:
         row = next(
             item for item in response.json() if item["sequence_key"] == target.sequence_key
         )
-        assert row["next_number"] == "<已达上限 99999>"
+        assert row["next_number"] == "KU_100000"
 

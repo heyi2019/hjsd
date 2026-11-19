@@ -17,8 +17,7 @@ from sqlalchemy import select
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.domain.trade import Order, OrderFormField
-from app.settings.lists import export as export_module
-from app.settings.lists.export import EXPORT_ROW_LIMIT, build_list_csv
+from app.settings.lists.export import build_list_csv
 from app.business.export_fields import _event_platform, _order_detail_export_fields
 
 
@@ -399,18 +398,12 @@ def test_export_writes_list_export_audit(seeded_client, headers, seeded_db):
 
 # 主列表导出上限与截断口径
 
-def test_export_row_limit_contract_is_10000():
-    assert EXPORT_ROW_LIMIT == 10_000
-
-def test_build_list_csv_truncates_when_over_limit(seeded_db, monkeypatch):
-    """拼装层兜底：即便调用方交来超量行，写出也截到上限并标注 truncated。"""
-    monkeypatch.setattr(export_module, "EXPORT_ROW_LIMIT", 3)
-    rows = [{"row_type": "明细", "title": f"第{i}行"} for i in range(5)]
+def test_build_list_csv_does_not_truncate_rows(seeded_db):
+    rows = [{"row_type": "明细", "title": f"第{i}行"} for i in range(10001)]
     csv_text, meta = build_list_csv(seeded_db, "CUSTOMER", rows)
-    assert meta["row_count"] == 3
-    assert meta["truncated"] is True
-    lines = [line for line in csv_text.splitlines() if line.strip()]
-    assert len(lines) - 1 == 3
+    assert meta["row_count"] == 10001
+    assert meta["truncated"] is False
+    assert len([line for line in csv_text.splitlines() if line.strip()]) - 1 == 10001
 
 def test_build_list_csv_under_limit_not_truncated(seeded_db):
     rows = [{"row_type": "明细", "title": "甲"}, {"row_type": "明细", "title": "乙"}]
@@ -418,8 +411,21 @@ def test_build_list_csv_under_limit_not_truncated(seeded_db):
     assert meta["row_count"] == 2
     assert meta["truncated"] is False
 
-def test_stocks_export_passes_export_row_limit(seeded_client, headers, monkeypatch):
-    """库存导出查询层传 EXPORT_ROW_LIMIT，不再 limit=None 拉全量。"""
+def test_order_exports_have_no_total_limit(seeded_client, headers, monkeypatch):
+    from app.business.queries import list_orders
+    seen = []
+    def spy(db, **kwargs):
+        seen.append(kwargs.get("limit"))
+        return list_orders(db, **kwargs)
+    monkeypatch.setattr("app.business.export_router.orders_list_orders", spy)
+    for suffix in ("csv", "xlsx"):
+        response = seeded_client.get(f"/api/v1/orders/export.{suffix}", headers=headers)
+        assert response.status_code == 200, response.text
+    assert seen == [None, None]
+
+
+def test_stocks_export_has_no_total_limit(seeded_client, headers, monkeypatch):
+    """库存导出不截断结果。"""
     from app.business.stocks.inventory import list_accounts
 
     seen: dict[str, object] = {}
@@ -432,10 +438,10 @@ def test_stocks_export_passes_export_row_limit(seeded_client, headers, monkeypat
     monkeypatch.setattr("app.business.stocks.router.stocks_list_accounts", spy)
     resp = seeded_client.get("/api/v1/stocks/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
-    assert seen.get("limit") == EXPORT_ROW_LIMIT
+    assert "limit" in seen and seen["limit"] is None
 
-def test_customers_export_passes_export_row_limit(seeded_client, headers, monkeypatch):
-    """客户导出查询层传 EXPORT_ROW_LIMIT，不再 limit=None 拉全量。"""
+def test_customers_export_has_no_total_limit(seeded_client, headers, monkeypatch):
+    """客户导出不截断结果。"""
     from app.customers.customers import list_customers
 
     seen: dict[str, object] = {}
@@ -448,7 +454,7 @@ def test_customers_export_passes_export_row_limit(seeded_client, headers, monkey
     monkeypatch.setattr("app.customers.customers_router.parties_list_customers", spy)
     resp = seeded_client.get("/api/v1/customers/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
-    assert seen.get("limit") == EXPORT_ROW_LIMIT
+    assert "limit" in seen and seen["limit"] is None
 
 def test_stocks_export_audit_records_row_count_and_truncated(
     seeded_client, headers, seeded_db

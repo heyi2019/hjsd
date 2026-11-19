@@ -28,7 +28,6 @@ from app.settings.lists.export_labels import (
 
 UI_ONLY_KEYS = frozenset({"actions"})
 # 导出行数上限：主列表导出一次性拉全量，防误操作拖垮库；超过时按列表接口同口径截断。
-EXPORT_ROW_LIMIT = 10_000
 
 
 def merge_static_value_labels(
@@ -125,7 +124,6 @@ def build_list_csv(
     total: dict[str, Any] | None = None,
     extra_columns: list[tuple[str, str, bool]] | None = None,
     include_header: bool = True,
-    enforce_row_limit: bool = True,
 ) -> tuple[str, dict[str, Any]]:
     """按 scope 的列配置把行 dict 列表拼成 CSV 文本。
 
@@ -144,12 +142,6 @@ def build_list_csv(
     if extra_columns:
         columns.extend(extra_columns)
     items = inject_custom_columns(rows, config)
-    # 导出兜底：无论调用方是否传 limit=None，写出永远不超过 EXPORT_ROW_LIMIT。
-    # 与 orders/finance 导出端点的 limit=EXPORT_ROW_LIMIT 形成双保险，
-    # 防止后续新增导出端点漏加查询层 limit 时一次性拉爆库或写出超大文件。
-    truncated = enforce_row_limit and len(items) > EXPORT_ROW_LIMIT
-    if truncated:
-        items = items[:EXPORT_ROW_LIMIT]
     report: dict[str, Any] = {"items": items}
     if total is not None:
         report["total"] = total
@@ -173,5 +165,5 @@ def build_list_csv(
             list_columns_service.get_value_labels(db, scope_code)
         ),
         "row_count": len(items),
-        "truncated": truncated,
+        "truncated": False,
     }

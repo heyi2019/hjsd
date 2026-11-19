@@ -38,7 +38,7 @@ def list_orders(
     game_type: str | None = None,
     account_status: str | None = None,
     sort_desc: bool | None = None,
-    limit: int = 100,
+    limit: int | None = 100,
     offset: int = 0,
     user: CurrentUser | None = None,
     mine: bool = False,

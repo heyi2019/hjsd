@@ -17,7 +17,7 @@ from app.settings.auth.session import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
-from app.settings.lists.export import EXPORT_ROW_LIMIT, build_list_csv
+from app.settings.lists.export import build_list_csv
 from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.business.stocks.inventory import (
     inventory_ledger as stocks_inventory_ledger,
@@ -52,7 +52,7 @@ def export_accounts_csv(
 ) -> Response:
     """库存中心按可见列导出 CSV，沿用 /stocks 的权限口径。"""
     accounts = stocks_list_accounts(
-        db, status=status, user=_user, limit=EXPORT_ROW_LIMIT, offset=0
+        db, status=status, user=_user, limit=None, offset=0
     )
     outputs = _account_outputs(
         db,
@@ -173,7 +173,7 @@ def export_inventory_ledger_csv(
         inventory_operator_ids=inventory_operator_ids,
         age_gt_days=age_gt_days,
         sort_desc=sort_desc,
-        limit=EXPORT_ROW_LIMIT,
+        limit=None,
         offset=0,
         user=user,
     )
@@ -200,7 +200,7 @@ def export_inventory_ledger_csv(
         after={
             "rows": len(pairs),
             "total": result["total"],
-            "truncated": result["total"] > EXPORT_ROW_LIMIT,
+            "truncated": False,
             "detail_failures": failed_details,
         },
     )

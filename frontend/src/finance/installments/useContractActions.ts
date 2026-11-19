@@ -145,8 +145,14 @@ export function useContractActions(params: {
 
   const openResale = async (row: Installment) => {
     try {
-      const candidates = await ordersApi.listPage({ status: "COMPLETED", limit: 500, offset: 0 });
-      setResaleOrders(candidates.items);
+      const orders: Order[] = [];
+      while (true) {
+        const page = await ordersApi.listPage({ status: "COMPLETED", limit: 500, offset: orders.length });
+        if (!page.items.length && orders.length < page.total) throw new Error("出售订单读取不完整，请重试");
+        orders.push(...page.items);
+        if (orders.length >= page.total) break;
+      }
+      setResaleOrders(orders);
       resaleForm.resetFields();
       setResaleTarget(row);
       resaleForm.setFieldsValue({ occurred_on: today() });

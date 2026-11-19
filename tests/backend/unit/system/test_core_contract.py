@@ -16,7 +16,7 @@ from app import api_v1
 from app.core.errors import AppError, ErrorCode, NotFound, TokenExpired, Validation, require_condition
 from app.core.money import Amount, to_money
 from app.core.ratelimit import RateLimiter
-from app.shared.numbering import peek_number, sequence_max
+from app.shared.numbering import peek_number
 from app.core.security import (
     ROLE_ADMIN,
     ROLE_OPERATOR,
@@ -65,25 +65,7 @@ class TestNumberingGuards:
             seeded_db.flush()
         seeded_db.rollback()
 
-        seeded_db.add(
-            DocumentSequence(
-                # 800faea 放宽 DB CHECK 至 999999/padding<=6（适配 KU_ 五位），
-                # 序列上限由服务层按 10^padding-1 拦截（SEQUENCE_EXHAUSTED）。
-                sequence_key="OVERFLOW_SEQUENCE", prefix="OF", padding=4,
-                current_value=999999 + 1,
-            )
-        )
-        with pytest.raises(IntegrityError):
-            seeded_db.flush()
-        seeded_db.rollback()
-
-        # padding=4 时 current_value=10000 现在是 DB 层合法值（服务层拦截）
-        seeded_db.add(
-            DocumentSequence(
-                sequence_key="OVER_PADDING4", prefix="OF4", padding=4,
-                current_value=sequence_max(4) + 1,
-            )
-        )
+        seeded_db.add(DocumentSequence(sequence_key="LARGE_SEQUENCE", prefix="OF", padding=4, current_value=1_000_000))
         seeded_db.flush()
         seeded_db.rollback()
 
@@ -102,40 +84,12 @@ class TestNumberingGuards:
             peek_number(seeded_db, "NO_SUCH_KEY")
         assert "尚未初始化" in str(exc.value)
 
-    def test_peek_exhausted_sequence_rejected(self, seeded_db):
-        seeded_db.add(
-            DocumentSequence(
-                sequence_key="FULL_KEY", prefix="FK", padding=4,
-                current_value=sequence_max(4),
-            )
-        )
-        seeded_db.flush()
-        with pytest.raises(Validation) as exc:
-            peek_number(seeded_db, "FULL_KEY")
-        assert "已达上限" in str(exc.value)
-
-    def test_format_next_number_uses_padding_specific_max(self):
-        """预览层上限按 padding 算：5 位序列 9999→10000 不误报、99999→耗尽才报。"""
+    def test_peek_and_format_expand_past_padding(self, seeded_db):
         from app.shared.numbering import format_next_number
-
-        assert sequence_max(4) == 9999
-        assert sequence_max(5) == 99999
-
-        # 缺陷回归：旧实现硬编码 9999，5 位序列到 9999 时预览会误报耗尽
-        assert (
-            format_next_number(
-                sequence_key="CASHFLOW_OUT", prefix="ZC", padding=5, current_value=9999
-            )
-            == "ZC10000"
-        )
-
-        # 真到 5 位上限才抛，且 details.max 是真实上限（非硬编码 9999）
-        with pytest.raises(Validation) as exc:
-            format_next_number(
-                sequence_key="CASHFLOW_OUT", prefix="ZC", padding=5, current_value=99999
-            )
-        assert "已达上限" in str(exc.value)
-        assert exc.value.details["max"] == 99999
+        seeded_db.add(DocumentSequence(sequence_key="FULL_KEY", prefix="FK", padding=4, current_value=9999))
+        seeded_db.flush()
+        assert peek_number(seeded_db, "FULL_KEY") == "FK10000"
+        assert format_next_number(sequence_key="CASHFLOW_OUT", prefix="ZC", padding=5, current_value=99999) == "ZC100000"
 
     def test_like_contains_escapes_wildcards(self):
         """LIKE 元字符必须转义：下划线是单字符通配、百分号是全量通配。"""

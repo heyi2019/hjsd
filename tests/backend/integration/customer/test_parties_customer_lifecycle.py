@@ -186,6 +186,14 @@ class TestListAndGetCustomers:
         with pytest.raises(NotFound):
             get_customer(seeded_db, other.id, _scoped_user())
 
+    def test_customer_detail_keeps_all_audit_records(self, seeded_db):
+        customer = _customer(seeded_db, "审计完整客户", owner_id=9)
+        for index in range(101):
+            record_audit(seeded_db, action=AuditAction.CUSTOMER_UPDATE, entity_type="customer", entity_id=customer.customer_no, actor="pytest", reason=f"记录{index}")
+        seeded_db.flush()
+        detail = get_customer_detail(seeded_db, customer.id)
+        assert {item["reason"] for item in detail["audit"] if item["reason"]} >= {f"记录{index}" for index in range(101)}
+
     def test_customer_detail_aggregates_business_installments_and_audit(self, seeded_db):
         customer = _customer(seeded_db, "详情客户", owner_id=9)
         request_id = "customer-detail-trace-20261017"

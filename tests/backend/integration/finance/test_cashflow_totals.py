@@ -187,10 +187,8 @@ def test_cashflow_export_displays_chinese_labels_like_list(seeded_client, header
 
 def test_export_has_no_row_cap_and_respects_date_range(seeded_client, headers, monkeypatch):
     from app.funds.routers import cashflows_router
-    from app.settings.lists import export
 
     monkeypatch.setattr(cashflows_router, "CASHFLOW_EXPORT_BATCH_SIZE", 3)
-    monkeypatch.setattr(export, "EXPORT_ROW_LIMIT", 2)
     for index in range(3):
         _create(seeded_client, headers, direction="IN", amount="10", note=f"导出测试{index}\n第二行")
     _create(seeded_client, headers, direction="IN", amount="10", note="范围外流水", occurred_on=date(2026, 10, 5))

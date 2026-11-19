@@ -227,7 +227,7 @@ def export_cashflows_csv(
             for row in rows:
                 row["pool_name"] = pool_names.get(row["pool_id"], f"账户 {row['pool_id']}")
             csv_text, meta = build_list_csv(
-                db, "CASHFLOW", rows, include_header=offset == 0, enforce_row_limit=False,
+                db, "CASHFLOW", rows, include_header=offset == 0,
             )
             output.write(csv_text.encode("utf-8"))
             offset += len(rows)

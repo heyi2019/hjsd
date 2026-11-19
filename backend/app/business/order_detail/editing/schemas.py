@@ -61,11 +61,11 @@ class ExecutionPartyEditItem(RequestModel):
 
 
 class ExecutionEditRequest(RequestModel):
-    events: list[ExecutionEditItem] = Field(max_length=100)
-    new_events: list[ExecutionOperationCreateItem] = Field(default_factory=list, max_length=20)
-    cashflows: list[ExecutionCashflowEditItem] = Field(default_factory=list, max_length=100)
-    orders: list[ExecutionOrderEditItem] = Field(default_factory=list, max_length=20)
-    parties: list[ExecutionPartyEditItem] = Field(default_factory=list, max_length=50)
+    events: list[ExecutionEditItem]
+    new_events: list[ExecutionOperationCreateItem] = Field(default_factory=list)
+    cashflows: list[ExecutionCashflowEditItem] = Field(default_factory=list)
+    orders: list[ExecutionOrderEditItem] = Field(default_factory=list)
+    parties: list[ExecutionPartyEditItem] = Field(default_factory=list)
     profile: AccountProfileUpdate | None = None
 
 

@@ -46,6 +46,7 @@ from app.funds.installments.schemas import (
     ScheduleWaiveIn,
 )
 from app.business.schemas import EventCreate
+from app.business.order_detail.editing.schemas import ExecutionEditRequest
 from app.customers.schemas import (
     CounterpartyCreate,
     CounterpartyUpdate,
@@ -55,6 +56,18 @@ from app.customers.schemas import (
     ExtraValueIn,
     MergeRequest,
 )
+
+
+@pytest.mark.parametrize(("field", "item", "count"), [
+    ("events", {"id": 1, "expected_amount": "0", "amount": "0"}, 101),
+    ("new_events", {"operation_type": "DESCRIPTION", "occurred_at": "2026-11-20T10:00:00"}, 21),
+    ("cashflows", {"flow_no": "CF0001"}, 101),
+    ("orders", {"order_id": 1}, 21),
+    ("parties", {"order_id": 1, "entity_type": "customer", "entity_id": 1, "role": "BUYER"}, 51),
+])
+def test_execution_edit_does_not_limit_batch_record_count(field, item, count):
+    payload = {"events": [], field: [item] * count}
+    assert len(getattr(ExecutionEditRequest.model_validate(payload), field)) == count
 
 
 @pytest.mark.parametrize(

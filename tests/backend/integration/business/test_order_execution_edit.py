@@ -15,6 +15,17 @@ from app.business.events import post_event
 from app.core.database import get_db
 
 
+def test_execution_edit_saves_more_than_twenty_operations(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="many-operations", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={
+        "events": [], "new_events": [{"operation_type": "DESCRIPTION", "occurred_at": f"2026-10-02T11:{minute:02d}:00", "operator_user_ids": [1]} for minute in range(21)],
+    })
+    assert response.status_code == 200, response.text
+    events = seeded_db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "OPERATE")).all()
+    assert len(events) == 21
+
+
 def test_new_operation_requires_event_permission(seeded_client, seeded_db):
     from app.business.routers.order_execution_router import edit_order_detail
     from app.core.security import CurrentUser, PERM_ORDER_UPDATE

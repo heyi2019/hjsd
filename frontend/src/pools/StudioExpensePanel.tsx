@@ -249,6 +249,9 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
   const expense = summary?.expense ?? "0.00";
   const netTotal = summary?.net ?? "0.00";
   const flowCount = summary?.count ?? 0;
+  const categoryOptions = Array.from(
+    new Map([...expenseItems, ...INCOME_ITEMS].map((item) => [item.value, item])).values(),
+  );
 
   const columns: ColumnsType<Cashflow> = [
     { title: "流水号", dataIndex: "flow_no" },
@@ -331,11 +334,11 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
         <div className="ui-filter-bar studio-expense-filters studio-expense-filters--single-row">
           <BusinessPeriodPicker label="工作室支出日期区间" state={periodState} showAll />
           <Select
-            aria-label="工作室支出科目"
+            aria-label="工作室收支科目"
             allowClear
             value={category}
             placeholder="全部科目"
-            options={expenseItems}
+            options={categoryOptions}
             onChange={setCategory}
           />
         </div>

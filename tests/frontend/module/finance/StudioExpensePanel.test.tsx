@@ -91,6 +91,20 @@ async function pickDirection(modal: HTMLElement, label: "支出" | "收入") {
 }
 
 describe("StudioExpensePanel：工作室支出", () => {
+  it("科目筛选可选择工作室收入科目", async () => {
+    const income = { ...expenseFlows[0], flow_no: "CF-IN", category: "货款", direction: "IN", amount: "800.00" };
+    vi.mocked(studioExpensesApi.summary).mockImplementation(async (params) =>
+      params?.category === "货款"
+        ? studioExpenseSummary([income] as never, { income: "800.00", net: "800.00" })
+        : studioExpenseSummary(expenseFlows as never));
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    await screen.findByText("CF-001");
+    await ui.click(screen.getByRole("combobox", { name: "工作室收支科目" }));
+    await ui.click(await screen.findByText("货款", { selector: ".ant-select-item-option-content" }));
+    expect(await screen.findByText("CF-IN")).toBeInTheDocument();
+    expect(vi.mocked(studioExpensesApi.summary)).toHaveBeenLastCalledWith(expect.objectContaining({ category: "货款" }));
+    expect(screen.queryByText("CF-001")).toBeNull();
+  });
   it("翻页时加载后端对应页的流水", async () => {
     vi.mocked(studioExpensesApi.summary).mockImplementation(async (params) =>
       studioExpenseSummary([params?.offset === 10 ? expenseFlows[1] : expenseFlows[0]] as never, { count: 201, expense: "3100.00" }));
@@ -100,7 +114,7 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(await screen.findByText("CF-002")).toBeInTheDocument();
     expect(vi.mocked(studioExpensesApi.summary)).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 10 }));
     expect(screen.queryByText("CF-001")).toBeNull();
-    await ui.click(screen.getByRole("combobox", { name: "工作室支出科目" }));
+    await ui.click(screen.getByRole("combobox", { name: "工作室收支科目" }));
     await ui.click(await screen.findByText("房租", { selector: ".ant-select-item-option-content" }));
     await waitFor(() => expect(vi.mocked(studioExpensesApi.summary)).toHaveBeenLastCalledWith(expect.objectContaining({ category: "房租", offset: 0 })));
     expect(await screen.findByText("CF-001")).toBeInTheDocument();
@@ -308,7 +322,7 @@ describe("StudioExpensePanel：工作室支出", () => {
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
 
     // 等第二次请求（切科目）完成，显示新数据。
-    await ui.click(screen.getByRole("combobox", { name: "工作室支出科目" }));
+    await ui.click(screen.getByRole("combobox", { name: "工作室收支科目" }));
     await ui.click(await screen.findByTitle("房租"));
     await screen.findByText("新科目的流水");
 

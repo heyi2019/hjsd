@@ -591,6 +591,59 @@ describe("OrdersPage：四类订单台账", () => {
     expect(within(row as HTMLElement).queryByText("取消")).toBeNull();
   });
 
+  it("回收订单有活跃寄售记录时运营菜单显示下架（与库存中心对齐）", async () => {
+    setupLedgerApi([{ ...orders[0], account_id: 1 }]);
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+      account: { id: 1, source_order_id: 1, source_order_no: "HS-2026-0001", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "100.00" },
+      orders: [{
+        order_id: 1,
+        order_no: "HS-2026-0001",
+        order_type: "HS",
+        trade_date: "2026-10-01",
+        status: "ACTIVE",
+        events: [{
+          id: 29,
+          event_type: "OPERATE",
+          operation_type: "CONSIGNMENT",
+          form_extra: { consignment_platforms: ["千寻"], listed_at: "2026-11-01T10:00" },
+        }],
+      }],
+    } as never);
+    await openLedger("admin");
+
+    const row = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))?.closest("tr");
+    expect(row).not.toBeNull();
+    await ui.click(within(row as HTMLElement).getByRole("button", { name: "运营" }));
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "下架" })).toBeInTheDocument());
+  });
+
+  it("运营下拉在详情缓存过期后仍反映最新寄售记录", async () => {
+    const account = { id: 1, source_order_id: 1, source_order_no: "HS-2026-0001", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "100.00" };
+    const baseOrder = { order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE" };
+    const stale = { account, orders: [{ ...baseOrder, events: [] }] };
+    const fresh = {
+      account,
+      orders: [{
+        ...baseOrder,
+        events: [{ id: 29, event_type: "OPERATE", operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["千寻"], listed_at: "2026-11-19T21:25" } }],
+      }],
+    };
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(stale as never);
+    setupLedgerApi([{ ...orders[0], account_id: 1 }]);
+    await openLedger("admin");
+
+    // 先展开行，让台账缓存一份「无寄售」的旧详情。
+    const row = screen.getAllByText("HS-2026-0001").find((e) => e.closest("tr"))?.closest("tr");
+    fireEvent.click(row!.querySelector(".ant-table-row-expand-icon") as Element);
+    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledWith(1));
+
+    // 随后在别处登记了寄售；回到台账点开运营下拉应拿到最新详情并显示下架。
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(fresh as never);
+    const refreshedRow = screen.getAllByText("HS-2026-0001").find((e) => e.closest("tr"))?.closest("tr");
+    await ui.click(within(refreshedRow as HTMLElement).getByRole("button", { name: "运营" }));
+    await waitFor(() => expect(screen.getByRole("menuitem", { name: "下架" })).toBeInTheDocument());
+  });
+
   it("已售代挂改走取消，不再引导到下架", async () => {
     const soldConsignment = {
       id: 4,

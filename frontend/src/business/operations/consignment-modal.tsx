@@ -124,7 +124,7 @@ export function OrderConsignmentModal(props: {
             rules={[{ required: true, message: "请选择寄售平台" }]}
           >
             {platforms.length ? (
-              <Select aria-label="寄售平台" placeholder="请选择本次上架的平台" options={platforms} />
+              <Select aria-label="寄售平台" placeholder="请选择本次上架的平台" options={platforms} popupMatchSelectWidth />
             ) : (
               <span className="muted">暂无可用寄售平台，请先在中介业务配置中维护经手平台</span>
             )}

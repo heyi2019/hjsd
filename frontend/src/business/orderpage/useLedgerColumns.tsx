@@ -103,7 +103,9 @@ export function useLedgerColumns(params: {
               trigger={["click"]}
               placement="bottomLeft"
               onOpenChange={(open) => {
-                if (open && order.account_id) void loadLedgerDetail(order);
+                // 与库存中心对齐：每次展开运营菜单都强制刷新详情，避免账台缓存的旧寄售记录
+                // 让「下架」入口在别处登记寄售后仍不显示。
+                if (open && order.account_id) void loadLedgerDetail(order, true);
               }}
               menu={{
                 className: "orders-ledger-operation-menu",

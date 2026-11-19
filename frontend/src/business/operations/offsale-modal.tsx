@@ -34,7 +34,7 @@ export function OrderPlatformOffsaleModal(props: {
   account: Account | null;
   records: ActiveConsignment[];
   onClose: () => void;
-  onSystemOffsale: (payload: { reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => void | Promise<void>;
+  onSystemOffsale: (payload: { reason: string; unlisted_at: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => void | Promise<void>;
   onChanged: () => void | Promise<void>;
 }) {
   const [form] = Form.useForm();
@@ -69,7 +69,7 @@ export function OrderPlatformOffsaleModal(props: {
     if (values.listing_id === "SYSTEM") {
       setSubmitting(true);
       try {
-        await props.onSystemOffsale({ reason: values.reason.trim(), operator_user_ids: values.operator_user_ids, form_extra: values.form_extra });
+        await props.onSystemOffsale({ reason: values.reason.trim(), unlisted_at: (values.unlisted_at ?? dayjs()).format("YYYY-MM-DDTHH:mm"), operator_user_ids: values.operator_user_ids, form_extra: values.form_extra });
         form.resetFields();
       } catch (cause) {
         setError(normalizeError(cause));

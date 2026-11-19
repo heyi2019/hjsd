@@ -11,7 +11,6 @@ import type { Account } from "../../shared/api/types/accounts";
 import type { Pool } from "../../shared/api/types/finance";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import type { Order } from "../../shared/api/types/orders";
-import { today } from "../../shared/lib/format";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { consignmentRecords, type ActiveConsignment, unlistAndCancelConsignmentOrders } from "../operations";
 import type { OrderProfileTarget } from "../operations";
@@ -50,7 +49,7 @@ export function useOrderActionModals({
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
   const [cashflowUsers, setCashflowUsers] = useState<EmployeeOption[]>([]);
   const [profileTarget, setProfileTarget] = useState<OrderProfileTarget | null>(null);
-  const [orderOffsaleTarget, setOrderOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
+  const [orderOffsaleTarget, setOrderOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[]; orderId: number } | null>(null);
   /** 扣除公司配置比例后的可分配利润，负数表示可分配的亏损分担额。 */
   const [allocationProfit, setAllocationProfit] = useState<string>("0");
   /** 按操作分配时的动作执行人候选，来自建单/售出操作人和运营信息中的操作人。 */
@@ -194,27 +193,28 @@ export function useOrderActionModals({
       }
       const detail = await ordersApi.executionDetail(sourceOrder.id);
       const records = consignmentRecords(detail.orders);
-      if (!records.length) {
+      if (!records.length && detail.account.inventory_type !== "CONSIGNMENT") {
         appMessage.warning("当前账号没有仍在平台上的寄售记录");
         return;
       }
-      setOrderOffsaleTarget({ account: detail.account, records });
+      setOrderOffsaleTarget({ account: detail.account, records, orderId: sourceOrder.id });
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
   };
 
-  const handleOrderSystemOffsale = async (payload: { reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
+  const handleOrderSystemOffsale = async (payload: { reason: string; unlisted_at: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     const target = orderOffsaleTarget;
     if (!target) return;
     try {
       await unlistAndCancelConsignmentOrders({
         records: target.records,
-        cancelOrderIds: target.records.map((record) => record.orderId),
+        cancelOrderIds: target.records.length ? target.records.map((record) => record.orderId) : [target.account.source_order_id ?? target.orderId],
         note: `系统下架：${payload.reason}`,
         reason: payload.reason,
         operatorUserIds: payload.operator_user_ids,
-        occurredOn: today(),
+        occurredOn: payload.unlisted_at.slice(0, 10),
+        unlistedAt: payload.unlisted_at,
         formExtra: payload.form_extra,
       });
       appMessage.success("寄售记录已下架，账号已出库");
@@ -222,6 +222,7 @@ export function useOrderActionModals({
       await load();
     } catch (error) {
       appMessage.error(normalizeError(error).message);
+      throw error;
     }
   };
 

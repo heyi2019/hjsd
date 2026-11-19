@@ -1,4 +1,5 @@
 import { ordersApi } from "../../shared/api/orders.api";
+import dayjs from "dayjs";
 import type { ActiveConsignment } from "./offsale";
 
 interface SystemOffsaleCancellation {
@@ -12,6 +13,7 @@ interface SystemOffsaleCancellation {
   reason: string;
   /** 事件发生日期（YYYY-MM-DD）。 */
   occurredOn: string;
+  unlistedAt?: string;
   /** 本次下架的操作人，沿用建单/业务事件的默认当前员工并支持多选。 */
   operatorUserIds?: number[];
   /** 下架表单的扩展字段，原样并入两个请求的 form_extra。 */
@@ -31,15 +33,17 @@ export async function unlistAndCancelConsignmentOrders({
   note,
   reason,
   occurredOn,
+  unlistedAt,
   operatorUserIds,
   formExtra,
 }: SystemOffsaleCancellation): Promise<void> {
+  const timestamp = unlistedAt ?? dayjs().format("YYYY-MM-DDTHH:mm");
   await Promise.all(records.map(async (record) => {
     // 同一次下架的两个请求共用同一时间戳，避免分两次取值在分钟边界产生不一致。
     const unlistExtra = {
       ...formExtra,
       platform_unlist_scope: "SYSTEM",
-      platform_unlisted_at: new Date().toISOString().slice(0, 16),
+      platform_unlisted_at: timestamp,
     };
     await ordersApi.postEvent(record.orderId, {
       event_type: "OPERATE",
@@ -61,7 +65,7 @@ export async function unlistAndCancelConsignmentOrders({
     form_extra: {
       ...formExtra,
       platform_unlist_scope: "SYSTEM",
-      platform_unlisted_at: new Date().toISOString().slice(0, 16),
+      platform_unlisted_at: timestamp,
     },
   })));
 }

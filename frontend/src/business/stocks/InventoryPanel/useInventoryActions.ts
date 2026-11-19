@@ -153,7 +153,7 @@ export function useInventoryActions(params: {
       const detail = executionDetails[account.id] ?? await ordersApi.executionDetail(account.source_order_id);
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       const records = consignmentRecords(detail.orders);
-      if (!records.length) {
+      if (!records.length && account.inventory_type !== "CONSIGNMENT") {
         appMessage.warning("当前账号没有仍在平台上的寄售记录");
         return;
       }

@@ -137,26 +137,28 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         account={platformOffsaleTarget?.account ?? null}
         records={platformOffsaleTarget?.records ?? []}
         onClose={() => setPlatformOffsaleTarget(null)}
-        onSystemOffsale={async ({ reason, operator_user_ids, form_extra }) => {
+        onSystemOffsale={async ({ reason, unlisted_at, operator_user_ids, form_extra }) => {
           const target = platformOffsaleTarget;
-          setPlatformOffsaleTarget(null);
-          if (!target || target.records.length === 0) return;
+          if (!target || (!target.records.length && !target.account.source_order_id)) throw new Error("当前账号没有可出库的来源订单");
           try {
             await unlistAndCancelConsignmentOrders({
               records: target.records,
-              cancelOrderIds: target.records.map((record) => record.orderId),
+              cancelOrderIds: target.records.length ? target.records.map((record) => record.orderId) : [target.account.source_order_id!],
               note: `系统下架：${reason}`,
               reason,
               operatorUserIds: operator_user_ids,
-              occurredOn: new Date().toISOString().slice(0, 10),
+              occurredOn: unlisted_at.slice(0, 10),
+              unlistedAt: unlisted_at,
               formExtra: form_extra,
             });
             appMessage.success("寄售记录已下架，账号已出库");
+            setPlatformOffsaleTarget(null);
             await load();
             refreshExecution(target.account);
           } catch (cause) {
             controller.setError(normalizeError(cause));
             await load();
+            throw cause;
           }
         }}
         onChanged={async () => {

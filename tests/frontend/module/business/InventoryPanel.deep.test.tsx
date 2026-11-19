@@ -5,6 +5,7 @@ import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/business/stocks/InventoryPanel";
 import { consignmentRecords } from "@/business/operations/offsale";
+import { unlistAndCancelConsignmentOrders } from "@/business/operations/offsale-service";
 import { installmentsApi } from "@/shared/api/installments.api";
 import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
@@ -313,6 +314,39 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
         form_extra: expect.objectContaining({ platform_unlist_scope: "SYSTEM" }),
       }),
     ));
+  });
+
+  it("代挂没有外部上架记录时仍可出库来源订单", async () => {
+    const account = { ...consignmentRow, source_order_id: 88 } as Account;
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+      ...consignmentDetail,
+      account,
+      orders: [{ ...consignmentDetail.orders[0], events: [] }],
+    });
+    vi.mocked(ordersApi.cancel).mockResolvedValue({ status: "CANCELLED" } as never);
+    await openPanel([account]);
+    await clickOperation(rowOf(1), "下架");
+    const modal = await screen.findByRole("dialog");
+    await ui.click(modal.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(await screen.findByText(/本系统（上架于/, { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("下架原因"), "代挂结束");
+    await ui.click(screen.getByRole("button", { name: "确认出库" }));
+    await waitFor(() => expect(ordersApi.cancel).toHaveBeenCalledWith(88, expect.objectContaining({ reason: "代挂结束" })));
+  });
+
+  it("系统出库将选择的时间同时写入下架事件和取消订单", async () => {
+    const records = consignmentRecords(consignmentDetail.orders);
+    await unlistAndCancelConsignmentOrders({
+      records, cancelOrderIds: [88], note: "系统下架", reason: "代挂结束",
+      occurredOn: "2026-10-20", unlistedAt: "2026-10-20T15:30",
+    });
+    expect(ordersApi.postEvent).toHaveBeenCalledWith(88, expect.objectContaining({
+      occurred_on: "2026-10-20",
+      form_extra: expect.objectContaining({ platform_unlisted_at: "2026-10-20T15:30" }),
+    }));
+    expect(ordersApi.cancel).toHaveBeenCalledWith(88, expect.objectContaining({
+      form_extra: expect.objectContaining({ platform_unlisted_at: "2026-10-20T15:30" }),
+    }));
   });
 
   it("导出：读取明细并提示失败条数", async () => {

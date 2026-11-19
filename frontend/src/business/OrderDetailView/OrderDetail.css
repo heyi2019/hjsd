@@ -377,3 +377,9 @@
   .order-detail__image-upload { width: 8.5rem; height: 8.5rem; }
   .order-detail__image-card > .ant-image { width: 7rem; height: 7rem; }
 }
+
+.order-detail__party-editor { width: 100%; }
+.order-detail__party-row { display: flex; align-items: flex-start; gap: 12px; width: 100%; }
+.order-detail__party-label { flex: 0 0 64px; padding-top: 6px; color: var(--color-text-secondary); }
+.order-detail__party-row .ant-select { flex: 1; min-width: 0; }
+.order-detail__party-create { border-top: 1px solid var(--color-border, #eee); padding: 4px 8px; }

@@ -488,6 +488,52 @@ describe("OrderDetail", () => {
     expect(onRemoveOperationRow).toHaveBeenCalledWith("new:unlist:2");
   });
 
+  it("编辑参与方时保留已有客户角色，并按原角色移除买家", async () => {
+    const detail = { orders: [{ order_id: 22, order_no: "HS0022", order_type: "HS", customers: [{ id: 1, display_name: "卖家", role: "SELLER" }, { id: 2, display_name: "买家", role: "BUYER" }], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
+    vi.spyOn(customersApi, "page").mockResolvedValue({ items: [{ id: 1, customer_no: "C001", display_name: "卖家", status: "ACTIVE" }, { id: 2, customer_no: "C002", display_name: "买家", status: "ACTIVE" }, { id: 3, customer_no: "C003", display_name: "新客户", status: "ACTIVE" }], total: 3, limit: 500, offset: 0 } as never);
+    const onPartyEdit = vi.fn();
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} onPartyEdit={onPartyEdit} />);
+    const select = await screen.findByRole("combobox", { name: "选择卖家" });
+    await waitFor(() => expect(select).toBeEnabled());
+    expect(screen.getByRole("combobox", { name: "选择买家" })).toBeInTheDocument();
+    await userEvent.click(select);
+    await userEvent.click(await screen.findByRole("option", { name: /新客户/ }));
+    expect(onPartyEdit).toHaveBeenCalledTimes(1);
+    expect(onPartyEdit).toHaveBeenCalledWith(22, { entity_type: "customer", entity_id: 3, role: "SELLER" });
+    onPartyEdit.mockClear();
+    const buyerTag = screen.getAllByTitle("C002 · 买家").find((item) => item.closest(".ant-select-selection-item"))!.closest(".ant-select-selection-item")!;
+    await userEvent.click(within(buyerTag as HTMLElement).getByLabelText("close"));
+    expect(onPartyEdit).toHaveBeenCalledTimes(1);
+    expect(onPartyEdit).toHaveBeenCalledWith(22, { entity_type: "customer", entity_id: 2, role: "BUYER", operation: "remove" });
+  });
+
+  it.each([
+    ["HS", ["选择卖家", "选择买家"], false],
+    ["TH", ["选择买家"], true],
+    ["DG", ["选择委托方"], true],
+  ])("%s 订单按业务类型显示参与方角色", async (orderType, customerLabels, hasPartner) => {
+    const detail = { orders: [{ order_id: 22, order_no: "TEST0022", order_type: orderType, customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
+    vi.spyOn(customersApi, "page").mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 } as never);
+    vi.spyOn(counterpartiesApi, "list").mockResolvedValue([]);
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
+    for (const label of customerLabels) expect(await screen.findByRole("combobox", { name: label })).toBeInTheDocument();
+    expect(Boolean(screen.queryByRole("combobox", { name: "选择合作方" }))).toBe(hasPartner);
+  });
+
+  it("参与方多选支持输入新名字并在下拉中新建", async () => {
+    const detail = { orders: [{ order_id: 22, order_no: "HS0022", order_type: "HS", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
+    vi.spyOn(customersApi, "page").mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 } as never);
+    const create = vi.spyOn(customersApi, "create").mockResolvedValue({ customer: { id: 10, customer_no: "C010", display_name: "新卖家", status: "ACTIVE" }, duplicate_candidates: [] } as never);
+    const onPartyEdit = vi.fn();
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} onPartyEdit={onPartyEdit} />);
+    const select = await screen.findByRole("combobox", { name: "选择卖家" });
+    await waitFor(() => expect(select).toBeEnabled());
+    await userEvent.type(select, "新卖家");
+    await userEvent.click(screen.getByRole("button", { name: /新建卖家/ }));
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ display_name: "新卖家" }));
+    expect(onPartyEdit).toHaveBeenCalledWith(22, { entity_type: "customer", entity_id: 10, role: "SELLER" });
+  });
+
   it("客户名单加载失败时保留渠道方选择，并可重试客户加载", async () => {
     const detail = { orders: [{ order_id: 22, order_no: "TH0022", order_type: "TH", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
     vi.spyOn(customersApi, "page").mockRejectedValueOnce(new Error("客户名单读取失败")).mockResolvedValue({ items: [{ id: 1, customer_no: "C001", display_name: "已有客户", status: "ACTIVE" }], total: 1, limit: 500, offset: 0 } as never);
@@ -495,12 +541,12 @@ describe("OrderDetail", () => {
     vi.spyOn(counterpartiesApi, "list").mockResolvedValue([{ id: 2, counterparty_no: "CP002", display_name: "渠道甲", type: "PEER", status: "ACTIVE" }] as never);
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
     expect(await screen.findByText(/客户名单读取失败/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "新建客户" })).toBeDisabled();
-    await userEvent.click(screen.getByRole("combobox", { name: "选择渠道方" }));
+    expect(screen.getByRole("combobox", { name: "选择买家" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("combobox", { name: "选择合作方" }));
     expect(await screen.findByRole("option", { name: /渠道甲/ })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "重新加载" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "新建客户" })).toBeEnabled());
-    await userEvent.click(screen.getByRole("combobox", { name: "选择客户" }));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "选择买家" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("combobox", { name: "选择买家" }));
     expect(await screen.findByRole("option", { name: /已有客户/ })).toBeInTheDocument();
     expect(customersApi.create).not.toHaveBeenCalled();
   });
@@ -511,12 +557,12 @@ describe("OrderDetail", () => {
     vi.spyOn(counterpartiesApi, "list").mockRejectedValueOnce(new Error("渠道名单读取失败")).mockResolvedValue([{ id: 2, counterparty_no: "CP002", display_name: "渠道甲", type: "PEER", status: "ACTIVE" }] as never);
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
     expect(await screen.findByText(/渠道名单读取失败/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "新建渠道方" })).toBeDisabled();
-    await userEvent.click(screen.getByRole("combobox", { name: "选择客户" }));
+    expect(screen.getByRole("combobox", { name: "选择合作方" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("combobox", { name: "选择买家" }));
     expect(await screen.findByRole("option", { name: /已有客户/ })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "重新加载" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "新建渠道方" })).toBeEnabled());
-    await userEvent.click(screen.getByRole("combobox", { name: "选择渠道方" }));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "选择合作方" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("combobox", { name: "选择合作方" }));
     expect(await screen.findByRole("option", { name: /渠道甲/ })).toBeInTheDocument();
   });
 
@@ -528,7 +574,7 @@ describe("OrderDetail", () => {
     vi.spyOn(counterpartiesApi, "list").mockResolvedValue([]);
     const detail = { orders: [{ order_id: 22, order_no: "HS0022", order_type: "HS", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
-    const select = await screen.findByRole("combobox", { name: "选择客户" });
+    const select = await screen.findByRole("combobox", { name: "选择卖家" });
     await userEvent.click(select);
     await userEvent.type(select, "末尾客户");
     expect(await screen.findByRole("option", { name: /末尾客户/ })).toBeInTheDocument();
@@ -557,15 +603,15 @@ describe("OrderDetail", () => {
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
     await settleFieldConfig();
 
-    const customerSelect = screen.getByRole("combobox", { name: "选择客户" });
+    const customerSelect = screen.getByRole("combobox", { name: "选择卖家" });
     await userEvent.click(customerSelect);
     await waitFor(() => expect(screen.getByRole("option", { name: /买家A/ })).toBeInTheDocument());
     await userEvent.type(customerSelect, "买家A");
     expect(screen.getByRole("option", { name: /买家A/ })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /卖家B/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "新建客户名称" })).toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "选择渠道方" })).toBeNull();
-    expect(screen.queryByRole("textbox", { name: "新建渠道方名称" })).toBeNull();
+    expect(screen.getByRole("combobox", { name: "选择买家" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "选择合作方" })).toBeNull();
+
   });
 
   it("编辑态账号与交付补充资料可以修改并写入对应草稿", async () => {

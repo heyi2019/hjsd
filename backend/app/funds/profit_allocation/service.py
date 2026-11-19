@@ -24,17 +24,19 @@ from collections.abc import Mapping
 from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
 from app.core.security import CurrentUser
 from app.domain.enums import OrderStatus
+from app.domain.notifications import Notification
 from app.funds.profit_allocation.schemas import ProfitAllocationItem
 
 from ._shared import _scoped_order
 from .action import set_action_allocations
 from .action_rows import expand_action_form_rows
-from .listing import list_allocations as _list_allocations
+from .listing import collect_allocations, list_allocations as _list_allocations
 from .listing import summarize_allocations_by_type
 from .person import set_person_allocations
 from .terms import (
@@ -84,6 +86,15 @@ def set_allocations(
     if order.status != OrderStatus.COMPLETED.value:
         raise Validation("订单售出完成后才能配置分润", details={"order_id": order_id})
 
+    def snapshot(rows):
+        return frozenset((row["user_id"], row["role"], row["allocation_type"], row["allocation_rate"], row["allocation_amount"]) for row in rows)
+
+    previous_allocations = snapshot(collect_allocations(session, order))
+    pending_sale = session.scalar(select(Notification.id).where(
+        Notification.notification_type == "PROFIT_PENDING", Notification.entity_type == "order",
+        Notification.entity_id == order.order_no, Notification.read_at.is_(None),
+    ).limit(1)) is not None
+
     original_form_extra = order.form_extra
     if form_extra:
         order.form_extra = {**(order.form_extra or {}), **dict(form_extra)}
@@ -115,7 +126,8 @@ def set_allocations(
     from app.dashboard.notifications.triggers import close_pending_profit_for_order, notify_profit_recipients
 
     close_pending_profit_for_order(session, order, actor=actor)
-    notify_profit_recipients(session, order, actor=actor)
+    notify_profit_recipients(session, order, actor=actor,
+                             new_revision=pending_sale or previous_allocations != snapshot(result))
     return result
 
 

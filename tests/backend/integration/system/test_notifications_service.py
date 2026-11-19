@@ -254,6 +254,25 @@ def test_set_allocations_repeat_is_idempotent(seeded_db):
     _set_person_allocations(seeded_db, order, items)
     _set_person_allocations(seeded_db, order, items)
     assert len(_notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)) == 1
+    notification = _notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)[0]
+    notification_service.mark_read(seeded_db, notification.id, recipient_user_id=recipient_id, actor="pytest")
+    changed = [{"user_id": recipient_id, "role": "OWNER", "allocation_rate": "60"},
+               {"user_id": None, "role": "OWNER", "allocation_rate": "40"}]
+    _set_person_allocations(seeded_db, order, changed)
+    rows = _notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)
+    assert len(rows) == 2
+    assert sum(row.read_at is None for row in rows) == 1
+    _set_person_allocations(seeded_db, order, changed)
+    assert len(_notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)) == 2
+
+    sell_event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
+    post_event(seeded_db, order.id, event_type="CANCEL", amount="800", occurred_on=TODAY2,
+               actor="pytest", offset_event_id=sell_event.id, reason="取消售出")
+    _sell(seeded_db, order, operator_ids=[_uid(seeded_db, "seeduser1")])
+    _set_person_allocations(seeded_db, order, changed)
+    rows = _notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)
+    assert len(rows) == 3
+    assert sum(row.read_at is None for row in rows) == 1
 
 def test_company_allocation_is_not_notified(seeded_db):
     """公司归属（user_id 为空）不通知，只通知绑定的利润接收人。"""

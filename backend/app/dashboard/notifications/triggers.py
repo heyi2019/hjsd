@@ -95,7 +95,7 @@ def notify_seller_to_allocate(
     return created
 
 
-def notify_profit_recipients(session: Session, order: Order, *, actor: str) -> int:
+def notify_profit_recipients(session: Session, order: Order, *, actor: str, new_revision: bool = False) -> int:
     """段②：分润配置保存后通知利润接收人（排除公司归属），返回新建条数。
 
     仅在订单已 COMPLETED 时发送；分润配置入口本身也只接受已售订单。
@@ -106,12 +106,25 @@ def notify_profit_recipients(session: Session, order: Order, *, actor: str) -> i
         select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order.id)
     ).all()
     created = 0
-    for row in rows:
-        if row.user_id is None or (row.allocation_type or "").upper() == "COMPANY":
-            continue  # 公司归属不绑定人员，不通知
+    recipient_ids = {row.user_id for row in rows if row.user_id is not None and (row.allocation_type or "").upper() != "COMPANY"}
+    for recipient_id in sorted(recipient_ids):
+        if new_revision:
+            previous = session.scalars(select(Notification).where(
+                Notification.recipient_user_id == recipient_id, Notification.notification_type == PROFIT_ALLOCATED,
+                Notification.entity_type == "order", Notification.entity_id == order.order_no,
+                Notification.read_at.is_(None),
+            )).all()
+            for notification in previous:
+                notification.read_at = now_second()
+                notification.updated_by = actor
+            create_notification(session, recipient_user_id=recipient_id, notification_type=PROFIT_ALLOCATED,
+                title="订单分润已配置", message=f"订单 {order.order_no} 分润配置已保存，请到收益明细查看。",
+                entity_type="order", entity_id=order.order_no, actor=actor)
+            created += 1
+            continue
         _row, is_new = ensure_notification(
             session,
-            recipient_user_id=row.user_id,
+            recipient_user_id=recipient_id,
             notification_type=PROFIT_ALLOCATED,
             title="订单分润已配置",
             message=f"订单 {order.order_no} 分润配置已保存，请到收益明细查看。",

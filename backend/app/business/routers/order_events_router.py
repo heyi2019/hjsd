@@ -119,6 +119,8 @@ def post_event(
                 details={"allowed_event_types": ["BUY", "SELL"], "event_type": event_type},
             )
     operation_type = (payload.operation_type or "").strip().upper()
+    if event_type == "OPERATE" and operation_type == "UNLIST" and str((payload.form_extra or {}).get("platform_unlist_scope") or "").strip().upper() == "SYSTEM":
+        raise Validation("本系统下架请通过下架操作执行")
     if event_type == "OPERATE" and operation_type in {"CONSIGNMENT", "UNLIST"}:
         event, flow = post_consignment_operation(
             db,

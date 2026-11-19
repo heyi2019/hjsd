@@ -76,22 +76,40 @@ def test_linked_unlisting_time_remains_editable(seeded_client, seeded_db, header
     assert unlisting.occurred_on == date(2026, 10, 3)
 
 
-@pytest.mark.parametrize("order_type, expected", [("HS", 422), ("TH", 422), ("DG", 200)])
-def test_new_system_unlisting_only_for_consignment_order(seeded_client, seeded_db, headers, order_type, expected):
+@pytest.mark.parametrize("order_type", ["HS", "TH", "DG"])
+def test_detail_edit_cannot_create_system_unlisting(seeded_client, seeded_db, headers, order_type):
     inventory_type = {"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}[order_type]
     account = create_account(seeded_db, game_account=f"system-unlist-{order_type}", business_mode="SELF" if order_type == "HS" else "DISTRIBUTION", inventory_type=inventory_type, actor="pytest")
     order = create_order(seeded_db, order_type=order_type, trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [], "new_events": [{"operation_type": "UNLIST", "occurred_at": "2026-10-02T11:00:00", "form_extra": {"platform_unlist_scope": "SYSTEM"}}]})
-    assert response.status_code == expected, response.text
+    assert response.status_code == 422, response.text
 
 
-@pytest.mark.parametrize("order_type", ["HS", "TH"])
-def test_edit_system_unlisting_rejected_for_non_consignment_order(seeded_client, seeded_db, headers, order_type):
-    account = create_account(seeded_db, game_account=f"edit-system-unlist-{order_type}", business_mode="SELF" if order_type == "HS" else "DISTRIBUTION", inventory_type="RECOVERY" if order_type == "HS" else "PICKUP", actor="pytest")
+def test_single_event_endpoint_cannot_fake_system_unlisting(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="direct-system-unlist", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    response = seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json={"event_type": "OPERATE", "operation_type": "UNLIST", "occurred_on": "2026-10-02", "form_extra": {"platform_unlist_scope": "SYSTEM"}})
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.parametrize("order_type", ["HS", "TH", "DG"])
+def test_edit_platform_unlisting_cannot_be_changed_to_system(seeded_client, seeded_db, headers, order_type):
+    account = create_account(seeded_db, game_account=f"edit-system-unlist-{order_type}", business_mode="SELF" if order_type == "HS" else "DISTRIBUTION", inventory_type={"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}[order_type], actor="pytest")
     order = create_order(seeded_db, order_type=order_type, trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     event, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"platform_unlist_scope": "PLATFORM", "consignment_platforms": ["平台甲"]})
     response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "UNLIST", "platform_unlist_scope": "SYSTEM"}}]})
     assert response.status_code == 422, response.text
+
+
+def test_existing_system_unlisting_target_locked_but_time_editable(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="existing-system-unlist", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    event, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"platform_unlist_scope": "SYSTEM"})
+    url = f"/api/v1/orders/{order.id}/execution-edit"
+    response = seeded_client.patch(url, headers=headers, json={"events": [{"id": event.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "UNLIST", "platform_unlist_scope": "PLATFORM", "consignment_platforms": ["平台甲"]}}]})
+    assert response.status_code == 422, response.text
+    response = seeded_client.patch(url, headers=headers, json={"events": [{"id": event.id, "expected_amount": "0", "amount": "0", "occurred_at": "2026-10-03T11:00:00"}]})
+    assert response.status_code == 200, response.text
 
 
 def test_order_edit_updates_event_flow_and_cost_without_changing_time(seeded_client, seeded_db, headers):

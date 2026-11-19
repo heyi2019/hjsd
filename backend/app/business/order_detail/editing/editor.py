@@ -27,10 +27,9 @@ def edit_execution_detail(db: Session, order_id: int, payload: ExecutionEditRequ
     account = db.scalar(select(Account).where(Account.id == order.account_id).with_for_update())
     if account is None:
         raise Validation("订单未关联库存账号", details={"order_id": order_id})
-    if order.order_type != "DG":
-        for item in payload.new_events:
-            if item.operation_type == "UNLIST" and (item.form_extra or {}).get("platform_unlist_scope") == "SYSTEM":
-                raise Validation("只有代挂订单可以选择本系统下架")
+    for item in payload.new_events:
+        if item.operation_type == "UNLIST" and (item.form_extra or {}).get("platform_unlist_scope") == "SYSTEM":
+            raise Validation("本系统下架请通过下架操作执行")
     if len({item.id for item in payload.events}) != len(payload.events):
         raise Validation("同一执行记录不能重复修改")
     if len({item.flow_no for item in payload.cashflows}) != len(payload.cashflows):

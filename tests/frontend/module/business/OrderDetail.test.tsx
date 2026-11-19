@@ -63,11 +63,17 @@ describe("OrderDetail", () => {
     expect(screen.getByRole("combobox", { name: "编辑下架平台" })).toBeDisabled();
     expect(screen.getByLabelText("编辑下架平台时间")).not.toBeDisabled();
   });
-  it.each([["HS", false], ["TH", false], ["DG", true]] as const)("%s 订单按业务类型显示本系统下架选项", async (orderType, allowed) => {
+  it.each(["HS", "TH", "DG"] as const)("%s 订单详情不能新增本系统下架", async (orderType) => {
     renderLight(<OrderDetailOperationSection meta={{}} account={account} editing orderType={orderType} />);
     fireEvent.mouseDown(screen.getByRole("combobox", { name: "编辑下架平台" }).closest(".ant-select-selector")!);
-    if (allowed) expect(await screen.findByText("本系统", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
-    else expect(screen.queryByText("本系统", { selector: ".ant-select-item-option-content" })).toBeNull();
+    expect(screen.queryByText("本系统", { selector: ".ant-select-item-option-content" })).toBeNull();
+    if (orderType === "DG") expect(screen.getByText(/本系统下架请/)).toBeInTheDocument();
+  });
+  it("历史本系统下架锁定目标但仍可编辑时间", () => {
+    const unlist = { id: 9, event_type: "OPERATE", operation_type: "UNLIST", amount: "0", occurred_at: "2026-10-02T11:00:00", form_extra: { operation_type: "UNLIST", platform_unlist_scope: "SYSTEM" } } as never;
+    renderLight(<OrderDetailOperationSection meta={{}} account={account} editing orderType="DG" operationEvents={{ unlist: [unlist] }} />);
+    expect(screen.getByRole("combobox", { name: "编辑下架平台" })).toBeDisabled();
+    expect(screen.getByLabelText("编辑下架平台时间")).not.toBeDisabled();
   });
   it("多条运营记录按各自事件展示平台和寄售价", () => {
     expect(resolveOperationEventContent("consignment", "盼之 / 寄售价 ¥88.00", {

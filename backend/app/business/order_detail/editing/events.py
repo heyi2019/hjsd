@@ -99,12 +99,12 @@ def validate_event_edits(
         if Decimal(str(event.amount)) != item.expected_amount:
             raise Conflict("执行记录已被修改，请刷新后重试")
         original_extra = event.form_extra or {}
-        if event.event_type == "OPERATE" and original_extra.get("operation_type") == "UNLIST" and original_extra.get("consignment_event_id") is not None and item.form_extra is not None:
+        if event.event_type == "OPERATE" and original_extra.get("operation_type") == "UNLIST" and (original_extra.get("consignment_event_id") is not None or original_extra.get("platform_unlist_scope") == "SYSTEM") and item.form_extra is not None:
             protected = ("operation_type", "consignment_event_id", "consignment_platforms", "platform_unlist_scope")
             if any(item.form_extra.get(key) != original_extra.get(key) for key in protected):
                 raise Validation("已关联上架记录的下架平台及范围不能直接修改")
-        if order.order_type != "DG" and event.event_type == "OPERATE" and (event.form_extra or {}).get("operation_type") == "UNLIST" and item.form_extra is not None and item.form_extra.get("platform_unlist_scope") == "SYSTEM":
-            raise Validation("只有代挂订单可以选择本系统下架")
+        if event.event_type == "OPERATE" and original_extra.get("operation_type") == "UNLIST" and original_extra.get("platform_unlist_scope") != "SYSTEM" and item.form_extra is not None and item.form_extra.get("platform_unlist_scope") == "SYSTEM":
+            raise Validation("本系统下架请通过下架操作执行")
         if event.event_type == "OPERATE" and (event.form_extra or {}).get("operation_type") == "CONSIGNMENT" and item.form_extra is not None:
             old_platforms = (event.form_extra or {}).get("consignment_platforms") or []
             new_platforms = item.form_extra.get("consignment_platforms") or []

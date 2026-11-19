@@ -1,3 +1,4 @@
+import { CfgItem, FieldConfigScope } from "../../business/ConfigurableField";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Card, Form, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -64,11 +65,11 @@ export function OptionDictionarySection({ code, title, description }: { code: st
   return <Card size="small" title={title}>
     <ErrorBanner error={error} onRetry={() => void reloadSection()} /><Typography.Paragraph type="secondary">{description}</Typography.Paragraph>
     <DataTable<OptionItem> columns={columns} rows={rows} page={1} pageSize={Math.max(rows.length, 10)} total={rows.length} emptyText={`暂无${title}`} onPageChange={() => undefined} pagination={false} rowKey="value" />
-    <PermissionGate permission="option-set.manage"><BusinessRegistrationForm form={form} layout="inline" onFinish={save}>
-      <Form.Item name="option" label={title} rules={[{ required: true, message: `请输入${title}` }]}><Input placeholder={`请输入${title}`} /></Form.Item>
+    <PermissionGate permission="option-set.manage"><FieldConfigScope scope="SYSDICT" active={true}><BusinessRegistrationForm form={form} layout="inline" onFinish={save}>
+      <CfgItem name="option" label={title} rules={[{ required: true, message: `请输入${title}` }]}><Input placeholder={`请输入${title}`} /></CfgItem>
       <Form.Item><PermissionButton permission="option-set.manage" type="primary" htmlType="submit">{editingValue ? `保存${title}` : `新增${title}`}</PermissionButton></Form.Item>
       {editingValue ? <Form.Item><PermissionButton permission="option-set.manage" onClick={() => { setEditingValue(null); form.resetFields(); }}>取消编辑</PermissionButton></Form.Item> : null}
-    </BusinessRegistrationForm></PermissionGate>
+    </BusinessRegistrationForm></FieldConfigScope></PermissionGate>
   </Card>;
 }
 

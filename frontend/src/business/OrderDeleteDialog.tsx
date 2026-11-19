@@ -1,3 +1,4 @@
+import { CfgItem, FieldConfigScope } from "./ConfigurableField";
 import { Form, Input, Modal, Typography } from "antd";
 import { useEffect } from "react";
 import type { Order } from "../shared/api/types/orders";
@@ -36,12 +37,12 @@ export function OrderDeleteDialog({ order, submitting, onCancel, onConfirm }: {
       <Typography.Paragraph type="secondary">
         订单、事件、资金流水、分润、分期、返点、押金和订单关联等数据都会被清除，删除原因将写入审计日志。
       </Typography.Paragraph>
-      <Form
+      <FieldConfigScope scope="ORDDELETE" active={Boolean(order)}><Form
         form={form}
         layout="vertical"
         onFinish={(values) => void onConfirm(values.reason.trim())}
       >
-        <Form.Item
+        <CfgItem alwaysActive
           name="reason"
           label="删除原因"
           rules={[
@@ -60,8 +61,8 @@ export function OrderDeleteDialog({ order, submitting, onCancel, onConfirm }: {
             showCount
             placeholder="请填写删除原因（必填，将写入审计日志）"
           />
-        </Form.Item>
-      </Form>
+        </CfgItem>
+      </Form></FieldConfigScope>
     </Modal>
   );
 }

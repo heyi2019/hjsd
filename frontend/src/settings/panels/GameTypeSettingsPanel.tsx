@@ -1,3 +1,4 @@
+import { CfgItem, FieldConfigScope } from "../../business/ConfigurableField";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Checkbox, Form, Input, InputNumber, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -21,7 +22,8 @@ export function GameTypeSettingsPanel() {
 
   const submit = async (values: { game_type_name: string; sort_order?: number; is_default?: boolean; channel_regions?: string[] }) => {
     try {
-      const payload = { name: values.game_type_name, sort_order: Number(values.sort_order ?? 0), channel_regions: (values.channel_regions ?? []).map((item) => item.trim()).filter(Boolean) };
+      const previous = rows.find((row) => row.id === editingId);
+      const payload = { name: values.game_type_name, sort_order: Number(values.sort_order ?? previous?.sort_order ?? 0), channel_regions: (values.channel_regions ?? previous?.channel_regions ?? []).map((item) => item.trim()).filter(Boolean) };
       if (editingId === null) {
         // 后端 create 支持 is_default（自动清其他默认项）；update 不支持，编辑态不传。
         await gameTypesApi.create(values.is_default ? { ...payload, is_default: true } : payload);
@@ -150,14 +152,14 @@ export function GameTypeSettingsPanel() {
       <PermissionGate permission="order-type.manage">
         <div className="game-type-settings__container">
           <Typography.Title level={5}>{editingId === null ? "新增游戏类型" : "编辑游戏类型"}</Typography.Title>
-          <BusinessRegistrationForm form={form} layout="inline" onFinish={submit} initialValues={{ sort_order: 0 }}>
-            <Form.Item name="game_type_name" label="游戏类型" rules={[{ required: true, message: "请输入游戏类型" }]}> 
+          <FieldConfigScope scope="SYSGAME" active={true}><BusinessRegistrationForm form={form} layout="inline" onFinish={submit} initialValues={{ sort_order: 0 }}>
+            <CfgItem name="game_type_name" label="游戏类型" rules={[{ required: true, message: "请输入游戏类型" }]}>
               <Input name="game_type_name" autoComplete="off" placeholder="如：王者荣耀" />
-            </Form.Item>
-            <Form.Item name="sort_order" label="排序">
+            </CfgItem>
+            <CfgItem name="sort_order" label="排序">
               <InputNumber min={0} />
-            </Form.Item>
-            <Form.Item name="channel_regions" label="渠道／区服">
+            </CfgItem>
+            <CfgItem name="channel_regions" label="渠道／区服">
               <Select
                 mode="tags"
                 showSearch
@@ -166,11 +168,11 @@ export function GameTypeSettingsPanel() {
                 notFoundContent="回车即可新增"
                 className="ui-control-width-260"
               />
-            </Form.Item>
+            </CfgItem>
             {editingId === null ? (
-              <Form.Item name="is_default" valuePropName="checked" label="默认类型">
+              <CfgItem name="is_default" valuePropName="checked" label="默认类型">
                 <Checkbox>新建表单自动带出（保存后其他类型取消默认）</Checkbox>
-              </Form.Item>
+              </CfgItem>
             ) : null}
             <Form.Item>
               <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">
@@ -182,7 +184,7 @@ export function GameTypeSettingsPanel() {
                 <PermissionButton permission="order-type.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
               </Form.Item>
             )}
-          </BusinessRegistrationForm>
+          </BusinessRegistrationForm></FieldConfigScope>
         </div>
       </PermissionGate>
     </section>

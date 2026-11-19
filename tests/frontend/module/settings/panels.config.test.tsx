@@ -1,9 +1,10 @@
 /** 配置类只读面板——编号序列与业务提醒。 */
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { sequencesApi } from "@/shared/api/misc.api";
 import { optionSetsApi } from "@/shared/api/options.api";
+import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { SequencesPanel } from "@/settings/panels/SequencesPanel";
 import { BusinessReminderSettingsPanel } from "@/settings/panels/BusinessReminderSettingsPanel";
 
@@ -111,13 +112,23 @@ describe("BusinessReminderSettingsPanel", () => {
 
   it("业务提醒正常加载后保存按钮可用（L1659 反向保障）", async () => {
     vi.mocked(optionSetsApi).get.mockResolvedValue({
-      options: [{ value: "inventory_aging_days", label: "库存订单超过多少天提醒", value2: "7" }],
+      options: [{ value: "inventory_aging_days", label: "7" }, { value: "profit_notifications_enabled", label: "1" }],
     } as never);
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue([
+      { field_key: "inventoryAgingDays", label: "提醒天数", is_active: true, required: true, field_type: "NUMBER" },
+      { field_key: "profitNotificationsEnabled", label: "分润", is_active: false, required: false, field_type: "BOOLEAN" },
+    ] as never);
     vi.mocked(optionSetsApi).update.mockResolvedValue(undefined as never);
     renderLight(<BusinessReminderSettingsPanel />, { user: "admin" });
 
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /保存配置/ })).toBeEnabled(),
     );
+    expect(await screen.findByText("提醒天数")).toBeInTheDocument();
+    expect(screen.queryByText("新的分润通知")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /保存配置/ }));
+    await waitFor(() => expect(optionSetsApi.update).toHaveBeenCalledWith("BUSINESS_OVERVIEW_REMINDERS", expect.objectContaining({
+      options: expect.arrayContaining([{ value: "profit_notifications_enabled", label: "1" }]),
+    })));
   });
 });

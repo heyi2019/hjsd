@@ -1,3 +1,4 @@
+import { CfgItem, FieldConfigScope } from "../../business/ConfigurableField";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Card, Form, Input, Space, Switch, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -72,8 +73,8 @@ export function PoolsPanel() {
       await poolsApi.update(editing.id, {
         name: values.name as string,
         pool_type: values.pool_type as string,
-        is_default: Boolean(values.is_default),
-        note: (values.note as string) || null,
+        is_default: values.is_default === undefined ? editing.is_default : Boolean(values.is_default),
+        note: values.note === undefined ? editing.note : (values.note as string) || null,
       });
       appMessage.success("资金账户已更新");
       setEditing(null);
@@ -130,36 +131,36 @@ export function PoolsPanel() {
         permission="pool.manage"
         fallback={<Typography.Paragraph type="secondary">当前角色无主数据维护权限。</Typography.Paragraph>}
       >
-        <BusinessRegistrationForm form={form} layout="inline" onFinish={submit}>
-          <Form.Item name="code" rules={[{ required: true }]}>
+        <FieldConfigScope scope="SYSPOOL" active={true}><BusinessRegistrationForm form={form} layout="inline" onFinish={submit}>
+          <CfgItem name="code" rules={[{ required: true }]}>
             <Input placeholder="请输入资金账户编码" />
-          </Form.Item>
-          <Form.Item name="name" rules={[{ required: true }]}>
+          </CfgItem>
+          <CfgItem name="name" rules={[{ required: true }]}>
             <Input placeholder="显示名" />
-          </Form.Item>
-          <Form.Item name="is_default" valuePropName="checked">
+          </CfgItem>
+          <CfgItem name="is_default" valuePropName="checked">
             <Switch checkedChildren="默认" unCheckedChildren="否" />
-          </Form.Item>
+          </CfgItem>
           <Form.Item>
             <PermissionButton permission="pool.manage" type="primary" htmlType="submit" disabled={Boolean(error)}>
               新增资金账户
             </PermissionButton>
           </Form.Item>
-        </BusinessRegistrationForm>
+        </BusinessRegistrationForm></FieldConfigScope>
       </PermissionGate>
       <BusinessActionModal title={editing ? `编辑资金账户 · ${editing.code}` : "编辑资金账户"} fieldCount={5} open={Boolean(editing)} onCancel={() => { setEditing(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} okText="保存">
         <InlineError error={editing ? error : null} />
-        <BusinessRegistrationForm
+        <FieldConfigScope scope="SYSPOOL" active={true}><BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} form={editForm} onFinish={update}>
           <Form.Item label="代码"><Input value={editing?.code} disabled /></Form.Item>
-          <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="pool_type" label="用途类型" rules={[{ required: true }]}><Select options={poolTypeOptions} /></Form.Item>
-          <Form.Item name="is_default" label="默认账户" valuePropName="checked" extra="未指定资金账户的流水进默认账户"><Switch checkedChildren="是" unCheckedChildren="否" /></Form.Item>
-          <Form.Item name="note" label="备注"><Input.TextArea rows={3} /></Form.Item>
-        </BusinessRegistrationForm>
+          <CfgItem name="name" label="名称" rules={[{ required: true }]}><Input /></CfgItem>
+          <CfgItem name="pool_type" label="用途类型" rules={[{ required: true }]}><Select options={poolTypeOptions} /></CfgItem>
+          <CfgItem name="is_default" label="默认账户" valuePropName="checked" extra="未指定资金账户的流水进默认账户"><Switch checkedChildren="是" unCheckedChildren="否" /></CfgItem>
+          <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
+        </BusinessRegistrationForm></FieldConfigScope>
       </BusinessActionModal>
     </Card>
   );

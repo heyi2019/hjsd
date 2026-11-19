@@ -52,6 +52,8 @@ def test_scopes_endpoint_lists_all_scopes(seeded_client, headers):
     assert by_code["STUDIOEXP"]["group"] == "STUDIO"
     # 既有作用域仍在清单中
     assert by_code["HS"]["label"] == "回收建单"
+    for code in ("ORDDELETE", "INVDELETE", "SYSREMIND", "SYSGAME", "SYSDICT", "SYSFIELD", "SYSORDER", "SYSPOOL"):
+        assert by_code[code]["group"] == "SYSTEM"
 
 
 def test_operation_scope_seeds_match_registry(seeded_db):
@@ -70,6 +72,20 @@ def test_operation_scope_seeds_match_registry(seeded_db):
     }
     assert operation_codes <= seeded_codes
     assert operation_codes | {"ALLOCATION", "INVEDIT"} <= registry_codes
+    for code in ("ORDDELETE", "INVDELETE", "SYSREMIND", "SYSGAME", "SYSDICT", "SYSFIELD", "SYSORDER", "SYSPOOL"):
+        assert code in seeded_codes
+    from app.business.form_fields import create_order_form_field, set_order_form_field_active, update_order_form_field
+    reason = seeded_db.scalar(select(OrderFormField).where(OrderFormField.order_type_code == "ORDDELETE", OrderFormField.field_key == "reason"))
+    assert reason.required and reason.locked
+    with pytest.raises(Validation, match="不可停用"):
+        set_order_form_field_active(seeded_db, reason.id, False, actor="pytest")
+    with pytest.raises(Validation, match="不可改为选填"):
+        update_order_form_field(seeded_db, reason.id, required=False, actor="pytest")
+    with pytest.raises(Validation, match="不能新增自定义字段"):
+        create_order_form_field(seeded_db, order_type_code="ORDDELETE", field_key="extra", label="附加字段", actor="pytest")
+    optional = seeded_db.scalar(select(OrderFormField).where(OrderFormField.order_type_code == "SYSREMIND", OrderFormField.field_key == "profitNotificationsEnabled"))
+    set_order_form_field_active(seeded_db, optional.id, False, actor="pytest")
+    assert not optional.is_active
 
 
 def test_allocation_scope_has_core_field_seeds(seeded_db):

@@ -304,7 +304,7 @@ describe("OrderFormFieldsPanel", () => {
         sort_order: 20,
       }),
     ));
-    expect(vi.mocked(orderFormFieldsApi).list).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(orderFormFieldsApi).list.mock.calls.filter(([scope]) => scope === "HS")).toHaveLength(2);
   });
 
   it("归属板块支持运营信息", async () => {
@@ -379,7 +379,7 @@ describe("OrderFormFieldsPanel", () => {
     await waitFor(() =>
       expect(vi.mocked(orderFormFieldsApi).update).toHaveBeenCalledWith(50, { required: true }),
     );
-    expect(vi.mocked(orderFormFieldsApi).list).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(orderFormFieldsApi).list.mock.calls.filter(([scope]) => scope === "HS")).toHaveLength(2);
   });
 
   it("已必填字段再次点击行内开关改为选填", async () => {

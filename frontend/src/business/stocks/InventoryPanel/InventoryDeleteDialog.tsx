@@ -1,3 +1,4 @@
+import { CfgItem, FieldConfigScope } from "../../ConfigurableField";
 import { Form, Input, Modal, Typography } from "antd";
 import { useEffect } from "react";
 import type { Account } from "../../../shared/api/types/accounts";
@@ -43,12 +44,12 @@ export function InventoryDeleteDialog({ account, submitting, onCancel, onConfirm
       <Typography.Paragraph type="secondary">
         该库存及关联订单、资金流水、分润、分期、返点、押金和订单关系等内容都会被清除；删除原因将写入审计日志。
       </Typography.Paragraph>
-      <Form
+      <FieldConfigScope scope="INVDELETE" active={Boolean(account)}><Form
         form={form}
         layout="vertical"
         onFinish={(values) => void onConfirm(values.reason.trim())}
       >
-        <Form.Item
+        <CfgItem alwaysActive
           name="reason"
           label="删除原因"
           rules={[
@@ -67,8 +68,8 @@ export function InventoryDeleteDialog({ account, submitting, onCancel, onConfirm
             showCount
             placeholder="请填写删除原因（必填，将写入审计日志）"
           />
-        </Form.Item>
-      </Form>
+        </CfgItem>
+      </Form></FieldConfigScope>
     </Modal>
   );
 }

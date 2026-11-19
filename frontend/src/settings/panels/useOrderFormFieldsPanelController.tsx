@@ -221,6 +221,8 @@ export function useOrderFormFieldsPanelController({
 
   const submit = async (values: Record<string, unknown>) => {
     try {
+      // 系统表单允许隐藏控件；编辑时保留隐藏字段已有值，避免保存时重置配置。
+      values = { ...form.getFieldsValue(true), ...values };
       const sortOrder = Number(values.sort_order ?? 0);
       const condField = (values.cond_field as string | undefined) ?? undefined;
       const op = ((values.cond_op as string | undefined) ?? "eq") as "eq" | "ne" | "filled";

@@ -5,6 +5,7 @@ import { orderFormFieldsApi } from "../shared/api/orders.api";
 
 /** 作用域所属模块，设置面板按此分组展示。 */
 export const FORM_SCOPE_GROUP_LABEL: Record<string, string> = {
+  SYSTEM: "系统设置",
   ORDER: "建单表单",
   ORDEROP: "订单操作",
   INVENTORY: "库存中心",

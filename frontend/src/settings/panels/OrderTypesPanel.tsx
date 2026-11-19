@@ -1,3 +1,4 @@
+import { CfgItem, FieldConfigScope } from "../../business/ConfigurableField";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Form, Input, Space, Switch, Typography, InputNumber } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -52,9 +53,9 @@ export function OrderTypesPanel() {
     try {
       await orderTypesApi.update(editTarget.id, {
         name: values.name as string,
-        is_zero_principal: Boolean(values.is_zero_principal),
-        description: (values.description as string) || null,
-        sort_order: values.sort_order as number,
+        is_zero_principal: values.is_zero_principal === undefined ? editTarget.is_zero_principal : Boolean(values.is_zero_principal),
+        description: values.description === undefined ? editTarget.description : (values.description as string) || null,
+        sort_order: (values.sort_order as number | undefined) ?? editTarget.sort_order,
       });
       appMessage.success("业务类型已更新");
       setEditTarget(null);
@@ -129,46 +130,46 @@ export function OrderTypesPanel() {
         okText="创建"
         onOk={() => void createForm.submit()}
       >
-        <BusinessRegistrationForm
+        <FieldConfigScope scope="SYSORDER" active={true}><BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} form={createForm} onFinish={create} initialValues={{ sort_order: 0 }}>
-          <Form.Item name="code" label="代码" rules={[
+          <CfgItem name="code" label="代码" rules={[
             { required: true, message: "请输入类型代码" },
             { pattern: /^[A-Z0-9]{2,10}$/, message: "2-10 位大写字母或数字，创建后不可修改" },
           ]}>
             <Input placeholder="请输入类型代码" maxLength={10} />
-          </Form.Item>
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入类型名称" }]}>
+          </CfgItem>
+          <CfgItem name="name" label="名称" rules={[{ required: true, message: "请输入类型名称" }]}>
             <Input placeholder="例如 新业务" maxLength={64} />
-          </Form.Item>
-          <Form.Item name="is_zero_principal" label="零本金" valuePropName="checked" extra="勾选后该业务不垫付本金，登记本金支出会被拒绝">
+          </CfgItem>
+          <CfgItem name="is_zero_principal" label="零本金" valuePropName="checked" extra="勾选后该业务不垫付本金，登记本金支出会被拒绝">
             <Switch checkedChildren="是" unCheckedChildren="否" />
-          </Form.Item>
-          <Form.Item name="sequence_prefix" label="编号前缀" extra="选填，默认等于代码；订单编号 = 前缀 + 日期 + 序号">
+          </CfgItem>
+          <CfgItem name="sequence_prefix" label="编号前缀" extra="选填，默认等于代码；订单编号 = 前缀 + 日期 + 序号">
             <Input placeholder="默认同代码" maxLength={16} />
-          </Form.Item>
-          <Form.Item name="sort_order" label="排序">
+          </CfgItem>
+          <CfgItem name="sort_order" label="排序">
             <InputNumber min={0} precision={0} className="ui-control-full" />
-          </Form.Item>
-          <Form.Item name="description" label="说明">
+          </CfgItem>
+          <CfgItem name="description" label="说明">
             <Input.TextArea rows={3} placeholder="选填" />
-          </Form.Item>
-        </BusinessRegistrationForm>
+          </CfgItem>
+        </BusinessRegistrationForm></FieldConfigScope>
       </BusinessActionModal>
       <BusinessActionModal title={editTarget ? `编辑业务类型 · ${editTarget.code}` : "编辑业务类型"} fieldCount={5} open={Boolean(editTarget)} onCancel={() => { setEditTarget(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} okText="保存">
-        <BusinessRegistrationForm
+        <FieldConfigScope scope="SYSORDER" active={true}><BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} form={editForm} onFinish={update}>
           <Form.Item label="代码"><Input value={editTarget?.code} disabled /></Form.Item>
-          <Form.Item name="name" label="名称" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="is_zero_principal" label="零本金" valuePropName="checked"><Switch checkedChildren="是" unCheckedChildren="否" /></Form.Item>
-          <Form.Item name="sort_order" label="排序"><InputNumber min={0} precision={0} className="ui-control-full" /></Form.Item>
-          <Form.Item name="description" label="说明"><Input.TextArea rows={3} /></Form.Item>
-        </BusinessRegistrationForm>
+          <CfgItem name="name" label="名称" rules={[{ required: true }]}><Input /></CfgItem>
+          <CfgItem name="is_zero_principal" label="零本金" valuePropName="checked"><Switch checkedChildren="是" unCheckedChildren="否" /></CfgItem>
+          <CfgItem name="sort_order" label="排序"><InputNumber min={0} precision={0} className="ui-control-full" /></CfgItem>
+          <CfgItem name="description" label="说明"><Input.TextArea rows={3} /></CfgItem>
+        </BusinessRegistrationForm></FieldConfigScope>
       </BusinessActionModal>
     </section>
   );

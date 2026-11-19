@@ -28,8 +28,17 @@ GROUP_PARTY = "PARTY"
 GROUP_INSTALLMENT = "INSTALLMENT"
 GROUP_FUND = "FUND"
 GROUP_STUDIO = "STUDIO"
+GROUP_SYSTEM = "SYSTEM"
 
 FORM_SCOPES: list[FormScope] = [
+    FormScope("ORDDELETE", "删除订单确认", GROUP_SYSTEM),
+    FormScope("INVDELETE", "删除库存确认", GROUP_SYSTEM),
+    FormScope("SYSREMIND", "业务提醒设置", GROUP_SYSTEM),
+    FormScope("SYSGAME", "游戏类型设置", GROUP_SYSTEM),
+    FormScope("SYSDICT", "中介业务字典", GROUP_SYSTEM),
+    FormScope("SYSFIELD", "表单字段编辑", GROUP_SYSTEM),
+    FormScope("SYSORDER", "业务类型设置", GROUP_SYSTEM),
+    FormScope("SYSPOOL", "资金账户设置", GROUP_SYSTEM),
     # -- 订单表单 --
     FormScope("HS", "回收建单", GROUP_ORDER),
     FormScope("TH", "提号建单", GROUP_ORDER),

@@ -1,3 +1,4 @@
+import { CfgGroup, CfgItem, FieldConfigScope } from "../../business/ConfigurableField";
 /** 字段编辑表单 JSX：从 useOrderFormFieldsPanelController 逐字提取（纯渲染函数，不调用 hooks）。 */
 import { Form, Input, InputNumber, Space, Switch } from "antd";
 import type { FormInstance } from "antd";
@@ -39,7 +40,7 @@ export function renderOrderFormFieldEditorForm(params: {
   } = params;
   return (
     <PermissionGate permission="field-definition.manage">
-      <BusinessRegistrationForm
+      <FieldConfigScope scope="SYSFIELD" active={true}><BusinessRegistrationForm
         form={form}
         id={editorFormId}
         layout="inline"
@@ -47,10 +48,10 @@ export function renderOrderFormFieldEditorForm(params: {
         className="ui-form-spaced"
         initialValues={{ field_type: "TEXT", sort_order: 0, section: "EXTRA" }}
       >
-        <Form.Item name="field_key" label="字段键" rules={[{ required: true }, { pattern: /^[a-z][a-z0-9_]*$/, message: "仅支持小写字母与下划线，且以小写字母开头" }]}>
+        <CfgItem alwaysActive name="field_key" label="字段键" rules={[{ required: true }, { pattern: /^[a-z][a-z0-9_]*$/, message: "仅支持小写字母与下划线，且以小写字母开头" }]}>
           <Input placeholder="按小写字母和下划线填写" disabled={editingId !== null} />
-        </Form.Item>
-        <Form.Item
+        </CfgItem>
+        <CfgItem alwaysActive
           name="label"
           label="标签"
           rules={[{ required: true }]}
@@ -58,24 +59,24 @@ export function renderOrderFormFieldEditorForm(params: {
           extra={fixedLabelField ? "系统统一术语，全站统一显示，不可改名" : undefined}
         >
           <Input placeholder="页面显示名" disabled={fixedLabelField} />
-        </Form.Item>
-        <Form.Item name="field_type" label="类型">
+        </CfgItem>
+        <CfgItem name="field_type" label="类型">
           <Select options={editorFieldTypeOptions} className="ui-control-width-180" disabled={editingId !== null} />
-        </Form.Item>
-        <Form.Item name="section" label="归属板块">
+        </CfgItem>
+        <CfgItem name="section" label="归属板块">
           <Select
             options={orderedSectionOptions}
             className="ui-control-width-160"
             popupClassName="order-form-section-filter-pop"
           />
-        </Form.Item>
+        </CfgItem>
         {editorSection === "FINANCE" ? (
-          <Form.Item name="flow_direction" label="资金流向性质">
+          <CfgItem name="flow_direction" label="资金流向性质">
             <Select allowClear placeholder="请选择资金流向性质" options={[...FLOW_DIRECTION_OPTIONS]} className="ui-control-width-160" popupClassName="order-form-field-option-pop" />
-          </Form.Item>
+          </CfgItem>
         ) : null}
         {needsOptions && !managedOptionField && (
-          <Form.Item label="选项（值 / 展示名）">
+          <CfgGroup name="options" label="选项（值 / 展示名）">
             <Form.List name="options">
               {(fields, { add, remove }) => (
                 <Space direction="vertical" className="ui-control-full">
@@ -98,7 +99,7 @@ export function renderOrderFormFieldEditorForm(params: {
                 </Space>
               )}
             </Form.List>
-          </Form.Item>
+          </CfgGroup>
         )}
         {editingField?.field_key === "game_type" && onConfigureGameTypes ? (
           <Form.Item>
@@ -132,15 +133,15 @@ export function renderOrderFormFieldEditorForm(params: {
             </PermissionButton>
           </Form.Item>
         ) : null}
-        <Form.Item
+        <CfgItem
           name="required"
           label="必填"
           valuePropName="checked"
           tooltip={condFieldKey ? "已配置条件必填，二者互斥；清空依赖字段即可改回必填" : undefined}
         >
           <Switch disabled={Boolean(condFieldKey)} />
-        </Form.Item>
-        <Form.Item name="cond_field" label="条件必填·依赖字段">
+        </CfgItem>
+        <CfgItem name="cond_field" label="条件必填·依赖字段">
           <Select
             allowClear
             showSearch
@@ -153,14 +154,14 @@ export function renderOrderFormFieldEditorForm(params: {
               if (value) form.setFieldsValue({ required: false, cond_op: form.getFieldValue("cond_op") ?? "eq" });
             }}
           />
-        </Form.Item>
+        </CfgItem>
         {condFieldKey ? (
-          <Form.Item name="cond_op" label="条件" initialValue="eq">
+          <CfgItem name="cond_op" label="条件" initialValue="eq">
             <Select options={CONDITION_OP_OPTIONS} className="ui-control-width-110" popupClassName="order-form-field-option-pop" />
-          </Form.Item>
+          </CfgItem>
         ) : null}
         {condFieldKey && condOp !== "filled" ? (
-          <Form.Item name="cond_values" label="触发值">
+          <CfgItem name="cond_values" label="触发值">
             <Select
               mode="tags"
               options={triggerOptions}
@@ -168,9 +169,9 @@ export function renderOrderFormFieldEditorForm(params: {
               className="ui-control-width-200"
               popupClassName="order-form-field-option-pop"
             />
-          </Form.Item>
+          </CfgItem>
         ) : null}
-        <Form.Item name="sort_order" label="排序"><InputNumber min={0} className="ui-control-width-90" /></Form.Item>
+        <CfgItem name="sort_order" label="排序"><InputNumber min={0} className="ui-control-width-90" /></CfgItem>
         <Form.Item>
           <PermissionButton permission="field-definition.manage" type="primary" htmlType="submit" form={editorFormId}>
             {editingId === null ? "新增字段" : "保存字段"}
@@ -181,7 +182,7 @@ export function renderOrderFormFieldEditorForm(params: {
             <PermissionButton permission="field-definition.manage" onClick={cancelEditing}>取消编辑</PermissionButton>
           </Form.Item>
         )}
-      </BusinessRegistrationForm>
+      </BusinessRegistrationForm></FieldConfigScope>
     </PermissionGate>
   );
 

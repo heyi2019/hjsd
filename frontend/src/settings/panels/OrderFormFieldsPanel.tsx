@@ -117,7 +117,7 @@ export function OrderFormFieldsPanel({
           }}
         />
       </div>
-      {editingId === null ? (
+      {editingId === null && !groupedScopeOptions.find((group) => group.label === "系统设置")?.options.some((option) => option.value === activeType) ? (
         <div className="order-form-fields__container order-form-fields__create-container">
           <Typography.Title level={5}>新增自定义字段</Typography.Title>
           {editorForm}

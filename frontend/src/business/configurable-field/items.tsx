@@ -56,6 +56,13 @@ export function CfgItem(props: {
   );
 }
 
+/** 为 Form.List 等自己管理字段名的组合控件提供配置驱动的显示与标签。 */
+export function CfgGroup(props: { name: string; label: string; children: ReactNode }): ReactElement | null {
+  const cfg = useFieldConfig();
+  if (!isFieldActive(cfg, props.name)) return null;
+  return <Form.Item label={fieldLabel(cfg, props.name, props.label)}>{props.children}</Form.Item>;
+}
+
 /** 若 children 内的 Select / Select 未显式传 options，且字段配置带有选项集，则注入。
  *  动态数据源下拉（options 由 pools.map 等运行时计算）因显式传了 options 不会被覆盖。 */
 export function injectOptionsIfMissing(

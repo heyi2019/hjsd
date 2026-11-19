@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.shared.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AuditAction
+from app.domain.form_scopes import FORM_SCOPES, GROUP_SYSTEM
 from app.domain.trade import OrderFormField
 from app.shared.form_field_rules import (
     FIELD_TYPES, FIELD_KEY_PATTERN, ORDER_TYPE_CODE_PATTERN, _UNSET,
@@ -33,6 +34,8 @@ def create_order_form_field(
 ) -> OrderFormField:
     """新增自定义表单字段；核心字段由种子锁定，不在 UI 暴露新增入口。"""
     code = (order_type_code or "").strip().upper()
+    if any(scope.code == code and scope.group == GROUP_SYSTEM for scope in FORM_SCOPES):
+        raise Validation("系统表单仅支持配置现有字段，不能新增自定义字段")
     if not ORDER_TYPE_CODE_PATTERN.match(code):
         raise Validation(
             "业务类型 code 必须为 2-10 位大写字母或数字",
@@ -133,6 +136,9 @@ def update_order_form_field(
         raise NotFound(
             f"表单字段 {definition_id} 不存在", details={"order_form_field_id": definition_id}
         )
+    if definition.locked and any(scope.code == definition.order_type_code and scope.group == GROUP_SYSTEM for scope in FORM_SCOPES):
+        if required is False or (required_when is not _UNSET and required_when is not None):
+            raise Validation("系统必填字段不可改为选填或条件必填")
     if label is not None:
         if not isinstance(label, str) or not label.strip():
             raise Validation("字段名称不能为空", details={"field": "label"})
@@ -290,6 +296,8 @@ def delete_order_form_field(session: Session, definition_id: int, *, actor: str)
         raise NotFound(
             f"表单字段 {definition_id} 不存在", details={"order_form_field_id": definition_id}
         )
+    if any(scope.code == definition.order_type_code and scope.group == GROUP_SYSTEM for scope in FORM_SCOPES):
+        raise Validation("系统表单内置字段不可删除")
     if definition.locked:
         raise Validation(
             f"核心字段 {definition.label} 已锁定，不可删除（仅可改必填/停用）",

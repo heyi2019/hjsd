@@ -25,6 +25,29 @@ BUSINESS_RESPONSIBLE_FIELD_SEEDS = (
     ("DG", "代挂操作人"),
 )
 
+# 系统表单的内置字段；配置编辑器自身也保留字段定义，关键控件由前端强制保留。
+SYSTEM_FORM_FIELDS = {
+    "ORDDELETE": [("reason", "删除原因", "TEXT", True)],
+    "INVDELETE": [("reason", "删除原因", "TEXT", True)],
+    "SYSREMIND": [("inventoryAgingDays", "库存订单超过多少天提醒", "NUMBER", True), ("profitNotificationsEnabled", "新的分润通知", "BOOLEAN", False), ("overdueInstallmentsEnabled", "逾期合约提醒", "BOOLEAN", False)],
+    "SYSGAME": [("game_type_name", "游戏类型", "TEXT", True), ("sort_order", "排序", "NUMBER", False), ("channel_regions", "渠道／区服", "MULTI_SELECT", False), ("is_default", "默认类型", "BOOLEAN", False)],
+    "SYSDICT": [("option", "字典项", "TEXT", True)],
+    "SYSFIELD": [("field_key", "字段键", "TEXT", True), ("label", "标签", "TEXT", True), ("field_type", "类型", "SELECT", False), ("section", "归属板块", "SELECT", False), ("flow_direction", "资金流向性质", "SELECT", False), ("options", "选项（值 / 展示名）", "MULTI_SELECT", False), ("required", "必填", "BOOLEAN", False), ("cond_field", "条件必填·依赖字段", "SELECT", False), ("cond_op", "条件", "SELECT", False), ("cond_values", "触发值", "MULTI_SELECT", False), ("sort_order", "排序", "NUMBER", False)],
+    "SYSORDER": [("code", "代码", "TEXT", True), ("name", "名称", "TEXT", True), ("is_zero_principal", "零本金", "BOOLEAN", False), ("sequence_prefix", "编号前缀", "TEXT", False), ("sort_order", "排序", "NUMBER", False), ("description", "说明", "TEXT", False)],
+    "SYSPOOL": [("code", "代码", "TEXT", True), ("name", "名称", "TEXT", True), ("pool_type", "用途类型", "SELECT", True), ("is_default", "默认账户", "BOOLEAN", False), ("note", "备注", "TEXT", False)],
+}
+
+
+def seed_system_form_fields(session: Session, *, actor: str = "system") -> None:
+    for code, fields in SYSTEM_FORM_FIELDS.items():
+        for index, (key, label, field_type, required) in enumerate(fields):
+            existing = session.scalar(select(OrderFormField).where(OrderFormField.order_type_code == code, OrderFormField.field_key == key))
+            if existing is None:
+                session.add(OrderFormField(order_type_code=code, field_key=key, label=label,
+                    field_type=field_type, required=required, is_active=True, locked=required,
+                    is_custom=False, sort_order=index * 10, section="EXTRA", created_by=actor, updated_by=actor))
+    session.flush()
+
 
 def seed_business_responsible_fields(session: Session, *, actor: str = "system") -> None:
     """注册三类建单负责人字段；重复执行不覆盖管理员已保存的配置。"""
@@ -311,4 +334,5 @@ def seed_catalog(session: Session, *, actor: str = "system") -> None:
         values = {**values, "created_by": actor, "updated_by": actor}
         session.add(OrderFormField(**values))
     seed_business_responsible_fields(session, actor=actor)
+    seed_system_form_fields(session, actor=actor)
     session.flush()

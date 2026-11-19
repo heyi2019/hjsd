@@ -1,5 +1,6 @@
 import { api } from "./client";
 import type { Installment, InstallmentCancelResult, InstallmentDisposition, InstallmentScheduleInput, InstallmentTotals, Schedule } from "./types/installments";
+import type { SaleCustomerInput } from "./orders-api/orders";
 
 /** 分期列表与合计共用同一套筛选条件：改一处即两处同步，杜绝「列表按新条件、合计按旧条件」。 */
 export interface InstallmentListParams {
@@ -34,7 +35,7 @@ export const installmentsApi = {
       .then((r) => r.data),
   create: (payload: Partial<Installment> & { first_due_on: string; adjust_final_period?: boolean; schedule?: InstallmentScheduleInput[]; operator_user_ids?: number[] }) =>
     api.post<Installment>("/installments", payload).then((r) => r.data),
-  stockSale: (payload: Partial<Installment> & { order_id: number; first_due_on: string; paid_on: string; pool_id?: number; adjust_final_period?: boolean; schedule?: InstallmentScheduleInput[]; operator_user_ids?: number[] }) =>
+  stockSale: (payload: Partial<Installment> & { order_id: number; first_due_on: string; paid_on: string; pool_id?: number; adjust_final_period?: boolean; schedule?: InstallmentScheduleInput[]; operator_user_ids?: number[]; customer_input?: SaleCustomerInput; delivery_form_extra?: Record<string, unknown> }) =>
     api.post<Installment>("/installments/stock-sale", payload).then((r) => r.data),
   pay: (
     id: number,

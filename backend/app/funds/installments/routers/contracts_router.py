@@ -26,6 +26,7 @@ from app.funds.installments import create as inst_create
 from app.funds.installments import queries as inst_queries
 from app.funds.installments.repayments.pay import pay as inst_pay
 from app.business.events import post_event as orders_post_event
+from app.business.sale import apply_sale_details
 from app.settings.lists import service as list_columns_service
 from app.settings.lists.export import build_list_csv, detail_json
 from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
@@ -170,6 +171,8 @@ def create_stock_sale(
     """售出、建立合约与首付款在同一个请求事务中完成。"""
     if not (user.has(PERM_ORDER_EVENT_POST) or user.has(PERM_FINANCE_ORDER_EVENT_POST)):
         raise PermissionDenied("当前角色无权登记售出及分期收款")
+    apply_sale_details(db, payload.order_id, customer_input=payload.customer_input,
+                       delivery_form_extra=payload.delivery_form_extra, user=user)
     orders_post_event(
         db, payload.order_id, event_type="SELL", sale_mode="INSTALLMENT",
         amount=payload.principal, occurred_on=payload.paid_on, actor=_actor(user),

@@ -3,19 +3,14 @@ import { appMessage } from "../../../shared/ui/appFeedback";
 import { Form } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useRef, useState } from "react";
-import { customersApi } from "../../../shared/api/customers.api";
-import { loadCustomers } from "../../../shared/api/loadCustomers";
-import { ordersApi } from "../../../shared/api/orders.api";
 import { employeesApi } from "../../../shared/api/org.api";
 import { poolsApi } from "../../../shared/api/pools.api";
 import { installmentsApi, type SaleInstallmentPlan } from "../../../shared/api/installments.api";
 import type { Account } from "../../../shared/api/types/accounts";
-import type { Customer } from "../../../shared/api/types/customers";
 import type { Pool } from "../../../shared/api/types/finance";
 import type { EmployeeOption } from "../../../shared/api/types/org";
 import { currentDevUser, normalizeError } from "../../../shared/api/client";
 import { useSession } from "../../../shared/state/session";
-import { today } from "../../../shared/lib/format";
 import { BusinessActionModal, BusinessRegistrationForm, ErrorBanner, PermissionButton } from "../../../shared/ui";
 import { CustomFieldSection, FieldConfigScope } from "../../ConfigurableField";
 import { resizeInstallmentSchedule } from "../../InstallmentScheduleFields";
@@ -62,11 +57,6 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const { account, inventoryType, title = "售出账号", buyerInfoTitle = "买家信息" } = props;
   const resolvedType = inventoryType;
   const isConsignment = resolvedType === "CONSIGNMENT";
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [customersReady, setCustomersReady] = useState(false);
-  const [customersLoading, setCustomersLoading] = useState(false);
-  const [customerError, setCustomerError] = useState<{ message: string; code?: string } | null>(null);
-  const [customerRetry, setCustomerRetry] = useState(0);
   const [pools, setPools] = useState<Pool[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -145,25 +135,6 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setCustomersReady(false);
-    setCustomersLoading(true);
-    setCustomerError(null);
-    void loadCustomers().then((customerList) => {
-      if (cancelled) return;
-      setCustomers(customerList);
-      setCustomersReady(true);
-      setCustomerError(null);
-    }).catch((cause) => {
-      if (!cancelled) setCustomerError(normalizeError(cause));
-    }).finally(() => {
-      if (!cancelled) setCustomersLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, [open, customerRetry]);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
     void Promise.all([poolsApi.list(), employeesApi.list()])
       .then(([poolList, employeeList]) => {
         if (cancelled) return;
@@ -184,10 +155,6 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const submit = async (values: Record<string, unknown>) => {
     if (!props.account) return;
     const customerNickname = String(values.customer_nickname ?? "").trim();
-    if (customerNickname && !customersReady) {
-      if (!customerError) setCustomerError({ message: "客户名单正在加载，请稍后重试" });
-      return;
-    }
     const sourceOrderId = props.account.source_order_id;
     if (sourceOrderId == null) {
       setError({ message: "该库存账号未关联到入库订单，无法在其上登记售出" });
@@ -218,47 +185,16 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
         return;
       }
       values.operator_user_ids = operatorUserIds;
-      // 售出登记在原买入订单上，买家建档后挂到来源单。
-      if (customerNickname) {
-        const customerPhone = values.customer_phone as string | undefined;
-        const customerWechat = values.customer_wechat as string | undefined;
-        const existingCustomer = customers.find((customer) =>
-          customer.display_name === customerNickname
-          && ((customerPhone && customer.phone === customerPhone)
-            || (customerWechat && customer.wechat === customerWechat)
-            || (!customerPhone && !customerWechat)),
-        );
-        const customer = existingCustomer ?? (await customersApi.create({
-          display_name: customerNickname,
-          contact_name: values.customer_contact_name as string | undefined,
-          phone: customerPhone,
-          wechat: customerWechat,
-          qq: values.customer_qq as string | undefined,
-          source: values.customer_source as string | undefined,
-          note: values.note as string | undefined,
-        })).customer;
-        if (customer.status === "DISABLED" || customer.status === "MERGED") {
-          setError({
-            message: customer.status === "MERGED"
-              ? "客户已合并，不能作为售出买家"
-              : "客户已拉黑，不能作为售出买家",
-          });
-          return;
-        }
-        await ordersApi.addCustomerRole(sourceOrderId, {
-          customer_id: customer.id,
-          role: buyerRoleOf(resolvedType),
-        });
-      }
-
-      if (values.payment_method === "INSTALLMENT") {
-        await collectInstallmentPayment({ sourceOrderId, values });
-        appMessage.success("分期售出已创建，账号已进入分期中");
-      } else {
-        await collectFullPayment({ sourceOrderId, values, isConsignment });
-        appMessage.success("账号已售出");
-      }
-      // 售出表单的交付信息是卖号交付的事实来源；统一 merge 到来源订单，详情直接复用这一组字段。
+      const customerInput = customerNickname ? {
+        display_name: customerNickname,
+        role: buyerRoleOf(resolvedType),
+        contact_name: values.customer_contact_name as string | undefined,
+        phone: values.customer_phone as string | undefined,
+        wechat: values.customer_wechat as string | undefined,
+        qq: values.customer_qq as string | undefined,
+        source: (values.customer_source === "其他" ? values.customer_source_other : values.customer_source) as string | undefined,
+        note: values.note as string | undefined,
+      } : undefined;
       const deliveryFormExtra: Record<string, unknown> = {};
       for (const key of ["bound_phone", "bound_phone_owner", "intermediary_platform", "intermediary_type", "compensation_type"]) {
         const value = values[key];
@@ -268,8 +204,12 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
         ? (values.delivery_responsible_ids as unknown[]).filter((id): id is number => typeof id === "number")
         : [];
       if (deliveryResponsibleIds.length > 0) deliveryFormExtra.delivery_responsible_ids = deliveryResponsibleIds;
-      if (Object.keys(deliveryFormExtra).length > 0) {
-        await ordersApi.patch(sourceOrderId, { form_extra: deliveryFormExtra });
+      if (values.payment_method === "INSTALLMENT") {
+        await collectInstallmentPayment({ sourceOrderId, values, customerInput, deliveryFormExtra });
+        appMessage.success("分期售出已创建，账号已进入分期中");
+      } else {
+        await collectFullPayment({ sourceOrderId, values, isConsignment, customerInput, deliveryFormExtra });
+        appMessage.success("账号已售出");
       }
       form.resetFields();
       props.onClose();
@@ -297,7 +237,6 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
       }
     >
       <ErrorBanner error={error} />
-      <ErrorBanner error={customerError} onRetry={!customersLoading ? () => setCustomerRetry((value) => value + 1) : undefined} />
       <InventoryAccountSummary account={props.account} />
       <FieldConfigScope scope={saleScope ?? ""} active={open && Boolean(saleScope)}>
         <BusinessRegistrationForm

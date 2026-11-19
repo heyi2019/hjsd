@@ -4,7 +4,8 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.security import CurrentUser
+from app.core.security import CurrentUser, PERM_CUSTOMER_CREATE
+from app.core.errors import PermissionDenied
 from app.domain.parties import Counterparty, Customer
 from app.customers.counterparties import create_counterparty
 from app.customers.customers import create_customer
@@ -13,7 +14,7 @@ from .schemas import CounterpartyDraftInput, CustomerDraftInput
 
 
 def resolve_customer_role(
-    session: Session, draft: CustomerDraftInput | None, user: CurrentUser
+    session: Session, draft: CustomerDraftInput | None, user: CurrentUser, *, require_create_permission: bool = False,
 ) -> tuple[int, str] | None:
     if draft is None:
         return None
@@ -38,6 +39,8 @@ def resolve_customer_role(
         None,
     )
     if customer is None:
+        if require_create_permission and not user.has(PERM_CUSTOMER_CREATE):
+            raise PermissionDenied("当前角色无权新建客户")
         customer = create_customer(
             session,
             display_name=draft.display_name,

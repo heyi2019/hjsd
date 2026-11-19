@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from app.core.money import to_money
 from app.core.schemas import RequestModel
 from app.shared.installment_amounts import total_receivable
+from app.business.schemas import CustomerDraftInput
 
 
 class ScheduleCreate(RequestModel):
@@ -88,6 +89,8 @@ class StockSaleIn(InstallmentCreate):
     contract_type: Literal["STOCK_SALE"] = "STOCK_SALE"
     paid_on: date
     pool_id: int | None = Field(default=None, gt=0)
+    customer_input: CustomerDraftInput | None = None
+    delivery_form_extra: dict[str, object] | None = None
 
 
 class ScheduleOut(BaseModel):

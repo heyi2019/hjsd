@@ -64,6 +64,7 @@ beforeEach(() => {
     }) as never);
   resolveMock(vi.mocked(ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(ordersApi.postEvent), {});
+  resolveMock(vi.mocked(ordersApi.stockSale), {});
   resolveMock(vi.mocked(ordersApi.addCustomerRole), { id: 21 });
   resolveMock(vi.mocked(customersApi.page), { items: [{ id: 7, display_name: "买家A", status: "ACTIVE" }], total: 1, limit: 500, offset: 0 });
   resolveMock(vi.mocked(poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
@@ -748,62 +749,39 @@ it.each([RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal])("已选售�
   const employeeOptions = screen.getAllByText("小红", { selector: ".ant-select-item-option-content" });
   await saleUi.click(employeeOptions[employeeOptions.length - 1]);
   vi.mocked(employeesApi.list).mockReturnValue(new Promise(() => {}));
-  vi.mocked(ordersApi.postEvent).mockReturnValue(new Promise(() => {}));
+  vi.mocked(ordersApi.stockSale).mockReturnValue(new Promise(() => {}));
   const form = screen.getByLabelText(amountLabel).closest("form")!;
   fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
-  await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(ordersApi.stockSale).toHaveBeenCalledTimes(1));
   fireEvent.submit(form);
   expect(employeesApi.list).toHaveBeenCalledTimes(1);
   expect(screen.getByRole("button", { name: /确认售出/ })).toHaveClass("ant-btn-loading");
-  expect(ordersApi.postEvent).toHaveBeenCalledTimes(1);
+  expect(ordersApi.stockSale).toHaveBeenCalledTimes(1);
 });
 
-it("不填写客户时，客户名单加载中仍可售出", async () => {
-  vi.mocked(customersApi.page).mockReturnValueOnce(new Promise(() => {}));
+it("不填写客户时仍可售出", async () => {
   const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
   renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
   await saleUi.type(await screen.findByLabelText("售出金额"), "350");
   await saleUi.click(screen.getByLabelText("资金账户"));
   await saleUi.click(await screen.findByText(/利润池/));
   await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
-  await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(21, expect.objectContaining({ event_type: "SELL", amount: "350" })));
+  await waitFor(() => expect(ordersApi.stockSale).toHaveBeenCalledWith(21, expect.objectContaining({ amount: "350" })));
   expect(customersApi.create).not.toHaveBeenCalled();
   expect(ordersApi.addCustomerRole).not.toHaveBeenCalled();
 });
 
-it("填写客户时，名单加载失败可重试后再售出", async () => {
-  vi.mocked(customersApi.page).mockRejectedValueOnce(new Error("客户读取失败"));
+it("填写客户时无需预先加载完整客户名单", async () => {
   const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
   renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-  expect(await screen.findByText(/客户读取失败/)).toBeInTheDocument();
+  await screen.findByText("买家信息");
   await saleUi.type(screen.getByLabelText("客户昵称"), "买家A");
   await saleUi.type(screen.getByLabelText("售出金额"), "350");
   await saleUi.click(screen.getByLabelText("资金账户"));
   await saleUi.click(await screen.findByText(/利润池/));
   await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
-  expect(customersApi.create).not.toHaveBeenCalled();
-  expect(ordersApi.postEvent).not.toHaveBeenCalled();
-  await saleUi.click(screen.getByRole("button", { name: "重新加载" }));
-  await waitFor(() => expect(screen.queryByText(/客户读取失败/)).not.toBeInTheDocument());
-  await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
-  await waitFor(() => expect(ordersApi.addCustomerRole).toHaveBeenCalledWith(21, { customer_id: 7, role: "BUYER" }));
-});
-
-it("售出时匹配第500条以后的已有客户", async () => {
-  const first = Array.from({ length: 500 }, (_, index) => ({ id: index + 1, display_name: `客户${index + 1}`, status: "ACTIVE" }));
-  const last = { id: 501, display_name: "末尾买家", status: "ACTIVE" };
-  vi.mocked(customersApi.list).mockResolvedValue(first as never);
-  vi.mocked(customersApi.page).mockImplementation(async (params) => ({ items: params?.offset ? [last] : first, total: 501, limit: 500, offset: params?.offset ?? 0 }) as never);
-  const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
-  renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-  await screen.findByText("买家信息");
-  await saleUi.type(screen.getByLabelText("客户昵称"), "末尾买家");
-  await saleUi.type(screen.getByLabelText("售出金额"), "350");
-  await saleUi.click(screen.getByLabelText("资金账户"));
-  await saleUi.click(await screen.findByText(/利润池/));
-  await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
-  await waitFor(() => expect(ordersApi.addCustomerRole).toHaveBeenCalledWith(21, { customer_id: 501, role: "BUYER" }));
-  expect(customersApi.create).not.toHaveBeenCalled();
+  await waitFor(() => expect(ordersApi.stockSale).toHaveBeenCalledWith(21, expect.objectContaining({ customer_input: expect.objectContaining({ display_name: "买家A", role: "BUYER" }) })));
+  expect(customersApi.page).not.toHaveBeenCalled();
 });
 
 it("售出时把新买家关联到来源单而非新建订单", async () => {
@@ -823,12 +801,14 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
   await saleUi.click(await screen.findByText(/利润池/));
   fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
 
-  await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalledWith(expect.objectContaining({ display_name: "新买家" })));
+  await waitFor(() => expect(vi.mocked(ordersApi.stockSale)).toHaveBeenCalledWith(21, expect.objectContaining({
+    customer_input: expect.objectContaining({ display_name: "新买家", role: "BUYER" }),
+    amount: "350", pool_id: 3, operator_user_ids: [1],
+  })));
   expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
-  expect(vi.mocked(ordersApi.addCustomerRole)).toHaveBeenCalledWith(21, { customer_id: 8, role: "BUYER" });
-  expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
-    event_type: "SELL", amount: "350", pool_id: 3, portion: "PROFIT", operator_user_ids: [1],
-  }));
+  expect(vi.mocked(ordersApi.addCustomerRole)).not.toHaveBeenCalled();
+  expect(vi.mocked(customersApi.create)).not.toHaveBeenCalled();
+  expect(vi.mocked(ordersApi.postEvent)).not.toHaveBeenCalled();
 });
 
 it("库存售出：成功后立即从库存列表移除账号，即使列表重拉暂时返回旧快照", async () => {
@@ -843,7 +823,7 @@ it("库存售出：成功后立即从库存列表移除账号，即使列表重�
   await saleUi.click(await screen.findByText(/利润池/));
   await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
 
-  await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalled());
+  await waitFor(() => expect(vi.mocked(ordersApi.stockSale)).toHaveBeenCalled());
   await waitFor(() => expect(screen.queryByText("acc-1")).not.toBeInTheDocument());
 });
 
@@ -868,12 +848,12 @@ describe("库存售出三表单分支", () => {
     await saleUi.click(screen.getByLabelText("资金账户"));
     await saleUi.click(await screen.findByText(/利润池/));
     await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
-    await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalled());
+    await waitFor(() => expect(vi.mocked(ordersApi.stockSale)).toHaveBeenCalled());
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
-    expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
-      event_type: "SELL", amount: "200", pool_id: 3, portion: "PROFIT", form_extra: { sale_amount: "1000" },
+    expect(vi.mocked(ordersApi.stockSale)).toHaveBeenCalledWith(21, expect.objectContaining({
+      amount: "200", pool_id: 3, sale_amount: "1000", customer_input: expect.objectContaining({ display_name: "买家A", role: "CONSIGNOR" }),
     }));
-    expect(vi.mocked(ordersApi.addCustomerRole)).toHaveBeenCalledWith(21, { customer_id: 7, role: "CONSIGNOR" });
+    expect(vi.mocked(ordersApi.addCustomerRole)).not.toHaveBeenCalled();
     expect(vi.mocked(installmentsApi.create)).not.toHaveBeenCalled();
   });
 
@@ -899,9 +879,8 @@ describe("库存售出三表单分支", () => {
     await saleUi.click(screen.getByLabelText("资金账户"));
     await saleUi.click(await screen.findByText(/利润池/));
     await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
-    await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalled());
-    await waitFor(() => expect(vi.mocked(ordersApi.patch)).toHaveBeenCalledWith(21, expect.objectContaining({
-      form_extra: expect.objectContaining({ delivery_responsible_ids: [1], intermediary_platform: "盼之" }),
+    await waitFor(() => expect(vi.mocked(ordersApi.stockSale)).toHaveBeenCalledWith(21, expect.objectContaining({
+      delivery_form_extra: expect.objectContaining({ delivery_responsible_ids: [1], intermediary_platform: "盼之" }),
     })));
   });
 
@@ -1003,7 +982,7 @@ describe("库存售出三表单分支", () => {
   });
 
   it("P1/FE-042：已拉黑客户不能参与库存售出", async () => {
-    vi.mocked(customersApi.page).mockResolvedValueOnce({ items: [{ id: 7, display_name: "买家A", status: "DISABLED" }], total: 1, limit: 500, offset: 0 } as never);
+    vi.mocked(ordersApi.stockSale).mockRejectedValueOnce(new Error("客户已拉黑，不能作为售出买家"));
     vi.mocked(poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
     vi.mocked(employeesApi.list).mockResolvedValueOnce([{ id: 1, username: "admin", display_name: "管理员", is_active: true }] as never);
     renderLight(

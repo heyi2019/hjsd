@@ -29,6 +29,7 @@ from app.business.consignment import post_consignment_operation
 from app.business.create import add_customer_role
 from app.business.events import post_event as orders_post_event
 from app.business.cancellation_model import cancel_order as orders_cancel_order
+from app.business.sale import apply_sale_details
 
 from ..router_output import (
     _actor,
@@ -124,6 +125,28 @@ def inventory_offsale(
             record_audit(db, action="ORDER_CANCEL", entity_type="inventory_cancel", entity_id=order.order_no,
                 actor=_actor(user), before=before, after={"order_status": order.status, "account_status": account.status}, reason=payload.reason)
     return {"ok": True}
+
+@router.post("/orders/{order_id}/stock-sale", response_model=schemas.EventPostResult, status_code=201)
+def stock_sale(
+    order_id: int,
+    payload: schemas.StockSaleIn,
+    db: Session = Depends(get_db),
+    user: CurrentUser = post_events,
+) -> schemas.EventPostResult:
+    apply_sale_details(db, order_id, customer_input=payload.customer_input,
+                       delivery_form_extra=payload.delivery_form_extra, user=user)
+    event, flow = orders_post_event(
+        db, order_id, event_type="SELL", sale_mode="FULL", amount=payload.amount,
+        occurred_on=payload.occurred_on, actor=_actor(user), pool_id=payload.pool_id,
+        portion="PROFIT", operator_user_ids=payload.operator_user_ids, note=payload.note,
+        bound_phone=payload.bound_phone, bound_phone_owner=payload.bound_phone_owner,
+        form_extra={"sale_amount": str(payload.sale_amount)} if payload.sale_amount is not None else None,
+        user=user,
+    )
+    events = list(db.scalars(select(OrderEvent).where(OrderEvent.order_id == event.order_id)).all())
+    return schemas.EventPostResult(event=_event_output(event, _operator_names(db, [event]), cancellable_by_event(events)),
+                                   cashflow_no=flow.flow_no if flow else None)
+
 
 @router.post("/orders/{order_id}/events", response_model=schemas.EventPostResult, status_code=201)
 def post_event(

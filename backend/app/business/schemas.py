@@ -44,6 +44,21 @@ class CustomerDraftInput(BaseModel):
     note: str | None = None
 
 
+class StockSaleIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    amount: Decimal = Field(ge=0)
+    occurred_on: date
+    pool_id: int | None = Field(default=None, gt=0)
+    operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
+    note: str | None = None
+    bound_phone: str | None = Field(default=None, max_length=64)
+    bound_phone_owner: str | None = Field(default=None, max_length=128)
+    sale_amount: Decimal | None = Field(default=None, ge=0)
+    customer_input: CustomerDraftInput | None = None
+    delivery_form_extra: dict[str, object] | None = None
+
+
 class CounterpartyDraftInput(BaseModel):
     """建单时内联输入的供货方；后端在同一事务内复用或建档。"""
 

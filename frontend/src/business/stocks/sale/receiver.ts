@@ -9,6 +9,7 @@ import { installmentsApi } from "../../../shared/api/installments.api";
 import { ordersApi } from "../../../shared/api/orders.api";
 import { today } from "../../../shared/lib/format";
 import { serializeInstallmentSchedule } from "../../InstallmentScheduleFields";
+import type { SaleCustomerInput } from "../../../shared/api/orders-api/orders";
 
 export interface CollectPaymentInput {
   /** 关联入库订单 ID（售出事件/分期合同登记在其上）。 */
@@ -17,33 +18,30 @@ export interface CollectPaymentInput {
   values: Record<string, unknown>;
   /** 是否代挂（CONSIGNMENT）：代挂无买入价，且只走全款。 */
   isConsignment: boolean;
+  customerInput?: SaleCustomerInput;
+  deliveryFormExtra?: Record<string, unknown>;
 }
 
 /** 全款收款：登记 SELL 事件，金额作为 PROFIT 份额入账。 */
 export async function collectFullPayment(input: CollectPaymentInput): Promise<void> {
-  const { sourceOrderId, values, isConsignment } = input;
-  const consignmentExtra: Record<string, unknown> = {};
-  if (isConsignment && values.sale_amount != null && String(values.sale_amount) !== "") {
-    consignmentExtra.form_extra = { sale_amount: String(values.sale_amount) };
-  }
-  await ordersApi.postEvent(sourceOrderId, {
-    event_type: "SELL",
-    sale_mode: "FULL",
+  const { sourceOrderId, values, isConsignment, customerInput, deliveryFormExtra } = input;
+  await ordersApi.stockSale(sourceOrderId, {
     amount: values.amount as string,
     occurred_on: today(),
     pool_id: values.pool_id as number,
-    portion: "PROFIT",
     operator_user_ids: values.operator_user_ids as number[] | undefined,
     note: values.cashflow_note as string | undefined,
     bound_phone: values.bound_phone as string | undefined,
     bound_phone_owner: values.bound_phone_owner as string | undefined,
-    ...consignmentExtra,
+    ...(isConsignment && values.sale_amount != null && String(values.sale_amount) !== "" ? { sale_amount: String(values.sale_amount) } : {}),
+    customer_input: customerInput,
+    delivery_form_extra: deliveryFormExtra,
   });
 }
 
 /** 分期收款：建立库存分期出售合同（STOCK_SALE），并在确立时收首付（期次 0）。 */
 export async function collectInstallmentPayment(input: Omit<CollectPaymentInput, "isConsignment">): Promise<void> {
-  const { sourceOrderId, values } = input;
+  const { sourceOrderId, values, customerInput, deliveryFormExtra } = input;
   const schedule = serializeInstallmentSchedule(
     values.installment_schedule as Array<{ due_on?: unknown }> | undefined,
     (value) => value && typeof value === "object" && "format" in value
@@ -68,5 +66,7 @@ export async function collectInstallmentPayment(input: Omit<CollectPaymentInput,
     schedule,
     note: values.note as string | undefined,
     operator_user_ids: values.operator_user_ids as number[] | undefined,
+    customer_input: customerInput,
+    delivery_form_extra: deliveryFormExtra,
   });
 }

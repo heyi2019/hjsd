@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+import pytest
 from sqlalchemy import select
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
@@ -12,8 +13,9 @@ from app.domain.enums import (
     InstallmentStatus,
     ScheduleStatus)
 from app.domain.trade import Installment, InstallmentSchedule, OrderEvent
-from app.domain.trade import Cashflow, Account
+from app.domain.trade import Cashflow, Account, Order
 from app.domain.foundation import Pool
+from app.domain.parties import Customer, OrderCustomerRole
 from app.core.database import get_db
 from app.funds.installments import create as inst_create
 from app.funds.installments import recovery as inst_recovery
@@ -76,6 +78,78 @@ def _contract(
 
 
 class TestInstallmentsApi:
+    def test_sale_customer_creation_keeps_customer_permission_check(self, seeded_db):
+        from app.business.sale import apply_sale_details
+        from app.business.schemas import CustomerDraftInput
+        from app.core.errors import PermissionDenied
+        from app.core.security import PERM_ORDER_UPDATE
+        order = _order(seeded_db, order_type="HS", account_id=_account(seeded_db, "sale-customer-permission").id)
+        user = CurrentUser(id=1, username="admin", permissions=frozenset({PERM_ORDER_UPDATE}), owner_scope="ALL")
+        with pytest.raises(PermissionDenied):
+            apply_sale_details(seeded_db, order.id,
+                customer_input=CustomerDraftInput(display_name="无权限新建", role="BUYER"),
+                delivery_form_extra=None, user=user)
+        assert seeded_db.scalar(select(Customer.id).where(Customer.display_name == "无权限新建")) is None
+
+    def test_full_stock_sale_saves_buyer_delivery_and_cashflow_together(self, seeded_client, seeded_db, headers):
+        account = _account(seeded_db, "atomic-full-sale")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, "100")
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        response = seeded_client.post(f"/api/v1/orders/{order.id}/stock-sale", headers=headers, json={
+            "amount": "200", "occurred_on": TODAY.isoformat(), "pool_id": pool.id,
+            "operator_user_ids": [1], "customer_input": {"display_name": "完整售出买家", "role": "BUYER"},
+            "delivery_form_extra": {"delivery_responsible_ids": [1]},
+        })
+        assert response.status_code == 201, response.text
+        customer = seeded_db.scalar(select(Customer).where(Customer.display_name == "完整售出买家"))
+        assert customer is not None
+        assert seeded_db.scalar(select(OrderCustomerRole.id).where(OrderCustomerRole.order_id == order.id, OrderCustomerRole.customer_id == customer.id, OrderCustomerRole.role == "BUYER"))
+        seeded_db.refresh(order)
+        assert order.form_extra["delivery_responsible_ids"] == [1]
+        assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.order_id == order.id, Cashflow.category == "SELL"))
+
+    def test_full_stock_sale_failure_rolls_back_buyer_and_delivery(self, seeded_client, seeded_db, headers):
+        account = _account(seeded_db, "atomic-full-failed")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, "100")
+        order_id, account_id = order.id, account.id
+        seeded_db.commit()
+        def transactional_db():
+            try:
+                yield seeded_db
+                seeded_db.commit()
+            except Exception:
+                seeded_db.rollback()
+                raise
+        seeded_client.app.dependency_overrides[get_db] = transactional_db
+        response = seeded_client.post(f"/api/v1/orders/{order_id}/stock-sale", headers=headers, json={
+            "amount": "200", "occurred_on": TODAY.isoformat(), "pool_id": 999999999,
+            "operator_user_ids": [1], "customer_input": {"display_name": "失败时不留买家", "role": "BUYER"},
+            "delivery_form_extra": {"delivery_responsible_ids": [1]},
+        })
+        assert response.status_code in (400, 404, 409, 422), response.text
+        seeded_db.expire_all()
+        assert seeded_db.get(Account, account_id).status == "WAITING"
+        assert seeded_db.scalar(select(Customer.id).where(Customer.display_name == "失败时不留买家")) is None
+        assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "SELL")) is None
+        assert not (seeded_db.get(Order, order_id).form_extra or {}).get("delivery_responsible_ids")
+
+    def test_stock_sale_rejects_disabled_buyer_without_selling(self, seeded_client, seeded_db, headers):
+        from app.customers.customers import create_customer
+        customer = create_customer(seeded_db, display_name="已拉黑买家", actor="pytest")
+        customer.status = "DISABLED"
+        account = _account(seeded_db, "atomic-disabled-buyer")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, "100")
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        response = seeded_client.post(f"/api/v1/orders/{order.id}/stock-sale", headers=headers, json={
+            "amount": "200", "occurred_on": TODAY.isoformat(), "pool_id": pool.id,
+            "operator_user_ids": [1], "customer_input": {"display_name": "已拉黑买家", "role": "BUYER"},
+        })
+        assert response.status_code in (400, 409, 422), response.text
+        assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL")) is None
+
     def test_stock_sale_commits_event_contract_and_down_payment_together(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "atomic-sale-success")
         order = _order(seeded_db, order_type="HS", account_id=account.id)
@@ -94,6 +168,8 @@ class TestInstallmentsApi:
             "order_id": order.id, "principal": "200", "down_payment": "50", "periods": 1,
             "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
             "pool_id": pool.id, "operator_user_ids": [1],
+            "customer_input": {"display_name": "分期售出买家", "role": "BUYER"},
+            "delivery_form_extra": {"delivery_responsible_ids": [1]},
         })
         assert response.status_code == 201, response.text
         contract = seeded_db.scalar(select(Installment).where(Installment.order_id == order.id))
@@ -101,6 +177,10 @@ class TestInstallmentsApi:
         assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
         flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == order.id, Cashflow.category == "INSTALLMENT_PAYMENT"))
         assert flow is not None and flow.amount == Decimal("50") and flow.pool_id == pool.id
+        customer = seeded_db.scalar(select(Customer).where(Customer.display_name == "分期售出买家"))
+        assert customer is not None
+        assert seeded_db.scalar(select(OrderCustomerRole.id).where(OrderCustomerRole.order_id == order.id, OrderCustomerRole.customer_id == customer.id, OrderCustomerRole.role == "BUYER"))
+        assert seeded_db.get(Order, order.id).form_extra["delivery_responsible_ids"] == [1]
 
     def test_stock_sale_rolls_back_when_down_payment_fails(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "atomic-sale-rollback")
@@ -120,6 +200,8 @@ class TestInstallmentsApi:
             "order_id": order_id, "principal": "200", "down_payment": "50", "periods": 1,
             "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
             "pool_id": 999999999, "operator_user_ids": [1],
+            "customer_input": {"display_name": "分期失败买家", "role": "BUYER"},
+            "delivery_form_extra": {"delivery_responsible_ids": [1]},
         })
         assert response.status_code in (400, 404, 409, 422), response.text
         seeded_db.expire_all()
@@ -127,6 +209,8 @@ class TestInstallmentsApi:
         assert seeded_db.scalar(select(Installment.id).where(Installment.order_id == order_id)) is None
         assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "SELL")) is None
         assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.order_id == order_id, Cashflow.category == "INSTALLMENT_PAYMENT")) is None
+        assert seeded_db.scalar(select(Customer.id).where(Customer.display_name == "分期失败买家")) is None
+        assert not (seeded_db.get(Order, order_id).form_extra or {}).get("delivery_responsible_ids")
 
     def test_stock_sale_rolls_back_when_contract_plan_is_invalid(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "atomic-sale-invalid-plan")

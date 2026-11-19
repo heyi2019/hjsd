@@ -50,7 +50,23 @@ export type OrderExecutionEditPayload = {
   parties?: { order_id: number; entity_type: "customer" | "counterparty"; entity_id: number; role: string; operation?: "add" | "remove" }[];
 };
 
+export type SaleCustomerInput = {
+  display_name: string;
+  role: "BUYER" | "CONSIGNOR";
+  contact_name?: string;
+  phone?: string;
+  wechat?: string;
+  qq?: string;
+  source?: string;
+  note?: string;
+};
+
 export const ordersApi = {
+  stockSale: (orderId: number, payload: {
+    amount: string; occurred_on: string; pool_id?: number; operator_user_ids?: number[];
+    note?: string; bound_phone?: string; bound_phone_owner?: string; sale_amount?: string;
+    customer_input?: SaleCustomerInput; delivery_form_extra?: Record<string, unknown>;
+  }) => api.post<EventPostResult>(`/orders/${orderId}/stock-sale`, payload).then((r) => r.data),
   ledgerSummary: (params?: {
     mine?: boolean;
     trade_date_from?: string;

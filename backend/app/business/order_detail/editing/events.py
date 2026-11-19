@@ -65,6 +65,7 @@ def apply_operation_event_creates(
             occurred_on=occurred_at.date(),
             actor=actor,
             operator_user_ids=item.operator_user_ids,
+            note=item.note,
             form_extra=form_extra,
             form_extra_scope=form_extra_scope,
             user=user,

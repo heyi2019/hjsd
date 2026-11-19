@@ -31,6 +31,7 @@ class ExecutionOperationCreateItem(RequestModel):
     occurred_at: datetime
     form_extra: dict[str, object] | None = None
     operator_user_ids: list[int] | None = Field(default=None, min_length=0, max_length=30)
+    note: str | None = None
 
 
 class ExecutionCashflowEditItem(RequestModel):

@@ -1,5 +1,5 @@
 import { BusinessActionModal } from "../../../shared/ui";
-import { money, today } from "../../../shared/lib/format";
+import { money } from "../../../shared/lib/format";
 import { appMessage } from "../../../shared/ui/appFeedback";
 import { currentDevUser, normalizeError } from "../../../shared/api/client";
 import { ordersApi } from "../../../shared/api/orders.api";
@@ -212,18 +212,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
           refreshExecution(updated, profileTarget?.orderId ?? updated.source_order_id);
         }}
         onError={(error) => controller.setError(normalizeError(error))}
-        onOperation={async (operationType, operatorUserIds) => {
-          const account = profileTarget?.account;
-          const orderId = profileTarget?.orderId ?? account?.source_order_id;
-          if (!orderId) throw new Error("账号没有可关联的来源订单，无法登记运营事件");
-          await ordersApi.postEvent(orderId, {
-            event_type: "OPERATE",
-            operation_type: operationType,
-            occurred_on: today(),
-            operator_user_ids: operatorUserIds,
-            note: operationType === "IMAGE" ? "库存中心登记作图" : "库存中心登记描述",
-          });
-        }}
+        operationSource="库存中心"
       />
       {/* 删除确认与其它弹窗同级渲染：嵌套进受控 Modal 的 children 会被父级 open=false 打断关闭渲染。 */}
       <InventoryDeleteDialog

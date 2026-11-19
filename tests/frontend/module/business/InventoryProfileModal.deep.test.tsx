@@ -85,7 +85,7 @@ describe("OrderProfileModal：描述与图片读取", () => {
     await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalled());
     expect(vi.mocked(ordersApi.updateExecution).mock.calls[0]).toEqual([
       71,
-      { profile: { account_description: "满级账号" }, events: [] },
+      { profile: { account_description: "满级账号" }, events: [], new_events: [expect.objectContaining({ operation_type: "DESCRIPTION", occurred_at: expect.any(String), operator_user_ids: [1] })] },
     ]);
     expect(onSaved).toHaveBeenCalledWith({ ...account, account_description: "满级账号" });
     expect(onClose).toHaveBeenCalled();
@@ -98,7 +98,7 @@ describe("OrderProfileModal：描述与图片读取", () => {
     await ui.click(screen.getByRole("button", { name: /保存/ }));
     await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalled());
     expect(vi.mocked(ordersApi.updateExecution).mock.calls[0][1]).toEqual({
-      profile: { account_images: ["https://cdn/1.png"] }, events: [],
+      profile: { account_images: ["https://cdn/1.png"] }, events: [], new_events: [expect.objectContaining({ operation_type: "IMAGE", occurred_at: expect.any(String), operator_user_ids: [1] })],
     });
   });
 

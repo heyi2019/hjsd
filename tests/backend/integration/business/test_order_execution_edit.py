@@ -12,6 +12,49 @@ from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
 from app.business.create import create_order
 from app.business.events import post_event
+from app.core.database import get_db
+
+
+def test_new_operation_requires_event_permission(seeded_client, seeded_db):
+    from app.business.routers.order_execution_router import edit_order_detail
+    from app.core.security import CurrentUser, PERM_ORDER_UPDATE
+    account = create_account(seeded_db, game_account="profile-operation-permission", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    user = CurrentUser(id=1, username="admin", permissions=frozenset({PERM_ORDER_UPDATE}), owner_scope="ALL")
+    seeded_client.app.dependency_overrides[edit_order_detail.dependency] = lambda: user
+    try:
+        response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", json={"events": [], "new_events": [{"operation_type": "DESCRIPTION", "occurred_at": "2026-10-02T11:00:00", "operator_user_ids": [1]}]})
+        assert response.status_code == 403, response.text
+        assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "OPERATE")) is None
+    finally:
+        seeded_client.app.dependency_overrides.pop(edit_order_detail.dependency, None)
+
+
+def test_profile_and_operation_share_one_transaction(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="profile-operation-atomic", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    account_id, order_id = account.id, order.id
+    seeded_db.commit()
+    def transactional_db():
+        try:
+            yield seeded_db
+            seeded_db.commit()
+        except Exception:
+            seeded_db.rollback()
+            raise
+    seeded_client.app.dependency_overrides[get_db] = transactional_db
+    payload = {"profile": {"account_description": "新描述"}, "events": [], "new_events": [{"operation_type": "DESCRIPTION", "occurred_at": "2026-10-02T11:00:00", "operator_user_ids": [999999999]}]}
+    failed = seeded_client.patch(f"/api/v1/orders/{order_id}/execution-edit", headers=headers, json=payload)
+    assert failed.status_code in (400, 422), failed.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Account, account_id).account_description != "新描述"
+    assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "OPERATE")) is None
+    payload["new_events"][0]["operator_user_ids"] = [1]
+    success = seeded_client.patch(f"/api/v1/orders/{order_id}/execution-edit", headers=headers, json=payload)
+    assert success.status_code == 200, success.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Account, account_id).account_description == "新描述"
+    assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "OPERATE"))
 
 
 def test_new_unlisting_requires_valid_active_listing_and_stores_event_id(seeded_client, seeded_db, headers):

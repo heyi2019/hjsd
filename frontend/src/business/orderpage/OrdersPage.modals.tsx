@@ -1,7 +1,5 @@
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
-import { today } from "../../shared/lib/format";
-import { ordersApi } from "../../shared/api/orders.api";
 import { CashflowModal } from "../../finance/cashflow";
 import { InventoryRebateModal } from "../stocks/rebate";
 import { OrderProfileModal, OrderPlatformOffsaleModal } from "../operations";
@@ -49,18 +47,7 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
           void controller.load();
         }}
         onError={(error) => appMessage.error(normalizeError(error).message)}
-        onOperation={async (operationType, operatorUserIds) => {
-          const target = controller.profileTarget;
-          const orderId = target?.orderId ?? target?.account.source_order_id;
-          if (!orderId) throw new Error("账号没有可关联的来源订单，无法登记运营事件");
-          await ordersApi.postEvent(orderId, {
-            event_type: "OPERATE",
-            operation_type: operationType,
-            occurred_on: today(),
-            operator_user_ids: operatorUserIds,
-            note: operationType === "IMAGE" ? "订单台账登记作图" : "订单台账登记描述",
-          });
-        }}
+        operationSource="订单台账"
       />
       <OrderPlatformOffsaleModal
         account={controller.orderOffsaleTarget?.account ?? null}

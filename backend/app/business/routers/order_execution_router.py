@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.errors import Validation
+from app.core.errors import PermissionDenied, Validation
 from app.core.security import (
     PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
@@ -53,6 +53,8 @@ def update_order_execution_detail(
     user: CurrentUser = edit_order_detail,
 ) -> dict[str, bool]:
     """保存一个订单及其强绑定账号的详情编辑。"""
+    if payload.new_events and not user.has(PERM_ORDER_EVENT_POST):
+        raise PermissionDenied("当前角色无权登记运营事件")
     order = orders_get_order(db, order_id, user)
     if order.account_id is None:
         raise Validation("订单未关联库存账号", details={"order_id": order_id})

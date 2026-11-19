@@ -572,10 +572,14 @@ describe("OrdersPage：操作与筛选分支", () => {
     const modal = descriptionInput.closest(".ant-modal-content") as HTMLElement;
     await ui.type(descriptionInput, "台账补充描述");
     await ui.click(within(modal).getByRole("button", { name: "保存" }));
-    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalledWith(
       1,
-      expect.objectContaining({ event_type: "OPERATE", operation_type: "DESCRIPTION" }),
+      expect.objectContaining({
+        profile: { account_description: "台账补充描述" },
+        new_events: [expect.objectContaining({ operation_type: "DESCRIPTION", note: "订单台账登记描述" })],
+      }),
     ));
+    expect(ordersApi.postEvent).not.toHaveBeenCalled();
   });
 
   it("取消：存在买入流水时按实际金额取消入库", async () => {

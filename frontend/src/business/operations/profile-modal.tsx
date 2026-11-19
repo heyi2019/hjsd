@@ -1,6 +1,7 @@
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Form, Input, Space, Upload } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
+import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
@@ -41,13 +42,13 @@ export function OrderProfileModal({
   onClose,
   onSaved,
   onError,
-  onOperation,
+  operationSource = "业务中心",
 }: {
   target: OrderProfileTarget | null;
   onClose: () => void;
   onSaved: (account: Account) => void;
   onError: (error: unknown) => void;
-  onOperation?: (operationType: "IMAGE" | "DESCRIPTION", operatorUserIds: number[]) => void | Promise<void>;
+  operationSource?: string;
 }) {
   const [description, setDescription] = useState("");
   const [images, setImages] = useState<UploadFile[]>([]);
@@ -98,10 +99,16 @@ export function OrderProfileModal({
         setValidationError({ message: "当前账号没有来源订单，无法保存运营资料" });
         return;
       }
-      await ordersApi.updateExecution(orderId, { profile: payload, events: [] });
-      if (onOperation) {
-        await onOperation(target.mode === "images" ? "IMAGE" : "DESCRIPTION", values.operator_user_ids ?? []);
-      }
+      await ordersApi.updateExecution(orderId, {
+        profile: payload,
+        events: [],
+        new_events: [{
+          operation_type: target.mode === "images" ? "IMAGE" : "DESCRIPTION",
+          occurred_at: dayjs().format("YYYY-MM-DDTHH:mm:ss"),
+          operator_user_ids: values.operator_user_ids ?? [],
+          note: `${operationSource}登记${target.mode === "images" ? "作图" : "描述"}`,
+        }],
+      });
       onSaved({ ...target.account, ...payload });
       onClose();
       appMessage.success("账号资料已保存");

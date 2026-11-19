@@ -37,6 +37,7 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
   const [exporting, setExporting] = useState(false);
   const [serverGameTypes, setServerGameTypes] = useState<string[]>([]);
   const locallyRemovedIdsRef = useRef(new Set<number>());
+  const loadSequence = useRef(0);
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
   const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
   const gameTypeOptions = useMemo(() => serverGameTypes.map((value) => ({ value, label: value })), [serverGameTypes]);
@@ -54,8 +55,10 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
   }), [businessMode, inventoryType, gameTypeFilter, inventoryOperatorIds, ageGtDays, keyword, dateRange, sortDesc]);
 
   const load = useCallback(async () => {
+    const requestId = ++loadSequence.current;
     try {
       const data = await stocksApi.inventoryLedger({ ...filters, limit: pageSize, offset: (page - 1) * pageSize });
+      if (requestId !== loadSequence.current) return;
       const list = data.items
         .filter(({ account }) => !locallyRemovedIdsRef.current.has(account.id))
         .map(({ account, order }) => toInventoryOrderRow(account, order as InventoryOrderRow));
@@ -71,12 +74,13 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
       setInventoryStats(data.stats);
       setError(null);
     } catch (err) {
-      setError(normalizeError(err));
+      if (requestId === loadSequence.current) setError(normalizeError(err));
     }
   }, [filters, page, pageSize]);
 
   useEffect(() => {
     if (active) void load();
+    return () => { loadSequence.current += 1; };
   }, [active, load, refreshKey]);
 
   useEffect(() => {

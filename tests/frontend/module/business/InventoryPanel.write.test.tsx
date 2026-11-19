@@ -8,6 +8,7 @@ import { InventoryRebateModal } from "@/business/stocks/rebate";
 import { OrderConsignmentModal } from "@/business/operations/consignment";
 import { OrderDetailDeliverySection } from "@/business/OrderDetailView/OrderDetailDeliverySection";
 import { useOrderDetailEditor } from "@/business/OrderDetailView/editing/use-order-detail-editor";
+import { useInventoryList } from "@/business/stocks/InventoryPanel/useInventoryList";
 
 import type { Account } from "@/shared/api/types/accounts";
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
@@ -121,6 +122,32 @@ beforeEach(() => {
   vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 describe("InventoryPanel：写入与长路径", () => {
+  it.each(["success", "failure"])("库存筛选切换后忽略较旧请求的%s结果", async (oldResult) => {
+    let resolveOld!: (value: Awaited<ReturnType<typeof stocksApi.inventoryLedger>>) => void;
+    let rejectOld!: (error: Error) => void;
+    const oldRequest = new Promise<Awaited<ReturnType<typeof stocksApi.inventoryLedger>>>((resolve, reject) => { resolveOld = resolve; rejectOld = reject; });
+    vi.mocked(stocksApi.inventoryLedger).mockReturnValueOnce(oldRequest).mockResolvedValueOnce(inventoryLedgerResponse([{
+      account: { ...accounts[0], game_account: "新结果" },
+      order: { id: 21, order_no: "HS0001", order_type: "HS", account_id: 1, status: "ACTIVE" },
+    }], { stats: { account_count: 1, occupied_cost: "100", over_7d_count: 0, over_30d_count: 0 } }) as never);
+    function ListProbe() {
+      const list = useInventoryList({});
+      return <><button onClick={() => list.setKeyword("新条件")}>筛选</button>
+        <span>{list.rows.map((row) => row.account.game_account).join(",")}</span>
+        <span>{list.error?.message ?? "无错误"}</span></>;
+    }
+    renderLight(<ListProbe />, { user: "admin" });
+    await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenCalledTimes(1));
+    await ui.click(screen.getByRole("button", { name: "筛选" }));
+    expect(await screen.findByText("新结果")).toBeInTheDocument();
+    await act(async () => {
+      if (oldResult === "failure") rejectOld(new Error("旧请求失败"));
+      else resolveOld(inventoryLedgerResponse([{ account: { ...accounts[0], game_account: "旧结果" }, order: { id: 21, order_no: "HS0001", order_type: "HS", account_id: 1, status: "ACTIVE" } }]) as never);
+    });
+    expect(screen.getByText("新结果")).toBeInTheDocument();
+    expect(screen.getByText("无错误")).toBeInTheDocument();
+    expect(screen.queryByText("旧结果")).not.toBeInTheDocument();
+  });
   it("详情保存成功但刷新失败时清除已保存草稿并作废旧详情", async () => {
     const detail = { account: accounts[0], orders: [], detail_view: { finance_rows: [] } } as never;
     const refreshFailed = vi.fn();

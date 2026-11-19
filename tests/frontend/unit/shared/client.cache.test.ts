@@ -28,7 +28,7 @@ vi.mock("axios", () => {
       },
       request: vi.fn(async (config: any) => {
         let cfg = { ...config, headers: { ...(config.headers || {}) } };
-        for (const h of reqHandlers) cfg = (await h(cfg)) ?? cfg;
+        for (const h of reqHandlers.slice().reverse()) cfg = (await h(cfg)) ?? cfg;
         let response: any;
         if (typeof cfg.adapter === "function") {
           response = await cfg.adapter(cfg);
@@ -70,7 +70,7 @@ vi.mock("axios", () => {
 });
 
 import axios from "axios";
-import { clearApiCache } from "@/shared/api/client";
+import { clearApiCache, setDevUser } from "@/shared/api/client";
 
 function apiInstance() {
   return (axios as any).__instances[0];
@@ -79,7 +79,18 @@ function apiInstance() {
 describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
   beforeEach(() => {
     clearApiCache();
+    localStorage.removeItem("hj.dev-user");
     (axios as any).__resetCalls();
+  });
+
+  it("切换操作用户后不会复用上一用户的缓存", async () => {
+    const api = apiInstance();
+    setDevUser("admin");
+    const first = await api.request({ method: "get", url: "/orders" });
+    setDevUser("viewer");
+    const second = await api.request({ method: "get", url: "/orders" });
+    expect(second.data).not.toBe(first.data);
+    expect((axios as any).__getCallCount()).toBe(2);
   });
 
   it("并发相同 GET 只发一次网络请求（去重）", async () => {
@@ -99,6 +110,7 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     // 前台返回的是缓存值，与首请求一致（证明被缓存短路，而非重新走网络）
     expect(cached.data).toBe(first.data);
     expect(cached.data).toMatch(/^NET-\d+$/);
+    expect((axios as any).__getCallCount()).toBe(1);
   });
 
   it("POST 成功后清空 GET 缓存，下次 GET 走网络拿新值（写失效）", async () => {
@@ -115,6 +127,21 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     // 缓存被清空，重新走网络，拿到与 g1 不同的新响应
     expect(g2.data).not.toBe(g1.data);
     expect(g2.data).toMatch(/^NET-\d+$/);
+  });
+
+  it("写入后旧的进行中读取不会重新填充缓存", async () => {
+    const api = apiInstance();
+    const transport = (axios as any).__instances[1];
+    let finish!: (value: unknown) => void;
+    transport.request.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const old = api.request({ method: "get", url: "/orders" });
+    await Promise.resolve();
+    await api.request({ method: "post", url: "/orders", data: {} });
+    const fresh = await api.request({ method: "get", url: "/orders" });
+    finish({ data: "OLD", status: 200, headers: {}, config: { method: "GET" } });
+    await old;
+    const again = await api.request({ method: "get", url: "/orders" });
+    expect(again.data).toBe(fresh.data);
   });
 
   it("首访 GET 只发一次网络请求（不双倍发送）", async () => {
@@ -151,6 +178,25 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     } finally {
       nowSpy.mockRestore();
     }
+  });
+
+  it("多处同时读取过期缓存时只触发一次后台刷新", async () => {
+    const api = apiInstance();
+    const nowSpy = vi.spyOn(Date, "now");
+    let fake = Date.now();
+    nowSpy.mockImplementation(() => fake);
+    try {
+      await api.request({ method: "get", url: "/orders" });
+      fake += 10_000;
+      const [a, b] = await Promise.all([
+        api.request({ method: "get", url: "/orders" }),
+        api.request({ method: "get", url: "/orders" }),
+      ]);
+      expect(a.data).toBe("NET-1");
+      expect(b.data).toBe("NET-1");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect((axios as any).__getCallCount()).toBe(2);
+    } finally { nowSpy.mockRestore(); }
   });
 
   it("远超 MAX_STALE：不再返回陈旧值，改为等待新鲜响应", async () => {

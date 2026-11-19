@@ -218,10 +218,14 @@ export function AllocationModal({ controller }: { controller: AllocationControll
       }));
       await profitAllocationApi.set(actionOrder.id, payloadRows, sourceFormExtra);
       appMessage.success("分润已保存");
-      await load();
-      if (actionOrder.account_id != null) await loadLedgerDetail(actionOrder, true);
+      const savedOrder = actionOrder;
       setAllocationOpen(false);
       setActionOrder(null);
+      // 保存成功后先关闭弹窗，台账和详情在后台刷新；刷新失败不应误报保存失败。
+      void (async () => {
+        await load();
+        if (savedOrder.account_id != null) await loadLedgerDetail(savedOrder, true);
+      })().catch(() => appMessage.warning("分润已保存，台账刷新失败，请手动刷新"));
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     } finally {

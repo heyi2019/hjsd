@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -173,6 +173,23 @@ describe("InventoryPanel：写入与长路径", () => {
     await screen.findByRole("button", { name: "保存修改" });
     expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1);
     expect(ordersApi.executionDetail).toHaveBeenCalledWith(21);
+  });
+
+  it("寄售提交成功后无需等详情刷新即可通知页面关闭", async () => {
+    const detail = { account: accounts[0], orders: [{ order_id: 21, order_no: "HS0001", order_type: "HS", trade_date: "2026-10-15", status: "ACTIVE", events: [] }] };
+    let finish!: (value: never) => void;
+    const slowRefresh = new Promise<never>((resolve) => { finish = resolve; });
+    vi.mocked(ordersApi.executionDetail).mockResolvedValueOnce(detail as never).mockReturnValueOnce(slowRefresh);
+    const onCreated = vi.fn();
+    renderLight(<OrderConsignmentModal account={accounts[0] as never} onClose={() => undefined} onCreated={onCreated} />, { user: "admin" });
+    const platform = await screen.findByRole("combobox", { name: "寄售平台" });
+    await waitFor(() => expect(platform).toBeEnabled());
+    await ui.click(platform);
+    await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByRole("button", { name: "确认上架" }));
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    await act(async () => { finish(detail as never); await slowRefresh; });
   });
 
   it("寄售登记到来源订单，不创建 DG 代挂订单", async () => {

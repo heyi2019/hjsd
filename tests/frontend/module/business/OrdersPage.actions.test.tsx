@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
@@ -461,6 +461,20 @@ describe("OrdersPage：操作与筛选分支", () => {
     const buyRows = payload.filter((item) => item.allocation_type === "BUY");
     expect(buyRows).toEqual([{ allocation_type: "BUY", employee_ids: [11, 22], role: "BUYER", allocation_rate: null, allocation_amount: "300.00" }]);
     expect(payload).toHaveLength(4);
+  });
+
+  it("分润保存成功后不等待台账刷新即可关闭弹窗", async () => {
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse(actionAllocationRows, { order_profit: "5000.00", allocatable_profit: "3000.00", company_rate: "40.00" }));
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    let finish!: (value: never) => void;
+    const slowReload = new Promise<never>((resolve) => { finish = resolve; });
+    vi.mocked(ordersApi.listPage).mockReturnValueOnce(slowReload);
+    await clickModalOk(modal);
+    await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /分润 · HS-2026-0001/ })).toBeNull());
+    await act(async () => { finish(pageResponse(orders) as never); await slowReload; });
   });
 
   it("分润：按操作四项提交时只传金额、比例一律传 null", async () => {

@@ -47,19 +47,16 @@ interface CacheEntry {
 
 const responseCache = new Map<string, CacheEntry>();
 const pending = new Map<string, Promise<CacheEntry>>();
+let cacheGeneration = 0;
 
 // 纯传输层：复用相同 baseURL 与默认 xhr adapter，但不挂载本项目拦截器，
 // 供缓存层直接发起真实网络请求（避免与缓存拦截器相互递归）。
 const transport = axios.create({ baseURL: API_BASE, timeout: 15_000 });
 
 function buildCacheKey(config: Pick<AxiosRequestConfig, "method" | "url" | "params" | "headers">): string {
-  const headers = config.headers;
-  const auth =
-    (headers instanceof axios.AxiosHeaders
-      ? headers.get("Authorization") || headers.get("X-Dev-User")
-      : ((headers as Record<string, unknown> | undefined)?.Authorization as string | undefined) ||
-        ((headers as Record<string, unknown> | undefined)?.["X-Dev-User"] as string | undefined)) ||
-    "";
+  // 请求拦截器按后注册先执行：此处可能还没注入认证头，直接使用实际会话身份区分缓存。
+  const token = import.meta.env.DEV ? null : localStorage.getItem(ACCESS_TOKEN_KEY);
+  const auth = token ? `Bearer ${token}` : currentDevUser();
   const params = config.params ? JSON.stringify(config.params) : "";
   return `${String(config.method || "get").toUpperCase()} ${auth} ${config.url ?? ""} ${params}`;
 }
@@ -109,47 +106,47 @@ function dedupAdapter(key: string, config: InternalAxiosRequestConfig): AxiosAda
   };
 }
 
-function swrAdapter(key: string, config: InternalAxiosRequestConfig): AxiosAdapter {
-  return async () => {
-    const cached = responseCache.get(key)!;
-    // 前台立即返回陈旧值；后台静默重验，失败则保留旧值
-    realSend(config)
-      .then((entry) => responseCache.set(key, entry))
-      .catch(() => undefined);
-    return fakeResponse(cached);
-  };
+function startCachedRequest(key: string, config: InternalAxiosRequestConfig): Promise<CacheEntry> {
+  const generation = cacheGeneration;
+  const request = realSend(config)
+    .then((entry) => {
+      if (generation === cacheGeneration) responseCache.set(key, entry);
+      return entry;
+    })
+    .finally(() => {
+      if (pending.get(key) === request) pending.delete(key);
+    });
+  pending.set(key, request);
+  return request;
 }
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const method = String(config.method || "get").toUpperCase();
-  if (method !== "GET") return config; // 写操作不参与缓存，仅触发失效（见响应拦截器）
+  if (method !== "GET") return config;
   const key = buildCacheKey(config);
   const now = Date.now();
+  const cached = responseCache.get(key);
+  if (cached && cached.expireAt > now) {
+    config.adapter = async () => fakeResponse(cached);
+    return config;
+  }
+  if (cached && cached.expireAt > now - GET_CACHE_MAX_STALE_MS) {
+    if (!pending.has(key)) void startCachedRequest(key, config).catch(() => undefined);
+    config.adapter = async () => fakeResponse(cached);
+    return config;
+  }
   if (pending.has(key)) {
     config.adapter = dedupAdapter(key, config);
     return config;
   }
-  const cached = responseCache.get(key);
-  if (cached && cached.expireAt > now - GET_CACHE_MAX_STALE_MS) {
-    config.adapter = swrAdapter(key, config);
-    return config;
-  }
-  const p = realSend(config)
-    .then((entry) => {
-      responseCache.set(key, entry);
-      return entry;
-    })
-    .finally(() => {
-      pending.delete(key);
-    });
-  pending.set(key, p);
-  // 必须设置 adapter，否则 axios 默认适配器会再发一次请求（与 realSend 重复）
-  config.adapter = async () => fakeResponse(await p);
+  const request = startCachedRequest(key, config);
+  config.adapter = async () => fakeResponse(await request);
   return config;
 });
 
-/** 清空全部 GET 缓存（写操作成功后自动调用；亦供测试在 beforeEach 重置客户端状态）。 */
+/** 清空全部 GET 缓存，并丢弃失效前尚未完成的结果。 */
 export function clearApiCache(): void {
+  cacheGeneration += 1;
   responseCache.clear();
   pending.clear();
 }

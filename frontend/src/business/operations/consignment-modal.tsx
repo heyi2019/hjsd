@@ -94,8 +94,13 @@ export function OrderConsignmentModal(props: {
       });
       appMessage.success(`${values.platform} 已上架，账号仍保持在库`);
       form.setFieldsValue({ platform: undefined, consignment_price: null, listed_at: dayjs().second(0).millisecond(0) });
-      await refreshListed(sourceOrderId, requestGeneration.current);
-      await props.onCreated();
+      // 上架已成功；列表刷新与通知父页面并行，避免详情慢时弹窗一直停在确认状态。
+      // 刷新完成前暂不可再次选平台，防止重复上架。
+      setListingReady(false);
+      await Promise.all([
+        refreshListed(sourceOrderId, requestGeneration.current),
+        Promise.resolve().then(() => props.onCreated()),
+      ]);
     } catch (cause) {
       setError(normalizeError(cause));
     } finally {

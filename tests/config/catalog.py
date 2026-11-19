@@ -103,6 +103,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_finance_rebates_service.py": "D04",
     "test_finance_reconciliation_service.py": "D03",
     "test_finance_reversal_service.py": "D03",
+    "test_cashflow_write_concurrency.py": "D03",
     "test_finance_router_contract.py": "D02",
     "test_finance_transfers_service.py": "D01",
     "test_flow_config_driven.py": "B09",

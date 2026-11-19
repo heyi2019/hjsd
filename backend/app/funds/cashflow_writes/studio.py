@@ -32,7 +32,7 @@ def _assert_editable_studio_cashflow(
     cashflow_id: int,
     user: CurrentUser | None = None,
 ) -> Cashflow:
-    flow = _get_cashflow(session, cashflow_id, user)
+    flow = _get_cashflow(session, cashflow_id, user, for_update=True)
     if (
         flow.ledger_type != CashflowLedgerType.STUDIO.value
         or flow.order_id is not None

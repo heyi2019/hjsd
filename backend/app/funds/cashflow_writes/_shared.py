@@ -10,9 +10,13 @@ from app.shared.order_access import get_order
 
 
 def _get_cashflow(
-    session: Session, cashflow_id: int, user: CurrentUser | None = None
+    session: Session, cashflow_id: int, user: CurrentUser | None = None, *, for_update: bool = False
 ) -> Cashflow:
-    flow = session.get(Cashflow, cashflow_id)
+    if for_update:
+        # 锁定原流水并刷新会话缓存，再检查冲销状态，避免并发写入基于旧快照。
+        flow = session.get(Cashflow, cashflow_id, with_for_update=True, populate_existing=True)
+    else:
+        flow = session.get(Cashflow, cashflow_id)
     if flow is None:
         raise NotFound(
             f"资金流水 {cashflow_id} 不存在", details={"cashflow_id": cashflow_id}

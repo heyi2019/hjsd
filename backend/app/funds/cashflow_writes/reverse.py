@@ -45,7 +45,7 @@ def reverse_cashflow(
         message="冲销流水必须填写原因",
         type_message="冲销流水必须填写原因",
     )
-    flow = _get_cashflow(session, cashflow_id, user)
+    flow = _get_cashflow(session, cashflow_id, user, for_update=True)
     if flow.source_type == CashflowSourceType.REVERSAL.value:
         raise Validation("冲销流水不能再次冲销", details={"cashflow_id": cashflow_id})
     if flow.source_type == CashflowSourceType.ORDER_EVENT.value:

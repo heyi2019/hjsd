@@ -36,6 +36,7 @@ DECLARED_DB_FILES = {
     # 并发测试额外创建临时数据库并使用独立连接，必须排除在不连库通道之外。
     "test_installment_payment_concurrency.py",
     "test_inventory_offsale_concurrency.py",
+    "test_cashflow_write_concurrency.py",
 }
 
 _SELF_ENGINE = re.compile(r"create_engine\s*\(")

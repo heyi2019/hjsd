@@ -488,6 +488,38 @@ describe("OrderDetail", () => {
     expect(onRemoveOperationRow).toHaveBeenCalledWith("new:unlist:2");
   });
 
+  it("客户名单加载失败时保留渠道方选择，并可重试客户加载", async () => {
+    const detail = { orders: [{ order_id: 22, order_no: "TH0022", order_type: "TH", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
+    vi.spyOn(customersApi, "page").mockRejectedValueOnce(new Error("客户名单读取失败")).mockResolvedValue({ items: [{ id: 1, customer_no: "C001", display_name: "已有客户", status: "ACTIVE" }], total: 1, limit: 500, offset: 0 } as never);
+    vi.spyOn(customersApi, "create");
+    vi.spyOn(counterpartiesApi, "list").mockResolvedValue([{ id: 2, counterparty_no: "CP002", display_name: "渠道甲", type: "PEER", status: "ACTIVE" }] as never);
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
+    expect(await screen.findByText(/客户名单读取失败/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新建客户" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("combobox", { name: "选择渠道方" }));
+    expect(await screen.findByRole("option", { name: /渠道甲/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "新建客户" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("combobox", { name: "选择客户" }));
+    expect(await screen.findByRole("option", { name: /已有客户/ })).toBeInTheDocument();
+    expect(customersApi.create).not.toHaveBeenCalled();
+  });
+
+  it("渠道方名单加载失败时保留客户选择，并可重试渠道方加载", async () => {
+    const detail = { orders: [{ order_id: 22, order_no: "TH0022", order_type: "TH", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
+    vi.spyOn(customersApi, "page").mockResolvedValue({ items: [{ id: 1, customer_no: "C001", display_name: "已有客户", status: "ACTIVE" }], total: 1, limit: 500, offset: 0 } as never);
+    vi.spyOn(counterpartiesApi, "list").mockRejectedValueOnce(new Error("渠道名单读取失败")).mockResolvedValue([{ id: 2, counterparty_no: "CP002", display_name: "渠道甲", type: "PEER", status: "ACTIVE" }] as never);
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
+    expect(await screen.findByText(/渠道名单读取失败/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新建渠道方" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("combobox", { name: "选择客户" }));
+    expect(await screen.findByRole("option", { name: /已有客户/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "新建渠道方" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("combobox", { name: "选择渠道方" }));
+    expect(await screen.findByRole("option", { name: /渠道甲/ })).toBeInTheDocument();
+  });
+
   it("编辑参与方可选择第500条以后的客户", async () => {
     const first = Array.from({ length: 500 }, (_, index) => ({ id: index + 1, customer_no: `C${index + 1}`, display_name: `客户${index + 1}`, status: "ACTIVE" }));
     const last = { id: 501, customer_no: "C501", display_name: "末尾客户", status: "ACTIVE" };

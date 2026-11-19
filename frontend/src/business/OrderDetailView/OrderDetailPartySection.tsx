@@ -7,7 +7,8 @@ import type { Counterparty, Customer } from "../../shared/api/types/customers";
 import { customersApi, counterpartiesApi } from "../../shared/api/customers.api";
 import { loadCustomers } from "../../shared/api/loadCustomers";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { PermissionButton, Select } from "../../shared/ui";
+import { normalizeError } from "../../shared/api/client";
+import { ErrorBanner, PermissionButton, Select } from "../../shared/ui";
 import {
   OrderSectionHeading,
   type OrderDetailMeta,
@@ -34,6 +35,12 @@ export function OrderDetailPartySection({
   const counterpartyRole = order?.order_type === "DG" ? "PLATFORM" : order?.order_type === "TH" ? "PEER" : null;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
+  const [customersReady, setCustomersReady] = useState(false);
+  const [counterpartiesReady, setCounterpartiesReady] = useState(false);
+  const [customersError, setCustomersError] = useState<{ message: string; code?: string } | null>(null);
+  const [counterpartiesError, setCounterpartiesError] = useState<{ message: string; code?: string } | null>(null);
+  const [customerRetry, setCustomerRetry] = useState(0);
+  const [counterpartyRetry, setCounterpartyRetry] = useState(0);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<number[]>([]);
   const [selectedCounterpartyIds, setSelectedCounterpartyIds] = useState<number[]>([]);
   const [newCustomerName, setNewCustomerName] = useState("");
@@ -43,18 +50,33 @@ export function OrderDetailPartySection({
     if (!editing) return;
     setSelectedCustomerIds(order?.customers?.map((item) => item.id) ?? []);
     setSelectedCounterpartyIds(order?.counterparties?.map((item) => item.id) ?? []);
-    void Promise.all([
-      loadCustomers("ACTIVE"),
-      counterpartiesApi.list({ status: "ACTIVE" }),
-    ]).then(([customerRows, counterpartyRows]) => {
-      setCustomers(customerRows ?? []);
-      setCounterparties(counterpartyRows ?? []);
-    }).catch(() => undefined);
   }, [editing, order]);
+
+  useEffect(() => {
+    if (!editing) return;
+    let cancelled = false;
+    setCustomersReady(false);
+    setCustomersError(null);
+    void loadCustomers("ACTIVE").then((rows) => {
+      if (!cancelled) { setCustomers(rows); setCustomersReady(true); }
+    }).catch((error) => { if (!cancelled) setCustomersError(normalizeError(error)); });
+    return () => { cancelled = true; };
+  }, [editing, customerRetry]);
+
+  useEffect(() => {
+    if (!editing || !counterpartyRole) return;
+    let cancelled = false;
+    setCounterpartiesReady(false);
+    setCounterpartiesError(null);
+    void counterpartiesApi.list({ status: "ACTIVE" }).then((rows) => {
+      if (!cancelled) { setCounterparties(rows); setCounterpartiesReady(true); }
+    }).catch((error) => { if (!cancelled) setCounterpartiesError(normalizeError(error)); });
+    return () => { cancelled = true; };
+  }, [editing, counterpartyRole, counterpartyRetry]);
 
   const addCustomer = async () => {
     const name = newCustomerName.trim();
-    if (!name || !meta.orderId) return;
+    if (!name || !meta.orderId || !customersReady) return;
     try {
       const customer = customers.find((item) => item.display_name === name)
         ?? (await customersApi.create({ display_name: name })).customer;
@@ -69,7 +91,7 @@ export function OrderDetailPartySection({
 
   const addCounterparty = async () => {
     const name = newCounterpartyName.trim();
-    if (!name || !meta.orderId) return;
+    if (!name || !meta.orderId || !counterpartiesReady) return;
     try {
       if (!counterpartyRole) return;
       const counterparty = counterparties.find((item) => item.display_name === name && item.type === counterpartyRole)
@@ -111,12 +133,15 @@ export function OrderDetailPartySection({
         </Descriptions>
         {editing && meta.orderId != null ? (
           <Space direction="vertical" className="order-detail__party-editor">
+            <ErrorBanner error={customersError} onRetry={() => setCustomerRetry((value) => value + 1)} />
+            <ErrorBanner error={counterpartiesError} onRetry={() => setCounterpartyRetry((value) => value + 1)} />
             <Space.Compact block>
               <Select
                 mode="multiple"
                 showSearch
                 optionFilterProp="label"
                 aria-label="选择客户"
+                disabled={!customersReady}
                 value={selectedCustomerIds}
                 placeholder="选择客户"
                 options={customers.map((item) => ({ value: item.id, label: `${item.customer_no} · ${item.display_name}` }))}
@@ -128,7 +153,7 @@ export function OrderDetailPartySection({
                 }}
               />
               <Input aria-label="新建客户名称" value={newCustomerName} placeholder="新建客户" onChange={(event) => setNewCustomerName(event.target.value)} />
-              <PermissionButton permission="customer.create" onClick={() => void addCustomer()}>新建客户</PermissionButton>
+              <PermissionButton permission="customer.create" disabled={!customersReady} onClick={() => void addCustomer()}>新建客户</PermissionButton>
             </Space.Compact>
             {counterpartyRole ? <Space.Compact block>
                 <Select
@@ -136,6 +161,7 @@ export function OrderDetailPartySection({
                   showSearch
                   optionFilterProp="label"
                   aria-label="选择渠道方"
+                  disabled={!counterpartiesReady}
                   value={selectedCounterpartyIds}
                   placeholder="选择渠道方"
                   options={counterparties.map((item) => ({ value: item.id, label: `${item.counterparty_no} · ${item.display_name}` }))}
@@ -147,7 +173,7 @@ export function OrderDetailPartySection({
                   }}
                 />
                 <Input aria-label="新建渠道方名称" value={newCounterpartyName} placeholder="新建渠道方" onChange={(event) => setNewCounterpartyName(event.target.value)} />
-                <PermissionButton permission="counterparty.manage" onClick={() => void addCounterparty()}>新建渠道方</PermissionButton>
+                <PermissionButton permission="counterparty.manage" disabled={!counterpartiesReady} onClick={() => void addCounterparty()}>新建渠道方</PermissionButton>
               </Space.Compact> : null}
           </Space>
         ) : null}

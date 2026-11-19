@@ -32,7 +32,7 @@ function operationPlatforms(extra: Record<string, unknown>): string[] {
 export function resolveOperationEventContent(
   operationKey: OrderOperationKey,
   fallback: ReactNode,
-  event: Pick<AccountExecutionEvent, "event_type" | "operation_type" | "form_extra">,
+  event: Pick<AccountExecutionEvent, "event_type" | "operation_type" | "form_extra" | "reason">,
 ): ReactNode {
   const extra = event.form_extra ?? {};
   const platforms = operationPlatforms(extra);
@@ -49,8 +49,9 @@ export function resolveOperationEventContent(
     return platform || fallback;
   }
   if (operationKey === "unlist" && event.operation_type === "UNLIST") {
-    if (extra.platform_unlist_scope === "SYSTEM") return "本系统";
-    return platforms.join("、") || fallback;
+    const target = extra.platform_unlist_scope === "SYSTEM" ? "本系统" : platforms.join("、") || fallback;
+    if (!event.reason?.trim()) return target;
+    return typeof target === "string" ? `${target} / 下架原因：${event.reason.trim()}` : <>{target} / 下架原因：{event.reason.trim()}</>;
   }
   return fallback;
 }

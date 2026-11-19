@@ -129,6 +129,7 @@ def post_event(
             occurred_on=payload.occurred_on,
             actor=_actor(user),
             note=payload.note,
+            reason=payload.reason,
             operator_user_ids=payload.operator_user_ids,
             form_extra=payload.form_extra,
             form_extra_scope=payload.form_extra_scope,

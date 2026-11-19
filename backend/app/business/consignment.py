@@ -36,6 +36,7 @@ def _post_operation(
     form_extra: Mapping[str, Any] | None,
     form_extra_scope: str | None,
     user: CurrentUser | None,
+    reason: str | None = None,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """寄售运营事件的唯一落库适配器。"""
     return _post_event(
@@ -46,6 +47,7 @@ def _post_operation(
         occurred_on=occurred_on,
         actor=actor,
         note=note,
+        reason=reason,
         operator_user_ids=operator_user_ids,
         form_extra=form_extra,
         form_extra_scope=form_extra_scope,
@@ -106,6 +108,7 @@ def platform_unlist_consignment(
     form_extra: Mapping[str, Any] | None = None,
     form_extra_scope: str | None = "INVOID",
     user: CurrentUser | None = None,
+    reason: str | None = None,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """平台下架：只登记 UNLIST，账号仍保留在 ERP 库存。"""
     order = get_order(session, order_id, user)
@@ -123,6 +126,7 @@ def platform_unlist_consignment(
         occurred_on=occurred_on,
         actor=actor,
         note=note,
+        reason=reason,
         operator_user_ids=operator_user_ids,
         form_extra=extra,
         form_extra_scope=form_extra_scope,
@@ -172,6 +176,7 @@ def post_consignment_operation(
     form_extra: Mapping[str, Any] | None = None,
     form_extra_scope: str | None = None,
     user: CurrentUser | None = None,
+    reason: str | None = None,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """HTTP 事件入口适配器：把寄售请求路由到三个明确业务入口。"""
     normalized = operation_type.strip().upper()
@@ -196,6 +201,7 @@ def post_consignment_operation(
                 occurred_on=occurred_on,
                 actor=actor,
                 note=note,
+                reason=reason,
                 operator_user_ids=operator_user_ids,
                 form_extra=form_extra,
                 form_extra_scope=form_extra_scope or "INVOID",

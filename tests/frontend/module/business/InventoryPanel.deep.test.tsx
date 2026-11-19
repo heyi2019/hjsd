@@ -316,6 +316,18 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     ));
   });
 
+  it("平台下架提交填写的原因", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(consignmentDetail);
+    await openPanel([consignmentRow]);
+    await clickOperation(rowOf(1), "下架");
+    const modal = await screen.findByRole("dialog");
+    await ui.click(modal.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(await screen.findByText(/千寻（上架于/, { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("下架原因"), "平台停售");
+    await ui.click(screen.getByRole("button", { name: "确认下架" }));
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(88, expect.objectContaining({ reason: "平台停售" })));
+  });
+
   it("代挂没有外部上架记录时仍可出库来源订单", async () => {
     const account = { ...consignmentRow, source_order_id: 88 } as Account;
     vi.mocked(ordersApi.executionDetail).mockResolvedValue({

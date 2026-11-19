@@ -34,6 +34,7 @@ export interface AccountExecutionEvent {
   portion: string;
   delivery_direction?: "BUY" | "SELL" | null;
   is_posted: boolean;
+  reason?: string | null;
   note?: string | null;
   form_extra?: Record<string, unknown>;
   cashflow?: AccountExecutionCashflow | null;

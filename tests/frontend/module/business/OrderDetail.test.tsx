@@ -88,6 +88,12 @@ describe("OrderDetail", () => {
     })).toBe("盼之");
   });
 
+  it("运营明细展示平台下架原因", () => {
+    const unlist = { id: 9, event_type: "OPERATE", operation_type: "UNLIST", amount: "0", occurred_at: "2026-10-02T11:00:00", reason: "平台停售", form_extra: { consignment_platforms: ["平台甲"], platform_unlist_scope: "PLATFORM" } } as never;
+    renderLight(<OrderDetailOperationSection meta={{}} account={account} operationEvents={{ unlist: [unlist] }} />);
+    expect(screen.getByText(/平台甲.*平台停售/)).toBeInTheDocument();
+  });
+
   it("加载中没有明细时显示加载状态", () => {
     render(<OrderDetail row={account} loading />);
     expect(document.querySelector(".ant-spin")).toBeTruthy();

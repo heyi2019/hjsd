@@ -100,13 +100,15 @@ def test_platform_unlisting_endpoint_requires_active_listing_on_same_order(seede
     other_order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=other_account.id)
     other_listing, _ = post_event(seeded_db, other_order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
     def submit(extra):
-        return seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json={"event_type": "OPERATE", "operation_type": "UNLIST", "occurred_on": "2026-10-02", "form_extra": {"platform_unlist_scope": "PLATFORM", **extra}})
+        return seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json={"event_type": "OPERATE", "operation_type": "UNLIST", "occurred_on": "2026-10-02", "reason": "平台停售", "form_extra": {"platform_unlist_scope": "PLATFORM", **extra}})
     assert submit({"consignment_event_id": 999999, "consignment_platforms": ["不存在的平台"]}).status_code == 422
     assert submit({"consignment_event_id": other_listing.id, "consignment_platforms": ["平台甲"]}).status_code == 422
     assert submit({"consignment_event_id": listing.id, "consignment_platforms": ["平台乙"]}).status_code == 422
     assert submit({"consignment_platforms": ["平台甲"]}).status_code == 422
     valid = {"consignment_event_id": listing.id, "consignment_platforms": ["平台甲"]}
-    assert submit(valid).status_code == 201
+    response = submit(valid)
+    assert response.status_code == 201
+    assert response.json()["event"]["reason"] == "平台停售"
     assert submit(valid).status_code == 422
 
 

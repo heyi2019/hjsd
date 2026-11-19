@@ -87,6 +87,7 @@ export function OrderPlatformOffsaleModal(props: {
         event_type: "OPERATE",
         operation_type: "UNLIST",
         occurred_on: unlistedAt.format("YYYY-MM-DD"),
+        reason: values.reason.trim(),
         operator_user_ids: values.operator_user_ids,
         note: `寄售下架：${selected.platform}`,
         form_extra_scope: "INVOID",

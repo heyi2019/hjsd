@@ -8,11 +8,13 @@ import { CustomerDetailDrawer } from "./CustomerDetailDrawer";
 import { CustomerEditModal } from "./CustomerEditModal";
 import { CustomerMergeModal } from "./CustomerMergeModal";
 import { useCustomerController } from "./useCustomerController";
+import { useSession } from "../shared/state/session";
 
 /** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
 const CUSTOMER_MOBILE_HIDDEN_KEYS = ["phone", "wechat", "qq", "created_at"] as const;
 
-export function CustomerPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
+export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrderFilter }: { active?: boolean; focusId?: number; orderFilter?: { from: string; to: string }; onClearOrderFilter?: () => void }) {
+  const { username } = useSession();
   const {
     activeDefs,
     arrangeColumns,
@@ -61,7 +63,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
     submitEdit,
     submitMerge,
     total,
-  } = useCustomerController({ active, focusId });
+  } = useCustomerController({ active, focusId, orderFilter });
   return (
     <Card
       className="glass"
@@ -96,6 +98,7 @@ export function CustomerPanel({ active = true, focusId }: { active?: boolean; fo
         ]}
       />
       <Space wrap className="customer-list-filters customer-list-filters--separated">
+        {orderFilter ? <span className="customer-order-filter">订单操作人：{creatorOptions?.find((item) => item.value === username)?.label || username} · 订单日期：{orderFilter.from} 至 {orderFilter.to}<button type="button" aria-label="清除订单筛选" onClick={onClearOrderFilter}>×</button></span> : null}
         <Input.Search
           aria-label="搜索客户"
           enterButton={(

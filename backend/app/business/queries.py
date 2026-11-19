@@ -81,15 +81,15 @@ def count_orders(
     return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
 
 
-def order_customer_count(
+def order_customer_ids(
     session: Session,
     *,
     trade_date_from: date | None = None,
     trade_date_to: date | None = None,
     user: CurrentUser | None = None,
     mine: bool = False,
-) -> int:
-    """统计订单关联的去重客户数，口径与订单列表筛选保持一致。"""
+):
+    """订单关联客户的去重查询，供工作台和客户列表共用。"""
     order_stmt = _order_list_stmt(
         order_type=None,
         status=None,
@@ -102,12 +102,25 @@ def order_customer_count(
         mine=mine,
         session=session,
     ).with_only_columns(Order.id, maintain_column_froms=True).subquery()
-    customer_stmt = (
-        select(func.count(func.distinct(OrderCustomerRole.customer_id)))
+    return (
+        select(OrderCustomerRole.customer_id.distinct())
         .select_from(OrderCustomerRole)
         .join(order_stmt, order_stmt.c.id == OrderCustomerRole.order_id)
     )
-    return int(session.scalar(customer_stmt) or 0)
+
+
+def order_customer_count(
+    session: Session, *, trade_date_from: date | None = None, trade_date_to: date | None = None,
+    user: CurrentUser | None = None, mine: bool = False,
+) -> int:
+    stmt = select(func.count(Customer.id)).where(Customer.id.in_(order_customer_ids(
+        session, trade_date_from=trade_date_from, trade_date_to=trade_date_to, user=user, mine=mine,
+    )))
+    if user is not None:
+        scope = owner_scope_filter(Customer.owner_id, user, session)
+        if scope is not None:
+            stmt = stmt.where(scope)
+    return int(session.scalar(stmt) or 0)
 
 
 def order_status_counts(

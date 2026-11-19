@@ -40,6 +40,8 @@ type PageProps = {
   /** Customer Center deep-link focus, passed from the shell so standalone page tests need no Router context. */
   focusCustomerId?: number;
   focusCounterpartyId?: number;
+  customerOrderFilter?: { from: string; to: string };
+  onClearCustomerOrderFilter?: () => void;
 };
 const PAGES: Record<string, ComponentType<PageProps>> = {
   business: OrdersPage,
@@ -66,6 +68,10 @@ export function AppShell() {
   const parsedCounterpartyFocusId = Number(customerFocusParams?.get("counterparty_id"));
   const focusCustomerId = Number.isInteger(parsedCustomerFocusId) && parsedCustomerFocusId > 0 ? parsedCustomerFocusId : undefined;
   const focusCounterpartyId = Number.isInteger(parsedCounterpartyFocusId) && parsedCounterpartyFocusId > 0 ? parsedCounterpartyFocusId : undefined;
+  const customerOrderFrom = customerFocusParams?.get("trade_date_from");
+  const customerOrderTo = customerFocusParams?.get("trade_date_to");
+  const customerOrderFilter = customerFocusParams?.get("mine_orders") === "true" && customerOrderFrom && customerOrderTo
+    ? { from: customerOrderFrom, to: customerOrderTo } : undefined;
   const rawBizTab = (segments[1] as BusinessCenterEntryTab | undefined) ?? undefined;
   const query = new URLSearchParams(location.search);
   const businessMine = active === "business" && query.get("mine") === "true";
@@ -306,6 +312,8 @@ export function AppShell() {
                         initialReportTo={key === "operations" && active === "operations" ? initialReportTo : undefined}
                         active={isActive}
                         focusCustomerId={key === "customers" ? focusCustomerId : undefined}
+                        customerOrderFilter={key === "customers" ? customerOrderFilter : undefined}
+                        onClearCustomerOrderFilter={key === "customers" ? () => navigate("/customers", { replace: true }) : undefined}
                         focusCounterpartyId={key === "customers" ? focusCounterpartyId : undefined}
                       />
                     )}

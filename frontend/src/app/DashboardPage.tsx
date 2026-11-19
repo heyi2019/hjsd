@@ -136,7 +136,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
           personalCustomers={personalCustomers}
           personalOrdersError={Boolean(personalOrdersError)}
           onPersonalOrdersClick={() => onDashboardNavigate ? openDashboardPath(withPeriod("/business/ledger?mine=true")) : onPersonalNavigate?.("orders")}
-          onPersonalCustomersClick={() => onDashboardNavigate ? openDashboardPath("/customers") : undefined}
+          onPersonalCustomersClick={() => onDashboardNavigate ? openDashboardPath(withPeriod("/customers?mine_orders=true")) : undefined}
           personalEarnings={personalEarnings}
           personalEarningsError={Boolean(earningsError)}
           onPersonalEarningsClick={() => onDashboardNavigate

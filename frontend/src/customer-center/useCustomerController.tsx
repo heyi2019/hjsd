@@ -17,7 +17,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { collectExtras } from "./CustomersPage.fragments";
 
 /** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
-export function useCustomerController({ active = true, focusId }: { active?: boolean; focusId?: number }) {
+export function useCustomerController({ active = true, focusId, orderFilter }: { active?: boolean; focusId?: number; orderFilter?: { from: string; to: string } }) {
   const [rows, setRows] = useState<Customer[] | null>(null);
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<{ month_count: number; today_count: number } | null>(null);
@@ -38,6 +38,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [creatorFilter, setCreatorFilter] = useState<string[]>([]);
   const [creatorOptions, setCreatorOptions] = useState<{ label: string; value: string }[] | null>(null);
+  const requestRef = useRef(0);
   const customerStatusOptions = useOptionSet("CUSTOMER_STATUS");
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -55,6 +56,7 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
           ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
           ...(statusFilter ? { status: statusFilter } : {}),
           ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
+          ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
         }),
         `客户-${today()}.csv`,
       );
@@ -67,12 +69,14 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
   };
 
   const load = useCallback(async () => {
+    const request = ++requestRef.current;
     setLoading(true);
     try {
       const params = {
         ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
         ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
+        ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
         limit: pageSize,
         offset: (page - 1) * pageSize,
       };
@@ -81,25 +85,29 @@ export function useCustomerController({ active = true, focusId }: { active?: boo
         ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
         ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
+        ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
       };
       const [customerPage, customerSummary] = await Promise.all([
         customersApi.page(params),
         customersApi.summary(summaryParams),
       ]);
+      if (request !== requestRef.current) return;
       setRows(customerPage.items);
       setTotal(customerPage.total);
       setSummary(customerSummary);
       setError(null);
     } catch (err) {
-      setError(normalizeError(err));
+      if (request === requestRef.current) setError(normalizeError(err));
     } finally {
-      setLoading(false);
+      if (request === requestRef.current) setLoading(false);
     }
-  }, [creatorFilter, keyword, page, pageSize, statusFilter]);
+  }, [creatorFilter, keyword, page, pageSize, statusFilter, orderFilter?.from, orderFilter?.to]);
 
+  useEffect(() => { setPage(1); }, [orderFilter?.from, orderFilter?.to]);
   // 页面被 keep-alive 隐藏时不请求；重新激活、筛选、翻页都由同一个后端查询入口刷新。
   useEffect(() => {
     if (active) void load();
+    return () => { requestRef.current += 1; };
   }, [active, load]);
 
   useEffect(() => {

@@ -229,6 +229,17 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
 });
 
 describe("AppShell：角色展示与退出", () => {
+  it("我的当期客户跳转展示本人和周期，并按订单口径筛选", async () => {
+    vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员姓名", is_active: true }] as never);
+    await renderShell({ user: "admin", initialPath: "/customers?mine_orders=true&trade_date_from=2026-11-16&trade_date_to=2026-12-15" });
+    await waitFor(() => expect(customersApi.page).toHaveBeenCalledWith(expect.objectContaining({ mine_orders: true, trade_date_from: "2026-11-16", trade_date_to: "2026-12-15" })));
+    expect(customersApi.summary).toHaveBeenCalledWith(expect.objectContaining({ mine_orders: true, trade_date_from: "2026-11-16", trade_date_to: "2026-12-15" }));
+    expect(await screen.findByText(/管理员姓名.*2026-11-16.*2026-12-15/)).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "清除订单筛选" }));
+    await waitFor(() => expect(customersApi.page).toHaveBeenLastCalledWith(expect.not.objectContaining({ mine_orders: true })));
+    expect(screen.queryByText(/管理员姓名.*2026-11-16.*2026-12-15/)).toBeNull();
+  });
+
   it("工作台与经营中心共用已配置的周期和临时日期选择", async () => {
     vi.mocked(optionSetsApi.get).mockResolvedValue({ code: "BUSINESS_PERIOD", options: [{ value: "start_day", label: "10" }] } as never);
     await renderShell({ user: "admin" });

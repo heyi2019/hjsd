@@ -9,12 +9,12 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 from app.core.errors import NotFound, Validation
-from app.core.security import CurrentUser
+from app.core.security import CurrentUser, DEV_USERS
 from app.domain.enums import (
     AccountStatus,
     OrderStatus)
 from app.business.stocks.profile import create_account
-from app.customers.customers import create_customer
+from app.customers.customers import create_customer, list_customers, count_customers
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, OrderEvent
 from app.domain.users import User
@@ -320,6 +320,41 @@ class TestGetAndListOrders:
         seeded_db.flush()
         operator = CurrentUser.build(id=users[0].id, username=users[0].username, roles=["ADMIN"], owner_scope="ALL")
         assert order_customer_count(seeded_db, user=operator, mine=True) == 2
+        filtered = list_customers(seeded_db, user=operator, mine_orders=True, trade_date_from=D, trade_date_to=D)
+        assert {customer.id for customer in filtered} == {customer_a.id, customer_b.id}
+        assert count_customers(seeded_db, user=operator, mine_orders=True, trade_date_from=D, trade_date_to=D) == 2
+        assert count_customers(seeded_db, user=operator, mine_orders=True, trade_date_from=D + timedelta(days=1), trade_date_to=D + timedelta(days=1)) == 0
+        other = users[1]
+        visible = create_customer(seeded_db, display_name="可见客户", actor=other.username, owner_id=other.id)
+        hidden = create_customer(seeded_db, display_name="不可见客户", actor=other.username, owner_id=users[0].id)
+        scoped_order = _order(seeded_db, owner_id=other.id, form_extra={"business_responsible_ids": [other.id]})
+        seeded_db.add_all([
+            OrderCustomerRole(order_id=scoped_order.id, customer_id=visible.id, role="BUYER"),
+            OrderCustomerRole(order_id=scoped_order.id, customer_id=hidden.id, role="BUYER"),
+        ])
+        seeded_db.flush()
+        scoped_user = CurrentUser.build(id=other.id, username=other.username, roles=["OPERATOR"], owner_scope="SELF")
+        assert order_customer_count(seeded_db, user=scoped_user, mine=True, trade_date_from=D, trade_date_to=D) == 1
+        assert [customer.id for customer in list_customers(seeded_db, user=scoped_user, mine_orders=True, trade_date_from=D, trade_date_to=D)] == [visible.id]
+
+    def test_workbench_customer_list_and_export_match_personal_order_count(self, seeded_client, seeded_db, headers):
+        admin = DEV_USERS["admin"]
+        customer = create_customer(seeded_db, display_name="当期客户", actor="pytest")
+        outside = create_customer(seeded_db, display_name="其他周期客户", actor="pytest")
+        for trade_day, party in [(D, customer), (D, customer), (D + timedelta(days=1), outside)]:
+            order = _order(seeded_db, trade_date=trade_day, form_extra={"business_responsible_ids": [admin.id]})
+            seeded_db.add(OrderCustomerRole(order_id=order.id, customer_id=party.id, role="BUYER"))
+        seeded_db.flush()
+        params = {"mine_orders": "true", "trade_date_from": D.isoformat(), "trade_date_to": D.isoformat()}
+        listing = seeded_client.get("/api/v1/customers", params=params, headers=headers)
+        dashboard = seeded_client.get("/api/v1/dashboard/summary", params={"from": D.isoformat(), "to": D.isoformat()}, headers=headers)
+        assert listing.status_code == dashboard.status_code == 200
+        assert listing.json()["total"] == dashboard.json()["personal_customers"] == 1
+        assert [item["id"] for item in listing.json()["items"]] == [customer.id]
+        exported = seeded_client.get("/api/v1/customers/export.csv", params=params, headers=headers)
+        assert exported.status_code == 200
+        assert "当期客户" in exported.text and "其他周期客户" not in exported.text
+        assert seeded_client.get("/api/v1/customers", params={"mine_orders": "true"}, headers=headers).status_code == 422
 
     def test_list_orders_supports_workbench_date_owner_keyword_filters(
         self, seeded_client, seeded_db, headers

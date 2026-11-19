@@ -81,6 +81,7 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     }));
     renderLight(<DashboardPage onDashboardNavigate={onDashboardNavigate} />, { user: "admin" });
 
+    await waitFor(() => expect(screen.getByTestId("dashboard-personal-orders")).toHaveAttribute("role", "button"));
     await ui.click((await screen.findByText("我的当期订单")).closest(".ui-stat") as HTMLElement);
     await ui.click(screen.getByText("我的当期收益").closest(".ui-stat") as HTMLElement);
     await ui.click((await screen.findByText("在库账号")).closest(".ui-stat") as HTMLElement);
@@ -95,7 +96,7 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
       ["/operations?tab=my-earnings&from=2026-11-01&to=2026-11-16"],
       ["/business/inventory"],
       ["/business/ledger?trade_date_from=2026-11-01&trade_date_to=2026-11-16"],
-      ["/customers"],
+      ["/customers?mine_orders=true&trade_date_from=2026-11-01&trade_date_to=2026-11-16"],
       ["/business/collections"],
       ["/business/collections?status=OVERDUE"],
       ["/business/inventory?age_gt_days=30"],

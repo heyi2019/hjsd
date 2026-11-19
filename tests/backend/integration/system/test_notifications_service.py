@@ -227,7 +227,11 @@ def test_set_allocations_after_completion_notifies_recipients(seeded_db):
     recipient_id = _uid(seeded_db, "seeduser2")
     order = _order(seeded_db, "p1")
     _buy(seeded_db, order)
-    _sell(seeded_db, order, operator_ids=[seller_id])
+    _sell(seeded_db, order, operator_ids=[seller_id, recipient_id])
+
+    with pytest.raises(Validation):
+        _set_person_allocations(seeded_db, order, [])
+    assert _notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)[0].read_at is None
 
     _set_person_allocations(
         seeded_db,
@@ -237,6 +241,8 @@ def test_set_allocations_after_completion_notifies_recipients(seeded_db):
 
     assert len(_notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)) == 1
     assert len(_notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)) == 1
+    assert _notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)[0].read_at is not None
+    assert _notifs(seeded_db, recipient_id, triggers.PROFIT_PENDING)[0].read_at is not None
 
 def test_set_allocations_repeat_is_idempotent(seeded_db):
     """重复保存同一分润，接收人只收到一次「已确认」。"""

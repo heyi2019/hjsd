@@ -183,9 +183,6 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
     assert item["sale_at"].startswith("2026-10-31")
     assert item["sale_operator"] == (operator.display_name or operator.username)
     assert Decimal(str(item["profit_base"])) == Decimal("170")
-    set_allocations(seeded_db, order.id, items=[{"user_id": operator.id, "role": "OWNER", "allocation_rate": "100"}], actor="pytest")
-    group = next(group for group in r3_commission_reconciliation(seeded_db)["order_groups"] if group["order_id"] == order.id)
-    assert group["outbound_date"] == date(2026, 10, 31)
     for selected, expected_total in ((operator, 1), (previous_operator, 0)):
         filtered = seeded_client.get("/api/v1/orders", headers=headers, params={"keyword": order.order_no, "sale_operator_ids": selected.id})
         assert filtered.status_code == 200, filtered.text
@@ -205,3 +202,6 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == 120
     current_pending = seeded_db.scalar(select(Notification).where(Notification.recipient_user_id == operator.id, Notification.notification_type == "PROFIT_PENDING", Notification.entity_id == order.order_no))
     assert current_pending.read_at is None
+    set_allocations(seeded_db, order.id, items=[{"user_id": operator.id, "role": "OWNER", "allocation_rate": "100"}], actor="pytest")
+    group = next(group for group in r3_commission_reconciliation(seeded_db)["order_groups"] if group["order_id"] == order.id)
+    assert group["outbound_date"] == date(2026, 10, 31)

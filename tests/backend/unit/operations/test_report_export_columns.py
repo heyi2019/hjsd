@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import csv
 import io
-from app.reporting.export import report_csv
+from app.operations.export import report_csv
 
 
 def _header(csv_text: str) -> list[str]:

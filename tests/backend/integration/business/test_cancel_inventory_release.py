@@ -13,10 +13,10 @@ import pytest
 from app.core.errors import Validation
 from app.domain.enums import AccountStatus
 from app.domain.trade import Account
-from app.orders.cancellation_model import cancel_order
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.stocks import inventory as inventory_service
+from app.business.cancellation_model import cancel_order
+from app.business.create import create_order
+from app.business.events import post_event
+from app.business.stocks import inventory as inventory_service
 
 D = date(2026, 11, 1)
 

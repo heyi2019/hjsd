@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { sequencesApi } from "@/shared/api/misc.api";
 import { optionSetsApi } from "@/shared/api/options.api";
-import { SequencesPanel } from "@/field-definitions/panels/SequencesPanel";
-import { BusinessReminderSettingsPanel } from "@/field-definitions/panels/BusinessReminderSettingsPanel";
+import { SequencesPanel } from "@/settings/panels/SequencesPanel";
+import { BusinessReminderSettingsPanel } from "@/settings/panels/BusinessReminderSettingsPanel";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");

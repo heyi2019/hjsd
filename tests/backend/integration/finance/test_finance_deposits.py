@@ -10,21 +10,21 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.stocks.profile import create_account
+from app.business.stocks.profile import create_account
 from app.core.errors import NotFound, Validation
 from app.domain.foundation import Pool
 from app.domain.enums import CashflowSourceType
 from app.domain.trade import Cashflow, Reconciliation
-from app.finance.cashflows import create_cashflow
-from app.finance.deposits.writes import create_deposit
-from app.finance.deposits.lifecycle import cancel_deposit, lose_deposit, return_deposit
-from app.finance.deposits.reads import deposit_held_total, list_deposits
-from app.finance.reconciliation import create_reconciliation
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.finance.balances import pool_balance
-from app.customer_center.counterparties import create_counterparty, set_counterparty_status
-from app.reporting.r2_monthly_pnl import r2_monthly_pnl
+from app.funds.cashflows import create_cashflow
+from app.funds.deposits.writes import create_deposit
+from app.funds.deposits.lifecycle import cancel_deposit, lose_deposit, return_deposit
+from app.funds.deposits.reads import deposit_held_total, list_deposits
+from app.funds.reconciliation import create_reconciliation
+from app.business.create import create_order
+from app.business.events import post_event
+from app.funds.balances import pool_balance
+from app.customers.counterparties import create_counterparty, set_counterparty_status
+from app.operations.r2_monthly_pnl import r2_monthly_pnl
 
 TODAY = date(2026, 10, 4)
 
@@ -418,7 +418,7 @@ class TestDepositLedgerType:
         assert len(losses) == 1 and losses[0].ledger_type == "STUDIO"
 
     def test_update_ledger_type_syncs_hold_flow(self, seeded_db):
-        from app.finance.deposits.writes import update_deposit
+        from app.funds.deposits.writes import update_deposit
         invest = _pool(seeded_db, "HJ_INVEST")
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"

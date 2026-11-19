@@ -7,15 +7,15 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.stocks.profile import create_account
+from app.business.stocks.profile import create_account
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.core.tokens import hash_password
 from app.domain.users import User
-from app.finance import rebates
-from app.finance import cashflows
-from app.orders.create import create_order
-from app.orders.events import post_event
+from app.funds import rebates
+from app.funds import cashflows
+from app.business.create import create_order
+from app.business.events import post_event
 from app.domain.trade import Cashflow, Order, OrderEvent
 
 

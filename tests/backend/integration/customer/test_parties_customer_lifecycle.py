@@ -25,16 +25,16 @@ from app.domain.foundation import AuditLog
 from app.domain.parties import (
     OrderCustomerRole)
 from app.domain.trade import InstallmentSchedule, OrderFormField
-from app.finance.installments import create as inst_create
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.stocks.profile import create_account
-from app.customer_center.counterparties import (
+from app.funds.installments import create as inst_create
+from app.business.create import create_order
+from app.business.events import post_event
+from app.business.stocks.profile import create_account
+from app.customers.counterparties import (
     create_counterparty,
     update_counterparty)
-from app.customer_center.customer_detail import get_customer_activity_summary, get_customer_detail
-from app.customer_center.customer_merge import duplicate_candidates, merge_customers
-from app.customer_center.customers import create_customer, get_customer, list_customers, set_customer_status, update_customer
+from app.customers.customer_detail import get_customer_activity_summary, get_customer_detail
+from app.customers.customer_merge import duplicate_candidates, merge_customers
+from app.customers.customers import create_customer, get_customer, list_customers, set_customer_status, update_customer
 from app.shared.form_values import get_extra_values, set_extra_values
 
 CUSTOMERS = "/api/v1/customers"

@@ -9,7 +9,7 @@ import importlib.util
 from app.shared import business_numbering
 from app.domain.base import Base
 from app.domain import trade
-from app.finance import rebates, router, schemas
+from app.funds import rebates, router, schemas
 
 
 def test_rebate_has_only_register_edit_delete_lifecycle():
@@ -35,7 +35,7 @@ def test_rebate_has_only_register_edit_delete_lifecycle():
         for name in legacy_names:
             assert not hasattr(module, name), f"{module.__name__}.{name} is obsolete"
     # 2026-11-12 去兼容：finance.service 再导出门面已删除
-    assert importlib.util.find_spec("app.finance.service") is None
+    assert importlib.util.find_spec("app.funds.service") is None
 
 
 def test_rebate_settlement_model_layer_is_removed():

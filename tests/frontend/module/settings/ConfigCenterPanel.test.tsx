@@ -30,7 +30,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
   checkBackendHealth: vi.fn(),
 }));
 import { renderLight } from "@fixtures/render";
-import { ConfigCenterPanel } from "@/field-definitions/panels/ConfigCenterPanel";
+import { ConfigCenterPanel } from "@/settings/panels/ConfigCenterPanel";
 
 const orderTypes = [
   { id: 1, code: "HS", name: "回收", is_active: true },

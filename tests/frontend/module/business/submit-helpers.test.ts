@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { splitFormExtra } from "@/orders/create/submit-helpers";
-import type { FieldConfigMap } from "@/orders/ConfigurableField";
+import { splitFormExtra } from "@/business/create/submit-helpers";
+import type { FieldConfigMap } from "@/business/ConfigurableField";
 
 const config: FieldConfigMap = {
   optional_number: {

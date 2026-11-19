@@ -11,11 +11,11 @@ from app.domain.enums import AccountStatus
 from app.domain.foundation import Pool
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
-from app.finance.installments import create as inst_create
-from app.finance.installments.repayments.pay import pay as inst_pay
-from app.orders.create import add_customer_role, create_order
-from app.orders.events import post_event
-from app.customer_center.customers import create_customer, set_customer_status
+from app.funds.installments import create as inst_create
+from app.funds.installments.repayments.pay import pay as inst_pay
+from app.business.create import add_customer_role, create_order
+from app.business.events import post_event
+from app.customers.customers import create_customer, set_customer_status
 
 TODAY = date(2026, 10, 4)
 TODAY2 = date(2026, 10, 18)

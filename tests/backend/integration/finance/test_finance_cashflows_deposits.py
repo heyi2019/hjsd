@@ -12,12 +12,12 @@ from app.core.security import CurrentUser
 from app.domain.enums import CashflowLedgerType, CashflowSourceType
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
-from app.finance import cashflows
-from app.finance.cashflow_queries import list_cashflows
-from app.finance.deposits.writes import create_deposit
-from app.finance.deposits.lifecycle import cancel_deposit, lose_deposit, return_deposit
-from app.finance.deposits.reads import list_deposits
-from app.finance import transfers
+from app.funds import cashflows
+from app.funds.cashflow_queries import list_cashflows
+from app.funds.deposits.writes import create_deposit
+from app.funds.deposits.lifecycle import cancel_deposit, lose_deposit, return_deposit
+from app.funds.deposits.reads import list_deposits
+from app.funds import transfers
 
 
 TODAY = date(2026, 10, 17)
@@ -58,7 +58,7 @@ def _make_flow(seeded_db, *, direction,
     )
 
 def _make_order(seeded_db, order_type):
-    from app.orders.create import create_order
+    from app.business.create import create_order
 
     kwargs: dict = {"order_type": order_type, "trade_date": TODAY, "actor": "pytest"}
     if order_type == "DG":
@@ -83,9 +83,9 @@ def _cashflow_row(**overrides):
     return row
 
 def _order_with_buy_event(seeded_db):
-    from app.stocks.profile import create_account
-    from app.orders.create import create_order
-    from app.orders.events import post_event
+    from app.business.stocks.profile import create_account
+    from app.business.create import create_order
+    from app.business.events import post_event
 
     account = create_account(
         seeded_db, game_account="cf-guard-account",
@@ -332,7 +332,7 @@ def test_list_cashflows_by_pool_id_visible(seeded_db):
 
 def test_cashflow_out_marks_order_event_source(seeded_db):
     """挂了订单事件就必须标 ORDER_EVENT —— 前端据此决定能否跳订单详情。"""
-    from app.finance import router_output
+    from app.funds import router_output
 
     assert router_output._cashflow_out(seeded_db, _cashflow_row(source_type="ORDER_EVENT", source_id="HS0001-EV-BUY-01")).source == (
         "ORDER_EVENT"
@@ -340,7 +340,7 @@ def test_cashflow_out_marks_order_event_source(seeded_db):
 
 def test_cashflow_out_marks_order_event_rebate_source(seeded_db):
     """返点收入流水通过返点订单事件回指来源。"""
-    from app.finance import router_output
+    from app.funds import router_output
 
     out = router_output._cashflow_out(
         seeded_db,

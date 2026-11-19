@@ -1,7 +1,7 @@
 import { Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { buildFormExtraDisplay, CfgItem, CustomFieldSection, FieldConfigScope, formatExtraDisplayValue } from "../orders/ConfigurableField";
+import { buildFormExtraDisplay, CfgItem, CustomFieldSection, FieldConfigScope, formatExtraDisplayValue } from "../business/ConfigurableField";
 import { counterpartiesApi } from "../shared/api/customers.api";
 import { employeesApi } from "../shared/api/org.api";
 import { orderFormFieldsApi } from "../shared/api/orders.api";

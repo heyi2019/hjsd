@@ -45,13 +45,13 @@ from app.domain.enums import (
     InstallmentStatus,
     ScheduleStatus)
 from app.domain.trade import InstallmentSchedule, OrderEvent
-from app.finance.installments import create as inst_create
-from app.finance.installments import recovery as inst_recovery
-from app.finance.installments.repayments.waive import waive_schedule as inst_waive
-from app.finance.installments.repayments.extend import extend_schedule as inst_extend
-from app.finance.installments import settlement as inst_settlement
-from app.orders.create import create_order
-from app.orders.events import post_event
+from app.funds.installments import create as inst_create
+from app.funds.installments import recovery as inst_recovery
+from app.funds.installments.repayments.waive import waive_schedule as inst_waive
+from app.funds.installments.repayments.extend import extend_schedule as inst_extend
+from app.funds.installments import settlement as inst_settlement
+from app.business.create import create_order
+from app.business.events import post_event
 
 TODAY = date(2026, 10, 12)
 FUTURE = date(2026, 11, 30)
@@ -64,7 +64,7 @@ def _account(
     business_mode="SELF",
     inventory_type="RECOVERY",
 ):
-    from app.stocks.profile import create_account
+    from app.business.stocks.profile import create_account
 
     return create_account(
         seeded_db,

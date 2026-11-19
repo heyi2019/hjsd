@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.stocks.profile import create_account
+from app.business.stocks.profile import create_account
 from app.core.errors import ErrorCode
 from app.domain.enums import (
     AccountStatus,
@@ -19,18 +19,18 @@ from app.domain.enums import (
 )
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order
-from app.finance.deposits.writes import create_deposit
-from app.finance.deposits.lifecycle import return_deposit
-from app.finance.rebates import create_rebate
+from app.funds.deposits.writes import create_deposit
+from app.funds.deposits.lifecycle import return_deposit
+from app.funds.rebates import create_rebate
 from app.shared.installment_amounts import total_receivable
-from app.finance.installments import create as inst_create
-from app.finance.installments import recovery as inst_recovery
-from app.finance.installments.repayments.pay import pay as inst_pay
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.finance.balances import pool_balance
-from app.customer_center.counterparties import create_counterparty
-from app.customer_center.customers import create_customer
+from app.funds.installments import create as inst_create
+from app.funds.installments import recovery as inst_recovery
+from app.funds.installments.repayments.pay import pay as inst_pay
+from app.business.create import create_order
+from app.business.events import post_event
+from app.funds.balances import pool_balance
+from app.customers.counterparties import create_counterparty
+from app.customers.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 

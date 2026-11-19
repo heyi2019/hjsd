@@ -6,8 +6,8 @@ import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { poolsApi } from "@/shared/api/pools.api";
-import { PoolsAndRoutesPanel } from "@/field-definitions/panels/PoolsAndRoutesPanel";
-import { CONFIG_CENTER_GROUP_ORDER, SETTINGS_TAB_ORDER } from "@/field-definitions/configCatalog";
+import { PoolsAndRoutesPanel } from "@/settings/panels/PoolsAndRoutesPanel";
+import { CONFIG_CENTER_GROUP_ORDER, SETTINGS_TAB_ORDER } from "@/settings/configCatalog";
 
 vi.mock("@/shared/api/pools.api");
 

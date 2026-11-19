@@ -1,7 +1,7 @@
 """LIST-01 列表列显示配置（迁移 0051）：作用域清单、可见性与顺序保存。
 
 口径：
-- 列清单/中文名以 `app.lists.scopes` 注册表为准，库只存 is_visible + sort_order；
+- 列清单/中文名以 `app.settings.lists.scopes` 注册表为准，库只存 is_visible + sort_order；
 - 缺行即默认可见（新增列无需数据迁移）；
 - 所有列均可隐藏与调序（无锁定约束）；未知列仍拒绝写入。
 """
@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
-from app.lists.scopes import LIST_SCOPES, get_scope
+from app.settings.lists.scopes import LIST_SCOPES, get_scope
 
 
 def _registry(code: str):

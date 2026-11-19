@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.orders.create import create_order
-from app.customer_center.customers import create_customer
+from app.business.create import create_order
+from app.customers.customers import create_customer
 
 
 def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, headers):

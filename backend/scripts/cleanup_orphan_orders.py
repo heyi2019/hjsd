@@ -32,7 +32,7 @@ from sqlalchemy import select  # noqa: E402
 
 from app.core.database import get_session_factory  # noqa: E402
 from app.domain.trade import Order, OrderEvent  # noqa: E402
-from app.orders.cancellation_model import cancel_order  # noqa: E402
+from app.business.cancellation_model import cancel_order  # noqa: E402
 
 REASON = "售出登记失败的孤儿订单，批量清理取消"
 

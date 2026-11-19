@@ -43,11 +43,11 @@ from app.domain.trade import (
     RebateRecord,
     Reconciliation,
 )
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.orders.mutations import update_order
-from app.reporting.r2_monthly_pnl import r2_monthly_pnl
-from app.stocks.profile import create_account
+from app.business.create import create_order
+from app.business.events import post_event
+from app.business.mutations import update_order
+from app.operations.r2_monthly_pnl import r2_monthly_pnl
+from app.business.stocks.profile import create_account
 
 D1 = date(2026, 9, 10)
 D2 = date(2026, 10, 10)
@@ -106,7 +106,7 @@ def test_cancel_sell_flow_is_out(seeded_db):
     )
     assert cancel_flow.direction == Direction.OUT.value
     # 资金账户收支卡片：OUT 计入 expense，账与余额自洽。
-    from app.finance.balances import pool_balances
+    from app.funds.balances import pool_balances
     balances = pool_balances(seeded_db, [1])
     # 主 SELL(IN 200) + BUY(OUT 100) + CANCEL(OUT 200) → expense 应含 BUY 100 + CANCEL 200
     assert balances[1]["expense"] >= Decimal("300.00")

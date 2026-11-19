@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.domain.trade import Order, OrderFormField
-from app.lists import service
+from app.settings.lists import service
 
 
 def _seed_custom_field(

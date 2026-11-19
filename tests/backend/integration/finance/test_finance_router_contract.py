@@ -10,22 +10,22 @@ from decimal import Decimal
 
 import pytest
 
-from app.stocks.profile import create_account
+from app.business.stocks.profile import create_account
 from app.core.errors import NotFound
 from app.core.security import CurrentUser
-from app.finance.deposits.writes import create_deposit
-from app.finance import rebates
-from app.finance import schemas
-from app.finance.routers.cashflows_router import list_cashflows
-from app.finance.routers.deposits_router import cancel_deposit, lose_deposit, return_deposit
-from app.finance.routers.rebates_router import get_rebate
-from app.finance.routers.reconciliation_router import (
+from app.funds.deposits.writes import create_deposit
+from app.funds import rebates
+from app.funds import schemas
+from app.funds.routers.cashflows_router import list_cashflows
+from app.funds.routers.deposits_router import cancel_deposit, lose_deposit, return_deposit
+from app.funds.routers.rebates_router import get_rebate
+from app.funds.routers.reconciliation_router import (
     create_reconciliation,
     list_reconciliations,
     repair_transfer,
 )
-from app.orders.create import create_order
-from app.orders.events import post_event
+from app.business.create import create_order
+from app.business.events import post_event
 
 
 TODAY = date(2026, 10, 17)
@@ -217,8 +217,8 @@ def test_router_get_rebate_endpoint(seeded_db):
 # ----------------------------------------------------- cashflows_router 补口
 from app.core.errors import Validation  # noqa: E402
 from app.domain.enums import CashflowLedgerType  # noqa: E402
-from app.finance import cashflows as cashflow_service  # noqa: E402
-from app.finance.routers.cashflows_router import (  # noqa: E402
+from app.funds import cashflows as cashflow_service  # noqa: E402
+from app.funds.routers.cashflows_router import (  # noqa: E402
     create_order_cashflow,
     delete_cashflow as delete_cashflow_endpoint,
     list_cashflow_totals,
@@ -329,20 +329,20 @@ def test_router_delete_cashflow_endpoint(seeded_db):
 
 # ----------------------------------------------------- 查询层与零头端点补口
 from app.domain.trade import Deposit  # noqa: E402
-from app.finance.balances import pool_balances  # noqa: E402
-from app.finance.cashflow_queries import cashflow_totals, studio_summary  # noqa: E402
-from app.finance.routers.deposits_router import (  # noqa: E402
+from app.funds.balances import pool_balances  # noqa: E402
+from app.funds.cashflow_queries import cashflow_totals, studio_summary  # noqa: E402
+from app.funds.routers.deposits_router import (  # noqa: E402
     delete_deposit as delete_deposit_endpoint,
     update_deposit as update_deposit_endpoint,
 )
-from app.finance.routers.rebates_router import (  # noqa: E402
+from app.funds.routers.rebates_router import (  # noqa: E402
     update_rebate as update_rebate_endpoint,
 )
-from app.finance.reconciliation import resolve_reconciliation  # noqa: E402
+from app.funds.reconciliation import resolve_reconciliation  # noqa: E402
 
 
 def test_query_list_cashflows_rejects_bad_ledger_type(seeded_db):
-    from app.finance.cashflow_queries import list_cashflows as query_list
+    from app.funds.cashflow_queries import list_cashflows as query_list
 
     with pytest.raises(Validation, match="ledger_type 必须为"):
         query_list(seeded_db, ledger_type="NOPE")
@@ -395,7 +395,7 @@ def test_router_update_rebate_endpoint(seeded_db):
 
 
 def test_resolve_reconciliation_with_form_extra(seeded_db):
-    from app.finance.routers.reconciliation_router import create_reconciliation
+    from app.funds.routers.reconciliation_router import create_reconciliation
 
     item = create_reconciliation(
         payload=schemas.ReconciliationCreate(

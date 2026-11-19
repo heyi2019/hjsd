@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildEventEdits } from "@/orders/OrderDetailView/editing/execution-edit-payload";
-import { propagateSharedOrderExtra, sharedOrderIdsForEdit } from "@/orders/OrderDetailView/editing/use-order-detail-editor";
-import { resolveExecutionPlatform } from "@/orders/OrderDetailView/OrderDetail.shared";
-import { mergeLedgerOrderWithDetail } from "@/orders/orderpage/useLedgerInlineEdit";
+import { buildEventEdits } from "@/business/OrderDetailView/editing/execution-edit-payload";
+import { propagateSharedOrderExtra, sharedOrderIdsForEdit } from "@/business/OrderDetailView/editing/use-order-detail-editor";
+import { resolveExecutionPlatform } from "@/business/OrderDetailView/OrderDetail.shared";
+import { mergeLedgerOrderWithDetail } from "@/business/orderpage/useLedgerInlineEdit";
 
 describe("详情编辑保存载荷", () => {
   it("会提交事件的文本、时间和操作人修改", () => {

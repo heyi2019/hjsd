@@ -12,7 +12,7 @@ from datetime import date
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import select
-from app.auth import service
+from app.settings.auth import service
 from app.core.errors import Validation
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
@@ -305,7 +305,7 @@ def test_user_service_rejects_non_boolean_active_state(seeded_db):
     assert user.is_active is True
 
 def test_user_deactivation_with_active_orders_requires_handover_or_retention_note(seeded_db):
-    from app.orders.create import create_order
+    from app.business.create import create_order
 
     order = create_order(
         seeded_db, order_type="HS", trade_date=date.today(),
@@ -323,7 +323,7 @@ def test_user_deactivation_with_active_orders_requires_handover_or_retention_not
     assert seeded_db.get(Order, order.id).owner_id == 1
 
 def test_user_deactivation_handover_moves_active_orders_and_records_audit(seeded_db):
-    from app.orders.create import create_order
+    from app.business.create import create_order
 
     order = create_order(
         seeded_db, order_type="HS", trade_date=date.today(), owner_id=1, actor="pytest",
@@ -346,7 +346,7 @@ def test_user_deactivation_handover_moves_active_orders_and_records_audit(seeded
     assert AuditAction.USER_HANDOVER.value in actions
 
 def test_user_deactivation_rejects_inactive_handover_target(seeded_db):
-    from app.orders.create import create_order
+    from app.business.create import create_order
 
     target = seeded_db.get(User, 2)
     target.is_active = False

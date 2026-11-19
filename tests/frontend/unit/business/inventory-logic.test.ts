@@ -1,7 +1,7 @@
-import { buildActionAllocationCandidates, buildActionAllocationRows } from "@/orders/orderpage/helpers";
+import { buildActionAllocationCandidates, buildActionAllocationRows } from "@/business/orderpage/helpers";
 import { describe, expect, it, vi } from "vitest";
-import { INVENTORY_AGE_COLOR, INVENTORY_TYPE_LABEL } from "@/stocks/inventory-logic";
-import { applyOffsetEventSelection } from "@/stocks/InventoryCancellationDialog";
+import { INVENTORY_AGE_COLOR, INVENTORY_TYPE_LABEL } from "@/business/stocks/inventory-logic";
+import { applyOffsetEventSelection } from "@/business/stocks/InventoryCancellationDialog";
 
 describe("库存纯逻辑", () => {
   it("展示提号库存类型", () => {

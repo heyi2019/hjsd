@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orderOperationMenuItems } from "@/orders/operations";
+import { orderOperationMenuItems } from "@/business/operations";
 
 describe("订单运营菜单", () => {
   it("不可用动作直接隐藏，不返回置灰占位", () => {

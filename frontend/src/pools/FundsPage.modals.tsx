@@ -9,13 +9,13 @@ import { BusinessActionModal, BusinessRegistrationForm, DataTable, DateField, In
 import type { NormalizedError } from "../shared/api/client";
 import type { Permission } from "../shared/state/session";
 import type { EmployeeOption } from "../shared/api/types/org";
-import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
+import { CfgItem, FieldConfigScope } from "../business/ConfigurableField";
 import { today } from "../shared/lib/format";
 import { positiveIntegerRules, requiredMoneyRules } from "../shared/lib/validators";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { ACCOUNTING_ATTRIBUTE_LABEL } from "../shared/lib/labels";
 import type { FundsPageController } from "./useFundsPageController";
-import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
+import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect";
 
 const Modal = BusinessActionModal;
 

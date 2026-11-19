@@ -9,11 +9,11 @@ from app.shared.audit import record_audit
 from app.core.security import CurrentUser, DEV_USERS, build_access_token
 from app.domain.enums import (
     AuditAction)
-from app.stocks.profile import create_account
-from app.finance.installments import create as inst_create
-from app.finance.rebates import create_rebate
-from app.orders.create import create_order
-from app.orders.events import post_event
+from app.business.stocks.profile import create_account
+from app.funds.installments import create as inst_create
+from app.funds.rebates import create_rebate
+from app.business.create import create_order
+from app.business.events import post_event
 
 D = date(2026, 10, 4)
 

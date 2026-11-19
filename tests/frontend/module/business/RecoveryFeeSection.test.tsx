@@ -6,8 +6,8 @@ import type { ReactElement } from "react";
 import type { Pool } from "@/shared/api/types/finance";
 import type { OrderFormField } from "@/shared/api/types/forms";
 import { renderLight } from "@fixtures/render";
-import { FieldConfigContext, type FieldConfigMap } from "@/orders/ConfigurableField";
-import { RecoveryFeeSection } from "@/orders/recovery/RecoveryFeeSection";
+import { FieldConfigContext, type FieldConfigMap } from "@/business/ConfigurableField";
+import { RecoveryFeeSection } from "@/business/recovery/RecoveryFeeSection";
 
 const makeField = (over: Partial<OrderFormField> = {}): OrderFormField => ({
   id: 1,

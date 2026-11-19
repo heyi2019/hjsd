@@ -21,11 +21,11 @@ from app.domain.enums import Direction, InstallmentStatus, OrderStatus
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Order
 from app.domain.trade_models.cashflow import Cashflow
-from app.orders import events
-from app.orders.create import create_order
-from app.finance.installments.create import create_installment
-from app.finance.installments.recovery import deliver
-from app.finance.installments.repayments.pay import pay
+from app.business import events
+from app.business.create import create_order
+from app.funds.installments.create import create_installment
+from app.funds.installments.recovery import deliver
+from app.funds.installments.repayments.pay import pay
 
 TODAY = date(2026, 10, 7)
 

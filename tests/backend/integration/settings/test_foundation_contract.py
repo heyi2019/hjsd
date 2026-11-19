@@ -16,8 +16,8 @@ from sqlalchemy.exc import IntegrityError
 from app.core.errors import NotFound, Validation
 from app.domain.enums import PoolStatus
 from app.domain.foundation import OrderTypeDef
-from app.field_definitions import seeds
-from app.field_definitions.order_types import (
+from app.settings.field_definitions import seeds
+from app.settings.field_definitions.order_types import (
     create_order_type,
     get_order_type_by_code,
     list_order_types,
@@ -25,7 +25,7 @@ from app.field_definitions.order_types import (
     set_order_type_active,
     update_order_type,
 )
-from app.field_definitions.pools import (
+from app.settings.field_definitions.pools import (
     _has_cashflow,
     create_pool,
     list_pools,

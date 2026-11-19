@@ -7,17 +7,17 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.stocks.profile import create_account
+from app.business.stocks.profile import create_account
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AccountStatus, EventType
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
-from app.finance.installments import create as inst_create
-from app.finance.installments import recovery as inst_recovery
-from app.finance.installments.repayments.pay import pay as inst_pay
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.customer_center.customers import create_customer, set_customer_status
+from app.funds.installments import create as inst_create
+from app.funds.installments import recovery as inst_recovery
+from app.funds.installments.repayments.pay import pay as inst_pay
+from app.business.create import create_order
+from app.business.events import post_event
+from app.customers.customers import create_customer, set_customer_status
 
 TODAY = date(2026, 10, 4)
 TODAY2 = date(2026, 10, 18)
@@ -143,7 +143,7 @@ class TestEventRules:
         assert event.amount == 0
 
     def test_cancelled_order_rejects_new_event(self, seeded_db):
-        from app.orders.cancellation_model import cancel_order
+        from app.business.cancellation_model import cancel_order
 
         order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")
         cancel_order(seeded_db, order.id, actor="pytest", reason="撤销空订单")
@@ -168,7 +168,7 @@ class TestEventRules:
             )
 
     def test_disabled_pool_rejects_new_order_event(self, seeded_db):
-        from app.field_definitions.pools import set_pool_status
+        from app.settings.field_definitions.pools import set_pool_status
 
         set_pool_status(seeded_db, 1, "DISABLED", actor="pytest")
         order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")

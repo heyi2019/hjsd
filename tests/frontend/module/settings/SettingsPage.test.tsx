@@ -34,7 +34,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
 }));
 import { renderLight } from "@fixtures/render";
 import { screen } from "@testing-library/react";
-import { SettingsPage } from "@/field-definitions/SettingsPage";
+import { SettingsPage } from "@/settings/SettingsPage";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listResponse, optionSetList } from "@fixtures/api-responses";
 

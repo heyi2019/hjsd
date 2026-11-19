@@ -22,7 +22,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 import * as client from "@/shared/api/client";
 import { renderLight } from "@fixtures/render";
-import { OrderFormFieldsPanel } from "@/field-definitions/panels/OrderFormFieldsPanel";
+import { OrderFormFieldsPanel } from "@/settings/panels/OrderFormFieldsPanel";
 
 vi.mock("@/shared/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/api/client")>()),

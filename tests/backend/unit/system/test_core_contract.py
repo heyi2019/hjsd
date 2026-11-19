@@ -27,7 +27,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.auth.session import (
+from app.settings.auth.session import (
     require_role,
 )
 from app.shared.scope import (

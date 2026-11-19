@@ -1,8 +1,8 @@
 import dayjs from "dayjs";
 import { describe, expect, it } from "vitest";
 import type { Account } from "@/shared/api/types/accounts";
-import type { InventoryOrderRow } from "@/stocks/InventoryPanel/types";
-import { filterInventoryRows } from "@/stocks/InventoryPanel/helpers";
+import type { InventoryOrderRow } from "@/business/stocks/InventoryPanel/types";
+import { filterInventoryRows } from "@/business/stocks/InventoryPanel/helpers";
 
 const row = (overrides: {
   id?: number;

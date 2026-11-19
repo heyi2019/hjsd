@@ -20,7 +20,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 import * as client from "@/shared/api/client";
 import { renderLight, renderApp } from "@fixtures/render";
-import { SettingsPage } from "@/field-definitions/SettingsPage";
+import { SettingsPage } from "@/settings/SettingsPage";
 import { listResponse } from "@fixtures/api-responses";
 
 let ui: ReturnType<typeof userEvent.setup>;

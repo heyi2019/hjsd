@@ -11,10 +11,10 @@ import { normalizeError } from "../shared/api/client";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { BusinessActionModal, BusinessRegistrationForm, CompactActions, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules, positiveIntegerRules } from "../shared/lib/validators";
-import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../orders/ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../business/ConfigurableField";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
-import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
+import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
 

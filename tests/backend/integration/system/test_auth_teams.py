@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.auth import service
+from app.settings.auth import service
 from app.core.errors import Validation
 from app.core.security import hash_password
 from app.core.security import CurrentUser

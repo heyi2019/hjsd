@@ -1,9 +1,9 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { ThFeeSection } from "@/orders/th/ThFeeSection";
+import { ThFeeSection } from "@/business/th/ThFeeSection";
 import { Form } from "antd";
-import { FieldConfigContext, type FieldConfigMap } from "@/orders/ConfigurableField";
+import { FieldConfigContext, type FieldConfigMap } from "@/business/ConfigurableField";
 import type { Pool } from "@/shared/api/types/finance";
 import type { OrderFormField } from "@/shared/api/types/forms";
 

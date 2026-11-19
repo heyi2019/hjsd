@@ -7,11 +7,11 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.foundation import Pool
-from app.finance.cashflows import create_cashflow
-from app.finance.deposits.writes import create_deposit
-from app.orders import events
-from app.orders.create import create_order
-from app.stocks.profile import create_account
+from app.funds.cashflows import create_cashflow
+from app.funds.deposits.writes import create_deposit
+from app.business import events
+from app.business.create import create_order
+from app.business.stocks.profile import create_account
 
 
 TODAY = date(2026, 10, 6)

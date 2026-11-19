@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildGroupedScopeOptions } from "@/field-definitions/formScopes";
-import { normalizeOptionItems } from "@/field-definitions/panels/OrderFormFieldsPanel.fragments";
+import { buildGroupedScopeOptions } from "@/settings/formScopes";
+import { normalizeOptionItems } from "@/settings/panels/OrderFormFieldsPanel.fragments";
 
 const scopes = [
   { code: "SALE", label: "售出", group: "INVENTORY" },

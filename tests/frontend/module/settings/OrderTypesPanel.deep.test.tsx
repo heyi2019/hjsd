@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { OrderTypesPanel } from "@/field-definitions/panels/OrderTypesPanel";
+import { OrderTypesPanel } from "@/settings/panels/OrderTypesPanel";
 import { orderTypesApi } from "@/shared/api/orders.api";
 
 vi.mock("@/shared/api/cashflows.api");

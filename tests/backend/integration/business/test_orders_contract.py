@@ -19,12 +19,12 @@ from app.core.errors import Validation
 from app.core.security import CurrentUser
 from app.domain.enums import (
     OrderStatus)
-from app.stocks.profile import create_account
+from app.business.stocks.profile import create_account
 from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField
-from app.orders import schemas
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.orders.router_output import _order_list_payload
+from app.business import schemas
+from app.business.create import create_order
+from app.business.events import post_event
+from app.business.router_output import _order_list_payload
 
 D = date(2026, 10, 4)
 
@@ -93,7 +93,7 @@ def test_workbench_personal_earnings_uses_commission_profit_base(
     seeded_client, headers, monkeypatch
 ):
     monkeypatch.setattr(
-        "app.workbench.service.r3_commission_reconciliation",
+        "app.dashboard.service.r3_commission_reconciliation",
         lambda *args, **kwargs: {
             "order_groups": [],
             "total": {"order_count": 1, "profit_base": Decimal("123.45")},
@@ -113,7 +113,7 @@ def test_workbench_order_cards_use_the_current_period(seeded_client, headers, mo
         calls.append(kwargs)
         return {"COMPLETED": 1}
 
-    monkeypatch.setattr("app.workbench.service.order_status_counts", fake_order_status_counts)
+    monkeypatch.setattr("app.dashboard.service.order_status_counts", fake_order_status_counts)
 
     response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
 

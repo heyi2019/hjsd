@@ -12,10 +12,10 @@ from app.shared.numbering import allocate_flow_no
 from app.core.security import CurrentUser
 from app.domain.enums import CashflowLedgerType, CashflowSourceType
 from app.domain.trade import Cashflow
-from app.finance import cashflows
-from app.finance.deposits.writes import create_deposit, delete_deposit, update_deposit
-from app.finance.deposits.lifecycle import cancel_deposit, return_deposit
-from app.finance.deposits.reads import deposit_held_total, list_deposits
+from app.funds import cashflows
+from app.funds.deposits.writes import create_deposit, delete_deposit, update_deposit
+from app.funds.deposits.lifecycle import cancel_deposit, return_deposit
+from app.funds.deposits.reads import deposit_held_total, list_deposits
 
 
 TODAY = date(2026, 10, 17)
@@ -56,7 +56,7 @@ def _make_flow(seeded_db, *, direction,
     )
 
 def _make_order(seeded_db, order_type):
-    from app.orders.create import create_order
+    from app.business.create import create_order
 
     kwargs: dict = {"order_type": order_type, "trade_date": TODAY, "actor": "pytest"}
     if order_type == "DG":
@@ -81,9 +81,9 @@ def _cashflow_row(**overrides):
     return row
 
 def _order_with_buy_event(seeded_db):
-    from app.stocks.profile import create_account
-    from app.orders.create import create_order
-    from app.orders.events import post_event
+    from app.business.stocks.profile import create_account
+    from app.business.create import create_order
+    from app.business.events import post_event
 
     account = create_account(
         seeded_db, game_account="cf-guard-account",

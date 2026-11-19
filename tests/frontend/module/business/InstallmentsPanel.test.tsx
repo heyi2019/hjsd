@@ -5,7 +5,7 @@ import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { resolveMockOnce } from "@fixtures/mock-api";
 import { installmentTotals } from "@fixtures/api-responses";
-import { InstallmentsPanel } from "@/installments/InstallmentsPanel";
+import { InstallmentsPanel } from "@/finance/installments/InstallmentsPanel";
 import type { Installment } from "@/shared/api/types/installments";
 
 import { installmentsApi } from "@/shared/api/installments.api";

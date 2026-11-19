@@ -28,7 +28,7 @@ from app.domain.trade_models.form_config import (  # noqa: E402
     OrderFormField,
     OrderFormSectionLabel,
 )
-from app.field_definitions.catalog_seed import _CATALOG_BLOB, seed_catalog  # noqa: E402
+from app.settings.field_definitions.catalog_seed import _CATALOG_BLOB, seed_catalog  # noqa: E402
 
 NEW_SCOPES = ("SALEREC", "SALETH", "SALEDG")
 LEGACY_SCOPE = "SALE"

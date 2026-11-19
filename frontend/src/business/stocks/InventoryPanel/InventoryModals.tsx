@@ -1,0 +1,237 @@
+import { BusinessActionModal } from "../../../shared/ui";
+import { money, today } from "../../../shared/lib/format";
+import { appMessage } from "../../../shared/ui/appFeedback";
+import { currentDevUser, normalizeError } from "../../../shared/api/client";
+import { ordersApi } from "../../../shared/api/orders.api";
+import { InventoryCancellationDialog } from "../InventoryCancellationDialog";
+import { InventoryDeleteDialog } from "./InventoryDeleteDialog";
+import { OrderConsignmentModal, OrderPlatformOffsaleModal, OrderProfileModal, unlistAndCancelConsignmentOrders } from "../../operations";
+import { InventoryRebateModal } from "../rebate";
+import { CashflowModal } from "../../../finance/cashflow";
+import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../sale";
+import { OrderDetail } from "../../OrderDetailView/OrderDetail";
+import type { InventoryController } from "./useInventoryController";
+import { mergeInventoryAccount } from "./types";
+
+export function InventoryModals({ controller }: { controller: InventoryController }) {
+  const {
+    cancelInlineEdit,
+    consignmentTarget,
+    deleteTarget,
+    deleting,
+    detailTarget,
+    editingAccount,
+    employees,
+    pools,
+    operatorUsername,
+    eventDrafts,
+    financeDrafts,
+    executionDetails,
+    executionLoading,
+    inlineEditId,
+    invEditExtraForm,
+    load,
+    loadExecution,
+    platformOffsaleTarget,
+    profileTarget,
+    rebateTarget,
+    removeFromInventory,
+    cashflowPools,
+    cashflowTarget,
+    cashflowUsers,
+    refreshExecution,
+    saleTarget,
+    saveInline,
+    savingAccount,
+    setConsignmentTarget,
+    setDeleteTarget,
+    setDetailTarget,
+    setExecutionDetails,
+    setPlatformOffsaleTarget,
+    setProfileTarget,
+    setRebateTarget,
+    setCashflowTarget,
+    setSaleTarget,
+    submitDelete,
+    submitVoid,
+    updateEventDraft,
+    updateFinanceDraft,
+    updateEditingAccount,
+    orderDrafts,
+    updateOrderDraft,
+    updatePartyDraft,
+    voidForm,
+    voidPools,
+    voidTarget,
+    voiding,
+  } = controller;
+
+  return (
+    <>
+      {saleTarget ? (() => {
+        const onCreated = async () => {
+          const account = saleTarget;
+          setSaleTarget(null);
+          if (account) removeFromInventory(account.id, account.source_order_id ?? undefined);
+          await load();
+          if (account) controller.dropExecutionCache(account.id);
+        };
+        const common = { account: saleTarget, onClose: () => setSaleTarget(null), onCreated };
+        if (saleTarget.inventory_type === "CONSIGNMENT") return <ConsignmentSaleModal {...common} />;
+        if (saleTarget.inventory_type === "PICKUP") return <PickupSaleModal {...common} />;
+        return <RecoverySaleModal {...common} />;
+      })() : null}
+      <OrderConsignmentModal
+        account={consignmentTarget}
+        onClose={() => setConsignmentTarget(null)}
+        onCreated={async () => {
+          const account = consignmentTarget;
+          setConsignmentTarget(null);
+          await load();
+          if (account) refreshExecution(account);
+        }}
+      />
+      <InventoryRebateModal
+        account={rebateTarget}
+        onClose={() => setRebateTarget(null)}
+        onCreated={async () => {
+          const account = rebateTarget;
+          setRebateTarget(null);
+          await load();
+          if (account) refreshExecution(account);
+        }}
+      />
+      <CashflowModal
+        target={cashflowTarget}
+        pools={cashflowPools}
+        users={cashflowUsers}
+        scope="REFUND"
+        showOperator
+        showDetails
+        currentOperator={currentDevUser()}
+        onClose={() => setCashflowTarget(null)}
+        onCreated={async () => {
+          const account = cashflowTarget?.account;
+          setCashflowTarget(null);
+          await load();
+          if (account) refreshExecution(account);
+        }}
+      />
+      <InventoryCancellationDialog
+        title="系统下架登记"
+        open={Boolean(voidTarget)}
+        okText="确认下架"
+        submitting={voiding}
+        form={voidForm}
+        scope="INVOID"
+        amount={voidTarget?.amount ?? "0.00"}
+        pools={voidPools}
+        onCancel={() => { if (!voiding) { controller.setVoidTarget(null); voidForm.resetFields(); } }}
+        onFinish={(values) => void submitVoid(values)}
+        description={voidTarget ? <p className="muted">
+          将按来源订单全额冲销该账号的买入流水（¥{money(voidTarget.amount)}），账号状态变为「下架」并退出在库统计；
+          这是 ERP 系统下架，不影响已登记的寄售平台历史记录。下架不可撤销，历史轨迹保留。
+        </p> : null}
+      />
+      <OrderPlatformOffsaleModal
+        account={platformOffsaleTarget?.account ?? null}
+        records={platformOffsaleTarget?.records ?? []}
+        onClose={() => setPlatformOffsaleTarget(null)}
+        onSystemOffsale={async ({ reason, operator_user_ids, form_extra }) => {
+          const target = platformOffsaleTarget;
+          setPlatformOffsaleTarget(null);
+          if (!target || target.records.length === 0) return;
+          try {
+            await unlistAndCancelConsignmentOrders({
+              records: target.records,
+              cancelOrderIds: target.records.map((record) => record.orderId),
+              note: `系统下架：${reason}`,
+              reason,
+              operatorUserIds: operator_user_ids,
+              occurredOn: new Date().toISOString().slice(0, 10),
+              formExtra: form_extra,
+            });
+            appMessage.success("寄售记录已下架，账号已出库");
+            await load();
+            refreshExecution(target.account);
+          } catch (cause) {
+            controller.setError(normalizeError(cause));
+            await load();
+          }
+        }}
+        onChanged={async () => {
+          const account = platformOffsaleTarget?.account;
+          setPlatformOffsaleTarget(null);
+          if (!account?.source_order_id) return;
+          await load();
+          const detail = await ordersApi.executionDetail(account.source_order_id);
+          setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
+        }}
+      />
+      <BusinessActionModal
+        className="inventory-detail-modal"
+        title={inlineEditId === detailTarget?.id ? "编辑详情" : "库存详情"}
+        open={Boolean(detailTarget)}
+        footer={null}
+        width="min(1200px, calc(100vw - 24px))"
+        onCancel={() => cancelInlineEdit()}
+      >
+        {detailTarget ? <OrderDetail
+          row={detailTarget}
+          detail={executionDetails[detailTarget.id]}
+          loading={Boolean(executionLoading[detailTarget.id])}
+          onPartyClick={controller.openPartyCard}
+          editing={inlineEditId === detailTarget.id ? editingAccount : undefined}
+          eventDrafts={eventDrafts}
+          onEventEdit={updateEventDraft}
+          financeDrafts={financeDrafts}
+          onFinanceEdit={updateFinanceDraft}
+          onProfileChange={updateEditingAccount}
+          orderDrafts={orderDrafts}
+          onOrderEdit={updateOrderDraft}
+          onOrderExtraChange={(orderId, key, value) => updateOrderDraft(orderId, { form_extra: { [key]: value } })}
+          onPartyEdit={updatePartyDraft}
+          employees={employees}
+          pools={pools}
+          operatorUsername={operatorUsername}
+          extraForm={invEditExtraForm}
+          onSave={saveInline}
+          onCancel={cancelInlineEdit}
+          saving={savingAccount}
+        /> : null}
+      </BusinessActionModal>
+      <OrderProfileModal
+        target={profileTarget}
+        onClose={() => setProfileTarget(null)}
+        onSaved={(updated) => {
+          controller.setRows((current) => current.map((row) => row.account.id === updated.id ? mergeInventoryAccount(row, updated) : row));
+          setExecutionDetails((current) => {
+            const detail = current[updated.id];
+            return detail ? { ...current, [updated.id]: { ...detail, account: { ...detail.account, ...updated } } } : current;
+          });
+          refreshExecution(updated, profileTarget?.orderId ?? updated.source_order_id);
+        }}
+        onError={(error) => controller.setError(normalizeError(error))}
+        onOperation={async (operationType, operatorUserIds) => {
+          const account = profileTarget?.account;
+          const orderId = profileTarget?.orderId ?? account?.source_order_id;
+          if (!orderId) throw new Error("账号没有可关联的来源订单，无法登记运营事件");
+          await ordersApi.postEvent(orderId, {
+            event_type: "OPERATE",
+            operation_type: operationType,
+            occurred_on: today(),
+            operator_user_ids: operatorUserIds,
+            note: operationType === "IMAGE" ? "库存中心登记作图" : "库存中心登记描述",
+          });
+        }}
+      />
+      {/* 删除确认与其它弹窗同级渲染：嵌套进受控 Modal 的 children 会被父级 open=false 打断关闭渲染。 */}
+      <InventoryDeleteDialog
+        account={deleteTarget}
+        submitting={deleting}
+        onCancel={() => { if (!deleting) setDeleteTarget(null); }}
+        onConfirm={(reason) => submitDelete(reason)}
+      />
+    </>
+  );
+}

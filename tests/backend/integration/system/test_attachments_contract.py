@@ -4,7 +4,7 @@ from __future__ import annotations
 import base64
 from datetime import date
 
-from app.orders.create import create_order
+from app.business.create import create_order
 
 
 def test_order_attachment_can_be_uploaded_listed_downloaded_and_deleted(

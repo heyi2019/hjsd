@@ -12,11 +12,11 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.notifications import Notification
 from app.domain.trade import Account, Order, OrderEvent
 from app.domain.users import User
-from app.notifications import triggers
-from app.notifications import service as notification_service
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.finance.profit_allocation import service as policy_allocations
+from app.dashboard.notifications import triggers
+from app.dashboard.notifications import service as notification_service
+from app.business.create import create_order
+from app.business.events import post_event
+from app.funds.profit_allocation import service as policy_allocations
 
 
 def _make_unread(seeded_db, **kwargs):

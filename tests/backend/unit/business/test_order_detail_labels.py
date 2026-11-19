@@ -2,8 +2,8 @@
 
 from datetime import datetime
 
-from app.orders.order_detail.view.derived import _finance_type
-from app.orders.output_labels import _elapsed_label
+from app.business.order_detail.view.derived import _finance_type
+from app.business.output_labels import _elapsed_label
 
 
 def test_buy_finance_type_uses_order_cost_label():

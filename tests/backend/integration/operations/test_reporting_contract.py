@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
-from app.stocks.profile import create_account
+from app.business.stocks.profile import create_account
 from app.core.errors import Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, build_access_token
@@ -17,14 +17,14 @@ from app.domain.enums import (
 )
 from app.domain.foundation import Pool
 from app.domain.trade import Account, RebateRecord
-from app.finance.cashflows import create_cashflow
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.finance.profit_allocation import service as policy_allocations
-from app.reporting.profit import order_profit_detail
-from app.reporting.r2_monthly_pnl import r2_monthly_pnl
-from app.reporting.r3_commission import r3_commission_reconciliation
-from app.reporting.r5_business_pnl import r5_business_pnl
+from app.funds.cashflows import create_cashflow
+from app.business.create import create_order
+from app.business.events import post_event
+from app.funds.profit_allocation import service as policy_allocations
+from app.operations.profit import order_profit_detail
+from app.operations.r2_monthly_pnl import r2_monthly_pnl
+from app.operations.r3_commission import r3_commission_reconciliation
+from app.operations.r5_business_pnl import r5_business_pnl
 
 
 def test_report_viewer_can_read_employee_options_for_operations_filter(
@@ -142,7 +142,7 @@ def test_order_profit_scopes_downstream_reads_to_requested_trade_dates(seeded_db
         return {}
 
     monkeypatch.setattr(
-        "app.reporting.profit.cashflow_totals_by_order",
+        "app.operations.profit.cashflow_totals_by_order",
         capture_cashflow_order_ids,
     )
 
@@ -569,9 +569,9 @@ class TestReports:
 
 
 # ----------------------------------------------------- 覆盖补口：池作用域与日期窗口
-from app.finance import rebates  # noqa: E402
-from app.reporting.export import report_for_export  # noqa: E402
-from app.reporting.router import business_pnl  # noqa: E402
+from app.funds import rebates  # noqa: E402
+from app.operations.export import report_for_export  # noqa: E402
+from app.operations.router import business_pnl  # noqa: E402
 
 
 def _pool1_user(seeded_db) -> CurrentUser:

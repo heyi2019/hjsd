@@ -15,7 +15,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import (
     AuditAction)
 from app.domain.foundation import AuditLog
-from app.customer_center.customers import create_customer
+from app.customers.customers import create_customer
 
 CUSTOMERS = "/api/v1/customers"
 COUNTERPARTIES = "/api/v1/counterparties"
@@ -99,7 +99,7 @@ def test_customer_detail_does_not_record_contact_read_audit(seeded_client, seede
     assert not any(row.action == "CONTACT_READ" for row in seeded_db.scalars(select(AuditLog)).all())
 
 def test_validate_owner_id_rejects_non_positive_and_inactive(seeded_db):
-    from app.customer_center._common import _validate_owner_id
+    from app.customers._common import _validate_owner_id
     from app.domain.users import User
 
     with pytest.raises(Validation):

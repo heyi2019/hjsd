@@ -22,16 +22,16 @@ from app.domain.enums import (
 from app.domain.foundation import AuditLog
 from app.domain.parties import (
     OrderCounterpartyRole)
-from app.finance.installments import create as inst_create
-from app.orders.create import create_order
-from app.customer_center.counterparties import (
+from app.funds.installments import create as inst_create
+from app.business.create import create_order
+from app.customers.counterparties import (
     create_counterparty,
     get_counterparty,
     list_counterparties,
     set_counterparty_status,
     update_counterparty,
 )
-from app.customer_center.customers import create_customer
+from app.customers.customers import create_customer
 
 CUSTOMERS = "/api/v1/customers"
 COUNTERPARTIES = "/api/v1/counterparties"

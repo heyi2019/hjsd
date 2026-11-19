@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.core.security import CurrentUser, build_access_token, AuthError
-from app.auth.session import get_current_user
+from app.settings.auth.session import get_current_user
 from app.core.settings import Settings
 from app.domain.users import RevokedToken, User
 

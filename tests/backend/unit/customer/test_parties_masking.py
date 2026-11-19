@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from app.domain.parties import Counterparty, Customer
-from app.customer_center._common import to_counterparty_out, to_customer_out
+from app.customers._common import to_counterparty_out, to_customer_out
 
 
 def test_customer_output_always_returns_full_contact():

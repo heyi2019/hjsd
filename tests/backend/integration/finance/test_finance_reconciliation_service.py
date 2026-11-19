@@ -10,9 +10,9 @@ from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.domain.foundation import Pool
 from app.domain.trade import BalanceSnapshot
-from app.finance.balances import pool_balance
-from app.finance.cashflows import create_cashflow
-from app.finance.reconciliation import (
+from app.funds.balances import pool_balance
+from app.funds.cashflows import create_cashflow
+from app.funds.reconciliation import (
     _get_reconciliation,
     create_reconciliation,
     list_reconciliations,

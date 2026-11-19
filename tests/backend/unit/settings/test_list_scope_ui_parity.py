@@ -25,7 +25,7 @@ import re
 
 import pytest
 
-from app.lists.scopes import LIST_SCOPES, get_scope
+from app.settings.lists.scopes import LIST_SCOPES, get_scope
 import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 
 _FRONTEND_SRC = _repo.FRONTEND_DIR / "src"
@@ -35,12 +35,12 @@ _FRONTEND_SRC = _repo.FRONTEND_DIR / "src"
 # 列数组被拆到独立工厂且锚点仍留在调用方时（INSTALLMENT），用二元组分别指定两处。
 PANEL_SOURCES: dict[str, str | tuple[str, str]] = {
     # 前四轮拆分把列定义下沉到专用 hook 文件；面板壳只剩编排，标记必须跟随列数组。
-    "LEDGER": "orders/orderpage/useLedgerColumns.tsx",
-    "INVENTORY": "stocks/InventoryPanel/useInventoryColumns.tsx",
+    "LEDGER": "business/orderpage/useLedgerColumns.tsx",
+    "INVENTORY": "business/stocks/InventoryPanel/useInventoryColumns.tsx",
     # 列数组拆到 contractColumns 工厂，useListViewColumns 锚点仍在 controller —— 两文件分离。
     "INSTALLMENT": (
-        "installments/useContractTableController.tsx",
-        "installments/contractColumns.tsx",
+        "finance/installments/useContractTableController.tsx",
+        "finance/installments/contractColumns.tsx",
     ),
     "CUSTOMER": "customer-center/useCustomerController.tsx",
     "COUNTERPARTY": "customer-center/CounterpartyPanel.tsx",

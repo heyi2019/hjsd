@@ -4,10 +4,10 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from app.finance.rebates import create_rebate
-from app.stocks.profile import create_account
-from app.orders.create import create_order
-from app.orders.events import post_event
+from app.funds.rebates import create_rebate
+from app.business.stocks.profile import create_account
+from app.business.create import create_order
+from app.business.events import post_event
 
 
 D = date(2026, 10, 17)
@@ -71,8 +71,8 @@ def test_rebate_delete_service_removed():
     """返点作废服务移除；退回走资金中心录入 OUT 支出，不再 reverse_cashflow+VOID。"""
     import importlib.util
 
-    from app.finance import rebates
+    from app.funds import rebates
 
     assert not hasattr(rebates, "delete_rebate")
     # 2026-11-12 去兼容：finance.service 再导出门面已删除
-    assert importlib.util.find_spec("app.finance.service") is None
+    assert importlib.util.find_spec("app.funds.service") is None

@@ -19,14 +19,14 @@ from app.domain.enums import AccountStatus, AuditAction
 from app.domain.foundation import AuditLog, Pool
 from app.domain.trade import Account
 from app.domain.users import User
-from app.stocks.inventory import inventory, inventory_ledger, list_accounts, total_inventory_cost
-from app.stocks.profile import create_account, get_account, update_account_profile
-from app.finance.cashflows import create_cashflow
-from app.finance.rebates import create_rebate
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.customer_center.counterparties import create_counterparty
-from app.customer_center.customers import create_customer
+from app.business.stocks.inventory import inventory, inventory_ledger, list_accounts, total_inventory_cost
+from app.business.stocks.profile import create_account, get_account, update_account_profile
+from app.funds.cashflows import create_cashflow
+from app.funds.rebates import create_rebate
+from app.business.create import create_order
+from app.business.events import post_event
+from app.customers.counterparties import create_counterparty
+from app.customers.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 

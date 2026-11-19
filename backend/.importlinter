@@ -9,10 +9,10 @@
 #                  表单作用域清单）。依赖 L0。
 #   L2  shared     跨业务域共享原语：被 ≥2 个业务域引用、自身不属于任何
 #                  业务域、只依赖 L0+L1。依赖 L0+L1，**不依赖任何业务域**。
-#   L3  业务域     orders / customer_center / finance（含 installments /
-#                  profit_allocation 子模块）/ stocks / field_definitions /
-#                  reporting / workbench / lists / auth / audit / attachments /
-#                  options / notifications。依赖 L0+L1+L2。
+#   L3  业务域     与前端 6 导航 key 一一对应：dashboard（含 notifications）/ business（含
+#                  stocks）/ customers / funds（含 installments、profit_allocation）/
+#                  operations / settings（含 field_definitions、options、lists、auth、
+#                  audit、attachments）。依赖 L0+L1+L2。
 #
 # ─────────────────────────────────────────────────────────────────────────
 # 2026-11-18 实测（AST 静态分析 211 文件）与归位成果
@@ -42,10 +42,13 @@
 #       finance 域；foundation/pools.py 是「资金池主数据」，属设置，已随
 #       foundation 一并归入 field_definitions。）
 #
-#   2026-11-19 域边界裁决（用户 C）：installments 与 profit_allocation 再并入 finance：
-#     app/installments/        → app/finance/installments/
-#     app/profit_allocation/   → app/finance/profit_allocation/
-#     （API URL 不变；orders↛installments 契约由 orders↛finance 统一覆盖。）
+#   2026-11-19 域归并 + 改名（用户裁决，API URL 一律不变）：
+#     installments/profit_allocation → funds/（子模块）
+#     stocks → business/stocks、notifications → dashboard/notifications
+#     field_definitions/options/lists/auth/audit/attachments → settings/（六子模块）
+#     末轮 domain 改名对齐前端导航 key：workbench→dashboard、customer_center→customers、
+#       finance→funds、reporting→operations、orders→business。
+#     契约收敛为 3 条：business↛funds 统一覆盖原 orders↛installments / stocks↛orders。
 #
 #   底座纯化：
 #     core/database.py 的 Base + create_all → domain/base.py（Base 是 ORM 的东西）
@@ -54,9 +57,9 @@
 # ─────────────────────────────────────────────────────────────────────────
 # 合法依赖方向（L3 业务域之间仍允许单向依赖，但不得成环）
 #
-#   reporting / workbench  → 各业务域（只读聚合层）
-#   finance（含两子模块）  → orders
-#   orders → customer_center / field_definitions / stocks
+#   operations / dashboard → 各业务域（只读聚合层）
+#   funds（含两子模块）    → business
+#   business → customers / settings
 #
 # 运行：backend 目录下执行 lint-imports（CI lint-gate 同步强制）。
 # 纪律：整边豁免；归位一批、收紧一批，使豁免清单单调收紧。
@@ -80,33 +83,21 @@ type = forbidden
 source_modules =
     app.shared
 forbidden_modules =
-    app.orders
-    app.customer_center
-    app.finance
-    app.stocks
-    app.field_definitions
-    app.reporting
-    app.workbench
-    app.lists
-    app.auth
-    app.audit
-    app.attachments
-    app.options
-    app.notifications
+    app.business
+    app.customers
+    app.funds
+    app.settings
+    app.operations
+    app.dashboard
 
 # ── 业务域之间的既成禁止边（2026-11-18 P0-A 归位成果，保持不放松）────────
-[importlinter:contract:orders-not-import-finance]
-name = orders 不得依赖 finance（合法方向只有 finance -> orders）
+[importlinter:contract:business-not-import-funds]
+name = business 不得依赖 funds（合法方向只有 funds -> business）
 type = forbidden
 source_modules =
-    app.orders
+    app.business
 forbidden_modules =
-    app.finance
+    app.funds
 
-[importlinter:contract:stocks-not-import-orders]
-name = stocks 不得依赖 orders（合法方向只有 orders -> stocks）
-type = forbidden
-source_modules =
-    app.stocks
-forbidden_modules =
-    app.orders
+# 2026-11-19 域归并后契约收敛为 3 条：子模块均随父包被既有契约覆盖，
+# 不新增禁止边（stocks/notifications/settings 六子模块均已并入对应父域）。

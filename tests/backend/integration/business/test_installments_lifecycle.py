@@ -13,21 +13,21 @@ from app.domain.enums import (
     InstallmentStatus,
     ScheduleStatus)
 from app.domain.trade import Installment, InstallmentSchedule, Order
-from app.finance.installments import _shared as inst__shared
-from app.finance.installments import create as inst_create
-from app.finance.installments import queries as inst_queries
-from app.finance.installments import recovery as inst_recovery
-from app.finance.installments.repayments.pay import pay as inst_pay
-from app.finance.installments.repayments.pay import _pick_schedule as inst_pick
-from app.finance.installments.repayments.waive import waive_schedule as inst_waive
-from app.orders.create import create_order
-from app.orders.events import post_event
+from app.funds.installments import _shared as inst__shared
+from app.funds.installments import create as inst_create
+from app.funds.installments import queries as inst_queries
+from app.funds.installments import recovery as inst_recovery
+from app.funds.installments.repayments.pay import pay as inst_pay
+from app.funds.installments.repayments.pay import _pick_schedule as inst_pick
+from app.funds.installments.repayments.waive import waive_schedule as inst_waive
+from app.business.create import create_order
+from app.business.events import post_event
 
 TODAY = date(2026, 10, 12)
 PAST = date(2026, 9, 1)
 
 def _account(seeded_db, game_account: str):
-    from app.stocks.profile import create_account
+    from app.business.stocks.profile import create_account
 
     return create_account(
         seeded_db,

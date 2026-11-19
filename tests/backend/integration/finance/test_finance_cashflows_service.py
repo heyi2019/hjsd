@@ -12,11 +12,11 @@ from app.shared.operation_operators import list_operation_operators
 from app.core.security import CurrentUser
 from app.domain.enums import CashflowLedgerType, CashflowSourceType
 from app.domain.trade import Cashflow, Deposit
-from app.finance import cashflows
-from app.finance.cashflow_queries import list_cashflows
-from app.finance.cashflows import create_cashflow
-from app.finance.deposits.writes import create_deposit, delete_deposit, update_deposit
-from app.finance.deposits.lifecycle import lose_deposit, return_deposit
+from app.funds import cashflows
+from app.funds.cashflow_queries import list_cashflows
+from app.funds.cashflows import create_cashflow
+from app.funds.deposits.writes import create_deposit, delete_deposit, update_deposit
+from app.funds.deposits.lifecycle import lose_deposit, return_deposit
 
 
 TODAY = date(2026, 10, 17)
@@ -57,7 +57,7 @@ def _make_flow(seeded_db, *, direction,
     )
 
 def _make_order(seeded_db, order_type):
-    from app.orders.create import create_order
+    from app.business.create import create_order
 
     kwargs: dict = {"order_type": order_type, "trade_date": TODAY, "actor": "pytest"}
     if order_type == "DG":
@@ -82,9 +82,9 @@ def _cashflow_row(**overrides):
     return row
 
 def _order_with_buy_event(seeded_db):
-    from app.stocks.profile import create_account
-    from app.orders.create import create_order
-    from app.orders.events import post_event
+    from app.business.stocks.profile import create_account
+    from app.business.create import create_order
+    from app.business.events import post_event
 
     account = create_account(
         seeded_db, game_account="cf-guard-account",
@@ -192,8 +192,8 @@ def test_cashflow_and_deposit_entries_come_from_real_modules():
     import importlib.util
 
     assert create_cashflow is cashflows.create_cashflow
-    assert create_deposit.__module__ == "app.finance.deposits.writes"
-    assert importlib.util.find_spec("app.finance.service") is None
+    assert create_deposit.__module__ == "app.funds.deposits.writes"
+    assert importlib.util.find_spec("app.funds.service") is None
 
 def test_update_deposit_updates_the_linked_hold_cashflow(seeded_db):
     deposit = create_deposit(
@@ -298,7 +298,7 @@ def test_get_cashflow_rejects_user_not_visible(seeded_db):
         cashflows._get_cashflow(seeded_db, flow.id, user=_restricted_user())
 
 def test_get_cashflow_checks_order_visible(seeded_db):
-    from app.orders.create import create_order
+    from app.business.create import create_order
 
     order = create_order(
         seeded_db, order_type="HS", trade_date=TODAY, actor="pytest"

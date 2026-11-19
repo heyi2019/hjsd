@@ -2,11 +2,11 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { InventoryPanel } from "@/stocks/InventoryPanel";
-import { RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/stocks/sale";
-import { InventoryRebateModal } from "@/stocks/rebate";
-import { OrderConsignmentModal } from "@/orders/operations/consignment";
-import { OrderDetailDeliverySection } from "@/orders/OrderDetailView/OrderDetailDeliverySection";
+import { InventoryPanel } from "@/business/stocks/InventoryPanel";
+import { RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/business/stocks/sale";
+import { InventoryRebateModal } from "@/business/stocks/rebate";
+import { OrderConsignmentModal } from "@/business/operations/consignment";
+import { OrderDetailDeliverySection } from "@/business/OrderDetailView/OrderDetailDeliverySection";
 
 import type { Account } from "@/shared/api/types/accounts";
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { PoolsPanel } from "@/field-definitions/panels/PoolsPanel";
+import { PoolsPanel } from "@/settings/panels/PoolsPanel";
 import { poolsApi } from "@/shared/api/pools.api";
 
 vi.mock("@/shared/api/cashflows.api");

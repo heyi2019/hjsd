@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.errors import ErrorCode
-from app.field_definitions.pools import get_pool_by_code
+from app.settings.field_definitions.pools import get_pool_by_code
 
 POOLS = "/api/v1/pools"
 

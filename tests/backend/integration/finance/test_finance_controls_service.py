@@ -7,10 +7,10 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.foundation import Pool
-from app.finance import reconciliation, transfers
-from app.finance.cashflows import create_cashflow
-from app.finance.reconciliation import create_reconciliation
-from app.finance.transfers import create_transfer, repair_transfer
+from app.funds import reconciliation, transfers
+from app.funds.cashflows import create_cashflow
+from app.funds.reconciliation import create_reconciliation
+from app.funds.transfers import create_transfer, repair_transfer
 
 
 TODAY = date(2026, 10, 17)

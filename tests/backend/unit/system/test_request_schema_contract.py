@@ -6,8 +6,8 @@ from datetime import date
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from app.stocks.schemas import AccountProfileUpdate
-from app.auth.router import (
+from app.business.stocks.schemas import AccountProfileUpdate
+from app.settings.auth.router import (
     LoginRequest,
     PasswordChange,
     PasswordResetRequest,
@@ -16,7 +16,7 @@ from app.auth.router import (
     UserCreate,
     UserUpdate,
 )
-from app.finance.schemas import (
+from app.funds.schemas import (
     CashflowCreate,
     CashflowReverse,
     DepositCreate,
@@ -28,14 +28,14 @@ from app.finance.schemas import (
     TransferCreate,
     TransferRepair,
 )
-from app.field_definitions.schemas import (
+from app.settings.field_definitions.schemas import (
     OrderTypeCreate,
     OrderTypeUpdate,
     PoolCreate,
     PoolStatusUpdate,
     PoolUpdate,
 )
-from app.finance.installments.schemas import (
+from app.funds.installments.schemas import (
     DefaultIn,
     DeliverIn,
     EarlySettlementIn,
@@ -45,8 +45,8 @@ from app.finance.installments.schemas import (
     ScheduleExtendIn,
     ScheduleWaiveIn,
 )
-from app.orders.schemas import EventCreate
-from app.customer_center.schemas import (
+from app.business.schemas import EventCreate
+from app.customers.schemas import (
     CounterpartyCreate,
     CounterpartyUpdate,
     CustomerCreate,

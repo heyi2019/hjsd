@@ -9,14 +9,14 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
-from app.stocks.profile import create_account
+from app.business.stocks.profile import create_account
 from app.core.errors import Validation
 from app.shared.operation_operators import list_operation_operators
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
-from app.finance.reconciliation import create_reconciliation, resolve_reconciliation
-from app.orders.create import create_order
-from app.orders.events import post_event
+from app.funds.reconciliation import create_reconciliation, resolve_reconciliation
+from app.business.create import create_order
+from app.business.events import post_event
 
 TODAY = date(2026, 10, 4)
 

@@ -13,17 +13,17 @@ from app.core.security import CurrentUser
 from app.domain.enums import (
     AccountStatus,
     OrderStatus)
-from app.stocks.profile import create_account
-from app.customer_center.customers import create_customer
+from app.business.stocks.profile import create_account
+from app.customers.customers import create_customer
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, OrderEvent
 from app.domain.users import User
 from app.shared.order_access import get_order
-from app.orders.cancellation_model import cancel_order
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.orders.mutations import update_order
-from app.orders.queries import list_orders, order_customer_count
+from app.business.cancellation_model import cancel_order
+from app.business.create import create_order
+from app.business.events import post_event
+from app.business.mutations import update_order
+from app.business.queries import list_orders, order_customer_count
 
 D = date(2026, 10, 4)
 

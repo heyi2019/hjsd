@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
-import { OrderTypesPanel } from "@/field-definitions/panels/OrderTypesPanel";
+import { OrderTypesPanel } from "@/settings/panels/OrderTypesPanel";
 import { orderTypesApi } from "@/shared/api/orders.api";
 import type { OrderType } from "@/shared/api/types/orders";
 

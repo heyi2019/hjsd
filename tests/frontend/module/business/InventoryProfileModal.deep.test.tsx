@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { OrderProfileModal, type OrderProfileTarget } from "@/orders/operations";
+import { OrderProfileModal, type OrderProfileTarget } from "@/business/operations";
 import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import type { Account } from "@/shared/api/types/accounts";

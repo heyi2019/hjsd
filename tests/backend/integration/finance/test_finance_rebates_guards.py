@@ -9,17 +9,17 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
-from app.stocks.profile import create_account
+from app.business.stocks.profile import create_account
 from app.core.errors import Validation
 from app.domain.foundation import Pool
 from app.domain.enums import CashflowSourceType
 from app.domain.trade import Cashflow
-from app.finance.cashflows import create_cashflow, reverse_cashflow
-from app.finance.rebates import create_rebate, list_rebates
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.finance.balances import pool_balance
-from app.reporting.r2_monthly_pnl import r2_monthly_pnl
+from app.funds.cashflows import create_cashflow, reverse_cashflow
+from app.funds.rebates import create_rebate, list_rebates
+from app.business.create import create_order
+from app.business.events import post_event
+from app.funds.balances import pool_balance
+from app.operations.r2_monthly_pnl import r2_monthly_pnl
 
 TODAY = date(2026, 10, 4)
 

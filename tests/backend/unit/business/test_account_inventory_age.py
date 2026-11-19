@@ -17,9 +17,9 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from app.domain.trade import Account
-from app.stocks.inventory import dashboard_inventory_summary
-from app.stocks.profile import create_account
-from app.stocks.schemas import AccountOut
+from app.business.stocks.inventory import dashboard_inventory_summary
+from app.business.stocks.profile import create_account
+from app.business.stocks.schemas import AccountOut
 
 
 def _out(
@@ -83,7 +83,7 @@ def test_future_entry_is_clamped_to_zero():
 def test_age_falls_back_when_entry_time_missing():
     """`_common.inventory_age_days` 是唯一口径：无条件回退链由调用方挑，
     函数本身拿到 None 必须返回 None，不能默认 0 天。"""
-    from app.stocks import _common
+    from app.business.stocks import _common
 
     assert _common.inventory_age_days(None) is None
     assert _common.inventory_age_days(date.today() - timedelta(days=12)) == 12

@@ -3,7 +3,7 @@ import { Space } from "antd";
 import { useCallback } from "react";
 import { reportsApi } from "../shared/api/reports.api";
 import type { DataCenterSummary } from "../shared/api/types/reporting";
-import type { BusinessCenterEntryTab } from "../orders/businessCenter";
+import type { BusinessCenterEntryTab } from "../business/businessCenter";
 import { type ReportRange, useReport } from "./reports/shared";
 import {
   EntryCard,

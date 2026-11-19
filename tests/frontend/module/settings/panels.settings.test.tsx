@@ -10,8 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { gameTypesApi } from "@/shared/api/misc.api";
 import { poolsApi } from "@/shared/api/pools.api";
-import { PoolsPanel } from "@/field-definitions/panels/PoolsPanel";
-import { GameTypeSettingsPanel } from "@/field-definitions/panels/GameTypeSettingsPanel";
+import { PoolsPanel } from "@/settings/panels/PoolsPanel";
+import { GameTypeSettingsPanel } from "@/settings/panels/GameTypeSettingsPanel";
 import { listResponse } from "@fixtures/api-responses";
 
 vi.mock("@/shared/api/cashflows.api");

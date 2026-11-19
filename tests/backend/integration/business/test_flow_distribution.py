@@ -22,9 +22,9 @@ from app.domain.enums import AccountingAttribute, Direction
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Order
 from app.domain.trade_models.cashflow import Cashflow
-from app.orders import events
-from app.orders.create import create_order
-from app.stocks.profile import create_account
+from app.business import events
+from app.business.create import create_order
+from app.business.stocks.profile import create_account
 
 TODAY = date(2026, 10, 6)
 

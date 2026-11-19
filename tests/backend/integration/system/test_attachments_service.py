@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from app.attachments import service as svc
+from app.settings.attachments import service as svc
 from app.core.errors import NotFound, PermissionDenied, Validation
 from app.core.money import to_money
 from app.core.security import (
@@ -22,7 +22,7 @@ from app.core.security import (
 )
 from app.domain.attachments import Attachment
 from app.domain.trade import Cashflow, Installment, OrderEvent
-from app.orders.create import create_order
+from app.business.create import create_order
 
 
 D = date(2026, 10, 17)

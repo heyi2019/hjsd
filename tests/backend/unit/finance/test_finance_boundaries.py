@@ -7,13 +7,13 @@ from decimal import Decimal
 import pytest
 
 from app.domain.trade import Deposit
-from app.finance.deposits._shared import _status_after_loss, _status_after_return
-from app.finance.schemas import CashflowCreate
+from app.funds.deposits._shared import _status_after_loss, _status_after_return
+from app.funds.schemas import CashflowCreate
 from app.shared.order_amounts import is_deposit_loss_flow
 
 
 def test_finance_router_only_exposes_the_composed_router() -> None:
-    finance_router = importlib.import_module("app.finance.router")
+    finance_router = importlib.import_module("app.funds.router")
 
     assert finance_router.__all__ == ["router"]
     assert not hasattr(finance_router, "create_cashflow")
@@ -34,8 +34,8 @@ def test_manual_cashflow_request_accepts_minimal_payload() -> None:
 
 
 def test_pool_balance_projection_belongs_to_finance() -> None:
-    importlib.import_module("app.finance.balances")
-    assert importlib.util.find_spec("app.orders.pools") is None
+    importlib.import_module("app.funds.balances")
+    assert importlib.util.find_spec("app.business.pools") is None
 
 
 def _deposit(paid: str, returned: str = "0", lost: str = "0", status: str = "PAID") -> Deposit:

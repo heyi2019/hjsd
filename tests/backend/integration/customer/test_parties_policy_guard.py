@@ -20,12 +20,12 @@ from app.domain.parties import (
 )
 from app.domain.trade import Order, OrderEvent
 from app.domain.users import User
-from app.orders.create import create_order
-from app.customer_center.customer_detail import get_customer_activity_summary
-from app.customer_center.customer_merge import merge_customers
-from app.customer_center.customers import create_customer
-from app.customer_center.leads import close_lead, convert_lead, create_lead, get_lead, list_leads, update_lead
-from app.finance.profit_allocation import service as policy_allocations
+from app.business.create import create_order
+from app.customers.customer_detail import get_customer_activity_summary
+from app.customers.customer_merge import merge_customers
+from app.customers.customers import create_customer
+from app.customers.leads import close_lead, convert_lead, create_lead, get_lead, list_leads, update_lead
+from app.funds.profit_allocation import service as policy_allocations
 
 
 # ───────────────────────────── 共用辅助 ─────────────────────────────

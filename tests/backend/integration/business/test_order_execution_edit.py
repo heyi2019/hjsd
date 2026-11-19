@@ -5,12 +5,12 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.stocks.profile import create_account
+from app.business.stocks.profile import create_account
 from app.domain.foundation import AuditLog
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
-from app.orders.create import create_order
-from app.orders.events import post_event
+from app.business.create import create_order
+from app.business.events import post_event
 
 
 def test_order_edit_updates_event_flow_and_cost_without_changing_time(seeded_client, seeded_db, headers):

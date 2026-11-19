@@ -10,7 +10,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { Card, DatePicker, Form, Input, Segmented, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
-import { CfgItem, CustomFieldSection, FieldConfigScope } from "../orders/ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigScope } from "../business/ConfigurableField";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cashflowsApi } from "../shared/api/cashflows.api";
 import { studioExpensesApi } from "../shared/api/studioExpenses.api";
@@ -36,7 +36,7 @@ import { ConfirmButton,
   StatRow,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
-import { ResponsibleEmployeeSelect } from "../orders/ResponsibleEmployeeSelect";
+import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect";
 import type { FundsPageController } from "./useFundsPageController";
 /** 弹窗视觉稿落地：作用域严格限定 .studio-ledger-modal（单一弹窗），不污染全站 .ant-modal。 */
 import "./StudioExpensePanel.css";

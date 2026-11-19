@@ -1,6 +1,6 @@
 import { Form, Input, Typography } from "antd";
 import type { FormInstance } from "antd";
-import { CfgItem, FieldConfigScope } from "../orders/ConfigurableField";
+import { CfgItem, FieldConfigScope } from "../business/ConfigurableField";
 import type { OrderFormField } from "../shared/api/types/forms";
 import { BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, dateValueFromEvent, dateValueProps, PermissionButton } from "../shared/ui";
 import { ExtraFieldControl } from "./CustomersPage.fragments";

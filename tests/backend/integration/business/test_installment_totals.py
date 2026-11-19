@@ -13,9 +13,9 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.finance.installments import create as inst_create
+from app.business.create import create_order
+from app.business.events import post_event
+from app.funds.installments import create as inst_create
 
 D1 = date(2026, 9, 1)
 D2 = date(2026, 10, 15)
@@ -26,7 +26,7 @@ def _contract(seeded_db, *, trade_date: date, paid: str = "0", down: str = "200.
     # PICKUP_SALE 仅 TH 且天然不带账号（保持其余合计用例的最简构造）。
     # STOCK_SALE 要求账号已入库：先建账号 + BUY 事件，再走 HS 订单。
     if contract_type == "STOCK_SALE":
-        from app.stocks.profile import create_account
+        from app.business.stocks.profile import create_account
 
         account = create_account(
             seeded_db,

@@ -9,15 +9,15 @@ from sqlalchemy import select
 from app.core.errors import ErrorCode, Validation
 from app.domain.enums import AccountStatus, Direction, OrderStatus
 from app.domain.foundation import Pool
-from app.field_definitions.order_types import get_order_type_by_code
+from app.settings.field_definitions.order_types import get_order_type_by_code
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
-from app.finance.installments import create as inst_create
-from app.finance.installments import recovery as inst_recovery
-from app.finance.installments.repayments.pay import pay as inst_pay
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.customer_center.counterparties import create_counterparty
-from app.customer_center.customers import create_customer
+from app.funds.installments import create as inst_create
+from app.funds.installments import recovery as inst_recovery
+from app.funds.installments.repayments.pay import pay as inst_pay
+from app.business.create import create_order
+from app.business.events import post_event
+from app.customers.counterparties import create_counterparty
+from app.customers.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 TODAY2 = date(2026, 10, 18)

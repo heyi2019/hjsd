@@ -6,8 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Button, Form, type FormInstance } from "antd";
 import { renderLight } from "@fixtures/render";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
-import { CustomerSourceFields } from "@/orders/CustomerSourceInput";
-import { FinanceExpenseItems } from "@/orders/finance/FinanceExpenseItems";
+import { CustomerSourceFields } from "@/business/CustomerSourceInput";
+import { FinanceExpenseItems } from "@/business/finance/FinanceExpenseItems";
 import { clearOptionSetsCache } from "@/shared/lib/optionSets";
 
 vi.mock("@/shared/api/options.api");

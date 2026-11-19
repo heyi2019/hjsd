@@ -7,8 +7,8 @@ from app.core.errors import AppError, ErrorCode
 from app.domain.enums import AuditAction, EventType
 from app.domain.options import OptionSet
 from app.domain.trade_models.form_config import OrderFormField
-from app.field_definitions.catalog_seed import seed_catalog
-from app.field_definitions.order_types import create_order_type
+from app.settings.field_definitions.catalog_seed import seed_catalog
+from app.settings.field_definitions.order_types import create_order_type
 
 
 class TestOrderTypes:
@@ -90,7 +90,7 @@ class TestLookupAndZeroPrincipal:
     """Task #5 补口：代码查找 NotFound、零本金开关更新与种子回填分支。"""
 
     def test_require_order_type_by_code_success_and_not_found(self, db):
-        from app.field_definitions.order_types import require_order_type_by_code
+        from app.settings.field_definitions.order_types import require_order_type_by_code
 
         created = create_order_type(
             db, code="LKT", name="查找类型", sequence_prefix="LKT", actor="pytest"
@@ -103,7 +103,7 @@ class TestLookupAndZeroPrincipal:
         assert exc.value.code == ErrorCode.RESOURCE_NOT_FOUND
 
     def test_update_zero_principal_flag_roundtrip(self, seeded_db):
-        from app.field_definitions.order_types import (
+        from app.settings.field_definitions.order_types import (
             get_order_type_by_code,
             update_order_type,
         )
@@ -118,7 +118,7 @@ class TestLookupAndZeroPrincipal:
         assert get_order_type_by_code(seeded_db, "DG").is_zero_principal is True
 
     def test_update_zero_principal_rejects_non_bool(self, seeded_db):
-        from app.field_definitions.order_types import (
+        from app.settings.field_definitions.order_types import (
             get_order_type_by_code,
             update_order_type,
         )

@@ -11,7 +11,7 @@ import { Form, Input, Radio } from "antd";
 import type { OrderFormField } from "@/shared/api/types/forms";
 import { Select } from "@/shared/ui";
 import { renderLight } from "@fixtures/render";
-import { splitFormExtra } from "@/orders/create/submit-helpers";
+import { splitFormExtra } from "@/business/create/submit-helpers";
 import {
   CfgItem,
   CfgNestedItem,
@@ -27,7 +27,7 @@ import {
   sectionLabel,
   buildFormExtraDisplay,
   type FieldConfigMap,
-} from "@/orders/ConfigurableField";
+} from "@/business/ConfigurableField";
 
 it("嵌套表单的必填字段标签显示星号", () => {
   renderLight(

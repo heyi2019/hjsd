@@ -15,7 +15,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.stocks.profile import create_account
+from app.business.stocks.profile import create_account
 from app.core.errors import Validation
 from app.core.money import to_money
 from app.domain.enums import (
@@ -34,8 +34,8 @@ from app.shared.order_amounts import (
     event_contribution,
     event_totals,
 )
-from app.orders.create import create_order
-from app.reporting.export import report_csv, report_for_export
+from app.business.create import create_order
+from app.operations.export import report_csv, report_for_export
 
 TODAY = date(2026, 10, 17)
 

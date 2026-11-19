@@ -15,15 +15,15 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
     AccountStatus,
     CustomerStatus)
-from app.stocks.profile import create_account
-from app.customer_center.counterparties import create_counterparty
-from app.customer_center.customers import create_customer, set_customer_status
+from app.business.stocks.profile import create_account
+from app.customers.counterparties import create_counterparty
+from app.customers.customers import create_customer, set_customer_status
 from app.domain.trade import Account, Order
 from app.domain.users import User
-from app.field_definitions.order_types import get_order_type_by_code, set_order_type_active
-from app.orders import schemas
-from app.orders.create import create_order
-from app.orders.events import post_event
+from app.settings.field_definitions.order_types import get_order_type_by_code, set_order_type_active
+from app.business import schemas
+from app.business.create import create_order
+from app.business.events import post_event
 
 D = date(2026, 10, 4)
 

@@ -18,7 +18,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.foundation import Pool
-from app.finance.cashflows import create_cashflow, reverse_cashflow
+from app.funds.cashflows import create_cashflow, reverse_cashflow
 
 TODAY = date(2026, 10, 4)
 
@@ -156,9 +156,9 @@ def test_summary_ignores_item_limit(seeded_client, seeded_db, headers):
 
 
 def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
-    from app.orders.create import create_order
-    from app.orders.events import post_event
-    from app.stocks.profile import create_account
+    from app.business.create import create_order
+    from app.business.events import post_event
+    from app.business.stocks.profile import create_account
 
     account = create_account(
         seeded_db,
@@ -189,8 +189,8 @@ def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
 
 def test_summary_excludes_order_plain_cashflows(seeded_client, seeded_db, headers):
     """订单普通资金流水（挂 order_id 但无事件/押金/划转）属性命中也不算工作室收支。"""
-    from app.orders.create import create_order
-    from app.stocks.profile import create_account
+    from app.business.create import create_order
+    from app.business.stocks.profile import create_account
 
     account = create_account(
         seeded_db,

@@ -9,16 +9,16 @@ import { DashboardPage } from "./DashboardPage";
 import { LoginPage } from "../auth/LoginPage";
 import { ChangePasswordPage } from "../auth/ChangePasswordPage";
 import type { ComponentType } from "react";
-import type { BusinessCenterEntryTab } from "../orders/businessCenter";
-import type { InitialLedgerFilters } from "../orders/orderpage/useLedgerList";
+import type { BusinessCenterEntryTab } from "../business/businessCenter";
+import type { InitialLedgerFilters } from "../business/orderpage/useLedgerList";
 import { ConfirmButton } from "../shared/ui";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 
-const OrdersPage = lazy(() => import("../orders/OrdersPage").then(({ OrdersPage }) => ({ default: OrdersPage })));
+const OrdersPage = lazy(() => import("../business/OrdersPage").then(({ OrdersPage }) => ({ default: OrdersPage })));
 const CustomersPage = lazy(() => import("../customer-center/CustomersPage").then(({ CustomersPage }) => ({ default: CustomersPage })));
 const FundsPage = lazy(() => import("../pools/FundsPage").then(({ FundsPage }) => ({ default: FundsPage })));
 const ReportsPage = lazy(() => import("../reporting/ReportsPage").then(({ ReportsPage }) => ({ default: ReportsPage })));
-const SettingsPage = lazy(() => import("../field-definitions/SettingsPage").then(({ SettingsPage }) => ({ default: SettingsPage })));
+const SettingsPage = lazy(() => import("../settings/SettingsPage").then(({ SettingsPage }) => ({ default: SettingsPage })));
 const UserCenterPage = lazy(() => import("../auth/UserCenterPage").then(({ UserCenterPage }) => ({ default: UserCenterPage })));
 
 // 注：dashboard 不入此映射——工作台是纯动作入口（无跳转需求），由下方三元单独渲染；

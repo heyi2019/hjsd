@@ -28,21 +28,21 @@ from app.domain.trade import (
     OrderEvent,
     RebateRecord,
 )
-from app.orders.create import create_order
-from app.orders.events import post_event
+from app.business.create import create_order
+from app.business.events import post_event
 from app.shared.order_amounts import (
     event_totals,
     order_amounts,
     order_cashflow_profit_by_order,
 )
-from app.reporting._shared import cashflow_totals_by_order
-from app.orders.router_output import _order_list_payload
-from app.finance.profit_allocation import service as policy_allocations
-from app.reporting.profit import order_profit_detail
-from app.reporting.r2_monthly_pnl import r2_monthly_pnl
-from app.reporting.r3_commission import r3_commission_reconciliation
-from app.reporting.r5_business_pnl import r5_business_pnl
-from app.stocks.profile import create_account
+from app.operations._shared import cashflow_totals_by_order
+from app.business.router_output import _order_list_payload
+from app.funds.profit_allocation import service as policy_allocations
+from app.operations.profit import order_profit_detail
+from app.operations.r2_monthly_pnl import r2_monthly_pnl
+from app.operations.r3_commission import r3_commission_reconciliation
+from app.operations.r5_business_pnl import r5_business_pnl
+from app.business.stocks.profile import create_account
 from sqlalchemy import select
 
 D = date(2026, 10, 17)
@@ -322,7 +322,7 @@ def test_r2_rebate_column_counts_action_model_rebate_like_profit_detail(seeded_d
     而后者对「已生成资金流水的新模型返点」continue 防重复，连带把其中项展示也跳过，
     导致同一笔新模型返点在 R2 列=0、利润明细列=amount 口径打架（2026-11-12 修）。
     """
-    from app.finance.rebates import create_rebate
+    from app.funds.rebates import create_rebate
 
     order_id = _order_with_events(seeded_db)  # HS，BUY+SELL，D=2026-10-17
     # 新模型返点：create_rebate 同时生成 IN 资金流水（amount 计入 sales_income）

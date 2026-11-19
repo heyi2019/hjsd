@@ -269,7 +269,6 @@ GROUPS = {
         "tests/backend/integration/business/test_installment_totals.py",
     ],
     "finance": [
-        "tests/backend/integration/finance/test_finance_contract.py",
         "tests/backend/integration/finance/test_finance_api.py",
         "tests/backend/integration/finance/test_finance_deposits.py",
         "tests/backend/integration/finance/test_finance_rebates_guards.py",
@@ -381,20 +380,20 @@ def _groups_for_source_path(path: str) -> set[str]:
     """源码路径 → 业务域组。规则与历史 groups_for_changes 完全一致，抽出来供
     选测与「结构性变更」判定共用，避免两份 token 规则各自漂移。"""
     selected: set[str] = set()
-    if path.startswith("backend/app/field_definitions/") or "foundation" in path \
+    if path.startswith("backend/app/settings/field_definitions/") or "foundation" in path \
         or "order_type" in path or "pool" in path or "live_field" in path:
         selected.add("foundation")
     if "account" in path:
         selected.add("accounts")
     if path.startswith("backend/app/trade/") or any(
-        t in path for t in ("order", "state_machine", "request_schema")
+        t in path for t in ("business/", "order", "state_machine", "request_schema")
     ):
         selected.add("orders")
     if "installment" in path or path.endswith("/test_m2.py"):
         selected.add("installments")
-    if path.startswith("backend/app/finance/") or "finance" in path or "rebate" in path:
+    if path.startswith("backend/app/funds/") or "finance" in path or "rebate" in path:
         selected.add("finance")
-    if any(t in path for t in ("customer_center", "parties", "leads")):
+    if any(t in path for t in ("customers", "parties", "leads")):
         selected.add("parties")
     if "report" in path:
         selected.add("reporting")
@@ -416,8 +415,8 @@ STRUCTURAL_PREFIXES = (
     "backend/requirements", "backend/alembic/", "backend/run_regression.py",
     "tests/config/catalog.py", "backend/scripts/promise_catalog.py",
     "conftest.py", "pytest.ini", "tests/conftest.py", "tests/backend/conftest.py",
-    "backend/app/orders/amounts.py", "backend/app/reporting/",
-    "backend/app/finance/installments/", "backend/app/finance/profit_allocation/",
+    "backend/app/business/amounts.py", "backend/app/operations/",
+    "backend/app/funds/installments/", "backend/app/funds/profit_allocation/",
 )
 # 自动发版只改版本常量，不影响测试范围；本地 changed 遇到它也不该触发全量。
 NON_STRUCTURAL_FILES = {"backend/app/version.py"}

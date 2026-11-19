@@ -9,10 +9,10 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from app.orders import events
-from app.orders.create import create_order
-from app.reporting.profit import order_profit_detail
-from app.reporting.r5_business_pnl import r5_business_pnl
+from app.business import events
+from app.business.create import create_order
+from app.operations.profit import order_profit_detail
+from app.operations.r5_business_pnl import r5_business_pnl
 
 TODAY = date(2026, 10, 17)
 

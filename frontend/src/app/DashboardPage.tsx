@@ -6,8 +6,8 @@ import { notificationsApi } from "../shared/api/misc.api";
 import { ordersApi } from "../shared/api/orders.api";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
-import { CreateBusinessModal, type BusinessOrderType } from "../orders/CreateBusinessModal";
-import type { BusinessCenterEntryTab } from "../orders/businessCenter";
+import { CreateBusinessModal, type BusinessOrderType } from "../business/CreateBusinessModal";
+import type { BusinessCenterEntryTab } from "../business/businessCenter";
 import { BusinessAlerts, BusinessOverview } from "./BusinessOverview";
 import { useDashboardSummary } from "./useDashboardSummary";
 

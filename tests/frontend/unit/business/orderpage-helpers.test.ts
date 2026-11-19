@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickCancelableEvent, resolveCancelAmount } from "@/orders/orderpage/helpers";
+import { pickCancelableEvent, resolveCancelAmount } from "@/business/orderpage/helpers";
 
 describe("订单台账冲销 helpers", () => {
   const remaining = "500.00";

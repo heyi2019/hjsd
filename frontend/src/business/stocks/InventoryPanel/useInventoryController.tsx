@@ -1,0 +1,283 @@
+import { useEffect } from "react";
+import { useSession } from "../../../shared/state/session";
+import { type BusinessCenterEntryTab } from "../../businessCenter";
+import { useOrderDetailEditor } from "../../OrderDetailView/editing/use-order-detail-editor";
+import { useInventoryList } from "./useInventoryList";
+import { useExecutionCache } from "./useExecutionCache";
+import { useInventoryActions } from "./useInventoryActions";
+import { useInventoryColumns } from "./useInventoryColumns";
+import { mergeInventoryAccount } from "./types";
+
+export function useInventoryController({ refreshKey = 0, active = true, initialAgeGtDays, onNavigate }: { refreshKey?: number; active?: boolean; initialAgeGtDays?: number; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
+  // 删除不可逆：按钮按系统角色显隐，后端仍做管理员二次鉴权。
+  const { role, username } = useSession();
+  const canDelete = role === "admin";
+
+  // —— 列表域：加载 / 筛选 / 分页 / 排序 / 统计 / 派生行 / 导出 ——
+  const list = useInventoryList({ active, refreshKey, initialAgeGtDays });
+  const {
+  rows,
+  setRows,
+  inventoryStats,
+  businessMode,
+  setBusinessMode,
+  inventoryType,
+  setInventoryType,
+  inventoryOperatorIds,
+  setInventoryOperatorIds,
+  ageGtDays,
+  setAgeGtDays,
+  gameTypeFilter,
+  setGameTypeFilter,
+  keyword,
+  setKeyword,
+  dateRange,
+  setDateRange,
+  sortDesc,
+  setSortDesc,
+  page,
+  setPage,
+  pageSize,
+  setPageSize,
+  error,
+  setError,
+  businessOptions,
+  inventoryTypeOptions,
+  gameTypeOptions,
+  load,
+  countInventoryRows,
+  totalCount,
+  setTotalCount,
+  handleExport,
+  exporting,
+  locallyRemovedIdsRef,
+  } = list;
+
+  // —— 详情缓存域：明细缓存 + 展开滚动记忆（注入列表的 setRows/setError / 本地移除集合）——
+  const cache = useExecutionCache({ setRows, setError, locallyRemovedIdsRef });
+  const {
+  expandedOrderIds,
+  loadExecution,
+  loadOrderExecution,
+  loadEditorExecution,
+  executionDetails,
+  setExecutionDetails,
+  executionLoading,
+  orderExecutionDetails,
+  orderExecutionLoading,
+  setOrderExecutionDetails,
+  dropExecutionCache,
+  removeFromInventory,
+  refreshExecution,
+  expandTo,
+  } = cache;
+
+  // —— 订单详情内联编辑状态机（onSaved 回写详情缓存与列表行）——
+  const orderDetailEditor = useOrderDetailEditor({
+    getExecutionDetail: (accountId) => executionDetails[accountId],
+    onSaved: (accountId, detail) => {
+      setExecutionDetails((current) => ({ ...current, [accountId]: detail }));
+      setOrderExecutionDetails((current) => Object.fromEntries(
+        Object.entries(current).map(([orderId, cached]) => cached.account.id === accountId ? [orderId, detail] : [orderId, cached]),
+      ));
+      setRows((current) => current.map((row) => row.account.id === accountId ? mergeInventoryAccount(row, detail.account) : row));
+      void load();
+    },
+  });
+  useEffect(() => {
+    if (active) void orderDetailEditor.ensureEmployees();
+  }, [active]);
+  const {
+    editingAccount,
+    inlineEditId,
+    eventDrafts,
+    updateEventDraft,
+    operationDrafts,
+    updateOperationDraft,
+    addOperationDraft,
+    removeOperationDraft,
+    financeDrafts,
+    updateFinanceDraft,
+    updateEditingAccount,
+    orderDrafts,
+    updateOrderDraft,
+    partyDrafts,
+    updatePartyDraft,
+    employees,
+    pools,
+    invEditExtraForm,
+    savingAccount,
+  } = orderDetailEditor;
+  const saveInline = orderDetailEditor.saveInline;
+
+  // —— 业务动作域：open* / submit* / 删除下架 / 运营动作 ——
+  const actions = useInventoryActions({
+    load, setRows, setError,
+    executionDetails, setExecutionDetails, loadExecution, loadOrderExecution, loadEditorExecution, dropExecutionCache,
+    expandTo, expandedOrderIds,
+    removeFromInventory: (accountId, orderId) => {
+      const wasVisible = rows.some((row) => row.account.id === accountId);
+      removeFromInventory(accountId, orderId);
+      if (wasVisible) setTotalCount((current) => Math.max(0, current - 1));
+    },
+    editorOpenEditor: orderDetailEditor.openEditor,
+    editorCancelInlineEdit: orderDetailEditor.cancelInlineEdit,
+    inlineEditId,
+    onNavigate,
+  });
+  const {
+  saleTarget,
+  setSaleTarget,
+  consignmentTarget,
+  setConsignmentTarget,
+  rebateTarget,
+  setRebateTarget,
+  cashflowTarget,
+  setCashflowTarget,
+  cashflowPools,
+  cashflowUsers,
+  profileTarget,
+  setProfileTarget,
+  detailTarget,
+  setDetailTarget,
+  voidTarget,
+  setVoidTarget,
+  voidPools,
+  voidForm,
+  voiding,
+  submitVoid,
+  platformOffsaleTarget,
+  setPlatformOffsaleTarget,
+  deleteTarget,
+  setDeleteTarget,
+  deleting,
+  submitDelete,
+  openProfile,
+  openEditor,
+  cancelInlineEdit,
+  openDetail,
+  openVoid,
+  openPlatformOffsale,
+  handleInventoryAction,
+  handleExpand,
+  openPartyCard,
+  openCashflow,
+  } = actions;
+
+  // —— 台账列定义域：15 列 + 移动端列编排（回调依赖注入）——
+  const { columns, mobileFieldOrder, arrangeColumns } = useInventoryColumns({
+    canDelete, editingAccount, executionDetails, loadExecution,
+    setSaleTarget, setConsignmentTarget, setRebateTarget, setDeleteTarget,
+    openCashflow, openPlatformOffsale, openEditor, handleInventoryAction,
+  });
+
+  return {
+    active,
+    arrangeColumns,
+    businessMode,
+    businessOptions,
+    canDelete,
+    cancelInlineEdit,
+    cashflowPools,
+    cashflowUsers,
+    cashflowTarget,
+    columns,
+    consignmentTarget,
+    countInventoryRows,
+    dateRange,
+    deleteTarget,
+    deleting,
+    detailTarget,
+    dropExecutionCache,
+    editingAccount,
+    employees,
+    pools,
+    error,
+    eventDrafts,
+    operationDrafts,
+    financeDrafts,
+    executionDetails,
+    executionLoading,
+    orderExecutionDetails,
+    orderExecutionLoading,
+    operatorUsername: username,
+    expandedOrderIds,
+    exporting,
+    gameTypeFilter,
+    gameTypeOptions,
+    handleExpand,
+    handleExport,
+    inlineEditId,
+    invEditExtraForm,
+    inventoryStats,
+    inventoryType,
+    inventoryTypeOptions,
+    inventoryOperatorIds,
+    ageGtDays,
+    keyword,
+    load,
+    loadExecution,
+    loadOrderExecution,
+    mobileFieldOrder,
+    onNavigate,
+    openDetail,
+    openEditor,
+    openPartyCard,
+    openPlatformOffsale,
+    openProfile,
+    openVoid,
+    totalCount,
+    page,
+    pageSize,
+    platformOffsaleTarget,
+    profileTarget,
+    rebateTarget,
+    refreshExecution,
+    removeFromInventory,
+    rows,
+    saleTarget,
+    saveInline,
+    savingAccount,
+    setBusinessMode,
+    setCashflowTarget,
+    setConsignmentTarget,
+    setDateRange,
+    setDeleteTarget,
+    setDetailTarget,
+    setError,
+    setExecutionDetails,
+    setGameTypeFilter,
+    setInventoryType,
+    setInventoryOperatorIds,
+    setAgeGtDays,
+    setKeyword,
+    setPage,
+    setPageSize,
+    setPlatformOffsaleTarget,
+    setProfileTarget,
+    setRebateTarget,
+    setRows,
+    setSaleTarget,
+    setSortDesc,
+    setVoidTarget,
+    sortDesc,
+    submitDelete,
+    submitVoid,
+    updateEventDraft,
+    updateOperationDraft,
+    addOperationDraft,
+    removeOperationDraft,
+    updateFinanceDraft,
+    updateEditingAccount,
+    orderDrafts,
+    updateOrderDraft,
+    partyDrafts,
+    updatePartyDraft,
+    voidForm,
+    voidPools,
+    voidTarget,
+    voiding,
+  };
+}
+
+export type InventoryController = ReturnType<typeof useInventoryController>;

@@ -17,9 +17,9 @@ from sqlalchemy import select
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.domain.trade import Order, OrderFormField
-from app.lists import export as export_module
-from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
-from app.orders.export_fields import _event_platform, _order_detail_export_fields
+from app.settings.lists import export as export_module
+from app.settings.lists.export import EXPORT_ROW_LIMIT, build_list_csv
+from app.business.export_fields import _event_platform, _order_detail_export_fields
 
 
 def _seed_select_field(db, *, field_key: str = "trade_role") -> OrderFormField:
@@ -420,7 +420,7 @@ def test_build_list_csv_under_limit_not_truncated(seeded_db):
 
 def test_stocks_export_passes_export_row_limit(seeded_client, headers, monkeypatch):
     """库存导出查询层传 EXPORT_ROW_LIMIT，不再 limit=None 拉全量。"""
-    from app.stocks.inventory import list_accounts
+    from app.business.stocks.inventory import list_accounts
 
     seen: dict[str, object] = {}
     original = list_accounts
@@ -429,14 +429,14 @@ def test_stocks_export_passes_export_row_limit(seeded_client, headers, monkeypat
         seen.update(kwargs)
         return original(db, **kwargs)
 
-    monkeypatch.setattr("app.stocks.router.stocks_list_accounts", spy)
+    monkeypatch.setattr("app.business.stocks.router.stocks_list_accounts", spy)
     resp = seeded_client.get("/api/v1/stocks/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
     assert seen.get("limit") == EXPORT_ROW_LIMIT
 
 def test_customers_export_passes_export_row_limit(seeded_client, headers, monkeypatch):
     """客户导出查询层传 EXPORT_ROW_LIMIT，不再 limit=None 拉全量。"""
-    from app.customer_center.customers import list_customers
+    from app.customers.customers import list_customers
 
     seen: dict[str, object] = {}
     original = list_customers
@@ -445,7 +445,7 @@ def test_customers_export_passes_export_row_limit(seeded_client, headers, monkey
         seen.update(kwargs)
         return original(db, **kwargs)
 
-    monkeypatch.setattr("app.customer_center.customers_router.parties_list_customers", spy)
+    monkeypatch.setattr("app.customers.customers_router.parties_list_customers", spy)
     resp = seeded_client.get("/api/v1/customers/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
     assert seen.get("limit") == EXPORT_ROW_LIMIT

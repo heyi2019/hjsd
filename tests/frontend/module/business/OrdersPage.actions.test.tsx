@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
-import { OrdersPage } from "@/orders/OrdersPage";
+import { OrdersPage } from "@/business/OrdersPage";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
@@ -38,7 +38,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
 // 操作流只验证订单台账与分期入口；库存面板由 InventoryPanel 专项测试覆盖。
-vi.mock("@/stocks/InventoryPanel", () => ({
+vi.mock("@/business/stocks/InventoryPanel", () => ({
   InventoryPanel: ({ active = true }: { active?: boolean }) => active ? <div data-testid="inventory-panel-test-stub" /> : null,
 }));
 
@@ -54,7 +54,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => {
 // 订单页的台账编排与分期入口保留真实组件；库存面板本身由独立专项覆盖。
 
 // CreateBusinessModal 用桩替换：暴露 open/onClose/onCreated 三个口，用于覆盖回调分支。
-vi.mock("@/orders/CreateBusinessModal", () => ({
+vi.mock("@/business/CreateBusinessModal", () => ({
   CreateBusinessModal: (props: {
     open: boolean;
     onClose: () => void;
@@ -445,24 +445,24 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
 
-    // 买号两人只占一行，人员多选后填写动作合计。
+    // 买号两人只占一行，人员多选后填写动作合计；金额是唯一提交口径，比例只读展示。
     expect(within(modal).getByText("买号")).toBeInTheDocument();
-    const rates = within(modal).getAllByLabelText("比例");
-    expect(rates).toHaveLength(3);
-    fireEvent.change(rates[0], { target: { value: "30" } });
+    expect(within(modal).getAllByLabelText("比例")).toHaveLength(3);
+    const amounts = within(modal).getAllByLabelText("金额");
+    fireEvent.change(amounts[0], { target: { value: "300.00" } });
 
-    // 售出 30、运营 0；公司 40 由规则配置自动补入，四项合计 100
-    fireEvent.change(rates[1], { target: { value: "30" } });
+    // 售出 150.00、运营留空；公司金额由后端按固定比例自动补入。
+    fireEvent.change(amounts[1], { target: { value: "150.00" } });
 
     await clickModalOk(modal);
     await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalled());
     const [, payload] = vi.mocked(profitAllocationApi.set).mock.calls[0];
     const buyRows = payload.filter((item) => item.allocation_type === "BUY");
-    expect(buyRows).toEqual([{ allocation_type: "BUY", employee_ids: [11, 22], role: "BUYER", allocation_rate: "30", allocation_amount: null }]);
+    expect(buyRows).toEqual([{ allocation_type: "BUY", employee_ids: [11, 22], role: "BUYER", allocation_rate: null, allocation_amount: "300.00" }]);
     expect(payload).toHaveLength(4);
   });
 
-  it("分润：按操作四项提交时带上 allocation_type 与比例", async () => {
+  it("分润：按操作四项提交时只传金额、比例一律传 null", async () => {
     vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse(actionAllocationRows, { order_profit: "5000.00", allocatable_profit: "3000.00", company_rate: "40.00" }));
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
@@ -474,7 +474,9 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(payload).toHaveLength(4);
     expect(payload.map((item) => item.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
     expect(payload.find((item) => item.allocation_type === "OPERATION")).toMatchObject({ employee_ids: [9], role: "SERVICE" });
-    expect(payload.find((item) => item.allocation_type === "COMPANY")).toMatchObject({ allocation_rate: "40.00" });
+    // 比例只读展示，落库与提交唯一口径是金额：比例一律 null，公司行金额留空交后端补。
+    expect(payload.every((item) => item.allocation_rate === null)).toBe(true);
+    expect(payload.find((item) => item.allocation_type === "COMPANY")).toMatchObject({ allocation_rate: null, allocation_amount: null });
   });
 
   it("资金收支：退款已并入普通支出，登记为 OTHER 支出明细", async () => {

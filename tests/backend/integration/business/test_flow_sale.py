@@ -20,7 +20,7 @@ from app.domain.enums import Direction, EventType
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Order
 from app.domain.trade_models.cashflow import Cashflow
-from app.reporting.profit import order_profit_detail
+from app.operations.profit import order_profit_detail
 
 TODAY = date(2026, 10, 5)
 

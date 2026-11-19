@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { OrdersPage } from "@/orders/OrdersPage";
+import { OrdersPage } from "@/business/OrdersPage";
 
 import { installmentsApi } from "@/shared/api/installments.api";
 import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
@@ -32,7 +32,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
 // 订单台账测试不覆盖库存面板本身；库存面板有独立回归，主页面测试用轻量桩避免重复挂载整套库存依赖。
-vi.mock("@/stocks/InventoryPanel", () => ({
+vi.mock("@/business/stocks/InventoryPanel", () => ({
   InventoryPanel: ({ active = true }: { active?: boolean }) => active ? <div data-testid="inventory-panel-test-stub" /> : null,
 }));
 

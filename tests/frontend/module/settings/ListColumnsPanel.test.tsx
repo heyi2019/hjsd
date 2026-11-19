@@ -20,7 +20,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
 import { renderLight } from "@fixtures/render";
-import { ListColumnsPanel } from "@/field-definitions/panels/ListColumnsPanel";
+import { ListColumnsPanel } from "@/settings/panels/ListColumnsPanel";
 
 const ledger: ListScopeConfig = {
   code: "LEDGER",

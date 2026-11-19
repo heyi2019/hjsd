@@ -18,19 +18,19 @@ from app.core.security import CurrentUser
 from app.domain.enums import Direction
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Installment, Order, OrderEvent
-from app.finance.installments import create as inst_create
-from app.finance.installments import recovery as inst_recovery
-from app.finance.installments.repayments.pay import pay as inst_pay
-from app.orders import events
-from app.orders._shared import _audit_value
-from app.orders.cancellation_model import get_cancellation_offset as _get_offset_event
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.orders.events_rules import _resolve_pool
-from app.orders.mutations import update_order
-from app.orders.queries import list_orders
-from app.customer_center.counterparties import create_counterparty
-from app.customer_center.customers import create_customer
+from app.funds.installments import create as inst_create
+from app.funds.installments import recovery as inst_recovery
+from app.funds.installments.repayments.pay import pay as inst_pay
+from app.business import events
+from app.business._shared import _audit_value
+from app.business.cancellation_model import get_cancellation_offset as _get_offset_event
+from app.business.create import create_order
+from app.business.events import post_event
+from app.business.events_rules import _resolve_pool
+from app.business.mutations import update_order
+from app.business.queries import list_orders
+from app.customers.counterparties import create_counterparty
+from app.customers.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 TODAY2 = date(2026, 10, 18)

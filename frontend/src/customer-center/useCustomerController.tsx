@@ -1,7 +1,7 @@
 import { Form, Space, Typography } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { buildFormExtraDisplay, formatExtraDisplayValue } from "../orders/ConfigurableField";
+import { buildFormExtraDisplay, formatExtraDisplayValue } from "../business/ConfigurableField";
 import { customersApi } from "../shared/api/customers.api";
 import { employeesApi } from "../shared/api/org.api";
 import { orderFormFieldsApi } from "../shared/api/orders.api";

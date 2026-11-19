@@ -15,10 +15,10 @@ from app.core.errors import NotFound, PermissionDenied, Validation
 from app.core.security import CurrentUser
 from app.domain.trade import Account
 from app.domain.enums import AccountStatus
-from app.orders import router, schemas
-from app.orders.create import create_order
-from app.customer_center.counterparties import create_counterparty
-from app.customer_center.customers import create_customer
+from app.business import router, schemas
+from app.business.create import create_order
+from app.customers.counterparties import create_counterparty
+from app.customers.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 
@@ -174,7 +174,7 @@ def test_order_list_payload_includes_counterparty_role(seeded_db):
 # ---- pool_balance：无池授权返回 NotFound（端点 2026-11-18 归位 finance/balances_router，URL 不变） ----
 
 def test_pool_balance_hidden_for_unauthorized_viewer(seeded_db):
-    from app.finance.routers.balances_router import pool_balance_detail
+    from app.funds.routers.balances_router import pool_balance_detail
 
     with pytest.raises(NotFound, match="资金账户不存在"):
         pool_balance_detail(1, db=seeded_db, _user=_viewer())

@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from app.finance.cashflows import create_cashflow
+from app.funds.cashflows import create_cashflow
 
 TODAY = date(2026, 10, 4)
 

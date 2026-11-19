@@ -1,6 +1,6 @@
 """domain.lists：列表列显示配置（哪些列显示、以什么顺序显示）+ 自定义列定义。
 
-`ListColumnConfig` 只存「状态」不存「文案」：列清单与中文名以 `app.lists.scopes`
+`ListColumnConfig` 只存「状态」不存「文案」：列清单与中文名以 `app.settings.lists.scopes`
 注册表为唯一事实源，本表按 (scope, column_key) 记录可见性与排序；缺行即默认可见
 + 按注册表顺序，因此后续新增列不需要写数据迁移，也不会因漏播种而「新列凭空消失」。
 

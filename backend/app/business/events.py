@@ -24,6 +24,7 @@ from app.domain.enums import (
 )
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
 from ._common import _non_negative_money, _positive_money
+from .listing_state import active_listings
 from .cancellation_model import opposite_cancellation_direction as _opposite_direction
 from .events_helpers import (
     _assert_event_context,
@@ -107,6 +108,11 @@ def post_event(
         ).scalar_one_or_none()
         if account is not None and account.status == AccountStatus.VOID.value:
             raise Validation("账号已出库，不能登记寄售上架")
+    if event_type == EventType.OPERATE.value and operation_type == "CONSIGNMENT":
+        platforms = (form_extra or {}).get("consignment_platforms") or []
+        active_platforms = {platform for _, platform in active_listings(session, order.id)}
+        if isinstance(platforms, list) and any(isinstance(platform, str) and platform.strip() in active_platforms for platform in platforms):
+            raise Validation("该平台已上架，请先下架后再重新上架")
     can_reopen_for_buy = _assert_event_context(
         session,
         order,

@@ -321,6 +321,30 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
     expect(await screen.findByText("盼之")).toBeInTheDocument();
   });
 
+  it("已上架平台不再出现在新增上架选项", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: { id: 1, status: "WAITING" }, orders: [{
+      order_id: 22, status: "ACTIVE", events: [{ id: 901, event_type: "OPERATE", operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["盼之"] } }],
+    }] } as never);
+    renderConsignment();
+    await screen.findByText("盼之");
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "寄售平台" }).closest(".ant-select-selector")!);
+    expect(await screen.findByText("千寻", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(screen.queryByText("盼之", { selector: ".ant-select-item-option-content" })).toBeNull();
+  });
+
+  it("平台下架后可重新选择上架", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: { id: 1, status: "WAITING" }, orders: [{
+      order_id: 22, status: "ACTIVE", events: [
+        { id: 901, event_type: "OPERATE", operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["盼之"] } },
+        { id: 902, event_type: "OPERATE", operation_type: "UNLIST", form_extra: { consignment_event_id: 901, consignment_platforms: ["盼之"], platform_unlist_scope: "PLATFORM" } },
+      ],
+    }] } as never);
+    renderConsignment();
+    await screen.findByText("暂无上架记录");
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "寄售平台" }).closest(".ant-select-selector")!);
+    expect(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+  });
+
   it("寄售平台从原订单寄售事件读取", async () => {
     vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: { id: 1, status: "IN_STOCK" },

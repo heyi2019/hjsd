@@ -14,6 +14,41 @@ from app.business.create import create_order
 from app.business.events import post_event
 
 
+def test_new_unlisting_requires_valid_active_listing_and_stores_event_id(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="select-active-listing", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
+    def submit(extra):
+        return seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [], "new_events": [{"operation_type": "UNLIST", "occurred_at": "2026-10-02T11:00:00", "form_extra": extra}]})
+    assert submit({"platform_unlist_scope": "PLATFORM", "consignment_platforms": ["平台甲"]}).status_code == 422
+    assert submit({"platform_unlist_scope": "PLATFORM", "consignment_event_id": listing.id, "consignment_platforms": ["平台乙"]}).status_code == 422
+    valid = {"platform_unlist_scope": "PLATFORM", "consignment_event_id": listing.id, "consignment_platforms": ["平台甲"]}
+    assert submit(valid).status_code == 200
+    assert submit(valid).status_code == 422
+    events = seeded_db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id)).all()
+    assert sum((e.form_extra or {}).get("operation_type") == "UNLIST" for e in events) == 1
+
+
+def test_cannot_relist_platform_before_it_is_unlisted(seeded_db):
+    from app.core.errors import Validation
+    account = create_account(seeded_db, game_account="duplicate-platform", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
+    with pytest.raises(Validation):
+        post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
+    post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 2), actor="pytest", form_extra={"platform_unlist_scope": "PLATFORM", "consignment_event_id": listing.id, "consignment_platforms": ["平台甲"]})
+    post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 3), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
+
+
+def test_edit_listing_cannot_change_to_another_active_platform(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="edit-duplicate-listing", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    first, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
+    post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台乙"]})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": first.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["平台乙"]}}]})
+    assert response.status_code == 422, response.text
+
+
 @pytest.mark.parametrize("change", [
     {"consignment_platforms": ["平台乙"]},
     {"platform_unlist_scope": "SYSTEM"},

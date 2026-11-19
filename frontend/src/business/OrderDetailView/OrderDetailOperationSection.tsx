@@ -4,7 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useMemo } from "react";
 import type { ReactNode } from "react";
 import { DataTable, DateField, PermissionButton, Select } from "../../shared/ui";
-import type { AccountExecutionEvent } from "../../shared/api/types/account-execution";
+import type { AccountExecutionEvent, AccountExecutionOrder } from "../../shared/api/types/account-execution";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import type { Account } from "../../shared/api/types/accounts";
 import type { OrderEventDraft, OrderOperationDraft, OrderOperationKey, OrderOperationRow } from "./OrderDetail.shared";
@@ -13,6 +13,7 @@ import { useOptionSet } from "../../shared/lib/optionSets";
 import { OrderSectionHeading, OPERATION_KEY_BY_TYPE, OPERATION_TYPE_BY_KEY, type OrderDetailMeta } from "./OrderDetail.shared";
 import { defaultOperatorUserIds } from "./editing/use-order-detail-editor";
 import { currentDevUser } from "../../shared/api/client";
+import { activeConsignmentListings } from "../operations/consignment-logic";
 
 const OPERATION_COLUMNS: ColumnsType<OrderOperationRow> = [
   { title: "动作", dataIndex: "action", key: "action", width: 88 },
@@ -75,6 +76,10 @@ export function OrderDetailOperationSection({
 }) {
   const platformOptions = useOptionSet("INTERMEDIARY_PLATFORM") ?? [];
   const defaultOperatorIds = defaultOperatorUserIds(employees, operatorUsername) ?? [];
+  const activeListings = activeConsignmentListings({
+    order_id: meta.orderId ?? 0, order_no: "", status: "ACTIVE",
+    events: [...(operationEvents?.consignment ?? []), ...(operationEvents?.unlist ?? [])],
+  } as AccountExecutionOrder);
   const rows = useMemo<OrderOperationRow[]>(() => {
     const makeRows = (operationKey: OrderOperationKey, action: string, content: OrderOperationRow["content"], occurredAt: string, operator: string) => {
       const events = operationEvents?.[operationKey] ?? [];
@@ -110,7 +115,7 @@ export function OrderDetailOperationSection({
         <PermissionButton permission="order.update" type="link" size="small" onClick={() => onAddOperationRow?.("CONSIGNMENT")}>+ 添加上架行</PermissionButton>
         <PermissionButton permission="order.update" type="link" size="small" onClick={() => onAddOperationRow?.("UNLIST")}>+ 添加下架行</PermissionButton>
       </Space>
-      <DataTable className="order-detail__data-table order-operation-table" columns={editableOperationColumns(account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onRemoveOperationRow, onProfileChange, employees, platformOptions, defaultOperatorIds, orderType === "DG")} rows={rows} page={1} pageSize={20} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
+      <DataTable className="order-detail__data-table order-operation-table" columns={editableOperationColumns(account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onRemoveOperationRow, onProfileChange, employees, platformOptions, defaultOperatorIds, orderType === "DG", activeListings)} rows={rows} page={1} pageSize={20} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
     </div>;
   }
   return <div className="order-detail__section order-detail__section--operation">
@@ -131,6 +136,7 @@ function editableOperationColumns(
   platformOptions: Array<{ value: string; label: string }>,
   defaultOperatorIds: number[],
   allowSystemUnlist: boolean,
+  activeListings: ReturnType<typeof activeConsignmentListings>,
 ): ColumnsType<OrderOperationRow> {
   const platformOptionValues = (current: string[], includeSystem = false) => {
     const options = [...platformOptions];
@@ -155,9 +161,30 @@ function editableOperationColumns(
         if (row.operationKey === "consignment") {
           const selectedPlatforms = platformValues(extra.consignment_platforms);
           const currentPrice = extra.consignment_price == null || extra.consignment_price === "" ? undefined : Number(extra.consignment_price);
-          return <div className="order-operation-edit-fields"><Select aria-label={`编辑上架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={selectedPlatforms[0]} options={platformOptionValues(selectedPlatforms)} placeholder="选择上架平台" onChange={(next) => { const nextExtra = { ...extra }; if (next) nextExtra.consignment_platforms = [next]; else { delete nextExtra.consignment_platforms; delete nextExtra.consignment_price; } updateExtra(row, nextExtra); }} /><InputNumber aria-label={`编辑寄售价格${row.ariaLabelSuffix ?? ""}`} min={0} precision={2} value={Number.isFinite(currentPrice) ? currentPrice : null} placeholder="寄售价" onChange={(next) => { const nextExtra = { ...extra }; if (next == null) delete nextExtra.consignment_price; else nextExtra.consignment_price = next; updateExtra(row, nextExtra); }} /></div>;
+          const choices = platformOptionValues(selectedPlatforms).filter((option) => {
+            const takenByListing = activeListings.some((listing) => listing.platform === option.value && listing.eventId !== row.event?.id);
+            const takenByDraft = Object.entries(operationDrafts ?? {}).some(([key, candidate]) => key !== row.key && candidate?.operation_type === "CONSIGNMENT" && platformValues(candidate.form_extra?.consignment_platforms).includes(String(option.value)));
+            return !takenByListing && !takenByDraft;
+          });
+          return <div className="order-operation-edit-fields"><Select aria-label={`编辑上架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={selectedPlatforms[0]} options={choices} placeholder="选择上架平台" onChange={(next) => { const nextExtra = { ...extra }; if (next) nextExtra.consignment_platforms = [next]; else { delete nextExtra.consignment_platforms; delete nextExtra.consignment_price; } updateExtra(row, nextExtra); }} /><InputNumber aria-label={`编辑寄售价格${row.ariaLabelSuffix ?? ""}`} min={0} precision={2} value={Number.isFinite(currentPrice) ? currentPrice : null} placeholder="寄售价" onChange={(next) => { const nextExtra = { ...extra }; if (next == null) delete nextExtra.consignment_price; else nextExtra.consignment_price = next; updateExtra(row, nextExtra); }} /></div>;
         }
         const currentPlatforms = platformValues(extra.consignment_platforms);
+        if (!row.event) {
+          const choices = activeListings.filter((listing) => listing.eventId != null).map((listing) => ({ value: JSON.stringify([listing.eventId, listing.platform]), label: `${listing.platform}（上架于 ${listing.listedAt}，事件 ${listing.eventId}）` }));
+          if (allowSystemUnlist) choices.push({ value: "__SYSTEM__", label: "本系统" });
+          const current = extra.platform_unlist_scope === "SYSTEM" ? "__SYSTEM__" : extra.consignment_event_id != null && currentPlatforms[0] ? JSON.stringify([extra.consignment_event_id, currentPlatforms[0]]) : undefined;
+          return <Select aria-label={`编辑下架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={current} options={choices} placeholder="选择已上架记录" notFoundContent="暂无已上架记录" onChange={(next) => {
+            const nextExtra = { ...extra };
+            delete nextExtra.consignment_event_id;
+            delete nextExtra.consignment_platforms;
+            if (next === "__SYSTEM__") nextExtra.platform_unlist_scope = "SYSTEM";
+            else if (typeof next === "string") {
+              const listing = activeListings.find((item) => JSON.stringify([item.eventId, item.platform]) === next);
+              if (listing) { nextExtra.platform_unlist_scope = "PLATFORM"; nextExtra.consignment_event_id = listing.eventId; nextExtra.consignment_platforms = [listing.platform]; }
+            } else delete nextExtra.platform_unlist_scope;
+            updateExtra(row, nextExtra);
+          }} />;
+        }
         const currentScope = extra.platform_unlist_scope === "SYSTEM" ? ["__SYSTEM__"] : currentPlatforms;
         return <Select aria-label={`编辑下架平台${row.ariaLabelSuffix ?? ""}`} disabled={row.event?.form_extra?.consignment_event_id != null} allowClear value={currentScope[0]} options={platformOptionValues(currentScope.filter((value) => value !== "__SYSTEM__"), allowSystemUnlist)} placeholder="选择下架平台" onChange={(next) => { const nextExtra = { ...extra }; if (next === "__SYSTEM__") { nextExtra.platform_unlist_scope = "SYSTEM"; delete nextExtra.consignment_platforms; } else if (next) { nextExtra.platform_unlist_scope = "PLATFORM"; nextExtra.consignment_platforms = [next]; } else { delete nextExtra.platform_unlist_scope; delete nextExtra.consignment_platforms; } updateExtra(row, nextExtra); }} />;
       },

@@ -15,6 +15,7 @@ from app.domain.enums import CashflowSourceType
 from app.domain.users import User
 from app.shared.order_access import get_order
 from app.business.events import post_event
+from app.business.listing_state import active_listings
 
 from .schemas import ExecutionEditItem, ExecutionEditRequest, ExecutionOperationCreateItem
 
@@ -44,6 +45,12 @@ def apply_operation_event_creates(
             form_extra["listed_at"] = occurred_at.isoformat()
             form_extra_scope = "CONSIGN"
         elif item.operation_type == "UNLIST":
+            if form_extra.get("platform_unlist_scope") != "SYSTEM":
+                platforms = form_extra.get("consignment_platforms")
+                listing_id = form_extra.get("consignment_event_id")
+                if not isinstance(listing_id, int) or isinstance(listing_id, bool) or not isinstance(platforms, list) or len(platforms) != 1 or not isinstance(platforms[0], str) or (listing_id, platforms[0].strip()) not in active_listings(db, order_id):
+                    raise Validation("请选择当前订单仍在上架的具体平台记录")
+                form_extra["platform_unlist_scope"] = "PLATFORM"
             form_extra["platform_unlisted_at"] = occurred_at.isoformat()
             form_extra_scope = "INVOID"
         else:
@@ -102,6 +109,16 @@ def validate_event_edits(
             old_platforms = (event.form_extra or {}).get("consignment_platforms") or []
             new_platforms = item.form_extra.get("consignment_platforms") or []
             if old_platforms != new_platforms:
+                active = active_listings(db, order_id)
+                other_active = {platform for listing_id, platform in active if listing_id != event.id}
+                active_ids = {listing_id for listing_id, _ in active}
+                for other in payload.events:
+                    if other.id != event.id and other.id in active_ids and other.form_extra is not None:
+                        proposed = other.form_extra.get("consignment_platforms")
+                        if isinstance(proposed, list):
+                            other_active.update(value.strip() for value in proposed if isinstance(value, str) and value.strip())
+                if isinstance(new_platforms, list) and any(isinstance(platform, str) and platform.strip() in other_active for platform in new_platforms):
+                    raise Validation("该平台已上架，请先下架后再重新上架")
                 linked = _linked_unlistings(db, event)
                 if linked and (len(old_platforms) != 1 or len(new_platforms) != 1):
                     raise Validation("已有下架记录的多平台上架不能直接修改平台，请先核对历史记录")

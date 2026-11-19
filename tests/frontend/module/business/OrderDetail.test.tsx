@@ -40,6 +40,23 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it("新增下架行选择具体上架事件并保存关联编号", async () => {
+    const onOperationEdit = vi.fn();
+    const listing = { id: 7, event_type: "OPERATE", operation_type: "CONSIGNMENT", amount: "0", occurred_at: "2026-10-01T10:00:00", form_extra: { consignment_platforms: ["平台甲"], listed_at: "2026-10-01T10:00" } } as never;
+    renderLight(<OrderDetailOperationSection meta={{}} account={account} editing orderType="HS" operationEvents={{ consignment: [listing] }} onOperationEdit={onOperationEdit} />);
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "编辑下架平台" }).closest(".ant-select-selector")!);
+    fireEvent.click(await screen.findByText(/平台甲.*2026-10-01/, { selector: ".ant-select-item-option-content" }));
+    expect(onOperationEdit).toHaveBeenCalledWith("unlist", expect.objectContaining({ form_extra: expect.objectContaining({ consignment_event_id: 7, consignment_platforms: ["平台甲"], platform_unlist_scope: "PLATFORM" }) }));
+  });
+
+  it("同平台多次上架时按上架时间和事件编号区分下架目标", async () => {
+    const onOperationEdit = vi.fn();
+    const makeListing = (id: number, time: string) => ({ id, event_type: "OPERATE", operation_type: "CONSIGNMENT", amount: "0", occurred_at: time, form_extra: { consignment_platforms: ["平台甲"], listed_at: time } }) as never;
+    renderLight(<OrderDetailOperationSection meta={{}} account={account} editing orderType="HS" operationEvents={{ consignment: [makeListing(7, "2026-10-01T10:00:00"), makeListing(8, "2026-10-02T10:00:00")] }} onOperationEdit={onOperationEdit} />);
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "编辑下架平台" }).closest(".ant-select-selector")!);
+    fireEvent.click(await screen.findByText(/平台甲.*2026-10-02.*事件 8/, { selector: ".ant-select-item-option-content" }));
+    expect(onOperationEdit).toHaveBeenCalledWith("unlist", expect.objectContaining({ form_extra: expect.objectContaining({ consignment_event_id: 8, consignment_platforms: ["平台甲"] }) }));
+  });
   it("关联上架事件的历史下架记录锁定平台但仍可编辑时间", () => {
     const unlist = { id: 9, event_type: "OPERATE", operation_type: "UNLIST", amount: "0", occurred_at: "2026-10-02T11:00:00", form_extra: { operation_type: "UNLIST", consignment_event_id: 7, consignment_platforms: ["平台甲"], platform_unlist_scope: "PLATFORM" } } as never;
     renderLight(<OrderDetailOperationSection meta={{}} account={account} editing orderType="DG" operationEvents={{ unlist: [unlist] }} />);

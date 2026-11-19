@@ -2,7 +2,7 @@ import { appMessage } from "../../shared/ui/appFeedback";
 /** 库存账号寄售：每次只登记一个中介平台及其实际上架时间。 */
 import { DatePicker, Form, InputNumber } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
 import type { Account } from "../../shared/api/types/accounts";
@@ -27,33 +27,44 @@ export function OrderConsignmentModal(props: {
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [listed, setListed] = useState<ListedPlatform[]>([]);
+  const [listingReady, setListingReady] = useState(false);
+  const requestGeneration = useRef(0);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [sourceOrderId, setSourceOrderId] = useState<number | null>(props.orderId ?? props.account?.source_order_id ?? null);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
   const { config } = useOrderFormConfig(open ? "CONSIGN" : undefined);
   const platforms = useOptionSet("INTERMEDIARY_PLATFORM") ?? [];
+  const availablePlatforms = platforms.filter((option) => !listed.some((item) => item.platform === option.value));
 
-  const refreshListed = async (orderId: number) => {
+  const refreshListed = async (orderId: number, generation: number) => {
     const detail = await ordersApi.executionDetail(orderId);
+    if (generation !== requestGeneration.current) return;
     const sourceOrder = detail.orders.find((order) => order.order_id === orderId);
     setSourceOrderId(sourceOrder?.order_id ?? null);
-    setListed(detail.account.status === "VOID" || !sourceOrder ? [] : activeConsignmentListings(sourceOrder).map((item) => ({
+    const current = detail.account.status === "VOID" || !sourceOrder ? [] : activeConsignmentListings(sourceOrder).map((item) => ({
       key: item.eventId ?? item.orderId,
       platform: item.platform,
       price: item.price,
       listedAt: item.listedAt,
-    })));
+    }));
+    setListed(current);
+    if (current.some((item) => item.platform === form.getFieldValue("platform"))) form.setFieldValue("platform", undefined);
+    setListingReady(Boolean(sourceOrder) && detail.account.status !== "VOID");
   };
 
   useEffect(() => {
     if (!open) return;
+    const generation = ++requestGeneration.current;
     setError(null);
+    setListed([]);
+    setListingReady(false);
     setSourceOrderId(props.orderId ?? props.account?.source_order_id ?? null);
     form.setFieldsValue({ listed_at: dayjs().second(0).millisecond(0) });
     void employeesApi.list().then((items) => setEmployees(items.filter((item) => item.is_active))).catch((cause) => setError(normalizeError(cause)));
     const orderId = props.orderId ?? props.account?.source_order_id;
-    if (orderId != null) void refreshListed(orderId).catch((cause) => setError(normalizeError(cause)));
+    if (orderId != null) void refreshListed(orderId, generation).catch((cause) => { if (generation === requestGeneration.current) setError(normalizeError(cause)); });
+    return () => { requestGeneration.current += 1; };
   }, [form, open, props.account, props.orderId]);
 
   const submit = async (values: { platform?: string; consignment_price?: number | null; listed_at?: Dayjs; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
@@ -83,7 +94,7 @@ export function OrderConsignmentModal(props: {
       });
       appMessage.success(`${values.platform} 已上架，账号仍保持在库`);
       form.setFieldsValue({ platform: undefined, consignment_price: null, listed_at: dayjs().second(0).millisecond(0) });
-      await refreshListed(sourceOrderId);
+      await refreshListed(sourceOrderId, requestGeneration.current);
       await props.onCreated();
     } catch (cause) {
       setError(normalizeError(cause));
@@ -127,8 +138,10 @@ export function OrderConsignmentModal(props: {
             {platforms.length ? (
               <Select
                 aria-label="寄售平台"
+                disabled={!listingReady}
                 placeholder="请选择本次上架的平台"
-                options={platforms}
+                options={availablePlatforms}
+                notFoundContent="当前平台均已上架"
                 popupMatchSelectWidth
                 popupClassName="consignment-platform-pop"
               />

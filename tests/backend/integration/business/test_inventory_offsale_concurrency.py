@@ -143,6 +143,29 @@ def test_simultaneous_offsale_has_one_result(v1_engine):
                 unlistings = [e for e in events if (e.form_extra or {}).get("operation_type") == "UNLIST"]
                 assert len(listings) == len(unlistings) == 1
                 assert unlistings[0].form_extra["consignment_event_id"] == listings[0].id
+
+        with factory() as session:
+            order = create_order(session, order_type="DG", trade_date=date(2026, 11, 1), actor="pytest",
+                account_snapshot={"game_account": "concurrent-duplicate-listing", "game_type": "王者荣耀"})
+            order_id = order.id
+            session.commit()
+        barrier = Barrier(2, timeout=10)
+        def duplicate_listing_worker(_):
+            with factory() as session:
+                barrier.wait()
+                try:
+                    register_consignment(session, order_id, occurred_on=date(2026, 11, 2), actor="pytest",
+                        form_extra={"consignment_platforms": ["同一平台"]})
+                    session.commit()
+                    return "success"
+                except AppError:
+                    session.rollback()
+                    return "rejected"
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            assert sorted(executor.map(duplicate_listing_worker, range(2))) == ["rejected", "success"]
+        with factory() as session:
+            events = session.scalars(select(OrderEvent).where(OrderEvent.order_id == order_id)).all()
+            assert sum((item.form_extra or {}).get("operation_type") == "CONSIGNMENT" for item in events) == 1
     finally:
         engine.dispose()
         with admin.connect() as connection:

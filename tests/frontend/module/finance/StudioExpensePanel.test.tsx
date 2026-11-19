@@ -249,6 +249,30 @@ describe("StudioExpensePanel：工作室支出", () => {
     await waitFor(() => expect(vi.mocked(cashflowsApi.remove)).toHaveBeenCalledWith(51));
   });
 
+  it("删除失败在列表显示原因，打开登记时不残留错误", async () => {
+    vi.mocked(cashflowsApi.remove).mockRejectedValueOnce(new Error("删除失败，请重试"));
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    const row = (await screen.findByText("CF-001")).closest("tr") as HTMLElement;
+    await ui.click(within(row).getByRole("button", { name: "删除" }));
+    await ui.click(await screen.findByRole("button", { name: "确认删除" }));
+    expect(await screen.findByText(/删除失败，请重试/)).toBeVisible();
+    expect(screen.getByText("CF-001")).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "记一笔" }));
+    expect(screen.queryByText(/删除失败，请重试/)).toBeNull();
+  });
+
+  it("编辑失败后关闭并重新打开时不残留错误", async () => {
+    vi.mocked(cashflowsApi.update).mockRejectedValueOnce(new Error("保存失败，请重试"));
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    const row = (await screen.findByText("CF-001")).closest("tr") as HTMLElement;
+    await ui.click(within(row).getByRole("button", { name: "编辑" }));
+    await ui.click(await screen.findByRole("button", { name: "保存修改" }));
+    expect(await screen.findByText(/保存失败，请重试/)).toBeVisible();
+    await ui.click(screen.getByRole("button", { name: "Close" }));
+    await ui.click(within(row).getByRole("button", { name: "编辑" }));
+    expect(screen.queryByText(/保存失败，请重试/)).toBeNull();
+  });
+
   it("登记支出：提交即入账（OUT / OPERATING_EXPENSE）", async () => {
     mockOptionSets();
     resolveMockOnce(vi.mocked(cashflowsApi.create), { id: 61 });

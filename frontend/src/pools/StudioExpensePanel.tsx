@@ -215,6 +215,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
   };
 
   const openRegister = () => {
+    write.clearError();
     setEditTarget(null);
     registerForm.resetFields();
     registerForm.setFieldsValue({ occurred_on: dayjs(today()), direction: "OUT" });
@@ -223,6 +224,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
   };
 
   const openEdit = (row: Cashflow) => {
+    write.clearError();
     setEditTarget(row);
     setRegisterDirection(row.direction === "IN" ? "IN" : "OUT");
     registerForm.setFieldsValue({
@@ -239,6 +241,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
   };
 
   const closeRegister = () => {
+    write.clearError();
     setRegisterOpen(false);
     setEditTarget(null);
     registerForm.resetFields();
@@ -321,6 +324,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
     >
       <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} retrying={loading} />
+      {!registerOpen && <InlineError error={write.error} />}
       <StatRow
         items={[
           // 失败态一律显示「—」（amount: null），不把未知状态当成可信 0

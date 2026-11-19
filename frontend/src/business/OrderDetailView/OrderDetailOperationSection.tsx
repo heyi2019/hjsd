@@ -159,7 +159,7 @@ function editableOperationColumns(
         }
         const currentPlatforms = platformValues(extra.consignment_platforms);
         const currentScope = extra.platform_unlist_scope === "SYSTEM" ? ["__SYSTEM__"] : currentPlatforms;
-        return <Select aria-label={`编辑下架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={currentScope[0]} options={platformOptionValues(currentScope.filter((value) => value !== "__SYSTEM__"), allowSystemUnlist)} placeholder="选择下架平台" onChange={(next) => { const nextExtra = { ...extra }; if (next === "__SYSTEM__") { nextExtra.platform_unlist_scope = "SYSTEM"; delete nextExtra.consignment_platforms; } else if (next) { nextExtra.platform_unlist_scope = "PLATFORM"; nextExtra.consignment_platforms = [next]; } else { delete nextExtra.platform_unlist_scope; delete nextExtra.consignment_platforms; } updateExtra(row, nextExtra); }} />;
+        return <Select aria-label={`编辑下架平台${row.ariaLabelSuffix ?? ""}`} disabled={row.event?.form_extra?.consignment_event_id != null} allowClear value={currentScope[0]} options={platformOptionValues(currentScope.filter((value) => value !== "__SYSTEM__"), allowSystemUnlist)} placeholder="选择下架平台" onChange={(next) => { const nextExtra = { ...extra }; if (next === "__SYSTEM__") { nextExtra.platform_unlist_scope = "SYSTEM"; delete nextExtra.consignment_platforms; } else if (next) { nextExtra.platform_unlist_scope = "PLATFORM"; nextExtra.consignment_platforms = [next]; } else { delete nextExtra.platform_unlist_scope; delete nextExtra.consignment_platforms; } updateExtra(row, nextExtra); }} />;
       },
     },
     {

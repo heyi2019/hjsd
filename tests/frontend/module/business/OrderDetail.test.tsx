@@ -40,6 +40,12 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it("关联上架事件的历史下架记录锁定平台但仍可编辑时间", () => {
+    const unlist = { id: 9, event_type: "OPERATE", operation_type: "UNLIST", amount: "0", occurred_at: "2026-10-02T11:00:00", form_extra: { operation_type: "UNLIST", consignment_event_id: 7, consignment_platforms: ["平台甲"], platform_unlist_scope: "PLATFORM" } } as never;
+    renderLight(<OrderDetailOperationSection meta={{}} account={account} editing orderType="DG" operationEvents={{ unlist: [unlist] }} />);
+    expect(screen.getByRole("combobox", { name: "编辑下架平台" })).toBeDisabled();
+    expect(screen.getByLabelText("编辑下架平台时间")).not.toBeDisabled();
+  });
   it.each([["HS", false], ["TH", false], ["DG", true]] as const)("%s 订单按业务类型显示本系统下架选项", async (orderType, allowed) => {
     renderLight(<OrderDetailOperationSection meta={{}} account={account} editing orderType={orderType} />);
     fireEvent.mouseDown(screen.getByRole("combobox", { name: "编辑下架平台" }).closest(".ant-select-selector")!);

@@ -353,6 +353,24 @@ describe("FundsPage：押金占用", () => {
 });
 
 describe("FundsPage：资金流水", () => {
+  it("资金明细按页读取全部流水，筛选变化后回到第一页", async () => {
+    vi.mocked(cashflowsApi.list).mockImplementation(async (params) => {
+      const row = params?.offset === 10 ? { ...cashflows[1], flow_no: "FLOW-PAGE-2" } : cashflows[0];
+      return cashflowPage([row], { total: 2001, total_in: "5000.00", total_out: "100.00" });
+    });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    await screen.findByText("ZC00001");
+    await ui.click(screen.getByTitle("2"));
+    expect(await screen.findByText("FLOW-PAGE-2")).toBeInTheDocument();
+    expect(cashflowsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 10 }));
+    expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("5,000.00");
+    await ui.click(screen.getByRole("combobox", { name: "流水方向" }));
+    await ui.click(await screen.findByText("收入", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(cashflowsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ direction: "IN", offset: 0 })));
+    expect(await screen.findByText("ZC00001")).toBeInTheDocument();
+  });
   it("资金明细不提供新增流水入口", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
@@ -437,9 +455,8 @@ describe("FundsPage：资金流水", () => {
     ));
   });
 
-  it("流水被服务端截断时，本地关键词收窄不回退本地求和（避免少算）", async () => {
-    // 修复 #1：total=5000 > 已加载 2 条（limit=2000 截断）。此时本地可见行只是部分数据，
-    // 用户再输入关键词收窄，合计必须仍取服务端聚合，不能用可见的 1 条冒充全量。
+  it("流水分页时关键词筛选的合计取服务端全量汇总", async () => {
+    // 当前页只有部分流水，关键词筛选后仍应使用服务端汇总而不是当页求和。
     vi.mocked(cashflowsApi.list).mockImplementation(async (params) => cashflowPage(
       params?.keyword ? [cashflows[1]] : cashflows,
       { total: 5000, total_in: "123456.78", total_out: "87654.32" },

@@ -31,6 +31,18 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
   const [cashflowAttribute, setCashflowAttribute] = useState("");
   const [cashflowCategory, setCashflowCategory] = useState("");
   const [cashflowExporting, setCashflowExporting] = useState(false);
+  const filterKey = JSON.stringify([cashflowFrom, cashflowTo, cashflowPoolId, cashflowDirection, cashflowLedgerType, cashflowAttribute, cashflowCategory, cashflowKeyword]);
+  const [paging, setPaging] = useState({ filterKey, page: 1, pageSize: 10 });
+  const cashflowPage = paging.filterKey === filterKey ? paging.page : 1;
+  const cashflowPageSize = paging.pageSize;
+  const pagingRef = useRef({ filterKey, page: cashflowPage, pageSize: cashflowPageSize });
+  pagingRef.current = { filterKey, page: cashflowPage, pageSize: cashflowPageSize };
+  useEffect(() => {
+    setPaging((current) => current.filterKey === filterKey ? current : { ...current, filterKey, page: 1 });
+  }, [filterKey]);
+  const setCashflowPage = (page: number, pageSize: number) => {
+    setPaging({ filterKey, page: pageSize === cashflowPageSize ? page : 1, pageSize });
+  };
 
   const cashflowFromRef = useRef(cashflowFrom);
   cashflowFromRef.current = cashflowFrom;
@@ -55,6 +67,7 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     setCashflowLoading(true);
     setCashflowError(null);
     const listRequestId = ++cashflowListRequestRef.current;
+    const requestedPage = pagingRef.current;
     try {
       const result = await cashflowsApi.list({
         occurred_from: cashflowFromRef.current || undefined,
@@ -65,10 +78,15 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
         accounting_attribute: cashflowAttributeRef.current || undefined,
         category: cashflowCategoryRef.current.trim() || undefined,
         keyword: cashflowKeywordRef.current.trim() || undefined,
-        limit: 2000,
-        offset: 0,
+        limit: requestedPage.pageSize,
+        offset: (requestedPage.page - 1) * requestedPage.pageSize,
       });
       if (listRequestId !== cashflowListRequestRef.current) return;
+      const lastPage = Math.max(1, Math.ceil(result.total / requestedPage.pageSize));
+      if (requestedPage.page > lastPage) {
+        setPaging({ ...requestedPage, page: lastPage });
+        return;
+      }
       setCashflows(result.items);
       setCashflowTotal(result.total);
       setCashflowTotals({
@@ -114,6 +132,8 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     cashflowKeyword,
     cashflowPoolId,
     cashflowTo,
+    cashflowPage,
+    cashflowPageSize,
     fetchCashflows,
   ]);
 
@@ -143,6 +163,9 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
   return {
     cashflows,
     cashflowTotal,
+    cashflowPage,
+    cashflowPageSize,
+    setCashflowPage,
     cashflowTotals,
     cashflowsReady,
     cashflowLoading,

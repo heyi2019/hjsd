@@ -28,7 +28,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
     cashflowDirection, setCashflowDirection,
     cashflowLedgerType, setCashflowLedgerType,
     cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, flowDirectionOptions, flowAttributeOptions,
-    fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, totalFlowIncome, totalFlowExpense,
+    fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, cashflowPage, cashflowPageSize, setCashflowPage, totalFlowIncome, totalFlowExpense,
     loading, cashflowsReady, cashflowLoading, cashflowError, error,
   } = ctrl;
   const cashflowUnavailable = !cashflowsReady || Boolean(error) || Boolean(cashflowError);
@@ -102,10 +102,6 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
         <Typography.Text type="secondary">正在加载资金流水…</Typography.Text>
       ) : cashflowUnavailable ? (
         <Typography.Text type="warning">资金流水数据不可用，请点击“重新加载”。</Typography.Text>
-      ) : cashflowTotal > cashflows.length ? (
-        <Typography.Text type="warning">
-          共匹配 {cashflowTotal} 笔，已加载 {cashflows.length} 笔（单次上限 2000 条，请用日期区间缩小范围）。
-        </Typography.Text>
       ) : (
         <Typography.Text type="secondary">共 {cashflowTotal} 笔资金流水。</Typography.Text>
       )}
@@ -119,12 +115,13 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
       <DataTable<Cashflow>
         columns={arrangeCashflowColumns(cashflowColumns)}
         rows={cashflowUnavailable ? [] : cashflows}
-        page={1}
-        pageSize={10}
-        total={cashflowUnavailable ? 0 : cashflows.length}
+        page={cashflowPage}
+        pageSize={cashflowPageSize}
+        total={cashflowUnavailable ? 0 : cashflowTotal}
+        controlledPaging
         emptyText={cashflowUnavailable ? "资金流水数据不可用，请点击重新加载" : "暂无资金流水"}
         loading={loading || cashflowLoading}
-        onPageChange={() => undefined}
+        onPageChange={setCashflowPage}
       />
     </Card>
   );

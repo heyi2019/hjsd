@@ -194,7 +194,7 @@ describe("FundsPage：资金账户卡片", () => {
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "资金明细" }));
 
-    expect(await screen.findByText("资金流水数据不可用，请点击“查询”或页面顶部的“重新加载”。")).toBeInTheDocument();
+    expect(await screen.findByText("资金流水数据不可用，请点击“重新加载”。")).toBeInTheDocument();
     expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("不可用");
     expect(screen.getByRole("button", { name: /新增流水/ })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "流水方向" })).toBeDisabled();
@@ -230,6 +230,28 @@ describe("FundsPage：资金账户卡片", () => {
     await act(async () => { rejectOld(new Error("旧请求失败")); await oldRequest.catch(() => undefined); });
     expect(screen.queryByText(/旧请求失败/)).toBeNull();
     expect(screen.getByText("ZC00001")).toBeInTheDocument();
+  });
+
+  it("修改收支筛选后列表和汇总自动同步", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof cashflowsApi.list>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof cashflowsApi.list>>>((resolve) => { finish = resolve; });
+    vi.mocked(cashflowsApi.list).mockImplementation(async (params) => params?.direction === "IN"
+      ? pending
+      : cashflowPage(cashflows, { total_in: "800.00", total_out: "500.00" }));
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    await screen.findByText("ZC00001");
+    expect(screen.queryByRole("button", { name: "查询" })).toBeNull();
+    await ui.click(screen.getByRole("combobox", { name: "流水方向" }));
+    await ui.click(await screen.findByText("收入", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(cashflowsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ direction: "IN" })));
+    expect(screen.getByRole("button", { name: "导出" })).toBeDisabled();
+    await act(async () => { finish(cashflowPage([cashflows[1]], { total_in: "800.00", total_out: "0.00" })); await pending; });
+    expect(await screen.findByText("SR00001")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导出" })).toBeEnabled();
+    expect(screen.queryByText("ZC00001")).toBeNull();
+    expect(screen.getByText("总支出").closest(".ui-stat")).toHaveTextContent("0.00");
   });
 
   it("FE-230：对账失败时显示明确空态并禁用新增", async () => {
@@ -361,7 +383,6 @@ describe("FundsPage：资金流水", () => {
     await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     const search = screen.getByLabelText("流水搜索");
     await ui.type(search, "SELL");
-    await ui.click(screen.getByRole("button", { name: "查询" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "SELL" })));
     expect(screen.getByText("SR00001")).toBeInTheDocument();
     expect(screen.queryByText("ZC00001")).not.toBeInTheDocument();
@@ -377,6 +398,7 @@ describe("FundsPage：资金流水", () => {
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     await ui.type(screen.getByLabelText("流水搜索"), "SELL");
+    await waitFor(() => expect(screen.getByRole("button", { name: "导出" })).toBeEnabled());
     await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.exportCsv)).toHaveBeenCalledWith(
       expect.objectContaining({ keyword: "SELL" }),
@@ -394,7 +416,6 @@ describe("FundsPage：资金流水", () => {
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "资金明细" }));
     await ui.type(screen.getByLabelText("流水搜索"), "SELL");
-    await ui.click(screen.getByRole("button", { name: "查询" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "SELL" })));
     // 本地已收窄到只剩 SELL 一条，但合计不得跟着塌成这一条的 800.00。
     expect(screen.queryByText("ZC00001")).not.toBeInTheDocument();
@@ -420,7 +441,6 @@ describe("FundsPage：资金流水", () => {
       { total: rows.length, total_in: "1.01", total_out: "9.00" },
     ));
     await ui.type(screen.getByLabelText("流水搜索"), "SE");
-    await ui.click(screen.getByRole("button", { name: "查询" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "SE" })));
     expect(screen.queryByText("BUY-C")).not.toBeInTheDocument();
     expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("1.01");

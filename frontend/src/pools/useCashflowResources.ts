@@ -48,7 +48,6 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
   cashflowCategoryRef.current = cashflowCategory;
   const cashflowKeywordRef = useRef(cashflowKeyword);
   cashflowKeywordRef.current = cashflowKeyword;
-  const cashflowTotalsRequestRef = useRef(0);
   const cashflowListRequestRef = useRef(0);
 
   const fetchCashflows = useCallback(async () => {
@@ -56,7 +55,6 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     setCashflowLoading(true);
     setCashflowError(null);
     const listRequestId = ++cashflowListRequestRef.current;
-    const totalsRequestId = ++cashflowTotalsRequestRef.current;
     try {
       const result = await cashflowsApi.list({
         occurred_from: cashflowFromRef.current || undefined,
@@ -73,12 +71,10 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
       if (listRequestId !== cashflowListRequestRef.current) return;
       setCashflows(result.items);
       setCashflowTotal(result.total);
-      if (totalsRequestId === cashflowTotalsRequestRef.current) {
-        setCashflowTotals({
-          income: result.total_in ?? "0.00",
-          expense: result.total_out ?? "0.00",
-        });
-      }
+      setCashflowTotals({
+        income: result.total_in ?? "0.00",
+        expense: result.total_out ?? "0.00",
+      });
       setCashflowsReady(true);
     } catch (err) {
       if (listRequestId === cashflowListRequestRef.current) setCashflowError(normalizeError(err));
@@ -87,45 +83,26 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     }
   }, []);
 
-  const lastPeriodRef = useRef<string | null>(null);
+  const lastFilterRef = useRef<{ base: string; keyword: string } | null>(null);
   useEffect(() => {
     if (!active) {
-      lastPeriodRef.current = null;
+      lastFilterRef.current = null;
       return;
     }
-    const key = `${cashflowFrom}|${cashflowTo}`;
-    if (lastPeriodRef.current !== key) {
-      lastPeriodRef.current = key;
-      void fetchCashflows().catch(() => undefined);
-    }
-  }, [active, cashflowFrom, cashflowTo, fetchCashflows]);
-
-  useEffect(() => {
-    if (!active) return;
-    const requestId = ++cashflowTotalsRequestRef.current;
+    const base = JSON.stringify([cashflowFrom, cashflowTo, cashflowPoolId, cashflowDirection, cashflowLedgerType, cashflowAttribute, cashflowCategory]);
+    const previous = lastFilterRef.current;
+    const keywordOnly = previous !== null && previous.base === base && previous.keyword !== cashflowKeyword;
+    lastFilterRef.current = { base, keyword: cashflowKeyword };
+    cashflowListRequestRef.current += 1;
+    setCashflowsReady(false);
+    setCashflowLoading(true);
+    setCashflowError(null);
     const timer = window.setTimeout(() => {
-      void cashflowsApi.totals({
-        occurred_from: cashflowFrom || undefined,
-        occurred_to: cashflowTo || undefined,
-        pool_id: cashflowPoolId,
-        direction: cashflowDirection || undefined,
-        ledger_type: cashflowLedgerType || undefined,
-        accounting_attribute: cashflowAttribute || undefined,
-        category: cashflowCategory.trim() || undefined,
-        keyword: cashflowKeyword.trim() || undefined,
-      }).then((result) => {
-        if (requestId !== cashflowTotalsRequestRef.current) return;
-        setCashflowTotals({ income: result.total_in, expense: result.total_out });
-      }).catch(() => {
-        if (requestId !== cashflowTotalsRequestRef.current) return;
-        setCashflowTotals({ income: "不可用", expense: "不可用" });
-      });
-    }, 180);
+      void fetchCashflows();
+    }, keywordOnly ? 180 : 0);
     return () => {
       window.clearTimeout(timer);
-      if (cashflowTotalsRequestRef.current === requestId) {
-        cashflowTotalsRequestRef.current += 1;
-      }
+      cashflowListRequestRef.current += 1;
     };
   }, [
     active,
@@ -137,6 +114,7 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     cashflowKeyword,
     cashflowPoolId,
     cashflowTo,
+    fetchCashflows,
   ]);
 
   const exportCashflows = async () => {

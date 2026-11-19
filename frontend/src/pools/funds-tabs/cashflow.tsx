@@ -32,6 +32,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
     cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, loading, cashflowsReady, cashflowLoading, cashflowError, error,
   } = ctrl;
   const cashflowUnavailable = !cashflowsReady || Boolean(error) || Boolean(cashflowError);
+  const filtersDisabled = Boolean(error) || Boolean(cashflowError) || (!cashflowsReady && !cashflowLoading);
   const { arrange: arrangeCashflowColumns } = useListViewColumns("CASHFLOW");
   // 类别筛选下拉：业务类别=系统固定枚举；工作室类别=支出科目词典（可配置）+ 固定收入科目。
   // value 用 category 原文，与后端精确匹配（Cashflow.category == category）对齐。
@@ -93,30 +94,31 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
     <Card className="glass" title="资金明细" extra={<PermissionButton permission="deposit.post" type="primary" disabled={cashflowUnavailable || loading || !flowDirectionOptions} onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>
       <div className="ui-filter-bar funds-cashflow-filters">
         <Input aria-label="流水搜索" allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注" onChange={(event) => setCashflowKeyword(event.target.value)} />
-        <Select aria-label="流水资金账户" allowClear disabled={cashflowUnavailable} value={cashflowPoolId} placeholder="全部资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
-        <Select aria-label="流水方向" allowClear disabled={cashflowUnavailable} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
-        <Select aria-label="流水账簿" allowClear disabled={cashflowUnavailable} value={cashflowLedgerType || undefined} placeholder="全部账簿" options={Object.entries(LEDGER_TYPE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(value) => setCashflowLedgerType(value ?? "")} />
-        <Select aria-label="流水核算属性" allowClear disabled={cashflowUnavailable} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
+        <Select aria-label="流水资金账户" allowClear disabled={filtersDisabled} value={cashflowPoolId} placeholder="全部资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
+        <Select aria-label="流水方向" allowClear disabled={filtersDisabled} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
+        <Select aria-label="流水账簿" allowClear disabled={filtersDisabled} value={cashflowLedgerType || undefined} placeholder="全部账簿" options={Object.entries(LEDGER_TYPE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(value) => setCashflowLedgerType(value ?? "")} />
+        <Select aria-label="流水核算属性" allowClear disabled={filtersDisabled} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
         <Select
           aria-label="流水中类别筛选"
           showSearch
           optionFilterProp="label"
           allowClear
-          disabled={cashflowUnavailable}
+          disabled={filtersDisabled}
           value={cashflowCategory || undefined}
           placeholder="全部类别"
           options={cashflowCategoryOptions}
           onChange={(value) => setCashflowCategory(value ?? "")}
         />
         <BusinessPeriodPicker label="流水日期区间" state={periodState} showAll />
-        <PermissionButton permission="finance.read" loading={cashflowLoading} onClick={() => void fetchCashflows()}>查询</PermissionButton>
         <PermissionButton permission="finance.read" size="small" disabled={cashflowUnavailable || cashflowLoading} loading={cashflowExporting} onClick={() => void exportCashflows()}>
           导出
         </PermissionButton>
       </div>
       <ErrorBanner error={cashflowError} onRetry={() => void fetchCashflows()} retrying={cashflowLoading} />
-      {cashflowUnavailable ? (
-        <Typography.Text type="warning">资金流水数据不可用，请点击“查询”或页面顶部的“重新加载”。</Typography.Text>
+      {cashflowLoading ? (
+        <Typography.Text type="secondary">正在加载资金流水…</Typography.Text>
+      ) : cashflowUnavailable ? (
+        <Typography.Text type="warning">资金流水数据不可用，请点击“重新加载”。</Typography.Text>
       ) : cashflowTotal > cashflows.length ? (
         <Typography.Text type="warning">
           共匹配 {cashflowTotal} 笔，已加载 {cashflows.length} 笔（单次上限 2000 条，请用日期区间缩小范围）。

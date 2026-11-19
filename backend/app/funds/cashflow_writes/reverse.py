@@ -46,6 +46,8 @@ def reverse_cashflow(
         type_message="冲销流水必须填写原因",
     )
     flow = _get_cashflow(session, cashflow_id, user)
+    if flow.source_type == CashflowSourceType.REVERSAL.value:
+        raise Validation("冲销流水不能再次冲销", details={"cashflow_id": cashflow_id})
     if flow.source_type == CashflowSourceType.ORDER_EVENT.value:
         event = session.scalar(select(OrderEvent).where(OrderEvent.event_no == flow.source_id))
         if event is None or event.event_type not in {"REBATE"}:

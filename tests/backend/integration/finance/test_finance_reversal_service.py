@@ -86,6 +86,13 @@ def test_reverse_rejects_already_reversed(seeded_db):
         )
 
 
+def test_reverse_rejects_reversal_flow(seeded_db):
+    flow = _make_flow(seeded_db, direction="OUT", amount="10")
+    reversal = reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="录错")
+    with pytest.raises(Validation, match="冲销流水不能再次冲销"):
+        reverse_cashflow(seeded_db, reversal.id, reversed_on=TODAY, actor="pytest", reason="再次冲销")
+
+
 def test_reverse_rejects_business_event_flow(seeded_db):
     """业务事件派生流水必须走业务事件冲销，不能用独立冲销入口。"""
     order = create_order(

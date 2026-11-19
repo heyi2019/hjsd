@@ -143,8 +143,10 @@ describe("BusinessPeriodSettingsPanel", () => {
     renderLight(<BusinessPeriodSettingsPanel />, { user: "admin" });
     const input = await screen.findByRole("spinbutton", { name: "每月起始日" });
     await waitFor(() => expect(input).toHaveValue("16"));
+    expect(screen.getByText("每月 16 日开始")).toBeInTheDocument();
     fireEvent.change(input, { target: { value: "10" } });
     fireEvent.blur(input);
+    expect(await screen.findByText("每月 10 日开始")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "保存当期设置" }));
     await waitFor(() => expect(optionSetsApi.update).toHaveBeenCalledWith("BUSINESS_PERIOD", { options: [{ value: "start_day", label: "10" }] }));
     expect(changed).toHaveBeenCalled();

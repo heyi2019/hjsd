@@ -1,0 +1,86 @@
+.business-period-settings {
+  max-width: 56rem;
+}
+
+.business-period-settings__intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.business-period-settings__icon {
+  display: grid;
+  flex: 0 0 42px;
+  height: 42px;
+  place-items: center;
+  color: var(--color-primary);
+  background: var(--brand-soft);
+  border-radius: 12px;
+  font-size: 20px;
+}
+
+.business-period-settings__heading {
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.business-period-settings p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.business-period-settings__form.ui-form-spaced {
+  margin-top: 24px;
+}
+
+.business-period-settings__content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.9fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.business-period-settings__field .ant-form-item {
+  margin-bottom: 0;
+}
+
+.business-period-settings__field .ant-input-number-affix-wrapper {
+  width: 140px;
+  max-width: 100%;
+}
+
+.business-period-settings__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--brand-surface-1);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.business-period-settings__preview strong {
+  color: var(--color-text-primary);
+  font-size: 16px;
+}
+
+.business-period-settings__preview p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.business-period-settings__actions {
+  margin-top: 24px;
+}
+
+@media (max-width: 640px) {
+  .business-period-settings__content {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}

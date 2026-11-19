@@ -25,7 +25,7 @@ export const installmentsApi = {
     api
       .get<InstallmentTotals>("/installments/totals", { params })
       .then((r) => r.data),
-  exportCsv: (params?: { status?: string; order_id?: number }) =>
+  exportCsv: (params?: InstallmentListParams) =>
     api
       .get<Blob>("/installments/export.csv", {
         params: { ...params, _t: Date.now() },

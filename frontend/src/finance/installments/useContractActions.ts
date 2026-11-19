@@ -3,7 +3,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { FormInstance } from "antd";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { installmentsApi } from "../../shared/api/installments.api";
+import { installmentsApi, type InstallmentListParams } from "../../shared/api/installments.api";
 import { ordersApi } from "../../shared/api/orders.api";
 import type { Installment, Schedule } from "../../shared/api/types/installments";
 import type { Order } from "../../shared/api/types/orders";
@@ -46,18 +46,19 @@ export function useContractActions(params: {
   setError: Dispatch<SetStateAction<{ message: string; code?: string } | null>>;
   setResaleOrders: Dispatch<SetStateAction<Order[]>>;
   setExporting: Dispatch<SetStateAction<boolean>>;
+  filters: InstallmentListParams;
 }) {
   const {
     payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
     setPayTarget, setDeliverTarget, setRecoverTarget, setResaleTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
     payForm, deliverForm, recoverForm, resaleForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
-    write, load, setError, setResaleOrders, setExporting,
+    write, load, setError, setResaleOrders, setExporting, filters,
   } = params;
 
   const exportCsv = async () => {
     setExporting(true);
     try {
-      downloadBlob(await installmentsApi.exportCsv(), `分期与回款-${today()}.csv`);
+      downloadBlob(await installmentsApi.exportCsv(filters), `分期与回款-${today()}.csv`);
     } catch (err) {
       appMessage.error(normalizeError(err).message);
     } finally {

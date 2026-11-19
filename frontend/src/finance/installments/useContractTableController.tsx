@@ -112,6 +112,7 @@ export function useContractTableController(params: { contractType: string; reloa
     setPayTarget, setDeliverTarget, setRecoverTarget, setResaleTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
     payForm, deliverForm, recoverForm, resaleForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
     write, load, setError, setResaleOrders, setExporting,
+    filters: { contract_type: contractType, status: status || undefined, trade_date_from: dateFrom || undefined, trade_date_to: dateTo || undefined },
   });
 
   useEffect(() => {

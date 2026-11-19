@@ -99,6 +99,9 @@ def preview_sale_installment_plan(
 def export_installments_csv(
     status: str | None = Query(default=None),
     order_id: int | None = Query(default=None),
+    contract_type: str | None = Query(default=None),
+    trade_date_from: date | None = Query(default=None),
+    trade_date_to: date | None = Query(default=None),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> Response:
@@ -108,9 +111,9 @@ def export_installments_csv(
     outputs = list_installments(
         status=status,
         order_id=order_id,
-        contract_type=None,
-        trade_date_from=None,
-        trade_date_to=None,
+        contract_type=contract_type,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
         db=db,
         _user=_user,
     )

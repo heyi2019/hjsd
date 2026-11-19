@@ -129,3 +129,24 @@ def test_export_rows_include_remaining_receivable(seeded_client, seeded_db, head
 
     stored = seeded_db.scalar(select(Installment).where(Installment.id == contract.id))
     assert stored is not None
+
+
+def test_installment_export_uses_same_status_type_and_date_filters_as_list(seeded_client, seeded_db, headers):
+    matching = _contract(seeded_db)
+    wrong_date = _contract(seeded_db)
+    wrong_type = _contract(seeded_db)
+    wrong_status = _contract(seeded_db)
+    for contract in (matching, wrong_date, wrong_status):
+        contract.contract_type = "STOCK_SALE"
+        contract.status = "OVERDUE"
+    wrong_type.status = "OVERDUE"
+    wrong_status.status = "ACTIVE"
+    seeded_db.get(Order, wrong_date.order_id).trade_date = date(2026, 9, 1)
+    seeded_db.flush()
+    filters = {"status": "OVERDUE", "contract_type": "STOCK_SALE", "trade_date_from": "2026-10-01", "trade_date_to": "2026-10-31"}
+    listing = seeded_client.get("/api/v1/installments", params=filters, headers=headers)
+    exported = seeded_client.get("/api/v1/installments/export.csv", params=filters, headers=headers)
+    assert listing.status_code == exported.status_code == 200
+    assert [item["id"] for item in listing.json()] == [matching.id]
+    assert matching.inst_no in exported.text
+    assert all(item.inst_no not in exported.text for item in (wrong_date, wrong_type, wrong_status))

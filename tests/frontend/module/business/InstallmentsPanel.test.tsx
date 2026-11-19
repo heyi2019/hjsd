@@ -13,6 +13,8 @@ import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { pageResponse } from "@fixtures/api-responses";
+import { setAntdDateRange } from "@fixtures/antdRange";
+vi.mock("@/shared/api/download", () => ({ downloadBlob: vi.fn() }));
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");
@@ -123,6 +125,17 @@ beforeEach(() => {
 });
 
 describe("InstallmentsPanel：分期合约", () => {
+  it("导出使用当前合约类型、状态和日期筛选", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(installmentsApi.exportCsv).mockResolvedValue(new Blob(["csv"]));
+    renderLight(<InstallmentsPanel initialStatus="OVERDUE" />, { user: "admin" });
+    await screen.findByText("HS0001-INS01");
+    await setAntdDateRange(document.body, user, "2026-10-01", "2026-10-31");
+    await waitFor(() => expect(installmentsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: "OVERDUE", contract_type: "STOCK_SALE", trade_date_from: "2026-10-01", trade_date_to: "2026-10-31" })));
+    await user.click(screen.getByRole("button", { name: "导出分期与回款数据" }));
+    await waitFor(() => expect(installmentsApi.exportCsv).toHaveBeenCalledWith({ status: "OVERDUE", contract_type: "STOCK_SALE", trade_date_from: "2026-10-01", trade_date_to: "2026-10-31" }));
+  });
+
   it("只展示分期出售，不展示代分期/提号分期/代挂分期", async () => {
     renderLight(<InstallmentsPanel />, { user: "admin" });
     expect(await screen.findByText("HS0001-INS01")).toBeInTheDocument();

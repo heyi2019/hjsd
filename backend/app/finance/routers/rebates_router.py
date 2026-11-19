@@ -27,7 +27,7 @@ from app.lists.export import build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.shared.order_access import get_order
 
-from .router_output import _actor, _rebate_out
+from ..router_output import _actor, _rebate_out
 
 router = APIRouter(tags=["返点"])
 read_access = require_permissions(PERM_FINANCE_READ, PERM_ORDER_CREATE, require_all=False)

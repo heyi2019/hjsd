@@ -33,7 +33,7 @@ from app.finance.cashflows import (
 )
 from app.lists.export import EXPORT_ROW_LIMIT, build_list_csv
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response
-from .router_output import _actor, _cashflow_out
+from ..router_output import _actor, _cashflow_out
 
 router = APIRouter(tags=["资金流水"])
 read_access = require_permissions(PERM_FINANCE_READ, PERM_ORDER_CREATE, require_all=False)

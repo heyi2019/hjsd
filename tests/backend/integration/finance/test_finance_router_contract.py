@@ -16,10 +16,10 @@ from app.core.security import CurrentUser
 from app.finance.deposits.writes import create_deposit
 from app.finance import rebates
 from app.finance import schemas
-from app.finance.cashflows_router import list_cashflows
-from app.finance.deposits_router import cancel_deposit, lose_deposit, return_deposit
-from app.finance.rebates_router import get_rebate
-from app.finance.reconciliation_router import (
+from app.finance.routers.cashflows_router import list_cashflows
+from app.finance.routers.deposits_router import cancel_deposit, lose_deposit, return_deposit
+from app.finance.routers.rebates_router import get_rebate
+from app.finance.routers.reconciliation_router import (
     create_reconciliation,
     list_reconciliations,
     repair_transfer,
@@ -218,7 +218,7 @@ def test_router_get_rebate_endpoint(seeded_db):
 from app.core.errors import Validation  # noqa: E402
 from app.domain.enums import CashflowLedgerType  # noqa: E402
 from app.finance import cashflows as cashflow_service  # noqa: E402
-from app.finance.cashflows_router import (  # noqa: E402
+from app.finance.routers.cashflows_router import (  # noqa: E402
     create_order_cashflow,
     delete_cashflow as delete_cashflow_endpoint,
     list_cashflow_totals,
@@ -331,11 +331,11 @@ def test_router_delete_cashflow_endpoint(seeded_db):
 from app.domain.trade import Deposit  # noqa: E402
 from app.finance.balances import pool_balances  # noqa: E402
 from app.finance.cashflow_queries import cashflow_totals, studio_summary  # noqa: E402
-from app.finance.deposits_router import (  # noqa: E402
+from app.finance.routers.deposits_router import (  # noqa: E402
     delete_deposit as delete_deposit_endpoint,
     update_deposit as update_deposit_endpoint,
 )
-from app.finance.rebates_router import (  # noqa: E402
+from app.finance.routers.rebates_router import (  # noqa: E402
     update_rebate as update_rebate_endpoint,
 )
 from app.finance.reconciliation import resolve_reconciliation  # noqa: E402
@@ -395,7 +395,7 @@ def test_router_update_rebate_endpoint(seeded_db):
 
 
 def test_resolve_reconciliation_with_form_extra(seeded_db):
-    from app.finance.reconciliation_router import create_reconciliation
+    from app.finance.routers.reconciliation_router import create_reconciliation
 
     item = create_reconciliation(
         payload=schemas.ReconciliationCreate(

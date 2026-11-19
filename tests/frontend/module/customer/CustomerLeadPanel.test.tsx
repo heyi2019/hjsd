@@ -52,6 +52,18 @@ beforeEach(() => {
 });
 
 describe("CustomerLeadPanel：客户需求池", () => {
+  it("需求列表翻页时加载后台下一页", async () => {
+    vi.mocked(leadsApi.summary).mockResolvedValueOnce({ total_count: 11, open_count: 11 }).mockResolvedValueOnce({ total_count: 11, open_count: 11 });
+    vi.mocked(leadsApi.page).mockImplementation(async (params) => pageResponse(
+      [{ ...leads[0], lead_no: params?.offset === 10 ? "LD-PAGE2" : "LD-1" }],
+      { total: 11, limit: params?.limit ?? 10, offset: params?.offset ?? 0 },
+    ));
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    await screen.findByText("LD-1");
+    await ui.click(screen.getByTitle("2"));
+    expect(await screen.findByText("LD-PAGE2")).toBeInTheDocument();
+    expect(leadsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 10 }));
+  });
   it("加载成功后渲染需求列表、客户名与统计", async () => {
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     expect(await screen.findByText("LD-1")).toBeInTheDocument();

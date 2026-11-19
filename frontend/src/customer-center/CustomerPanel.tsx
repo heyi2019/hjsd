@@ -158,6 +158,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
         page={page}
         pageSize={pageSize}
         total={total}
+        controlledPaging
         className="customer-table"
        
         emptyText={error || rows === null ? "客户数据不可用，请点击重新加载" : "暂无客户档案"}

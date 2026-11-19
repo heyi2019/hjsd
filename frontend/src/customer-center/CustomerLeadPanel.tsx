@@ -143,6 +143,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
         page={page}
         pageSize={pageSize}
         total={summary?.total_count ?? 0}
+        controlledPaging
         emptyText="暂无客户需求"
         pagination={error ? false : undefined}
         onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}

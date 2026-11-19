@@ -236,6 +236,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
         page={page}
         pageSize={pageSize}
         total={total}
+        controlledPaging
         emptyText={error ? "合作方数据不可用，请点击重新加载" : "暂无合作方"}
         onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
      />

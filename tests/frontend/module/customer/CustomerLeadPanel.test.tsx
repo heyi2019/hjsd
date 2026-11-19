@@ -161,7 +161,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
   });
 
   it("新增需求接口失败时展示错误", async () => {
-    vi.mocked(leadsApi.create).mockRejectedValue(new Error("create boom"));
+    vi.mocked(leadsApi.create).mockRejectedValueOnce(new Error("create boom"));
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     await ui.click(await screen.findByRole("button", { name: /新增需求/ }));
     const modal = screen.getByText("新增客户需求").closest(".ant-modal-content") as HTMLElement;
@@ -172,7 +172,28 @@ describe("CustomerLeadPanel：客户需求池", () => {
     await ui.type(screen.getByLabelText("预算"), "100");
     await ui.type(screen.getByLabelText("需求目标"), "找一个号");
     await ui.click(within(modal).getByRole("button", { name: /创建需求/ }));
-    expect(await screen.findByText(/create boom/)).toBeInTheDocument();
+    expect(await within(modal).findByText(/create boom/)).toBeVisible();
+    expect(within(modal).getByLabelText("需求目标")).toHaveValue("找一个号");
+    await ui.click(within(modal).getByRole("button", { name: /创建需求/ }));
+    await waitFor(() => expect(leadsApi.create).toHaveBeenCalledTimes(2));
+  });
+
+  it.each([
+    { action: "关闭", title: "关闭客户需求", field: "关闭原因", value: "取消", submit: "确认关闭", method: "close" as const },
+    { action: "转单", title: "需求转单", field: "订单编号", value: "99", submit: "确认转单", method: "convert" as const },
+  ])("$action 失败在弹窗显示原因并保留输入", async ({ action, title, field, value, submit, method }) => {
+    vi.mocked(leadsApi[method]).mockRejectedValueOnce(new Error("操作未完成"));
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    const row = (await screen.findByText("LD-1")).closest("tr")!;
+    await ui.click(within(row).getByRole("button", { name: action }));
+    const modal = screen.getByText(title).closest(".ant-modal-content") as HTMLElement;
+    await ui.type(within(modal).getByLabelText(field), value);
+    await ui.click(within(modal).getByRole("button", { name: submit }));
+    expect(await within(modal).findByText(/操作未完成/)).toBeVisible();
+    expect(within(modal).getByLabelText(field)).toHaveValue(value);
+    await ui.click(within(modal).getByRole("button", { name: "Close" }));
+    await ui.click(within(row).getByRole("button", { name: action }));
+    expect(within(screen.getByText(title).closest(".ant-modal-content") as HTMLElement).queryByText(/操作未完成/)).toBeNull();
   });
 
   it("点击行内关闭打开弹窗并提交调用 leadsApi.close", async () => {

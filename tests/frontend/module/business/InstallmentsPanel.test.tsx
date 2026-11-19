@@ -43,16 +43,16 @@ function withBackendActions<T extends {
     if (row.status === "SETTLED") acts.push("deliver");
     const hasRec = disps.includes("RECOVER");
     const hasResell = disps.includes("RESELL");
-    if (["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status) && !hasRec) acts.push("recover");
+    if (["OVERDUE", "DEFAULTED"].includes(row.status) && !hasRec) acts.push("recover");
     if (["PENDING", "ACTIVE", "OVERDUE"].includes(row.status)) acts.push("cancel", "settle_early");
-    if (["ACTIVE", "OVERDUE"].includes(row.status)) acts.push("default");
+    if (row.status === "OVERDUE") acts.push("default");
     if (["CLOSED", "OVERDUE", "DEFAULTED"].includes(row.status) && hasRec && !hasResell) acts.push("resale");
     return {
       ...row,
       available_actions: acts,
       schedules: (row.schedules ?? []).map((s) => ({
         ...s,
-        available_actions: ["PAID", "WAIVED"].includes(s.status) ? [] : ["waive", "extend"],
+        available_actions: ["CANCELLED", "CLOSED", "DELIVERED", "SETTLED"].includes(row.status) || ["PAID", "WAIVED"].includes(s.status) ? [] : ["waive", "extend"],
       })),
     } as unknown as Installment;
   });
@@ -530,6 +530,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     });
 
     it("登记违约提交调用 markDefault 并提示", async () => {
+      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "OVERDUE" }]));
       renderLight(<InstallmentsPanel />, { user: "admin" });
       await screen.findByText("HS0001-INS01");
       await ui.click(screen.getByRole("button", { name: /登记违约/ }));
@@ -541,6 +542,13 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
         { reason: "长期失联", form_extra: undefined, operator_user_ids: [1] },
       ));
       expect(successSpy).toHaveBeenCalledWith("已登记违约，合约进入 DEFAULTED");
+    });
+
+    it("未逾期合约不允许登记违约", async () => {
+      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "ACTIVE" }]));
+      renderLight(<InstallmentsPanel />, { user: "admin" });
+      await screen.findByText("HS0001-INS01");
+      expect(screen.getByRole("button", { name: /登记违约/ })).toBeDisabled();
     });
 
     it("期次减免（展开行）提交调用 waiveSchedule 并提示", async () => {
@@ -651,6 +659,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     });
 
     it("P2-274：上一弹窗操作失败后，打开其它业务弹窗不残留旧错误", async () => {
+      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "OVERDUE" }]));
       vi.mocked(installmentsApi.markDefault).mockRejectedValueOnce(new Error("default boom"));
       renderLight(<InstallmentsPanel />, { user: "admin" });
       await screen.findByText("HS0001-INS01");

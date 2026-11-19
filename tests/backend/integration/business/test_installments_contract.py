@@ -322,9 +322,9 @@ def test_list_dispositions_endpoint_returns_records(seeded_client, seeded_db, he
     assert any(item["action"] == "RECOVER" for item in response.json())
 
 
-# —— F5 available_actions 下发契约（等价搬运前端原 9 处判定，行为零变化）——
-def test_available_actions_match_legacy_frontend_rules():
-    """后端纯函数逐状态/处置穷举，与改造前前端 contractColumns.tsx 判定一致。"""
+# —— available_actions 下发契约 ——
+def test_available_actions_match_business_rules():
+    """后端纯函数按合约状态和处置记录生成可执行动作。"""
     from app.funds.installments import action_availability as av
 
     def legacy_inst(status, disps):
@@ -334,11 +334,11 @@ def test_available_actions_match_legacy_frontend_rules():
         if status == "SETTLED":
             acts.append("deliver")
         has_rec, has_resell = "RECOVER" in disps, "RESELL" in disps
-        if status in {"CLOSED", "OVERDUE", "DEFAULTED"} and not has_rec:
+        if status in {"OVERDUE", "DEFAULTED"} and not has_rec:
             acts.append("recover")
         if status in {"PENDING", "ACTIVE", "OVERDUE"}:
             acts += ["cancel", "settle_early"]
-        if status in {"ACTIVE", "OVERDUE"}:
+        if status == "OVERDUE":
             acts.append("default")
         if status in {"CLOSED", "OVERDUE", "DEFAULTED"} and has_rec and not has_resell:
             acts.append("resale")
@@ -371,6 +371,21 @@ def test_list_endpoint_emits_available_actions(seeded_client, seeded_db, headers
     assert row["schedules"], "合约应带期次明细"
     # PENDING 期次：可减免/展期
     assert set(row["schedules"][0]["available_actions"]) == {"waive", "extend"}
+
+
+def test_list_actions_match_default_and_recovery_status_guards(seeded_client, seeded_db, headers):
+    account = _account(seeded_db, "contract-action-status")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id, "100")
+    contract = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="200", down_payment="0", periods=1, per_period="200")
+    def actions(status):
+        contract.status = status
+        seeded_db.flush()
+        rows = seeded_client.get("/api/v1/installments", headers=headers).json()
+        return next(row["available_actions"] for row in rows if row["id"] == contract.id)
+    assert "default" not in actions("ACTIVE")
+    assert "recover" not in actions("CLOSED")
+    assert {"default", "recover"}.issubset(actions("OVERDUE"))
 
 
 def test_cancelled_installment_schedules_cannot_be_waived_or_extended(seeded_client, seeded_db, headers):

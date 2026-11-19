@@ -3,11 +3,7 @@
 把原先散在前端 `contractColumns.tsx` 的 9 处状态/处置判定等价搬运到后端单点下发：
 前端只回显本模块给出的动作 key，不再自行拼状态白名单数组。
 
-口径来源：刻意复刻**前端历史判定**（等价于改造前的线上行为），不是写路径守卫。
-二者存在已知差异（recover 放行 CLOSED、default 放行 ACTIVE、settle 仅三态、
-pay 拦 SETTLED/CLOSED），本次改造要求行为零变化，故不做修正。写路径守卫仍是
-服务端最终防线——本模块回答「按钮能不能点」，写路径守卫回答「请求能不能过」，
-职责不同。若要统一二者口径属另一次业务裁决，不在本模块进行。
+写路径仍负责最终校验；列表操作应符合对应的合约状态限制。
 """
 from __future__ import annotations
 
@@ -40,7 +36,6 @@ _PAY_BLOCKED = frozenset({
 })  # disabled = status ∈ 此集合
 _DELIVER_ALLOWED = frozenset({InstallmentStatus.SETTLED.value})  # disabled = status != SETTLED
 _RECOVER_ALLOWED = frozenset({
-    InstallmentStatus.CLOSED.value,
     InstallmentStatus.OVERDUE.value,
     InstallmentStatus.DEFAULTED.value,
 })  # 需 status ∈ 此集合，且无 RECOVER 处置
@@ -51,10 +46,9 @@ _CANCEL_ALLOWED = frozenset({
 })  # disabled = status ∉ 此集合
 _SETTLE_ALLOWED = frozenset(_CANCEL_ALLOWED)  # 与终止退款同口径
 _DEFAULT_ALLOWED = frozenset({
-    InstallmentStatus.ACTIVE.value,
     InstallmentStatus.OVERDUE.value,
 })  # disabled = status ∉ 此集合
-_RESALE_ALLOWED = frozenset(_RECOVER_ALLOWED)  # 需 status ∈ 此集合，且有 RECOVER、无 RESELL
+_RESALE_ALLOWED = frozenset({InstallmentStatus.CLOSED.value, *_RECOVER_ALLOWED})  # 需已有回收、无出售
 
 # 期次级：仅看期次状态，与改造前一致（不额外看 received_amount）
 _SCHEDULE_BLOCKED = frozenset({

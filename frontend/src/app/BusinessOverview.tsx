@@ -81,6 +81,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<ProfitNotificationDetail[]>([]);
+  const [unavailableCount, setUnavailableCount] = useState(0);
   const onReadRef = useRef(onRead);
 
   useEffect(() => {
@@ -93,6 +94,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
     setLoading(true);
     setError(null);
     setDetails([]);
+    setUnavailableCount(0);
     void notificationsApi.list({ limit: 200, unread_only: true, notification_type: "PROFIT_ALLOCATED" })
       .then(async ({ items }) => {
         const profitNotifications = items.filter((item) => item.notification_type === "PROFIT_ALLOCATED" && item.entity_type === "order");
@@ -104,10 +106,12 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
           return { notification, order, execution };
         }));
         if (cancelled) return;
-        setDetails(loaded.filter((item): item is ProfitNotificationDetail => item !== null));
+        const available = loaded.filter((item): item is ProfitNotificationDetail => item !== null);
+        setDetails(available);
+        setUnavailableCount(profitNotifications.length - available.length);
         setLoading(false);
-        if (profitNotifications.length) {
-          void Promise.all(profitNotifications.map((item) => notificationsApi.markRead(item.id))).then(() => onReadRef.current?.());
+        if (available.length) {
+          void Promise.all(available.map((item) => notificationsApi.markRead(item.notification.id))).then(() => onReadRef.current?.());
         }
       })
       .catch((reason) => {
@@ -124,6 +128,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
     <Modal open={open} title="订单分润通知详情" onCancel={onClose} footer={null} width={720} destroyOnHidden>
       {loading ? <div className="dashboard-notification-detail__loading"><Spin /></div> : null}
       {error ? <Typography.Text type="danger">{error}</Typography.Text> : null}
+      {!loading && !error && unavailableCount > 0 ? <Typography.Text type="warning">{unavailableCount} 条通知暂时无法查看，已保留未读。</Typography.Text> : null}
       {!loading && !error && details.length === 0 ? <Typography.Text type="secondary">暂无可查看的分润通知</Typography.Text> : null}
       <div className="dashboard-notification-detail-list">
         {details.map(({ notification, order, execution }) => {

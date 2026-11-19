@@ -65,7 +65,7 @@ it("工作台展示业务总览指标和业务提醒", async () => {
 
 it("点击获得分润通知展示订单金额、分润配置人和库存回收信息", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
-      notifications: { pending_profit_count: 0, allocated_profit_count: 1 },
+      notifications: { pending_profit_count: 0, allocated_profit_count: 2 },
     }));
     vi.mocked(notificationsApi.list).mockResolvedValue({
       items: [{
@@ -79,9 +79,13 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
         entity_id: "TH0001",
         created_by: "admin",
         read_at: null,
+      }, {
+        id: 2, notification_no: "NTF0002", recipient_user_id: 2,
+        notification_type: "PROFIT_ALLOCATED", title: "订单分润已配置", message: "订单不可见",
+        entity_type: "order", entity_id: "TH-MISSING", created_by: "admin", read_at: null,
       }],
-      total: 1,
-      unread_total: 1,
+      total: 2,
+      unread_total: 2,
     });
     vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{
       id: 42,
@@ -125,7 +129,7 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
     } as never);
     renderLight(<DashboardPage />, { user: "admin" });
 
-    fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 1 条" }));
+    fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 2 条" }));
     expect(await screen.findByText("订单分润通知详情")).toBeInTheDocument();
     expect(notificationsApi.list).toHaveBeenCalledWith({ limit: 200, unread_only: true, notification_type: "PROFIT_ALLOCATED" });
     expect(screen.getByText("TH0001")).toBeInTheDocument();
@@ -135,6 +139,9 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
     expect(screen.getByText("库存入库时间")).toBeInTheDocument();
     expect(screen.getByText("库存移出时间")).toBeInTheDocument();
     expect(screen.getByText("2026-11-17 12:30")).toBeInTheDocument();
+    expect(screen.getByText(/1 条通知暂时无法查看/)).toBeInTheDocument();
+    await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledWith(1));
+    expect(notificationsApi.markRead).not.toHaveBeenCalledWith(2);
   });
 
 it("点击分润待配置通知跳转到对应订单的分润配置入口", async () => {

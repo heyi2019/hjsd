@@ -94,6 +94,17 @@ def test_linked_unlisting_target_cannot_be_changed(seeded_client, seeded_db, hea
     assert response.status_code == 422, response.text
 
 
+def test_unlinked_unlisting_cannot_gain_listing_association(seeded_client, seeded_db, headers):
+    from app.business.listing_state import active_listings
+    account = create_account(seeded_db, game_account="edit-unlinked-unlisting", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
+    unlisting, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 2), actor="pytest", form_extra={"platform_unlist_scope": "PLATFORM", "consignment_platforms": ["平台甲"]})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": unlisting.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "UNLIST", "platform_unlist_scope": "PLATFORM", "consignment_platforms": ["平台甲"], "consignment_event_id": listing.id}}]})
+    assert response.status_code == 422, response.text
+    assert active_listings(seeded_db, order.id) == {(listing.id, "平台甲")}
+
+
 def test_linked_unlisting_time_remains_editable(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="edit-unlisting-time", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

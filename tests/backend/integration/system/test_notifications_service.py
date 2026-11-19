@@ -274,6 +274,11 @@ def test_set_allocations_repeat_is_idempotent(seeded_db):
     assert len(rows) == 3
     assert sum(row.read_at is None for row in rows) == 1
 
+    replacement_id = _uid(seeded_db, "seeduser3")
+    _set_person_allocations(seeded_db, order, [{"user_id": replacement_id, "role": "OWNER", "allocation_rate": "100"}])
+    assert all(row.read_at is not None for row in _notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED))
+    assert len([row for row in _notifs(seeded_db, replacement_id, triggers.PROFIT_ALLOCATED) if row.read_at is None]) == 1
+
 def test_company_allocation_is_not_notified(seeded_db):
     """公司归属（user_id 为空）不通知，只通知绑定的利润接收人。"""
     recipient_id = _uid(seeded_db, "seeduser2")

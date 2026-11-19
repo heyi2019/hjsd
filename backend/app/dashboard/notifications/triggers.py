@@ -107,16 +107,17 @@ def notify_profit_recipients(session: Session, order: Order, *, actor: str, new_
     ).all()
     created = 0
     recipient_ids = {row.user_id for row in rows if row.user_id is not None and (row.allocation_type or "").upper() != "COMPANY"}
+    if new_revision:
+        previous = session.scalars(select(Notification).where(
+            Notification.notification_type == PROFIT_ALLOCATED,
+            Notification.entity_type == "order", Notification.entity_id == order.order_no,
+            Notification.read_at.is_(None),
+        )).all()
+        for notification in previous:
+            notification.read_at = now_second()
+            notification.updated_by = actor
     for recipient_id in sorted(recipient_ids):
         if new_revision:
-            previous = session.scalars(select(Notification).where(
-                Notification.recipient_user_id == recipient_id, Notification.notification_type == PROFIT_ALLOCATED,
-                Notification.entity_type == "order", Notification.entity_id == order.order_no,
-                Notification.read_at.is_(None),
-            )).all()
-            for notification in previous:
-                notification.read_at = now_second()
-                notification.updated_by = actor
             create_notification(session, recipient_user_id=recipient_id, notification_type=PROFIT_ALLOCATED,
                 title="订单分润已配置", message=f"订单 {order.order_no} 分润配置已保存，请到收益明细查看。",
                 entity_type="order", entity_id=order.order_no, actor=actor)

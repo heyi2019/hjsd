@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,6 +52,26 @@ beforeEach(() => {
 });
 
 describe("CustomerLeadPanel：客户需求池", () => {
+  it("需求建档请求进行时快速重复提交只创建一次", async () => {
+    let finish!: (value: Lead) => void;
+    const pending = new Promise<Lead>((resolve) => { finish = resolve; });
+    vi.mocked(leadsApi.create).mockReturnValueOnce(pending);
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    await ui.click(await screen.findByRole("button", { name: "新增需求" }));
+    const modal = (await screen.findByText("新增客户需求")).closest(".ant-modal-content") as HTMLElement;
+    await ui.click(within(modal).getByLabelText("客户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(await screen.findByText("C-1 · 张三", { selector: ".ant-select-item-option-content" }));
+    await ui.click(within(modal).getByLabelText("需求类型").closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(await screen.findByText("找号", { selector: ".ant-select-item-option-content" }));
+    await ui.type(within(modal).getByLabelText("需求目标"), "需求测试");
+    const form = modal.querySelector("form") as HTMLFormElement;
+    fireEvent.submit(form);
+    await waitFor(() => expect(leadsApi.create).toHaveBeenCalledTimes(1));
+    fireEvent.submit(form);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(leadsApi.create).toHaveBeenCalledTimes(1);
+    await act(async () => { finish(leads[0]); await pending; });
+  });
   it("新增需求可选择后续页的有效客户", async () => {
     vi.mocked(customersApi.page)
       .mockResolvedValueOnce(pageResponse(customers, { total: 2, limit: 500, offset: 0 }))

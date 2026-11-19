@@ -16,6 +16,7 @@ import { configurableLabel } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect";
 import { loadActiveCustomers } from "./loadActiveCustomers";
+import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
 
@@ -33,8 +34,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const [closeTarget, setCloseTarget] = useState<Lead | null>(null);
   const [convertTarget, setConvertTarget] = useState<Lead | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
-  const [actionError, setActionError] = useState<{ message: string; code?: string } | null>(null);
-  const [acting, setActing] = useState(false);
+  const write = useAsyncAction();
   const [customersLoading, setCustomersLoading] = useState(false);
   const [createForm] = Form.useForm();
   const [closeForm] = Form.useForm();
@@ -71,7 +71,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const openCreate = async () => {
     try {
       setError(null);
-      setActionError(null);
+      write.clearError();
       setCustomersLoading(true);
       setCustomers(await loadActiveCustomers());
       setCreateOpen(true);
@@ -80,40 +80,29 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   };
 
   const createLead = async (values: Record<string, unknown>) => {
-    try {
-      setActionError(null);
-      setActing(true);
+    await write.run(async () => {
       await leadsApi.create({ customer_id: Number(values.customer_id), request_type: values.request_type as string, budget: values.budget as string, target: values.target as string, note: values.note as string, extra_values: values.form_extra, operator_user_ids: values.operator_user_ids as number[] | undefined });
       appMessage.success("客户需求已创建"); setCreateOpen(false); createForm.resetFields(); await load();
-    } catch (err) { setActionError(normalizeError(err)); }
-    finally { setActing(false); }
+    });
   };
   const closeLead = async (values: Record<string, unknown>) => {
     if (!closeTarget) return;
-    try {
-      setActionError(null);
-      setActing(true);
+    await write.run(async () => {
       const operatorUserIds = values.operator_user_ids as number[] | undefined;
       if (operatorUserIds?.length) await leadsApi.close(closeTarget.id, values.reason as string, values.form_extra as Record<string, unknown> | undefined, operatorUserIds);
       else await leadsApi.close(closeTarget.id, values.reason as string, values.form_extra as Record<string, unknown> | undefined);
       appMessage.success("需求已关闭"); setCloseTarget(null); closeForm.resetFields(); await load();
-    }
-    catch (err) { setActionError(normalizeError(err)); }
-    finally { setActing(false); }
+    });
   };
   const convertLead = async (values: Record<string, unknown>) => {
     if (!convertTarget) return;
-    try {
-      setActionError(null);
-      setActing(true);
+    await write.run(async () => {
       const operatorUserIds = values.operator_user_ids as number[] | undefined;
       const orderNo = String(values.order_id ?? "").trim();
       if (operatorUserIds?.length) await leadsApi.convert(convertTarget.id, orderNo, values.form_extra as Record<string, unknown> | undefined, operatorUserIds);
       else await leadsApi.convert(convertTarget.id, orderNo, values.form_extra as Record<string, unknown> | undefined);
       appMessage.success("需求已转单"); setConvertTarget(null); convertForm.resetFields(); await load();
-    }
-    catch (err) { setActionError(normalizeError(err)); }
-    finally { setActing(false); }
+    });
   };
 
   const { arrange: arrangeColumns } = useListViewColumns("LEAD");
@@ -125,7 +114,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
     { title: "目标", dataIndex: "target" },
     { title: "状态", dataIndex: "status", render: (v: string) => <StatusTag status={v} optionSet="LEAD_STATUS" /> },
     { title: "创建操作人", dataIndex: "created_by", render: (v: string | null | undefined, row) => v || row.operation_operators?.find((item) => item.operation_key === "CREATE")?.operator_user_ids.join("、") || "-" },
-    { title: "操作", key: "actions", render: (_v, row) => row.status === "OPEN" ? <Space size={2}><PermissionButton permission="customer.create" size="small" onClick={() => { setActionError(null); setConvertTarget(row); }}>转单</PermissionButton><PermissionButton permission="customer.update" size="small" onClick={() => { setActionError(null); setCloseTarget(row); }}>关闭</PermissionButton></Space> : null },
+    { title: "操作", key: "actions", render: (_v, row) => row.status === "OPEN" ? <Space size={2}><PermissionButton permission="customer.create" size="small" onClick={() => { write.clearError(); setConvertTarget(row); }}>转单</PermissionButton><PermissionButton permission="customer.update" size="small" onClick={() => { write.clearError(); setCloseTarget(row); }}>关闭</PermissionButton></Space> : null },
   ];
 
   return <section className="ui-stack">
@@ -154,10 +143,10 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       title="新增客户需求"
       fieldCount={5}
       open={createOpen}
-      onCancel={() => { setActionError(null); setCreateOpen(false); }}
+      onCancel={() => { write.clearError(); setCreateOpen(false); }}
       footer={null}
     >
-      <InlineError error={actionError} />
+      <InlineError error={write.error} />
       <FieldConfigContext.Provider value={config}>
         <BusinessRegistrationForm scope="LEAD" form={createForm} onFinish={createLead}>
           <CfgItem name="customer_id" label="客户" rules={[{ required: true }]}><Select options={customers.map((customer) => ({ value: customer.id, label: `${customer.customer_no} · ${customer.display_name}` }))} /></CfgItem>
@@ -167,12 +156,12 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
           <CfgItem name="note" label="备注"><Input.TextArea rows={2} /></CfgItem>
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="lead-create" />
-          <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting} disabled={customers.length === 0}>创建需求</PermissionButton>
+          <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={write.pending} disabled={customers.length === 0}>创建需求</PermissionButton>
         </BusinessRegistrationForm>
       </FieldConfigContext.Provider>
     </BusinessActionModal>
-    <BusinessActionModal size="compact" title="关闭客户需求" open={Boolean(closeTarget)} onCancel={() => { setActionError(null); setCloseTarget(null); }} footer={null}>
-      <InlineError error={actionError} />
+    <BusinessActionModal size="compact" title="关闭客户需求" open={Boolean(closeTarget)} onCancel={() => { write.clearError(); setCloseTarget(null); }} footer={null}>
+      <InlineError error={write.error} />
       <FieldConfigScope scope="LEADCLOSE" active={Boolean(closeTarget)}>
         <BusinessRegistrationForm
           layout="horizontal"
@@ -183,13 +172,13 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="lead-close" />
           <CompactActions>
-            <PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={acting}>确认关闭</PermissionButton>
+            <PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={write.pending}>确认关闭</PermissionButton>
           </CompactActions>
         </BusinessRegistrationForm>
       </FieldConfigScope>
     </BusinessActionModal>
-    <BusinessActionModal size="compact" title="需求转单" open={Boolean(convertTarget)} onCancel={() => { setActionError(null); setConvertTarget(null); }} footer={null}>
-      <InlineError error={actionError} />
+    <BusinessActionModal size="compact" title="需求转单" open={Boolean(convertTarget)} onCancel={() => { write.clearError(); setConvertTarget(null); }} footer={null}>
+      <InlineError error={write.error} />
       <FieldConfigScope scope="LEADCONVERT" active={Boolean(convertTarget)}>
         <BusinessRegistrationForm
           layout="horizontal"
@@ -200,7 +189,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="lead-convert" />
           <CompactActions>
-            <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={acting}>确认转单</PermissionButton>
+            <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={write.pending}>确认转单</PermissionButton>
           </CompactActions>
         </BusinessRegistrationForm>
       </FieldConfigScope>

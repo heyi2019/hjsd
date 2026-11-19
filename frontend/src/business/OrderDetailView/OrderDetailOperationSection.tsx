@@ -56,11 +56,12 @@ export function resolveOperationEventContent(
 
 /** 运营信息展示四类动作；上架/下架允许同一账号拥有多条平台记录。 */
 export function OrderDetailOperationSection({
-  meta, editing, account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onAddOperationRow, onRemoveOperationRow, onProfileChange, employees = [], operationEvents, operatorUsername = currentDevUser(),
+  meta, editing, account, orderType, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onAddOperationRow, onRemoveOperationRow, onProfileChange, employees = [], operationEvents, operatorUsername = currentDevUser(),
 }: {
   meta: OrderDetailMeta;
   editing?: boolean;
   account?: Account | null;
+  orderType?: string | null;
   eventDrafts?: Record<number, OrderEventDraft>;
   operationDrafts?: Partial<Record<string, OrderOperationDraft>>;
   onEventEdit?: (event: AccountExecutionEvent, changes: { occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) => void;
@@ -109,7 +110,7 @@ export function OrderDetailOperationSection({
         <PermissionButton permission="order.update" type="link" size="small" onClick={() => onAddOperationRow?.("CONSIGNMENT")}>+ 添加上架行</PermissionButton>
         <PermissionButton permission="order.update" type="link" size="small" onClick={() => onAddOperationRow?.("UNLIST")}>+ 添加下架行</PermissionButton>
       </Space>
-      <DataTable className="order-detail__data-table order-operation-table" columns={editableOperationColumns(account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onRemoveOperationRow, onProfileChange, employees, platformOptions, defaultOperatorIds)} rows={rows} page={1} pageSize={20} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
+      <DataTable className="order-detail__data-table order-operation-table" columns={editableOperationColumns(account, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onRemoveOperationRow, onProfileChange, employees, platformOptions, defaultOperatorIds, orderType === "DG")} rows={rows} page={1} pageSize={20} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
     </div>;
   }
   return <div className="order-detail__section order-detail__section--operation">
@@ -129,6 +130,7 @@ function editableOperationColumns(
   employees: EmployeeOption[],
   platformOptions: Array<{ value: string; label: string }>,
   defaultOperatorIds: number[],
+  allowSystemUnlist: boolean,
 ): ColumnsType<OrderOperationRow> {
   const platformOptionValues = (current: string[], includeSystem = false) => {
     const options = [...platformOptions];
@@ -157,7 +159,7 @@ function editableOperationColumns(
         }
         const currentPlatforms = platformValues(extra.consignment_platforms);
         const currentScope = extra.platform_unlist_scope === "SYSTEM" ? ["__SYSTEM__"] : currentPlatforms;
-        return <Select aria-label={`编辑下架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={currentScope[0]} options={platformOptionValues(currentScope.filter((value) => value !== "__SYSTEM__"), true)} placeholder="选择下架平台" onChange={(next) => { const nextExtra = { ...extra }; if (next === "__SYSTEM__") { nextExtra.platform_unlist_scope = "SYSTEM"; delete nextExtra.consignment_platforms; } else if (next) { nextExtra.platform_unlist_scope = "PLATFORM"; nextExtra.consignment_platforms = [next]; } else { delete nextExtra.platform_unlist_scope; delete nextExtra.consignment_platforms; } updateExtra(row, nextExtra); }} />;
+        return <Select aria-label={`编辑下架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={currentScope[0]} options={platformOptionValues(currentScope.filter((value) => value !== "__SYSTEM__"), allowSystemUnlist)} placeholder="选择下架平台" onChange={(next) => { const nextExtra = { ...extra }; if (next === "__SYSTEM__") { nextExtra.platform_unlist_scope = "SYSTEM"; delete nextExtra.consignment_platforms; } else if (next) { nextExtra.platform_unlist_scope = "PLATFORM"; nextExtra.consignment_platforms = [next]; } else { delete nextExtra.platform_unlist_scope; delete nextExtra.consignment_platforms; } updateExtra(row, nextExtra); }} />;
       },
     },
     {

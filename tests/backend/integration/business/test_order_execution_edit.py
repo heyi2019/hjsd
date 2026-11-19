@@ -2,6 +2,7 @@
 
 from datetime import date
 from decimal import Decimal
+import pytest
 
 from sqlalchemy import select
 
@@ -11,6 +12,24 @@ from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
 from app.business.create import create_order
 from app.business.events import post_event
+
+
+@pytest.mark.parametrize("order_type, expected", [("HS", 422), ("TH", 422), ("DG", 200)])
+def test_new_system_unlisting_only_for_consignment_order(seeded_client, seeded_db, headers, order_type, expected):
+    inventory_type = {"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}[order_type]
+    account = create_account(seeded_db, game_account=f"system-unlist-{order_type}", business_mode="SELF" if order_type == "HS" else "DISTRIBUTION", inventory_type=inventory_type, actor="pytest")
+    order = create_order(seeded_db, order_type=order_type, trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [], "new_events": [{"operation_type": "UNLIST", "occurred_at": "2026-10-02T11:00:00", "form_extra": {"platform_unlist_scope": "SYSTEM"}}]})
+    assert response.status_code == expected, response.text
+
+
+@pytest.mark.parametrize("order_type", ["HS", "TH"])
+def test_edit_system_unlisting_rejected_for_non_consignment_order(seeded_client, seeded_db, headers, order_type):
+    account = create_account(seeded_db, game_account=f"edit-system-unlist-{order_type}", business_mode="SELF" if order_type == "HS" else "DISTRIBUTION", inventory_type="RECOVERY" if order_type == "HS" else "PICKUP", actor="pytest")
+    order = create_order(seeded_db, order_type=order_type, trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    event, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"platform_unlist_scope": "PLATFORM", "consignment_platforms": ["平台甲"]})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "UNLIST", "platform_unlist_scope": "SYSTEM"}}]})
+    assert response.status_code == 422, response.text
 
 
 def test_order_edit_updates_event_flow_and_cost_without_changing_time(seeded_client, seeded_db, headers):

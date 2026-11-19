@@ -89,7 +89,9 @@ def test_recovery_offsale_unlists_and_reverses_buy(seeded_db):
         unlisted_at="2026-11-02T12:00", amount="100", pool_id=buy.pool_id, offset_event_id=buy.id)
     assert inventory_offsale(order.id, payload, seeded_db, DEV_USERS["admin"]) == {"ok": True}
     events = seeded_db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id)).all()
-    assert any((event.form_extra or {}).get("operation_type") == "UNLIST" for event in events)
+    unlisting = next(event for event in events if (event.form_extra or {}).get("operation_type") == "UNLIST")
+    assert unlisting.form_extra["platform_unlist_scope"] == "PLATFORM"
+    assert unlisting.form_extra["consignment_platforms"] == ["测试平台"]
     assert any(event.event_type == "CANCEL" and event.offset_event_id == buy.id for event in events)
     assert seeded_db.get(Account, order.account_id).status == "VOID"
 

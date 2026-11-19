@@ -5,7 +5,7 @@ import type { AccountExecutionDetail } from "@/shared/api/types/account-executio
 import type { Account } from "@/shared/api/types/accounts";
 import { OrderDetail } from "@/business/OrderDetailView/OrderDetail";
 import { OrderDetailImageGallery } from "@/business/OrderDetailView/OrderDetailImageGallery";
-import { resolveOperationEventContent } from "@/business/OrderDetailView/OrderDetailOperationSection";
+import { OrderDetailOperationSection, resolveOperationEventContent } from "@/business/OrderDetailView/OrderDetailOperationSection";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
 import { renderApp, renderLight } from "@fixtures/render";
@@ -40,6 +40,12 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it.each([["HS", false], ["TH", false], ["DG", true]] as const)("%s 订单按业务类型显示本系统下架选项", async (orderType, allowed) => {
+    renderLight(<OrderDetailOperationSection meta={{}} account={account} editing orderType={orderType} />);
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "编辑下架平台" }).closest(".ant-select-selector")!);
+    if (allowed) expect(await screen.findByText("本系统", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    else expect(screen.queryByText("本系统", { selector: ".ant-select-item-option-content" })).toBeNull();
+  });
   it("多条运营记录按各自事件展示平台和寄售价", () => {
     expect(resolveOperationEventContent("consignment", "盼之 / 寄售价 ¥88.00", {
       event_type: "OPERATE",

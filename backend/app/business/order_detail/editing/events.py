@@ -91,6 +91,8 @@ def validate_event_edits(
             raise NotFound("执行记录不存在")
         if Decimal(str(event.amount)) != item.expected_amount:
             raise Conflict("执行记录已被修改，请刷新后重试")
+        if order.order_type != "DG" and event.event_type == "OPERATE" and (event.form_extra or {}).get("operation_type") == "UNLIST" and item.form_extra is not None and item.form_extra.get("platform_unlist_scope") == "SYSTEM":
+            raise Validation("只有代挂订单可以选择本系统下架")
         if event.event_type == "OPERATE" and (event.form_extra or {}).get("operation_type") == "CONSIGNMENT" and item.form_extra is not None:
             old_platforms = (event.form_extra or {}).get("consignment_platforms") or []
             new_platforms = item.form_extra.get("consignment_platforms") or []

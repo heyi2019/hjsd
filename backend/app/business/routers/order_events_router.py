@@ -90,7 +90,7 @@ def inventory_offsale(
             orders_post_event(db, order.id, event_type="OPERATE", operation_type="UNLIST",
                 occurred_on=payload.occurred_on, actor=_actor(user), operator_user_ids=payload.operator_user_ids,
                 note="系统下架同步取消寄售平台上架", form_extra_scope="INVOID",
-                form_extra={**extra_base, "consignment_event_id": event.id, "consignment_platforms": [platform]}, user=user)
+                form_extra={**extra_base, "platform_unlist_scope": "SYSTEM" if order.order_type == "DG" else "PLATFORM", "consignment_event_id": event.id, "consignment_platforms": [platform]}, user=user)
     if order.order_type == "DG":
         orders_cancel_order(db, order.id, actor=_actor(user), reason=payload.reason,
             form_extra=extra_base, form_extra_scope="INVOID", user=user)

@@ -5,7 +5,6 @@ import { studioExpensesApi } from "@/shared/api/studioExpenses.api";
 import { transfersApi } from "@/shared/api/transfers.api";
 import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
 import { useCashflowResources } from "@/pools/useCashflowResources";
-import { useCashflowActions } from "@/pools/useCashflowActions";
 import { useDepositActions } from "@/pools/useDepositActions";
 import { useDepositResources } from "@/pools/useDepositResources";
 import { usePoolResources } from "@/pools/usePoolResources";
@@ -21,7 +20,6 @@ describe("资金中心 API 边界", () => {
     expect(studioExpensesApi).toBeDefined();
     expect(orderCashflowsApi).toBeDefined();
     expect(useCashflowResources).toBeDefined();
-    expect(useCashflowActions).toBeDefined();
     expect(useDepositActions).toBeDefined();
     expect(useDepositResources).toBeDefined();
     expect(usePoolResources).toBeDefined();

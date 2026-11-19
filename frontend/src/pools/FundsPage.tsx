@@ -8,7 +8,6 @@ import { useBusinessPeriod } from "../shared/state/businessPeriod";
 import { DepositSection, OverviewTab, CashflowTab, ReconciliationTab } from "./FundsPage.tabs";
 import {
   CancelModal,
-  CashflowModal,
   DepositModal,
   LossModal,
   ReconciliationModal,
@@ -43,7 +42,6 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
         ]}
       />
       <DepositModal ctrl={ctrl} />
-      <CashflowModal ctrl={ctrl} />
       <TransferModal ctrl={ctrl} />
       <ReconciliationModal ctrl={ctrl} />
       <ResolveModal ctrl={ctrl} />

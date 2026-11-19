@@ -202,7 +202,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
       setRegisterOpen(false);
       setEditTarget(null);
       registerForm.resetFields();
-      await load();
+      await Promise.all([load(), ctrl?.load()]);
     });
   };
 
@@ -210,7 +210,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
     await write.run(async () => {
       await cashflowsApi.remove(cashflowId);
       appMessage.success("工作室收支已删除");
-      await load();
+      await Promise.all([load(), ctrl?.load()]);
     });
   };
 

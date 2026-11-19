@@ -156,30 +156,6 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
     </FundsActionModal>
   );
 }
-export function CashflowModal({ ctrl }: { ctrl: FundsPageController }) {
-  const { cashflowOpen, setCashflowOpen, cashflowForm, submitCashflow, write, pools, employees, cashflowAttributeOptions, flowDirectionOptions } = ctrl;
-  return (
-    <FundsActionModal
-      title="新增独立资金流水" fieldCount={7}
-      open={cashflowOpen} onCancel={() => setCashflowOpen(false)}
-      scope="FUNDFLOW" form={cashflowForm} onFinish={submitCashflow}
-      initialValues={{ occurred_on: today(), direction: "IN", accounting_attribute: "SELF_REVENUE" }}
-      write={write} permission="deposit.post" submitLabel="提交"
-      employees={employees} showOperator
-    >
-      <CfgItem name="pool_id" label="资金账户" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
-      <CfgItem name="occurred_on" label="发生日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
-      <CfgItem name="direction" label="收支方向" rules={[{ required: true }]}><Select options={flowDirectionOptions ?? []} aria-label="收支方向" /></CfgItem>
-      <CfgItem name="accounting_attribute" label="核算属性" rules={[{ required: true }]}>
-        <Select options={cashflowAttributeOptions} />
-      </CfgItem>
-      <CfgItem name="category" label="类别" rules={[{ required: true }]}><Input /></CfgItem>
-      <CfgItem name="amount" label="金额" rules={requiredMoneyRules("金额")}><MoneyInput /></CfgItem>
-      <CfgItem name="note" label="摘要" rules={[{ required: true }]}><Input.TextArea rows={2} /></CfgItem>
-    </FundsActionModal>
-  );
-}
-
 export function TransferModal({ ctrl }: { ctrl: FundsPageController }) {
   const { transferOpen, setTransferOpen, transferForm, submitTransfer, write, pools, employees } = ctrl;
   return (

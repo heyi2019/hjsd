@@ -93,6 +93,41 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
 }
 
 describe("FundsPage：资金账户卡片", () => {
+  it.each(["新增", "编辑", "删除"])("工作室收支%s后刷新资金明细和账户余额", async (action) => {
+    let changed = false;
+    vi.mocked(optionSetsApi.get).mockImplementation(async (code) => ({ code, options: code === "STUDIO_EXPENSE_ITEM" ? [{ value: "房租", label: "房租" }] : code === "BUSINESS_PERIOD" ? [{ value: "start_day", label: "16" }] : [] }) as never);
+    const studioFlow = { id: 51, flow_no: "STUDIO-51", pool_id: 1, occurred_on: "2026-10-20", category: "房租", direction: "OUT", amount: "100.00", source_type: "MANUAL", source: "MANUAL", ledger_type: "STUDIO", accounting_attribute: "OPERATING_EXPENSE", is_reversed: false };
+    vi.mocked(studioExpensesApi.summary).mockImplementation(async () => studioExpenseSummary(changed ? [] : [studioFlow] as never));
+    vi.mocked(cashflowsApi.list).mockImplementation(async () => changed ? cashflowPage([{ ...studioFlow, flow_no: "UPDATED-FLOW" }]) : cashflowPage(cashflows));
+    vi.mocked(poolsApi.balances).mockImplementation(async () => poolBalancesResponse(
+      pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
+      { pool_count: 2, cash_balance: changed ? "1500.00" : "1600.00", available: "1400.00", deposit_held: "200.00" },
+    ));
+    vi.mocked(cashflowsApi.update).mockImplementation(async () => { changed = true; return studioFlow as never; });
+    vi.mocked(cashflowsApi.create).mockImplementation(async () => { changed = true; return studioFlow as never; });
+    vi.mocked(cashflowsApi.remove).mockImplementation(async () => { changed = true; return undefined as never; });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "工作室运营" }));
+    const row = (await screen.findByText("STUDIO-51")).closest("tr") as HTMLElement;
+    if (action === "新增") {
+      await ui.click(screen.getByRole("button", { name: "记一笔" }));
+      const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+      await pickSelect(modal, 0, /经营主池/);
+      await pickSelect(modal, 1, /房租/);
+      await ui.type(within(modal).getByLabelText("金额"), "100");
+      await ui.click(within(modal).getByRole("button", { name: "登记入账" }));
+    } else {
+      await ui.click(within(row).getByRole("button", { name: action }));
+      if (action === "编辑") await ui.click(await screen.findByRole("button", { name: "保存修改" }));
+      else await ui.click(await screen.findByRole("button", { name: "确认删除" }));
+    }
+    await waitFor(() => expect(changed).toBe(true));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    expect(await screen.findByText("UPDATED-FLOW")).toBeInTheDocument();
+    await ui.click(screen.getByRole("tab", { name: "总览" }));
+    expect(await screen.findByText("1,500.00")).toBeInTheDocument();
+  });
   it("资金明细与工作室运营共享周期，全部展示所有流水", async () => {
     vi.mocked(optionSetsApi.get).mockImplementation(async (code) => ({ code, options: code === "BUSINESS_PERIOD" ? [{ value: "start_day", label: "16" }] : [] }) as never);
     renderLight(<BusinessPeriodProvider><FundsPage /></BusinessPeriodProvider>, { user: "admin" });
@@ -188,7 +223,7 @@ describe("FundsPage：资金账户卡片", () => {
     expect(screen.queryByRole("columnheader", { name: "资金性质" })).not.toBeInTheDocument();
   });
 
-  it("FE-229：资金流水失败时统计不可用、筛选和新增入口禁用", async () => {
+  it("FE-229：资金流水失败时统计不可用且筛选禁用", async () => {
     vi.mocked(cashflowsApi.list).mockRejectedValueOnce(new Error("cashflows down"));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
@@ -196,7 +231,6 @@ describe("FundsPage：资金账户卡片", () => {
 
     expect(await screen.findByText("资金流水数据不可用，请点击“重新加载”。")).toBeInTheDocument();
     expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("不可用");
-    expect(screen.getByRole("button", { name: /新增流水/ })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "流水方向" })).toBeDisabled();
   });
 
@@ -319,6 +353,13 @@ describe("FundsPage：押金占用", () => {
 });
 
 describe("FundsPage：资金流水", () => {
+  it("资金明细不提供新增流水入口", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    await screen.findByText("ZC00001");
+    expect(screen.queryByRole("button", { name: "新增流水" })).toBeNull();
+  });
   it("资金流水日期筛选使用日期范围控件（与工作室经营一致）", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
@@ -329,26 +370,6 @@ describe("FundsPage：资金流水", () => {
     const rangePicker = rangeInputs[0]!.closest(".ant-picker");
     expect(rangePicker).toBeInTheDocument();
     expect(rangePicker!.querySelectorAll(".ant-picker-input")).toHaveLength(2);
-  });
-
-  it("资金流水录入不再提供资金账户账户选择", async () => {
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
-    await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
-
-    expect(screen.queryByText("资金账户账户")).not.toBeInTheDocument();
-  });
-
-  it("资金流水录入显示操作人选择", async () => {
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
-    await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
-
-    const modal = document.querySelector(".ant-modal-content") as HTMLElement;
-    expect(within(modal).getByLabelText("操作人")).toBeInTheDocument();
-    expect(employeesApi.list).toHaveBeenCalled();
   });
 
   it("展示订单号、收支明细及总收入/总支出", async () => {

@@ -3,7 +3,7 @@ import { Card, Input, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { DataTable, ErrorBanner, MoneyText, PermissionButton, Select, StatRow } from "../../shared/ui";
 import { useListViewColumns } from "../../shared/lib/listColumns";
-import { formatDateTimeMinute, today } from "../../shared/lib/format";
+import { formatDateTimeMinute } from "../../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import {
   ACCOUNTING_ATTRIBUTE_LABEL,
@@ -29,7 +29,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
     cashflowLedgerType, setCashflowLedgerType,
     cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, flowDirectionOptions, flowAttributeOptions,
     fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, totalFlowIncome, totalFlowExpense,
-    cashflowForm, setCashflowOpen, loading, cashflowsReady, cashflowLoading, cashflowError, error,
+    loading, cashflowsReady, cashflowLoading, cashflowError, error,
   } = ctrl;
   const cashflowUnavailable = !cashflowsReady || Boolean(error) || Boolean(cashflowError);
   const filtersDisabled = Boolean(error) || Boolean(cashflowError) || (!cashflowsReady && !cashflowLoading);
@@ -74,7 +74,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
 
   ];
   return (
-    <Card className="glass" title="资金明细" extra={<PermissionButton permission="deposit.post" type="primary" disabled={cashflowUnavailable || loading || !flowDirectionOptions} onClick={() => { cashflowForm.setFieldsValue({ occurred_on: today() }); setCashflowOpen(true); }}>新增流水</PermissionButton>}>
+    <Card className="glass" title="资金明细">
       <div className="ui-filter-bar funds-cashflow-filters">
         <Input aria-label="流水搜索" allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注" onChange={(event) => setCashflowKeyword(event.target.value)} />
         <Select aria-label="流水资金账户" allowClear disabled={filtersDisabled} value={cashflowPoolId} placeholder="全部资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />

@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import type { Reconciliation } from "../shared/api/types/finance";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
-import { useCashflowActions } from "./useCashflowActions";
 import { useDepositActions } from "./useDepositActions";
 import { useReconciliationActions } from "./useReconciliationActions";
 import { useTransferActions } from "./useTransferActions";
@@ -16,7 +15,6 @@ interface FundsFormActionsDeps {
 }
 
 export function useFundsFormActions({ load, reconciliations, write }: FundsFormActionsDeps) {
-  const cashflow = useCashflowActions({ load, write });
   const deposit = useDepositActions({ load, write });
   const reconciliation = useReconciliationActions({ load, reconciliations, write });
   const transfer = useTransferActions({ load, write });
@@ -28,7 +26,6 @@ export function useFundsFormActions({ load, reconciliations, write }: FundsFormA
     write.clearError();
   }, [
     deposit.depositOpen,
-    cashflow.cashflowOpen,
     transfer.transferOpen,
     reconciliation.reconciliationOpen,
     reconciliation.resolveTarget,
@@ -39,7 +36,6 @@ export function useFundsFormActions({ load, reconciliations, write }: FundsFormA
   ]);
 
   return {
-    ...cashflow,
     ...deposit,
     ...reconciliation,
     ...transfer,

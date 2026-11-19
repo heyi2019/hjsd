@@ -94,24 +94,6 @@ function modalContent(): HTMLElement {
 }
 
 describe("FundsPage：资金写路径深覆盖", () => {
-  it("新增流水下发方向/核算属性，不再传 nature", async () => {
-    resolveMockOnce(vi.mocked(cashflowsApi.create), { id: 100 });
-    renderLight(<FundsPage />, { user: "admin" });
-    await screen.findByRole("cell", { name: /经营主池/ });
-    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
-    await ui.click(await screen.findByRole("button", { name: /新增流水/ }));
-    const modal = modalContent();
-    await pickSelect(modal, 0, /经营主池/);
-    await ui.type(modal.querySelector("#occurred_on") ?? modal, "2026-10-17");
-    await ui.type(modal.querySelector("#category") ?? modal, "SELL");
-    await ui.type(modal.querySelector("#amount") ?? modal, "300.00");
-    await ui.type(modal.querySelector("#note") ?? modal, "测试收入");
-    await ui.click(screen.getByRole("button", { name: /提交/ }));
-    await waitFor(() => expect(vi.mocked(cashflowsApi.create)).toHaveBeenCalled());
-    const payload = vi.mocked(cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>;
-    expect(payload).not.toHaveProperty("nature");
-  });
-
   it("已入账且无关联流水 → 冲销调用 cashflowsApi.reverse", async () => {
     const approved = [{ id: 7, flow_no: "CF-A-07", pool_id: 1, occurred_on: "2026-10-17", category: "BUY", direction: "OUT", amount: "300.00", source_type: "MANUAL", source_id: null, source: "MANUAL", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" }];
     resolveMock(vi.mocked(cashflowsApi.list), cashflowPage(approved, { total_in: "0.00", total_out: "300.00" }));

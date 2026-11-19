@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.core.report_csv import report_csv
 from app.settings.lists import service as list_columns_service
 from app.settings.lists.export_labels import (
+    CASHFLOW_VALUE_LABELS,
     COLUMN_VALUE_LABELS,
     DETAIL_KEY_LABELS,
     DETAIL_PRUNED_KEYS,
@@ -152,12 +153,14 @@ def build_list_csv(
     report: dict[str, Any] = {"items": items}
     if total is not None:
         report["total"] = total
+    value_labels = merge_static_value_labels(list_columns_service.get_value_labels(db, scope_code))
+    if scope_code == "CASHFLOW":
+        for key, labels in CASHFLOW_VALUE_LABELS.items():
+            value_labels[key] = {**labels, **value_labels.get(key, {})}
     csv_text = report_csv(
         report,
         columns=columns,
-        value_labels=merge_static_value_labels(
-            list_columns_service.get_value_labels(db, scope_code)
-        ),
+        value_labels=value_labels,
         # 主列表空数据也要完整表头（报表保持旧行为：只导出现过的键）
         force_registered_keys=True,
         # 机器行标记翻中文（明细/合计），与业务人员看到的界面同语言

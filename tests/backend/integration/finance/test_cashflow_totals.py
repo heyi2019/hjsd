@@ -157,6 +157,34 @@ def test_cashflow_export_includes_fund_account_name(seeded_client, seeded_db, he
     assert rows[1][rows[0].index("资金账户")] == pool.name
 
 
+def test_cashflow_export_displays_chinese_labels_like_list(seeded_client, headers):
+    payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "ledger_type": "STUDIO",
+               "direction": "OUT", "accounting_attribute": "OPERATING_EXPENSE",
+               "category": "房租", "amount": "100"}
+    created = seeded_client.post("/api/v1/cashflows", json=payload, headers=headers)
+    assert created.status_code == 201, created.text
+    response = seeded_client.get("/api/v1/cashflows/export.csv", headers=headers,
+                                 params={"keyword": created.json()["flow_no"]})
+    assert response.status_code == 200, response.text
+    rows = list(csv.DictReader(io.StringIO(response.text.lstrip("\ufeff"))))
+    assert len(rows) == 1
+    assert rows[0]["账簿"] == "工作室运营"
+    assert rows[0]["收支"] == "支出"
+    assert rows[0]["核算属性"] == "工作室运营支出"
+    assert rows[0]["来源"] == "手工登记"
+    assert rows[0]["类别"] == "房租"
+    business = seeded_client.post("/api/v1/cashflows", headers=headers, json={
+        **payload, "ledger_type": "BUSINESS", "accounting_attribute": "SELF_DIRECT_COST", "category": "BUY",
+    })
+    assert business.status_code == 201, business.text
+    response = seeded_client.get("/api/v1/cashflows/export.csv", headers=headers,
+                                 params={"keyword": business.json()["flow_no"]})
+    rows = list(csv.DictReader(io.StringIO(response.text.lstrip("\ufeff"))))
+    assert rows[0]["账簿"] == "业务资金"
+    assert rows[0]["类别"] == "买入"
+    assert rows[0]["核算属性"] == "回收成本"
+
+
 def test_export_has_no_row_cap_and_respects_date_range(seeded_client, headers, monkeypatch):
     from app.funds.routers import cashflows_router
     from app.settings.lists import export

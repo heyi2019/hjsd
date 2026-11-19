@@ -169,7 +169,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("accounting_attribute", "核算属性"),
             ListColumn("direction", "收支"),
             ListColumn("amount", "金额"),
-            ListColumn("source", "来源"),
+            ListColumn("source", "来源", value_set="FUND_FLOW_SOURCE"),
             ListColumn("operator", "操作人"),
             ListColumn("note", "备注"),
         ),

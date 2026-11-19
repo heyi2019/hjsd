@@ -302,7 +302,27 @@ NESTED_VALUE_LABELS: dict[str, dict[str, str]] = {
     },
 }
 
+CASHFLOW_VALUE_LABELS: dict[str, dict[str, str]] = {
+    "ledger_type": {"BUSINESS": "业务资金", "STUDIO": "工作室运营"},
+    "direction": NESTED_VALUE_LABELS["direction"],
+    "category": NESTED_VALUE_LABELS["category"],
+    "source": {
+        "MANUAL": "手工登记", "ORDER": "订单", "ORDER_EVENT": "订单事件",
+        "INSTALLMENT": "分期收款", "REBATE": "返点", "DEPOSIT": "押金",
+        "TRANSFER": "资金划转", "REVERSAL": "冲销",
+    },
+    "accounting_attribute": {
+        "SELF_DIRECT_COST": "回收成本", "SELF_REVENUE": "回收收入",
+        "TH_DIRECT_COST": "提号成本", "TH_REVENUE": "提号收入", "DG_REVENUE": "代挂收入",
+        "SERVICE_REVENUE": "增值服务费收入", "REBATE_INCOME": "返点收入",
+        "OTHER_INCOME": "其他收入", "OTHER_EXPENSE": "其他支出", "OPERATING_EXPENSE": "工作室运营支出",
+        "DEPOSIT": "押金/保证金", "EXTERNAL_FUNDING": "外部资金", "INTERNAL_TRANSFER": "内部调拨",
+        "REVERSAL": "冲销", "REFUND": "退款",
+    },
+}
+
 __all__ = [
+    "CASHFLOW_VALUE_LABELS",
     "COLUMN_VALUE_LABELS",
     "DETAIL_KEY_LABELS",
     "DETAIL_PRUNED_KEYS",

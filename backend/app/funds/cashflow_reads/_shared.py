@@ -126,6 +126,7 @@ def _flow_row(flow: Cashflow, order_no: str | None) -> dict[str, Any]:
         "order_no": order_no,
         "source": source,
         "note": flow.note,
+        "form_extra": flow.form_extra,
         "operator": flow.created_by,
         "operator_user_ids": flow.operator_user_ids,
     }

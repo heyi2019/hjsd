@@ -192,7 +192,9 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
         amount: values.amount as string,
         note: (values.note as string) || null,
         operator_user_ids: values.operator_user_ids as number[] | undefined,
-        form_extra: (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
+        form_extra: editing
+          ? { ...(editing.form_extra ?? {}), ...((values.form_extra as Record<string, unknown> | undefined) ?? {}) }
+          : (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
       };
       if (editing) {
         await cashflowsApi.update(editing.id, payload);

@@ -139,6 +139,27 @@ def test_studio_create_and_edit_use_studio_custom_field_rules(seeded_client, see
     assert saved.json()["form_extra"] == {"studio_note": "凭据3"}
 
 
+def test_studio_custom_fields_round_trip_through_list_and_edit(seeded_client, seeded_db, headers):
+    create_order_form_field(seeded_db, order_type_code="STUDIOEXP", field_key="receipt",
+                            label="凭据", required=False, actor="pytest")
+    seeded_db.commit()
+    payload = {"pool_id": _pool(seeded_db).id, "occurred_on": TODAY.isoformat(),
+               "ledger_type": "STUDIO", "direction": "OUT", "accounting_attribute": "OPERATING_EXPENSE",
+               "category": "房租", "amount": "120", "form_extra": {"receipt": "单据A"}}
+    created = seeded_client.post("/api/v1/cashflows", headers=headers, json=payload)
+    assert created.status_code == 201, created.text
+    item = _summary(seeded_client, headers)["items"][0]
+    assert item["form_extra"] == {"receipt": "单据A"}
+    listing = seeded_client.get("/api/v1/cashflows", headers=headers, params={"keyword": item["flow_no"]})
+    assert listing.status_code == 200, listing.text
+    assert listing.json()["items"][0]["form_extra"] == {"receipt": "单据A"}
+    saved = seeded_client.put(f"/api/v1/cashflows/{item['id']}", headers=headers,
+                              json={**payload, "amount": "150", "form_extra": item["form_extra"]})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["form_extra"] == {"receipt": "单据A"}
+    assert _summary(seeded_client, headers)["items"][0]["form_extra"] == {"receipt": "单据A"}
+
+
 def test_edit_studio_cashflow_saves_operator_and_rejects_invalid_operator(seeded_client, seeded_db, headers):
     flow = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="120")
     payload = {

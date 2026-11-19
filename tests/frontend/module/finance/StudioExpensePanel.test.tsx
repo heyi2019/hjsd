@@ -228,6 +228,19 @@ describe("StudioExpensePanel：工作室支出", () => {
     })));
   });
 
+  it("编辑时保留未显示的历史自定义字段", async () => {
+    const existing = { ...expenseFlows[0], form_extra: { receipt: "历史凭据" } };
+    vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary([existing] as never));
+    resolveMockOnce(vi.mocked(cashflowsApi.update), existing);
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    const row = (await screen.findByText("CF-001")).closest("tr") as HTMLElement;
+    await ui.click(within(row).getByRole("button", { name: "编辑" }));
+    await ui.click(await screen.findByRole("button", { name: "保存修改" }));
+    await waitFor(() => expect(cashflowsApi.update).toHaveBeenCalledWith(51, expect.objectContaining({
+      form_extra: { receipt: "历史凭据" },
+    })));
+  });
+
   it("工作室收支登记带默认当前操作人", async () => {
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     await screen.findByText("房租");

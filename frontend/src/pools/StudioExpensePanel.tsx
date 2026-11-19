@@ -263,22 +263,26 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       title: "操作",
       width: 150,
       render: (_v, row) => (
-        <Space size={2}>
-          <PermissionButton permission="deposit.post" size="small" onClick={() => openEdit(row)}>
-            编辑
-          </PermissionButton>
-          <ConfirmButton
-            permission="deposit.post"
-            size="small"
-            danger
-            title="删除工作室收支"
-            description="删除后会立即移除这笔工作室收支及其经营统计，且不可恢复。"
-            okText="确认删除"
-            onConfirm={() => deleteStudioCashflow(row.id)}
-          >
-            删除
-          </ConfirmButton>
-        </Space>
+        // 冲销流水（REVERSAL）用于抵消原流水、不可编辑或删除；后端对这类流水直接拒绝写操作，
+        // 前端不渲染按钮，避免出现「点了就报错」的死操作。
+        row.source_type === "REVERSAL" ? null : (
+          <Space size={2}>
+            <PermissionButton permission="deposit.post" size="small" onClick={() => openEdit(row)}>
+              编辑
+            </PermissionButton>
+            <ConfirmButton
+              permission="deposit.post"
+              size="small"
+              danger
+              title="删除工作室收支"
+              description="删除后会立即移除这笔工作室收支及其经营统计，且不可恢复。"
+              okText="确认删除"
+              onConfirm={() => deleteStudioCashflow(row.id)}
+            >
+              删除
+            </ConfirmButton>
+          </Space>
+        )
       ),
     },
   ];

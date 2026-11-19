@@ -71,6 +71,10 @@ def reverse_cashflow(
         flow_no=allocate_flow_no(session, reverse_direction),
         pool_id=flow.pool_id,
         occurred_on=reversed_on,
+        # 继承原流水账簿：工作室手工收支（STUDIO）的冲销必须留在工作室账簿，
+        # 否则 studio-summary 按 ledger_type=STUDIO 过滤时会漏掉冲销、净额虚高。
+        # 业务账簿流水继承 BUSINESS，与原行为一致，无副作用。
+        ledger_type=flow.ledger_type,
         accounting_attribute=AccountingAttribute.REVERSAL.value,
         category="REVERSAL",
         direction=reverse_direction,

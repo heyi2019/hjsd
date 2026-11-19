@@ -4,10 +4,12 @@ from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
 from typing import Any
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 from app.core.security import CurrentUser
-from app.domain.enums import CashflowLedgerType, CashflowSourceType, Direction
+from app.domain.enums import (
+    AccountingAttribute, CashflowLedgerType, CashflowSourceType, Direction,
+)
 from app.domain.trade import Cashflow, Order
 from app.finance.attributes import (
     MANUAL_EXCLUDED_CATEGORIES, STUDIO_EXPENSE_ATTRIBUTE, STUDIO_INCOME_ATTRIBUTE,
@@ -15,13 +17,15 @@ from app.finance.attributes import (
 from ._shared import _apply_cashflow_filters, _attach_extra_values, _direction_sums, _flow_row
 
 def _studio_scope() -> Any:
-    """工作室运营账簿的顶层条件。"""
-    return and_(
-        Cashflow.ledger_type == CashflowLedgerType.STUDIO.value,
-        # 订单普通资金流水（挂 order_id 但无事件/押金/划转）属订单口径，不计入工作室收支。
-        Cashflow.order_id.is_(None),
+    """工作室运营账簿的顶层条件。
+
+    纳入两类流水（净额均为「工作室运营收支」）：
+    - 手工登记：direction 与核算属性必须配对（OUT+运营支出 / IN+回收收入）；
+    - 工作室流水的冲销：核算属性为 REVERSAL、账簿随原流水继承为 STUDIO，
+      direction 与原流水相反。汇总时按反向方向做带符号汇总，使冲销抵消原流水。
+    """
+    manual = and_(
         Cashflow.source_type == CashflowSourceType.MANUAL.value,
-        or_(Cashflow.category.is_(None), Cashflow.category.notin_(MANUAL_EXCLUDED_CATEGORIES)),
         or_(
             and_(
                 Cashflow.direction == Direction.OUT.value,
@@ -32,6 +36,19 @@ def _studio_scope() -> Any:
                 Cashflow.accounting_attribute == STUDIO_INCOME_ATTRIBUTE,
             ),
         ),
+    )
+    # 冲销流水：REVERSAL 属性 + REVERSAL 来源；账簿随原流水继承为 STUDIO，
+    # 由调用方 reverse_cashflow 保证。业务账簿的冲销不会进入本 scope。
+    reversal = and_(
+        Cashflow.source_type == CashflowSourceType.REVERSAL.value,
+        Cashflow.accounting_attribute == AccountingAttribute.REVERSAL.value,
+    )
+    return and_(
+        Cashflow.ledger_type == CashflowLedgerType.STUDIO.value,
+        # 订单普通资金流水（挂 order_id 但无事件/押金/划转）属订单口径，不计入工作室收支。
+        Cashflow.order_id.is_(None),
+        or_(Cashflow.category.is_(None), Cashflow.category.notin_(MANUAL_EXCLUDED_CATEGORIES)),
+        or_(manual, reversal),
     )
 
 
@@ -87,13 +104,31 @@ def studio_summary(
     ).all():
         rows.append(_flow_row(flow, order_no))
 
+    # 冲销流水（REVERSAL）的 direction 与原流水相反。若按 direction 直接分组，
+    # 「支出冲销」会被算成收入、「收入冲销」被算成支出，净额虽归零但收入/支出两栏
+    # 各自虚增。按方案 A：把冲销流水方向取反、金额取负，归到原流水方向做反向扣减，
+    # 使冲销真正抵消原流水（净额、收入、支出三栏同时正确）。
+    effective_direction = case(
+        (
+            Cashflow.source_type == CashflowSourceType.REVERSAL.value,
+            case(
+                (Cashflow.direction == Direction.OUT.value, Direction.IN.value),
+                else_=Direction.OUT.value,
+            ),
+        ),
+        else_=Cashflow.direction,
+    )
+    effective_amount = case(
+        (Cashflow.source_type == CashflowSourceType.REVERSAL.value, -Cashflow.amount),
+        else_=Cashflow.amount,
+    )
     # 当前流水登记即生效，工作室汇总直接按统一口径聚合。
     totals_stmt = _apply_cashflow_filters(
-        select(Cashflow.direction, func.sum(Cashflow.amount)).outerjoin(
+        select(effective_direction, func.sum(effective_amount)).outerjoin(
             Order, Order.id == Cashflow.order_id
         ),
         **common,
-    ).where(_studio_scope()).group_by(Cashflow.direction)
+    ).where(_studio_scope()).group_by(effective_direction)
     sums = _direction_sums(session, totals_stmt)
     income = sums.get(Direction.IN.value, Decimal("0.00"))
     expense = sums.get(Direction.OUT.value, Decimal("0.00"))

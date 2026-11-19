@@ -18,7 +18,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.foundation import Pool
-from app.finance.cashflows import create_cashflow
+from app.finance.cashflows import create_cashflow, reverse_cashflow
 
 TODAY = date(2026, 10, 4)
 
@@ -88,6 +88,53 @@ def test_new_flow_appears_in_items_and_summary(seeded_client, seeded_db, headers
     assert [item["flow_no"] for item in payload["items"]] == [flow.flow_no]
     assert Decimal(payload["expense"]) == Decimal("120.00")
     assert Decimal(payload["net"]) == Decimal("-120.00")
+
+
+def test_reversal_offsets_expense_and_income(seeded_client, seeded_db, headers):
+    """工作室手工收支冲销后，冲销流水应留在工作室账簿并反向抵消，净额归零。"""
+    expense = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="100")
+    income = _flow(seeded_db, direction="IN", attribute="SELF_REVENUE", amount="250")
+
+    before = _summary(seeded_client, headers)
+    assert Decimal(before["expense"]) == Decimal("100.00")
+    assert Decimal(before["income"]) == Decimal("250.00")
+
+    rev_expense = reverse_cashflow(
+        seeded_db, expense.id, reversed_on=TODAY, actor="pytest", reason="支出录错冲销"
+    )
+    rev_income = reverse_cashflow(
+        seeded_db, income.id, reversed_on=TODAY, actor="pytest", reason="收入录错冲销"
+    )
+    # 冲销流水继承原流水账簿（STUDIO），而不是落到默认 BUSINESS。
+    assert rev_expense.ledger_type == "STUDIO"
+    assert rev_income.ledger_type == "STUDIO"
+
+    after = _summary(seeded_client, headers)
+    assert Decimal(after["expense"]) == Decimal("0.00")
+    assert Decimal(after["income"]) == Decimal("0.00")
+    assert Decimal(after["net"]) == Decimal("0.00")
+    # 明细与汇总同源：两条原流水 + 两条冲销都计入笔数（毛额呈现）。
+    numbers = {item["flow_no"] for item in after["items"]}
+    assert {expense.flow_no, income.flow_no, rev_expense.flow_no, rev_income.flow_no} <= numbers
+    assert after["count"] == 4
+
+
+def test_business_reversal_not_in_studio_scope(seeded_client, seeded_db, headers):
+    """业务账簿手工流水被冲销，冲销流水不进工作室面板（账簿隔离）。"""
+    biz = create_cashflow(
+        seeded_db, pool_id=_pool(seeded_db).id, occurred_on=TODAY, direction="OUT",
+        ledger_type="BUSINESS", accounting_attribute="OPERATING_EXPENSE",
+        category="房租", amount=Decimal("300"), actor="pytest",
+    )
+    rev = reverse_cashflow(
+        seeded_db, biz.id, reversed_on=TODAY, actor="pytest", reason="业务支出冲销"
+    )
+    assert rev.ledger_type == "BUSINESS"
+
+    payload = _summary(seeded_client, headers)
+    assert payload["items"] == []
+    assert Decimal(payload["expense"]) == Decimal("0.00")
+    assert Decimal(payload["net"]) == Decimal("0.00")
 
 
 def test_summary_ignores_item_limit(seeded_client, seeded_db, headers):

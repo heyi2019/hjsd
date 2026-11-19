@@ -88,6 +88,27 @@ class TestCreateAccountGuards:
 
         assert [account.id for account, _order in result["items"]] == [old_account.id]
 
+    def test_dashboard_inventory_cards_match_ledger_and_age_filter(self, seeded_client, seeded_db, headers):
+        old = _account(seeded_db, "dashboard-inventory-old")
+        recent = _account(seeded_db, "dashboard-inventory-recent")
+        boundary = _account(seeded_db, "dashboard-inventory-boundary")
+        unlinked = _account(seeded_db, "dashboard-inventory-unlinked")
+        create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=old.id)
+        create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=recent.id)
+        create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=boundary.id)
+        old.inventory_entry_at = datetime.combine(date.today() - timedelta(days=45), datetime.min.time())
+        recent.inventory_entry_at = datetime.combine(date.today() - timedelta(days=10), datetime.min.time())
+        boundary.inventory_entry_at = datetime.combine(date.today() - timedelta(days=30), datetime.min.time())
+        unlinked.inventory_entry_at = datetime.combine(date.today() - timedelta(days=45), datetime.min.time())
+        seeded_db.flush()
+        dashboard = seeded_client.get("/api/v1/dashboard/summary", headers=headers).json()["inventory"]
+        ledger = seeded_client.get("/api/v1/stocks/inventory/ledger", headers=headers).json()
+        overdue = seeded_client.get("/api/v1/stocks/inventory/ledger", params={"age_gt_days": 30}, headers=headers).json()
+        aging = seeded_client.get("/api/v1/stocks/inventory/ledger", params={"age_gt_days": 7}, headers=headers).json()
+        assert dashboard["account_count"] == ledger["total"] == 3
+        assert dashboard["overdue_count"] == overdue["total"] == 1
+        assert dashboard["aging_count"] == aging["total"] == 3
+
     def test_pickup_inventory_type_can_be_created_for_th(self, seeded_db):
         account = create_account(
             seeded_db,

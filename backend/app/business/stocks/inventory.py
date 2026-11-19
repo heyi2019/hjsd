@@ -77,6 +77,14 @@ def inventory(session: Session, *, user: CurrentUser | None = None) -> list[dict
     ]
 
 
+def _inventory_ledger_scope(session: Session, user: CurrentUser | None):
+    stmt = select(Account, Order).join(Order, Order.account_id == Account.id).where(
+        Account.status == "WAITING", Order.status.in_(("ACTIVE", "INSTALLMENT")),
+    )
+    scope = scope_filter(session, user)
+    return stmt.where(scope) if scope is not None else stmt
+
+
 def inventory_ledger(
     session: Session, *, business_mode: str | None = None,
     inventory_type: str | None = None, game_type: str | None = None,
@@ -87,7 +95,6 @@ def inventory_ledger(
     limit: int = 10, offset: int = 0, user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """服务端筛选、排序、分页库存台账，并返回分页所需统计。"""
-    active_order_statuses = ("ACTIVE", "INSTALLMENT")
     type_expr = func.coalesce(
         Account.inventory_type,
         case((Order.order_type == "HS", "RECOVERY"), (Order.order_type == "TH", "PICKUP"),
@@ -104,12 +111,7 @@ def inventory_ledger(
     )
 
     def stmt(*, include_type: bool = True, include_search_date: bool = True):
-        query = select(Account, Order).join(Order, Order.account_id == Account.id).where(
-            Account.status == "WAITING", Order.status.in_(active_order_statuses),
-        )
-        scope = scope_filter(session, user)
-        if scope is not None:
-            query = query.where(scope)
+        query = _inventory_ledger_scope(session, user)
         if business_mode:
             query = query.where(business_mode_expr == business_mode)
         if game_type:
@@ -149,14 +151,9 @@ def inventory_ledger(
         stmt(include_type=False, include_search_date=False).subquery()
     )) or 0)
     # options remain available across the current business/game filters, like the prior UI.
-    game_type_query = select(game_type_expr).select_from(Account).join(
-        Order, Order.account_id == Account.id,
-    ).where(
-        Account.status == "WAITING", Order.status.in_(active_order_statuses), game_type_expr.is_not(None),
-    )
-    scope = scope_filter(session, user)
-    if scope is not None:
-        game_type_query = game_type_query.where(scope)
+    game_type_query = _inventory_ledger_scope(session, user).with_only_columns(
+        game_type_expr, maintain_column_froms=True,
+    ).where(game_type_expr.is_not(None))
     game_type_query = game_type_query.distinct().order_by(game_type_expr)
     game_types = list(session.scalars(game_type_query).all())
     account_id_query = stmt().with_only_columns(Account.id, maintain_column_froms=True).distinct()
@@ -253,7 +250,7 @@ def dashboard_inventory_summary(
     today: date | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, int]:
-    """工作台库存卡片与提醒所需的计数，保留 WAITING 订单状态口径。"""
+    """工作台库存卡片和提醒与库存台账使用同一账号及订单范围。"""
     reference = today or date.today()
     aging_cutoff = datetime.combine(
         reference - timedelta(days=reminder_days), time.min
@@ -261,7 +258,7 @@ def dashboard_inventory_summary(
     overdue_cutoff = datetime.combine(
         reference - timedelta(days=AGE_WARNING_MAX_DAYS), time.min
     )
-    stmt = select(
+    stmt = _inventory_ledger_scope(session, user).with_only_columns(
         func.count(Account.id),
         func.coalesce(
             func.sum(case((Account.inventory_entry_at < aging_cutoff, 1), else_=0)),
@@ -271,10 +268,8 @@ def dashboard_inventory_summary(
             func.sum(case((Account.inventory_entry_at < overdue_cutoff, 1), else_=0)),
             0,
         ),
-    ).where(Account.status == "WAITING")
-    scope = scope_filter(session, user)
-    if scope is not None:
-        stmt = stmt.where(scope)
+        maintain_column_froms=True,
+    )
     account_count, aging_count, overdue_count = session.execute(stmt).one()
     return {
         "account_count": int(account_count or 0),

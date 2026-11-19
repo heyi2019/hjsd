@@ -110,6 +110,7 @@ export function OrderConsignmentModal(props: {
       <InventoryAccountSummary account={props.account} />
       <FieldConfigContext.Provider value={config}>
         <BusinessRegistrationForm
+          className="consignment-compact-form"
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
@@ -124,7 +125,13 @@ export function OrderConsignmentModal(props: {
             rules={[{ required: true, message: "请选择寄售平台" }]}
           >
             {platforms.length ? (
-              <Select aria-label="寄售平台" placeholder="请选择本次上架的平台" options={platforms} popupMatchSelectWidth />
+              <Select
+                aria-label="寄售平台"
+                placeholder="请选择本次上架的平台"
+                options={platforms}
+                popupMatchSelectWidth
+                popupClassName="consignment-platform-pop"
+              />
             ) : (
               <span className="muted">暂无可用寄售平台，请先在中介业务配置中维护经手平台</span>
             )}
@@ -135,7 +142,6 @@ export function OrderConsignmentModal(props: {
               min={0}
               precision={2}
               prefix="¥"
-              className="ui-control-width-180"
               placeholder="本次挂牌价，选填"
             />
           </CfgItem>

@@ -1,3 +1,20 @@
+/* compact 弹窗用 wrapperCol flex:auto，控件会按内容撑满整个弹窗宽度，导致右侧
+   输入项横向拉得过长。用专属 class 把四个输入控件统一收敛到同一宽度，保持表单
+   紧凑对齐。下拉 portal 到 body，同样按内容撑开，需限宽到与输入框一致。 */
+.consignment-compact-form .ant-form-item .ant-form-item-control {
+  flex: 0 0 260px !important;
+  max-width: 260px !important;
+}
+.consignment-compact-form .ant-form-item-control-input-content > .ant-input-number-affix-wrapper,
+.consignment-compact-form .ant-form-item-control-input-content > .ant-input-number {
+  width: 100%;
+}
+/* popupMatchSelectWidth 让下拉宽度跟随已收窄到 260px 的触发器；antd 内联的
+   min-width（按选项内容测量）会顶掉这个宽度，归零后才真正跟随。 */
+.ant-select-dropdown.consignment-platform-pop {
+  min-width: 0 !important;
+}
+
 .inventory-consignment-records-table {
   margin-top: -4px;
 }

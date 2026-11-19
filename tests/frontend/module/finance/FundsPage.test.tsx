@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -198,6 +198,38 @@ describe("FundsPage：资金账户卡片", () => {
     expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("不可用");
     expect(screen.getByRole("button", { name: /新增流水/ })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "流水方向" })).toBeDisabled();
+  });
+
+  it("切换流水日期请求失败时展示原因并按当前日期重试", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    await screen.findByText("ZC00001");
+    vi.mocked(cashflowsApi.list).mockRejectedValueOnce(new Error("流水连接超时"));
+    await ui.click(screen.getByRole("button", { name: "上期" }));
+    expect(await screen.findByText(/流水连接超时/)).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    const previous = previousReportPeriod();
+    await waitFor(() => expect(cashflowsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ occurred_from: previous.from, occurred_to: previous.to })));
+    expect(await screen.findByText("ZC00001")).toBeInTheDocument();
+    expect(screen.queryByText(/流水连接超时/)).toBeNull();
+  });
+
+  it("旧日期请求失败不会覆盖新日期的流水结果", async () => {
+    let rejectOld!: (reason: Error) => void;
+    const oldRequest = new Promise<Awaited<ReturnType<typeof cashflowsApi.list>>>((_resolve, reject) => { rejectOld = reject; });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    await screen.findByText("ZC00001");
+    vi.mocked(cashflowsApi.list).mockReturnValueOnce(oldRequest);
+    await ui.click(screen.getByRole("button", { name: "上期" }));
+    await waitFor(() => expect(cashflowsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ occurred_from: previousReportPeriod().from })));
+    await ui.click(screen.getByRole("button", { name: "本期" }));
+    expect(await screen.findByText("ZC00001")).toBeInTheDocument();
+    await act(async () => { rejectOld(new Error("旧请求失败")); await oldRequest.catch(() => undefined); });
+    expect(screen.queryByText(/旧请求失败/)).toBeNull();
+    expect(screen.getByText("ZC00001")).toBeInTheDocument();
   });
 
   it("FE-230：对账失败时显示明确空态并禁用新增", async () => {

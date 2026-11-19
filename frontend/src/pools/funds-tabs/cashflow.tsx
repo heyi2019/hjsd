@@ -1,7 +1,7 @@
 /** 资金明细 Tab：从 FundsPage.tabs.tsx 拆出，函数体与拆前逐字等价。 */
 import { Card, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { ConfirmButton, DataTable, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../../shared/ui";
+import { ConfirmButton, DataTable, ErrorBanner, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../../shared/ui";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { formatDateTimeMinute, today } from "../../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
@@ -29,9 +29,9 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
     cashflowLedgerType, setCashflowLedgerType,
     cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, flowDirectionOptions, flowAttributeOptions,
     fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, totalFlowIncome, totalFlowExpense,
-    cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, loading, cashflowsReady, error,
+    cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, loading, cashflowsReady, cashflowLoading, cashflowError, error,
   } = ctrl;
-  const cashflowUnavailable = !cashflowsReady || Boolean(error);
+  const cashflowUnavailable = !cashflowsReady || Boolean(error) || Boolean(cashflowError);
   const { arrange: arrangeCashflowColumns } = useListViewColumns("CASHFLOW");
   // 类别筛选下拉：业务类别=系统固定枚举；工作室类别=支出科目词典（可配置）+ 固定收入科目。
   // value 用 category 原文，与后端精确匹配（Cashflow.category == category）对齐。
@@ -109,11 +109,12 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
           onChange={(value) => setCashflowCategory(value ?? "")}
         />
         <BusinessPeriodPicker label="流水日期区间" state={periodState} showAll />
-        <PermissionButton permission="finance.read" onClick={() => void fetchCashflows()}>查询</PermissionButton>
-        <PermissionButton permission="finance.read" size="small" loading={cashflowExporting} onClick={() => void exportCashflows()}>
+        <PermissionButton permission="finance.read" loading={cashflowLoading} onClick={() => void fetchCashflows()}>查询</PermissionButton>
+        <PermissionButton permission="finance.read" size="small" disabled={cashflowUnavailable || cashflowLoading} loading={cashflowExporting} onClick={() => void exportCashflows()}>
           导出
         </PermissionButton>
       </div>
+      <ErrorBanner error={cashflowError} onRetry={() => void fetchCashflows()} retrying={cashflowLoading} />
       {cashflowUnavailable ? (
         <Typography.Text type="warning">资金流水数据不可用，请点击“查询”或页面顶部的“重新加载”。</Typography.Text>
       ) : cashflowTotal > cashflows.length ? (
@@ -132,12 +133,12 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
       />
       <DataTable<Cashflow>
         columns={arrangeCashflowColumns(cashflowColumns)}
-        rows={cashflows}
+        rows={cashflowUnavailable ? [] : cashflows}
         page={1}
         pageSize={10}
-        total={cashflows.length}
+        total={cashflowUnavailable ? 0 : cashflows.length}
         emptyText={cashflowUnavailable ? "资金流水数据不可用，请点击重新加载" : "暂无资金流水"}
-        loading={loading}
+        loading={loading || cashflowLoading}
         onPageChange={() => undefined}
       />
     </Card>

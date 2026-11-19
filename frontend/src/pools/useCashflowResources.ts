@@ -20,6 +20,8 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
   const [cashflowTotal, setCashflowTotal] = useState(0);
   const [cashflowTotals, setCashflowTotals] = useState({ income: "0.00", expense: "0.00" });
   const [cashflowsReady, setCashflowsReady] = useState(false);
+  const [cashflowLoading, setCashflowLoading] = useState(false);
+  const [cashflowError, setCashflowError] = useState<{ message: string; code?: string } | null>(null);
   const [cashflowKeyword, setCashflowKeyword] = useState("");
   const [cashflowPoolId, setCashflowPoolId] = useState<number | undefined>();
   const [cashflowDirection, setCashflowDirection] = useState<string | undefined>();
@@ -51,30 +53,38 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
 
   const fetchCashflows = useCallback(async () => {
     setCashflowsReady(false);
+    setCashflowLoading(true);
+    setCashflowError(null);
     const listRequestId = ++cashflowListRequestRef.current;
     const totalsRequestId = ++cashflowTotalsRequestRef.current;
-    const result = await cashflowsApi.list({
-      occurred_from: cashflowFromRef.current || undefined,
-      occurred_to: cashflowToRef.current || undefined,
-      pool_id: cashflowPoolIdRef.current ?? undefined,
-      direction: cashflowDirectionRef.current || undefined,
-      ledger_type: cashflowLedgerTypeRef.current || undefined,
-      accounting_attribute: cashflowAttributeRef.current || undefined,
-      category: cashflowCategoryRef.current.trim() || undefined,
-      keyword: cashflowKeywordRef.current.trim() || undefined,
-      limit: 2000,
-      offset: 0,
-    });
-    if (listRequestId !== cashflowListRequestRef.current) return;
-    setCashflows(result.items);
-    setCashflowTotal(result.total);
-    if (totalsRequestId === cashflowTotalsRequestRef.current) {
-      setCashflowTotals({
-        income: result.total_in ?? "0.00",
-        expense: result.total_out ?? "0.00",
+    try {
+      const result = await cashflowsApi.list({
+        occurred_from: cashflowFromRef.current || undefined,
+        occurred_to: cashflowToRef.current || undefined,
+        pool_id: cashflowPoolIdRef.current ?? undefined,
+        direction: cashflowDirectionRef.current || undefined,
+        ledger_type: cashflowLedgerTypeRef.current || undefined,
+        accounting_attribute: cashflowAttributeRef.current || undefined,
+        category: cashflowCategoryRef.current.trim() || undefined,
+        keyword: cashflowKeywordRef.current.trim() || undefined,
+        limit: 2000,
+        offset: 0,
       });
+      if (listRequestId !== cashflowListRequestRef.current) return;
+      setCashflows(result.items);
+      setCashflowTotal(result.total);
+      if (totalsRequestId === cashflowTotalsRequestRef.current) {
+        setCashflowTotals({
+          income: result.total_in ?? "0.00",
+          expense: result.total_out ?? "0.00",
+        });
+      }
+      setCashflowsReady(true);
+    } catch (err) {
+      if (listRequestId === cashflowListRequestRef.current) setCashflowError(normalizeError(err));
+    } finally {
+      if (listRequestId === cashflowListRequestRef.current) setCashflowLoading(false);
     }
-    setCashflowsReady(true);
   }, []);
 
   const lastPeriodRef = useRef<string | null>(null);
@@ -157,6 +167,8 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     cashflowTotal,
     cashflowTotals,
     cashflowsReady,
+    cashflowLoading,
+    cashflowError,
     cashflowKeyword,
     setCashflowKeyword,
     cashflowPoolId,

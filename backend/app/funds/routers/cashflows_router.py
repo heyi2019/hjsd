@@ -1,8 +1,11 @@
 """资金流水查询、登记和冲销 API。"""
 from datetime import date
 from decimal import Decimal
+from tempfile import SpooledTemporaryFile
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
@@ -31,14 +34,15 @@ from app.funds.cashflows import (
     reverse_cashflow as finance_reverse_cashflow,
     update_cashflow as finance_update_cashflow,
 )
-from app.settings.lists.export import EXPORT_ROW_LIMIT, build_list_csv
-from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
+from app.settings.lists.export import build_list_csv
+from app.settings.lists.file_response import CSV_MEDIA_TYPE
 from ..router_output import _actor, _cashflow_out, _cashflow_outputs
 
 router = APIRouter(tags=["资金流水"])
 read_access = require_permissions(PERM_FINANCE_READ, PERM_ORDER_CREATE, require_all=False)
 post_deposit = require_permissions(PERM_DEPOSIT_POST)
 post_rebate = require_permissions(PERM_ORDER_EVENT_POST)
+CASHFLOW_EXPORT_BATCH_SIZE = 2000
 
 
 @router.get("/cashflows/studio-summary", response_model=schemas.StudioSummaryOut)
@@ -201,33 +205,43 @@ def export_cashflows_csv(
 ) -> Response:
     # 直接调用路由函数时 `Query(default=None)` 不会被解析成 None，
     # 漏传 keyword 会把 Query 对象一路带进 SQL 条件（曾让导出直接 500）。
-    result = list_cashflows(
-        pool_id=pool_id,
-        order_id=order_id,
-        direction=direction,
-        occurred_from=occurred_from,
-        occurred_to=occurred_to,
-        ledger_type=ledger_type,
-        accounting_attribute=accounting_attribute,
-        category=category,
-        created_by=created_by,
-        keyword=keyword,
-        limit=EXPORT_ROW_LIMIT,
-        offset=0,
-        db=db,
-        user=user,
-    )
-    rows = [item.model_dump() for item in result.items]
-    csv_text, meta = build_list_csv(db, "CASHFLOW", rows)
-    record_audit(
-        db,
-        action=AuditAction.LIST_EXPORT,
-        entity_type="list_export",
-        entity_id="CASHFLOW",
-        actor=user.username,
-        after={"rows": len(rows), "column_count": meta["column_count"]},
-    )
-    return file_response(csv_text, f"资金流水-{date.today().isoformat()}.csv", CSV_MEDIA_TYPE)
+    output = SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b")
+    offset = 0
+    try:
+        while True:
+            result = list_cashflows(
+                pool_id=pool_id, order_id=order_id, direction=direction,
+                occurred_from=occurred_from, occurred_to=occurred_to,
+                ledger_type=ledger_type, accounting_attribute=accounting_attribute,
+                category=category, created_by=created_by, keyword=keyword,
+                limit=CASHFLOW_EXPORT_BATCH_SIZE, offset=offset, db=db, user=user,
+            )
+            rows = [item.model_dump() for item in result.items]
+            csv_text, meta = build_list_csv(
+                db, "CASHFLOW", rows, include_header=offset == 0, enforce_row_limit=False,
+            )
+            output.write(csv_text.encode("utf-8"))
+            offset += len(rows)
+            if not rows or offset >= result.total:
+                break
+        record_audit(
+            db, action=AuditAction.LIST_EXPORT, entity_type="list_export", entity_id="CASHFLOW",
+            actor=user.username, after={"rows": offset, "column_count": meta["column_count"]},
+        )
+        output.seek(0)
+    except Exception:
+        output.close()
+        raise
+
+    def stream():
+        try:
+            yield from output
+        finally:
+            output.close()
+
+    filename = f"资金流水-{date.today().isoformat()}.csv"
+    return StreamingResponse(stream(), media_type=CSV_MEDIA_TYPE,
+                             headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"})
 
 
 @router.post("/cashflows", response_model=schemas.CashflowOut, status_code=201)

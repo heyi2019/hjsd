@@ -438,7 +438,7 @@ describe("FundsPage：资金流水", () => {
     expect(screen.queryByText("ZC00001")).not.toBeInTheDocument();
   });
 
-  it("资金流水导出与列表同口径：带上当前搜索关键词", async () => {
+  it("资金流水导出使用当前日期和搜索条件", async () => {
     // 修复 #2：旧实现 exportCsv 漏传 keyword，筛关键词后导出的是全量。
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:flow");
@@ -447,11 +447,13 @@ describe("FundsPage：资金流水", () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    await ui.click(screen.getByRole("button", { name: "上期" }));
+    const previous = previousReportPeriod();
     await ui.type(screen.getByLabelText("流水搜索"), "SELL");
     await waitFor(() => expect(screen.getByRole("button", { name: "导出" })).toBeEnabled());
     await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.exportCsv)).toHaveBeenCalledWith(
-      expect.objectContaining({ keyword: "SELL" }),
+      expect.objectContaining({ keyword: "SELL", occurred_from: previous.from, occurred_to: previous.to }),
     ));
   });
 

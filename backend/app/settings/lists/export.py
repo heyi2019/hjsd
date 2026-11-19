@@ -123,6 +123,8 @@ def build_list_csv(
     *,
     total: dict[str, Any] | None = None,
     extra_columns: list[tuple[str, str, bool]] | None = None,
+    include_header: bool = True,
+    enforce_row_limit: bool = True,
 ) -> tuple[str, dict[str, Any]]:
     """按 scope 的列配置把行 dict 列表拼成 CSV 文本。
 
@@ -144,7 +146,7 @@ def build_list_csv(
     # 导出兜底：无论调用方是否传 limit=None，写出永远不超过 EXPORT_ROW_LIMIT。
     # 与 orders/finance 导出端点的 limit=EXPORT_ROW_LIMIT 形成双保险，
     # 防止后续新增导出端点漏加查询层 limit 时一次性拉爆库或写出超大文件。
-    truncated = len(items) > EXPORT_ROW_LIMIT
+    truncated = enforce_row_limit and len(items) > EXPORT_ROW_LIMIT
     if truncated:
         items = items[:EXPORT_ROW_LIMIT]
     report: dict[str, Any] = {"items": items}
@@ -160,6 +162,7 @@ def build_list_csv(
         force_registered_keys=True,
         # 机器行标记翻中文（明细/合计），与业务人员看到的界面同语言
         row_type_label="行类型",
+        include_header=include_header,
     )
     return csv_text, {
         "column_count": sum(1 for _key, _label, visible in columns if visible),

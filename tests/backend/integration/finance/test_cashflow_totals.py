@@ -10,6 +10,8 @@
 """
 from __future__ import annotations
 
+import csv
+import io
 from datetime import date
 from decimal import Decimal
 from uuid import uuid4
@@ -17,10 +19,10 @@ from uuid import uuid4
 TODAY = date(2026, 10, 4)
 
 
-def _create(client, headers, *, direction: str, amount: str, note: str) -> dict:
+def _create(client, headers, *, direction: str, amount: str, note: str, occurred_on: date = TODAY) -> dict:
     payload = {
         "pool_id": 1,
-        "occurred_on": TODAY.isoformat(),
+        "occurred_on": occurred_on.isoformat(),
         "direction": direction,
         "category": "OPERATING",
         "amount": amount,
@@ -119,3 +121,26 @@ def test_export_accepts_keyword_instead_of_leaking_query_object(seeded_client, h
     )
     assert miss.status_code == 200, miss.text
     assert created["flow_no"] not in miss.text
+
+
+def test_export_has_no_row_cap_and_respects_date_range(seeded_client, headers, monkeypatch):
+    from app.funds.routers import cashflows_router
+    from app.settings.lists import export
+
+    monkeypatch.setattr(cashflows_router, "CASHFLOW_EXPORT_BATCH_SIZE", 3)
+    monkeypatch.setattr(export, "EXPORT_ROW_LIMIT", 2)
+    for index in range(3):
+        _create(seeded_client, headers, direction="IN", amount="10", note=f"导出测试{index}\n第二行")
+    _create(seeded_client, headers, direction="IN", amount="10", note="范围外流水", occurred_on=date(2026, 10, 5))
+    response = seeded_client.get("/api/v1/cashflows/export.csv", headers=headers)
+    assert response.status_code == 200, response.text
+    assert all(f"导出测试{index}" in response.text for index in range(3))
+    assert "范围外流水" in response.text
+    csv_rows = list(csv.reader(io.StringIO(response.text.lstrip("\ufeff"))))
+    assert len(csv_rows) == 5
+    assert sum(row[0] == "行类型" for row in csv_rows) == 1
+    assert any("导出测试0\n第二行" in row for row in csv_rows)
+    narrowed = seeded_client.get("/api/v1/cashflows/export.csv", headers=headers, params={"occurred_from": "2026-10-04", "occurred_to": "2026-10-04"})
+    assert narrowed.status_code == 200, narrowed.text
+    assert all(f"导出测试{index}" in narrowed.text for index in range(3))
+    assert "范围外流水" not in narrowed.text

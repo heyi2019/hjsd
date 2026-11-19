@@ -36,6 +36,7 @@ def report_csv(
     value_labels: dict[str, dict[str, str]] | None = None,
     force_registered_keys: bool = False,
     row_type_label: str = ROW_TYPE_KEY,
+    include_header: bool = True,
 ) -> str:
     """将报表 items 与 total 统一导出为 UTF-8 CSV，嵌套字段保留为 JSON。"""
     items = report.get("items") if isinstance(report.get("items"), list) else []
@@ -106,10 +107,11 @@ def report_csv(
         lineterminator="\r\n",
     )
     # 表头手工写：fieldnames 是字段键（取值用），首行要中文
-    writer.writerow(dict(zip(fieldnames, header)))
+    if include_header:
+        writer.writerow(dict(zip(fieldnames, header)))
     for row in rows:
         writer.writerow({key: cell(key, row.get(key)) for key in fieldnames})
-    return "\ufeff" + stream.getvalue()
+    return ("\ufeff" if include_header else "") + stream.getvalue()
 
 
 __all__ = ["report_csv"]

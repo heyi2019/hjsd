@@ -51,9 +51,9 @@ export function resolveRules(
   const def = fieldConfigFor(config, key);
   const base = (baseRules ?? []).filter(Boolean) as Rule[];
   if (!def) return base;
-  // 金额类字段（NUMBER/MONEY）在「必填」语义下不允许为 0 / 负数：
+  // 金额类字段（NUMBER/MONEY）在「必填」语义下不允许为 0 / 负数；排序允许 0。
   // 选填（含条件必填未命中）时本规则不挂载，留空传 0 由后端按选填口径放行。
-  const isMoney = def.field_type === "NUMBER" || def.field_type === "MONEY";
+  const isMoney = def.field_type === "MONEY" || (def.field_type === "NUMBER" && def.field_key !== "sort_order");
   const moneyPositiveRule: Rule = {
     validator(_rule, value) {
       if (value === undefined || value === null || value === "") return Promise.resolve();

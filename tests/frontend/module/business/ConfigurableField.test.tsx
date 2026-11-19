@@ -127,6 +127,10 @@ describe("resolveRules 金额字段必填 > 0（选填可 0 / 必填不可 0）"
       price: makeField({ field_key: "price", label: "账号号价", field_type: "NUMBER", required: true }),
     };
     expect(await validate(resolveRules(cfg, "price", []), 0)).toContain("必须大于 0");
+    const sorting: FieldConfigMap = {
+      sort_order: makeField({ order_type_code: "SYSGAME", field_key: "sort_order", label: "排序", field_type: "NUMBER", required: true }),
+    };
+    expect(await validate(resolveRules(sorting, "sort_order", []), 0)).toBe("no-validator");
   });
 
   it("必填 NUMBER 字段填负数被拒", async () => {

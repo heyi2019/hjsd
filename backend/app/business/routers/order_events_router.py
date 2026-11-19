@@ -67,9 +67,15 @@ def inventory_offsale(
         raise PermissionDenied("当前角色无权登记库存下架事件")
     events = list(db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id)).all())
     unlisted: set[tuple[str, str]] = set()
+    unlisted_event_ids: set[str] = set()
+    system_unlisted_event_ids: set[str] = set()
     for event in events:
         extra = event.form_extra or {}
         if event.event_type == "OPERATE" and extra.get("operation_type") == "UNLIST":
+            if extra.get("consignment_event_id") is not None:
+                unlisted_event_ids.add(str(extra["consignment_event_id"]))
+                if extra.get("platform_unlist_scope") == "SYSTEM":
+                    system_unlisted_event_ids.add(str(extra["consignment_event_id"]))
             for platform in extra.get("consignment_platforms") or []:
                 unlisted.add((str(extra.get("consignment_event_id")), str(platform)))
     extra_base = {**(payload.form_extra or {}), "platform_unlist_scope": "SYSTEM", "platform_unlisted_at": payload.unlisted_at.isoformat(timespec="minutes")}
@@ -77,7 +83,10 @@ def inventory_offsale(
         extra = event.form_extra or {}
         if event.event_type != "OPERATE" or extra.get("operation_type") != "CONSIGNMENT":
             continue
-        for platform in extra.get("consignment_platforms") or []:
+        platforms = extra.get("consignment_platforms") or []
+        for platform in platforms:
+            if str(event.id) in system_unlisted_event_ids or (len(platforms) == 1 and str(event.id) in unlisted_event_ids):
+                continue
             if (str(event.id), str(platform)) in unlisted:
                 continue
             orders_post_event(db, order.id, event_type="OPERATE", operation_type="UNLIST",

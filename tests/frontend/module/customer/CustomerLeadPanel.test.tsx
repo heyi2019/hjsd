@@ -52,6 +52,17 @@ beforeEach(() => {
 });
 
 describe("CustomerLeadPanel：客户需求池", () => {
+  it("需求日期筛选失败隐藏旧数据，重试后恢复", async () => {
+    const view = renderLight(<CustomerLeadPanel createdPeriod={{ from: "2026-10-01", to: "2026-10-31" }} />, { user: "admin" });
+    await screen.findByText("LD-1");
+    vi.mocked(leadsApi.page).mockRejectedValueOnce(new Error("需求筛选失败"));
+    view.rerender(<CustomerLeadPanel createdPeriod={{ from: "2026-11-01", to: "2026-11-30" }} />);
+    expect(await screen.findByText(/需求筛选失败/)).toBeVisible();
+    expect(screen.queryByText("LD-1")).toBeNull();
+    expect(screen.getByText("客户需求数据不可用，请点击重新加载")).toBeVisible();
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(await screen.findByText("LD-1")).toBeInTheDocument();
+  });
   it("需求列表翻页时加载后台下一页", async () => {
     vi.mocked(leadsApi.summary).mockResolvedValueOnce({ total_count: 11, open_count: 11 }).mockResolvedValueOnce({ total_count: 11, open_count: 11 });
     vi.mocked(leadsApi.page).mockImplementation(async (params) => pageResponse(

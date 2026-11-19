@@ -138,13 +138,13 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       {createdPicker ? <Space wrap className="customer-list-filters--separated">{createdPicker}</Space> : null}
       <DataTable<Lead>
         columns={arrangeColumns(columns)}
-        rows={rows}
+        rows={error ? [] : rows}
         loading={loading || (summary === null && !error)}
         page={page}
         pageSize={pageSize}
-        total={summary?.total_count ?? 0}
+        total={error ? 0 : summary?.total_count ?? 0}
         controlledPaging
-        emptyText="暂无客户需求"
+        emptyText={error ? "客户需求数据不可用，请点击重新加载" : "暂无客户需求"}
         pagination={error ? false : undefined}
         onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
       />

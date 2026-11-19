@@ -120,6 +120,32 @@ beforeEach(() => {
   }));
 });
 describe("CustomersPage：客户档案", () => {
+  it("客户筛选失败隐藏旧数据，重试后显示当前结果", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    vi.mocked(customersApi.page).mockRejectedValueOnce(new Error("客户筛选失败"));
+    await user.click(screen.getByRole("button", { name: "上期" }));
+    expect(await screen.findByText(/客户筛选失败/)).toBeVisible();
+    expect(screen.queryByText("CUS-0001")).toBeNull();
+    expect(screen.getByText("客户数据不可用，请点击重新加载")).toBeVisible();
+    expect(screen.getByText("客户总数").closest(".ui-stat")).toHaveTextContent("不可用");
+    await user.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(await screen.findByText("CUS-0001")).toBeInTheDocument();
+  });
+
+  it("合作方首屏失败后显示不可用并可重试", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(counterpartiesApi.page).mockRejectedValueOnce(new Error("合作方读取失败"));
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await user.click(screen.getByRole("tab", { name: /合作方/ }));
+    expect(await screen.findByText(/合作方读取失败/)).toBeVisible();
+    expect(screen.getByText("合作方数据不可用，请点击重新加载")).toBeVisible();
+    vi.mocked(counterpartiesApi.page).mockResolvedValueOnce(pageResponse(counterparties));
+    await user.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(await screen.findByText("CP-0001")).toBeInTheDocument();
+  });
   it("客户档案翻页时加载后台下一页", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(customersApi.page).mockImplementation(async (params) => pageResponse(

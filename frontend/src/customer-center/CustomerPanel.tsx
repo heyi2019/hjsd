@@ -93,9 +93,9 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
       </Typography.Paragraph>
       <StatRow
         items={[
-          { label: "客户总数", kind: "count", amount: loading ? null : rows === null ? "不可用" : String(total) },
-          { label: "本月新增客户数", kind: "count", amount: loading ? null : rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
-          { label: "今日新增客户数", kind: "count", amount: loading ? null : rows === null ? "不可用" : String(newTodayCount ?? 0) },
+          { label: "客户总数", kind: "count", amount: loading ? null : error || rows === null ? "不可用" : String(total) },
+          { label: "本月新增客户数", kind: "count", amount: loading ? null : error || rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
+          { label: "今日新增客户数", kind: "count", amount: loading ? null : error || rows === null ? "不可用" : String(newTodayCount ?? 0) },
         ]}
       />
       <Space wrap className="customer-list-filters customer-list-filters--separated">
@@ -153,11 +153,11 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
       <DataTable<Customer>
         // 移动端隐藏按列 key 绑定，不随「设置 → 列表字段」的过滤/排序而错位。
         columns={markMobileHiddenColumns(arrangeColumns(columns), CUSTOMER_MOBILE_HIDDEN_KEYS)}
-        rows={rows ?? []}
+        rows={error ? [] : rows ?? []}
         loading={loading}
         page={page}
         pageSize={pageSize}
-        total={total}
+        total={error ? 0 : total}
         controlledPaging
         className="customer-table"
        

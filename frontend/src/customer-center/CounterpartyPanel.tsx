@@ -231,11 +231,11 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
       </Space>
       <DataTable<Counterparty>
         columns={arrangeColumns(columns)}
-        rows={rows ?? []}
-        loading={loading || rows === null}
+        rows={error ? [] : rows ?? []}
+        loading={loading || (rows === null && !error)}
         page={page}
         pageSize={pageSize}
-        total={total}
+        total={error ? 0 : total}
         controlledPaging
         emptyText={error ? "合作方数据不可用，请点击重新加载" : "暂无合作方"}
         onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}

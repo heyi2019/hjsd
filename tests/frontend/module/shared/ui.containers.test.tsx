@@ -335,6 +335,22 @@ describe("DataTable：三态一致（加载 / 空 / 有数据）", () => {
     expect(screen.getByText("暂无数据")).toBeInTheDocument();
   });
 
+  it("空数据时不启用会撑高空态的滚动容器", () => {
+    const { container } = render(
+      <DataTable
+        columns={tableColumns}
+        rows={[]}
+        page={1}
+        pageSize={10}
+        total={0}
+        scroll={{ x: "max-content", y: 180 }}
+        onPageChange={() => {}}
+      />,
+    );
+    expect(container.querySelector(".ant-table-body")).toBeNull();
+    expect(container.querySelector(".ui-datatable__empty")).toBeInTheDocument();
+  });
+
   it("有数据时渲染表格行", () => {
     render(<DataTable columns={tableColumns} rows={tableRows} page={1} pageSize={20} total={12} onPageChange={() => {}} />);
     expect(screen.getByText("第1行")).toBeInTheDocument();

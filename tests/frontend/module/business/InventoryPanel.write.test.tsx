@@ -346,6 +346,73 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
     expect(await screen.findByText("寄售平台A")).toBeInTheDocument();
   });
 
+  it("已上架记录限制为弹窗内滚动，不继续撑高寄售弹窗", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+      account: { id: 1, status: "IN_STOCK" },
+      orders: [{
+        order_id: 22,
+        order_no: "DG-2026-0003",
+        order_type: "DG",
+        status: "ACTIVE",
+        trade_date: "2026-10-12",
+        created_at: "2026-10-12T09:10:00",
+        events: Array.from({ length: 12 }, (_, index) => ({
+          id: 920 + index,
+          event_type: "OPERATE",
+          operation_type: "CONSIGNMENT",
+          form_extra: { consignment_platforms: [`寄售平台${index + 1}`], listed_at: `2026-10-${String(index + 1).padStart(2, "0")}T09:10:00` },
+        })),
+      }],
+    } as never);
+
+    renderConsignment();
+
+    await screen.findByText("寄售平台12");
+    const recordsBody = document.querySelector<HTMLElement>(".inventory-consignment-records-table .ant-table-body");
+    expect(recordsBody).toHaveStyle({ maxHeight: "180px", overflowY: "scroll" });
+  });
+
+  it("没有足够明细时不预留固定滚动高度", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+      account: { id: 1, status: "IN_STOCK" },
+      orders: [{
+        order_id: 22,
+        order_no: "DG-2026-0003",
+        order_type: "DG",
+        status: "ACTIVE",
+        trade_date: "2026-10-12",
+        created_at: "2026-10-12T09:10:00",
+        events: [],
+      }],
+    } as never);
+
+    renderConsignment();
+
+    await screen.findByText("暂无上架记录");
+    expect(document.querySelector(".inventory-consignment-records-table .ant-table-body")).toBeNull();
+  });
+
+  it("没有上架明细时使用共享紧凑空态", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+      account: { id: 1, status: "IN_STOCK" },
+      orders: [{
+        order_id: 22,
+        order_no: "DG-2026-0003",
+        order_type: "DG",
+        status: "ACTIVE",
+        trade_date: "2026-10-12",
+        created_at: "2026-10-12T09:10:00",
+        events: [],
+      }],
+    } as never);
+
+    renderConsignment();
+
+    await screen.findByText("暂无上架记录");
+    expect(document.querySelector(".inventory-consignment-records-table .ant-table-body")).toBeNull();
+    expect(document.querySelector(".inventory-consignment-records-table .ui-datatable__empty")).toBeTruthy();
+  });
+
   it("账号处于 VOID 时，已上架记录为空且无旧平台残留", async () => {
     vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: { id: 1, status: "VOID" },

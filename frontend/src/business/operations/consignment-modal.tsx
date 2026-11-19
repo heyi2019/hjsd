@@ -162,6 +162,7 @@ export function OrderConsignmentModal(props: {
               pageSize={10}
               total={listed.length}
               onPageChange={() => undefined}
+              scroll={listed.length > 5 ? { x: "max-content", y: 180 } : { x: "max-content" }}
               emptyText="暂无上架记录"
               columns={[
                 { title: "上架平台", dataIndex: "platform" },

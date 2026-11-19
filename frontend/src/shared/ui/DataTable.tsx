@@ -6,7 +6,7 @@
  *  - 服务端分页（controlledPaging=true）：调用方自管 page/pageSize 并向后端取数
  *    （如历史批次行用 offset 分页），DataTable 完全受控。
  */
-import { Empty, Spin, Table } from "antd";
+import { Spin, Table } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
 import { useEffect, useRef, useState } from "react";
 
@@ -98,6 +98,7 @@ export function DataTable<T>(props: {
         },
       };
   const pagination = props.pagination !== undefined ? props.pagination : defaultPagination;
+  const tableScroll = props.rows.length > 0 ? (props.scroll ?? { x: "max-content" }) : undefined;
 
   return (
     <div className={`ui-table-wrap ui-datatable${props.className ? ` ${props.className}` : ""}`}>
@@ -109,12 +110,12 @@ export function DataTable<T>(props: {
         expandable={props.expandable}
         rowSelection={props.rowSelection}
         onRow={props.onRow}
-        // 横向滚动为表格默认标准：内容超出容器（“看不到了”）时自动可滑动；
-        // 调用方传 scroll 则覆盖默认值（如 InventoryDetail 的固定宽度）。
-        scroll={props.scroll ?? { x: "max-content" }}
+        // 有数据时横向滚动为默认标准；空数据不启用滚动容器，避免 antd 空态被固定高度或
+        // max-content 撑高。调用方传 scroll 仍只对有数据的表格生效。
+        scroll={tableScroll}
         pagination={pagination}
         locale={{
-          emptyText: <Empty description={props.emptyText ?? "暂无数据"} />,
+          emptyText: <div className="ui-datatable__empty">{props.emptyText ?? "暂无数据"}</div>,
         }}
       />
     </div>

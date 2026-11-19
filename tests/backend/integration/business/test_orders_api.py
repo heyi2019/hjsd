@@ -2,44 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
-from decimal import Decimal
+from datetime import date
 from uuid import uuid4
 
-import pytest
-from pydantic import ValidationError
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-
 from app.shared.audit import record_audit
-from app.core.errors import ErrorCode, NotFound, Validation
-from app.core.money import to_money
 from app.core.security import CurrentUser, DEV_USERS, build_access_token
 from app.domain.enums import (
-    AccountStatus,
-    AuditAction,
-    CustomerStatus,
-    OrderStatus,
-)
+    AuditAction)
 from app.stocks.profile import create_account
 from app.installments import create as inst_create
 from app.finance.rebates import create_rebate
-from app.customer_center.counterparties import create_counterparty
-from app.customer_center.customers import create_customer, set_customer_status
-from app.domain.foundation import AuditLog
-from app.domain.parties import OrderCustomerRole
-from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField
-from app.domain.users import User
-from app.field_definitions.order_types import get_order_type_by_code, set_order_type_active
-from app.orders import schemas
-from app.shared.order_access import get_order
-from app.orders.cancellation_model import cancel_order
 from app.orders.create import create_order
-from app.orders.events import _opposite_direction, post_event
-from app.orders.mutations import update_order
-from app.finance.balances import pool_balance
-from app.orders.queries import list_orders, order_customer_count
-from app.orders.router_output import _order_list_payload
+from app.orders.events import post_event
 
 D = date(2026, 10, 4)
 
@@ -154,8 +128,6 @@ class TestOrdersApi:
     def test_scoped_user_cannot_assign_created_order_to_other_owner(
         self, seeded_client, seeded_db
     ):
-        from app.core.security import build_access_token
-
         user = _scoped_user()
         scoped_headers = {"Authorization": f"Bearer {build_access_token(user)}"}
         response = seeded_client.post(

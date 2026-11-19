@@ -8,42 +8,14 @@
 表单扩展字段覆写，以及 7 个未测路由端点。
 """
 from __future__ import annotations
-
-from datetime import date
 import pytest
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-
-from app.shared.audit import record_audit
-from app.core.errors import Conflict, NotFound, Validation
-from app.core.security import CurrentUser, build_access_token
+from app.core.errors import Validation
+from app.core.security import CurrentUser
 from app.domain.enums import (
-    AuditAction,
-    CounterpartyStatus,
-    CustomerStatus,
-    ScheduleStatus,
-)
+    AuditAction)
 from app.domain.foundation import AuditLog
-from app.domain.parties import (
-    OrderCounterpartyRole,
-    OrderCustomerRole,
-)
-from app.domain.trade import InstallmentSchedule, OrderFormField
-from app.installments import create as inst_create
-from app.orders.create import create_order
-from app.orders.events import post_event
-from app.stocks.profile import create_account
-from app.customer_center.counterparties import (
-    create_counterparty,
-    get_counterparty,
-    list_counterparties,
-    set_counterparty_status,
-    update_counterparty,
-)
-from app.customer_center.customer_detail import get_customer_activity_summary, get_customer_detail
-from app.customer_center.customer_merge import duplicate_candidates, merge_customers
-from app.customer_center.customers import create_customer, get_customer, list_customers, set_customer_status, update_customer
-from app.shared.form_values import get_extra_values, set_extra_values
+from app.customer_center.customers import create_customer
 
 CUSTOMERS = "/api/v1/customers"
 COUNTERPARTIES = "/api/v1/counterparties"
@@ -129,7 +101,6 @@ def test_customer_detail_does_not_record_contact_read_audit(seeded_client, seede
 def test_validate_owner_id_rejects_non_positive_and_inactive(seeded_db):
     from app.customer_center._common import _validate_owner_id
     from app.domain.users import User
-    from app.core.errors import Validation
 
     with pytest.raises(Validation):
         _validate_owner_id(seeded_db, 0)

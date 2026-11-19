@@ -90,8 +90,8 @@ def test_orders_export_mine_only_includes_my_orders(seeded_client, headers, seed
 
     headers = X-Dev-User: admin → id=1；入库操作人是本人，另一单的入库操作人是他人。
     """
-    mine = _seed_order(seeded_db, order_no="HSMINE01", form_extra={"business_responsible_ids": [1]})
-    foreign = _seed_order(seeded_db, order_no="HSFOREIGN01", form_extra={"business_responsible_ids": [2]})
+    _seed_order(seeded_db, order_no="HSMINE01", form_extra={"business_responsible_ids": [1]})
+    _seed_order(seeded_db, order_no="HSFOREIGN01", form_extra={"business_responsible_ids": [2]})
     seeded_db.flush()
 
     full = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text

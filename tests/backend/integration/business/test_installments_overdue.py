@@ -6,24 +6,17 @@ from datetime import date
 from decimal import Decimal
 import pytest
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
-from app.core.errors import Conflict, ErrorCode, NotFound, Validation
-from app.core.security import CurrentUser, build_access_token
+from app.core.errors import Validation
 from app.domain.enums import (
-    AccountStatus,
     AuditAction,
-    EventType,
     InstallmentContractType,
     InstallmentStatus,
-    ScheduleStatus,
-)
+    ScheduleStatus)
 from app.domain.foundation import AuditLog
-from app.domain.trade import Cashflow, Installment, InstallmentSchedule, Order, OrderEvent
-from app.domain.users import User
+from app.domain.trade import Installment, InstallmentSchedule
 from app.shared.installment_amounts import total_receivable
 from app.installments import create as inst_create
-from app.installments import queries as inst_queries
 from app.installments import recovery as inst_recovery
 from app.installments.repayments.pay import pay as inst_pay
 from app.installments.repayments.waive import waive_schedule as inst_waive

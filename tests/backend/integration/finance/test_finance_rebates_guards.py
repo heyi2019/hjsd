@@ -8,27 +8,17 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 from app.stocks.profile import create_account
-from app.core.errors import NotFound, Validation
-from app.shared.operation_operators import list_operation_operators
-from app.core.security import CurrentUser, build_access_token
+from app.core.errors import Validation
 from app.domain.foundation import Pool
 from app.domain.enums import CashflowSourceType
-from app.domain.trade import Cashflow, RebateRecord, Reconciliation
-from app.finance.cashflow_queries import list_cashflows
+from app.domain.trade import Cashflow
 from app.finance.cashflows import create_cashflow, reverse_cashflow
-from app.finance.deposits.writes import create_deposit
-from app.finance.deposits.lifecycle import lose_deposit, return_deposit
-from app.finance.deposits.reads import deposit_held_total, list_deposits
 from app.finance.rebates import create_rebate, list_rebates
-from app.finance.reconciliation import create_reconciliation, resolve_reconciliation
-from app.finance.transfers import create_transfer, repair_transfer
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.finance.balances import pool_balance
-from app.customer_center.counterparties import create_counterparty, set_counterparty_status
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 
 TODAY = date(2026, 10, 4)

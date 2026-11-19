@@ -30,6 +30,7 @@ def test_manual_cashflow_request_accepts_minimal_payload() -> None:
         category="OTHER",
         amount="1.00",
     )
+    assert Decimal(payload.amount) == Decimal("1.00")
 
 
 def test_pool_balance_projection_belongs_to_finance() -> None:

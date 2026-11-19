@@ -37,23 +37,19 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 
 from app.core.errors import Conflict, NotFound, Validation
 from app.domain.enums import (
     EventType,
     InstallmentContractType,
-    InstallmentStatus,
-    ScheduleStatus,
-)
-from app.domain.trade import Cashflow, InstallmentSchedule, OrderEvent
+    InstallmentStatus)
+from app.domain.trade import Cashflow, OrderEvent
 from app.installments import create as inst_create
 from app.installments import recovery as inst_recovery
 from app.installments.repayments.pay import pay as inst_pay
 from app.installments.repayments.cancel import cancel_installment as inst_cancel
 from app.installments.repayments.waive import waive_schedule as inst_waive
-from app.installments import settlement as inst_settlement
 from app.orders.create import create_order
 from app.orders.events import post_event
 
@@ -248,34 +244,6 @@ def test_installment_sale_posts_sell_attribute_without_sale_cashflow(seeded_db):
     assert payment_flow is not None
     assert payment_flow.source_type == "INSTALLMENT"
     assert payment_flow.source_id == contract.inst_no
-
-def _posted_event(seeded_db, order_id: int, *, event_type: str, amount: str, offset_event_id=None):
-    event = OrderEvent(
-        event_no=f"EVT-{order_id}-{event_type}-{amount}-{offset_event_id}",
-        order_id=order_id,
-        event_type=event_type,
-        amount=Decimal(amount),
-        occurred_on=TODAY,
-        is_posted=True,
-        offset_event_id=offset_event_id,
-    )
-    seeded_db.add(event)
-    seeded_db.flush()
-    return event
-
-def _pickup_overdue(seeded_db, game_account: str, **kwargs):
-    """DG 订单 + 逾期分期合约（订单创建时即关联库存账号）。"""
-    account = _account(
-        seeded_db,
-        game_account,
-        business_mode="DISTRIBUTION",
-        inventory_type="PICKUP",
-    )
-    order = _order(seeded_db, order_type="TH", account_id=account.id)
-    contract = _contract(seeded_db, order.id, **kwargs)
-    contract.status = InstallmentStatus.OVERDUE.value
-    seeded_db.flush()
-    return order, contract
 
 # ------------------------------------------------------- 建单：合约类型与计划
 def test_create_pickup_sale_requires_th_order(seeded_db):

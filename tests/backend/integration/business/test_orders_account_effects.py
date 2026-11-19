@@ -2,44 +2,24 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from pydantic import ValidationError
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-
-from app.shared.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.core.money import to_money
-from app.core.security import CurrentUser, DEV_USERS, build_access_token
+from app.core.security import CurrentUser
 from app.domain.enums import (
     AccountStatus,
-    AuditAction,
-    CustomerStatus,
-    OrderStatus,
-)
+    OrderStatus)
 from app.stocks.profile import create_account
-from app.installments import create as inst_create
-from app.finance.rebates import create_rebate
-from app.customer_center.counterparties import create_counterparty
-from app.customer_center.customers import create_customer, set_customer_status
-from app.domain.foundation import AuditLog
-from app.domain.parties import OrderCustomerRole
-from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField
-from app.domain.users import User
-from app.field_definitions.order_types import get_order_type_by_code, set_order_type_active
-from app.orders import schemas
-from app.shared.order_access import get_order
+from app.domain.trade import Account, Cashflow
 from app.orders.cancellation_model import cancel_order
 from app.orders.create import create_order
 from app.orders.events import _opposite_direction, post_event
-from app.orders.mutations import update_order
 from app.finance.balances import pool_balance
-from app.orders.queries import list_orders, order_customer_count
-from app.orders.router_output import _order_list_payload
 
 D = date(2026, 10, 4)
 
@@ -75,10 +55,7 @@ def _scoped_user() -> CurrentUser:
 
 class TestCancelOffsetDirection:
     def test_opposite_direction_three_branches(self, seeded_db):
-        from sqlalchemy import select
-
         from app.domain.enums import Direction
-        from app.domain.trade import Cashflow
 
         # 分支一：offset 指向 BUY → 方向取反为 IN（每分支独立建单）
         order_a = _order(seeded_db)

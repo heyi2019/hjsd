@@ -37,17 +37,14 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 
 from app.core.errors import Conflict, NotFound, Validation
 from app.domain.enums import (
-    EventType,
     InstallmentContractType,
     InstallmentStatus,
-    ScheduleStatus,
-)
-from app.domain.trade import Cashflow, InstallmentSchedule, OrderEvent
+    ScheduleStatus)
+from app.domain.trade import InstallmentSchedule, OrderEvent
 from app.installments import create as inst_create
 from app.installments import recovery as inst_recovery
 from app.installments.repayments.waive import waive_schedule as inst_waive

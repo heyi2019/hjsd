@@ -7,24 +7,13 @@
 """
 from __future__ import annotations
 
-from datetime import date
-
 from fastapi.testclient import TestClient
 import pytest
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
-from app.auth import router as auth_router
-from app.auth import service
-from app.core.errors import Validation
-from app.core.security import hash_password
 from app.core.security import CurrentUser, build_access_token, AuthError
 from app.auth.session import get_current_user
 from app.core.settings import Settings
-from app.domain.enums import AuditAction
-from app.domain.foundation import AuditLog
-from app.domain.trade import Order
 from app.domain.users import RevokedToken, User
 
 def _create_user(client: TestClient, *, username: str = "alice", password: str = "password123",

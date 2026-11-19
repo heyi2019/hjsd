@@ -42,11 +42,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import Conflict, NotFound, Validation
 from app.domain.enums import (
-    EventType,
     InstallmentContractType,
-    InstallmentStatus,
-    ScheduleStatus,
-)
+    InstallmentStatus)
 from app.domain.trade import Cashflow, InstallmentSchedule, OrderEvent
 from app.installments import create as inst_create
 from app.installments import recovery as inst_recovery
@@ -222,45 +219,7 @@ def test_recover_rejects_duplicate_recovery(seeded_db):
         )  # 1069-1076
 
 # ------------------------------------------------------- 回收账号出售登记全流程
-def _recovered(seeded_db, game_account: str):
-    """返回 (order, contract)：已完成账号回收、合约 CLOSED。"""
-    order, contract = _pickup_overdue(seeded_db, game_account)
-    inst_recovery.recover_account(
-        seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
-    )
-    seeded_db.refresh(order)
-    seeded_db.refresh(contract)
-    return order, contract
-
 # ------------------------------------------------- 外键 / 精度保证的不可达防御
-def _raw_sql(seeded_db, sql: str, params=()):
-    """在主会话的连接上执行 DML，绕过外键约束造脏数据。
-
-    PostgreSQL 没有 SQLite 的 `PRAGMA foreign_keys=OFF`；superuser 把会话级的
-    `session_replication_role` 设为 `replica` 后 FK 触发器不执行，可真实复现
-    「DBA 直连改数据遗留悬空引用 / 超精度零头」——这是生产同样会出现的一类脏行。
-
-    [2026-11-03 夹具改为事务回滚后重写] 原实现走**独立连接**：那时每个用例结束会
-    物理清库，主会话的 `commit()` 是真的落库，独立连接看得到那几行。夹具换成
-    「外层事务 + savepoint」后主会话写入不再真正提交，独立连接看不到，`UPDATE ...
-    WHERE id = ?` 会匹配 0 行，`pytest.raises(NotFound)` 随之失效。
-
-    现在改在主会话的连接内执行：
-    - 用 `SET LOCAL` 而不是 `SET`，作用域是当前事务，用例回滚时自动失效——比原来
-      「用完必须 RESET、否则连接归还池后静默关掉后续用例的 FK 约束」更安全；
-    - 造完脏数据立刻把 `session_replication_role` 恢复 `origin`，本事务后续的正常
-      写入仍受 FK 约束保护。
-    """
-    seeded_db.flush()
-    connection = seeded_db.connection()
-    connection.exec_driver_sql("SET LOCAL session_replication_role = 'replica'")
-    try:
-        # 调用点沿用 SQLite 的 `?` 占位符书写，这里翻译成 psycopg 的 `%s`。
-        connection.exec_driver_sql(sql.replace("?", "%s"), tuple(params))
-    finally:
-        connection.exec_driver_sql("SET LOCAL session_replication_role = 'origin'")
-    seeded_db.expire_all()
-
 def test_create_stock_sale_rejects_dangling_account(seeded_db):
     """orders.account_id 悬空 → STOCK_SALE 建单拒绝（L315）。
 

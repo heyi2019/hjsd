@@ -3,24 +3,18 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-
-import pytest
 from sqlalchemy import select
 
 from app.stocks.profile import create_account
-from app.core.errors import Conflict, ErrorCode, NotFound, Validation
-from app.domain.enums import AccountStatus, Direction, EventType, OrderStatus
+from app.core.errors import ErrorCode
+from app.domain.enums import AccountStatus
 from app.domain.foundation import Pool
-from app.field_definitions.order_types import get_order_type_by_code
-from app.domain.parties import OrderCustomerRole
-from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
+from app.domain.trade import Account, Cashflow, OrderEvent
 from app.installments import create as inst_create
-from app.installments import recovery as inst_recovery
 from app.installments.repayments.pay import pay as inst_pay
-from app.orders.create import add_customer_role, create_order
+from app.orders.create import create_order
 from app.orders.events import post_event
-from app.customer_center.counterparties import create_counterparty
-from app.customer_center.customers import create_customer, set_customer_status
+from app.customer_center.customers import create_customer
 
 TODAY = date(2026, 10, 4)
 TODAY2 = date(2026, 10, 18)

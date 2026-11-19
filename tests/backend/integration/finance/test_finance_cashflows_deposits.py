@@ -8,15 +8,12 @@ import pytest
 from sqlalchemy import select
 
 from app.core.errors import NotFound, Validation
-from app.shared.numbering import allocate_flow_no
-from app.shared.operation_operators import list_operation_operators
 from app.core.security import CurrentUser
 from app.domain.enums import CashflowLedgerType, CashflowSourceType
 from app.domain.foundation import Pool
-from app.domain.trade import Cashflow, Deposit
+from app.domain.trade import Cashflow
 from app.finance import cashflows
 from app.finance.cashflow_queries import list_cashflows
-from app.finance.cashflows import create_cashflow
 from app.finance.deposits.writes import create_deposit
 from app.finance.deposits.lifecycle import cancel_deposit, lose_deposit, return_deposit
 from app.finance.deposits.reads import list_deposits

@@ -22,8 +22,6 @@ from app.domain.enums import (
 from app.domain.trade import Cashflow, RebateRecord
 from app.finance.cashflows import create_cashflow, reverse_cashflow
 from app.orders.create import create_order
-from app.shared.order_amounts import order_amounts, order_profit_flow_by_order
-from app.reporting.profit import order_profit_detail
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 
 D = date(2026, 10, 17)

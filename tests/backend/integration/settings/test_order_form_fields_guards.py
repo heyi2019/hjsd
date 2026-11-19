@@ -13,10 +13,10 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from app.core.errors import Conflict, NotFound, Validation
+from app.core.errors import Validation
 from app.domain.trade import OrderFormField, OrderFormSectionLabel
 from app.orders import form_fields as ff
-from app.orders.schemas import OrderFormFieldCreate, OrderFormFieldUpdate, SectionLabelsSaveIn
+from app.orders.schemas import OrderFormFieldCreate, SectionLabelsSaveIn
 
 
 # --------------------------------------------------------------------------- #

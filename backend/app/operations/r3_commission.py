@@ -7,7 +7,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 from app.core.security import CurrentUser
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.orm import Session
 from app.domain.enums import EventType, OrderStatus
 from app.domain.trade import (
@@ -65,11 +65,17 @@ def r3_commission_reconciliation(
     if order_ids:
         for order_id, occurred_on in session.execute(
             select(OrderEvent.order_id, OrderEvent.occurred_on)
+            .join(Order, Order.id == OrderEvent.order_id)
             .where(
                 OrderEvent.order_id.in_(order_ids),
                 OrderEvent.event_type == EventType.SELL.value,
+                OrderEvent.is_posted.is_(True),
             )
-            .order_by(OrderEvent.order_id, OrderEvent.occurred_on)
+            .order_by(
+                OrderEvent.order_id,
+                case((Order.order_type.in_(("HS", "TH")), None), else_=OrderEvent.occurred_on).desc(),
+                OrderEvent.id.desc(),
+            )
         ).all():
             outbound_dates.setdefault(order_id, occurred_on)
 

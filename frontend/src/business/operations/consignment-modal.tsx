@@ -10,7 +10,7 @@ import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, MoneyText, PermissionButton, Select } from "../../shared/ui";
-import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigStatus, useOrderFormConfig } from "../ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { InventoryAccountSummary } from "../stocks/InventoryAccountSummary";
 import { activeConsignmentListings } from "./consignment-logic";
@@ -33,7 +33,7 @@ export function OrderConsignmentModal(props: {
   const [sourceOrderId, setSourceOrderId] = useState<number | null>(props.orderId ?? props.account?.source_order_id ?? null);
   const [form] = Form.useForm();
   const open = Boolean(props.account);
-  const { config } = useOrderFormConfig(open ? "CONSIGN" : undefined);
+  const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(open ? "CONSIGN" : undefined);
   const platforms = useOptionSet("INTERMEDIARY_PLATFORM") ?? [];
   const availablePlatforms = platforms.filter((option) => !listed.some((item) => item.platform === option.value));
 
@@ -68,7 +68,7 @@ export function OrderConsignmentModal(props: {
   }, [form, open, props.account, props.orderId]);
 
   const submit = async (values: { platform?: string; consignment_price?: number | null; listed_at?: Dayjs; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
-    if (!props.account) return;
+    if (!props.account || !configReady) return;
     const listedAt = values.listed_at ?? dayjs();
     if (!values.platform) return;
     if (!sourceOrderId) {
@@ -116,7 +116,7 @@ export function OrderConsignmentModal(props: {
       onCancel={props.onClose}
       footer={
         <CompactActions onCancel={props.onClose} divider={false}>
-          <PermissionButton permission="order.create" type="primary" aria-label="确认上架" loading={submitting} onClick={() => form.submit()}>
+          <PermissionButton permission="order.create" type="primary" aria-label="确认上架" loading={submitting} disabled={!configReady} onClick={() => form.submit()}>
             确认上架
           </PermissionButton>
         </CompactActions>
@@ -135,6 +135,7 @@ export function OrderConsignmentModal(props: {
           form={form}
           onFinish={submit}
         >
+          <FieldConfigStatus scope="CONSIGN" ready={configReady} error={configError} retry={retryConfig} />
           <CfgItem
             name="platform"
             label="寄售平台"

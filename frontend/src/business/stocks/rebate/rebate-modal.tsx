@@ -13,7 +13,7 @@ import { normalizeError } from "../../../shared/api/client";
 import { today } from "../../../shared/lib/format";
 import { moneyRules } from "../../../shared/lib/validators";
 import { BusinessActionModal, BusinessRegistrationForm, DateField, ErrorBanner, MoneyInput, MoneyText, PermissionButton, dateValueFromEvent, dateValueProps } from "../../../shared/ui";
-import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../../ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigStatus, useOrderFormConfig } from "../../ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../../ResponsibleEmployeeSelect";
 import { InventoryAccountSummary } from "../InventoryAccountSummary";
 import "./rebate-modal.css";
@@ -51,7 +51,7 @@ export function InventoryRebateModal(props: {
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const open = Boolean(props.account);
-  const { config } = useOrderFormConfig(open ? "INVREBATE" : undefined);
+  const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(open ? "INVREBATE" : undefined);
 
   useEffect(() => {
     if (!open || !props.account) return;
@@ -98,7 +98,7 @@ export function InventoryRebateModal(props: {
   );
 
   const submit = async (values: { rebate_type?: RebateKind; amount?: string; collected_on?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
-    if (!props.account) return;
+    if (!props.account || !configReady) return;
     const kind = values.rebate_type;
     const order = kind ? sourceOrder(detail, props.account.source_order_id, kind) : undefined;
     if (!kind || !order || submitInFlight.current) return;
@@ -128,7 +128,7 @@ export function InventoryRebateModal(props: {
   };
 
   const submitEdit = async (values: { amount?: string; collected_on?: string; note?: string; operator_user_ids?: number[] }) => {
-    if (!editTarget || editInFlight.current) return;
+    if (!editTarget || editInFlight.current || !configReady) return;
     editInFlight.current = true;
     setEditSubmitting(true);
     setEditError(null);
@@ -164,7 +164,7 @@ export function InventoryRebateModal(props: {
       onCancel={() => { setEditTarget(null); props.onClose(); }}
       width={900}
       footer={
-        <PermissionButton permission="order.event.post" type="primary" aria-label="确认登记" loading={submitting} onClick={() => form.submit()}>
+        <PermissionButton permission="order.event.post" type="primary" aria-label="确认登记" loading={submitting} disabled={!configReady} onClick={() => form.submit()}>
           确认登记
         </PermissionButton>
       }
@@ -183,6 +183,7 @@ export function InventoryRebateModal(props: {
             className="inventory-rebate-form ui-form-spaced"
             onFinish={submit}
           >
+            <FieldConfigStatus scope="INVREBATE" ready={configReady} error={configError} retry={retryConfig} />
             <CfgItem
               name="rebate_type"
               label="返点类型"
@@ -276,13 +277,14 @@ export function InventoryRebateModal(props: {
         labelAlign="left"
         labelCol={{ flex: "108px" }}
         wrapperCol={{ flex: "auto" }} scope="INVREBATE" form={editForm} onFinish={submitEdit}>
+          <FieldConfigStatus scope="INVREBATE_EDIT" ready={configReady} error={configError} retry={retryConfig} />
           <div className="rebate-core-fields">
             <CfgItem name="amount" label="返点金额" rules={[{ required: true, message: "请输入返点金额" }, ...moneyRules("返点金额")]}> <MoneyInput /></CfgItem>
             <CfgItem name="collected_on" label="返点日期" rules={[{ required: true, message: "请输入返点日期" }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
             <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           </div>
           <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
-          <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={editSubmitting}>保存</PermissionButton>
+          <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={editSubmitting} disabled={!configReady}>保存</PermissionButton>
         </BusinessRegistrationForm>
       </FieldConfigContext.Provider>
     </BusinessActionModal>

@@ -11,7 +11,7 @@ import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError } from "../shared/api/client";
 import { BusinessActionModal, BusinessRegistrationForm, CompactActions, DataTable, ErrorBanner, InlineError, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules } from "../shared/lib/validators";
-import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../business/ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, FieldConfigStatus, useOrderFormConfig } from "../business/ConfigurableField";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect";
@@ -30,7 +30,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
-  const { config } = useOrderFormConfig(createOpen ? "LEAD" : undefined);
+  const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(createOpen ? "LEAD" : undefined);
   const [closeTarget, setCloseTarget] = useState<Lead | null>(null);
   const [convertTarget, setConvertTarget] = useState<Lead | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -80,6 +80,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   };
 
   const createLead = async (values: Record<string, unknown>) => {
+    if (!configReady) return;
     await write.run(async () => {
       await leadsApi.create({ customer_id: Number(values.customer_id), request_type: values.request_type as string, budget: values.budget as string, target: values.target as string, note: values.note as string, extra_values: values.form_extra, operator_user_ids: values.operator_user_ids as number[] | undefined });
       appMessage.success("客户需求已创建"); setCreateOpen(false); createForm.resetFields(); await load();
@@ -149,6 +150,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       <InlineError error={write.error} />
       <FieldConfigContext.Provider value={config}>
         <BusinessRegistrationForm scope="LEAD" form={createForm} onFinish={createLead}>
+          <FieldConfigStatus scope="LEAD" ready={configReady} error={configError} retry={retryConfig} />
           <CfgItem name="customer_id" label="客户" rules={[{ required: true }]}><Select options={customers.map((customer) => ({ value: customer.id, label: `${customer.customer_no} · ${customer.display_name}` }))} /></CfgItem>
           <CfgItem name="request_type" label="需求类型" rules={[{ required: true }]}><Select /></CfgItem>
           <CfgItem name="budget" label="预算" rules={moneyRules("预算")}><MoneyInput /></CfgItem>
@@ -156,7 +158,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
           <CfgItem name="note" label="备注"><Input.TextArea rows={2} /></CfgItem>
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="lead-create" />
-          <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={write.pending} disabled={customers.length === 0}>创建需求</PermissionButton>
+          <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={write.pending} disabled={customers.length === 0 || !configReady}>创建需求</PermissionButton>
         </BusinessRegistrationForm>
       </FieldConfigContext.Provider>
     </BusinessActionModal>

@@ -176,6 +176,7 @@ export function useOrderDetailEditor(params: {
     if (!editingAccount) return;
     setSavingAccount(true);
     try {
+      const extraValues = await invEditExtraForm.validateFields();
       const {
         id,
         game_account,
@@ -208,7 +209,7 @@ export function useOrderDetailEditor(params: {
         account_images,
         note,
         extra_values,
-        form_extra: invEditExtraForm.getFieldsValue()?.form_extra,
+        form_extra: extraValues?.form_extra,
       };
       const detail = getExecutionDetail(id);
       const originalEvents = detail?.orders.flatMap((order) => order.events) ?? [];

@@ -17,6 +17,7 @@ vi.mock("@/business/ConfigurableField", () => ({
   FieldConfigContext: createContext({}),
   SectionLabelsContext: createContext({}),
   CustomFieldSection: () => null,
+  FieldConfigStatus: () => null,
   useOrderFormConfig: () => ({ config: {} }),
   useOrderFormSectionLabels: () => ({ labels: {} }),
 }));

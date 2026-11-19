@@ -9,7 +9,7 @@ import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, PermissionButton, Select } from "../../shared/ui";
-import { CfgItem, CustomFieldSection, FieldConfigContext, useOrderFormConfig } from "../ConfigurableField";
+import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigStatus, useOrderFormConfig } from "../ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { consignmentListings, type ConsignmentListing } from "./consignment-logic";
 import { formatDateTimeMinute } from "../../shared/lib/format";
@@ -56,7 +56,7 @@ export function OrderPlatformOffsaleModal(props: {
     : null;
   const displayRecords: DisplayConsignment[] = systemRecord ? [...props.records, systemRecord] : props.records;
   const [selectedMode, setSelectedMode] = useState<"PLATFORM" | "SYSTEM">("PLATFORM");
-  const { config } = useOrderFormConfig(open ? "INVOID" : undefined);
+  const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(open ? "INVOID" : undefined);
 
   useEffect(() => {
     if (!open) return;
@@ -67,7 +67,7 @@ export function OrderPlatformOffsaleModal(props: {
   }, [canSystemOffsale, form, open, props.account, props.records.length]);
 
   const submit = async (values: { listing_id: string; unlisted_at?: Dayjs; reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
-    if (submitInFlight.current) return;
+    if (submitInFlight.current || !configReady) return;
     if (values.listing_id === "SYSTEM") {
       submitInFlight.current = true;
       setSubmitting(true);
@@ -125,7 +125,7 @@ export function OrderPlatformOffsaleModal(props: {
       onCancel={props.onClose}
       footer={
         <CompactActions onCancel={props.onClose} divider={false}>
-          <PermissionButton permission="order.update" danger type="primary" aria-label={selectedMode === "SYSTEM" ? "确认出库" : "确认下架"} loading={submitting} onClick={() => form.submit()}>
+          <PermissionButton permission="order.update" danger type="primary" aria-label={selectedMode === "SYSTEM" ? "确认出库" : "确认下架"} loading={submitting} disabled={!configReady} onClick={() => form.submit()}>
             {selectedMode === "SYSTEM" ? "确认出库" : "确认下架"}
           </PermissionButton>
         </CompactActions>
@@ -139,6 +139,7 @@ export function OrderPlatformOffsaleModal(props: {
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="INVOID" form={form} onFinish={submit}>
+          <FieldConfigStatus scope="INVOID" ready={configReady} error={configError} retry={retryConfig} />
           <CfgItem name="listing_id" label="下架平台" rules={[{ required: true, message: "请选择下架平台" }]}>
             <Select
               aria-label="下架平台"

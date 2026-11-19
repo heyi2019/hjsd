@@ -318,6 +318,7 @@ if (mainSource.includes("responsive-overrides.css")) {
 const CONFIG_MODULE_RE = /from\s+"[^"]*ConfigurableField"/;
 const WIRED_RE = /FieldConfigScope|useOrderFormConfig/;
 const FORM_SCOPE_WHITELIST = new Map([
+  ["src/shared/ui/BusinessRegistrationForm.tsx", "共享表单容器，字段配置由使用它的业务表单提供"],
   ["src/auth/LoginPage.tsx", "登录表单，非业务数据录入"],
   ["src/auth/ChangePasswordPage.tsx", "改密表单，非业务数据录入"],
   ["src/auth/UserCenterPage.tsx", "用户中心，非业务数据录入"],

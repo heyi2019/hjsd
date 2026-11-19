@@ -15,6 +15,7 @@ import {
   isFieldActive,
   useOrderFormConfig,
   useOrderFormSectionLabels,
+  FieldConfigStatus,
 } from "../ConfigurableField";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Select } from "../../shared/ui";
@@ -143,7 +144,7 @@ export function OrderDetailProfileSection({
     [detail, meta.sourceOrderNo],
   );
   const creationOrderType = creationOrder?.order_type ?? undefined;
-  const { config: creationConfig } = useOrderFormConfig(creationOrderType);
+  const { config: creationConfig, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(creationOrderType);
   const { labels: sectionLabels } = useOrderFormSectionLabels(creationOrderType);
   // 编辑态必须以本地草稿 account 为唯一受控源；详情快照只用于只读展示。
   // 否则每次输入都会被 detail.account 的旧值覆盖，表现为输入框无法编辑。
@@ -174,6 +175,7 @@ export function OrderDetailProfileSection({
   return (
     <div className="order-detail__section order-detail__section--profile">
       <OrderSectionHeading title={sectionLabels["ACCOUNT_PRODUCT"] ?? "游戏账号信息"} />
+      {!editing ? <FieldConfigStatus scope="PROFILE" ready={configReady} error={configError} retry={retryConfig} /> : null}
       <div className="order-detail__meta">
         <div className="order-detail__meta-group">
           <div className="order-detail__meta-group-title">账号资料</div>

@@ -1,7 +1,10 @@
 /** 字段配置上下文与按作用域拉取配置；拆分自 ConfigurableField.tsx。 */
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
+import { Form, Input } from "antd";
 import { orderFormFieldsApi } from "../../shared/api/orders.api";
+import { normalizeError, type NormalizedError } from "../../shared/api/client";
+import { ErrorBanner } from "../../shared/ui/ErrorBanner";
 import type { OrderFormField } from "../../shared/api/types/forms";
 
 export type FieldConfigMap = Record<string, OrderFormField>;
@@ -13,25 +16,31 @@ export function fieldConfigFor(config: FieldConfigMap, key: string): OrderFormFi
 export function useOrderFormConfig(orderType: string | undefined): {
   config: FieldConfigMap;
   loading: boolean;
+  ready: boolean;
+  error: NormalizedError | null;
+  retry: () => void;
 } {
-  const [config, setConfig] = useState<FieldConfigMap>({});
+  const [loaded, setLoaded] = useState<{ scope: string; config: FieldConfigMap } | null>(null);
+  const [failure, setFailure] = useState<{ scope: string; error: NormalizedError } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   useEffect(() => {
-    if (!orderType) {
-      setConfig({});
-      return undefined;
-    }
+    if (!orderType) return undefined;
     let cancelled = false;
     setLoading(true);
+    setFailure(null);
     Promise.resolve(orderFormFieldsApi.list(orderType, true))
       .then((rows) => {
         if (cancelled) return;
         const map: FieldConfigMap = {};
         for (const row of rows ?? []) map[row.field_key] = row;
-        setConfig(map);
+        setLoaded({ scope: orderType, config: map });
       })
-      .catch(() => {
-        if (!cancelled) setConfig({});
+      .catch((cause) => {
+        if (!cancelled) {
+          setLoaded(null);
+          setFailure({ scope: orderType, error: normalizeError(cause) });
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -39,8 +48,27 @@ export function useOrderFormConfig(orderType: string | undefined): {
     return () => {
       cancelled = true;
     };
-  }, [orderType]);
-  return { config, loading };
+  }, [orderType, retryCount]);
+  const error = failure && failure.scope === orderType ? failure.error : null;
+  const ready = !orderType || (loaded?.scope === orderType && !error && !loading);
+  return {
+    config: loaded && loaded.scope === orderType ? loaded.config : {},
+    loading: Boolean(orderType && !ready && !error) || loading,
+    ready,
+    error,
+    retry: () => setRetryCount((value) => value + 1),
+  };
+}
+
+export function FieldConfigStatus({ scope, ready, error, retry }: {
+  scope: string; ready: boolean; error: NormalizedError | null; retry: () => void;
+}) {
+  const form = Form.useFormInstance();
+  return <>
+    {error ? <ErrorBanner error={{ ...error, message: `字段配置加载失败：${error.message}` }} onRetry={retry} /> : null}
+    {!ready && !error ? <div role="status">正在加载字段配置…</div> : null}
+    {form ? <Form.Item name={`__field_config_ready_${scope}`} hidden initialValue="ready" rules={[{ validator: () => ready ? Promise.resolve() : Promise.reject(new Error("请先加载字段配置")) }]}><Input /></Form.Item> : null}
+  </>;
 }
 
 /** 按业务类型拉取板块标题覆盖映射（section_key -> 显示标题）。
@@ -99,17 +127,21 @@ export function sectionLabel(key: string, fallback: string): string {
 
 /** 按「表单作用域」按需拉取配置并注入上下文。
  *  仅在 active 为 true 时请求，避免多弹窗面板挂载时一次性拉取全部作用域配置；
- *  无配置或请求失败时降级为空配置，各字段保持原硬编码标签/必填态。 */
+ *  配置加载失败时提示并禁止提交，重试后恢复表单。 */
 export function FieldConfigScope(props: {
   scope: string;
   active: boolean;
   children: ReactNode;
 }): ReactElement {
-  const { config } = useOrderFormConfig(props.active ? props.scope : undefined);
+  const state = useOrderFormConfig(props.active ? props.scope : undefined);
   const { labels } = useOrderFormSectionLabels(props.active ? props.scope : undefined);
+  const outerForm = Form.useFormInstance();
   return (
-    <FieldConfigContext.Provider value={config}>
-      <SectionLabelsContext.Provider value={labels}>{props.children}</SectionLabelsContext.Provider>
+    <FieldConfigContext.Provider value={state.config}>
+      <SectionLabelsContext.Provider value={labels}>
+        <FieldConfigStatus scope={props.scope} ready={state.ready} error={state.error} retry={state.retry} />
+        {outerForm || state.ready ? props.children : null}
+      </SectionLabelsContext.Provider>
     </FieldConfigContext.Provider>
   );
 }

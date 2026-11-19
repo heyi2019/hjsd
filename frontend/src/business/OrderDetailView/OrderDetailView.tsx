@@ -4,7 +4,7 @@ import type { AccountExecutionDetail, AccountExecutionEvent } from "../../shared
 import type { Account } from "../../shared/api/types/accounts";
 import type { Pool } from "../../shared/api/types/finance";
 import { BusinessRegistrationForm, PermissionButton } from "../../shared/ui";
-import { FieldConfigScope } from "../ConfigurableField";
+import { FieldConfigScope, FieldConfigStatus, useOrderFormConfig } from "../ConfigurableField";
 import { OrderDetailDeliverySection } from "./OrderDetailDeliverySection";
 import { OrderDetailExecutionSection } from "./OrderDetailExecutionSection";
 import { OrderDetailFinanceSection } from "./OrderDetailFinanceSection";
@@ -95,6 +95,8 @@ export function OrderDetailView({
   onCancel,
   saving,
 }: OrderDetailViewProps) {
+  const creationType = detail?.orders.find((order) => order.order_no === meta.sourceOrderNo)?.order_type;
+  const profileConfig = useOrderFormConfig(editing ? creationType : undefined);
   if (editing) {
     return (
       <div className="order-detail order-detail--editing">
@@ -104,6 +106,7 @@ export function OrderDetailView({
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="INVEDIT" form={extraForm}>
+          <FieldConfigStatus scope="PROFILE" ready={profileConfig.ready} error={profileConfig.error} retry={profileConfig.retry} />
           <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
             <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onOrderEdit={onOrderEdit} onProfileChange={onProfileChange} operatorUsername={operatorUsername} />
             <OrderDetailOperationSection meta={meta} editing account={editing ?? account} orderType={detail?.orders.find((order) => order.order_id === meta.orderId)?.order_type ?? detail?.orders[0]?.order_type} eventDrafts={eventDrafts} operationDrafts={operationDrafts} onEventEdit={onEventEdit} onOperationEdit={onOperationEdit} onAddOperationRow={onAddOperationRow} onRemoveOperationRow={onRemoveOperationRow} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} operatorUsername={operatorUsername} />

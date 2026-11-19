@@ -9,6 +9,8 @@ import { OrderConsignmentModal } from "@/business/operations/consignment";
 import { OrderDetailDeliverySection } from "@/business/OrderDetailView/OrderDetailDeliverySection";
 import { useOrderDetailEditor } from "@/business/OrderDetailView/editing/use-order-detail-editor";
 import { useInventoryList } from "@/business/stocks/InventoryPanel/useInventoryList";
+import { FieldConfigScope } from "@/business/ConfigurableField";
+import { BusinessRegistrationForm } from "@/shared/ui";
 
 import type { Account } from "@/shared/api/types/accounts";
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
@@ -122,6 +124,48 @@ beforeEach(() => {
   vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 describe("InventoryPanel：写入与长路径", () => {
+  it("详情编辑的字段配置未加载时禁止直接保存", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockRejectedValueOnce(new Error("配置读取失败"));
+    vi.mocked(ordersApi.updateExecution).mockResolvedValue({ ok: true });
+    const detail = { account: accounts[0], orders: [], detail_view: { finance_rows: [] } } as never;
+    function EditorProbe() {
+      const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved: vi.fn(), onRefreshFailed: vi.fn() });
+      return <><button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑</button>
+        {editor.editingAccount ? <><BusinessRegistrationForm form={editor.invEditExtraForm}><FieldConfigScope scope="INVEDIT" active><span>详情编辑</span></FieldConfigScope></BusinessRegistrationForm>
+          <button onClick={() => void editor.saveInline()}>保存</button></> : null}</>;
+    }
+    renderLight(<EditorProbe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑" }));
+    await screen.findByText(/字段配置加载失败/);
+    await ui.click(screen.getByRole("button", { name: "保存" }));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(ordersApi.updateExecution).not.toHaveBeenCalled();
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.queryByText(/字段配置加载失败/)).not.toBeInTheDocument());
+    await ui.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalledTimes(1));
+  });
+  it.each(["outside", "inside"])("字段配置失败时%s表单不能提交，重试后恢复", async (placement) => {
+    vi.mocked(orderFormFieldsApi.list).mockRejectedValueOnce(new Error("配置读取失败"));
+    const submit = vi.fn();
+    const content = <><input aria-label="辅助输入" /><button type="submit">提交</button></>;
+    const form = placement === "outside"
+      ? <FieldConfigScope scope="INVVOID" active><BusinessRegistrationForm onFinish={submit}>{content}</BusinessRegistrationForm></FieldConfigScope>
+      : <BusinessRegistrationForm onFinish={submit}><FieldConfigScope scope="INVVOID" active>{content}</FieldConfigScope></BusinessRegistrationForm>;
+    renderLight(form, { user: "admin" });
+    expect(await screen.findByText(/字段配置加载失败/)).toBeInTheDocument();
+    if (placement === "inside") {
+      await ui.click(screen.getByRole("button", { name: "提交" }));
+      expect(submit).not.toHaveBeenCalled();
+    } else {
+      expect(screen.queryByRole("button", { name: "提交" })).not.toBeInTheDocument();
+    }
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.queryByText(/字段配置加载失败/)).not.toBeInTheDocument());
+    await ui.click(await screen.findByRole("button", { name: "提交" }));
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+    expect(Object.keys(submit.mock.calls[0][0])).not.toContain("__field_config_ready_INVVOID");
+  });
   it.each(["success", "failure"])("库存筛选切换后忽略较旧请求的%s结果", async (oldResult) => {
     let resolveOld!: (value: Awaited<ReturnType<typeof stocksApi.inventoryLedger>>) => void;
     let rejectOld!: (error: Error) => void;

@@ -14,6 +14,7 @@ import {
   formatExtraDisplayValue,
   isFieldActive,
   useOrderFormConfig,
+  FieldConfigStatus,
 } from "../ConfigurableField";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import {
@@ -68,7 +69,7 @@ function DeliverySubSection({
   onProfileChange?: (changes: Partial<Account>) => void;
   operatorUsername?: string;
 }) {
-  const { config } = useOrderFormConfig(orderType ?? undefined);
+  const { config, ready, error, retry } = useOrderFormConfig(orderType ?? undefined);
   const platformOptions = useOptionSet("INTERMEDIARY_PLATFORM");
   const intermediaryTypeOptions = useOptionSet("INTERMEDIARY_TYPE");
   const compensationTypeOptions = useOptionSet("COMPENSATION_TYPE");
@@ -123,6 +124,7 @@ function DeliverySubSection({
   return (
     <div className="order-detail__meta-group">
       <div className="order-detail__meta-group-title">{title}</div>
+      <FieldConfigStatus scope={`DELIVERY_${order?.order_id ?? title}`} ready={ready} error={error} retry={retry} />
       <Descriptions className="order-detail__meta-table" size="small" bordered column={3}>
         {mainFields
           .filter((field) => isFieldActive(config, field.key))

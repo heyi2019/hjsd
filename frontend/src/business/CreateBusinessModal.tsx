@@ -2,7 +2,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form } from "antd";
 import { useEffect, useRef, useState } from "react";
-import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection } from "./ConfigurableField";
+import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection, FieldConfigStatus } from "./ConfigurableField";
 import { ordersApi } from "../shared/api/orders.api";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
@@ -69,7 +69,7 @@ export function CreateBusinessModal(props: {
   const formId = "business-order-form";
   // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
   // 不同业务类型通过 orderType 变化自动切换配置（get/post 走已落地的 GET 缓存层）。
-  const { config } = useOrderFormConfig(orderType);
+  const { config, ready: configReady = true, error: configError, retry: retryConfig } = useOrderFormConfig(orderType);
   const { labels } = useOrderFormSectionLabels(orderType);
   // 关闭弹窗即清空表单：antd Form 默认 preserve=true，destroyOnHidden 只销毁 DOM 不丢表单实例值，
   // 仅成功路径显式 resetFields；取消/点遮罩关闭会残留上次输入，故在 open 变 false 时统一 reset。
@@ -106,6 +106,7 @@ export function CreateBusinessModal(props: {
   }, [form, gameTypes, isRecovery, isTh, orderType, props.open]);
 
   const submit = async (values: Record<string, unknown>) => {
+    if (!configReady) return;
     if (submitInFlight.current) return;
     submitInFlight.current = true;
     setSubmitting(true);
@@ -184,7 +185,7 @@ export function CreateBusinessModal(props: {
         }
       }}
       footer={(
-        <PermissionButton permission="order.create" type="primary" htmlType="submit" form={formId} loading={submitting} disabled={submitting}>
+        <PermissionButton permission="order.create" type="primary" htmlType="submit" form={formId} loading={submitting} disabled={submitting || !configReady}>
           {submitting ? "创建中…" : "创建订单"}
         </PermissionButton>
       )}
@@ -224,6 +225,7 @@ export function CreateBusinessModal(props: {
             : {}),
         }}
       >
+        <FieldConfigStatus scope={orderType} ready={configReady} error={configError ?? null} retry={retryConfig ?? (() => undefined)} />
         <FieldConfigContext.Provider value={config}>
           <SectionLabelsContext.Provider value={labels}>
             {isRecovery ? <RecoveryAccountSection gameTypes={gameTypes} employees={employees} businessResponsibleLabel="回收操作人" showIntermediaryDelivery accountExtras={<CustomFieldSection section="ACCOUNT_PRODUCT" testIdSuffix="account" />}>

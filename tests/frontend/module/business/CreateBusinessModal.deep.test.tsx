@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { CreateBusinessModal } from "@/business/CreateBusinessModal";
 import { gameTypesApi } from "@/shared/api/misc.api";
-import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
+import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
@@ -60,6 +60,17 @@ async function openTypedModal(orderType: string, onClose = vi.fn(), onCreated = 
 }
 
 describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", () => {
+  it("字段配置读取失败时阻止建单并可重试", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockRejectedValueOnce(new Error("字段配置网络错误"));
+    await openTypedModal("HS");
+    expect(await screen.findByText(/字段配置加载失败/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /创建订单/ })).toBeDisabled();
+    await ui.type(screen.getByLabelText("客户昵称"), "保留客户输入");
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.queryByText(/字段配置加载失败/)).not.toBeInTheDocument());
+    expect(screen.getByLabelText("客户昵称")).toHaveValue("保留客户输入");
+    expect(screen.getByRole("button", { name: /创建订单/ })).toBeEnabled();
+  });
   it("业务数据加载失败后可在表单内重试并保留已输入内容", async () => {
     vi.mocked(poolsApi.list).mockRejectedValueOnce(new Error("load fail"));
     await openTypedModal("HS");

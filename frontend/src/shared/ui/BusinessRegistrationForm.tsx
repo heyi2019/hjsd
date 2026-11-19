@@ -23,12 +23,20 @@ export function BusinessRegistrationForm<Values = Record<string, unknown>>({
   labelCol = { flex: "108px" },
   wrapperCol = { flex: "auto" },
   scrollToFirstError = true,
+  onFinish,
   children,
   ...props
 }: BusinessRegistrationFormProps<Values>) {
   return (
     <Form
       {...props}
+      onFinish={onFinish ? (values) => {
+        if (values && typeof values === "object") {
+          const cleaned = Object.fromEntries(Object.entries(values).filter(([key]) => !key.startsWith("__field_config_ready_")));
+          return onFinish(cleaned as Values);
+        }
+        return onFinish(values);
+      } : undefined}
       layout={layout}
       labelAlign={labelAlign}
       labelCol={labelCol}

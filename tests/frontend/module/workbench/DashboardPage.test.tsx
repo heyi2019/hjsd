@@ -65,7 +65,7 @@ it("工作台展示业务总览指标和业务提醒", async () => {
 
 it("点击获得分润通知展示订单金额、分润配置人和库存回收信息", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
-      notifications: { pending_profit_count: 0, allocated_profit_count: 2 },
+      notifications: { pending_profit_count: 0, allocated_profit_count: 3 },
     }));
     vi.mocked(notificationsApi.list).mockResolvedValue({
       items: [{
@@ -83,11 +83,17 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
         id: 2, notification_no: "NTF0002", recipient_user_id: 2,
         notification_type: "PROFIT_ALLOCATED", title: "订单分润已配置", message: "订单不可见",
         entity_type: "order", entity_id: "TH-MISSING", created_by: "admin", read_at: null,
+      }, {
+        id: 3, notification_no: "NTF0003", recipient_user_id: 2,
+        notification_type: "PROFIT_ALLOCATED", title: "订单分润已配置", message: "查询失败",
+        entity_type: "order", entity_id: "TH-ERROR", created_by: "admin", read_at: null,
       }],
-      total: 2,
-      unread_total: 2,
+      total: 3,
+      unread_total: 3,
     });
-    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{
+    vi.mocked(ordersApi.listPage).mockImplementation(async (params) => {
+      if (params?.keyword === "TH-ERROR") throw new Error("订单查询失败");
+      return pageResponse([{
       id: 42,
       order_no: "TH0001",
       order_type: "TH",
@@ -96,7 +102,8 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
       sale_amount: "300.00",
       account_id: 7,
       stock_no: "KU0007",
-    }]));
+      }]);
+    });
     vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: {
         id: 7,
@@ -129,7 +136,7 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
     } as never);
     renderLight(<DashboardPage />, { user: "admin" });
 
-    fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 2 条" }));
+    fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 3 条" }));
     expect(await screen.findByText("订单分润通知详情")).toBeInTheDocument();
     expect(notificationsApi.list).toHaveBeenCalledWith({ limit: 200, unread_only: true, notification_type: "PROFIT_ALLOCATED" });
     expect(screen.getByText("TH0001")).toBeInTheDocument();
@@ -139,9 +146,10 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
     expect(screen.getByText("库存入库时间")).toBeInTheDocument();
     expect(screen.getByText("库存移出时间")).toBeInTheDocument();
     expect(screen.getByText("2026-11-17 12:30")).toBeInTheDocument();
-    expect(screen.getByText(/1 条通知暂时无法查看/)).toBeInTheDocument();
+    expect(screen.getByText(/2 条通知暂时无法查看/)).toBeInTheDocument();
     await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledWith(1));
     expect(notificationsApi.markRead).not.toHaveBeenCalledWith(2);
+    expect(notificationsApi.markRead).not.toHaveBeenCalledWith(3);
   });
 
 it("点击分润待配置通知跳转到对应订单的分润配置入口", async () => {

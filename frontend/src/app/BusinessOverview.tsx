@@ -98,7 +98,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
     void notificationsApi.list({ limit: 200, unread_only: true, notification_type: "PROFIT_ALLOCATED" })
       .then(async ({ items }) => {
         const profitNotifications = items.filter((item) => item.notification_type === "PROFIT_ALLOCATED" && item.entity_type === "order");
-        const loaded = await Promise.all(profitNotifications.map(async (notification) => {
+        const loaded = await Promise.allSettled(profitNotifications.map(async (notification) => {
           const page = await ordersApi.listPage({ keyword: notification.entity_id, limit: 20, offset: 0 });
           const order = page.items.find((item) => item.order_no === notification.entity_id);
           if (!order) return null;
@@ -106,7 +106,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
           return { notification, order, execution };
         }));
         if (cancelled) return;
-        const available = loaded.filter((item): item is ProfitNotificationDetail => item !== null);
+        const available = loaded.flatMap((item) => item.status === "fulfilled" && item.value !== null ? [item.value] : []);
         setDetails(available);
         setUnavailableCount(profitNotifications.length - available.length);
         setLoading(false);

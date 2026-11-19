@@ -1,6 +1,6 @@
 import { DatePicker, Form, Input } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
 import type { AccountExecutionOrder } from "../../shared/api/types/account-execution";
@@ -39,6 +39,7 @@ export function OrderPlatformOffsaleModal(props: {
 }) {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
+  const submitInFlight = useRef(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const open = Boolean(props.account);
@@ -66,21 +67,27 @@ export function OrderPlatformOffsaleModal(props: {
   }, [canSystemOffsale, form, open, props.account, props.records.length]);
 
   const submit = async (values: { listing_id: string; unlisted_at?: Dayjs; reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
+    if (submitInFlight.current) return;
     if (values.listing_id === "SYSTEM") {
+      submitInFlight.current = true;
       setSubmitting(true);
+      setError(null);
       try {
         await props.onSystemOffsale({ reason: values.reason.trim(), unlisted_at: (values.unlisted_at ?? dayjs()).format("YYYY-MM-DDTHH:mm"), operator_user_ids: values.operator_user_ids, form_extra: values.form_extra });
         form.resetFields();
       } catch (cause) {
         setError(normalizeError(cause));
       } finally {
+        submitInFlight.current = false;
         setSubmitting(false);
       }
       return;
     }
     const selected = props.records.find((record) => record.id === values.listing_id);
     if (!selected) return;
+    submitInFlight.current = true;
     setSubmitting(true);
+    setError(null);
     try {
       const unlistedAt = values.unlisted_at ?? dayjs();
       await ordersApi.postEvent(selected.orderId, {
@@ -105,6 +112,7 @@ export function OrderPlatformOffsaleModal(props: {
     } catch (cause) {
       setError(normalizeError(cause));
     } finally {
+      submitInFlight.current = false;
       setSubmitting(false);
     }
   };

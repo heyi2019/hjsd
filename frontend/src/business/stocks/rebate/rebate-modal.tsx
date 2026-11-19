@@ -41,6 +41,9 @@ export function InventoryRebateModal(props: {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const submitInFlight = useRef(false);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const editInFlight = useRef(false);
+  const [editError, setEditError] = useState<{ message: string; code?: string } | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [rebates, setRebates] = useState<Rebate[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
@@ -125,7 +128,10 @@ export function InventoryRebateModal(props: {
   };
 
   const submitEdit = async (values: { amount?: string; collected_on?: string; note?: string; operator_user_ids?: number[] }) => {
-    if (!editTarget) return;
+    if (!editTarget || editInFlight.current) return;
+    editInFlight.current = true;
+    setEditSubmitting(true);
+    setEditError(null);
     try {
       const updated = await rebatesApi.update(editTarget.id, {
         amount: values.amount,
@@ -140,7 +146,10 @@ export function InventoryRebateModal(props: {
       // 返点是收入"其中项"，编辑会改变订单利润/分润：必须通知上层刷新订单详情与统计（与登记/删除同口径）。
       await props.onCreated();
     } catch (cause) {
-      setError(normalizeError(cause));
+      setEditError(normalizeError(cause));
+    } finally {
+      editInFlight.current = false;
+      setEditSubmitting(false);
     }
   };
 
@@ -225,6 +234,7 @@ export function InventoryRebateModal(props: {
                         permission="order.event.post"
                         size="small"
                         onClick={() => {
+                          setEditError(null);
                           editForm.setFieldsValue({
                             amount: row.amount,
                             collected_on: row.collected_on,
@@ -259,6 +269,7 @@ export function InventoryRebateModal(props: {
       onCancel={() => setEditTarget(null)}
       footer={null}
     >
+      <ErrorBanner error={editError} />
       <FieldConfigContext.Provider value={config}>
         <BusinessRegistrationForm
         layout="horizontal"
@@ -271,7 +282,7 @@ export function InventoryRebateModal(props: {
             <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           </div>
           <CfgItem name="note" label="备注"><Input.TextArea rows={3} /></CfgItem>
-          <PermissionButton permission="order.event.post" type="primary" htmlType="submit">保存</PermissionButton>
+          <PermissionButton permission="order.event.post" type="primary" htmlType="submit" loading={editSubmitting}>保存</PermissionButton>
         </BusinessRegistrationForm>
       </FieldConfigContext.Provider>
     </BusinessActionModal>

@@ -261,6 +261,28 @@ describe("InventoryPanel：写入与长路径", () => {
     });
   });
 
+  it("编辑返点保存中防止重复请求，失败后在弹窗内提示并可重试", async () => {
+    let rejectUpdate!: (error: Error) => void;
+    vi.mocked(rebatesApi.update).mockReturnValueOnce(new Promise((_resolve, reject) => { rejectUpdate = reject; }));
+    renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+    await screen.findByText("返点明细");
+    await ui.click(screen.getByRole("button", { name: "编辑" }));
+    const modal = (await screen.findByText(/编辑返点 · HS0001-RB01/)).closest(".ant-modal-content") as HTMLElement;
+    const form = within(modal).getByRole("button", { name: "保存" }).closest("form")!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(rebatesApi.update).toHaveBeenCalledTimes(1));
+    fireEvent.submit(form);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(rebatesApi.update).toHaveBeenCalledTimes(1);
+    expect(within(modal).getByRole("button", { name: /保存/ })).toHaveClass("ant-btn-loading");
+    await act(async () => rejectUpdate(new Error("保存失败，请重试")));
+    expect(await within(modal).findByText(/保存失败，请重试/)).toBeInTheDocument();
+    expect(within(modal).getByRole("button", { name: /保存/ })).not.toHaveClass("ant-btn-loading");
+    resolveMock(vi.mocked(rebatesApi.update), { id: 41, rebate_no: "HS0001-RB01", amount: "1200.00" });
+    await ui.click(within(modal).getByRole("button", { name: /保存/ }));
+    await waitFor(() => expect(rebatesApi.update).toHaveBeenCalledTimes(2));
+  });
+
   it("编辑返点明细后通知上层刷新订单详情与统计（#9）", async () => {
     const onCreated = vi.fn();
     resolveMock(vi.mocked(rebatesApi.update), {

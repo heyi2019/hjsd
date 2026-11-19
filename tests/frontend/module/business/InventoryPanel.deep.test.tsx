@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
@@ -332,6 +332,29 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
         unlisted_at: expect.any(String),
       }),
     ));
+  });
+
+  it.each([
+    { label: "平台下架", option: /千寻（上架于/, button: "确认下架", request: ordersApi.postEvent },
+    { label: "代挂出库", option: /本系统（上架于/, button: "确认出库", request: ordersApi.inventoryOffsale },
+  ])("$label 提交期间防止重复操作", async ({ option, button, request }) => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(consignmentDetail);
+    if (button === "确认下架") vi.mocked(ordersApi.postEvent).mockReturnValue(new Promise(() => {}));
+    else vi.mocked(ordersApi.inventoryOffsale).mockReturnValue(new Promise(() => {}));
+    await openPanel([consignmentRow]);
+    await clickOperation(rowOf(1), "下架");
+    const modal = await screen.findByRole("dialog");
+    await ui.click(modal.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(await screen.findByText(option, { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("下架原因"), "结束上架");
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "操作人" }).closest(".ant-select")).toHaveTextContent("管理员"));
+    const form = screen.getByLabelText("下架原因").closest("form")!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+    fireEvent.submit(form);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: button })).toHaveClass("ant-btn-loading");
   });
 
   it("平台下架提交填写的原因", async () => {

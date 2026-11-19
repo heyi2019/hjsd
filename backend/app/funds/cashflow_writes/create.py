@@ -121,7 +121,11 @@ def create_cashflow(
         source_id=source_id,
         order_id=order_id,
         note=note,
-        form_extra=validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None,
+        form_extra=validate_form_extra(
+            session,
+            order_type_code="STUDIOEXP" if normalized_ledger_type == CashflowLedgerType.STUDIO.value else form_extra_scope,
+            values=form_extra,
+        ) or None,
         created_by=actor,
         updated_by=actor,
         operator_user_ids=operator_ids,

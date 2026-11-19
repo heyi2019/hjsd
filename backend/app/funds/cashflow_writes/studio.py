@@ -102,7 +102,6 @@ def update_cashflow(
     note: str | None = None,
     operator_user_ids: list[int] | None = None,
     form_extra: Mapping[str, Any] | None = None,
-    form_extra_scope: str = "STUDIOEXP",
     actor: str,
     user: CurrentUser | None = None,
 ) -> Cashflow:
@@ -141,7 +140,7 @@ def update_cashflow(
     flow.note = note
     if operator_ids is not None:
         flow.operator_user_ids = operator_ids
-    flow.form_extra = validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None
+    flow.form_extra = validate_form_extra(session, order_type_code="STUDIOEXP", values=form_extra) or None
     flow.updated_by = actor
     session.flush()
     record_audit(

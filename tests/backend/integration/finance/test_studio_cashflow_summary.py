@@ -18,6 +18,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.foundation import AuditLog, Pool
+from app.business.form_fields import create_order_form_field
 from app.funds.cashflows import create_cashflow, reverse_cashflow
 
 TODAY = date(2026, 10, 4)
@@ -88,6 +89,32 @@ def test_new_flow_appears_in_items_and_summary(seeded_client, seeded_db, headers
     assert [item["flow_no"] for item in payload["items"]] == [flow.flow_no]
     assert Decimal(payload["expense"]) == Decimal("120.00")
     assert Decimal(payload["net"]) == Decimal("-120.00")
+
+
+def test_studio_create_and_edit_use_studio_custom_field_rules(seeded_client, seeded_db, headers):
+    for scope, key, label in [("STUDIOEXP", "studio_note", "工作室凭据"), ("FUNDFLOW", "business_note", "业务凭据")]:
+        create_order_form_field(seeded_db, order_type_code=scope, field_key=key, label=label, required=True, actor="pytest")
+    seeded_db.commit()
+    payload = {
+        "pool_id": _pool(seeded_db).id, "occurred_on": TODAY.isoformat(),
+        "direction": "OUT", "ledger_type": "STUDIO", "accounting_attribute": "OPERATING_EXPENSE",
+        "category": "房租", "amount": "120.00",
+    }
+    missing = seeded_client.post("/api/v1/cashflows", headers=headers, json=payload)
+    assert missing.status_code == 422, missing.text
+    assert "工作室凭据" in missing.text
+    bypass_create = seeded_client.post("/api/v1/cashflows", headers=headers, json={**payload, "form_extra_scope": "FUNDFLOW", "form_extra": {"business_note": "凭据2"}})
+    assert bypass_create.status_code == 422, bypass_create.text
+    assert "工作室凭据" in bypass_create.text
+    created = seeded_client.post("/api/v1/cashflows", headers=headers, json={**payload, "form_extra": {"studio_note": "凭据1"}})
+    assert created.status_code == 201, created.text
+    assert created.json()["form_extra"] == {"studio_note": "凭据1"}
+    flow_id = created.json()["id"]
+    bypass = seeded_client.put(f"/api/v1/cashflows/{flow_id}", headers=headers, json={**payload, "form_extra_scope": "FUNDFLOW", "form_extra": {"business_note": "凭据2"}})
+    assert bypass.status_code == 422, bypass.text
+    saved = seeded_client.put(f"/api/v1/cashflows/{flow_id}", headers=headers, json={**payload, "form_extra": {"studio_note": "凭据3"}})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["form_extra"] == {"studio_note": "凭据3"}
 
 
 def test_edit_studio_cashflow_saves_operator_and_rejects_invalid_operator(seeded_client, seeded_db, headers):

@@ -182,7 +182,7 @@ class CashflowUpdate(RequestModel):
     amount: Decimal
     note: str | None = None
     form_extra: dict[str, Any] | None = None
-    form_extra_scope: str = "STUDIOEXP"
+    form_extra_scope: Literal["STUDIOEXP"] = "STUDIOEXP"
 
 
 class CashflowReverse(RequestModel):

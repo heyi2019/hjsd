@@ -520,6 +520,24 @@ describe("OrderDetail", () => {
     expect(Boolean(screen.queryByRole("combobox", { name: "选择合作方" }))).toBe(hasPartner);
   });
 
+  it.each([ ["HS", "选择卖家", "新建卖家"], ["TH", "选择合作方", "新建合作方"] ])("%s 新建参与方请求期间快速重复点击只创建一次", async (orderType, selectName, buttonName) => {
+    const detail = { orders: [{ order_id: 22, order_no: "TEST0022", order_type: orderType, customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
+    vi.spyOn(customersApi, "page").mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 } as never);
+    vi.spyOn(counterpartiesApi, "list").mockResolvedValue([]);
+    let finish!: (value: never) => void;
+    const pending = new Promise<never>((resolve) => { finish = resolve; });
+    const create = orderType === "HS" ? vi.spyOn(customersApi, "create").mockReturnValue(pending) : vi.spyOn(counterpartiesApi, "create").mockReturnValue(pending);
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
+    const select = await screen.findByRole("combobox", { name: selectName });
+    await waitFor(() => expect(select).toBeEnabled());
+    await userEvent.type(select, "新参与方");
+    const button = screen.getByRole("button", { name: new RegExp(buttonName) });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(create).toHaveBeenCalledTimes(1);
+    await act(async () => { finish((orderType === "HS" ? { customer: { id: 10, customer_no: "C010", display_name: "新参与方", status: "ACTIVE" }, duplicate_candidates: [] } : { id: 10, counterparty_no: "CP010", display_name: "新参与方", type: "PEER", status: "ACTIVE" }) as never); await pending; });
+  });
+
   it("参与方多选支持输入新名字并在下拉中新建", async () => {
     const detail = { orders: [{ order_id: 22, order_no: "HS0022", order_type: "HS", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
     vi.spyOn(customersApi, "page").mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 } as never);
@@ -564,6 +582,20 @@ describe("OrderDetail", () => {
     await waitFor(() => expect(screen.getByRole("combobox", { name: "选择合作方" })).toBeEnabled());
     await userEvent.click(screen.getByRole("combobox", { name: "选择合作方" }));
     expect(await screen.findByRole("option", { name: /渠道甲/ })).toBeInTheDocument();
+  });
+
+  it("客户较多时下拉只渲染可见选项，仍能搜索末尾客户", async () => {
+    const customers = Array.from({ length: 500 }, (_, index) => ({ id: index + 1, customer_no: `C${index + 1}`, display_name: `客户${index + 1}`, status: "ACTIVE" }));
+    const detail = { orders: [{ order_id: 22, order_no: "HS0022", order_type: "HS", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
+    vi.spyOn(customersApi, "page").mockResolvedValue({ items: customers, total: 500, limit: 500, offset: 0 } as never);
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
+    const select = await screen.findByRole("combobox", { name: "选择卖家" });
+    await waitFor(() => expect(select).toBeEnabled());
+    await userEvent.click(select);
+    await waitFor(() => expect(document.querySelectorAll(".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option").length).toBeGreaterThan(0));
+    expect(document.querySelectorAll(".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option").length).toBeLessThan(100);
+    await userEvent.type(select, "客户500");
+    expect(await screen.findByRole("option", { name: /客户500/ })).toBeInTheDocument();
   });
 
   it("编辑参与方可选择第500条以后的客户", async () => {

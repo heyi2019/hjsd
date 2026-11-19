@@ -8,6 +8,7 @@ import { customersApi, counterpartiesApi } from "../../shared/api/customers.api"
 import { loadCustomers } from "../../shared/api/loadCustomers";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
+import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import { ErrorBanner, PermissionButton, Select } from "../../shared/ui";
 import {
   OrderSectionHeading,
@@ -50,6 +51,8 @@ export function OrderDetailPartySection({
   const [selectedCounterpartyIds, setSelectedCounterpartyIds] = useState<number[]>([]);
   const [newCustomerNames, setNewCustomerNames] = useState<Record<string, string>>({});
   const [newCounterpartyName, setNewCounterpartyName] = useState("");
+  const customerCreate = useAsyncAction();
+  const counterpartyCreate = useAsyncAction();
 
   useEffect(() => {
     if (!editing) return;
@@ -87,37 +90,43 @@ export function OrderDetailPartySection({
 
   const addCustomer = async (role: string) => {
     const name = (newCustomerNames[role] ?? "").trim();
-    if (!name || !meta.orderId || !customersReady) return;
-    try {
-      const customer = customers.find((item) => item.display_name === name)
-        ?? (await customersApi.create({ display_name: name })).customer;
-      setCustomers((current) => current.some((item) => item.id === customer.id) ? current : [...current, customer]);
-      if (!selectedCustomers[role]?.includes(customer.id)) {
-        setSelectedCustomers((current) => ({ ...current, [role]: [...(current[role] ?? []), customer.id] }));
-        onPartyEdit?.(meta.orderId, { entity_type: "customer", entity_id: customer.id, role });
+    const orderId = meta.orderId;
+    if (!name || !orderId || !customersReady) return;
+    await customerCreate.run(async () => {
+      try {
+        const customer = customers.find((item) => item.display_name === name)
+          ?? (await customersApi.create({ display_name: name })).customer;
+        setCustomers((current) => current.some((item) => item.id === customer.id) ? current : [...current, customer]);
+        if (!selectedCustomers[role]?.includes(customer.id)) {
+          setSelectedCustomers((current) => ({ ...current, [role]: [...(current[role] ?? []), customer.id] }));
+          onPartyEdit?.(orderId, { entity_type: "customer", entity_id: customer.id, role });
+        }
+        setNewCustomerNames((current) => ({ ...current, [role]: "" }));
+      } catch (error) {
+        appMessage.error(error instanceof Error ? error.message : "新建客户失败");
       }
-      setNewCustomerNames((current) => ({ ...current, [role]: "" }));
-    } catch (error) {
-      appMessage.error(error instanceof Error ? error.message : "新建客户失败");
-    }
+    });
   };
 
   const addCounterparty = async () => {
     const name = newCounterpartyName.trim();
-    if (!name || !meta.orderId || !counterpartiesReady) return;
-    try {
-      if (!counterpartyRole) return;
-      const counterparty = counterparties.find((item) => item.display_name === name && item.type === counterpartyRole)
-        ?? (await counterpartiesApi.create({ display_name: name, type: counterpartyRole }));
-      setCounterparties((current) => current.some((item) => item.id === counterparty.id) ? current : [...current, counterparty]);
-      if (!selectedCounterpartyIds.includes(counterparty.id)) {
-        setSelectedCounterpartyIds((current) => [...current, counterparty.id]);
-        onPartyEdit?.(meta.orderId, { entity_type: "counterparty", entity_id: counterparty.id, role: counterpartyRole });
+    const orderId = meta.orderId;
+    if (!name || !orderId || !counterpartiesReady) return;
+    await counterpartyCreate.run(async () => {
+      try {
+        if (!counterpartyRole) return;
+        const counterparty = counterparties.find((item) => item.display_name === name && item.type === counterpartyRole)
+          ?? (await counterpartiesApi.create({ display_name: name, type: counterpartyRole }));
+        setCounterparties((current) => current.some((item) => item.id === counterparty.id) ? current : [...current, counterparty]);
+        if (!selectedCounterpartyIds.includes(counterparty.id)) {
+          setSelectedCounterpartyIds((current) => [...current, counterparty.id]);
+          onPartyEdit?.(orderId, { entity_type: "counterparty", entity_id: counterparty.id, role: counterpartyRole });
+        }
+        setNewCounterpartyName("");
+      } catch (error) {
+        appMessage.error(error instanceof Error ? error.message : "新建渠道方失败");
       }
-      setNewCounterpartyName("");
-    } catch (error) {
-      appMessage.error(error instanceof Error ? error.message : "新建渠道方失败");
-    }
+    });
   };
   const displayFields = useMemo(() => {
     const participantFields = [
@@ -156,6 +165,8 @@ export function OrderDetailPartySection({
                 <span className="order-detail__party-label">{label}</span>
                 <Select
                   mode="multiple"
+                  virtual={customers.length > 100}
+                  popupMatchSelectWidth={customers.length > 100}
                   showSearch
                   optionFilterProp="label"
                   aria-label={`选择${label}`}
@@ -164,7 +175,7 @@ export function OrderDetailPartySection({
                   placeholder={`输入或选择${label}，可多选`}
                   searchValue={newCustomerNames[role] ?? ""}
                   onSearch={(value) => setNewCustomerNames((current) => ({ ...current, [role]: value }))}
-                  popupRender={(menu) => <>{menu}{newCustomerNames[role]?.trim() ? <div className="order-detail__party-create" onMouseDown={(event) => event.preventDefault()}><PermissionButton permission="customer.create" disabled={!customersReady} type="link" onClick={() => void addCustomer(role)}>{`新建${label}：${newCustomerNames[role].trim()}`}</PermissionButton></div> : null}</>}
+                  popupRender={(menu) => <>{menu}{newCustomerNames[role]?.trim() ? <div className="order-detail__party-create" onMouseDown={(event) => event.preventDefault()}><PermissionButton permission="customer.create" disabled={!customersReady} loading={customerCreate.pending} type="link" onClick={() => void addCustomer(role)}>{`新建${label}：${newCustomerNames[role].trim()}`}</PermissionButton></div> : null}</>}
                   options={customers.map((item) => ({ value: item.id, label: `${item.customer_no} · ${item.display_name}` }))}
                   onChange={(ids: number[]) => {
                     setSelectedCustomers((current) => ({ ...current, [role]: ids }));
@@ -179,6 +190,8 @@ export function OrderDetailPartySection({
                 <span className="order-detail__party-label">合作方</span>
                 <Select
                   mode="multiple"
+                  virtual={counterparties.length > 100}
+                  popupMatchSelectWidth={counterparties.length > 100}
                   showSearch
                   optionFilterProp="label"
                   aria-label="选择合作方"
@@ -187,7 +200,7 @@ export function OrderDetailPartySection({
                   placeholder="输入或选择合作方，可多选"
                   searchValue={newCounterpartyName}
                   onSearch={setNewCounterpartyName}
-                  popupRender={(menu) => <>{menu}{newCounterpartyName.trim() ? <div className="order-detail__party-create" onMouseDown={(event) => event.preventDefault()}><PermissionButton permission="counterparty.manage" disabled={!counterpartiesReady} type="link" onClick={() => void addCounterparty()}>{`新建合作方：${newCounterpartyName.trim()}`}</PermissionButton></div> : null}</>}
+                  popupRender={(menu) => <>{menu}{newCounterpartyName.trim() ? <div className="order-detail__party-create" onMouseDown={(event) => event.preventDefault()}><PermissionButton permission="counterparty.manage" disabled={!counterpartiesReady} loading={counterpartyCreate.pending} type="link" onClick={() => void addCounterparty()}>{`新建合作方：${newCounterpartyName.trim()}`}</PermissionButton></div> : null}</>}
                   options={counterparties.filter((item) => item.type === counterpartyRole).map((item) => ({ value: item.id, label: `${item.counterparty_no} · ${item.display_name}` }))}
                   onChange={(ids: number[]) => {
                   const removed = selectedCounterpartyIds.filter((id) => !ids.includes(id));

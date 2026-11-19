@@ -111,12 +111,12 @@ def set_person_allocations(
                 "存在按金额分润时，比例合计不能超过 100%",
                 details={"total_rate": str(total_rate)},
             )
-        # 与分润对账一致，逐行按订单利润换算比例并保留两位小数。
+        # 与分润对账一致，先合计比例的精确金额，再统一舍入到分。
         rate_amount = sum(
-            ((profit * to_money(item.get("allocation_rate") or 0) / Decimal("100")).quantize(Decimal("0.01")) for item in items),
+            (profit * to_money(item.get("allocation_rate") or 0) / Decimal("100") for item in items),
             Decimal("0"),
         )
-        if abs(total_amount + rate_amount) > abs(profit):
+        if abs((total_amount + rate_amount).quantize(Decimal("0.01"))) > abs(profit):
             raise Validation(
                 "固定金额与比例换算后的分润合计不能超过订单利润",
                 details={"total_amount": str(total_amount + rate_amount), "profit": str(profit)},

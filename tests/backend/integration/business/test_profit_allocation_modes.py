@@ -278,6 +278,13 @@ def test_person_mode_amount_cannot_exceed_order_profit(seeded_db):
     report = r3_commission_reconciliation(seeded_db)
     group = next(group for group in report["order_groups"] if group["order_id"] == order_id)
     assert group["profit_base"] == Decimal("500.00")
+    small_order = _order_with_profit(seeded_db, buy="100", sell="100.05")
+    policy_allocations.set_allocations(seeded_db, small_order, items=[
+        {"user_id": 1, "role": "OWNER", "allocation_amount": "0.01"},
+        {"user_id": 2, "role": "OWNER", "allocation_rate": "10"},
+    ])
+    small_group = next(group for group in r3_commission_reconciliation(seeded_db)["order_groups"] if group["order_id"] == small_order)
+    assert small_group["profit_base"] == Decimal("0.02")
 
 
 def test_person_mode_amount_requires_positive_profit(seeded_db):
@@ -361,6 +368,26 @@ def test_commission_report_uses_amount_as_payable_base(seeded_db):
     rows = [row for group in report["order_groups"] for row in group["orders"]]
 
     assert [row["profit_base"] for row in rows] == [Decimal("120.00")]
+
+    for buy, sell, expected in (("100", "100.05", Decimal("0.05")), ("100.05", "100", Decimal("-0.05"))):
+        small_order = _order_with_profit(seeded_db, buy=buy, sell=sell)
+        policy_allocations.set_allocations(seeded_db, small_order, items=[
+            {"user_id": 1, "role": "OWNER", "allocation_rate": "33.33"},
+            {"user_id": 2, "role": "OWNER", "allocation_rate": "33.33"},
+            {"user_id": 3, "role": "OWNER", "allocation_rate": "33.34"},
+        ])
+        report = r3_commission_reconciliation(seeded_db)
+        group = next(group for group in report["order_groups"] if group["order_id"] == small_order)
+        assert group["profit_base"] == expected
+        assert sum((row["profit_base"] for row in group["orders"]), Decimal("0")) == expected
+        sign = Decimal("1") if expected > 0 else Decimal("-1")
+        assert {row["user_id"]: row["profit_base"] for row in group["orders"]} == {
+            1: sign * Decimal("0.02"), 2: sign * Decimal("0.01"), 3: sign * Decimal("0.02"),
+        }
+        for detail in group["orders"]:
+            personal = r3_commission_reconciliation(seeded_db, user_id=detail["user_id"])
+            personal_group = next(item for item in personal["order_groups"] if item["order_id"] == small_order)
+            assert personal_group["profit_base"] == detail["profit_base"]
 
 
 # ---- 亏损单分润（2026-11-05 用户裁决「亏损的时候分亏损」）----

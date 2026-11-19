@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
 from typing import Any
 from app.core.security import CurrentUser
 from sqlalchemy import case, select
@@ -24,6 +24,32 @@ from ._shared import (
     _validate_date_range,
     cashflow_totals_by_order,
 )
+
+
+def _allocation_bases(rows: list[OrderProfitAllocation], profit: Decimal) -> dict[int, Decimal]:
+    """同一订单先统一分配尾差，再按人员筛选，确保各视图金额一致。"""
+    fixed: dict[int, Decimal] = {}
+    raw_rates: dict[int, Decimal] = {}
+    for row in rows:
+        amount = to_money_or_zero(row.allocation_amount)
+        if amount != 0:
+            fixed[row.id] = amount
+        else:
+            raw_rates[row.id] = profit * to_money_or_zero(row.allocation_rate) / Decimal("100")
+    rounded = {key: value.quantize(Decimal("0.01"), rounding=ROUND_DOWN) for key, value in raw_rates.items()}
+    fixed_total = sum(fixed.values(), ZERO)
+    target = (fixed_total + sum(raw_rates.values(), ZERO)).quantize(Decimal("0.01")) - fixed_total
+    cents = int((target - sum(rounded.values(), ZERO)) * 100)
+    if cents:
+        direction = Decimal("0.01") if cents > 0 else Decimal("-0.01")
+        candidates = sorted(
+            (key for key, value in raw_rates.items() if value * direction > 0),
+            key=lambda key: (-(abs(raw_rates[key]) - abs(rounded[key])), key),
+        )
+        for key in candidates[:abs(cents)]:
+            rounded[key] += direction
+    return {**fixed, **rounded}
+
 
 def r3_commission_reconciliation(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
@@ -50,11 +76,6 @@ def r3_commission_reconciliation(
             session,
         )
     ).all()
-    if mine and user is not None:
-        rows = [row for row in rows if row[0].user_id == user.id]
-    if user_id is not None:
-        rows = [row for row in rows if row[0].user_id == user_id]
-
     order_ids = {order.id for _, order in rows}
     account_ids = {order.account_id for _, order in rows if order.account_id is not None}
     accounts = {
@@ -90,25 +111,31 @@ def r3_commission_reconciliation(
         ).items():
             per_order_profit[order_id] = to_money_or_zero(income - expense)
 
+    allocations_by_order: dict[int, list[OrderProfitAllocation]] = defaultdict(list)
+    for allocation, order in rows:
+        allocations_by_order[order.id].append(allocation)
+    base_by_allocation = {
+        allocation_id: amount
+        for order_id, allocations in allocations_by_order.items()
+        for allocation_id, amount in _allocation_bases(allocations, per_order_profit[order_id]).items()
+    }
+    if mine and user is not None:
+        rows = [row for row in rows if row[0].user_id == user.id]
+    if user_id is not None:
+        rows = [row for row in rows if row[0].user_id == user_id]
+
     order_grouped: dict[int, dict[str, Any]] = {}
     for allocation, order in rows:
         if from_date and order.trade_date < from_date:
             continue
         if to_date and order.trade_date > to_date:
             continue
-        profit = per_order_profit[order.id]
-        rate = to_money_or_zero(allocation.allocation_rate)
-        amount = to_money_or_zero(allocation.allocation_amount)
         account = accounts.get(order.account_id)
         # 分润支持「按比例」与「按金额」两种录入口径：填了金额就直接作为应付基数，
         # 否则按 利润 × 比例 计算。二者由录入校验保证不会同时出现。
         # 判据必须是 `!= 0` 而非 `> 0`：亏损单的金额本身就是负数（填 -300 表示分担 300 亏损），
         # 用 `> 0` 会把负数误判成「没填金额」而回退到比例，亏损分润就算错。
-        base = (
-            amount
-            if amount != 0
-            else (profit * rate / Decimal("100")).quantize(Decimal("0.01"))
-        )
+        base = base_by_allocation[allocation.id]
         detail = {
             "user_id": allocation.user_id,
             "order_no": order.order_no,

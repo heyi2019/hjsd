@@ -64,6 +64,20 @@ def test_edit_listing_cannot_change_to_another_active_platform(seeded_client, se
     assert response.status_code == 422, response.text
 
 
+@pytest.mark.parametrize("new_type", ["DESCRIPTION", "UNLIST", None])
+def test_existing_listing_operation_type_cannot_be_changed(seeded_client, seeded_db, headers, new_type):
+    from app.business.listing_state import active_listings
+    account = create_account(seeded_db, game_account="edit-operation-type", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
+    extra = {"consignment_platforms": ["平台甲"]}
+    if new_type is not None:
+        extra["operation_type"] = new_type
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": extra}]})
+    assert response.status_code == 422, response.text
+    assert active_listings(seeded_db, order.id) == {(listing.id, "平台甲")}
+
+
 @pytest.mark.parametrize("change", [
     {"consignment_platforms": ["平台乙"]},
     {"platform_unlist_scope": "SYSTEM"},

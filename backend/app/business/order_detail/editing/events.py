@@ -100,6 +100,8 @@ def validate_event_edits(
         if Decimal(str(event.amount)) != item.expected_amount:
             raise Conflict("执行记录已被修改，请刷新后重试")
         original_extra = event.form_extra or {}
+        if event.event_type == "OPERATE" and original_extra.get("operation_type") and item.form_extra is not None and item.form_extra.get("operation_type") != original_extra.get("operation_type"):
+            raise Validation("运营记录的动作类型不能直接修改")
         if event.event_type == "OPERATE" and original_extra.get("operation_type") == "UNLIST" and (original_extra.get("consignment_event_id") is not None or original_extra.get("platform_unlist_scope") == "SYSTEM") and item.form_extra is not None:
             protected = ("operation_type", "consignment_event_id", "consignment_platforms", "platform_unlist_scope")
             if any(item.form_extra.get(key) != original_extra.get(key) for key in protected):

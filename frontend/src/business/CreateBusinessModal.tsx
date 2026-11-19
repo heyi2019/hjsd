@@ -52,6 +52,9 @@ export function CreateBusinessModal(props: {
     employees,
     loadError,
     setLoadError,
+    canRetryLookups,
+    lookupLoading,
+    retryLookups,
   } = useCreateBusinessLookups();
   const [submitting, setSubmitting] = useState(false);
   const submitInFlight = useRef(false);
@@ -61,6 +64,8 @@ export function CreateBusinessModal(props: {
   const [repurchasePrompt, setRepurchasePrompt] = useState<{ values: Record<string, unknown>; gameAccount: string } | null>(null);
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
   const initialValuesRef = useRef<Record<string, unknown>>({});
+  const initializedFormRef = useRef(false);
+  const userChangedFormRef = useRef(false);
   const formId = "business-order-form";
   // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
   // 不同业务类型通过 orderType 变化自动切换配置（get/post 走已落地的 GET 缓存层）。
@@ -72,15 +77,16 @@ export function CreateBusinessModal(props: {
     if (!props.open) {
       form.resetFields();
       repurchaseConfirmedFor.current = null;
+      initializedFormRef.current = false;
+      userChangedFormRef.current = false;
     }
   }, [props.open, form]);
 
   useEffect(() => {
     if (!props.open || !orderType) return;
-    const defaults: Record<string, unknown> = {
-      order_type: orderType,
-    };
-    if (isRecovery) {
+    const firstInitialization = !initializedFormRef.current;
+    const defaults: Record<string, unknown> = firstInitialization ? { order_type: orderType } : {};
+    if (firstInitialization && isRecovery) {
       defaults.customer_role = "SELLER";
       defaults.counterparty_role = "PEER";
     }
@@ -90,8 +96,13 @@ export function CreateBusinessModal(props: {
       defaults[gameTypeField] = defaultGameType;
     }
     form.setFieldsValue(defaults);
-    // 以「打开瞬间」的表单值为脏判定基线：仅打开下拉再收起不算脏（P2-198）。
-    initialValuesRef.current = form.getFieldsValue(true);
+    if (firstInitialization) {
+      // 只在打开时建立基线；异步选项返回不能把用户的输入视作初始值。
+      initialValuesRef.current = form.getFieldsValue(true);
+      initializedFormRef.current = true;
+    } else if (defaults[gameTypeField] !== undefined) {
+      initialValuesRef.current = { ...initialValuesRef.current, [gameTypeField]: defaults[gameTypeField] };
+    }
   }, [form, gameTypes, isRecovery, isTh, orderType, props.open]);
 
   const submit = async (values: Record<string, unknown>) => {
@@ -165,7 +176,7 @@ export function CreateBusinessModal(props: {
       open={props.open}
       onCancel={() => {
         const currentValues = form.getFieldsValue(true);
-        const isDirty = JSON.stringify(currentValues) !== JSON.stringify(initialValuesRef.current);
+        const isDirty = userChangedFormRef.current && JSON.stringify(currentValues) !== JSON.stringify(initialValuesRef.current);
         if (isDirty) {
           setAbandonConfirmOpen(true);
         } else {
@@ -179,7 +190,7 @@ export function CreateBusinessModal(props: {
       )}
       width={1200}
     >
-      <ErrorBanner error={loadError} />
+      <ErrorBanner error={loadError} onRetry={canRetryLookups ? () => void retryLookups() : undefined} retrying={lookupLoading} />
       <BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"
@@ -195,6 +206,7 @@ export function CreateBusinessModal(props: {
           setLoadError({ code: "FORM_VALIDATION", message: "请补齐必填项后再创建订单" });
         }}
         onValuesChange={(changed) => {
+          userChangedFormRef.current = true;
           if (submitErrorVisible.current) {
             submitErrorVisible.current = false;
             setLoadError(null);

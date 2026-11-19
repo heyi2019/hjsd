@@ -456,6 +456,20 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("基础资料延迟返回后，已填写内容仍会触发放弃确认", async () => {
+    let resolveGames!: (items: Awaited<ReturnType<typeof gameTypesApi.list>>) => void;
+    vi.mocked(gameTypesApi.list).mockReturnValueOnce(new Promise((resolve) => { resolveGames = resolve; }));
+    const onClose = vi.fn();
+    renderLight(<CreateBusinessModal open onClose={onClose} onCreated={() => undefined} initialOrderType="HS" />, { user: "admin" });
+    await screen.findByText("新建回收订单");
+    await ui.type(screen.getByLabelText("客户昵称"), "未保存的客户");
+    await act(async () => resolveGames([{ id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true }]));
+    await waitFor(() => expect(screen.getByLabelText("游戏类型").closest(".ant-select")).toHaveTextContent("王者荣耀"));
+    await ui.click(document.querySelector(".ant-modal-close") as Element);
+    expect(await screen.findByText("放弃未保存的建单内容？")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("P2-198：已改值关闭弹出放弃确认，确认后关闭", async () => {
     const onClose = vi.fn();
     renderLight(

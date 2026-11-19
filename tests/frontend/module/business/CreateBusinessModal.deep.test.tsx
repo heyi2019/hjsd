@@ -60,12 +60,17 @@ async function openTypedModal(orderType: string, onClose = vi.fn(), onCreated = 
 }
 
 describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", () => {
-  it("业务数据加载失败展示错误横幅（弹窗内无重试入口）", async () => {
-    vi.mocked(poolsApi.list).mockRejectedValue(new Error("load fail"));
+  it("业务数据加载失败后可在表单内重试并保留已输入内容", async () => {
+    vi.mocked(poolsApi.list).mockRejectedValueOnce(new Error("load fail"));
     await openTypedModal("HS");
     expect((await screen.findAllByText(/load fail/)).length).toBeGreaterThan(0);
-    // 组件未给 ErrorBanner 传 onRetry，故弹窗内无「重新加载」按钮；load 的 catch 分支已覆盖
-    expect(screen.queryByText("重新加载")).toBeNull();
+    await ui.type(screen.getByLabelText("客户昵称"), "已输入的客户");
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(poolsApi.list).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText(/load fail/)).not.toBeInTheDocument());
+    expect(screen.getByLabelText("客户昵称")).toHaveValue("已输入的客户");
+    await ui.click(screen.getByLabelText("资金账户"));
+    expect(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
   });
 
   it("提交客户草稿给订单接口，由后端在同一事务中解析档案", async () => {

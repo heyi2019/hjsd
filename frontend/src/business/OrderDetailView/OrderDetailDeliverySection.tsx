@@ -124,7 +124,7 @@ function DeliverySubSection({
   return (
     <div className="order-detail__meta-group">
       <div className="order-detail__meta-group-title">{title}</div>
-      <FieldConfigStatus scope={`DELIVERY_${order?.order_id ?? title}`} ready={ready} error={error} retry={retry} />
+      <FieldConfigStatus scope={`DELIVERY_${order?.order_id ?? "none"}_${title}`} ready={ready} error={error} retry={retry} />
       <Descriptions className="order-detail__meta-table" size="small" bordered column={3}>
         {mainFields
           .filter((field) => isFieldActive(config, field.key))

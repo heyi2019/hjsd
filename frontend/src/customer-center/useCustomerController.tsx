@@ -16,6 +16,7 @@ import { ConfirmButton, PermissionButton, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { collectExtras } from "./CustomersPage.fragments";
+import { loadActiveCustomers } from "./loadActiveCustomers";
 
 /** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
 export function useCustomerController({ active = true, focusId, orderFilter, createdPeriod }: { active?: boolean; focusId?: number; orderFilter?: { from?: string; to?: string }; createdPeriod?: { from: string; to: string } | null }) {
@@ -330,8 +331,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     setMergeTarget(target);
     setMergeCandidates(null);
     try {
-      const customerPage = await customersApi.page({ status: "ACTIVE", limit: 500, offset: 0 });
-      setMergeCandidates(customerPage.items);
+      setMergeCandidates(await loadActiveCustomers());
     } catch (err) {
       setCandidateError(normalizeError(err));
       setMergeCandidates([]);

@@ -4,7 +4,7 @@ import { Card, Form, Input, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { customersApi, leadsApi } from "../shared/api/customers.api";
+import { leadsApi } from "../shared/api/customers.api";
 import type { Customer, Lead } from "../shared/api/types/customers";
 import { employeesApi } from "../shared/api/org.api";
 import type { EmployeeOption } from "../shared/api/types/org";
@@ -15,6 +15,7 @@ import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useO
 import { configurableLabel } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect";
+import { loadActiveCustomers } from "./loadActiveCustomers";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
 
@@ -72,10 +73,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       setError(null);
       setActionError(null);
       setCustomersLoading(true);
-      if (customers.length === 0) {
-        const customerPage = await customersApi.page({ status: "ACTIVE", limit: 500, offset: 0 });
-        setCustomers(customerPage.items);
-      }
+      setCustomers(await loadActiveCustomers());
       setCreateOpen(true);
     } catch (err) { setError(normalizeError(err)); }
     finally { setCustomersLoading(false); }

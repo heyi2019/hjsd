@@ -52,6 +52,27 @@ beforeEach(() => {
 });
 
 describe("CustomerLeadPanel：客户需求池", () => {
+  it("新增需求可选择后续页的有效客户", async () => {
+    vi.mocked(customersApi.page)
+      .mockResolvedValueOnce(pageResponse(customers, { total: 2, limit: 500, offset: 0 }))
+      .mockResolvedValueOnce(pageResponse([{ id: 2, customer_no: "C-LATER", display_name: "后续客户", status: "ACTIVE" }], { total: 2, limit: 500, offset: 1 }));
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    await ui.click(await screen.findByRole("button", { name: "新增需求" }));
+    const modal = (await screen.findByText("新增客户需求")).closest(".ant-modal-content") as HTMLElement;
+    await ui.click(within(modal).getByLabelText("客户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
+    expect(await screen.findByText("C-LATER · 后续客户", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(customersApi.page).toHaveBeenLastCalledWith({ status: "ACTIVE", limit: 500, offset: 1 });
+  });
+
+  it("客户名单后续页加载失败时提示重试，不显示不完整名单", async () => {
+    vi.mocked(customersApi.page)
+      .mockResolvedValueOnce(pageResponse(customers, { total: 2, limit: 500, offset: 0 }))
+      .mockRejectedValueOnce(new Error("客户名单读取失败"));
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    await ui.click(await screen.findByRole("button", { name: "新增需求" }));
+    expect(await screen.findByText(/客户名单读取失败/)).toBeVisible();
+    expect(screen.queryByRole("dialog", { name: "新增客户需求" })).toBeNull();
+  });
   it("需求日期筛选失败隐藏旧数据，重试后恢复", async () => {
     const view = renderLight(<CustomerLeadPanel createdPeriod={{ from: "2026-10-01", to: "2026-10-31" }} />, { user: "admin" });
     await screen.findByText("LD-1");

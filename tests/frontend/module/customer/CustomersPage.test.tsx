@@ -507,6 +507,23 @@ describe("CustomersPage：行内动作", () => {
   });
 
   describe("CustomersPage：客户与合作方操作流", () => {
+    it("合并客户可选择后续页的有效客户", async () => {
+      vi.mocked(customersApi.page).mockImplementation(async (params) => {
+        if (params?.status === "ACTIVE" && params?.limit === 500) {
+          return params.offset === 0
+            ? pageResponse([customers[0]], { total: 2, limit: 500, offset: 0 })
+            : pageResponse([customers[1]], { total: 2, limit: 500, offset: 1 });
+        }
+        return pageResponse(customers);
+      });
+      renderLight(<CustomersPage />, { user: "admin" });
+      await screen.findByText("CUS-0001");
+      await ui.click(screen.getAllByRole("button", { name: /合并/ })[0]);
+      const modal = await screen.findByRole("dialog");
+      await waitFor(() => expect(customersApi.page).toHaveBeenCalledWith({ status: "ACTIVE", limit: 500, offset: 1 }));
+      await ui.click(modal.querySelector(".ant-select-selector") as HTMLElement);
+      expect(await screen.findByText("CUS-0002 李四", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    });
     it("客户建档请求未完成时不能重复提交", async () => {
       let finish!: (value: Awaited<ReturnType<typeof customersApi.create>>) => void;
       const pending = new Promise<Awaited<ReturnType<typeof customersApi.create>>>((resolve) => { finish = resolve; });

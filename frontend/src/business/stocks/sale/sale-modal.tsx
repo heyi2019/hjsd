@@ -4,6 +4,7 @@ import { Form } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useRef, useState } from "react";
 import { customersApi } from "../../../shared/api/customers.api";
+import { loadCustomers } from "../../../shared/api/loadCustomers";
 import { ordersApi } from "../../../shared/api/orders.api";
 import { employeesApi } from "../../../shared/api/org.api";
 import { poolsApi } from "../../../shared/api/pools.api";
@@ -139,7 +140,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    void Promise.all([customersApi.list({ limit: 500, offset: 0 }), poolsApi.list(), employeesApi.list()])
+    void Promise.all([loadCustomers(), poolsApi.list(), employeesApi.list()])
       .then(([customerList, poolList, employeeList]) => {
         if (cancelled) return;
         setCustomers(customerList);

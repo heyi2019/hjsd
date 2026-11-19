@@ -65,7 +65,7 @@ beforeEach(() => {
   resolveMock(vi.mocked(ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(ordersApi.postEvent), {});
   resolveMock(vi.mocked(ordersApi.addCustomerRole), { id: 21 });
-  resolveMock(vi.mocked(customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
+  resolveMock(vi.mocked(customersApi.page), { items: [{ id: 7, display_name: "买家A", status: "ACTIVE" }], total: 1, limit: 500, offset: 0 });
   resolveMock(vi.mocked(poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(rebatesApi.create), { id: 31 });
@@ -679,9 +679,26 @@ beforeEach(() => {
   seedOrderFormFields();
 });
 
+it("售出时匹配第500条以后的已有客户", async () => {
+  const first = Array.from({ length: 500 }, (_, index) => ({ id: index + 1, display_name: `客户${index + 1}`, status: "ACTIVE" }));
+  const last = { id: 501, display_name: "末尾买家", status: "ACTIVE" };
+  vi.mocked(customersApi.list).mockResolvedValue(first as never);
+  vi.mocked(customersApi.page).mockImplementation(async (params) => ({ items: params?.offset ? [last] : first, total: 501, limit: 500, offset: params?.offset ?? 0 }) as never);
+  const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+  await screen.findByText("买家信息");
+  await saleUi.type(screen.getByLabelText("客户昵称"), "末尾买家");
+  await saleUi.type(screen.getByLabelText("售出金额"), "350");
+  await saleUi.click(screen.getByLabelText("资金账户"));
+  await saleUi.click(await screen.findByText(/利润池/));
+  await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
+  await waitFor(() => expect(ordersApi.addCustomerRole).toHaveBeenCalledWith(21, { customer_id: 501, role: "BUYER" }));
+  expect(customersApi.create).not.toHaveBeenCalled();
+});
+
 it("售出时把新买家关联到来源单而非新建订单", async () => {
   const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
-  resolveMock(vi.mocked(customersApi.list), []);
+  resolveMock(vi.mocked(customersApi.page), { items: [], total: 0, limit: 500, offset: 0 });
   resolveMock(vi.mocked(customersApi.create), {
     customer: { id: 8, customer_no: "C0008", display_name: "新买家", status: "ACTIVE" },
     duplicate_candidates: [],
@@ -879,7 +896,7 @@ describe("库存售出三表单分支", () => {
   });
 
   it("P1/FE-042：已拉黑客户不能参与库存售出", async () => {
-    vi.mocked(customersApi.list).mockResolvedValueOnce([{ id: 7, display_name: "买家A", status: "DISABLED" }] as never);
+    vi.mocked(customersApi.page).mockResolvedValueOnce({ items: [{ id: 7, display_name: "买家A", status: "DISABLED" }], total: 1, limit: 500, offset: 0 } as never);
     vi.mocked(poolsApi.list).mockResolvedValue([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
     vi.mocked(employeesApi.list).mockResolvedValueOnce([{ id: 1, username: "admin", display_name: "管理员", is_active: true }] as never);
     renderLight(

@@ -488,6 +488,20 @@ describe("OrderDetail", () => {
     expect(onRemoveOperationRow).toHaveBeenCalledWith("new:unlist:2");
   });
 
+  it("编辑参与方可选择第500条以后的客户", async () => {
+    const first = Array.from({ length: 500 }, (_, index) => ({ id: index + 1, customer_no: `C${index + 1}`, display_name: `客户${index + 1}`, status: "ACTIVE" }));
+    const last = { id: 501, customer_no: "C501", display_name: "末尾客户", status: "ACTIVE" };
+    vi.spyOn(customersApi, "list").mockResolvedValue(first as never);
+    vi.spyOn(customersApi, "page").mockImplementation(async (params) => ({ items: params?.offset ? [last] : first, total: 501, limit: 500, offset: params?.offset ?? 0 }) as never);
+    vi.spyOn(counterpartiesApi, "list").mockResolvedValue([]);
+    const detail = { orders: [{ order_id: 22, order_no: "HS0022", order_type: "HS", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
+    const select = await screen.findByRole("combobox", { name: "选择客户" });
+    await userEvent.click(select);
+    await userEvent.type(select, "末尾客户");
+    expect(await screen.findByRole("option", { name: /末尾客户/ })).toBeInTheDocument();
+  });
+
   it("编辑参与方时按订单类型提供客户或渠道方的新建与选择控件", async () => {
     const detail = {
       orders: [{
@@ -503,10 +517,10 @@ describe("OrderDetail", () => {
       finance_summary: { total_expense: "0.00", total_income: "0.00" },
     } as unknown as AccountExecutionDetail;
 
-    vi.spyOn(customersApi, "list").mockResolvedValue([
+    vi.spyOn(customersApi, "page").mockResolvedValue({ items: [
       { id: 1, customer_no: "C001", display_name: "买家A", status: "ACTIVE" },
       { id: 2, customer_no: "C002", display_name: "卖家B", status: "ACTIVE" },
-    ] as never);
+    ], total: 2, limit: 500, offset: 0 } as never);
     vi.spyOn(counterpartiesApi, "list").mockResolvedValue([] as never);
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
     await settleFieldConfig();

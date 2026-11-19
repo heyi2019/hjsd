@@ -5,6 +5,7 @@ import type { PartyAddition } from "./editing/use-order-detail-editor";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Counterparty, Customer } from "../../shared/api/types/customers";
 import { customersApi, counterpartiesApi } from "../../shared/api/customers.api";
+import { loadCustomers } from "../../shared/api/loadCustomers";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { PermissionButton, Select } from "../../shared/ui";
 import {
@@ -43,7 +44,7 @@ export function OrderDetailPartySection({
     setSelectedCustomerIds(order?.customers?.map((item) => item.id) ?? []);
     setSelectedCounterpartyIds(order?.counterparties?.map((item) => item.id) ?? []);
     void Promise.all([
-      customersApi.list({ status: "ACTIVE", limit: 500, offset: 0 }),
+      loadCustomers("ACTIVE"),
       counterpartiesApi.list({ status: "ACTIVE" }),
     ]).then(([customerRows, counterpartyRows]) => {
       setCustomers(customerRows ?? []);

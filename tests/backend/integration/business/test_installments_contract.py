@@ -373,6 +373,26 @@ def test_list_endpoint_emits_available_actions(seeded_client, seeded_db, headers
     assert set(row["schedules"][0]["available_actions"]) == {"waive", "extend"}
 
 
+def test_schedule_endpoints_return_consistent_available_actions(seeded_client, seeded_db, headers):
+    account = _account(seeded_db, "schedule-actions-consistency")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id, "100")
+    contract = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="200", down_payment="0", periods=1, per_period="200")
+    response = seeded_client.get(f"/api/v1/installments/{contract.id}/schedules", headers=headers)
+    assert response.status_code == 200
+    schedule = next(item for item in response.json() if item["period_no"] == 1)
+    assert set(schedule["available_actions"]) == {"waive", "extend"}
+    result = seeded_client.post(f"/api/v1/installments/{contract.id}/schedules/1/extend", headers=headers, json={"new_due_on": "2026-12-12", "reason": "客户申请"})
+    assert result.status_code == 200, result.text
+    assert set(result.json()["available_actions"]) == {"waive", "extend"}
+    result = seeded_client.post(f"/api/v1/installments/{contract.id}/schedules/1/waive", headers=headers, json={"amount": "10", "waived_on": "2026-10-13", "reason": "客户申请"})
+    assert result.status_code == 200, result.text
+    assert set(result.json()["available_actions"]) == {"waive", "extend"}
+    inst_cancel(seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="取消交易")
+    response = seeded_client.get(f"/api/v1/installments/{contract.id}/schedules", headers=headers)
+    assert all(not row["available_actions"] for row in response.json())
+
+
 def test_list_actions_match_default_and_recovery_status_guards(seeded_client, seeded_db, headers):
     account = _account(seeded_db, "contract-action-status")
     order = _order(seeded_db, order_type="HS", account_id=account.id)

@@ -43,7 +43,7 @@ post_payment = require_permissions(
 post_delivery = require_permissions(PERM_ORDER_EVENT_POST)
 default_manage = require_permissions(PERM_ORDER_UPDATE)
 
-from ._router_shared import _installment_output
+from ._router_shared import _installment_output, _schedule_output
 
 @router.put(
     "/installments/{installment_id}/operation-operators/{operation_key}",
@@ -93,13 +93,13 @@ def list_schedules(
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
 ) -> list[schemas.ScheduleOut]:
-    inst__shared.get_installment(db, installment_id, _user)
+    installment = inst__shared.get_installment(db, installment_id, _user)
     rows = db.scalars(
         select(InstallmentSchedule)
         .where(InstallmentSchedule.installment_id == installment_id)
         .order_by(InstallmentSchedule.period_no)
     ).all()
-    return [schemas.ScheduleOut.model_validate(row) for row in rows]
+    return [_schedule_output(row, installment.status) for row in rows]
 
 @router.post(
     "/installments/{installment_id}/schedules/{period_no}/waive",
@@ -124,7 +124,8 @@ def waive_schedule(
         operator_user_ids=payload.operator_user_ids,
         user=user,
     )
-    return schemas.ScheduleOut.model_validate(item)
+    installment = inst__shared.get_installment(db, installment_id, user)
+    return _schedule_output(item, installment.status)
 
 @router.post(
     "/installments/{installment_id}/schedules/{period_no}/extend",
@@ -148,6 +149,7 @@ def extend_schedule(
         operator_user_ids=payload.operator_user_ids,
         user=user,
     )
-    return schemas.ScheduleOut.model_validate(item)
+    installment = inst__shared.get_installment(db, installment_id, user)
+    return _schedule_output(item, installment.status)
 
 __all__ = ["router"]

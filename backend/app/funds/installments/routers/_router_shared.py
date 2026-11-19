@@ -25,6 +25,13 @@ INSTALLMENT_DETAIL_EXPORT_COLUMNS = [
     ("installment_dispositions", "处置记录", True),
 ]
 
+def _schedule_output(row, contract_status: str) -> schemas.ScheduleOut:
+    return schemas.ScheduleOut.model_validate({
+        **row.__dict__,
+        "available_actions": actions.available_schedule_actions(row.status, contract_status),
+    })
+
+
 def _installment_outputs(
     db: Session,
     items,
@@ -60,10 +67,7 @@ def _installment_outputs(
             "extra_values": extras.get(item.id, {}),
             "order": order_context[item.order_id],
             "schedules": [
-                schemas.ScheduleOut.model_validate({
-                    **row.__dict__,
-                    "available_actions": actions.available_schedule_actions(row.status, item.status),
-                })
+                _schedule_output(row, item.status)
                 for row in schedules_by_installment.get(item.id, [])
             ],
             "dispositions": [schemas.DispositionOut.model_validate(row) for row in dispositions_by_installment.get(item.id, [])],

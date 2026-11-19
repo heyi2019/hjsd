@@ -175,7 +175,7 @@ def installment_totals(
 ) -> dict[str, Decimal]:
     """按与列表**完全相同**的条件聚合总应收 / 已收 / 剩余（Decimal，服务端唯一口径）。
 
-    剩余用 GREATEST(..., 0) 夹住：先收款后减免时公式会得负数，页面不能显示负的「剩余」。
+    已取消合约保留列表历史，但不计入应收、已收和剩余汇总。
     """
     receivable = (
         Installment.down_payment
@@ -189,11 +189,12 @@ def installment_totals(
         - func.coalesce(Installment.bad_debt_amount, 0),
         0,
     )
+    effective = Installment.status != InstallmentStatus.CANCELLED.value
     stmt = _apply_installment_filters(
         select(
-            func.coalesce(func.sum(receivable), 0),
-            func.coalesce(func.sum(Installment.paid_amount), 0),
-            func.coalesce(func.sum(remaining), 0),
+            func.coalesce(func.sum(case((effective, receivable), else_=0)), 0),
+            func.coalesce(func.sum(case((effective, Installment.paid_amount), else_=0)), 0),
+            func.coalesce(func.sum(case((effective, remaining), else_=0)), 0),
             func.count(Installment.id),
             func.coalesce(
                 func.sum(

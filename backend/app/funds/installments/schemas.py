@@ -177,6 +177,8 @@ class InstallmentOut(BaseModel):
         口径唯一来源在后端：前端原先自己相减，先收后减免时会出现负的「剩余」。
         已收 + 坏账超过总应收（减免把应收降到已收之下）时按 0 计，不显示负数。
         """
+        if self.status == "CANCELLED":
+            return Decimal("0.00")
         remaining = (
             self.total_receivable
             - to_money(self.paid_amount)

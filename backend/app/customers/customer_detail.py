@@ -151,13 +151,15 @@ def get_customer_detail(
         receivable = total_receivable(item)
         paid = to_money(item.paid_amount)
         # 与分期域 InstallmentOut.remaining_receivable 同源：减坏账、夹底 0
-        remaining = max(
+        cancelled = item.status == "CANCELLED"
+        remaining = Decimal("0.00") if cancelled else max(
             receivable - paid - to_money(item.bad_debt_amount or 0),
             Decimal("0.00"),
         )
-        overdue_periods = overdue_by_installment.get(item.id, 0)
-        paid_total += paid
-        receivable_total += receivable
+        overdue_periods = 0 if cancelled else overdue_by_installment.get(item.id, 0)
+        if not cancelled:
+            paid_total += paid
+            receivable_total += receivable
         remaining_total += remaining
         overdue_period_count += overdue_periods
         installment_items.append(

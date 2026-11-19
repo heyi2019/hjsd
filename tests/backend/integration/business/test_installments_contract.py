@@ -210,6 +210,39 @@ def test_cancelling_new_installment_only_refunds_its_own_payments(seeded_db):
     assert result["refund_amount"] == Decimal("50")
     assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.source_type == "REVERSAL", Cashflow.source_id == old_flow.flow_no)) is None
 
+
+def test_cancelled_installment_does_not_inflate_receivable_totals(seeded_client, seeded_db, headers):
+    from app.business.create import add_customer_role
+    from app.customers.customer_detail import get_customer_detail
+    from app.customers.customers import create_customer
+    account = _account(seeded_db, "cancelled-installment-totals")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    customer = create_customer(seeded_db, display_name="分期统计客户", actor="pytest")
+    add_customer_role(seeded_db, order.id, customer.id, "BUYER", actor="pytest")
+    _buy(seeded_db, order.id, "100")
+    first = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="100", down_payment="50", periods=1, per_period="50")
+    inst_pay(seeded_db, first.id, amount=Decimal("50"), paid_on=TODAY, period_no=0, actor="pytest")
+    old_schedule = seeded_db.scalar(select(InstallmentSchedule).where(InstallmentSchedule.installment_id == first.id, InstallmentSchedule.period_no == 1))
+    old_schedule.status = "OVERDUE"
+    seeded_db.flush()
+    inst_cancel(seeded_db, first.id, cancelled_on=TODAY, actor="pytest", reason="取消旧合约")
+    second = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="200", down_payment="50", periods=1, per_period="150")
+    inst_pay(seeded_db, second.id, amount=Decimal("50"), paid_on=TODAY, period_no=0, actor="pytest")
+    rows = seeded_client.get("/api/v1/installments", params={"order_id": order.id}, headers=headers).json()
+    old = next(row for row in rows if row["id"] == first.id)
+    assert Decimal(old["total_receivable"]) == 100 and Decimal(old["paid_amount"]) == 50
+    assert Decimal(old["remaining_receivable"]) == 0
+    totals = seeded_client.get("/api/v1/installments/totals", params={"order_id": order.id}, headers=headers).json()
+    assert Decimal(totals["total_receivable"]) == 200
+    assert Decimal(totals["total_paid"]) == 50
+    assert Decimal(totals["total_remaining"]) == 150
+    detail = get_customer_detail(seeded_db, customer.id)
+    assert detail["overview"]["installment_receivable_total"] == 200
+    assert detail["overview"]["installment_paid_total"] == 50
+    assert detail["overview"]["installment_remaining_total"] == 150
+    assert detail["overview"]["overdue_period_count"] == 0
+    assert next(item for item in detail["installments"] if item["id"] == first.id)["remaining_amount"] == 0
+
 def test_installment_scope_follows_order_owner(seeded_db):
     scoped_user = CurrentUser.build(
         id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"

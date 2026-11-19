@@ -45,10 +45,10 @@ from app.domain.enums import (
     InstallmentContractType,
     InstallmentStatus)
 from app.domain.trade import Cashflow, InstallmentSchedule, OrderEvent
-from app.installments import create as inst_create
-from app.installments import recovery as inst_recovery
-from app.installments.repayments.cancel import cancel_installment as inst_cancel
-from app.installments import settlement as inst_settlement
+from app.finance.installments import create as inst_create
+from app.finance.installments import recovery as inst_recovery
+from app.finance.installments.repayments.cancel import cancel_installment as inst_cancel
+from app.finance.installments import settlement as inst_settlement
 from app.orders.create import create_order
 from app.orders.events import post_event
 

@@ -1,7 +1,7 @@
 """订单分润配置 HTTP 接口（薄壳）。
 
 接口只保存利润归属配置，不创建资金流水。所有业务编排收敛在主体服务
-:mod:`app.profit_allocation.service`；本模块只做鉴权、入参/响应契约映射。
+:mod:`app.finance.profit_allocation.service`；本模块只做鉴权、入参/响应契约映射。
 """
 from __future__ import annotations
 

@@ -25,7 +25,7 @@ from app.domain.foundation import AuditLog
 from app.domain.parties import (
     OrderCustomerRole)
 from app.domain.trade import InstallmentSchedule, OrderFormField
-from app.installments import create as inst_create
+from app.finance.installments import create as inst_create
 from app.orders.create import create_order
 from app.orders.events import post_event
 from app.stocks.profile import create_account

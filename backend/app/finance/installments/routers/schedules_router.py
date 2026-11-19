@@ -22,10 +22,10 @@ from app.auth.session import (
 )
 from app.domain.enums import AuditAction
 from app.domain.trade import InstallmentSchedule
-from app.installments import schemas
-from app.installments import _shared as inst__shared
-from app.installments.repayments.waive import waive_schedule as inst_waive
-from app.installments.repayments.extend import extend_schedule as inst_extend
+from app.finance.installments import schemas
+from app.finance.installments import _shared as inst__shared
+from app.finance.installments.repayments.waive import waive_schedule as inst_waive
+from app.finance.installments.repayments.extend import extend_schedule as inst_extend
 from app.core.actor import actor_name as _actor
 from app.shared.operation_operators import (
     get_operation_operators,

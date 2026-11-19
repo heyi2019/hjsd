@@ -9,10 +9,10 @@
 #                  表单作用域清单）。依赖 L0。
 #   L2  shared     跨业务域共享原语：被 ≥2 个业务域引用、自身不属于任何
 #                  业务域、只依赖 L0+L1。依赖 L0+L1，**不依赖任何业务域**。
-#   L3  业务域     orders / customer_center / finance / stocks /
-#                  installments / field_definitions / reporting / workbench /
-#                  lists / auth / audit / attachments / options /
-#                  notifications。依赖 L0+L1+L2。
+#   L3  业务域     orders / customer_center / finance（含 installments /
+#                  profit_allocation 子模块）/ stocks / field_definitions /
+#                  reporting / workbench / lists / auth / audit / attachments /
+#                  options / notifications。依赖 L0+L1+L2。
 #
 # ─────────────────────────────────────────────────────────────────────────
 # 2026-11-18 实测（AST 静态分析 211 文件）与归位成果
@@ -42,6 +42,11 @@
 #       finance 域；foundation/pools.py 是「资金池主数据」，属设置，已随
 #       foundation 一并归入 field_definitions。）
 #
+#   2026-11-19 域边界裁决（用户 C）：installments 与 profit_allocation 再并入 finance：
+#     app/installments/        → app/finance/installments/
+#     app/profit_allocation/   → app/finance/profit_allocation/
+#     （API URL 不变；orders↛installments 契约由 orders↛finance 统一覆盖。）
+#
 #   底座纯化：
 #     core/database.py 的 Base + create_all → domain/base.py（Base 是 ORM 的东西）
 #     core/security.py 的查库三段 → auth/session.py（认证本就是业务域）
@@ -50,7 +55,7 @@
 # 合法依赖方向（L3 业务域之间仍允许单向依赖，但不得成环）
 #
 #   reporting / workbench  → 各业务域（只读聚合层）
-#   finance / installments → orders
+#   finance（含两子模块）  → orders
 #   orders → customer_center / field_definitions / stocks
 #
 # 运行：backend 目录下执行 lint-imports（CI lint-gate 同步强制）。
@@ -79,7 +84,6 @@ forbidden_modules =
     app.customer_center
     app.finance
     app.stocks
-    app.installments
     app.field_definitions
     app.reporting
     app.workbench
@@ -98,14 +102,6 @@ source_modules =
     app.orders
 forbidden_modules =
     app.finance
-
-[importlinter:contract:orders-not-import-installments]
-name = orders 不得依赖 installments（合法方向只有 installments -> orders）
-type = forbidden
-source_modules =
-    app.orders
-forbidden_modules =
-    app.installments
 
 [importlinter:contract:stocks-not-import-orders]
 name = stocks 不得依赖 orders（合法方向只有 orders -> stocks）

@@ -10,7 +10,7 @@ from app.core.security import CurrentUser, DEV_USERS, build_access_token
 from app.domain.enums import (
     AuditAction)
 from app.stocks.profile import create_account
-from app.installments import create as inst_create
+from app.finance.installments import create as inst_create
 from app.finance.rebates import create_rebate
 from app.orders.create import create_order
 from app.orders.events import post_event

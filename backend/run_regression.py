@@ -417,7 +417,7 @@ STRUCTURAL_PREFIXES = (
     "tests/config/catalog.py", "backend/scripts/promise_catalog.py",
     "conftest.py", "pytest.ini", "tests/conftest.py", "tests/backend/conftest.py",
     "backend/app/orders/amounts.py", "backend/app/reporting/",
-    "backend/app/installments/",
+    "backend/app/finance/installments/", "backend/app/finance/profit_allocation/",
 )
 # 自动发版只改版本常量，不影响测试范围；本地 changed 遇到它也不该触发全量。
 NON_STRUCTURAL_FILES = {"backend/app/version.py"}

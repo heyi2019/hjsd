@@ -37,7 +37,7 @@ from app.shared.order_amounts import (
 )
 from app.reporting._shared import cashflow_totals_by_order
 from app.orders.router_output import _order_list_payload
-from app.profit_allocation import service as policy_allocations
+from app.finance.profit_allocation import service as policy_allocations
 from app.reporting.profit import order_profit_detail
 from app.reporting.r2_monthly_pnl import r2_monthly_pnl
 from app.reporting.r3_commission import r3_commission_reconciliation

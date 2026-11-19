@@ -20,9 +20,9 @@ from app.auth.session import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
-from app.installments import schemas
-from app.installments import create as inst_create
-from app.installments import queries as inst_queries
+from app.finance.installments import schemas
+from app.finance.installments import create as inst_create
+from app.finance.installments import queries as inst_queries
 from app.lists import service as list_columns_service
 from app.lists.export import build_list_csv, detail_json
 from app.lists.file_response import CSV_MEDIA_TYPE, file_response

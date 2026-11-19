@@ -18,8 +18,8 @@ from app.core.security import (
 from app.auth.session import (
     require_permissions,
 )
-from app.installments import schemas
-from app.installments import recovery as inst_recovery
+from app.finance.installments import schemas
+from app.finance.installments import recovery as inst_recovery
 from app.core.actor import actor_name as _actor
 
 

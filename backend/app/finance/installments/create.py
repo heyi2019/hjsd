@@ -30,11 +30,11 @@ from app.domain.enums import (
 from app.domain.trade import (
     Account, Installment, InstallmentSchedule, Order, OrderEvent, OrderProfitAllocation,
 )
-from app.installments._shared import _add_months, _non_negative
+from app.finance.installments._shared import _add_months, _non_negative
 from app.shared.installment_amounts import total_receivable
 
-from app.installments.create_details.link import link_recovered_sale
-from app.installments.create_details.plan import (
+from app.finance.installments.create_details.link import link_recovered_sale
+from app.finance.installments.create_details.plan import (
     _assert_installment_amounts,
     _normalize_schedule,
     sale_installment_plan,

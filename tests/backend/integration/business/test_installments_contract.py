@@ -18,12 +18,12 @@ from app.domain.enums import (
     InstallmentStatus,
     ScheduleStatus)
 from app.domain.trade import Cashflow, Installment, InstallmentSchedule
-from app.installments import _shared as inst__shared
+from app.finance.installments import _shared as inst__shared
 from app.shared.installment_amounts import total_receivable
-from app.installments import create as inst_create
-from app.installments import queries as inst_queries
-from app.installments.repayments.pay import pay as inst_pay
-from app.installments.repayments.cancel import cancel_installment as inst_cancel
+from app.finance.installments import create as inst_create
+from app.finance.installments import queries as inst_queries
+from app.finance.installments.repayments.pay import pay as inst_pay
+from app.finance.installments.repayments.cancel import cancel_installment as inst_cancel
 from app.orders.create import create_order
 from app.orders.events import post_event
 
@@ -205,7 +205,7 @@ def test_list_dispositions_endpoint_returns_records(seeded_client, seeded_db, he
 # —— F5 available_actions 下发契约（等价搬运前端原 9 处判定，行为零变化）——
 def test_available_actions_match_legacy_frontend_rules():
     """后端纯函数逐状态/处置穷举，与改造前前端 contractColumns.tsx 判定一致。"""
-    from app.installments import action_availability as av
+    from app.finance.installments import action_availability as av
 
     def legacy_inst(status, disps):
         acts = []

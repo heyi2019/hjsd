@@ -18,7 +18,7 @@ from app.notifications import service as notification_service
 from app.orders.queries import order_customer_count, order_status_counts
 from app.reporting.r3_commission import r3_commission_reconciliation
 from app.stocks.inventory import dashboard_inventory_summary
-from app.installments import queries as installment_queries
+from app.finance.installments import queries as installment_queries
 
 REMINDER_CODE = "BUSINESS_OVERVIEW_REMINDERS"
 DEFAULT_REMINDERS = {

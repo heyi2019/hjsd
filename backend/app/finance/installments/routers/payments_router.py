@@ -17,10 +17,10 @@ from app.core.security import (
 from app.auth.session import (
     require_permissions,
 )
-from app.installments import schemas
-from app.installments.repayments.pay import pay as inst_pay
-from app.installments.repayments.cancel import cancel_installment as inst_cancel
-from app.installments import settlement as inst_settlement
+from app.finance.installments import schemas
+from app.finance.installments.repayments.pay import pay as inst_pay
+from app.finance.installments.repayments.cancel import cancel_installment as inst_cancel
+from app.finance.installments import settlement as inst_settlement
 from app.core.actor import actor_name as _actor
 
 

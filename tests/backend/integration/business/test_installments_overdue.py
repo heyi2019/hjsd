@@ -16,12 +16,12 @@ from app.domain.enums import (
 from app.domain.foundation import AuditLog
 from app.domain.trade import Installment, InstallmentSchedule
 from app.shared.installment_amounts import total_receivable
-from app.installments import create as inst_create
-from app.installments import recovery as inst_recovery
-from app.installments.repayments.pay import pay as inst_pay
-from app.installments.repayments.waive import waive_schedule as inst_waive
-from app.installments.repayments.extend import extend_schedule as inst_extend
-from app.installments import settlement as inst_settlement
+from app.finance.installments import create as inst_create
+from app.finance.installments import recovery as inst_recovery
+from app.finance.installments.repayments.pay import pay as inst_pay
+from app.finance.installments.repayments.waive import waive_schedule as inst_waive
+from app.finance.installments.repayments.extend import extend_schedule as inst_extend
+from app.finance.installments import settlement as inst_settlement
 from app.orders.create import create_order
 from app.orders.events import post_event
 

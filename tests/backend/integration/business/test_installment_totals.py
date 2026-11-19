@@ -15,7 +15,7 @@ from decimal import Decimal
 
 from app.orders.create import create_order
 from app.orders.events import post_event
-from app.installments import create as inst_create
+from app.finance.installments import create as inst_create
 
 D1 = date(2026, 9, 1)
 D2 = date(2026, 10, 15)

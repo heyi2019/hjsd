@@ -44,9 +44,10 @@ jobs:
         run: pip install import-linter==2.16
 
       - name: Run import contract gate
-        # 域依赖方向门禁（backend/.importlinter）5 条契约：core 不得依赖 domain、
-        # shared 不得依赖任何业务域、orders 不得依赖 finance / installments、
-        # stocks 不得依赖 orders。四层模型 0 豁免，新增违规 import 即红。
+        # 域依赖方向门禁（backend/.importlinter）4 条契约：core 不得依赖 domain、
+        # shared 不得依赖任何业务域、orders 不得依赖 finance（含 installments /
+        # profit_allocation 子模块）、stocks 不得依赖 orders。
+        # 四层模型 0 豁免，新增违规 import 即红。
         working-directory: backend
         run: lint-imports
 

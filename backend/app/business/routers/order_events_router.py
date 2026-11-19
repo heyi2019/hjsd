@@ -75,7 +75,7 @@ def inventory_offsale(
                 if extra.get("platform_unlist_scope") == "SYSTEM":
                     system_unlisted_event_ids.add(str(extra["consignment_event_id"]))
             for platform in extra.get("consignment_platforms") or []:
-                unlisted.add((str(extra.get("consignment_event_id")), str(platform)))
+                unlisted.add((str(extra.get("consignment_event_id")), str(platform).strip()))
     extra_base = {**(payload.form_extra or {}), "platform_unlist_scope": "SYSTEM", "platform_unlisted_at": payload.unlisted_at.isoformat(timespec="minutes")}
     for event in events:
         extra = event.form_extra or {}
@@ -85,7 +85,7 @@ def inventory_offsale(
         for platform in platforms:
             if str(event.id) in system_unlisted_event_ids:
                 continue
-            if (str(event.id), str(platform)) in unlisted:
+            if (str(event.id), str(platform).strip()) in unlisted:
                 continue
             orders_post_event(db, order.id, event_type="OPERATE", operation_type="UNLIST",
                 occurred_on=payload.occurred_on, actor=_actor(user), operator_user_ids=payload.operator_user_ids,

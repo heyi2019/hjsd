@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app.business import schemas
-from app.business.consignment import register_consignment
+from app.business.consignment import platform_unlist_consignment, register_consignment
 from app.business.create import create_order
 from app.business.events import post_event
 from app.business.routers.order_events_router import inventory_offsale
@@ -44,6 +44,21 @@ def test_system_offsale_cancels_order_and_unlists_platform(seeded_db):
     assert unlisted[0].form_extra["platform_unlisted_at"] == "2026-11-02T12:00"
     assert order.status == "CANCELLED"
     assert seeded_db.get(Account, order.account_id).status == "VOID"
+
+
+def test_system_offsale_does_not_repeat_whitespace_platform_unlisting(seeded_db):
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 11, 1),
+        actor="pytest", account_snapshot={"game_account": "whitespace-offsale", "game_type": "王者荣耀"})
+    listing, _ = register_consignment(seeded_db, order.id, occurred_on=date(2026, 11, 1), actor="pytest",
+        form_extra={"consignment_platforms": [" 测试平台 "]})
+    platform_unlist_consignment(seeded_db, order.id, occurred_on=date(2026, 11, 2), actor="pytest",
+        form_extra={"consignment_event_id": listing.id, "consignment_platforms": ["测试平台"]})
+    payload = schemas.InventoryOffsaleIn(reason="结束代挂", occurred_on=date(2026, 11, 3), unlisted_at="2026-11-03T12:00")
+    inventory_offsale(order.id, payload, seeded_db, DEV_USERS["admin"])
+    events = seeded_db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id)).all()
+    unlisted = [event for event in events if (event.form_extra or {}).get("operation_type") == "UNLIST"]
+    assert len(unlisted) == 1
+    assert order.status == "CANCELLED"
 
 
 def test_other_platform_unlisting_does_not_hide_remaining_platform(seeded_db):

@@ -10,7 +10,7 @@ import { employeesApi } from "../shared/api/org.api";
 import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError } from "../shared/api/client";
 import { BusinessActionModal, BusinessRegistrationForm, CompactActions, DataTable, ErrorBanner, InlineError, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
-import { moneyRules, positiveIntegerRules } from "../shared/lib/validators";
+import { moneyRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../business/ConfigurableField";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
@@ -107,8 +107,9 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       setActionError(null);
       setActing(true);
       const operatorUserIds = values.operator_user_ids as number[] | undefined;
-      if (operatorUserIds?.length) await leadsApi.convert(convertTarget.id, Number(values.order_id), values.form_extra as Record<string, unknown> | undefined, operatorUserIds);
-      else await leadsApi.convert(convertTarget.id, Number(values.order_id), values.form_extra as Record<string, unknown> | undefined);
+      const orderNo = String(values.order_id ?? "").trim();
+      if (operatorUserIds?.length) await leadsApi.convert(convertTarget.id, orderNo, values.form_extra as Record<string, unknown> | undefined, operatorUserIds);
+      else await leadsApi.convert(convertTarget.id, orderNo, values.form_extra as Record<string, unknown> | undefined);
       appMessage.success("需求已转单"); setConvertTarget(null); convertForm.resetFields(); await load();
     }
     catch (err) { setActionError(normalizeError(err)); }
@@ -195,7 +196,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="LEADCONVERT" form={convertForm} onFinish={convertLead}>
-          <CfgItem name="order_id" label="订单编号" rules={[{ required: true, message: "请输入订单编号" }, ...positiveIntegerRules("订单编号")]}><Input inputMode="numeric" /></CfgItem>
+          <CfgItem name="order_id" label="订单编号" rules={[{ required: true, whitespace: true, message: "请输入订单编号" }]}><Input placeholder="例如 HS0001" /></CfgItem>
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="lead-convert" />
           <CompactActions>

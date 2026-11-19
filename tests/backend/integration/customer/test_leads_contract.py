@@ -86,9 +86,13 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
     order = create_order(
         seeded_db, order_type="HS", trade_date=date(2026, 10, 17), actor="pytest"
     )
+    legacy = seeded_client.post(f"/api/v1/leads/{lead['id']}/convert", json={"order_id": order.id}, headers=headers)
+    assert legacy.status_code == 422, legacy.text
+    missing = seeded_client.post(f"/api/v1/leads/{lead['id']}/convert", json={"order_no": "HS-NOT-FOUND"}, headers=headers)
+    assert missing.status_code == 404, missing.text
     converted = seeded_client.post(
         f"/api/v1/leads/{lead['id']}/convert",
-        json={"order_id": order.id},
+        json={"order_no": f"  {order.order_no.lower()}  "},
         headers=headers,
     )
     assert converted.status_code == 200, converted.text

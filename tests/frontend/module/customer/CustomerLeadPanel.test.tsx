@@ -201,7 +201,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
 
   it.each([
     { action: "关闭", title: "关闭客户需求", field: "关闭原因", value: "取消", submit: "确认关闭", method: "close" as const },
-    { action: "转单", title: "需求转单", field: "订单编号", value: "99", submit: "确认转单", method: "convert" as const },
+    { action: "转单", title: "需求转单", field: "订单编号", value: "HS0001", submit: "确认转单", method: "convert" as const },
   ])("$action 失败在弹窗显示原因并保留输入", async ({ action, title, field, value, submit, method }) => {
     vi.mocked(leadsApi[method]).mockRejectedValueOnce(new Error("操作未完成"));
     renderLight(<CustomerLeadPanel />, { user: "admin" });
@@ -232,20 +232,19 @@ describe("CustomerLeadPanel：客户需求池", () => {
     const row = (await screen.findByText("LD-1")).closest("tr")!;
     await ui.click(within(row).getByRole("button", { name: /转单/ }));
     const modal = screen.getByText("需求转单").closest(".ant-modal-content") as HTMLElement;
-    await ui.type(within(modal).getByLabelText("订单编号"), "99");
+    await ui.type(within(modal).getByLabelText("订单编号"), "HS0001");
     await ui.click(within(modal).getByRole("button", { name: /确认转单/ }));
-    await waitFor(() => expect(leadsApi.convert).toHaveBeenCalledWith(1, 99, undefined, [1]));
+    await waitFor(() => expect(leadsApi.convert).toHaveBeenCalledWith(1, "HS0001", undefined, [1]));
   });
 
-  it("转单订单编号必须是正整数", async () => {
+  it("转单时订单编号必填", async () => {
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     const row = (await screen.findByText("LD-1")).closest("tr")!;
     await ui.click(within(row).getByRole("button", { name: /转单/ }));
     const modal = screen.getByText("需求转单").closest(".ant-modal-content") as HTMLElement;
-    await ui.type(within(modal).getByLabelText("订单编号"), "1.5");
     await ui.click(within(modal).getByRole("button", { name: /确认转单/ }));
 
-    expect(await screen.findByText("订单编号必须是正整数")).toBeInTheDocument();
+    expect(await screen.findByText("请输入订单编号")).toBeInTheDocument();
     expect(vi.mocked(leadsApi.convert)).not.toHaveBeenCalled();
   });
 

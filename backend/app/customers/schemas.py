@@ -175,7 +175,9 @@ class LeadUpdate(RequestModel):
 
 
 class LeadConvert(RequestModel):
-    order_id: int = Field(gt=0)
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    order_no: str = Field(min_length=1, max_length=32)
     extra_values: dict[str, Any] | None = None
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 

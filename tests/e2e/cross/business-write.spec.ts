@@ -170,7 +170,7 @@ test("客户需求池：新建、查询与转单", async ({ request }) => {
   const listed = await request.get(`${apiBase}/leads?status=OPEN`, { headers });
   expect(listed.ok()).toBe(true);
   expect((await listed.json()).some((item: { id: number }) => item.id === lead.id)).toBe(true);
-  const converted = await request.post(`${apiBase}/leads/${lead.id}/convert`, { headers, data: { order_id: order.id } });
+  const converted = await request.post(`${apiBase}/leads/${lead.id}/convert`, { headers, data: { order_no: order.order_no } });
   expect(converted.status()).toBe(200);
   expect((await converted.json()).status).toBe("CONVERTED");
 });

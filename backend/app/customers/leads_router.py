@@ -157,7 +157,7 @@ def convert_lead(
     item = parties_convert_lead(
         db,
         lead_id,
-        order_id=payload.order_id,
+        order_no=payload.order_no,
         actor=_actor(user),
         user=user,
         extra_values=payload.extra_values,

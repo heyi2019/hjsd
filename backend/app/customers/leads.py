@@ -259,7 +259,7 @@ def convert_lead(
     session: Session,
     lead_id: int,
     *,
-    order_id: int,
+    order_no: str,
     actor: str,
     user: CurrentUser | None = None,
     extra_values: Mapping[str, Any] | None = None,
@@ -268,14 +268,14 @@ def convert_lead(
     lead = _get_lead_for_user(session, lead_id, user)
     if lead.status != LeadStatus.OPEN.value:
         raise Conflict("只有 OPEN 需求可以转单", details={"lead_no": lead.lead_no})
-    order = session.get(Order, order_id)
-    if order is None:
-        raise NotFound("订单不存在", details={"order_id": order_id})
+    normalized_order_no = _required_text(order_no, message="订单编号不能为空", field="order_no").upper()
     scope = owner_scope_filter(Order.owner_id, user, session) if user is not None else None
-    if scope is not None and not session.scalar(
-        select(Order.id).where(Order.id == order_id, scope)
-    ):
-        raise NotFound("订单不存在", details={"order_id": order_id})
+    stmt = select(Order).where(Order.order_no == normalized_order_no)
+    if scope is not None:
+        stmt = stmt.where(scope)
+    order = session.scalar(stmt)
+    if order is None:
+        raise NotFound("订单不存在", details={"order_no": normalized_order_no})
     lead.status = LeadStatus.CONVERTED.value
     lead.converted_order_id = order.id
     lead.updated_by = actor

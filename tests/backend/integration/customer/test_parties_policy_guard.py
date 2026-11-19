@@ -300,7 +300,7 @@ class TestPartiesLeadGuards:
         seeded_db.commit()
         with pytest.raises(Conflict):
             convert_lead(
-                seeded_db, lead.id, order_id=1, actor="pytest"
+                seeded_db, lead.id, order_no="HS0001", actor="pytest"
             )
 
     def test_convert_lead_order_missing(self, seeded_db):
@@ -313,7 +313,7 @@ class TestPartiesLeadGuards:
         seeded_db.commit()
         with pytest.raises(NotFound):
             convert_lead(
-                seeded_db, lead.id, order_id=99999, actor="pytest"
+                seeded_db, lead.id, order_no="HS99999", actor="pytest"
             )
 
     def test_convert_lead_order_scope_excludes(self, seeded_db):
@@ -329,7 +329,7 @@ class TestPartiesLeadGuards:
         seeded_db.commit()
         with pytest.raises(NotFound):
             convert_lead(
-                seeded_db, lead.id, order_id=order.id, actor="pytest", user=scoped
+                seeded_db, lead.id, order_no=order.order_no, actor="pytest", user=scoped
             )
 
     def test_close_lead_not_open(self, seeded_db):

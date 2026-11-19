@@ -14,7 +14,7 @@ from app.shared.operation_operators import upsert_operation_operators
 from app.core.state_machine import INSTALLMENT_TRANSITIONS, transition
 from app.domain.enums import AuditAction, InstallmentStatus, ScheduleStatus
 from app.domain.trade import InstallmentSchedule
-from .._shared import _merge_form_extra, _positive, _required_text, get_installment
+from .._shared import SCHEDULE_CLOSED_STATUSES, _merge_form_extra, _positive, _required_text, get_installment
 from app.shared.installment_amounts import total_receivable
 
 def waive_schedule(
@@ -33,8 +33,8 @@ def waive_schedule(
     """登记经授权的期次减免，不改写原应收金额。"""
     text_reason = _required_text(reason, field="reason", message="减免必须填写原因")
     installment = get_installment(session, installment_id, user, for_update=True)
-    if installment.status == InstallmentStatus.CANCELLED.value:
-        raise Validation("已取消的分期合约不能减免")
+    if installment.status in SCHEDULE_CLOSED_STATUSES:
+        raise Validation("已结束的分期合约不能减免")
     _merge_form_extra(session, installment, scope="INSTWAIVE", values=form_extra)
     schedule = session.scalar(
         select(InstallmentSchedule).where(

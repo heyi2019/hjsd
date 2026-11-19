@@ -25,6 +25,14 @@ from app.domain.trade import (
     Installment,
     Order,
 )
+from app.domain.enums import InstallmentStatus
+
+SCHEDULE_CLOSED_STATUSES = frozenset({
+    InstallmentStatus.CANCELLED.value,
+    InstallmentStatus.CLOSED.value,
+    InstallmentStatus.DELIVERED.value,
+    InstallmentStatus.SETTLED.value,
+})
 
 def _non_negative(value: Any, *, field: str) -> Decimal:
     try:

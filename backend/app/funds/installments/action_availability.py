@@ -18,6 +18,7 @@ from app.domain.enums import (
     InstallmentStatus,
     ScheduleStatus,
 )
+from ._shared import SCHEDULE_CLOSED_STATUSES
 
 # 下发给前端的稳定动作 key（契约，勿随意改名）
 PAY = "pay"
@@ -96,11 +97,8 @@ def available_installment_actions(
 
 
 def available_schedule_actions(status: str, contract_status: str | None = None) -> list[str]:
-    """期次级可用动作（等价搬运前端 waive/extend 两处判定）。
-
-    仅看期次 status；PAID / WAIVED 不可减免展期，其余一律可用。
-    """
-    if contract_status == InstallmentStatus.CANCELLED.value or status in _SCHEDULE_BLOCKED:
+    """结束的合约及已完成的期次不允许减免或展期。"""
+    if contract_status in SCHEDULE_CLOSED_STATUSES or status in _SCHEDULE_BLOCKED:
         return []
     return [WAIVE, EXTEND]
 

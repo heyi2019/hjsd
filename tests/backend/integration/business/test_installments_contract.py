@@ -389,3 +389,23 @@ def test_cancelled_installment_schedules_cannot_be_waived_or_extended(seeded_cli
     seeded_db.refresh(contract)
     assert contract.waived_amount == 0
 
+
+def test_recovered_installment_schedules_cannot_be_waived_or_extended(seeded_client, seeded_db, headers):
+    from app.funds.installments.recovery import recover_account
+    account = _account(seeded_db, "recovered-schedule-actions")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id, "100")
+    contract = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="200", down_payment="0", periods=1, per_period="200")
+    contract.status = "OVERDUE"
+    seeded_db.flush()
+    recover_account(seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="违约回收")
+    row = next(row for row in seeded_client.get("/api/v1/installments", headers=headers).json() if row["id"] == contract.id)
+    assert all(not schedule["available_actions"] for schedule in row["schedules"])
+    base = f"/api/v1/installments/{contract.id}/schedules/1"
+    waive = seeded_client.post(f"{base}/waive", headers=headers, json={"amount": "10", "waived_on": "2026-10-13", "reason": "减免"})
+    extend = seeded_client.post(f"{base}/extend", headers=headers, json={"new_due_on": "2026-12-12", "reason": "展期"})
+    assert waive.status_code in (400, 409, 422), waive.text
+    assert extend.status_code in (400, 409, 422), extend.text
+    seeded_db.refresh(contract)
+    assert contract.waived_amount == 0 and contract.bad_debt_amount == 200
+

@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
 from app.shared.operation_operators import upsert_operation_operators
-from app.domain.enums import AuditAction, InstallmentStatus, ScheduleStatus
+from app.domain.enums import AuditAction, ScheduleStatus
 from app.domain.trade import InstallmentSchedule
-from .._shared import _merge_form_extra, _required_text, get_installment
+from .._shared import SCHEDULE_CLOSED_STATUSES, _merge_form_extra, _required_text, get_installment
 
 def extend_schedule(
     session: Session,
@@ -30,8 +30,8 @@ def extend_schedule(
     """修改未收期次到期日，并通过审计保留原计划日期。"""
     text_reason = _required_text(reason, field="reason", message="展期必须填写原因")
     installment = get_installment(session, installment_id, user, for_update=True)
-    if installment.status == InstallmentStatus.CANCELLED.value:
-        raise Validation("已取消的分期合约不能展期")
+    if installment.status in SCHEDULE_CLOSED_STATUSES:
+        raise Validation("已结束的分期合约不能展期")
     _merge_form_extra(session, installment, scope="INSTEXTEND", values=form_extra)
     schedule = session.scalar(
         select(InstallmentSchedule).where(

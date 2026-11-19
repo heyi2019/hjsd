@@ -58,11 +58,11 @@ export function BusinessOverview({
   return (
     <section aria-label="我的业务总览" className="ui-stack">
       <StatRow className="ui-stat-row--overview" items={[
-        ...(personalOrders !== undefined ? [{ label: "我的当期订单", kind: "count" as const, amount: personalOrdersError ? null : String(personalOrders), hint: "入库 / 售出操作人", onClick: onPersonalOrdersClick, testId: "dashboard-personal-orders" }] : []),
-        ...(personalEarnings !== undefined ? [{ label: "我的当期收益", amount: personalEarningsError ? null : personalEarnings, hint: "当期 · 本人分润基数", onClick: onPersonalEarningsClick, testId: "dashboard-personal-earnings" }] : []),
+        ...(personalOrders !== undefined ? [{ label: "我的当期订单", kind: "count" as const, amount: loading || personalOrdersError ? null : String(personalOrders), hint: "入库 / 售出操作人", onClick: loading || personalOrdersError ? undefined : onPersonalOrdersClick, testId: "dashboard-personal-orders" }] : []),
+        ...(personalEarnings !== undefined ? [{ label: "我的当期收益", amount: loading || personalEarningsError ? null : personalEarnings, hint: "当期 · 本人分润基数", onClick: loading || personalEarningsError || personalEarnings === null ? undefined : onPersonalEarningsClick, testId: "dashboard-personal-earnings" }] : []),
         { label: "在库账号", kind: "count", amount: amount(inventoryCount), onClick: onInventoryClick, testId: "dashboard-inventory" },
-        { label: "订单总量", kind: "count", amount: ordersError || !orderSummary ? null : amount(orderSummary.total_count), onClick: onOrdersClick, testId: "dashboard-orders" },
-        ...(personalCustomers !== undefined ? [{ label: "我的当期客户数", kind: "count" as const, amount: ordersError ? null : String(personalCustomers), onClick: onPersonalCustomersClick, testId: "dashboard-personal-customers" }] : []),
+        { label: "订单总量", kind: "count", amount: ordersError || !orderSummary ? null : amount(orderSummary.total_count), onClick: loading || ordersError || !orderSummary ? undefined : onOrdersClick, testId: "dashboard-orders" },
+        ...(personalCustomers !== undefined ? [{ label: "我的当期客户数", kind: "count" as const, amount: loading || ordersError ? null : String(personalCustomers), onClick: loading || ordersError ? undefined : onPersonalCustomersClick, testId: "dashboard-personal-customers" }] : []),
         { label: "分期合约", kind: "count", amount: amount(installmentCount), onClick: onInstallmentsClick, testId: "dashboard-installments" },
         { label: "逾期合约", kind: "count", amount: amount(overdueInstallmentCount), tone: "warn", onClick: onOverdueInstallmentsClick, testId: "dashboard-overdue-installments" },
         { label: "在库超期账号", kind: "count", amount: amount(inventoryOverdueCount), hint: "未售超过 30 天", tone: "warn", onClick: onInventoryOverdueClick, testId: "dashboard-inventory-overdue" },

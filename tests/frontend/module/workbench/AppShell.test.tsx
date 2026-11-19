@@ -39,7 +39,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");
 vi.mock("@/shared/api/transfers.api");
 import { renderApp } from "@fixtures/render";
-import { cashflowPage, customerSummary, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
+import { cashflowPage, customerSummary, dashboardSummary, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
 import { AppShell } from "@/app/AppShell";
 import { navigation } from "@/app/navigation";
 import { MemoryRouter } from "react-router-dom";
@@ -119,6 +119,7 @@ beforeEach(() => {
   vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([]));
   vi.mocked(ordersApi.ledgerSummary).mockResolvedValue(orderLedgerSummary());
   vi.mocked(orderTypesApi.list).mockResolvedValue([]);
+  vi.mocked(dashboardApi.summary).mockImplementation(async (period) => dashboardSummary(period ? { period } : {}));
   vi.mocked(customersApi.page).mockResolvedValue(pageResponse([]));
   vi.mocked(customersApi.summary).mockResolvedValue(customerSummary());
   vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse([]));
@@ -252,11 +253,13 @@ describe("AppShell：角色展示与退出", () => {
     expect(within(topbar).queryByRole("button", { name: "我的当期订单" })).toBeNull();
     expect(within(topbar).queryByRole("button", { name: "我的当期收益" })).toBeNull();
 
+    await waitFor(() => expect(within(dashboard).getByTestId("dashboard-personal-orders")).toHaveAttribute("role", "button"));
     await ui.click(within(dashboard).getByTestId("dashboard-personal-orders"));
     expect(await screen.findByRole("tab", { name: "订单台账" })).toHaveAttribute("aria-selected", "true");
     expect(vi.mocked(ordersApi.listPage)).toHaveBeenCalledWith(expect.objectContaining({ mine: true }));
 
     await ui.click(screen.getByRole("button", { name: "工作台" }));
+    await waitFor(() => expect(screen.getByTestId("dashboard-personal-earnings")).toHaveAttribute("role", "button"));
     await ui.click(screen.getByTestId("dashboard-personal-earnings"));
     const commissionTab = await screen.findByRole("tab", { name: "分润对账" });
     expect(commissionTab).toHaveAttribute("aria-selected", "true");

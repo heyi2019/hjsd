@@ -9,6 +9,7 @@ import { notificationsApi } from "@/shared/api/misc.api";
 import { ordersApi } from "@/shared/api/orders.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { dashboardSummary, pageResponse } from "@fixtures/api-responses";
+import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
 /** 2026-10-13：工作台数据总览（资金账户/统计/入口卡）已迁至「经营中心 · 数据中心」
  *  （用例见 reporting/DataCenterPanel.test.tsx）。本文件只覆盖瘦身后的工作台：
  *  纯动作入口——新建业务卡 + 登记弹窗，以及「数据已迁走」的回归断言。 */
@@ -34,6 +35,32 @@ beforeEach(() => {
 });
 
 describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
+it("切换周期加载期间隐藏旧统计并暂停旧周期跳转", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof dashboardApi.summary>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof dashboardApi.summary>>>((resolve) => { finish = resolve; });
+    vi.mocked(dashboardApi.summary)
+      .mockResolvedValueOnce(dashboardSummary({ period: currentReportPeriod(), personal_orders: 7, personal_customers: 3, personal_earnings: "88.00" }))
+      .mockReturnValueOnce(pending);
+    const navigate = vi.fn();
+    renderLight(<DashboardPage onDashboardNavigate={navigate} />, { user: "admin" });
+    const orders = screen.getByTestId("dashboard-personal-orders");
+    const earnings = screen.getByTestId("dashboard-personal-earnings");
+    const customers = screen.getByTestId("dashboard-personal-customers");
+    await within(orders).findByText("7");
+    fireEvent.click(screen.getByRole("button", { name: "上期" }));
+    await waitFor(() => expect(dashboardApi.summary).toHaveBeenLastCalledWith(previousReportPeriod()));
+    for (const card of [orders, earnings, customers]) {
+      expect(within(card).getByText("-")).toBeInTheDocument();
+      expect(card).not.toHaveAttribute("role", "button");
+      fireEvent.click(card);
+    }
+    expect(navigate).not.toHaveBeenCalled();
+    await act(async () => { finish(dashboardSummary({ period: previousReportPeriod(), personal_orders: 2 })); await pending; });
+    expect(within(orders).getByText("2")).toBeInTheDocument();
+    fireEvent.click(orders);
+    expect(navigate).toHaveBeenCalledWith(expect.stringContaining(`trade_date_from=${previousReportPeriod().from}`));
+  });
+
 it("工作台展示业务总览指标和业务提醒", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
       orders: { total_count: 2, completed_count: 1, active_count: 1 },

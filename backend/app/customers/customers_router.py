@@ -27,6 +27,7 @@ from app.settings.lists.export import EXPORT_ROW_LIMIT, build_list_csv
 from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.customers import schemas
 from app.customers._common import to_customer_out
+from app.customers._filters import created_date_filter
 from app.customers.customer_detail import get_customer_activity_summary
 from app.customers.customer_merge import (
     duplicate_candidates,
@@ -57,7 +58,7 @@ def mine_order_filter(
     trade_date_from: date | None = Query(default=None),
     trade_date_to: date | None = Query(default=None),
 ) -> dict:
-    if mine_orders and (trade_date_from is None or trade_date_to is None or trade_date_from > trade_date_to):
+    if mine_orders and ((trade_date_from is None) != (trade_date_to is None) or (trade_date_from is not None and trade_date_to is not None and trade_date_from > trade_date_to)):
         raise Validation("请选择有效的订单日期范围")
     return {"mine_orders": mine_orders, "trade_date_from": trade_date_from, "trade_date_to": trade_date_to}
 
@@ -70,11 +71,12 @@ def list_customers(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     order_filter: dict = Depends(mine_order_filter),
+    created_filter: dict = Depends(created_date_filter),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> PageOut[schemas.CustomerOut]:
     customers = parties_list_customers(
-        db, keyword=keyword, status=status, created_by=created_by, user=user, limit=limit, offset=offset, **order_filter
+        db, keyword=keyword, status=status, created_by=created_by, user=user, limit=limit, offset=offset, **order_filter, **created_filter
     )
     extras = get_extra_values_bulk(
         db, entity_type="customer", entity_ids=[item.id for item in customers]
@@ -91,7 +93,7 @@ def list_customers(
             )
             for item in customers
         ],
-        total=count_customers(db, keyword=keyword, status=status, created_by=created_by, user=user, **order_filter),
+        total=count_customers(db, keyword=keyword, status=status, created_by=created_by, user=user, **order_filter, **created_filter),
         limit=limit,
         offset=offset,
     )
@@ -104,11 +106,12 @@ def customer_summary(
     status: str | None = Query(default=None),
     created_by: list[str] | None = Query(default=None),
     order_filter: dict = Depends(mine_order_filter),
+    created_filter: dict = Depends(created_date_filter),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> schemas.CustomerSummaryOut:
     return schemas.CustomerSummaryOut(**parties_summarize_customers(
-        db, today_date=today_date, keyword=keyword, status=status, created_by=created_by, user=user, **order_filter
+        db, today_date=today_date, keyword=keyword, status=status, created_by=created_by, user=user, **order_filter, **created_filter
     ))
 
 
@@ -118,12 +121,13 @@ def export_customers_csv(
     status: str | None = Query(default=None),
     created_by: list[str] | None = Query(default=None),
     order_filter: dict = Depends(mine_order_filter),
+    created_filter: dict = Depends(created_date_filter),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> Response:
     """客户按可见列导出 CSV：同 /customers 筛选口径，上限 EXPORT_ROW_LIMIT。"""
     customers = parties_list_customers(
-        db, keyword=keyword, status=status, created_by=created_by, user=user, limit=EXPORT_ROW_LIMIT, offset=0, **order_filter
+        db, keyword=keyword, status=status, created_by=created_by, user=user, limit=EXPORT_ROW_LIMIT, offset=0, **order_filter, **created_filter
     )
     extras = get_extra_values_bulk(
         db, entity_type="customer", entity_ids=[item.id for item in customers]

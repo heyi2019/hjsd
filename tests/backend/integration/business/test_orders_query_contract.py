@@ -354,7 +354,11 @@ class TestGetAndListOrders:
         exported = seeded_client.get("/api/v1/customers/export.csv", params=params, headers=headers)
         assert exported.status_code == 200
         assert "当期客户" in exported.text and "其他周期客户" not in exported.text
-        assert seeded_client.get("/api/v1/customers", params={"mine_orders": "true"}, headers=headers).status_code == 422
+        all_customers = seeded_client.get("/api/v1/customers", params={"mine_orders": "true"}, headers=headers)
+        all_dashboard = seeded_client.get("/api/v1/dashboard/summary", params={"all_time": "true"}, headers=headers)
+        assert all_customers.status_code == 200
+        assert all_customers.json()["total"] == all_dashboard.json()["personal_customers"] == 2
+        assert seeded_client.get("/api/v1/customers", params={"mine_orders": "true", "trade_date_from": D.isoformat()}, headers=headers).status_code == 422
 
     def test_list_orders_supports_workbench_date_owner_keyword_filters(
         self, seeded_client, seeded_db, headers

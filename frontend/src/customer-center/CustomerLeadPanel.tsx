@@ -2,13 +2,13 @@ import { appMessage } from "../shared/ui/appFeedback";
 /** 客户需求池：记录需求事实，支持转单或关闭，不自动生成订单（CUS-02）。 */
 import { Card, Form, Input, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { customersApi, leadsApi } from "../shared/api/customers.api";
 import type { Customer, Lead } from "../shared/api/types/customers";
 import { employeesApi } from "../shared/api/org.api";
 import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError } from "../shared/api/client";
-import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { BusinessActionModal, BusinessRegistrationForm, CompactActions, DataTable, ErrorBanner, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules, positiveIntegerRules } from "../shared/lib/validators";
 import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, useOrderFormConfig } from "../business/ConfigurableField";
@@ -18,11 +18,13 @@ import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
 
-export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
+export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker }: { active?: boolean; createdPeriod?: { from: string; to: string } | null; createdPicker?: ReactNode }) {
   const [rows, setRows] = useState<Lead[]>([]);
   const [summary, setSummary] = useState<{ total_count: number; open_count: number } | null>(null);
+  const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const requestRef = useRef(0);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -43,17 +45,26 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
   }, []);
 
   const load = useCallback(async () => {
+    const request = ++requestRef.current;
+    setLoading(true);
     try {
+      const dates = createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {};
       const [leadPage, leadSummary] = await Promise.all([
-        leadsApi.page({ limit: pageSize, offset: (page - 1) * pageSize }),
-        leadsApi.summary(),
+        leadsApi.page({ ...dates, limit: pageSize, offset: (page - 1) * pageSize }),
+        leadsApi.summary(dates),
       ]);
+      if (request !== requestRef.current) return;
       setRows(leadPage.items);
       setSummary(leadSummary);
       setError(null);
-    } catch (err) { setError(normalizeError(err)); }
-  }, [page, pageSize]);
-  useReloadOnActive(active, load);
+    } catch (err) { if (request === requestRef.current) setError(normalizeError(err)); }
+    finally { if (request === requestRef.current) setLoading(false); }
+  }, [page, pageSize, createdPeriod?.from, createdPeriod?.to]);
+  useEffect(() => { setPage(1); }, [createdPeriod?.from, createdPeriod?.to]);
+  useEffect(() => {
+    if (active) void load();
+    return () => { requestRef.current += 1; };
+  }, [active, load]);
 
   const openCreate = async () => {
     try {
@@ -123,11 +134,12 @@ export function CustomerLeadPanel({ active = true }: { active?: boolean }) {
       extra={<PermissionButton permission="customer.create" type="primary" loading={customersLoading} disabled={Boolean(error)} onClick={() => void openCreate()}>新增需求</PermissionButton>}
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
-      <StatRow items={[{ label: "需求总数", kind: "count", amount: error ? null : String(summary?.total_count ?? 0) }, { label: "待跟进", kind: "count", amount: error ? null : String(summary?.open_count ?? 0), tone: "warn" }]} />
+      <StatRow items={[{ label: "需求总数", kind: "count", amount: loading || error ? null : String(summary?.total_count ?? 0) }, { label: "待跟进", kind: "count", amount: loading || error ? null : String(summary?.open_count ?? 0), tone: "warn" }]} />
+      {createdPicker ? <Space wrap className="customer-list-filters--separated">{createdPicker}</Space> : null}
       <DataTable<Lead>
         columns={arrangeColumns(columns)}
         rows={rows}
-        loading={summary === null && !error}
+        loading={loading || (summary === null && !error)}
         page={page}
         pageSize={pageSize}
         total={summary?.total_count ?? 0}

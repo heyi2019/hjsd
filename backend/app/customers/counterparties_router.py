@@ -26,6 +26,7 @@ from app.customers.counterparties import (
 from app.customers.counterparty_detail import get_counterparty_detail as parties_get_counterparty_detail
 from app.shared.form_values import get_extra_values_bulk
 from .router_output import _counterparty_output
+from ._filters import created_date_filter
 
 router = APIRouter(tags=["CUS-01 客户与合作方"])
 
@@ -38,10 +39,11 @@ def list_counterparties(
     type: str | None = Query(default=None),
     status: str | None = Query(default=None),
     created_by: list[str] | None = Query(default=None),
+    created_filter: dict = Depends(created_date_filter),
     db: Session = Depends(get_db),
     user: CurrentUser = read_counterparties,
 ) -> list[schemas.CounterpartyOut]:
-    items = parties_list_counterparties(db, type=type, status=status, created_by=created_by)
+    items = parties_list_counterparties(db, type=type, status=status, created_by=created_by, **created_filter)
     extras = get_extra_values_bulk(
         db, entity_type="counterparty", entity_ids=[item.id for item in items]
     )
@@ -62,11 +64,12 @@ def list_counterparties_page(
     created_by: list[str] | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    created_filter: dict = Depends(created_date_filter),
     db: Session = Depends(get_db),
     user: CurrentUser = read_counterparties,
 ) -> PageOut[schemas.CounterpartyOut]:
     items = parties_list_counterparties(
-        db, type=type, status=status, created_by=created_by, limit=limit, offset=offset
+        db, type=type, status=status, created_by=created_by, limit=limit, offset=offset, **created_filter
     )
     extras = get_extra_values_bulk(
         db, entity_type="counterparty", entity_ids=[item.id for item in items]
@@ -78,7 +81,7 @@ def list_counterparties_page(
             )
             for item in items
         ],
-        total=parties_count_counterparties(db, type=type, status=status, created_by=created_by),
+        total=parties_count_counterparties(db, type=type, status=status, created_by=created_by, **created_filter),
         limit=limit,
         offset=offset,
     )

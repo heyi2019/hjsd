@@ -2,7 +2,8 @@ import { api } from "./client";
 import type { PageResponse } from "./types/common";
 import type { Counterparty, Customer, CustomerDetail, CustomerSummary, DuplicateCandidate, Lead, LeadSummary } from "./types/customers";
 
-type CustomerFilterParams = { keyword?: string; status?: string; created_by?: string[]; mine_orders?: boolean; trade_date_from?: string; trade_date_to?: string };
+type CreatedDateFilter = { created_from?: string; created_to?: string };
+type CustomerFilterParams = CreatedDateFilter & { keyword?: string; status?: string; created_by?: string[]; mine_orders?: boolean; trade_date_from?: string; trade_date_to?: string };
 type CustomerListParams = CustomerFilterParams & { limit?: number; offset?: number };
 
 const customerPage = (params?: CustomerListParams) =>
@@ -42,9 +43,9 @@ export const customersApi = {
 };
 
 export const counterpartiesApi = {
-  list: (params?: { type?: string; status?: string; created_by?: string[] }) =>
+  list: (params?: CreatedDateFilter & { type?: string; status?: string; created_by?: string[] }) =>
     api.get<Counterparty[]>("/counterparties", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
-  page: (params?: { type?: string; status?: string; created_by?: string[]; limit?: number; offset?: number }) =>
+  page: (params?: CreatedDateFilter & { type?: string; status?: string; created_by?: string[]; limit?: number; offset?: number }) =>
     api.get<PageResponse<Counterparty>>("/counterparties/page", {
       params: { limit: 10, offset: 0, ...params },
       paramsSerializer: { indexes: null },
@@ -59,11 +60,11 @@ export const counterpartiesApi = {
 };
 
 export const leadsApi = {
-  page: (params?: { limit?: number; offset?: number; status?: string; keyword?: string; customer_id?: number }) =>
+  page: (params?: CreatedDateFilter & { limit?: number; offset?: number; status?: string; keyword?: string; customer_id?: number }) =>
     api.get<PageResponse<Lead>>("/leads/page", {
       params: { limit: 10, offset: 0, ...params },
     }).then((r) => r.data),
-  summary: () => api.get<LeadSummary>("/leads/summary").then(r => r.data),
+  summary: (params?: CreatedDateFilter) => api.get<LeadSummary>("/leads/summary", { params }).then(r => r.data),
   create: (data: Record<string, unknown>) => api.post<Lead>("/leads", data).then(r => r.data),
   close: (id: number, reason: string, extra_values?: Record<string, unknown>, operator_user_ids?: number[]) => api.post<Lead>(`/leads/${id}/close`, { reason, extra_values, operator_user_ids }).then(r => r.data),
   convert: (id: number, order_id: number, extra_values?: Record<string, unknown>, operator_user_ids?: number[]) => api.post<Lead>(`/leads/${id}/convert`, { order_id, extra_values, operator_user_ids }).then(r => r.data),

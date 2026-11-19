@@ -45,6 +45,7 @@ import { navigation } from "@/app/navigation";
 import { MemoryRouter } from "react-router-dom";
 import dayjs from "dayjs";
 import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
+import { setAntdDateRange } from "@fixtures/antdRange";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -229,15 +230,60 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
 });
 
 describe("AppShell：角色展示与退出", () => {
+  it("工作台全部时间统计与客户、收益明细保持一致", async () => {
+    vi.mocked(dashboardApi.summary).mockImplementation(async (period) => dashboardSummary({ period: (period === null ? null : period ?? currentReportPeriod()) as never }));
+    await renderShell({ user: "admin" });
+    await waitFor(() => expect(dashboardApi.summary).toHaveBeenCalled());
+    await ui.click(screen.getByRole("button", { name: "全部" }));
+    await waitFor(() => expect(dashboardApi.summary).toHaveBeenLastCalledWith(null));
+    const orderCard = screen.getByTestId("dashboard-personal-orders");
+    await waitFor(() => expect(orderCard).toHaveAttribute("role", "button"));
+    await ui.click(screen.getByTestId("dashboard-personal-customers"));
+    await waitFor(() => expect(customersApi.page).toHaveBeenCalledWith(expect.objectContaining({ mine_orders: true })));
+    expect(await screen.findByText(/订单操作人：.*全部时间/)).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "工作台" }));
+    await waitFor(() => expect(screen.getByTestId("dashboard-personal-earnings")).toHaveAttribute("role", "button"));
+    await ui.click(screen.getByTestId("dashboard-personal-earnings"));
+    await waitFor(() => expect(reportsApi.commission).toHaveBeenCalledWith(expect.objectContaining({ mine: true })));
+    expect(vi.mocked(reportsApi.commission).mock.lastCall?.[0]).not.toHaveProperty("from");
+    expect(vi.mocked(reportsApi.commission).mock.lastCall?.[0]).not.toHaveProperty("to");
+    await ui.click(screen.getByRole("button", { name: "本期" }));
+    await waitFor(() => expect(reportsApi.commission).toHaveBeenLastCalledWith(expect.objectContaining({ mine: true, ...currentReportPeriod() })));
+    await ui.click(screen.getByRole("button", { name: "全部" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission).mock.lastCall?.[0]).not.toHaveProperty("from"));
+    await ui.click(screen.getByRole("button", { name: "工作台" }));
+    await waitFor(() => expect(dashboardApi.summary).toHaveBeenLastCalledWith(null));
+  });
+
   it("我的当期客户跳转展示本人和周期，并按订单口径筛选", async () => {
     vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员姓名", is_active: true }] as never);
     await renderShell({ user: "admin", initialPath: "/customers?mine_orders=true&trade_date_from=2026-11-16&trade_date_to=2026-12-15" });
     await waitFor(() => expect(customersApi.page).toHaveBeenCalledWith(expect.objectContaining({ mine_orders: true, trade_date_from: "2026-11-16", trade_date_to: "2026-12-15" })));
     expect(customersApi.summary).toHaveBeenCalledWith(expect.objectContaining({ mine_orders: true, trade_date_from: "2026-11-16", trade_date_to: "2026-12-15" }));
     expect(await screen.findByText(/管理员姓名.*2026-11-16.*2026-12-15/)).toBeInTheDocument();
+    expect(vi.mocked(customersApi.page).mock.lastCall?.[0]).not.toHaveProperty("created_from");
+    await ui.click(screen.getByRole("button", { name: "本期" }));
+    await waitFor(() => expect(customersApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ created_from: currentReportPeriod().from, created_to: currentReportPeriod().to, mine_orders: true })));
     await ui.click(screen.getByRole("button", { name: "清除订单筛选" }));
     await waitFor(() => expect(customersApi.page).toHaveBeenLastCalledWith(expect.not.objectContaining({ mine_orders: true })));
     expect(screen.queryByText(/管理员姓名.*2026-11-16.*2026-12-15/)).toBeNull();
+  });
+
+  it("客户中心的创建日期快捷筛选应用于客户、合作方和需求", async () => {
+    await renderShell({ user: "admin", initialPath: "/customers" });
+    expect((await screen.findByRole("button", { name: "上期" })).closest(".customer-list-filters")).not.toBeNull();
+    await ui.click(await screen.findByRole("button", { name: "上期" }));
+    const previous = previousReportPeriod();
+    await waitFor(() => expect(customersApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ created_from: previous.from, created_to: previous.to })));
+    await setAntdDateRange(screen.getByRole("tabpanel"), ui, "2026-01-02", "2026-02-03");
+    await waitFor(() => expect(customersApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ created_from: "2026-01-02", created_to: "2026-02-03" })));
+    await ui.click(screen.getByRole("tab", { name: "合作方（同行/供货方/平台）" }));
+    expect(screen.getByRole("button", { name: "上期" }).closest(".counterparty-filter-bar")).not.toBeNull();
+    await waitFor(() => expect(counterpartiesApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ created_from: "2026-01-02", created_to: "2026-02-03" })));
+    await ui.click(screen.getByRole("tab", { name: "客户需求池" }));
+    await waitFor(() => expect(leadsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ created_from: "2026-01-02", created_to: "2026-02-03" })));
+    await ui.click(screen.getByRole("button", { name: "全部" }));
+    await waitFor(() => expect(vi.mocked(leadsApi.page).mock.lastCall?.[0]).not.toHaveProperty("created_from"));
   });
 
   it("工作台与经营中心共用已配置的周期和临时日期选择", async () => {

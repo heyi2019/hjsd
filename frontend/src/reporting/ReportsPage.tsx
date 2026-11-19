@@ -13,7 +13,7 @@ import { OrderProfit } from "./reports/OrderProfitReport";
 import { OperatingPnl } from "./reports/OperatingPnlReport";
 import { type ReportRange, ReportsActiveContext } from "./reports/shared";
 
-export function ReportsPage({ onNavigate, active = true, initialReportTab, initialReportFrom, initialReportTo }: { onNavigate?: (key: string) => void; active?: boolean; initialReportTab?: "commission" | "my-earnings"; initialReportFrom?: string; initialReportTo?: string }) {
+export function ReportsPage({ onNavigate, active = true, initialReportTab, initialReportFrom, initialReportTo, initialReportAll = false }: { onNavigate?: (key: string) => void; active?: boolean; initialReportTab?: "commission" | "my-earnings"; initialReportFrom?: string; initialReportTo?: string; initialReportAll?: boolean }) {
   const [myEarnings, setMyEarnings] = useState(initialReportTab === "my-earnings");
   const [activeTab, setActiveTab] = useState(initialReportTab === "commission" || myEarnings ? "r3" : "pnl");
   const periodState = useBusinessPeriod();
@@ -22,14 +22,16 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab, initi
     // 重新激活后再按 URL 入口决定是「我的收益」还是完整分润对账。
     if (!active) return;
     setMyEarnings(initialReportTab === "my-earnings");
-    if (periodState.ready && initialReportFrom && initialReportTo && dayjs(initialReportFrom).isValid() && dayjs(initialReportTo).isValid() && initialReportFrom <= initialReportTo) {
+    if (periodState.ready && initialReportAll) {
+      periodState.useAllPeriods();
+    } else if (periodState.ready && initialReportFrom && initialReportTo && dayjs(initialReportFrom).isValid() && dayjs(initialReportTo).isValid() && initialReportFrom <= initialReportTo) {
       periodState.setPeriod({ from: initialReportFrom, to: initialReportTo });
     }
     if (initialReportTab === "commission" || initialReportTab === "my-earnings") setActiveTab("r3");
-  }, [active, initialReportTab, initialReportFrom, initialReportTo, periodState.ready]);
+  }, [active, initialReportTab, initialReportFrom, initialReportTo, initialReportAll, periodState.ready]);
   const reportRange: ReportRange = {
-    params: periodState.period,
-    picker: <BusinessPeriodPicker label="报表日期区间" state={periodState} />,
+    params: periodState.period ?? {},
+    picker: <BusinessPeriodPicker label="报表日期区间" state={periodState} showAll />,
   };
   const tabItems = [
     { key: "data-center", label: "数据中心", render: () => <DataCenterPanel onNavigate={onNavigate} range={reportRange} /> },

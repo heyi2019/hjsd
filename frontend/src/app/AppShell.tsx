@@ -35,12 +35,13 @@ type PageProps = {
   initialReportTab?: "commission" | "my-earnings";
   initialReportFrom?: string;
   initialReportTo?: string;
+  initialReportAll?: boolean;
   /** keep-alive 下当前页是否处于激活态：非激活仅隐藏不卸载，页面可据此在重新激活时重拉数据。 */
   active?: boolean;
   /** Customer Center deep-link focus, passed from the shell so standalone page tests need no Router context. */
   focusCustomerId?: number;
   focusCounterpartyId?: number;
-  customerOrderFilter?: { from: string; to: string };
+  customerOrderFilter?: { from?: string; to?: string };
   onClearCustomerOrderFilter?: () => void;
 };
 const PAGES: Record<string, ComponentType<PageProps>> = {
@@ -70,8 +71,8 @@ export function AppShell() {
   const focusCounterpartyId = Number.isInteger(parsedCounterpartyFocusId) && parsedCounterpartyFocusId > 0 ? parsedCounterpartyFocusId : undefined;
   const customerOrderFrom = customerFocusParams?.get("trade_date_from");
   const customerOrderTo = customerFocusParams?.get("trade_date_to");
-  const customerOrderFilter = customerFocusParams?.get("mine_orders") === "true" && customerOrderFrom && customerOrderTo
-    ? { from: customerOrderFrom, to: customerOrderTo } : undefined;
+  const customerOrderFilter = customerFocusParams?.get("mine_orders") === "true"
+    ? { from: customerOrderFrom || undefined, to: customerOrderTo || undefined } : undefined;
   const rawBizTab = (segments[1] as BusinessCenterEntryTab | undefined) ?? undefined;
   const query = new URLSearchParams(location.search);
   const businessMine = active === "business" && query.get("mine") === "true";
@@ -310,6 +311,7 @@ export function AppShell() {
                         initialReportTab={key === "operations" && active === "operations" ? initialReportTab : undefined}
                         initialReportFrom={key === "operations" && active === "operations" ? initialReportFrom : undefined}
                         initialReportTo={key === "operations" && active === "operations" ? initialReportTo : undefined}
+                        initialReportAll={key === "operations" && active === "operations" && query.get("period") === "all"}
                         active={isActive}
                         focusCustomerId={key === "customers" ? focusCustomerId : undefined}
                         customerOrderFilter={key === "customers" ? customerOrderFilter : undefined}

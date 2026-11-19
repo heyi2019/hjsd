@@ -45,6 +45,7 @@ const expenseFlows = [
 
 function mockOptionSets() {
   vi.mocked(optionSetsApi.get).mockImplementation(async (code: string) => {
+    if (code === "BUSINESS_PERIOD") return { code, options: [{ value: "start_day", label: "16" }] } as never;
     if (code === "STUDIO_EXPENSE_ITEM") {
       return {
         id: 92, code, label: "工作室支出费用科目", group: "FUND", editable: true,

@@ -7,10 +7,11 @@ import { usePoolResources } from "./usePoolResources";
 import { useReconciliationResources } from "./useReconciliationResources";
 import { employeesApi } from "../shared/api/org.api";
 import type { EmployeeOption } from "../shared/api/types/org";
+import type { PeriodState } from "../shared/state/businessPeriod";
 
 /** 资金中心数据/查询层：资金账户、余额、押金、流水、对账的加载与筛选，以及派生统计。
  *  逐字切片自原 useFundsPageController，仅按职责归位；写操作见 useFundsFormActions。 */
-export function useFundsResources(active = true) {
+export function useFundsResources(active: boolean, periodState: PeriodState) {
   const poolResources = usePoolResources();
   const depositResources = useDepositResources();
   const reconciliationResources = useReconciliationResources();
@@ -19,7 +20,7 @@ export function useFundsResources(active = true) {
   const [fundsReady, setFundsReady] = useState(false);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loading, setLoading] = useState(false);
-  const cashflow = useCashflowResources(active);
+  const cashflow = useCashflowResources(active && periodState.ready, periodState);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,14 +32,14 @@ export function useFundsResources(active = true) {
     return () => { cancelled = true; };
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (includeCashflow = true) => {
     setLoading(true);
     setFundsReady(false);
     setReconciliationsReady(false);
     try {
       await poolResources.loadPools();
       await depositResources.loadDeposits();
-      await cashflow.fetchCashflows();
+      if (includeCashflow && periodState.ready) await cashflow.fetchCashflows();
       await reconciliationResources.loadReconciliations();
       setReconciliationsReady(true);
       setError(null);
@@ -48,10 +49,10 @@ export function useFundsResources(active = true) {
     } finally {
       setLoading(false);
     }
-  }, [cashflow.fetchCashflows, depositResources.loadDeposits, poolResources.loadPools, reconciliationResources.loadReconciliations]);
+  }, [cashflow.fetchCashflows, depositResources.loadDeposits, poolResources.loadPools, reconciliationResources.loadReconciliations, periodState.ready]);
 
   // keep-alive：建单（initial_buy/initial_costs）与退款都会生成资金流水，重新激活时重拉避免资金中心过期。
-  useReloadOnActive(active, load);
+  useReloadOnActive(active, () => load(false));
 
   // 四张统计卡全部取服务端汇总（Decimal 聚合）：前端不再对卡片浮点累加，也不再有 N+1。
   const unavailableAmount = error ? "不可用" : "—";

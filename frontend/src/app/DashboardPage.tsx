@@ -118,7 +118,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
 
       <div className="dashboard-summary">
         <h2 id="dashboard-summary-title" className="dashboard-summary__title">我的业务总览</h2>
-        <BusinessPeriodPicker state={periodState} />
+        <BusinessPeriodPicker state={periodState} showAll />
         <ErrorBanner error={periodState.error ? { message: periodState.error } : null} onRetry={periodState.retry} />
         <ErrorBanner error={summaryError} onRetry={() => void loadSummary()} />
         <BusinessOverview
@@ -132,6 +132,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
           overdueInstallmentsEnabled={businessReminderConfig.overdueInstallmentsEnabled}
           ordersError={Boolean(summaryError)}
           loading={summaryLoading}
+          allPeriods={periodState.period === null}
           personalOrders={personalOrders}
           personalCustomers={personalCustomers}
           personalOrdersError={Boolean(personalOrdersError)}
@@ -142,7 +143,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
           onPersonalEarningsClick={() => onDashboardNavigate
             ? openDashboardPath(period
               ? `/operations?tab=my-earnings&from=${encodeURIComponent(period.from)}&to=${encodeURIComponent(period.to)}`
-              : "/operations?tab=my-earnings")
+              : "/operations?tab=my-earnings&period=all")
             : onPersonalNavigate?.("earnings")}
           onInventoryClick={() => openDashboardPath("/business/inventory")}
           onOrdersClick={() => openDashboardPath(withPeriod("/business/ledger"))}

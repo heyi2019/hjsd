@@ -9,11 +9,12 @@ import { CustomerEditModal } from "./CustomerEditModal";
 import { CustomerMergeModal } from "./CustomerMergeModal";
 import { useCustomerController } from "./useCustomerController";
 import { useSession } from "../shared/state/session";
+import type { ReactNode } from "react";
 
 /** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
 const CUSTOMER_MOBILE_HIDDEN_KEYS = ["phone", "wechat", "qq", "created_at"] as const;
 
-export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrderFilter }: { active?: boolean; focusId?: number; orderFilter?: { from: string; to: string }; onClearOrderFilter?: () => void }) {
+export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrderFilter, createdPeriod, createdPicker }: { active?: boolean; focusId?: number; orderFilter?: { from?: string; to?: string }; onClearOrderFilter?: () => void; createdPeriod?: { from: string; to: string } | null; createdPicker?: ReactNode }) {
   const { username } = useSession();
   const {
     activeDefs,
@@ -63,7 +64,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
     submitEdit,
     submitMerge,
     total,
-  } = useCustomerController({ active, focusId, orderFilter });
+  } = useCustomerController({ active, focusId, orderFilter, createdPeriod });
   return (
     <Card
       className="glass"
@@ -92,13 +93,13 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
       </Typography.Paragraph>
       <StatRow
         items={[
-          { label: "客户总数", kind: "count", amount: rows === null ? "不可用" : String(total) },
-          { label: "本月新增客户数", kind: "count", amount: rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
-          { label: "今日新增客户数", kind: "count", amount: rows === null ? "不可用" : String(newTodayCount ?? 0) },
+          { label: "客户总数", kind: "count", amount: loading ? null : rows === null ? "不可用" : String(total) },
+          { label: "本月新增客户数", kind: "count", amount: loading ? null : rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
+          { label: "今日新增客户数", kind: "count", amount: loading ? null : rows === null ? "不可用" : String(newTodayCount ?? 0) },
         ]}
       />
       <Space wrap className="customer-list-filters customer-list-filters--separated">
-        {orderFilter ? <span className="customer-order-filter">订单操作人：{creatorOptions?.find((item) => item.value === username)?.label || username} · 订单日期：{orderFilter.from} 至 {orderFilter.to}<button type="button" aria-label="清除订单筛选" onClick={onClearOrderFilter}>×</button></span> : null}
+        {orderFilter ? <span className="customer-order-filter">订单操作人：{creatorOptions?.find((item) => item.value === username)?.label || username} · 订单日期：{orderFilter.from && orderFilter.to ? `${orderFilter.from} 至 ${orderFilter.to}` : "全部时间"}<button type="button" aria-label="清除订单筛选" onClick={onClearOrderFilter}>×</button></span> : null}
         <Input.Search
           aria-label="搜索客户"
           enterButton={(
@@ -147,6 +148,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
             setPage(1);
           }}
         />
+        {createdPicker}
       </Space>
       <DataTable<Customer>
         // 移动端隐藏按列 key 绑定，不随「设置 → 列表字段」的过滤/排序而错位。

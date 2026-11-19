@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -15,6 +16,14 @@ from app.domain.users import User
 
 CONTACT_FIELDS: tuple[str, ...] = ("contact_name", "phone", "wechat", "qq", "note")
 _UNSET = object()
+
+
+def apply_created_range(stmt, column, created_from: date | None, created_to: date | None):
+    if created_from is not None:
+        stmt = stmt.where(column >= datetime.combine(created_from, time.min))
+    if created_to is not None and created_to < date.max:
+        stmt = stmt.where(column < datetime.combine(created_to + timedelta(days=1), time.min))
+    return stmt
 
 def _required_text(value: Any, *, message: str, field: str) -> str:
     if not isinstance(value, str) or not value.strip():

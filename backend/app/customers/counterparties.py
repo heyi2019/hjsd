@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from datetime import date
 from typing import Any
 
 from sqlalchemy import func, select
@@ -27,6 +28,7 @@ from ._common import (
     _normalize_extra_values,
     _required_bool,
     _required_text,
+    apply_created_range,
 )
 from app.shared.form_values import _validate_required_extras, set_extra_values
 
@@ -98,8 +100,10 @@ def list_counterparties(
     created_by: Sequence[str] | None = None,
     limit: int | None = None,
     offset: int = 0,
+    created_from: date | None = None,
+    created_to: date | None = None,
 ) -> list[Counterparty]:
-    stmt = select(Counterparty)
+    stmt = apply_created_range(select(Counterparty), Counterparty.created_at, created_from, created_to)
     if type:
         stmt = stmt.where(Counterparty.type == type)
     if status:
@@ -114,8 +118,9 @@ def list_counterparties(
 def count_counterparties(
     session: Session, *, type: str | None = None, status: str | None = None,
     created_by: Sequence[str] | None = None,
+    created_from: date | None = None, created_to: date | None = None,
 ) -> int:
-    stmt = select(func.count(Counterparty.id))
+    stmt = apply_created_range(select(func.count(Counterparty.id)), Counterparty.created_at, created_from, created_to)
     if type:
         stmt = stmt.where(Counterparty.type == type)
     if status:

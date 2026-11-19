@@ -7,7 +7,7 @@ export const BUSINESS_PERIOD_CODE = "BUSINESS_PERIOD";
 const PERIOD_CHANGED = "business-period-config-changed";
 
 export type PeriodState = {
-  period: ReportPeriod;
+  period: ReportPeriod | null;
   startDay: number;
   ready: boolean;
   error: string | null;
@@ -15,6 +15,7 @@ export type PeriodState = {
   setPeriod: (period: ReportPeriod) => void;
   useCurrentPeriod: () => void;
   usePreviousPeriod: () => void;
+  useAllPeriods: () => void;
 };
 
 const PeriodContext = createContext<PeriodState | null>(null);
@@ -25,7 +26,7 @@ export function announceBusinessPeriodChange(startDay: number) {
 
 function usePeriodState(enabled = true): PeriodState {
   const [startDay, setStartDay] = useState(16);
-  const [selection, setSelection] = useState<ReportPeriod | null>(null);
+  const [selection, setSelection] = useState<ReportPeriod | null | undefined>(undefined);
   const [ready, setReady] = useState(!enabled);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -52,7 +53,7 @@ function usePeriodState(enabled = true): PeriodState {
       if (Number.isInteger(value) && value >= 1 && value <= 31) {
         version.current += 1;
         setStartDay(value);
-        setSelection(null);
+        setSelection(undefined);
         setError(null);
         setReady(true);
       }
@@ -65,17 +66,18 @@ function usePeriodState(enabled = true): PeriodState {
     return () => { cancelled = true; window.removeEventListener(PERIOD_CHANGED, changed); window.removeEventListener("focus", onFocus); window.clearInterval(timer); };
   }, [enabled, retryCount]);
   return {
-    period: selection ?? currentReportPeriod(dayjs(), startDay),
+    period: selection === undefined ? currentReportPeriod(dayjs(), startDay) : selection,
     startDay,
     ready,
     error,
     retry: () => setRetryCount((value) => value + 1),
     setPeriod: (period) => {
       const current = currentReportPeriod(dayjs(), startDay);
-      setSelection(period.from === current.from && period.to === current.to ? null : period);
+      setSelection(period.from === current.from && period.to === current.to ? undefined : period);
     },
-    useCurrentPeriod: () => setSelection(null),
+    useCurrentPeriod: () => setSelection(undefined),
     usePreviousPeriod: () => setSelection(previousReportPeriod(dayjs(), startDay)),
+    useAllPeriods: () => setSelection(null),
   };
 }
 

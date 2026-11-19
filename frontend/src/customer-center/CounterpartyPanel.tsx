@@ -1,6 +1,7 @@
 import { Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { buildFormExtraDisplay, CfgItem, CustomFieldSection, FieldConfigScope, formatExtraDisplayValue } from "../business/ConfigurableField";
 import { counterpartiesApi } from "../shared/api/customers.api";
 import { employeesApi } from "../shared/api/org.api";
@@ -16,13 +17,15 @@ import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, 
 import { appMessage } from "../shared/ui/appFeedback";
 import { collectExtras } from "./CustomersPage.fragments";
 
-export function CounterpartyPanel({ active = true, focusId }: { active?: boolean; focusId?: number }) {
+export function CounterpartyPanel({ active = true, focusId, createdPeriod, createdPicker }: { active?: boolean; focusId?: number; createdPeriod?: { from: string; to: string } | null; createdPicker?: ReactNode }) {
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [creatorFilter, setCreatorFilter] = useState<string[]>([]);
   const [creatorOptions, setCreatorOptions] = useState<{ label: string; value: string }[] | null>(null);
+  const requestRef = useRef(0);
   const [rows, setRows] = useState<Counterparty[] | null>(null);
+  const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -45,24 +48,32 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
   };
 
   const load = useCallback(async () => {
+    const request = ++requestRef.current;
+    setLoading(true);
     try {
       const response = await counterpartiesApi.page({
         ...(statusFilter ? { status: statusFilter } : {}),
         ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
+        ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
         limit: pageSize,
         offset: (page - 1) * pageSize,
       });
+      if (request !== requestRef.current) return;
       setRows(response.items);
       setTotal(response.total);
       setError(null);
     } catch (err) {
-      setError(normalizeError(err));
+      if (request === requestRef.current) setError(normalizeError(err));
+    } finally {
+      if (request === requestRef.current) setLoading(false);
     }
-  }, [creatorFilter, page, pageSize, statusFilter]);
+  }, [creatorFilter, page, pageSize, statusFilter, createdPeriod?.from, createdPeriod?.to]);
 
+  useEffect(() => { setPage(1); }, [createdPeriod?.from, createdPeriod?.to]);
   // 页面被 keep-alive 隐藏时不请求；重新激活或状态筛选变化都从后端刷新。
   useEffect(() => {
     if (active) void load();
+    return () => { requestRef.current += 1; };
   }, [active, load]);
 
   useEffect(() => {
@@ -216,11 +227,12 @@ export function CounterpartyPanel({ active = true, focusId }: { active?: boolean
       <Space wrap className="counterparty-filter-bar">
         <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? []} disabled={counterpartyStatusOptions === null || rows === null} onChange={(value) => { setStatusFilter(value); setPage(1); }} />
         <Select mode="multiple" allowClear placeholder="创建操作人" aria-label="合作方创建操作人筛选" value={creatorFilter} options={creatorOptions ?? []} maxTagCount={2} disabled={creatorOptions === null || rows === null} onChange={(value) => { setCreatorFilter(value as string[]); setPage(1); }} />
+        {createdPicker}
       </Space>
       <DataTable<Counterparty>
         columns={arrangeColumns(columns)}
         rows={rows ?? []}
-        loading={rows === null}
+        loading={loading || rows === null}
         page={page}
         pageSize={pageSize}
         total={total}

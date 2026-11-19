@@ -26,6 +26,7 @@ from app.customers.leads import (
     update_lead as parties_update_lead,
 )
 from .router_output import _lead_output, _lead_outputs
+from ._filters import created_date_filter
 
 router = APIRouter(tags=["CUS-01 客户与合作方"])
 
@@ -39,11 +40,12 @@ def list_leads(
     customer_id: int | None = Query(default=None, gt=0),
     status: str | None = Query(default=None),
     keyword: str | None = Query(default=None, max_length=128),
+    created_filter: dict = Depends(created_date_filter),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> list[schemas.LeadOut]:
     items = parties_list_leads(
-        db, customer_id=customer_id, status=status, keyword=keyword, user=user
+        db, customer_id=customer_id, status=status, keyword=keyword, user=user, **created_filter
     )
     return _lead_outputs(db, items)
 
@@ -55,6 +57,7 @@ def list_leads_page(
     keyword: str | None = Query(default=None, max_length=128),
     limit: int = Query(default=10, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    created_filter: dict = Depends(created_date_filter),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> PageOut[schemas.LeadOut]:
@@ -66,8 +69,9 @@ def list_leads_page(
         user=user,
         limit=limit,
         offset=offset,
+        **created_filter,
     )
-    summary = parties_summarize_leads(db, user=user)
+    summary = parties_summarize_leads(db, user=user, customer_id=customer_id, status=status, keyword=keyword, **created_filter)
     return PageOut(
         items=_lead_outputs(db, items),
         total=summary["total_count"],
@@ -78,10 +82,11 @@ def list_leads_page(
 
 @router.get("/leads/summary", response_model=schemas.LeadSummaryOut)
 def lead_summary(
+    created_filter: dict = Depends(created_date_filter),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> schemas.LeadSummaryOut:
-    return schemas.LeadSummaryOut(**parties_summarize_leads(db, user=user))
+    return schemas.LeadSummaryOut(**parties_summarize_leads(db, user=user, **created_filter))
 
 
 @router.get("/leads/{lead_id}", response_model=schemas.LeadOut)

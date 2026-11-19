@@ -10,13 +10,15 @@ from app.shared.scope import owner_scope_filter, owner_scope_ids
 from app.core.errors import NotFound
 from app.domain.parties import Customer
 from app.business.queries import order_customer_ids
+from app.customers._common import apply_created_range
 
 def _customer_list_stmt(
     *, keyword: str | None, status: str | None, created_by: Sequence[str] | None,
     user: CurrentUser | None, session: Session, mine_orders: bool = False,
     trade_date_from: date | None = None, trade_date_to: date | None = None,
+    created_from: date | None = None, created_to: date | None = None,
 ):
-    stmt = select(Customer)
+    stmt = apply_created_range(select(Customer), Customer.created_at, created_from, created_to)
     if mine_orders:
         if user is None:
             raise ValueError("我的订单筛选需要当前用户")
@@ -50,10 +52,12 @@ def list_customers(
     created_by: Sequence[str] | None = None, user: CurrentUser | None = None,
     limit: int | None = None, offset: int = 0, mine_orders: bool = False,
     trade_date_from: date | None = None, trade_date_to: date | None = None,
+    created_from: date | None = None, created_to: date | None = None,
 ) -> list[Customer]:
     stmt = _customer_list_stmt(
         keyword=keyword, status=status, created_by=created_by, user=user, session=session,
         mine_orders=mine_orders, trade_date_from=trade_date_from, trade_date_to=trade_date_to,
+        created_from=created_from, created_to=created_to,
     )
     if limit is not None:
         stmt = stmt.limit(limit).offset(offset)
@@ -64,10 +68,12 @@ def count_customers(
     session: Session, *, keyword: str | None = None, status: str | None = None,
     created_by: Sequence[str] | None = None, user: CurrentUser | None = None, mine_orders: bool = False,
     trade_date_from: date | None = None, trade_date_to: date | None = None,
+    created_from: date | None = None, created_to: date | None = None,
 ) -> int:
     stmt = _customer_list_stmt(
         keyword=keyword, status=status, created_by=created_by, user=user, session=session,
         mine_orders=mine_orders, trade_date_from=trade_date_from, trade_date_to=trade_date_to,
+        created_from=created_from, created_to=created_to,
     )
     return int(session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
 
@@ -83,6 +89,8 @@ def summarize_customers(
     mine_orders: bool = False,
     trade_date_from: date | None = None,
     trade_date_to: date | None = None,
+    created_from: date | None = None,
+    created_to: date | None = None,
 ) -> dict[str, int]:
     """Summarize the same customer scope as the list, using the caller's local date."""
     month_start = today_date.replace(day=1)
@@ -93,6 +101,7 @@ def summarize_customers(
     scope = _customer_list_stmt(
         keyword=keyword, status=status, created_by=created_by, user=user, session=session,
         mine_orders=mine_orders, trade_date_from=trade_date_from, trade_date_to=trade_date_to,
+        created_from=created_from, created_to=created_to,
     ).subquery()
     created_at = scope.c.created_at
     month_count, today_count = session.execute(

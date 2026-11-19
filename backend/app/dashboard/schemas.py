@@ -43,7 +43,7 @@ class DashboardRemindersOut(BaseModel):
 
 
 class DashboardSummaryOut(BaseModel):
-    period: DashboardPeriodOut
+    period: DashboardPeriodOut | None
     orders: DashboardOrdersOut | None
     personal_orders: int | None
     personal_customers: int | None

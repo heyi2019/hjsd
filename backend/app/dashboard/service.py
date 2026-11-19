@@ -51,11 +51,11 @@ def _reminder_config(session: Session) -> dict[str, Any]:
     }
 
 
-def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | None = None, to_date: date | None = None) -> dict[str, Any]:
+def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | None = None, to_date: date | None = None, all_time: bool = False) -> dict[str, Any]:
     today = date.today()
-    if (from_date is None) != (to_date is None) or (from_date is not None and to_date is not None and from_date > to_date):
+    if (all_time and (from_date is not None or to_date is not None)) or (from_date is None) != (to_date is None) or (from_date is not None and to_date is not None and from_date > to_date):
         raise Validation("请选择有效的开始和结束日期")
-    period_from, period_to = (from_date, to_date) if from_date is not None else business_period(today, period_start_day(session))
+    period_from, period_to = (None, None) if all_time else (from_date, to_date) if from_date is not None else business_period(today, period_start_day(session))
     reminders = _reminder_config(session)
     can_orders = user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ))
     can_reports = user.has(PERM_REPORT_READ)
@@ -116,7 +116,7 @@ def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | 
         personal_earnings = commission["total"]["profit_base"]
 
     return {
-        "period": {"from": period_from, "to": period_to},
+        "period": None if all_time else {"from": period_from, "to": period_to},
         "orders": orders,
         "personal_orders": personal_orders,
         "personal_customers": personal_customers,

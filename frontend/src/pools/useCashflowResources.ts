@@ -6,6 +6,7 @@ import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { today } from "../shared/lib/format";
 import { ACCOUNTING_ATTRIBUTE_LABEL } from "../shared/lib/labels";
+import type { PeriodState } from "../shared/state/businessPeriod";
 
 /** 收支方向固定两项（Direction 枚举），不依赖词典。 */
 const FLOW_DIRECTION_OPTIONS = [
@@ -14,7 +15,7 @@ const FLOW_DIRECTION_OPTIONS = [
 ];
 
 /** 资金流水查询域：筛选、服务端汇总、导出和列表状态集中在这里。 */
-export function useCashflowResources(active = true) {
+export function useCashflowResources(active: boolean, periodState: PeriodState) {
   const [cashflows, setCashflows] = useState<Cashflow[]>([]);
   const [cashflowTotal, setCashflowTotal] = useState(0);
   const [cashflowTotals, setCashflowTotals] = useState({ income: "0.00", expense: "0.00" });
@@ -22,8 +23,8 @@ export function useCashflowResources(active = true) {
   const [cashflowKeyword, setCashflowKeyword] = useState("");
   const [cashflowPoolId, setCashflowPoolId] = useState<number | undefined>();
   const [cashflowDirection, setCashflowDirection] = useState<string | undefined>();
-  const [cashflowFrom, setCashflowFrom] = useState("");
-  const [cashflowTo, setCashflowTo] = useState("");
+  const cashflowFrom = periodState.period?.from ?? "";
+  const cashflowTo = periodState.period?.to ?? "";
   const [cashflowLedgerType, setCashflowLedgerType] = useState("");
   const [cashflowAttribute, setCashflowAttribute] = useState("");
   const [cashflowCategory, setCashflowCategory] = useState("");
@@ -46,9 +47,11 @@ export function useCashflowResources(active = true) {
   const cashflowKeywordRef = useRef(cashflowKeyword);
   cashflowKeywordRef.current = cashflowKeyword;
   const cashflowTotalsRequestRef = useRef(0);
+  const cashflowListRequestRef = useRef(0);
 
   const fetchCashflows = useCallback(async () => {
     setCashflowsReady(false);
+    const listRequestId = ++cashflowListRequestRef.current;
     const totalsRequestId = ++cashflowTotalsRequestRef.current;
     const result = await cashflowsApi.list({
       occurred_from: cashflowFromRef.current || undefined,
@@ -62,6 +65,7 @@ export function useCashflowResources(active = true) {
       limit: 2000,
       offset: 0,
     });
+    if (listRequestId !== cashflowListRequestRef.current) return;
     setCashflows(result.items);
     setCashflowTotal(result.total);
     if (totalsRequestId === cashflowTotalsRequestRef.current) {
@@ -72,6 +76,19 @@ export function useCashflowResources(active = true) {
     }
     setCashflowsReady(true);
   }, []);
+
+  const lastPeriodRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!active) {
+      lastPeriodRef.current = null;
+      return;
+    }
+    const key = `${cashflowFrom}|${cashflowTo}`;
+    if (lastPeriodRef.current !== key) {
+      lastPeriodRef.current = key;
+      void fetchCashflows().catch(() => undefined);
+    }
+  }, [active, cashflowFrom, cashflowTo, fetchCashflows]);
 
   useEffect(() => {
     if (!active) return;
@@ -147,9 +164,7 @@ export function useCashflowResources(active = true) {
     cashflowDirection,
     setCashflowDirection,
     cashflowFrom,
-    setCashflowFrom,
     cashflowTo,
-    setCashflowTo,
     cashflowLedgerType,
     setCashflowLedgerType,
     cashflowAttribute,

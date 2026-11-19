@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -23,7 +24,7 @@ from app.domain.enums import AuditAction, EntityType, LeadStatus, LeadType, Sequ
 from app.domain.parties import CustomerLead
 from app.domain.trade import Order
 
-from ._common import _UNSET, _normalize_extra_values, _required_text, _validate_owner_id
+from ._common import _UNSET, _normalize_extra_values, _required_text, _validate_owner_id, apply_created_range
 from .customer_merge import assert_customer_usable
 from app.shared.form_values import _validate_required_extras, set_extra_values
 
@@ -115,17 +116,17 @@ def create_lead(
     return lead
 
 
-def list_leads(
+def _lead_list_stmt(
     session: Session,
     *,
     customer_id: int | None = None,
     status: str | None = None,
     keyword: str | None = None,
     user: CurrentUser | None = None,
-    limit: int | None = None,
-    offset: int = 0,
-) -> list[CustomerLead]:
-    stmt = select(CustomerLead)
+    created_from: date | None = None,
+    created_to: date | None = None,
+):
+    stmt = apply_created_range(select(CustomerLead), CustomerLead.created_at, created_from, created_to)
     if customer_id is not None:
         stmt = stmt.where(CustomerLead.customer_id == customer_id)
     if status is not None:
@@ -149,19 +150,28 @@ def list_leads(
         scope = owner_scope_filter(CustomerLead.owner_id, user, session)
         if scope is not None:
             stmt = stmt.where(scope)
+    return stmt
+
+
+def list_leads(session: Session, *, customer_id: int | None = None, status: str | None = None,
+               keyword: str | None = None, user: CurrentUser | None = None,
+               limit: int | None = None, offset: int = 0,
+               created_from: date | None = None, created_to: date | None = None) -> list[CustomerLead]:
+    stmt = _lead_list_stmt(session, customer_id=customer_id, status=status, keyword=keyword, user=user,
+                           created_from=created_from, created_to=created_to)
     if limit is not None:
         stmt = stmt.limit(limit).offset(offset)
     return list(session.scalars(stmt.order_by(CustomerLead.id.desc())).all())
 
 
-def summarize_leads(session: Session, *, user: CurrentUser | None = None) -> dict[str, int]:
+def summarize_leads(session: Session, *, user: CurrentUser | None = None, customer_id: int | None = None,
+                    status: str | None = None, keyword: str | None = None,
+                    created_from: date | None = None, created_to: date | None = None) -> dict[str, int]:
     """Return total and open lead counts within the same owner scope as the list."""
-    stmt = select(CustomerLead.status, func.count(CustomerLead.id))
-    if user is not None:
-        scope = owner_scope_filter(CustomerLead.owner_id, user, session)
-        if scope is not None:
-            stmt = stmt.where(scope)
-    counts = dict(session.execute(stmt.group_by(CustomerLead.status)).all())
+    filtered = _lead_list_stmt(session, customer_id=customer_id, status=status, keyword=keyword, user=user,
+                               created_from=created_from, created_to=created_to).subquery()
+    stmt = select(filtered.c.status, func.count(filtered.c.id)).group_by(filtered.c.status)
+    counts = dict(session.execute(stmt).all())
     return {
         "total_count": sum(counts.values()),
         "open_count": counts.get(LeadStatus.OPEN.value, 0),

@@ -38,6 +38,8 @@ import { ConfirmButton,
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect";
 import type { FundsPageController } from "./useFundsPageController";
+import { useBusinessPeriod, type PeriodState } from "../shared/state/businessPeriod";
+import { BusinessPeriodPicker } from "../shared/ui/BusinessPeriodPicker";
 /** 弹窗视觉稿落地：作用域严格限定 .studio-ledger-modal（单一弹窗），不污染全站 .ant-modal。 */
 import "./StudioExpensePanel.css";
 
@@ -92,7 +94,9 @@ async function readOptionSet(code: string): Promise<OptionItem[]> {
   return set.options ?? [];
 }
 
-export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: FundsPageController }) {
+export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }: { pools: Pool[]; ctrl?: FundsPageController; periodState?: PeriodState }) {
+  const fallbackPeriod = useBusinessPeriod();
+  const periodState = suppliedPeriod ?? fallbackPeriod;
   const [flows, setFlows] = useState<Cashflow[]>([]);
   const [summary, setSummary] = useState<{
     income: string;
@@ -105,7 +109,6 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<NormalizedError | null>(null);
 
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [category, setCategory] = useState<string | undefined>(undefined);
 
   const [registerOpen, setRegisterOpen] = useState(false);
@@ -115,8 +118,8 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
   const [registerForm] = Form.useForm();
   const write = useAsyncAction();
 
-  const from = dateRange?.[0]?.format("YYYY-MM-DD") ?? "";
-  const to = dateRange?.[1]?.format("YYYY-MM-DD") ?? "";
+  const from = periodState.period?.from ?? "";
+  const to = periodState.period?.to ?? "";
 
   useEffect(() => {
     let cancelled = false;
@@ -158,8 +161,9 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
   }, [category, from, to]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (periodState.ready && (ctrl?.active ?? true)) void load();
+    return () => { loadSeqRef.current += 1; };
+  }, [load, periodState.ready, ctrl?.active]);
 
   const submitRegister = async (values: Record<string, unknown>) => {
     const direction = (values.direction as string) === "IN" ? "IN" : "OUT";
@@ -307,24 +311,15 @@ export function StudioExpensePanel({ pools, ctrl }: { pools: Pool[]; ctrl?: Fund
       <StatRow
         items={[
           // 失败态一律显示「—」（amount: null），不把未知状态当成可信 0
-          { label: "收入", amount: error ? null : income },
-          { label: "支出", amount: error ? null : expense },
-          { label: "净额", amount: error ? null : netTotal },
-          { label: "笔数", kind: "count", amount: error ? null : flowCount },
+          { label: "收入", amount: loading || error ? null : income },
+          { label: "支出", amount: loading || error ? null : expense },
+          { label: "净额", amount: loading || error ? null : netTotal },
+          { label: "笔数", kind: "count", amount: loading || error ? null : flowCount },
         ]}
       />
       <Card className="glass studio-expense-card">
         <div className="ui-filter-bar studio-expense-filters studio-expense-filters--single-row">
-          <DatePicker.RangePicker
-            aria-label="工作室支出日期区间"
-            placeholder={["开始日期", "结束日期"]}
-            format="YYYY-MM-DD"
-            size="small"
-            placement="bottomLeft"
-            classNames={{ popup: { root: "compact-date-range-picker" } }}
-            value={dateRange}
-            onChange={(value) => setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null)}
-          />
+          <BusinessPeriodPicker label="工作室支出日期区间" state={periodState} showAll />
           <Select
             aria-label="工作室支出科目"
             allowClear

@@ -1,10 +1,33 @@
 """PARTY-01 CUS-02 客户需求池契约测试。"""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from app.business.create import create_order
 from app.customers.customers import create_customer
+from app.customers.counterparties import create_counterparty
+from app.customers.leads import create_lead
+
+
+def test_customer_center_creation_period_filters_lists_summaries_and_export(seeded_client, seeded_db, headers):
+    customers = [create_customer(seeded_db, display_name=f"周期客户{index}", actor="pytest") for index in range(2)]
+    parties = [create_counterparty(seeded_db, display_name=f"周期合作方{index}", type="PEER", actor="pytest") for index in range(2)]
+    leads = [create_lead(seeded_db, customer_id=customer.id, request_type="FIND_ACCOUNT", target=f"周期需求{index}", actor="pytest") for index, customer in enumerate(customers)]
+    for group in (customers, parties, leads):
+        group[0].created_at = datetime(2026, 12, 15, 23, 59, 59)
+        group[1].created_at = datetime(2026, 12, 16, 0, 0, 0)
+    seeded_db.flush()
+    params = {"created_from": "2026-11-16", "created_to": "2026-12-15"}
+    for path, target in (("/api/v1/customers", customers[0]), ("/api/v1/counterparties/page", parties[0]), ("/api/v1/leads/page", leads[0])):
+        response = seeded_client.get(path, params=params, headers=headers)
+        assert response.status_code == 200, response.text
+        assert response.json()["total"] == 1
+        assert [item["id"] for item in response.json()["items"]] == [target.id]
+    summary = seeded_client.get("/api/v1/leads/summary", params=params, headers=headers)
+    assert summary.json() == {"total_count": 1, "open_count": 1}
+    exported = seeded_client.get("/api/v1/customers/export.csv", params=params, headers=headers)
+    assert "周期客户0" in exported.text and "周期客户1" not in exported.text
+    assert seeded_client.get("/api/v1/customers", params={"created_from": "2026-12-16", "created_to": "2026-12-15"}, headers=headers).status_code == 422
 
 
 def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, headers):

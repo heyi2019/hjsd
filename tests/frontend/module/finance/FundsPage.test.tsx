@@ -16,6 +16,9 @@ import { employeesApi } from "@/shared/api/org.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { cashflowPage, cashflowTotals, poolBalancesResponse, studioExpenseSummary } from "@fixtures/api-responses";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { BusinessPeriodProvider } from "@/shared/state/businessPeriod";
+import { previousReportPeriod } from "@/reporting/reportPeriod";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -90,6 +93,22 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
 }
 
 describe("FundsPage：资金账户卡片", () => {
+  it("资金明细与工作室运营共享周期，全部展示所有流水", async () => {
+    vi.mocked(optionSetsApi.get).mockImplementation(async (code) => ({ code, options: code === "BUSINESS_PERIOD" ? [{ value: "start_day", label: "16" }] : [] }) as never);
+    renderLight(<BusinessPeriodProvider><FundsPage /></BusinessPeriodProvider>, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    await ui.click(await screen.findByRole("button", { name: "上期" }));
+    const previous = previousReportPeriod();
+    await waitFor(() => expect(cashflowsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ occurred_from: previous.from, occurred_to: previous.to })));
+    await ui.click(screen.getByRole("tab", { name: "工作室运营" }));
+    await waitFor(() => expect(studioExpensesApi.summary).toHaveBeenLastCalledWith(expect.objectContaining({ occurred_from: previous.from, occurred_to: previous.to })));
+    await ui.click(screen.getByRole("button", { name: "全部" }));
+    await waitFor(() => expect(studioExpensesApi.summary).toHaveBeenLastCalledWith(expect.objectContaining({ occurred_from: undefined, occurred_to: undefined })));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    await waitFor(() => expect(cashflowsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ occurred_from: undefined, occurred_to: undefined })));
+  });
+
   it("资金中心不再展示返点明细 Tab", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
@@ -289,11 +308,12 @@ describe("FundsPage：资金流水", () => {
       total_in: "123456.78",
       total_out: "87654.32",
     }));
+    vi.mocked(cashflowsApi.totals).mockResolvedValue(cashflowTotals({ total_in: "123456.78", total_out: "87654.32" }));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "资金明细" }));
 
-    expect((await screen.findByText("总收入")).closest(".ui-stat")).toHaveTextContent("123,456.78");
+    await waitFor(() => expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("123,456.78"));
     expect(screen.getByText("总支出").closest(".ui-stat")).toHaveTextContent("87,654.32");
   });
 

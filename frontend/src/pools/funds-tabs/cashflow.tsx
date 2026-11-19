@@ -1,6 +1,5 @@
 /** 资金明细 Tab：从 FundsPage.tabs.tsx 拆出，函数体与拆前逐字等价。 */
-import { Card, DatePicker, Input, Space, Typography } from "antd";
-import dayjs from "dayjs";
+import { Card, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { ConfirmButton, DataTable, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../../shared/ui";
 import { useListViewColumns } from "../../shared/lib/listColumns";
@@ -15,19 +14,20 @@ import {
 } from "../../shared/lib/labels";
 import type { FundsPageController } from "../useFundsPageController";
 import type { Cashflow } from "../../shared/api/types/finance";
+import { BusinessPeriodPicker } from "../../shared/ui/BusinessPeriodPicker";
+import type { PeriodState } from "../../shared/state/businessPeriod";
 
 const LEDGER_TYPE_LABEL: Record<string, string> = {
   BUSINESS: "业务资金",
   STUDIO: "工作室运营",
 };
 
-export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
+export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; periodState: PeriodState }) {
   const {
     cashflows, cashflowKeyword, setCashflowKeyword, pools, cashflowPoolId, setCashflowPoolId,
     cashflowDirection, setCashflowDirection,
     cashflowLedgerType, setCashflowLedgerType,
-    cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, cashflowFrom, setCashflowFrom,
-    cashflowTo, setCashflowTo, flowDirectionOptions, flowAttributeOptions,
+    cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, flowDirectionOptions, flowAttributeOptions,
     fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, totalFlowIncome, totalFlowExpense,
     cashflowForm, setCashflowOpen, reverseForm, setReverseTarget, loading, cashflowsReady, error,
   } = ctrl;
@@ -108,19 +108,7 @@ export function CashflowTab({ ctrl }: { ctrl: FundsPageController }) {
           options={cashflowCategoryOptions}
           onChange={(value) => setCashflowCategory(value ?? "")}
         />
-        <DatePicker.RangePicker
-          aria-label="流水日期区间"
-          placeholder={["开始日期", "结束日期"]}
-          format="YYYY-MM-DD"
-          size="small"
-          placement="bottomLeft"
-          classNames={{ popup: { root: "compact-date-range-picker" } }}
-          value={cashflowFrom && cashflowTo ? [dayjs(cashflowFrom), dayjs(cashflowTo)] : null}
-          onChange={(value) => {
-            setCashflowFrom(value?.[0] ? value[0].format("YYYY-MM-DD") : "");
-            setCashflowTo(value?.[1] ? value[1].format("YYYY-MM-DD") : "");
-          }}
-        />
+        <BusinessPeriodPicker label="流水日期区间" state={periodState} showAll />
         <PermissionButton permission="finance.read" onClick={() => void fetchCashflows()}>查询</PermissionButton>
         <PermissionButton permission="finance.read" size="small" loading={cashflowExporting} onClick={() => void exportCashflows()}>
           导出

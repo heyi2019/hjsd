@@ -4,6 +4,7 @@ import { Tabs } from "antd";
 import { ErrorBanner } from "../shared/ui";
 import { StudioExpensePanel } from "./StudioExpensePanel";
 import { useFundsPageController } from "./useFundsPageController";
+import { useBusinessPeriod } from "../shared/state/businessPeriod";
 import { DepositSection, OverviewTab, CashflowTab, ReconciliationTab } from "./FundsPage.tabs";
 import {
   CancelModal,
@@ -17,10 +18,12 @@ import {
   TransferModal,
 } from "./FundsPage.modals";
 export function FundsPage({ active = true }: { active?: boolean } = {}) {
-  const ctrl = useFundsPageController(active);
+  const periodState = useBusinessPeriod();
+  const ctrl = useFundsPageController(active, periodState);
   return (
     <section className="ui-stack">
       <ErrorBanner error={ctrl.error} onRetry={() => void ctrl.load()} retrying={ctrl.loading} />
+      <ErrorBanner error={periodState.error ? { message: periodState.error } : null} onRetry={periodState.retry} />
       <Tabs
         defaultActiveKey="overview"
         destroyOnHidden
@@ -33,9 +36,9 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
           {
             key: "cashflows",
             label: "资金明细",
-            children: <CashflowTab ctrl={ctrl} />,
+            children: <CashflowTab ctrl={ctrl} periodState={periodState} />,
           },
-          { key: "studio-operations", label: "工作室运营", children: <StudioExpensePanel pools={ctrl.pools} ctrl={ctrl} /> },
+          { key: "studio-operations", label: "工作室运营", children: <StudioExpensePanel pools={ctrl.pools} ctrl={ctrl} periodState={periodState} /> },
           { key: "deposits", label: "押金", children: <DepositSection ctrl={ctrl} /> },
           { key: "reconciliations", label: "对账", children: <ReconciliationTab ctrl={ctrl} /> },
         ]}

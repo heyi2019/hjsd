@@ -19,7 +19,8 @@ def dashboard_summary(
     user: CurrentUser = Depends(get_current_user),
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
+    all_time: bool = Query(default=False),
 ) -> schemas.DashboardSummaryOut:
     return schemas.DashboardSummaryOut.model_validate(
-        service.dashboard_summary(db, user=user, from_date=from_date, to_date=to_date)
+        service.dashboard_summary(db, user=user, from_date=from_date, to_date=to_date, all_time=all_time)
     )

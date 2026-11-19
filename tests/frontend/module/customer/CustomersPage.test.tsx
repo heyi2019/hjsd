@@ -2,7 +2,7 @@ import { CustomerPanel } from "@/customer-center/CustomerPanel";
 import { CustomerEditModal } from "@/customer-center/CustomerEditModal";
 import { appMessage } from "@/shared/ui/appFeedback";
 import { Form } from "antd";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -15,6 +15,7 @@ import type { OrderFormField } from "@/shared/api/types/forms";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { resolveMockOnce } from "@fixtures/mock-api";
 import { customerDetail, customerSummary, pageResponse } from "@fixtures/api-responses";
+import { currentReportPeriod } from "@/reporting/reportPeriod";
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");
@@ -119,6 +120,21 @@ beforeEach(() => {
   }));
 });
 describe("CustomersPage：客户档案", () => {
+  it("切换创建日期时不显示旧周期的客户统计", async () => {
+    let finish!: (value: ReturnType<typeof pageResponse>) => void;
+    const pending = new Promise<ReturnType<typeof pageResponse>>((resolve) => { finish = resolve; });
+    vi.mocked(customersApi.page).mockResolvedValueOnce(pageResponse(customers)).mockReturnValueOnce(pending as never);
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    const stat = screen.getByText("客户总数").closest(".ui-stat") as HTMLElement;
+    expect(within(stat).getByText("2")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "上期" }));
+    await waitFor(() => expect(customersApi.page).toHaveBeenCalledTimes(2));
+    expect(within(stat).getByText("-")).toBeInTheDocument();
+    await act(async () => { finish(pageResponse([])); await pending; });
+    expect(within(stat).getByText("0")).toBeInTheDocument();
+  });
   it("从客户中心深链参数打开指定客户卡片", async () => {
     renderLight(<CustomersPage focusCustomerId={1} />);
     expect(await screen.findByText("客户档案 · CUS-0001")).toBeInTheDocument();
@@ -208,6 +224,8 @@ describe("CustomersPage：客户档案", () => {
     await user.click((await screen.findAllByText("管理员", { selector: ".ant-select-item-option-content" }))[0]);
     await waitFor(() => expect(customersApi.page).toHaveBeenLastCalledWith({
       created_by: ["admin"],
+      created_from: currentReportPeriod().from,
+      created_to: currentReportPeriod().to,
       limit: 10,
       offset: 0,
     }));
@@ -220,6 +238,8 @@ describe("CustomersPage：客户档案", () => {
     await user.click(creatorOptions[creatorOptions.length - 1]);
     await waitFor(() => expect(counterpartiesApi.page).toHaveBeenLastCalledWith({
       created_by: ["admin"],
+      created_from: currentReportPeriod().from,
+      created_to: currentReportPeriod().to,
       limit: 10,
       offset: 0,
     }));
@@ -663,7 +683,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     await screen.findByText("CUS-0001");
     await ui.type(screen.getByRole("searchbox", { name: "搜索客户" }), "张三");
     await ui.click(screen.getByRole("button", { name: "搜索客户" }));
-    await waitFor(() => expect(vi.mocked(customersApi.page)).toHaveBeenCalledWith({ keyword: "张三", limit: 10, offset: 0 }));
+    await waitFor(() => expect(vi.mocked(customersApi.page)).toHaveBeenCalledWith({ keyword: "张三", created_from: currentReportPeriod().from, created_to: currentReportPeriod().to, limit: 10, offset: 0 }));
   });
 
   it("客户 CSV 导出完成后给出成功反馈", async () => {

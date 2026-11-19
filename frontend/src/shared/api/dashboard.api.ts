@@ -1,7 +1,7 @@
 import { api } from "./client";
 
 export interface DashboardSummary {
-  period: { from: string; to: string };
+  period: { from: string; to: string } | null;
   orders: { total_count: number; completed_count: number; active_count: number } | null;
   personal_orders: number | null;
   personal_customers: number | null;
@@ -17,5 +17,5 @@ export interface DashboardSummary {
 }
 
 export const dashboardApi = {
-  summary: (period?: { from: string; to: string }) => api.get<DashboardSummary>("/dashboard/summary", { params: period }).then((response) => response.data),
+  summary: (period?: { from: string; to: string } | null) => api.get<DashboardSummary>("/dashboard/summary", { params: period === null ? { all_time: true } : period }).then((response) => response.data),
 };

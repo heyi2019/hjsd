@@ -4,7 +4,7 @@ import { dashboardApi } from "../shared/api/dashboard.api";
 import { DEFAULT_BUSINESS_REMINDER_CONFIG, type BusinessReminderConfig } from "./businessReminderConfig";
 import { buildDashboardAlertMessages } from "./dashboardSummary";
 
-export function useDashboardSummary(active = true, selectedPeriod?: { from: string; to: string }) {
+export function useDashboardSummary(active = true, selectedPeriod?: { from: string; to: string } | null) {
   const [orderSummary, setOrderSummary] = useState<{ total_count: number; completed_count: number } | null>(null);
   const [personalOrders, setPersonalOrders] = useState(0);
   const [personalCustomers, setPersonalCustomers] = useState(0);
@@ -84,7 +84,7 @@ export function useDashboardSummary(active = true, selectedPeriod?: { from: stri
     return () => { requestRef.current += 1; };
   // 仅在激活或日期变化时重查；loadSummary 本身每次渲染都会重建。
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, selectedPeriod?.from, selectedPeriod?.to]);
+  }, [active, selectedPeriod === null, selectedPeriod?.from, selectedPeriod?.to]);
 
   const businessAlerts = buildDashboardAlertMessages({
     inventoryAgingCount,

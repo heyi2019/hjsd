@@ -519,10 +519,24 @@ def test_edit_single_listed_platform_updates_linked_unlist(seeded_client, seeded
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["旧平台"]})
     unlisting, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_event_id": listing.id, "consignment_platforms": ["旧平台"], "platform_unlist_scope": "PLATFORM"})
+    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": [" 新平台 "]}}]})
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(OrderEvent, unlisting.id).form_extra["consignment_platforms"] == ["新平台"]
+
+
+def test_edit_listing_with_whitespace_updates_linked_unlisting(seeded_client, seeded_db, headers):
+    from app.business.consignment import platform_unlist_consignment
+    from app.business.listing_state import active_listings
+    account = create_account(seeded_db, game_account="edit-whitespace-platform", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": [" 旧平台 "]})
+    unlisting, _ = platform_unlist_consignment(seeded_db, order.id, occurred_on=date(2026, 10, 2), actor="pytest", form_extra={"consignment_event_id": listing.id, "consignment_platforms": ["旧平台"]})
     response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["新平台"]}}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(OrderEvent, unlisting.id).form_extra["consignment_platforms"] == ["新平台"]
+    assert active_listings(seeded_db, order.id) == set()
 
 
 def test_cannot_reduce_partially_unlisted_multi_platform_record(seeded_client, seeded_db, headers):

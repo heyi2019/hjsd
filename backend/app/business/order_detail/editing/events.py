@@ -207,9 +207,11 @@ def apply_event_edits(db: Session, changes: list[tuple[OrderEvent, Cashflow | No
                 for linked in _linked_unlistings(db, event):
                     linked_extra = linked.form_extra or {}
                     platforms = linked_extra.get("consignment_platforms") or []
-                    if old_platforms[0] in platforms:
+                    old_platform = old_platforms[0].strip() if isinstance(old_platforms[0], str) else old_platforms[0]
+                    new_platform = new_platforms[0].strip() if isinstance(new_platforms[0], str) else new_platforms[0]
+                    if any((value.strip() if isinstance(value, str) else value) == old_platform for value in platforms):
                         before_extra = jsonable_encoder(linked_extra)
-                        linked.form_extra = {**linked_extra, "consignment_platforms": [new_platforms[0] if value == old_platforms[0] else value for value in platforms]}
+                        linked.form_extra = {**linked_extra, "consignment_platforms": [new_platform if (value.strip() if isinstance(value, str) else value) == old_platform else value for value in platforms]}
                         linked.updated_by = actor
                         record_audit(db, action="ORDER_UPDATE", entity_type="inventory_event_edit", entity_id=linked.id,
                             actor=actor, before={"form_extra": before_extra}, after={"form_extra": jsonable_encoder(linked.form_extra)})

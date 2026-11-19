@@ -132,7 +132,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
       {!loading && !error && details.length === 0 ? <Typography.Text type="secondary">暂无可查看的分润通知</Typography.Text> : null}
       <div className="dashboard-notification-detail-list">
         {details.map(({ notification, order, execution }) => {
-          const recoveryRow = execution.detail_view.execution_rows.find((row) => row.category === "OUTBOUND");
+          const recoveryRow = execution.detail_view.execution_rows.find((row) => row.category === "INBOUND");
           const inventoryEntryLabel = order.order_type === "HS" ? "回收入库时间" : "库存入库时间";
           return (
             <section key={notification.id} className="dashboard-notification-detail" aria-label={`订单 ${order.order_no}`}>

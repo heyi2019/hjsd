@@ -119,7 +119,10 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
         net_amount: "200.00",
       },
       detail_view: {
-        execution_rows: [],
+        execution_rows: [
+          { category: "INBOUND", operator: "回收人员" },
+          { category: "OUTBOUND", operator: "售出人员" },
+        ],
         finance_rows: [],
         operation_rows: [],
         lifecycle: {
@@ -145,6 +148,8 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
     expect(screen.getByText("KU0007")).toBeInTheDocument();
     expect(screen.getByText("库存入库时间")).toBeInTheDocument();
     expect(screen.getByText("库存移出时间")).toBeInTheDocument();
+    expect(screen.getByText("回收人员")).toBeInTheDocument();
+    expect(screen.queryByText("售出人员")).not.toBeInTheDocument();
     expect(screen.getByText("2026-11-17 12:30")).toBeInTheDocument();
     expect(screen.getByText(/2 条通知暂时无法查看/)).toBeInTheDocument();
     await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledWith(1));

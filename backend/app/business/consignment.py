@@ -11,15 +11,17 @@ from collections.abc import Mapping
 from datetime import date
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
 from app.core.security import CurrentUser
 from app.domain.enums import EventType, OperationType
-from app.domain.trade import Cashflow, OrderEvent
+from app.domain.trade import Cashflow, Order, OrderEvent
 
 from app.shared.order_access import get_order
 from .events import post_event as _post_event
+from .listing_state import active_listings
 
 
 def _post_operation(
@@ -106,6 +108,14 @@ def platform_unlist_consignment(
     user: CurrentUser | None = None,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """平台下架：只登记 UNLIST，账号仍保留在 ERP 库存。"""
+    order = get_order(session, order_id, user)
+    session.execute(select(Order.id).where(Order.id == order.id).with_for_update()).scalar_one()
+    extra = _with_unlist_scope(form_extra, "PLATFORM")
+    listing_id = extra.get("consignment_event_id")
+    platforms = extra.get("consignment_platforms")
+    if not isinstance(listing_id, int) or isinstance(listing_id, bool) or not isinstance(platforms, list) or len(platforms) != 1 or not isinstance(platforms[0], str) or (listing_id, platforms[0].strip()) not in active_listings(session, order.id):
+        raise Validation("请选择当前订单仍在上架的具体平台记录")
+    extra["consignment_platforms"] = [platforms[0].strip()]
     return _post_operation(
         session,
         order_id,
@@ -114,7 +124,7 @@ def platform_unlist_consignment(
         actor=actor,
         note=note,
         operator_user_ids=operator_user_ids,
-        form_extra=_with_unlist_scope(form_extra, "PLATFORM"),
+        form_extra=extra,
         form_extra_scope=form_extra_scope,
         user=user,
     )

@@ -92,6 +92,24 @@ def test_single_event_endpoint_cannot_fake_system_unlisting(seeded_client, seede
     assert response.status_code == 422, response.text
 
 
+def test_platform_unlisting_endpoint_requires_active_listing_on_same_order(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="api-platform-unlist", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
+    other_account = create_account(seeded_db, game_account="api-platform-other", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    other_order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=other_account.id)
+    other_listing, _ = post_event(seeded_db, other_order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
+    def submit(extra):
+        return seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json={"event_type": "OPERATE", "operation_type": "UNLIST", "occurred_on": "2026-10-02", "form_extra": {"platform_unlist_scope": "PLATFORM", **extra}})
+    assert submit({"consignment_event_id": 999999, "consignment_platforms": ["不存在的平台"]}).status_code == 422
+    assert submit({"consignment_event_id": other_listing.id, "consignment_platforms": ["平台甲"]}).status_code == 422
+    assert submit({"consignment_event_id": listing.id, "consignment_platforms": ["平台乙"]}).status_code == 422
+    assert submit({"consignment_platforms": ["平台甲"]}).status_code == 422
+    valid = {"consignment_event_id": listing.id, "consignment_platforms": ["平台甲"]}
+    assert submit(valid).status_code == 201
+    assert submit(valid).status_code == 422
+
+
 @pytest.mark.parametrize("order_type", ["HS", "TH", "DG"])
 def test_edit_platform_unlisting_cannot_be_changed_to_system(seeded_client, seeded_db, headers, order_type):
     account = create_account(seeded_db, game_account=f"edit-system-unlist-{order_type}", business_mode="SELF" if order_type == "HS" else "DISTRIBUTION", inventory_type={"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}[order_type], actor="pytest")

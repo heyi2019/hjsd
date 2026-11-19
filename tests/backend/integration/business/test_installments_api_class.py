@@ -150,6 +150,23 @@ class TestInstallmentsApi:
         assert response.status_code in (400, 409, 422), response.text
         assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL")) is None
 
+    def test_consignment_sale_reuses_existing_consignor_and_records_sale_amount(self, seeded_client, seeded_db, headers):
+        from app.business.stocks.profile import create_account
+        from app.customers.customers import create_customer
+        customer = create_customer(seeded_db, display_name="代挂委托人", phone="13800138001", actor="pytest")
+        account = create_account(seeded_db, game_account="atomic-consignment-sale", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+        order = _order(seeded_db, order_type="DG", account_id=account.id)
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        response = seeded_client.post(f"/api/v1/orders/{order.id}/stock-sale", headers=headers, json={
+            "amount": "20", "sale_amount": "200", "occurred_on": TODAY.isoformat(), "pool_id": pool.id,
+            "operator_user_ids": [1], "customer_input": {"display_name": "代挂委托人", "phone": "13800138001", "role": "CONSIGNOR"},
+        })
+        assert response.status_code == 201, response.text
+        assert seeded_db.scalar(select(OrderCustomerRole.id).where(OrderCustomerRole.order_id == order.id, OrderCustomerRole.customer_id == customer.id, OrderCustomerRole.role == "CONSIGNOR"))
+        assert len(seeded_db.scalars(select(Customer.id).where(Customer.display_name == "代挂委托人")).all()) == 1
+        event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
+        assert event.amount == Decimal("20") and Decimal(event.form_extra["sale_amount"]) == Decimal("200")
+
     def test_stock_sale_commits_event_contract_and_down_payment_together(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "atomic-sale-success")
         order = _order(seeded_db, order_type="HS", account_id=account.id)

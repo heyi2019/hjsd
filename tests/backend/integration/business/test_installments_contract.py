@@ -137,6 +137,63 @@ def test_installment_payment_is_cashflow_only(seeded_db):
     assert payment_flow.source_type == "INSTALLMENT"
     assert payment_flow.source_id == contract.inst_no
 
+
+def test_cancelled_installment_can_be_replaced_without_losing_history(seeded_client, seeded_db, headers):
+    from app.core.errors import Conflict
+    from app.domain.attachments import Attachment
+    from sqlalchemy.exc import IntegrityError
+    account = _account(seeded_db, "installment-retry-account")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id, "100")
+    first = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="200", down_payment="0", periods=1, per_period="200")
+    inst_cancel(seeded_db, first.id, cancelled_on=TODAY, actor="pytest", reason="取消售出")
+    second = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="250", down_payment="0", periods=1, per_period="250")
+    assert second.id != first.id and second.inst_no != first.inst_no
+    assert first.status == "CANCELLED" and second.status == "PENDING"
+    for number, contract in enumerate((first, second), 1):
+        seeded_db.add(Attachment(attachment_no=f"ATT-REPEAT-{number}", entity_type="installment", entity_id=contract.inst_no, file_name=f"{number}.png", storage_key=f"repeat/{number}.png", content_type="image/png", size_bytes=1, sha256="a" * 64, created_by="pytest", updated_by="pytest"))
+    seeded_db.flush()
+    assert len(inst_queries.list_installments(seeded_db, order_id=order.id)) == 2
+    with pytest.raises(Conflict):
+        _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="250", down_payment="0", periods=1, per_period="250")
+    with pytest.raises(IntegrityError):
+        with seeded_db.begin_nested():
+            seeded_db.add(Installment(inst_no="DB-DUPLICATE-ACTIVE", order_id=order.id, contract_type="STOCK_SALE", principal=250, down_payment=0, periods=1, per_period=250, first_due_on=TODAY, status="PENDING", created_by="pytest", updated_by="pytest"))
+            seeded_db.flush()
+    detail = seeded_client.get(f"/api/v1/orders/{order.id}", headers=headers)
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["installment"]["id"] == second.id
+    assert {item["attachment_no"] for item in detail.json()["attachments"]} >= {"ATT-REPEAT-1", "ATT-REPEAT-2"}
+
+
+@pytest.mark.parametrize("order_type", ["HS", "TH"])
+def test_cancel_installment_then_resell_in_installments(seeded_client, seeded_db, headers, order_type):
+    from app.business.router_output import _order_list_payload
+    from app.shared.order_amounts import order_cashflow_profit_by_order
+    from app.business.stocks.profile import create_account
+    account = create_account(seeded_db, game_account=f"repeat-installment-{order_type}", business_mode="SELF" if order_type == "HS" else "DISTRIBUTION", inventory_type="RECOVERY" if order_type == "HS" else "PICKUP", actor="pytest")
+    order = _order(seeded_db, order_type=order_type, account_id=account.id)
+    _buy(seeded_db, order.id, "100")
+    post_event(seeded_db, order.id, event_type="SELL", sale_mode="INSTALLMENT", amount=Decimal("200"), occurred_on=TODAY, actor="pytest")
+    first = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="200", down_payment="50", periods=1, per_period="150")
+    inst_pay(seeded_db, first.id, amount=Decimal("50"), paid_on=TODAY, period_no=0, actor="pytest")
+    inst_cancel(seeded_db, first.id, cancelled_on=TODAY, actor="pytest", reason="取消售出")
+    post_event(seeded_db, order.id, event_type="SELL", sale_mode="INSTALLMENT", amount=Decimal("250"), occurred_on=TODAY, actor="pytest")
+    second = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="250", down_payment="50", periods=1, per_period="200")
+    inst_pay(seeded_db, second.id, amount=Decimal("50"), paid_on=TODAY, period_no=0, actor="pytest")
+    flows = seeded_db.scalars(select(Cashflow).where(Cashflow.order_id == order.id)).all()
+    assert any(flow.source_id == first.inst_no for flow in flows)
+    assert any(flow.source_id == second.inst_no for flow in flows)
+    seeded_db.flush()
+    assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == Decimal("-50")
+    ledger = _order_list_payload(seeded_db, [order])[0]
+    assert ledger["installment_principal"] == Decimal("250")
+    assert ledger["installment_status"] == second.status
+    assert ledger["profit_base"] == Decimal("-50")
+    response = seeded_client.get(f"/api/v1/orders/{order.id}", headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["installment"]["id"] == second.id
+
 def test_installment_scope_follows_order_owner(seeded_db):
     scoped_user = CurrentUser.build(
         id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"

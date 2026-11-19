@@ -85,9 +85,10 @@ def _order_detail_output(
             )
             for item in rebates
         ]
-    installment = db.scalar(
-        select(Installment).where(Installment.order_id == order.id)
-    )
+    installments = db.scalars(
+        select(Installment).where(Installment.order_id == order.id).order_by(Installment.id.desc())
+    ).all()
+    installment = installments[0] if installments else None
     if installment is not None:
         output.installment = schemas.OrderInstallmentOut.model_validate(installment)
         schedules = db.scalars(
@@ -100,8 +101,7 @@ def _order_detail_output(
         ]
     attachment_refs = [("order", order.order_no)]
     attachment_refs.extend(("order_event", event.event_no) for event in events)
-    if installment is not None:
-        attachment_refs.append(("installment", installment.inst_no))
+    attachment_refs.extend(("installment", item.inst_no) for item in installments)
     if user.has(PERM_FINANCE_READ):
         attachment_refs.extend(("cashflow", item.flow_no) for item in cashflows)
     if attachment_refs:

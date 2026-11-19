@@ -33,7 +33,7 @@ from sqlalchemy.orm import (
 )
 
 class Installment(Base, AuditMixin):
-    """分期合约：一单一合约，按业务类型隔离资金与交付口径。"""
+    """分期合约：同一订单允许保留取消历史，最多一份未取消合约。"""
 
     __tablename__ = "installments"
     __table_args__ = (
@@ -47,7 +47,7 @@ class Installment(Base, AuditMixin):
             name="installment_status_valid",
         ),
         UniqueConstraint("inst_no", name="uq_installments_no"),
-        UniqueConstraint("order_id", name="uq_installments_order"),
+        Index("uq_installments_active_order", "order_id", unique=True, postgresql_where=text("status <> 'CANCELLED'")),
         Index("ix_installments_status", "status", "first_due_on"),
         CheckConstraint(
             "principal >= 0 AND down_payment >= 0 AND service_fee >= 0 AND per_period_service_fee >= 0 AND per_period >= 0 AND paid_amount >= 0 AND waived_amount >= 0 AND bad_debt_amount >= 0",

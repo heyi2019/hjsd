@@ -81,6 +81,7 @@ def _resolve_action_actor_ids(
                 select(Installment).where(
                     Installment.order_id == order.id,
                     Installment.contract_type == "STOCK_SALE",
+                    Installment.status != "CANCELLED",
                 )
             )
             if contract is not None:

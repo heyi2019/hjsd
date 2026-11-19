@@ -102,10 +102,10 @@ def _order_list_payload(db: Session, orders: list) -> list[dict]:
         [event for events in events_by_order.values() for event in events],
     )
 
-    installments = (
-        {item.order_id: item for item in db.scalars(select(Installment).where(Installment.order_id.in_(order_ids))).all()}
-        if order_ids else {}
-    )
+    installments = {}
+    if order_ids:
+        for item in db.scalars(select(Installment).where(Installment.order_id.in_(order_ids)).order_by(Installment.id.desc())).all():
+            installments.setdefault(item.order_id, item)
 
     payloads: list[dict] = []
     for order in orders:

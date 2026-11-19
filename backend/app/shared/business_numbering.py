@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.domain.trade import (
     Order,
     OrderEvent,
+    Installment,
     RebateRecord,
 )
 
@@ -29,9 +30,16 @@ def event_no(session: Session, *, order_no: str, order_id: int, event_type: str)
     return f"{order_no}-EV-{event_type}-{count + 1:02d}"
 
 
-def installment_no(order_no: str) -> str:
-    """分期合约号：每个业务订单只有一个，直接由订单号派生。"""
-    return f"{order_no}-FQ"
+def installment_no(session: Session, *, order_no: str, order_id: int) -> str:
+    """同一订单保留取消历史，后续合约使用递增编号。"""
+    _lock_row(session, Order, order_id)
+    used = set(session.scalars(select(Installment.inst_no).where(Installment.order_id == order_id)).all())
+    if f"{order_no}-FQ" not in used:
+        return f"{order_no}-FQ"
+    sequence = 2
+    while f"{order_no}-FQ-{sequence:02d}" in used:
+        sequence += 1
+    return f"{order_no}-FQ-{sequence:02d}"
 
 
 def rebate_no(session: Session, *, order_no: str, order_id: int) -> str:

@@ -83,8 +83,9 @@ def create_installment(
         ) from exc
 
     order = get_order(session, order_id, user)
+    order = session.execute(select(Order).where(Order.id == order.id).with_for_update().execution_options(populate_existing=True)).scalar_one()
     existing = session.scalar(
-        select(Installment).where(Installment.order_id == order.id)
+        select(Installment).where(Installment.order_id == order.id, Installment.status != "CANCELLED")
     )
     if existing is not None:
         raise Conflict(
@@ -189,8 +190,7 @@ def create_installment(
         adjust_final_period=adjust_final_period,
     )
 
-    # 分期合约号统一由业务订单号派生；一笔订单只允许一条分期合约。
-    installment_no_value = order_installment_no(order.order_no)
+    installment_no_value = order_installment_no(session, order_no=order.order_no, order_id=order.id)
     installment = Installment(
         inst_no=installment_no_value,
         order_id=order.id,

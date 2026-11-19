@@ -159,7 +159,12 @@ def _assert_event_allowed(
                     OrderEvent.order_id == order.id, OrderEvent.event_type == "CANCEL",
                     OrderEvent.offset_event_id == last_sell_id, OrderEvent.is_posted.is_(True),
                 ).limit(1))
-                if account is None or account.status != AccountStatus.WAITING.value or cancelled_sale is None:
+                cancelled_installment = session.scalar(select(Installment.id).where(
+                    Installment.order_id == order.id, Installment.status == "CANCELLED"
+                ).limit(1))
+                last_sell = session.get(OrderEvent, last_sell_id)
+                cancelled_installment_sale = cancelled_installment is not None and last_sell is not None and (last_sell.form_extra or {}).get("sale_mode") == "INSTALLMENT"
+                if account is None or account.status != AccountStatus.WAITING.value or (cancelled_sale is None and not cancelled_installment_sale):
                     raise Validation("每张订单只能登记一次 SELL；重开 BUY 或取消售出并回到库存后可再次售出")
     if event_type == EventType.CANCEL.value:
         _required_text(reason, field="reason", message="CANCEL 必须填写冲销原因")
@@ -225,7 +230,7 @@ def _post_deliver(
             details={"delivery_direction": direction},
         )
     installment = session.scalar(
-        select(Installment).where(Installment.order_id == order.id)
+        select(Installment).where(Installment.order_id == order.id, Installment.status != "CANCELLED").order_by(Installment.id.desc())
     )
     if installment is not None:
         if installment.status != "SETTLED":

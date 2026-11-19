@@ -87,7 +87,7 @@ def _assert_event_context(
         and order.status == OrderStatus.COMPLETED.value
         and order.order_type in {"HS", "TH"}
         and session.scalar(
-            select(Installment.id).where(Installment.order_id == order.id)
+            select(Installment.id).where(Installment.order_id == order.id, Installment.status != "CANCELLED")
         )
         is None
     )
@@ -95,7 +95,7 @@ def _assert_event_context(
         event_type == EventType.SELL.value
         and order.status == OrderStatus.COMPLETED.value
         and session.scalar(
-            select(Installment.id).where(Installment.order_id == order.id)
+            select(Installment.id).where(Installment.order_id == order.id, Installment.status != "CANCELLED")
         )
         is None
     )

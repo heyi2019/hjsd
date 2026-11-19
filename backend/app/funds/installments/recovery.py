@@ -313,29 +313,44 @@ def mark_overdue(
     user: CurrentUser | None = None,
 ) -> int:
     """按到期日实时标记逾期；已收满的期次不标记。"""
-    stmt = (
-        select(InstallmentSchedule)
-        .join(Installment, Installment.id == InstallmentSchedule.installment_id)
-        .join(Order, Order.id == Installment.order_id)
+    pending_overdue = (
+        select(InstallmentSchedule.id)
         .where(
-            Installment.status.in_(
-                (
-                    InstallmentStatus.PENDING.value,
-                    InstallmentStatus.ACTIVE.value,
-                    InstallmentStatus.OVERDUE.value,
-                )
-            ),
+            InstallmentSchedule.installment_id == Installment.id,
             InstallmentSchedule.due_on < as_of,
             InstallmentSchedule.received_amount + InstallmentSchedule.waived_amount
             < InstallmentSchedule.due_amount,
             InstallmentSchedule.status != ScheduleStatus.OVERDUE.value,
         )
+        .exists()
+    )
+    lock_stmt = (
+        select(Installment)
+        .join(Order, Order.id == Installment.order_id)
+        .where(
+            Installment.status.in_((InstallmentStatus.PENDING.value, InstallmentStatus.ACTIVE.value, InstallmentStatus.OVERDUE.value)),
+            pending_overdue,
+        )
+        .order_by(Installment.id)
+        .with_for_update(of=Installment)
+        .execution_options(populate_existing=True)
     )
     if user is not None:
         scope = owner_scope_filter(Order.owner_id, user, session)
         if scope is not None:
-            stmt = stmt.where(scope)
-    rows = session.scalars(stmt).all()
+            lock_stmt = lock_stmt.where(scope)
+    locked = session.scalars(lock_stmt).all()
+    if not locked:
+        return 0
+    installments = {item.id: item for item in locked}
+    rows = session.scalars(
+        select(InstallmentSchedule).where(
+            InstallmentSchedule.installment_id.in_(installments),
+            InstallmentSchedule.due_on < as_of,
+            InstallmentSchedule.received_amount + InstallmentSchedule.waived_amount < InstallmentSchedule.due_amount,
+            InstallmentSchedule.status != ScheduleStatus.OVERDUE.value,
+        ).execution_options(populate_existing=True)
+    ).all()
     count = len(rows)
     for row in rows:
         row.status = ScheduleStatus.OVERDUE.value
@@ -343,13 +358,6 @@ def mark_overdue(
         # 一次性统计每个合约本次被标记的期数：原实现在合约循环里再扫一遍全量 rows，
         # 是 O(合约数 × 期次数)；Counter 单趟线性。
         overdue_counts = Counter(row.installment_id for row in rows)
-        # 一次性预取涉及的合约，避免在循环里逐条 session.get（N+1）。
-        installments = {
-            item.id: item
-            for item in session.scalars(
-                select(Installment).where(Installment.id.in_(overdue_counts))
-            ).all()
-        }
         for installment_id, overdue_periods in overdue_counts.items():
             installment = installments.get(installment_id)
             if installment and installment.status in {

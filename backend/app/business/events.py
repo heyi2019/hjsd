@@ -285,9 +285,8 @@ def post_event(
         (offset is None or cancel_fully_consumed)
     ):
         # 冲销事件闭环：订单进入 CANCELLED，此后不再接受任何新事件
-        order.status = transition(
-            ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单"
-        )
+        action = "CANCEL_SELL" if offset is not None and offset.event_type == "SELL" and order.account_id is not None and order.order_type in {"HS", "TH"} else "CANCEL"
+        order.status = transition(ORDER_TRANSITIONS, order.status, action, entity="订单")
     session.flush()
 
     # 售出完成后提醒本次 SELL 执行人配置分润；通知通过

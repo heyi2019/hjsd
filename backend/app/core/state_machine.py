@@ -17,10 +17,12 @@ ORDER_TRANSITIONS: Mapping[str, Mapping[str, str]] = {
     "COMPLETED": {
         "BUY": "ACTIVE",
         "CANCEL": "CANCELLED",
+        "CANCEL_SELL": "ACTIVE",
     },
     "INSTALLMENT": {
         "COMPLETE": "COMPLETED",
         "CANCEL": "CANCELLED",
+        "CANCEL_SELL": "ACTIVE",
     },
     "CANCELLED": {},
 }

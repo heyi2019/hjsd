@@ -230,6 +230,7 @@ class EventCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     event_type: str
+    finalize_sale_cancel: bool = False
     sale_mode: str | None = Field(
         default=None, description="SELL 的售出方式：FULL / INSTALLMENT"
     )

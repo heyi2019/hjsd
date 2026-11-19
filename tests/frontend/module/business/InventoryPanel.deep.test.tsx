@@ -229,21 +229,21 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
 
     const modal = await screen.findByRole("dialog");
     const amount = within(modal).getByLabelText("退回金额");
-    const account = within(modal).getByLabelText("收款账户");
     // 弹窗默认值直接取后端 cancellable_amount（不再由前端按 amount − 已冲销 算）。
     expect((amount as HTMLInputElement).value).toBe("100.00");
 
     await ui.clear(amount);
     await ui.type(amount, "80");
-    await ui.click(account.closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(within(modal).getByLabelText("收款账户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
     await ui.click(await screen.findByText("利润池", { selector: ".ant-select-item-option-content" }));
     await ui.type(within(modal).getByLabelText("取消原因"), "   ");
-    await ui.click(within(modal).getByRole("button", { name: /确认下架/ }));
+    expect(within(modal).getByText(/按实际退回金额冲销/)).toBeInTheDocument();
+    await ui.click(within(modal).getByRole("button", { name: /确认冲销/ }));
     expect(await within(modal).findByText("请填写取消原因")).toBeInTheDocument();
     expect(ordersApi.inventoryOffsale).not.toHaveBeenCalled();
     await ui.clear(within(modal).getByLabelText("取消原因"));
     await ui.type(within(modal).getByLabelText("取消原因"), "取消");
-    await ui.click(within(modal).getByRole("button", { name: /确认下架/ }));
+    await ui.click(within(modal).getByRole("button", { name: /确认冲销/ }));
 
     await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(
       21,
@@ -251,7 +251,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     ));
   });
 
-  it("FE-264：系统下架完整提交关闭弹窗并给出成功结果", async () => {
+  it("回收账号全额取消入库后提示退出库存", async () => {
     vi.mocked(ordersApi.executionDetail).mockResolvedValue({
       account: inStockRow,
       orders: [{
@@ -266,14 +266,27 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await clickOperation(rowOf(1), "取消");
     const modal = await screen.findByRole("dialog");
     await ui.clear(within(modal).getByLabelText("退回金额"));
-    await ui.type(within(modal).getByLabelText("退回金额"), "80");
+    await ui.type(within(modal).getByLabelText("退回金额"), "100");
     await ui.click(within(modal).getByLabelText("收款账户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
     await ui.click(await screen.findByText("利润池", { selector: ".ant-select-item-option-content" }));
-    await ui.type(within(modal).getByLabelText("取消原因"), "系统下架回归");
-    await ui.click(within(modal).getByRole("button", { name: /确认下架/ }));
+    await ui.type(within(modal).getByLabelText("取消原因"), "取消入库回归");
+    await ui.click(within(modal).getByRole("button", { name: /确认冲销/ }));
 
-    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(21, expect.objectContaining({ amount: "80", pool_id: 3 })));
-    await waitFor(() => expect(message.success).toHaveBeenCalledWith("账号已下架"));
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(21, expect.objectContaining({ amount: "100", pool_id: 3 })));
+    await waitFor(() => expect(message.success).toHaveBeenCalledWith("入库已取消，账号已退出库存"));
+  });
+
+  it("未售出账号没有买入流水时可零退款取消", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: inStockRow, orders: [{ order_id: 21, order_type: "HS", status: "ACTIVE", events: [] }] } as unknown as AccountExecutionDetail);
+    vi.mocked(poolsApi.list).mockResolvedValue([]);
+    await openPanel([inStockRow]);
+    await clickOperation(rowOf(1), "取消");
+    const modal = await screen.findByRole("dialog");
+    expect(within(modal).getByLabelText("退回金额")).toHaveValue("0.00");
+    await ui.type(within(modal).getByLabelText("取消原因"), "取消交易");
+    await ui.click(within(modal).getByRole("button", { name: "确认冲销" }));
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(21, expect.objectContaining({ amount: "0.00", reason: "取消交易" })));
+    expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(21, expect.not.objectContaining({ pool_id: expect.anything() }));
   });
 
   it("代挂下架平台选项包含本系统并显示入库时间", async () => {

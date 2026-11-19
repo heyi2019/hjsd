@@ -62,14 +62,19 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
                 .limit(1)
             )
             if purchased is None:
-                raise Validation(
-                    "TH 售出前必须在本订单登记已过账 BUY 事件",
-                    details={"order_no": order.order_no, "account_id": order.account_id},
-                )
+                cancelled_installment = session.scalar(select(Installment.id).where(
+                    Installment.order_id == order.id, Installment.status == "CANCELLED"
+                ).limit(1))
+                account = session.get(Account, order.account_id) if order.account_id is not None else None
+                if cancelled_installment is None or account is None or account.status != AccountStatus.WAITING.value:
+                    raise Validation(
+                        "TH 售出前必须在本订单登记已过账 BUY 事件",
+                        details={"order_no": order.order_no, "account_id": order.account_id},
+                    )
         return
 
     if session.scalar(
-        select(Installment.id).where(Installment.order_id == order.id)
+        select(Installment.id).where(Installment.order_id == order.id, Installment.status != "CANCELLED")
     ) is not None:
         raise Validation("HS 已建立分期合约，必须通过分期收款并在结清后交付")
     if order.account_id is None:
@@ -124,7 +129,7 @@ def _assert_event_allowed(
         raise Validation("代挂业务不允许 BUY 事件")
     if order.order_type in {"TH", "DG"} and event_type == EventType.SELL.value:
         installment = session.scalar(
-            select(Installment).where(Installment.order_id == order.id)
+            select(Installment).where(Installment.order_id == order.id, Installment.status != "CANCELLED")
         )
         if installment is not None:
             raise Validation(
@@ -149,7 +154,13 @@ def _assert_event_allowed(
                 ).order_by(OrderEvent.id.desc()).limit(1)
             )
             if last_buy_id is None or last_buy_id < last_sell_id:
-                raise Validation("每张订单只能登记一次 SELL；重开 BUY 后可再次售出")
+                account = session.get(Account, order.account_id) if order.account_id is not None else None
+                cancelled_sale = session.scalar(select(OrderEvent.id).where(
+                    OrderEvent.order_id == order.id, OrderEvent.event_type == "CANCEL",
+                    OrderEvent.offset_event_id == last_sell_id, OrderEvent.is_posted.is_(True),
+                ).limit(1))
+                if account is None or account.status != AccountStatus.WAITING.value or cancelled_sale is None:
+                    raise Validation("每张订单只能登记一次 SELL；重开 BUY 或取消售出并回到库存后可再次售出")
     if event_type == EventType.CANCEL.value:
         _required_text(reason, field="reason", message="CANCEL 必须填写冲销原因")
         if offset_event_id is None:

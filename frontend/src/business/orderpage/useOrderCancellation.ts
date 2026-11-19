@@ -1,4 +1,5 @@
 import { Form } from "antd";
+import dayjs from "dayjs";
 import { useState } from "react";
 import { installmentsApi } from "../../shared/api/installments.api";
 import { ordersApi } from "../../shared/api/orders.api";
@@ -55,7 +56,8 @@ export function useOrderCancellation(params: {
     try {
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
       if (!order) return;
-      if (order.installment_principal) {
+      const hasActiveInstallment = Boolean(order.installment_principal && order.installment_status !== "CANCELLED");
+      if (hasActiveInstallment) {
         const contracts = await installmentsApi.list({ order_id: order.id });
         const target = contracts.find((item) => !["CANCELLED", "DELIVERED"].includes(item.status));
         if (!target) {
@@ -69,11 +71,13 @@ export function useOrderCancellation(params: {
         // 避免用户在下拉尚未加载时确认导致无请求、无结果的"假提交"。
         const reversible = reversibleEvents(order);
         const first = reversible[0];
-        const nextScope: CancelFormScope = first?.event.event_type === "BUY" ? "INVREFUND" : "ORDERCANC";
+        const unsoldInventory = order.status === "ACTIVE" && ["HS", "TH"].includes(order.order_type) && order.account_id != null;
+        const nextScope: CancelFormScope = first?.event.event_type === "BUY" || (!first && unsoldInventory) ? "INVREFUND" : "ORDERCANC";
         cancelForm.setFieldsValue({
           cancelled_on: today(),
           offset_event_id: first?.event.id,
           [nextScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: first?.remaining,
+          amount: first?.remaining ?? "0.00",
           pool_id: first?.event.pool_id ?? undefined,
         });
         const [poolList, employeeList] = await Promise.all([poolsApi.list(), employeesApi.list()]);
@@ -94,7 +98,7 @@ export function useOrderCancellation(params: {
         setCancelOrderTarget(order);
         setCancelInstallmentTarget(null);
       }
-      if (order.installment_principal) cancelForm.setFieldsValue({ cancelled_on: today() });
+      if (hasActiveInstallment) cancelForm.setFieldsValue({ cancelled_on: today() });
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
@@ -116,11 +120,41 @@ export function useOrderCancellation(params: {
       if (installment) {
         const result = await installmentsApi.cancel(installment.id, values);
         appMessage.success(cancelRefundSuccess(result.refund_amount, installment.contract_type));
-        if (result.order_status === "CANCELLED") await load();
+        await load();
       } else {
         if (!order) return;
         const reversible = cancelableEventsForScope(order, cancelScope);
         const selected = pickCancelableEvent(reversible, values.offset_event_id);
+        if (cancelScope === "INVREFUND" && order.account_id != null) {
+          const amount = values.amount ?? selected?.remaining ?? "0.00";
+          let operatorUserIds = values.operator_user_ids?.length ? values.operator_user_ids : undefined;
+          if (!operatorUserIds?.length) {
+            const byDevUser = cancelEmployees.find((employee) => employee.username === currentOperator);
+            if (byDevUser) operatorUserIds = [byDevUser.id];
+            else if (cancelEmployees.length === 1) operatorUserIds = [cancelEmployees[0].id];
+            else if (cancelEmployees.length > 0) {
+              try {
+                const current = await currentUser();
+                const bySessionUser = cancelEmployees.find((employee) => employee.id === current.id || employee.username === current.username);
+                if (bySessionUser) operatorUserIds = [bySessionUser.id];
+              } catch { /* 无法取得当前人员时交给后端校验。 */ }
+            }
+          }
+          await ordersApi.inventoryOffsale(order.id, {
+            amount,
+            occurred_on: values.cancelled_on,
+            unlisted_at: `${values.cancelled_on}T${dayjs().format("HH:mm")}`,
+            ...(Number(amount) > 0 ? { pool_id: Number(values.pool_id), offset_event_id: selected?.event.id } : {}),
+            operator_user_ids: operatorUserIds,
+            reason: values.reason.trim(),
+            form_extra: values.form_extra,
+          });
+          appMessage.success("交易已取消，账号已退出库存");
+          await load();
+          closeCancelTransaction();
+          setSelectedOrder(null);
+          return;
+        }
         if (selected) {
           const resolved = resolveCancelAmount({ scope: cancelScope, values, remaining: selected.remaining });
           if (!resolved.ok) {
@@ -147,6 +181,7 @@ export function useOrderCancellation(params: {
           }
           const result = await ordersApi.postEvent(order.id, {
             event_type: "CANCEL",
+            finalize_sale_cancel: ["HS", "TH"].includes(order.order_type),
             amount,
             occurred_on: values.cancelled_on,
             offset_event_id: selected.event.id,
@@ -178,7 +213,7 @@ export function useOrderCancellation(params: {
   const sharedCancellationEvent = cancelOrderTarget
     ? cancelableEventsForScope(cancelOrderTarget, cancelScope)[0]
     : undefined;
-  const hasSharedCancellation = Boolean(sharedCancellationEvent);
+  const hasSharedCancellation = Boolean(sharedCancellationEvent || (cancelOrderTarget && cancelScope === "INVREFUND" && cancelOrderTarget.account_id != null));
 
   return {
     cancelEmployees,

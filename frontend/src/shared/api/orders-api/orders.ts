@@ -177,6 +177,7 @@ export const ordersApi = {
     orderId: number,
     payload: {
       event_type: string;
+      finalize_sale_cancel?: boolean;
       sale_mode?: "FULL" | "INSTALLMENT";
       operation_type?: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST";
       rebate_type?: "BUY" | "SELL";

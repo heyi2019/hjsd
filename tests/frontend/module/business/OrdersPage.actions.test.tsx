@@ -221,6 +221,7 @@ beforeEach(() => {
     finance_summary: { total_income: "0", total_expense: "0", net_profit: "0" },
   } as never);
   vi.mocked(ordersApi.cancel).mockResolvedValue({ ...order1, status: "CANCELLED" });
+  vi.mocked(ordersApi.inventoryOffsale).mockResolvedValue({ ok: true });
   vi.mocked(ordersApi.postEvent).mockResolvedValue({
     event: { id: 2, event_no: "EV-2", order_id: 1, event_type: "CANCEL", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "0.00" },
     installment: { id: 11, inst_no: "INS-1", status: "CANCELLED" },
@@ -546,7 +547,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     ));
   });
 
-  it("取消：存在可冲销已登记动作时发起 CANCEL 冲销", async () => {
+  it("取消：存在买入流水时按实际金额取消入库", async () => {
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       events: [{ id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, cancellable_amount: "1000.00" }],
@@ -558,9 +559,9 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.type(screen.getByLabelText("取消原因"), "重复登记");
     await clickModalOk(modal);
     await waitFor(() =>
-      expect(ordersApi.postEvent).toHaveBeenCalledWith(
+      expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({ event_type: "CANCEL", offset_event_id: 101, form_extra_scope: "INVREFUND" }),
+        expect.objectContaining({ offset_event_id: 101, amount: "1000.00" }),
       )
     );
   });
@@ -594,9 +595,9 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.type(within(modal).getByLabelText("取消原因"), "异步加载回归");
     await clickModalOk(modal);
 
-    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(
       21,
-      expect.objectContaining({ event_type: "CANCEL", offset_event_id: 2101, pool_id: 7 }),
+      expect.objectContaining({ offset_event_id: 2101, pool_id: 7 }),
     ));
   });
 
@@ -614,10 +615,21 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.click((await screen.findAllByText("投资款荷包"))[1]);
     await ui.type(within(modal).getByLabelText("取消原因"), "对方退款");
     await clickModalOk(modal);
-    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(
       1,
-      expect.objectContaining({ event_type: "CANCEL", pool_id: 7, form_extra_scope: "INVREFUND", operator_user_ids: expect.arrayContaining([expect.any(Number)]) }),
+      expect.objectContaining({ pool_id: 7, operator_user_ids: expect.arrayContaining([expect.any(Number)]) }),
     ));
+  });
+
+  it("未售出订单无买入流水时可零退款取消", async () => {
+    vi.mocked(ordersApi.get).mockResolvedValue({ ...order1, events: [] });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "取消");
+    const modal = await modalOf(/取消 · HS-2026-0001/);
+    expect(within(modal).getByLabelText("退回金额")).toHaveValue("0.00");
+    await ui.type(within(modal).getByLabelText("取消原因"), "取消交易");
+    await clickModalOk(modal);
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(1, expect.objectContaining({ amount: "0.00", reason: "取消交易" })));
   });
 
   it("取消：按售出流水做部分退款冲销", async () => {
@@ -644,7 +656,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() =>
       expect(ordersApi.postEvent).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({ event_type: "CANCEL", offset_event_id: 102, amount: "300", form_extra_scope: "ORDERCANC" }),
+        expect.objectContaining({ event_type: "CANCEL", finalize_sale_cancel: true, offset_event_id: 102, amount: "300", form_extra_scope: "ORDERCANC" }),
       )
     );
   });

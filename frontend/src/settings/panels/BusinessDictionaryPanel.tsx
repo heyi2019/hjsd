@@ -233,7 +233,7 @@ export function BusinessDictionaryPanel() {
           />
           <EntryLine
             name="已售出"
-            desc="人工确认售出即代表已收款；取消时冲销售出流水，登记退款金额和付款钱包，普通账号回库存，提号账号结束。"
+            desc="人工确认售出即代表已收款；取消时冲销售出流水，登记退款金额和付款钱包，回收和提号账号均回库存。"
           />
           <EntryLine
             name="全额与部分"

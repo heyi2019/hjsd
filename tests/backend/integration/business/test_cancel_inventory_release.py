@@ -129,3 +129,34 @@ def test_dg_platform_offsale_keeps_account_in_stock(seeded_db):
 
     assert account.status == AccountStatus.WAITING.value
     assert account.inventory_status == "IN_STOCK"
+
+
+@pytest.mark.parametrize("order_type", ["HS", "TH"])
+def test_cancel_completed_sale_returns_account_to_inventory(seeded_db, order_type):
+    order = create_order(seeded_db, order_type=order_type, trade_date=D, actor="pytest", account_snapshot=_snapshot(f"cancel-sale-{order_type}"))
+    post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=D, actor="pytest")
+    sell, _ = post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("200"), occurred_on=D, actor="pytest")
+    post_event(seeded_db, order.id, event_type="CANCEL", amount=Decimal("200"), occurred_on=D, actor="pytest", offset_event_id=sell.id, pool_id=sell.pool_id, reason="取消售出")
+    account = seeded_db.get(Account, order.account_id)
+    assert account.status == AccountStatus.WAITING.value
+    assert account.inventory_status == "IN_STOCK"
+    assert account.id in _inventory_ids(seeded_db)
+    assert order.status == "ACTIVE"
+    resold, _ = post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("220"), occurred_on=D, actor="pytest")
+    assert resold.event_type == "SELL"
+
+
+@pytest.mark.parametrize("order_type", ["HS", "TH"])
+def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded_db, headers, order_type):
+    from app.shared.order_amounts import order_cashflow_profit_by_order
+    order = create_order(seeded_db, order_type=order_type, trade_date=D, actor="pytest", account_snapshot=_snapshot(f"partial-sale-{order_type}"))
+    post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=D, actor="pytest")
+    sell, _ = post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("200"), occurred_on=D, actor="pytest")
+    response = seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json={"event_type": "CANCEL", "amount": "150", "occurred_on": "2026-11-01", "offset_event_id": sell.id, "pool_id": sell.pool_id, "reason": "取消售出", "finalize_sale_cancel": True})
+    assert response.status_code == 201, response.text
+    seeded_db.flush()
+    assert seeded_db.get(Account, order.account_id).status == "WAITING"
+    assert order.status == "ACTIVE"
+    assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == -50
+    resold, _ = post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("220"), occurred_on=D, actor="pytest")
+    assert resold.event_type == "SELL"

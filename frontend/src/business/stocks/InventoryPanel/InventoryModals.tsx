@@ -118,19 +118,20 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         }}
       />
       <InventoryCancellationDialog
-        title="系统下架登记"
+        title="取消入库登记"
         open={Boolean(voidTarget)}
-        okText="确认下架"
+        okText="确认冲销"
         submitting={voiding}
         form={voidForm}
         scope="INVOID"
         amount={voidTarget?.amount ?? "0.00"}
+        allowZeroRefund
         pools={voidPools}
         onCancel={() => { if (!voiding) { controller.setVoidTarget(null); voidForm.resetFields(); } }}
         onFinish={(values) => void submitVoid(values)}
         description={voidTarget ? <p className="muted">
-          将按来源订单全额冲销该账号的买入流水（¥{money(voidTarget.amount)}），账号状态变为「下架」并退出在库统计；
-          这是 ERP 系统下架，不影响已登记的寄售平台历史记录。下架不可撤销，历史轨迹保留。
+          来源订单买入流水剩余可冲销 ¥{money(voidTarget.amount)}。按实际退回金额冲销，取消后账号退出库存，同时关闭仍在上架的平台记录。
+          冲销不可撤销，历史轨迹保留。
         </p> : null}
       />
       <OrderPlatformOffsaleModal

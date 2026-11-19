@@ -154,8 +154,8 @@ describe("statusColor：颜色只做辅助", () => {
 
 describe("cancellationCopy：分期取消文案唯一源", () => {
   it("提号分期取消：成功提示与弹窗说明都说「账号结束」，不写「交易」", () => {
-    expect(cancelRefundSuccess("50.00", "PICKUP_SALE")).toBe("退款已登记：¥50.00，提号账号已结束");
-    expect(cancelRefundIntro("PICKUP_SALE")).toBe("按已收款原资金账户退款，提号取消后账号直接结束。");
+    expect(cancelRefundSuccess("50.00", "PICKUP_SALE")).toBe("退款已登记：¥50.00，账号已回到库存");
+    expect(cancelRefundIntro("PICKUP_SALE")).toBe("按已收款原资金账户退款，取消后账号回到库存。");
     expect(cancelRefundSuccess("50.00", "PICKUP_SALE")).not.toContain("交易");
     expect(cancelRefundIntro("PICKUP_SALE")).not.toContain("交易");
   });

@@ -25,6 +25,7 @@ export function SharedCancellationDialog({ controller }: { controller: OrdersPag
       open={hasSharedCancellation}
       title={cancelOrderTarget ? `取消 · ${cancelOrderTarget.order_no}` : "取消"}
       amount={sharedCancellationEvent?.remaining ?? "0.00"}
+      allowZeroRefund={cancelScope === "INVREFUND"}
       pools={cancelPools}
       form={cancelForm}
       scope={cancelScope}
@@ -35,8 +36,8 @@ export function SharedCancellationDialog({ controller }: { controller: OrdersPag
       onCancel={closeCancelTransaction}
       onFinish={(values) => void submitCancelTransaction({ ...values, cancelled_on: today() })}
       description={cancelScope === "INVREFUND"
-        ? <p className="muted">将冲销来源订单的买入流水（¥{money(sharedCancellationEvent?.remaining ?? "0.00")}），退回金额进入所选收款账户；订单状态变为「取消」并退出在库统计。取消不可撤销，历史轨迹保留。</p>
-        : <p className="muted">将冲销来源订单的售出流水（¥{money(sharedCancellationEvent?.remaining ?? "0.00")}），退款金额将从所选付款账户支出；订单状态变为「取消」，历史轨迹保留。</p>}
+        ? <p className="muted">按实际退回金额冲销买入流水（剩余可冲 ¥{money(sharedCancellationEvent?.remaining ?? "0.00")}）；取消后账号退出库存，原有资金收支仍计入利润。</p>
+        : <p className="muted">将冲销来源订单的售出流水（¥{money(sharedCancellationEvent?.remaining ?? "0.00")}），退款金额将从所选付款账户支出；取消售出后账号回到库存，历史轨迹保留。</p>}
     />
   );
 }

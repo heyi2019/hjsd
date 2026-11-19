@@ -27,8 +27,6 @@ from app.domain.enums import (
     AuditAction,
     Direction,
     EventType,
-    InstallmentContractType,
-    InventoryType,
 )
 from app.domain.trade import Account, Order, OrderEvent
 from app.shared.form_field_rules import validate_form_extra
@@ -120,12 +118,7 @@ def apply_cancellation_account_effect(
     """把一次取消映射到账号成本与库存状态。"""
     if offset_event is not None and offset_event.event_type == EventType.SELL.value:
         if cancel_fully_consumed:
-            action = (
-                "CANCEL_SELL_END"
-                if account.inventory_type == InventoryType.PICKUP.value
-                else "CANCEL_SELL"
-            )
-            account.status = transition(ACCOUNT_TRANSITIONS, account.status, action, entity="账号")
+            account.status = transition(ACCOUNT_TRANSITIONS, account.status, "CANCEL_SELL", entity="账号")
     else:
         account.cost_amount = to_money(account.cost_amount) - amount
         if offset_event is None or (
@@ -149,11 +142,7 @@ def apply_installment_cancellation_account_effect(
     account = session.get(Account, order.account_id)
     if account is None:
         raise NotFound("分期合约关联账号不存在", details={"account_id": order.account_id})
-    action = (
-        "CANCEL_SELL_END"
-        if contract_type == InstallmentContractType.PICKUP_SALE.value
-        else "CANCEL_STOCK"
-    )
+    action = "CANCEL_STOCK"
     account.status = transition(ACCOUNT_TRANSITIONS, account.status, action, entity="账号")
     account.updated_by = actor
     return account.status

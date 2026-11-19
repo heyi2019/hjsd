@@ -57,7 +57,7 @@ export function useInventoryActions(params: {
   const [cashflowUsers, setCashflowUsers] = useState<EmployeeOption[]>([]);
   const [profileTarget, setProfileTarget] = useState<OrderProfileTarget | null>(null);
   const [detailTarget, setDetailTarget] = useState<Account | null>(null);
-  const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId: number; amount: string; portion: string } | null>(null);
+  const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId?: number; amount: string; portion: string } | null>(null);
   const [voidPools, setVoidPools] = useState<Pool[]>([]);
   const [platformOffsaleTarget, setPlatformOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
   const [voiding, setVoiding] = useState(false);
@@ -123,7 +123,7 @@ export function useInventoryActions(params: {
   }
   async function openVoid(account: Account) {
     if (account.source_order_id == null) {
-      appMessage.warning("当前账号没有绑定来源订单，无法下架");
+      appMessage.warning("当前账号没有绑定来源订单，无法取消交易");
       return;
     }
     try {
@@ -134,12 +134,8 @@ export function useInventoryActions(params: {
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       setVoidPools(poolList.filter((pool) => pool.status === "ACTIVE"));
       const buy = findCancelableBuy(detail);
-      if (!buy) {
-        appMessage.warning("未找到可冲销的买入流水，无法下架");
-        return;
-      }
-      setVoidTarget({ account, ...buy });
-      voidForm.setFieldsValue({ amount: buy.amount, pool_id: undefined, reason: undefined });
+      setVoidTarget({ account, ...(buy ?? { orderId: account.source_order_id, amount: "0.00", portion: "PRINCIPAL" }) });
+      voidForm.setFieldsValue({ amount: buy?.amount ?? "0.00", pool_id: undefined, reason: undefined });
     } catch (cause) {
       setError(normalizeError(cause));
     }
@@ -166,25 +162,21 @@ export function useInventoryActions(params: {
     if (!voidTarget) return;
     setVoiding(true);
     try {
-      // 系统下架先在原订单上登记所有寄售记录的 UNLIST，再冲销买入，
-      // 避免出现 ERP 已下架但平台记录仍有效的中间结果。
-      await ordersApi.inventoryOffsale(voidTarget.orderId, {
+      const payload = {
         amount: values.amount,
         occurred_on: today(),
-        unlisted_at: dayjs().format("YYYY-MM-DDTHH:mm"),
-        pool_id: Number(values.pool_id),
+        ...(Number(values.amount) > 0 ? { pool_id: Number(values.pool_id) } : {}),
         portion: voidTarget.portion,
-        offset_event_id: voidTarget.eventId,
+        ...(voidTarget.eventId != null && Number(values.amount) > 0 ? { offset_event_id: voidTarget.eventId } : {}),
         reason: values.reason.trim(),
         form_extra: values.form_extra,
-      });
-      appMessage.success("账号已下架");
-      // 下架后账号转 VOID 并退出在库统计，与售出同理，只丢缓存。
+      };
+      await ordersApi.inventoryOffsale(voidTarget.orderId, { ...payload, unlisted_at: dayjs().format("YYYY-MM-DDTHH:mm") });
+      appMessage.success("入库已取消，账号已退出库存");
       dropExecutionCache(voidTarget.account.id);
       setVoidTarget(null);
       voidForm.resetFields();
-      // 先关闭提交弹窗，再后台刷新库存；等待列表刷新会让确认按钮长期处于 loading，
-      // 用户无法确认下架是否已经完成。
+      // 先关闭提交弹窗，再后台刷新库存。
       void load();
       // 取消会改订单/流水状态，同步通知上层重拉台账与分期列表。
     } catch (cause) {

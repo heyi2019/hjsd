@@ -321,7 +321,7 @@ class TestAccountEffect:
         assert account.cost_amount == Decimal("500.00")
         assert account.status == AccountStatus.WAITING.value
 
-    def test_cancel_pickup_sell_ends_without_returning_to_inventory(self, seeded_db):
+    def test_cancel_pickup_sell_returns_to_inventory(self, seeded_db):
         account = Account(
             business_mode="DISTRIBUTION",
             inventory_type="PICKUP",
@@ -348,7 +348,7 @@ class TestAccountEffect:
             reason="提号售出撤销",
         )
 
-        assert account.status == AccountStatus.VOID.value
+        assert account.status == AccountStatus.WAITING.value
 
     def test_removed_payment_event_is_rejected(self, seeded_db):
         order = _order(seeded_db, order_type="TH")

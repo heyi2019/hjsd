@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.errors import PermissionDenied, Validation
+from app.core.state_machine import ACCOUNT_TRANSITIONS, ORDER_TRANSITIONS, transition
 from app.core.security import (
     PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
@@ -20,7 +21,8 @@ from app.core.security import (
 from app.settings.auth.session import (
     require_permissions,
 )
-from app.domain.trade import Order, OrderEvent
+from app.domain.trade import Account, Order, OrderEvent
+from app.shared.audit import record_audit
 from app.business import schemas
 from app.shared.order_access import get_order as orders_get_order
 from app.business.consignment import post_consignment_operation
@@ -63,9 +65,23 @@ def inventory_offsale(
         raise Validation("订单未关联库存账号")
     if payload.unlisted_at.tzinfo is not None or payload.unlisted_at.date() != payload.occurred_on:
         raise Validation("下架时间须为本地时间且日期须与业务日期一致")
+    if not payload.reason.strip():
+        raise Validation("取消必须填写原因")
     if not user.has(PERM_ORDER_EVENT_POST):
         raise PermissionDenied("当前角色无权登记库存下架事件")
     events = list(db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id)).all())
+    if order.order_type != "DG":
+        if payload.amount is None:
+            raise Validation("请填写退回金额")
+        if payload.amount > 0:
+            if payload.pool_id is None or payload.offset_event_id is None:
+                raise Validation("有退款时必须选择资金账户和买入流水")
+            offset = next((event for event in events if event.is_posted and event.id == payload.offset_event_id and event.event_type == "BUY"), None)
+            if offset is None:
+                raise Validation("取消入库必须选择本订单的买入流水")
+        account = db.scalar(select(Account).where(Account.id == order.account_id).with_for_update())
+        if account is None or account.status != "WAITING":
+            raise Validation("只有在库账号才能取消入库")
     unlisted: set[tuple[str, str]] = set()
     system_unlisted_event_ids: set[str] = set()
     for event in events:
@@ -95,12 +111,18 @@ def inventory_offsale(
         orders_cancel_order(db, order.id, actor=_actor(user), reason=payload.reason,
             form_extra=extra_base, form_extra_scope="INVOID", user=user)
     else:
-        if payload.amount is None or payload.pool_id is None or payload.offset_event_id is None:
-            raise Validation("回收库存出库必须提供冲销金额、资金账户和原事件")
-        orders_post_event(db, order.id, event_type="CANCEL", amount=payload.amount,
-            occurred_on=payload.occurred_on, actor=_actor(user), pool_id=payload.pool_id,
-            portion=payload.portion, offset_event_id=payload.offset_event_id, reason=payload.reason,
-            form_extra=payload.form_extra, note="账号下架，冲销买入", user=user)
+        if payload.amount > 0:
+            orders_post_event(db, order.id, event_type="CANCEL", amount=payload.amount,
+                occurred_on=payload.occurred_on, actor=_actor(user), pool_id=payload.pool_id,
+                portion=payload.portion, offset_event_id=payload.offset_event_id, reason=payload.reason,
+                form_extra=payload.form_extra, note="取消入库，冲销买入", user=user)
+        if order.status != "CANCELLED":
+            before = {"order_status": order.status, "account_status": account.status}
+            order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
+            account.status = transition(ACCOUNT_TRANSITIONS, account.status, "VOID", entity="账号")
+            order.updated_by = account.updated_by = _actor(user)
+            record_audit(db, action="ORDER_CANCEL", entity_type="inventory_cancel", entity_id=order.order_no,
+                actor=_actor(user), before=before, after={"order_status": order.status, "account_status": account.status}, reason=payload.reason)
     return {"ok": True}
 
 @router.post("/orders/{order_id}/events", response_model=schemas.EventPostResult, status_code=201)
@@ -110,8 +132,14 @@ def post_event(
     db: Session = Depends(get_db),
     user: CurrentUser = post_events,
 ) -> schemas.EventPostResult:
-    orders_get_order(db, order_id, user)
+    order = orders_get_order(db, order_id, user)
     event_type = payload.event_type.strip().upper()
+    if payload.finalize_sale_cancel:
+        order = db.execute(select(Order).where(Order.id == order.id).with_for_update().execution_options(populate_existing=True)).scalar_one()
+        offset = db.get(OrderEvent, payload.offset_event_id) if payload.offset_event_id else None
+        account = db.scalar(select(Account).where(Account.id == order.account_id).with_for_update()) if order.account_id else None
+        if order.order_type not in {"HS", "TH"} or event_type != "CANCEL" or offset is None or offset.order_id != order.id or offset.event_type != "SELL" or not offset.is_posted or account is None or account.status != "SOLD" or order.status != "COMPLETED":
+            raise Validation("取消售出必须选择该订单已售出的流水")
     if user.has(PERM_FINANCE_ORDER_EVENT_POST) and not user.has(PERM_ORDER_EVENT_POST):
         if event_type not in {"BUY", "SELL"}:
             raise PermissionDenied(
@@ -159,6 +187,13 @@ def post_event(
             form_extra=payload.form_extra,
             user=user,
         )
+    if payload.finalize_sale_cancel and order.status == "COMPLETED":
+        before = {"order_status": order.status, "account_status": account.status}
+        order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL_SELL", entity="订单")
+        account.status = transition(ACCOUNT_TRANSITIONS, account.status, "CANCEL_SELL", entity="账号")
+        order.updated_by = account.updated_by = _actor(user)
+        record_audit(db, action="ORDER_CANCEL", entity_type="sale_cancel", entity_id=order.order_no,
+            actor=_actor(user), before=before, after={"order_status": order.status, "account_status": account.status}, reason=payload.reason)
     # 刚提交的事件要能立刻显示「还能冲多少」：把同订单事件一并取出算余额。
     order_events = list(
         db.scalars(select(OrderEvent).where(OrderEvent.order_id == event.order_id)).all()

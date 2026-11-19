@@ -95,7 +95,8 @@ def cancel_installment(
             refund_amount += amount
             reversed_amount += amount
             direct_cashflows = [flow for flow in direct_cashflows if flow.flow_no not in reversed_cashflow_nos]
-    order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
+    action = "CANCEL_SELL" if order.account_id is not None and order.order_type in {"HS", "TH"} and order.status == "INSTALLMENT" else "CANCEL"
+    order.status = transition(ORDER_TRANSITIONS, order.status, action, entity="订单")
     installment.status = transition(
         INSTALLMENT_TRANSITIONS, installment.status, "CANCEL", entity="分期合约"
     )

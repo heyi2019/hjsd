@@ -11,7 +11,7 @@ from app.business.routers.order_events_router import inventory_offsale
 from app.core.errors import Validation
 from app.core.database import get_db
 from app.core.security import DEV_USERS
-from app.domain.trade import Account, Order, OrderEvent
+from app.domain.trade import Account, Cashflow, Order, OrderEvent
 
 
 def test_failed_system_offsale_rolls_back_platform_events(seeded_db):
@@ -109,6 +109,48 @@ def test_recovery_offsale_unlists_and_reverses_buy(seeded_db):
     assert unlisting.form_extra["consignment_platforms"] == ["测试平台"]
     assert any(event.event_type == "CANCEL" and event.offset_event_id == buy.id for event in events)
     assert seeded_db.get(Account, order.account_id).status == "VOID"
+
+
+def test_recovery_cancellation_with_partial_refund_exits_inventory(seeded_db):
+    from app.business.router_output import _order_list_payload
+    from app.shared.order_amounts import order_cashflow_profit_by_order
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 11, 1), actor="pytest", account_snapshot={"game_account": "partial-cancel", "game_type": "王者荣耀"})
+    buy, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 11, 1), actor="pytest")
+    seeded_db.add_all([
+        Cashflow(flow_no="CF-CANCEL-OTHER-IN", pool_id=buy.pool_id, occurred_on=date(2026, 11, 1), direction="IN", category="OTHER", amount=40, order_id=order.id, created_by="pytest", updated_by="pytest"),
+        Cashflow(flow_no="CF-CANCEL-OTHER-OUT", pool_id=buy.pool_id, occurred_on=date(2026, 11, 1), direction="OUT", category="OTHER", amount=10, order_id=order.id, created_by="pytest", updated_by="pytest"),
+    ])
+    seeded_db.flush()
+    register_consignment(seeded_db, order.id, occurred_on=date(2026, 11, 1), actor="pytest", form_extra={"consignment_platforms": ["测试平台"]})
+    payload = schemas.InventoryOffsaleIn(reason="取消入库", occurred_on=date(2026, 11, 2), unlisted_at="2026-11-02T12:00", amount="80", pool_id=buy.pool_id, offset_event_id=buy.id)
+    assert inventory_offsale(order.id, payload, seeded_db, DEV_USERS["admin"]) == {"ok": True}
+    events = seeded_db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id)).all()
+    assert sum((event.form_extra or {}).get("operation_type") == "UNLIST" for event in events) == 1
+    cancel = next(event for event in events if event.event_type == "CANCEL")
+    assert cancel.amount == 80 and cancel.offset_event_id == buy.id
+    assert seeded_db.get(Account, order.account_id).status == "VOID"
+    assert seeded_db.get(Account, order.account_id).cost_amount == 20
+    assert order.status == "CANCELLED"
+    seeded_db.flush()
+    assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == 10
+    assert _order_list_payload(seeded_db, [order])[0]["profit_base"] == 10
+
+
+@pytest.mark.parametrize("has_buy", [False, True])
+def test_unsold_cancellation_without_refund_keeps_existing_finance(seeded_db, has_buy):
+    from app.shared.order_amounts import order_cashflow_profit_by_order
+    order = create_order(seeded_db, order_type="TH", trade_date=date(2026, 11, 1), actor="pytest", account_snapshot={"game_account": f"zero-cancel-{has_buy}", "game_type": "王者荣耀"})
+    if has_buy:
+        post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 11, 1), actor="pytest")
+    payload = schemas.InventoryOffsaleIn(reason="取消交易", occurred_on=date(2026, 11, 2), unlisted_at="2026-11-02T12:00", amount="0")
+    assert inventory_offsale(order.id, payload, seeded_db, DEV_USERS["admin"]) == {"ok": True}
+    events = seeded_db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id)).all()
+    assert sum(event.event_type == "BUY" for event in events) == int(has_buy)
+    assert all(event.event_type != "CANCEL" for event in events)
+    assert seeded_db.get(Account, order.account_id).status == "VOID"
+    assert order.status == "CANCELLED"
+    seeded_db.flush()
+    assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id]).get(order.id, 0) == (-100 if has_buy else 0)
 
 
 def test_http_failure_rolls_back_and_retry_succeeds(seeded_db, seeded_client, headers):

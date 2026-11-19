@@ -741,7 +741,7 @@ describe("OrdersPage：四类订单台账", () => {
     expect(within(modal).getByLabelText("退回金额")).toBeInTheDocument();
     expect(within(modal).getByLabelText("收款账户")).toBeInTheDocument();
     expect(within(modal).getByLabelText("取消原因")).toBeInTheDocument();
-    expect(modal).toHaveTextContent("订单状态变为「取消」并退出在库统计。取消不可撤销，历史轨迹保留。");
+    expect(modal).toHaveTextContent("取消后账号退出库存，原有资金收支仍计入利润。");
     expect(within(modal).queryByLabelText("入账金额")).toBeNull();
     expect(within(modal).queryByLabelText("入账账户")).toBeNull();
   });

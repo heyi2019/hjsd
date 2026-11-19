@@ -84,7 +84,7 @@ def _contract(
 @pytest.mark.parametrize(
     ("order_type", "contract_type", "business_mode", "inventory_type", "expected_status"),
     [
-        ("TH", "PICKUP_SALE", "DISTRIBUTION", "PICKUP", AccountStatus.VOID.value),
+        ("TH", "PICKUP_SALE", "DISTRIBUTION", "PICKUP", AccountStatus.WAITING.value),
     ],
 )
 def test_cancel_distribution_installment_uses_business_specific_account_result(
@@ -116,6 +116,10 @@ def test_cancel_distribution_installment_uses_business_specific_account_result(
 
     seeded_db.refresh(account)
     assert account.status == expected_status
+    seeded_db.refresh(order)
+    assert order.status == "ACTIVE"
+    post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("120"), occurred_on=TODAY, actor="pytest")
+    assert account.status == "SOLD"
 
 def test_installment_payment_is_cashflow_only(seeded_db):
     order = _order(seeded_db)

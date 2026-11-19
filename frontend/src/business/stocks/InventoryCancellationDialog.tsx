@@ -1,6 +1,6 @@
 import type { FormInstance } from "antd/es/form";
 import type { ReactNode } from "react";
-import { Input } from "antd";
+import { Form, Input } from "antd";
 import type { Pool } from "../../shared/api/types/finance";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import {
@@ -61,10 +61,12 @@ export function InventoryCancellationDialog<T extends InventoryCancellationValue
   amountLabel?: string;
   accountLabel?: string;
   submitting?: boolean;
+  allowZeroRefund?: boolean;
   onCancel: () => void;
   onFinish: (values: T) => void | Promise<void>;
 }) {
   const maximum = Number(props.amount);
+  const refundAmount = Form.useWatch("amount", props.form);
   const amountLabel = props.amountLabel ?? "退回金额";
   const accountLabel = props.accountLabel ?? "收款账户";
   const offsetLabel = props.scope === "INVREFUND" ? "入库流水" : "售出流水";
@@ -120,16 +122,16 @@ export function InventoryCancellationDialog<T extends InventoryCancellationValue
                 { required: true, message: `请输入${amountLabel}` },
                 { validator: async (_, value) => {
                   const amount = Number(value);
-                  if (!Number.isFinite(amount) || amount <= 0) throw new Error(`请输入大于 0 的${amountLabel}`);
+                  if (!Number.isFinite(amount) || (props.allowZeroRefund ? amount < 0 : amount <= 0)) throw new Error(`请输入${props.allowZeroRefund ? "不小于" : "大于"} 0 的${amountLabel}`);
                   if (amount > maximum) throw new Error(`${amountLabel}不能超过 ¥${money(props.amount)}`);
                 } },
               ]}
             >
               <MoneyInput aria-label={amountLabel} placeholder={`请输入${amountLabel}`} />
             </CfgItem>
-            <CfgItem alwaysActive name="pool_id" label={accountLabel} fixedLabel={accountLabel} rules={[{ required: true, message: `请选择${accountLabel}` }]}>
+            {(!props.allowZeroRefund || Number(refundAmount) > 0) && <CfgItem alwaysActive name="pool_id" label={accountLabel} fixedLabel={accountLabel} rules={[{ required: true, message: `请选择${accountLabel}` }]}>
               <Select placeholder={`请选择${accountLabel}`} options={props.pools.map((pool) => ({ value: pool.id, label: pool.name }))} notFoundContent={`暂无可用${accountLabel}`} />
-            </CfgItem>
+            </CfgItem>}
             {props.employees ? <ResponsibleEmployeeSelect name="operator_user_ids" label={operatorLabel} employees={props.employees} className="order-cancel-employee" /> : null}
           </AdaptiveFormGrid>
           <CfgItem alwaysActive name="reason" label="取消原因" fixedLabel="取消原因" rules={[{ required: true, whitespace: true, message: "请填写取消原因" }]}>

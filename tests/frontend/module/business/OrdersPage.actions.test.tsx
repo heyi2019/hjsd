@@ -321,6 +321,20 @@ describe("OrdersPage：操作与筛选分支", () => {
     );
   });
 
+  it("标记逾期失败时提示错误且允许重试", async () => {
+    vi.mocked(installmentsApi.list).mockResolvedValue([]);
+    vi.mocked(installmentsApi.markOverdue).mockRejectedValueOnce(new Error("逾期标记失败"));
+    await openLedger();
+    fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
+    const button = await screen.findByRole("button", { name: /标记逾期/ });
+    await ui.click(button);
+    await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("逾期标记失败")));
+    expect(button).not.toHaveClass("ant-btn-loading");
+    vi.mocked(installmentsApi.markOverdue).mockResolvedValueOnce({ marked: 1 });
+    await ui.click(button);
+    await waitFor(() => expect(message.success).toHaveBeenCalledWith("已标记 1 笔逾期"));
+  });
+
   // 原两条（有新增 / 无新增）是同一条「标记逾期」路径的两个分支，合并为一次挂载逐次点击。
   it("标记逾期：有新增提示笔数并刷新列表，无新增提示当前无新增", async () => {
     vi.mocked(installmentsApi.list).mockResolvedValue([]);

@@ -6,6 +6,7 @@ import { InstallmentsPanel } from "../finance/installments/InstallmentsPanel";
 import { ErrorBanner, PermissionButton } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { installmentsApi } from "../shared/api/installments.api";
+import { normalizeError } from "../shared/api/client";
 import type { BusinessOrderType } from "./CreateBusinessModal";
 import { BUSINESS_CREATE_ITEMS } from "./orderpage/helpers";
 import { OrdersLedgerPanel } from "./orderpage/OrdersLedgerPanel";
@@ -47,6 +48,8 @@ export function OrdersPage({ initialTab, initialMine = false, initialLedgerFilte
       const result = await installmentsApi.markOverdue();
       appMessage.success(result.marked > 0 ? `已标记 ${result.marked} 笔逾期` : "当前无新增逾期合约");
       setInstallmentRefreshKey((key) => key + 1);
+    } catch (error) {
+      appMessage.error(normalizeError(error).message);
     } finally {
       setMarkingOverdue(false);
     }

@@ -48,9 +48,6 @@ const ITEM_SET_CODE = STUDIO_EXPENSE_ITEM_SET;
 
 const INCOME_ITEMS: OptionItem[] = [...STUDIO_INCOME_ITEMS];
 
-/** 单次拉取上限：按日期区间查询，200 条覆盖月度收支足够。 */
-const FETCH_LIMIT = 200;
-
 /** 登记弹窗标题节点：图标砖 + 主副标题。
  * BusinessActionModal 只对字符串标题包拖拽 handle，传节点则由本节点自行承担（见 .studio-ledger-head 的 grab 光标）。 */
 const REGISTER_TITLE = (
@@ -120,6 +117,14 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
 
   const from = periodState.period?.from ?? "";
   const to = periodState.period?.to ?? "";
+  const filterKey = JSON.stringify([from, to, category]);
+  const [paging, setPaging] = useState({ filterKey, page: 1, pageSize: 10 });
+  const page = paging.filterKey === filterKey ? paging.page : 1;
+  const pageSize = paging.pageSize;
+
+  useEffect(() => {
+    setPaging((current) => current.filterKey === filterKey ? current : { ...current, filterKey, page: 1 });
+  }, [filterKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,9 +152,15 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
         occurred_from: from || undefined,
         occurred_to: to || undefined,
         category,
-        limit: FETCH_LIMIT,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
       });
       if (seq !== loadSeqRef.current) return;
+      const lastPage = Math.max(1, Math.ceil(result.count / pageSize));
+      if (page > lastPage) {
+        setPaging({ filterKey, page: lastPage, pageSize });
+        return;
+      }
       setFlows(result.items);
       setSummary(result);
       setError(null);
@@ -158,7 +169,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
     } finally {
       if (seq === loadSeqRef.current) setLoading(false);
     }
-  }, [category, from, to]);
+  }, [category, from, to, filterKey, page, pageSize]);
 
   useEffect(() => {
     if (periodState.ready && (ctrl?.active ?? true)) void load();
@@ -331,13 +342,14 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
         <DataTable<Cashflow>
           columns={columns}
           rows={flows}
-          page={1}
-          pageSize={10}
+          page={page}
+          pageSize={pageSize}
           total={flowCount}
+          controlledPaging
           emptyText="暂无工作室收支"
           loading={loading}
           pagination={error ? false : undefined}
-          onPageChange={() => undefined}
+          onPageChange={(nextPage, nextPageSize) => setPaging({ filterKey, page: nextPageSize === pageSize ? nextPage : 1, pageSize: nextPageSize })}
        />
       </Card>
 

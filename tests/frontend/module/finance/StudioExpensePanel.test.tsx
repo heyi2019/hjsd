@@ -91,6 +91,20 @@ async function pickDirection(modal: HTMLElement, label: "支出" | "收入") {
 }
 
 describe("StudioExpensePanel：工作室支出", () => {
+  it("翻页时加载后端对应页的流水", async () => {
+    vi.mocked(studioExpensesApi.summary).mockImplementation(async (params) =>
+      studioExpenseSummary([params?.offset === 10 ? expenseFlows[1] : expenseFlows[0]] as never, { count: 201, expense: "3100.00" }));
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    expect(await screen.findByText("CF-001")).toBeInTheDocument();
+    await ui.click(screen.getByTitle("2"));
+    expect(await screen.findByText("CF-002")).toBeInTheDocument();
+    expect(vi.mocked(studioExpensesApi.summary)).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 10 }));
+    expect(screen.queryByText("CF-001")).toBeNull();
+    await ui.click(screen.getByRole("combobox", { name: "工作室支出科目" }));
+    await ui.click(await screen.findByText("房租", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(vi.mocked(studioExpensesApi.summary)).toHaveBeenLastCalledWith(expect.objectContaining({ category: "房租", offset: 0 })));
+    expect(await screen.findByText("CF-001")).toBeInTheDocument();
+  });
   it("已冲销原流水在筛选结果中不显示编辑和删除", async () => {
     vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary([{ ...expenseFlows[0], source_type: "MANUAL", ledger_type: "STUDIO", is_reversed: true }] as never));
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });

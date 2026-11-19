@@ -9,6 +9,7 @@ export const studioExpensesApi = {
     occurred_to?: string;
     category?: string;
     limit?: number;
+    offset?: number;
   }) =>
     api
       .get<{

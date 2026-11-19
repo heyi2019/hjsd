@@ -51,6 +51,7 @@ def studio_summary(
     occurred_to: date | None = Query(default=None),
     category: str | None = Query(default=None),
     limit: int = Query(default=200, ge=1, le=2000),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
 ) -> schemas.StudioSummaryOut:
@@ -75,6 +76,7 @@ def studio_summary(
         occurred_to=occurred_to,
         category=category.strip().upper() if category else None,
         limit=limit,
+        offset=offset,
         user=user,
     )
     return schemas.StudioSummaryOut(

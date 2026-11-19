@@ -204,6 +204,18 @@ def test_summary_ignores_item_limit(seeded_client, seeded_db, headers):
     assert payload["count"] == 3
 
 
+def test_summary_paginates_items_without_changing_totals(seeded_client, seeded_db, headers):
+    first = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="100")
+    second = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="200")
+    _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="300")
+    page = _summary(seeded_client, headers, limit=1, offset=1)
+    assert [item["flow_no"] for item in page["items"]] == [second.flow_no]
+    assert page["count"] == 3
+    assert Decimal(page["expense"]) == Decimal("600.00")
+    last = _summary(seeded_client, headers, limit=1, offset=2)
+    assert [item["flow_no"] for item in last["items"]] == [first.flow_no]
+
+
 def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
     from app.business.create import create_order
     from app.business.events import post_event

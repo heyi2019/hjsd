@@ -60,6 +60,7 @@ def studio_summary(
     occurred_to: date | None = None,
     category: str | None = None,
     limit: int = 200,
+    offset: int = 0,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
     """工作室收支面板：一次返回明细与已入账汇总。
@@ -100,7 +101,7 @@ def studio_summary(
     ).where(_studio_scope())
     rows: list[dict[str, Any]] = []
     for flow, order_no in session.execute(
-        list_stmt.order_by(Cashflow.occurred_on.desc(), Cashflow.id.desc()).limit(limit)
+        list_stmt.order_by(Cashflow.occurred_on.desc(), Cashflow.id.desc()).limit(limit).offset(offset)
     ).all():
         rows.append(_flow_row(flow, order_no))
 

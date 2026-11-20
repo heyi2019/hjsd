@@ -33,7 +33,13 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
     accounts_by_id = (
         {item.id: item for item in accounts}
         if accounts is not None
-        else {item.id: item for item in db.scalars(select(Account).where(Account.id.in_(account_ids))).all()}
+        else {
+            item.id: item for item in db.execute(
+                select(Account.id, Account.stock_no, Account.game_type, Account.game_account,
+                       Account.channel_region, Account.business_mode, Account.status, Account.inventory_entry_at)
+                .where(Account.id.in_(account_ids))
+            ).all()
+        }
         if account_ids else {}
     )
     # 账号和订单一对一，当前列表中的订单就是账号来源，无须再按 account_id 回查订单表。

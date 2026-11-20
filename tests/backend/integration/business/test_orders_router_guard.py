@@ -146,11 +146,14 @@ def test_order_list_payload_includes_customer_role(seeded_db):
     )
     seeded_db.commit()
     queries = []
+    account_queries = []
 
     def record_sql(_conn, _cursor, statement, _params, _context, _many):
         sql = " ".join(statement.lower().split())
         if "from order_customer_roles join customers" in sql or "from order_counterparty_roles join counterparties" in sql:
             queries.append(sql)
+        if "from stocks" in sql:
+            account_queries.append(sql)
 
     connection = seeded_db.connection()
     event.listen(connection, "after_cursor_execute", record_sql)
@@ -162,6 +165,12 @@ def test_order_list_payload_includes_customer_role(seeded_db):
     assert payloads[0]["party_role"] == "BUYER"
     assert len(queries) == 2
     assert all(".phone" not in query and ".wechat" not in query and ".note" not in query for query in queries)
+    assert payloads[0]["account_game_account"] == account.game_account
+    assert len(account_queries) == 1
+    assert "stocks.game_password" not in account_queries[0]
+    assert "stocks.secondary_images" not in account_queries[0]
+    assert "stocks.wallet_realname_images" not in account_queries[0]
+    assert "stocks.account_images" not in account_queries[0]
 
 def test_order_list_payload_includes_counterparty_role(seeded_db):
     account = _new_account(
